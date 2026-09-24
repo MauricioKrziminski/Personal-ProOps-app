@@ -1,7 +1,7 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeOutDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
@@ -34,15 +34,43 @@ const ToastContext = createContext<(t: Toast) => void>(() => {});
  * desenha o MESMO toast dentro dele — o estado é um só, o `show` (e o haptics) roda uma vez, e
  * a cópia da raiz fica escondida atrás da folha, que é onde ela já estava.
  */
-const ToastStateContext = createContext<{ toast: Toast | null; dismiss: () => void }>({
+const ToastStateContext = createContext<{ toast: Toast | null; dismiss: () => void; medir: (altura: number) => void }>({
   toast: null,
   dismiss: () => {},
+  medir: () => {},
 });
+
+/**
+ * Quanto o toast VISÍVEL ocupa a partir do pé da tela (do pé até o topo dele), ou 0.
+ *
+ * ⚠️ Existe pelo FAB (24/09/2026): o "Lançar" e o toast moram no MESMO lugar — os dois a
+ * `insets.bottom + Space.xxl` —, e em Lançamentos o toque no "Desfazer" caía no botão de baixo e
+ * abria "Novo lançamento" (medido no simulador). Quem sai do caminho é o FAB, como no Material:
+ * ele sobe acima do toast e volta quando ele sai (`useSubirAcimaDoToast`).
+ */
+const ToastOcupaContext = createContext(0);
+export function useToastOcupa() {
+  return useContext(ToastOcupaContext);
+}
+
+/**
+ * O deslocamento do FAB enquanto um toast está no ar: sobe o bastante para o topo do toast
+ * (`useToastOcupa`) ficar abaixo dele, e volta quando o toast sai. `base` é o `bottom` do FAB.
+ */
+export function useSubirAcimaDoToast(base: number) {
+  const ocupa = useToastOcupa();
+  const alvo = Math.max(0, ocupa - base);
+  const sobe = useSharedValue(0);
+  useEffect(() => {
+    sobe.set(withTiming(alvo, { duration: Motion.duration.base, easing: Motion.easing.out }));
+  }, [alvo, sobe]);
+  return useAnimatedStyle(() => ({ transform: [{ translateY: -sobe.get() }] }));
+}
 
 /** Desenha o toast corrente. Vive na raiz e dentro de cada `Sheet`. */
 export function ToastOutlet() {
-  const { toast, dismiss } = useContext(ToastStateContext);
-  return toast ? <ToastView toast={toast} onDismiss={dismiss} /> : null;
+  const { toast, dismiss, medir } = useContext(ToastStateContext);
+  return toast ? <ToastView toast={toast} onDismiss={dismiss} onAltura={medir} /> : null;
 }
 
 /**
@@ -73,6 +101,8 @@ export function useToast() {
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toast, setToast] = useState<Toast | null>(null);
+  const [altura, setAltura] = useState(0);
+  const insets = useSafeAreaInsets();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const show = useCallback((next: Toast) => {
@@ -93,19 +123,23 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(() => show, [show]);
-  const estado = useMemo(() => ({ toast, dismiss }), [toast, dismiss]);
+  const estado = useMemo(() => ({ toast, dismiss, medir: setAltura }), [toast, dismiss]);
+  // Do pé da tela até o topo do toast (a mesma conta do `bottom` do `ToastView`), mais uma folga.
+  const ocupa = toast && altura > 0 ? insets.bottom + Space.xxl + altura + Space.sm : 0;
 
   return (
     <ToastContext.Provider value={value}>
       <ToastStateContext.Provider value={estado}>
-        {children}
-        <ToastOutlet />
+        <ToastOcupaContext.Provider value={ocupa}>
+          {children}
+          <ToastOutlet />
+        </ToastOcupaContext.Provider>
       </ToastStateContext.Provider>
     </ToastContext.Provider>
   );
 }
 
-function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }) {
+function ToastView({ toast, onDismiss, onAltura }: { toast: Toast; onDismiss: () => void; onAltura: (altura: number) => void }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const scheme = useScheme();
@@ -126,6 +160,7 @@ function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
       entering={FadeInDown.duration(Motion.duration.base).easing(Motion.easing.out)}
       exiting={FadeOutDown.duration(Motion.duration.exit)}
       pointerEvents="box-none"
+      onLayout={(e) => onAltura(e.nativeEvent.layout.height)}
       style={[styles.host, { bottom: insets.bottom + Space.xxl }]}>
       <View
         accessibilityLiveRegion="polite"

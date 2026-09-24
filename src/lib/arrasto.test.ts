@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { BOTAO, abriuOLado, executaAoSoltar, cardAberto, ladosDoArrasto, larguraDoBotao, limiarAteOFim, passouAteOFim, passouHaPouco, temArrasto, traducaoNoSoltar, ladoDoSoltar } from './arrasto.ts';
+import { BOTAO, abriuOLado, aparicao, deslocamentoDaPonta, executaAoSoltar, largurasDoPainel, pontasDoPainel, cardAberto, ladosDoArrasto, larguraDoBotao, limiarAteOFim, passouAteOFim, passouHaPouco, temArrasto, traducaoNoSoltar, ladoDoSoltar } from './arrasto.ts';
 
 const a = (label: string, extra: Record<string, unknown> = {}) => ({ label, onPress: () => {}, ...extra });
 
@@ -28,13 +28,47 @@ test('ação desligada ou sem onPress não entra no arrasto nem no "Mais"', () =
   assert.equal(lados.mais, false);
 });
 
-test('até o fim só com desfaz: a ponta é a primeira do lado', () => {
+test('até o fim aciona a opção da BORDA, qualquer que seja (24/09/2026)', () => {
+  // "ao arrastar tudo para o lado esquerdo, ele aciona a opção mais à direita que tiver; se eu
+  // arrasto para a direita, ele aciona o mais à esquerda". Apagar continua pedindo confirmação:
+  // arrastar até o fim é o mesmo que tocar no botão da borda.
   const lados = ladosDoArrasto([
-    a('Fixar', { arrasto: 'direita', desfaz: true }),
+    a('Editar', { arrasto: 'direita' }),
     a('Apagar', { arrasto: 'esquerda', destructive: true }),
   ]);
-  assert.equal(lados.pontaDireita?.label, 'Fixar');
-  assert.equal(lados.pontaEsquerda, null, 'Apagar nunca vai sozinho');
+  assert.equal(lados.pontaDireita?.label, 'Editar');
+  assert.equal(lados.pontaEsquerda?.label, 'Apagar');
+});
+
+test('a ponta é a do painel DESENHADO: só "Mais" à esquerda, "Mais" é a ponta', () => {
+  const mais = a('Mais ações');
+  assert.equal(pontasDoPainel([], [mais]).esquerda?.label, 'Mais ações');
+  assert.equal(pontasDoPainel([a('Fixar')], [mais, a('Arquivar')]).esquerda?.label, 'Arquivar');
+  assert.equal(pontasDoPainel([a('Fixar'), a('Cor')], []).direita?.label, 'Fixar');
+  assert.deepEqual(pontasDoPainel([], []), { direita: null, esquerda: null });
+});
+
+test('o painel acompanha o dedo: os botões dividem o revelado; até o fim, a ponta toma tudo', () => {
+  assert.deepEqual(largurasDoPainel(100, 2, 0, 'esquerda'), [50, 50]);
+  assert.deepEqual(largurasDoPainel(300, 2, 1, 'esquerda'), [0, 300], 'a ponta da esquerda é a última');
+  assert.deepEqual(largurasDoPainel(300, 2, 1, 'direita'), [300, 0], 'a da direita é a primeira');
+  assert.deepEqual(largurasDoPainel(200, 2, 0.5, 'esquerda'), [50, 150], 'a mola passa pelo meio');
+  assert.deepEqual(largurasDoPainel(-5, 3, 0, 'esquerda'), [0, 0, 0], 'fechado não desenha nada');
+});
+
+test('até o fim, o ícone da ponta segue a borda do card', () => {
+  assert.equal(deslocamentoDaPonta(300, 88, 1, 'esquerda'), -106, 'para a esquerda, junto do card');
+  assert.equal(deslocamentoDaPonta(300, 88, 1, 'direita'), 106);
+  assert.equal(deslocamentoDaPonta(300, 88, 0, 'esquerda'), 0, 'sem o até o fim, no centro do botão');
+  assert.equal(deslocamentoDaPonta(60, 88, 1, 'esquerda'), 0, 'nunca passa do próprio botão');
+});
+
+test('o conteúdo do botão aparece junto com o espaço dele', () => {
+  assert.equal(aparicao(0, 88), 0);
+  assert.equal(aparicao(88, 88), 1);
+  assert.equal(aparicao(200, 88), 1);
+  const meio = aparicao(60, 88);
+  assert.ok(meio > 0 && meio < 1);
 });
 
 test('temArrasto: só quando há algo para mostrar', () => {

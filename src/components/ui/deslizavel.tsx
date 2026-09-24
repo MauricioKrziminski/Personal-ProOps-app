@@ -10,18 +10,25 @@ import Animated, {
   runOnJS,
   useAnimatedReaction,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
+  withSpring,
   type SharedValue,
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { DeslocamentoDoArrasto } from '@/components/ui/arrasto-contexto';
 import { Icon } from '@/components/ui/icon';
 import { DentroDeArrasto } from '@/components/ui/money';
 import { Motion, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import {
   abriuOLado,
+  aparicao,
   cardAberto,
+  deslocamentoDaPonta,
+  largurasDoPainel,
+  pontasDoPainel,
   fecharCardAberto,
   ladosDoArrasto,
   larguraDoBotao,
@@ -74,6 +81,8 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
   const inicio = useSharedValue(0);
   const armado = useSharedValue(false);
   const abertoAntes = useSharedValue<'direita' | 'esquerda' | null>(null);
+  // O deslocamento do card, para a superfície dele perder o canto do lado que abre.
+  const deslocamento = useSharedValue(0);
 
   // Sem ações o gesto fica DESLIGADO, não desmontado: montar e desmontar o arrasto quando as
   // ações chegam (Contas, com a conta carregando) remontava o card inteiro.
@@ -87,12 +96,14 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
   };
   // Como no WhatsApp: "Mais" por dentro, a ação de tirar na BORDA — é ela que "até o fim" executa.
   const esquerda = lados.mais ? [mais, ...lados.esquerda] : lados.esquerda;
+  // A ponta de cada lado é a do painel DESENHADO: só "Mais" à esquerda, o "Mais" é a borda.
+  const pontas = pontasDoPainel(lados.direita, esquerda);
 
   // Os botões leem a lista MAIS NOVA na hora do toque: o painel só é redesenhado quando o que
   // aparece nele muda (a assinatura), então o `onPress` guardado nele pode ser de outro render.
-  const atual = useRef({ direita: lados.direita, esquerda, pontas: lados });
+  const atual = useRef({ direita: lados.direita, esquerda, pontas });
   useEffect(() => {
-    atual.current = { direita: lados.direita, esquerda, pontas: lados };
+    atual.current = { direita: lados.direita, esquerda, pontas };
   });
   const tocar = useCallback((acao: ItemAction) => {
     const viva = [...atual.current.direita, ...atual.current.esquerda].find((x) => x.label === acao.label) ?? acao;
@@ -119,13 +130,13 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
     if (!pedido || feito.current === pedido) return;
     feito.current = pedido;
     const { pontas } = atual.current;
-    const ponta = pedido.lado === 'direita' ? pontas.pontaDireita : pontas.pontaEsquerda;
+    const ponta = pedido.lado === 'direita' ? pontas.direita : pontas.esquerda;
     if (ponta) tocar(ponta);
   }, [pedido, tocar]);
   const nDireita = lados.direita.length;
   const nEsquerda = esquerda.length;
-  const pontaD = Boolean(lados.pontaDireita);
-  const pontaE = Boolean(lados.pontaEsquerda);
+  const pontaD = Boolean(pontas.direita);
+  const pontaE = Boolean(pontas.esquerda);
   const soltura = useMemo<Soltura>(
     () => ({
       inicio,
@@ -155,22 +166,22 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
     lista.map((x) => [x.label, x.curto, x.icon, x.destructive, x.desfaz].join('|')).join('¦');
   const chaveDireita = assinatura(lados.direita);
   const chaveEsquerda = assinatura(esquerda);
-  const pontaDireita = Boolean(lados.pontaDireita);
-  const pontaEsquerda = Boolean(lados.pontaEsquerda);
+  const pontaDireita = pontaD;
+  const pontaEsquerda = pontaE;
 
   const renderDireita = useCallback(
     (_p: SharedValue<number>, translation: SharedValue<number>) => (
-      <Painel lado="direita" acoes={lados.direita} temPonta={pontaDireita} botao={botao} translation={translation} largura={largura} estado={direita} tocar={tocarRotulo} dedo={dedo} />
+      <Painel lado="direita" acoes={lados.direita} temPonta={pontaDireita} botao={botao} translation={translation} largura={largura} estado={direita} tocar={tocarRotulo} dedo={dedo} deslocamento={deslocamento} />
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a assinatura É a dependência da lista
-    [chaveDireita, pontaDireita, botao, largura, direita, tocarRotulo, dedo],
+    [chaveDireita, pontaDireita, botao, largura, direita, tocarRotulo, dedo, deslocamento],
   );
   const renderEsquerda = useCallback(
     (_p: SharedValue<number>, translation: SharedValue<number>) => (
-      <Painel lado="esquerda" acoes={esquerda} temPonta={pontaEsquerda} botao={botao} translation={translation} largura={largura} estado={esquerdaSV} tocar={tocarRotulo} dedo={dedo} />
+      <Painel lado="esquerda" acoes={esquerda} temPonta={pontaEsquerda} botao={botao} translation={translation} largura={largura} estado={esquerdaSV} tocar={tocarRotulo} dedo={dedo} deslocamento={deslocamento} />
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a assinatura É a dependência da lista
-    [chaveEsquerda, pontaEsquerda, botao, largura, esquerdaSV, tocarRotulo, dedo],
+    [chaveEsquerda, pontaEsquerda, botao, largura, esquerdaSV, tocarRotulo, dedo, deslocamento],
   );
 
   return (
@@ -220,7 +231,12 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
             }
             cardAberto.fechou(meu);
           }}>
-          <DentroDeArrasto.Provider value>{children}</DentroDeArrasto.Provider>
+          <DentroDeArrasto.Provider value>
+            {/* Só o card de canto próprio precisa: a linha de uma `Section` já é reta. */}
+            <DeslocamentoDoArrasto.Provider value={forma === 'card' ? deslocamento : null}>
+              {children}
+            </DeslocamentoDoArrasto.Provider>
+          </DentroDeArrasto.Provider>
         </ReanimatedSwipeable>
       </View>
     </GestureDetector>
@@ -303,6 +319,7 @@ function Painel({
   estado,
   tocar,
   dedo,
+  deslocamento,
 }: {
   lado: 'direita' | 'esquerda';
   acoes: ItemAction[];
@@ -313,8 +330,17 @@ function Painel({
   estado: Lado;
   tocar: (label: string) => void;
   dedo: GestureType;
+  deslocamento: SharedValue<number>;
 }) {
   const theme = useTheme();
+  // 0 → 1 numa mola quando o dedo passa do "até o fim": é ela que faz a ponta tomar o painel.
+  const cheio = useSharedValue(0);
+  // O quanto o card revelou DESTE lado — a largura que os botões dividem.
+  const revelado = useDerivedValue(() => Math.max(0, lado === 'direita' ? translation.get() : -translation.get()));
+  useAnimatedReaction(
+    () => translation.get(),
+    (v) => deslocamento.set(v),
+  );
   // Um toque por gesto, no idioma do sistema: seleção ao cruzar o ponto de ABRIR, impacto leve
   // ao cruzar o ponto de "até o fim" (é ali que soltar passa a executar). Quem avisa o resultado
   // é o toast da ação, como no menu.
@@ -331,34 +357,54 @@ function Painel({
     (agora, antes) => {
       if (agora === (antes ?? false)) return;
       estado.passou.set(agora);
+      cheio.set(withSpring(agora ? 1 : 0, Motion.spring.snap));
       if (agora) runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
       else estado.desligouEm.set(Date.now());
     },
   );
+  // A faixa desenhada cresce com o dedo a partir da borda de fora; a `View` de fora mantém a
+  // largura do painel ABERTO, que é o que a biblioteca mede para saber onde o card para.
+  const faixa = useAnimatedStyle(() => ({ width: revelado.get() }));
+  const n = acoes.length;
+  const ponta = lado === 'direita' ? 0 : n - 1;
 
   return (
-    <Animated.View style={[styles.painel, lado === 'esquerda' && styles.painelEsquerda]}>
-      {acoes.map((acao, i) => {
-        // Vermelho só para o que apaga; Arquivar e "Mais" são neutros (spec do arrasto). O neutro
-        // usa `backgroundSelected`: no escuro o `backgroundElement` quase não se distinguia da linha.
-        const cor = acao.destructive
-          ? { fundo: theme.dangerSoft, tinta: 'danger' as const }
-          : lado === 'direita'
-            ? { fundo: theme.tintFill, tinta: 'onTint' as const }
-            : { fundo: theme.backgroundSelected, tinta: 'text' as const };
-        return (
-          <BotaoDoPainel key={acao.label} label={acao.label} dedo={dedo} tocar={tocar} largura={botao} fundo={cor.fundo}>
-            {/* Dois neutros lado a lado ("Mais" e "Arquivar") liam como um bloco só: um fio da cor
-                do fundo separa um botão do outro. É `View`, não borda. */}
-            {i > 0 ? <View style={[styles.fio, { backgroundColor: theme.background }]} /> : null}
-            {acao.icon ? <Icon name={acao.icon} size="md" color={cor.tinta} /> : null}
-            <ThemedText type="caption" themeColor={cor.tinta} style={styles.rotulo}>
-              {acao.curto ?? acao.label}
-            </ThemedText>
-          </BotaoDoPainel>
-        );
-      })}
-    </Animated.View>
+    <View style={{ width: n * botao }}>
+      <Animated.View style={[styles.faixa, lado === 'esquerda' ? styles.faixaNaDireita : styles.faixaNaEsquerda, faixa]}>
+        {acoes.map((acao, i) => {
+          // Vermelho só para o que apaga; Arquivar e "Mais" são neutros (spec do arrasto). O neutro
+          // usa `backgroundSelected`: no escuro o `backgroundElement` quase não se distinguia da linha.
+          const cor = acao.destructive
+            ? { fundo: theme.dangerSoft, tinta: 'danger' as const }
+            : lado === 'direita'
+              ? { fundo: theme.tintFill, tinta: 'onTint' as const }
+              : { fundo: theme.backgroundSelected, tinta: 'text' as const };
+          return (
+            <BotaoDoPainel
+              key={acao.label}
+              label={acao.label}
+              dedo={dedo}
+              tocar={tocar}
+              botao={botao}
+              fundo={cor.fundo}
+              indice={i}
+              n={n}
+              lado={lado}
+              ehPonta={temPonta && i === ponta}
+              revelado={revelado}
+              cheio={cheio}
+              // Dois neutros lado a lado ("Mais" e "Arquivar") liam como um bloco só: um fio da cor
+              // do fundo separa um botão do outro, na altura inteira. É `View`, não borda.
+              fio={i > 0 ? theme.background : null}>
+              {acao.icon ? <Icon name={acao.icon} size="md" color={cor.tinta} /> : null}
+              <ThemedText type="caption" themeColor={cor.tinta} style={styles.rotulo}>
+                {acao.curto ?? acao.label}
+              </ThemedText>
+            </BotaoDoPainel>
+          );
+        })}
+      </Animated.View>
+    </View>
   );
 }
 
@@ -371,20 +417,38 @@ function Painel({
  * soltar), então o toque do botão declara a relação com ele. No Android o `Pressable` da RN também
  * não serve: dentro do `ReanimatedSwipeable` o gesto nativo do arrasto fica com o toque. Um
  * caminho só, nas duas plataformas.
+ *
+ * **O efeito** (24/09/2026, *"estilo o do WhatsApp… fluido e clean"*): os botões dividem o que o
+ * card revelou, o ícone e o rótulo aparecem junto com o espaço (fade e escala) e, até o fim, a
+ * ponta toma o painel com o ícone colado na borda do card (`lib/arrasto.ts`).
  */
 function BotaoDoPainel({
   label,
   dedo,
   tocar,
-  largura,
+  botao,
   fundo,
+  indice,
+  n,
+  lado,
+  ehPonta,
+  revelado,
+  cheio,
+  fio,
   children,
 }: {
   label: string;
   dedo: GestureType;
   tocar: (label: string) => void;
-  largura: number;
+  botao: number;
   fundo: string;
+  indice: number;
+  n: number;
+  lado: 'direita' | 'esquerda';
+  ehPonta: boolean;
+  revelado: SharedValue<number>;
+  cheio: SharedValue<number>;
+  fio: string | null;
   children: ReactNode;
 }) {
   const apertado = useSharedValue(0);
@@ -399,8 +463,22 @@ function BotaoDoPainel({
         }),
     [dedo, apertado, tocar, label],
   );
-  // Press-in de botão (design.md §5): a opacidade cai enquanto o dedo está em cima.
-  const estilo = useAnimatedStyle(() => ({ opacity: apertado.get() ? 0.7 : 1 }));
+  const caixa = useAnimatedStyle(() => ({
+    width: largurasDoPainel(revelado.get(), n, cheio.get(), lado)[indice],
+    // Press-in de botão (design.md §5): a opacidade cai enquanto o dedo está em cima.
+    opacity: apertado.get() ? 0.7 : 1,
+  }));
+  const conteudo = useAnimatedStyle(() => {
+    const w = largurasDoPainel(revelado.get(), n, cheio.get(), lado)[indice];
+    const p = aparicao(w, botao);
+    return {
+      opacity: p,
+      transform: [
+        { translateX: ehPonta ? deslocamentoDaPonta(revelado.get(), botao, cheio.get(), lado) : 0 },
+        { scale: 0.6 + 0.4 * p },
+      ],
+    };
+  });
   return (
     <GestureDetector gesture={toque}>
       <Animated.View
@@ -410,22 +488,22 @@ function BotaoDoPainel({
         // O leitor de tela ativa pela ação, não pelo gesto.
         accessibilityActions={[{ name: 'activate' }]}
         onAccessibilityAction={() => tocar(label)}
-        style={[styles.botao, { width: largura, backgroundColor: fundo }, estilo]}>
-        {children}
+        style={[styles.botao, { backgroundColor: fundo }, caixa]}>
+        {fio ? <View style={[styles.fio, { backgroundColor: fio }]} /> : null}
+        <Animated.View style={[styles.conteudo, { width: botao }, conteudo]}>{children}</Animated.View>
       </Animated.View>
     </GestureDetector>
   );
 }
 
 const styles = StyleSheet.create({
-  painel: { flexDirection: 'row' },
-  painelEsquerda: { justifyContent: 'flex-end' },
-  botao: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Space.xs,
-    paddingHorizontal: Space.xs,
-  },
+  // A faixa mora na borda de FORA do painel e cresce para dentro com o dedo.
+  faixa: { position: 'absolute', top: 0, bottom: 0, flexDirection: 'row' },
+  faixaNaDireita: { right: 0 },
+  faixaNaEsquerda: { left: 0 },
+  // `overflow: hidden`: o botão que encolhe (os outros, até o fim) não deixa o conteúdo vazar.
+  botao: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  conteudo: { alignItems: 'center', justifyContent: 'center', gap: Space.xs, paddingHorizontal: Space.xs },
   fio: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 1 },
   // Rótulo não parte palavra nem trunca: centraliza e quebra entre palavras (design.md §3).
   rotulo: { textAlign: 'center', flexShrink: 0, maxWidth: '100%' },

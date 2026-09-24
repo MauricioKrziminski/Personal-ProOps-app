@@ -16,6 +16,7 @@ import { Icon, type IconName } from '@/components/ui/icon';
 import { TAB_BAR_CLEARANCE } from '@/components/ui/pill-tab-bar';
 import { useRolagemDaTela } from '@/components/ui/screen-scroll';
 import { Elevation, Motion, Radius, Space } from '@/design/tokens';
+import { useSubirAcimaDoToast } from '@/components/ui/toast';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 
 const ALTURA = 48;
@@ -38,6 +39,10 @@ export function ExtendedFab({ label, icon, onPress }: { label: string; icon: Ico
   const aberto = useSharedValue(1);
   const alvo = useSharedValue(1);
   const [larguraAberta, setLarguraAberta] = useState(0);
+  // No Android o FAB sobe ACIMA da `PillTabBar` (que flutua); a folga já está na constante.
+  const base = insets.bottom + (Platform.OS === 'android' ? TAB_BAR_CLEARANCE : Space.xxl);
+  // Com um toast no ar o FAB sai do caminho: o "Desfazer" ficava debaixo dele.
+  const subir = useSubirAcimaDoToast(base);
 
   useAnimatedReaction(
     () => rolagem.get(),
@@ -60,18 +65,12 @@ export function ExtendedFab({ label, icon, onPress }: { label: string; icon: Ico
   }));
 
   return (
-    <View
+    <Animated.View
       // A âncora ocupa a linha inteira para o MEDIDOR abaixo não ser limitado pela largura do
       // botão (com a fonte do sistema crescendo, a medida ficava presa na largura antiga e o
       // rótulo saía cortado — "Lanc", medido a 384dp × 1,3). `box-none`: a faixa não rouba toque.
       pointerEvents="box-none"
-      style={[
-        styles.ancora,
-        {
-          // No Android o FAB sobe ACIMA da `PillTabBar` (que flutua); a folga já está na constante.
-          bottom: insets.bottom + (Platform.OS === 'android' ? TAB_BAR_CLEARANCE : Space.xxl),
-        },
-      ]}>
+      style={[styles.ancora, { bottom: base }, subir]}>
       <PressableScale haptic="light" accessibilityRole="button" accessibilityLabel={label} onPress={onPress}>
         <Animated.View
           style={[
@@ -98,7 +97,7 @@ export function ExtendedFab({ label, icon, onPress }: { label: string; icon: Ico
           {label}
         </ThemedText>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 

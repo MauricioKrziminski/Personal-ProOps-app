@@ -277,7 +277,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
         useMonthRuler: () => ({ view: 'cycle', setView: () => {}, temCiclo: false, cycle: { data: undefined } }),
       };
       if (name === '@/lib/item-actions') return { confirmDestructive: (_title: string, _label: string, callback: () => void, mensagem?: string) => { confirmations.push(callback); avisos.push(mensagem ?? ''); }, showItemActions: (_title: string, entries: any[]) => actions.push(...entries) };
-      if (name === '@/components/ui/toast') return { useToast: () => (t: any) => toasts.push(t) };
+      if (name === '@/components/ui/toast') return { useToast: () => (t: any) => toasts.push(t), useSubirAcimaDoToast: () => ({}) };
       // O provider de "esconder saldo" só existe dentro da árvore real; aqui o valor aparece.
       if (name === '@/components/ui/conceal') return {
         useConceal: () => ({ concealed: false, toggle: () => {} }),
@@ -1283,7 +1283,7 @@ test('Lembretes: arrastar à direita pausa (até o fim, com Desfazer), à esquer
   const ui = screen('src/app/reminders.tsx', { reminders: [{ id: 'r1', title: 'Aluguel', active: true, next_run_at: '2026-10-05T12:00:00Z', recurrence: null }] });
   const [card] = deslizaveis(ui);
   assert.ok(card, 'o lembrete está num Deslizavel');
-  assert.deepEqual(ladosDe(card), { direita: ['Pausar'], esquerda: ['Apagar'], mais: false, pontaDireita: 'Pausar', pontaEsquerda: null });
+  assert.deepEqual(ladosDe(card), { direita: ['Pausar'], esquerda: ['Apagar'], mais: false, pontaDireita: 'Pausar', pontaEsquerda: 'Apagar' });
   // o toque longo continua com todas as ações
   ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Row' && n.props.onLongPress).props.onLongPress());
   assert.deepEqual(JSON.parse(JSON.stringify(ui.actions.map((a: any) => a.label))), ['Editar', 'Pausar', 'Apagar']);
@@ -1299,19 +1299,19 @@ const ladosDoLink = (node: any) => ladosDe({ props: { acoes: node.props.actions 
 
 test('Lançamentos: pendente arrasta Paguei à direita; efetivado arrasta Editar; Apagar à esquerda', () => {
   const pendente = itemLinks(screen(transacoesFile, { txStatus: 'pending' }))[0];
-  assert.deepEqual(ladosDoLink(pendente), { direita: ['Paguei'], esquerda: ['Apagar'], mais: true, pontaDireita: null, pontaEsquerda: null });
+  assert.deepEqual(ladosDoLink(pendente), { direita: ['Paguei'], esquerda: ['Apagar'], mais: true, pontaDireita: 'Paguei', pontaEsquerda: 'Apagar' });
   const efetivado = itemLinks(screen(transacoesFile))[0];
-  assert.deepEqual(ladosDoLink(efetivado), { direita: ['Editar'], esquerda: ['Apagar'], mais: false, pontaDireita: null, pontaEsquerda: null });
+  assert.deepEqual(ladosDoLink(efetivado), { direita: ['Editar'], esquerda: ['Apagar'], mais: false, pontaDireita: 'Editar', pontaEsquerda: 'Apagar' });
 });
 
 test('Financeiro: o último lançamento arrasta Editar e Apagar (Ver detalhe é o toque)', () => {
   const ui = screen(financeiroFile, { recent: [{ id: 't1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', status: 'cleared' }] });
-  assert.deepEqual(ladosDoLink(itemLinks(ui)[0]), { direita: ['Editar'], esquerda: ['Apagar'], mais: false, pontaDireita: null, pontaEsquerda: null });
+  assert.deepEqual(ladosDoLink(itemLinks(ui)[0]), { direita: ['Editar'], esquerda: ['Apagar'], mais: false, pontaDireita: 'Editar', pontaEsquerda: 'Apagar' });
 });
 
 test('Fatura: a compra arrasta Editar e Apagar', () => {
   const ui = screen('src/app/finance/invoice/[id].tsx');
-  assert.deepEqual(ladosDoLink(itemLinks(ui)[0]), { direita: ['Editar'], esquerda: ['Apagar'], mais: false, pontaDireita: null, pontaEsquerda: null });
+  assert.deepEqual(ladosDoLink(itemLinks(ui)[0]), { direita: ['Editar'], esquerda: ['Apagar'], mais: false, pontaDireita: 'Editar', pontaEsquerda: 'Apagar' });
 });
 
 test('Contas: a conta arrasta Editar e Arquivar (Ver extrato é o toque)', () => {
@@ -1321,26 +1321,26 @@ test('Contas: a conta arrasta Editar e Arquivar (Ver extrato é o toque)', () =>
   });
   const [link] = itemLinks(ui);
   assert.ok(link, 'a conta está num ItemLink');
-  assert.deepEqual(ladosDoLink(link), { direita: ['Editar'], esquerda: ['Arquivar'], mais: false, pontaDireita: null, pontaEsquerda: null });
+  assert.deepEqual(ladosDoLink(link), { direita: ['Editar'], esquerda: ['Arquivar'], mais: false, pontaDireita: 'Editar', pontaEsquerda: 'Arquivar' });
 });
 
 test('Projeção: a conta prevista arrasta Paguei à direita e Editar à esquerda', () => {
   const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], bills: [{ ref_id: 'b1', title: 'Aluguel', kind: 'expense', amount_cents: 180000, due_date: '2026-10-05', overdue: false }] });
   const card = deslizaveis(ui).find((n: any) => n.props.titulo === 'Aluguel');
   assert.ok(card, 'a conta prevista está num Deslizavel');
-  assert.deepEqual(ladosDe(card), { direita: ['Paguei'], esquerda: ['Editar'], mais: false, pontaDireita: null, pontaEsquerda: null });
+  assert.deepEqual(ladosDe(card), { direita: ['Paguei'], esquerda: ['Editar'], mais: false, pontaDireita: 'Paguei', pontaEsquerda: 'Editar' });
 });
 
 test('Regras: a regra arrasta Editar e Apagar', () => {
   const ui = screen('src/app/finance/rules.tsx', { rules: [{ id: 'r1', pattern: 'ifood', category: 'restaurante', match_type: 'contains', account_id: null, hits: 3, source: 'user' }] });
   const [card] = deslizaveis(ui);
   assert.ok(card, 'a regra está num Deslizavel');
-  assert.deepEqual(ladosDe(card), { direita: ['Editar'], esquerda: ['Apagar'], mais: false, pontaDireita: null, pontaEsquerda: null });
+  assert.deepEqual(ladosDe(card), { direita: ['Editar'], esquerda: ['Apagar'], mais: false, pontaDireita: 'Editar', pontaEsquerda: 'Apagar' });
 });
 
 test('Dívidas: arrasta Pagar parcela à direita; Arquivar à esquerda vai até o fim (tem Desfazer)', () => {
   const ui = screen(debtsFile, { create: false, debts: [carro] });
-  assert.deepEqual(ladosDe(deslizaveis(ui)[0]), { direita: ['Pagar parcela'], esquerda: ['Arquivar'], mais: true, pontaDireita: null, pontaEsquerda: 'Arquivar' });
+  assert.deepEqual(ladosDe(deslizaveis(ui)[0]), { direita: ['Pagar parcela'], esquerda: ['Arquivar'], mais: true, pontaDireita: 'Pagar parcela', pontaEsquerda: 'Arquivar' });
 });
 
 test('Cartões: fatura aberta arrasta Importar fatura; a carteira fica à esquerda', () => {
@@ -1348,7 +1348,7 @@ test('Cartões: fatura aberta arrasta Importar fatura; a carteira fica à esquer
   const card = ui.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'PressCard');
   const raiz = card.type(card.props);
   assert.equal(raiz.type, 'Deslizavel', 'o cartão está num Deslizavel');
-  assert.deepEqual(ladosDe(raiz), { direita: ['Importar fatura'], esquerda: ['Abrir na carteira'], mais: false, pontaDireita: null, pontaEsquerda: null });
+  assert.deepEqual(ladosDe(raiz), { direita: ['Importar fatura'], esquerda: ['Abrir na carteira'], mais: false, pontaDireita: 'Importar fatura', pontaEsquerda: 'Abrir na carteira' });
 });
 
 test('Cartões: "Paguei" abre a fatura já no pagamento, não só a fatura', () => {
@@ -1365,7 +1365,7 @@ test('Recorrentes: arrasta Pausar (até o fim, com Desfazer) e Apagar; o resto n
   const ui = screen('src/app/finance/recurring.tsx', { recurring: [{ id: 'rec-1', description: 'Academia', kind: 'expense', amount_cents: 12000, rrule: 'FREQ=MONTHLY;BYMONTHDAY=15', dtstart: '2026-01-15', next_run_at: '2026-10-15T12:00:00Z', active: true, account_id: null, category: 'saúde' }] });
   const card = deslizaveis(ui)[0];
   assert.ok(card, 'a série está num Deslizavel');
-  assert.deepEqual(ladosDe(card), { direita: ['Pausar'], esquerda: ['Apagar'], mais: true, pontaDireita: 'Pausar', pontaEsquerda: null });
+  assert.deepEqual(ladosDe(card), { direita: ['Pausar'], esquerda: ['Apagar'], mais: true, pontaDireita: 'Pausar', pontaEsquerda: 'Apagar' });
   // O Desfazer é a rede do "até o fim": se ele falhar, a pessoa precisa saber (design.md §6).
   ui.interact(() => card.props.acoes.find((x: any) => x.label === 'Pausar').onPress());
   ui.interact(() => ui.pedidos.at(-1).opts.onSuccess());
@@ -1382,7 +1382,7 @@ test('Metas: arrasta Guardar à direita e Arquivar à esquerda', () => {
   const ui = screen('src/app/finance/goals.tsx', { goals: [{ id: 'g1', name: 'Viagem', target_cents: 500000, saved_cents: 100000, deadline: null, archived: false }] });
   const card = deslizaveis(ui)[0];
   assert.ok(card, 'a meta está num Deslizavel');
-  assert.deepEqual(ladosDe(card), { direita: ['Guardar'], esquerda: ['Arquivar'], mais: true, pontaDireita: null, pontaEsquerda: null });
+  assert.deepEqual(ladosDe(card), { direita: ['Guardar'], esquerda: ['Arquivar'], mais: true, pontaDireita: 'Guardar', pontaEsquerda: 'Arquivar' });
 });
 
 test('Nota: arrasta Fixar à direita e Arquivar à esquerda (os dois até o fim); o resto no Mais', () => {
@@ -1410,14 +1410,14 @@ test('Lixeira: arrasta só Apagar de vez à esquerda (Ver conteúdo é o toque)'
   const ui = screen('src/app/notes/trash.tsx', { notes: [{ id: 'n1', content: 'Teste', deleted_at: '2026-09-20T12:00:00Z', updated_at: '2026-09-20T12:00:00Z', pinned: false }] });
   const [card] = deslizaveis(ui).length ? deslizaveis(ui) : itemLinks(ui).map((l: any) => ({ props: { acoes: l.props.actions } }));
   assert.ok(card, 'a nota da lixeira arrasta');
-  assert.deepEqual(ladosDe(card), { direita: [], esquerda: ['Apagar de vez'], mais: false, pontaDireita: null, pontaEsquerda: null });
+  assert.deepEqual(ladosDe(card), { direita: [], esquerda: ['Apagar de vez'], mais: false, pontaDireita: null, pontaEsquerda: 'Apagar de vez' });
 });
 
 test('Conversa: arrasta Renomear à direita e Apagar à esquerda', () => {
   const ui = screen('src/app/agent/history.tsx', { conversations: [{ id: 'c1', title: 'gastei 45 no mercado', last_message: 'Ok', updated_at: '2026-09-21T12:00:00Z' }] });
   const [card] = deslizaveis(ui);
   assert.ok(card, 'a conversa está num Deslizavel');
-  assert.deepEqual(ladosDe(card), { direita: ['Renomear'], esquerda: ['Apagar'], mais: false, pontaDireita: null, pontaEsquerda: null });
+  assert.deepEqual(ladosDe(card), { direita: ['Renomear'], esquerda: ['Apagar'], mais: false, pontaDireita: 'Renomear', pontaEsquerda: 'Apagar' });
   assert.equal(card.props.fundo, 'groupedBackground', 'lista chapada: a linha tem o fundo da tela');
 });
 
@@ -1425,14 +1425,14 @@ test('Importação: arrasta só Apagar registro à esquerda (retomar é o toque)
   const ui = screen('src/app/import-history.tsx', { batches: [{ id: 'b1', filename: 'nubank.ofx', source: 'ofx', created_at: '2026-09-20T12:00:00Z', account_id: null, pendentes: 0, aprovados: 3, total: 3, status: 'done' }] });
   const [card] = deslizaveis(ui);
   assert.ok(card, 'o lote está num Deslizavel');
-  assert.deepEqual(ladosDe(card), { direita: [], esquerda: ['Apagar registro'], mais: false, pontaDireita: null, pontaEsquerda: null });
+  assert.deepEqual(ladosDe(card), { direita: [], esquerda: ['Apagar registro'], mais: false, pontaDireita: null, pontaEsquerda: 'Apagar registro' });
 });
 
 test('Orçamento: arrasta Editar limite à direita; o resto no Mais', () => {
   const ui = screen('src/app/finance/budgets.tsx', { budgets: [{ category: 'mercado', limit_cents: 100_00, base_limit_cents: 100_00, rollover_cents: 0, spent_cents: 40_00, committed_cents: 0, month: null }] });
   const [card] = deslizaveis(ui);
   assert.ok(card, 'o orçamento está num Deslizavel');
-  assert.deepEqual(ladosDe(card), { direita: ['Editar limite'], esquerda: [], mais: true, pontaDireita: null, pontaEsquerda: null });
+  assert.deepEqual(ladosDe(card), { direita: ['Editar limite'], esquerda: [], mais: true, pontaDireita: 'Editar limite', pontaEsquerda: null });
 });
 
 test('Aporte: no extrato da meta arrasta Desfazer à esquerda, e ele confirma antes de mover dinheiro', () => {
@@ -1444,7 +1444,7 @@ test('Aporte: no extrato da meta arrasta Desfazer à esquerda, e ele confirma an
   ui.interact(() => meta.props.acoes.find((x: any) => x.label === 'Ver extrato').onPress());
   const aporte = deslizaveis(ui).find((d: any) => d.props.acoes.some((x: any) => x.label === 'Desfazer'));
   assert.ok(aporte, 'o aporte do extrato está num Deslizavel');
-  assert.deepEqual(ladosDe(aporte), { direita: [], esquerda: ['Desfazer'], mais: false, pontaDireita: null, pontaEsquerda: null });
+  assert.deepEqual(ladosDe(aporte), { direita: [], esquerda: ['Desfazer'], mais: false, pontaDireita: null, pontaEsquerda: 'Desfazer' });
   ui.interact(() => aporte.props.acoes[0].onPress());
   assert.deepEqual(ui.writes, [], 'nada move antes da confirmação');
   assert.equal(ui.confirmations.length, 1);
@@ -1457,7 +1457,7 @@ test('Parcelada: arrasta Editar a compra à direita e Apagar a compra inteira à
   });
   const [card] = deslizaveis(ui);
   assert.ok(card, 'a compra está num Deslizavel');
-  assert.deepEqual(ladosDe(card), { direita: ['Editar a compra'], esquerda: ['Apagar a compra inteira'], mais: true, pontaDireita: null, pontaEsquerda: null });
+  assert.deepEqual(ladosDe(card), { direita: ['Editar a compra'], esquerda: ['Apagar a compra inteira'], mais: true, pontaDireita: 'Editar a compra', pontaEsquerda: 'Apagar a compra inteira' });
 });
 
 /**

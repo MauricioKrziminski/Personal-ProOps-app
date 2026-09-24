@@ -1,9 +1,11 @@
 import { memo } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import type { StyleProp, ViewStyle } from 'react-native';
 import { GestureDetector, type ComposedGesture, type GestureType } from 'react-native-gesture-handler';
 
 import { ThemedText } from '@/components/themed-text';
+import { useCantosDoArrasto } from '@/components/ui/arrasto-contexto';
 import { Icon } from '@/components/ui/icon';
 import { ItemLink } from '@/components/ui/item-link';
 import { Mark } from '@/components/ui/mark';
@@ -124,7 +126,7 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
           onLongPress={onLongPress}
           style={styles.alvo}>
           {({ pressed }) => (
-            <View
+            <SuperficieDoCartao
               style={[
                 styles.cartao,
                 {
@@ -208,7 +210,7 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
                   os dois se encavalavam), e o alvo de toque ficava do tamanho de uma linha de
                   texto. Como coluna ela tem a altura inteira do cartão e nunca colide. */}
               {drag ? <Alca gesture={drag} /> : null}
-            </View>
+            </SuperficieDoCartao>
           )}
         </Pressable>
       )}
@@ -252,6 +254,16 @@ function Alca({ gesture }: { gesture: ComposedGesture | GestureType }) {
 /** A lista redesenha o cartão inteiro a cada arrasto; sem `memo` são N re-renders por quadro. */
 export const NoteCard = memo(NoteCardBase);
 
+/**
+ * A superfície do cartão: dentro do arrasto ela perde o canto do lado que abre e encosta no painel
+ * como uma peça só (`arrasto-contexto`). Componente próprio porque o contexto do arrasto só existe
+ * DENTRO do `ItemLink` — o corpo do `NoteCard` está fora dele.
+ */
+function SuperficieDoCartao({ style, children }: { style: StyleProp<ViewStyle>; children: React.ReactNode }) {
+  const cantos = useCantosDoArrasto(Radius.md);
+  return <Animated.View style={[style, cantos]}>{children}</Animated.View>;
+}
+
 const styles = StyleSheet.create({
   /**
    * O cartão é uma `View` DENTRO do `Pressable`, não o próprio `Pressable`.
@@ -265,9 +277,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderRadius: Radius.md,
     borderCurve: 'continuous',
-    // Cartão OUTLINED, não elevated: quem desenha a borda é a hairline, não a sombra. É o que
-    // Linear e Notion fazem, e funciona nos dois temas.
-    borderWidth: StyleSheet.hairlineWidth,
+    // Cartão OUTLINED, não elevated: quem desenha a borda é o fio, não a sombra. É o que
+    // Linear e Notion fazem, e funciona nos dois temas. 1dp e não `hairlineWidth` (um pixel
+    // FÍSICO, que some em escala) — a mesma régua do `Card` (design.md §2).
+    borderWidth: 1,
     overflow: 'hidden',
   },
   /** O trilho sangra de topo a base porque é IDENTIDADE do cartão, não um ponto ao lado dele. */

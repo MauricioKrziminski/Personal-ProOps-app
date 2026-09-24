@@ -24,13 +24,14 @@ import { Screen } from '@/components/ui/screen';
 import { fecharDeslizavelAberto } from '@/components/ui/deslizavel';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonChart, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
-import { useToast } from '@/components/ui/toast';
+import { useSubirAcimaDoToast, useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
 import { Elevation, Motion, Radius, Space } from '@/design/tokens';
 import {
   NO_ACCOUNT,
   useAccounts,
   useDeleteTransaction,
+  useDesfazerBaixa,
   useMarkPaid,
   useRecentTransactions,
   useMonthRange,
@@ -136,6 +137,8 @@ export default function TransactionsScreen() {
   const scheme = useScheme();
   const toast = useToast();
   const insets = useSafeAreaInsets();
+  const fabBase = insets.bottom + Space.xxl;
+  const subirFab = useSubirAcimaDoToast(fabBase);
   const { width, windowClass } = useAdaptiveWindow();
   // A barra de filtros precisa caber AO LADO do livro-caixa. No intervalo 840–950dp a janela
   // já é expanded, mas os dois painéis ainda não têm largura útil depois do respiro editorial.
@@ -274,6 +277,9 @@ export default function TransactionsScreen() {
   // Um item basta para separar "nunca teve nada" de "este mês não teve nada".
   const anyEver = useRecentTransactions(1);
   const markPaid = useMarkPaid();
+  const desfazer = useDesfazerBaixa();
+  const desfazerBaixa = (id: string) =>
+    desfazer.mutate({ id }, { onError: () => toast({ message: 'Não deu para desfazer. Tenta de novo.', tone: 'error' }) });
   const remove = useDeleteTransaction();
 
   const accountName = useMemo(() => {
@@ -384,7 +390,12 @@ export default function TransactionsScreen() {
     markPaid.mutate(
       { id: tx.id, paidAt: localISODate() },
       {
-        onSuccess: () => toast({ message: `${tx.description}: ${settleDone(tx.kind)}.`, tone: 'success' }),
+        onSuccess: () =>
+          toast({
+            message: `${tx.description}: ${settleDone(tx.kind)}.`,
+            tone: 'success',
+            action: { label: 'Desfazer', onPress: () => desfazerBaixa(tx.id) },
+          }),
         onError: () => toast({ message: 'Não deu para dar baixa. Tenta de novo.', tone: 'error' }),
       }
     );
@@ -780,6 +791,7 @@ export default function TransactionsScreen() {
                             label: settleLabel(tx.kind),
                             icon: 'checkmark.circle' as const,
                             arrasto: 'direita' as const,
+                            desfaz: true,
                             onPress: () => pay(tx),
                           },
                         ]
@@ -872,15 +884,15 @@ export default function TransactionsScreen() {
   );
 
   const fab = vazioComAcao ? null : (
-    <Button
-      label="Lançar"
-      icon="plus"
-      onPress={() => router.push({ pathname: '/finance/transaction-form', params: { month } })}
-      style={[
-        styles.fab,
-        { bottom: insets.bottom + Space.xxl, boxShadow: Elevation[scheme].floating },
-      ]}
-    />
+    // Com um toast no ar o FAB sobe: o "Desfazer" do toast ficava debaixo dele (24/09/2026).
+    <Animated.View style={[styles.fab, { bottom: fabBase }, subirFab]}>
+      <Button
+        label="Lançar"
+        icon="plus"
+        onPress={() => router.push({ pathname: '/finance/transaction-form', params: { month } })}
+        style={{ boxShadow: Elevation[scheme].floating }}
+      />
+    </Animated.View>
   );
 
   /*

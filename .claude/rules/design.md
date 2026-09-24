@@ -609,13 +609,25 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
   entra por dentro da esquerda quando sobra ação. Caminho ÚNICO: `Deslizavel`
   (`components/ui/deslizavel.tsx`); a tela só marca as ações que já declara (`ItemAction`):
   - `arrasto: 'direita' | 'esquerda' | 'fora'` — `fora` repete o toque curto e não chama o "Mais";
-  - `desfaz: true` — arrastar até o fim executa, e a tela mostra toast com "Desfazer". Apagar
-    nunca vai sozinho: ele confirma, como sempre;
+  - **arrastar até o fim aciona a ação da BORDA do lado, qualquer que seja** (24/09/2026, pedido
+    do dono do produto: *"ao arrastar tudo para o lado esquerdo, ele aciona a opção mais à
+    direita que tiver"*): é o mesmo que tocar nela. Apagar confirma, "Mais" abre o menu, e o que
+    muda sem confirmar traz "Desfazer" no toast (`desfaz: true`: Arquivar, Fixar, Paguei —
+    `useDesfazerBaixa`). Ação nova na borda que muda dado sem confirmar nasce com o "Desfazer";
   - `icon` em toda ação revelada e `curto` (uma palavra) quando o rótulo não cabe nos 88dp.
   O toque longo não muda. `ItemLink` aplica sozinho; os outros cards envolvem com a mesma lista.
+  **O painel é peça do card** ("tudo junto", escolha do dono do produto em 24/09/2026): aberto, o
+  card perde o canto do lado que abre (`useCantosDoArrasto`, lido por `Card` e pelo cartão da
+  nota) e o conjunto só arredonda nas pontas. **O movimento é o do WhatsApp**: os botões dividem o
+  que o card revelou, ícone e rótulo aparecem com o espaço, e até o fim a ponta toma o painel com
+  o ícone colado na borda do card (`largurasDoPainel`, `deslocamentoDaPonta`, com teste).
+  ⚠️ Os botões do painel são `Gesture.Tap` **simultâneos ao observador do dedo**: o `Pressable`
+  do gesture-handler perdia o toque para o `Gesture.Manual` no iPhone (24/09/2026).
+  ⚠️ **O FAB sobe acima do toast** (`useSubirAcimaDoToast`): os dois moravam no mesmo lugar e o
+  "Desfazer" do toast caía no "Lançar".
   Grade (pasta em grade) não arrasta: o toque longo já é o arrasto de reordenar.
-  ⚠️ Os botões do painel usam o `Pressable` do **gesture-handler**: o da RN não recebe o toque
-  dentro do `ReanimatedSwipeable` no Android.
+  ⚠️ Os botões do painel NÃO são o `Pressable` da RN: ele não recebe o toque dentro do
+  `ReanimatedSwipeable` no Android (ver o `Tap` acima).
   ⚠️ **Dentro de um card arrastável o valor NÃO é selecionável** (`DentroDeArrasto`, em
   `money.tsx`): no Android o arrasto que começava em cima do número selecionava a palavra, e o
   toque longo ali é o menu do card. Não "devolver" o `selectable`.

@@ -5,7 +5,8 @@ import type { ItemAction } from './item-actions';
  *
  * Direita = a ação rápida do item; esquerda = tirar da lista. "Mais" aparece quando sobra ação
  * sem lado — ele abre o mesmo menu do toque longo, com a lista inteira. Arrastar até o fim
- * executa só a ação da BORDA do lado, e só quando ela tem `desfaz`: Apagar nunca vai sozinho.
+ * aciona a ação da BORDA do lado, qualquer que seja (24/09/2026): é o mesmo que tocar nela —
+ * Apagar pede confirmação, "Mais" abre o menu, Arquivar e Paguei trazem "Desfazer".
  */
 export function ladosDoArrasto(acoes: ItemAction[]) {
   const usavel = (x: ItemAction) => !x.disabled && Boolean(x.onPress);
@@ -16,8 +17,50 @@ export function ladosDoArrasto(acoes: ItemAction[]) {
   );
   // A ponta é o botão da BORDA: o primeiro na direita (encostado na borda esquerda da tela), o
   // último na esquerda (o "Mais" entra por dentro, antes dele).
-  const ponta = (acao: ItemAction | undefined) => (acao?.desfaz ? acao : null);
-  return { direita, esquerda, mais, pontaDireita: ponta(direita[0]), pontaEsquerda: ponta(esquerda.at(-1)) };
+  return { direita, esquerda, mais, pontaDireita: direita[0] ?? null, pontaEsquerda: esquerda.at(-1) ?? null };
+}
+
+/**
+ * A ponta de cada lado do painel DESENHADO — com o "Mais" já dentro. Sem ação própria à
+ * esquerda, o "Mais" é a borda, e arrastar até o fim abre o menu.
+ */
+export function pontasDoPainel<T>(direita: T[], esquerda: T[]): { direita: T | null; esquerda: T | null } {
+  return { direita: direita[0] ?? null, esquerda: esquerda.at(-1) ?? null };
+}
+
+/**
+ * A largura de cada botão enquanto o dedo arrasta (o efeito do WhatsApp, 24/09/2026): os botões
+ * dividem o que o card já revelou, e passado o "até o fim" (`cheio` vai de 0 a 1 numa mola) a
+ * PONTA toma o painel inteiro e os outros somem. A ponta da esquerda é a última; a da direita, a
+ * primeira.
+ */
+export function largurasDoPainel(revelado: number, n: number, cheio: number, lado: 'direita' | 'esquerda'): number[] {
+  'worklet';
+  const r = Math.max(0, revelado);
+  const ponta = lado === 'direita' ? 0 : n - 1;
+  const larguras: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const igual = r / n;
+    larguras.push(igual + ((i === ponta ? r : 0) - igual) * cheio);
+  }
+  return larguras;
+}
+
+/**
+ * Até o fim, o conteúdo da ponta (ícone e rótulo) acompanha a borda do card em vez de ficar no
+ * meio do painel largo — é o que faz o gesto "puxar" a ação. Positivo = para a direita.
+ */
+export function deslocamentoDaPonta(revelado: number, botao: number, cheio: number, lado: 'direita' | 'esquerda'): number {
+  'worklet';
+  const sobra = Math.max(0, revelado - botao) / 2;
+  // `|| 0`: sem o até o fim a conta dá -0 à esquerda.
+  return (lado === 'direita' ? sobra : -sobra) * cheio || 0;
+}
+
+/** 0 → 1: o ícone e o rótulo aparecem junto com o espaço do botão (fade e escala). */
+export function aparicao(largura: number, botao: number): number {
+  'worklet';
+  return Math.min(1, Math.max(0, (largura - botao * 0.35) / (botao * 0.65)));
 }
 
 /** O card tem algo para mostrar ao arrastar? Sem nada, o `Deslizavel` nem monta o gesto. */

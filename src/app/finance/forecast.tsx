@@ -37,6 +37,7 @@ import {
   useCashHistory,
   useForecastMonths,
   useForecastWithDrafts,
+  useDesfazerBaixa,
   useMarkPaid,
   useMonthSummary,
   useUpcomingBills,
@@ -242,6 +243,9 @@ export default function ForecastScreen() {
   const bills = useUpcomingBills(30);
   const accounts = useAccounts();
   const markPaid = useMarkPaid();
+  const desfazer = useDesfazerBaixa();
+  const desfazerBaixa = (id: string) =>
+    desfazer.mutate({ id }, { onError: () => toast({ message: 'Não deu para desfazer. Tenta de novo.', tone: 'error' }) });
 
   // ⚠️ A troca do rascunho acontece AQUI, num lugar só, nos DOIS caminhos: o mensal recebe as
   // mesmas hipóteses e passa pela mesma `forecast_json` por dentro. Assim a tabela e a curva
@@ -391,7 +395,12 @@ export default function ForecastScreen() {
     markPaid.mutate(
       { id, paidAt: localISODate() },
       {
-        onSuccess: () => toast({ message: `${titulo}: ${settleDone(kind)}.`, tone: 'success' }),
+        onSuccess: () =>
+          toast({
+            message: `${titulo}: ${settleDone(kind)}.`,
+            tone: 'success',
+            action: { label: 'Desfazer', onPress: () => desfazerBaixa(id) },
+          }),
         // otimista sem rollback visível faz o usuário achar que pagou
         onError: () => toast({ message: `Não deu para dar baixa em ${titulo}.`, tone: 'error' }),
       }
@@ -430,6 +439,7 @@ export default function ForecastScreen() {
               label: settleLabel(receita ? 'income' : 'expense'),
               icon: 'checkmark.circle',
               arrasto: 'direita',
+              desfaz: true,
               onPress: () => pagar(b.ref_id, b.title, b.kind),
             },
             {
