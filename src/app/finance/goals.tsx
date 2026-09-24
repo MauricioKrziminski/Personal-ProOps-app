@@ -390,6 +390,16 @@ export default function GoalsScreen() {
           ) : null}
         </View>
       ) : null}
+      {/* Só concluídas: elas vêm primeiro e o vazio vira uma linha embaixo (24/09/2026). */}
+      {!goals.isLoading && !goals.isError && lista.length > 0 && abertas.length === 0 ? (
+        <EmptyState
+          icon="target"
+          title="Nenhuma meta em andamento"
+          hint="Toca em + para começar a próxima."
+          action={{ label: 'Nova meta', onPress: abrirNova }}
+          compacto
+        />
+      ) : null}
       {!goals.isLoading && !goals.isError && lista.length === 0 ? (
         <EmptyState
           icon="target"

@@ -107,10 +107,21 @@ export default function RemindersScreen() {
         <Section title="Pausados">{paused.map(line)}</Section>
       </View>
     ) : null;
+  // Só pausados: eles vêm primeiro e o vazio vira uma linha embaixo (24/09/2026).
+  const semAtivos =
+    !isLoading && !isError && reminders.length > 0 && active.length === 0 ? (
+      <EmptyState
+        icon="bell"
+        title="Nenhum lembrete ativo"
+        action={{ label: 'Novo lembrete', onPress: () => router.push('/reminder-form') }}
+        compacto
+      />
+    ) : null;
   const list = (
     <>
       {activeSection}
       {pausedSection}
+      {semAtivos}
       {/* O servidor manda 20 por vez; o resto vem pelo toque. */}
       <VerMais
         restantes={hasNextPage ? null : 0}

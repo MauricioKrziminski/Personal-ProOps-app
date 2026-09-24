@@ -557,6 +557,8 @@ export default function BudgetsScreen() {
         label: 'Definir limite',
         onPress: () => abrirNovo(semLimite[0]?.category),
       }}
+      // Com "Sem limite definido" na tela, o vazio é uma linha depois dela (24/09/2026).
+      compacto={semLimite.length > 0}
     />
   ) : null;
 

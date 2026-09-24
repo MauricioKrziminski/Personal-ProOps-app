@@ -637,6 +637,11 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
    atualização parcial.
 2. **Empty** — `EmptyState`: ícone SF, título, e uma **dica acionável** (normalmente o atalho do
    WhatsApp). Composto, não um parágrafo cinza.
+   ⚠️ **Lista vazia que não é a única coisa da tela: o que existe vem PRIMEIRO e o vazio é
+   `EmptyState compacto`, um card de linha depois dele** (24/09/2026). Dívidas desenhava o vazio
+   grande no centro e "Arquivadas · 1" solto embaixo (*"está horrível… esse layout tem que ser em
+   todas as telas"*); Metas, Parceladas, Recorrentes e Lembretes com só concluídas/terminadas/
+   pausadas nem diziam que não havia nada ativo. `simple-finance-ui.test.ts` prende as cinco.
 3. **Error** — inline e específico, com "Tentar de novo" que refaz a query.
 4. **Conteúdo longo** — texto que **quebra** sem quebrar layout. Quem cede é o LAYOUT.
 

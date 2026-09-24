@@ -717,6 +717,10 @@ export default function InstallmentsScreen() {
       {terminadas.length > 0 && verTerminadas ? (
         <VerMais restantes={jTerminadas.restantes} onPress={() => janelas.verMais('terminadas')} />
       ) : null}
+      {/* Só terminadas: elas vêm primeiro e o vazio vira uma linha embaixo (24/09/2026). */}
+      {!plans.isLoading && !plans.isError && lista.length > 0 && emAndamento.length === 0 ? (
+        <EmptyState icon="creditcard" title="Nenhuma compra em andamento" compacto />
+      ) : null}
       {!plans.isLoading && !plans.isError && lista.length === 0 ? (
         <EmptyState
           icon="creditcard"

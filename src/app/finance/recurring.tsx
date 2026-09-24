@@ -641,6 +641,18 @@ export default function RecurringScreen() {
         </View>
       ) : null}
 
+      {/* Só pausadas (ou com erro): elas vêm primeiro e o vazio vira uma linha embaixo (24/09/2026). */}
+      {!series.isLoading && !series.isError && lista.length > 0 && ativas.length === 0 ? (
+        <EmptyState
+          icon="repeat"
+          title="Nada ativo se repetindo"
+          action={{
+            label: 'Nova recorrência',
+            onPress: () => setForm({ ...FORM_VAZIO, inicio: isoToBR(localISODate()) }),
+          }}
+          compacto
+        />
+      ) : null}
       {!series.isLoading && !series.isError && lista.length === 0 ? (
         <EmptyState
           icon="repeat"

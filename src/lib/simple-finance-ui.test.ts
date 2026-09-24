@@ -1791,3 +1791,27 @@ test('Lançamentos: a linha diz a data da COMPRA, nunca o vencimento da fatura (
   // (o `formatDateBR` do harness é um dublê de data fixa — o que se prende aqui é o rótulo)
   assert.match(legenda('Boleto'), /^vence /);
 });
+
+test('Lista principal vazia com seção secundária: a secundária em cima e o vazio COMPACTO embaixo', () => {
+  // "A tela de arquivadas quando não tem nenhum financiamento e tem uma arquivada está horrível…
+  // tem que mostrar o arquivadas em cima e depois embaixo mostrar que não tem nenhuma dívida
+  // ativa. Esse layout tem que ser em todas as telas que tiver coisas assim." (24/09/2026)
+  const ordem = (ui: any, secundaria: (n: any) => boolean) => {
+    const nos = ui.nodes();
+    const iSec = nos.findIndex(secundaria);
+    const iVazio = nos.findIndex((n: any) => n.type === 'EmptyState');
+    assert.ok(iSec >= 0, 'seção secundária na tela');
+    assert.ok(iVazio >= 0, 'a tela diz que não há nada ativo');
+    assert.ok(iSec < iVazio, 'secundária antes do vazio');
+    assert.equal(nos[iVazio].props.compacto, true, 'o vazio é compacto quando há outra coisa na tela');
+  };
+  const carro = { id: 'd1', name: 'Carro', kind: 'financing', calculation_mode: 'fixed_installments', principal_cents: 100, remaining_cents: 100, installments: 10, installments_paid: 0, installment_cents: 10, due_day: 10, archived: true };
+  ordem(screen(debtsFile, { create: false, debts: [], archivedDebts: [carro] }), (n: any) => n.type === 'Row' && /^Arquivadas/.test(n.props.title ?? ''));
+  const meta = { id: 'g1', name: 'Viagem', target_cents: 1000, saved_cents: 1000, deadline: null, archived: false };
+  ordem(screen('src/app/finance/goals.tsx', { goals: [meta] }), (n: any) => n.type === 'SectionHead' && /^Concluídas/.test(n.props.title ?? ''));
+  const plano = { id: 'p1', title: 'tv', description: 'tv', merchant: null, category: null, account_id: null, total_cents: 1000, installments: 2, installment_cents: 500, first_occurred_at: '2026-01-01', active: false, paid: 2, remaining_cents: 0, locked: 2, locked_cents: 1000, locked_paid: 2, parcels: [] };
+  ordem(screen('src/app/finance/installments.tsx', { plans: [plano] }), (n: any) => n.type === 'Section' && n.props.title === 'Terminadas');
+  const serie = { id: 's1', description: 'Academia', kind: 'expense', amount_cents: 100, rrule: 'FREQ=MONTHLY;BYMONTHDAY=5', active: false, next_run_at: '2026-10-05T12:00:00Z', dtstart: '2026-01-05', category: null, account_id: null };
+  ordem(screen('src/app/finance/recurring.tsx', { recurring: [serie] }), (n: any) => n.type === 'SectionHead' && n.props.title === 'Pausadas');
+  ordem(screen('src/app/reminders.tsx', { reminders: [{ id: 'r1', title: 'Remédio', active: false, next_run_at: null, rrule: null }] }), (n: any) => n.type === 'Section' && n.props.title === 'Pausados');
+});

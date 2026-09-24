@@ -663,18 +663,26 @@ export default function DebtsScreen() {
       </Section>
     ) : null;
 
+  // Sem dívida ativa e com arquivada, as arquivadas vêm PRIMEIRO e o vazio vira uma linha embaixo
+  // (24/09/2026): o vazio grande no meio da tela deixava "Arquivadas · 1" solto num canto.
+  const semAtivas = !debts.isLoading && !debts.isError && lista.length === 0;
+  const temArquivadas = listaArquivadas.length > 0;
+  const vazio = semAtivas ? (
+    <EmptyState
+      icon="creditcard.trianglebadge.exclamationmark"
+      title={temArquivadas ? 'Nenhuma dívida ativa' : 'Nenhuma dívida cadastrada'}
+      hint={'Manda no WhatsApp: “financiei o carro em 48x de 1.470”\n— ou toca em + para cadastrar aqui.'}
+      action={{ label: 'Nova dívida', onPress: abrirNova }}
+      compacto={temArquivadas}
+    />
+  ) : null;
+
   const debtListContent = (
     <View style={styles.paneBody}>
       {lista.map(cartaoDivida)}
-      {!debts.isLoading && !debts.isError && lista.length === 0 ? (
-        <EmptyState
-          icon="creditcard.trianglebadge.exclamationmark"
-          title={listaArquivadas.length > 0 ? 'Nenhuma dívida ativa' : 'Nenhuma dívida cadastrada'}
-          hint="Informe o valor da parcela e quantas são. Os outros detalhes são opcionais."
-          action={{ label: 'Nova dívida', onPress: abrirNova }}
-        />
-      ) : null}
-      {secaoArquivadas}
+      {semAtivas && temArquivadas ? secaoArquivadas : null}
+      {vazio}
+      {semAtivas && temArquivadas ? null : secaoArquivadas}
     </View>
   );
 

@@ -375,10 +375,12 @@ export default function NotesScreen() {
       action={{ label: 'Limpar filtro', onPress: () => setTag(null) }}
     />
   ) : pastas.length > 0 ? (
+    // As pastas estão logo acima: o vazio é uma linha depois delas, não o centro da tela.
     <EmptyState
       icon="tray"
       title="Nada solto por aqui"
       hint="Tudo que você anotou está dentro de uma pasta. Escreve aí em cima para começar outra."
+      compacto
     />
   ) : (
     <EmptyState
