@@ -237,9 +237,12 @@ function Linha({ linha }: { linha: CycleLine }) {
   // A linha cabe a 384dp × fonte 1,3: o ano já está no cabeçalho do ciclo, o cartão já está no
   // título da fatura, e o "(atrasada)" desce para o subtítulo. Quem DECIDE que ela é atrasada
   // continua sendo a coluna `atrasada`; o sufixo só é tirado do texto quando ela diz que é.
-  const titulo = linha.atrasada ? linha.title.replace(/\s*\(atrasada\)$/, '') : linha.title;
+  // O banco escreve "(atrasada)" na fatura e "(atrasado)" no boleto: o sufixo sai do título nos
+  // dois, e o subtítulo diz a palavra que ele tinha.
+  const sufixo = linha.atrasada ? linha.title.match(/\s*\((atrasad[ao])\)$/) : null;
+  const titulo = sufixo ? linha.title.slice(0, sufixo.index) : linha.title;
   const subtitulo = [
-    linha.atrasada ? 'atrasada' : null,
+    linha.atrasada ? (sufixo?.[1] ?? 'atrasado') : null,
     isoToBR(linha.day).slice(0, 5),
     linha.method_label && !titulo.includes(linha.method_label) ? linha.method_label : null,
   ]
