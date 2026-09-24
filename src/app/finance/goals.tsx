@@ -19,6 +19,9 @@ import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { Deslizavel, fecharDeslizavelAberto } from '@/components/ui/deslizavel';
+import { PressableScale } from '@/components/motion/pressable-scale';
+import { VerMais } from '@/components/ui/ver-mais';
+import { useAosPoucos, useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
@@ -119,6 +122,10 @@ export default function GoalsScreen() {
   const lista = goals.isError ? [] : (goals.data ?? []);
   const abertas = lista.filter((g) => Number(g.saved_cents) < Number(g.target_cents));
   const concluidas = lista.filter((g) => Number(g.saved_cents) >= Number(g.target_cents));
+  // Aos poucos, como toda lista do app (24/09/2026).
+  const janelas = useJanelasPorGrupo('');
+  const jAbertas = janelas.janelaDe('abertas', abertas);
+  const jConcluidas = janelas.janelaDe('concluidas', concluidas);
   const guardado = lista.reduce((s, g) => s + Number(g.saved_cents), 0);
   const alvo = lista.reduce((s, g) => s + Number(g.target_cents), 0);
 
@@ -247,7 +254,7 @@ export default function GoalsScreen() {
           Math.min(index * Motion.stagger.step, Motion.stagger.cap)
         )}>
         <Deslizavel titulo={g.name} acoes={acoesDaMeta(g)} forma="card">
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={`${g.name}, ${formatBRL(saved)} de ${formatBRL(target)}, ${Math.round(pct * 100)} por cento${concluida ? ', concluída' : `, faltam ${formatBRL(falta)}`}`}
           onPress={() => abrirAporte(g)}
@@ -299,20 +306,29 @@ export default function GoalsScreen() {
               <Button label="Guardar" size="sm" variant="secondary" onPress={() => abrirAporte(g)} />
             ) : null}
           </Card>
-        </Pressable>
+        </PressableScale>
         </Deslizavel>
       </Animated.View>
     );
   };
 
-  /** Extrato agrupado por mês: com o total do mês no cabeçalho. */
+  /**
+   * Extrato agrupado por mês: com o total do mês no cabeçalho. Aos poucos (24/09/2026): os aportes
+   * aparecem um passo por vez, mas o total de cada mês é o do mês INTEIRO — um mês cortado pela
+   * janela não pode dizer que guardou menos do que guardou.
+   */
+  const aportes = useAosPoucos(contribuicoes.data ?? [], extrato?.id ?? '');
   const mesesDoExtrato = () => {
-    const grupos = new Map<string, { total: number; itens: typeof contribuicoes.data }>();
+    const totais = new Map<string, number>();
     for (const c of contribuicoes.data ?? []) {
       const chave = c.occurred_at.slice(0, 7);
-      const atual = grupos.get(chave) ?? { total: 0, itens: [] };
-      atual.total += Number(c.amount_cents);
-      atual.itens!.push(c);
+      totais.set(chave, (totais.get(chave) ?? 0) + Number(c.amount_cents));
+    }
+    const grupos = new Map<string, { total: number; itens: typeof aportes.visiveis }>();
+    for (const c of aportes.visiveis) {
+      const chave = c.occurred_at.slice(0, 7);
+      const atual = grupos.get(chave) ?? { total: totais.get(chave) ?? 0, itens: [] };
+      atual.itens.push(c);
       grupos.set(chave, atual);
     }
     return [...grupos.entries()];
@@ -348,7 +364,8 @@ export default function GoalsScreen() {
 
   const goalListContent = (
     <View style={styles.paneBody}>
-      {abertas.map(cartaoMeta)}
+      {jAbertas.visiveis.map(cartaoMeta)}
+      <VerMais restantes={jAbertas.restantes} onPress={() => janelas.verMais('abertas')} />
       {concluidas.length > 0 ? (
         <View style={styles.secao}>
           <Pressable
@@ -367,7 +384,10 @@ export default function GoalsScreen() {
               }
             />
           </Pressable>
-          {concluidasAbertas ? concluidas.map(cartaoMeta) : null}
+          {concluidasAbertas ? jConcluidas.visiveis.map(cartaoMeta) : null}
+          {concluidasAbertas ? (
+            <VerMais restantes={jConcluidas.restantes} onPress={() => janelas.verMais('concluidas')} />
+          ) : null}
         </View>
       ) : null}
       {!goals.isLoading && !goals.isError && lista.length === 0 ? (
@@ -520,6 +540,7 @@ export default function GoalsScreen() {
                 })}
               </Section>
             ))}
+            <VerMais restantes={aportes.restantes} onPress={aportes.verMais} />
 
             {!contribuicoes.isLoading &&
             !contribuicoes.isError &&

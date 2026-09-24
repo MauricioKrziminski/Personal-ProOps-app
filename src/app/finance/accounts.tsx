@@ -156,7 +156,17 @@ export default function AccountsScreen() {
 
   // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
   // falha, e sem este corte a tela seguia afirmando números embaixo da faixa de erro.
-  const linhas = balances.isError ? [] : (balances.data ?? []);
+  /**
+   * A conta mais recente primeiro (24/09/2026). `account_balances` não tem ORDER BY, e a ordem
+   * das linhas era a física da tabela — mudava sem ninguém mexer. A data vem de `useAccounts`;
+   * contas criadas juntas (o mesmo instante) desempatam pelo nome.
+   */
+  const criadaEm = new Map((accounts.data ?? []).map((a) => [a.id, a.created_at ?? '']));
+  const linhas = (balances.isError ? [] : [...(balances.data ?? [])]).sort(
+    (a, b) =>
+      (criadaEm.get(b.account_id) ?? '').localeCompare(criadaEm.get(a.account_id) ?? '') ||
+      a.name.localeCompare(b.name),
+  );
   const semConta = linhas.find((l) => l.account_id === null);
   const dinheiro = linhas.filter((l) => l.account_id && GUARDA_DINHEIRO.includes(l.type));
   const investimentos = linhas.filter((l) => l.account_id && l.type === 'investment');

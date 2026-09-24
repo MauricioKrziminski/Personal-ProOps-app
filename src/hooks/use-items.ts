@@ -1,5 +1,5 @@
 import { scheduleRealtimeFinanceRefresh, invalidateKeys } from '@/lib/query-invalidation';
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { localISODate } from '@/lib/dates';
@@ -68,21 +68,33 @@ export function useRealtimeInvalidate(table: string, queryKey: string[]) {
   }, [table, queryClient, key]);
 }
 
+/**
+ * Lembretes em PÁGINAS (24/09/2026). Era `limit(100)`: do 101º em diante o lembrete sumia da tela
+ * sem aviso nenhum — e 100 de uma vez era a lista inteira de uma vez. Agora vêm 20 por vez, e a
+ * tela pede a próxima no "Ver mais". `id` desempata a ordem para a página seguinte não repetir
+ * nem pular linha.
+ */
+const REMINDERS_PAGE = 20;
+
 export function useReminders() {
   useRealtimeInvalidate('reminders', ['reminders']);
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ['reminders'],
-    queryFn: async (): Promise<Reminder[]> => {
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }): Promise<Reminder[]> => {
       const { data, error } = await supabase
         .from('reminders')
         .select('id, title, recurrence, next_run_at, channel, active')
         // pausados também vêm: sem eles não haveria como retomar pelo app
         .order('active', { ascending: false })
         .order('next_run_at')
-        .limit(100);
+        .order('id')
+        .range(pageParam, pageParam + REMINDERS_PAGE - 1);
       if (error) throw error;
       return data as Reminder[];
     },
+    getNextPageParam: (ultima, todas) =>
+      ultima.length < REMINDERS_PAGE ? undefined : todas.length * REMINDERS_PAGE,
   });
 }
 

@@ -21,6 +21,7 @@ import { Money } from '@/components/ui/money';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Screen } from '@/components/ui/screen';
 import { Deslizavel } from '@/components/ui/deslizavel';
+import { PressableScale } from '@/components/motion/pressable-scale';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { Segmented } from '@/components/ui/segmented';
@@ -323,7 +324,7 @@ export default function BudgetsScreen() {
           Math.min(index * Motion.stagger.step, Motion.stagger.cap)
         )}>
         <Deslizavel titulo={b.category} acoes={acoesDoOrcamento(b)} forma="card">
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={`${b.category}, gastou ${formatBRL(gastoCents)} de ${formatBRL(limiteCents)}${comprometido > 0 ? `, mais ${formatBRL(comprometido)} comprometidos` : ''}, ${Math.round(pct * 100)} por cento${estourou ? ', estourou' : ''}`}
           onPress={() => verLancamentos(b.category)}
@@ -396,7 +397,7 @@ export default function BudgetsScreen() {
               </ThemedText>
             ) : null}
           </Card>
-        </Pressable>
+        </PressableScale>
         </Deslizavel>
       </Animated.View>
     );

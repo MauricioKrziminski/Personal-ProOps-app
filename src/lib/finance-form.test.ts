@@ -3,7 +3,7 @@ import test from 'node:test';
 import {
   debtTerm, validRecurringRange, simpleDebtValues, destinoDoSalvar, podeParcelar, temContrato, faixaDeParcelas,
   totalDigitado, totalPorParcela, parcelaDoTotal, valorExibido, digitarValor, nomeDaCompra, type Contrato,
-  ancoraDoContrato, parcelaDoTotalDoContrato, proximaDoContrato,
+  ancoraDoContrato, parcelaDoTotalDoContrato, proximaDoContrato, proximaNoCronograma,
 } from './finance-form.ts';
 test('remaining installments are added to already paid, never subtracted twice', () => {
   assert.equal(debtTerm('8', 4), 12);
@@ -212,4 +212,18 @@ test('âncora e próxima parcela fazem ida e volta, inclusive no dia 31', () => 
   assert.equal(proximaDoContrato('2027-02-28', 1, 31), '2027-03-31');
   assert.equal(proximaDoContrato('2027-01-31', 1, 31), '2027-02-28');
   assert.equal(proximaDoContrato('2027-01-31', 2, 31), '2027-03-31');
+});
+
+test('a próxima parcela que o formulário mostra é a do cronograma: nunca no passado', () => {
+  // Contrato em dia: é a do contrato.
+  assert.equal(proximaNoCronograma('2026-02-05', 9, 5, '2026-09-24'), '2026-11-05');
+  // Diminuir as pagas para 5 levaria a 6ª a 05/07 (passado); o banco a mostra na próxima
+  // ocorrência do dia 5 a partir de hoje — e o formulário também.
+  assert.equal(proximaNoCronograma('2026-02-05', 5, 5, '2026-09-24'), '2026-10-05');
+  // Hoje é o dia do vencimento: vale hoje.
+  assert.equal(proximaNoCronograma('2026-02-24', 5, 24, '2026-09-24'), '2026-09-24');
+  // Dia 31 num mês de 30: o piso é o último dia deste mês, se ainda não passou.
+  assert.equal(proximaNoCronograma('2026-01-31', 2, 31, '2026-09-24'), '2026-09-30');
+  // Carência: a do contrato está no futuro e ganha.
+  assert.equal(proximaNoCronograma('2026-12-05', 0, 5, '2026-09-24'), '2026-12-05');
 });

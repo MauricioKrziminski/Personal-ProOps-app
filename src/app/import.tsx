@@ -58,6 +58,8 @@ import {
   type Grupo,
 } from '@/lib/import-preview';
 import { AccountPicker } from '@/components/finance/account-picker';
+import { VerMais } from '@/components/ui/ver-mais';
+import { useAosPoucos, useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
 import { transicaoDeLayoutRapida } from '@/components/motion/transicao';
 
 /**
@@ -188,6 +190,17 @@ export default function ImportScreen() {
     estar sobrando. É uma SEÇÃO à parte: o que ela lista são lançamentos do app, não do arquivo.
   */
   const sobrando = useImportUnmatched(batchId, fechado);
+  /**
+   * Aos poucos (24/09/2026): a prévia vai a 500 linhas e desenhava todas de uma vez. Cada grupo
+   * mostra um passo; "Marcar todos" continua valendo para o grupo INTEIRO, visível ou não. E o que
+   * está no app sem estar no arquivo vem do mais recente para o mais antigo (a RPC devolve na
+   * ordem contrária).
+   */
+  const janelas = useJanelasPorGrupo(batchId ?? '');
+  const sobra = useAosPoucos(
+    [...(sobrando.data ?? [])].sort((a, b) => b.occurred_at.localeCompare(a.occurred_at)),
+    batchId ?? '',
+  );
 
   // Estáveis (`useCallback` + atualização funcional): a linha é `memo` e a lista vai a 500.
   const selecaoSugerida = selecaoInicial(lista, cartao);
@@ -516,6 +529,7 @@ export default function ImportScreen() {
           {grupos.map(({ grupo, itens }) => {
             const ids = itens.map((i) => i.id);
             const todos = ids.every((id) => escolhidos.has(id));
+            const j = janelas.janelaDe(grupo, itens);
             return (
               <Animated.View key={grupo} layout={transicaoDeLayoutRapida} style={styles.bloco}>
                 <SectionHead
@@ -530,7 +544,7 @@ export default function ImportScreen() {
                   }
                 />
                 <Section>
-                  {itens.map((item) => (
+                  {j.visiveis.map((item) => (
                     <ImportRow
                       key={item.id}
                       id={item.id}
@@ -547,6 +561,7 @@ export default function ImportScreen() {
                     />
                   ))}
                 </Section>
+                <VerMais restantes={j.restantes} onPress={() => janelas.verMais(grupo)} />
                 {EXPLICACAO[grupo] ? (
                   <ThemedText type="footnote" themeColor="textSecondary" style={styles.rodape}>
                     {EXPLICACAO[grupo]}
@@ -587,7 +602,7 @@ export default function ImportScreen() {
       {fechado && (sobrando.data?.length ?? 0) > 0 ? (
         <View style={styles.bloco}>
           <Section title="Está no app e não veio no arquivo">
-            {(sobrando.data ?? []).map((t) => (
+            {sobra.visiveis.map((t) => (
               <Row
                 key={t.id}
                 title={t.description}
@@ -628,6 +643,7 @@ export default function ImportScreen() {
               />
             ))}
           </Section>
+          <VerMais restantes={sobra.restantes} onPress={sobra.verMais} />
         </View>
       ) : null}
 

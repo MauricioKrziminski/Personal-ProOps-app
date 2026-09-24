@@ -20,6 +20,8 @@ import { Row, Section } from '@/components/ui/row';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Screen } from '@/components/ui/screen';
 import { Deslizavel } from '@/components/ui/deslizavel';
+import { VerMais } from '@/components/ui/ver-mais';
+import { useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { BarTrack, ProgressBar } from '@/components/ui/sparkline';
@@ -220,6 +222,10 @@ export default function InstallmentsScreen() {
     [plans.data],
   );
   const terminadas = useMemo(() => (plans.data ?? []).filter((p) => !p.active), [plans.data]);
+  // Aos poucos (24/09/2026): as terminadas crescem para sempre.
+  const janelas = useJanelasPorGrupo('');
+  const jAndamento = janelas.janelaDe('andamento', emAndamento);
+  const jTerminadas = janelas.janelaDe('terminadas', terminadas);
 
   /**
    * Parcelas por mês — TODAS, inclusive as já pagas e as de meses passados.
@@ -477,6 +483,64 @@ export default function InstallmentsScreen() {
       (a, b) => (a.installment_no ?? 0) - (b.installment_no ?? 0),
     );
     const atual = nextPendingInstallment(parcelas, plano.installments);
+    /**
+     * As parcelas em duas metades (24/09/2026), como a linha do tempo da dívida: o que falta a
+     * partir da próxima, e o que já foi pago do mais recente para o mais antigo — aos poucos.
+     */
+    const aSeguir = parcelas.filter((p) => p.status !== 'cleared');
+    const pagas = parcelas.filter((p) => p.status === 'cleared').reverse();
+    const jSeguir = janelas.janelaDe(`${plano.id}:seguir`, aSeguir);
+    const jPagas = janelas.janelaDe(`${plano.id}:pagas`, pagas);
+    const linhaDaParcela = (parcela: (typeof parcelas)[number]) => {
+              /*
+                A parcela de cartão fica `pending` até a fatura ser paga: chamar de "prevista" a
+                parcela do mês passado é a mesma mentira que a lista de Lançamentos contava.
+
+                ⚠️ `InstallmentParcel` não tem `due_at`, e o tipo de `estadoDaLinha` o exige desde
+                a Tarefa 2 — escrito assim de propósito: parcela de compra é sempre despesa. A
+                consequência é real: uma parcela sem cartão e com data passada agora lê
+                "atrasada", onde antes lia "prevista". É o certo — ninguém a pagou.
+              */
+              const estado = estadoDaLinha({ ...parcela, kind: 'expense', due_at: null }, hoje);
+              const rotulo =
+                parcela.status === 'cleared' ? 'paga'
+                : estado === 'atrasado' ? 'atrasada'
+                : estado === 'previsto' ? 'prevista'
+                : 'na fatura';
+              return (
+                <Pressable
+                  key={parcela.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Parcela ${parcela.installment_no ?? ''} de ${plano.installments}, ${formatBRL(parcela.amount_cents)}, ${rotulo}, ${formatDateBR(parcela.occurred_at)}`}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/finance/[txId]',
+                      params: { txId: parcela.id, month: parcela.occurred_at.slice(0, 7) },
+                    })
+                  }>
+                  {({ pressed }) => (
+                    <View
+                      style={[
+                        styles.parcela,
+                        { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
+                      ]}>
+                      <ThemedText type="small" style={tabular}>
+                        {parcela.installment_no ?? '—'}/{plano.installments} ·{' '}
+                        {formatDateBR(parcela.occurred_at)}
+                      </ThemedText>
+                      <View style={styles.parcelaValor}>
+                        <ThemedText
+                          type="small"
+                          themeColor={parcela.status === 'cleared' ? 'success' : 'textSecondary'}>
+                          {rotulo}
+                        </ThemedText>
+                        <Money cents={parcela.amount_cents} variant="subhead" />
+                      </View>
+                    </View>
+                  )}
+                </Pressable>
+              );
+    };
     const resumo = plano.active
       ? `${atual} de ${plano.installments} · ${brl(plano.installment_cents)}/mês`
       : `${plano.installments} de ${plano.installments} · quitada`;
@@ -534,56 +598,20 @@ export default function InstallmentsScreen() {
             layout={transicaoDeLayout}
             entering={FadeInDown.duration(Motion.duration.base)}
             style={styles.parcelas}>
-            {parcelas.map((parcela) => {
-              /*
-                A parcela de cartão fica `pending` até a fatura ser paga: chamar de "prevista" a
-                parcela do mês passado é a mesma mentira que a lista de Lançamentos contava.
-
-                ⚠️ `InstallmentParcel` não tem `due_at`, e o tipo de `estadoDaLinha` o exige desde
-                a Tarefa 2 — escrito assim de propósito: parcela de compra é sempre despesa. A
-                consequência é real: uma parcela sem cartão e com data passada agora lê
-                "atrasada", onde antes lia "prevista". É o certo — ninguém a pagou.
-              */
-              const estado = estadoDaLinha({ ...parcela, kind: 'expense', due_at: null }, hoje);
-              const rotulo =
-                parcela.status === 'cleared' ? 'paga'
-                : estado === 'atrasado' ? 'atrasada'
-                : estado === 'previsto' ? 'prevista'
-                : 'na fatura';
-              return (
-                <Pressable
-                  key={parcela.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Parcela ${parcela.installment_no ?? ''} de ${plano.installments}, ${formatBRL(parcela.amount_cents)}, ${rotulo}, ${formatDateBR(parcela.occurred_at)}`}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/finance/[txId]',
-                      params: { txId: parcela.id, month: parcela.occurred_at.slice(0, 7) },
-                    })
-                  }>
-                  {({ pressed }) => (
-                    <View
-                      style={[
-                        styles.parcela,
-                        { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
-                      ]}>
-                      <ThemedText type="small" style={tabular}>
-                        {parcela.installment_no ?? '—'}/{plano.installments} ·{' '}
-                        {formatDateBR(parcela.occurred_at)}
-                      </ThemedText>
-                      <View style={styles.parcelaValor}>
-                        <ThemedText
-                          type="small"
-                          themeColor={parcela.status === 'cleared' ? 'success' : 'textSecondary'}>
-                          {rotulo}
-                        </ThemedText>
-                        <Money cents={parcela.amount_cents} variant="subhead" />
-                      </View>
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
+            {aSeguir.length > 0 ? (
+              <ThemedText type="meta" themeColor="textSecondary" style={styles.subtituloParcelas}>
+                A seguir
+              </ThemedText>
+            ) : null}
+            {jSeguir.visiveis.map(linhaDaParcela)}
+            <VerMais restantes={jSeguir.restantes} onPress={() => janelas.verMais(`${plano.id}:seguir`)} />
+            {pagas.length > 0 ? (
+              <ThemedText type="meta" themeColor="textSecondary" style={styles.subtituloParcelas}>
+                Pagas
+              </ThemedText>
+            ) : null}
+            {jPagas.visiveis.map(linhaDaParcela)}
+            <VerMais restantes={jPagas.restantes} onPress={() => janelas.verMais(`${plano.id}:pagas`)} />
           </Animated.View>
         ) : null}
       </Animated.View>
@@ -669,7 +697,12 @@ export default function InstallmentsScreen() {
 
   const listaParcelas = (
     <>
-      {emAndamento.length > 0 ? <Section title="Em andamento">{emAndamento.map(bloco)}</Section> : null}
+      {emAndamento.length > 0 ? (
+        <View style={styles.lista}>
+          <Section title="Em andamento">{jAndamento.visiveis.map(bloco)}</Section>
+          <VerMais restantes={jAndamento.restantes} onPress={() => janelas.verMais('andamento')} />
+        </View>
+      ) : null}
       {terminadas.length > 0 ? (
         <Section title="Terminadas">
           <Row
@@ -678,8 +711,11 @@ export default function InstallmentsScreen() {
             chevron={false}
             onPress={() => setVerTerminadas(!verTerminadas)}
           />
-          {verTerminadas ? terminadas.map(bloco) : null}
+          {verTerminadas ? jTerminadas.visiveis.map(bloco) : null}
         </Section>
+      ) : null}
+      {terminadas.length > 0 && verTerminadas ? (
+        <VerMais restantes={jTerminadas.restantes} onPress={() => janelas.verMais('terminadas')} />
       ) : null}
       {!plans.isLoading && !plans.isError && lista.length === 0 ? (
         <EmptyState
@@ -866,6 +902,9 @@ export default function InstallmentsScreen() {
 }
 
 const styles = StyleSheet.create({
+  lista: { gap: Space.md },
+  // Alinhado ao texto das parcelas (o mesmo recuo de `parcela`).
+  subtituloParcelas: { paddingTop: Space.sm, paddingHorizontal: Space.xl },
   paneBody: {
     gap: Space.xl,
     minWidth: 0,

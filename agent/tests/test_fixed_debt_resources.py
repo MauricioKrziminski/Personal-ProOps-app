@@ -332,7 +332,7 @@ async def test_next_due_date_becomes_the_contract_anchor(fixed_debt):
 @pytest.mark.asyncio
 async def test_paid_count_never_below_registered_payments(fixed_debt_with_payment):
     """Com 2 pagamentos lançados, dizer "1 paga" faria o próximo "Paguei" repetir o número 2."""
-    with pytest.raises(Level1Error, match="lançados"):
+    with pytest.raises(Level1Error, match="lançado"):
         await resources.prepare(fixed_debt_with_payment, action("resource_update", installments_paid=1))
 
 
@@ -352,3 +352,20 @@ async def test_purge_rechecks_workspace_and_version(fixed_debt_with_payment, mon
     sql, args = chamadas[0]
     assert "workspace_id" in sql and "xmin" in sql, "a exclusão reconfere dono e versão"
     assert args == ("debt", "workspace", "3")
+
+
+@pytest.mark.asyncio
+async def test_paid_floor_counts_the_highest_paid_installment(fixed_debt_with_payment, monkeypatch):
+    """O piso é a MAIOR parcela já paga, não só a contagem: um "Paguei" lançado como a 5ª com
+    4 pagas deixaria a 5ª paga aparecendo como futura (o mesmo piso do app)."""
+    consultas = []
+    anterior = resources.db.fetch
+
+    async def fetch(sql, *args):
+        consultas.append(sql)
+        return await anterior(sql, *args)
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    await resources.prepare(fixed_debt_with_payment, action("resource_update", installments_paid=10))
+    piso = [q for q in consultas if "public.transactions" in q]
+    assert piso and "max(debt_payment_no)" in piso[0]

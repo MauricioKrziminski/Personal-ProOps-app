@@ -1196,3 +1196,19 @@ test('o título da linha de extrato tem o mesmo piso de largura do título da Ro
   assert.ok(piso && extrato, 'os dois estilos existem');
   assert.equal(Number(extrato), Number(piso));
 });
+
+test('card que arrasta tem press-in: o filho do Deslizavel é PressableScale ou desenha o pressionado', () => {
+  // 24/09/2026: metas, orçamentos, recorrentes e dívidas usavam um `Pressable` cru — o toque no
+  // card não dava sinal nenhum (design.md §5: `scale 0.97` em card).
+  const semSinal: string[] = [];
+  for (const file of walk(join(SRC, 'app'))) {
+    if (!file.endsWith('.tsx')) continue;
+    const text = readFileSync(file, 'utf8');
+    for (const m of text.matchAll(/<Deslizavel\b[^<]*?>\s*<(Pressable|PressableScale)\b([^]*?)(?:<Card|<View)/g)) {
+      if (m[1] === 'Pressable' && !/\(\{ pressed \}\)/.test(m[2])) {
+        semSinal.push(`${file.slice(SRC.length + 1)}:${text.slice(0, m.index).split('\n').length}`);
+      }
+    }
+  }
+  assert.deepEqual(semSinal, []);
+});

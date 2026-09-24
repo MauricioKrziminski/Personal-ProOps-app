@@ -1,5 +1,5 @@
 import { vereditoDoDia } from '@/lib/widget-snapshot';
-import { router, type Href } from 'expo-router';
+import { router } from 'expo-router';
 import { Fragment, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
@@ -8,6 +8,8 @@ import { ErrorCard } from '@/components/error-card';
 import { AgendaItem } from '@/components/feed/agenda-item';
 import { ReminderTimeline } from '@/components/feed/reminder-timeline';
 import { ProximoPassoCard } from '@/components/feed/proximo-passo';
+import { VerMais } from '@/components/ui/ver-mais';
+import { useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
 import { SetupChecklist } from '@/components/feed/setup-checklist';
 import { TodaySignals, type TodaySignal } from '@/components/feed/today-signals';
 import { TodayTabletCanvas } from '@/components/feed/today-tablet-canvas';
@@ -142,6 +144,10 @@ export default function TodayScreen() {
   );
   const atrasados = agenda.agora.filter((i) => i.atrasado);
   const doDia = agenda.agora.filter((i) => !i.atrasado);
+  // Aos poucos (24/09/2026): o atrasado não tem data mínima e podia encher a Hoje inteira.
+  const janelas = useJanelasPorGrupo('');
+  const jAtrasados = janelas.janelaDe('atrasados', atrasados);
+  const jDoDia = janelas.janelaDe('doDia', doDia);
   /** O contador "Vencendo" e o badge são SÓ de despesa (receita prevista não vence). */
   const contas = (bills.data ?? []).filter((b) => b.kind !== 'income');
   const lembretes = reminders.data ?? [];
@@ -415,7 +421,7 @@ export default function TodayScreen() {
             onAbrir={() => {
               const passo = proximo.passo!;
               if (passo.id === 'projecao') proximo.dispensar('projecao');
-              router.push(passo.href as Href);
+              router.push(passo.href);
             }}
             onDispensar={() => proximo.dispensar(proximo.passo!.id)}
           />
@@ -432,15 +438,17 @@ export default function TodayScreen() {
           <View>
             {atrasados.length > 0 ? (
               <DayRail label="atrasado" tone="danger" last={doDia.length === 0}>
-                {atrasados.map((i) => itemDaAgenda(i, 'agora'))}
+                {jAtrasados.visiveis.map((i) => itemDaAgenda(i, 'agora'))}
               </DayRail>
             ) : null}
             {doDia.length > 0 ? (
               <DayRail label="hoje" last>
-                {doDia.map((i) => itemDaAgenda(i, 'agora'))}
+                {jDoDia.visiveis.map((i) => itemDaAgenda(i, 'agora'))}
               </DayRail>
             ) : null}
           </View>
+          <VerMais restantes={jAtrasados.restantes} onPress={() => janelas.verMais('atrasados')} />
+          <VerMais restantes={jDoDia.restantes} onPress={() => janelas.verMais('doDia')} />
         </Bloco>
       ) : null}
     </>
@@ -462,8 +470,8 @@ export default function TodayScreen() {
         onOpen={(l: LinhaDeCaixa) =>
           router.push(
             l.id
-              ? ({ pathname: '/finance/transactions', params: { accountId: l.id } } as Href)
-              : ('/finance/transactions' as Href)
+              ? { pathname: '/finance/transactions', params: { accountId: l.id } }
+              : '/finance/transactions'
           )
         }
       />

@@ -949,7 +949,7 @@ function seedClient() {
     status: 'active',
   });
   client.setQueryData<AiMonthStats>(['ai-month-stats', mes], { lancamentos: 18, notas: 7 });
-  client.setQueryData(['reminders'], []);
+  client.setQueryData(['reminders'], { pages: [[]], pageParams: [0] });
   client.setQueryData(['goals'], []);
   /**
    * `Recorrentes` ganhou EDIÇÃO em 09/09/2026 e o sheet de edição é outro desenho do de

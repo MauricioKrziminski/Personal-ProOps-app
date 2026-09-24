@@ -9,6 +9,8 @@
  * pessoa. A ordem é a do valor para quem acabou de chegar: a fatura primeiro (é o que mais dado
  * traz de uma vez), a projeção (é a pergunta que o app responde e a planilha não), e o resto.
  */
+import type { Href } from 'expo-router';
+
 export type ProximoId = 'importar' | 'projecao' | 'lembrete' | 'parcelada' | 'nota';
 
 export type Proximo = {
@@ -16,7 +18,7 @@ export type Proximo = {
   titulo: string;
   acao: string;
   icon: 'square.and.arrow.down' | 'chart.line.uptrend.xyaxis' | 'bell' | 'creditcard.and.123' | 'note.text';
-  href: string;
+  href: Href;
 };
 
 export function proximoPasso(
@@ -30,7 +32,7 @@ export function proximoPasso(
       titulo: 'Traga sua fatura',
       acao: 'Importar fatura',
       icon: 'square.and.arrow.down',
-      href: `/import?conta=${i.cartaoId ?? ''}`,
+      href: { pathname: '/import', params: { conta: i.cartaoId ?? '' } },
     },
     {
       id: 'projecao',

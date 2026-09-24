@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; batches?: any[]; plans?: any[]; contributions?: any[] } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; batches?: any[]; plans?: any[]; contributions?: any[] } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -29,6 +29,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   /** As mesmas escritas de `writes`, com as opções (`onSuccess`/`onError`) — é por aqui que se chama o retorno. */
   const pedidos: { operation: string; value: any; opts: any }[] = [];
   const toasts: any[] = [];
+  /** Com que limite cada lista paginada no servidor foi pedida — é como se vê o "Ver mais" pedir mais. */
+  const pedidosDeLimite: [string, number | undefined][] = [];
   const mutation = (operation: string) => ({ isPending: false, reset() {}, mutate(value: any, opts?: any) { writes.push({ operation, value }); pedidos.push({ operation, value, opts }); } });
   const animation = { duration: () => animation, delay: () => animation };
   const finance = new Proxy({
@@ -39,14 +41,21 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     ASSET_CLASSES: [{ value: 'investment', label: 'Investimento', icon: 'chart.line.uptrend.xyaxis' }],
     useDebts: () => ({ ...query, data: options.debts ?? [] }),
     useCardSummary: () => ({ ...query, isSuccess: true, data: options.cards ?? [] }),
+    useCardInvoices: () => ({ ...query, isSuccess: true, data: options.faturas ?? [] }),
+    useCategoriesUsed: () => ({ ...query, isSuccess: true, data: options.categoriasUsadas ?? [] }),
+    useImportItems: () => ({ ...query, isSuccess: true, data: options.importItems ?? [] }),
+    useImportBatch: () => ({ ...query, isSuccess: true, data: options.importBatch ?? { status: 'open', account_id: 'conta-1', accounts: { type: 'checking' } } }),
+    useImportUnmatched: () => ({ ...query, isSuccess: true, data: options.unmatched ?? [] }),
     // Só responde quando o teste dá os lançamentos: respondido e vazio, o Financeiro afirmaria
     // "Ainda não tem movimento", e o teste das bordas falhando depende de ele NÃO afirmar.
     useRules: () => ({ ...query, isSuccess: true, data: options.rules ?? [] }),
     useRecurringTransactions: () => ({ ...query, isSuccess: true, data: options.recurring ?? [] }),
     useToggleRecurring: () => mutation('toggleRecurring'),
     useGoals: () => ({ ...query, isSuccess: true, data: options.goals ?? [] }),
-    useImportBatches: () => ({ ...query, isSuccess: true, data: options.batches ?? [] }),
+    useImportBatches: (limite?: number) => { pedidosDeLimite.push(['batches', limite]); return { ...query, isSuccess: true, data: options.batches ?? [] }; },
+    useAlertsSent: (limite?: number) => { pedidosDeLimite.push(['alerts', limite]); return { ...query, isSuccess: true, data: options.alerts ?? [] }; },
     useInstallmentPlans: () => ({ ...query, isSuccess: true, data: options.plans ?? [] }),
+    useInstallmentPlan: (id?: string) => ({ ...query, isSuccess: true, data: (options.plans ?? []).find((p: any) => p.id === id) ?? null }),
     useGoalContributions: () => ({ ...query, isSuccess: true, data: options.contributions ?? [] }),
     useGoalDeposit: () => mutation('goalDeposit'),
     useDeleteImportBatch: () => mutation('deleteImportBatch'),
@@ -105,7 +114,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       forecastDrafts = drafts;
       return { ...query, data: [{ day: '2026-09-18', balance_cents: 10000, in_cents: 0, out_cents: 0 }] };
     },
-    useForecastMonths: () => ({ ...query, data: { hoje: 10000, meses: [] }, isPlaceholderData: false }),
+    useForecastMonths: () => ({ ...query, data: { hoje: 10000, meses: options.forecastMonths ?? [] }, isPlaceholderData: false }),
     // O mês é uma STRING (`2026-09`); sem este dublê o Proxy devolvia um objeto-consulta.
     useCycleMonth: () => '2026-09',
     useMonthBreakdown: () => ({ ...query, data: [] }),
@@ -115,7 +124,9 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useDeleteDebt: () => mutation('deleteDebt'),
     useArchivedDebts: () => ({ ...query, data: options.archivedDebts ?? [] }),
     useDebtSchedule: () => ({ ...query, data: options.debtSchedule ?? [] }),
-    useDebtPayments: () => ({ ...query, isSuccess: true, data: [] }),
+    useDebtPayments: () => options.paymentsError
+      ? { ...query, isSuccess: false, isError: true, data: undefined, refetch: async () => { refetches.push('payments'); } }
+      : { ...query, isSuccess: true, data: options.debtPayments ?? [] },
     pagamentosDaDivida: async () => ({ count: 0, totalCents: 0 }),
     useSaveAsset: () => mutation('saveAsset'),
     useArchiveAsset: () => mutation('archiveAsset'),
@@ -174,6 +185,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => options.params ?? ({ id: 'invoice-1', ...(options.create !== false ? { create: 'financing' } : {}) }), router: { push: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }) } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
+      if (name === '@/hooks/use-aos-poucos') return load('src/hooks/use-aos-poucos.ts');
       if (name === '@/hooks/use-lock') return { useLock: () => ({ semTrancar: (fn: () => unknown) => fn() }) };
       // O voo da Carteira é camada da raiz; aqui só a forma dos hooks, inerte.
       if (name === '@/components/motion/flight-layer') return { useFlight: () => ({ voar: async () => false }), useFlightAnchor: () => ({ prender: null, aoPosicionar: undefined }), useFlightHidden: () => undefined };
@@ -189,7 +201,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@/hooks/use-tela-pronta') return { useTelaPronta: (...consultas: any[]) => { gates.push(consultas); return true; } };
       // Carregado DE VERDADE: ele é a regra que se quer testar, não um arredor da tela.
       if (name === '@/hooks/use-voltar-quando-fechar') return load('src/hooks/use-voltar-quando-fechar.ts');
-      if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useToggleReminder: () => mutation('toggleReminder'), useDeleteReminder: () => mutation('deleteReminder') };
+      if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useReminders: () => ({ ...query, isSuccess: true, data: { pages: [options.reminders ?? []], pageParams: [0] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }), useToggleReminder: () => mutation('toggleReminder'), useDeleteReminder: () => mutation('deleteReminder') };
       if (name === '@/hooks/use-session') return { useSession: () => ({ session: { user: { id: 'user-1' } } }) };
       if (name === '@/hooks/use-profile') return { useProfile: () => ({ ...query, isSuccess: true, data: { display_name: 'Gabriel Almeida', phone: null } }) };
       if (name === '@/hooks/use-proximo-passo') return { useProximoPasso: () => ({ passo: options.proximo ?? null, dispensar: (id: string) => writes.push({ operation: 'dispensarProximo', value: id }), consultas: [] }) };
@@ -206,12 +218,13 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/lib/rrule-text') return { describeRRule: () => 'todo mês' };
+      if (name === '@/hooks/use-archived-folders') return { useArchivedFolders: () => ({ ...query, isSuccess: true, data: [] }) };
       if (name === '@/hooks/use-notes') return new Proxy({
         useNoteFolders: () => ({ ...query, isSuccess: true, data: options.folders ?? [] }),
-        useNotesList: () => ({ ...query, isSuccess: true, data: { pages: [options.notes ?? []] } }),
+        useNotesList: () => ({ ...query, isSuccess: true, data: { pages: [options.notes ?? []] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }),
         folderTree: (lista: any[]) => lista.map((f) => ({ ...f, depth: 0 })),
       } as Record<string, any>, { get: (target, key) => key in target ? target[key as string] : () => mutation(String(key)) });
       if (name === '@/hooks/use-agent-chat') return {
@@ -221,6 +234,13 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       };
       if (name === '@/components/notes/note-actions') return { actionSheet: () => {}, FOLDER_ICONS: [], notesLabel: (n: number) => `${n} notas`, symbol: () => 'folder' };
       if (name === '@/design/note-colors') return { noteRail: () => null, noteInk: () => null };
+      if (name === '@/hooks/use-search') return {
+        useGlobalSearch: (_q: string, limite?: number) => {
+          pedidosDeLimite.push(['busca', limite]);
+          const r = (data: any[]) => ({ ...query, isSuccess: true, isLoading: false, data });
+          return { notes: r(options.buscaNotas ?? []), transactions: r([]), reminders: r([]), enabled: true, term: 'mercado' };
+        },
+      };
       if (name === '@/lib/search') return { noteTitle: (texto: string) => texto.split('\n')[0], notePreview: () => '' };
       if (name === '@/lib/note-blocks') return { todoProgress: () => ({ done: 0, total: 0 }) };
       if (name === '@/design/category-icons') return { categoryIcon: () => 'circle' };
@@ -228,6 +248,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       // import relativo DENTRO de um módulo puro já carregado (month-view → ./dates.ts)
       if (name === './dates.ts' || name === './dates') return load('src/lib/dates.ts');
       if (name === './debt-history.ts' || name === './debt-history') return load('src/lib/debt-history.ts');
+      if (name === './text.ts' || name === './text') return load('src/lib/text.ts');
       // o `month-picker` é `.tsx` e importa React Native; aqui só as funções puras dele
       if (name === '@/components/finance/month-picker') return {
         MonthPicker: 'MonthPicker',
@@ -311,7 +332,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   const render = () => { cursor = 0; nodes = []; visit(Component(options.props ?? {})); };
   render();
   return {
-    writes, pedidos, toasts, confirmations, actions, navigations, refetches, gates,
+    writes, pedidos, toasts, pedidosDeLimite, confirmations, actions, navigations, refetches, gates,
     drafts: () => forecastDrafts,
     nodes: () => nodes,
     button(label: string) { const node = nodes.find((n) => n.type === 'Button' && n.props.label === label); assert.ok(node, `visible button: ${label}`); return node; },
@@ -559,7 +580,7 @@ const carro = {
   first_due_date: '2026-02-05',
 };
 const editar = (ui: any) => {
-  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Pressable' && n.props.onLongPress).props.onLongPress());
+  ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onLongPress());
   ui.interact(() => ui.actions.find((a: any) => a.label === 'Editar').onPress());
 };
 
@@ -580,7 +601,7 @@ test('editing the paid count keeps the contract calendar: the next date follows 
 
 test('long press on an active debt offers the full set, including delete for good', () => {
   const ui = screen(debtsFile, { create: false, debts: [carro] });
-  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Pressable' && n.props.onLongPress).props.onLongPress());
+  ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onLongPress());
   assert.deepEqual(ui.actions.map((a: any) => a.label), ['Pagar parcela', 'Ver as parcelas', 'Editar', 'Arquivar', 'Excluir por completo']);
 });
 
@@ -595,6 +616,28 @@ test('archived debts have a place to come back from', () => {
   assert.deepEqual(ui.writes.at(-1), { operation: 'unarchiveDebt', value: 'd2' });
 });
 
+test('"Desfazer"/Desarquivar de uma dívida que já não existe não diz que ela voltou', () => {
+  const ui = screen(debtsFile, { create: false, debts: [carro], archivedDebts: [{ ...carro, id: 'd2', name: 'Moto', archived: true }] });
+  ui.interact(() => ui.nodes().find((n) => n.type === 'Row' && n.props.title === 'Arquivadas · 1').props.onPress());
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Row' && n.props.title === 'Moto').props.onPress());
+  ui.interact(() => ui.actions[0].onPress());
+  ui.interact(() => ui.pedidos.at(-1).opts.onSuccess(false));
+  assert.doesNotMatch(ui.toasts.at(-1).message, /voltou/);
+  assert.match(ui.toasts.at(-1).message, /não existe mais/);
+  ui.interact(() => ui.pedidos.at(-1).opts.onSuccess(true));
+  assert.match(ui.toasts.at(-1).message, /voltou para a lista/);
+});
+
+test('salvar a edição manda a versão que foi aberta, e a dívida que mudou no meio vira aviso', () => {
+  const ui = screen(debtsFile, { create: false, debts: [{ ...carro, updated_at: '2026-09-24T10:00:00.123456+00:00' }] });
+  editar(ui);
+  ui.fill('Nome', 'Carro novo');
+  ui.press('Salvar');
+  assert.equal(ui.writes[0].value.versao, '2026-09-24T10:00:00.123456+00:00');
+  ui.interact(() => ui.pedidos.at(-1).opts.onError(Object.assign(new Error('x'), { code: 'VERSAO' })));
+  assert.match(ui.toasts.at(-1).message, /mudou enquanto você editava/);
+});
+
 test('without archived debts there is no empty "Arquivadas" row', () => {
   const ui = screen(debtsFile, { create: false, debts: [carro] });
   assert.equal(ui.nodes().some((n) => n.type === 'Row' && String(n.props.title).startsWith('Arquivadas')), false);
@@ -602,7 +645,7 @@ test('without archived debts there is no empty "Arquivadas" row', () => {
 
 test('delete for good asks with the consequence first, then deletes', async () => {
   const ui = screen(debtsFile, { create: false, debts: [carro] });
-  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Pressable' && n.props.onLongPress).props.onLongPress());
+  ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onLongPress());
   ui.interact(() => ui.actions.find((a: any) => a.label === 'Excluir por completo').onPress());
   await new Promise((r) => setTimeout(r, 0));
   assert.equal(ui.writes.some((w: any) => w.operation === 'deleteDebt'), false, 'nada sai antes do SIM');
@@ -613,12 +656,31 @@ test('delete for good asks with the consequence first, then deletes', async () =
 
 test('the detail has the "…" with the same actions as the long press', () => {
   const ui = screen(debtsFile, { create: false, debts: [carro] });
-  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Pressable' && n.props.onLongPress).props.onPress());
+  ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onPress());
   const menu = ui.nodes().find((n) => n.type === 'HeaderIconButton' && n.props.label === 'Mais ações');
   assert.ok(menu, 'o detalhe tem o "…" no alto');
   ui.interact(() => menu.props.onPress());
   // no detalhe "Ver as parcelas" sai: é o que já se está vendo
   assert.deepEqual(ui.actions.map((a: any) => a.label), ['Editar', 'Arquivar', 'Excluir por completo']);
+});
+
+test('detalhe da dívida: "A seguir" começa na próxima, 20 por vez, e "Já pagas" vem da mais recente', () => {
+  const futuras = Array.from({ length: 30 }, (_, i) => ({
+    installment_no: 9 + i, due_date: `${2026 + Math.floor((9 + i) / 12)}-${String(((9 + i) % 12) + 1).padStart(2, '0')}-05`,
+    payment_cents: 147000, interest_cents: null, principal_cents: null, balance_cents: 0,
+  }));
+  const ui = screen(debtsFile, { create: false, debts: [{ ...carro, installments_paid: 8 }], debtSchedule: futuras });
+  ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onPress());
+  const linhas = () => ui.nodes().filter((n: any) => n.type === 'DebtTimeline');
+  const seguir = () => linhas()[0].props.anos.flatMap((a: any) => a.itens);
+  assert.equal(seguir()[0].n, 9, 'a próxima no topo');
+  assert.equal(seguir().length, 20, 'só o primeiro passo');
+  const pagas = linhas()[1].props.anos.flatMap((a: any) => a.itens);
+  assert.deepEqual(JSON.parse(JSON.stringify(pagas.map((i: any) => i.n))), [8, 7, 6, 5, 4, 3, 2, 1], 'a mais recente primeiro');
+  const mais = ui.nodes().find((n: any) => n.type === 'VerMais' && n.props.restantes === 10);
+  assert.ok(mais, '"Ver mais" com as 10 que faltam');
+  ui.interact(() => mais.props.onPress());
+  assert.equal(seguir().length, 30);
 });
 
 test('editing the paid count of an OLD debt keeps the date its schedule shows (final review, 23/09/2026)', () => {
@@ -636,6 +698,39 @@ test('editing the paid count of an OLD debt keeps the date its schedule shows (f
   ui.press('Salvar');
   assert.equal('first_due_date' in ui.writes[0].value, false, 'sem tocar na data, nada de âncora');
   assert.equal(ui.writes[0].value.installments_paid, 9);
+});
+
+test('editar com os pagamentos sem carregar diz por que o Salvar não liga, e tenta de novo', () => {
+  const ui = screen(debtsFile, { create: false, debts: [{ ...carro }], paymentsError: true });
+  editar(ui);
+  assert.equal(ui.button('Salvar').props.disabled, true);
+  const faixa = ui.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'ErrorBand' && /pagamentos/.test(n.props.message));
+  assert.ok(faixa, 'a faixa de erro aparece no formulário');
+  faixa.props.onRetry();
+  assert.ok(ui.refetches.includes('payments'));
+});
+
+test('as pagas não descem abaixo da maior parcela já paga pelo app (não só da contagem)', () => {
+  // Um "Paguei" lançado como a 5ª: dizer 4 pagas deixaria a 5ª paga aparecendo como futura.
+  const ui = screen(debtsFile, {
+    create: false,
+    debts: [{ ...carro, installments_paid: 5, remaining_cents: 147000 * 43 }],
+    debtPayments: [{ debt_payment_no: 5, occurred_at: '2026-09-05', amount_cents: 147000 }],
+  });
+  editar(ui);
+  ui.fill('Parcelas já pagas', '4');
+  ui.press('Salvar');
+  assert.equal(ui.writes[0].value.installments_paid, 5);
+});
+
+test('diminuir as pagas de uma dívida com âncora nunca mostra uma próxima parcela no passado', () => {
+  // Contrato com 1ª em 05/02/2026 e 9 pagas: a 10ª é 05/11. Corrigir para 5 levaria a 6ª a 05/07,
+  // que já passou — o cronograma a mostra na próxima ocorrência do dia 5 a partir de hoje (08/09).
+  const ui = screen(debtsFile, { create: false, debts: [{ ...carro, first_due_date: '2026-02-05', installments_paid: 9, remaining_cents: 147000 * 39 }] });
+  editar(ui);
+  ui.fill('Parcelas já pagas', '5');
+  const campo = ui.nodes().find((n) => n.type === 'DatePickerField');
+  assert.equal(campo.props.value, '05/10/2026');
 });
 
 test('a month-end contract keeps day 31 when the chosen date falls in a short month (final review)', () => {
@@ -702,7 +797,7 @@ test('e quem abriu o formulário PELA PRÓPRIA tela continua nela', () => {
 
 test('editing a legacy amortized financing preserves its mode and remaining-term semantics', () => {
   const ui = screen(debtsFile, { create: false, debts: [{ id: 'old-debt', name: 'Carro', kind: 'financing', calculation_mode: 'amortized', principal_cents: 7056000, remaining_cents: 5880000, installments: 48, installments_paid: 8, installment_cents: 147000, interest_rate_monthly: 0.0199, account_id: null, due_day: 10 }] });
-  ui.interact((nodes) => nodes.find((n) => n.type === 'Pressable' && n.props.onLongPress).props.onLongPress());
+  ui.interact((nodes) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onLongPress());
   ui.interact(() => ui.actions.find((a) => a.label === 'Editar')!.onPress());
   assert.ok(ui.nodes().some((n) => n.type === 'Field' && n.props.label === 'Juros por mês'));
   assert.ok(!ui.nodes().some((n) => n.type === 'Segmented'));
@@ -1385,4 +1480,219 @@ test('Paywall: no plano que a pessoa já tem, o botão não oferece dias grátis
   assert.equal(botaoPro.props.label, 'Seu plano atual');
   const noFree = screen('src/app/paywall.tsx', { plan: 'free' });
   assert.match(String(noFree.nodes().find((n: any) => n.type === 'Button').props.label), /dias grátis/);
+});
+
+test('Ciclo: dentro de cada grupo, do mais recente para o mais antigo, e 20 por vez com "Ver mais"', () => {
+  const linhas = Array.from({ length: 25 }, (_, i) => ({
+    day: `2026-09-${String(11 + i).padStart(2, '0')}`.replace(/-(3[2-9]|4\d)$/, (m) => `-${m.slice(1)}`),
+    in_cents: 0, out_cents: 1000 + i, title: `gasto ${i + 1}`, origin: 'transaction', ref_id: `t${i}`,
+    method_label: null, atrasada: false,
+  })).map((l, i) => ({ ...l, day: i < 20 ? `2026-09-${String(11 + i)}` : `2026-10-0${i - 19}` }));
+  const ui = screen('src/app/finance/cycle.tsx', { cycleLines: linhas });
+  const dias = () => ui.nodes().filter((n: any) => typeof n.type === 'function' && n.type.name === 'Linha').map((n: any) => n.props.linha.day);
+  assert.equal(dias().length, 20, 'só o primeiro passo');
+  assert.equal(dias()[0], '2026-10-05', 'o mais recente primeiro');
+  assert.deepEqual([...dias()].sort().reverse(), dias(), 'em ordem decrescente');
+  const mais = ui.nodes().find((n: any) => n.type === 'VerMais');
+  assert.equal(mais.props.restantes, 5);
+  ui.interact(() => mais.props.onPress());
+  assert.equal(dias().length, 25);
+  assert.equal(dias().at(-1), '2026-09-11', 'o mais antigo por último');
+});
+
+test('Importar: a prévia desenha cada grupo aos poucos, e "Marcar todos" continua valendo para o grupo inteiro', () => {
+  const itens = Array.from({ length: 45 }, (_, i) => ({
+    id: `i${i}`, status: 'pending', kind: 'expense', nature: 'compra', amount_cents: 1000 + i,
+    occurred_at: `2026-09-${String((i % 28) + 1).padStart(2, '0')}`, description: `compra ${i}`, suggested_category: 'mercado',
+  }));
+  const ui = screen(importFile, { params: { batch: 'b1' }, forecastAccounts: contasDoImport, importItems: itens });
+  const linhas = () => ui.nodes().filter((n: any) => n.type === 'ImportRow');
+  assert.equal(linhas().length, 20);
+  const cabecalho = ui.nodes().find((n: any) => n.type === 'SectionHead' && /^Novos/.test(n.props.title));
+  assert.match(cabecalho.props.title, /45$/, 'o título conta o grupo inteiro');
+  const mais = ui.nodes().find((n: any) => n.type === 'VerMais');
+  assert.equal(mais.props.restantes, 25);
+  ui.interact(() => mais.props.onPress());
+  assert.equal(linhas().length, 40);
+});
+
+test('Importar: "Está no app e não veio no arquivo" vem do mais recente para o mais antigo, aos poucos', () => {
+  const sobrando = Array.from({ length: 25 }, (_, i) => ({
+    id: `t${i}`, description: `lanç ${i}`, category: null, amount_cents: 100,
+    occurred_at: `2026-09-${String(i + 1).padStart(2, '0')}`,
+  }));
+  const ui = screen(importFile, {
+    params: { batch: 'b1' }, forecastAccounts: contasDoImport,
+    importBatch: { status: 'done', account_id: 'conta-1', accounts: { type: 'checking' } }, unmatched: sobrando,
+  });
+  const linhas = ui.nodes().filter((n: any) => n.type === 'Row' && /^lanç /.test(n.props.title));
+  assert.equal(linhas.length, 20);
+  assert.equal(linhas[0].props.title, 'lanç 24', 'o mais recente primeiro');
+  assert.ok(ui.nodes().some((n: any) => n.type === 'VerMais' && n.props.restantes === 5));
+});
+
+test('Projeção: "Atrasado" e os meses aparecem aos poucos, com "Ver mais"', () => {
+  const atrasadas = Array.from({ length: 25 }, (_, i) => ({
+    kind: 'bill', ref_id: `b${i}`, title: `conta ${i}`, amount_cents: 1000, due_date: `2026-08-${String(i + 1).padStart(2, '0')}`, overdue: true,
+  }));
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], bills: atrasadas });
+  assert.equal(ui.nodes().filter((n: any) => n.type === 'Deslizavel').length, 20);
+  assert.ok(ui.nodes().some((n: any) => n.type === 'VerMais' && n.props.restantes === 5));
+
+  const meses = Array.from({ length: 30 }, (_, i) => ({
+    mes: `${2026 + Math.floor((8 + i) / 12)}-${String(((8 + i) % 12) + 1).padStart(2, '0')}-01`,
+    entra: 0, sai: 0, saldo: 1000, parcial: false, primeiroNegativo: null, de: '2026-09-01', ate: '2026-09-30',
+  }));
+  const ui2 = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], forecastMonths: meses });
+  ui2.interact((nodes: any[]) => nodes.find((n) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'mes')).props.onChange('mes'));
+  const mais = ui2.nodes().find((n: any) => n.type === 'VerMais' && n.props.restantes === 10);
+  assert.ok(mais, 'os 30 meses em passos de 20');
+});
+
+test('Recorrentes: cada seção aparece aos poucos, com "Ver mais"', () => {
+  const series = Array.from({ length: 25 }, (_, i) => ({
+    id: `rec-${i}`, description: `série ${i}`, kind: 'expense', amount_cents: 1000, rrule: 'FREQ=MONTHLY;BYMONTHDAY=15',
+    dtstart: '2026-01-15', next_run_at: '2026-10-15T12:00:00Z', active: true, account_id: null, category: 'casa',
+  }));
+  const ui = screen('src/app/finance/recurring.tsx', { recurring: series });
+  assert.equal(ui.nodes().filter((n: any) => n.type === 'Deslizavel').length, 20);
+  const mais = ui.nodes().find((n: any) => n.type === 'VerMais' && n.props.restantes === 5);
+  assert.ok(mais);
+  ui.interact(() => mais.props.onPress());
+  assert.equal(ui.nodes().filter((n: any) => n.type === 'Deslizavel').length, 25);
+});
+
+test('Metas: o extrato vem aos poucos, e o total do mês continua sendo o do mês inteiro', () => {
+  // 25 aportes em setembro, do mais recente para o mais antigo (a consulta já ordena assim).
+  const aportes = Array.from({ length: 25 }, (_, i) => ({
+    id: `c${i}`, goal_id: 'g1', amount_cents: 1000, occurred_at: `2026-09-${String(25 - i).padStart(2, '0')}`, note: null,
+  }));
+  const ui = screen('src/app/finance/goals.tsx', {
+    goals: [{ id: 'g1', name: 'Viagem', target_cents: 500000, saved_cents: 25000, deadline: null, archived: false }],
+    contributions: aportes,
+  });
+  ui.interact(() => deslizaveis(ui)[0].props.acoes.find((x: any) => x.label === 'Ver extrato').onPress());
+  const doExtrato = () => deslizaveis(ui).filter((d: any) => d.props.acoes.some((x: any) => x.label === 'Desfazer'));
+  assert.equal(doExtrato().length, 20);
+  const secao = ui.nodes().find((n: any) => n.type === 'Section' && /setembro/.test(n.props.title ?? ''));
+  assert.match(secao.props.title, /R\$ 250\.00$/, 'o total do mês conta os 25');
+  const mais = ui.nodes().find((n: any) => n.type === 'VerMais' && n.props.restantes === 5);
+  ui.interact(() => mais.props.onPress());
+  assert.equal(doExtrato().length, 25);
+});
+
+test('Parcelada aberta: "A seguir" a partir da próxima, e "Pagas" da mais recente para a mais antiga', () => {
+  const parcelas = [1, 2, 3, 4].map((n) => ({ id: `t${n}`, installment_no: n, amount_cents: 30000, occurred_at: `2026-0${6 + n}-10`, status: n <= 2 ? 'cleared' : 'pending', invoice_id: null }));
+  const ui = screen('src/app/finance/installments.tsx', {
+    plans: [{ id: 'p1', title: 'tv', description: 'tv', merchant: null, category: 'casa', account_id: null, total_cents: 120000, installments: 4, installment_cents: 30000, first_occurred_at: '2026-07-10', active: true, paid: 2, remaining_cents: 60000, locked: 2, locked_cents: 60000, locked_paid: 2, parcels: parcelas }],
+  });
+  ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.accessibilityState?.expanded === false).props.onPress());
+  const ordem = ui.nodes()
+    .filter((n: any) => n.type === 'Pressable' && /^Parcela \d/.test(n.props.accessibilityLabel ?? ''))
+    .map((n: any) => Number(n.props.accessibilityLabel.match(/^Parcela (\d+)/)[1]));
+  assert.deepEqual(JSON.parse(JSON.stringify(ordem)), [3, 4, 2, 1]);
+});
+
+test('Regras: a lista vem aos poucos, com "Ver mais"', () => {
+  const regras = Array.from({ length: 23 }, (_, i) => ({ id: `r${i}`, pattern: `loja ${i}`, category: 'casa', priority: i, hits: 0, active: true }));
+  const ui = screen('src/app/finance/rules.tsx', { rules: regras });
+  assert.equal(ui.nodes().filter((n: any) => n.type === 'Deslizavel').length, 20);
+  assert.ok(ui.nodes().some((n: any) => n.type === 'VerMais' && n.props.restantes === 3));
+});
+
+test('Categoria: a folha de "Todas…" mostra aos poucos, e a busca recomeça', () => {
+  const usadas = Array.from({ length: 30 }, (_, i) => ({ category: `categoria ${String(i).padStart(2, '0')}`, uses: 30 - i }));
+  const ui = screen('src/components/finance/category-picker.tsx', { componente: 'CategoryPicker', props: { value: null, onChange: () => {} }, categoriasUsadas: usadas });
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Chip' && n.props.label === 'Todas…').props.onPress());
+  const opcoes = () => ui.nodes().filter((n: any) => n.type === 'Row' && n.props.icon === 'tag');
+  assert.equal(opcoes().length, 20);
+  const mais = ui.nodes().find((n: any) => n.type === 'VerMais');
+  assert.ok(mais.props.restantes > 0);
+});
+
+test('Lembretes: vêm do servidor em páginas; "Ver mais" busca a próxima', () => {
+  const ui = screen('src/app/reminders.tsx', {
+    reminders: [{ id: 'r1', title: 'Aluguel', active: true, next_run_at: '2026-10-05T12:00:00Z', recurrence: null }],
+    maisPaginas: true,
+  });
+  const mais = ui.nodes().find((n: any) => n.type === 'VerMais');
+  assert.ok(mais, 'tem mais no servidor: o botão aparece');
+  ui.interact(() => mais.props.onPress());
+  assert.ok(ui.refetches.includes('proxima-pagina'));
+});
+
+test('Alertas e importações: o servidor manda 20; "Ver mais" pede mais 20', () => {
+  const alertas = Array.from({ length: 20 }, (_, i) => ({ id: `a${i}`, workspace_id: 'w', kind: 'bill_due', ref: `r${i}`, sent_on: '2026-09-20', channel: 'push', created_at: `2026-09-20T10:${String(i).padStart(2, '0')}:00Z` }));
+  const ui = screen('src/app/profile/alerts.tsx', { alerts: alertas });
+  assert.equal(ui.pedidosDeLimite.at(-1)?.[1], 20);
+  const mais = ui.nodes().find((n: any) => n.type === 'VerMais');
+  assert.equal(mais.props.restantes, null, 'veio a página cheia: pode ter mais');
+  ui.interact(() => mais.props.onPress());
+  assert.equal(ui.pedidosDeLimite.at(-1)?.[1], 40);
+
+  const lotes = Array.from({ length: 20 }, (_, i) => ({ id: `b${i}`, filename: `f${i}.ofx`, source: 'ofx', account_id: null, status: 'done', error: null, created_at: '2026-09-20T10:00:00Z', total: 1, pendentes: 0, aprovados: 1, descartados: 0, duplicados: 0 }));
+  const ui2 = screen('src/app/import-history.tsx', { batches: lotes });
+  const mais2 = ui2.nodes().find((n: any) => n.type === 'VerMais');
+  assert.equal(mais2.props.restantes, null);
+  ui2.interact(() => mais2.props.onPress());
+  assert.equal(ui2.pedidosDeLimite.filter((p: any) => p[0] === 'batches').at(-1)?.[1], 40);
+});
+
+test('Notas arquivadas: com mais no servidor, "Ver mais" busca a próxima página', () => {
+  const notas = [{ id: 'n1', content: 'Reunião', archived_at: '2026-09-20T10:00:00Z', pinned: false, color: null }];
+  const ui = screen('src/app/notes/archived.tsx', { notes: notas, maisPaginas: true });
+  const mais = ui.nodes().find((n: any) => n.type === 'VerMais');
+  assert.equal(mais.props.restantes, null);
+  ui.interact(() => mais.props.onPress());
+  assert.ok(ui.refetches.includes('proxima-pagina'));
+});
+
+test('Hoje: "Agora" com muito atrasado mostra aos poucos, com "Ver mais"', () => {
+  const contas = Array.from({ length: 25 }, (_, i) => ({ ref_id: `c${i}`, title: `conta ${i}`, due_date: `2026-08-${String(i + 1).padStart(2, '0')}`, amount_cents: 1000, kind: 'transaction', overdue: true }));
+  const ui = screen(hojeFile, { bills: contas });
+  assert.equal(ui.nodes().filter((n: any) => n.type === 'AgendaItem').length, 20);
+  assert.ok(ui.nodes().some((n: any) => n.type === 'VerMais' && n.props.restantes === 5));
+});
+
+test('Busca: em "Tudo" cada tipo mostra 5 e "Ver mais" abre o tipo; dentro dele, "Ver mais" pede mais 20', () => {
+  // 21 = o limite (20) + 1: o servidor tem mais.
+  const notas = Array.from({ length: 21 }, (_, i) => ({ id: `n${i}`, content: `mercado ${i}`, folder_id: null, source: 'app', updated_at: '2026-09-20T10:00:00Z' }));
+  const ui = screen('src/app/search.tsx', { buscaNotas: notas });
+  const linhas = () => ui.nodes().filter((n: any) => n.type === 'Row' && /^mercado /.test(n.props.title));
+  assert.equal(linhas().length, 5);
+  const chip = ui.nodes().find((n: any) => n.type === 'Chip' && /^Notas/.test(n.props.label));
+  assert.equal(chip.props.label, 'Notas 20+', 'o chip não finge que 20 é o total');
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'VerMais').props.onPress());
+  assert.equal(linhas().length, 20, 'abriu o tipo');
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'VerMais').props.onPress());
+  assert.equal(ui.pedidosDeLimite.at(-1)?.[1], 40);
+});
+
+test('Contas: dentro de cada seção, a conta mais recente primeiro', () => {
+  const saldo = (id: string, name: string) => ({ account_id: id, name, type: 'checking', balance_cents: 0, cleared_cents: 0, pending_in_cents: 0, pending_out_cents: 0 });
+  const ui = screen('src/app/finance/accounts.tsx', {
+    // `useAccounts` vem por ordem de criação (a mais antiga primeiro); o saldo vem sem ordem.
+    forecastAccounts: [
+      { id: 'velha', name: 'Beta', type: 'checking', created_at: '2026-08-01T10:00:00Z' },
+      // No empate a POSIÇÃO diz Zeta antes de Alfa; quem decide é o nome.
+      { id: 'empate', name: 'Alfa', type: 'checking', created_at: '2026-09-01T10:00:00Z' },
+      { id: 'nova', name: 'Zeta', type: 'checking', created_at: '2026-09-01T10:00:00Z' },
+    ],
+    balances: [saldo('velha', 'Beta'), saldo('nova', 'Zeta'), saldo('empate', 'Alfa')],
+  });
+  const ordem = ui.nodes().filter((n: any) => n.type === 'ItemLink').map((n: any) => n.props.title);
+  // A mais recente primeiro; no empate (criadas juntas), o nome.
+  assert.deepEqual(JSON.parse(JSON.stringify(ordem)), ['Alfa', 'Zeta', 'Beta']);
+});
+
+test('Faturas: fatura FUTURA sem compra nenhuma não aparece em "Próximas faturas"', () => {
+  const fatura = (id: string, mes: string, n: number) => ({ id, reference_month: `${mes}-01`, closing_date: `${mes}-03`, due_date: `${mes}-10`, status: 'open', paid_at: null, payment_transaction_id: null, rolled_into_invoice_id: null, total_cents: n * 1000, tx_count: n });
+  const ui = screen('src/app/finance/invoices.tsx', {
+    forecastAccounts: [{ id: 'card-1', name: 'Nubank Cartão', type: 'credit_card' }],
+    faturas: [fatura('f3', '2028-01', 0), fatura('f2', '2027-02', 2), fatura('f1', '2026-09', 3)],
+  });
+  const proximas = ui.nodes().find((n: any) => n.type === 'Section' && n.props.title === 'Próximas faturas');
+  const titulos = ui.nodes().filter((n: any) => n.type === 'Row' && n.props.icon === 'calendar').map((n: any) => n.props.title);
+  assert.ok(proximas);
+  assert.equal(titulos.length, 1, 'só a que tem compra');
 });

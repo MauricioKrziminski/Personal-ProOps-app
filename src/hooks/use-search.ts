@@ -13,7 +13,11 @@ import { supabase } from '@/lib/supabase';
  * chega do WhatsApp reordenaria a lista embaixo do dedo de quem está lendo.
  */
 
-const LIMIT = 30;
+/**
+ * O primeiro passo de cada tipo; o "Ver mais" da tela pede mais (24/09/2026). A consulta traz UM
+ * a mais que o limite: é assim que a tela sabe que existe mais sem contar a tabela inteira.
+ */
+const LIMIT = 20;
 /** Uma letra devolveria o app inteiro. */
 const MIN = 2;
 
@@ -43,14 +47,14 @@ export interface ReminderHit {
   active: boolean;
 }
 
-export function useGlobalSearch(q: string) {
+export function useGlobalSearch(q: string, limite = LIMIT) {
   const term = q.trim();
   const enabled = term.length >= MIN;
 
   const [notes, transactions, reminders] = useQueries({
     queries: [
       {
-        queryKey: ['search', 'notes', term],
+        queryKey: ['search', 'notes', term, limite],
         enabled,
         placeholderData: (prev: NoteHit[] | undefined) => prev,
         queryFn: async (): Promise<NoteHit[]> => {
@@ -63,13 +67,13 @@ export function useGlobalSearch(q: string) {
             .is('deleted_at', null)
             .textSearch('search_tsv', tsq, { config: 'pt_unaccent' })
             .order('updated_at', { ascending: false })
-            .limit(LIMIT);
+            .limit(limite + 1);
           if (error) throw error;
           return data as unknown as NoteHit[];
         },
       },
       {
-        queryKey: ['search', 'transactions', term],
+        queryKey: ['search', 'transactions', term, limite],
         enabled,
         placeholderData: (prev: TransactionHit[] | undefined) => prev,
         queryFn: async (): Promise<TransactionHit[]> => {
@@ -82,13 +86,13 @@ export function useGlobalSearch(q: string) {
             .select('id, description, merchant, category, amount_cents, kind, occurred_at')
             .or(`description.ilike.${like},merchant.ilike.${like},category.ilike.${like}`)
             .order('occurred_at', { ascending: false })
-            .limit(LIMIT);
+            .limit(limite + 1);
           if (error) throw error;
           return data as unknown as TransactionHit[];
         },
       },
       {
-        queryKey: ['search', 'reminders', term],
+        queryKey: ['search', 'reminders', term, limite],
         enabled,
         placeholderData: (prev: ReminderHit[] | undefined) => prev,
         queryFn: async (): Promise<ReminderHit[]> => {
@@ -100,7 +104,7 @@ export function useGlobalSearch(q: string) {
             .select('id, title, recurrence, next_run_at, active')
             .ilike('title', like)
             .order('next_run_at')
-            .limit(LIMIT);
+            .limit(limite + 1);
           if (error) throw error;
           return data as unknown as ReminderHit[];
         },

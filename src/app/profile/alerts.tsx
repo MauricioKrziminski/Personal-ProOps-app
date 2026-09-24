@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Stack } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
@@ -10,6 +11,8 @@ import { SkeletonRow } from '@/components/ui/skeleton';
 import { categoryIcon } from '@/design/category-icons';
 import { Radius, Space, tabular } from '@/design/tokens';
 import { useAlertsSent } from '@/hooks/use-finance';
+import { VerMais } from '@/components/ui/ver-mais';
+import { PASSO } from '@/lib/aos-poucos';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
@@ -79,7 +82,9 @@ export default function AlertsScreen() {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const theme = useTheme();
-  const alertas = useAlertsSent();
+  // Aos poucos: 20 do servidor, e o "Ver mais" pede mais 20.
+  const [limite, setLimite] = useState(PASSO);
+  const alertas = useAlertsSent(limite);
   const dias = porDia(combineAlertDeliveries(alertas.data ?? []));
 
   return (
@@ -133,6 +138,13 @@ export default function AlertsScreen() {
             </Section>
           ))
         )}
+        {!alertas.isLoading && !alertas.isError ? (
+          <VerMais
+            restantes={(alertas.data?.length ?? 0) >= limite ? null : 0}
+            carregando={alertas.isPlaceholderData}
+            onPress={() => setLimite(limite + PASSO)}
+          />
+        ) : null}
       </View>
     </Screen>
   );

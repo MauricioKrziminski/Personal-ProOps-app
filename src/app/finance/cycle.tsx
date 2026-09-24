@@ -17,6 +17,8 @@ import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Radius, Space } from '@/design/tokens';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { VerMais } from '@/components/ui/ver-mais';
+import { useAosPoucos, useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
 import { type CycleLine, type CycleRow, type CycleView, useCycleLines, useCycleMonth, useCycleSeries, useInvoice } from '@/hooks/use-finance';
 import { describeCycle } from '@/lib/cycle-label';
 import { rotaDaLinha } from '@/lib/cycle-routes';
@@ -92,6 +94,12 @@ export default function CycleDetailScreen() {
   const linhas = useCycleLines(month, view);
   const ciclo = serie.data?.find((c) => mesmoMes(c.mes, month)) ?? null;
 
+  /**
+   * Quantas linhas cada grupo mostra (24/09/2026): um ciclo tem 30 a 150 movimentos, e desenhar
+   * todos de uma vez era a tela inteira de uma vez. Recomeça quando o mês, a régua ou o lado mudam.
+   */
+  const janelas = useJanelasPorGrupo(`${month}|${view}|${lado}`);
+
   const grupos = useMemo(() => {
     const todas = linhas.data ?? [];
     const doLado = todas.filter((l) =>
@@ -140,16 +148,20 @@ export default function CycleDetailScreen() {
         ? 'Nenhum movimento cai neste período.'
         : 'O filtro acima mostra o outro lado do período.'}
     />
-  ) : grupos.map((g) => (
-    <View key={g.titulo} style={styles.grupo}>
-      <SectionHead title={g.titulo} />
-      <Section>
-        {g.linhas.map((l, i) => (
-          <Linha key={`${l.origin}-${l.ref_id}-${i}`} linha={l} />
-        ))}
-      </Section>
-    </View>
-  ));
+  ) : grupos.map((g) => {
+    const j = janelas.janelaDe(g.chave, g.linhas);
+    return (
+      <View key={g.chave} style={styles.grupo}>
+        <SectionHead title={g.titulo} />
+        <Section>
+          {j.visiveis.map((l, i) => (
+            <Linha key={`${l.origin}-${l.ref_id}-${i}`} linha={l} />
+          ))}
+        </Section>
+        <VerMais restantes={j.restantes} onPress={() => janelas.verMais(g.chave)} />
+      </View>
+    );
+  });
   const compact = <>{fechamento}{filtro}{movimentos}</>;
 
   return (
@@ -233,6 +245,8 @@ function Conta({
 function Linha({ linha }: { linha: CycleLine }) {
   const abre = linha.origin === 'invoice' && !linha.atrasada;
   const fatura = useInvoice(abre ? linha.ref_id : undefined);
+  // As compras da fatura aberta também vêm aos poucos: uma fatura tem de 30 a 150 compras.
+  const compras = useAosPoucos(abre ? (fatura.data?.transactions ?? []) : [], linha.ref_id);
   const entra = Number(linha.in_cents) > 0;
   // A linha cabe a 384dp × fonte 1,3: o ano já está no cabeçalho do ciclo, o cartão já está no
   // título da fatura, e o "(atrasada)" desce para o subtítulo. Quem DECIDE que ela é atrasada
@@ -263,7 +277,7 @@ function Linha({ linha }: { linha: CycleLine }) {
         onPress={destino(linha)}
       />
       {abre
-        ? (fatura.data?.transactions ?? []).map((t) => (
+        ? compras.visiveis.map((t) => (
             <Row
               key={t.id}
               title={t.description ?? t.merchant ?? 'Compra'}
@@ -273,6 +287,7 @@ function Linha({ linha }: { linha: CycleLine }) {
             />
           ))
         : null}
+      {abre ? <VerMais restantes={compras.restantes} onPress={compras.verMais} /> : null}
     </>
   );
 }
@@ -313,11 +328,18 @@ function agrupar(linhas: CycleLine[], brl: (cents: number) => string) {
   return ordem
     .filter((t) => mapa.has(t))
     .map((titulo) => ({
+      chave: titulo,
       // O subtotal mora no cabeçalho: sem ele, "qual grupo pesou" só sai somando de cabeça.
       titulo: `${titulo} · ${brl(
         (mapa.get(titulo) ?? []).reduce((s, l) => s + Number(l.in_cents) + Number(l.out_cents), 0),
       )}`,
-      linhas: (mapa.get(titulo) ?? []).sort((a, b) => a.day.localeCompare(b.day)),
+      // Do mais recente para o mais antigo (24/09/2026: *"em tudo tem que ser do mais recente
+      // para o mais antigo"*); no mesmo dia, o maior valor primeiro.
+      linhas: (mapa.get(titulo) ?? []).sort(
+        (a, b) =>
+          b.day.localeCompare(a.day) ||
+          Number(b.in_cents) + Number(b.out_cents) - Number(a.in_cents) - Number(a.out_cents),
+      ),
     }));
 }
 

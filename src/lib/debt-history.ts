@@ -51,15 +51,18 @@ export function paidInstallments({
   payments?: readonly DebtPaymentRow[];
 }): PaidInstallment[] {
   const pagas = Math.max(0, Math.trunc(installmentsPaid || 0));
-  if (pagas === 0) return [];
   // Quitada não tem próxima parcela: a cadência anda para trás a partir de hoje.
   const ancora = nextDueDate ?? new Date().toISOString().slice(0, 10);
   const porNumero = new Map<number, DebtPaymentRow>();
   for (const p of payments) {
     if (p.debt_payment_no != null) porNumero.set(p.debt_payment_no, p);
   }
+  // Pagamento lançado com número ACIMA das pagas (dado de antes do piso das pagas) é fato: ele
+  // entra como pago, e a contagem estimada vai até ele.
+  const ate = Math.max(pagas, ...porNumero.keys());
+  if (ate === 0) return [];
   const linhas: PaidInstallment[] = [];
-  for (let n = 1; n <= pagas; n++) {
+  for (let n = 1; n <= ate; n++) {
     const real = porNumero.get(n);
     linhas.push(
       real
@@ -109,7 +112,8 @@ export function linhaDoTempo(
       jurosCents: null,
       estado: p.registered ? ('paga' as const) : ('estimada' as const),
     })),
-    ...futuras.map((p, i) => ({
+    // O cronograma começa em `pagas + 1`; a parcela que já tem pagamento lançado não é futura.
+    ...futuras.filter((p) => !historico.some((h) => h.installment_no === p.installment_no)).map((p, i) => ({
       n: p.installment_no,
       iso: p.due_date,
       cents: Number(p.payment_cents),
@@ -117,6 +121,11 @@ export function linhaDoTempo(
       estado: i === 0 ? ('proxima' as const) : ('futura' as const),
     })),
   ];
+  return porAno(itens);
+}
+
+/** Agrupa por ano sem mudar a ordem: um cabeçalho a cada vez que o ano muda. */
+export function porAno(itens: readonly ItemDaLinha[]): { ano: string; itens: ItemDaLinha[] }[] {
   const anos: { ano: string; itens: ItemDaLinha[] }[] = [];
   for (const item of itens) {
     const ano = item.iso.slice(0, 4);
@@ -124,4 +133,20 @@ export function linhaDoTempo(
     anos.at(-1)!.itens.push(item);
   }
   return anos;
+}
+
+/**
+ * As duas metades do contrato (24/09/2026). O que FALTA começa pela próxima parcela — é a
+ * resposta da tela —, e o que já foi PAGO vem do mais recente para o mais antigo. Numa linha só,
+ * de 1 a 360, a próxima ficava centenas de linhas abaixo do topo.
+ */
+export function secoesDaLinha(
+  historico: readonly PaidInstallment[],
+  futuras: Parameters<typeof linhaDoTempo>[1],
+): { aSeguir: ItemDaLinha[]; pagas: ItemDaLinha[] } {
+  const itens = linhaDoTempo(historico, futuras).flatMap((a) => a.itens);
+  return {
+    aSeguir: itens.filter((i) => i.estado === 'proxima' || i.estado === 'futura'),
+    pagas: itens.filter((i) => i.estado === 'paga' || i.estado === 'estimada').reverse(),
+  };
 }

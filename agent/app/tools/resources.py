@@ -901,16 +901,19 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                 values["remaining_cents"] = contrato["remaining_cents"]
             prepared["_pagas_atuais"] = int(old.get("installments_paid") or 0)
             if action.type == Op.UPDATE and "installments_paid" in values:
+                # O piso é a MAIOR parcela já paga, não só a contagem (o mesmo do app): com um
+                # "Paguei" lançado como a 5ª, 4 pagas deixariam a 5ª paga aparecendo como futura.
                 lancados = await db.fetch(
-                    "select count(*) as n from public.transactions where debt_id = %s and workspace_id = %s",
+                    "select greatest(count(*), coalesce(max(debt_payment_no), 0)) as n "
+                    "from public.transactions where debt_id = %s and workspace_id = %s",
                     old["id"],
                     ctx.workspace_id,
                 )
                 n = int((lancados[0].get("n") if lancados else 0) or 0)
                 if values["installments_paid"] < n:
                     _error(
-                        f"Já há {n} pagamentos lançados pelo app; as parcelas pagas não "
-                        "podem ficar abaixo disso."
+                        f"Já há pagamento lançado pelo app até a {n}ª parcela; as parcelas "
+                        "pagas não podem ficar abaixo disso."
                     )
             if (
                 not fixa

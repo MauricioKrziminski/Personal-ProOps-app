@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { ThemedText } from '@/components/themed-text';
 import { symbol } from '@/components/notes/note-actions';
 import { EmptyState } from '@/components/ui/empty-state';
+import { VerMais } from '@/components/ui/ver-mais';
 import { Icon } from '@/components/ui/icon';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Card } from '@/components/ui/card';
@@ -149,6 +150,13 @@ export default function ArchivedScreen() {
               ))}
             </Section>
           ) : null}
+          {/* Vinham 30 e a tela nunca pedia a página seguinte: da 31ª em diante a nota arquivada
+              não aparecia em lugar nenhum (24/09/2026). */}
+          <VerMais
+            restantes={notas.hasNextPage ? null : 0}
+            carregando={notas.isFetchingNextPage}
+            onPress={() => void notas.fetchNextPage()}
+          />
 
           {/* A linha de saída: daqui a lixeira é o outro lugar onde há coisa escondida. */}
           <View style={styles.rodape}>

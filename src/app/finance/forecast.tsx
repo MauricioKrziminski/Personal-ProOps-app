@@ -16,6 +16,8 @@ import { Field, MoneyField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
+import { VerMais } from '@/components/ui/ver-mais';
+import { useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
 import { Screen } from '@/components/ui/screen';
 import { Deslizavel } from '@/components/ui/deslizavel';
 import { HeroLabel } from '@/components/ui/section-head';
@@ -334,6 +336,16 @@ export default function ForecastScreen() {
   const atrasadas = contas.filter((b) => b.overdue);
   const aVencer = contas.filter((b) => !b.overdue);
   const aReceber = (bills.data ?? []).filter((b) => b.kind === 'income');
+  /**
+   * Aos poucos (24/09/2026): o "mês a mês" vai a 120 meses (horizonte de 10 anos) e o que vence
+   * em 30 dias passa de 30 linhas com o atrasado sem limite de data. Cada lista mostra um passo;
+   * trocar o horizonte ou o modo recomeça. A ORDEM continua a da agenda — o mais próximo primeiro.
+   */
+  const janelas = useJanelasPorGrupo(`${modo}|${dias}`);
+  const jMeses = janelas.janelaDe('meses', mesesInteiros);
+  const jAtrasadas = janelas.janelaDe('atrasadas', atrasadas);
+  const jAVencer = janelas.janelaDe('aVencer', aVencer);
+  const jAReceber = janelas.janelaDe('aReceber', aReceber);
 
   /**
    * O empty de verdade é *nada para projetar*: sem conta cadastrada, sem nada a vencer e a série
@@ -893,7 +905,7 @@ export default function ForecastScreen() {
 
       {modo === 'mes' && !nadaParaProjetar ? (
         <Section title="Saldo mês a mês">
-          {mesesInteiros.map((m, iMes) => (
+          {jMeses.visiveis.map((m, iMes) => (
             <View key={m.mes}>
               {/*
                 A linha do corte: daqui para baixo a recorrente não é mais lançamento criado
@@ -945,12 +957,15 @@ export default function ForecastScreen() {
               ) : null}
             </View>
           ))}
-          {cicloCortado ? (
+          {cicloCortado && jMeses.restantes === 0 ? (
             <ThemedText type="footnote" themeColor="textSecondary" style={styles.corte}>
               {`Projeção até ${isoToBR(cicloCortado.de)}. Aumente o horizonte.`}
             </ThemedText>
           ) : null}
         </Section>
+      ) : null}
+      {modo === 'mes' && !nadaParaProjetar ? (
+        <VerMais restantes={jMeses.restantes} onPress={() => janelas.verMais('meses')} />
       ) : null}
 
       {modo === 'dia' && bills.isError ? (
@@ -961,17 +976,26 @@ export default function ForecastScreen() {
           de "Atrasado" continuava oferecendo "Pagar fatura" logo abaixo da faixa que acabou de
           dizer que não conseguiu carregar o que vence — com um botão que escreve no banco. */}
       {modo === 'dia' && !bills.isError && atrasadas.length > 0 ? (
-        <Section title="Atrasado">{atrasadas.map(linhaConta)}</Section>
+        <View style={styles.lista}>
+          <Section title="Atrasado">{jAtrasadas.visiveis.map(linhaConta)}</Section>
+          <VerMais restantes={jAtrasadas.restantes} onPress={() => janelas.verMais('atrasadas')} />
+        </View>
       ) : null}
       {modo === 'dia' && !bills.isError && aVencer.length > 0 ? (
-        <Section title="O que vence">{aVencer.map(linhaConta)}</Section>
+        <View style={styles.lista}>
+          <Section title="O que vence">{jAVencer.visiveis.map(linhaConta)}</Section>
+          <VerMais restantes={jAVencer.restantes} onPress={() => janelas.verMais('aVencer')} />
+        </View>
       ) : null}
       {/*
         O par de "O que vence". Vem DEPOIS de propósito: quem abre esta tela vem perguntar se o
         dinheiro dá, e a resposta é o que sai. O que entra é a segunda metade da conta.
       */}
       {modo === 'dia' && !bills.isError && aReceber.length > 0 ? (
-        <Section title="O que entra">{aReceber.map(linhaConta)}</Section>
+        <View style={styles.lista}>
+          <Section title="O que entra">{jAReceber.visiveis.map(linhaConta)}</Section>
+          <VerMais restantes={jAReceber.restantes} onPress={() => janelas.verMais('aReceber')} />
+        </View>
       ) : null}
 
       {modo === 'dia' &&
@@ -1172,6 +1196,8 @@ export default function ForecastScreen() {
 }
 
 const styles = StyleSheet.create({
+  // A lista e o seu "Ver mais" a `Space.md` um do outro, como título e conteúdo.
+  lista: { gap: Space.md },
   horizonteCorpo: {
     paddingHorizontal: Space.lg,
     paddingBottom: Space.xl,

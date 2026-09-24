@@ -21,6 +21,8 @@ import { Chip } from '@/components/finance/chip';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { useAccounts, useCardInvoices, type CardInvoiceHistory } from '@/hooks/use-finance';
+import { useAosPoucos } from '@/hooks/use-aos-poucos';
+import { VerMais } from '@/components/ui/ver-mais';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { showItemActions } from '@/lib/item-actions';
@@ -40,7 +42,8 @@ import { useTheme } from '@/hooks/use-theme';
 // mês até a última parcela: com 12, as doze mais novas eram todas de 2027 e o
 // histórico inteiro — o motivo de a tela existir — ficava de fora, sem erro e sem
 // aviso. Foi assim que a tela abriu mostrando só 2027.
-const MESES = 60;
+/** Quantas barras o gráfico mostra — a lista embaixo tem todas. */
+const GRAFICO = 60;
 const ALTURA_BARRA = 76;
 
 /**
@@ -110,7 +113,7 @@ export default function InvoicesScreen() {
     [accounts.data, accounts.isError],
   );
   const atual = cartoes.find((c) => c.id === cartaoId) ?? cartoes[0];
-  const invoices = useCardInvoices(atual?.id, MESES);
+  const invoices = useCardInvoices(atual?.id);
 
   const hoje = localISODate();
   const lista = useMemo(
@@ -126,12 +129,20 @@ export default function InvoicesScreen() {
     () => lista.filter((i) => i.reference_month.slice(0, 7) <= hoje.slice(0, 7)),
     [lista, hoje],
   );
+  // Fatura futura sem compra nenhuma não é "próxima fatura" (24/09/2026): ela sobra quando uma
+  // compra parcelada é encurtada ou apagada, e a lista enchia de "R$ 0,00" até 2029.
   const futuras = useMemo(
-    () => [...lista.filter((i) => i.reference_month.slice(0, 7) > hoje.slice(0, 7))].reverse(),
+    () =>
+      [
+        ...lista.filter((i) => i.reference_month.slice(0, 7) > hoje.slice(0, 7) && i.tx_count > 0),
+      ].reverse(),
     [lista, hoje],
   );
   // A série lê da esquerda (mais antiga) para a direita (mês corrente).
-  const serie = useMemo(() => [...passadas].reverse(), [passadas]);
+  // O gráfico continua nas últimas 60, como antes; a lista abaixo é que tem tudo, aos poucos.
+  const serie = useMemo(() => [...passadas.slice(0, GRAFICO)].reverse(), [passadas]);
+  const jPassadas = useAosPoucos(passadas, atual?.id ?? '');
+  const jFuturas = useAosPoucos(futuras, atual?.id ?? '');
   const maior = Math.max(...serie.map((i) => i.total_cents), 0);
   const ultimos = serie.slice(-6);
   const media =
@@ -340,7 +351,7 @@ export default function InvoicesScreen() {
 
       {passadas.length > 0 ? (
         <Section title="Faturas anteriores">
-          {passadas.map((invoice, index) => {
+          {jPassadas.visiveis.map((invoice, index) => {
             // A data do DESTINO sai da própria lista — todas as faturas do cartão já estão
             // aqui, então não custa consulta nenhuma.
             const situacao = estado(
@@ -389,6 +400,7 @@ export default function InvoicesScreen() {
           })}
         </Section>
       ) : null}
+      {passadas.length > 0 ? <VerMais restantes={jPassadas.restantes} onPress={jPassadas.verMais} /> : null}
 
       {/* Fatura futura existe de verdade — parcelamento cria uma por mês até a
           última parcela. Ela não pode sumir da tela (esconder dado é o problema
@@ -396,7 +408,7 @@ export default function InvoicesScreen() {
           seção própria, depois do passado, e da mais próxima para a mais distante. */}
       {futuras.length > 0 ? (
         <Section title="Próximas faturas">
-          {futuras.map((invoice) => (
+          {jFuturas.visiveis.map((invoice) => (
             <Row
               key={invoice.id}
               title={mesDaLinha(invoice.reference_month.slice(0, 7))}
@@ -411,6 +423,7 @@ export default function InvoicesScreen() {
           ))}
         </Section>
       ) : null}
+      {futuras.length > 0 ? <VerMais restantes={jFuturas.restantes} onPress={jFuturas.verMais} /> : null}
 
       {!accounts.isLoading && !accounts.isError && cartoes.length === 0 ? (
         <EmptyState

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { addMonthsISO, linhaDoTempo, paidInstallments } from './debt-history.ts';
+import { addMonthsISO, linhaDoTempo, paidInstallments, porAno, secoesDaLinha } from './debt-history.ts';
 
 test('a cadência anda para trás sem estourar o fim do mês', () => {
   assert.equal(addMonthsISO('2026-10-08', -1), '2026-09-08');
@@ -83,4 +83,40 @@ test('linha do tempo agrupa por ano e marca paga, estimada, próxima e futura', 
   assert.deepEqual(anos.map((a) => a.ano), ['2026', '2027']);
   assert.deepEqual(anos[0].itens.map((i) => i.estado), ['estimada', 'paga']);
   assert.deepEqual(anos[1].itens.map((i) => [i.n, i.estado, i.jurosCents]), [[3, 'proxima', null], [4, 'futura', 7]]);
+});
+
+test('pagamento lançado com número acima das pagas aparece como PAGO, uma vez só, e a próxima é a seguinte', () => {
+  // Dado antigo: 4 pagas no cadastro, mas um "Paguei" registrado como a 5ª.
+  const historico = paidInstallments({
+    installmentsPaid: 4,
+    installmentCents: 1000,
+    nextDueDate: '2026-10-05',
+    payments: [{ debt_payment_no: 5, occurred_at: '2026-09-05', amount_cents: 1000 }],
+  });
+  const anos = linhaDoTempo(historico, [
+    { installment_no: 5, due_date: '2026-10-05', payment_cents: 1000, interest_cents: null },
+    { installment_no: 6, due_date: '2026-11-05', payment_cents: 1000, interest_cents: null },
+  ]);
+  const itens = anos.flatMap((a) => a.itens);
+  assert.deepEqual(itens.filter((i) => i.n === 5).map((i) => i.estado), ['paga']);
+  assert.equal(itens.find((i) => i.estado === 'proxima')?.n, 6);
+});
+
+test('a linha do tempo se divide em "a seguir" (a próxima primeiro) e "já pagas" (a mais recente primeiro)', () => {
+  const historico = paidInstallments({
+    installmentsPaid: 3, installmentCents: 1000, nextDueDate: '2026-10-05',
+    payments: [{ debt_payment_no: 3, occurred_at: '2026-09-06', amount_cents: 1000 }],
+  });
+  const { aSeguir, pagas } = secoesDaLinha(historico, [
+    { installment_no: 4, due_date: '2026-10-05', payment_cents: 1000, interest_cents: null },
+    { installment_no: 5, due_date: '2026-11-05', payment_cents: 1000, interest_cents: null },
+    { installment_no: 6, due_date: '2027-01-05', payment_cents: 1000, interest_cents: null },
+  ]);
+  assert.deepEqual(aSeguir.map((i) => i.n), [4, 5, 6]);
+  assert.equal(aSeguir[0].estado, 'proxima');
+  assert.deepEqual(pagas.map((i) => i.n), [3, 2, 1]);
+  assert.equal(pagas[0].estado, 'paga');
+  // Agrupa por ano sem mudar a ordem de cada seção.
+  assert.deepEqual(porAno(aSeguir).map((a) => a.ano), ['2026', '2027']);
+  assert.deepEqual(porAno(pagas).map((a) => [a.ano, a.itens.map((i) => i.n)]), [['2026', [3, 2, 1]]]);
 });

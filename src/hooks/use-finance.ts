@@ -1,6 +1,6 @@
 import { invalidateFinance, invalidateKeys } from '@/lib/query-invalidation';
 import type { Natureza } from '@/lib/import-preview';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { ProjecaoMensal } from '@/lib/forecast-months';
 import { supabase } from '@/lib/supabase';
@@ -82,6 +82,7 @@ export type Account = Pick<
   Tables['accounts']['Row'],
   | 'id'
   | 'name'
+  | 'created_at'
   | 'initial_balance_cents'
   | 'archived'
   // cartão de crédito: null nos demais tipos (check no banco)
@@ -375,7 +376,7 @@ export function useAccounts() {
     queryFn: async (): Promise<Account[]> => {
       const { data, error } = await supabase
         .from('accounts')
-        .select('id, name, type, initial_balance_cents, archived, closing_day, due_day, credit_limit_cents, payment_account_id, closing_day_inclusive, rotativo_auto, rotativo_rate_monthly')
+        .select('id, name, type, initial_balance_cents, archived, closing_day, due_day, credit_limit_cents, payment_account_id, closing_day_inclusive, rotativo_auto, rotativo_rate_monthly, created_at')
         .eq('archived', false)
         .order('created_at');
       if (error) throw error;
@@ -393,7 +394,8 @@ export function useGoals() {
         .from('goals')
         .select('id, name, target_cents, saved_cents, deadline, archived')
         .eq('archived', false)
-        .order('created_at');
+        // A mais recente primeiro (24/09/2026: "em tudo, do mais recente para o mais antigo").
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -1497,6 +1499,7 @@ export type Debt = Pick<
   | 'due_day'
   | 'archived'
   | 'first_due_date'
+  | 'updated_at'
 > & { kind: (typeof DEBT_KINDS)[number]['value']; calculation_mode: 'amortized' | 'fixed_installments' };
 
 export type DebtScheduleRow = Omit<Fns['debt_schedule']['Returns'][number], 'interest_cents' | 'principal_cents'> & { interest_cents: number | null; principal_cents: number | null };
@@ -1521,7 +1524,7 @@ export function useDebts() {
 }
 
 const DEBT_COLUMNS =
-  'id, name, kind, calculation_mode, principal_cents, remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, account_id, due_day, archived, first_due_date';
+  'id, name, kind, calculation_mode, principal_cents, remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, account_id, due_day, archived, first_due_date, updated_at';
 
 /**
  * As arquivadas (23/09/2026). Arquivar tirava a dívida da lista e não havia volta em lugar
@@ -2036,11 +2039,20 @@ export function useSaveDebt() {
       due_day: number | null;
       /** A âncora do contrato (`debts.first_due_date`) — só vai quando a tela a conhece. */
       first_due_date?: string | null;
+      /**
+       * O `updated_at` da dívida quando o formulário abriu (24/09/2026). Um "Paguei" pelo WhatsApp
+       * com o formulário aberto muda as pagas e o saldo; sem esta trava o salvar os sobrescrevia
+       * com o que a tela tinha lido antes. Mudou no meio: nada é gravado, e o erro diz por quê.
+       */
+      versao?: string | null;
     }) => {
-      const { id, ...resto } = input;
+      const { id, versao, ...resto } = input;
       if (id) {
-        const { error } = await supabase.from('debts').update(resto).eq('id', id).select('id').single();
+        let consulta = supabase.from('debts').update(resto).eq('id', id);
+        if (versao) consulta = consulta.eq('updated_at', versao);
+        const { data, error } = await consulta.select('id');
         if (error) throw error;
+        if (!data?.length) throw Object.assign(new Error('A dívida mudou enquanto você editava.'), { code: 'VERSAO' });
       } else {
         const { error } = await supabase.from('debts').insert({ ...resto, user_id: await userId() });
         if (error) throw error;
@@ -2079,15 +2091,16 @@ export function useArchiveDebt() {
 }
 
 /**
- * Sem `.single()` de propósito: o "Desfazer" do toast pode chegar depois de a dívida ter sido
- * apagada por outro caminho, e aí não há o que desarquivar — zero linhas, sem erro.
+ * Devolve se a dívida VOLTOU. O "Desfazer" do toast pode chegar depois de a dívida ter sido
+ * apagada por outro caminho: zero linhas, sem erro — e a tela não pode dizer que ela voltou.
  */
 export function useUnarchiveDebt() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('debts').update({ archived: false }).eq('id', id);
+    mutationFn: async (id: string): Promise<boolean> => {
+      const { data, error } = await supabase.from('debts').update({ archived: false }).eq('id', id).select('id');
       if (error) throw error;
+      return Boolean(data?.length);
     },
     onSuccess: invalidate,
   });
@@ -2752,6 +2765,22 @@ async function fetchPaged<T>(
   throw new Error('Leitura truncada: esta agregação precisa virar RPC.');
 }
 
+/**
+ * `fetchPaged` para um `in(...)` de muitos ids (24/09/2026): a lista de ids vai na URL, e com
+ * centenas deles o pedido estoura o tamanho. Em lotes de 100, cada lote paginado.
+ */
+async function fetchPagedEmLotes<T>(
+  ids: readonly string[],
+  page: (lote: string[], from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    const lote = ids.slice(i, i + 100);
+    rows.push(...(await fetchPaged<T>((from, to) => page(lote, from, to))));
+  }
+  return rows;
+}
+
 export interface InstallmentParcel {
   id: string;
   installment_no: number | null;
@@ -2850,23 +2879,32 @@ export function useInstallmentPlan(id: string | null | undefined) {
   });
 }
 
+/**
+ * Todas as compras parceladas (24/09/2026). Era `limit(200)`: da 201ª em diante a compra sumia da
+ * tela e do "Comprometido nos próximos 12 meses" — uma compra antiga em 48x ainda pesa no mês. A
+ * soma precisa de todas; a tela desenha 20 por vez.
+ */
 async function buscarPlanos(apenas?: string): Promise<InstallmentPlanSummary[]> {
-  const consulta = supabase
-    .from('installment_plans')
-    .select('id, merchant, description, category, account_id, total_cents, installments, first_occurred_at');
-  const { data: plans, error } = await (apenas
-    ? consulta.eq('id', apenas)
-    : consulta.order('first_occurred_at', { ascending: false }).limit(200));
-  if (error) throw error;
-  if (!plans?.length) return [];
+  type Plano = {
+    id: string; merchant: string | null; description: string | null; category: string | null;
+    account_id: string | null; total_cents: number; installments: number; first_occurred_at: string;
+  };
+  const plans = await fetchPaged<Plano>((from, to) => {
+    const consulta = supabase
+      .from('installment_plans')
+      .select('id, merchant, description, category, account_id, total_cents, installments, first_occurred_at');
+    return (apenas ? consulta.eq('id', apenas) : consulta.order('first_occurred_at', { ascending: false }).order('id')).range(from, to);
+  });
+  if (!plans.length) return [];
 
   const ids = plans.map((p) => p.id);
-  const rows = await fetchPaged<InstallmentParcel & { installment_plan_id: string | null }>(
-    (from, to) =>
+  const rows = await fetchPagedEmLotes<InstallmentParcel & { installment_plan_id: string | null }>(
+    ids,
+    (lote, from, to) =>
       supabase
         .from('transactions')
         .select('id, installment_plan_id, installment_no, amount_cents, occurred_at, status, invoice_id')
-        .in('installment_plan_id', ids)
+        .in('installment_plan_id', lote)
         .order('installment_no')
         .range(from, to),
   );
@@ -2961,29 +2999,36 @@ export interface CardInvoiceHistory {
  * é o mês vizinho. Com janela curta, quem tem três anos de cartão pararia de
  * navegar num ponto arbitrário — sem erro e sem aviso.
  */
-export function useCardInvoices(accountId: string | undefined, months = 60) {
+/**
+ * TODAS as faturas do cartão (24/09/2026). Era `limit(60)`: depois de cinco anos a fatura mais
+ * antiga sumia da tela sem aviso. A tela desenha 20 por vez; o dado vem inteiro porque a série
+ * e a média precisam dele, e um cartão tem uma fatura por mês.
+ */
+export function useCardInvoices(accountId: string | undefined) {
   useRealtimeInvalidate('card_invoices', ['card-invoices']);
   useRealtimeInvalidate('transactions', ['card-invoices']);
   return useQuery({
     enabled: Boolean(accountId),
-    queryKey: ['card-invoices', accountId ?? '', String(months)],
+    queryKey: ['card-invoices', accountId ?? ''],
     queryFn: async (): Promise<CardInvoiceHistory[]> => {
-      const limite = Math.min(60, Math.max(1, months));
-      const { data: invoices, error } = await supabase
-        .from('card_invoices')
-        .select('id, reference_month, closing_date, due_date, status, paid_at, payment_transaction_id, rolled_into_invoice_id')
-        .eq('account_id', accountId!)
-        .order('reference_month', { ascending: false })
-        .limit(limite);
-      if (error) throw error;
-      if (!invoices?.length) return [];
+      type Linha = Omit<CardInvoiceHistory, 'total_cents' | 'tx_count'>;
+      const invoices = await fetchPaged<Linha>((from, to) =>
+        supabase
+          .from('card_invoices')
+          .select('id, reference_month, closing_date, due_date, status, paid_at, payment_transaction_id, rolled_into_invoice_id')
+          .eq('account_id', accountId!)
+          .order('reference_month', { ascending: false })
+          .order('id')
+          .range(from, to),
+      );
+      if (!invoices.length) return [];
 
       const ids = invoices.map((i) => i.id);
-      const rows = await fetchPaged<{ invoice_id: string | null; amount_cents: number }>((from, to) =>
+      const rows = await fetchPagedEmLotes<{ invoice_id: string | null; amount_cents: number }>(ids, (lote, from, to) =>
         supabase
           .from('transactions')
           .select('invoice_id, amount_cents')
-          .in('invoice_id', ids)
+          .in('invoice_id', lote)
           // pagamento de fatura é transferência: entra como compra inflaria o total
           .eq('kind', 'expense')
           .range(from, to),
@@ -3000,7 +3045,7 @@ export function useCardInvoices(accountId: string | undefined, months = 60) {
       }
 
       return invoices.map((invoice) => ({
-        ...(invoice as Omit<CardInvoiceHistory, 'total_cents' | 'tx_count'>),
+        ...invoice,
         total_cents: totais.get(invoice.id)?.cents ?? 0,
         tx_count: totais.get(invoice.id)?.count ?? 0,
       }));
@@ -3032,7 +3077,8 @@ export function useWorkspaceMembers() {
         // sem o filtro, quem estiver em dois espaços veria linhas misturadas e a
         // contagem discordaria de `plan_status`
         .eq('workspace_id', ws)
-        .order('created_at');
+        // Quem entrou por último primeiro (24/09/2026: "do mais recente para o mais antigo").
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return data as WorkspaceMember[];
     },
@@ -3062,9 +3108,15 @@ export interface ImportBatchSummary {
  * item nenhum é lote fantasma (o insert dos itens estourou) e a tela mostra como
  * falha.
  */
+/**
+ * `limit` cresce pelo "Ver mais" da tela (24/09/2026): era um teto fixo de 20, e da 21ª em diante
+ * a importação sumia do histórico sem aviso. `keepPreviousData` segura a lista na tela enquanto a
+ * página maior chega.
+ */
 export function useImportBatches(limit = 20) {
   useRealtimeInvalidate('import_items', ['import-batches']);
   return useQuery({
+    placeholderData: keepPreviousData,
     queryKey: ['import-batches', String(limit)],
     queryFn: async (): Promise<ImportBatchSummary[]> => {
       const { data: batches, error } = await supabase
@@ -3147,8 +3199,10 @@ export interface AlertSent {
  * Sem realtime e sem `useRealtimeInvalidate`: o cron escreve **uma vez por dia**, e um canal
  * aberto para isso custaria mais do que vale. O refetch ao focar a tela basta.
  */
-export function useAlertsSent(limit = 60) {
+/** `limit` cresce pelo "Ver mais" (24/09/2026): o teto de 60 escondia o alerta mais antigo. */
+export function useAlertsSent(limit = 20) {
   return useQuery({
+    placeholderData: keepPreviousData,
     queryKey: ['alerts-sent', String(limit)],
     queryFn: async (): Promise<AlertSent[]> => {
       const { data, error } = await supabase

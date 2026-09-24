@@ -19,7 +19,8 @@ test('a ordem: importar, projeção, lembrete, parcelada, nota', () => {
 });
 
 test('importar leva à importação com o cartão já escolhido', () => {
-  assert.equal(proximoPasso(novo, nada)?.href, '/import?conta=c1');
+  // Rota tipada (typedRoutes): objeto com `params`, nunca uma string montada à mão.
+  assert.deepEqual(proximoPasso(novo, nada)?.href, { pathname: '/import', params: { conta: 'c1' } });
 });
 
 test('sem cartão não oferece importar a fatura nem compra parcelada', () => {

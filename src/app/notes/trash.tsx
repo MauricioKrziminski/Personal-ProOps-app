@@ -11,6 +11,7 @@ import { ThemedText } from '@/components/themed-text';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
+import { VerMais } from '@/components/ui/ver-mais';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
@@ -189,15 +190,12 @@ export default function TrashScreen() {
         </Section>
       )}
 
-      {list.hasNextPage ? (
-        <Button
-          label="Carregar mais"
-          variant="secondary"
-          size="sm"
-          loading={list.isFetchingNextPage}
-          onPress={() => void list.fetchNextPage()}
-        />
-      ) : null}
+      {/* O mesmo "Ver mais" de toda lista do app — era "Carregar mais", outro rótulo para a mesma intenção. */}
+      <VerMais
+        restantes={list.hasNextPage ? null : 0}
+        carregando={list.isFetchingNextPage}
+        onPress={() => void list.fetchNextPage()}
+      />
     </>
   );
 

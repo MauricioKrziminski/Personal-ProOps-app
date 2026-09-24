@@ -189,9 +189,14 @@ export default function InvoiceScreen() {
     return [...mapa.entries()].map(([data, itens]) => ({ data, itens }));
   }, [compras]);
 
-  // Quem são as faturas vizinhas. A janela default do hook é o teto (60): com
-  // janela curta, quem tem anos de cartão pararia de navegar num ponto arbitrário.
+  // Quem são as faturas vizinhas: todas as do cartão (o hook não tem teto desde 24/09/2026), menos
+  // a FUTURA sem compra nenhuma — ela sobra de parcelado encurtado ou apagado, e as setas paravam
+  // em meses de "R$ 0,00" até 2029. A aberta agora fica sempre, mesmo vazia.
   const vizinhas = useCardInvoices(fatura?.account_id);
+  const mesAtual = localISODate().slice(0, 7);
+  const navegaveis = (vizinhas.data ?? []).filter(
+    (i) => i.id === fatura?.id || i.tx_count > 0 || i.reference_month.slice(0, 7) <= mesAtual,
+  );
 
   // `paid_cents` é a única coisa materializada da fatura, e é somada só por `pay_invoice`.
   // O total continua saindo das compras: é o valor de face, o número impresso na fatura.
@@ -352,9 +357,9 @@ export default function InvoiceScreen() {
            empurra tudo para baixo — "zero salto de layout" é item do checklist */
         <Skeleton height={HitTarget} radius={Radius.pill} />
       ) : null}
-      {fatura && (vizinhas.data?.length ?? 0) > 1 ? (
+      {fatura && navegaveis.length > 1 ? (
         <InvoicePager
-          invoices={vizinhas.data ?? []}
+          invoices={navegaveis}
           currentId={fatura.id}
           onChange={(destino) =>
             router.setParams({ id: destino })
@@ -390,7 +395,7 @@ export default function InvoiceScreen() {
               fecha: fatura.closing_date,
               vence: fatura.due_date,
             }}
-            faturas={vizinhas.data ?? []}
+            faturas={navegaveis}
             atualId={fatura.id}
             onChange={(destino) => router.setParams({ id: destino })}>
             {/*

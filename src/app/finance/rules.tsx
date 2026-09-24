@@ -19,6 +19,8 @@ import { Field, TextField } from '@/components/ui/field';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { Deslizavel } from '@/components/ui/deslizavel';
+import { VerMais } from '@/components/ui/ver-mais';
+import { useAosPoucos } from '@/hooks/use-aos-poucos';
 import { HeroLabel } from '@/components/ui/section-head';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -200,9 +202,12 @@ export default function RulesScreen() {
       </Card>
     </Animated.View>
   ) : null;
+  // Aos poucos (24/09/2026): o agente cria regra sozinho, e a lista cresce.
+  const regras = useAosPoucos(lista);
   const regraRows = lista.length > 0 ? (
+    <View style={styles.lista}>
     <Section title="Suas regras">
-      {lista.map((rule, index) => (
+      {regras.visiveis.map((rule, index) => (
         <Animated.View
           key={rule.id}
           layout={transicaoDeLayout}
@@ -224,6 +229,8 @@ export default function RulesScreen() {
         </Animated.View>
       ))}
     </Section>
+    <VerMais restantes={regras.restantes} onPress={regras.verMais} />
+    </View>
   ) : null;
   const vazio = !isLoading && !isError && lista.length === 0 ? (
     <EmptyState
@@ -326,6 +333,7 @@ export default function RulesScreen() {
 }
 
 const styles = StyleSheet.create({
+  lista: { gap: Space.md },
   paneBody: {
     gap: Space.xl,
     minWidth: 0,

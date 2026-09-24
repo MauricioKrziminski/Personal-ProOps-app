@@ -7,6 +7,8 @@ import { Row } from '@/components/ui/row';
 import { SearchField } from '@/components/ui/search-field';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
+import { VerMais } from '@/components/ui/ver-mais';
+import { useAosPoucos } from '@/hooks/use-aos-poucos';
 import { Space } from '@/design/tokens';
 import { useCategoriesUsed } from '@/hooks/use-finance';
 import { SUGGESTED_CATEGORIES } from '@/lib/categories';
@@ -64,6 +66,8 @@ export function CategoryPicker({
   };
 
   const filtradas = filterCategories(opcoes, busca);
+  // Aos poucos (24/09/2026): a lista é aberta e cresce com o que o WhatsApp cria. Buscar recomeça.
+  const visiveis = useAosPoucos(filtradas, busca);
   const termo = busca.trim();
   // Categoria nova nasce aqui, digitada — é o mesmo que o WhatsApp já permite.
   const podeCriar =
@@ -112,7 +116,7 @@ export function CategoryPicker({
           {value ? (
             <Row title="Sem categoria" icon="xmark" chevron={false} onPress={() => escolher(null)} />
           ) : null}
-          {filtradas.map((o) => (
+          {visiveis.visiveis.map((o) => (
             <Row
               key={o.label}
               title={o.label}
@@ -124,6 +128,7 @@ export function CategoryPicker({
               onPress={() => escolher(o.label)}
             />
           ))}
+          <VerMais restantes={visiveis.restantes} onPress={visiveis.verMais} />
           {filtradas.length === 0 && !podeCriar ? (
             <ThemedText type="small" themeColor="textSecondary">
               Nada com esse nome. Digite mais para criar uma categoria.

@@ -27,7 +27,7 @@ import {
   useInvoice,
   useMarkPaid,
   useDeleteInstallmentPlan,
-  useInstallmentPlans,
+  useInstallmentPlan,
   useRecurringTransactions,
   useSaveTransaction,
   useTransaction,
@@ -96,8 +96,9 @@ export default function TransactionDetailScreen() {
 
   const accounts = useAccounts();
   const invoice = useInvoice(tx?.invoice_id ?? undefined);
-  const plans = useInstallmentPlans();
-  const plano = (plans.data ?? []).find((p) => p.id === tx?.installment_plan_id);
+  // A compra DESTA parcela, pelo id — procurá-la na lista de todas era carregar todas para achar uma.
+  const plans = useInstallmentPlan(tx?.installment_plan_id);
+  const plano = plans.data ?? undefined;
   const series = useRecurringTransactions();
   const serie = (series.data ?? []).find((r) => r.id === tx?.recurring_id);
   const removePlan = useDeleteInstallmentPlan();

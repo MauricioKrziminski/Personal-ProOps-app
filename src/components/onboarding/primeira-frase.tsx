@@ -122,6 +122,11 @@ function Cena({ exemplo, tocou }: { exemplo: Exemplo; tocou: boolean }) {
   const cartaoEntra = reduzido
     ? FadeIn.duration(Motion.duration.base)
     : FadeInUp.delay(pouso).duration(Motion.duration.slow).easing(Motion.easing.out);
+  // Cada parte do cartão um degrau depois da anterior; com Reduce Motion entra junto, sem atraso.
+  const parte = (i: number) =>
+    reduzido
+      ? undefined
+      : FadeIn.delay(pouso + i * Motion.stagger.step * 3).duration(Motion.duration.base);
 
   return (
     <Animated.View exiting={FadeOut.duration(Motion.duration.fast)} style={styles.cena}>
@@ -143,19 +148,26 @@ function Cena({ exemplo, tocou }: { exemplo: Exemplo; tocou: boolean }) {
         <View style={[styles.selo, { backgroundColor: theme.backgroundElement }]}>
           <Icon name={exemplo.icon} size="md" color="text" />
         </View>
+        {/* O resultado se MONTA (spec): o título entra, depois a linha de apoio, depois o valor. */}
         <View style={styles.textos}>
           <ThemedText type="meta" themeColor="textSecondary" style={styles.semEncolher}>
             {`exemplo · ${exemplo.tipo}`}
           </ThemedText>
-          <ThemedText type="headline" style={styles.semEncolher}>
-            {exemplo.titulo}
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.semEncolher}>
-            {exemplo.apoio}
-          </ThemedText>
+          <Animated.View entering={parte(1)}>
+            <ThemedText type="headline" style={styles.semEncolher}>
+              {exemplo.titulo}
+            </ThemedText>
+          </Animated.View>
+          <Animated.View entering={parte(2)}>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.semEncolher}>
+              {exemplo.apoio}
+            </ThemedText>
+          </Animated.View>
         </View>
         {exemplo.cents != null ? (
-          <Money cents={exemplo.cents} variant="headline" tone="auto" concealable={false} />
+          <Animated.View entering={parte(3)}>
+            <Money cents={exemplo.cents} variant="headline" tone="auto" concealable={false} />
+          </Animated.View>
         ) : null}
       </Animated.View>
     </Animated.View>

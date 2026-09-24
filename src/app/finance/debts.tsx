@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, useLocalSearchParams } from 'expo-router';
 
@@ -21,7 +21,10 @@ import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { Deslizavel } from '@/components/ui/deslizavel';
-import { HeroLabel } from '@/components/ui/section-head';
+import { PressableScale } from '@/components/motion/pressable-scale';
+import { HeroLabel, SectionHead } from '@/components/ui/section-head';
+import { VerMais } from '@/components/ui/ver-mais';
+import { useAosPoucos } from '@/hooks/use-aos-poucos';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonHero, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
@@ -43,15 +46,16 @@ import {
   useUnarchiveDebt,
   type Debt,
 } from '@/hooks/use-finance';
+import { localISODate } from '@/hooks/use-items';
 import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { brToISO, formatNumberBR, isoToBR } from '@/lib/dates';
-import { linhaDoTempo, paidInstallments } from '@/lib/debt-history';
+import { paidInstallments, porAno, secoesDaLinha } from '@/lib/debt-history';
 import {
   ancoraDoContrato,
   debtTerm,
   financeErrorMessage,
   parcelaDoTotalDoContrato,
-  proximaDoContrato,
+  proximaNoCronograma,
   simpleDebtValues,
   type UnidadeDoValor,
 } from '@/lib/finance-form';
@@ -91,6 +95,8 @@ function parseTaxa(texto: string): number {
 interface FormState {
   calculationMode: 'amortized' | 'fixed_installments';
   id?: string;
+  /** O `updated_at` de quando o formulário abriu: o salvar só grava se a dívida não mudou no meio. */
+  versao?: string | null;
   name: string;
   kind: Debt['kind'];
   remainingCents: number;
@@ -224,6 +230,14 @@ export default function DebtsScreen() {
         payments: payments.data ?? [],
       })
     : [];
+  /**
+   * A linha do tempo em duas metades, cada uma aos poucos (24/09/2026): o que falta a partir da
+   * próxima, e o que já foi pago do mais recente para o mais antigo. Um financiamento de 360
+   * parcelas desenhava as 360 de uma vez, com a próxima centenas de linhas abaixo do topo.
+   */
+  const secoes = secoesDaLinha(historico, detalhe ? (schedule.data ?? []) : []);
+  const aSeguir = useAosPoucos(secoes.aSeguir, detalhe?.id ?? '');
+  const jaPagas = useAosPoucos(secoes.pagas, detalhe?.id ?? '');
   const pagadoras = (accounts.data ?? []).filter((a) => a.type !== 'credit_card');
 
   const abrirNova = () => setForm({ ...FORM_VAZIO });
@@ -236,6 +250,7 @@ export default function DebtsScreen() {
       ancora: d.first_due_date ?? null,
       pagasOriginal: d.installments_paid,
       id: d.id,
+      versao: d.updated_at,
       name: d.name,
       kind: d.kind,
       remainingCents: Number(d.remaining_cents),
@@ -271,8 +286,17 @@ export default function DebtsScreen() {
   if (form?.calculationMode === 'fixed_installments') {
     try { simpleValues = simpleDebtValues(parcelaCents, form.parcelas, form.installmentsPaid); } catch { /* Invalid input keeps Save disabled. */ }
   }
-  /** Pagamento lançado pelo app é fato: dizer menos pagas do que isso é contradição. */
-  const pagamentosLancados = form?.id ? (payments.data ?? []).length : 0;
+  /**
+   * Pagamento lançado pelo app é fato: dizer menos pagas do que isso é contradição. O piso é a
+   * MAIOR parcela já paga, não só a contagem — com um "Paguei" lançado como a 5ª, dizer 4 pagas
+   * deixava a 5ª paga aparecendo como futura na linha do tempo e no cronograma.
+   */
+  const pagamentosLancados = form?.id
+    ? Math.max(
+        (payments.data ?? []).length,
+        ...(payments.data ?? []).map((p) => Number(p.debt_payment_no ?? 0)),
+      )
+    : 0;
   /**
    * ⚠️ **A âncora só existe quando veio do banco ou foi ESCOLHIDA** (revisão final, 23/09/2026).
    * Deduzir uma âncora da dívida antiga (`schedule[0]` − pagas) parecia inofensivo e não era: o
@@ -284,7 +308,8 @@ export default function DebtsScreen() {
   const diaDoContrato = form?.diaVencimento ? Number(form.diaVencimento) : null;
   const proximaISO =
     ancoraEfetiva && diaDoContrato && form
-      ? proximaDoContrato(ancoraEfetiva, form.installmentsPaid, diaDoContrato)
+      ? // A do CRONOGRAMA, não só a do contrato: diminuir as pagas não põe a data no passado.
+        proximaNoCronograma(ancoraEfetiva, form.installmentsPaid, diaDoContrato, localISODate())
       : form?.id
         ? (schedule.data?.[0]?.due_date ?? null)
         : null;
@@ -362,6 +387,7 @@ export default function DebtsScreen() {
         due_day: diaDoContrato,
         // Só com âncora conhecida: sem ela o cronograma segue o jeito antigo, sem data inventada.
         ...(ancoraEfetiva ? { first_due_date: ancoraEfetiva } : {}),
+        ...(form.id ? { versao: form.versao ?? null } : {}),
       },
       {
         onSuccess: () => {
@@ -370,7 +396,10 @@ export default function DebtsScreen() {
         },
         onError: (error) =>
           toast({
-            message: financeErrorMessage(error, 'Não deu para salvar. Já existe uma dívida com esse nome?'),
+            message:
+              (error as { code?: string }).code === 'VERSAO'
+                ? 'A dívida mudou enquanto você editava (um pagamento pode ter chegado). Feche e abra de novo.'
+                : financeErrorMessage(error, 'Não deu para salvar. Já existe uma dívida com esse nome?'),
             tone: 'error',
           }),
       }
@@ -410,7 +439,12 @@ export default function DebtsScreen() {
 
   const desarquivar = (d: Debt) =>
     unarchive.mutate(d.id, {
-      onSuccess: () => toast({ message: `"${d.name}" voltou para a lista.`, tone: 'success' }),
+      onSuccess: (voltou) =>
+        toast(
+          voltou
+            ? { message: `"${d.name}" voltou para a lista.`, tone: 'success' }
+            : { message: `"${d.name}" não existe mais.`, tone: 'error' },
+        ),
       onError: () => toast({ message: `Não deu para desarquivar ${d.name}.`, tone: 'error' }),
     });
 
@@ -491,7 +525,7 @@ export default function DebtsScreen() {
           Math.min(index * Motion.stagger.step, Motion.stagger.cap)
         )}>
         <Deslizavel titulo={d.name} acoes={listaDaDivida(d)} forma="card">
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={`${d.name}, ${tipo}, deve ${brl(restante)}, ${juros}${parcelas ? `, ${parcelas}` : ''}`}
           onPress={() => setDetalhe(d)}
@@ -509,7 +543,7 @@ export default function DebtsScreen() {
               {parcelas ? ` · ${parcelas}` : ''}
             </ThemedText>
           </Card>
-        </Pressable>
+        </PressableScale>
         </Deslizavel>
       </Animated.View>
     );
@@ -794,7 +828,22 @@ export default function DebtsScreen() {
             */}
             {detalhe && payments.isSuccess && !schedule.isLoading &&
             (historico.length > 0 || (schedule.data ?? []).length > 0) ? (
-              <DebtTimeline anos={linhaDoTempo(historico, schedule.data ?? [])} />
+              <>
+                {aSeguir.visiveis.length > 0 ? (
+                  <View style={styles.secaoDaLinha}>
+                    <SectionHead title="A seguir" />
+                    <DebtTimeline anos={porAno(aSeguir.visiveis)} />
+                    <VerMais restantes={aSeguir.restantes} onPress={aSeguir.verMais} />
+                  </View>
+                ) : null}
+                {jaPagas.visiveis.length > 0 ? (
+                  <View style={styles.secaoDaLinha}>
+                    <SectionHead title="Já pagas" />
+                    <DebtTimeline anos={porAno(jaPagas.visiveis)} />
+                    <VerMais restantes={jaPagas.restantes} onPress={jaPagas.verMais} />
+                  </View>
+                ) : null}
+              </>
             ) : null}
           </ScrollView>
       </Sheet>
@@ -888,6 +937,13 @@ export default function DebtsScreen() {
 
           {form ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+              {/* Os pagamentos lançados são o piso das "pagas": sem eles o Salvar espera — e diz por quê. */}
+              {form.id && payments.isError ? (
+                <ErrorBand
+                  message="Não deu para carregar os pagamentos desta dívida."
+                  onRetry={payments.refetch}
+                />
+              ) : null}
               {/*
                 Nome e conta NO TOPO (23/09/2026, pedido do dono do produto): eram uma linha
                 recolhida no fim do "Parcela fixa", e o nome caía em "Financiamento 2". O nome
@@ -1193,6 +1249,8 @@ const styles = StyleSheet.create({
   tabelaBloco: {
     gap: Space.sm,
   },
+  // Título da seção a `Space.md` do conteúdo, como todo `SectionHead` (design.md §2).
+  secaoDaLinha: { gap: Space.md },
   sheetBody: {
     gap: Space.xl,
     padding: Space.lg,

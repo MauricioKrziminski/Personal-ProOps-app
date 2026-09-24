@@ -20,6 +20,9 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Screen } from '@/components/ui/screen';
 import { Deslizavel } from '@/components/ui/deslizavel';
+import { PressableScale } from '@/components/motion/pressable-scale';
+import { VerMais } from '@/components/ui/ver-mais';
+import { useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Search } from '@/components/ui/search';
 import { SwitchRow } from '@/components/ui/switch-row';
@@ -321,6 +324,11 @@ export default function RecurringScreen() {
   const comErro = lista.filter((r) => r.last_error);
   const ativas = lista.filter((r) => r.active && !r.last_error);
   const pausadas = lista.filter((r) => !r.active && !r.last_error);
+  // Aos poucos (24/09/2026): é a lista que mais cresce. Uma busca nova recomeça as seções.
+  const janelas = useJanelasPorGrupo(termo);
+  const jErro = janelas.janelaDe('erro', comErro);
+  const jAtivas = janelas.janelaDe('ativas', ativas);
+  const jPausadas = janelas.janelaDe('pausadas', pausadas);
 
   const sai = (proximos.data ?? [])
     .filter((t) => t.kind === 'expense')
@@ -492,7 +500,7 @@ export default function RecurringScreen() {
           Math.min(index * Motion.stagger.step, Motion.stagger.cap)
         )}>
         <Deslizavel titulo={r.description ?? 'Recorrência'} acoes={acoesDaSerie(r)} forma="card">
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={`${r.description ?? 'recorrência'}, ${receita ? 'receita' : 'despesa'}, ${quando}, próximo em ${isoToBR(r.next_run_at.slice(0, 10))}${r.active ? '' : ', pausado'}`}
           onPress={() => acoes(r)}
@@ -526,7 +534,7 @@ export default function RecurringScreen() {
               {r.active ? '' : ' · pausada'}
             </ThemedText>
           </Card>
-        </Pressable>
+        </PressableScale>
         </Deslizavel>
       </Animated.View>
     );
@@ -574,7 +582,7 @@ export default function RecurringScreen() {
       {comErro.length > 0 ? (
         <View style={styles.secao}>
           <SectionHead title="Precisa de atenção" />
-          {comErro.map((r) => (
+          {jErro.visiveis.map((r) => (
             <Animated.View key={r.id} entering={FadeIn.duration(Motion.duration.base)}>
               <Card
                 style={[
@@ -613,20 +621,23 @@ export default function RecurringScreen() {
               </Card>
             </Animated.View>
           ))}
+          <VerMais restantes={jErro.restantes} onPress={() => janelas.verMais('erro')} />
         </View>
       ) : null}
 
       {ativas.length > 0 ? (
         <View style={styles.secao}>
           <SectionHead title="Ativas" />
-          {ativas.map(cartaoSerie)}
+          {jAtivas.visiveis.map(cartaoSerie)}
+          <VerMais restantes={jAtivas.restantes} onPress={() => janelas.verMais('ativas')} />
         </View>
       ) : null}
 
       {pausadas.length > 0 ? (
         <View style={styles.secao}>
           <SectionHead title="Pausadas" />
-          {pausadas.map(cartaoSerie)}
+          {jPausadas.visiveis.map(cartaoSerie)}
+          <VerMais restantes={jPausadas.restantes} onPress={() => janelas.verMais('pausadas')} />
         </View>
       ) : null}
 

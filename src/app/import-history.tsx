@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -22,6 +22,8 @@ import {
   usePlanStatus,
   type ImportBatchSummary,
 } from '@/hooks/use-finance';
+import { VerMais } from '@/components/ui/ver-mais';
+import { PASSO } from '@/lib/aos-poucos';
 import { formatDateBR } from '@/hooks/use-items';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { accountLabel } from '@/lib/accounts';
@@ -61,7 +63,9 @@ function estadoDoLote(lote: ImportBatchSummary): Estado {
 
 export default function ImportHistoryScreen() {
   const toast = useToast();
-  const batches = useImportBatches();
+  // Aos poucos: 20 do servidor, e o "Ver mais" pede mais 20.
+  const [limite, setLimite] = useState(PASSO);
+  const batches = useImportBatches(limite);
   const accounts = useAccounts();
   const plano = usePlanStatus();
   const apagar = useDeleteImportBatch();
@@ -212,6 +216,13 @@ export default function ImportHistoryScreen() {
           })}
         </Section>
       ))}
+      {!batches.isLoading && !batches.isError && (batches.data?.length ?? 0) > 0 ? (
+        <VerMais
+          restantes={(batches.data?.length ?? 0) >= limite ? null : 0}
+          carregando={batches.isPlaceholderData}
+          onPress={() => setLimite(limite + PASSO)}
+        />
+      ) : null}
 
       {/* Esconder a funcionalidade não vende plano; explicar vende. */}
       {!batches.isLoading && !batches.isError && lista.length === 0 && bloqueadoNoPlano ? (

@@ -1,4 +1,4 @@
-import { router, type Href } from 'expo-router';
+import { router } from 'expo-router';
 import { Fragment, useMemo, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 
@@ -396,7 +396,7 @@ export default function FinanceScreen() {
             icon="list.bullet"
             label="Lançamentos"
             value={<ThemedText type="headline">{monthTitle(month).replace(/ de \d{4}$/, '')}</ThemedText>}
-            onPress={() => router.push({ pathname: '/finance/transactions', params: { month, view: regua.view } } as Href)}
+            onPress={() => router.push({ pathname: '/finance/transactions', params: { month, view: regua.view } })}
           />
           <Tile
             layout="half"
@@ -477,7 +477,8 @@ export default function FinanceScreen() {
         </Section>
       ) : (recent.data ?? []).length > 0 ? (
         <View style={styles.bloco}>
-          {/* Lista CHAPADA: a ordem é a do registro (`created_at`), e cabeçalho de dia contradiria. */}
+          {/* Lista CHAPADA, do mais recente para o mais antigo pela data do lançamento (`occurred_at`,
+              `created_at` desempata) — são só cinco, cabeçalho de dia seria mais ruído que ajuda. */}
           <BlockHeader title="Últimos lançamentos" action={{ label: 'Ver todos', onPress: () => openTransactions({}) }} />
           <Section>
             {(recent.data ?? []).map((tx) => {

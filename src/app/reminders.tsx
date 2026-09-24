@@ -5,6 +5,7 @@ import { ErrorCard } from '@/components/error-card';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Deslizavel } from '@/components/ui/deslizavel';
+import { VerMais } from '@/components/ui/ver-mais';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
@@ -31,14 +32,14 @@ import { describeRRule } from '@/lib/rrule-text';
 export default function RemindersScreen() {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
-  const { data, isLoading, isError, refetch } = useReminders();
+  const { data, isLoading, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } = useReminders();
   const toggle = useToggleReminder();
   const remove = useDeleteReminder();
   const toast = useToast();
 
   // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
   // falha, e sem este corte a tela seguia afirmando números embaixo da faixa de erro.
-  const reminders = isError ? [] : (data ?? []);
+  const reminders = isError ? [] : (data?.pages.flat() ?? []);
   const active = reminders.filter((r) => r.active);
   const paused = reminders.filter((r) => !r.active);
 
@@ -110,6 +111,12 @@ export default function RemindersScreen() {
     <>
       {activeSection}
       {pausedSection}
+      {/* O servidor manda 20 por vez; o resto vem pelo toque. */}
+      <VerMais
+        restantes={hasNextPage ? null : 0}
+        carregando={isFetchingNextPage}
+        onPress={() => void fetchNextPage()}
+      />
     </>
   );
 

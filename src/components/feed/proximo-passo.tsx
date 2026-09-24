@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
@@ -27,10 +28,12 @@ export function ProximoPassoCard({
   onDispensar: () => void;
 }) {
   const theme = useTheme();
+  // O primeiro passo chega com a cascata da Hoje; só a TROCA de passo faz o cross-fade próprio.
+  const [primeiroId] = useState(passo.id);
   return (
     <Animated.View
       key={passo.id}
-      entering={FadeIn.duration(Motion.duration.base)}
+      entering={passo.id === primeiroId ? undefined : FadeIn.duration(Motion.duration.base)}
       exiting={FadeOut.duration(Motion.duration.fast)}
       style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
       <View style={styles.topo}>

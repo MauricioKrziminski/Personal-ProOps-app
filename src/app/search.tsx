@@ -11,6 +11,8 @@ import { Search } from '@/components/ui/search';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { Space } from '@/design/tokens';
 import { useGlobalSearch } from '@/hooks/use-search';
+import { VerMais } from '@/components/ui/ver-mais';
+import { PASSO } from '@/lib/aos-poucos';
 import { formatDateBR } from '@/hooks/use-items';
 import { useDebounced } from '@/hooks/use-debounced';
 import { noteTitle, notePreview } from '@/lib/search';
@@ -34,20 +36,44 @@ export default function SearchScreen() {
   const [text, setText] = useState('');
   const [scope, setScope] = useState<Scope>('tudo');
   const q = useDebounced(text, 250);
-  const { notes, transactions, reminders, enabled, term } = useGlobalSearch(q);
+  /**
+   * Aos poucos (24/09/2026): 20 por tipo, e o "Ver mais" pede mais 20 — antes o teto era 30 em
+   * silêncio, e o chip dizia "30" como se fosse o total. Outra busca ou outro escopo recomeça.
+   */
+  const [janela, setJanela] = useState({ chave: '', limite: PASSO });
+  const chave = `${q}|${scope}`;
+  const limite = janela.chave === chave ? janela.limite : PASSO;
+  const { notes, transactions, reminders, enabled, term } = useGlobalSearch(q, limite);
+  // A consulta traz um a mais que o limite: sobrou um, existe mais no servidor.
+  const temMais = (rows: unknown[] | undefined) => (rows?.length ?? 0) > limite;
+  const contagem = (rows: unknown[] | undefined) =>
+    `${Math.min(rows?.length ?? 0, limite)}${temMais(rows) ? '+' : ''}`;
 
   const counts = useMemo(
     () => ({
-      notas: notes.data?.length ?? 0,
-      lancamentos: transactions.data?.length ?? 0,
-      lembretes: reminders.data?.length ?? 0,
+      notas: Math.min(notes.data?.length ?? 0, limite),
+      lancamentos: Math.min(transactions.data?.length ?? 0, limite),
+      lembretes: Math.min(reminders.data?.length ?? 0, limite),
     }),
-    [notes.data, transactions.data, reminders.data]
+    [notes.data, transactions.data, reminders.data, limite]
   );
 
   const show = (s: Scope) => scope === 'tudo' || scope === s;
-  const cut = <T,>(rows: T[] | undefined, s: Scope) =>
-    scope === 'tudo' ? (rows ?? []).slice(0, PREVIEW) : (rows ?? []);
+  const cut = <T,>(rows: T[] | undefined) =>
+    scope === 'tudo' ? (rows ?? []).slice(0, PREVIEW) : (rows ?? []).slice(0, limite);
+  /** Em "Tudo", o "Ver mais" abre a seção; dentro dela, pede mais 20 ao servidor. */
+  const verMais = (rows: unknown[] | undefined, s: Scope) =>
+    scope === 'tudo' ? (
+      <VerMais
+        restantes={temMais(rows) ? null : Math.max(0, (rows?.length ?? 0) - PREVIEW)}
+        onPress={() => setScope(s)}
+      />
+    ) : (
+      <VerMais
+        restantes={temMais(rows) ? null : 0}
+        onPress={() => setJanela({ chave, limite: limite + PASSO })}
+      />
+    );
 
   const loading = enabled && (notes.isLoading || transactions.isLoading || reminders.isLoading);
   const nothing =
@@ -80,9 +106,9 @@ export default function SearchScreen() {
         {(
           [
             ['tudo', 'Tudo'],
-            ['notas', `Notas${counts.notas ? ` ${counts.notas}` : ''}`],
-            ['lancamentos', `Lançamentos${counts.lancamentos ? ` ${counts.lancamentos}` : ''}`],
-            ['lembretes', `Lembretes${counts.lembretes ? ` ${counts.lembretes}` : ''}`],
+            ['notas', `Notas${counts.notas ? ` ${contagem(notes.data)}` : ''}`],
+            ['lancamentos', `Lançamentos${counts.lancamentos ? ` ${contagem(transactions.data)}` : ''}`],
+            ['lembretes', `Lembretes${counts.lembretes ? ` ${contagem(reminders.data)}` : ''}`],
           ] as [Scope, string][]
         ).map(([value, label]) => (
           <Chip key={value} label={label} selected={scope === value} onPress={() => setScope(value)} />
@@ -110,7 +136,7 @@ export default function SearchScreen() {
           {notes.isError ? (
             <Row title="Não deu para buscar em notas" subtitle="Toque para tentar de novo" icon="exclamationmark.triangle" onPress={() => notes.refetch()} />
           ) : (
-            cut(notes.data, 'notas').map((n) => (
+            cut(notes.data).map((n) => (
               <Row
                 key={n.id}
                 title={noteTitle(n.content) || 'Nota sem título'}
@@ -122,13 +148,14 @@ export default function SearchScreen() {
           )}
         </Section>
       ) : null}
+      {show('notas') && !notes.isError && counts.notas > 0 ? verMais(notes.data, 'notas') : null}
 
       {show('lancamentos') && (transactions.isError || counts.lancamentos > 0) ? (
         <Section title="Lançamentos">
           {transactions.isError ? (
             <Row title="Não deu para buscar em lançamentos" subtitle="Toque para tentar de novo" icon="exclamationmark.triangle" onPress={() => transactions.refetch()} />
           ) : (
-            cut(transactions.data, 'lancamentos').map((t) => (
+            cut(transactions.data).map((t) => (
               <Row
                 key={t.id}
                 title={t.description ?? t.merchant ?? t.category ?? 'Lançamento'}
@@ -149,13 +176,14 @@ export default function SearchScreen() {
           )}
         </Section>
       ) : null}
+      {show('lancamentos') && !transactions.isError && counts.lancamentos > 0 ? verMais(transactions.data, 'lancamentos') : null}
 
       {show('lembretes') && (reminders.isError || counts.lembretes > 0) ? (
         <Section title="Lembretes">
           {reminders.isError ? (
             <Row title="Não deu para buscar em lembretes" subtitle="Toque para tentar de novo" icon="exclamationmark.triangle" onPress={() => reminders.refetch()} />
           ) : (
-            cut(reminders.data, 'lembretes').map((r) => (
+            cut(reminders.data).map((r) => (
               <Row
                 key={r.id}
                 title={r.title}
@@ -173,6 +201,7 @@ export default function SearchScreen() {
           )}
         </Section>
       ) : null}
+      {show('lembretes') && !reminders.isError && counts.lembretes > 0 ? verMais(reminders.data, 'lembretes') : null}
 
       {nothing ? (
         <EmptyState

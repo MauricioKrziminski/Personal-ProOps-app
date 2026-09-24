@@ -261,3 +261,16 @@ export function proximaDoContrato(ancoraISO: string, pagas: number, dia: number)
   const ultimo = new Date(Date.UTC(y, m, 0)).getUTCDate();
   return `${mes.slice(0, 7)}-${String(Math.min(dia, ultimo)).padStart(2, '0')}`;
 }
+
+/**
+ * A próxima parcela que o CRONOGRAMA vai mostrar (24/09/2026): a do contrato, nunca antes da
+ * próxima ocorrência do dia a partir de hoje — o `greatest` de `private.debt_schedule_for` com
+ * âncora. Mostrar só a do contrato punha uma data no passado ao diminuir as pagas, e o banco a
+ * mostrava em outra.
+ */
+export function proximaNoCronograma(ancoraISO: string, pagas: number, dia: number, hojeISO: string): string {
+  const contrato = proximaDoContrato(ancoraISO, pagas, dia);
+  const esteMes = proximaDoContrato(hojeISO, 0, dia);
+  const piso = esteMes >= hojeISO ? esteMes : proximaDoContrato(hojeISO, 1, dia);
+  return contrato > piso ? contrato : piso;
+}
