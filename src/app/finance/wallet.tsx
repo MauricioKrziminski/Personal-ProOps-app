@@ -35,6 +35,7 @@ import { distanciaDoItem } from '@/design/carousel-math';
 import { caixaArrastada, type Caixa } from '@/design/flight-math';
 import { Radius, Space, tabular } from '@/design/tokens';
 import { cartaoEscolhido, escolherCartao, useCartaoEscolhido } from '@/hooks/use-cartao-escolhido';
+import { usarDica } from '@/hooks/use-dicas';
 import { invoiceQuery, useCardSummary, type CardSummary } from '@/hooks/use-finance';
 import { formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
@@ -100,6 +101,11 @@ export default function WalletScreen() {
 
   const x = useSharedValue(indice * g.passo);
   const arrasto = useSharedValue(0);
+
+  // Chegar aqui É o que a dica da pilha ensina (`fin-pilha`): ela não volta a aparecer.
+  useEffect(() => {
+    usarDica('fin-pilha');
+  }, []);
 
   // A fatura do cartão da frente, já carregada: o cartão pousa na fatura com o total, sem esqueleto.
   const invoiceId = ativo?.invoice_id;

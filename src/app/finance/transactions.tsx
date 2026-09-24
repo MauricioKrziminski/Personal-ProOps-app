@@ -1,5 +1,5 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, SectionList, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/finance/chip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Card } from '@/components/ui/card';
+import { Dica } from '@/components/ui/dica';
 import { useBRL } from '@/components/ui/conceal';
 import { Money } from '@/components/ui/money';
 import { Row } from '@/components/ui/row';
@@ -46,6 +47,7 @@ import {
   type TransactionKind,
   type TransactionSource,
 } from '@/hooks/use-finance';
+import { usarDica } from '@/hooks/use-dicas';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { mesmoMes } from '@/lib/dates';
@@ -209,6 +211,11 @@ export default function TransactionsScreen() {
     if (params.category) setCategory(params.category);
     if (params.accountId) setAccountId(params.accountId);
   }
+
+  // Abrir o extrato de uma conta é o que a dica "Nas contas" da Hoje ensina (`hoje-contas`).
+  useEffect(() => {
+    if (accountId && accountId !== NO_ACCOUNT) usarDica('hoje-contas');
+  }, [accountId]);
 
   const regua = useMonthRuler();
   const mesCorrente = useCycleMonth(regua.view);
@@ -575,6 +582,8 @@ export default function TransactionsScreen() {
           />
         ) : null}
       </View>
+      {/* Aponta para a primeira linha: só com linhas, e só onde a lista vem logo abaixo. */}
+      {sections.length > 0 && !wideWorkspace ? <Dica id="lista-arrasto" tela="lancamentos" bico="baixo" /> : null}
     </View>
   );
 

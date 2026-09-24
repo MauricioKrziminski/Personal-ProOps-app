@@ -18,6 +18,7 @@ import { useFlightAnchor, useFlightHidden } from '@/components/motion/flight-lay
 import { ThemedText } from '@/components/themed-text';
 import { CountUpMoney } from '@/components/ui/count-up-money';
 import { Motion, Space, tabular } from '@/design/tokens';
+import { usarDica } from '@/hooks/use-dicas';
 import { invoiceQuery, type CardInvoice, type Transaction } from '@/hooks/use-finance';
 import { formatDateBR, localISODate } from '@/hooks/use-items';
 import { STATUS_DA_FATURA, contagemDeLancamentos } from '@/lib/card-status';
@@ -134,6 +135,8 @@ export function InvoiceDock({
 
   const trocar = (destino: string) => {
     Haptics.selectionAsync();
+    // Deslizar o cartão é o que a dica da fatura ensina (`fatura-cartao`).
+    usarDica('fatura-cartao');
     onChange(destino);
   };
 

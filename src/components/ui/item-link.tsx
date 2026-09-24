@@ -1,6 +1,7 @@
 import { Link } from 'expo-router';
 
 import { Deslizavel } from '@/components/ui/deslizavel';
+import { usarDica } from '@/hooks/use-dicas';
 import { showItemActions } from '@/lib/item-actions';
 import type { ItemLinkProps } from './item-link.types';
 
@@ -23,7 +24,14 @@ export function ItemLink({ href, actions, title, forma, children }: ItemLinkProp
   return (
     <Deslizavel titulo={title} acoes={actions} forma={forma}>
       <Link asChild href={href}>
-        <Link.Trigger>{children({ onLongPress: () => showItemActions(title, actions) })}</Link.Trigger>
+        <Link.Trigger>
+          {children({
+            onLongPress: () => {
+              usarDica('lista-arrasto');
+              showItemActions(title, actions);
+            },
+          })}
+        </Link.Trigger>
       </Link>
     </Deslizavel>
   );

@@ -46,7 +46,7 @@ do inventário:
 | `hoje-painel` | Hoje (herói) | "Toque no painel para ver o que fecha o ciclo, a projeção e as metas." | abre o menu do painel |
 | `hoje-contas` | Hoje ("Nas contas") | "Toque numa conta para ver o saldo e o extrato dela." | abre o extrato de uma conta |
 | `fin-pilha` | Financeiro (pilha de cartões) | "Toque na pilha para ver todos os cartões." | abre a Carteira |
-| `fin-grafico` | Financeiro (gráfico do herói) | "Arraste o dedo no gráfico para ver o saldo de cada dia." | arrasta no gráfico |
+| `fin-grafico` | Financeiro (gráfico do herói) | "Arraste no gráfico para ver o saldo de cada dia." | arrasta no gráfico |
 | `lista-arrasto` | Lançamentos e Notas (1ª linha) | "Arraste para os lados para as ações rápidas. Segure para ver todas." | arrasta ou segura um card |
 | `fatura-cartao` | Fatura (cartão ancorado) | "Deslize o cartão para trocar de fatura. Importar a fatura fica no ⋯." | desliza o cartão |
 
@@ -58,7 +58,7 @@ certa e acende a dica dali (mesmo já dispensada):
 - **Registrar:** pelo WhatsApp ou pelo Agente, em frase ("gastei 45 no mercado"); pelo "+ Lançar";
   importar a fatura ou o extrato.
 - **Contas e cartões:** ver o saldo de uma conta; ver todos os cartões; trocar de fatura.
-- **Planejar:** o que fecha o ciclo; a projeção; "E se…"; metas e orçamentos.
+- **Planejar:** a projeção e o "E se…"; metas; orçamentos. (O que fecha o ciclo é o gesto "Tocar no painel": o link do ciclo carrega a régua do `cycle_now`, e só o painel a tem.)
 - **Notas e lembretes:** anotar rápido; lembrete que repete; nota em pasta.
 - **Gestos:** arrastar para os lados, segurar para ver tudo, tocar no painel, arrastar no gráfico.
 

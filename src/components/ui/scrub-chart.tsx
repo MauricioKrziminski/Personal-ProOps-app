@@ -7,6 +7,7 @@ import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-nativ
 import { ThemedText } from '@/components/themed-text';
 import { Sparkline } from '@/components/ui/sparkline';
 import { escalaDaSerie, indiceNoX } from '@/design/sparkline-geometry';
+import { usarDica } from '@/hooks/use-dicas';
 import { Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -60,6 +61,10 @@ export function ScrubChart({
         .enabled(pontos.length > 1)
         .activeOffsetX([-6, 6])
         .failOffsetY([-10, 10])
+        // Arrastar na curva é o que a dica do gráfico ensina (`fin-grafico`).
+        .onStart(() => {
+          runOnJS(usarDica)('fin-grafico');
+        })
         .onUpdate((e) => {
           const i = indiceNoX(e.x, pontos.length, width);
           if (i !== indice.get()) {

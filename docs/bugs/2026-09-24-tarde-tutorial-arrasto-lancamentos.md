@@ -32,8 +32,9 @@ fazer", e ele não ensina gesto nenhum.
 com "Mais" e "Arquivar" → tocar em "Mais" não faz nada e o painel continua aberto. No Android o
 mesmo toque abre o menu.
 
-**Causa:** a investigar no conserto, com experimento (o `Pressable` do gesture-handler dentro do
-`ReanimatedSwipeable`, e o gesto observador `Gesture.Manual` que envolve o card).
+**Causa (medida):** no iOS o gesto do arrasto (`dedo`, o `Gesture.Manual` que observa o card) e
+o toque do botão disputavam o mesmo toque, e o do botão perdia. O botão do painel passou a ser um
+`Gesture.Tap` declarado `simultaneousWithExternalGesture(dedo)` — o `anti-slop.test.ts` prende.
 
 ## 3. A borda do painel e o "arrastar até o fim"
 
@@ -71,8 +72,11 @@ sozinho — foi a data escolhida ali.
 gesto da borda → o Financeiro aparece com um header nativo escrito "(tabs)" por cima da faixa da
 marca.
 
-**Causa:** a investigar no conserto (a busca nativa `Stack.SearchBar` escreve opções de header, e
-a rota `(tabs)` não tem título).
+**Causa (medida):** o `UISearchController` com `hideNavigationBar` devolve a barra de navegação
+da tela de BAIXO quando o voltar é interativo — e a tela de baixo é o grupo `(tabs)`, que no
+stack raiz tem o nome do arquivo como título. Duas correções: `hideNavigationBar={false}` na busca
+do iOS e o título do grupo sendo o nome da aba ativa (`lib/abas.ts`), que é também o que o "voltar"
+passa a dizer.
 
 ## 7. Tela vazia com seção secundária
 
@@ -97,8 +101,35 @@ preenchido ("Nubank", "Viagem", "Tesouro Selic", "mercado", "Contas do mês").
 
 ## Decisões
 
-(preenchido com a resposta do dono do produto)
+- **Item 1:** "Dicas no lugar + Guia" (o padrão do TipKit e da ajuda contextual do NN/g), escrito
+  em `specs/2026-09-24-dicas-e-guia-design.md` e aprovado antes de implementar.
+- **Item 3:** o painel é "tudo junto" — o botão da ponta cresce e cobre os outros no até o fim —,
+  e até o fim aciona SEMPRE a ponta (Apagar continua confirmando).
+- **Ordem das listas:** agenda e o que vem continuam do mais próximo; histórico e período, do mais
+  recente (confirmado pelo dono do produto).
 
 ## Validação
 
-(preenchido item a item)
+Portão em cada commit: `tsc`, `expo lint` e `npm test` verdes (853/853 no último).
+
+| item | commit | conferido em |
+|---|---|---|
+| 1 — dicas e guia | este lote | s26 (claro; escuro a 384dp × 1,3) e iPhone 17 Pro (escuro): as seis dicas no lugar, uma por tela e por visita; some no "Entendi" e no uso (menu do herói, Carteira, curva, arrasto, extrato da conta); volta pelo "Mostrar"; sobrevive a fechar o app; "Conhecer o app" marca ao abrir o guia |
+| 2 — botões do arrasto no iOS | `ec08d7e` | simulador: "Mais" abre o menu, "Arquivar" arquiva |
+| 3 — borda e até o fim | `5278f48` | s26 e simulador: canto casado com o card; até o fim aciona a ponta dos dois lados (6/6 medido no banco) |
+| 4 — efeito do WhatsApp | `5278f48` | vídeo quadro a quadro no s26 |
+| 5 — data da compra e "Concluído" | `a352e5b` | "wardogs" mostra "compra de 14/09" e aparece em Concluído |
+| 6 — "(tabs)" | `85806a1` | simulador: voltar pela borda com a busca ativa |
+| 7 — vazio com seção secundária | `62fd988` | Dívidas, Metas, Parceladas, Recorrentes, Lembretes, Notas e Orçamentos |
+| 8 — "Últimos lançamentos" no iOS | `4891b38` | simulador: tocar abre o detalhe |
+| 9 — placeholders | `981b4dd` | teste de anti-slop prende nome real e valor sem "Ex.:" |
+
+**Achado junto, e corrigido:** o FAB ficava por cima do toast com "Desfazer" (`5278f48`, sobe
+acima dele); os números do Perfil não diziam que eram do mês e do WhatsApp (`a7923f3`); a Hoje
+não tinha porta para a busca em tudo (`0b86cb7`); o extrato de uma conta não dizia o saldo dela
+(`c30f3ad`); a dica da lista sumia com o painel aberto e movia os botões sob o dedo (agora some
+ao fechar).
+
+**Efeito colateral no staging (conta `dev@`):** os testes de arrastar até o fim mexeram em notas
+de demonstração; `b7e765de` foi restaurada pelo id, e `9772618e`/`adaaaf73` ficaram só com o
+`updated_at` novo (conteúdo igual).

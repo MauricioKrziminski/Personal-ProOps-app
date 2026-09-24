@@ -25,6 +25,7 @@ import { Money } from '@/components/ui/money';
 import { RingGauge } from '@/components/ui/ring-gauge';
 import { Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { Dica } from '@/components/ui/dica';
 import { ScrubChart } from '@/components/ui/scrub-chart';
 import { Skeleton, SkeletonCards, SkeletonChart, SkeletonHero, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
@@ -294,7 +295,7 @@ export default function FinanceScreen() {
   const cycleBlock = (
     <>
       <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} variant="bare" />
-      <View onLayout={measureHeroPane}>
+      <View onLayout={measureHeroPane} style={styles.comDica}>
         {heroError ? (
           <ErrorCard onRetry={() => {
             void refazerPeriodo();
@@ -350,6 +351,10 @@ export default function FinanceScreen() {
             ])}
           />
         )}
+        {/* Só com a curva na tela: a dica ensina o gesto DELA. */}
+        {!heroError && !heroLoading && isCurrent && series.length > 1 && chartWidth > 0 ? (
+          <Dica id="fin-grafico" tela="financeiro" />
+        ) : null}
       </View>
     </>
   );
@@ -386,6 +391,7 @@ export default function FinanceScreen() {
             action={{ label: 'Ver todos', accessibilityLabel: 'Ver todos os cartões', onPress: () => router.push('/finance/cards') }}
           />
           <CardStack cards={cartoesDaCarteira} onOpen={abrirFatura} />
+          <Dica id="fin-pilha" tela="financeiro" />
         </View>
       ) : null}
       <View style={styles.bloco}>
@@ -595,6 +601,8 @@ export default function FinanceScreen() {
 
 const styles = StyleSheet.create({
   bloco: { gap: Space.md },
+  /** A dica encosta no que ela explica — mais perto que o `gap` entre blocos. */
+  comDica: { gap: Space.sm },
   heroRodape: {
     flex: 1,
     flexDirection: 'row',

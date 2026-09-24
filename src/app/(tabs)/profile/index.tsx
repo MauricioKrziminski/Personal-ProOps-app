@@ -501,6 +501,10 @@ export default function ProfileScreen() {
         hasVerifiedPhone={!!phone}
       />
 
+      <Section heading="block" title="Ajuda">
+        <Row title="Como usar o ProOps" icon="questionmark.circle" onPress={() => router.push('/guia')} />
+      </Section>
+
       <Section heading="block" title="Dados">
         <Row title="Lixeira de notas" icon="trash" onPress={() => router.push('/notes/trash')} />
         <Row title="Regras" subtitle="Categoria automática por palavra" icon="wand.and.stars" onPress={() => router.push('/finance/rules')} />

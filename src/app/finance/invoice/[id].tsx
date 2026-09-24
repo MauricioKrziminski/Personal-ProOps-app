@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Card } from '@/components/ui/card';
+import { Dica } from '@/components/ui/dica';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ItemLink } from '@/components/ui/item-link';
 import { Field, MoneyField } from '@/components/ui/field';
@@ -385,7 +386,7 @@ export default function InvoiceScreen() {
 
       {/* O único destaque da tela: o cartão ancorado, com as linhas que explicam o total logo abaixo. */}
       {fatura ? (
-        <Animated.View entering={via ? undefined : FadeInDown.duration(Motion.duration.slow)}>
+        <Animated.View entering={via ? undefined : FadeInDown.duration(Motion.duration.slow)} style={styles.comDica}>
           <InvoiceDock
             nome={nomeDoCartao}
             resumo={{
@@ -447,6 +448,7 @@ export default function InvoiceScreen() {
               </View>
             ) : null}
           </InvoiceDock>
+          <Dica id="fatura-cartao" tela="fatura" />
         </Animated.View>
       ) : null}
     </View>
@@ -723,6 +725,8 @@ export default function InvoiceScreen() {
 }
 
 const styles = StyleSheet.create({
+  /** A dica encosta no cartão — mais perto que o `gap` entre blocos. */
+  comDica: { gap: Space.sm },
   flex: {
     flex: 1,
   },

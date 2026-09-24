@@ -641,6 +641,18 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
   depois do aviso — o arrasto rápido só abria (4 de 6 no emulador; 10 de 10 depois). O limiar
   cabe em 85% do card (`limiarAteOFim`): a 384dp × fonte 1,3 ele passava da borda.
 
+- **Dica no lugar é `Dica`** (`components/ui/dica.tsx`, 24/09/2026, spec
+  `2026-09-24-dicas-e-guia-design.md`): card inline com bico, colado no que explica — não
+  escurece, não flutua. O catálogo e a regra são `lib/dicas.ts` (puro, testado): **uma por tela,
+  uma por visita**, a da vez só entre as que estão NA tela (`useDica` registra a montagem), e
+  encerrada no "Entendi" OU quando a pessoa USA o gesto (`usarDica`, chamado pelo próprio gesto:
+  menu do herói, Carteira, curva, arrasto, deslize da fatura, extrato de conta). Só volta pelo
+  "Mostrar" do guia (`/guia`). Guardada por usuário no aparelho (`dicas:<userId>`).
+  ⚠️ **Some quando o gesto TERMINA, nunca no meio dele.** Encerrada no `onSwipeableWillOpen`, a
+  dica da lista sumia com o painel abrindo: a lista subia ~200dp e os botões do painel andavam
+  sob o dedo. É no `onSwipeableClose`. Dica nova que some pelo uso segue a mesma pergunta: o que
+  está embaixo do dedo se move quando ela sai?
+
 ---
 
 ## 7. Estados obrigatórios em TODA tela

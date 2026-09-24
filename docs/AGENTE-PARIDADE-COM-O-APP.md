@@ -527,3 +527,11 @@ teto de 252):
 
 **Ordem de deploy:** as migrations `20260923160000` e `20260923170000` vêm antes do agente — sem ela `delete_debt` não
 existe e o `first_due_date` bate numa coluna que não há.
+
+## Dicas no lugar e "Como usar o ProOps" (24/09/2026)
+
+Spec: `docs/superpowers/specs/2026-09-24-dicas-e-guia-design.md`.
+
+| app | agente |
+|---|---|
+| "Entendi" das dicas, "Mostrar" do guia, "Conhecer o app" nos Primeiros passos | **não — exclusão declarada.** Não é mutação: nada vai ao banco. É ajuda sobre GESTOS da tela (arrastar, tocar no painel, deslizar o cartão), guardada no aparelho (`dicas:<userId>`). Pela conversa a pergunta equivalente ("o que dá para fazer?") já é respondida pelo nó `geral` |

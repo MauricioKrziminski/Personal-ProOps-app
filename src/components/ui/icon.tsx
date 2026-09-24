@@ -50,6 +50,9 @@ const MATERIAL: Record<string, MaterialName> = {
   heart: 'favorite',
   iphone: 'smartphone',
   lightbulb: 'lightbulb',
+  // As dicas no lugar (`lib/dicas.ts`): o gesto que a dica ensina.
+  'hand.tap': 'touch_app',
+  'hand.draw': 'swipe',
   'pause.circle': 'pause_circle',
   'pencil.circle': 'edit',
   pills: 'medication',

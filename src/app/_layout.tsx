@@ -438,6 +438,7 @@ function AppTree() {
                   />
                   <Stack.Screen name="reminders" options={{ title: 'Lembretes' }} />
                   <Stack.Screen name="search" options={{ title: 'Buscar' }} />
+                  <Stack.Screen name="guia" options={{ title: 'Como usar o ProOps' }} />
                 <Stack.Screen name="import" options={{ title: 'Importar' }} />
                 <Stack.Screen name="import-history" options={{ title: 'Importações' }} />
                   {/* Paywall é modal fechável SEMPRE: paywall que não fecha é reprovação na App Review. */}

@@ -12,6 +12,7 @@ import type { NoteCardActions } from '@/components/notes/note-card';
 import { NoteList } from '@/components/notes/note-list';
 import { useFolderMenu } from '@/components/notes/use-folder-menu';
 import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
+import { Dica } from '@/components/ui/dica';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SearchField } from '@/components/ui/search-field';
 import { BlockHeader } from '@/components/ui/block-header';
@@ -559,6 +560,8 @@ export default function NotesScreen() {
             )}
           </View>
         ) : null}
+
+        {notes.length > 0 ? <Dica id="lista-arrasto" tela="notas" bico="baixo" /> : null}
 
         {fixadas.length > 0 ? (
           <View onLayout={(e) => setTopoFixadas(e.nativeEvent.layout.y)}>

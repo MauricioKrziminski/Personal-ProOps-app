@@ -18,6 +18,7 @@ import { CashAccounts } from '@/components/finance/cash-accounts';
 import { ThemedText } from '@/components/themed-text';
 import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
 import { BlockHeader } from '@/components/ui/block-header';
+import { Dica } from '@/components/ui/dica';
 import { useBRL } from '@/components/ui/conceal';
 import { CountUpMoney } from '@/components/ui/count-up-money';
 import { DayRail } from '@/components/ui/day-rail';
@@ -46,6 +47,7 @@ import {
 import { localISODate, useTodayReminders } from '@/hooks/use-items';
 import { useProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
+import { usarDica } from '@/hooks/use-dicas';
 import { useProximoPasso } from '@/hooks/use-proximo-passo';
 import { useSetupProgress } from '@/hooks/use-setup-progress';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
@@ -316,7 +318,8 @@ export default function TodayScreen() {
     conforme a tela é menu que se lê toda vez). `mes` e `view` saem do próprio `cycle.data`, nunca
     de um default — o destino tem que mostrar o período que o rodapé nomeou (`finance.md`).
   */
-  const abrirMenu = () =>
+  const abrirMenu = () => {
+    usarDica('hoje-painel');
     showItemActions('Mais opções', [
       ...(cycle.data?.mes
         ? [
@@ -335,6 +338,7 @@ export default function TodayScreen() {
       { label: 'Patrimônio', icon: 'building.columns', onPress: () => router.push('/finance/net-worth') },
       { label: 'Metas', icon: 'target', onPress: () => router.push('/finance/goals') },
     ]);
+  };
 
   if (!pronta) {
     return (
@@ -368,6 +372,7 @@ export default function TodayScreen() {
       {gasto.isError ? (
         <ErrorCard onRetry={() => gasto.refetch()} />
       ) : (
+        <View style={styles.comDica}>
         <HeroPanel
           surface="live"
           label={ateQuando ? `Livre até ${isoToBR(ateQuando)}` : 'Livre'}
@@ -385,6 +390,8 @@ export default function TodayScreen() {
           ) : undefined}
           onPress={abrirMenu}
         />
+        <Dica id="hoje-painel" tela="hoje" />
+        </View>
       )}
     </>
   );
@@ -479,6 +486,7 @@ export default function TodayScreen() {
         title="Nas contas"
         action={{ label: 'Contas', onPress: () => router.push('/finance/accounts') }}
       />
+      <Dica id="hoje-contas" tela="hoje" bico="baixo" />
       <CashAccounts
         caixa={emConta}
         onOpen={(l: LinhaDeCaixa) =>
@@ -609,6 +617,8 @@ const styles = StyleSheet.create({
   shrink: { flex: 1, minWidth: 0 },
   semEncolher: { flexShrink: 0, maxWidth: '100%' },
   cabecalho: { gap: Space.xs },
+  /** A dica encosta no que ela explica — mais perto que o `gap` entre blocos. */
+  comDica: { gap: Space.sm },
   bloco: { gap: Space.md },
   rodapeHeroi: {
     flex: 1,

@@ -21,6 +21,7 @@ import { DeslocamentoDoArrasto } from '@/components/ui/arrasto-contexto';
 import { Icon } from '@/components/ui/icon';
 import { DentroDeArrasto } from '@/components/ui/money';
 import { Motion, Radius, Space } from '@/design/tokens';
+import { usarDica } from '@/hooks/use-dicas';
 import { useTheme } from '@/hooks/use-theme';
 import {
   abriuOLado,
@@ -225,6 +226,9 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
             cardAberto.fechou(meu);
           }}
           onSwipeableClose={() => {
+            // Arrastar é o que a dica das listas ensina (`lista-arrasto`). Encerrada no FECHAR, não
+            // no abrir: sumindo com o painel aberto, a lista subia e os botões andavam sob o dedo.
+            usarDica('lista-arrasto');
             for (const l of [direita, esquerdaSV]) {
               l.passou.set(false);
               l.desligouEm.set(0);

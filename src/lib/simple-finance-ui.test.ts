@@ -186,7 +186,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === 'expo-haptics') return { selectionAsync() {}, notificationAsync() {}, NotificationFeedbackType: { Success: 'success', Warning: 'warning' } };
       // `back` é navegação como qualquer outra e ENTRA na lista: é o que prende o "fechar um
       // formulário que outra tela abriu devolve para ela" (`useVoltarQuandoFechar`).
-      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => options.params ?? ({ id: 'invoice-1', ...(options.create !== false ? { create: 'financing' } : {}) }), router: { push: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }) } };
+      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => options.params ?? ({ id: 'invoice-1', ...(options.create !== false ? { create: 'financing' } : {}) }), router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }) } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
       if (name === '@/hooks/use-aos-poucos') return load('src/hooks/use-aos-poucos.ts');
@@ -211,6 +211,16 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@/hooks/use-proximo-passo') return { useProximoPasso: () => ({ passo: options.proximo ?? null, dispensar: (id: string) => writes.push({ operation: 'dispensarProximo', value: id }), consultas: [] }) };
       if (name === '@/hooks/use-setup-progress') return { useSetupProgress: () => ({ passos: options.setupPassos ?? [], pronto: true, consultas: [] }) };
       if (name === '@/hooks/use-bool-pref') return { useBoolPref: () => [false, () => {}] };
+      // As dicas: a loja fica fora (aparelho); o que se prende é ONDE a tela as põe e o que o
+      // gesto e o "Mostrar" pedem a ela.
+      if (name === '@/hooks/use-dicas') return {
+        useDica: () => true,
+        useGuiaAberto: () => false,
+        usarDica: (id: string) => writes.push({ operation: 'usarDica', value: id }),
+        reacenderDica: (id: string) => writes.push({ operation: 'reacenderDica', value: id }),
+        dispensarDica: () => {},
+        marcarGuiaAberto: () => {},
+      };
       if (name === '@/hooks/use-agent-activity') return {
         useAgentActivity: () => ({
           ...query,
@@ -222,7 +232,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/lib/rrule-text') return { describeRRule: () => 'todo mês' };
       if (name === '@/hooks/use-archived-folders') return { useArchivedFolders: () => ({ ...query, isSuccess: true, data: [] }) };
@@ -1814,4 +1824,41 @@ test('Lista principal vazia com seção secundária: a secundária em cima e o v
   const serie = { id: 's1', description: 'Academia', kind: 'expense', amount_cents: 100, rrule: 'FREQ=MONTHLY;BYMONTHDAY=5', active: false, next_run_at: '2026-10-05T12:00:00Z', dtstart: '2026-01-05', category: null, account_id: null };
   ordem(screen('src/app/finance/recurring.tsx', { recurring: [serie] }), (n: any) => n.type === 'SectionHead' && n.props.title === 'Pausadas');
   ordem(screen('src/app/reminders.tsx', { reminders: [{ id: 'r1', title: 'Remédio', active: false, next_run_at: null, rrule: null }] }), (n: any) => n.type === 'Section' && n.props.title === 'Pausados');
+});
+
+const dicas = (ui: ReturnType<typeof screen>) =>
+  ui.nodes().filter((n: any) => n.type === 'Dica').map((n: any) => n.props.id);
+
+test('Hoje: a dica do painel mora no herói, e tocar nele a encerra', () => {
+  const ui = screen(hojeFile, { balances: [saldo('Nubank', 'checking', 120_00)] });
+  assert.deepEqual(dicas(ui), ['hoje-painel', 'hoje-contas']);
+  ui.nodes().find((n: any) => n.type === 'HeroPanel').props.onPress();
+  assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'usarDica', value: 'hoje-painel' });
+});
+
+test('Hoje: sem conta na tela, a dica das contas não é montada', () => {
+  assert.deepEqual(dicas(screen(hojeFile)), ['hoje-painel']);
+});
+
+test('Lançamentos: a dica do arrasto aponta para a primeira linha, e some com a lista vazia', () => {
+  assert.deepEqual(dicas(screen(transacoesFile)), ['lista-arrasto']);
+  assert.deepEqual(dicas(screen(transacoesFile, { txs: [] })), []);
+});
+
+const guiaFile = 'src/app/guia.tsx';
+
+test('Guia: "Mostrar" de um gesto acende a dica e leva à tela dela', () => {
+  const ui = screen(guiaFile);
+  const pilha = ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'Todos os cartões');
+  assert.ok(pilha, 'o item precisa estar no guia');
+  pilha.props.onPress();
+  assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'reacenderDica', value: 'fin-pilha' });
+  assert.equal(ui.navigations.at(-1), '/finance');
+});
+
+test('Guia: item sem dica só leva à tela, sem acender nada', () => {
+  const ui = screen(guiaFile);
+  ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'Importar fatura ou extrato').props.onPress();
+  assert.equal(ui.writes.length, 0);
+  assert.equal(ui.navigations.at(-1), '/import');
 });
