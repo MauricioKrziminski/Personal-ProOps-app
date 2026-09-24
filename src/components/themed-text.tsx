@@ -1,4 +1,4 @@
-import { StyleSheet, Text, type TextProps } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, type TextProps } from 'react-native';
 
 import { Fonts, ThemeColor } from '@/constants/theme';
 import { Type } from '@/design/tokens';
@@ -37,9 +37,14 @@ export type ThemedTextProps = TextProps & {
  */
 export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
   const theme = useTheme();
+  // ⚠️ Mudar o tamanho da fonte do sistema com o app ABERTO não mede de novo o texto já montado:
+  // no iPhone o Perfil ficou com "Aparên", "Tem" e a última linha cortada (23/09/2026). A chave
+  // muda com a escala e o `Text` remonta com a medida nova — texto não tem estado a perder.
+  const { fontScale } = useWindowDimensions();
 
   return (
     <Text
+      key={fontScale}
       /*
         ⚠️ **Nenhuma palavra parte ao meio, e nenhuma letra fica sozinha na última linha.**
 
