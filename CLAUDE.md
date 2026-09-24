@@ -100,6 +100,16 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   parcela e um pagamento feito no ciclo pula uma parcela no cronograma, na Projeção,
   em "O mês inteiro", no ciclo e no "livre".
 
+  ⚠️ **PENDENTE em produção: `20260924120000`** (`anon` sem EXECUTE nas funções de public — 45
+  funções antigas ainda abriam para a anon key; nenhuma `security definer`, e a chamada morria em
+  "permission denied for schema private", então não havia vazamento). Aplicada e conferida no
+  STAGING em 24/09/2026 (`supabase/tests/anon_sem_execute.sql` verde; as 52 RPCs do app e as duas
+  funções da escrita de `notes` seguem com `authenticated`; o app logado carrega a Hoje; a anon key
+  recebe "permission denied for function"). **Independente de app e agente** — pode subir a
+  qualquer momento. ⚠️ O PUBLIC do padrão global do Postgres reabre toda função NOVA: migration que
+  cria função em public continua com o seu `revoke execute ... from public, anon`, e o teste acusa a
+  que esquecer.
+
   ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
   manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente
   antigo (`extra='forbid'`) recusa com 422 — TODA primeira mensagem falha. Sem migration: é só
