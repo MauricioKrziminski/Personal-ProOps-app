@@ -771,7 +771,7 @@ function TransactionForm({
               <TextField
                 value={field.value}
                 onChangeText={field.onChange}
-                placeholder="Ex.: Nuuvem Wardog"
+                placeholder="Ex.: Fone de ouvido"
                 accessibilityLabel="Título"
                 autoFocus={!editing}
                 invalid={!!errors.description}

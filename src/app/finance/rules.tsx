@@ -297,7 +297,7 @@ export default function RulesScreen() {
                 onChangeText={(pattern) =>
                   setRascunho((atual) => (atual ? { ...atual, pattern } : atual))
                 }
-                placeholder="ex.: ifood"
+                placeholder="Ex.: padaria"
                 autoCapitalize="none"
                 autoCorrect={false}
                 autoFocus

@@ -775,7 +775,7 @@ export default function InstallmentsScreen() {
               <TextField
                 value={form.description}
                 onChangeText={(description) => setForm({ ...form, description })}
-                placeholder="Ex.: Nuuvem Wardog"
+                placeholder="Ex.: Fone de ouvido"
                 accessibilityLabel="Título da compra"
                 invalid={!tituloOk}
               />

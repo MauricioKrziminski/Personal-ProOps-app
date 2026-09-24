@@ -524,7 +524,7 @@ export default function NetWorthScreen() {
                 <TextField
                   value={form.name}
                   onChangeText={(name) => setForm({ ...form, name })}
-                  placeholder="Tesouro Selic"
+                  placeholder="Ex.: Reserva de emergência"
                   autoFocus={!form.id}
                   invalid={form.name.length > 0 && !nomeOk}
                 />

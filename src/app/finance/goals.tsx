@@ -459,7 +459,7 @@ export default function GoalsScreen() {
                 <TextField
                   value={aporteNota}
                   onChangeText={setAporteNota}
-                  placeholder="de onde veio"
+                  placeholder="Ex.: sobra do salário"
                   returnKeyType="done"
                 />
               </Field>
@@ -584,7 +584,7 @@ export default function GoalsScreen() {
                 <TextField
                   value={form.name}
                   onChangeText={(name) => setForm({ ...form, name })}
-                  placeholder="Viagem"
+                  placeholder="Ex.: Viagem de férias"
                   autoFocus
                 />
               </Field>

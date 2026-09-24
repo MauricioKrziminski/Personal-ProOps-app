@@ -267,7 +267,7 @@ export default function FoldersScreen() {
                 setName(text);
                 setError(null);
               }}
-              placeholder="mercado"
+              placeholder="Ex.: mercado"
               autoCapitalize="none"
               maxLength={40}
               invalid={!!error}

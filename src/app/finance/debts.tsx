@@ -998,7 +998,7 @@ export default function DebtsScreen() {
                       }
                     }}
                     keyboardType="number-pad"
-                    placeholder="48"
+                    placeholder="Ex.: 48"
                   />
                 </Field>
                 <Field
@@ -1067,7 +1067,7 @@ export default function DebtsScreen() {
                   <TextField
                     value={form.taxa}
                     onChangeText={(taxa) => setForm({ ...form, taxa })}
-                    placeholder="1,99"
+                    placeholder="Ex.: 1,99"
                     keyboardType="decimal-pad"
                     accessibilityLabel="Juros por mês, em porcentagem"
                     accessibilityHint={
@@ -1114,7 +1114,7 @@ export default function DebtsScreen() {
                   onChangeText={(v) =>
                     setForm({ ...form, parcelas: v.replace(/\D/g, '').slice(0, 3) })
                   }
-                  placeholder="12"
+                  placeholder="Ex.: 12"
                   keyboardType="number-pad"
                 />
               </Field>

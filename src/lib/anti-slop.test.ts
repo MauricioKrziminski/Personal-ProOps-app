@@ -1212,3 +1212,36 @@ test('card que arrasta tem press-in: o filho do Deslizavel é PressableScale ou 
   }
   assert.deepEqual(semSinal, []);
 });
+
+/*
+  Placeholder é EXEMPLO, nunca um valor que parece preenchido (24/09/2026). O cadastro mostrava
+  "Gabriel" — o nome do dono do produto — e o lançamento "Ex.: Nuuvem Wardog", uma compra real
+  dele. "Nubank", "Viagem" e "28" num campo vazio liam como campo já preenchido. A régua: o que é
+  exemplo começa com "Ex.:"; o resto é instrução ("Buscar…", "Escolher…", "Seu nome"), formato
+  que ninguém confunde com dado ("voce@exemplo.com", "dd/mm/aaaa", "(11) 99999-9999") ou o
+  PADRÃO do campo (frontend.md: campo com default mostra o default).
+*/
+const PLACEHOLDER_OK = [
+  /^Ex\.: /,
+  /^(Buscar|Escolher|Anotar|Escreve|Nome da|Seu |Título$|Sem fim$|Não repete$|dd\/mm\/aaaa$)/,
+  /^voce@exemplo\.com$/,
+  /^\(\d\d\) 99999-\d{4}$/,
+  /^0$/,
+];
+const NOME_REAL = /gabriel|wardog|nuuvem|almeida/i;
+
+test('Placeholder é exemplo ("Ex.: …") ou instrução, nunca dado que parece preenchido', () => {
+  const erros: string[] = [];
+  for (const arquivo of walk(SRC)) {
+    // `catalog.tsx` é a vitrine de componentes (dev), com valor preenchido de propósito.
+    if (arquivo.endsWith('catalog.tsx')) continue;
+    const fonte = readFileSync(arquivo, 'utf8');
+    for (const m of fonte.matchAll(/placeholder="([^"]*)"/g)) {
+      const texto = m[1];
+      if (NOME_REAL.test(texto) || !PLACEHOLDER_OK.some((r) => r.test(texto))) {
+        erros.push(`${arquivo.replace(SRC, 'src')}: placeholder="${texto}"`);
+      }
+    }
+  }
+  assert.deepEqual(erros, []);
+});

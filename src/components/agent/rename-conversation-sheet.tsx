@@ -65,7 +65,7 @@ export function RenameConversationSheet({
         <TextField
           value={titulo}
           onChangeText={setTitulo}
-          placeholder="Contas do mês"
+          placeholder="Ex.: Contas do mês"
           autoFocus
           returnKeyType="done"
           onSubmitEditing={() => podeSalvar && onSave(titulo.trim())}

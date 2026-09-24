@@ -554,7 +554,7 @@ export default function AccountsScreen() {
                 <TextField
                   value={form.name}
                   onChangeText={(name) => setForm({ ...form, name })}
-                  placeholder="Nubank"
+                  placeholder="Ex.: Conta do banco"
                   autoFocus
                   invalid={form.name.length > 0 && !nomeOk}
                 />
@@ -609,7 +609,7 @@ export default function AccountsScreen() {
                           onChangeText={(v) =>
                             setForm({ ...form, closingDay: v.replace(/\D/g, '').slice(0, 2) })
                           }
-                          placeholder="28"
+                          placeholder="Ex.: 28"
                           keyboardType="number-pad"
                         />
                       </Field>
@@ -623,7 +623,7 @@ export default function AccountsScreen() {
                           onChangeText={(v) =>
                             setForm({ ...form, dueDay: v.replace(/\D/g, '').slice(0, 2) })
                           }
-                          placeholder="5"
+                          placeholder="Ex.: 5"
                           keyboardType="number-pad"
                         />
                       </Field>
@@ -684,7 +684,7 @@ export default function AccountsScreen() {
                         setForm({ ...form, rotativoRate: rotativoRate.replace(/[^\d,.]/g, '').slice(0, 6) })
                       }
                       keyboardType="decimal-pad"
-                      placeholder="15,5"
+                      placeholder="Ex.: 15,5"
                     />
                   </Field>
 

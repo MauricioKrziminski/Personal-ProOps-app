@@ -569,7 +569,7 @@ export default function ProfileScreen() {
             <TextField
               value={nameDraft ?? ''}
               onChangeText={(v) => setNameDraft(v.slice(0, 60))}
-              placeholder="Gabriel"
+              placeholder="Seu nome"
               autoFocus
               autoCapitalize="words"
               returnKeyType="done"

@@ -180,7 +180,7 @@ export default function SignupScreen() {
                   value={field.value}
                   onChangeText={field.onChange}
                   onBlur={field.onBlur}
-                  placeholder="Gabriel"
+                  placeholder="Seu nome"
                   autoCapitalize="words"
                   autoComplete="name"
                   textContentType="name"
