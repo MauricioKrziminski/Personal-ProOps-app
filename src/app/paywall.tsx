@@ -182,8 +182,10 @@ export default function PaywallScreen() {
           <ThemedText type="smallBold">Assinatura só pelo aplicativo</ThemedText>
         ) : (
           <Button
-            label={`Começar ${TRIAL_DAYS} dias grátis`}
-            icon="lock"
+            // Oferecer "dias grátis" do plano que a pessoa JÁ tem era a oferta de teste para quem
+            // está pagando: no plano atual o botão diz o que é, sem cadeado.
+            label={escolhido === plano.data?.plan ? 'Seu plano atual' : `Começar ${TRIAL_DAYS} dias grátis`}
+            icon={escolhido === plano.data?.plan ? 'checkmark.circle' : 'lock'}
             disabled
             onPress={() => {}}
             block

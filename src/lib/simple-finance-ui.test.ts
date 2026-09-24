@@ -51,6 +51,11 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useGoalDeposit: () => mutation('goalDeposit'),
     useDeleteImportBatch: () => mutation('deleteImportBatch'),
     useRecentTransactions: () => (options.recent ? { ...query, isSuccess: true, data: options.recent } : query),
+    PLANS: [
+      { value: 'free', label: 'Free', price: 'grátis', pitch: '1 pessoa' },
+      { value: 'pro', label: 'Pro', price: 'R$ 24,90/mês', pitch: '3 pessoas' },
+      { value: 'family', label: 'Família', price: 'R$ 39,90/mês', pitch: '5 pessoas' },
+    ],
     usePlanStatus: () => options.planPending
       ? { ...query, isPending: true, data: undefined }
       : { ...query, isPending: false, isSuccess: true, data: { plan: options.plan ?? 'pro' } },
@@ -1367,4 +1372,17 @@ test('Lançamentos: o valor da linha não encolhe a fonte', () => {
   const linha = link.props.children({ onLongPress() {} });
   assert.equal(linha.props.inlineValue, true, 'a linha do extrato usa o valor na linha do título');
   assert.equal(linha.props.trailing.props.encolhe, false);
+});
+
+/**
+ * Quem já está no Pro via o card do Pro marcado e, embaixo, "Começar 7 dias grátis" — oferta de
+ * teste para o plano que a pessoa já tem (visto no iPhone em 24/09/2026). O botão diz o que é.
+ */
+test('Paywall: no plano que a pessoa já tem, o botão não oferece dias grátis', () => {
+  const noPro = screen('src/app/paywall.tsx', { plan: 'pro' });
+  const botaoPro = noPro.nodes().find((n: any) => n.type === 'Button');
+  assert.ok(botaoPro, 'o botão existe');
+  assert.equal(botaoPro.props.label, 'Seu plano atual');
+  const noFree = screen('src/app/paywall.tsx', { plan: 'free' });
+  assert.match(String(noFree.nodes().find((n: any) => n.type === 'Button').props.label), /dias grátis/);
 });
