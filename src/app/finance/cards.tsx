@@ -478,14 +478,18 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: Space.xs,
   },
+  // Título e estado lado a lado quando cabe; o estado desce quando não. Com `flex: 1` o nome
+  // encolhia e partia em duas linhas ("Cartão da / viagem") ao lado de "Atrasada" (design.md §3).
   cardHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
     gap: Space.sm,
   },
   cardName: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 0,
+    maxWidth: '100%',
   },
   badge: {
     flexDirection: 'row',

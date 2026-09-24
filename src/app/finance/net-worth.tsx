@@ -429,7 +429,7 @@ export default function NetWorthScreen() {
         trailing={<ThemedText type="small" style={tabular}>{formatNumberBR(saude.data.months_of_reserve)} meses</ThemedText>}
       />
       <Row
-        title="Quanto da renda vai para dívida"
+        title="Renda em dívidas"
         trailing={<ThemedText type="small" style={tabular}>{formatNumberBR(saude.data.debt_ratio)}%</ThemedText>}
       />
       <Row title="Ver relatórios" icon="chart.bar" onPress={() => router.push('/finance/reports')} />

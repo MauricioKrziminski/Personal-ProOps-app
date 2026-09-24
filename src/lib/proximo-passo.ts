@@ -27,7 +27,7 @@ export function proximoPasso(
     {
       id: 'importar',
       aplica: Boolean(i.cartaoId) && !i.importou,
-      titulo: 'Traga a fatura do cartão',
+      titulo: 'Traga sua fatura',
       acao: 'Importar fatura',
       icon: 'square.and.arrow.down',
       href: `/import?conta=${i.cartaoId ?? ''}`,

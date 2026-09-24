@@ -521,7 +521,7 @@ export default function RecurringScreen() {
               </Pressable>
             </View>
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              {quando} · próximo em {isoToBR(r.next_run_at.slice(0, 10))}
+              {quando} · próximo {isoToBR(r.next_run_at.slice(0, 10)).slice(0, 5)}
               {r.category ? ` · ${r.category}` : ''}
               {r.active ? '' : ' · pausada'}
             </ThemedText>

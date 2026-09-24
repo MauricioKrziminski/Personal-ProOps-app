@@ -930,7 +930,7 @@ test('Hoje: com os passos todos feitos o card não aparece', () => {
   assert.ok(!tipos(ui).includes('SetupChecklist'));
 });
 
-const passoImportar = { id: 'importar', titulo: 'Traga a fatura do cartão', acao: 'Importar fatura', icon: 'square.and.arrow.down', href: '/import?conta=c1' };
+const passoImportar = { id: 'importar', titulo: 'Traga sua fatura', acao: 'Importar fatura', icon: 'square.and.arrow.down', href: '/import?conta=c1' };
 
 test('Hoje: o Próximo passo espera os Primeiros passos acabarem', () => {
   const ui = screen(hojeFile, {
@@ -1043,7 +1043,7 @@ test('Hoje: o ritmo do dia compara hoje com os dias ANTERIORES do ciclo', () => 
   const tile = ui.nodes().find((n: any) => n.type === 'Tile' && n.props.label === 'Saiu hoje');
   assert.ok(tile, 'o ladrilho do dia precisa aparecer');
   // (900 − 200) / 7 = 100 por dia; hoje ficou acima.
-  assert.match(String(tile.props.caption), /acima do ritmo/);
+  assert.match(String(tile.props.caption), /^acima de R\$ [0-9.,]+\/dia$/);
   assert.match(String(tile.props.caption), /100/, "a média por dia aparece na legenda");
 });
 

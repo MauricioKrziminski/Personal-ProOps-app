@@ -8,6 +8,7 @@ import { useBRL } from '@/components/ui/conceal';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { monthTitle } from '@/components/finance/month-picker';
+import { mesCurto } from '@/lib/dates';
 import { ThemedText } from '@/components/themed-text';
 import { EmptyState } from '@/components/ui/empty-state';
 import { BarTrack } from '@/components/ui/sparkline';
@@ -41,6 +42,16 @@ import { useTheme } from '@/hooks/use-theme';
 // aviso. Foi assim que a tela abriu mostrando só 2027.
 const MESES = 60;
 const ALTURA_BARRA = 76;
+
+/**
+ * O mês de uma LINHA de fatura: "Set 2026". Com o nome inteiro, ao lado do valor a 384dp ×
+ * fonte 1,3 os meses longos ("Novembro 2026") mandavam o ano para a linha de baixo. O herói e o
+ * leitor de tela continuam com o nome inteiro (`monthTitle`).
+ */
+function mesDaLinha(mes: string): string {
+  const curto = mesCurto(`${mes}-01`);
+  return `${curto.charAt(0).toUpperCase()}${curto.slice(1)} ${mes.slice(0, 4)}`;
+}
 
 /**
  * Estado como PALAVRA — cor sozinha não informa.
@@ -352,7 +363,7 @@ export default function InvoicesScreen() {
                 }>
                 <Row
                   // Curto para caber ao lado do valor a 384dp × fonte 1,3: o ano já está no título.
-                  title={monthTitle(mes).replace(' de ', ' ')}
+                  title={mesDaLinha(mes)}
                   subtitle={
                     /\d{2}\/\d{2}/.test(situacao.texto)
                       ? situacao.texto.replace(/(\d{2}\/\d{2})\/\d{4}/, '$1')
@@ -388,7 +399,7 @@ export default function InvoicesScreen() {
           {futuras.map((invoice) => (
             <Row
               key={invoice.id}
-              title={monthTitle(invoice.reference_month.slice(0, 7)).replace(' de ', ' ')}
+              title={mesDaLinha(invoice.reference_month.slice(0, 7))}
               subtitle={`vence ${formatDateBR(invoice.due_date).slice(0, 5)}`}
               icon="calendar"
               trailing={<Money cents={invoice.total_cents} variant="ticker" tone="textSecondary" />}

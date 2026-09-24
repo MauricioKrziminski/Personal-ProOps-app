@@ -49,6 +49,14 @@ interface RowProps {
    * pareceria um card dentro da lista.
    */
   indent?: number;
+  /**
+   * Linha de EXTRATO: o valor sobe para a linha do título e a legenda ocupa a largura inteira
+   * embaixo, como no extrato do banco. Com o valor numa coluna à direita, a 384dp × fonte 1,3 a
+   * legenda longa de um lançamento ("previsto · na fatura de 10/10 · casa · Nubank Cartão") se
+   * espremia em cinco linhas ao lado dele. Título longo continua quebrando entre palavras, e o
+   * valor desce para baixo dele quando não cabe.
+   */
+  inlineValue?: boolean;
 }
 
 /**
@@ -70,8 +78,18 @@ export function Row({
   accessibilityState,
   accessibilityLabel,
   indent = 0,
+  inlineValue = false,
 }: RowProps) {
   const theme = useTheme();
+  const valor =
+    trailing || (chevron ?? !!onPress) ? (
+      <View style={styles.trailing}>
+        {trailing}
+        {(chevron ?? !!onPress) ? (
+          <Icon name="chevron.right" size="sm" color="textSecondary" />
+        ) : null}
+      </View>
+    ) : null;
 
   const content = (pressed: boolean) => (
     <View
@@ -101,9 +119,18 @@ export function Row({
         Ver `design.md` §7.
       */}
       <View style={styles.labels}>
-        <ThemedText type="default" themeColor={destructive ? 'danger' : 'text'}>
-          {title}
-        </ThemedText>
+        {inlineValue ? (
+          <View style={styles.tituloComValor}>
+            <ThemedText type="default" themeColor={destructive ? 'danger' : 'text'} style={styles.tituloDoExtrato}>
+              {title}
+            </ThemedText>
+            {valor}
+          </View>
+        ) : (
+          <ThemedText type="default" themeColor={destructive ? 'danger' : 'text'}>
+            {title}
+          </ThemedText>
+        )}
         {badge || subtitle ? (
           /*
             `flexWrap` e não `numberOfLines`: a pílula fica ao lado do subtítulo quando cabe e
@@ -129,14 +156,7 @@ export function Row({
         Valor e chevron andam JUNTOS: com `flexWrap` na linha eles poderiam cair em linhas
         diferentes, e um chevron sozinho numa terceira linha não é ponteiro de nada.
       */}
-      {trailing || (chevron ?? !!onPress) ? (
-        <View style={styles.trailing}>
-          {trailing}
-          {(chevron ?? !!onPress) ? (
-            <Icon name="chevron.right" size="sm" color="textSecondary" />
-          ) : null}
-        </View>
-      ) : null}
+      {inlineValue ? null : valor}
     </View>
   );
 
@@ -270,6 +290,17 @@ const styles = StyleSheet.create({
    * e os 8dp que isso devolve são o que faz um título de 15 letras caber ao lado de um valor
    * de quatro dígitos em 384dp. Quem separa o par do texto é o `gap` da própria linha.
    */
+  // Linha de extrato: título e valor lado a lado; o valor desce quando o título não deixa espaço.
+  tituloComValor: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    columnGap: Space.md,
+  },
+  // `flexBasis: 0` + `flexGrow`: o título ocupa a sobra e empurra o valor para a borda; com o
+  // `minWidth` ele desce para baixo do título quando a palavra não cabe.
+  tituloDoExtrato: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 96 },
   trailing: {
     flexDirection: 'row',
     alignItems: 'center',

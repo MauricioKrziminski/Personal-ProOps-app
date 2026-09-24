@@ -712,10 +712,12 @@ export default function TransactionsScreen() {
              * Quem decide a PÍLULA é o estado (data); quem decide o SUBTÍTULO é o `status`, que é
              * o que responde "esse dinheiro já saiu?".
              */
+            const tituloDaLinha = tx.description || tx.merchant || tx.category || 'Sem descrição';
             const badges = [
-              tx.installment_no ? `parcela ${tx.installment_no}` : null,
+              // "parcela 2" some quando o título já diz "(2/10)" — a mesma informação duas vezes.
+              tx.installment_no && !/\(\d+\/\d+\)$/.test(tituloDaLinha) ? `parcela ${tx.installment_no}` : null,
               emAberto
-                ? dueInline(tx.kind, tx.due_at ? formatDateBR(tx.due_at) : null, {
+                ? dueInline(tx.kind, tx.due_at ? formatDateBR(tx.due_at).slice(0, 5) : null, {
                     onCard: tx.invoice_id !== null,
                   }).replace(/^previsto( · )?/, '')
                 : null,
@@ -737,7 +739,8 @@ export default function TransactionsScreen() {
 
             const context = [
               tx.category,
-              tx.account_id ? accountName.get(tx.account_id) : null,
+              // O nome da conta não parte ao meio ("Nubank / Cartão"): espaço inseparável nele.
+              tx.account_id ? accountName.get(tx.account_id)?.replace(/ /g, '\u00A0') : null,
               SOURCE_LABEL[tx.source],
             ].filter(Boolean);
 
@@ -814,7 +817,8 @@ export default function TransactionsScreen() {
                   ]}>
                   {({ onLongPress }) => (
                     <Row
-                      title={tx.description || tx.merchant || tx.category || 'Sem descrição'}
+                      title={tituloDaLinha}
+                      inlineValue
                       /*
                         ⚠️ `atrasado` leva `danger`. `design.md §2`: vermelho é semântica — "erro
                         e atraso" —, e é a última alavanca de cor que este app tem. Atraso em

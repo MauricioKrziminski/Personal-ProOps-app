@@ -480,7 +480,7 @@ export default function DebtsScreen() {
     const original = Number(d.principal_cents) || restante;
     const pago = Math.max(0, original - restante);
     const tipo = DEBT_KINDS.find((k) => k.value === d.kind)?.label ?? '';
-    const juros = d.calculation_mode === 'fixed_installments' ? 'juros incluídos, sem detalhamento' : d.interest_rate_monthly > 0 ? `juros ${taxaLabel(d.interest_rate_monthly)}` : 'sem juros';
+    const juros = d.calculation_mode === 'fixed_installments' ? 'parcela fixa' : d.interest_rate_monthly > 0 ? `juros ${taxaLabel(d.interest_rate_monthly)}` : 'sem juros';
     const parcelas = d.installments ? `${d.installments_paid}/${d.installments} pagas` : null;
 
     return (

@@ -298,36 +298,43 @@ export default function ProfileScreen() {
 
           <View style={styles.idInfo}>
             {nome ? (
-              <>
-                <ThemedText type="headline" themeColor="onHero">
-                  {nome}
-                </ThemedText>
-                {phone ? (
-                  <ThemedText type="code" themeColor="onHeroMuted" style={tabular} selectable>
-                    {phone}
-                  </ThemedText>
-                ) : null}
-              </>
-            ) : (
-              <ThemedText type="ticker" themeColor="onHero" selectable>
-                {phone ?? 'Sua conta'}
+              <ThemedText type="headline" themeColor="onHero">
+                {nome}
               </ThemedText>
-            )}
+            ) : null}
             {/*
-              A linha de estado do WhatsApp. Sem telefone ela não vira um erro em vermelho: não
-              ter WhatsApp ligado é um estado NORMAL de quem entrou por e-mail, e pintar de
-              `danger` transformaria uma escolha em problema. Cinza, dizendo o que falta.
+              O estado do WhatsApp mora NO número: o balão verde na frente dele é o "conectado".
+              Uma linha só de "conectado ao WhatsApp" ao lado da pílula do plano quebrava em duas
+              a 384dp × fonte 1,3. Sem telefone ele não vira erro em vermelho: não ter WhatsApp
+              ligado é um estado NORMAL de quem entrou por e-mail, e pintar de `danger`
+              transformaria uma escolha em problema. Cinza, dizendo o que falta.
             */}
-            <View style={styles.idMeta}>
-              <Icon
-                name={phone ? 'bubble.left' : 'exclamationmark.bubble'}
-                size="xs"
-                color={phone ? 'onHeroSuccess' : 'onHeroMuted'}
-              />
-              <ThemedText type="caption" themeColor="onHeroMuted">
-                {phone ? 'conectado ao WhatsApp' : 'WhatsApp não conectado'}
-              </ThemedText>
-            </View>
+            {phone ? (
+              <View style={styles.idMeta} accessible accessibilityLabel={`WhatsApp conectado, ${phone}`}>
+                <Icon name="bubble.left" size="xs" color="onHeroSuccess" />
+                <ThemedText
+                  type={nome ? 'code' : 'ticker'}
+                  themeColor={nome ? 'onHeroMuted' : 'onHero'}
+                  style={tabular}
+                  selectable>
+                  {phone}
+                </ThemedText>
+              </View>
+            ) : (
+              <>
+                {nome ? null : (
+                  <ThemedText type="ticker" themeColor="onHero">
+                    Sua conta
+                  </ThemedText>
+                )}
+                <View style={styles.idMeta}>
+                  <Icon name="exclamationmark.bubble" size="xs" color="onHeroMuted" />
+                  <ThemedText type="caption" themeColor="onHeroMuted">
+                    WhatsApp desligado
+                  </ThemedText>
+                </View>
+              </>
+            )}
           </View>
 
           {plan.data?.plan ? (

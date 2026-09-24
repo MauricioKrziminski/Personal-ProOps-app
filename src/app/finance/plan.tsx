@@ -156,7 +156,7 @@ export default function PlanScreen() {
   const planLimits = plano ? (
     <Section title="O que seu plano dá">
       <Row title="Pessoas" icon="person.2" chevron={false} trailing={<ThemedText type="smallBold" style={tabular}>{plano.members} de {plano.max_members}</ThemedText>} />
-      <Row title="Mensagens da IA" subtitle="zera na virada do mês" icon="sparkles" chevron={false} trailing={<ThemedText type="smallBold" style={tabular}>{usadas} de {teto}</ThemedText>} />
+      <Row title="Uso da IA" subtitle="zera todo mês" icon="sparkles" chevron={false} trailing={<ThemedText type="smallBold" style={tabular}>{usadas} de {teto}</ThemedText>} />
       <Row title="Importar extrato" icon="arrow.down.doc" chevron={false} trailing={<ThemedText type="small" themeColor={plano.can_import ? 'success' : 'textSecondary'}>{plano.can_import ? 'liberada' : 'bloqueada'}</ThemedText>} />
     </Section>
   ) : null;

@@ -358,7 +358,7 @@ export default function TodayScreen() {
           footer={cycle.data?.ate ? (
             <View style={styles.rodapeHeroi}>
               <ThemedText type="footnote" themeColor="onHeroMuted" style={styles.shrink}>
-                {`Compromissos até ${isoToBR(cycle.data.ate).slice(0, 5)}`}
+                Compromissos
               </ThemedText>
               <Money cents={comprometidoNoCiclo} variant="ticker" tone="onHero" concealable />
             </View>
@@ -379,7 +379,7 @@ export default function TodayScreen() {
         value={<Money cents={ritmo.hoje} variant="money" tone="text" concealable />}
         caption={ritmo.media === null
           ? undefined
-          : `${ritmo.acima ? 'acima' : 'abaixo'} do ritmo de ${brl(ritmo.media)} por dia`}
+          : `${ritmo.acima ? 'acima' : 'abaixo'} de ${brl(ritmo.media)}/dia`}
         accessibilityLabel={`Saiu hoje: ${brl(ritmo.hoje)}`}
         onPress={() => router.push('/finance/transactions')}
       />

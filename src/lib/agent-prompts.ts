@@ -11,10 +11,13 @@ export const EXEMPLOS_DO_AGENTE = [
   'O que vence esta semana?',
 ] as const;
 
-/** Atalhos curtos para a superfície de conversa; o texto continua editável. */
+/**
+ * Atalhos curtos para a superfície de conversa; o texto continua editável. Uma ou duas palavras:
+ * a 384dp × fonte 1,3 "Registrar gasto" partia em duas linhas dentro da pílula.
+ */
 export const ATALHOS_DO_AGENTE = [
-  { label: 'Registrar gasto', prompt: 'Gastei ', icon: 'arrow.up.right' },
-  { label: 'Criar lembrete', prompt: 'Me lembra de ', icon: 'bell' },
-  { label: 'Gastos do mês', prompt: 'Quanto gastei este mês?', icon: 'chart.bar' },
+  { label: 'Gasto', prompt: 'Gastei ', icon: 'arrow.up.right' },
+  { label: 'Lembrete', prompt: 'Me lembra de ', icon: 'bell' },
+  { label: 'Este mês', prompt: 'Quanto gastei este mês?', icon: 'chart.bar' },
   { label: 'Vencimentos', prompt: 'O que vence esta semana?', icon: 'calendar' },
 ] as const;

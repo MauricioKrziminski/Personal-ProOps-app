@@ -234,12 +234,23 @@ function Linha({ linha }: { linha: CycleLine }) {
   const abre = linha.origin === 'invoice' && !linha.atrasada;
   const fatura = useInvoice(abre ? linha.ref_id : undefined);
   const entra = Number(linha.in_cents) > 0;
+  // A linha cabe a 384dp × fonte 1,3: o ano já está no cabeçalho do ciclo, o cartão já está no
+  // título da fatura, e o "(atrasada)" desce para o subtítulo. Quem DECIDE que ela é atrasada
+  // continua sendo a coluna `atrasada`; o sufixo só é tirado do texto quando ela diz que é.
+  const titulo = linha.atrasada ? linha.title.replace(/\s*\(atrasada\)$/, '') : linha.title;
+  const subtitulo = [
+    linha.atrasada ? 'atrasada' : null,
+    isoToBR(linha.day).slice(0, 5),
+    linha.method_label && !titulo.includes(linha.method_label) ? linha.method_label : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <>
       <Row
-        title={linha.title}
-        subtitle={`${isoToBR(linha.day)} · ${linha.method_label}`}
+        title={titulo}
+        subtitle={subtitulo}
         trailing={
           <Money
             cents={entra ? Number(linha.in_cents) : Number(linha.out_cents)}
@@ -253,7 +264,7 @@ function Linha({ linha }: { linha: CycleLine }) {
             <Row
               key={t.id}
               title={t.description ?? t.merchant ?? 'Compra'}
-              subtitle={`${isoToBR(t.occurred_at)}${t.category ? ` · ${t.category}` : ''}`}
+              subtitle={`${isoToBR(t.occurred_at).slice(0, 5)}${t.category ? ` · ${t.category}` : ''}`}
               trailing={<Money cents={Number(t.amount_cents)} variant="footnote" />}
               onPress={() => router.push({ pathname: '/finance/[txId]', params: { txId: t.id } })}
             />

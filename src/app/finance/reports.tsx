@@ -23,7 +23,9 @@ import { Motion, Space, tabular } from '@/design/tokens';
 import { localISODate } from '@/hooks/use-items';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { formatNumberBR } from '@/lib/dates';
+import { ACCOUNT_TYPES } from '@/lib/accounts';
 import {
+  useAccounts,
   useAnnualReport,
   useFirstTransactionYear,
   type AnnualCategoryRow,
@@ -77,6 +79,13 @@ export default function ReportsScreen() {
   const [ano, setAno] = useState(anoAtual);
   const [verTodas, setVerTodas] = useState(false);
   const { data, isLoading, isError, refetch } = useAnnualReport(ano);
+  // O saldo do fim do ano vem sem o tipo da conta: o ícone sai do cadastro, pelo nome (cartão com
+  // o cartão, poupança com a poupança) em vez de uma cédula igual para todas.
+  const contas = useAccounts();
+  const iconeDaConta = (nome: string) => {
+    const tipo = (contas.data ?? []).find((c) => c.name === nome)?.type;
+    return ACCOUNT_TYPES.find((t) => t.value === tipo)?.icon ?? 'banknote';
+  };
 
   const primeiroAno = useFirstTransactionYear();
   // Do ano corrente para TRÁS: o padrão é o ano corrente, e ele precisa estar visível sem rolar.
@@ -151,7 +160,7 @@ export default function ReportsScreen() {
             <Row
               key={`${s.kind}-${s.name}`}
               title={s.name}
-              icon={s.kind === 'account' ? 'banknote' : 'chart.line.uptrend.xyaxis'}
+              icon={s.kind === 'account' ? iconeDaConta(s.name) : 'chart.line.uptrend.xyaxis'}
               chevron={false}
               accessibilityLabel={`${s.name}, ${(Number(s.balance_cents) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} em 31 de dezembro`}
               trailing={<Money cents={Number(s.balance_cents)} variant="headline" />}

@@ -668,7 +668,7 @@ export default function ForecastScreen() {
             </View>
             {entra > 0 || sai > 0 ? (
               <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
-                entra {brl(entra)} · sai {brl(sai)} em {rotuloHorizonte(dias)}
+                entra {brl(entra)} · sai {brl(sai)}
               </ThemedText>
             ) : null}
           </>

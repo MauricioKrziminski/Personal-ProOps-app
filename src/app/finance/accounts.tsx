@@ -329,7 +329,10 @@ export default function AccountsScreen() {
         {({ onLongPress }) => (
           <Row
             title={saldo.name}
-            subtitle={[ciclo ?? tipo, previstoTexto].filter(Boolean).join(' · ')}
+            // O tipo embaixo do nome some quando É o nome ("Poupança / Poupança").
+            subtitle={[ciclo ?? (tipo.toLowerCase() === saldo.name.toLowerCase() ? null : tipo), previstoTexto]
+              .filter(Boolean)
+              .join(' · ')}
             icon={ICONE[saldo.type]}
             // o valor negativo não pode ser comunicado só pela cor — e o previsto precisa
             // estar aqui também, senão o leitor de tela esconde o que a tela mostra

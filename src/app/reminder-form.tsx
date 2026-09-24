@@ -533,7 +533,7 @@ function ReminderForm({
           {isPast && !errors.date && !errors.time ? (
             <Animated.View entering={FadeIn.duration(Motion.duration.base)}>
               <ThemedText type="small" themeColor="warning">
-                Já passou: dispara no próximo minuto
+                Já passou: dispara em 1 minuto
               </ThemedText>
             </Animated.View>
           ) : null}

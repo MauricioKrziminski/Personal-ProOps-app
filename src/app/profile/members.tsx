@@ -189,7 +189,7 @@ export default function MembersScreen() {
         <Section title="Plano">
           <Row
             title="Pessoas no plano"
-            subtitle={noLimite ? 'no limite do plano' : 'inclui convites esperando aceite'}
+            subtitle={noLimite ? 'no limite do plano' : 'inclui convites pendentes'}
             icon="person.2"
             chevron={false}
             trailing={
