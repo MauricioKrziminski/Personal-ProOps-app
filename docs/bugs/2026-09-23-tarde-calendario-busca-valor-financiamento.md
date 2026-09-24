@@ -234,11 +234,10 @@ própria, longe de orçamento e metas.
 Planejamento fica com Orçamentos e Metas, e Dia a dia com Lançamentos, Contas, Cartões e
 Faturas. Recorrentes ganhou subtítulo ("Salário, aluguel e assinaturas"), como os vizinhos.
 
-Visto e não perseguido (fora do lote): o LogBox "Can't perform a React state update on a
-component that hasn't mounted yet" no login do Android. E a barra de abas do Android sumiu duas
-vezes no emulador — depois de trocar a densidade com o app aberto, e depois de fechar o LogBox
-poucos segundos após a abertura. Não reproduziu numa comparação controlada, nem com o código do
-lote nem sem ele (uma amostra de cada): **não atribuído**, não "não causado".
+Visto e não perseguido (fora do lote) — **investigado em 24/09/2026**, ver
+`docs/bugs/2026-09-24-nada-pendente-listas-e-ordem.md`: o aviso do login não reproduziu em nenhum
+caminho (os avisos amarelos eram o "Cannot connect to Expo CLI" do Metro em desenvolvimento), e a
+barra do Android some só enquanto a Activity é recriada por troca de densidade, voltando com a tela.
 
 ---
 
