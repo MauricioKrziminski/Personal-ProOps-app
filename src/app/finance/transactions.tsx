@@ -846,7 +846,6 @@ export default function TransactionsScreen() {
                           variant="ticker"
                           tone={tx.kind === 'income' ? 'success' : 'text'}
                           signed={assinado}
-                          encolhe={false}
                         />
                       }
                     />

@@ -6,6 +6,7 @@ import { PressableScale } from '@/components/motion/pressable-scale';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { Elevation, Radius, Space } from '@/design/tokens';
 import { useScheme, useTheme } from '@/hooks/use-theme';
+import { DinheiroEncolhe } from '@/components/ui/money';
 
 export interface TileProps {
   /** `fill` divide uma `TileRow`; `half` e `wide` são células da `TileGrid`. */
@@ -81,7 +82,8 @@ export function Tile({
         <ThemedText type="footnote" themeColor="textSecondary">
           {label}
         </ThemedText>
-        {value}
+        {/* Ladrilho tem largura fixa: o valor encolhe para caber (`DinheiroEncolhe`). */}
+        <DinheiroEncolhe.Provider value>{value}</DinheiroEncolhe.Provider>
         {caption ? (
           <ThemedText type="caption" themeColor="textSecondary">
             {caption}

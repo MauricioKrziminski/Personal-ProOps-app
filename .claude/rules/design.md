@@ -423,6 +423,14 @@ desliga o encolhimento na chamada.**
 continua sumindo. O padrão para "título + pílula na mesma linha" é `flexWrap: 'wrap'` na linha e
 `flexShrink: 0, maxWidth: '100%'` no título — lado a lado quando cabe, pílula embaixo quando não.
 
+⚠️ **Dinheiro NÃO encolhe por padrão; quem encolhe é o bloco de geometria FIXA** (24/09/2026).
+Em 23/09 o `Money` passou a `adjustsFontSizeToFit` em todo lugar (a face do cartão partia
+"R$ 1.423,0" / "0"), e no iPhone isso cobrou caro: o texto que encolhe numa passada de layout
+estreita não volta a crescer, e valores soltos no ciclo ficaram minúsculos. Onde há espaço a `Row`
+manda o valor para baixo do título; onde não há — face do cartão, ladrilho, número do herói — o
+primitivo liga `DinheiroEncolhe` (ou `encolhe` na chamada). `simple-finance-ui.test.ts` prende o
+padrão e os três lugares.
+
 ⚠️ **Frase com dinheiro dentro é UM texto, com o `Money` aninhado** (23/09/2026). Montada em
 peças soltas numa linha `flexWrap` — "R$ 0,00" · "de" · "R$ 30.000,00" · "· faltam" · valor —,
 cada peça quebrava sozinha, o `Money` encolhia para caber (`adjustsFontSizeToFit`) e a linha de

@@ -14,6 +14,7 @@ import { QuickActions, type QuickAction } from '@/components/ui/quick-actions';
 import { useConceal } from '@/components/ui/conceal';
 import { Motion, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
+import { DinheiroEncolhe } from '@/components/ui/money';
 
 interface HeroPanelProps {
   /** Controle que ESCOPA o número — hoje, o seletor de mês do Financeiro. */
@@ -162,7 +163,10 @@ export function HeroPanel({
               ) : null}
             </View>
 
-            <View style={styles.valueRow}>{value}</View>
+            {/* O número do herói divide a faixa com o olho e o "…": encolhe para caber. */}
+            <View style={styles.valueRow}>
+              <DinheiroEncolhe.Provider value>{value}</DinheiroEncolhe.Provider>
+            </View>
 
             {secondary ? (
               <View style={styles.secondaryRow}>

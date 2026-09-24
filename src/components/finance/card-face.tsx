@@ -202,7 +202,8 @@ export function BaseDaPilha({ card, onFatura }: { card: CartaoDaPilha; onFatura?
           <ThemedText type="meta" themeColor={t.suave}>
             Fatura atual
           </ThemedText>
-          <Money cents={usado} variant="title" tone={t.tinta} concealable />
+          {/* A face tem proporção fixa: o valor encolhe para caber, nunca parte os dígitos. */}
+          <Money cents={usado} variant="title" tone={t.tinta} concealable encolhe />
         </View>
         {/* Um toque só não decide entre "ver os cartões" e "abrir a fatura": a fatura tem o
             botão dela, e o resto do cartão abre a Carteira. */}

@@ -39,13 +39,21 @@ interface MoneyProps {
    */
   concealable?: boolean;
   /**
-   * Encolhe a fonte para caber (`adjustsFontSizeToFit`). Ligado por padrão. Desligue onde o
-   * layout já dá espaço ao valor — a linha de extrato manda o valor para baixo do título quando
-   * ele não cabe —: no iOS o texto que encolhe numa passada de layout estreita (a troca de tema
-   * re-layouta a lista) não volta a crescer, e o valor fica minúsculo até sair da tela.
+   * Encolhe a fonte para caber (`adjustsFontSizeToFit`). DESLIGADO por padrão desde 24/09/2026:
+   * no iPhone o texto que encolhe numa passada de layout estreita não volta a crescer, e valores
+   * soltos no ciclo ("Comecei com", a parcela do macbook) ficavam minúsculos. Onde o layout dá
+   * espaço — a `Row` manda o valor para baixo do título quando ele não cabe — não há o que
+   * encolher. Quem tem geometria FIXA (face do cartão, ladrilho, herói) liga por
+   * `DinheiroEncolhe`, sem cada tela lembrar.
    */
   encolhe?: boolean;
 }
+
+/**
+ * Bloco de geometria FIXA — a face do cartão, o ladrilho, o número do herói: lá o valor não tem
+ * para onde descer, e encolher é o único jeito de não partir no meio dos dígitos nem cortar.
+ */
+export const DinheiroEncolhe = createContext(false);
 
 /**
  * Dentro de um card que arrasta (`Deslizavel`) o valor não é selecionável: no Android o arrasto
@@ -63,9 +71,11 @@ export function Money({
   tone = 'plain',
   signed = false,
   concealable = true,
-  encolhe = true,
+  encolhe: encolhePedido,
 }: MoneyProps) {
   const { concealed } = useConceal();
+  const noBlocoFixo = useContext(DinheiroEncolhe);
+  const encolhe = encolhePedido ?? noBlocoFixo;
   const oculto = concealable && concealed;
   const noArrasto = useContext(DentroDeArrasto);
 

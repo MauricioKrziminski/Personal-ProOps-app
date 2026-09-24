@@ -483,7 +483,6 @@ export default function ForecastScreen() {
             // Receita atrasada não é dívida: `success` mesmo quando não caiu. `danger` ali
             // seria gastar a alavanca de cor do app num aviso (design.md §2b).
             tone={receita ? 'success' : b.overdue ? 'danger' : 'text'}
-            encolhe={false}
           />
         }
       />

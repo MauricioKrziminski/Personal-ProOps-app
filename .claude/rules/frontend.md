@@ -77,6 +77,26 @@ card de erro e a recuperação.
 - Decimal em texto (percentual, taxa, meses) só por `formatNumberBR` — vírgula, nunca ponto.
   Havia três cópias disso e uma tela sem nenhuma, escrevendo `90.4%` ao lado de `90,4%`.
 
+### Lista: do mais recente para o mais antigo, e aos poucos (24/09/2026)
+
+*"em tudo tem que ser do mais recente para o mais antigo… sempre preze pelo lazy loading,
+carregando de pouco em pouco e clicando para ver mais"* — do ciclo, que vinha do mais antigo e
+inteiro de uma vez.
+
+- **Ordem.** Lista de HISTÓRICO ou de PERÍODO (ciclo, fatura, pagamentos, importação, alertas,
+  lançamentos, contas, metas, membros) vem do mais recente para o mais antigo. Contrato com passado
+  e futuro (financiamento, parcelas de uma compra) se divide em **"A seguir"** (a próxima primeiro)
+  e **"Já pagas"/"Pagas"** (a mais recente primeiro). AGENDA do que vem (O que vence, Próximos
+  dias, lembretes, recorrentes, meses da Projeção) mostra o mais próximo primeiro — ali "mais
+  recente" poria o mais distante no topo.
+- **Aos poucos.** Lista que chega inteira de uma RPC desenha `PASSO` (20) por vez com `VerMais`
+  (`components/ui/ver-mais.tsx`, `hooks/use-aos-poucos.ts`: `useAosPoucos` e `useJanelasPorGrupo`);
+  lista que cresce sem fim pagina no servidor (`useInfiniteQuery` ou o limite que cresce pelo
+  "Ver mais", com `keepPreviousData`). **Teto fixo em silêncio (`limit(100)`) é defeito**: o 101º
+  some da tela sem aviso. Total e agregado (soma do mês, "Comprometido") contam a lista INTEIRA,
+  nunca só o que está visível.
+- Um rótulo: **"Ver mais"** (com a contagem quando se sabe). Era "Carregar mais" na lixeira.
+
 ### Quantidade é campo ABERTO, nunca lista de atalhos (22/09/2026)
 
 ⚠️ *"essas coisas assim nunca devem ser fixadas, deve ser totalmente aberta"* — do "Adiantar"

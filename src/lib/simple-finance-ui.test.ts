@@ -175,6 +175,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
         useRef: (v: unknown) => ({ current: v }),
         useEffect: () => {},
         memo: (componente: unknown) => componente,
+        createContext: (valor: unknown) => ({ valor, Provider: 'Provider' }),
+        useContext: (ctx: any) => ctx?.valor,
       };
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', useWindowDimensions: () => ({ width: 384, height: 800 }), Platform: { OS: 'android', select: (o: any) => o.android ?? o.default } };
@@ -1466,7 +1468,8 @@ test('Lançamentos: o valor da linha não encolhe a fonte', () => {
   const [link] = itemLinks(screen(transacoesFile));
   const linha = link.props.children({ onLongPress() {} });
   assert.equal(linha.props.inlineValue, true, 'a linha do extrato usa o valor na linha do título');
-  assert.equal(linha.props.trailing.props.encolhe, false);
+  // Não encolher é o padrão do `Money` desde 24/09/2026; a linha só não pode LIGAR o encolher.
+  assert.notEqual(linha.props.trailing.props.encolhe, true);
 });
 
 /**
@@ -1695,4 +1698,17 @@ test('Faturas: fatura FUTURA sem compra nenhuma não aparece em "Próximas fatur
   const titulos = ui.nodes().filter((n: any) => n.type === 'Row' && n.props.icon === 'calendar').map((n: any) => n.props.title);
   assert.ok(proximas);
   assert.equal(titulos.length, 1, 'só a que tem compra');
+});
+
+test('Dinheiro não encolhe por padrão; encolhe só onde o bloco tem geometria fixa (24/09/2026)', () => {
+  // No iPhone o `adjustsFontSizeToFit` encolhe numa passada de layout estreita e não volta a
+  // crescer: "Comecei com" e a parcela do macbook ficaram minúsculos no ciclo.
+  const solto = screen('src/components/ui/money.tsx', { componente: 'Money', props: { cents: 4890500 } });
+  assert.equal(solto.nodes().find((n: any) => n.type === 'ThemedText').props.adjustsFontSizeToFit, false);
+  const noBloco = screen('src/components/ui/money.tsx', { componente: 'Money', props: { cents: 4890500, encolhe: true } });
+  assert.equal(noBloco.nodes().find((n: any) => n.type === 'ThemedText').props.adjustsFontSizeToFit, true);
+  // Quem tem geometria fixa liga o encolher para o valor que recebe.
+  for (const arquivo of ['src/components/ui/tile.tsx', 'src/components/ui/hero-panel.tsx', 'src/components/finance/card-face.tsx']) {
+    assert.match(readFileSync(arquivo, 'utf8'), /DinheiroEncolhe\.Provider value|<Money[^>]*\bencolhe\b/, arquivo);
+  }
 });
