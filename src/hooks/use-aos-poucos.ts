@@ -5,13 +5,14 @@ import { PASSO, janela } from '@/lib/aos-poucos';
 /**
  * A janela de "ver mais" de uma lista que chegou INTEIRA (24/09/2026). `chave` recomeça a janela
  * quando o que a lista mostra muda de sentido (outro filtro, outro mês): continuar com 60 visíveis
- * num filtro novo seria mostrar tudo de uma vez por outro caminho.
+ * num filtro novo seria mostrar tudo de uma vez por outro caminho. `passo` menor serve a um bloco
+ * de SUGESTÃO no meio de uma tela (os 5 "sem limite" de Orçamentos).
  */
-export function useAosPoucos<T>(itens: readonly T[], chave = '') {
-  const [estado, setEstado] = useState({ chave, mostrados: PASSO });
-  const mostrados = estado.chave === chave ? estado.mostrados : PASSO;
+export function useAosPoucos<T>(itens: readonly T[], chave = '', passo = PASSO) {
+  const [estado, setEstado] = useState({ chave, mostrados: passo });
+  const mostrados = estado.chave === chave ? estado.mostrados : passo;
   const j = janela(itens, mostrados);
-  return { ...j, verMais: () => setEstado({ chave, mostrados: mostrados + PASSO }) };
+  return { ...j, verMais: () => setEstado({ chave, mostrados: mostrados + passo }) };
 }
 
 /**

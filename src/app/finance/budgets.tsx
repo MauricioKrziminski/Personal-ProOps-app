@@ -22,6 +22,8 @@ import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Screen } from '@/components/ui/screen';
 import { Deslizavel } from '@/components/ui/deslizavel';
 import { PressableScale } from '@/components/motion/pressable-scale';
+import { VerMais } from '@/components/ui/ver-mais';
+import { useAosPoucos } from '@/hooks/use-aos-poucos';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { Segmented } from '@/components/ui/segmented';
@@ -198,6 +200,9 @@ export default function BudgetsScreen() {
   const semLimite = (resumo.data ?? [])
     .filter((r) => r.kind === 'expense' && !linhas.some((b) => b.category === r.category))
     .sort((a, b) => Number(b.total_cents) - Number(a.total_cents));
+  // Cinco à vista; o resto pelo "Ver mais" (24/09/2026) — era `slice(0, 5)` calado, e a sexta
+  // categoria sem limite não aparecia em lugar nenhum.
+  const sugestoes = useAosPoucos(semLimite, month, 5);
 
   const mesFuturo = month > mesCorrente;
 
@@ -506,7 +511,7 @@ export default function BudgetsScreen() {
       ) : semLimite.length > 0 ? (
         <View style={styles.secao}>
           <SectionHead title="Sem limite definido" />
-          {semLimite.slice(0, 5).map((r) => (
+          {sugestoes.visiveis.map((r) => (
             <Card key={r.category} style={styles.linha}>
               <View style={styles.linhaTopo}>
                 <ThemedText type="default">
@@ -522,6 +527,7 @@ export default function BudgetsScreen() {
               />
             </Card>
           ))}
+          <VerMais restantes={sugestoes.restantes} onPress={sugestoes.verMais} />
         </View>
       ) : null}
     </>

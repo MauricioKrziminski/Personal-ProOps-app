@@ -1724,3 +1724,14 @@ test('Importações: apagar o registro diz o que fica no financeiro sem "Os 0 la
     assert.match(ui.avisos.at(-1), esperado, `com ${n} confirmados`);
   }
 });
+
+test('Orçamentos: "Sem limite definido" mostra 5 e o resto vem pelo "Ver mais" (era corte calado)', () => {
+  const gastos = Array.from({ length: 8 }, (_, i) => ({ category: `cat ${i}`, kind: 'expense', total_cents: 10000 - i * 100, count: 1 }));
+  const ui = screen('src/app/finance/budgets.tsx', { saiuNoCiclo: gastos });
+  const sugestoes = () => ui.nodes().filter((n: any) => n.type === 'Button' && n.props.label === 'Definir limite');
+  assert.equal(sugestoes().length, 5);
+  const mais = ui.nodes().find((n: any) => n.type === 'VerMais');
+  assert.equal(mais?.props.restantes, 3);
+  ui.interact(() => mais.props.onPress());
+  assert.equal(sugestoes().length, 8);
+});
