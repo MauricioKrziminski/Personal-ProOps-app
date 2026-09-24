@@ -38,6 +38,13 @@ interface MoneyProps {
    * confirmar no escuro, que é pior do que qualquer risco de alguém olhar por cima do ombro.
    */
   concealable?: boolean;
+  /**
+   * Encolhe a fonte para caber (`adjustsFontSizeToFit`). Ligado por padrão. Desligue onde o
+   * layout já dá espaço ao valor — a linha de extrato manda o valor para baixo do título quando
+   * ele não cabe —: no iOS o texto que encolhe numa passada de layout estreita (a troca de tema
+   * re-layouta a lista) não volta a crescer, e o valor fica minúsculo até sair da tela.
+   */
+  encolhe?: boolean;
 }
 
 /**
@@ -56,6 +63,7 @@ export function Money({
   tone = 'plain',
   signed = false,
   concealable = true,
+  encolhe = true,
 }: MoneyProps) {
   const { concealed } = useConceal();
   const oculto = concealable && concealed;
@@ -82,8 +90,8 @@ export function Money({
       // cartão a 375dp × fonte 1,3. Dinheiro fica em UMA linha e, se não couber, encolhe até
       // caber; reticência nunca aparece, porque `adjustsFontSizeToFit` reduz antes de cortar.
       numberOfLines={1}
-      adjustsFontSizeToFit
-      minimumFontScale={0.5}
+      adjustsFontSizeToFit={encolhe}
+      minimumFontScale={encolhe ? 0.5 : undefined}
       style={[Type[variant], tabular, { flexShrink: 0 }]}>
       {oculto ? concealText() : `${prefix}${texto}`}
     </ThemedText>

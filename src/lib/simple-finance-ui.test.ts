@@ -1355,3 +1355,16 @@ test('Parcelada: arrasta Editar a compra à direita e Apagar a compra inteira à
   assert.ok(card, 'a compra está num Deslizavel');
   assert.deepEqual(ladosDe(card), { direita: ['Editar a compra'], esquerda: ['Apagar a compra inteira'], mais: true, pontaDireita: null, pontaEsquerda: null });
 });
+
+/**
+ * Na linha de extrato o valor sobe para a linha do título e, sem espaço, desce para baixo dele.
+ * Ele NÃO encolhe a fonte: no iOS o `adjustsFontSizeToFit` que encolhe numa passada de layout
+ * estreita (a troca de tema re-layouta a lista) não cresce de volta — "pc gamer (6/8)" ficou com
+ * o valor minúsculo até sair da tela (medido no simulador em 23/09/2026).
+ */
+test('Lançamentos: o valor da linha não encolhe a fonte', () => {
+  const [link] = itemLinks(screen(transacoesFile));
+  const linha = link.props.children({ onLongPress() {} });
+  assert.equal(linha.props.inlineValue, true, 'a linha do extrato usa o valor na linha do título');
+  assert.equal(linha.props.trailing.props.encolhe, false);
+});
