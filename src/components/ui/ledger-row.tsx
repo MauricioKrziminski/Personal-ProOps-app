@@ -14,8 +14,11 @@ const CITACAO = 90;
  * A linha de lançamento das raízes: selo de categoria, título, meta, valor e data empilhados, e
  * — quando o lançamento veio de uma fala — a citação do que a pessoa disse.
  *
- * Mesmo contrato do `Row` para o `ItemLink`: sem `onLongPress` (iOS) ela é uma `View`, porque
- * quem abre o menu lá é o `Link.Menu`. Feedback de linha é highlight, nunca escala (§5).
+ * Mesmo contrato do `Row` para o `ItemLink`: no iOS ela vem SEM `onLongPress` (quem abre o menu
+ * lá é o `Link.Menu`) e COM o `onPress` que o `<Link asChild>` injeta. Sem nenhum dos dois ela é
+ * uma `View`; com qualquer um, um `Pressable` que repassa os dois. Desenhada como `View` só por
+ * faltar o `onLongPress`, a linha jogava o `onPress` fora e tocar no lançamento não abria nada no
+ * iPhone (24/09/2026). Feedback de linha é highlight, nunca escala (§5).
  */
 export function LedgerRow({
   title,
@@ -26,6 +29,7 @@ export function LedgerRow({
   tone,
   date,
   quote,
+  onPress,
   onLongPress,
   accessibilityLabel,
 }: {
@@ -37,6 +41,8 @@ export function LedgerRow({
   tone: ThemeColor | 'plain';
   date: string;
   quote?: string | null;
+  /** Injetado pelo `<Link asChild>` do `ItemLink` — nunca escrito pela tela. */
+  onPress?: () => void;
   onLongPress?: () => void;
   accessibilityLabel: string;
 }) {
@@ -73,9 +79,9 @@ export function LedgerRow({
     </View>
   );
 
-  if (!onLongPress) return conteudo(false);
+  if (!onPress && !onLongPress) return conteudo(false);
   return (
-    <Pressable onLongPress={onLongPress} accessibilityRole="button" accessibilityLabel={accessibilityLabel}>
+    <Pressable onPress={onPress} onLongPress={onLongPress} accessibilityRole="button" accessibilityLabel={accessibilityLabel}>
       {({ pressed }) => conteudo(pressed)}
     </Pressable>
   );

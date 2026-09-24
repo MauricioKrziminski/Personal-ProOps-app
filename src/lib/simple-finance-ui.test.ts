@@ -1735,3 +1735,34 @@ test('Orçamentos: "Sem limite definido" mostra 5 e o resto vem pelo "Ver mais" 
   ui.interact(() => mais.props.onPress());
   assert.equal(sugestoes().length, 8);
 });
+
+test('Últimos lançamentos: a linha recebe o toque do Link do iOS (24/09/2026)', () => {
+  // No iOS o `ItemLink` é `<Link asChild>`, que INJETA `onPress` no filho, e o filho vem sem
+  // `onLongPress` (quem abre o menu lá é o `Link.Menu`). O `LedgerRow` desenhava uma `View` sem
+  // `onLongPress` e jogava o `onPress` fora: tocar no lançamento não abria nada.
+  let tocou = 0;
+  const ui = screen('src/components/ui/ledger-row.tsx', {
+    componente: 'LedgerRow',
+    props: { title: 'Ferramentas', icon: 'house', cents: -44300, signed: true, tone: 'text', date: '11/09/2026', accessibilityLabel: 'Ferramentas', onPress: () => { tocou += 1; } },
+  });
+  const tocavel = ui.nodes().find((n: any) => n.type === 'Pressable' && typeof n.props.onPress === 'function');
+  assert.ok(tocavel, 'a linha é tocável quando o Link injeta onPress');
+  tocavel.props.onPress();
+  assert.equal(tocou, 1);
+});
+
+test('Todo filho de ItemLink repassa o onPress que o Link do iOS injeta', () => {
+  // Contrato de `ItemLink` (iOS): o filho recebe `onPress` do `<Link asChild>`. Componente novo
+  // que não o repassa fica mudo no iPhone e funciona no Android — foi o `LedgerRow`.
+  const repassam = new Set(['Row', 'Pressable', 'LedgerRow']);
+  const arquivos = ['src/app/(tabs)/finance/index.tsx', 'src/app/finance/accounts.tsx', 'src/app/finance/transactions.tsx', 'src/app/finance/invoice/[id].tsx', 'src/components/notes/note-card.tsx'];
+  for (const arquivo of arquivos) {
+    const fonte = readFileSync(arquivo, 'utf8');
+    for (const m of fonte.matchAll(/\{\(\{ onLongPress \}\) => \(\s*<([A-Z][A-Za-z]*)/g)) {
+      assert.ok(repassam.has(m[1]), `${arquivo}: <${m[1]}> como filho de ItemLink precisa repassar onPress`);
+    }
+  }
+  for (const [comp, arquivo] of [['Row', 'src/components/ui/row.tsx'], ['LedgerRow', 'src/components/ui/ledger-row.tsx']]) {
+    assert.match(readFileSync(arquivo, 'utf8'), /\bonPress\b[\s\S]*<Pressable[\s\S]*onPress=\{onPress\}/, `${comp} repassa onPress ao Pressable`);
+  }
+});
