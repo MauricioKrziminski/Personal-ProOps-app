@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[] } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; batches?: any[]; plans?: any[]; contributions?: any[] } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -45,6 +45,11 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useRecurringTransactions: () => ({ ...query, isSuccess: true, data: options.recurring ?? [] }),
     useToggleRecurring: () => mutation('toggleRecurring'),
     useGoals: () => ({ ...query, isSuccess: true, data: options.goals ?? [] }),
+    useImportBatches: () => ({ ...query, isSuccess: true, data: options.batches ?? [] }),
+    useInstallmentPlans: () => ({ ...query, isSuccess: true, data: options.plans ?? [] }),
+    useGoalContributions: () => ({ ...query, isSuccess: true, data: options.contributions ?? [] }),
+    useGoalDeposit: () => mutation('goalDeposit'),
+    useDeleteImportBatch: () => mutation('deleteImportBatch'),
     useRecentTransactions: () => (options.recent ? { ...query, isSuccess: true, data: options.recent } : query),
     usePlanStatus: () => options.planPending
       ? { ...query, isPending: true, data: undefined }
@@ -153,6 +158,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
         useCallback: (fn: unknown) => fn,
         useRef: (v: unknown) => ({ current: v }),
         useEffect: () => {},
+        memo: (componente: unknown) => componente,
       };
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', useWindowDimensions: () => ({ width: 384, height: 800 }), Platform: { OS: 'android', select: (o: any) => o.android ?? o.default } };
@@ -195,9 +201,23 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/lib/rrule-text') return { describeRRule: () => 'todo mês' };
+      if (name === '@/hooks/use-notes') return new Proxy({
+        useNoteFolders: () => ({ ...query, isSuccess: true, data: options.folders ?? [] }),
+        useNotesList: () => ({ ...query, isSuccess: true, data: { pages: [options.notes ?? []] } }),
+        folderTree: (lista: any[]) => lista.map((f) => ({ ...f, depth: 0 })),
+      } as Record<string, any>, { get: (target, key) => key in target ? target[key as string] : () => mutation(String(key)) });
+      if (name === '@/hooks/use-agent-chat') return {
+        useAgentConversations: () => ({ ...query, isSuccess: true, hasNextPage: false, fetchNextPage() {}, data: { pages: [{ items: options.conversations ?? [] }] } }),
+        useRenameAgentConversation: () => mutation('renameConversation'),
+        useDeleteAgentConversation: () => mutation('deleteConversation'),
+      };
+      if (name === '@/components/notes/note-actions') return { actionSheet: () => {}, FOLDER_ICONS: [], notesLabel: (n: number) => `${n} notas`, symbol: () => 'folder' };
+      if (name === '@/design/note-colors') return { noteRail: () => null, noteInk: () => null };
+      if (name === '@/lib/search') return { noteTitle: (texto: string) => texto.split('\n')[0], notePreview: () => '' };
+      if (name === '@/lib/note-blocks') return { todoProgress: () => ({ done: 0, total: 0 }) };
       if (name === '@/design/category-icons') return { categoryIcon: () => 'circle' };
       if (name === '@/design/adaptive-window') return load('src/design/adaptive-window.ts');
       // import relativo DENTRO de um módulo puro já carregado (month-view → ./dates.ts)
@@ -239,7 +259,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     } });
     return module.exports;
   };
-  const Component = load(file).default;
+  // `componente`: um componente nomeado (o card de nota), renderizado com `props`.
+  const Component = load(file)[options.componente ?? 'default'];
   const visit = (node: any) => {
     if (Array.isArray(node)) return node.forEach(visit);
     if (!node?.props || (node.type === 'Sheet' && !node.props.visible)) return;
@@ -254,6 +275,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       for (const slot of ['cycle', 'actions', 'ledger', 'breakdown']) visit(node.props[slot]);
     }
     if (node.type === 'FinanceAnalysisPanes') visit(node.props.compact);
+    // No celular o `AdaptivePanes` desenha o slot de uma coluna só (Pastas, Recorrentes…).
+    if (node.type === 'AdaptivePanes') visit(node.props.singlePaneContent ?? node.props.main);
     visit(node.props.ListHeaderComponent);
     // Mesmo motivo do header: slot é conteúdo renderizado. As ações da fatura desceram para o
     // FIM da lista em 15/09/2026 (botão fixo sobre o scroll foi recusado pelo dono do produto),
@@ -280,7 +303,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     if (node.type === 'HeaderActions' && Array.isArray(node.props.actions))
       node.props.actions.forEach((a: any) => nodes.push({ type: 'Button', props: a }));
   };
-  const render = () => { cursor = 0; nodes = []; visit(Component()); };
+  const render = () => { cursor = 0; nodes = []; visit(Component(options.props ?? {})); };
   render();
   return {
     writes, pedidos, toasts, confirmations, actions, navigations, refetches, gates,
@@ -1256,4 +1279,79 @@ test('Metas: arrasta Guardar à direita e Arquivar à esquerda', () => {
   const card = deslizaveis(ui)[0];
   assert.ok(card, 'a meta está num Deslizavel');
   assert.deepEqual(ladosDe(card), { direita: ['Guardar'], esquerda: ['Arquivar'], mais: true, pontaDireita: null, pontaEsquerda: null });
+});
+
+test('Nota: arrasta Fixar à direita e Arquivar à esquerda (os dois até o fim); o resto no Mais', () => {
+  const vazio = () => {};
+  const ui = screen('src/components/notes/note-card.tsx', {
+    componente: 'NoteCard',
+    props: {
+      note: { id: 'n1', content: 'Ideias para o app', pinned: false, source: 'app', updated_at: '2026-09-01T12:00:00Z', created_at: '2026-09-01T12:00:00Z', color: null, folder_id: null, tags: [] },
+      actions: { onPin: vazio, onColor: vazio, onMove: vazio, onArchive: vazio, onTrash: vazio },
+    },
+  });
+  const [link] = itemLinks(ui);
+  assert.ok(link, 'a nota está num ItemLink');
+  assert.deepEqual(ladosDoLink(link), { direita: ['Fixar'], esquerda: ['Arquivar'], mais: true, pontaDireita: 'Fixar', pontaEsquerda: 'Arquivar' });
+});
+
+test('Pasta: arrasta Fixar à direita e Arquivar à esquerda (os dois até o fim); o resto no Mais', () => {
+  const ui = screen('src/app/notes/folders.tsx', { folders: [{ id: 'f1', name: 'trabalho', icon: 'folder', color: null, pinned: false, parent_id: null, notes_count: 2, tags: [] }] });
+  const [card] = deslizaveis(ui);
+  assert.ok(card, 'a pasta está num Deslizavel');
+  assert.deepEqual(ladosDe(card), { direita: ['Fixar'], esquerda: ['Arquivar'], mais: true, pontaDireita: 'Fixar', pontaEsquerda: 'Arquivar' });
+});
+
+test('Lixeira: arrasta só Apagar de vez à esquerda (Ver conteúdo é o toque)', () => {
+  const ui = screen('src/app/notes/trash.tsx', { notes: [{ id: 'n1', content: 'Teste', deleted_at: '2026-09-20T12:00:00Z', updated_at: '2026-09-20T12:00:00Z', pinned: false }] });
+  const [card] = deslizaveis(ui).length ? deslizaveis(ui) : itemLinks(ui).map((l: any) => ({ props: { acoes: l.props.actions } }));
+  assert.ok(card, 'a nota da lixeira arrasta');
+  assert.deepEqual(ladosDe(card), { direita: [], esquerda: ['Apagar de vez'], mais: false, pontaDireita: null, pontaEsquerda: null });
+});
+
+test('Conversa: arrasta Renomear à direita e Apagar à esquerda', () => {
+  const ui = screen('src/app/agent/history.tsx', { conversations: [{ id: 'c1', title: 'gastei 45 no mercado', last_message: 'Ok', updated_at: '2026-09-21T12:00:00Z' }] });
+  const [card] = deslizaveis(ui);
+  assert.ok(card, 'a conversa está num Deslizavel');
+  assert.deepEqual(ladosDe(card), { direita: ['Renomear'], esquerda: ['Apagar'], mais: false, pontaDireita: null, pontaEsquerda: null });
+  assert.equal(card.props.fundo, 'groupedBackground', 'lista chapada: a linha tem o fundo da tela');
+});
+
+test('Importação: arrasta só Apagar registro à esquerda (retomar é o toque)', () => {
+  const ui = screen('src/app/import-history.tsx', { batches: [{ id: 'b1', filename: 'nubank.ofx', source: 'ofx', created_at: '2026-09-20T12:00:00Z', account_id: null, pendentes: 0, aprovados: 3, total: 3, status: 'done' }] });
+  const [card] = deslizaveis(ui);
+  assert.ok(card, 'o lote está num Deslizavel');
+  assert.deepEqual(ladosDe(card), { direita: [], esquerda: ['Apagar registro'], mais: false, pontaDireita: null, pontaEsquerda: null });
+});
+
+test('Orçamento: arrasta Editar limite à direita; o resto no Mais', () => {
+  const ui = screen('src/app/finance/budgets.tsx', { budgets: [{ category: 'mercado', limit_cents: 100_00, base_limit_cents: 100_00, rollover_cents: 0, spent_cents: 40_00, committed_cents: 0, month: null }] });
+  const [card] = deslizaveis(ui);
+  assert.ok(card, 'o orçamento está num Deslizavel');
+  assert.deepEqual(ladosDe(card), { direita: ['Editar limite'], esquerda: [], mais: true, pontaDireita: null, pontaEsquerda: null });
+});
+
+test('Aporte: no extrato da meta arrasta Desfazer à esquerda, e ele confirma antes de mover dinheiro', () => {
+  const ui = screen('src/app/finance/goals.tsx', {
+    goals: [{ id: 'g1', name: 'Viagem', target_cents: 500000, saved_cents: 100000, deadline: null, archived: false }],
+    contributions: [{ id: 'c1', goal_id: 'g1', amount_cents: 100000, occurred_at: '2026-09-01', note: null }],
+  });
+  const meta = deslizaveis(ui)[0];
+  ui.interact(() => meta.props.acoes.find((x: any) => x.label === 'Ver extrato').onPress());
+  const aporte = deslizaveis(ui).find((d: any) => d.props.acoes.some((x: any) => x.label === 'Desfazer'));
+  assert.ok(aporte, 'o aporte do extrato está num Deslizavel');
+  assert.deepEqual(ladosDe(aporte), { direita: [], esquerda: ['Desfazer'], mais: false, pontaDireita: null, pontaEsquerda: null });
+  ui.interact(() => aporte.props.acoes[0].onPress());
+  assert.deepEqual(ui.writes, [], 'nada move antes da confirmação');
+  assert.equal(ui.confirmations.length, 1);
+});
+
+test('Parcelada: arrasta Editar a compra à direita e Apagar a compra inteira à esquerda; o resto no Mais', () => {
+  const parcelas = [1, 2, 3].map((n) => ({ id: `t${n}`, installment_no: n, amount_cents: 30000, occurred_at: `2026-0${6 + n}-10`, status: n === 1 ? 'cleared' : 'pending', invoice_id: null }));
+  const ui = screen('src/app/finance/installments.tsx', {
+    plans: [{ id: 'p1', title: 'tv', description: 'tv', merchant: null, category: 'casa', account_id: null, total_cents: 90000, installments: 3, installment_cents: 30000, first_occurred_at: '2026-07-10', active: true, paid: 1, remaining_cents: 60000, locked: 1, locked_cents: 30000, locked_paid: 1, parcels: parcelas }],
+  });
+  const [card] = deslizaveis(ui);
+  assert.ok(card, 'a compra está num Deslizavel');
+  assert.deepEqual(ladosDe(card), { direita: ['Editar a compra'], esquerda: ['Apagar a compra inteira'], mais: true, pontaDireita: null, pontaEsquerda: null });
 });
