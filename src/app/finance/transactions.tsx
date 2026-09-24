@@ -18,6 +18,8 @@ import { PeriodSummaryCard } from '@/components/finance/period-summary-card';
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/finance/chip';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Card } from '@/components/ui/card';
+import { useBRL } from '@/components/ui/conceal';
 import { Money } from '@/components/ui/money';
 import { Row } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
@@ -29,6 +31,7 @@ import { MaxContentWidth } from '@/constants/theme';
 import { Elevation, Motion, Radius, Space } from '@/design/tokens';
 import {
   NO_ACCOUNT,
+  useAccountBalances,
   useAccounts,
   useDeleteTransaction,
   useDesfazerBaixa,
@@ -51,7 +54,7 @@ import { rotuloDaCompra } from '@/lib/data-da-compra';
 import { dueInline, estadoDaLinha, settleDone, settleLabel } from '@/lib/settle-labels';
 import { useDebounced } from '@/hooks/use-debounced';
 import { useTheme, useScheme } from '@/hooks/use-theme';
-import { accountLabel } from '@/lib/accounts';
+import { accountLabel, saldoDaConta } from '@/lib/accounts';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { tabletPaneWidths } from '@/design/adaptive-window';
 
@@ -274,6 +277,9 @@ export default function TransactionsScreen() {
   }, [summary.data]);
 
   const accounts = useAccounts();
+  const saldos = useAccountBalances();
+  // O saldo respeita o "esconder valores" (`useBRL`), como na tela Contas.
+  const brl = useBRL();
   // Um item basta para separar "nunca teve nada" de "este mês não teve nada".
   const anyEver = useRecentTransactions(1);
   const markPaid = useMarkPaid();
@@ -326,6 +332,27 @@ export default function TransactionsScreen() {
 
   /** Id da conta filtrada; `undefined` na lista global e também em "Sem conta". */
   const contaFiltrada = accountId === undefined || accountId === NO_ACCOUNT ? undefined : accountId;
+  const saldoFiltrado = contaFiltrada ? saldos.data?.find((x) => x.account_id === contaFiltrada) : undefined;
+  const saldoDaContaFiltrada = saldoFiltrado
+    ? (() => {
+        const saldo = saldoDaConta(saldoFiltrado);
+        return (
+          <Card style={styles.saldoConta}>
+            <View style={styles.saldoLinha}>
+              <ThemedText type="small" themeColor="textSecondary">
+                {saldo.rotulo}
+              </ThemedText>
+              <Money cents={saldo.cents} variant="headline" tone={saldo.cents < 0 ? 'danger' : 'text'} />
+            </View>
+            {saldo.previsto > 0 ? (
+              <ThemedText type="footnote" themeColor="textSecondary">
+                {`${brl(saldo.previsto)} ${saldo.previstoTexto}`}
+              </ThemedText>
+            ) : null}
+          </Card>
+        );
+      })()
+    : null;
 
   /** Título da tela quando ela está filtrada por conta — não é o rótulo de uma conta. */
   const tituloDaConta =
@@ -433,6 +460,11 @@ export default function TransactionsScreen() {
   const header = (
     <View style={styles.header}>
       {wideWorkspace ? busca : null}
+
+      {/* O extrato de UMA conta começa pelo saldo dela (24/09/2026): só dizia os totais do
+          período, e "quanto tem nessa conta?" não tinha resposta em tela nenhuma. A régua é a
+          da tela Contas (`saldoDaConta`). */}
+      {saldoDaContaFiltrada}
 
       <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} />
 
@@ -1014,4 +1046,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: Space.lg,
   },
+  saldoConta: { gap: Space.xs },
+  saldoLinha: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: Space.sm },
 });

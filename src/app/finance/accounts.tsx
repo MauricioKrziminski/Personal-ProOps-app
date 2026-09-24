@@ -42,6 +42,7 @@ import {
   type Account,
   type AccountBalance,
 } from '@/hooks/use-finance';
+import { saldoDaConta } from '@/lib/accounts';
 import { confirmDestructive } from '@/lib/item-actions';
 
 /**
@@ -290,8 +291,7 @@ export default function AccountsScreen() {
      * Cartão mostra o TOTAL (parcela futura é dívida assumida); conta de dinheiro mostra o
      * confirmado, e o que falta cair vai para o subtítulo em vez de sumir dentro do número.
      */
-    const cents = Number(cartao ? saldo.balance_cents : saldo.cleared_cents);
-    const previsto = Number(cartao ? saldo.pending_out_cents : saldo.pending_in_cents);
+    const { cents, previsto } = saldoDaConta(saldo);
     const negativo = cents < 0;
     const tipo = ACCOUNT_TYPES.find((t) => t.value === saldo.type)?.label ?? '';
     const ciclo =

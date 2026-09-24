@@ -1167,6 +1167,7 @@ test('frase com dinheiro não é montada em peças numa linha que quebra', () =>
     'src/app/finance/debts.tsx dividaTopo', // nome da dívida | total
     'src/app/finance/debts.tsx proximaLinha', // "Próxima · data" | valor, mesmo tamanho
     'src/components/finance/period-summary-card.tsx faixaLinha', // rótulo | valor da faixa
+    'src/app/finance/transactions.tsx saldoLinha', // "Saldo" | valor, no extrato de uma conta
   ]);
   const fora: string[] = [];
   for (const file of walk(SRC).filter((f) => f.endsWith('.tsx'))) {

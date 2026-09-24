@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { accountLabel } from './accounts.ts';
+import { accountLabel, saldoDaConta } from './accounts.ts';
 
 test('o cartão diz que é cartão — foi o que custou R$ 4.000 em produção', () => {
   // As quatro contas reais de 09/09/2026, na ordem em que apareciam no seletor.
@@ -29,4 +29,13 @@ test('sem conta e tipo desconhecido não quebram a tela', () => {
   assert.equal(accountLabel(undefined), 'Sem conta');
   assert.equal(accountLabel({ name: 'Alguma', type: null }), 'Alguma');
   assert.equal(accountLabel({ name: 'Alguma', type: 'coisa_nova' }), 'Alguma');
+});
+
+test('O saldo de UMA conta: dinheiro mostra o confirmado; cartão, o total (24/09/2026)', () => {
+  // "meu pai… como acessar saldo de uma conta específica": o extrato da conta mostrava só os
+  // totais do período. A régua é a mesma da tela Contas — uma função, as duas telas.
+  const corrente = { type: 'checking', balance_cents: 50000, cleared_cents: 30000, pending_in_cents: 20000, pending_out_cents: 0 };
+  assert.deepEqual(saldoDaConta(corrente), { cents: 30000, previsto: 20000, rotulo: 'Saldo', previstoTexto: 'a receber' });
+  const cartao = { type: 'credit_card', balance_cents: -90000, cleared_cents: 0, pending_in_cents: 0, pending_out_cents: 60000 };
+  assert.deepEqual(saldoDaConta(cartao), { cents: -90000, previsto: 60000, rotulo: 'Saldo do cartão', previstoTexto: 'a vencer' });
 });

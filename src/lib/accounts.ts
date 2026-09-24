@@ -82,3 +82,28 @@ export function accountLabel(
     ? account.name
     : `${account.name} · ${tipo}`;
 }
+
+/**
+ * O saldo de UMA conta, na régua da tela Contas — a mesma função nas duas telas.
+ *
+ * Conta de dinheiro mostra o CONFIRMADO (`cleared_cents`), e o que falta cair vai à parte
+ * ("a receber"); cartão mostra o TOTAL (`balance_cents`), porque a parcela futura é dívida já
+ * assumida, e à parte o que ainda vai vencer. Existe desde 24/09/2026 para o extrato de uma conta
+ * dizer quanto ela tem — só dizia os totais do período (*"como acessar saldo de uma conta
+ * específica"*).
+ */
+export function saldoDaConta(saldo: {
+  type: string;
+  balance_cents: number | string;
+  cleared_cents: number | string;
+  pending_in_cents: number | string;
+  pending_out_cents: number | string;
+}): { cents: number; previsto: number; rotulo: string; previstoTexto: string } {
+  const cartao = saldo.type === 'credit_card';
+  return {
+    cents: Number(cartao ? saldo.balance_cents : saldo.cleared_cents),
+    previsto: Number(cartao ? saldo.pending_out_cents : saldo.pending_in_cents),
+    rotulo: cartao ? 'Saldo do cartão' : 'Saldo',
+    previstoTexto: cartao ? 'a vencer' : 'a receber',
+  };
+}
