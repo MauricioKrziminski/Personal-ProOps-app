@@ -459,7 +459,8 @@ function PassoAvisos({
             <Icon name="bell.badge" size="sm" color="onTint" />
           </View>
           <ThemedText type="footnote" style={styles.exemploTexto}>
-            Sua fatura fecha amanhã — R$ 1.350,00 até agora. Quer adiar?
+            {/* Espaço inseparável no valor: "R$ / 1.350,00" partia a 384dp × 1,3. */}
+            {'Sua fatura fecha amanhã — R$\u00A01.350,00 até agora. Quer adiar?'}
           </ThemedText>
         </View>
       </Animated.View>
