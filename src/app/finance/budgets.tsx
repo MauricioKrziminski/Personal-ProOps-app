@@ -374,7 +374,7 @@ export default function BudgetsScreen() {
                 type="small"
                 themeColor={estourou ? 'danger' : 'textSecondary'}
                 style={tabular}>
-                {`mais ${brl(comprometido)} em contas previstas — ${
+                {`+ ${brl(comprometido)} previstos · ${
                   estourou ? `passa em ${brl(Math.abs(sobra))}` : `sobram ${brl(sobra)}`
                 }`}
               </ThemedText>
