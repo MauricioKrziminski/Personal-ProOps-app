@@ -25,8 +25,10 @@ import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { formatNumberBR } from '@/lib/dates';
 import { ACCOUNT_TYPES } from '@/lib/accounts';
 import {
+  ASSET_CLASSES,
   useAccounts,
   useAnnualReport,
+  useAssets,
   useFirstTransactionYear,
   type AnnualCategoryRow,
   type YearEndBalance,
@@ -79,12 +81,17 @@ export default function ReportsScreen() {
   const [ano, setAno] = useState(anoAtual);
   const [verTodas, setVerTodas] = useState(false);
   const { data, isLoading, isError, refetch } = useAnnualReport(ano);
-  // O saldo do fim do ano vem sem o tipo da conta: o ícone sai do cadastro, pelo nome (cartão com
-  // o cartão, poupança com a poupança) em vez de uma cédula igual para todas.
+  // O saldo do fim do ano vem sem o tipo: o ícone sai do cadastro, pelo nome (cartão com o
+  // cartão, poupança com a poupança, imóvel com a casa) em vez de um glifo igual para todos.
   const contas = useAccounts();
+  const bens = useAssets();
   const iconeDaConta = (nome: string) => {
     const tipo = (contas.data ?? []).find((c) => c.name === nome)?.type;
     return ACCOUNT_TYPES.find((t) => t.value === tipo)?.icon ?? 'banknote';
+  };
+  const iconeDoBem = (nome: string) => {
+    const classe = (bens.data ?? []).find((b) => b.name === nome)?.class;
+    return ASSET_CLASSES.find((c) => c.value === classe)?.icon ?? 'chart.line.uptrend.xyaxis';
   };
 
   const primeiroAno = useFirstTransactionYear();
@@ -160,7 +167,7 @@ export default function ReportsScreen() {
             <Row
               key={`${s.kind}-${s.name}`}
               title={s.name}
-              icon={s.kind === 'account' ? iconeDaConta(s.name) : 'chart.line.uptrend.xyaxis'}
+              icon={s.kind === 'account' ? iconeDaConta(s.name) : iconeDoBem(s.name)}
               chevron={false}
               accessibilityLabel={`${s.name}, ${(Number(s.balance_cents) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} em 31 de dezembro`}
               trailing={<Money cents={Number(s.balance_cents)} variant="headline" />}
@@ -192,7 +199,8 @@ export default function ReportsScreen() {
               </ThemedText>
               <Money cents={Number(c.total_cents)} variant="headline" />
             </View>
-            <ProgressBar value={Number(c.total_cents)} max={maiorDespesa} />
+            {/* Comparação entre categorias é DADO, não estado: barra cinza (design.md §2b). */}
+            <ProgressBar value={Number(c.total_cents)} max={maiorDespesa} tone="data" />
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
               {c.tx_count} {Number(c.tx_count) === 1 ? 'lançamento' : 'lançamentos'}
             </ThemedText>
