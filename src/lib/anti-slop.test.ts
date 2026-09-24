@@ -1182,3 +1182,17 @@ test('frase com dinheiro não é montada em peças numa linha que quebra', () =>
   }
   assert.deepEqual(fora, [], 'aninhe o <Money> dentro de um <ThemedText>');
 });
+
+/**
+ * O título da linha de EXTRATO tem o mesmo piso de largura do título da `Row` (134dp, medido para
+ * "Estacionamentoo" a 384dp). Com 96dp, a 384dp × fonte 1,3 "Financiamento" partia em
+ * "Fina / nciamento" ao lado do valor na Projeção (24/09/2026) — palavra partida ao meio é o
+ * defeito que o design.md §3 proíbe. Abaixo do piso, o valor desce para baixo do título.
+ */
+test('o título da linha de extrato tem o mesmo piso de largura do título da Row', () => {
+  const row = readFileSync(join(SRC, 'components/ui/row.tsx'), 'utf8');
+  const piso = row.match(/\n  labels: \{[^}]*minWidth: (\d+)/)?.[1];
+  const extrato = row.match(/tituloDoExtrato: \{[^}]*minWidth: (\d+)/)?.[1];
+  assert.ok(piso && extrato, 'os dois estilos existem');
+  assert.equal(Number(extrato), Number(piso));
+});

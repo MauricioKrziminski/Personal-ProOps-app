@@ -298,9 +298,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     columnGap: Space.md,
   },
-  // `flexBasis: 0` + `flexGrow`: o título ocupa a sobra e empurra o valor para a borda; com o
-  // `minWidth` ele desce para baixo do título quando a palavra não cabe.
-  tituloDoExtrato: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 96 },
+  // `flexBasis: 0` + `flexGrow`: o título ocupa a sobra e empurra o valor para a borda. O piso é
+  // o MESMO do título da `Row` (134, medido para "Estacionamentoo"): com 96, "Financiamento"
+  // partia ao meio a 384dp × 1,3. Abaixo dele o valor desce para baixo do título.
+  tituloDoExtrato: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 134 },
   trailing: {
     flexDirection: 'row',
     alignItems: 'center',

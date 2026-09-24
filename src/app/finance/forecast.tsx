@@ -433,12 +433,15 @@ export default function ForecastScreen() {
       <Deslizavel key={b.ref_id} titulo={b.title} acoes={acoesDoPrevisto}>
       <Row
         title={b.title}
+        // Linha de extrato: o valor na linha do título e a data curta — com a data inteira e o
+        // valor numa coluna, "Parcela / Financiamento" partia a 384dp (o ano está no cabeçalho).
+        inlineValue
         subtitle={
           b.overdue
             ? receita
-              ? `não caiu em ${isoToBR(b.due_date)}`
-              : `venceu em ${isoToBR(b.due_date)}`
-            : isoToBR(b.due_date)
+              ? `não caiu em ${isoToBR(b.due_date).slice(0, 5)}`
+              : `venceu em ${isoToBR(b.due_date).slice(0, 5)}`
+            : isoToBR(b.due_date).slice(0, 5)
         }
         icon={fatura ? 'creditcard' : parcelaDeDivida ? 'banknote' : receita ? 'arrow.down.left' : 'doc.text'}
         chevron
@@ -464,10 +467,11 @@ export default function ForecastScreen() {
         trailing={
           <Money
             cents={cents}
-            variant="headline"
+            variant="ticker"
             // Receita atrasada não é dívida: `success` mesmo quando não caiu. `danger` ali
             // seria gastar a alavanca de cor do app num aviso (design.md §2b).
             tone={receita ? 'success' : b.overdue ? 'danger' : 'text'}
+            encolhe={false}
           />
         }
       />
