@@ -103,7 +103,12 @@ export default function ImportHistoryScreen() {
           onSuccess: () => toast({ message: 'Registro apagado.', tone: 'success' }),
           onError: () => toast({ message: 'Não deu para apagar o registro.', tone: 'error' }),
         }),
-      `Os ${lote.aprovados} lançamentos que você confirmou continuam no financeiro. Só o histórico da importação some.`,
+      // Com zero, "Os 0 lançamentos que você confirmou continuam" não diz nada (24/09/2026).
+      lote.aprovados === 0
+        ? 'Nada desta importação entrou no financeiro. Só o histórico dela some.'
+        : lote.aprovados === 1
+          ? 'O lançamento que você confirmou continua no financeiro. Só o histórico da importação some.'
+          : `Os ${lote.aprovados} lançamentos que você confirmou continuam no financeiro. Só o histórico da importação some.`,
     );
 
   /** O menu do lote, UMA lista para o toque longo e o arrasto (abrir é o toque curto). */

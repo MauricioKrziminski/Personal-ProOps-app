@@ -29,6 +29,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   /** As mesmas escritas de `writes`, com as opções (`onSuccess`/`onError`) — é por aqui que se chama o retorno. */
   const pedidos: { operation: string; value: any; opts: any }[] = [];
   const toasts: any[] = [];
+  /** O texto de cada confirmação destrutiva (o 4º argumento de `confirmDestructive`). */
+  const avisos: string[] = [];
   /** Com que limite cada lista paginada no servidor foi pedida — é como se vê o "Ver mais" pedir mais. */
   const pedidosDeLimite: [string, number | undefined][] = [];
   const mutation = (operation: string) => ({ isPending: false, reset() {}, mutate(value: any, opts?: any) { writes.push({ operation, value }); pedidos.push({ operation, value, opts }); } });
@@ -274,7 +276,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
         MonthRuler: 'MonthRuler',
         useMonthRuler: () => ({ view: 'cycle', setView: () => {}, temCiclo: false, cycle: { data: undefined } }),
       };
-      if (name === '@/lib/item-actions') return { confirmDestructive: (_title: string, _label: string, callback: () => void) => confirmations.push(callback), showItemActions: (_title: string, entries: any[]) => actions.push(...entries) };
+      if (name === '@/lib/item-actions') return { confirmDestructive: (_title: string, _label: string, callback: () => void, mensagem?: string) => { confirmations.push(callback); avisos.push(mensagem ?? ''); }, showItemActions: (_title: string, entries: any[]) => actions.push(...entries) };
       if (name === '@/components/ui/toast') return { useToast: () => (t: any) => toasts.push(t) };
       // O provider de "esconder saldo" só existe dentro da árvore real; aqui o valor aparece.
       if (name === '@/components/ui/conceal') return {
@@ -334,7 +336,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   const render = () => { cursor = 0; nodes = []; visit(Component(options.props ?? {})); };
   render();
   return {
-    writes, pedidos, toasts, pedidosDeLimite, confirmations, actions, navigations, refetches, gates,
+    writes, pedidos, toasts, pedidosDeLimite, avisos, confirmations, actions, navigations, refetches, gates,
     drafts: () => forecastDrafts,
     nodes: () => nodes,
     button(label: string) { const node = nodes.find((n) => n.type === 'Button' && n.props.label === label); assert.ok(node, `visible button: ${label}`); return node; },
@@ -1710,5 +1712,15 @@ test('Dinheiro não encolhe por padrão; encolhe só onde o bloco tem geometria 
   // Quem tem geometria fixa liga o encolher para o valor que recebe.
   for (const arquivo of ['src/components/ui/tile.tsx', 'src/components/ui/hero-panel.tsx', 'src/components/finance/card-face.tsx']) {
     assert.match(readFileSync(arquivo, 'utf8'), /DinheiroEncolhe\.Provider value|<Money[^>]*\bencolhe\b/, arquivo);
+  }
+});
+
+test('Importações: apagar o registro diz o que fica no financeiro sem "Os 0 lançamentos"', () => {
+  const lote = (aprovados: number) => ({ id: `b${aprovados}`, filename: 'f.csv', source: 'csv', account_id: null, status: 'done', error: null, created_at: '2026-09-20T10:00:00Z', total: 3, pendentes: 0, aprovados, descartados: 3 - aprovados, duplicados: 0 });
+  for (const [n, esperado] of [[0, /Nada desta importação entrou no financeiro/], [1, /^O lançamento que você confirmou continua/], [3, /^Os 3 lançamentos que você confirmou continuam/]] as const) {
+    const ui = screen('src/app/import-history.tsx', { batches: [lote(n)] });
+    const linha = ui.nodes().find((x: any) => x.type === 'Deslizavel');
+    ui.interact(() => linha.props.acoes.find((a: any) => a.label === 'Apagar registro').onPress());
+    assert.match(ui.avisos.at(-1), esperado, `com ${n} confirmados`);
   }
 });
