@@ -340,6 +340,9 @@ marcar e um parágrafo com vírgulas.
 - Passo a passo ou ordem explícita ("primeiro..., depois...") vira "1. ", "2. ".
 - Título dito pelo usuário ("anota aí, título Reunião de segunda: ...") vira uma
   primeira linha com "# ". Subtítulo dentro do texto vira "## ".
+- Frase que APRESENTA a lista antes dos itens ("o que levar pra praia: protetor,
+  toalha, chinelo") vira a primeira linha com "# " e os itens vêm embaixo, um por
+  linha — nunca "O que levar pra praia:" solto em cima de "- item".
 - Citação de alguém vira "> ".
 - Ênfase que o usuário FALAR ("põe negrito no prazo") usa a marcação do WhatsApp:
   *negrito*, _itálico_, ~riscado~, `mono`. Nunca use ** (dois asteriscos).
