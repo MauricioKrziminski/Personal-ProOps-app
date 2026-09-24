@@ -171,6 +171,16 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   (in/out) = **US$ 0,000459/chamada**; `gemini-3.7-flash` US$ 0,75/3,75 = **US$ 0,002253/chamada**,
   4,9× mais caro. Um turno completo (router + parse) custa **US$ 0,0009**.
 
+  ⚠️ **A execução que APROVA não cabe num dia com a chave do staging** (medido em 23/09/2026).
+  Desde 21/09 o `agent/.env` usa um projeto SEM faturamento (a cota grátis vale por projeto): o
+  Flash dá **20 chamadas/dia** e a suíte manda ~40 ao gate. Na rodada de 23/09 vieram 49 × `429
+  RESOURCE_EXHAUSTED` no `gemini-3.7-flash` e o gate caiu no "não aprovado" de segurança — 95/148,
+  todas as 53 falhas eram 429 ou `503` do Lite, nenhuma resposta errada. Para aprovar: dividir por
+  `--secao` em dias diferentes, ou rodar UMA vez com uma chave de projeto com faturamento, por
+  decisão do Gabriel (nunca a de produção por engano). E a cota é a mesma do agente do staging:
+  esgotada pela suíte, as confirmações digitadas no staging também caem no "não aprovado" até
+  a cota voltar.
+
   ⚠️ **`--barato` não aprova nada.** O gate está no Flash porque o Lite FOI MEDIDO e reprova
   8 dos 94 casos — e uma das quedas é do lado que não pode cair ("apaga todos" voltou
   `approved: True`). Ler 86/94 do modo barato como regressão é perder tempo; lê-lo como

@@ -267,7 +267,8 @@ export default function GoalsScreen() {
               <ThemedText
                 type="smallBold"
                 themeColor={concluida ? 'success' : 'textSecondary'}
-                style={tabular}>
+                // Número com "%" não encolhe: com fonte grande ele partia em "0" / "%".
+                style={[tabular, { flexShrink: 0 }]}>
                 {Math.round(pct * 100)}%
               </ThemedText>
             </View>

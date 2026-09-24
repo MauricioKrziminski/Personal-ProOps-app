@@ -338,7 +338,8 @@ export default function BudgetsScreen() {
                   {b.category}
                 </ThemedText>
               </View>
-              <ThemedText type="smallBold" themeColor={tom} style={tabular}>
+              {/* Número com "%" não encolhe: com fonte grande ele partia em "0" / "%". */}
+              <ThemedText type="smallBold" themeColor={tom} style={[tabular, { flexShrink: 0 }]}>
                 {Math.round(pct * 100)}%
               </ThemedText>
             </View>
