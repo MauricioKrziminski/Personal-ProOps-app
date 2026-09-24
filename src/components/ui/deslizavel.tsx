@@ -26,8 +26,8 @@ import {
   fecharCardAberto,
   ladosDoArrasto,
   larguraDoBotao,
+  executaAoSoltar,
   passouAteOFim,
-  passouHaPouco,
   temArrasto,
 } from '@/lib/arrasto';
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
@@ -70,6 +70,12 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
   const largura = useSharedValue(0);
   const direita = useLado();
   const esquerdaSV = useLado();
+  // O deslocamento do card, o mesmo nos dois painéis: a biblioteca o entrega ao painel, e o
+  // painel o registra aqui para o "soltou" ler o valor real do instante do soltar.
+  const traducao = useRef<SharedValue<number> | null>(null);
+  const registrar = useCallback((t: SharedValue<number>) => {
+    traducao.current = t;
+  }, []);
 
   // Sem ações o gesto fica DESLIGADO, não desmontado: montar e desmontar o arrasto quando as
   // ações chegam (Contas, com a conta carregando) remontava o card inteiro.
@@ -104,17 +110,17 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
 
   const renderDireita = useCallback(
     (_p: SharedValue<number>, translation: SharedValue<number>) => (
-      <Painel lado="direita" acoes={lados.direita} temPonta={pontaDireita} botao={botao} translation={translation} largura={largura} estado={direita} tocar={tocar} />
+      <Painel lado="direita" acoes={lados.direita} temPonta={pontaDireita} botao={botao} translation={translation} largura={largura} estado={direita} tocar={tocar} registrar={registrar} />
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a assinatura É a dependência da lista
-    [chaveDireita, pontaDireita, botao, largura, direita, tocar],
+    [chaveDireita, pontaDireita, botao, largura, direita, tocar, registrar],
   );
   const renderEsquerda = useCallback(
     (_p: SharedValue<number>, translation: SharedValue<number>) => (
-      <Painel lado="esquerda" acoes={esquerda} temPonta={pontaEsquerda} botao={botao} translation={translation} largura={largura} estado={esquerdaSV} tocar={tocar} />
+      <Painel lado="esquerda" acoes={esquerda} temPonta={pontaEsquerda} botao={botao} translation={translation} largura={largura} estado={esquerdaSV} tocar={tocar} registrar={registrar} />
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a assinatura É a dependência da lista
-    [chaveEsquerda, pontaEsquerda, botao, largura, esquerdaSV, tocar],
+    [chaveEsquerda, pontaEsquerda, botao, largura, esquerdaSV, tocar, registrar],
   );
 
   return (
@@ -146,9 +152,23 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
           // Ao soltar: o dedo passou do fim DO LADO que abriu, com ação que se desfaz? `right` é o
           // conteúdo indo para a direita — o painel `direita`. Executa JÁ, sem esperar a mola
           // assentar no painel (no WhatsApp a ação sai ao soltar).
-          const lado = direcao === 'right' ? direita : esquerdaSV;
-          const ponta = direcao === 'right' ? lados.pontaDireita : lados.pontaEsquerda;
-          if (ponta && passouHaPouco(lado.passou.get(), lado.desligouEm.get(), Date.now())) tocar(ponta);
+          const direito = direcao === 'right';
+          const lado = direito ? direita : esquerdaSV;
+          const ponta = direito ? lados.pontaDireita : lados.pontaEsquerda;
+          const executa = executaAoSoltar({
+            passou: lado.passou.get(),
+            desligouEm: lado.desligouEm.get(),
+            agora: Date.now(),
+            // O deslocamento NO SOLTAR: a mola ainda está no primeiro passo, e o quadro pode não
+            // ter visto o fim do arrasto (ver `executaAoSoltar`).
+            traducao: traducao.current?.get() ?? 0,
+            lado: direito ? 'direita' : 'esquerda',
+            largura: largura.get(),
+            botoes: direito ? lados.direita.length : esquerda.length,
+            temPonta: Boolean(ponta),
+            botao,
+          });
+          if (ponta && executa) tocar(ponta);
         }}
         // Fechando, o card já não é "o aberto": um toque noutro card logo em seguida navega.
         onSwipeableWillClose={() => cardAberto.fechou(meu)}
@@ -183,6 +203,7 @@ function Painel({
   largura,
   estado,
   tocar,
+  registrar,
 }: {
   lado: 'direita' | 'esquerda';
   acoes: ItemAction[];
@@ -192,8 +213,10 @@ function Painel({
   largura: SharedValue<number>;
   estado: Lado;
   tocar: (acao: ItemAction) => void;
+  registrar: (t: SharedValue<number>) => void;
 }) {
   const theme = useTheme();
+  useEffect(() => registrar(translation), [registrar, translation]);
   // Um toque por gesto, no idioma do sistema: seleção ao cruzar o ponto de ABRIR, impacto leve
   // ao cruzar o ponto de "até o fim" (é ali que soltar passa a executar). Quem avisa o resultado
   // é o toast da ação, como no menu.

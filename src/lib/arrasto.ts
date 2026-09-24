@@ -86,6 +86,30 @@ export function passouAteOFim(
   return largura > 0 && andou > limiarAteOFim(largura, botoes, temPonta, botao);
 }
 
+/**
+ * Soltou: executa a ação da ponta? Vale o que o QUADRO viu (`passou`, ou desligado há pouco pela
+ * mola) OU o deslocamento real no instante do soltar (`traducao`). O "passou" é amostrado uma vez
+ * por quadro, e num arrasto que acelera no fim o dedo solta antes de um quadro mostrar a posição
+ * final — medido no emulador: quadro em 210dp, soltura em ~280dp, e só abria (24/09/2026).
+ */
+export function executaAoSoltar(p: {
+  passou: boolean;
+  desligouEm: number;
+  agora: number;
+  traducao: number;
+  lado: 'direita' | 'esquerda';
+  largura: number;
+  botoes: number;
+  temPonta: boolean;
+  botao: number;
+}): boolean {
+  if (!p.temPonta) return false;
+  return (
+    passouHaPouco(p.passou, p.desligouEm, p.agora) ||
+    passouAteOFim(p.traducao, p.lado, p.largura, p.botoes, p.temPonta, p.botao)
+  );
+}
+
 type Fechavel = { close: () => void };
 let aberto: Fechavel | null = null;
 

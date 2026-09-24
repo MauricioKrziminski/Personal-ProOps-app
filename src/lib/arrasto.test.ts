@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { BOTAO, abriuOLado, cardAberto, ladosDoArrasto, larguraDoBotao, limiarAteOFim, passouAteOFim, passouHaPouco, temArrasto } from './arrasto.ts';
+import { BOTAO, abriuOLado, executaAoSoltar, cardAberto, ladosDoArrasto, larguraDoBotao, limiarAteOFim, passouAteOFim, passouHaPouco, temArrasto } from './arrasto.ts';
 
 const a = (label: string, extra: Record<string, unknown> = {}) => ({ label, onPress: () => {}, ...extra });
 
@@ -117,4 +117,15 @@ test('"até o fim" que a mola desligou há instantes ainda vale; de propósito, 
   assert.equal(passouHaPouco(false, 950, 1000), true, 'a mola puxou para dentro no quadro seguinte ao soltar');
   assert.equal(passouHaPouco(false, 700, 1000), false, 'a pessoa voltou o dedo e segurou antes de soltar');
   assert.equal(passouHaPouco(false, 0, 1000), false);
+});
+
+test('ao soltar, vale o deslocamento REAL do soltar — o quadro pode não ter visto o fim', () => {
+  // Arrasto que acelera no fim: o último quadro mostrou 210dp, o dedo soltou em 280dp.
+  const base = { lado: 'direita' as const, largura: 350, botoes: 1, temPonta: true, botao: 114, desligouEm: 0, agora: 1000 };
+  assert.equal(executaAoSoltar({ ...base, passou: false, traducao: 280 }), true);
+  assert.equal(executaAoSoltar({ ...base, passou: false, traducao: 200 }), false, 'soltou antes do fim: só abre');
+  assert.equal(executaAoSoltar({ ...base, passou: true, traducao: 200 }), true, 'o quadro viu o fim');
+  assert.equal(executaAoSoltar({ ...base, passou: false, traducao: 150, desligouEm: 950 }), true, 'a mola desligou há pouco');
+  assert.equal(executaAoSoltar({ ...base, temPonta: false, passou: true, traducao: 400 }), false, 'sem ação que se desfaz, nunca');
+  assert.equal(executaAoSoltar({ ...base, lado: 'esquerda', botoes: 2, passou: false, traducao: 280 }), false, 'lado errado');
 });
