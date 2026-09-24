@@ -831,14 +831,14 @@ export default function DebtsScreen() {
               <>
                 {aSeguir.visiveis.length > 0 ? (
                   <View style={styles.secaoDaLinha}>
-                    <SectionHead title="A seguir" />
+                    <SectionHead title="A seguir" inset={false} />
                     <DebtTimeline anos={porAno(aSeguir.visiveis)} />
                     <VerMais restantes={aSeguir.restantes} onPress={aSeguir.verMais} />
                   </View>
                 ) : null}
                 {jaPagas.visiveis.length > 0 ? (
                   <View style={styles.secaoDaLinha}>
-                    <SectionHead title="Já pagas" />
+                    <SectionHead title="Já pagas" inset={false} />
                     <DebtTimeline anos={porAno(jaPagas.visiveis)} />
                     <VerMais restantes={jaPagas.restantes} onPress={jaPagas.verMais} />
                   </View>
