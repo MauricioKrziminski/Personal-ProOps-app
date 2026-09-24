@@ -88,7 +88,8 @@ inteiro de uma vez.
   e futuro (financiamento, parcelas de uma compra) se divide em **"A seguir"** (a próxima primeiro)
   e **"Já pagas"/"Pagas"** (a mais recente primeiro). AGENDA do que vem (O que vence, Próximos
   dias, lembretes, recorrentes, meses da Projeção) mostra o mais próximo primeiro — ali "mais
-  recente" poria o mais distante no topo.
+  recente" poria o mais distante no topo. Exceção confirmada pelo dono do produto (24/09/2026):
+  *"as telas que realmente não fizerem sentido, pode manter a ordem normal"*.
 - **Aos poucos.** Lista que chega inteira de uma RPC desenha `PASSO` (20) por vez com `VerMais`
   (`components/ui/ver-mais.tsx`, `hooks/use-aos-poucos.ts`: `useAosPoucos` e `useJanelasPorGrupo`);
   lista que cresce sem fim pagina no servidor (`useInfiniteQuery` ou o limite que cresce pelo

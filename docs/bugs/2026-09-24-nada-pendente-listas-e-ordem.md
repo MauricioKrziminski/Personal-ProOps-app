@@ -97,12 +97,12 @@ Portão: `tsc`, `lint`, `npm test` 822/822, `ruff`, `pytest` 1112. Agente do sta
 
 ## O que não depende de código
 
-- **A execução que aprova `evaluate_answer_forms.py` e os `probe_*`** não rodaram: o Gemini do
-  staging (projeto sem faturamento) devolveu `503 UNAVAILABLE` das 13h53 às 14h33 em todas as
-  tentativas, e a cota grátis do Flash (20/dia) é menor que a suíte. As frases novas de
-  financiamento que passaram antes do 503 ("a próxima parcela do carro vence dia 10/11" →
-  `next_due_date`; "apaga de vez…" → `trashed=true`) saíram certas. Rodar com uma chave com
-  faturamento é decisão do Gabriel (`ai-gemini.md`).
+- **A execução que aprova `evaluate_answer_forms.py` e os `probe_*`**: o Gemini do staging (projeto
+  sem faturamento) devolveu `503 UNAVAILABLE` das 13h53 às 15h25, em dez tentativas. Com a
+  autorização do Gabriel (uma execução só, ~R$ 1), rodaram UMA vez com a chave de produção:
+  **148/148** na suíte, `probe_mes_vs_cartao` 31/31 e as duas frases de financiamento que faltavam
+  ("o carro já tem 10 parcelas pagas" → `installments_paid=10`; "desarquiva o financiamento do
+  carro" → `archived=false`). 183 chamadas, ~US$ 0,18. Repetir espera a cota do staging.
 - **Produção**: `20260923120000`, `20260923140000`, `20260923160000`, `20260923170000` e
   `20260924120000`, depois agente, depois app — só o Gabriel sobe (o hook bloqueia).
 
