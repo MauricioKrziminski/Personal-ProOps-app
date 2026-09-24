@@ -13,7 +13,7 @@ import {
 import { useFonts } from 'expo-font';
 import simbolosAndroid from 'expo-symbols/androidWeights/regular';
 import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, useRootNavigationState } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { AppState, Platform } from 'react-native';
@@ -147,8 +147,12 @@ function AppTree() {
     void queryClient.refetchQueries({ type: 'active', stale: true });
   }, [pathname]);
 
-  // Tocar numa notificação precisa levar a algum lugar — inclusive em cold start.
-  useEffect(attachNotificationListeners, []);
+  // Tocar numa notificação precisa levar a algum lugar — inclusive em cold start. Só depois de o
+  // navegador existir: a pilha só é desenhada quando as fontes carregam, e o `router.push` da
+  // abertura caía num navegador ainda montando ("The 'navigation' object hasn't been
+  // initialized yet") e se perdia.
+  const navegadorPronto = Boolean(useRootNavigationState()?.key);
+  useEffect(() => (navegadorPronto ? attachNotificationListeners() : undefined), [navegadorPronto]);
 
   /**
    * A família do design (Plus Jakarta Sans) e a mono do código inline das notas.
@@ -192,8 +196,10 @@ function AppTree() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
         {/* Requisito do `react-native-keyboard-controller`: sem o provider os componentes de
-            teclado (o editor de nota) não recebem evento nenhum. */}
-        <KeyboardProvider statusBarTranslucent navigationBarTranslucent>
+            teclado (o editor de nota) não recebem evento nenhum. Sem `statusBarTranslucent` /
+            `navigationBarTranslucent`: com o app em edge-to-edge (padrão do SDK 57) a lib os
+            ignora e só avisava no console. */}
+        <KeyboardProvider>
           <ConcealProvider>
           {/*
             A trava fica ACIMA do `<Stack>` e DENTRO dos providers (precisa de `useTheme` e de

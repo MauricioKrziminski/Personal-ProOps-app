@@ -28,6 +28,9 @@ export function configureNotificationHandler() {
 }
 
 function open(response: NotificationResponse) {
+  // A resposta fica guardada até alguém LIMPAR: sem isto, toda abertura do app voltava para a
+  // notificação tocada dias antes (a doc do expo-notifications recomenda exatamente isto).
+  notifications?.clearLastNotificationResponseAsync().catch(() => {});
   const rota = routeFor(response.notification.request.content.data);
   if (!rota) return;
   router.push(rota);
