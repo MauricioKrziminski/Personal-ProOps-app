@@ -72,43 +72,20 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   agente.** O agente novo exige a conta no import (o app antigo a deixava opcional → 422 claro).
   Seguida nessa ordem no mesmo dia: build de produção no iPhone e agente `agente-00080-4cl`.
 
-  ⚠️ **PENDENTE em produção: `20260923120000`** (lembrete vinculado à nota — `reminders.note_id`,
-  FK composta `(note_id, workspace_id)` e um lembrete por nota). Aplicada e conferida no STAGING
-  em 23/09/2026. **Ordem: migration → app.** O app novo lê `reminders.note_id` na tela da nota e o
-  grava ao criar o lembrete por ela; sem a coluna em produção, a nota perde o chip do lembrete e
-  "Criar lembrete" pela nota falha com "Não deu para salvar" (a coluna não existe). O resto do app
-  e o agente não dependem dela.
-
-  ⚠️ **PENDENTE em produção: `20260923140000`** (o mês fecha em qualquer dia até o 31 — `check`
-  1..30 e `cycle_bounds` com o clamp do `day_in_month`). Aplicada e conferida no STAGING em
-  23/09/2026 (`supabase/tests/mes_fecha_ate_o_31.sql` verde). **Ordem: migration → agente e app.**
-  O app novo grava 29 e 30 na grade do Perfil e o agente novo aceita "meu mês fecha dia 30"; sem
-  a migration em produção os dois batem no `check` antigo (1..28) e o salvar falha. Até o 30 o
-  resultado das leituras não muda para quem já usa um dia até 28.
-
-  ⚠️ **PENDENTE em produção: `20260923160000`** (financiamento maleável — `debts.first_due_date`
-  no cronograma, contrato fixo editável com pagamento lançado, `public.delete_debt`). Aplicada e
-  conferida no STAGING em 23/09/2026 (`supabase/tests/financiamento_maleavel.sql` verde, com o
-  caso de RLS). **Ordem: migration → agente → app.** O app novo lê/grava `first_due_date` e chama
-  `delete_debt`; o agente novo também. Sem ela o app novo quebra na LEITURA, não só no salvar: o
-  `select` de `debts` pede `first_due_date`, o PostgREST devolve 400, e a tela Dívidas e o bloco de
-  dívidas do Financeiro não carregam.
-
-  ⚠️ **PENDENTE em produção: `20260923170000`** (a âncora do financiamento sem o ramo "paga no
-  ciclo" — sobe JUNTO com a `20260923160000`, logo depois dela). Aplicada e conferida no STAGING
-  em 23/09/2026 (`financiamento_maleavel.sql` caso 8). Sem ela, um contrato com data da primeira
-  parcela e um pagamento feito no ciclo pula uma parcela no cronograma, na Projeção,
-  em "O mês inteiro", no ciclo e no "livre".
-
-  ⚠️ **PENDENTE em produção: `20260924120000`** (`anon` sem EXECUTE nas funções de public — 45
-  funções antigas ainda abriam para a anon key; nenhuma `security definer`, e a chamada morria em
-  "permission denied for schema private", então não havia vazamento). Aplicada e conferida no
-  STAGING em 24/09/2026 (`supabase/tests/anon_sem_execute.sql` verde; as 52 RPCs do app e as duas
-  funções da escrita de `notes` seguem com `authenticated`; o app logado carrega a Hoje; a anon key
-  recebe "permission denied for function"). **Independente de app e agente** — pode subir a
-  qualquer momento. ⚠️ O PUBLIC do padrão global do Postgres reabre toda função NOVA: migration que
-  cria função em public continua com o seu `revoke execute ... from public, anon`, e o teste acusa a
-  que esquecer.
+  **Produção e staging ALINHADOS em `20260924120000`** — aplicadas em produção pelo Gabriel em
+  24/09/2026 (`db push --project-ref`) e conferidas na fonte (`migration list --project-ref` devolve
+  as cinco com `remote` preenchido: `20260923120000`, `20260923140000`, `20260923160000`,
+  `20260923170000`, `20260924120000`; a anon key recebe `42501 permission denied for function` em
+  `cycle_now`). Seguida a ordem migrations → agente → app no mesmo dia: agente `agente-00082-zvx`
+  (`/health` 200) e depois a tag `v1.3.48` e o build de produção no iPhone.
+  `20260923120000`: lembrete vinculado à nota (`reminders.note_id`, FK composta, um por nota).
+  `20260923140000`: o mês fecha em qualquer dia até o 31 (`check` 1..30, clamp do `day_in_month`).
+  `20260923160000` + `20260923170000`: financiamento maleável (`debts.first_due_date`, contrato
+  fixo editável com pagamento lançado, `public.delete_debt`, âncora sem o ramo "paga no ciclo").
+  `20260924120000`: `anon` sem EXECUTE nas funções de public. ⚠️ O PUBLIC do padrão global do
+  Postgres reabre toda função NOVA: migration que cria função em public continua com o seu
+  `revoke execute ... from public, anon`, e `supabase/tests/anon_sem_execute.sql` acusa a que
+  esquecer.
 
   ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
   manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente
