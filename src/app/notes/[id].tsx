@@ -31,10 +31,10 @@ import {
   useToggleNotePin,
   useTrashNote,
 } from '@/hooks/use-notes';
-import { useScheme, useTheme } from '@/hooks/use-theme';
+import { PaletaTingida, useScheme, useTheme } from '@/hooks/use-theme';
 import { useNoteReminder } from '@/hooks/use-items';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
-import { noteInk } from '@/design/note-colors';
+import { noteInk, notePalette } from '@/design/note-colors';
 import { horaBR, localISODate, relativeBR, rotuloDoDia } from '@/lib/dates';
 import { addTag, noteTitle, removeTag, tagsOf } from '@/lib/search';
 import { showItemActions } from '@/lib/item-actions';
@@ -338,6 +338,14 @@ export default function NoteDetailScreen() {
   });
   const tinta = noteInk(note.data?.color ?? null, scheme);
   const folder = folders.data?.find((f) => f.id === folderId);
+  /*
+    O editor fica da cor da nota, como o cartão dela na lista (25/09/2026, decisão do dono do
+    produto) — inclusive a herdada da pasta, senão a nota azul na lista abriria branca. Só o corpo
+    e a barra de formatação leem a paleta ajustada; os seletores (cor, pasta, tag) são folhas à
+    parte e ficam no tema comum.
+  */
+  const paleta = notePalette(note.data?.color ?? folder?.color ?? null, scheme, theme);
+  const cores = paleta ? { ...theme, ...paleta } : theme;
 
   const onTogglePin = () => {
     const id = savedId;
@@ -575,236 +583,238 @@ export default function NoteDetailScreen() {
   };
 
   return (
-    <Screen scroll={false} wide={tablet}>
+    <Screen scroll={false} wide={tablet} background={paleta?.background}>
       <Stack.Screen options={{ title: screenTitle }} />
       <HeaderActions actions={headerActions} />
 
-      <KeyboardAwareScrollView
-        bottomOffset={Space.xxl}
-        // `flexGrow` para o corpo ocupar a tela inteira mesmo com duas linhas de texto: é o que
-        // transforma os 70% em branco de uma nota curta em área de toque, em vez de vazio morto.
-        contentContainerStyle={styles.body}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        contentInsetAdjustmentBehavior="automatic">
-        {/* Barra de propriedades: só a pasta é editável — tag se edita digitando `#` no corpo. */}
-        <View style={styles.props}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Pasta: ${folder?.name ?? 'sem pasta'}. Toque para mudar.`}
-            hitSlop={8}
-            onPress={() => {
-              Haptics.selectionAsync();
-              setPickerOpen(true);
-            }}
-            style={[styles.chip, { backgroundColor: vidro ? 'transparent' : theme.accentSoft }]}>
-            {vidro ? <GlassBackdrop fallbackColor={theme.accentSoft} radius={Radius.pill} /> : null}
-            <Icon name={symbol(folder?.icon)} size="sm" color="tint" />
-            <ThemedText type="smallBold" themeColor="tint">
-              {folder?.name ?? 'Sem pasta'}
-            </ThemedText>
-          </Pressable>
-
-          {tags.map((tag) => (
-            <Pressable
-              key={tag}
-              accessibilityRole="button"
-              accessibilityLabel={`Tag ${tag}. Toque para tirar da nota.`}
-              hitSlop={CHIP_SLOP}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                tirarTag(tag);
-              }}
-              style={[
-                styles.tagChip,
-                { backgroundColor: vidro ? 'transparent' : theme.backgroundElement },
-              ]}>
-              {vidro ? (
-                <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} />
-              ) : null}
-              <ThemedText type="footnote">#{tag}</ThemedText>
-              <Icon name="xmark" size={12} color="textSecondary" />
-            </Pressable>
-          ))}
-
-          {/*
-            A cor é um DISCO, e ele só existe depois do primeiro autosave: `useUpdateNote` grava
-            por id, e em nota nova ainda não há id. Sem cor ele é um anel vazio — a mesma forma
-            do "Sem cor" do seletor, para o controle não mudar de silhueta ao ganhar cor.
-          */}
-          {savedId ? (
+      <PaletaTingida cores={paleta}>
+        <KeyboardAwareScrollView
+          bottomOffset={Space.xxl}
+          // `flexGrow` para o corpo ocupar a tela inteira mesmo com duas linhas de texto: é o que
+          // transforma os 70% em branco de uma nota curta em área de toque, em vez de vazio morto.
+          contentContainerStyle={styles.body}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentInsetAdjustmentBehavior="automatic">
+          {/* Barra de propriedades: só a pasta é editável — tag se edita digitando `#` no corpo. */}
+          <View style={styles.props}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={
-                note.data?.color ? `Cor ${note.data.color}. Toque para mudar.` : 'Escolher cor'
-              }
-              hitSlop={13}
+              accessibilityLabel={`Pasta: ${folder?.name ?? 'sem pasta'}. Toque para mudar.`}
+              hitSlop={8}
               onPress={() => {
                 Haptics.selectionAsync();
-                setColorOpen(true);
+                setPickerOpen(true);
               }}
-              style={[
-                styles.disco,
-                {
-                  backgroundColor: tinta ?? 'transparent',
-                  borderColor: tinta ?? theme.separator,
-                },
-              ]}
-            />
-          ) : null}
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Adicionar tag"
-            hitSlop={CHIP_SLOP}
-            onPress={() => {
-              Haptics.selectionAsync();
-              setTagPickerOpen(true);
-            }}
-            style={[
-              styles.tagChip,
-              { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.separator },
-            ]}>
-            {vidro ? (
-              <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} />
-            ) : null}
-            <Icon name="plus" size={12} color="tint" />
-            <ThemedText type="footnote" themeColor="tint">
-              tag
-            </ThemedText>
-          </Pressable>
-
-          {/* O lembrete desta nota, quando existe e ainda vai tocar — tocar abre para editar. */}
-          {lembrete.data?.active ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Lembrete ${quandoToca(lembrete.data.next_run_at)}. Toque para editar.`}
-              hitSlop={CHIP_SLOP}
-              onPress={() => {
-                Haptics.selectionAsync();
-                void abrirLembrete();
-              }}
-              style={[
-                styles.tagChip,
-                { backgroundColor: vidro ? 'transparent' : theme.backgroundElement },
-              ]}>
-              {vidro ? (
-                <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} />
-              ) : null}
-              <Icon name="bell" size={12} color="textSecondary" />
-              <ThemedText type="footnote" style={tabular}>
-                {quandoToca(lembrete.data.next_run_at)}
+              style={[styles.chip, { backgroundColor: vidro ? 'transparent' : cores.accentSoft }]}>
+              {vidro ? <GlassBackdrop fallbackColor={cores.accentSoft} radius={Radius.pill} /> : null}
+              <Icon name={symbol(folder?.icon)} size="sm" color="tint" />
+              <ThemedText type="smallBold" themeColor="tint">
+                {folder?.name ?? 'Sem pasta'}
               </ThemedText>
             </Pressable>
-          ) : lembrete.isError ? (
-            <Pressable
-              accessibilityRole="button"
-              hitSlop={CHIP_SLOP}
-              onPress={() => void lembrete.refetch()}>
-              <ThemedText type="footnote" themeColor="danger">
-                Não deu para ver o lembrete · Tentar de novo
-              </ThemedText>
-            </Pressable>
-          ) : null}
 
-          {savedFlash ? (
-            <Animated.View
-              entering={FadeIn.duration(Motion.duration.fast)}
-              exiting={FadeOut.duration(Motion.duration.exit)}>
-              <ThemedText type="footnote" themeColor="textSecondary">
-                Salvo
-              </ThemedText>
-            </Animated.View>
-          ) : note.data ? (
-            <ThemedText type="footnote" themeColor="textSecondary">
-              {note.data.source === 'whatsapp' ? 'via WhatsApp' : 'no app'} ·{' '}
-              {relativeBR(note.data.updated_at)}
-            </ThemedText>
-          ) : null}
-        </View>
+            {tags.map((tag) => (
+              <Pressable
+                key={tag}
+                accessibilityRole="button"
+                accessibilityLabel={`Tag ${tag}. Toque para tirar da nota.`}
+                hitSlop={CHIP_SLOP}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  tirarTag(tag);
+                }}
+                style={[
+                  styles.tagChip,
+                  { backgroundColor: vidro ? 'transparent' : cores.backgroundElement },
+                ]}>
+                {vidro ? (
+                  <GlassBackdrop fallbackColor={cores.backgroundElement} radius={Radius.pill} />
+                ) : null}
+                <ThemedText type="footnote">#{tag}</ThemedText>
+                <Icon name="xmark" size={12} color="textSecondary" />
+              </Pressable>
+            ))}
 
-        {note.isLoading ? (
-          <View style={styles.loading}>
-            <Skeleton width="70%" height={Type.title.lineHeight} />
-            <Skeleton width="100%" height={Type.body.lineHeight} />
-            <Skeleton width="90%" height={Type.body.lineHeight} />
-            <Skeleton width="45%" height={Type.body.lineHeight} />
-          </View>
-        ) : (
-          <>
             {/*
-            O TÍTULO tem campo próprio, grande e forte, como no Notes do iPhone — e o corpo começa
-            embaixo dele (23/09/2026). Uma linha só: Enter desce para o corpo. Na nota nova é ele
-            que leva o foco.
-          */}
-            <TextInput
-              ref={tituloRef}
-              value={nota.titulo}
-              onChangeText={mudarTitulo}
-              multiline
-              onBlur={() => void flushRef.current()}
-              autoFocus={params.id === 'new'}
-              scrollEnabled={false}
-              placeholder="Título"
-              placeholderTextColor={theme.textSecondary}
-              accessibilityLabel="Título da nota"
-              style={[Type.title, styles.titulo, { color: theme.text }]}
-            />
-            {editing ? (
-              <TextInput
-                ref={inputRef}
-                value={nota.corpo}
-                onChangeText={mudarCorpo}
-                multiline
-                autoFocus
-                scrollEnabled={false}
-                selection={selection}
-                onSelectionChange={(e) => {
-                  // O cursor é guardado para a barra de blocos saber em QUE linha aplicar. Sem isto
-                  // ela só poderia agir na última linha, e converter um bloco do meio da nota
-                  // exigiria descer até o fim e voltar.
-                  cursorRef.current = e.nativeEvent.selection.start;
-                  setSel(e.nativeEvent.selection);
-                  setSelection(undefined);
+              A cor é um DISCO, e ele só existe depois do primeiro autosave: `useUpdateNote` grava
+              por id, e em nota nova ainda não há id. Sem cor ele é um anel vazio — a mesma forma
+              do "Sem cor" do seletor, para o controle não mudar de silhueta ao ganhar cor.
+            */}
+            {savedId ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  note.data?.color ? `Cor ${note.data.color}. Toque para mudar.` : 'Escolher cor'
+                }
+                hitSlop={13}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setColorOpen(true);
                 }}
-                onBlur={() => {
-                  setEditing(false);
-                  void flushRef.current();
-                }}
-                placeholder="Escreve alguma coisa…"
-                placeholderTextColor={theme.textSecondary}
-                accessibilityLabel="Conteúdo da nota"
-                textAlignVertical="top"
-                style={[Type.body, styles.input, { color: theme.text }]}
+                style={[
+                  styles.disco,
+                  {
+                    backgroundColor: tinta ?? 'transparent',
+                    borderColor: tinta ?? theme.separator,
+                  },
+                ]}
               />
-            ) : (
-              <NoteBody content={nota.corpo} onEdit={startEditing} onToggleLine={onToggleLine} />
-            )}
-          </>
-        )}
-      </KeyboardAwareScrollView>
+            ) : null}
 
-      {/*
-        A barra fica GRUDADA no teclado, não dentro do scroll.
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Adicionar tag"
+              hitSlop={CHIP_SLOP}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setTagPickerOpen(true);
+              }}
+              style={[
+                styles.tagChip,
+                { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.separator },
+              ]}>
+              {vidro ? (
+                <GlassBackdrop fallbackColor={cores.backgroundElement} radius={Radius.pill} />
+              ) : null}
+              <Icon name="plus" size={12} color="tint" />
+              <ThemedText type="footnote" themeColor="tint">
+                tag
+              </ThemedText>
+            </Pressable>
 
-        Dentro do scroll ela nunca aparecia: o `TextInput` de edição tem `flexGrow: 1`, então ele
-        come toda a altura disponível e empurra a barra para fora da tela — verificado no
-        emulador, a barra existia na árvore e ficava abaixo da dobra. `KeyboardStickyView` a
-        prende logo acima do teclado, que é onde Apple Notes, Bear e Things põem a mesma coisa;
-        o `KeyboardAwareScrollView` continua responsável por manter o cursor visível acima dela.
-      */}
-      {editing ? (
-        <KeyboardStickyView>
-          <View style={styles.blockBarWrap}>
-            <FormatBar
-              content={nota.corpo}
-              selection={sel}
-              onMark={aplicarMarca}
-              onBlock={aplicarBloco}
-            />
+            {/* O lembrete desta nota, quando existe e ainda vai tocar — tocar abre para editar. */}
+            {lembrete.data?.active ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Lembrete ${quandoToca(lembrete.data.next_run_at)}. Toque para editar.`}
+                hitSlop={CHIP_SLOP}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  void abrirLembrete();
+                }}
+                style={[
+                  styles.tagChip,
+                  { backgroundColor: vidro ? 'transparent' : cores.backgroundElement },
+                ]}>
+                {vidro ? (
+                  <GlassBackdrop fallbackColor={cores.backgroundElement} radius={Radius.pill} />
+                ) : null}
+                <Icon name="bell" size={12} color="textSecondary" />
+                <ThemedText type="footnote" style={tabular}>
+                  {quandoToca(lembrete.data.next_run_at)}
+                </ThemedText>
+              </Pressable>
+            ) : lembrete.isError ? (
+              <Pressable
+                accessibilityRole="button"
+                hitSlop={CHIP_SLOP}
+                onPress={() => void lembrete.refetch()}>
+                <ThemedText type="footnote" themeColor="danger">
+                  Não deu para ver o lembrete · Tentar de novo
+                </ThemedText>
+              </Pressable>
+            ) : null}
+
+            {savedFlash ? (
+              <Animated.View
+                entering={FadeIn.duration(Motion.duration.fast)}
+                exiting={FadeOut.duration(Motion.duration.exit)}>
+                <ThemedText type="footnote" themeColor="textSecondary">
+                  Salvo
+                </ThemedText>
+              </Animated.View>
+            ) : note.data ? (
+              <ThemedText type="footnote" themeColor="textSecondary">
+                {note.data.source === 'whatsapp' ? 'via WhatsApp' : 'no app'} ·{' '}
+                {relativeBR(note.data.updated_at)}
+              </ThemedText>
+            ) : null}
           </View>
-        </KeyboardStickyView>
-      ) : null}
+
+          {note.isLoading ? (
+            <View style={styles.loading}>
+              <Skeleton width="70%" height={Type.title.lineHeight} />
+              <Skeleton width="100%" height={Type.body.lineHeight} />
+              <Skeleton width="90%" height={Type.body.lineHeight} />
+              <Skeleton width="45%" height={Type.body.lineHeight} />
+            </View>
+          ) : (
+            <>
+              {/*
+              O TÍTULO tem campo próprio, grande e forte, como no Notes do iPhone — e o corpo começa
+              embaixo dele (23/09/2026). Uma linha só: Enter desce para o corpo. Na nota nova é ele
+              que leva o foco.
+            */}
+              <TextInput
+                ref={tituloRef}
+                value={nota.titulo}
+                onChangeText={mudarTitulo}
+                multiline
+                onBlur={() => void flushRef.current()}
+                autoFocus={params.id === 'new'}
+                scrollEnabled={false}
+                placeholder="Título"
+                placeholderTextColor={cores.textSecondary}
+                accessibilityLabel="Título da nota"
+                style={[Type.title, styles.titulo, { color: theme.text }]}
+              />
+              {editing ? (
+                <TextInput
+                  ref={inputRef}
+                  value={nota.corpo}
+                  onChangeText={mudarCorpo}
+                  multiline
+                  autoFocus
+                  scrollEnabled={false}
+                  selection={selection}
+                  onSelectionChange={(e) => {
+                    // O cursor é guardado para a barra de blocos saber em QUE linha aplicar. Sem isto
+                    // ela só poderia agir na última linha, e converter um bloco do meio da nota
+                    // exigiria descer até o fim e voltar.
+                    cursorRef.current = e.nativeEvent.selection.start;
+                    setSel(e.nativeEvent.selection);
+                    setSelection(undefined);
+                  }}
+                  onBlur={() => {
+                    setEditing(false);
+                    void flushRef.current();
+                  }}
+                  placeholder="Escreve alguma coisa…"
+                  placeholderTextColor={cores.textSecondary}
+                  accessibilityLabel="Conteúdo da nota"
+                  textAlignVertical="top"
+                  style={[Type.body, styles.input, { color: theme.text }]}
+                />
+              ) : (
+                <NoteBody content={nota.corpo} onEdit={startEditing} onToggleLine={onToggleLine} />
+              )}
+            </>
+          )}
+        </KeyboardAwareScrollView>
+
+        {/*
+          A barra fica GRUDADA no teclado, não dentro do scroll.
+
+          Dentro do scroll ela nunca aparecia: o `TextInput` de edição tem `flexGrow: 1`, então ele
+          come toda a altura disponível e empurra a barra para fora da tela — verificado no
+          emulador, a barra existia na árvore e ficava abaixo da dobra. `KeyboardStickyView` a
+          prende logo acima do teclado, que é onde Apple Notes, Bear e Things põem a mesma coisa;
+          o `KeyboardAwareScrollView` continua responsável por manter o cursor visível acima dela.
+        */}
+        {editing ? (
+          <KeyboardStickyView>
+            <View style={styles.blockBarWrap}>
+              <FormatBar
+                content={nota.corpo}
+                selection={sel}
+                onMark={aplicarMarca}
+                onBlock={aplicarBloco}
+              />
+            </View>
+          </KeyboardStickyView>
+        ) : null}
+      </PaletaTingida>
 
       <TagPicker
         visible={tagPickerOpen}

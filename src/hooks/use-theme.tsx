@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Appearance, useColorScheme } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+import { Colors, type Palette } from '@/constants/theme';
 
 /** O que o usuário escolheu — não o que está na tela. `system` segue o aparelho. */
 export type ThemeMode = 'system' | 'light' | 'dark';
@@ -75,9 +75,30 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
+const Tingida = createContext<Partial<Palette> | null>(null);
+
+/**
+ * Um pedaço da árvore com a paleta ajustada: o cartão e o editor de uma nota COLORIDA
+ * (25/09/2026). Troca poucas cores — superfície, o cinza secundário, os tons de chip e de
+ * tocado — e todo `ThemedText`, `Icon` e primitivo lá dentro segue sozinho, sem a tela repintar
+ * peça por peça (a prévia, a data, o checklist, o placeholder). A régua de contraste mora em
+ * `design/note-surface.ts`.
+ */
+export function PaletaTingida({
+  cores,
+  children,
+}: {
+  cores: Partial<Palette> | null;
+  children: React.ReactNode;
+}) {
+  return <Tingida.Provider value={cores}>{children}</Tingida.Provider>;
+}
+
 /** A paleta que vale agora. É o caminho único para cor em tela. */
-export function useTheme() {
-  return Colors[useContext(Ctx).scheme];
+export function useTheme(): Palette {
+  const base = Colors[useContext(Ctx).scheme];
+  const tinta = useContext(Tingida);
+  return useMemo(() => (tinta ? { ...base, ...tinta } : base), [base, tinta]);
 }
 
 /** A escolha do usuário e como mudá-la — só a tela de Perfil precisa disto. */

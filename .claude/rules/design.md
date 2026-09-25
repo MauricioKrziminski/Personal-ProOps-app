@@ -1000,15 +1000,24 @@ crédito:
 
 - **É escolha do USUÁRIO sobre o dado dele**, não a voz do produto. O app não escolhe cor de nota
   nenhuma; o padrão é `null` e não desenha nada.
-- **Vive em geometria fechada**: trilho de 3px na borda do cartão e ladrilho do ícone da pasta.
-  Nunca pinta texto, superfície de card, botão ou estado.
+- **Pinta o cartão INTEIRO da nota e da pasta, e o editor da nota** (25/09/2026, decisão do dono
+  do produto: *"o card inteiro tem que ficar daquela cor e não somente um detalhe quase
+  imperceptível, o intuito é melhorar a identificação"*). Era um trilho de 3px e o ladrilho do
+  ícone da pasta, e ninguém identificava nada de relance. O modelo é o do Keep: pastel no claro,
+  tom fundo no escuro, misturado com a superfície (`design/note-surface.ts`). Quem está dentro lê
+  a paleta ajustada (`PaletaTingida`, em `use-theme.tsx`): o cinza secundário do tema cai abaixo
+  de 4,5:1 sobre o fundo tingido em metade das cores, e o ajustado passa de 5:1 nas oito
+  (`note-surface.test.ts`). Nota sem cor herda a da pasta — no cartão e no editor. Continua sem
+  pintar texto, botão ou estado, e os seletores (cor, pasta, tag) abertos do editor ficam no tema
+  comum. Na lista de Pastas, na Lixeira e em Arquivadas (linhas de lista, não cartões) a cor
+  segue um disco.
 - **Nenhum dos oito valores é `tint`, `danger` ou `warning`** — cor de nota não pode ler como
   "ação" nem como "erro", que são as únicas coisas que a cor significa neste app.
 - **A contagem anti-slop não muda**: continua UM accent na tela. Cor de conteúdo não entra na
   conta pelo mesmo motivo que a foto de um comprovante não entraria.
 
 > `violeta` está na paleta, e a regra "se um dia a cor voltar, que não seja roxo" continua
-> valendo — ela é sobre o ACCENT do app. Aqui é escolha do usuário dentro de um trilho de 3px.
+> valendo — ela é sobre o ACCENT do app. Aqui é escolha do usuário sobre o cartão da nota dela.
 
 ### O roxo foi testado e devolvido (30/08/2026)
 

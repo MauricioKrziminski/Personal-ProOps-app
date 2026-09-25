@@ -3,9 +3,9 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
-import { noteInk, noteTile } from '@/design/note-colors';
+import { notePalette } from '@/design/note-colors';
 import { Radius, Space, tabular } from '@/design/tokens';
-import { useScheme, useTheme } from '@/hooks/use-theme';
+import { PaletaTingida, useScheme, useTheme } from '@/hooks/use-theme';
 import type { NoteFolder } from '@/hooks/use-notes';
 import { symbol } from '@/components/notes/note-actions';
 
@@ -36,11 +36,11 @@ export function folderTileHeight(fontScale: number): number {
  * tela própria. Os chips de PASTA saíram junto; os de TAG ficaram, porque tag é transversal e
  * recorta a tela inteira, incluindo as pastas.
  *
- * ## A cor mora no LADRILHO do ícone, não no ladrilho inteiro
+ * ## A cor pinta o ladrilho INTEIRO (25/09/2026)
  *
- * O fundo do quadradinho do ícone é a cor misturada com a superfície (18%), e o glifo é a tinta
- * cheia. O cartão continua sendo `surface` do tema. É a mesma fronteira do trilho de 3px na
- * nota: cor de conteúdo vive em geometria fechada e nunca vira superfície de tela.
+ * Era só o quadradinho do ícone, e não identificava nada de relance (a queixa do dono do produto
+ * valeu para a nota e para a pasta). Hoje a pasta colorida é um ladrilho daquela cor, como o
+ * cartão da nota, e o quadradinho do ícone é o tom forte da mesma cor (`notePalette`).
  *
  * ## Duas zonas, não três linhas empilhadas (14/09/2026)
  *
@@ -71,8 +71,9 @@ function FolderCardBase({
   const theme = useTheme();
   const scheme = useScheme();
 
-  const fundo = noteTile(folder.color, theme.surface, scheme) ?? theme.backgroundElement;
-  const tinta = noteInk(folder.color, scheme);
+  // A cor pinta o ladrilho INTEIRO (25/09/2026), como o cartão da nota — ver `note-card.tsx`.
+  const paleta = notePalette(folder.color, scheme, theme);
+  const cores = paleta ? { ...theme, ...paleta } : theme;
 
   const label = [
     folder.name,
@@ -94,57 +95,51 @@ function FolderCardBase({
           style={[
             styles.ladrilho,
             {
-              backgroundColor: pressed || dragging ? theme.backgroundSelected : theme.surface,
-              borderColor: theme.cardBorder,
+              backgroundColor: pressed || dragging ? cores.backgroundSelected : cores.surface,
+              borderColor: cores.cardBorder,
             },
           ]}>
-          <View style={styles.topo}>
+          <PaletaTingida cores={paleta}>
+            <View style={styles.topo}>
+              {/*
+                Quem carrega a cor é o LADRILHO INTEIRO, não o glifo (`Icon` só aceita token de
+                tema). O quadrado do ícone é o tom FORTE da mesma cor — ou o elemento neutro, sem
+                cor —, lido da paleta ajustada.
+              */}
+              <View style={[styles.icone, { backgroundColor: cores.backgroundElement }]}>
+                {/* Glifo em tinta CHEIA mesmo sem cor escolhida: em `textSecondary` o ladrilho
+                    cinza com o desenho cinza dentro lia como controle desabilitado, e a pasta sem
+                    cor é o caso PADRÃO — quase toda a grade. Quem diferencia é o fundo, não o
+                    apagamento do glifo. */}
+                <Icon name={symbol(folder.icon)} size="md" color="text" />
+              </View>
+              <View style={styles.metaDireita}>
+                {folder.pinned ? <Icon name="pin.fill" size="sm" color="tint" /> : null}
+                {/* ⚠️ **Pasta vazia não carimba "0".** É a mesma régua do badge de aba (§8):
+                    contagem real ou nada. Uma grade de pastas novas virava uma fileira de zeros —
+                    ruído no canto de cada ladrilho dizendo que não há o que ver ali. */}
+                {folder.notes_count > 0 ? (
+                  <ThemedText type="code" themeColor="textSecondary" style={tabular}>
+                    {folder.notes_count}
+                  </ThemedText>
+                ) : null}
+              </View>
+            </View>
+
             {/*
-              ⚠️ **Quem carrega a cor é o LADRILHO, não o glifo.**
-              `Icon` só aceita nome de token de tema, e com razão — cor crua em tela é o que o
-              `anti-slop.test.ts` existe para impedir. Tingir o glifo pediria um furo no
-              primitivo (ou um truque de blend que não tem valor válido nas duas plataformas).
-              O ladrilho colorido com contorno na tinta cheia dá o mesmo reconhecimento à
-              distância, mantém o glifo legível e não encosta no contrato do `Icon`.
+              Nome NUNCA trunca: é identificador (§7). Não coube em duas linhas, a fonte não é o
+              problema — o ladrilho é que está estreito, e aí quem cede é o layout.
+
+              ⚠️ **`flexShrink: 0` porque a grade entra com `FadeInDown`** (§3, 15/09/2026): o Yoga
+              mede o filho enquanto o contêiner animado ainda está chegando e, com o `flexShrink: 1`
+              que o `ThemedText` traz na base, ele prefere ENCOLHER a quebrar — encolhido naquele
+              instante, o texto não se remede nunca mais. Foi assim que "App bloqueado" virou "App"
+              no APK de release, invisível no dev.
             */}
-            <View
-              style={[
-                styles.icone,
-                { backgroundColor: fundo, borderColor: tinta ?? 'transparent' },
-                tinta ? styles.contornado : null,
-              ]}>
-              {/* Glifo em tinta CHEIA mesmo sem cor escolhida: em `textSecondary` o ladrilho
-                  cinza com o desenho cinza dentro lia como controle desabilitado, e a pasta sem
-                  cor é o caso PADRÃO — quase toda a grade. Quem diferencia é o fundo, não o
-                  apagamento do glifo. */}
-              <Icon name={symbol(folder.icon)} size="md" color="text" />
-            </View>
-            <View style={styles.metaDireita}>
-              {folder.pinned ? <Icon name="pin.fill" size="sm" color="tint" /> : null}
-              {/* ⚠️ **Pasta vazia não carimba "0".** É a mesma régua do badge de aba (§8):
-                  contagem real ou nada. Uma grade de pastas novas virava uma fileira de zeros —
-                  ruído no canto de cada ladrilho dizendo que não há o que ver ali. */}
-              {folder.notes_count > 0 ? (
-                <ThemedText type="code" themeColor="textSecondary" style={tabular}>
-                  {folder.notes_count}
-                </ThemedText>
-              ) : null}
-            </View>
-          </View>
-
-          {/*
-            Nome NUNCA trunca: é identificador (§7). Não coube em duas linhas, a fonte não é o
-            problema — o ladrilho é que está estreito, e aí quem cede é o layout.
-
-            ⚠️ **`flexShrink: 0` porque a grade entra com `FadeInDown`** (§3, 15/09/2026): o Yoga
-            mede o filho enquanto o contêiner animado ainda está chegando e, com o `flexShrink: 1`
-            que o `ThemedText` traz na base, ele prefere ENCOLHER a quebrar — encolhido naquele
-            instante, o texto não se remede nunca mais. Foi assim que "App bloqueado" virou "App"
-            no APK de release, invisível no dev.
-          */}
-          <ThemedText type="smallBold" style={styles.nome}>
-            {folder.name}
-          </ThemedText>
+            <ThemedText type="smallBold" style={styles.nome}>
+              {folder.name}
+            </ThemedText>
+          </PaletaTingida>
         </View>
       )}
     </Pressable>
@@ -161,7 +156,8 @@ const styles = StyleSheet.create({
     padding: Space.md,
     borderRadius: Radius.md,
     borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
+    // 1dp, não `hairlineWidth` (um pixel FÍSICO, que some em escala) — a régua do `Card` (§2).
+    borderWidth: 1,
     justifyContent: 'space-between',
   },
   topo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -174,7 +170,5 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     borderCurve: 'continuous',
   },
-  /** Contorno na tinta cheia: no escuro, 18% de mistura sozinho quase não separa duas cores. */
-  contornado: { borderWidth: 1.5 },
   nome: { flexShrink: 0, maxWidth: '100%' },
 });

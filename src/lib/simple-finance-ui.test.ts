@@ -205,7 +205,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
           fontScale: 1,
         }),
       };
-      if (name === '@/hooks/use-theme') return { useTheme: () => ({}), useScheme: () => 'light' };
+      if (name === '@/hooks/use-theme') return { useTheme: () => ({}), useScheme: () => 'light', PaletaTingida: 'PaletaTingida' };
       // portão de "a tela está pronta": no harness nada carrega, então ele já nasce aberto
       if (name === '@/hooks/use-tela-pronta') return { useTelaPronta: (...consultas: any[]) => { gates.push(consultas); return true; } };
       // Carregado DE VERDADE: ele é a regra que se quer testar, não um arredor da tela.
@@ -256,7 +256,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
         useDeleteAgentConversation: () => mutation('deleteConversation'),
       };
       if (name === '@/components/notes/note-actions') return { actionSheet: () => {}, FOLDER_ICONS: [], notesLabel: (n: number) => `${n} notas`, symbol: () => 'folder' };
-      if (name === '@/design/note-colors') return { noteRail: () => null, noteInk: () => null };
+      if (name === '@/design/note-colors') return { noteInk: () => null, notePalette: (cor: string | null) => (cor ? { surface: `fundo-${cor}`, backgroundSelected: `forte-${cor}`, cardBorder: `borda-${cor}`, accentSoft: `forte-${cor}` } : null) };
       if (name === '@/hooks/use-search') return {
         useGlobalSearch: (_q: string, limite?: number) => {
           pedidosDeLimite.push(['busca', limite]);
@@ -1471,6 +1471,31 @@ test('Nota: arrasta Fixar à direita e Arquivar à esquerda (os dois até o fim)
   const [link] = itemLinks(ui);
   assert.ok(link, 'a nota está num ItemLink');
   assert.deepEqual(ladosDoLink(link), { direita: ['Fixar'], esquerda: ['Arquivar'], mais: true, pontaDireita: 'Fixar', pontaEsquerda: 'Arquivar' });
+});
+
+test('Nota colorida: o cartão INTEIRO é da cor, e sem cor própria herda a da pasta', () => {
+  // 25/09/2026: *"o card inteiro tem que ficar daquela cor e não somente um detalhe quase
+  // imperceptível"*. Era um trilho de 3px.
+  const vazio = () => {};
+  const cartao = (color: string | null, folderColor: string | null = null, pressed = false) => {
+    const ui = screen('src/components/notes/note-card.tsx', {
+      componente: 'NoteCard',
+      props: {
+        note: { id: 'n1', content: 'Mercado', pinned: false, source: 'app', updated_at: '2026-09-01T12:00:00Z', created_at: '2026-09-01T12:00:00Z', color, folder_id: null, tags: [] },
+        folderColor,
+        actions: { onPin: vazio, onColor: vazio, onMove: vazio, onArchive: vazio, onTrash: vazio },
+      },
+    });
+    const [link] = itemLinks(ui);
+    const view = link.props.children({ onLongPress: vazio }).props.children({ pressed });
+    const estilo = Object.assign({}, ...view.props.style.flat().filter(Boolean));
+    const tingida = [view.props.children].flat().find((n: any) => n?.type === 'PaletaTingida');
+    return { fundo: estilo.backgroundColor, borda: estilo.borderColor, tingida: tingida?.props.cores ?? null };
+  };
+  assert.deepEqual(cartao('oceano'), { fundo: 'fundo-oceano', borda: 'borda-oceano', tingida: { surface: 'fundo-oceano', backgroundSelected: 'forte-oceano', cardBorder: 'borda-oceano', accentSoft: 'forte-oceano' } });
+  assert.equal(cartao('oceano', null, true).fundo, 'forte-oceano', 'tocado: o tom forte da mesma cor, não o cinza');
+  assert.equal(cartao(null, 'musgo').fundo, 'fundo-musgo', 'sem cor própria, a da pasta');
+  assert.equal(cartao(null).tingida, null, 'sem cor nenhuma, o tema comum');
 });
 
 test('Pasta: arrasta Fixar à direita e Arquivar à esquerda (os dois até o fim); o resto no Mais', () => {

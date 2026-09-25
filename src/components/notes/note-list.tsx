@@ -43,7 +43,7 @@ export function NoteList({
    * Mostrar a pílula com o nome da pasta.
    *
    * `false` DENTRO de uma pasta: ali a pílula repete o título da tela em toda linha, e a cor do
-   * trilho já diz de qual pasta a nota herdou. A cor continua vindo — ela identifica, a palavra
+   * cartão já diz de qual pasta a nota herdou. A cor continua vindo — ela identifica, a palavra
    * só ecoa.
    */
   showFolder?: boolean;

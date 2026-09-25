@@ -7,22 +7,18 @@ import { Icon } from '@/components/ui/icon';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { NOTE_COLOR_NAMES, type NoteColorName } from '@/constants/theme';
-import { noteInk, noteTile } from '@/design/note-colors';
+import { noteInk, notePalette } from '@/design/note-colors';
 import { HitTarget, Motion, Radius, Space } from '@/design/tokens';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 
 /**
  * Escolher a cor de uma nota ou de uma pasta.
  *
- * ## Por que a amostra é um DISCO e não um quadrado preenchido
+ * ## A amostra é o cartão em miniatura
  *
- * A cor aqui não pinta superfície nenhuma — ela vai virar um trilho de 3px na borda do cartão e
- * o fundo do ladrilho do ícone da pasta. Uma grade de quadrados grandes prometeria um cartão
- * inteiro colorido, que é justamente o que este design recusou (`design.md` §2b: a cor é
- * conteúdo do usuário e vive em geometria fechada).
- *
- * O disco mostra a tinta cheia, que é o que o trilho usa, dentro de um anel do mesmo tom — a
- * mesma relação tinta/superfície que o ladrilho terá.
+ * A cor pinta o cartão INTEIRO e o editor desde 25/09/2026 (`design.md` §2b). O anel da amostra
+ * tem o fundo EXATO que o cartão vai ter (`notePalette`), e o disco no meio a tinta cheia — quem
+ * escolhe vê a cor que vai morar na lista, não um tom que não aparece em lugar nenhum.
  *
  * ⚠️ "Sem cor" é a PRIMEIRA opção e é o padrão. Uma paleta sem saída obrigaria a escolher uma
  * cor para toda nota nova, e a maioria das notas não quer cor nenhuma.
@@ -77,7 +73,7 @@ export function ColorPicker({
             <Amostra
               key={cor}
               selecionada={value === cor}
-              fundo={noteTile(cor, theme.surface, scheme) ?? theme.backgroundElement}
+              fundo={notePalette(cor, scheme, theme)?.surface ?? theme.backgroundElement}
               tinta={noteInk(cor, scheme) ?? theme.textSecondary}
               label={cor[0].toUpperCase() + cor.slice(1)}
               onPress={() => escolher(cor)}

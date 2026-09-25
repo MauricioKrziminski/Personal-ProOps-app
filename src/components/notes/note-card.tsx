@@ -1,6 +1,5 @@
 import { memo } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { GestureDetector, type ComposedGesture, type GestureType } from 'react-native-gesture-handler';
 
 import { ThemedText } from '@/components/themed-text';
@@ -8,9 +7,9 @@ import { Icon } from '@/components/ui/icon';
 import { ItemLink } from '@/components/ui/item-link';
 import { Mark } from '@/components/ui/mark';
 import { Fonts, type NoteColorName } from '@/constants/theme';
-import { noteRail } from '@/design/note-colors';
-import { HitTarget, Motion, Radius, Space, Type, tabular } from '@/design/tokens';
-import { useScheme, useTheme } from '@/hooks/use-theme';
+import { notePalette } from '@/design/note-colors';
+import { HitTarget, Radius, Space, Type, tabular } from '@/design/tokens';
+import { PaletaTingida, useScheme, useTheme } from '@/hooks/use-theme';
 import type { Note } from '@/hooks/use-notes';
 import { relativeBR } from '@/lib/dates';
 import { todoProgress } from '@/lib/note-blocks';
@@ -20,15 +19,17 @@ import type { ItemAction } from '@/lib/item-actions';
 /**
  * O cartão de uma nota na lista.
  *
- * ## O trilho de cor
+ * ## A cor pinta o cartão inteiro
  *
- * Três pixels na borda esquerda, tinta cheia, e **só isso**. A cor de nota é conteúdo do usuário,
- * não estado da interface: pintar o cartão inteiro faria a lista competir com o único accent do
- * app e transformaria a tela num mosaico (`design.md` §2b).
+ * Era um trilho de 3px, e o dono do produto recusou em 25/09/2026: *"o card inteiro tem que
+ * ficar daquela cor e não somente um detalhe quase imperceptível, o intuito é melhorar a
+ * identificação"*. O cartão inteiro vira a cor (pastel no claro, tom fundo no escuro, como o
+ * Keep) e o que está dentro dele lê a paleta ajustada (`PaletaTingida`): o cinza secundário puro
+ * perderia o contraste sobre o fundo tingido (`design/note-surface.ts`).
  *
  * ⚠️ **Sem cor própria, a nota herda a da PASTA.** A pasta já identifica o lugar, e sem a herança
- * o trilho ficaria vazio em quase toda nota — a cor só apareceria em quem tivesse mexido nota por
- * nota, que é o oposto de "dá para reconhecer de relance".
+ * a cor só apareceria em quem tivesse mexido nota por nota, que é o oposto de "dá para reconhecer
+ * de relance".
  *
  * ## A alça de arrastar
  *
@@ -80,7 +81,9 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
     o lugar dela é embaixo do título, alinhada com ele.
   */
   const quando = relativeBR(note.updated_at);
-  const trilho = noteRail(note.color ?? folderColor ?? null, scheme);
+  const paleta = notePalette(note.color ?? folderColor ?? null, scheme, theme);
+  // O cartão lê a paleta de FORA com a da nota por cima; o que está dentro lê pelo contexto.
+  const cores = paleta ? { ...theme, ...paleta } : theme;
   const temOutroMeta = Boolean(folderName) || Boolean(contagem) || note.source === 'whatsapp';
 
   const label = [
@@ -128,86 +131,77 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
               style={[
                 styles.cartao,
                 {
-                  backgroundColor: pressed || dragging ? theme.backgroundSelected : theme.surface,
-                  borderColor: theme.cardBorder,
+                  backgroundColor: pressed || dragging ? cores.backgroundSelected : cores.surface,
+                  borderColor: cores.cardBorder,
                 },
               ]}>
-              {/* `key` na COR: trocar a cor remonta o trilho e ele entra em fade, em vez de
-                  saltar de um tom para o outro. É o cross-fade do §5 sem uma shared value só
-                  para uma transição que acontece uma vez a cada muitas semanas. */}
-              {trilho ? (
-                <Animated.View
-                  key={trilho}
-                  entering={FadeIn.duration(Motion.duration.base)}
-                  style={[styles.trilho, { backgroundColor: trilho }]}
-                />
-              ) : null}
+              <PaletaTingida cores={paleta}>
+                <View style={styles.conteudo}>
+                  {/* Título e pin dividem a primeira linha: o pin fica no canto do cartão (padrão
+                      do Keep), não como bullet antes do texto — ali ele lia como marcador. */}
+                  <View style={styles.cabeca}>
+                    <ThemedText type="headline" style={styles.cresce}>
+                      {titulo}
+                    </ThemedText>
+                    {note.pinned ? <Icon name="pin.fill" size="sm" color="tint" /> : null}
+                  </View>
 
-              <View style={styles.conteudo}>
-                {/* Título e pin dividem a primeira linha: o pin fica no canto do cartão (padrão
-                    do Keep), não como bullet antes do texto — ali ele lia como marcador. */}
-                <View style={styles.cabeca}>
-                  <ThemedText type="headline" style={styles.cresce}>
-                    {titulo}
-                  </ThemedText>
-                  {note.pinned ? <Icon name="pin.fill" size="sm" color="tint" /> : null}
+                  {previa ? (
+                    <ThemedText
+                      type="small"
+                      themeColor="textSecondary"
+                      numberOfLines={fontScale >= 1.4 ? 1 : 2}>
+                      {previa}
+                    </ThemedText>
+                  ) : null}
+
+                  {/* Faixa de metadados com FORMA, não string corrida: pasta é pill, checklist é
+                      ícone + contagem, origem é ícone, e a data vai encostada à direita. */}
+                  <View style={styles.meta}>
+                    {folderName ? (
+                      <View style={[styles.pilulaPasta, { backgroundColor: cores.accentSoft }]}>
+                        <ThemedText themeColor="tint" style={styles.pilulaTexto}>
+                          {folderName}
+                        </ThemedText>
+                      </View>
+                    ) : null}
+
+                    {contagem ? (
+                      <View style={styles.pedaco}>
+                        <Icon name="checkmark.circle" size={13} color="textSecondary" />
+                        <ThemedText type="caption" themeColor="textSecondary" style={tabular}>
+                          {contagem}
+                        </ThemedText>
+                      </View>
+                    ) : null}
+
+                    {/* A espiral marca o que a IA registrou — o quinto papel previsto em §2b. Um
+                        balão de conversa diria "veio de um chat"; a marca diz "isto entrou pelo
+                        ProOps", que é a informação que importa. */}
+                    {note.source === 'whatsapp' ? (
+                      <View style={styles.pedaco}>
+                        <Mark size={13} color="textSecondary" />
+                        <ThemedText type="caption" themeColor="textSecondary">
+                          WhatsApp
+                        </ThemedText>
+                      </View>
+                    ) : null}
+
+                    <ThemedText
+                      type="caption"
+                      themeColor="textSecondary"
+                      style={[temOutroMeta ? styles.quando : null, tabular]}>
+                      {quando}
+                    </ThemedText>
+                  </View>
                 </View>
 
-                {previa ? (
-                  <ThemedText
-                    type="small"
-                    themeColor="textSecondary"
-                    numberOfLines={fontScale >= 1.4 ? 1 : 2}>
-                    {previa}
-                  </ThemedText>
-                ) : null}
-
-                {/* Faixa de metadados com FORMA, não string corrida: pasta é pill, checklist é
-                    ícone + contagem, origem é ícone, e a data vai encostada à direita. */}
-                <View style={styles.meta}>
-                  {folderName ? (
-                    <View style={[styles.pilulaPasta, { backgroundColor: theme.accentSoft }]}>
-                      <ThemedText themeColor="tint" style={styles.pilulaTexto}>
-                        {folderName}
-                      </ThemedText>
-                    </View>
-                  ) : null}
-
-                  {contagem ? (
-                    <View style={styles.pedaco}>
-                      <Icon name="checkmark.circle" size={13} color="textSecondary" />
-                      <ThemedText type="caption" themeColor="textSecondary" style={tabular}>
-                        {contagem}
-                      </ThemedText>
-                    </View>
-                  ) : null}
-
-                  {/* A espiral marca o que a IA registrou — o quinto papel previsto em §2b. Um
-                      balão de conversa diria "veio de um chat"; a marca diz "isto entrou pelo
-                      ProOps", que é a informação que importa. */}
-                  {note.source === 'whatsapp' ? (
-                    <View style={styles.pedaco}>
-                      <Mark size={13} color="textSecondary" />
-                      <ThemedText type="caption" themeColor="textSecondary">
-                        WhatsApp
-                      </ThemedText>
-                    </View>
-                  ) : null}
-
-                  <ThemedText
-                    type="caption"
-                    themeColor="textSecondary"
-                    style={[temOutroMeta ? styles.quando : null, tabular]}>
-                    {quando}
-                  </ThemedText>
-                </View>
-              </View>
-
-              {/* ⚠️ A alça é COLUNA do cartão, irmã do trilho — não um ícone na linha do título.
-                  Dentro da `cabeca` ela dividia a fileira com o pin (e com o negativo de margem
-                  os dois se encavalavam), e o alvo de toque ficava do tamanho de uma linha de
-                  texto. Como coluna ela tem a altura inteira do cartão e nunca colide. */}
-              {drag ? <Alca gesture={drag} /> : null}
+                {/* ⚠️ A alça é COLUNA do cartão, irmã do conteúdo — não um ícone na linha do título.
+                    Dentro da `cabeca` ela dividia a fileira com o pin (e com o negativo de margem
+                    os dois se encavalavam), e o alvo de toque ficava do tamanho de uma linha de
+                    texto. Como coluna ela tem a altura inteira do cartão e nunca colide. */}
+                {drag ? <Alca gesture={drag} /> : null}
+              </PaletaTingida>
             </View>
           )}
         </Pressable>
@@ -271,8 +265,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
   },
-  /** O trilho sangra de topo a base porque é IDENTIDADE do cartão, não um ponto ao lado dele. */
-  trilho: { width: 3, alignSelf: 'stretch' },
   conteudo: { flex: 1, gap: Space.xs + 2, padding: Space.lg },
   cabeca: { flexDirection: 'row', alignItems: 'flex-start', gap: Space.sm },
   meta: { flexDirection: 'row', alignItems: 'center', gap: Space.md, marginTop: 2 },

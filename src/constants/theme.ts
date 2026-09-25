@@ -200,6 +200,9 @@ export const Colors = {
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
+/** A paleta como a tela a lê: os mesmos nomes, qualquer valor (a nota colorida troca alguns). */
+export type Palette = Record<ThemeColor, string>;
+
 /**
  * **Plus Jakarta Sans**, uma família só (16/09/2026, mundo Suave).
  *
@@ -261,21 +264,22 @@ export const MaxContentWidth = 800;
  *
  * ## Por que oito cores não quebram "um accent só"
  *
- * Elas são **conteúdo do usuário**, não estado da interface, e vivem em geometria fechada: o
- * trilho de 3px na borda do cartão e o ladrilho do ícone da pasta. Nunca pintam texto, superfície
- * de card, botão ou ícone de ação. É a mesma fronteira que liberou a cor do emissor DENTRO da
- * forma de um cartão de crédito.
+ * Elas são **conteúdo do usuário**, não estado da interface: pintam o cartão da nota e da pasta,
+ * e o editor da nota — nunca texto, botão ou ícone de ação. É a mesma fronteira que liberou a cor
+ * do emissor DENTRO da forma de um cartão de crédito. Até 25/09/2026 eram só um trilho de 3px e o
+ * ladrilho do ícone da pasta, e o dono do produto recusou: não identificavam nada de relance. O
+ * fundo sai de `design/note-surface.ts` (mistura com a superfície, contraste medido em teste).
  *
  * ⚠️ **Nenhum dos oito é igual a `tint`, `danger` ou `warning`.** Reaproveitar o verde do accent
  * faria uma nota colorida ler como "selecionada"; reaproveitar o vermelho faria ler como erro —
  * e a cor semântica é a última alavanca de cor que este design tem.
  *
  * Os valores são tom 40 (claro) e tom 80 (escuro) do Material 3, a mesma régua com que `danger`
- * (`#BA1A1A` / `#FFB4AB`) foi construído: contraste suficiente para o trilho existir nos dois
- * temas sem virar um bloco de tinta.
+ * (`#BA1A1A` / `#FFB4AB`) foi construído. São a TINTA cheia (disco, anel da amostra); o fundo do
+ * cartão é ela misturada com a superfície.
  *
  * `violeta` está na lista de propósito. A regra «se um dia a cor voltar, que não seja roxo» vale
- * para o ACCENT do app — uma escolha do usuário num trilho de 3px não lê como marca de banco.
+ * para o ACCENT do app — uma escolha do usuário no cartão da nota dela não lê como marca de banco.
  */
 export const NoteColors = {
   light: {

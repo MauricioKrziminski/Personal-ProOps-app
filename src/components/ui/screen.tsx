@@ -21,6 +21,7 @@ import { fecharDeslizavelAberto } from '@/components/ui/deslizavel';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 
+import { IOS_26_OU_MAIS } from '@/constants/platform';
 import { MaxContentWidth } from '@/constants/theme';
 import { bottomPillInset, rootContentMaxWidth } from '@/design/adaptive-window';
 import { useAppHeaderHeight } from '@/components/ui/app-header';
@@ -105,6 +106,12 @@ interface ScreenProps {
   contentStyle?: StyleProp<ViewStyle>;
   /** Let a tab root use a bounded tablet canvas; pushed routes keep their native scroll root. */
   wide?: boolean;
+  /**
+   * Fundo da tela no lugar do do tema — o editor de uma nota colorida (25/09/2026). Pinta também
+   * o header quando ele é OPACO (Android e iOS < 26); no iOS 26 o header é vidro e o fundo passa
+   * por baixo dele sozinho. `undefined` volta ao fundo do tema, header incluído.
+   */
+  background?: string;
 }
 
 /**
@@ -134,6 +141,7 @@ export function Screen({
   contentStyle,
   wide = false,
   search,
+  background: fundo,
 }: ScreenProps) {
   const theme = useTheme();
   const { width } = useAdaptiveWindow();
@@ -151,7 +159,7 @@ export function Screen({
     },
   });
 
-  const background = grouped ? theme.groupedBackground : theme.background;
+  const background = fundo ?? (grouped ? theme.groupedBackground : theme.background);
   /**
    * No Android a raiz de aba precisa reservar a altura da `PillTabBar`, que é absoluta e
    * desenha POR CIMA do conteúdo. `topBar` é o sinal de que esta é uma raiz de aba — telas
@@ -213,7 +221,15 @@ export function Screen({
     if (!topBar) {
       return (
         <>
-          <Stack.Screen options={{ contentStyle: { backgroundColor: background } }} />
+          <Stack.Screen
+            options={{
+              contentStyle: { backgroundColor: background },
+              // Só o header OPACO recebe cor; o do iOS 26 é translúcido e não pode deixar de ser.
+              // O mesmo fundo da tela — `headerStyle` da tela SUBSTITUI o da raiz, então sem cor
+              // própria ele repete o `background` do tema, como a raiz (`app/_layout.tsx`).
+              headerStyle: IOS_26_OU_MAIS ? undefined : { backgroundColor: background },
+            }}
+          />
           {faixa && !buscaNoHeader ? (
             // Android: não há header nativo procurando o scroll, a lista pode morar numa coluna.
             <View style={styles.root}>
