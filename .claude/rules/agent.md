@@ -306,6 +306,20 @@ pergunta.** Deduzir é a terceira coisa, e ela não existe.
 | campo obrigatório faltando | pergunta ("Para cadastrar X, informe Y. **Ainda não salvei nada.**") |
 | dois itens candidatos | `interrupt()` com a lista — já era assim |
 
+⚠️ **Nome dito sem maiúscula e sem acento é o MESMO nome** (25/09/2026). No celular se digita
+"gas", "nubank", "carro"; o `ilike` e o `name = %s` do catálogo não achavam "conta de gás",
+"Nubank", "Carro" — e a pessoa via "não encontrei" para o que existe. Toda busca por nome passa
+por `extensions.unaccent` (a extensão da `0038`) e o catálogo compara
+`unaccent(lower(nome))`; `tests/test_busca_sem_acento.py` quebra se um `ilike` nascer sem ela. O
+"não encontrei" de cadastro e de conta citada LISTA o que existe (cartão fora da lista onde ele
+seria recusado), e a frase do SIM usa o nome como está no app, não como foi digitado.
+
+⚠️ **A resposta a uma pergunta de cadastro chega ao roteador COMO resposta.** O cadastro
+incompleto ia ao roteador dentro do envelope do texto e sem dizer que houve pergunta: "nubank"
+respondendo "Qual conta foi usada para pagar a prestação?" virou "pagar qual?" com nove opções.
+Hoje ele vai fora do envelope, com "Você perguntou ao usuário: …" — a mesma frase que o nó de
+cadastros já recebia (`scripts/probe_resposta_ao_cadastro.py`, 4/4 no Gemini real).
+
 ⚠️ **`resolve_account` devolvia `None` para as três situações e ninguém distinguia.**
 Os chamadores faziam `resolve_account(...) or default_account(...)`, então "gastei 45
 no bradesco", sem Bradesco cadastrado, gravava na conta padrão — calado. Pior: o ramo
