@@ -459,3 +459,20 @@ async def test_conta_citada_casa_sem_maiuscula_e_o_nao_achei_lista_as_contas(mon
     assert "*itau*" in texto and "Nubank" in texto and "Poupança" in texto
     lista = next(s for s in consultas if "from public.accounts" in s and "order by" in s)
     assert "type <> 'credit_card'" in lista, "pagar dívida com cartão seria recusado: ele nem aparece"
+
+
+@pytest.mark.asyncio
+async def test_data_na_frase_do_sim_sai_no_formato_brasileiro(fixed_debt):
+    """A frase do SIM escrevia "data do pagamento: 2026-09-25" — ISO é como o dado é guardado."""
+    proposta = await resources.prepare(fixed_debt, action("resource_pay", amount_cents=147000, paid_at="2026-09-08"))
+    assert "data do pagamento: 08/09/2026" in proposta["summary"]
+    assert "2026-09-08" not in proposta["summary"]
+
+
+@pytest.mark.asyncio
+async def test_frase_do_sim_usa_o_nome_cadastrado_nao_o_digitado(fixed_debt):
+    """Achado sem maiúscula ("carro"), o SIM diz o nome como está no app ("Carro")."""
+    proposta = await resources.prepare(fixed_debt, ResourceAction(
+        type="resource_pay", resource="debts", name="carro",
+        fields=[ResourceField(name="amount_cents", value="147000")]))
+    assert "dívida/financiamento Carro" in proposta["summary"]

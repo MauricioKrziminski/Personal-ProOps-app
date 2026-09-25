@@ -881,6 +881,9 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         if len(rows) != 1:
             _error(_nao_achei(action, rows))
         old = rows[0]
+        # A frase do SIM diz o nome como está no app, não como foi digitado ("carro" → "Carro").
+        if action.resource not in {"notes", "folders", "budgets"} and old.get(identity):
+            prepared["nome_real"] = str(old[identity])
         if action.resource == "folders" and isinstance(values.get("tags"), list):
             # ⚠️ **Tag SOMA, não substitui.** "Põe a tag urgente na pasta" é
             # acrescentar; gravar só o que veio na frase apagaria em silêncio as
@@ -1207,6 +1210,13 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             shown = cents_to_brl(value)
         elif key == "interest_rate_monthly" and value is not None:
             shown = f"{Decimal(str(value)) * 100:g}%".replace(".", ",")
+        elif key == "month" and value:
+            # O mês do orçamento: "09/2026", nunca o dia 1º em ISO.
+            shown = f"{str(value)[5:7]}/{str(value)[:4]}"
+        elif key in {"paid_at", "started_at", "acquired_at", "deadline", "first_due_date",
+                     "next_due_date"} and value:
+            # A frase do SIM é lida pela pessoa: dd/mm/aaaa, como no app (ISO é armazenamento).
+            shown = format_date_br(str(value))
         elif (action.resource, key) in ENUMS:
             shown = ROTULO_DE_ENUM.get(str(value), value)
         elif key in {"archived_at", "deleted_at"}:
@@ -1227,7 +1237,8 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         )
     if prepared.get("proxima_label"):
         details.append(f"próxima parcela: {prepared['proxima_label']}")
-    prepared["summary"] = f"{verb} {LABELS[action.resource]} {action.name or ''}".rstrip() + (
+    nome = prepared.pop("nome_real", None) or action.name or ""
+    prepared["summary"] = f"{verb} {LABELS[action.resource]} {nome}".rstrip() + (
         " — " + "; ".join(details) if details else ""
     )
     if prepared.get("calculation_mode") == "fixed_installments":
