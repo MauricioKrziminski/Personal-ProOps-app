@@ -1258,3 +1258,14 @@ test('Botão do painel do arrasto é Tap simultâneo ao observador do dedo (iOS 
   assert.match(fonte, /Gesture\.Tap\(\)\s*\.simultaneousWithExternalGesture\(dedo\)/);
   assert.doesNotMatch(fonte, /<Pressable\b/, 'o painel não volta ao Pressable');
 });
+
+test('O item levantado no reordenar tem o raio do card: a sombra não desenha um quadrado', () => {
+  // 25/09/2026: segurar uma pasta mostrava bordas retas atrás do ladrilho. A sombra (`boxShadow`)
+  // mora no invólucro do `Reorderable`, que não tinha raio — ela contornava a CAIXA quadrada, e
+  // os quatro cantos (fora do raio do card, dentro do quadrado) ficavam sem sombra.
+  const fonte = readFileSync(join(SRC, 'components/ui/reorderable.tsx'), 'utf8');
+  const camada = fonte.slice(fonte.indexOf('const camada'), fonte.indexOf(': { zIndex: 1 }'));
+  assert.match(camada, /boxShadow/);
+  assert.match(camada, /borderRadius: Radius\.md/, 'o levantado tem o raio dos cards que ele carrega');
+  assert.match(camada, /borderCurve: 'continuous'/);
+});

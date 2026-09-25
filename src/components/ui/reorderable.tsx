@@ -33,7 +33,7 @@ import {
   slotSobODedo,
   velocidadeAutoScroll,
 } from '@/design/reorder-math';
-import { Elevation, Motion, Space } from '@/design/tokens';
+import { Elevation, Motion, Radius, Space } from '@/design/tokens';
 import { useScheme } from '@/hooks/use-theme';
 
 /**
@@ -590,8 +590,14 @@ function Celula({
    * (não por quadro), `boxShadow` é string e `zIndex` não interpola — animá-los seria pagar
    * ponte por nada e arriscar um valor intermediário sem sentido.
    */
+  /*
+    ⚠️ **O raio é o do card que o item carrega** (25/09/2026). A sombra contorna a CAIXA deste
+    invólucro: sem raio ela era um quadrado em volta do cartão arredondado, e os quatro cantos —
+    dentro do quadrado, fora do raio — ficavam sem sombra, desenhando bordas retas ao segurar uma
+    pasta. Os dois que reordenam (notas e pastas) desenham cards em `Radius.md`.
+  */
   const camada: ViewStyle = ativo
-    ? { zIndex: 20, boxShadow: Elevation[scheme].overlay }
+    ? { zIndex: 20, boxShadow: Elevation[scheme].overlay, borderRadius: Radius.md, borderCurve: 'continuous' }
     : { zIndex: 1 };
 
   // Na grade, `left/top` ficam em ZERO: a posição inteira é transform (ver `movimento`).
