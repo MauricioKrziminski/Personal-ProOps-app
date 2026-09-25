@@ -2,6 +2,7 @@ import { useNavigation, useSegments } from 'expo-router';
 import { useLayoutEffect } from 'react';
 
 import AppTabs from '@/components/app-tabs';
+import { useBuscarConversasAntes } from '@/hooks/use-agent-chat';
 import { tituloDaAba } from '@/lib/abas';
 
 export default function TabsLayout() {
@@ -12,5 +13,7 @@ export default function TabsLayout() {
   useLayoutEffect(() => {
     navigation.setOptions({ title: titulo });
   }, [navigation, titulo]);
+  // As abas só existem com sessão: é o lugar de adiantar o que a aba Agente vai pedir.
+  useBuscarConversasAntes();
   return <AppTabs />;
 }

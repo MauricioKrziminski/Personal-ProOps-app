@@ -1451,3 +1451,14 @@ test('o conteúdo que substitui o esqueleto nasce no lugar, sem voltar ao invis�
   assert.match(entrada, /export function useRelogioDeEntrada\(atrasoMs: number, duracaoMs: number, nascerNoLugar = false\)/);
   assert.match(entrada, /if \(geracao === noLugarNaGeracao\) \{\s*relogio\.set\(1\);\s*return;/);
 });
+
+test('as conversas do Agente são buscadas ao entrar na conta, com as MESMAS opções da aba', () => {
+  // 25/09/2026: *"eu abro a tela de agente e ele já mostra o campo de digitar e os atalhos, aí
+  // passa um tempo depois que ele mostra o recente"*. O agente dorme no Cloud Run; buscar só ao
+  // abrir a aba era esperar ele acordar. Duas cópias das opções divergiriam (chave, página).
+  const abas = readFileSync(join(SRC, 'app/(tabs)/_layout.tsx'), 'utf8');
+  assert.match(abas, /useBuscarConversasAntes\(\);/);
+  const hook = readFileSync(join(SRC, 'hooks/use-agent-chat.ts'), 'utf8');
+  assert.match(hook, /useInfiniteQuery\(\{ \.\.\.conversasQuery, enabled: isAgentConfigured \}\)/);
+  assert.match(hook, /prefetchInfiniteQuery\(conversasQuery\)/);
+});

@@ -8,6 +8,7 @@
  */
 
 import {
+  infiniteQueryOptions,
   useInfiniteQuery,
   useMutation,
   useQueryClient,
@@ -54,17 +55,32 @@ const PLAN_STATUS = ['plan-status'] as const;
 // leitura
 // ---------------------------------------------------------------------------
 
+/** A lista de conversas, uma vez só: o hook e a busca antecipada leem as MESMAS opções. */
+const conversasQuery = infiniteQueryOptions({
+  queryKey: agentKeys.conversations,
+  // A lista não precisa refazer GET em toda ida e volta entre abas. Um turno,
+  // renomeação ou exclusão já invalida a chave; puxar atualiza manualmente.
+  staleTime: 120_000,
+  initialPageParam: null as string | null,
+  queryFn: ({ pageParam }) => listConversations(pageParam),
+  getNextPageParam: (ultima: Page<AgentConversation>) => ultima.next_cursor,
+});
+
 export function useAgentConversations() {
-  return useInfiniteQuery({
-    queryKey: agentKeys.conversations,
-    enabled: isAgentConfigured,
-    // A lista não precisa refazer GET em toda ida e volta entre abas. Um turno,
-    // renomeação ou exclusão já invalida a chave; puxar atualiza manualmente.
-    staleTime: 120_000,
-    initialPageParam: null as string | null,
-    queryFn: ({ pageParam }) => listConversations(pageParam),
-    getNextPageParam: (ultima: Page<AgentConversation>) => ultima.next_cursor,
-  });
+  return useInfiniteQuery({ ...conversasQuery, enabled: isAgentConfigured });
+}
+
+/**
+ * Busca as conversas assim que a pessoa entra na conta (25/09/2026). Elas vêm do agente no Cloud
+ * Run, que dorme sem uso (`min_instances = 0`): buscadas só ao abrir a aba, "Recentes" chegava
+ * segundos depois do compositor e dos atalhos. Buscadas antes, a aba abre com elas — e o pedido
+ * ainda acorda o servidor para a primeira mensagem.
+ */
+export function useBuscarConversasAntes() {
+  const client = useQueryClient();
+  useEffect(() => {
+    if (isAgentConfigured) void client.prefetchInfiniteQuery(conversasQuery);
+  }, [client]);
 }
 
 /** De quanto em quanto tempo o histórico é relido enquanto um turno roda. */
