@@ -325,6 +325,20 @@ remanejar número — era dizer, na linha, para onde ela vai.
 está agrupada por natureza, e abrir o recorte na mesma régua dizia a mesma coisa duas vezes na
 mesma tela. Por meio é o bloco "Saídas" da planilha do dono do produto.
 
+## Ciclo FECHADO conta só o que aconteceu (`20260925130000`)
+
+⚠️ **Conta pendente num ciclo que já fechou não é saída dele.** `cash_events` contava o aluguel
+que venceu em 01/09 e não foi pago como saída do ciclo 11/08–10/09 — e o ramo 4 já o trazia para
+o ciclo atual como "(atrasado)". Na tela, "comecei + entrou − saiu" não chegava ao "sobrou na
+conta" (R$ 2.014,30 de diferença no staging) e `linha_do_tempo.sql` falhava. Hoje, em janela com
+`fim < hoje`, só entra o quitado (ramos 1 e 3) e a recorrente projetada da regra não inventa
+ocorrência (ramo 6); o "faltou pagar" soma a conta pendente fora de cartão vencida até o fim do
+ciclo, como já somava a fatura em aberto. Ciclo aberto e "livre" não mudam.
+`supabase/tests/ciclo_fechado.sql` prende as três coisas sem depender do dado do banco.
+
+A lista do ciclo fechado deixa de mostrar esses itens (como já não mostrava a fatura atrasada):
+eles aparecem no ciclo atual como atrasados e somam no "faltou pagar".
+
 ## A fatura ATRASADA é atômica no ciclo; a do ciclo abre
 
 ⚠️ **A tela do ciclo abria TODA fatura nas compras dela** (15/09/2026), e o sintoma foi imediato:
