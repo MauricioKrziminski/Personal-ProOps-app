@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import Animated, { FadeInDown, FadeOutDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
@@ -156,6 +157,15 @@ function ToastView({ toast, onDismiss, onAltura }: { toast: Toast; onDismiss: ()
   const faixa = { info: theme.tintFill, success: theme.onHeroSuccess, error: theme.onHeroDanger };
 
   return (
+    /*
+      ⚠️ **O toast sobe junto com o teclado** (25/09/2026). No pé da tela ele nascia ATRÁS do
+      teclado aberto: salvar um formulário que o banco recusava parecia "não fazer nada" — o motivo
+      estava lá, escondido. Aberto o teclado, ele fica logo acima dele.
+    */
+    <KeyboardStickyView
+      pointerEvents="box-none"
+      style={StyleSheet.absoluteFill}
+      offset={{ opened: insets.bottom + Space.xxl - Space.md }}>
     <Animated.View
       entering={FadeInDown.duration(Motion.duration.base).easing(Motion.easing.out)}
       exiting={FadeOutDown.duration(Motion.duration.exit)}
@@ -192,6 +202,7 @@ function ToastView({ toast, onDismiss, onAltura }: { toast: Toast; onDismiss: ()
         )}
       </View>
     </Animated.View>
+    </KeyboardStickyView>
   );
 }
 
