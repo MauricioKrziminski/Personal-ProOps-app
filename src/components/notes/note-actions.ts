@@ -55,3 +55,30 @@ export const FOLDER_ICONS: { name: string; label: string }[] = [
 export function notesLabel(count: number): string {
   return `${count} nota${count === 1 ? '' : 's'}`;
 }
+
+/**
+ * A confirmação de apagar uma pasta, uma vez só: o toque longo no ladrilho e "Gerenciar pastas"
+ * perguntam igual. Apagar a pasta nunca apaga nota nem subpasta (`on delete set null`): as notas
+ * ficam em "Sem pasta" — e a frase diz isso antes do toque.
+ */
+export function confirmarApagarPasta(
+  // `null` quando a contagem não é conhecida: a pasta ARQUIVADA não tem (`note_folder_counts()`
+  // exclui arquivada), e dizer "vazia" ali seria mentir.
+  folder: { name: string; notes_count: number | null },
+  apagar: () => void
+) {
+  actionSheet(
+    {
+      title: `Apagar «${folder.name}»?`,
+      message:
+        folder.notes_count === null
+          ? 'As notas dela ficam em "Sem pasta".'
+          : folder.notes_count === 0
+            ? 'A pasta está vazia.'
+            : `As ${notesLabel(folder.notes_count)} ficam em "Sem pasta".`,
+      options: ['Apagar pasta'],
+      destructiveIndex: 0,
+    },
+    apagar
+  );
+}

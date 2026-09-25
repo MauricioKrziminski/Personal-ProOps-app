@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[] } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -243,7 +243,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@/hooks/use-note-sort') return { SORT_LABEL: {}, useNoteSort: () => ['manual', () => {}] };
       if (name === '@/components/notes/use-folder-menu') return { useFolderMenu: () => () => {} };
       if (name === '@/lib/rrule-text') return { describeRRule: () => 'todo mês' };
-      if (name === '@/hooks/use-archived-folders') return { useArchivedFolders: () => ({ ...query, isSuccess: true, data: [] }) };
+      if (name === '@/hooks/use-archived-folders') return { useArchivedFolders: () => ({ ...query, isSuccess: true, data: options.pastasArquivadas ?? [] }) };
       if (name === '@/hooks/use-notes') return new Proxy({
         useNoteFolders: () => ({ ...query, isSuccess: true, data: options.folders ?? [] }),
         useNotesList: () => ({ ...query, isSuccess: true, data: { pages: [options.notes ?? []] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }),
@@ -255,7 +255,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
         useRenameAgentConversation: () => mutation('renameConversation'),
         useDeleteAgentConversation: () => mutation('deleteConversation'),
       };
-      if (name === '@/components/notes/note-actions') return { actionSheet: () => {}, FOLDER_ICONS: [], notesLabel: (n: number) => `${n} notas`, symbol: () => 'folder' };
+      if (name === '@/components/notes/note-actions') return { actionSheet: () => {}, confirmarApagarPasta: (pasta: any, apagar: () => void) => { avisos.push(`apagar ${pasta.name}: ${pasta.notes_count}`); confirmations.push(apagar); }, FOLDER_ICONS: [], notesLabel: (n: number) => `${n} notas`, symbol: () => 'folder' };
       if (name === '@/design/note-colors') return { noteInk: () => null, notePalette: (cor: string | null) => (cor ? { surface: `fundo-${cor}`, backgroundSelected: `forte-${cor}`, cardBorder: `borda-${cor}`, accentSoft: `forte-${cor}` } : null) };
       if (name === '@/hooks/use-search') return {
         useGlobalSearch: (_q: string, limite?: number) => {
@@ -1749,6 +1749,28 @@ test('Notas arquivadas: com mais no servidor, "Ver mais" busca a próxima págin
   assert.equal(mais.props.restantes, null);
   ui.interact(() => mais.props.onPress());
   assert.ok(ui.refetches.includes('proxima-pagina'));
+});
+
+test('Arquivadas: segurar a pasta apaga (com confirmação), segurar a nota manda à lixeira', () => {
+  // 25/09/2026: *"Eu não consigo apagar uma pasta?"* — arquivada, ela só voltava.
+  const ui = screen('src/app/notes/archived.tsx', {
+    notes: [{ id: 'n1', content: 'Reunião', archived_at: '2026-09-20T10:00:00Z', pinned: false, color: null }],
+    pastasArquivadas: [{ id: 'f1', name: 'viagem', icon: 'folder', color: null, pinned: false, archived_at: '2026-09-20T10:00:00Z', tags: [], notes_count: 0 }],
+  });
+  const linha = (titulo: string) => ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === titulo);
+  ui.interact(() => linha('viagem').props.onLongPress());
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Desarquivar', 'Apagar']);
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Apagar').onPress());
+  assert.equal(ui.writes.length, 0, 'nada sai sem confirmar');
+  assert.equal(ui.avisos.at(-1), 'apagar viagem: null', 'arquivada não sabe quantas notas tem: não diz "vazia"');
+  ui.interact(() => ui.confirmations.at(-1)());
+  assert.deepEqual(ui.writes.at(-1), { operation: 'useDeleteFolder', value: 'f1' });
+
+  ui.actions.length = 0;
+  ui.interact(() => linha('Reunião').props.onLongPress());
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Desarquivar', 'Lixeira']);
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Lixeira').onPress());
+  assert.deepEqual(ui.writes.at(-1), { operation: 'useTrashNote', value: 'n1' });
 });
 
 test('Hoje: "Agora" com muito atrasado mostra aos poucos, com "Ver mais"', () => {

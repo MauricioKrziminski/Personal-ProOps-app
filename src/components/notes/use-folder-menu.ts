@@ -2,9 +2,9 @@ import { useCallback } from 'react';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
-import { actionSheet, notesLabel } from '@/components/notes/note-actions';
+import { actionSheet, confirmarApagarPasta, notesLabel } from '@/components/notes/note-actions';
 import { useToast } from '@/components/ui/toast';
-import { useUpdateFolder, type NoteFolder } from '@/hooks/use-notes';
+import { useDeleteFolder, useUpdateFolder, type NoteFolder } from '@/hooks/use-notes';
 
 /**
  * O menu do LADRILHO de pasta — o que o toque longo abre quando o dedo não anda.
@@ -24,6 +24,7 @@ import { useUpdateFolder, type NoteFolder } from '@/hooks/use-notes';
 export function useFolderMenu({ onColor }: { onColor: (folder: NoteFolder) => void }) {
   const toast = useToast();
   const updateFolder = useUpdateFolder();
+  const deleteFolder = useDeleteFolder();
 
   return useCallback(
     (folder: NoteFolder) => {
@@ -31,7 +32,10 @@ export function useFolderMenu({ onColor }: { onColor: (folder: NoteFolder) => vo
         {
           title: folder.name,
           message: notesLabel(folder.notes_count),
-          options: [folder.pinned ? 'Desafixar' : 'Fixar', 'Cor', 'Arquivar', 'Abrir'],
+          // Apagar mora AQUI também (25/09/2026, *"Eu não consigo apagar uma pasta?"*): só existia
+          // em "Gerenciar pastas", longe do ladrilho que a pessoa segura. Por último, destrutivo.
+          options: [folder.pinned ? 'Desafixar' : 'Fixar', 'Cor', 'Arquivar', 'Abrir', 'Apagar'],
+          destructiveIndex: 4,
         },
         (i) => {
           if (i === 0) {
@@ -60,10 +64,17 @@ export function useFolderMenu({ onColor }: { onColor: (folder: NoteFolder) => vo
             );
           } else if (i === 3) {
             router.push(`/notes/folder/${folder.id}`);
+          } else if (i === 4) {
+            confirmarApagarPasta(folder, () => {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              deleteFolder.mutate(folder.id, {
+                onError: () => toast({ message: 'Não deu para apagar a pasta.', tone: 'error' }),
+              });
+            });
           }
         }
       );
     },
-    [onColor, updateFolder, toast]
+    [onColor, updateFolder, deleteFolder, toast]
   );
 }

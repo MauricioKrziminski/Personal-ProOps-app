@@ -35,7 +35,7 @@ import {
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 import { normalizeFolderName } from '@/lib/search';
-import { actionSheet, FOLDER_ICONS, notesLabel, symbol } from '@/components/notes/note-actions';
+import { actionSheet, confirmarApagarPasta, FOLDER_ICONS, notesLabel, symbol } from '@/components/notes/note-actions';
 import { ColorPicker } from '@/components/notes/color-picker';
 import { TagPicker } from '@/components/notes/tag-picker';
 import { noteInk } from '@/design/note-colors';
@@ -136,24 +136,13 @@ export default function FoldersScreen() {
   };
 
   const confirmDelete = (folder: NoteFolder) => {
-    actionSheet(
-      {
-        title: `Apagar «${folder.name}»?`,
-        message:
-          folder.notes_count === 0
-            ? 'A pasta está vazia.'
-            : `As ${notesLabel(folder.notes_count)} ficam em "Sem pasta".`,
-        options: ['Apagar pasta'],
-        destructiveIndex: 0,
-      },
-      () => {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        if (editing?.id === folder.id) reset();
-        deleteFolder.mutate(folder.id, {
-          onError: () => toast({ message: 'Não deu para apagar a pasta.', tone: 'error' }),
-        });
-      }
-    );
+    confirmarApagarPasta(folder, () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      if (editing?.id === folder.id) reset();
+      deleteFolder.mutate(folder.id, {
+        onError: () => toast({ message: 'Não deu para apagar a pasta.', tone: 'error' }),
+      });
+    });
   };
 
   /**

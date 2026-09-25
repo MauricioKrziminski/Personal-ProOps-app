@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
-import { symbol } from '@/components/notes/note-actions';
+import { confirmarApagarPasta, symbol } from '@/components/notes/note-actions';
 import { EmptyState } from '@/components/ui/empty-state';
 import { VerMais } from '@/components/ui/ver-mais';
 import { Icon } from '@/components/ui/icon';
@@ -17,7 +17,10 @@ import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Space } from '@/design/tokens';
 import {
+  useDeleteFolder,
   useNotesList,
+  useRestoreNote,
+  useTrashNote,
   useUpdateFolder,
   useUpdateNote,
   type Note,
@@ -25,6 +28,7 @@ import {
 } from '@/hooks/use-notes';
 import { useArchivedFolders } from '@/hooks/use-archived-folders';
 import { relativeBR } from '@/lib/dates';
+import { showItemActions } from '@/lib/item-actions';
 import { noteTitle } from '@/lib/search';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { transicaoDeLayout } from '@/components/motion/transicao';
@@ -55,6 +59,9 @@ export default function ArchivedScreen() {
 
   const updateNote = useUpdateNote();
   const updateFolder = useUpdateFolder();
+  const deleteFolder = useDeleteFolder();
+  const trash = useTrashNote();
+  const restore = useRestoreNote();
 
   const listaNotas = useMemo(() => notas.data?.pages.flat() ?? [], [notas.data]);
   const listaPastas = pastas.data ?? [];
@@ -83,6 +90,54 @@ export default function ArchivedScreen() {
       }
     );
   };
+
+  /*
+    Segurar a linha abre o resto (25/09/2026, *"Eu não consigo apagar uma pasta?"*): arquivada,
+    ela só sabia voltar. A pasta se apaga (com a mesma confirmação do ladrilho), e a nota vai à
+    lixeira com "Desfazer", como na aba Notas — apagar de vez continua só na Lixeira.
+  */
+  const acoesDaPasta = (f: NoteFolder) =>
+    showItemActions(f.name, [
+      { label: 'Desarquivar', icon: 'arrow.uturn.backward', onPress: () => desarquivarPasta(f) },
+      {
+        label: 'Apagar',
+        icon: 'trash',
+        destructive: true,
+        onPress: () =>
+          confirmarApagarPasta({ name: f.name, notes_count: null }, () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            deleteFolder.mutate(f.id, {
+              onError: () => toast({ message: 'Não deu para apagar a pasta.', tone: 'error' }),
+            });
+          }),
+      },
+    ]);
+
+  const acoesDaNota = (n: Note) =>
+    showItemActions(noteTitle(n.content) || 'Sem título', [
+      { label: 'Desarquivar', icon: 'arrow.uturn.backward', onPress: () => desarquivarNota(n) },
+      {
+        label: 'Lixeira',
+        icon: 'trash',
+        destructive: true,
+        onPress: () =>
+          trash.mutate(n.id, {
+            onSuccess: () =>
+              toast({
+                message: 'Nota na lixeira.',
+                tone: 'success',
+                action: {
+                  label: 'Desfazer',
+                  onPress: () =>
+                    restore.mutate(n.id, {
+                      onError: () => toast({ message: 'Não deu para desfazer.', tone: 'error' }),
+                    }),
+                },
+              }),
+            onError: () => toast({ message: 'Não deu para apagar a nota.', tone: 'error' }),
+          }),
+      },
+    ]);
 
   const archiveList = (
     <>
@@ -128,6 +183,7 @@ export default function ArchivedScreen() {
                     accessibilityLabel={`${f.name}, arquivada`}
                     trailing={<Icon name="arrow.uturn.backward" size="md" color="tint" />}
                     onPress={() => desarquivarPasta(f)}
+                    onLongPress={() => acoesDaPasta(f)}
                   />
                 </Animated.View>
               ))}
@@ -145,6 +201,7 @@ export default function ArchivedScreen() {
                     accessibilityLabel={`${noteTitle(n.content) || 'Sem título'}, arquivada`}
                     trailing={<Icon name="arrow.uturn.backward" size="md" color="tint" />}
                     onPress={() => desarquivarNota(n)}
+                    onLongPress={() => acoesDaNota(n)}
                   />
                 </Animated.View>
               ))}
