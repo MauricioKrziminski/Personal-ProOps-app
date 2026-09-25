@@ -19,6 +19,14 @@ do $$
 declare
   ws uuid; usr uuid; conta uuid; com_auto uuid; sem_auto uuid;
   n int;
+  -- ⚠️ A compra é datada a partir de HOJE (25/09/2026). Cravada em 15/07, ela servia enquanto a
+  -- fatura SEGUINTE (10/09) ainda não tinha vencido; depois disso a 2ª passada do cron adiava
+  -- aquela outra fatura, com razão, e o passo 3 acusava falta de idempotência sem defeito nenhum.
+  -- `vencida` é o último dia 10 ANTES de hoje; a compra cai no dia 15 do mês anterior a ele, que
+  -- é exatamente a fatura que fecha no dia 3 e vence nesse dia 10 — e a seguinte ainda não venceu.
+  vencida date := (date_trunc('month', current_date - 10) + interval '9 days')::date;
+  compra date := (date_trunc('month', (date_trunc('month', current_date - 10) + interval '9 days')::date
+                  - interval '1 month') + interval '14 days')::date;
 begin
   select id into usr from auth.users limit 1;
   insert into public.workspaces (name, owner_id) values ('teste cron rotativo', usr) returning id into ws;
@@ -34,11 +42,14 @@ begin
     (workspace_id, user_id, name, type, closing_day, due_day, payment_account_id, rotativo_auto)
     values (ws, usr, 'Sem auto', 'credit_card', 3, 10, conta, false) returning id into sem_auto;
 
-  -- Uma compra vencida em cada (a fatura de 15/07 fecha 03/08 e venceu 10/08).
+  -- Uma compra vencida em cada: a fatura dela fecha no dia 3 e venceu em `vencida`.
   insert into public.transactions
     (workspace_id, user_id, account_id, kind, amount_cents, category, description, occurred_at, status)
-  values (ws, usr, com_auto, 'expense', 50000, 'outros', 'Compra A', '2026-07-15', 'pending'),
-         (ws, usr, sem_auto, 'expense', 50000, 'outros', 'Compra B', '2026-07-15', 'pending');
+  values (ws, usr, com_auto, 'expense', 50000, 'outros', 'Compra A', compra, 'pending'),
+         (ws, usr, sem_auto, 'expense', 50000, 'outros', 'Compra B', compra, 'pending');
+  if not exists (select 1 from public.card_invoices where account_id = com_auto and due_date = vencida) then
+    raise exception '0. a compra de % não caiu na fatura que vence em %', compra, vencida;
+  end if;
   update public.card_invoices set status = 'closed'
     where account_id in (com_auto, sem_auto);
 

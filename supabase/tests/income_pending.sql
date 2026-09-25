@@ -86,7 +86,13 @@ begin
     'salário com auto_confirm precisa cair sozinho, senão a regra virou burocracia';
   assert (select status from public.transactions where id = boleto) = 'pending',
     'despesa sem auto_confirm continua esperando baixa, como sempre';
-  assert promovidas = 1, format('deveria promover só o salário; promoveu %s', promovidas);
+  -- ⚠️ A promoção é GLOBAL (todos os workspaces): no staging, onde o cron não roda, sempre há
+  -- outra linha vencida e o total passa de 1 sem nada de errado (25/09/2026). O que se afirma é
+  -- o que ela fez NESTE workspace.
+  assert promovidas >= 1, 'a promoção não rodou';
+  assert (select count(*) from public.transactions where workspace_id = w and status = 'cleared') = 1,
+    format('deveria promover só o salário neste workspace; promoveu %s',
+           (select count(*) from public.transactions where workspace_id = w and status = 'cleared'));
 
   -- ── a regra vale para lançamento AVULSO, não só recorrente ───────────────
   --
