@@ -273,10 +273,15 @@ const styles = StyleSheet.create({
     paddingVertical: Space.half,
     borderRadius: Radius.pill,
   },
-  base: { gap: Space.sm },
+  /*
+    Respiro medido no Android a 384dp × fonte 1,3 (25/09/2026, no Poco X6 Pro do pai do dono do
+    produto): com `sm` o valor da fatura ficava colado no "vence" (sem barra de limite, 8dp entre
+    os dois) e o rótulo "Fatura atual" encostava no número. A face tem vazio no meio para ceder.
+  */
+  base: { gap: Space.md },
   sobreposta: { position: 'absolute', left: 0, right: 0, bottom: 0 },
-  faturaLinha: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: Space.md },
-  fatura: { flex: 1, minWidth: 0, gap: Space.half },
+  faturaLinha: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: Space.lg },
+  fatura: { flex: 1, minWidth: 0, gap: Space.xs },
   fecha: { flexDirection: 'row', alignItems: 'center', gap: Space.xs, paddingBottom: Space.xs },
   rodape: {
     flexDirection: 'row',
