@@ -4,9 +4,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import Animated, { FadeInDown, FadeOutDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { useSegments } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
+import { TAB_BAR_CLEARANCE } from '@/components/ui/pill-tab-bar';
 import { Elevation, Motion, Radius, Space } from '@/design/tokens';
 import { useTheme, useScheme } from '@/hooks/use-theme';
 
@@ -69,10 +71,19 @@ export function useSubirAcimaDoToast(base: number) {
   return useAnimatedStyle(() => ({ transform: [{ translateY: -sobe.get() }] }));
 }
 
-/** Desenha o toast corrente. Vive na raiz e dentro de cada `Sheet`. */
-export function ToastOutlet() {
+/**
+ * Desenha o toast corrente. Vive na raiz e dentro de cada `Sheet`. `acimaDaBarra`: o da raiz, numa
+ * raiz de aba, sobe acima da barra de abas (25/09/2026) — no pé da tela ele cobria a navegação por
+ * 3 s, o que o Material não faz com o snackbar sobre a barra inferior.
+ */
+export function ToastOutlet({ acimaDaBarra = false }: { acimaDaBarra?: boolean }) {
   const { toast, dismiss, medir } = useContext(ToastStateContext);
-  return toast ? <ToastView toast={toast} onDismiss={dismiss} onAltura={medir} /> : null;
+  return toast ? <ToastView toast={toast} onDismiss={dismiss} onAltura={medir} acimaDaBarra={acimaDaBarra} /> : null;
+}
+
+/** Do pé da tela ao pé do toast: acima da barra de abas quando ela está na tela. */
+function peDoToast(inferior: number, acimaDaBarra: boolean) {
+  return inferior + (acimaDaBarra ? TAB_BAR_CLEARANCE : Space.xxl);
 }
 
 /**
@@ -106,6 +117,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [altura, setAltura] = useState(0);
   const insets = useSafeAreaInsets();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // As raízes de aba são as únicas telas com a barra: as empurradas moram fora de `(tabs)`.
+  const naRaizDeAba = useSegments()[0] === '(tabs)';
 
   const show = useCallback((next: Toast) => {
     if (timer.current) clearTimeout(timer.current);
@@ -127,21 +140,31 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo(() => show, [show]);
   const estado = useMemo(() => ({ toast, dismiss, medir: setAltura }), [toast, dismiss]);
   // Do pé da tela até o topo do toast (a mesma conta do `bottom` do `ToastView`), mais uma folga.
-  const ocupa = toast && altura > 0 ? insets.bottom + Space.xxl + altura + Space.sm : 0;
+  const ocupa = toast && altura > 0 ? peDoToast(insets.bottom, naRaizDeAba) + altura + Space.sm : 0;
 
   return (
     <ToastContext.Provider value={value}>
       <ToastStateContext.Provider value={estado}>
         <ToastOcupaContext.Provider value={ocupa}>
           {children}
-          <ToastOutlet />
+          <ToastOutlet acimaDaBarra={naRaizDeAba} />
         </ToastOcupaContext.Provider>
       </ToastStateContext.Provider>
     </ToastContext.Provider>
   );
 }
 
-function ToastView({ toast, onDismiss, onAltura }: { toast: Toast; onDismiss: () => void; onAltura: (altura: number) => void }) {
+function ToastView({
+  toast,
+  onDismiss,
+  onAltura,
+  acimaDaBarra,
+}: {
+  toast: Toast;
+  onDismiss: () => void;
+  onAltura: (altura: number) => void;
+  acimaDaBarra: boolean;
+}) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const scheme = useScheme();
@@ -172,7 +195,7 @@ function ToastView({ toast, onDismiss, onAltura }: { toast: Toast; onDismiss: ()
       exiting={FadeOutDown.duration(Motion.duration.exit)}
       pointerEvents="box-none"
       onLayout={(e) => onAltura(e.nativeEvent.layout.height)}
-      style={[styles.host, { bottom: insets.bottom + Space.xxl }]}>
+      style={[styles.host, { bottom: peDoToast(insets.bottom, acimaDaBarra) }]}>
       <View
         accessibilityLiveRegion="polite"
         style={[
