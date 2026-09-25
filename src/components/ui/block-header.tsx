@@ -15,7 +15,7 @@ export interface BlockHeaderProps {
   title: string;
   /** Contagem ao lado do título. Zero ou ausente não desenha nada (badge é contagem real, §8). */
   count?: number;
-  /** A ação do bloco, em pílula ("Ver todos"; com `icon`, "+ Nova pasta"). */
+  /** A ação do bloco, em pílula ("Ver todos"). */
   action?: AcaoDoBlocoProps;
   /** Etiqueta neutra quando não há ação — a LENTE do número ("por data da compra"). */
   tag?: string;
@@ -24,9 +24,9 @@ export interface BlockHeaderProps {
   /** Controle próprio à direita. Vence `action` e `tag`. */
   trailing?: ReactNode;
   /**
-   * O bloco RECOLHE: o título inteiro vira o alvo (44pt) e ganha a seta depois da contagem. A ação
+   * O bloco RECOLHE: o título inteiro vira o alvo (44pt) e ganha a seta depois da contagem. Uma ação
    * à direita continua um alvo SEPARADO — um dentro do outro, o leitor de tela não alcança o de
-   * dentro. `recolhido` diz o estado; é o caso de "Pastas" com "+ Nova pasta".
+   * dentro. `recolhido` diz o estado; é o caso de "Pastas".
    */
   recolher?: { recolhido: boolean; onToggle: () => void };
 }
@@ -35,16 +35,10 @@ interface AcaoDoBlocoProps {
   label: string;
   onPress: () => void;
   accessibilityLabel?: string;
-  /** Ícone ANTES do rótulo ("+ Nova pasta"); sem ele, a seta depois ("Ver todos ›"). */
-  icon?: React.ComponentProps<typeof Icon>['name'];
 }
 
-/**
- * A pílula de ação de um bloco. Exportada para quem monta o cabeçalho em partes — "Pastas" tem o
- * rótulo que recolhe a grade e, ao lado, "+ Nova pasta", e os dois precisam ser alvos separados
- * (um dentro do outro, o leitor de tela não alcança o de dentro).
- */
-export function AcaoDoBloco({ label, onPress, accessibilityLabel, icon }: AcaoDoBlocoProps) {
+/** A pílula de ação de um bloco ("Ver todos ›"). */
+function AcaoDoBloco({ label, onPress, accessibilityLabel }: AcaoDoBlocoProps) {
   const theme = useTheme();
   const vidro = supportsLiquidGlass();
   return (
@@ -61,11 +55,10 @@ export function AcaoDoBloco({ label, onPress, accessibilityLabel, icon }: AcaoDo
         { backgroundColor: vidro ? 'transparent' : pressed ? theme.backgroundSelected : theme.backgroundElement },
       ]}>
       {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
-      {icon ? <Icon name={icon} size="xs" color="text" /> : null}
       <ThemedText type="caption" style={styles.semEncolher}>
         {label}
       </ThemedText>
-      {icon ? null : <Icon name="chevron.right" size="xs" color="text" />}
+      <Icon name="chevron.right" size="xs" color="text" />
     </Pressable>
   );
 }

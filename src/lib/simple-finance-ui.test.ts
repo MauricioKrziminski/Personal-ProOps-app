@@ -360,6 +360,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     // O "Salvar" do sheet mora no slot `action` do `SheetHeader`, não em `children` — sem esta
     // linha o botão existe na tela e some daqui, que foi o que estas seis asserções viram.
     visit(node.props.action);
+    // A barra das raízes de aba (`AppHeader`) — é nela que mora o "…" da tela.
+    visit(node.props.topBar);
     // O `overlay` do `Screen` é conteúdo renderizado (a folha do "Paguei" na Hoje).
     visit(node.props.overlay);
     // Ação de header é DECLARADA como dado (`actions={[{label, onPress}]}`) e desenhada como
@@ -2259,17 +2261,21 @@ test('Orçamentos: o resumo chegando não segura a tela — só "Sem limite defi
   assert.doesNotMatch(textos, /Sem limite definido/, 'a seção do resumo espera sem texto');
 });
 
-test('Notas: "+ Nova pasta" no cabeçalho de Pastas, com e sem pastas, abre a folha ali mesmo', () => {
-  // 25/09/2026: *"eu tenho que entrar na tela de organizar pasta para criar uma pasta?"*.
+test('Notas: "Nova pasta" no "…" abre a folha ali mesmo, com e sem pastas, e o cabeçalho não leva botão', () => {
+  // 25/09/2026: *"eu tenho que entrar na tela de organizar pasta para criar uma pasta?"* e, com a
+  // pílula no cabeçalho, *"assim fica muito feio, é só colocar adicionar pasta nos três pontos"*.
   const pasta = { id: 'f1', name: 'trabalho', icon: 'folder', color: null, pinned: false, parent_id: null, notes_count: 2, tags: [] };
   for (const folders of [[pasta], []]) {
     const ui = screen('src/app/(tabs)/notes/index.tsx', { folders, notes: [] });
-    const cabecalho = () => ui.nodes().find((n: any) => n.type === 'BlockHeader' && n.props.title === 'Pastas');
-    assert.ok(cabecalho(), `cabeçalho de Pastas com ${folders.length} pasta(s)`);
-    assert.equal(cabecalho().props.action?.label, 'Nova pasta');
+    const cabecalho = ui.nodes().find((n: any) => n.type === 'BlockHeader' && n.props.title === 'Pastas');
+    if (folders.length) assert.equal(cabecalho?.props.action, undefined, 'sem pílula no cabeçalho de Pastas');
+    else assert.equal(cabecalho, undefined, 'sem pasta, nada de título sobre nada');
     const folha = () => ui.nodes().find((n: any) => n.type?.name === 'NovaPastaSheet');
     assert.equal(folha()?.props.visible, false, 'fechada até o toque');
-    ui.interact(() => cabecalho().props.action.onPress());
+    ui.interact((nodes) => nodes.find((n) => n.type === 'HeaderIconButton' && n.props.label === 'Mais opções').props.onPress());
+    const labels = ui.actions.map((a: any) => a.label);
+    assert.ok(labels.includes('Nova pasta') && !labels.includes('Organizar pastas'), labels.join(', '));
+    ui.interact(() => ui.actions.find((a: any) => a.label === 'Nova pasta').onPress());
     assert.equal(folha()?.props.visible, true, 'a folha "Nova pasta" abriu na própria aba');
   }
 });

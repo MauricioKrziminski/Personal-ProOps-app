@@ -312,11 +312,9 @@ export default function NotesScreen() {
             `Agora: ${SORT_LABEL[sort].toLowerCase()}`
           ),
       },
-      {
-        label: 'Organizar pastas',
-        icon: 'folder',
-        onPress: () => router.push('/notes/folders'),
-      },
+      // Criar pasta mora no "…" (25/09/2026): a pílula no cabeçalho de Pastas ficou feia, e sem
+      // pasta nenhuma era um título sobre nada. Organizar segue no menu de cada pasta.
+      { label: 'Nova pasta', icon: 'folder.badge.plus', onPress: () => setCriandoPasta(true) },
       { label: 'Arquivadas', icon: 'archivebox', onPress: () => router.push('/notes/archived') },
       { label: 'Lixeira', icon: 'trash', onPress: () => router.push('/notes/trash') },
     ]);
@@ -545,7 +543,6 @@ export default function NotesScreen() {
               title="Pastas"
               count={pastas.length}
               recolher={{ recolhido: pastasRecolhidas, onToggle: () => setPastasRecolhidas(!pastasRecolhidas) }}
-              action={{ label: 'Nova pasta', icon: 'plus', onPress: () => setCriandoPasta(true) }}
             />
             {pastasRecolhidas ? null : (
             <FolderGrid
@@ -568,17 +565,6 @@ export default function NotesScreen() {
             )}
             {/* Embaixo da grade: acima dela ficaria entre o título "Pastas" e o que ele nomeia. */}
             {!pastasRecolhidas && pastas.length > 1 ? <Dica id="notas-pastas" tela="notas" /> : null}
-          </View>
-        ) : null}
-
-        {/* Sem pasta nenhuma, o bloco é só o cabeçalho com "Nova pasta": criar pasta não pode
-            depender de achar "Organizar pastas" no "…" (25/09/2026). */}
-        {pastas.length === 0 && !procurando && foldersQuery.isSuccess ? (
-          <View style={styles.secao}>
-            <BlockHeader
-              title="Pastas"
-              action={{ label: 'Nova pasta', icon: 'plus', onPress: () => setCriandoPasta(true) }}
-            />
           </View>
         ) : null}
 

@@ -8,7 +8,6 @@ import { ColorPicker } from '@/components/notes/color-picker';
 import { FolderGrid } from '@/components/notes/folder-grid';
 import { FolderPicker } from '@/components/notes/folder-picker';
 import { NovaPastaSheet } from '@/components/notes/nova-pasta';
-import { AcaoDoBloco } from '@/components/ui/block-header';
 import { NoteList } from '@/components/notes/note-list';
 import { useFolderMenu } from '@/components/notes/use-folder-menu';
 import { TagPicker } from '@/components/notes/tag-picker';
@@ -310,17 +309,7 @@ export default function FolderScreen() {
 
             {subpastas.length > 0 ? (
               <View style={styles.secao} onLayout={(e) => setTopoSubpastas(e.nativeEvent.layout.y)}>
-                <SectionHead
-                  title="Subpastas"
-                  inset={false}
-                  action={
-                    // A pílula tem 30 de altura contra os 19 do título: a margem negativa não deixa
-                    // ela afastar o rótulo da grade (§2).
-                    <View style={styles.acaoDoTitulo}>
-                      <AcaoDoBloco label="Nova subpasta" icon="plus" onPress={() => setCriandoSubpasta(true)} />
-                    </View>
-                  }
-                />
+                <SectionHead title="Subpastas" inset={false} />
                 <FolderGrid
                   pastas={subpastas}
                   enabled={podeArrastar}
@@ -479,7 +468,6 @@ export default function FolderScreen() {
 }
 
 const styles = StyleSheet.create({
-  acaoDoTitulo: { marginVertical: -Space.xs },
   // Título da seção → conteúdo a `Space.md` (o rótulo encostava na grade e na lista).
   secao: { gap: Space.md },
   conteudo: {
