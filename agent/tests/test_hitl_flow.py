@@ -133,7 +133,7 @@ async def test_nota_pede_sim(grafo):
         config=config,
     )
     valor = _pausa(estado)
-    assert valor["summary"] == "criar a nota «ligar pro dentista»"
+    assert valor["summary"] == "criar a nota *ligar pro dentista*"
     retomado = await grafo.ainvoke(Command(resume=True), config=config)
     assert "EXECUTOU" in retomado["reply"]
 
@@ -146,7 +146,7 @@ async def test_lembrete_pede_sim_e_recusa_nao_grava(grafo):
                                            "remind_at": "2026-09-22T09:00:00"}]},
         config=config,
     )
-    assert _pausa(estado)["summary"] == "criar o lembrete «pagar aluguel» para 22/09/2026 às 09:00"
+    assert _pausa(estado)["summary"] == "criar o lembrete *pagar aluguel* para 22/09/2026 às 09:00"
     recusado = await grafo.ainvoke(Command(resume=False), config=config)
     assert "EXECUTOU" not in recusado["reply"]
 

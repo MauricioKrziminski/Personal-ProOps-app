@@ -60,7 +60,7 @@ test('segurar a pasta oferece Apagar, e apagar confirma antes', () => {
   apagar!.onPress();
   assert.equal(apagadas.length, 0, 'nada é apagado sem confirmar');
   const confirmacao = folhas[1];
-  assert.equal(confirmacao.titulo, 'Apagar «compras»?');
+  assert.equal(confirmacao.titulo, 'Apagar a pasta compras?');
   const sim = confirmacao.acoes.find((a) => a.label === 'Apagar pasta');
   assert.equal(sim?.destructive, true);
   sim!.onPress();

@@ -370,7 +370,7 @@ export default function NotesScreen() {
   ) : q ? (
     <EmptyState
       icon="magnifyingglass"
-      title={`Nada encontrado para «${q}»`}
+      title={`Nada encontrado para ${q}`}
       hint="Se você já apagou, ainda dá tempo de resgatar."
       action={{ label: 'Buscar na lixeira', onPress: () => router.push('/notes/trash') }}
     />
@@ -392,7 +392,7 @@ export default function NotesScreen() {
   ) : (
     <EmptyState
       title="Nada anotado ainda"
-      hint="Escreve aqui em cima — ou manda «anotar: ligar pro dentista» no WhatsApp."
+      hint="Escreve aqui em cima — ou manda *anotar: ligar pro dentista* no WhatsApp."
     />
   );
 

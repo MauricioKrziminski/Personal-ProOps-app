@@ -83,11 +83,11 @@ def test_frase_com_conta_citada_usa_a_citada():
 def test_frase_da_nota_e_do_lembrete():
     nota = NotesAction(type=NotesActionType.CREATE_NOTE, content="ligar pro dentista",
                        folder="saúde")
-    assert describe_for_confirmation(nota) == "criar a nota «ligar pro dentista» na pasta saúde"
+    assert describe_for_confirmation(nota) == "criar a nota *ligar pro dentista* na pasta saúde"
     lembrete = NotesAction(type=NotesActionType.CREATE_REMINDER, content="pagar aluguel",
                            remind_at="2026-09-22T09:00:00")
     assert describe_for_confirmation(lembrete) == (
-        "criar o lembrete «pagar aluguel» para 22/09/2026 às 09:00")
+        "criar o lembrete *pagar aluguel* para 22/09/2026 às 09:00")
 
 
 def test_valor_acima_do_teto_pergunta():

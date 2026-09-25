@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 import type { SymbolViewProps } from 'expo-symbols';
 
@@ -6,8 +6,10 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
+import { Fonts } from '@/constants/theme';
 import { Motion, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
+import { parseInlineBold } from '@/lib/agent-chat';
 
 interface EmptyStateProps {
   /**
@@ -16,7 +18,10 @@ interface EmptyStateProps {
    */
   icon?: SymbolViewProps['name'];
   title: string;
-  /** A dica ACIONÁVEL. Normalmente o atalho do WhatsApp que preenche esta tela. */
+  /**
+   * A dica ACIONÁVEL. Normalmente o atalho do WhatsApp que preenche esta tela. O exemplo do que
+   * mandar vai em `*negrito*`, como no WhatsApp — nunca entre « » (25/09/2026).
+   */
   hint?: string;
   action?: { label: string; onPress: () => void };
   /**
@@ -54,7 +59,7 @@ export function EmptyState({ icon, title, hint, action, compacto = false }: Empt
           {hint ? (
             // A quebra à mão ("…\n— ou toca em +") é do desenho centralizado; na linha o texto corre.
             <ThemedText type="footnote" themeColor="textSecondary">
-              {hint.replace(/\s*\n\s*/g, ' ')}
+              <ComNegrito texto={hint.replace(/\s*\n\s*/g, ' ')} />
             </ThemedText>
           ) : null}
           {action ? (
@@ -76,7 +81,7 @@ export function EmptyState({ icon, title, hint, action, compacto = false }: Empt
       </ThemedText>
       {hint ? (
         <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-          {hint}
+          <ComNegrito texto={hint} />
         </ThemedText>
       ) : null}
       {action ? (
@@ -88,7 +93,18 @@ export function EmptyState({ icon, title, hint, action, compacto = false }: Empt
   );
 }
 
+/** Os trechos `*assim*` da dica em semibold — o mesmo leitor do chat do agente. */
+function ComNegrito({ texto }: { texto: string }) {
+  return parseInlineBold(texto).map((t, i) => (
+    <Text key={i} style={t.bold ? styles.forte : undefined}>
+      {t.text}
+    </Text>
+  ));
+}
+
 const styles = StyleSheet.create({
+  // Peso é FAMÍLIA (§3): `fontWeight` no Android cai no regular com negrito sintético.
+  forte: { fontFamily: Fonts.semibold },
   container: {
     alignItems: 'center',
     gap: Space.sm,

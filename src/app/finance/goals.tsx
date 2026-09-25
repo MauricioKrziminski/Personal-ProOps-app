@@ -214,7 +214,7 @@ export default function GoalsScreen() {
             onError: () => toast({ message: 'Não deu para desfazer.', tone: 'error' }),
           }
         ),
-      `${formatBRL(amountCents)} sai de «${goal.name}».`
+      `${formatBRL(amountCents)} sai da meta ${goal.name}.`
     );
 
   const arquivar = (g: Goal) =>

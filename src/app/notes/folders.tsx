@@ -117,7 +117,7 @@ export default function FoldersScreen() {
     // atualizaria a pasta existente em silêncio em vez de reclamar.
     const clash = (folders.data ?? []).find((f) => f.name === normalized && f.id !== editing?.id);
     if (clash) {
-      setError(`Já existe uma pasta «${normalized}».`);
+      setError(`Já existe uma pasta chamada ${normalized}.`);
       return;
     }
 
@@ -128,7 +128,7 @@ export default function FoldersScreen() {
     } catch (e) {
       // 23505 = outro aparelho criou a mesma pasta entre a checagem e o insert.
       if ((e as { code?: string }).code === '23505') {
-        setError(`Já existe uma pasta «${normalized}».`);
+        setError(`Já existe uma pasta chamada ${normalized}.`);
         return;
       }
       toast({ message: 'Não deu para salvar a pasta.', tone: 'error' });
@@ -166,7 +166,7 @@ export default function FoldersScreen() {
 
     actionSheet(
       {
-        title: `Mover «${folder.name}» para`,
+        title: `Mover a pasta ${folder.name} para`,
         options: ['Raiz (nenhuma pasta)', ...destinos.map((f) => f.name)],
       },
       (index) => {
@@ -195,7 +195,7 @@ export default function FoldersScreen() {
       {
         onSuccess: () =>
           toast({
-            message: `«${folder.name}» arquivada.`,
+            message: `Pasta ${folder.name} arquivada.`,
             tone: 'success',
             action: {
               label: 'Desfazer',
@@ -214,7 +214,7 @@ export default function FoldersScreen() {
         // Com "Desfazer": é o que deixa fixar valer ao arrastar até o fim (Deslizavel).
         onSuccess: () =>
           toast({
-            message: folder.pinned ? `«${folder.name}» desafixada.` : `«${folder.name}» fixada.`,
+            message: folder.pinned ? `Pasta ${folder.name} desafixada.` : `Pasta ${folder.name} fixada.`,
             tone: 'success',
             action: { label: 'Desfazer', onPress: () => updateFolder.mutate({ id: folder.id, pinned: folder.pinned }, { onError: () => toast({ message: 'Não deu para desfazer.', tone: 'error' }) }) },
           }),
@@ -249,7 +249,7 @@ export default function FoldersScreen() {
   const folderEditor = (
       <Card>
         <View style={styles.form}>
-          <Field label={editing ? `Renomear «${editing.name}»` : 'Nova pasta'} error={error ?? undefined}>
+          <Field label={editing ? `Renomear ${editing.name}` : 'Nova pasta'} error={error ?? undefined}>
             <TextField
               value={name}
               onChangeText={(text) => {

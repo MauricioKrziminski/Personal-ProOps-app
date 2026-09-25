@@ -263,7 +263,7 @@ export default function CatalogScreen() {
           <Field label="Descrição" hint="Como isso aparece no extrato">
             <TextField placeholder="Mercado do bairro" />
           </Field>
-          <Field label="Nome da conta" error="Já existe uma conta «Nubank».">
+          <Field label="Nome da conta" error="Já existe uma conta chamada Nubank.">
             <TextField placeholder="Nubank" defaultValue="Nubank" invalid />
           </Field>
           <Field label="Valor">

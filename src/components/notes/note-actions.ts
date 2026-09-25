@@ -69,13 +69,13 @@ export function confirmarApagarPasta(
 ) {
   actionSheet(
     {
-      title: `Apagar «${folder.name}»?`,
+      title: `Apagar a pasta ${folder.name}?`,
       message:
         folder.notes_count === null
-          ? 'As notas dela ficam em "Sem pasta".'
+          ? 'As notas dela ficam sem pasta.'
           : folder.notes_count === 0
             ? 'A pasta está vazia.'
-            : `As ${notesLabel(folder.notes_count)} ficam em "Sem pasta".`,
+            : `As ${notesLabel(folder.notes_count)} ficam sem pasta.`,
       options: ['Apagar pasta'],
       destructiveIndex: 0,
     },

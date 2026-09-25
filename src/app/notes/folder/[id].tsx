@@ -373,7 +373,7 @@ export default function FolderScreen() {
               ) : fixadas.length === 0 && subpastas.length === 0 ? (
                 <EmptyState
                   icon="tray"
-                  title={`«${folder.name}» está vazia`}
+                  title={`A pasta ${folder.name} está vazia`}
                   hint="Toque no lápis aí em cima para escrever a primeira — ela já nasce aqui dentro."
                 />
               ) : null}

@@ -1269,3 +1269,17 @@ test('O item levantado no reordenar tem o raio do card: a sombra não desenha um
   assert.match(camada, /borderRadius: Radius\.md/, 'o levantado tem o raio dos cards que ele carrega');
   assert.match(camada, /borderCurve: 'continuous'/);
 });
+
+test('Nenhum « » em texto do app: o termo vai em negrito ou a frase se reescreve', () => {
+  // 25/09/2026, pedido do dono do produto: *"Esse « » pode retirar completamente de todos os
+  // lugares… coloque em negrito ou algo assim, mas não deixe nenhum caractere"*. Comentário pode.
+  const achados: string[] = [];
+  for (const arquivo of walk(SRC).filter((f) => /\.(ts|tsx)$/.test(f) && !/\.test\.ts$/.test(f))) {
+    readFileSync(arquivo, 'utf8').split('\n').forEach((linha, i) => {
+      const t = linha.trim();
+      if (/^(\/\/|\*|\/\*|\{\/\*)/.test(t)) return;
+      if (/[«»]/.test(linha.replace(/\/\/.*$/, ''))) achados.push(`${arquivo.slice(SRC.length)}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(achados, []);
+});

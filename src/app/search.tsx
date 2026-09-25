@@ -206,7 +206,7 @@ export default function SearchScreen() {
       {nothing ? (
         <EmptyState
           icon="magnifyingglass"
-          title={`Nada encontrado para «${term}»`}
+          title={`Nada encontrado para ${term}`}
           hint="Tente outra palavra"
         />
       ) : null}

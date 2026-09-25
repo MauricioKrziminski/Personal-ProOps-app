@@ -601,12 +601,12 @@ def describe_for_confirmation(
         return f"cancelar o lembrete de {alvo}"
     if tipo == "create_note":
         pasta = f" na pasta {action.folder}" if action.folder else ""
-        return f"criar a nota «{action.content or ''}»{pasta}"
+        return f"criar a nota *{action.content or ''}*{pasta}"
     if tipo == "create_reminder":
         quando = ""
         if action.remind_at:
             hora = str(action.remind_at)[11:16]
             quando = f" para {format_date_br(action.remind_at)}" + (f" às {hora}" if hora else "")
         repete = " (repete)" if action.recurrence else ""
-        return f"criar o lembrete «{action.content or ''}»{quando}{repete}"
+        return f"criar o lembrete *{action.content or ''}*{quando}{repete}"
     return f"salvar {alvo}"

@@ -110,7 +110,7 @@ async def run(
         tipo = ofx_tipo(content)
         if tipo == "cartao" and not cartao:
             raise ImportError_(
-                "Esse arquivo é a fatura de um cartão. Escolha o cartão em «Lançar na conta»."
+                "Esse arquivo é a fatura de um cartão. Escolha o cartão no campo Lançar na conta."
             )
         if tipo == "conta" and cartao:
             raise ImportError_(

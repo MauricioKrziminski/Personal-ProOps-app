@@ -110,7 +110,7 @@ def _sem_alvo(alvo: dict, action) -> str:
     termo = resolve.termo_de(action)
     if termo:
         return (
-            f"🤷 Não achei nada com «{termo}» por aqui. "
+            f"🤷 Não achei nada com *{termo}* por aqui. "
             "Confere o nome, ou me diz o valor ou a data?"
         )
     return "🤷 Não achei esse item por aqui. Me diz o valor ou a data?"
