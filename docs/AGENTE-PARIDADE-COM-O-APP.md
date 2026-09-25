@@ -448,6 +448,7 @@ tabela* —, cada um deles entra aqui.
 | `useArchiveNote` / `useArchiveFolder` (e desarquivar) | sim | `resource_update … archived=true/false`, campo **virtual** traduzido para `archived_at` |
 | `useSetFolderTags` | **parcial** | `resource_update folders tags` ACRESCENTA; tirar uma tag continua sendo do app (ver abaixo) |
 | ícone da pasta (`folders.tsx`) | sim | `resource_update folders icon`, com os nomes em português aceitos ("maleta", "carrinho") |
+| "+ Nova pasta" na aba Notas e "Nova subpasta" dentro da pasta (`NovaPastaSheet`, 25/09/2026) | sim | `resource_create folders` — com `parent_id` ("cria a pasta viagem dentro de trabalho"); o mesmo `useSaveFolder` de "Organizar pastas", agora à mão onde a pessoa está |
 | `useReorderNotes` / `useReorderFolders` | **não — exclusão declarada** | ordem manual é GESTO, não frase: "põe a nota do mercado em terceiro" pede que a pessoa conheça a numeração de uma lista que ela está vendo, e arrastar já resolve em um movimento. O que o agente faz é FIXAR, que é a mesma intenção ("deixa isso no topo") dita em palavras. |
 
 **Nada disso custou orçamento de schema.** `ResourceAction.resource` é `str` e `color`/`icon`

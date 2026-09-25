@@ -37,7 +37,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   const avisos: string[] = [];
   /** Com que limite cada lista paginada no servidor foi pedida — é como se vê o "Ver mais" pedir mais. */
   const pedidosDeLimite: [string, number | undefined][] = [];
-  const mutation = (operation: string) => ({ isPending: false, reset() {}, mutate(value: any, opts?: any) { writes.push({ operation, value }); pedidos.push({ operation, value, opts }); } });
+  const mutation = (operation: string) => ({ isPending: false, reset() {}, mutate(value: any, opts?: any) { writes.push({ operation, value }); pedidos.push({ operation, value, opts }); }, async mutateAsync(value: any) { writes.push({ operation, value }); return `${operation}-id`; } });
   const animation = { duration: () => animation, delay: () => animation, reduceMotion: () => animation };
   const finance = new Proxy({
     DEBT_KINDS: [{ value: 'financing', label: 'Financiamento' }, { value: 'loan', label: 'Empréstimo' }],
@@ -250,6 +250,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@/components/ui/glass-backdrop') return { GlassBackdrop: 'GlassBackdrop', supportsLiquidGlass: () => false };
       if (name === '@/hooks/use-note-sort') return { SORT_LABEL: {}, useNoteSort: () => ['manual', () => {}] };
       if (name === '@/components/notes/use-folder-menu') return { useFolderMenu: () => () => {} };
+      if (name === '@/components/notes/nova-pasta') return load('src/components/notes/nova-pasta.tsx');
       if (name === '@/lib/rrule-text') return { describeRRule: () => 'todo mês' };
       if (name === '@/hooks/use-archived-folders') return { useArchivedFolders: () => ({ ...query, isSuccess: true, data: options.pastasArquivadas ?? [] }) };
       if (name === '@/hooks/use-notes') return new Proxy({
@@ -277,7 +278,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
           return { notes: r(options.buscaNotas ?? []), transactions: options.buscaPendente ? chegando : r([]), reminders: options.buscaPendente ? chegando : r([]), enabled: true, term: 'mercado' };
         },
       };
-      if (name === '@/lib/search') return { noteTitle: (texto: string) => texto.split('\n')[0], notePreview: () => '' };
+      // A normalização do nome de pasta é a real: a "Nova pasta" a usa para achar nome repetido.
+      if (name === '@/lib/search') return { noteTitle: (texto: string) => texto.split('\n')[0], notePreview: () => '', normalizeFolderName: load('src/lib/search.ts').normalizeFolderName };
       if (name === '@/lib/note-blocks') return { todoProgress: () => ({ done: 0, total: 0 }) };
       if (name === '@/design/category-icons') return { categoryIcon: () => 'circle' };
       if (name === '@/design/adaptive-window') return load('src/design/adaptive-window.ts');
@@ -2255,4 +2257,40 @@ test('Orçamentos: o resumo chegando não segura a tela — só "Sem limite defi
   const textos = JSON.stringify(ui.nodes().filter((n: any) => n.type === 'ThemedText').map((n: any) => n.props.children));
   assert.match(textos, /mercado/, 'a lista de limites já aparece');
   assert.doesNotMatch(textos, /Sem limite definido/, 'a seção do resumo espera sem texto');
+});
+
+test('Notas: "+ Nova pasta" no cabeçalho de Pastas, com e sem pastas, abre a folha ali mesmo', () => {
+  // 25/09/2026: *"eu tenho que entrar na tela de organizar pasta para criar uma pasta?"*.
+  const pasta = { id: 'f1', name: 'trabalho', icon: 'folder', color: null, pinned: false, parent_id: null, notes_count: 2, tags: [] };
+  for (const folders of [[pasta], []]) {
+    const ui = screen('src/app/(tabs)/notes/index.tsx', { folders, notes: [] });
+    const cabecalho = () => ui.nodes().find((n: any) => n.type === 'BlockHeader' && n.props.title === 'Pastas');
+    assert.ok(cabecalho(), `cabeçalho de Pastas com ${folders.length} pasta(s)`);
+    assert.equal(cabecalho().props.action?.label, 'Nova pasta');
+    const folha = () => ui.nodes().find((n: any) => n.type?.name === 'NovaPastaSheet');
+    assert.equal(folha()?.props.visible, false, 'fechada até o toque');
+    ui.interact(() => cabecalho().props.action.onPress());
+    assert.equal(folha()?.props.visible, true, 'a folha "Nova pasta" abriu na própria aba');
+  }
+});
+
+test('Nova pasta: cria com o nome normalizado, recusa nome repetido e, dentro de uma pasta, cria subpasta', async () => {
+  const pasta = { id: 'f1', name: 'trabalho', icon: 'folder', color: null, pinned: false, parent_id: null, notes_count: 2, tags: [] };
+  const folha = (props: any) => screen('src/components/notes/nova-pasta.tsx', { componente: 'NovaPastaSheet', props: { visible: true, onClose: () => {}, pastas: [pasta], ...props } });
+  const digitarECriar = async (ui: any, nome: string) => {
+    ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'TextField' && n.props.accessibilityLabel === 'Nome da pasta').props.onChangeText(nome));
+    ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'TaskHeader').props.action.props.onPress());
+    await new Promise((r) => setTimeout(r, 0));
+    ui.interact(() => {});
+  };
+  const repetida = folha({});
+  await digitarECriar(repetida, 'Trabalho');
+  assert.equal(repetida.writes.filter((w: any) => w.operation === 'useSaveFolder').length, 0, 'nome repetido não grava');
+  const nova = folha({});
+  await digitarECriar(nova, 'Mercado ');
+  assert.deepEqual(copia(nova.writes.at(-1)), { operation: 'useSaveFolder', value: { name: 'mercado', icon: 'folder', parentId: null } });
+  const sub = folha({ paiId: 'f1' });
+  assert.ok(sub.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Nova subpasta'));
+  await digitarECriar(sub, 'viagem');
+  assert.equal(sub.writes.at(-1).value.parentId, 'f1', 'a subpasta nasce dentro da pasta aberta');
 });

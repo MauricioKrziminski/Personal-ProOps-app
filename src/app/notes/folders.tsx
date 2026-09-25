@@ -1,11 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Stack, router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
@@ -24,7 +20,7 @@ import { showItemActions, type ItemAction } from '@/lib/item-actions';
 import { Deslizavel } from '@/components/ui/deslizavel';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
+import { Motion, Space, tabular } from '@/design/tokens';
 import {
   useDeleteFolder,
   folderTree,
@@ -33,11 +29,11 @@ import {
   useUpdateFolder,
   type NoteFolder,
 } from '@/hooks/use-notes';
-import { useScheme, useTheme } from '@/hooks/use-theme';
+import { useScheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
-import { normalizeFolderName } from '@/lib/search';
-import { actionSheet, confirmarApagarPasta, FOLDER_ICONS, notesLabel, symbol } from '@/components/notes/note-actions';
+import { actionSheet, confirmarApagarPasta, notesLabel, symbol } from '@/components/notes/note-actions';
 import { ColorPicker } from '@/components/notes/color-picker';
+import { GradeDeIcones, useSalvarPasta } from '@/components/notes/nova-pasta';
 import { TagPicker } from '@/components/notes/tag-picker';
 import { noteInk } from '@/design/note-colors';
 import { transicaoDeLayout } from '@/components/motion/transicao';
@@ -75,12 +71,12 @@ function useLooseNotesCount() {
 }
 
 export default function FoldersScreen() {
-  const theme = useTheme();
   const scheme = useScheme();
   const toast = useToast();
   const folders = useNoteFolders();
   const loose = useLooseNotesCount();
   const saveFolder = useSaveFolder();
+  const { salvar, salvando } = useSalvarPasta(folders.data ?? []);
   const deleteFolder = useDeleteFolder();
   const updateFolder = useUpdateFolder();
 
@@ -109,31 +105,14 @@ export default function FoldersScreen() {
   };
 
   const submit = async () => {
-    const normalized = normalizeFolderName(name);
-    if (!normalized) {
-      setError('Dá um nome para a pasta.');
+    // A regra de nome (vazio, repetido, corrida entre aparelhos) mora em `useSalvarPasta` — a mesma
+    // da folha "Nova pasta" da aba Notas.
+    const r = await salvar({ id: editing?.id, nome: name, icone: icon });
+    if (r.erro) {
+      setError(r.erro);
       return;
     }
-    // Checagem local ANTES da mutation: o caminho de criação é `.upsert()`, que com nome repetido
-    // atualizaria a pasta existente em silêncio em vez de reclamar.
-    const clash = (folders.data ?? []).find((f) => f.name === normalized && f.id !== editing?.id);
-    if (clash) {
-      setError(<>Já existe uma pasta chamada <Forte>{normalized}</Forte>.</>);
-      return;
-    }
-
-    try {
-      await saveFolder.mutateAsync({ id: editing?.id, name: normalized, icon });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      reset();
-    } catch (e) {
-      // 23505 = outro aparelho criou a mesma pasta entre a checagem e o insert.
-      if ((e as { code?: string }).code === '23505') {
-        setError(<>Já existe uma pasta chamada <Forte>{normalized}</Forte>.</>);
-        return;
-      }
-      toast({ message: 'Não deu para salvar a pasta.', tone: 'error' });
-    }
+    if (r.id) reset();
   };
 
   const confirmDelete = (folder: NoteFolder) => {
@@ -266,41 +245,13 @@ export default function FoldersScreen() {
             />
           </Field>
 
-          <View style={styles.grid}>
-            {FOLDER_ICONS.map((option) => {
-              const selected = option.name === icon;
-              return (
-                <Pressable
-                  key={option.label}
-                  accessibilityRole="button"
-                  accessibilityLabel={option.label}
-                  accessibilityState={{ selected }}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setIcon(option.name);
-                  }}
-                  style={styles.iconCellWrap}>
-                  <View
-                    style={[
-                      styles.iconCell,
-                      { backgroundColor: selected ? theme.accentSoft : theme.backgroundElement },
-                    ]}>
-                    <Icon
-                      name={symbol(option.name)}
-                      size="lg"
-                      color={selected ? 'tint' : 'textSecondary'}
-                    />
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
+          <GradeDeIcones valor={icon} onChange={setIcon} />
 
           <View style={styles.formActions}>
             <Button
               label={editing ? 'Salvar' : 'Criar pasta'}
               size="sm"
-              loading={saveFolder.isPending}
+              loading={salvando}
               onPress={() => void submit()}
             />
             {editing ? <Button label="Cancelar" variant="ghost" size="sm" onPress={reset} /> : null}
@@ -474,24 +425,6 @@ const styles = StyleSheet.create({
   disco: { width: 12, height: 12, borderRadius: 6 },
   form: {
     gap: Space.lg,
-  },
-  /**
-   * Seis por linha, doze ícones, duas linhas exatas.
-   *
-   * ⚠️ Com `gap` + largura fixa a fileira embrulhava por largura e dava 7 em cima e 5 embaixo —
-   * lê como acidente, não como grade, e é o mesmo defeito que a paleta de cores tinha. A célula
-   * em porcentagem fecha a conta em qualquer tela sem medir nada; o respiro vem do padding dela,
-   * porque `gap` sobre porcentagem empurra a sexta para a linha seguinte.
-   */
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  iconCellWrap: { width: '16.666%', padding: Space.xs / 2 },
-  /** Ícone menor que a área de toque: o alvo é 44, o símbolo é 24. */
-  iconCell: {
-    height: HitTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: Radius.sm,
-    borderCurve: 'continuous',
   },
   formActions: {
     flexDirection: 'row',

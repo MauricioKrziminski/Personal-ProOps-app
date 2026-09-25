@@ -7,6 +7,8 @@ import { Chip } from '@/components/finance/chip';
 import { ColorPicker } from '@/components/notes/color-picker';
 import { FolderGrid } from '@/components/notes/folder-grid';
 import { FolderPicker } from '@/components/notes/folder-picker';
+import { NovaPastaSheet } from '@/components/notes/nova-pasta';
+import { AcaoDoBloco } from '@/components/ui/block-header';
 import { NoteList } from '@/components/notes/note-list';
 import { useFolderMenu } from '@/components/notes/use-folder-menu';
 import { TagPicker } from '@/components/notes/tag-picker';
@@ -243,9 +245,11 @@ export default function FolderScreen() {
                   },
                   { label: 'Cor', icon: 'paintpalette', onPress: () => setPintandoPasta(folder) },
                   { label: 'Tags', icon: 'tag', onPress: () => setEtiquetando(true) },
+                  // Criar a subpasta AQUI, sem passar por "Organizar pastas" (25/09/2026).
+                  { label: 'Nova subpasta', icon: 'folder.badge.plus', onPress: () => setCriandoSubpasta(true) },
                   {
                     label: 'Renomear e mover',
-                    icon: 'folder.badge.plus',
+                    icon: 'pencil',
                     onPress: () => router.push('/notes/folders'),
                   },
                   { label: 'Arquivar', icon: 'archivebox', onPress: arquivar },
@@ -306,7 +310,17 @@ export default function FolderScreen() {
 
             {subpastas.length > 0 ? (
               <View style={styles.secao} onLayout={(e) => setTopoSubpastas(e.nativeEvent.layout.y)}>
-                <SectionHead title="Subpastas" inset={false} />
+                <SectionHead
+                  title="Subpastas"
+                  inset={false}
+                  action={
+                    // A pílula tem 30 de altura contra os 19 do título: a margem negativa não deixa
+                    // ela afastar o rótulo da grade (§2).
+                    <View style={styles.acaoDoTitulo}>
+                      <AcaoDoBloco label="Nova subpasta" icon="plus" onPress={() => setCriandoSubpasta(true)} />
+                    </View>
+                  }
+                />
                 <FolderGrid
                   pastas={subpastas}
                   enabled={podeArrastar}
@@ -436,6 +450,15 @@ export default function FolderScreen() {
         onToggle={alternarTag}
       />
 
+      {folder ? (
+        <NovaPastaSheet
+          visible={criandoSubpasta}
+          onClose={() => setCriandoSubpasta(false)}
+          pastas={foldersQuery.data ?? []}
+          paiId={folder.id}
+        />
+      ) : null}
+
       <FolderPicker
         visible={movendo !== null}
         current={movendo?.folder_id ?? null}
@@ -456,6 +479,7 @@ export default function FolderScreen() {
 }
 
 const styles = StyleSheet.create({
+  acaoDoTitulo: { marginVertical: -Space.xs },
   // Título da seção → conteúdo a `Space.md` (o rótulo encostava na grade e na lista).
   secao: { gap: Space.md },
   conteudo: {

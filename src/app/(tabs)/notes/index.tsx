@@ -8,6 +8,7 @@ import { Chip } from '@/components/finance/chip';
 import { ColorPicker } from '@/components/notes/color-picker';
 import { FolderGrid } from '@/components/notes/folder-grid';
 import { FolderPicker } from '@/components/notes/folder-picker';
+import { NovaPastaSheet } from '@/components/notes/nova-pasta';
 import type { NoteCardActions } from '@/components/notes/note-card';
 import { NoteList } from '@/components/notes/note-list';
 import { useFolderMenu } from '@/components/notes/use-folder-menu';
@@ -160,6 +161,7 @@ export default function NotesScreen() {
   }, [typed]);
 
   const procurando = !!q || !!tag;
+  const [criandoPasta, setCriandoPasta] = useState(false);
 
   const list = useNotesList({
     // Sem recorte a home é a caixa de SOLTAS; com recorte ela é o resultado da busca.
@@ -539,23 +541,12 @@ export default function NotesScreen() {
               O rótulo inteiro é o alvo (não só o galão): é a área que o dedo já mira, e §5 pede
               alvo de 44pt. `LinearTransition` na grade fecha o buraco em vez de piscar.
             */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ expanded: !pastasRecolhidas }}
-              accessibilityLabel={`Pastas, ${pastas.length}`}
-              hitSlop={ALCANCE_DO_ROTULO}
-              onPress={() => {
-                Haptics.selectionAsync();
-                setPastasRecolhidas(!pastasRecolhidas);
-              }}>
-              <BlockHeader
-                title="Pastas"
-                count={pastas.length}
-                trailing={
-                  <Icon name={pastasRecolhidas ? 'chevron.down' : 'chevron.up'} size="sm" color="textSecondary" />
-                }
-              />
-            </Pressable>
+            <BlockHeader
+              title="Pastas"
+              count={pastas.length}
+              recolher={{ recolhido: pastasRecolhidas, onToggle: () => setPastasRecolhidas(!pastasRecolhidas) }}
+              action={{ label: 'Nova pasta', icon: 'plus', onPress: () => setCriandoPasta(true) }}
+            />
             {pastasRecolhidas ? null : (
             <FolderGrid
               pastas={pastas}
@@ -577,6 +568,17 @@ export default function NotesScreen() {
             )}
             {/* Embaixo da grade: acima dela ficaria entre o título "Pastas" e o que ele nomeia. */}
             {!pastasRecolhidas && pastas.length > 1 ? <Dica id="notas-pastas" tela="notas" /> : null}
+          </View>
+        ) : null}
+
+        {/* Sem pasta nenhuma, o bloco é só o cabeçalho com "Nova pasta": criar pasta não pode
+            depender de achar "Organizar pastas" no "…" (25/09/2026). */}
+        {pastas.length === 0 && !procurando && foldersQuery.isSuccess ? (
+          <View style={styles.secao}>
+            <BlockHeader
+              title="Pastas"
+              action={{ label: 'Nova pasta', icon: 'plus', onPress: () => setCriandoPasta(true) }}
+            />
           </View>
         ) : null}
 
@@ -673,6 +675,8 @@ export default function NotesScreen() {
       }>
       {biblioteca}
 
+      <NovaPastaSheet visible={criandoPasta} onClose={() => setCriandoPasta(false)} pastas={folders} />
+
       <ColorPicker
         visible={pintando !== null}
         value={pintando?.color ?? null}
@@ -730,9 +734,6 @@ export default function NotesScreen() {
     </Screen>
   );
 }
-
-/** O rótulo "Pastas" é um botão: o toque alcança 44pt (§11) sem a caixa empurrar o layout. */
-const ALCANCE_DO_ROTULO = { top: 10, bottom: 10 };
 
 const styles = StyleSheet.create({
   tabletShell: { paddingHorizontal: Space.lg },
