@@ -25,7 +25,6 @@ import {
   useAccounts,
   useDeleteTransaction,
   useInvoice,
-  useMarkPaid,
   useDeleteInstallmentPlan,
   useInstallmentPlan,
   useRecurringTransactions,
@@ -36,7 +35,8 @@ import {
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { confirmDestructive } from '@/lib/item-actions';
-import { dueLabel, estadoDaLinha, settleDone, settleLabel } from '@/lib/settle-labels';
+import { dueLabel, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
+import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 
 /**
@@ -104,7 +104,8 @@ export default function TransactionDetailScreen() {
   const removePlan = useDeleteInstallmentPlan();
   const save = useSaveTransaction();
   const remove = useDeleteTransaction();
-  const markPaid = useMarkPaid();
+  // "Paguei" confirma o valor numa folha curta (25/09/2026). Dada a baixa, volta para a lista.
+  const baixa = useConfirmarBaixa({ aoConcluir: () => router.back() });
   const refresh = () => Promise.all([list.refetch(), accounts.refetch(), tx?.invoice_id ? invoice.refetch() : Promise.resolve(), plans.refetch()]);
 
   const accountLabel = tx?.account_id
@@ -315,22 +316,7 @@ export default function TransactionDetailScreen() {
                 label={settleLabel(tx.kind)}
                 size="sm"
                 variant="secondary"
-                loading={markPaid.isPending}
-                onPress={() =>
-                  markPaid.mutate(
-                    { id: tx.id, paidAt: localISODate() },
-                    {
-                      // A baixa move `occurred_at` para hoje: se o lançamento era de outro mês,
-                      // ficar aqui mostraria "esse lançamento não existe mais" logo após dar certo.
-                      onSuccess: () => {
-                        router.back();
-                        toast({ message: `${tx.description}: ${settleDone(tx.kind)}.`, tone: 'success' });
-                      },
-                      onError: () =>
-                        toast({ message: 'Não deu para dar baixa. Tenta de novo.', tone: 'error' }),
-                    }
-                  )
-                }
+                onPress={() => baixa.abrir(tx.id)}
               />
             }
           />
@@ -513,6 +499,7 @@ export default function TransactionDetailScreen() {
       />
 
       {tablet ? tabletBody : compactBody}
+      {baixa.folha}
     </Screen>
   );
 }

@@ -164,6 +164,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       refetch: async () => { refetches.push('summary'); },
     }),
     useMarkPaid: () => mutation('markPaid'),
+    useSaveTransactionScoped: () => mutation('saveScoped'),
+    useTransaction: (id: string) => ({ ...query, isSuccess: true, data: (options.txs ?? [{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared', recurring_id: null, installment_plan_id: null }]).find((t: any) => t.id === id) ?? null }),
     usePayInvoice: () => mutation('payInvoice'),
     useInvoice: () => ({ ...query, data: {
       invoice: { id: 'invoice-1', account_id: 'card-1', status: options.invoiceStatus ?? 'closed', reference_month: '2026-08-01', closing_date: '2026-08-10', due_date: '2026-08-20', paid_at: options.invoiceStatus === 'paid' ? '2026-08-18' : null },
@@ -210,6 +212,9 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@/hooks/use-tela-pronta') return { useTelaPronta: (...consultas: any[]) => { gates.push(consultas); return true; } };
       // Carregado DE VERDADE: ele é a regra que se quer testar, não um arredor da tela.
       if (name === '@/hooks/use-voltar-quando-fechar') return load('src/hooks/use-voltar-quando-fechar.ts');
+      // O "Paguei" que confirma o valor (25/09/2026): carregado DE VERDADE, é a regra em teste.
+      if (name === '@/components/finance/confirmar-baixa') return load('src/components/finance/confirmar-baixa.tsx');
+      if (name === '@/lib/confirmar-baixa') return load('src/lib/confirmar-baixa.ts');
       if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useReminders: () => ({ ...query, isSuccess: true, data: { pages: [options.reminders ?? []], pageParams: [0] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }), useToggleReminder: () => mutation('toggleReminder'), useDeleteReminder: () => mutation('deleteReminder') };
       if (name === '@/hooks/use-session') return { useSession: () => ({ session: { user: { id: 'user-1' } } }) };
       if (name === '@/hooks/use-profile') return { useProfile: () => ({ ...query, isSuccess: true, data: { display_name: 'Gabriel Almeida', phone: null } }) };
@@ -345,6 +350,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     // O "Salvar" do sheet mora no slot `action` do `SheetHeader`, não em `children` — sem esta
     // linha o botão existe na tela e some daqui, que foi o que estas seis asserções viram.
     visit(node.props.action);
+    // O `overlay` do `Screen` é conteúdo renderizado (a folha do "Paguei" na Hoje).
+    visit(node.props.overlay);
     // Ação de header é DECLARADA como dado (`actions={[{label, onPress}]}`) e desenhada como
     // botão pela plataforma — o "+" que abre todo formulário de lista (§8 do design) mora aí.
     // Sem esta linha nenhum sheet de criação é alcançável por este harness. `ItemLink` também
@@ -1060,16 +1067,35 @@ const copia = (v: unknown) => JSON.parse(JSON.stringify(v));
 const agendaItem = (ui: ReturnType<typeof screen>, title?: string) =>
   ui.nodes().find((n: any) => n.type === 'AgendaItem' && (!title || n.props.title === title));
 
-test('Hoje: o atrasado aparece em Agora e o botão dá baixa no lançamento certo', () => {
+test('Hoje: o atrasado aparece em Agora e o botão dá baixa no lançamento certo, depois de confirmar o valor', () => {
   const ui = screen(hojeFile, {
     bills: [{ ref_id: 'luz-1', title: 'Luz', due_date: '2026-09-01', amount_cents: 21000, kind: 'transaction', overdue: true }],
+    txs: [{ id: 'luz-1', kind: 'expense', amount_cents: 21000, description: 'Luz', status: 'pending', recurring_id: null, installment_plan_id: null }],
   });
   const item = agendaItem(ui, 'Luz');
   assert.ok(item, 'a conta atrasada precisa estar na tela');
   assert.equal(item.props.meta, 'venceu 01/09');
-  item.props.action.onPress();
+  ui.interact(() => item.props.action.onPress());
+  assert.equal(ui.writes.length, 0, 'abre a confirmação, não dá baixa direto');
+  ui.press('Paguei');
   assert.deepEqual(ui.writes.map((w) => w.operation), ['markPaid']);
   assert.equal(ui.writes[0].value.id, 'luz-1');
+});
+
+test('Hoje: "Recebi" pergunta quanto ENTROU; numa série, outro valor pode valer para as próximas', () => {
+  const ui = screen(hojeFile, {
+    bills: [{ ref_id: 'sal-1', title: 'Salário', due_date: '2026-09-05', amount_cents: 400000, kind: 'income', overdue: true }],
+    txs: [{ id: 'sal-1', kind: 'income', amount_cents: 400000, description: 'Salário', status: 'pending', recurring_id: 'rec-1', installment_plan_id: null }],
+  });
+  ui.interact(() => agendaItem(ui, 'Salário').props.action.onPress());
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Field' && n.props.label === 'Quanto entrou'));
+  assert.ok(!ui.nodes().some((n: any) => n.type === 'SwitchRow'), 'com o valor previsto não há o que propagar');
+  ui.interact((nodes) => nodes.find((n: any) => n.type === 'MoneyField').props.onChangeCents(410000));
+  const chave = ui.nodes().find((n: any) => n.type === 'SwitchRow');
+  assert.equal(chave?.props.label, 'Usar este valor nas próximas');
+  ui.interact(() => chave.props.onValueChange(true));
+  ui.press('Recebi');
+  assert.deepEqual(copia(ui.writes[0]), { operation: 'saveScoped', value: { id: 'sal-1', scope: 'future', patch: { amount_cents: 410000 } } });
 });
 
 test('Hoje: fatura atrasada leva para a fatura, nunca dá baixa de lançamento', () => {
@@ -1376,6 +1402,29 @@ test('Lançamentos: pendente arrasta Paguei à direita; efetivado arrasta Editar
   assert.deepEqual(ladosDoLink(pendente), { direita: ['Paguei'], esquerda: ['Apagar'], mais: true, pontaDireita: 'Paguei', pontaEsquerda: 'Apagar' });
   const efetivado = itemLinks(screen(transacoesFile))[0];
   assert.deepEqual(ladosDoLink(efetivado), { direita: ['Editar'], esquerda: ['Apagar'], mais: false, pontaDireita: 'Editar', pontaEsquerda: 'Apagar' });
+});
+
+test('Paguei confirma o valor: o mesmo valor só dá baixa, outro valor corrige antes', () => {
+  // 25/09/2026, pedido do dono do produto: *"às vezes eu posso ter pago menos ou mais"*.
+  const abrir = () => {
+    const ui = screen(transacoesFile, { txStatus: 'pending' });
+    ui.interact(() => itemLinks(ui)[0].props.actions.find((a: any) => a.label === 'Paguei').onPress());
+    return ui;
+  };
+  const igual = abrir();
+  assert.equal(igual.writes.length, 0, 'Paguei não dá baixa sem confirmar o valor');
+  const campo = igual.nodes().find((n: any) => n.type === 'MoneyField');
+  assert.equal(campo?.props.valueCents, 4500, 'o valor nasce no previsto');
+  igual.press('Paguei');
+  assert.deepEqual(igual.writes.map((w: any) => w.operation), ['markPaid']);
+
+  const outro = abrir();
+  outro.interact((nodes) => nodes.find((n: any) => n.type === 'MoneyField').props.onChangeCents(5200));
+  outro.press('Paguei');
+  assert.deepEqual(JSON.parse(JSON.stringify(outro.writes[0])), { operation: 'saveScoped', value: { id: 'tx-1', scope: 'one', patch: { amount_cents: 5200 } } });
+  assert.equal(outro.writes.length, 1, 'a baixa espera a correção dar certo');
+  outro.interact(() => outro.pedidos[0].opts.onSuccess());
+  assert.equal(outro.writes.at(-1).operation, 'markPaid');
 });
 
 test('Financeiro: o último lançamento arrasta Editar e Apagar (Ver detalhe é o toque)', () => {

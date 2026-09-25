@@ -612,8 +612,9 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
   - **arrastar até o fim aciona a ação da BORDA do lado, qualquer que seja** (24/09/2026, pedido
     do dono do produto: *"ao arrastar tudo para o lado esquerdo, ele aciona a opção mais à
     direita que tiver"*): é o mesmo que tocar nela. Apagar confirma, "Mais" abre o menu, e o que
-    muda sem confirmar traz "Desfazer" no toast (`desfaz: true`: Arquivar, Fixar, Paguei —
-    `useDesfazerBaixa`). Ação nova na borda que muda dado sem confirmar nasce com o "Desfazer";
+    muda sem confirmar traz "Desfazer" no toast (`desfaz: true`: Arquivar, Fixar). "Paguei"
+    abre a confirmação do valor (`useConfirmarBaixa`, 25/09/2026) — a folha é o que protege, não
+    o desfazer. Ação nova na borda que muda dado sem confirmar nasce com o "Desfazer";
   - `icon` em toda ação revelada e `curto` (uma palavra) quando o rótulo não cabe nos 88dp.
   O toque longo não muda. `ItemLink` aplica sozinho; os outros cards envolvem com a mesma lista.
   **O painel mora ATRÁS do card e o movimento é o do WhatsApp no iPhone** (24/09/2026, gravação

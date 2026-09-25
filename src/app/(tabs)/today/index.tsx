@@ -29,7 +29,6 @@ import { RunwayBar } from '@/components/ui/runway-bar';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonHero, SkeletonList } from '@/components/ui/skeleton';
 import { Tile, TileRow } from '@/components/ui/tile';
-import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space } from '@/design/tokens';
 import { useBoolPref } from '@/hooks/use-bool-pref';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
@@ -37,7 +36,6 @@ import {
   useAccountBalances,
   useBudgetsStatus,
   useCycle,
-  useMarkPaid,
   useSpendable,
   useSpendablePath,
   useTransactionsSummary,
@@ -56,7 +54,8 @@ import { orcamentosApertados } from '@/lib/budget-tight';
 import { diaCurtoBR, diasAte, greetingBR, isoToBR, rotuloDoDia } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
 import { montarPista } from '@/lib/runway';
-import { settleDone, settleLabel } from '@/lib/settle-labels';
+import { settleLabel } from '@/lib/settle-labels';
+import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
 import { agendaDoDia, iconeDoItem, metaDoItem, type ItemDaAgenda } from '@/lib/today-sections';
 import { diasDoCiclo, ritmoDoDia } from '@/lib/today-spend';
 import { transicaoDeLayout } from '@/components/motion/transicao';
@@ -110,7 +109,6 @@ export default function TodayScreen() {
   const tablet = windowClass !== 'compact';
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
-  const toast = useToast();
   const hoje = localISODate();
   const [agora] = useState(() => Date.now());
 
@@ -129,7 +127,8 @@ export default function TodayScreen() {
   const setup = useSetupProgress();
   const proximo = useProximoPasso(session?.user?.id);
   const [passosEscondidos, esconderPassos] = useBoolPref(`hoje:passos-escondidos:${session?.user?.id ?? ''}`);
-  const markPaid = useMarkPaid();
+  // "Paguei"/"Recebi" confirma o valor numa folha curta antes da baixa (25/09/2026).
+  const baixa = useConfirmarBaixa();
   const caminho = useSpendablePath();
   const saldos = useAccountBalances();
   /*
@@ -255,14 +254,7 @@ export default function TodayScreen() {
     ...proximo.consultas,
   );
 
-  const pay = (id: string, title: string, kind: string | null | undefined) =>
-    markPaid.mutate(
-      { id, paidAt: localISODate() },
-      {
-        onSuccess: () => toast({ message: `${title}: ${settleDone(kind)}.`, tone: 'success' }),
-        onError: () => toast({ message: `Não deu para dar baixa em ${title}.`, tone: 'error' }),
-      }
-    );
+  const pay = (id: string) => baixa.abrir(id);
 
   /*
     `debt` é a prestação de um financiamento e `ref_id` é o id da DÍVIDA: dar baixa de
@@ -282,7 +274,7 @@ export default function TodayScreen() {
     return {
       label: settleLabel(i.kind === 'income' ? 'income' : 'expense'),
       icon: 'checkmark',
-      onPress: () => pay(i.ref_id, i.title, i.kind),
+      onPress: () => pay(i.ref_id),
     };
   };
 
@@ -575,6 +567,7 @@ export default function TodayScreen() {
       stagger
       wide={tablet}
       topBar={<CabecalhoDaHoje />}
+      overlay={baixa.folha}
       onRefresh={() =>
         Promise.all([
           gasto.refetch(),

@@ -28,7 +28,6 @@ import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Skeleton, SkeletonChart, SkeletonList } from '@/components/ui/skeleton';
 import { MeasuredSparkline } from '@/components/ui/measured-sparkline';
-import { useToast } from '@/components/ui/toast';
 import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useAccounts,
@@ -37,8 +36,6 @@ import {
   useCashHistory,
   useForecastMonths,
   useForecastWithDrafts,
-  useDesfazerBaixa,
-  useMarkPaid,
   useMonthSummary,
   useUpcomingBills,
   type Draft,
@@ -69,7 +66,8 @@ import {
 import { AdiantarCampos } from '@/components/finance/anticipation-fields';
 import { QuantityField } from '@/components/ui/quantity-field';
 import { faixaDeParcelas } from '@/lib/finance-form';
-import { settleDone, settleLabel } from '@/lib/settle-labels';
+import { settleLabel } from '@/lib/settle-labels';
+import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
 
 /**
  * Projeção — "posso gastar isso?".
@@ -171,7 +169,6 @@ export default function ForecastScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
   const theme = useTheme();
-  const toast = useToast();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
 
@@ -242,10 +239,8 @@ export default function ForecastScreen() {
   const forecast = useCashFlowForecast(dias, !emMes);
   const bills = useUpcomingBills(30);
   const accounts = useAccounts();
-  const markPaid = useMarkPaid();
-  const desfazer = useDesfazerBaixa();
-  const desfazerBaixa = (id: string) =>
-    desfazer.mutate({ id }, { onError: () => toast({ message: 'Não deu para desfazer. Tenta de novo.', tone: 'error' }) });
+  // "Paguei" confirma o valor numa folha curta antes da baixa (25/09/2026).
+  const baixa = useConfirmarBaixa();
 
   // ⚠️ A troca do rascunho acontece AQUI, num lugar só, nos DOIS caminhos: o mensal recebe as
   // mesmas hipóteses e passa pela mesma `forecast_json` por dentro. Assim a tabela e a curva
@@ -391,20 +386,7 @@ export default function ForecastScreen() {
     );
   }, [fica]);
 
-  const pagar = (id: string, titulo: string, kind: string | null | undefined) =>
-    markPaid.mutate(
-      { id, paidAt: localISODate() },
-      {
-        onSuccess: () =>
-          toast({
-            message: `${titulo}: ${settleDone(kind)}.`,
-            tone: 'success',
-            action: { label: 'Desfazer', onPress: () => desfazerBaixa(id) },
-          }),
-        // otimista sem rollback visível faz o usuário achar que pagou
-        onError: () => toast({ message: `Não deu para dar baixa em ${titulo}.`, tone: 'error' }),
-      }
-    );
+  const pagar = (id: string) => baixa.abrir(id);
 
 
   /** O último dia da projeção — o que o sheet marca no calendário e escreve no subtítulo. */
@@ -439,8 +421,7 @@ export default function ForecastScreen() {
               label: settleLabel(receita ? 'income' : 'expense'),
               icon: 'checkmark.circle',
               arrasto: 'direita',
-              desfaz: true,
-              onPress: () => pagar(b.ref_id, b.title, b.kind),
+              onPress: () => pagar(b.ref_id),
             },
             {
               label: 'Editar',
@@ -1200,6 +1181,7 @@ export default function ForecastScreen() {
         </ScrollView>
       </Sheet>
 
+      {baixa.folha}
     </Screen>
   );
 }

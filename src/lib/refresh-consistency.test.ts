@@ -327,6 +327,8 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
     };
     if (name === '@/hooks/use-bool-pref') return { useBoolPref: () => [false, () => {}] };
     if (name === '@/hooks/use-agent-activity') return { useAgentActivity: () => query };
+    // "Paguei" abre a confirmação do valor (25/09/2026): o que importa aqui é QUAL id ela abre.
+    if (name === '@/components/finance/confirmar-baixa') return { useConfirmarBaixa: () => ({ abrir: (id: string) => writes.push([{ id }]), folha: null }) };
     // Puros, carregados de verdade pelo mesmo motivo de `dates` e `settle-labels` (abaixo).
     if (name === '@/lib/today-sections') return todaySections;
     if (name === '@/lib/runway') return runway;
@@ -406,7 +408,7 @@ test('Today routes an overdue invoice to invoice payment instead of writing its 
   assert.equal(button.props.label, 'Pagar fatura');
 });
 
-test('Today still marks a standalone transaction paid and exposes pull to refresh', () => {
+test('Today opens the pay confirmation for the standalone transaction and exposes pull to refresh', () => {
   const { nodes, routes, writes } = renderToday({ kind: 'transaction', ref_id: 'transaction-1' });
   nodes.find((n) => n.type === 'AgendaItem').props.action.onPress();
   assert.equal(routes.length, 0);

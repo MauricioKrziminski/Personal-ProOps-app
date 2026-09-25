@@ -35,8 +35,6 @@ import {
   useAccountBalances,
   useAccounts,
   useDeleteTransaction,
-  useDesfazerBaixa,
-  useMarkPaid,
   useRecentTransactions,
   useMonthRange,
   useTransactions,
@@ -53,7 +51,8 @@ import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { mesmoMes } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
-import { dueInline, estadoDaLinha, settleDone, settleLabel } from '@/lib/settle-labels';
+import { dueInline, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
+import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
 import { useDebounced } from '@/hooks/use-debounced';
 import { useTheme, useScheme } from '@/hooks/use-theme';
 import { accountLabel, saldoDaConta } from '@/lib/accounts';
@@ -289,10 +288,8 @@ export default function TransactionsScreen() {
   const brl = useBRL();
   // Um item basta para separar "nunca teve nada" de "este mês não teve nada".
   const anyEver = useRecentTransactions(1);
-  const markPaid = useMarkPaid();
-  const desfazer = useDesfazerBaixa();
-  const desfazerBaixa = (id: string) =>
-    desfazer.mutate({ id }, { onError: () => toast({ message: 'Não deu para desfazer. Tenta de novo.', tone: 'error' }) });
+  // "Paguei" confirma o valor numa folha curta antes da baixa (25/09/2026).
+  const baixa = useConfirmarBaixa();
   const remove = useDeleteTransaction();
 
   const accountName = useMemo(() => {
@@ -420,19 +417,7 @@ export default function TransactionsScreen() {
     setSearch('');
   };
 
-  const pay = (tx: Transaction) =>
-    markPaid.mutate(
-      { id: tx.id, paidAt: localISODate() },
-      {
-        onSuccess: () =>
-          toast({
-            message: `${tx.description}: ${settleDone(tx.kind)}.`,
-            tone: 'success',
-            action: { label: 'Desfazer', onPress: () => desfazerBaixa(tx.id) },
-          }),
-        onError: () => toast({ message: 'Não deu para dar baixa. Tenta de novo.', tone: 'error' }),
-      }
-    );
+  const pay = (tx: Transaction) => baixa.abrir(tx.id);
 
   /** Destrutivo = action sheet nativo. `onLongPress` + `Alert` é proibido nesta tela. */
   const confirmDelete = (tx: Transaction) => {
@@ -832,7 +817,6 @@ export default function TransactionsScreen() {
                             label: settleLabel(tx.kind),
                             icon: 'checkmark.circle' as const,
                             arrasto: 'direita' as const,
-                            desfaz: true,
                             onPress: () => pay(tx),
                           },
                         ]
@@ -974,6 +958,7 @@ export default function TransactionsScreen() {
         ledger
       )}
       {!wideWorkspace ? fab : null}
+      {baixa.folha}
     </Screen>
   );
 }

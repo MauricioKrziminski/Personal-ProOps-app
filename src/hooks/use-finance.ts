@@ -1103,29 +1103,6 @@ export function useMarkPaid() {
   });
 }
 
-/**
- * Desfaz a baixa de `useMarkPaid`: volta a `pending` e apaga o `paid_at` — as duas únicas colunas
- * que a baixa escreve, então a linha volta EXATAMENTE a como era. Só age sobre linha `cleared`: se
- * outra coisa já mexeu nela, o desfazer não pisa por cima.
- *
- * Existe para o "Desfazer" do toast (24/09/2026): arrastar até o fim passou a acionar a ação da
- * borda, e "Paguei" é a borda da direita em Lançamentos e na Projeção.
- */
-export function useDesfazerBaixa() {
-  const invalidate = useInvalidateFinance();
-  return useMutation({
-    mutationFn: async (input: { id: string }) => {
-      const { error } = await supabase
-        .from('transactions')
-        .update({ status: 'pending', paid_at: null })
-        .eq('id', input.id)
-        .eq('status', 'cleared');
-      if (error) throw error;
-    },
-    onSuccess: invalidate,
-  });
-}
-
 // ── importação de extrato e regras de categorização ─────────────────────────
 
 export type ImportItem = Pick<
