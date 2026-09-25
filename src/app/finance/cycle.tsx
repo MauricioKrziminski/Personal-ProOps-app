@@ -172,7 +172,8 @@ export default function CycleDetailScreen() {
       inteiro, e gap de 12 contra 24. Num app cuja queixa era "espaçamento bagunçado", a tela que
       escreve o próprio padding é a que diverge.
     */
-    <Screen wide={tablet}>
+    // Puxar para atualizar, como as outras telas de dados (25/09/2026): era a única sem.
+    <Screen wide={tablet} onRefresh={() => Promise.all([serie.refetch(), linhas.refetch()])}>
       {tablet ? (
         <FinanceAnalysisPanes primary={fechamento} support={<>{filtro}{movimentos}</>} compact={compact} />
       ) : compact}

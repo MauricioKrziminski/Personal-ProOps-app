@@ -1462,3 +1462,25 @@ test('as conversas do Agente são buscadas ao entrar na conta, com as MESMAS op�
   assert.match(hook, /useInfiniteQuery\(\{ \.\.\.conversasQuery, enabled: isAgentConfigured \}\)/);
   assert.match(hook, /prefetchInfiniteQuery\(conversasQuery\)/);
 });
+
+test('toda tela de dados tem puxar para atualizar', () => {
+  // 25/09/2026: *"não tem nem como puxar de cima para baixo para atualizar"* — na pasta de notas,
+  // e o Detalhe do ciclo também não tinha. Quem não tem o gesto diz por quê.
+  const semDados: Record<string, string> = {
+    'app/guia.tsx': 'conteúdo fixo',
+    'app/catalog.tsx': 'vitrine de desenvolvimento',
+    'app/paywall.tsx': 'oferta, não lista',
+    'app/reminder-form.tsx': 'formulário',
+    'app/finance/transaction-form.tsx': 'formulário',
+    'app/notes/[id].tsx': 'editor: puxar competiria com a rolagem do texto',
+    'app/(tabs)/agent/index.tsx': 'compositor; o histórico tem o gesto',
+    'app/finance/wallet.tsx': 'carrossel de cartões',
+    'app/finance/manage.tsx': 'menu de destinos',
+  };
+  const faltando = walk(join(SRC, 'app'))
+    .filter((f) => f.endsWith('.tsx') && readFileSync(f, 'utf8').includes('<Screen'))
+    .map((f) => f.slice(SRC.length + 1))
+    .filter((f) => !(f in semDados))
+    .filter((f) => !/onRefresh|RefreshControl/.test(readFileSync(join(SRC, f), 'utf8')));
+  assert.deepEqual(faltando, []);
+});

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { RefreshControl, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 
@@ -61,6 +61,9 @@ export default function FolderScreen() {
 
   const [sort] = useNoteSort();
   const [arrastando, setArrastando] = useState(false);
+  const [criandoSubpasta, setCriandoSubpasta] = useState(false);
+  // O indicador é do GESTO, nunca do `isRefetching` (design.md §6) — o mesmo da aba Notas.
+  const [puxando, setPuxando] = useState(false);
   const [pintandoNota, setPintandoNota] = useState<Note | null>(null);
   const [movendo, setMovendo] = useState<Note | null>(null);
   /**
@@ -258,6 +261,17 @@ export default function FolderScreen() {
         onScrollBeginDrag={fecharDeslizavelAberto}
         onLayout={(e) => setAlturaVisivel(e.nativeEvent.layout.height)}
         scrollEnabled={!arrastando}
+        // Puxar para atualizar, como na aba Notas: a nota que chega pelo WhatsApp entra aqui por
+        // Realtime, e quando ele cai a pessoa não tinha como pedir de novo (25/09/2026).
+        refreshControl={
+          <RefreshControl
+            refreshing={puxando}
+            onRefresh={() => {
+              setPuxando(true);
+              void Promise.all([list.refetch(), foldersQuery.refetch()]).finally(() => setPuxando(false));
+            }}
+          />
+        }
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.conteudo}
