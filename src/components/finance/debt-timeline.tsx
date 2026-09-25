@@ -110,7 +110,9 @@ const styles = StyleSheet.create({
   wrap: { gap: Space.lg },
   // Sem `gap` entre as linhas: o trilho de uma encosta no da outra e a linha do tempo é contínua.
   ano: {},
-  cabecalhoAno: { paddingBottom: Space.xs },
+  // O ano a `Space.md` das parcelas dele, como todo rótulo e o que ele nomeia (§2): com `xs` ele
+  // encostava no cartão destacado da próxima parcela (25/09/2026).
+  cabecalhoAno: { paddingBottom: Space.md },
   linha: {
     flexDirection: 'row',
     alignItems: 'center',

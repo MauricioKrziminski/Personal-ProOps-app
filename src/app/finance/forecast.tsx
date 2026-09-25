@@ -684,7 +684,8 @@ export default function ForecastScreen() {
   ) : null;
 
   const scenario = !nadaParaProjetar ? (
-    <Card style={styles.simulador}>
+    // O `gap` é o do `Card` (`Space.md`, §2): era `lg`, e o título "E se…?" ficava longe do que ele abre.
+    <Card>
       <View style={styles.rascunhoTopo}>
         <Icon
           name={simulando ? 'pencil.and.outline' : 'questionmark.circle'}
@@ -1272,9 +1273,6 @@ const styles = StyleSheet.create({
     gap: Space.sm,
     paddingHorizontal: Space.md,
     paddingBottom: Space.md,
-  },
-  simulador: {
-    gap: Space.lg,
   },
   parcela: {
     flexDirection: 'row',

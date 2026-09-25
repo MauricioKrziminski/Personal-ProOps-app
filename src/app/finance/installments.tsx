@@ -909,7 +909,9 @@ export default function InstallmentsScreen() {
 const styles = StyleSheet.create({
   lista: { gap: Space.md },
   // Alinhado ao texto das parcelas (o mesmo recuo de `parcela`).
-  subtituloParcelas: { paddingTop: Space.sm, paddingHorizontal: Space.xl },
+  // "A seguir"/"Pagas" a `Space.md` do texto da primeira parcela (a linha já traz `sm` em cima) e
+  // mais longe do grupo de cima que do próprio (§2, 25/09/2026).
+  subtituloParcelas: { paddingTop: Space.md, paddingBottom: Space.xs, paddingHorizontal: Space.xl },
   paneBody: {
     gap: Space.xl,
     minWidth: 0,
