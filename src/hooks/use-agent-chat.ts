@@ -224,6 +224,34 @@ export function useSendAgentMessage(conversationId: string) {
       /** Clique num botão de rascunho: o id cru vai junto da mensagem. */
       clickedId?: string;
     }) => sendMessage(conversationId, clientMessageId, content, clickedId),
+    // O "Tentar novamente" reenvia a MESMA mensagem: ela volta a "Pensando…" e o teto de 5 min
+    // recomeça AGORA (a tela e a releitura contam do `created_at`). Sem isto, reenviada depois
+    // do teto, a tela desistia no instante do reenvio — o mesmo que a criação já fazia.
+    onMutate: ({ clientMessageId }) => {
+      qc.setQueryData<CacheMensagens>(agentKeys.messages(conversationId), (c) =>
+        c
+          ? (marcarTurnoLocal(c, clientMessageId, {
+              status: 'processing',
+              error_code: null,
+              error_status: null,
+              created_at: new Date().toISOString(),
+            }) as CacheMensagens)
+          : c,
+      );
+    },
+    onError: (e: Error, { clientMessageId }) => {
+      if (e instanceof AgentAuthExpiredError) return;
+      const api = e as AgentApiError;
+      qc.setQueryData<CacheMensagens>(agentKeys.messages(conversationId), (c) =>
+        c
+          ? (marcarTurnoLocal(c, clientMessageId, {
+              status: 'failed',
+              error_code: api.code,
+              error_status: api.status,
+            }) as CacheMensagens)
+          : c,
+      );
+    },
     onSuccess: async (turno, v) => {
       await aplicar(turno);
       // Mesma razão do HITL: o balão ANTERIOR ganhou `resolved` no servidor e

@@ -376,7 +376,8 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
 
     const falha = erro
       ? { texto: erro.message, retryable: erro.policy.retryable }
-      : desistiu
+      // Turno que terminou não "demorou demais": a resposta está logo acima.
+      : desistiu && noBanco?.status !== 'completed'
         ? { texto: 'Essa mensagem demorou demais.', retryable: true }
         : noBanco?.status === 'failed'
           ? falhaDoTurno(noBanco)

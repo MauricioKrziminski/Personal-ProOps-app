@@ -322,8 +322,12 @@ export function marcarTurnoLocal<M extends ComSeq>(
     ...cache,
     pages: cache.pages.map((p) => ({
       ...p,
+      // A local (conversa nova) OU a já gravada pelo servidor: o reenvio numa conversa que existe
+      // parte de uma mensagem com id do banco, e ela também precisa voltar a "Pensando…".
       items: p.items.map((m) =>
-        m.id === `local:${clientMessageId}` ? { ...m, ...patch } : m,
+        m.id === `local:${clientMessageId}` || m.client_message_id === clientMessageId
+          ? { ...m, ...patch }
+          : m,
       ),
     })),
   };
@@ -719,3 +723,4 @@ export async function authorizedRequest(deps: AuthDeps): Promise<AuthOutcome> {
   }
   return { kind: 'response', response: resposta };
 }
+

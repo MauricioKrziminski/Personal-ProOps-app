@@ -748,3 +748,24 @@ test('not_configured não vira "sem conexão" com retry', () => {
   assert.equal(retryPolicyFor({ status: 0, code: 'not_configured' }).retryable, false);
   assert.equal(retryPolicyFor({ status: 0, code: 'network' }).retryable, true);
 });
+
+
+/**
+ * "Essa mensagem demorou demais." embaixo da resposta que chegou (25/09/2026, no s26): o
+ * "Tentar novamente" reenvia a MESMA mensagem, que no cache seguia `failed` e com o `created_at`
+ * de 11 min antes — o teto de 5 min do "Pensando…" já tinha estourado no instante do reenvio, e
+ * a releitura do histórico (que conta do mesmo campo) nem ligava.
+ */
+test('marcarTurnoLocal reabre também a mensagem que o servidor já gravou', () => {
+  const cache = {
+    pages: [{ items: [{ id: 'u1', sequence: 3, client_message_id: 'c1', status: 'failed', created_at: '2026-09-25T17:41:00.000Z' }] }],
+    pageParams: [null],
+  };
+  const reaberto = marcarTurnoLocal(cache as any, 'c1', {
+    status: 'processing', error_code: null, created_at: '2026-09-25T17:52:00.000Z',
+  });
+  const m = reaberto.pages[0].items[0] as any;
+  assert.equal(m.status, 'processing');
+  assert.equal(m.created_at, '2026-09-25T17:52:00.000Z');
+  assert.equal((marcarTurnoLocal(cache as any, 'outro', { status: 'processing' }).pages[0].items[0] as any).status, 'failed');
+});
