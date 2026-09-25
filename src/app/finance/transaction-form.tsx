@@ -229,7 +229,8 @@ function TransactionForm({
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const toast = useToast();
-  const { data: accounts } = useAccounts();
+  const contas = useAccounts();
+  const accounts = contas.data;
 
   const save = useSaveTransaction();
   const salvarSerie = useSaveTransactionScoped();
@@ -928,8 +929,14 @@ function TransactionForm({
           render={({ field }) => (
             <Field
               label={kind === 'transfer' ? 'Da conta' : 'Conta'}
->
-              {(accounts ?? []).length === 0 ? (
+              error={contas.isError ? 'Não deu para carregar as contas.' : undefined}>
+              {/* Afirmar "não tem conta" exige a consulta respondida: carregando, era o
+                  "Cadastrar uma conta" que aparecia para quem tem contas. */}
+              {contas.isPending ? (
+                <Skeleton height={56} />
+              ) : contas.isError ? (
+                <Button label="Tentar de novo" variant="secondary" size="sm" onPress={() => contas.refetch()} />
+              ) : (accounts ?? []).length === 0 ? (
                 <Button
                   label="Cadastrar uma conta"
                   variant="secondary"

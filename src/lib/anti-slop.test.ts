@@ -1357,3 +1357,12 @@ test('Pagamento de dívida não troca de tipo, não vira "vou pagar depois" nem 
   assert.match(fonte, /const podeAdiar = [^;]*!editing\?\.debt_id/);
   assert.match(fonte, /filter\(\(a\) => !editing\?\.debt_id \|\| a\.type !== 'credit_card'\)/, 'nem sai de cartão');
 });
+
+test('Formulário de lançamento só diz "Cadastrar uma conta" com as contas carregadas e vazias', () => {
+  // 25/09/2026, no s26: abrindo o formulário, o campo Conta mostrava "Cadastrar uma conta" até a
+  // consulta chegar — afirmar vazio exige a consulta respondida (frontend.md), e o botão levava
+  // para outra tela quem tem contas.
+  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  // A ordem é o que conta: carregando → esqueleto; erro → tentar de novo; só então o vazio.
+  assert.match(fonte, /contas\.isPending \? \(\s*<Skeleton[\s\S]{0,200}?contas\.isError \? \([\s\S]{0,200}?\(accounts \?\? \[\]\)\.length === 0 \? \(/);
+});
