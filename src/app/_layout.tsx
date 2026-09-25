@@ -32,7 +32,7 @@ import { ConcealProvider } from '@/components/ui/conceal';
 import { SincronizaWidgets } from '@/widgets/sincroniza';
 import { ToastProvider } from '@/components/ui/toast';
 import { AppUpdateProvider } from '@/hooks/use-app-update';
-import { ThemeProvider as AppThemeProvider, useBarStyle, useScheme } from '@/hooks/use-theme';
+import { ThemeProvider as AppThemeProvider, useBarStyle, useScheme, useTheme } from '@/hooks/use-theme';
 import { SessionProvider, useSession } from '@/hooks/use-session';
 import { hasCompletedOnboarding } from '@/lib/onboarding';
 import { attachNotificationListeners, configureNotificationHandler } from '@/lib/notifications';
@@ -130,6 +130,7 @@ function AvisoDaAbertura({ pronto, temSessao }: { pronto: boolean; temSessao: bo
 
 function AppTree() {
   const scheme = useScheme();
+  const theme = useTheme();
   const pathname = usePathname();
 
   useEffect(() => {
@@ -291,6 +292,15 @@ function AppTree() {
                       (`anti-slop.test.ts`).
                     */
                     headerTransparent: IOS_26_OU_MAIS,
+                    /*
+                      O header OPACO (Android, iOS < 26) tem o fundo da TELA, não o `card` do
+                      tema da navegação: com ele, toda tela empurrada no Android tinha um header
+                      branco (#FFFFFF) sobre a página em papel (#F2F1EE) — e a faixa de busca, que
+                      tem o fundo da tela, não lia como parte do header (design.md §8). Medido no
+                      s26 em 25/09/2026. A tela que troca o fundo (o editor de uma nota colorida)
+                      troca o do header junto, pelo `Screen`.
+                    */
+                    headerStyle: IOS_26_OU_MAIS ? undefined : { backgroundColor: theme.background },
                     headerBackButtonDisplayMode: 'minimal',
                     ...stackHeaderFonts,
                   }}>
