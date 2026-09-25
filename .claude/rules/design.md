@@ -385,6 +385,16 @@ aponta pelo NOME, e face ausente não cai no system font — ela some.
 
 **Uma display por tela** continua valendo.
 
+**UM negrito no texto corrido, e nome citado nunca vai entre aspas** (25/09/2026, a partir de
+*"trocar por negrito a palavra que ficava dentro"* das « »). O peso é 700 (`Fonts.bold`), igual no
+chat, nos avisos, nas dicas e nos títulos (onde o `headline` já é 600). Dois caminhos, um peso:
+`<Forte>` para DADO do usuário (nome de pasta, busca, descrição de extrato — "IFD*IFOOD" partiria
+um `*` ao meio) e `*assim*` (`ComNegrito`) para texto NOSSO — exemplo do que mandar, nome de botão,
+frase do servidor e do agente. `Field` (rótulo, dica, erro), `Row` (subtítulo), `EmptyState`,
+toast, `Dica` e o guia aceitam os dois. No diálogo nativo (sem negrito) a frase nomeia o tipo:
+"Arquivar a meta Viagem?". `anti-slop.test.ts` barra « », “ ” e `"${…}"`; ficam as aspas de
+CITAÇÃO da fala da pessoa na Hoje.
+
 ⚠️ **Nenhuma palavra parte ao meio.** `ThemedText` traz `android_hyphenationFrequency="none"`, e
 os primitivos de duas colunas (`Row`) **quebram a linha e mandam o valor para baixo** em vez de
 espremer o título. A doc do Android é explícita: `none` não impede a quebra quando a palavra é
