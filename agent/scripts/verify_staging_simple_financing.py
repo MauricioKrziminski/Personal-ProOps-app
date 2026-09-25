@@ -25,8 +25,11 @@ def main():
             check(len(schedule) == 40, '40 installments remaining')
             check(all(row == (147000, None, None) for row in schedule), 'contract amount with unknown breakdown')
             check(conn.execute("select interest_rate_monthly,total_interest_cents from payoff_strategy('avalanche') where debt_id=%s", (debt,)).fetchone() == (None, None), 'unknown rate and interest remain null')
+            # Desde a `20260925120000` pagar diferente da parcela vale (encargo/desconto), dentro de
+            # UMA parcela: menos da metade e o dobro continuam recusados.
             for sql, args in [
-                ('select pay_debt_installment(%s,146999,%s)', (debt, account)),
+                ('select pay_debt_installment(%s,73499,%s)', (debt, account)),
+                ('select pay_debt_installment(%s,294000,%s)', (debt, account)),
                 ("update debts set calculation_mode='amortized' where id=%s", (debt,)),
             ]:
                 try:
@@ -39,11 +42,14 @@ def main():
             conn.execute('select pay_debt_installment(%s,147000,%s)', (debt, account))
             check(conn.execute('select remaining_cents,installments_paid from debts where id=%s', (debt,)).fetchone() == (5733000, 9), 'one installment settled exactly once')
             check(conn.execute('select count(*),sum(amount_cents) from transactions where debt_id=%s and account_id=%s', (debt, account)).fetchone() == (1, 147000), 'one actual payment, exact amount and account')
+            conn.execute('select pay_debt_installment(%s,150000,%s)', (debt, account))
+            check(conn.execute('select remaining_cents,installments_paid from debts where id=%s', (debt,)).fetchone() == (5586000, 10), 'paying more still settles ONE installment')
+            check(conn.execute('select debt_interest_cents from transactions where debt_id=%s and debt_payment_no=10', (debt,)).fetchone() == (3000,), 'the extra is recorded as encargo')
             conn.execute('reset role')
         for table in ['transactions', 'debts', 'accounts', 'workspace_members']:
             check(conn.execute(f'select count(*) from {table} where workspace_id=%s', (workspace,)).fetchone()[0] == 0, f'no fixture residue in {table}')
         check(conn.execute('select count(*) from workspaces where id=%s', (workspace,)).fetchone()[0] == 0, 'no workspace residue')
-    print('PASS authenticated staging simple financing: 48x1470, 8 paid, 40 remaining, unknown interest, exact payment and rollback without residue')
+    print('PASS authenticated staging simple financing: 48x1470, 8 paid, 40 remaining, unknown interest, exact payment, paid-more as encargo and rollback without residue')
 
 
 if __name__ == '__main__':
