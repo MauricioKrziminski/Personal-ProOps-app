@@ -33,6 +33,11 @@ export function Card({ children, elevation = 'none', style }: CardProps) {
           borderWidth: 1,
           borderColor: theme.cardBorder,
           padding: Space.lg,
+          // O respiro entre linhas irmãs de um card é DO card (design.md §2). Sem ele, cada tela
+          // que esquecia do `gap` no próprio estilo colava um texto no botão logo abaixo — foi o
+          // "É pagamento de uma dívida." grudado no "Ver dívidas" (24/09/2026). Quem precisa de
+          // outro ritmo passa o seu no `style`, que vem depois.
+          gap: Space.md,
           boxShadow: Elevation[scheme][elevation],
         },
         style,

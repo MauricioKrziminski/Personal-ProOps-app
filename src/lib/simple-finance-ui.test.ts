@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -126,6 +126,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useDeleteDebt: () => mutation('deleteDebt'),
     useArchivedDebts: () => ({ ...query, data: options.archivedDebts ?? [] }),
     useDebtSchedule: () => ({ ...query, data: options.debtSchedule ?? [] }),
+    usePayoffStrategy: () => ({ ...query, data: options.payoff ?? [] }),
     useDebtPayments: () => options.paymentsError
       ? { ...query, isSuccess: false, isError: true, data: undefined, refetch: async () => { refetches.push('payments'); } }
       : { ...query, isSuccess: true, data: options.debtPayments ?? [] },
@@ -699,6 +700,33 @@ test('detalhe da dívida: "A seguir" começa na próxima, 20 por vez, e "Já pag
   assert.ok(mais, '"Ver mais" com as 10 que faltam');
   ui.interact(() => mais.props.onPress());
   assert.equal(seguir().length, 30);
+});
+
+test('detalhe da dívida: juros de R$ 0,00 não viram linha vermelha; juros de verdade continuam', () => {
+  const texto = (ui: any) => JSON.stringify(ui.nodes().filter((n: any) => n.type === 'ThemedText').map((n: any) => n.props.children));
+  const abrir = (juros: number | null) => {
+    const ui = screen(debtsFile, {
+      create: false,
+      debts: [{ ...carro, calculation_mode: 'amortized', interest_rate_monthly: juros ? 0.0199 : 0 }],
+      debtSchedule: [{ installment_no: 9, due_date: '2026-10-05', payment_cents: 147000, interest_cents: juros, principal_cents: 147000, balance_cents: 0 }],
+    });
+    ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onPress());
+    return texto(ui);
+  };
+  assert.doesNotMatch(abrir(0), /são juros/, 'sem juros, nada a avisar');
+  assert.match(abrir(29000), /são juros/);
+});
+
+test('por onde começar: dívida com juros ZERO diz "sem juros", como a linha dela', () => {
+  const moto = { ...carro, id: 'd2', name: 'Moto', calculation_mode: 'amortized', interest_rate_monthly: 0 };
+  const ui = screen(debtsFile, {
+    create: false,
+    debts: [carro, moto],
+    payoff: [{ debt_id: 'd2', name: 'Moto', interest_rate_monthly: 0, months_left: 11, remaining_cents: 110000 }],
+  });
+  const texto = JSON.stringify(ui.nodes().filter((n: any) => n.type === 'ThemedText').map((n: any) => n.props.children));
+  assert.doesNotMatch(texto, /juros 0/);
+  assert.match(texto, /sem juros/);
 });
 
 test('editing the paid count of an OLD debt keeps the date its schedule shows (final review, 23/09/2026)', () => {
@@ -1883,4 +1911,14 @@ test('Notas: o arquivado tem porta no fim da aba, com a contagem, e ela some sem
   assert.equal(ui.navigations.at(-1), '/notes/archived');
   const sem = screen(notasFile, { notes: [nota('n1')] });
   assert.ok(!sem.nodes().some((n: any) => n.type === 'Row' && String(n.props.title).startsWith('Arquivadas')));
+});
+
+test('Card: os filhos têm respiro entre si — o texto e o botão não colam (design.md §2)', () => {
+  // "É pagamento de uma dívida." colado no "Ver dívidas" (24/09/2026): o `Card` não punha espaço
+  // entre filhos, e cada tela que esquecia do `gap` no próprio estilo saía assim.
+  const ui = screen('src/components/ui/card.tsx', { componente: 'Card', props: { children: ['a', 'b'] } });
+  const caixa = ui.nodes().find((n: any) => n.type === 'View');
+  assert.ok(caixa, 'o card desenha uma View');
+  const base = [caixa.props.style].flat(Infinity).find((s: any) => s && 'padding' in s);
+  assert.ok(base && 'gap' in base, 'a base do Card tem `gap`');
 });

@@ -89,7 +89,8 @@ export const AgentRecentConversations = memo(function AgentRecentConversations()
 
 const styles = StyleSheet.create({
   root: { gap: Space.md },
-  card: { paddingVertical: Space.xs, paddingHorizontal: Space.sm },
+  // Lista de linhas: quem separa uma conversa da outra é a própria linha, não o respiro do card.
+  card: { paddingVertical: Space.xs, paddingHorizontal: Space.sm, gap: 0 },
   esqueleto: { gap: Space.sm, paddingVertical: Space.sm },
   erro: { gap: Space.md, alignItems: 'flex-start' },
   verTodas: {

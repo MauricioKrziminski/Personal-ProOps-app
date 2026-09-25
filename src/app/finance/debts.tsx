@@ -622,7 +622,7 @@ export default function DebtsScreen() {
                   {p.name}
                 </ThemedText>
                 <ThemedText type="footnote" themeColor="textSecondary">
-                  {lista.find((d) => d.id === p.debt_id)?.calculation_mode === 'fixed_installments' ? 'parcelas fixas' : `juros ${taxaLabel(Number(p.interest_rate_monthly))}`} · {p.months_left} meses
+                  {lista.find((d) => d.id === p.debt_id)?.calculation_mode === 'fixed_installments' ? 'parcelas fixas' : Number(p.interest_rate_monthly) > 0 ? `juros ${taxaLabel(Number(p.interest_rate_monthly))}` : 'sem juros'} · {p.months_left} meses
                 </ThemedText>
               </View>
               <Money cents={Number(p.remaining_cents)} variant="subhead" tone="danger" />
@@ -784,7 +784,7 @@ export default function DebtsScreen() {
                   </ThemedText>
                   <Money cents={Number(proxima.payment_cents)} variant="body" />
                 </View>
-                {detalhe.calculation_mode !== 'fixed_installments' && (
+                {detalhe.calculation_mode !== 'fixed_installments' && Number(proxima.interest_cents) > 0 && (
                   <ThemedText type="small" themeColor="danger">
                     <Money cents={Number(proxima.interest_cents)} variant="subhead" tone="danger" /> disso
                     são juros

@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { CategoryPicker } from '@/components/finance/category-picker';
 import { Chip } from '@/components/finance/chip';
 import { Note } from '@/components/ui/note';
+import { Row, Section } from '@/components/ui/row';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
@@ -700,11 +701,18 @@ function TransactionForm({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic">
+        {/*
+          Uma linha só, e ela É o caminho: abre a dívida DESTE pagamento, não a lista. Era um texto
+          solto com um botão colado embaixo (24/09/2026).
+        */}
         {editing?.debt_id ? (
-          <Card>
-            <ThemedText type="small" themeColor="textSecondary">É pagamento de uma dívida.</ThemedText>
-            <Button label="Ver dívidas" icon="arrow.up.right" variant="secondary" size="sm" onPress={() => router.push('/finance/debts')} />
-          </Card>
+          <Section>
+            <Row
+              icon="doc.text"
+              title="Pagamento de uma dívida"
+              onPress={() => router.push({ pathname: '/finance/debts', params: { id: editing.debt_id! } })}
+            />
+          </Section>
         ) : null}
         {/*
           ⚠️ **Um lançamento que JÁ é de uma série precisa dizer isso na tela.** A pergunta de

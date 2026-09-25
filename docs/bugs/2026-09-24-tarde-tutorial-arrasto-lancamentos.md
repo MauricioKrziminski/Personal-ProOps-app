@@ -194,3 +194,12 @@ linha sumia de uma vez. Agora a linha encolhe logo depois da saída (~0,2 s), co
 banco chega depois sem ninguém ver; se falhar, ela reabre. Conferido no s26 e no iPhone (nota
 `28e7614a-…` arquivada nos testes e restaurada pelo ID). E o rótulo virou **"compra em 14/09"**
 (era "compra de"), na linha e no detalhe.
+
+**Sexta rodada.** *"olha o texto colado totalmente fora de lugar"* — no "Editar lançamento" de um
+pagamento de dívida, "É pagamento de uma dívida." vinha grudado no "Ver dívidas". A causa era o
+`Card`: sem `gap`, todo card com mais de um filho empilhava colado, e o §2 do design dizia que o
+`Card` já aplicava `Space.md`. Agora aplica (as duas listas com separador próprio pedem `gap: 0`), e
+o bloco virou UMA linha "Pagamento de uma dívida ›" que abre ESTA dívida, não a lista. Na mesma
+tela: "R$ 0,00 disso são juros" em vermelho numa dívida sem juros, e "juros 0%" no "Por onde
+começar" — os dois saíram ("sem juros", como a linha da dívida). Conferido no iPhone com uma dívida
+e um pagamento de teste no `dev@`, apagados pelo ID depois.

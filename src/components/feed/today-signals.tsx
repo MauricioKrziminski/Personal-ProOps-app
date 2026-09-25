@@ -66,7 +66,8 @@ export function TodaySignals({ signals }: { signals: readonly TodaySignal[] }) {
 }
 
 const styles = StyleSheet.create({
-  card: { paddingVertical: 0, paddingHorizontal: 0, overflow: 'hidden' },
+  // Lista de linhas com separador: sem o respiro do `Card` entre elas.
+  card: { paddingVertical: 0, paddingHorizontal: 0, overflow: 'hidden', gap: 0 },
   row: {
     minHeight: HitTarget + Space.lg,
     flexDirection: 'row',
