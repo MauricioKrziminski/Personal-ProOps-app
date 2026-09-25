@@ -1009,8 +1009,8 @@ crédito:
   de 4,5:1 sobre o fundo tingido em metade das cores, e o ajustado passa de 5:1 nas oito
   (`note-surface.test.ts`). Nota sem cor herda a da pasta — no cartão e no editor. Continua sem
   pintar texto, botão ou estado, e os seletores (cor, pasta, tag) abertos do editor ficam no tema
-  comum. Na lista de Pastas, na Lixeira e em Arquivadas (linhas de lista, não cartões) a cor
-  segue um disco.
+  comum. Na lista de Pastas (linhas, não cartões) a cor segue um disco; Lixeira e Arquivadas
+  não mostram cor.
 - **Nenhum dos oito valores é `tint`, `danger` ou `warning`** — cor de nota não pode ler como
   "ação" nem como "erro", que são as únicas coisas que a cor significa neste app.
 - **A contagem anti-slop não muda**: continua UM accent na tela. Cor de conteúdo não entra na

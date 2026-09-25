@@ -107,9 +107,10 @@ interface ScreenProps {
   /** Let a tab root use a bounded tablet canvas; pushed routes keep their native scroll root. */
   wide?: boolean;
   /**
-   * Fundo da tela no lugar do do tema — o editor de uma nota colorida (25/09/2026). Pinta também
-   * o header quando ele é OPACO (Android e iOS < 26); no iOS 26 o header é vidro e o fundo passa
-   * por baixo dele sozinho. `undefined` volta ao fundo do tema, header incluído.
+   * Fundo da tela no lugar do do tema — o editor de uma nota colorida (25/09/2026). Com
+   * `scroll={false}` (sem `topBar`) pinta também o header quando ele é OPACO (Android e iOS < 26);
+   * no iOS 26 o header é vidro e o fundo passa por baixo dele sozinho. Tela que rola não repinta o
+   * header: ele fica no fundo do tema, que a raiz já aplica. `undefined` volta ao fundo do tema.
    */
   background?: string;
 }
