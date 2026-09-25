@@ -98,7 +98,7 @@ def faltando(action, texto_cru: str = "", timezone: str = "America/Sao_Paulo") -
     if tipo in EXIGEM_VALOR and not action.occurred_at:
         if impossivel := _dia_impossivel(texto_cru):
             return "amount", (
-                f"📅 “dia {impossivel}” não existe. Que dia foi? "
+                f"📅 *dia {impossivel}* não existe. Que dia foi? "
                 "(ou me fala \"hoje\", \"ontem\")"
             )
 

@@ -32,7 +32,7 @@ STALE = "stale"
 # A resposta não confirmou, não recusou e não disse o que muda. A frase tem que dar a
 # SAÍDA — a anterior pedia "diga o que deseja mudar" num caminho que descartava a correção.
 MANTIDA = ("Ainda não fiz nada. Responde *SIM* para confirmar, *NÃO* para cancelar, "
-           "ou me diz o que está diferente — por exemplo: “foi no cartão em 2x”.")
+           "ou me diz o que está diferente — por exemplo: *foi no cartão em 2x*.")
 
 # `pa:<uuid do pendente>:<sufixo>`. O uuid vai DENTRO do id do botão porque botão
 # do WhatsApp continua clicável para sempre: um toque num "Confirmar" de três

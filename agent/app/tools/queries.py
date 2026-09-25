@@ -854,7 +854,7 @@ async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     # conhecido até aparecer no uso real ("conta de gas" contra "conta de gás").
     se_esvaziou = ""
     if alvo and not linhas_sql:
-        se_esvaziou = f"Não achei recorrência com “{alvo}”. Estas são todas:\n"
+        se_esvaziou = f"Não achei recorrência com *{alvo}*. Estas são todas:\n"
         alvo = ""
         linhas_sql = await db.fetch(
             """
@@ -944,7 +944,7 @@ async def query_debts(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     rows = await db.fetch(SQL, ctx.workspace_id, alvo, f"%{alvo}%")
     aviso = ""
     if alvo and not rows:
-        aviso = f"Não achei dívida com “{alvo}”. Estas são todas:\n"
+        aviso = f"Não achei dívida com *{alvo}*. Estas são todas:\n"
         alvo = ""
         rows = await db.fetch(SQL, ctx.workspace_id, "", "%")
     if not rows:

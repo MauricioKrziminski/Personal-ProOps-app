@@ -915,8 +915,8 @@ async def _cartao_citado(workspace_id, nome: str, cartoes: list[dict]):
     parecidas = matching.match_accounts(nome, cartoes, account_type="credit_card")
     if len(parecidas) > 1:
         opcoes = ", ".join(f"*{c['name']}*" for c in parecidas[:6])
-        return None, f"🤔 “{nome}” casa com mais de um cartão: {opcoes}. Me manda de novo dizendo qual."
-    return None, f"🤔 Não achei cartão com o nome “{nome}”. " + qual_cartao([c["name"] for c in cartoes])
+        return None, f"🤔 *{nome}* casa com mais de um cartão: {opcoes}. Me manda de novo dizendo qual."
+    return None, f"🤔 Não achei cartão com o nome *{nome}*. " + qual_cartao([c["name"] for c in cartoes])
 
 
 async def conversoes(workspace_id, acoes: list, alvos: list[dict]) -> list[dict]:

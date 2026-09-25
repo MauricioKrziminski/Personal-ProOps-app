@@ -31,3 +31,16 @@ def test_nenhum_texto_do_agente_tem_aspas_angulares():
                 if "«" in no.value or "»" in no.value:
                     achados.append(f"{arquivo.relative_to(APP)}:{no.lineno}")
     assert achados == []
+
+
+def test_nenhum_texto_do_agente_cita_entre_aspas_curvas():
+    """A padronização do mesmo dia: nome e exemplo entre “ ” também viram `*negrito*`."""
+    achados = []
+    for arquivo in APP.rglob("*.py"):
+        arvore = ast.parse(arquivo.read_text(encoding="utf-8"))
+        docs = _docstrings(arvore)
+        for no in ast.walk(arvore):
+            if isinstance(no, ast.Constant) and isinstance(no.value, str) and id(no) not in docs:
+                if "“" in no.value or "”" in no.value:
+                    achados.append(f"{arquivo.relative_to(APP)}:{no.lineno}")
+    assert achados == []

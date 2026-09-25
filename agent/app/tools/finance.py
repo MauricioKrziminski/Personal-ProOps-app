@@ -143,12 +143,12 @@ async def conta_citada(
 
     if len(parecidas) > 1:
         opcoes = ", ".join(f"*{c['name']}*" for c in parecidas[:6])
-        raise Level1Error(f"🤔 “{nome}” casa com mais de uma: {opcoes}. Qual delas?")
+        raise Level1Error(f"🤔 *{nome}* casa com mais de uma: {opcoes}. Qual delas?")
 
     existentes = ", ".join(f"*{c['name']}*" for c in linhas[:8]) or "nenhuma ainda"
     o_que = "cartão" if only_cards else "conta"
     raise Level1Error(
-        f"🤔 Não achei {o_que} com o nome “{nome}”. Você tem: {existentes}. "
+        f"🤔 Não achei {o_que} com o nome *{nome}*. Você tem: {existentes}. "
         f"Qual é {papel}?"
     )
 
