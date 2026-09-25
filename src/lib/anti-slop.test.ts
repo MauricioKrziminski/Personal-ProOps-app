@@ -1338,8 +1338,9 @@ test('Toda rolagem deixa o toque passar com o teclado aberto (keyboardShouldPers
         else if (generico && c === '>') generico -= 1;
         else if (!generico && chaves === 0 && c === '>' && texto[i - 1] !== '=') break;
       }
-      // `always` só onde a rolagem mora SOBRE o teclado (a barra de formatação da nota).
-      if (!/keyboardShouldPersistTaps="(handled|always)"/.test(texto.slice(m.index!, i))) {
+      // `always` só onde a rolagem mora SOBRE o teclado (a barra de formatação da nota). `never`
+      // escrito é decisão declarada e passa; o defeito era o padrão IMPLÍCITO.
+      if (!/keyboardShouldPersistTaps="(handled|always|never)"/.test(texto.slice(m.index!, i))) {
         fora.push(`${file.replace(`${SRC}/`, '')}: <${m[1]}>`);
       }
     }
