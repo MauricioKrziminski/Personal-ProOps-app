@@ -851,14 +851,33 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                     _error("Informe o primeiro dia do mês do orçamento.")
                 selector = " and month = %s"
                 params.append(month.isoformat())
+        # Sem maiúscula e sem acento (25/09/2026): "paguei a parcela do carro" com a dívida
+        # "Carro" dava "não encontrei". Pasta já chega normalizada (`lookup_name`).
+        comparacao = (
+            f"{identity} = %s" if action.resource == "folders"
+            else f"extensions.unaccent(lower({identity})) = extensions.unaccent(lower(%s))"
+        )
         rows = await db.fetch(
-            f"select *, xmin::text as row_version from public.{table} where workspace_id = %s and {identity} = %s"
+            f"select *, xmin::text as row_version from public.{table} where workspace_id = %s and {comparacao}"
             + _where(action.resource, lixeira)
             + selector,
             *params,
         )
         if len(rows) != 1 and action.resource == "notes":
             rows = await _notas_parecidas(ctx, action.name, lixeira)
+        if not rows and action.resource not in {"notes", "budgets"}:
+            # Citou e não existe: a pergunta mostra o que existe (a lista é curta e útil,
+            # como a de contas). "Informe o nome exato" deixava a pessoa adivinhar.
+            nomes = [r["label"] for r in await db.fetch(
+                f"select {identity} as label from public.{table} where workspace_id = %s"
+                + _where(action.resource, lixeira) + f" order by {identity} limit 8",
+                ctx.workspace_id,
+            ) if r.get("label")]
+            if nomes:
+                _error(
+                    f"Não achei {LABELS[action.resource]} com o nome *{action.name}*. "
+                    f"Tenho: {', '.join(nomes)}. Qual é? Nada foi alterado."
+                )
         if len(rows) != 1:
             _error(_nao_achei(action, rows))
         old = rows[0]

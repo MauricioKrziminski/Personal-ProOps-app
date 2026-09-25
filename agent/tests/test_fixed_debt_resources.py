@@ -391,3 +391,43 @@ async def test_pagar_parcela_fixa_fora_do_limite_pergunta_antes_do_sim(fixed_deb
         await resources.prepare(fixed_debt, action("resource_pay", amount_cents=70000))
     with pytest.raises(Exception, match="passa de uma parcela"):
         await resources.prepare(fixed_debt, action("resource_pay", amount_cents=300001))
+
+
+# --- o nome dito sem maiúscula e sem acento acha o cadastro (25/09/2026) -----------------
+
+
+@pytest.mark.asyncio
+async def test_nome_do_cadastro_casa_sem_maiuscula_nem_acento(monkeypatch):
+    """ "paguei a parcela do carro" com a dívida "Carro": a busca era `name = %s` exato."""
+    consultas = []
+
+    async def fetch(sql, *args):
+        consultas.append(sql)
+        return []
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    ctx = ExecContext("user", "workspace", None, "America/Sao_Paulo", "carro", "app:1")
+    with pytest.raises(Level1Error):
+        await resources.prepare(ctx, ResourceAction(
+            type="resource_pay", resource="debts", name="carro",
+            fields=[ResourceField(name="amount_cents", value="147000")]))
+    busca = next(s for s in consultas if "xmin" in s)
+    assert "extensions.unaccent(lower(name)) = extensions.unaccent(lower(%s))" in busca
+
+
+@pytest.mark.asyncio
+async def test_nome_que_nao_existe_pergunta_listando_os_que_existem(monkeypatch):
+    async def fetch(sql, *args):
+        if "xmin" in sql:
+            return []
+        return [{"label": "Carro"}, {"label": "Empréstimo Nubank"}]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    ctx = ExecContext("user", "workspace", None, "America/Sao_Paulo", "moto", "app:1")
+    with pytest.raises(Level1Error) as erro:
+        await resources.prepare(ctx, ResourceAction(
+            type="resource_pay", resource="debts", name="moto",
+            fields=[ResourceField(name="amount_cents", value="50000")]))
+    texto = erro.value.mensagem_usuario
+    assert "*moto*" in texto and "Carro" in texto and "Empréstimo Nubank" in texto
+    assert "Nada foi alterado" in texto
