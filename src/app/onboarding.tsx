@@ -23,7 +23,7 @@ import { CycleDayPicker } from '@/components/finance/cycle-day-picker';
 import { PrimeiraFrase } from '@/components/onboarding/primeira-frase';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { Icon } from '@/components/ui/icon';
+import { Icon, type IconName } from '@/components/ui/icon';
 import { Mark } from '@/components/ui/mark';
 import { TextField } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
@@ -32,6 +32,7 @@ import { useCycle, useSetCycleCloseDay } from '@/hooks/use-finance';
 import { useProfile, useUpdateProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
 import { useTheme } from '@/hooks/use-theme';
+import { O_QUE_DA_PARA_FAZER } from '@/lib/dicas';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -59,7 +60,7 @@ import { supabase } from '@/lib/supabase';
  * derrubar). Passo que não muda nada no primeiro dia é passo que se pula sem ler.
  */
 
-const TOTAL = 4;
+const TOTAL = 5;
 
 
 export default function OnboardingScreen() {
@@ -160,6 +161,7 @@ export default function OnboardingScreen() {
     />,
     <PassoCiclo key="2" entra={entra} valor={diaEscolhido} onChange={setDiaDoCiclo} />,
     <PassoAvisos key="3" entra={entra} userId={userId} />,
+    <PassoTudo key="4" entra={entra} />,
   ][passo];
 
   return (
@@ -468,6 +470,45 @@ function PassoAvisos({
   );
 }
 
+/**
+ * "O que dá para fazer" (24/09/2026): tudo que o app tem, numa tela, antes de "Começar a usar" —
+ * para quem nunca usou saber que dá para importar a fatura, abrir uma conta, tocar no painel.
+ * Uma linha por recurso, sem carrossel (escolha do dono do produto: "uma tela, lista").
+ */
+function PassoTudo({ entra }: { entra: (a: BaseAnimationBuilder) => BaseAnimationBuilder }) {
+  const theme = useTheme();
+  return (
+    <View style={styles.distribuido}>
+      <Cabecalho entra={entra} icone="hand.tap" titulo="O que dá para fazer" />
+      <View style={styles.tudo}>
+        {O_QUE_DA_PARA_FAZER.map((l, i) => (
+          <Animated.View
+            key={l.titulo}
+            entering={entra(
+              FadeInDown.delay(Motion.stagger.step * (2 + i))
+                .duration(Motion.duration.slow)
+                .easing(Motion.easing.out),
+            )}
+            style={styles.tudoLinha}>
+            <View style={[styles.tudoSelo, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+              <Icon name={l.icone as IconName} size="sm" color="text" />
+            </View>
+            <View style={styles.tudoTextos}>
+              {/* `flexShrink: 0`: texto dentro de `entering` encolhido não se remede (design.md §3). */}
+              <ThemedText type="headline" style={styles.semEncolher}>
+                {l.titulo}
+              </ThemedText>
+              <ThemedText type="footnote" themeColor="textSecondary" style={styles.semEncolher}>
+                {l.texto}
+              </ThemedText>
+            </View>
+          </Animated.View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 /** Ícone + título + uma linha. O mesmo esqueleto nos três passos de pergunta. */
 function Cabecalho({
   entra,
@@ -617,6 +658,18 @@ const styles = StyleSheet.create({
   cabecalho: { gap: Space.lg },
   titulo: { gap: Space.md },
   semEncolher: { flexShrink: 0, maxWidth: '100%' },
+  tudo: { gap: Space.lg },
+  tudoLinha: { flexDirection: 'row', alignItems: 'flex-start', gap: Space.md },
+  /* Geometria fixa, como o ícone do cabeçalho: ladrilho não cresce com a fonte. */
+  tudoSelo: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tudoTextos: { flex: 1, minWidth: 0, gap: Space.half },
   /* Geometria fixa: o ícone mora num ladrilho, e ladrilho não cresce com a fonte. */
   cabecalhoIcone: {
     width: 56,

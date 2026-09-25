@@ -1834,7 +1834,7 @@ const dicas = (ui: ReturnType<typeof screen>) =>
 
 test('Hoje: a dica do painel mora no herói, e tocar nele a encerra', () => {
   const ui = screen(hojeFile, { balances: [saldo('Nubank', 'checking', 120_00)] });
-  assert.deepEqual(dicas(ui), ['hoje-painel', 'hoje-contas']);
+  assert.deepEqual(dicas(ui), ['hoje-painel', 'conta-extrato']);
   ui.nodes().find((n: any) => n.type === 'HeroPanel').props.onPress();
   assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'usarDica', value: 'hoje-painel' });
 });

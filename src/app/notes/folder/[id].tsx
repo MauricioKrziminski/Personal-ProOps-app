@@ -313,6 +313,7 @@ export default function FolderScreen() {
 
             {/* A mesma dica da aba Notas: quem guarda tudo em pastas só vê cartões aqui. */}
             {notes.length > 0 ? <Dica id="lista-arrasto" tela="notas" bico="baixo" /> : null}
+            {notes.length > 1 ? <Dica id="notas-ordem" tela="notas" bico="baixo" /> : null}
 
             {fixadas.length > 0 ? (
               <View style={styles.secao} onLayout={(e) => setTopoFixadas(e.nativeEvent.layout.y)}>

@@ -486,7 +486,7 @@ export default function TodayScreen() {
         title="Nas contas"
         action={{ label: 'Contas', onPress: () => router.push('/finance/accounts') }}
       />
-      <Dica id="hoje-contas" tela="hoje" bico="baixo" />
+      <Dica id="conta-extrato" tela="hoje" bico="baixo" />
       <CashAccounts
         caixa={emConta}
         onOpen={(l: LinhaDeCaixa) =>

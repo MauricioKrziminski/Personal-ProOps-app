@@ -19,6 +19,7 @@ import { WalletCarousel, useGeometriaDaVitrine } from '@/components/finance/wall
 import { useFlight, useFlightAnchor } from '@/components/motion/flight-layer';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
+import { Dica } from '@/components/ui/dica';
 import { Card } from '@/components/ui/card';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { useBRL } from '@/components/ui/conceal';
@@ -119,6 +120,8 @@ export default function WalletScreen() {
     (i: number) => {
       const id = lista[i]?.account_id;
       if (id) setAtivoId(id);
+      // Folhear é o que a dica da Carteira ensina (`carteira`).
+      usarDica('carteira');
     },
     [lista]
   );
@@ -199,6 +202,7 @@ export default function WalletScreen() {
       setAtivoId(c.account_id);
       ativoAgora.current = c;
       escolherCartao(userId, c.account_id);
+      usarDica('carteira');
       fechar();
     },
     [lista, userId, fechar]
@@ -329,8 +333,17 @@ export default function WalletScreen() {
         {lista.length > 1 ? <Pontos total={lista.length} x={x} passo={g.passo} /> : null}
       </View>
     );
+    // Só com mais de um cartão: com um só não há o que folhear nem escolher. A Carteira não tem
+    // `Screen`, então a calha da dica é a mesma dos detalhes logo abaixo.
+    const dicaDaCarteira =
+      lista.length > 1 ? (
+        <View style={styles.dica}>
+          <Dica id="carteira" tela="carteira" />
+        </View>
+      ) : null;
     const walletContext = (
       <View style={styles.context}>
+        {dicaDaCarteira}
         {walletDetails}
         {walletActions}
       </View>
@@ -338,6 +351,7 @@ export default function WalletScreen() {
     const compactBody = (
       <>
         {walletVisual}
+        {dicaDaCarteira}
         {walletDetails}
         {walletActions}
       </>
@@ -526,4 +540,5 @@ const styles = StyleSheet.create({
   numeros: { gap: Space.sm },
   // O fim do conteúdo, encostado na base quando sobra tela (§1 do design: ação não fica ancorada).
   acoes: { marginTop: 'auto', flexShrink: 0, gap: Space.md, paddingHorizontal: Space.lg, paddingTop: Space.lg },
+  dica: { paddingHorizontal: Space.lg },
 });

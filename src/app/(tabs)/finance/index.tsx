@@ -35,6 +35,7 @@ import { categoryIcon } from '@/design/category-icons';
 import { chartWidthForPane } from '@/design/adaptive-window';
 import { Radius, Space } from '@/design/tokens';
 import { useAgentActivity } from '@/hooks/use-agent-activity';
+import { usarDica } from '@/hooks/use-dicas';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import {
   useAccounts,
@@ -344,20 +345,24 @@ export default function FinanceScreen() {
               />
             ) : undefined}
             concealable
-            onPress={heroLoading ? undefined : () => showItemActions('Mais opções', [
+            onPress={heroLoading ? undefined : () => {
+              usarDica('fin-painel');
+              showItemActions('Mais opções', [
               { label: 'Ver o que fecha o ciclo', icon: 'list.bullet', onPress: () => abrirCiclo('tudo') },
               { label: 'O que entra', icon: 'arrow.down.circle', onPress: () => abrirCiclo('entra') },
               { label: 'O que sai', icon: 'arrow.up.circle', onPress: () => abrirCiclo('sai') },
               { label: 'Projeção', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
               { label: 'Patrimônio', icon: 'building.columns', onPress: () => router.push('/finance/net-worth') },
               { label: 'Metas', icon: 'target', onPress: () => router.push('/finance/goals') },
-            ])}
+              ]);
+            }}
           />
         )}
         {/* Só com a curva na tela: a dica ensina o gesto DELA. */}
         {!heroError && !heroLoading && temCurva ? (
           <Dica id="fin-grafico" tela="financeiro" />
         ) : null}
+        {!heroError && !heroLoading ? <Dica id="fin-painel" tela="financeiro" /> : null}
       </View>
     </>
   );

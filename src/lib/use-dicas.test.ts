@@ -46,13 +46,13 @@ const esperar = () => new Promise((r) => setTimeout(r, 0));
 test('usar antes de o disco responder não se perde, nem apaga o que já estava encerrado', async () => {
   const { api, disco, responder } = carregar(JSON.stringify({ encerradas: ['hoje-painel'], guia: false }));
   assert.equal(api.useGuiaAberto(), undefined, 'o disco ainda não respondeu');
-  api.usarDica('hoje-contas');
+  api.usarDica('conta-extrato');
   api.marcarGuiaAberto();
   responder();
   await esperar();
   assert.equal(api.useGuiaAberto(), true);
   const salvo = JSON.parse(disco.get('dicas:u1')!);
-  assert.deepEqual([...salvo.encerradas].sort(), ['hoje-contas', 'hoje-painel']);
+  assert.deepEqual([...salvo.encerradas].sort(), ['conta-extrato', 'hoje-painel']);
   assert.equal(salvo.guia, true);
 });
 

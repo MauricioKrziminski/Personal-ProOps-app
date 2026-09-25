@@ -212,9 +212,9 @@ export default function TransactionsScreen() {
     if (params.accountId) setAccountId(params.accountId);
   }
 
-  // Abrir o extrato de uma conta é o que a dica "Nas contas" da Hoje ensina (`hoje-contas`).
+  // Abrir o extrato de uma conta é o que a dica das contas ensina (`conta-extrato`).
   useEffect(() => {
-    if (accountId && accountId !== NO_ACCOUNT) usarDica('hoje-contas');
+    if (accountId && accountId !== NO_ACCOUNT) usarDica('conta-extrato');
   }, [accountId]);
 
   const regua = useMonthRuler();

@@ -143,3 +143,30 @@ já usa o app; guardado no aparelho, como o "Agora não".
 **Efeito colateral no staging (conta `dev@`):** os testes de arrastar até o fim mexeram em notas
 de demonstração; `b7e765de` foi restaurada pelo id, e `9772618e`/`adaaaf73` ficaram só com o
 `updated_at` novo (conteúdo igual).
+
+## 24/09/2026 (noite) — segunda rodada, depois do teste do dono do produto
+
+**Arrasto.** *"Isso tem que ser redondo"*, *"esse meio tem que ser grudado"*, *"a borda está para
+fora, tem que ser para dentro"*, *"copie somente a animação do WhatsApp"* — com uma gravação do
+WhatsApp no iPhone, estudada quadro a quadro:
+
+- **Visual:** o card mantém os cantos (o "tudo junto", que os tirava, saiu com `arrasto-contexto`);
+  o painel mora atrás dele, com os botões grudados, a ponta de fora arredondada e o lado do card
+  entrando sob o canto dele (`recuo`), então a borda visível é a curva do card, côncava.
+- **Movimento, o do WhatsApp:** cada botão na largura natural, saindo de baixo do card em degraus,
+  o de fora por cima; nada encolhe nem esmaece (`botaoNoArrasto`, com teste). Até o fim, a ponta
+  desliza sobre os outros em ~0,3 s sem quique; soltando numa ação que tira o item (Arquivar), o
+  card segue até sair da tela e a linha some.
+- **Achados no teste:** a faixa não somava o recuo (o painel vazava para fora em vez de entrar sob
+  o card); no Android um quadro mostrava o fundo da tela entre dois botões (a posição de um chegou
+  um quadro depois — o de dentro agora vai até a borda, por baixo); com o card saindo, o painel
+  voltava a mostrar os dois botões esticados; e a saída não encerrava a dica do arrasto.
+- **Conferido:** simulador de iPhone (escuro) e Android (claro), gravados quadro a quadro, com
+  arrasto curto, aberto, até o fim e a saída. A nota arquivada nos testes foi restaurada pelo ID
+  (`adaaaf73-…`, só `archived_at`).
+
+**Tutorial.** *"não tem o tutorial em todos os lugares"* — dicas novas no painel do Financeiro, na
+Carteira, nas Contas, na ordem das notas e nas pastas, e o passo "O que dá para fazer" no fim do
+onboarding (spec, seção 3). Conferido no Android: onboarding com as cinco etapas (o dev@ teve o
+"onboarding concluído" desmarcado por alguns minutos e remarcado ao concluir), Financeiro,
+Carteira, Contas e Notas.

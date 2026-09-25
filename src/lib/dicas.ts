@@ -6,7 +6,7 @@
  * mora, some quando a pessoa o USA, e nunca volta sozinha — só pelo "Mostrar" do guia.
  */
 
-export type Tela = 'hoje' | 'financeiro' | 'lancamentos' | 'notas' | 'fatura';
+export type Tela = 'hoje' | 'contas' | 'financeiro' | 'carteira' | 'lancamentos' | 'notas' | 'fatura';
 
 export const DICAS = [
   {
@@ -16,16 +16,11 @@ export const DICAS = [
     texto: 'Toque no painel para ver o que fecha o ciclo, a projeção e as metas.',
   },
   {
-    id: 'hoje-contas',
-    telas: ['hoje'],
+    // A MESMA dica na Hoje ("Nas contas") e na lista de Contas: aprendeu numa, sabe na outra.
+    id: 'conta-extrato',
+    telas: ['contas', 'hoje'],
     icone: 'building.columns',
     texto: 'Toque numa conta para ver o extrato dela.',
-  },
-  {
-    id: 'fin-pilha',
-    telas: ['financeiro'],
-    icone: 'creditcard',
-    texto: 'Toque na pilha para ver todos os cartões.',
   },
   {
     id: 'fin-grafico',
@@ -34,11 +29,41 @@ export const DICAS = [
     texto: 'Arraste no gráfico para ver o saldo de cada dia.',
   },
   {
+    id: 'fin-painel',
+    telas: ['financeiro'],
+    icone: 'hand.tap',
+    texto: 'Toque no painel para ver o ciclo, o que entra e o que sai.',
+  },
+  {
+    id: 'fin-pilha',
+    telas: ['financeiro'],
+    icone: 'creditcard',
+    texto: 'Toque na pilha para ver todos os cartões.',
+  },
+  {
+    id: 'carteira',
+    telas: ['carteira'],
+    icone: 'wallet.pass',
+    texto: 'Deslize para ver os cartões. Toque para escolher.',
+  },
+  {
     // UMA dica para as duas listas: quem aprendeu a arrastar numa, sabe na outra.
     id: 'lista-arrasto',
     telas: ['lancamentos', 'notas'],
     icone: 'hand.draw',
     texto: 'Arraste para os lados para as ações rápidas. Segure para ver todas.',
+  },
+  {
+    id: 'notas-ordem',
+    telas: ['notas'],
+    icone: 'line.3.horizontal',
+    texto: 'Segure o ≡ e arraste para mudar a ordem.',
+  },
+  {
+    id: 'notas-pastas',
+    telas: ['notas'],
+    icone: 'folder',
+    texto: 'Segure uma pasta e arraste para mudar de lugar.',
   },
   {
     id: 'fatura-cartao',
@@ -94,7 +119,10 @@ export function telasDaDica(id: DicaId): readonly Tela[] {
 /** Onde cada dica mora — o "Mostrar" do guia leva para cá. A fatura depende do cartão: vai à lista. */
 const ROTA_DA_TELA = {
   hoje: '/today',
+  contas: '/finance/accounts',
   financeiro: '/finance',
+  // A Carteira abre pela pilha do Financeiro (ela depende do cartão da frente).
+  carteira: '/finance',
   lancamentos: '/finance/transactions',
   notas: '/notes',
   fatura: '/finance/cards',
@@ -103,7 +131,7 @@ const ROTA_DA_TELA = {
 // Sem `/finance/cycle`: o link do ciclo carrega a régua do `cycle_now` (finance.md), e quem leva
 // até ele com a régua certa é o painel da Hoje — o item "Tocar no painel".
 type Rota = (typeof ROTA_DA_TELA)[Tela] | '/agent/new' | '/import' | '/finance/forecast'
-  | '/finance/goals' | '/finance/budgets' | '/reminders' | '/notes/folders';
+  | '/finance/goals' | '/finance/budgets' | '/reminders';
 
 export type ItemDoGuia =
   | { titulo: string; texto: string; dica: DicaId }
@@ -125,14 +153,16 @@ export const GUIA: readonly { titulo: string; itens: readonly ItemDoGuia[] }[] =
   {
     titulo: 'Contas e cartões',
     itens: [
-      { titulo: 'Saldo de uma conta', texto: 'O saldo e o extrato dela.', dica: 'hoje-contas' },
+      { titulo: 'Saldo de uma conta', texto: 'O saldo e o extrato dela.', dica: 'conta-extrato' },
       { titulo: 'Todos os cartões', texto: 'A carteira, com a fatura de cada um.', dica: 'fin-pilha' },
+      { titulo: 'O cartão da frente', texto: 'Escolha qual fica na frente da pilha.', dica: 'carteira' },
       { titulo: 'Trocar de fatura', texto: 'Deslizar o cartão; importar fica no ⋯.', dica: 'fatura-cartao' },
     ],
   },
   {
     titulo: 'Planejar',
     itens: [
+      { titulo: 'O ciclo, o que entra e sai', texto: 'Toque no painel do Financeiro.', dica: 'fin-painel' },
       { titulo: 'Projeção e “E se…”', texto: 'Até quando o dinheiro dura, e se você comprar algo.', href: '/finance/forecast' },
       { titulo: 'Metas', texto: 'Guardar para um objetivo.', href: '/finance/goals' },
       { titulo: 'Orçamentos', texto: 'Um limite por categoria.', href: '/finance/budgets' },
@@ -143,7 +173,8 @@ export const GUIA: readonly { titulo: string; itens: readonly ItemDoGuia[] }[] =
     itens: [
       { titulo: 'Anotar rápido', texto: 'Pelo Agente, pelo WhatsApp ou em Notas.', href: '/notes' },
       { titulo: 'Lembrete que repete', texto: '“me lembra todo dia 5”.', href: '/reminders' },
-      { titulo: 'Pastas', texto: 'Notas por assunto.', href: '/notes/folders' },
+      { titulo: 'Pastas', texto: 'Segure e arraste para mudar de lugar.', dica: 'notas-pastas' },
+      { titulo: 'A ordem das notas', texto: 'Segure o ≡ e arraste.', dica: 'notas-ordem' },
     ],
   },
   {
@@ -159,3 +190,19 @@ export const GUIA: readonly { titulo: string; itens: readonly ItemDoGuia[] }[] =
 export function destinoDoItem(item: ItemDoGuia): Rota {
   return 'dica' in item ? ROTA_DA_TELA[telasDaDica(item.dica)[0]] : item.href;
 }
+
+/**
+ * O passo "O que dá para fazer" do onboarding (24/09/2026): o que existe no app, numa tela só,
+ * para quem nunca usou — *"meu pai… não sabia de coisas que tinha ali dentro, como importar a
+ * fatura"*. As dicas no lugar ensinam o gesto quando o alvo existe; esta lista cobre o que a
+ * conta nova ainda não tem (conta, cartão, fatura).
+ */
+export const O_QUE_DA_PARA_FAZER: readonly { icone: string; titulo: string; texto: string }[] = [
+  // O Agente do app só recebe texto; foto e áudio são do WhatsApp.
+  { icone: 'bubble.left.and.bubble.right', titulo: 'Fale do seu jeito', texto: 'No Agente ou no WhatsApp. No WhatsApp, até foto e áudio.' },
+  { icone: 'square.and.arrow.down', titulo: 'Traga a fatura do banco', texto: 'Importe o arquivo; o que já está no app fica de fora.' },
+  { icone: 'building.columns', titulo: 'Toque numa conta', texto: 'Para ver o saldo e o extrato dela.' },
+  { icone: 'chart.line.uptrend.xyaxis', titulo: 'Toque no painel', texto: 'O ciclo, a projeção e o “E se…”.' },
+  { icone: 'hand.draw', titulo: 'Arraste e segure os cards', texto: 'Para os lados: ações rápidas. Segurar: todas.' },
+  { icone: 'questionmark.circle', titulo: 'Ajuda sempre à mão', texto: 'Perfil › Como usar o ProOps.' },
+];

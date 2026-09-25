@@ -6,6 +6,7 @@ import { FolderCard, folderTileHeight } from '@/components/notes/folder-card';
 import { Reorderable } from '@/components/ui/reorderable';
 import { Motion, Space } from '@/design/tokens';
 import type { NoteFolder } from '@/hooks/use-notes';
+import { usarDica } from '@/hooks/use-dicas';
 
 /**
  * A grade de pastas — a home (pastas raiz) e a tela de uma pasta (subpastas).
@@ -74,7 +75,11 @@ export function FolderGrid({
         topInset={topInset}
         viewportHeight={viewportHeight || undefined}
         bottomInset={bottomInset}
-        onDragStateChange={onDragStateChange}
+        onDragStateChange={(v) => {
+          // Segurar e arrastar a pasta é o que a dica ensina (`notas-pastas`).
+          if (v) usarDica('notas-pastas');
+          onDragStateChange(v);
+        }}
         onTapItem={(i) => onMenu(pastas[i])}
         onReorder={onReorder}
         renderItem={({ item, index, active }) => (

@@ -8,6 +8,7 @@ import { NoteCard, type NoteCardActions } from '@/components/notes/note-card';
 import { Reorderable } from '@/components/ui/reorderable';
 import { Motion } from '@/design/tokens';
 import type { Note, NoteFolder } from '@/hooks/use-notes';
+import { usarDica } from '@/hooks/use-dicas';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
@@ -66,7 +67,11 @@ export function NoteList({
       topInset={topInset}
       viewportHeight={viewportHeight || undefined}
       bottomInset={bottomInset}
-      onDragStateChange={onDragStateChange}
+      onDragStateChange={(v) => {
+        // Mudar a ordem pelo ≡ é o que a dica ensina (`notas-ordem`).
+        if (v) usarDica('notas-ordem');
+        onDragStateChange(v);
+      }}
       onReorder={onReorder}
       renderItem={({ item, active, drag }) => {
         const pasta = folderById(item.folder_id);

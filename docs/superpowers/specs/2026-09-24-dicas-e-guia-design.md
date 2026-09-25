@@ -44,11 +44,20 @@ do inventário:
 | id | tela | frase | some quando |
 |---|---|---|---|
 | `hoje-painel` | Hoje (herói) | "Toque no painel para ver o que fecha o ciclo, a projeção e as metas." | abre o menu do painel |
-| `hoje-contas` | Hoje ("Nas contas") | "Toque numa conta para ver o extrato dela." (o extrato abre pelo saldo) | abre o extrato de uma conta |
-| `fin-pilha` | Financeiro (pilha de cartões) | "Toque na pilha para ver todos os cartões." | abre a Carteira |
+| `conta-extrato` | Contas e Hoje ("Nas contas") | "Toque numa conta para ver o extrato dela." (o extrato abre pelo saldo) | abre o extrato de uma conta |
 | `fin-grafico` | Financeiro (gráfico do herói) | "Arraste no gráfico para ver o saldo de cada dia." | arrasta no gráfico |
-| `lista-arrasto` | Lançamentos e Notas (1ª linha) | "Arraste para os lados para as ações rápidas. Segure para ver todas." | arrasta ou segura um card |
+| `fin-painel` | Financeiro (herói) | "Toque no painel para ver o ciclo, o que entra e o que sai." | abre o menu do painel |
+| `fin-pilha` | Financeiro (pilha de cartões) | "Toque na pilha para ver todos os cartões." | abre a Carteira |
+| `carteira` | Carteira (com 2+ cartões) | "Deslize para ver os cartões. Toque para escolher." | folheia ou escolhe um cartão |
+| `lista-arrasto` | Lançamentos, Notas e pastas (1ª linha) | "Arraste para os lados para as ações rápidas. Segure para ver todas." | arrasta ou segura um card |
+| `notas-ordem` | Notas e pastas (2+ notas) | "Segure o ≡ e arraste para mudar a ordem." | arrasta pelo ≡ |
+| `notas-pastas` | Notas (sob a grade de pastas) | "Segure uma pasta e arraste para mudar de lugar." | arrasta uma pasta |
 | `fatura-cartao` | Fatura (cartão ancorado) | "Deslize o cartão para trocar de fatura. Importar a fatura fica no ⋯." | desliza o cartão |
+
+> **Ampliado em 24/09/2026 (noite)**, a pedido do dono do produto: *"não tem o tutorial em todos os
+> lugares… nas outras coisas que ficam escondidas também"*. Dica de algo que a conta nova ainda não
+> tem (conta, cartão, nota) só aparece quando o alvo existe — quem cobre isso é o passo 3, abaixo.
+> Anexo no Agente ficou de fora: o Agente do app só recebe texto (foto e áudio são do WhatsApp).
 
 ## 2. "Como usar o ProOps" (`/guia`)
 
@@ -67,11 +76,19 @@ certa e acende a dica dali (mesmo já dispensada):
 - Primeiros passos da Hoje ganham "Conhecer o app" (marcado quando o guia é aberto) — é o que
   quem acabou de criar a conta vê; o Próximo passo só aparece depois deles.
 
+## 3. O passo "O que dá para fazer" (onboarding)
+
+Escolha do dono do produto (24/09/2026): **uma tela, em lista**, antes de "Começar a usar" — seis
+linhas de ícone + título + uma frase (`O_QUE_DA_PARA_FAZER`, `lib/dicas.ts`, com teste):
+fale do seu jeito (no WhatsApp, até foto e áudio); traga a fatura do banco; toque numa conta; toque
+no painel; arraste e segure os cards; ajuda no Perfil. É o que a pessoa que acabou de criar a conta
+vê antes de ter qualquer dado — as dicas no lugar ensinam o gesto quando o alvo aparece.
+
 ## Fora do escopo
 
 - Tour com a tela escurecida e passos numerados (recusado pela pesquisa e pela escolha).
 - Dica sobre a dock/barra de abas: no iOS a `NativeTabs` é do sistema.
-- Reapresentar o onboarding.
+- Reapresentar o onboarding a quem já passou por ele (o guia no Perfil é a porta).
 
 ## Validação
 

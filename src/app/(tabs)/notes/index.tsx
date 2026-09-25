@@ -558,10 +558,14 @@ export default function NotesScreen() {
               }
             />
             )}
+            {/* Embaixo da grade: acima dela ficaria entre o título "Pastas" e o que ele nomeia. */}
+            {!pastasRecolhidas && pastas.length > 1 ? <Dica id="notas-pastas" tela="notas" /> : null}
           </View>
         ) : null}
 
+        {/* Uma por vez (`dicaDaVez`): primeiro o arrasto, depois a ordem pelo ≡. */}
         {notes.length > 0 ? <Dica id="lista-arrasto" tela="notas" bico="baixo" /> : null}
+        {notes.length > 1 ? <Dica id="notas-ordem" tela="notas" bico="baixo" /> : null}
 
         {fixadas.length > 0 ? (
           <View onLayout={(e) => setTopoFixadas(e.nativeEvent.layout.y)}>

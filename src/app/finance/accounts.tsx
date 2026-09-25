@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Card } from '@/components/ui/card';
+import { Dica } from '@/components/ui/dica';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { formatNumberBR } from '@/lib/dates';
@@ -412,6 +413,9 @@ export default function AccountsScreen() {
 
   const accountSections = (
     <>
+      {dinheiro.length + investimentos.length + cartoes.length > 0 ? (
+        <Dica id="conta-extrato" tela="contas" bico="baixo" />
+      ) : null}
       {dinheiro.length > 0 ? <Section title="Dinheiro">{dinheiro.map(linhaConta)}</Section> : null}
       {investimentos.length > 0 ? (
         <Section title="Investimentos">{investimentos.map(linhaConta)}</Section>
