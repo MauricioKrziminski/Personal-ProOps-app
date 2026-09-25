@@ -335,7 +335,7 @@ export default function FoldersScreen() {
         <EmptyState
           icon="folder"
           title="Nenhuma pasta ainda"
-          hint="Pastas aparecem sozinhas quando você manda “anotar: comprar leite #mercado” no WhatsApp — ou cria uma aqui."
+          hint="Pastas aparecem sozinhas quando você manda *anotar: comprar leite #mercado* no WhatsApp — ou cria uma aqui."
         />
       ) : (
         <Section>

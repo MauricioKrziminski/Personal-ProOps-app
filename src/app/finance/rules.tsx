@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { ThemedText } from '@/components/themed-text';
+import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { EmptyState } from '@/components/ui/empty-state';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
@@ -74,7 +75,7 @@ export default function RulesScreen() {
   const remove = useDeleteRule();
 
   const [rascunho, setRascunho] = useState<Rascunho | null>(null);
-  const [erroSalvar, setErroSalvar] = useState<string | null>(null);
+  const [erroSalvar, setErroSalvar] = useState<ReactNode>(null);
 
   // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
   // falha, e sem este corte a tela seguia afirmando números embaixo da faixa de erro.
@@ -129,7 +130,7 @@ export default function RulesScreen() {
             );
             setErroSalvar(
               existente
-                ? `Já existe uma regra para “${existente.pattern}” → ${existente.category ?? 'sem categoria'}. Edite ela em vez de criar outra.`
+                ? <>Já existe uma regra para <Forte>{existente.pattern}</Forte> → {existente.category ?? 'sem categoria'}. Edite ela em vez de criar outra.</>
                 : 'Já existe uma regra com esse gatilho.'
             );
             return;
@@ -143,7 +144,7 @@ export default function RulesScreen() {
 
   const apagar = (rule: CategorizationRule) =>
     confirmDestructive(
-      `Parar de categorizar “${rule.pattern}” automaticamente?`,
+      `Parar de categorizar ${rule.pattern} automaticamente?`,
       'Apagar regra',
       () =>
         remove.mutate(rule.id, {
@@ -237,7 +238,7 @@ export default function RulesScreen() {
       icon="text.badge.checkmark"
       title="Nenhuma regra ainda"
       hint={
-        'Ex.: “posto” sempre vira transporte.'
+        'Ex.: *posto* sempre vira transporte.'
       }
       action={{ label: 'Nova regra', onPress: () => abrir() }}
     />

@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { Calendar } from '@/components/finance/calendar';
 import { Chip } from '@/components/finance/chip';
 import { ThemedText } from '@/components/themed-text';
+import { Forte } from '@/components/ui/forte';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, TextField } from '@/components/ui/field';
@@ -230,7 +231,7 @@ const schema = z.object({
     ctx.addIssue({
       code: 'custom',
       path: ['recurrence'],
-      message: `A repetição termina antes do primeiro lembrete (${v.date}). Escolha um “Até” a partir dessa data.`,
+      message: `A repetição termina antes do primeiro lembrete (${v.date}). Escolha uma data a partir dessa.`,
     });
   }
 });
@@ -443,11 +444,11 @@ function ReminderForm({
         remove.mutate(editing.id, {
           onSuccess: () => {
             router.back();
-            toast({ message: `Apaguei “${editing.title}”.`, tone: 'success' });
+            toast({ message: <>Apaguei o lembrete <Forte>{editing.title}</Forte>.</>, tone: 'success' });
           },
           onError: () => toast({ message: 'Não deu para apagar. Tenta de novo.', tone: 'error' }),
         }),
-      `“${editing.title}”. Isso não volta.`,
+      `O lembrete ${editing.title} não volta.`,
     );
   };
 
@@ -828,7 +829,7 @@ function RecurrenceEditor({
                 'Substituir esta repetição?',
                 'Substituir',
                 () => onChange(null),
-                `A regra “${describeRRule(value)}” veio do WhatsApp e não volta.`,
+                `A repetição ${describeRRule(value)} veio do WhatsApp e não volta.`,
               )
             }
           />
@@ -912,7 +913,7 @@ function RecurrenceEditor({
               label="Em quais dias do mês"
               hint={
                 state.bymonthday.includes(31)
-                  ? 'Dia 31 não dispara em fevereiro nem em meses de 30. Use “Último dia”.'
+                  ? 'Dia 31 não dispara em fevereiro nem em meses de 30. Use *Último dia*.'
                   : state.bymonthday.length > 4
                     ? `Isso vai disparar ${state.bymonthday.length} vezes por mês.`
                     : state.bymonthday.length === 0

@@ -446,7 +446,7 @@ export default function InvoicesScreen() {
         <EmptyState
           icon="calendar"
           title="Nenhuma fatura ainda"
-          hint={`A primeira fatura nasce junto com a primeira compra no cartão — manda “almocei 40 no ${atual.name}” no WhatsApp.`}
+          hint={`A primeira fatura nasce junto com a primeira compra no cartão — manda *almocei 40 no ${atual.name}* no WhatsApp.`}
         />
       ) : null}
     </>

@@ -22,6 +22,7 @@ import { AlertPreferencesSection } from '@/components/profile/alert-preferences-
 import { CycleDayPicker } from '@/components/finance/cycle-day-picker';
 import { PrimeiraFrase } from '@/components/onboarding/primeira-frase';
 import { ThemedText } from '@/components/themed-text';
+import { ComNegrito } from '@/components/ui/forte';
 import { Button } from '@/components/ui/button';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { Mark } from '@/components/ui/mark';
@@ -499,7 +500,7 @@ function PassoTudo({ entra }: { entra: (a: BaseAnimationBuilder) => BaseAnimatio
                 {l.titulo}
               </ThemedText>
               <ThemedText type="footnote" themeColor="textSecondary" style={styles.semEncolher}>
-                {l.texto}
+                <ComNegrito texto={l.texto} />
               </ThemedText>
             </View>
           </Animated.View>

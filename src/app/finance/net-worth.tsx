@@ -10,6 +10,7 @@ import { Stack, router } from 'expo-router';
 import { monthShort } from '@/components/finance/month-picker';
 import { FinanceAnalysisPanes } from '@/components/finance/finance-analysis-panes';
 import { ThemedText } from '@/components/themed-text';
+import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
@@ -237,16 +238,16 @@ export default function NetWorthScreen() {
 
   const arquivar = (b: Asset) =>
     confirmaDestrutiva({
-      title: `Arquivar "${b.name}"?`,
+      title: `Arquivar o bem ${b.name}?`,
       message: 'O histórico de marcações é mantido.',
       confirm: 'Arquivar',
       onConfirm: () =>
         archive.mutate(b.id, {
           onSuccess: () => {
             setForm(null);
-            toast({ message: `${b.name} arquivado.`, tone: 'success' });
+            toast({ message: <><Forte>{b.name}</Forte> arquivado.</>, tone: 'success' });
           },
-          onError: () => toast({ message: `Não deu para arquivar ${b.name}.`, tone: 'error' }),
+          onError: () => toast({ message: <>Não deu para arquivar <Forte>{b.name}</Forte>.</>, tone: 'error' }),
         }),
     });
 

@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { ComNegrito } from '@/components/ui/forte';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { marcarGuiaAberto, reacenderDica } from '@/hooks/use-dicas';
@@ -33,7 +34,7 @@ export default function GuiaScreen() {
             <Row
               key={item.titulo}
               title={item.titulo}
-              subtitle={item.texto}
+              subtitle={<ComNegrito texto={item.texto} />}
               chevron={false}
               trailing={
                 <ThemedText type="smallBold" style={styles.link}>

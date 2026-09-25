@@ -8,6 +8,7 @@ import { ErrorCard } from '@/components/error-card';
 import { currentMonth, monthTitle } from '@/components/finance/month-picker';
 import { Card } from '@/components/ui/card';
 import { ThemedText } from '@/components/themed-text';
+import { Forte } from '@/components/ui/forte';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
@@ -177,7 +178,7 @@ export default function TransactionDetailScreen() {
         removePlan.mutate(planId, {
           onSuccess: () => {
             router.back();
-            toast({ message: `Apaguei ${nome} e as parcelas.`, tone: 'success' });
+            toast({ message: <>Apaguei <Forte>{nome}</Forte> e as parcelas.</>, tone: 'success' });
           },
           onError: () =>
             toast({ message: 'Não deu para apagar a compra. Tenta de novo.', tone: 'error' }),

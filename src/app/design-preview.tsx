@@ -870,7 +870,7 @@ function seedClient() {
           {
             id: 'prev-c3',
             title: 'Planejar a viagem de dezembro',
-            preview: 'Criei a meta "Viagem dezembro" com R$ 4.000 até 01/12/2026.',
+            preview: 'Criei a meta *Viagem dezembro* com R$ 4.000 até 01/12/2026.',
             last_message_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
           },
         ],

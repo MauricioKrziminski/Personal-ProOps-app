@@ -15,6 +15,7 @@ import { Note } from '@/components/ui/note';
 import { Row, Section } from '@/components/ui/row';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { ThemedText } from '@/components/themed-text';
+import { Forte } from '@/components/ui/forte';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
@@ -701,7 +702,7 @@ function TransactionForm({
                 () => {
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                   router.back();
-                  toast({ message: `As parcelas de ${divida.name} passam a ${formatBRL(valor)}.`, tone: 'success' });
+                  toast({ message: <>As parcelas de <Forte>{divida.name}</Forte> passam a {formatBRL(valor)}.</>, tone: 'success' });
                 },
                 // O contrato JÁ mudou: dizer só "não deu para salvar" seria mentira.
                 'Mudei as próximas parcelas, mas não consegui salvar este pagamento. Tenta de novo.',

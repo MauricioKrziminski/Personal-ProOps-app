@@ -13,6 +13,7 @@ import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { monthLabel, monthShort, shiftMonth } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
+import { Forte } from '@/components/ui/forte';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
@@ -378,7 +379,7 @@ export default function InstallmentsScreen() {
       'Apagar tudo',
       () =>
         removePlan.mutate(plano.id, {
-          onSuccess: () => toast({ message: `Apaguei ${plano.title} e as parcelas.`, tone: 'success' }),
+          onSuccess: () => toast({ message: <>Apaguei <Forte>{plano.title}</Forte> e as parcelas.</>, tone: 'success' }),
           onError: () =>
             toast({ message: 'Não deu para apagar a compra. Tenta de novo.', tone: 'error' }),
         }),

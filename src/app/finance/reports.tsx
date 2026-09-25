@@ -317,7 +317,7 @@ export default function ReportsScreen() {
           icon="calendar"
           title={`Nada lançado em ${ano}`}
           hint={
-            'Escolha outro ano aí em cima — ou manda “gastei 45 no mercado”\nno WhatsApp para o ano que vem já nascer pronto.'
+            'Escolha outro ano aí em cima — ou manda *gastei 45 no mercado*\nno WhatsApp para o ano que vem já nascer pronto.'
           }
         />
       ) : null}

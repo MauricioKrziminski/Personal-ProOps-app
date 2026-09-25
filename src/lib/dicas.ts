@@ -145,7 +145,7 @@ export const GUIA: readonly { titulo: string; itens: readonly ItemDoGuia[] }[] =
   {
     titulo: 'Registrar',
     itens: [
-      { titulo: 'Em frase, pelo Agente', texto: '“gastei 45 no mercado”. No WhatsApp também.', href: '/agent/new' },
+      { titulo: 'Em frase, pelo Agente', texto: '*gastei 45 no mercado*. No WhatsApp também.', href: '/agent/new' },
       { titulo: 'Lançar à mão', texto: 'O + em Lançamentos.', href: '/finance/transactions' },
       { titulo: 'Importar fatura ou extrato', texto: 'O arquivo do banco; o que já está no app fica de fora.', href: '/import' },
     ],
@@ -163,7 +163,7 @@ export const GUIA: readonly { titulo: string; itens: readonly ItemDoGuia[] }[] =
     titulo: 'Planejar',
     itens: [
       { titulo: 'O ciclo, o que entra e sai', texto: 'Toque no painel do Financeiro.', dica: 'fin-painel' },
-      { titulo: 'Projeção e “E se…”', texto: 'Até quando o dinheiro dura, e se você comprar algo.', href: '/finance/forecast' },
+      { titulo: 'Projeção e simulação', texto: 'Até quando o dinheiro dura, e se você comprar algo.', href: '/finance/forecast' },
       { titulo: 'Metas', texto: 'Guardar para um objetivo.', href: '/finance/goals' },
       { titulo: 'Orçamentos', texto: 'Um limite por categoria.', href: '/finance/budgets' },
     ],
@@ -172,7 +172,7 @@ export const GUIA: readonly { titulo: string; itens: readonly ItemDoGuia[] }[] =
     titulo: 'Notas e lembretes',
     itens: [
       { titulo: 'Anotar rápido', texto: 'Pelo Agente, pelo WhatsApp ou em Notas.', href: '/notes' },
-      { titulo: 'Lembrete que repete', texto: '“me lembra todo dia 5”.', href: '/reminders' },
+      { titulo: 'Lembrete que repete', texto: '*me lembra todo dia 5*.', href: '/reminders' },
       { titulo: 'Pastas', texto: 'Segure e arraste para mudar de lugar.', dica: 'notas-pastas' },
       { titulo: 'A ordem das notas', texto: 'Segure o ≡ e arraste.', dica: 'notas-ordem' },
       { titulo: 'Notas arquivadas', texto: 'No fim da aba Notas; de lá elas voltam.', href: '/notes/archived' },
@@ -203,7 +203,7 @@ export const O_QUE_DA_PARA_FAZER: readonly { icone: string; titulo: string; text
   { icone: 'bubble.left.and.bubble.right', titulo: 'Fale do seu jeito', texto: 'No Agente ou no WhatsApp. No WhatsApp, até foto e áudio.' },
   { icone: 'square.and.arrow.down', titulo: 'Traga a fatura do banco', texto: 'Importe o arquivo; o que já está no app fica de fora.' },
   { icone: 'building.columns', titulo: 'Toque numa conta', texto: 'Para ver o saldo e o extrato dela.' },
-  { icone: 'chart.line.uptrend.xyaxis', titulo: 'Toque no painel', texto: 'O ciclo, a projeção e o “E se…”.' },
+  { icone: 'chart.line.uptrend.xyaxis', titulo: 'Toque no painel', texto: 'O ciclo, a projeção e o *E se…*.' },
   { icone: 'hand.draw', titulo: 'Arraste e segure os cards', texto: 'Para os lados: ações rápidas. Segurar: todas.' },
   { icone: 'questionmark.circle', titulo: 'Ajuda sempre à mão', texto: 'Perfil › Como usar o ProOps.' },
 ];

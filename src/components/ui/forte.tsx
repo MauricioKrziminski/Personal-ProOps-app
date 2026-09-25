@@ -15,20 +15,20 @@ export function Forte({ children }: { children: ReactNode }) {
 }
 
 /**
- * Texto ESCRITO POR NÓS com os trechos `*assim*` em negrito (dica de vazio, frase do servidor) — o
- * mesmo leitor do chat do agente. Dado do usuário não passa por aqui: ele usa `Forte`.
+ * Texto ESCRITO POR NÓS com os trechos `*assim*` em negrito (dica de vazio, frase do servidor, a
+ * fala do agente) — o mesmo leitor do WhatsApp. Dado do usuário não passa por aqui: ele usa `Forte`.
  */
 export function ComNegrito({ texto }: { texto: string }) {
   return parseInlineBold(texto).map((t, i) => (
-    <Text key={i} style={t.bold ? styles.markdown : undefined}>
+    <Text key={i} style={t.bold ? styles.forte : undefined}>
       {t.text}
     </Text>
   ));
 }
 
 const styles = StyleSheet.create({
-  // Peso é FAMÍLIA (§3): `fontWeight` no Android cai no regular com negrito sintético. O nome vai
-  // um degrau acima do semibold para destacar também dentro de título (`headline` já é 600).
+  // UM negrito no app inteiro (25/09/2026): eram dois, 600 no chat e nas dicas e 700 nos nomes.
+  // 700 porque o negrito também mora dentro de título (`headline` já é 600) e ali 600 não se vê.
+  // Peso é FAMÍLIA (§3): `fontWeight` no Android cai no regular com negrito sintético.
   forte: { fontFamily: Fonts.bold },
-  markdown: { fontFamily: Fonts.semibold },
 });

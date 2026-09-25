@@ -1419,3 +1419,23 @@ test('a cascata do Screen não embrulha o que não ocupa lugar na tela', () => {
   assert.match(fonte, /const SEM_CAIXA = new Set<unknown>\(\[Stack\.Screen, HeaderActions, HeaderMenu, Sheet\]\)/);
   assert.match(fonte, /if \(!isValidElement\(filho\) \|\| SEM_CAIXA\.has\(filho\.type\)\) return filho;/);
 });
+
+test('nome citado nem exemplo vão entre aspas: negrito onde o app desenha, frase nomeada no diálogo nativo', () => {
+  // 25/09/2026, a padronização do negrito: além das « », o app citava nome e exemplo entre “ ” e
+  // "" ("Arquivei "Carro"", "Manda “gastei 45 no mercado”"). Onde o app desenha, o nome vai em
+  // `<Forte>` e o exemplo em `*assim*`; no diálogo nativo (sem negrito) a frase nomeia o tipo:
+  // "Arquivar a meta Viagem?". Ficam as aspas de CITAÇÃO da fala da pessoa (a Conversa da Hoje) e
+  // os conjuntos de pontuação do editor de notas.
+  const dispensados = ['components/ui/ledger-row.tsx', 'lib/note-inline.ts', 'components/ui/icon.tsx'];
+  const achados: string[] = [];
+  for (const arquivo of walk(SRC).filter((f) => /\.(ts|tsx)$/.test(f) && !/\.test\.ts$/.test(f))) {
+    if (dispensados.some((d) => arquivo.endsWith(d))) continue;
+    readFileSync(arquivo, 'utf8').split('\n').forEach((linha, i) => {
+      const t = linha.trim();
+      if (/^(\/\/|\*|\/\*|\{\/\*)/.test(t)) return;
+      const codigo = linha.replace(/\/\/.*$/, '');
+      if (/[“”]/.test(codigo) || /"\$\{/.test(codigo)) achados.push(`${arquivo.slice(SRC.length)}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(achados, []);
+});

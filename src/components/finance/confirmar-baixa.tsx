@@ -8,6 +8,7 @@ import { Sheet } from '@/components/ui/sheet';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useToast } from '@/components/ui/toast';
+import { Forte } from '@/components/ui/forte';
 import { Space } from '@/design/tokens';
 import { useMarkPaid, useSaveTransactionScoped, useTransaction } from '@/hooks/use-finance';
 import { formatBRL, localISODate } from '@/hooks/use-items';
@@ -67,7 +68,7 @@ export function useConfirmarBaixa({ aoConcluir }: { aoConcluir?: (id: string) =>
           onSuccess: () => {
             fechar();
             toast({
-              message: `${titulo}: ${settleDone(linha.kind)}${plano.corrigir ? ` com ${formatBRL(pago)}` : ''}.`,
+              message: <><Forte>{titulo}</Forte>: {settleDone(linha.kind)}{plano.corrigir ? ` com ${formatBRL(pago)}` : ''}.</>,
               tone: 'success',
             });
             aoConcluir?.(linha.id);

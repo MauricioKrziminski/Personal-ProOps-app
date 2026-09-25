@@ -566,7 +566,7 @@ export default function InvoiceScreen() {
             <EmptyState
               icon="doc.text"
               title="Nenhuma compra nesta fatura"
-              hint="Compras no cartão caem aqui sozinhas — é só mandar “paguei 80 no mercado no Nubank” no WhatsApp."
+              hint="Compras no cartão caem aqui sozinhas — é só mandar *paguei 80 no mercado no Nubank* no WhatsApp."
             />
           ) : null
         }

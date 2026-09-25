@@ -167,7 +167,7 @@ export default function LinkEmailScreen() {
       // O e-mail JÁ está vinculado neste ponto — dizer só "deu erro" faria a pessoa repetir o
       // fluxo inteiro. A saída é a recuperação de senha, que agora funciona para este endereço.
       setError(
-        `${authErrorMessage(falhaSenha)} O e-mail já está vinculado: use "Esqueci minha senha" para definir uma.`
+        `${authErrorMessage(falhaSenha)} O e-mail já está vinculado: use *Esqueci minha senha* para definir uma.`
       );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;

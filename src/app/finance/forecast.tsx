@@ -1003,7 +1003,7 @@ export default function ForecastScreen() {
         <EmptyState
           icon="chart.line.uptrend.xyaxis"
           title="Ainda não dá para projetar"
-          hint={'Cadastre suas contas e manda no WhatsApp “todo dia 5 pago 1200 de aluguel”.\nA partir daí eu mostro quanto sobra em cada dia.'}
+          hint={'Cadastre suas contas e manda no WhatsApp *todo dia 5 pago 1200 de aluguel*.\nA partir daí eu mostro quanto sobra em cada dia.'}
           action={{ label: 'Cadastrar conta', onPress: () => router.push('/finance/accounts') }}
         />
       ) : null}

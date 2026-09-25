@@ -9,6 +9,7 @@ import { Chip } from '@/components/finance/chip';
 import { useMonthRuler } from '@/components/finance/month-ruler';
 import { PeriodBar } from '@/components/finance/period-bar';
 import { ThemedText } from '@/components/themed-text';
+import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
@@ -238,7 +239,7 @@ export default function BudgetsScreen() {
     };
     save.mutate(entrada, {
       onSuccess: () => {
-        toast({ message: `Limite de ${entrada.category} salvo.`, tone: 'success' });
+        toast({ message: <>Limite de <Forte>{entrada.category}</Forte> salvo.</>, tone: 'success' });
         setForm(null);
       },
       // o banco explica o motivo (limite ≤ 0, categoria vazia, sem workspace); esconder isso

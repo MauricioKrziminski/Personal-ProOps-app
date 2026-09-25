@@ -6,6 +6,7 @@ import type { SymbolViewProps } from 'expo-symbols';
 
 import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
+import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
@@ -274,14 +275,14 @@ export default function AccountsScreen() {
 
   const arquivar = (a: Account) =>
     confirmaDestrutiva({
-      title: `Arquivar "${a.name}"?`,
+      title: `Arquivar ${a.type === 'credit_card' ? 'o cartão' : 'a conta'} ${a.name}?`,
       message: 'Os lançamentos são mantidos.',
       confirm: 'Arquivar',
       onConfirm: () =>
         archive.mutate(a.id, {
-          onSuccess: () => toast({ message: `${a.name} arquivada.`, tone: 'success' }),
+          onSuccess: () => toast({ message: <>{a.type === 'credit_card' ? 'Cartão' : 'Conta'} <Forte>{a.name}</Forte> {a.type === 'credit_card' ? 'arquivado' : 'arquivada'}.</>, tone: 'success' }),
           onError: () =>
-            toast({ message: `Não deu para arquivar ${a.name}.`, tone: 'error' }),
+            toast({ message: <>Não deu para arquivar <Forte>{a.name}</Forte>.</>, tone: 'error' }),
         }),
     });
 
@@ -466,11 +467,11 @@ export default function AccountsScreen() {
   const empty = semNadaCadastrado && !balances.isLoading && !balances.isError ? (
     <EmptyState
       icon="wallet.bifold"
-      title={soTemSemConta ? 'Seus lançamentos estão em “Sem conta”' : 'Nenhuma conta ainda'}
+      title={soTemSemConta ? <>Seus lançamentos estão em <Forte>Sem conta</Forte></> : 'Nenhuma conta ainda'}
       hint={
         soTemSemConta
           ? 'Cadastre suas contas para saber quanto tem em cada uma. O que já foi lançado continua valendo.'
-          : 'Cadastre onde o dinheiro fica — corrente, poupança, dinheiro, cartão. Depois é só mandar “gastei 45 no mercado no Nubank” no WhatsApp.'
+          : 'Cadastre onde o dinheiro fica — corrente, poupança, dinheiro, cartão. Depois é só mandar *gastei 45 no mercado no Nubank* no WhatsApp.'
       }
       action={{ label: 'Cadastrar conta', onPress: abrirNova }}
     />

@@ -1,11 +1,10 @@
 import { memo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Fonts } from '@/constants/theme';
+import { ComNegrito } from '@/components/ui/forte';
 import { Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
-import { parseInlineBold } from '@/lib/agent-chat';
 
 interface Props {
   role: 'user' | 'assistant';
@@ -48,14 +47,9 @@ export const ChatMessage = memo(function ChatMessage({ role, content }: Props) {
           {/*
             O motor é compartilhado com o WhatsApp e escreve `*R$ 45,00*`. Sem
             esta tradução o app mostraria o asterisco em volta de todo valor.
-            Peso é FAMÍLIA, nunca `fontWeight` (`design.md` §3): fonte custom no
-            Android ignora `fontWeight` e cai no regular com bold sintético.
+            O negrito é o MESMO do resto do app (`ComNegrito`, `components/ui/forte.tsx`).
           */}
-          {parseInlineBold(content).map((t, i) => (
-            <Text key={i} style={t.bold ? styles.forte : undefined}>
-              {t.text}
-            </Text>
-          ))}
+          <ComNegrito texto={content} />
         </ThemedText>
       </View>
     </View>
@@ -72,7 +66,6 @@ const styles = StyleSheet.create({
     conversa perde o lado que diz quem falou.
   */
   corpo: { maxWidth: '88%', flexShrink: 1 },
-  forte: { fontFamily: Fonts.semibold },
   remetente: { marginBottom: Space.sm },
   balao: {
     paddingHorizontal: Space.lg,

@@ -173,7 +173,7 @@ export default function RemindersScreen() {
         <EmptyState
           icon="bell"
           title="Nenhum lembrete ainda"
-          hint={'Manda “me lembra de pagar o aluguel dia 5”\nno WhatsApp — ou crie um aqui.'}
+          hint={'Manda *me lembra de pagar o aluguel dia 5*\nno WhatsApp — ou crie um aqui.'}
           action={{ label: 'Novo lembrete', onPress: () => router.push('/reminder-form') }}
         />
       ) : null}

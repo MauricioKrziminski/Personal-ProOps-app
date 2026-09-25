@@ -660,16 +660,26 @@ test('archived debts have a place to come back from', () => {
   assert.deepEqual(ui.writes.at(-1), { operation: 'unarchiveDebt', value: 'd2' });
 });
 
+/** O texto de um aviso, que pode vir com o nome em `<Forte>` (25/09/2026). */
+const textoDo = (n: any): string =>
+  typeof n === 'string' || typeof n === 'number'
+    ? String(n)
+    : Array.isArray(n)
+      ? n.map(textoDo).join('')
+      : n?.props?.children !== undefined
+        ? textoDo(n.props.children)
+        : '';
+
 test('"Desfazer"/Desarquivar de uma dívida que já não existe não diz que ela voltou', () => {
   const ui = screen(debtsFile, { create: false, debts: [carro], archivedDebts: [{ ...carro, id: 'd2', name: 'Moto', archived: true }] });
   ui.interact(() => ui.nodes().find((n) => n.type === 'Row' && n.props.title === 'Arquivadas · 1').props.onPress());
   ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Row' && n.props.title === 'Moto').props.onPress());
   ui.interact(() => ui.actions[0].onPress());
   ui.interact(() => ui.pedidos.at(-1).opts.onSuccess(false));
-  assert.doesNotMatch(ui.toasts.at(-1).message, /voltou/);
-  assert.match(ui.toasts.at(-1).message, /não existe mais/);
+  assert.doesNotMatch(textoDo(ui.toasts.at(-1).message), /voltou/);
+  assert.match(textoDo(ui.toasts.at(-1).message), /Moto não existe mais/);
   ui.interact(() => ui.pedidos.at(-1).opts.onSuccess(true));
-  assert.match(ui.toasts.at(-1).message, /voltou para a lista/);
+  assert.match(textoDo(ui.toasts.at(-1).message), /Moto voltou para a lista/);
 });
 
 test('salvar a edição manda a versão que foi aberta, e a dívida que mudou no meio vira aviso', () => {

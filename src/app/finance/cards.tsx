@@ -351,7 +351,7 @@ export default function CardsScreen() {
         <EmptyState
           icon="creditcard"
           title="Nenhum cartão cadastrado"
-          hint="Cadastre o cartão com o dia que fecha e o dia que vence. Aí é só mandar “parcelei a geladeira em 12x no Nubank” no WhatsApp."
+          hint="Cadastre o cartão com o dia que fecha e o dia que vence. Aí é só mandar *parcelei a geladeira em 12x no Nubank* no WhatsApp."
           action={{ label: 'Cadastrar cartão', onPress: () => router.push('/finance/accounts') }}
         />
       ) : null}

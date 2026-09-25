@@ -240,7 +240,7 @@ export default function CatalogScreen() {
         <EmptyState
           icon="note.text"
           title="Nada anotado ainda"
-          hint={'Escreve aqui em cima — ou manda\n“anotar: ligar pro dentista” no WhatsApp'}
+          hint={'Escreve aqui em cima — ou manda\n*anotar: ligar pro dentista* no WhatsApp'}
           action={{ label: 'Criar nota', onPress: () => {} }}
         />
       </Section>

@@ -106,7 +106,7 @@ export function CategoryPicker({
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           {podeCriar ? (
             <Row
-              title={`Usar "${termo}"`}
+              title={termo}
               subtitle="Categoria nova"
               icon="plus"
               chevron={false}

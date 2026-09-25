@@ -24,6 +24,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { ComNegrito } from '@/components/ui/forte';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Fonts } from '@/constants/theme';
 import { HitTarget, Motion, Radius, Space, Type, tabular } from '@/design/tokens';
@@ -47,8 +48,9 @@ interface FieldProps {
    * erro vai em `<Forte>` ("Renomear **Mercado**"), nunca entre « ».
    */
   label: React.ReactNode;
+  /** Texto nosso pode marcar o nome de um botão ou exemplo com `*assim*`; dado vai em `<Forte>`. */
   error?: React.ReactNode;
-  hint?: string;
+  hint?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -83,12 +85,12 @@ export function Field({ label, error, hint, children }: FieldProps) {
         */}
         {error ? (
           <ThemedText type="footnote" themeColor="danger">
-            {error}
+            {typeof error === 'string' ? <ComNegrito texto={error} /> : error}
           </ThemedText>
         ) : null}
         {hint && hint !== error ? (
           <ThemedText type="footnote" themeColor="textSecondary">
-            {hint}
+            {typeof hint === 'string' ? <ComNegrito texto={hint} /> : hint}
           </ThemedText>
         ) : null}
       </View>

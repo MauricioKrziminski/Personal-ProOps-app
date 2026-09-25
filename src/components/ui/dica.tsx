@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { ComNegrito } from '@/components/ui/forte';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { Motion, Radius, Space } from '@/design/tokens';
 import { dispensarDica, useDica } from '@/hooks/use-dicas';
@@ -38,7 +39,7 @@ export function Dica({ id, tela, bico = 'cima' }: { id: DicaId; tela: Tela; bico
         {/* `flexShrink: 0` no texto: dentro de `entering`, encolhido não se remede (design.md §3). */}
         <View style={styles.coluna}>
           <ThemedText type="small" style={styles.texto}>
-            {dica.texto}
+            <ComNegrito texto={dica.texto} />
           </ThemedText>
           <Pressable
             accessibilityRole="button"

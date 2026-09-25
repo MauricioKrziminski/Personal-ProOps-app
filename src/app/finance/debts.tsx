@@ -6,6 +6,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { useBRL } from '@/components/ui/conceal';
 import { SelectField } from '@/components/ui/select-field';
 import { ThemedText } from '@/components/themed-text';
+import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
@@ -448,7 +449,7 @@ export default function DebtsScreen() {
         {
           onSuccess: () => {
             toast({
-              message: `Parcela de ${pagando.name} registrada.${mudaContrato ? ` As próximas passam a ${formatBRL(pagoCents)}.` : ''}`,
+              message: <>Parcela de <Forte>{pagando.name}</Forte> registrada.{mudaContrato ? ` As próximas passam a ${formatBRL(pagoCents)}.` : ''}</>,
               tone: 'success',
             });
             volta.aoFechar(() => setPagando(null));
@@ -493,11 +494,11 @@ export default function DebtsScreen() {
     archive.mutate(d.id, {
       onSuccess: () =>
         toast({
-          message: `Arquivei "${d.name}".`,
+          message: <>Arquivei <Forte>{d.name}</Forte>.</>,
           tone: 'success',
           action: { label: 'Desfazer', onPress: () => desarquivar(d) },
         }),
-      onError: () => toast({ message: `Não deu para arquivar ${d.name}.`, tone: 'error' }),
+      onError: () => toast({ message: <>Não deu para arquivar <Forte>{d.name}</Forte>.</>, tone: 'error' }),
     });
 
   const desarquivar = (d: Debt) =>
@@ -505,10 +506,10 @@ export default function DebtsScreen() {
       onSuccess: (voltou) =>
         toast(
           voltou
-            ? { message: `"${d.name}" voltou para a lista.`, tone: 'success' }
-            : { message: `"${d.name}" não existe mais.`, tone: 'error' },
+            ? { message: <><Forte>{d.name}</Forte> voltou para a lista.</>, tone: 'success' as const }
+            : { message: <><Forte>{d.name}</Forte> não existe mais.</>, tone: 'error' as const },
         ),
-      onError: () => toast({ message: `Não deu para desarquivar ${d.name}.`, tone: 'error' }),
+      onError: () => toast({ message: <>Não deu para desarquivar <Forte>{d.name}</Forte>.</>, tone: 'error' }),
     });
 
   /**
@@ -527,13 +528,13 @@ export default function DebtsScreen() {
       /* Sem a contagem, a frase genérica ainda diz o que some. */
     }
     confirmDestructive(
-      `Excluir "${d.name}" por completo?`,
+      `Excluir a dívida ${d.name} por completo?`,
       'Excluir',
       () =>
         excluirDivida.mutate(d.id, {
           onSuccess: () => {
             if (detalheId === d.id) setDetalhe(null);
-            toast({ message: `Excluí "${d.name}".`, tone: 'success' });
+            toast({ message: <>Excluí <Forte>{d.name}</Forte>.</>, tone: 'success' });
           },
           onError: (error) =>
             toast({ message: financeErrorMessage(error, `Não deu para excluir ${d.name}.`), tone: 'error' }),
@@ -746,7 +747,7 @@ export default function DebtsScreen() {
     <EmptyState
       icon="creditcard.trianglebadge.exclamationmark"
       title={temArquivadas ? 'Nenhuma dívida ativa' : 'Nenhuma dívida cadastrada'}
-      hint={'Manda no WhatsApp: “financiei o carro em 48x de 1.470”\n— ou toca em + para cadastrar aqui.'}
+      hint={'Manda no WhatsApp: *financiei o carro em 48x de 1.470*\n— ou toca em + para cadastrar aqui.'}
       action={{ label: 'Nova dívida', onPress: abrirNova }}
       compacto={temArquivadas}
     />

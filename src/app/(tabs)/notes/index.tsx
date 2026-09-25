@@ -716,7 +716,7 @@ export default function NotesScreen() {
                 onSuccess: () =>
                   toast({
                     message: destino
-                      ? `Movida para ${folderById(destino)?.name ?? 'a pasta'}.`
+                      ? <>Movida para <Forte>{folderById(destino)?.name ?? 'a pasta'}</Forte>.</>
                       : 'Tirada da pasta.',
                     tone: 'success',
                   }),

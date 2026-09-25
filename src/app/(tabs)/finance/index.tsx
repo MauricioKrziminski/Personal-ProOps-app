@@ -574,7 +574,7 @@ export default function FinanceScreen() {
       {isEmpty ? (
         <EmptyState
           title="Ainda não tem movimento"
-          hint={'Manda “gastei 45 no mercado” no WhatsApp —\nou toca no + para lançar aqui'}
+          hint={'Manda *gastei 45 no mercado* no WhatsApp —\nou toca no + para lançar aqui'}
         />
       ) : null}
     </>

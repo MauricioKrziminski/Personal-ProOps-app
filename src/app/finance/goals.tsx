@@ -5,6 +5,7 @@ import { Stack } from 'expo-router';
 
 import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
+import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
@@ -219,12 +220,12 @@ export default function GoalsScreen() {
 
   const arquivar = (g: Goal) =>
     confirmDestructive(
-      `Arquivar "${g.name}"?`,
+      `Arquivar a meta ${g.name}?`,
       'Arquivar',
       () =>
         archive.mutate(g.id, {
-          onSuccess: () => toast({ message: `${g.name} arquivada.`, tone: 'success' }),
-          onError: () => toast({ message: `Não deu para arquivar ${g.name}.`, tone: 'error' }),
+          onSuccess: () => toast({ message: <>Meta <Forte>{g.name}</Forte> arquivada.</>, tone: 'success' }),
+          onError: () => toast({ message: <>Não deu para arquivar <Forte>{g.name}</Forte>.</>, tone: 'error' }),
         }),
       'A meta sai da lista. O que você guardou fica no histórico.'
     );
@@ -404,7 +405,7 @@ export default function GoalsScreen() {
         <EmptyState
           icon="target"
           title="Nenhuma meta ainda"
-          hint={'Manda no WhatsApp: “quero juntar 3000 pra viagem até dezembro”\n— ou toca em + para criar aqui.'}
+          hint={'Manda no WhatsApp: *quero juntar 3000 pra viagem até dezembro*\n— ou toca em + para criar aqui.'}
           action={{ label: 'Nova meta', onPress: abrirNova }}
         />
       ) : null}

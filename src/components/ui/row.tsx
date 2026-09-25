@@ -12,7 +12,8 @@ type RowBadgeTone = 'warning' | 'danger' | 'success' | 'textSecondary';
 
 interface RowProps {
   title: string;
-  subtitle?: string;
+  /** Texto, ou texto com o nome citado em `<Forte>`. Nó não entra no rótulo de acessibilidade. */
+  subtitle?: ReactNode;
   icon?: SymbolViewProps['name'];
   /** Valor, badge ou qualquer coisa à direita. Chevron é automático quando há `onPress`. */
   trailing?: ReactNode;
@@ -168,7 +169,7 @@ export function Row({
       onLongPress={onLongPress}
       accessibilityRole="button"
       accessibilityState={accessibilityState}
-      accessibilityLabel={accessibilityLabel ?? [title, subtitle].filter(Boolean).join(', ')}>
+      accessibilityLabel={accessibilityLabel ?? [title, typeof subtitle === 'string' ? subtitle : null].filter(Boolean).join(', ')}>
       {({ pressed }) => content(pressed)}
     </Pressable>
   );

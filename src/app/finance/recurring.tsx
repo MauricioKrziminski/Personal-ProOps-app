@@ -452,7 +452,7 @@ export default function RecurringScreen() {
 
   const apagar = (r: RecurringTransaction) =>
     confirmDestructive(
-      `Apagar "${r.description ?? 'recorrência'}"?`,
+      r.description ? `Apagar a recorrência ${r.description}?` : 'Apagar esta recorrência?',
       'Apagar',
       () =>
         remove.mutate(r.id, {
@@ -657,7 +657,7 @@ export default function RecurringScreen() {
         <EmptyState
           icon="repeat"
           title="Nada se repete ainda"
-          hint={'Manda no WhatsApp: “todo dia 5 pago 1200 de aluguel”\n— ou toca em + para cadastrar aqui.'}
+          hint={'Manda no WhatsApp: *todo dia 5 pago 1200 de aluguel*\n— ou toca em + para cadastrar aqui.'}
           action={{
             label: 'Nova recorrência',
             onPress: () => setForm({ ...FORM_VAZIO, inicio: isoToBR(localISODate()) }),

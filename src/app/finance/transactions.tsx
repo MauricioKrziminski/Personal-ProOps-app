@@ -11,6 +11,7 @@ import { monthTitle, shiftMonth } from '@/components/finance/month-picker';
 import { useMonthRuler } from '@/components/finance/month-ruler';
 import { PeriodBar } from '@/components/finance/period-bar';
 import { ThemedText } from '@/components/themed-text';
+import { Forte } from '@/components/ui/forte';
 import { HeaderMenu } from '@/components/ui/header-actions';
 import { ItemLink } from '@/components/ui/item-link';
 import { Search } from '@/components/ui/search';
@@ -592,7 +593,7 @@ export default function TransactionsScreen() {
       icon="line.3.horizontal.decrease"
       title={
         search.trim()
-          ? `Nenhum lançamento com “${search.trim()}” em ${monthTitle(month)}`
+          ? <>Nenhum lançamento com <Forte>{search.trim()}</Forte> em {monthTitle(month)}</>
           : `Nenhum lançamento com esse filtro em ${monthTitle(month)}`
       }
       action={{ label: 'Limpar filtros', onPress: clearFilters }}
@@ -601,7 +602,7 @@ export default function TransactionsScreen() {
     <EmptyState
       icon="tray"
       title="Nenhum lançamento ainda"
-      hint={'Manda “gastei 45 no mercado” no WhatsApp —\nou toca no + para lançar aqui'}
+      hint={'Manda *gastei 45 no mercado* no WhatsApp —\nou toca no + para lançar aqui'}
     />
   ) : (
     <EmptyState
