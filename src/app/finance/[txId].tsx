@@ -395,7 +395,7 @@ export default function TransactionDetailScreen() {
               subtitle={
                 plano
                   ? // A data no topo é a da PARCELA (o mês em que ela cai); a da compra mora aqui.
-                    `${brl(plano.total_cents)} no total · compra de ${formatDateBR(plano.first_occurred_at)}`
+                    `${brl(plano.total_cents)} no total · compra em ${formatDateBR(plano.first_occurred_at)}`
                   : 'Ver parcelas'
               }
               icon="rectangle.split.3x1"

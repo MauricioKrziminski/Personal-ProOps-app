@@ -16,7 +16,7 @@ export function dataDaCompra(tx: ComPlano): string {
 }
 
 /**
- * "compra de 14/09" na linha que está numa data diferente da compra (a parcela 2 em diante), e
+ * "compra em 14/09" na linha que está numa data diferente da compra (a parcela 2 em diante), e
  * `null` quando a data da linha JÁ é a da compra.
  *
  * ⚠️ "Mostre sempre a data do lançamento" (24/09/2026): a lista escrevia só "na fatura de
@@ -27,7 +27,7 @@ export function rotuloDaCompra(tx: ComPlano): string | null {
   const compra = dataDaCompra(tx);
   if (compra === tx.occurred_at) return null;
   const br = isoToBR(compra);
-  return `compra de ${compra.slice(0, 4) === tx.occurred_at.slice(0, 4) ? br.slice(0, 5) : br}`;
+  return `compra em ${compra.slice(0, 4) === tx.occurred_at.slice(0, 4) ? br.slice(0, 5) : br}`;
 }
 
 /**

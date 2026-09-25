@@ -760,7 +760,7 @@ export default function TransactionsScreen() {
              * decisão do dono do produto: *"Mostre sempre a data do lançamento"*). Escrever
              * "na fatura de 10/10" numa compra de cartão fazia o vencimento ler como a data do
              * lançamento. A data é a do cabeçalho do dia; na parcela 2 em diante, que mora no mês
-             * em que cai, a linha acrescenta "compra de 14/09". A fatura continua no detalhe
+             * em que cai, a linha acrescenta "compra em 14/09". A fatura continua no detalhe
              * ("Entra na fatura de …"). Conta a pagar fora do cartão mantém "vence …": ali o
              * vencimento É a data daquela conta.
              */

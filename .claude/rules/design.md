@@ -632,8 +632,10 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
     leva até o fim do card como se o card desaparecesse… com a transição abrindo o que tiver que
     abrir"*). A ponta cobre a linha inteira, o card desliza para fora e, no fim da saída, abre o
     menu ("Mais"), a confirmação (Apagar) ou faz a ação. O que TIRA o item da lista (a ponta da
-    esquerda com `desfaz`: Arquivar) fica fora até o item sumir — se a ação falhar, volta em 3 s;
-    o resto volta logo, por trás do que abriu.
+    esquerda com `desfaz`: Arquivar) não espera o banco: logo depois da saída a linha ENCOLHE até
+    sumir (~0,2 s) e as de baixo sobem — esperando, a faixa ficava ~1 s parada e a linha sumia de
+    uma vez (medido no s26). Se a ação falhar, a linha reabre e o card volta em 3 s. O resto volta
+    logo, por trás do que abriu.
   - ⚠️ **O fundo da `linha` mora no invólucro que sai** (`Saida`), não no `childrenContainerStyle`
     da biblioteca: aquele fica parado no painel aberto e cobria metade da ponta com a linha vazia.
   - ⚠️ **Cada botão tem base OPACA** sob a cor: o `dangerSoft` é translúcido, e cobrindo o "Mais"

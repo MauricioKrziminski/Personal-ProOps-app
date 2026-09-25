@@ -81,6 +81,17 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
   // que tira o item da lista, o card segue até sair da tela (NaN = parado no gesto).
   const tx = useSharedValue(0);
   const saida = useSharedValue(Number.NaN);
+  // Quando a ação TIRA o item da lista, a linha encolhe até sumir logo depois de o card sair — como
+  // no WhatsApp —, sem esperar o banco: esperando, a faixa ficava parada ~1 s e a linha sumia de
+  // uma vez (medido no s26). `recolheu` fica ligado depois da primeira vez: a altura passa a ser
+  // escrita sempre (a do conteúdo, medida por dentro), porque um estilo animado que deixa de
+  // escrever uma chave não a devolve.
+  const altura = useSharedValue(0);
+  const recolhe = useSharedValue(0);
+  const recolheu = useSharedValue(false);
+  const recolher = useAnimatedStyle(() =>
+    recolheu.get() ? { height: altura.get() * (1 - recolhe.get()), overflow: 'hidden' as const } : {},
+  );
   const armado = useSharedValue(false);
   const abertoAntes = useSharedValue<'direita' | 'esquerda' | null>(null);
 
@@ -141,14 +152,21 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
     // fora até ele sumir — a ação chega ao banco e o card desmonta junto; se ela falhar (o toast já
     // disse), ele volta. O resto (menu, confirmação, ação rápida) volta logo, por trás do que abriu.
     const tira = pedido.lado === 'esquerda' && Boolean(pontas.esquerda?.desfaz);
+    if (tira) {
+      recolheu.set(true);
+      recolhe.set(withTiming(1, { duration: Motion.duration.base, easing: Motion.easing.out }));
+    }
     const volta = setTimeout(() => {
+      // Ainda aqui: a ação falhou (o toast já disse) ou não tirava o item — a linha reabre e o card
+      // volta para o lugar.
+      recolhe.set(withTiming(0, { duration: Motion.duration.base, easing: Motion.easing.out }));
       eu.current?.reset();
       saida.set(withTiming(0, { duration: Motion.duration.slow, easing: Motion.easing.out }, (fim) => {
         if (fim) saida.set(Number.NaN);
       }));
     }, tira ? 3000 : Motion.duration.slow * 2);
     return () => clearTimeout(volta);
-  }, [pedido, tocar, saida]);
+  }, [pedido, tocar, saida, recolhe, recolheu]);
   const pedir = useCallback((lado: 'direita' | 'esquerda') => setPedido({ lado }), []);
   const nDireita = lados.direita.length;
   const nEsquerda = esquerda.length;
@@ -211,12 +229,18 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
     // `pointerEvents: 'box-only'`, e preso a ele o gesto deixava de ver o dedo — continuar
     // arrastando a partir do painel aberto não executava mais.
     <GestureDetector gesture={dedo}>
-      <View
+      <Animated.View
         collapsable={false}
         // Um toque num card com OUTRO aberto só fecha o aberto — não navega no mesmo toque. No
         // próprio card aberto o toque passa: é ele que aperta os botões revelados.
         onStartShouldSetResponderCapture={() => cardAberto.toqueEmOutro(meu)}
-        onLayout={(e) => largura.set(e.nativeEvent.layout.width)}>
+        style={recolher}>
+        {/* Mede o tamanho NATURAL: a caixa de fora é a que encolhe quando o item sai da lista. */}
+        <View
+          onLayout={(e) => {
+            largura.set(e.nativeEvent.layout.width);
+            altura.set(e.nativeEvent.layout.height);
+          }}>
         <ReanimatedSwipeable
           ref={eu}
           enabled={tem}
@@ -265,7 +289,8 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
             </Saida>
           </DentroDeArrasto.Provider>
         </ReanimatedSwipeable>
-      </View>
+        </View>
+      </Animated.View>
     </GestureDetector>
   );
 }

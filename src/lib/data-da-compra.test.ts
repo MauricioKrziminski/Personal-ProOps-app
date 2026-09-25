@@ -14,7 +14,7 @@ test('A data da compra de uma parcela é a da parcela 1, não a do mês em que e
   // "o wardogs mostra na data que vai entrar na fatura ao invés de mostrar a data que o lançamento
   // foi feito de fato" (24/09/2026): a 2/2 mora em 14/10, a compra foi em 14/09.
   assert.equal(dataDaCompra(parcela(2, '2026-10-14', '2026-09-14')), '2026-09-14');
-  assert.equal(rotuloDaCompra(parcela(2, '2026-10-14', '2026-09-14')), 'compra de 14/09');
+  assert.equal(rotuloDaCompra(parcela(2, '2026-10-14', '2026-09-14')), 'compra em 14/09');
   // A parcela 1 já está na data da compra: nada a acrescentar.
   assert.equal(rotuloDaCompra(parcela(1, '2026-09-14', '2026-09-14')), null);
   // Avulso: a data é a dele.
@@ -23,7 +23,7 @@ test('A data da compra de uma parcela é a da parcela 1, não a do mês em que e
 });
 
 test('Compra de outro ano leva o ano junto', () => {
-  assert.equal(rotuloDaCompra(parcela(14, '2026-10-05', '2025-09-05')), 'compra de 05/09/2025');
+  assert.equal(rotuloDaCompra(parcela(14, '2026-10-05', '2025-09-05')), 'compra em 05/09/2025');
 });
 
 test('"Concluído" é o que já aconteceu — a mesma régua da pílula', () => {

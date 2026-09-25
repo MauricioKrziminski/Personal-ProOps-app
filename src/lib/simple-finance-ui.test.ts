@@ -1799,8 +1799,8 @@ test('Lançamentos: a linha diz a data da COMPRA, nunca o vencimento da fatura (
     return link.props.children({}).props.subtitle as string;
   };
   for (const t of ['wardogs (1/2)', 'wardogs (2/2)']) assert.doesNotMatch(legenda(t), /fatura/, t);
-  assert.match(legenda('wardogs (2/2)'), /compra de 14\/09/);
-  assert.doesNotMatch(legenda('wardogs (1/2)'), /compra de/, 'a parcela 1 já está no dia da compra');
+  assert.match(legenda('wardogs (2/2)'), /compra em 14\/09/);
+  assert.doesNotMatch(legenda('wardogs (1/2)'), /compra em/, 'a parcela 1 já está no dia da compra');
   // Conta a pagar fora do cartão: o vencimento É a data dela.
   // (o `formatDateBR` do harness é um dublê de data fixa — o que se prende aqui é o rótulo)
   assert.match(legenda('Boleto'), /^vence /);

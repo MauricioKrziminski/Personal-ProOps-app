@@ -118,7 +118,7 @@ Portão em cada commit: `tsc`, `expo lint` e `npm test` verdes (853/853 no últi
 | 2 — botões do arrasto no iOS | `ec08d7e` | simulador: "Mais" abre o menu, "Arquivar" arquiva |
 | 3 — borda e até o fim | `5278f48` | s26 e simulador: canto casado com o card; até o fim aciona a ponta dos dois lados (6/6 medido no banco) |
 | 4 — efeito do WhatsApp | `5278f48` | vídeo quadro a quadro no s26 |
-| 5 — data da compra e "Concluído" | `a352e5b` | "wardogs" mostra "compra de 14/09" e aparece em Concluído |
+| 5 — data da compra e "Concluído" | `a352e5b` | "wardogs" mostra "compra em 14/09" e aparece em Concluído |
 | 6 — "(tabs)" | `85806a1` | simulador: voltar pela borda com a busca ativa |
 | 7 — vazio com seção secundária | `62fd988` | Dívidas, Metas, Parceladas, Recorrentes, Lembretes, Notas e Orçamentos |
 | 8 — "Últimos lançamentos" no iOS | `4891b38` | simulador: tocar abre o detalhe |
@@ -187,3 +187,10 @@ linha (Lançamentos) ficava parado no contêiner da biblioteca e cobria metade d
 `dangerSoft` translúcido deixava ver o "Mais" através do "Apagar". Conferido no iPhone e no s26
 com Apagar → Cancelar (nada apagado). Três dicas encurtadas por deixarem uma palavra sozinha na
 largura do iPhone, com teste.
+
+**Quinta rodada.** *"trava quando eu arrasto tudo e fica uns segundos parado"* — medido no s26: no
+Arquivar, depois de o card sair, a faixa ficava ~1,2 s parada esperando o servidor tirar a nota e a
+linha sumia de uma vez. Agora a linha encolhe logo depois da saída (~0,2 s), como no WhatsApp, e o
+banco chega depois sem ninguém ver; se falhar, ela reabre. Conferido no s26 e no iPhone (nota
+`28e7614a-…` arquivada nos testes e restaurada pelo ID). E o rótulo virou **"compra em 14/09"**
+(era "compra de"), na linha e no detalhe.
