@@ -79,7 +79,7 @@ export default function PaywallScreen() {
     */
     <Screen scroll={false} grouped>
       <TaskHeader title="Assinar" onClose={() => router.back()} />
-      <ScrollView
+      <ScrollView keyboardShouldPersistTaps="handled"
         contentContainerStyle={[styles.corpo, { paddingBottom: insets.bottom + Space.xxl }]}
         showsVerticalScrollIndicator={false}>
 

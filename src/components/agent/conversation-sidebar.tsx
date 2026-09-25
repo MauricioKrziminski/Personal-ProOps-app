@@ -37,7 +37,7 @@ export function ConversationSidebar({ selectedId }: { selectedId?: string }) {
   );
 
   return (
-    <FlashList
+    <FlashList keyboardShouldPersistTaps="handled"
       style={styles.list}
       data={conversations}
       keyExtractor={(item) => item.id}

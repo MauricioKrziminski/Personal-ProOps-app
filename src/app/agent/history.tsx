@@ -109,7 +109,7 @@ export default function AgentHistoryScreen() {
 
   return (
     <Screen scroll={false} grouped>
-      <FlashList
+      <FlashList keyboardShouldPersistTaps="handled"
         // Rolar fecha o card arrastado que estiver aberto (Deslizavel).
         onScrollBeginDrag={fecharDeslizavelAberto}
         data={conversas}

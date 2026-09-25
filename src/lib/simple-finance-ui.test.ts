@@ -125,6 +125,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useCycleMonth: () => '2026-09',
     useMonthBreakdown: () => ({ ...query, data: [] }),
     useSaveDebt: () => mutation('saveDebt'),
+    usePayDebtInstallment: () => mutation('payDebt'),
     useArchiveDebt: () => mutation('archiveDebt'),
     useUnarchiveDebt: () => mutation('unarchiveDebt'),
     useDeleteDebt: () => mutation('deleteDebt'),
@@ -2049,4 +2050,79 @@ test('Card: os filhos têm respiro entre si — o texto e o botão não colam (d
   assert.ok(caixa, 'o card desenha uma View');
   const base = [caixa.props.style].flat(Infinity).find((s: any) => s && 'padding' in s);
   assert.ok(base && 'gap' in base, 'a base do Card tem `gap`');
+});
+
+test('Dívidas: parcela fixa paga com outro valor conta uma parcela e diz o encargo; fora do limite o botão espera', () => {
+  // 25/09/2026: *"às vezes eu posso ter pago menos ou mais em uma parcela"*. O valor era só
+  // leitura na parcela fixa, e o banco recusava qualquer outro.
+  const ui = screen(debtsFile, {
+    create: false, debts: [carro], params: { id: 'd1' },
+    debtSchedule: [{ installment_no: 9, due_date: '2026-10-05', payment_cents: 147000, interest_cents: null, principal_cents: null, balance_cents: 0 }],
+  });
+  ui.press('Paguei esta parcela');
+  const campo = () => ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Quanto você pagou');
+  assert.ok(campo(), 'o valor é editável, como na dívida com juros');
+  assert.equal(ui.nodes().find((n: any) => n.type === 'MoneyField').props.valueCents, 147000, 'nasce na parcela');
+  assert.equal(campo().props.hint, undefined, 'no valor da parcela não há o que explicar');
+  assert.ok(!ui.nodes().some((n: any) => n.type === 'SwitchRow'));
+
+  ui.fill('Quanto você pagou', 150000);
+  assert.equal(campo().props.hint.replace(/\s/g, ' '), 'Conta como 1 parcela; R$ 30,00 de encargo.');
+  ui.fill('Quanto você pagou', 145000);
+  assert.equal(campo().props.hint.replace(/\s/g, ' '), 'Conta como 1 parcela; R$ 20,00 de desconto.');
+
+  ui.fill('Quanto você pagou', 300000);
+  assert.match(campo().props.error, /passa de uma parcela/);
+  assert.equal(ui.button('Registrar pagamento').props.disabled, true, 'o banco recusaria: o botão espera e o campo diz por quê');
+  assert.ok(!ui.nodes().some((n: any) => n.type === 'SwitchRow'));
+
+  // Pagar diferente, só este: vai direto, a diferença é encargo.
+  ui.fill('Quanto você pagou', 150000);
+  ui.press('Registrar pagamento');
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.writes.map((w: any) => w.operation))), ['payDebt']);
+  assert.equal(ui.writes[0].value.amountCents, 150000);
+});
+
+test('Dívidas: "Usar este valor nas próximas" muda o contrato ANTES de pagar, e a parcela sai inteira no valor novo', () => {
+  const ui = screen(debtsFile, {
+    create: false, debts: [{ ...carro, updated_at: 'v1' }], params: { id: 'd1' },
+    debtSchedule: [{ installment_no: 9, due_date: '2026-10-05', payment_cents: 147000, interest_cents: null, principal_cents: null, balance_cents: 0 }],
+  });
+  ui.press('Paguei esta parcela');
+  ui.fill('Quanto você pagou', 150000);
+  const chave = ui.nodes().find((n: any) => n.type === 'SwitchRow' && n.props.label === 'Usar este valor nas próximas');
+  assert.ok(chave);
+  ui.interact(() => chave.props.onValueChange(true));
+  assert.equal(
+    ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Quanto você pagou').props.hint.replace(/\s/g, ' '),
+    'Esta e as próximas parcelas passam a R$ 1.500,00.',
+  );
+  ui.press('Registrar pagamento');
+  assert.equal(ui.writes.length, 1, 'o pagamento espera o contrato mudar');
+  const contrato = JSON.parse(JSON.stringify(ui.writes[0]));
+  assert.equal(contrato.operation, 'saveDebt');
+  assert.equal(contrato.value.id, 'd1');
+  assert.equal(contrato.value.versao, 'v1', 'um pagamento pelo WhatsApp no meio não é sobrescrito');
+  assert.equal(contrato.value.installment_cents, 150000);
+  assert.equal(contrato.value.principal_cents, 150000 * 48);
+  assert.equal(contrato.value.remaining_cents, 150000 * 40);
+  assert.equal(contrato.value.installments_paid, 8);
+  ui.interact(() => ui.pedidos[0].opts.onSuccess());
+  assert.equal(ui.writes[1].operation, 'payDebt');
+  assert.equal(ui.writes[1].value.amountCents, 150000);
+});
+
+test('a prestação da agenda abre A dívida dela, na Hoje e na Projeção — não a lista', () => {
+  // `upcoming_bills` traz o id da dívida em `ref_id`; mandar para a lista fazia quem tem cinco
+  // financiamentos caçar qual era (a mesma correção de `cycle-routes`).
+  const prestacao = { ref_id: 'd1', title: 'Parcela Carro', due_date: '2026-09-10', amount_cents: 147000, kind: 'debt', overdue: false };
+  const hoje = screen(hojeFile, { bills: [prestacao] });
+  hoje.interact(() => agendaItem(hoje, 'Parcela Carro').props.action.onPress());
+  assert.deepEqual(copia(hoje.navigations.at(-1)), { pathname: '/finance/debts', params: { id: 'd1' } });
+
+  const projecao = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], bills: [prestacao] });
+  const linha = projecao.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'Parcela Carro');
+  assert.ok(linha, 'a prestação aparece na Projeção');
+  projecao.interact(() => linha.props.onPress());
+  assert.deepEqual(copia(projecao.navigations.at(-1)), { pathname: '/finance/debts', params: { id: 'd1' } });
 });

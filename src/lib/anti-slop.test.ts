@@ -1312,3 +1312,47 @@ test('O toast sobe acima do teclado: erro de formulário não some atrás dele',
   const fonte = readFileSync(join(SRC, 'components/ui/toast.tsx'), 'utf8');
   assert.match(fonte, /<KeyboardStickyView/);
 });
+
+test('Toda rolagem deixa o toque passar com o teclado aberto (keyboardShouldPersistTaps, nunca o padrão never)', () => {
+  // 25/09/2026, medido no s26: com o teclado aberto, o primeiro toque em "Registrar pagamento"
+  // só fechava o teclado — sem pressIn, sem pagamento. A folha é um `Modal`, mas no React ela é
+  // filha da rolagem da TELA, e o sistema de responder sobe pela árvore do React: no padrão
+  // `never` aquela rolagem pega o toque na fase de captura para fechar o teclado. Com `handled`
+  // o botão recebe o toque (como no iOS e no Android nativos) e tocar no vazio continua fechando.
+  const TAG = /(?<![A-Za-z`])<((?:Animated\.)?(?:ScrollView|FlatList|SectionList|FlashList|KeyboardAwareScrollView|DragScrollView))\b/g;
+  const fora: string[] = [];
+  for (const file of walk(SRC)) {
+    if (!file.endsWith('.tsx')) continue;
+    const texto = stripComments(readFileSync(file, 'utf8'));
+    for (const m of texto.matchAll(TAG)) {
+      // Fim da tag de abertura: o primeiro `>` fora de chaves e de um genérico (`SectionList<T>`).
+      let i = m.index! + m[0].length;
+      let chaves = 0;
+      let generico = texto[i] === '<' ? 1 : 0;
+      if (generico) i += 1;
+      for (; i < texto.length; i += 1) {
+        const c = texto[i];
+        if (c === '{') chaves += 1;
+        else if (c === '}') chaves -= 1;
+        else if (generico && c === '<') generico += 1;
+        else if (generico && c === '>') generico -= 1;
+        else if (!generico && chaves === 0 && c === '>' && texto[i - 1] !== '=') break;
+      }
+      // `always` só onde a rolagem mora SOBRE o teclado (a barra de formatação da nota).
+      if (!/keyboardShouldPersistTaps="(handled|always)"/.test(texto.slice(m.index!, i))) {
+        fora.push(`${file.replace(`${SRC}/`, '')}: <${m[1]}>`);
+      }
+    }
+  }
+  assert.deepEqual(fora, []);
+});
+
+test('Pagamento de dívida não troca de tipo, não vira "vou pagar depois" nem sai de cartão no formulário', () => {
+  // O trigger `tg_transactions_debt_payment` exige despesa PAGA: o Segmented de tipo e o "vou
+  // pagar depois" num pagamento de dívida eram dois controles que o banco sempre recusaria.
+  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  assert.match(fonte, /const tipoTravado = [^;]*editing\?\.debt_id/);
+  assert.match(fonte, /\{!tipoTravado && \(/);
+  assert.match(fonte, /const podeAdiar = [^;]*!editing\?\.debt_id/);
+  assert.match(fonte, /filter\(\(a\) => !editing\?\.debt_id \|\| a\.type !== 'credit_card'\)/, 'nem sai de cartão');
+});

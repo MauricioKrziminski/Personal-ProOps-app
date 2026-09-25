@@ -251,7 +251,7 @@ export default function FolderScreen() {
         }
       />
 
-      <DragScrollView
+      <DragScrollView keyboardShouldPersistTaps="handled"
         ref={scrollRef}
         // Rolar fecha o card arrastado que estiver aberto (Deslizavel).
         onScrollBeginDrag={fecharDeslizavelAberto}

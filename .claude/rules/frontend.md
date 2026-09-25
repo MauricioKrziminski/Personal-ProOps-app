@@ -215,8 +215,9 @@ parcelas já foram pagas?"). São modos diferentes do mesmo cadastro, não conce
   tela. Pergunta continua onde ela É a escolha da tela ("É bem ou dívida?") — ali não há
   duplicata para unificar. (O "Acontece uma vez ou todo mês?" do "E se…" virou "Frequência" na
   limpeza de texto de 23/09/2026.)
-- `"Valor desta parcela"` (a tela de PAGAR) continua diferente de `"Valor da parcela"` (o
-  cadastro) **de propósito**: um é quanto está saindo agora, o outro é o contrato.
+- `"Quanto você pagou"` (a tela de PAGAR, nos dois modos de dívida desde 25/09/2026) continua
+  diferente de `"Valor da parcela"` (o cadastro) **de propósito**: um é quanto está saindo agora,
+  o outro é o contrato. (Era "Valor desta parcela", só leitura na parcela fixa.)
 
 ## Plataforma — a decisão mora no primitivo, nunca na tela
 
@@ -303,6 +304,15 @@ Três regras que caem disso:
 - **Pergunta de rascunho NÃO trava o campo de texto.** Os botões ali são atalho para o que já
   existe; digitar continua valendo, e é assim que se escolhe um cartão que não coube na lista
   ou se cria um novo. HITL continua travando: lá a resposta sai dos botões.
+
+### Com o teclado aberto, o primeiro toque num botão É o toque (25/09/2026)
+
+⚠️ **Toda rolagem declara `keyboardShouldPersistTaps="handled"`** (`always` só na barra de
+formatação da nota, que mora sobre o teclado). No padrão `never` a rolagem pega o primeiro toque
+para fechar o teclado, e o botão não recebe nada — medido no s26: "Registrar pagamento" tocado com
+o teclado aberto só fechava o teclado, sem `pressIn`. E vale para as FOLHAS: o `Sheet` é um
+`Modal`, mas o sistema de responder sobe pela árvore do REACT, e a rolagem da tela por trás é
+ancestral da folha. `anti-slop.test.ts` quebra se uma rolagem nascer sem a prop.
 
 ## Estado local
 

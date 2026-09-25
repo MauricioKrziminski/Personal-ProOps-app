@@ -37,6 +37,14 @@
   - **O contrato de parcela fixa se edita mesmo com "Paguei" lançado** (decisão do dono do
     produto, 23/09/2026): o `check` segura a aritmética; o pagamento anterior à edição vira
     histórico e não se corrige/apaga mais sozinho.
+  - **Parcela fixa paga com outro valor conta UMA parcela** (`20260925120000`, decisão do dono do
+    produto): o saldo cai o valor da parcela, como o banco vê, e a diferença mora em
+    `debt_interest_cents` — positiva é encargo, negativa é desconto. Limite: da metade até menos
+    do dobro da parcela (R$ 0,01 não quita uma parcela; três pagas juntas não contam como uma).
+    Corrigir o valor de um pagamento de parcela fixa vale em QUALQUER pagamento (o saldo não
+    depende do valor); com juros, só no mais recente. No app, "Usar este valor nas próximas"
+    passa o contrato ao valor novo ANTES de pagar (a parcela sai inteira nele), e editar o valor
+    de um pagamento pergunta "Só este pagamento / Este e as próximas parcelas".
   - **Excluir por completo é `public.delete_debt`**: trava a dívida, apaga os pagamentos
     (`transactions.debt_id`, com um desvio local à transação no `tg_transactions_debt_payment`) e a
     dívida. Idempotente. Apagar a dívida direto FALHA quando há pagamento: a FK `set null` dispara
@@ -744,6 +752,15 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
 - **Receita prevista que passou da data gera alerta `income_to_confirm`** — no dia e três dias
   depois, e para. Aberto (`occurred_at <= current_date`) mandaria o mesmo aviso todo dia, e no
   WhatsApp fora da janela de 24h isso é template PAGO.
+
+## "Paguei" confirma o valor (25/09/2026)
+
+Dar baixa abre uma folha curta (`useConfirmarBaixa`, `components/finance/confirmar-baixa.tsx`):
+quanto saiu (no previsto), quando, e — numa série com valor diferente — "Usar este valor nas
+próximas". Outro valor CORRIGE antes (`update_transaction_scoped`, `one` ou `future`) e só então
+dá a baixa: falhando a correção, nada é marcado como pago. O mesmo valor é o resultado de antes,
+com um toque a mais. Por isso o "Paguei" do arrasto não tem mais "Desfazer": ele não grava sem
+confirmar.
 
 ## Editar em série — "o passado só muda à mão"
 

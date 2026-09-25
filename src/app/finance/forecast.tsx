@@ -456,7 +456,7 @@ export default function ForecastScreen() {
           fatura
             ? () => router.push({ pathname: '/finance/invoice/[id]', params: { id: b.ref_id } })
             : parcelaDeDivida
-              ? () => router.push('/finance/debts')
+              ? () => router.push({ pathname: '/finance/debts', params: { id: b.ref_id } })
               : () => router.push({ pathname: '/finance/[txId]', params: { txId: b.ref_id } })
         }
         onLongPress={acoesDoPrevisto.length ? () => showItemActions(b.title, acoesDoPrevisto) : undefined}
@@ -806,7 +806,7 @@ export default function ForecastScreen() {
 
           O estado morre junto com o sheet: abrir de novo mostra o campo fechado.
         */}
-        <ScrollView contentContainerStyle={styles.horizonteCorpo}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.horizonteCorpo}>
           <View style={styles.horizonteAtalhos}>
             {HORIZONTES.map((h) => (
               <Chip

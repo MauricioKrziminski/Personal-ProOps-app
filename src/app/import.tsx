@@ -654,7 +654,7 @@ export default function ImportScreen() {
             onClose={() => setEditando(null)}
           />
 
-          <ScrollView
+          <ScrollView keyboardShouldPersistTaps="handled"
             contentContainerStyle={[styles.sheetBody, { paddingBottom: insets.bottom + Space.xxl }]}
           >
             {/*

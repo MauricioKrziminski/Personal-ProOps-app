@@ -655,7 +655,7 @@ export default function InstallmentsScreen() {
   const faixaMensal = temFaixa ? (
     <Card style={styles.faixa}>
       <ThemedText type="smallBold">Quanto cai por mês</ThemedText>
-      <ScrollView
+      <ScrollView keyboardShouldPersistTaps="handled"
         ref={faixaRef}
         horizontal
         showsHorizontalScrollIndicator={false}

@@ -55,6 +55,11 @@ export type Transaction = Pick<
   | 'installment_no'
   | 'merchant'
   | 'debt_id'
+  // O razão do pagamento de dívida (escrito pelo trigger): é o que diz ao "Editar lançamento" se
+  // o valor pode mudar e quanto da parcela ele quitou.
+  | 'debt_payment_no'
+  | 'debt_principal_cents'
+  | 'debt_balance_after_cents'
   // A série da recorrência: é o que diz se "esta e as futuras" faz sentido nesta linha.
   // Já vinha no select desde sempre; faltava só no tipo.
   | 'recurring_id'
@@ -166,7 +171,7 @@ export type TxSummaryRow = Omit<Fns['transactions_summary']['Returns'][number], 
 };
 
 const TRANSACTION_COLUMNS =
-  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, auto_confirm, rollover_of_invoice_id, installment_plans(first_occurred_at)';
+  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_balance_after_cents, auto_confirm, rollover_of_invoice_id, installment_plans(first_occurred_at)';
 
 export interface TransactionFilters {
   /**

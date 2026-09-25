@@ -58,7 +58,7 @@ export function AndroidActionSheet() {
             </ThemedText>
           ) : null}
 
-          <ScrollView bounces={false} showsVerticalScrollIndicator={false} style={styles.list}>
+          <ScrollView keyboardShouldPersistTaps="handled" bounces={false} showsVerticalScrollIndicator={false} style={styles.list}>
             {(sheet?.actions ?? []).map((action) => (
               <Pressable
                 key={action.label}

@@ -397,7 +397,7 @@ export default function NotesScreen() {
   );
 
   const biblioteca = (
-      <DragScrollView
+      <DragScrollView keyboardShouldPersistTaps="handled"
         ref={scrollRef}
         // Rolar fecha o card arrastado que estiver aberto (Deslizavel).
         onScrollBeginDrag={fecharDeslizavelAberto}
@@ -500,7 +500,7 @@ export default function NotesScreen() {
         </View>
 
         {chips.length > 0 ? (
-          <ScrollView
+          <ScrollView keyboardShouldPersistTaps="handled"
             horizontal
             showsHorizontalScrollIndicator={false}
             // A faixa SANGRA até as bordas: presa na calha da tela, o primeiro e o último chip

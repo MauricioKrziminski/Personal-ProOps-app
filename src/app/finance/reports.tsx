@@ -275,7 +275,7 @@ export default function ReportsScreen() {
           no destaque ("Sobrou em 2026") e no título de Bens e Direitos. Mesma régua do badge de
           aba e do card que soma uma lista de um item. */}
       {anos.length > 1 ? (
-        <ScrollView
+        <ScrollView keyboardShouldPersistTaps="handled"
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.anos}>

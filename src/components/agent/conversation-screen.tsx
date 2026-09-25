@@ -607,7 +607,7 @@ function ConversationTimeline({
 }) {
   const [startAtBottom] = useState(() => items.length > 4);
   return (
-    <FlashList
+    <FlashList keyboardShouldPersistTaps="handled"
       ref={listRef}
       style={styles.lista}
       data={items}

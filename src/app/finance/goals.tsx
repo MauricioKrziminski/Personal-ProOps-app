@@ -506,7 +506,7 @@ export default function GoalsScreen() {
             onClose={() => setExtrato(null)}
           />
 
-          <ScrollView
+          <ScrollView keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.sheetBody}
             // Rolar o extrato fecha o aporte arrastado que estiver aberto (Deslizavel).
             onScrollBeginDrag={fecharDeslizavelAberto}>

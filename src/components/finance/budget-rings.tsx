@@ -18,7 +18,7 @@ export function BudgetRings({ itens, onPress }: { itens: readonly OrcamentoApert
   const theme = useTheme();
   const brl = useBRL();
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.fileira}>
+    <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.fileira}>
       {itens.map((o) => {
         const pct = Math.round(o.fracaoGasta * 100);
         return (

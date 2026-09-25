@@ -293,6 +293,7 @@ export function Screen({
       style={[styles.root, topBar ? null : { backgroundColor: background }]}
       contentContainerStyle={padding}
       bottomOffset={Space.xxl}
+      keyboardShouldPersistTaps="handled"
         /*
           `never` só onde o header é NOSSO (`topBar`), porque ali a altura já entra no
           `paddingTop` acima — deixar o iOS ajustar por cima disso soma duas vezes.

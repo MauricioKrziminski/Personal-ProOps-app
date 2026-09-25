@@ -34,7 +34,9 @@ import {
   useCreateInstallmentPlan,
   useEditarCompraPelaParcela,
   useInstallmentPlan,
+  useDebts,
   useDeleteTransaction,
+  useSaveDebt,
   useSaveTransaction,
   useSaveTransactionScoped,
   useTransaction,
@@ -53,6 +55,7 @@ import {
   parcelasAbertas,
   recusaDoValor,
   podeParcelar,
+  simpleDebtValues,
   totalDigitado,
   UNIDADES_DO_VALOR,
   valorExibido,
@@ -67,6 +70,7 @@ import {
   dueFieldLabel,
 } from '@/lib/settle-labels';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { correcaoDoPagamento } from '@/lib/confirmar-baixa';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 
@@ -288,7 +292,8 @@ function TransactionForm({
    * pessoa preencher um vencimento que seria descartado em silêncio — o mesmo defeito do achado
    * A, com outra cara. Parcelar já diz quando cada parcela acontece.
    */
-  const podeAdiar = kind !== 'transfer' && !isCard && installmentCount <= 1;
+  // Pagamento de dívida é sempre PAGO (trigger da dívida): adiar seria recusado pelo banco.
+  const podeAdiar = kind !== 'transfer' && !isCard && installmentCount <= 1 && !editing?.debt_id;
   /*
     ⚠️ **O valor de uma PARCELA edita a COMPRA, com a unidade dita** (23/09/2026).
 
@@ -360,6 +365,8 @@ function TransactionForm({
   const podeInformarHistorico = podeParcelarAqui && !editing;
   /** Achado B: esconde o Segmented de tipo numa linha de série — ver o ⚠️ no Controller de `kind`. */
   const naSerieEditada = Boolean(editing?.installment_plan_id || editing?.recurring_id);
+  /** Pagamento de dívida também: o trigger da dívida exige despesa PAGA, e recusaria a troca. */
+  const tipoTravado = naSerieEditada || Boolean(editing?.debt_id);
 
   /**
    * ⚠️ **A fileira de parcelas sumir não pode deixar `installments` inválido para trás.**
@@ -375,8 +382,19 @@ function TransactionForm({
   };
 
   const editarCompra = useEditarCompraPelaParcela();
+  const salvarDivida = useSaveDebt();
   const saving =
-    save.isPending || createPlan.isPending || converter.isPending || editarCompra.isPending;
+    save.isPending || createPlan.isPending || converter.isPending || editarCompra.isPending || salvarDivida.isPending;
+
+  /**
+   * Pagamento de dívida (25/09/2026): o banco decide o que o valor novo pode ser, e a tela diz
+   * ANTES do Salvar — o erro chegava depois, atrás do teclado, e parecia que o Salvar não fazia
+   * nada. Na parcela fixa o valor novo ainda pergunta se vale para as próximas parcelas.
+   */
+  const dividas = useDebts();
+  const divida = editing?.debt_id ? dividas.data?.find((d) => d.id === editing.debt_id) ?? null : null;
+  const correcaoDaDivida =
+    divida && editing ? correcaoDoPagamento(divida, editing, amountCents) : { erro: null, perguntaAsProximas: false };
 
   /**
    * O que mudou E vale para a série inteira. Data fica de fora: ela é de cada
@@ -596,7 +614,7 @@ function TransactionForm({
     const patch = patchDaSerie(values);
     const naSerie = Boolean(editing?.installment_plan_id || editing?.recurring_id);
 
-    const gravar = (escopo: 'one' | 'future') =>
+    const gravar = (escopo: 'one' | 'future', depois?: () => void) =>
       save.mutate(
       {
         id: editing?.id,
@@ -619,6 +637,10 @@ function TransactionForm({
           // A âncora já foi gravada com o formulário inteiro (inclusive data, que não
           // se propaga). A RPC leva o resto da série — e reescreve a âncora com os
           // mesmos valores, que é barato e mantém UM caminho para a regra do lote.
+          if (depois) {
+            depois();
+            return;
+          }
           if (escopo === 'future' && editing) {
             salvarSerie.mutate(
               { id: editing.id, scope: 'future', patch },
@@ -644,6 +666,51 @@ function TransactionForm({
         onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para salvar. Tenta de novo.'), tone: 'error' }),
       },
     );
+
+    if (correcaoDaDivida.erro) return;
+    /**
+     * Parcela fixa com valor novo: "Só este pagamento" conta uma parcela e a diferença vira
+     * encargo/desconto; "Este e as próximas" também passa o contrato ao valor novo, pela mesma
+     * porta do "Editar dívida" (com a trava de versão). O pagamento é gravado primeiro — é o que
+     * a pessoa abriu para corrigir.
+     */
+    if (correcaoDaDivida.perguntaAsProximas && divida?.installments) {
+      const valor = values.amount_cents;
+      const mudarContrato = () =>
+        salvarDivida.mutate(
+          {
+            id: divida.id,
+            name: divida.name,
+            kind: divida.kind,
+            ...simpleDebtValues(valor, String(divida.installments), divida.installments_paid),
+            account_id: divida.account_id,
+            due_day: divida.due_day,
+            versao: divida.updated_at ?? null,
+          },
+          {
+            onSuccess: () => {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              router.back();
+              toast({ message: `As próximas parcelas de ${divida.name} passam a ${formatBRL(valor)}.`, tone: 'success' });
+            },
+            // O pagamento JÁ mudou: dizer só "não deu para salvar" seria mentira.
+            onError: () =>
+              toast({
+                message: 'Salvei este pagamento, mas não consegui mudar as próximas parcelas. Tenta de novo em Editar dívida.',
+                tone: 'error',
+              }),
+          },
+        );
+      showItemActions(
+        'Aplicar em quais?',
+        [
+          { label: 'Só este pagamento', onPress: () => gravar('one') },
+          { label: 'Este e as próximas parcelas', onPress: () => gravar('one', mudarContrato) },
+        ],
+        `Só este: a diferença fica como ${valor > (editing?.debt_principal_cents ?? valor) ? 'encargo' : 'desconto'} deste pagamento.`,
+      );
+      return;
+    }
 
     // A pergunta é no SALVAR, não na abertura: só aqui se sabe se mudou algum campo
     // que faz sentido propagar. Sem mudança propagável, não há escolha a fazer.
@@ -688,7 +755,7 @@ function TransactionForm({
           <Button
             label={saving ? 'Salvando…' : 'Salvar'}
             size="sm"
-            disabled={saving}
+            disabled={saving || !!correcaoDaDivida.erro}
             loading={saving}
             onPress={onSubmit}
           />
@@ -739,7 +806,7 @@ function TransactionForm({
           a fatura ficava com uma linha que soma para o outro lado. O valor gravado continua
           sendo `editing.kind`, que é o que o `defaultValues` já traz.
         */}
-        {!naSerieEditada && (
+        {!tipoTravado && (
           <Controller
             control={control}
             name="kind"
@@ -829,11 +896,11 @@ function TransactionForm({
             render={({ field }) => (
               <Field
                 label="Valor"
-                error={errors.amount_cents?.message}>
+                error={errors.amount_cents?.message ?? correcaoDaDivida.erro ?? undefined}>
                 <MoneyField
                   valueCents={field.value}
                   onChangeCents={field.onChange}
-                  invalid={!!errors.amount_cents}
+                  invalid={!!errors.amount_cents || !!correcaoDaDivida.erro}
                 />
               </Field>
             )}
@@ -871,7 +938,8 @@ function TransactionForm({
                 />
               ) : (
                 <AccountPicker
-                  accounts={accounts ?? []}
+                  // Pagamento de dívida sai de conta, nunca de cartão: o trigger da dívida recusa.
+                  accounts={(accounts ?? []).filter((a) => !editing?.debt_id || a.type !== 'credit_card')}
                   value={field.value ?? null}
                   onChange={(next: string | null) => {
                     field.onChange(next);

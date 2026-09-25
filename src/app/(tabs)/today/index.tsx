@@ -270,7 +270,11 @@ export default function TodayScreen() {
     if (i.kind === 'invoice') {
       return { label: 'Pagar fatura', icon: 'checkmark', onPress: () => router.push({ pathname: '/finance/invoice/[id]', params: { id: i.ref_id } }) };
     }
-    if (i.kind === 'debt') return { label: 'Ver dívida', icon: 'chevron.right', onPress: () => router.push('/finance/debts') };
+    // `ref_id` da prestação é o id da DÍVIDA: abre ela, não a lista (é ali o "Paguei esta parcela").
+    if (i.kind === 'debt') {
+      const id = i.ref_id;
+      return { label: 'Ver dívida', icon: 'chevron.right', onPress: () => router.push({ pathname: '/finance/debts', params: { id } }) };
+    }
     return {
       label: settleLabel(i.kind === 'income' ? 'income' : 'expense'),
       icon: 'checkmark',

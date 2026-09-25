@@ -541,7 +541,7 @@ export default function InvoiceScreen() {
         }
       />
 
-      <FlatList
+      <FlatList keyboardShouldPersistTaps="handled"
         // Rolar fecha o card arrastado que estiver aberto (Deslizavel).
         onScrollBeginDrag={fecharDeslizavelAberto}
         alwaysBounceVertical

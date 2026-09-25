@@ -690,6 +690,7 @@ export default function TransactionsScreen() {
 
   const ledgerList = (
     <SectionList<Transaction, DaySection>
+          keyboardShouldPersistTaps="handled"
           // Rolar fecha o card arrastado que estiver aberto (Deslizavel).
           onScrollBeginDrag={fecharDeslizavelAberto}
           sections={sections}

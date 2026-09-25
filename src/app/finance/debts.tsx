@@ -26,6 +26,7 @@ import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { VerMais } from '@/components/ui/ver-mais';
 import { useAosPoucos } from '@/hooks/use-aos-poucos';
 import { Segmented } from '@/components/ui/segmented';
+import { SwitchRow } from '@/components/ui/switch-row';
 import { Skeleton, SkeletonHero, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
@@ -46,8 +47,9 @@ import {
   useUnarchiveDebt,
   type Debt,
 } from '@/hooks/use-finance';
-import { localISODate } from '@/hooks/use-items';
+import { formatBRL, localISODate } from '@/hooks/use-items';
 import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
+import { pagamentoDaParcelaFixa } from '@/lib/confirmar-baixa';
 import { brToISO, formatNumberBR, isoToBR } from '@/lib/dates';
 import { paidInstallments, porAno, secoesDaLinha } from '@/lib/debt-history';
 import {
@@ -208,6 +210,7 @@ export default function DebtsScreen() {
   const setPagando = (debt: Debt | null) => setPagandoId(debt?.id ?? null);
   const [pagoCents, setPagoCents] = useState(0);
   const [contaId, setContaId] = useState<string | null>(null);
+  const [nasProximas, setNasProximas] = useState(false);
 
   // Lazy: só a dívida aberta (detalhe ou pagamento) puxa a tabela Price.
   // O formulário de edição também lê os dois: o cronograma dá a próxima parcela de quem não tem
@@ -281,8 +284,22 @@ export default function DebtsScreen() {
     setDetalhe(null);
     setPagoCents(Number((detalhe?.id === d.id ? schedule.data?.[0]?.payment_cents : null) ?? d.installment_cents ?? 0));
     setContaId(d.account_id);
+    setNasProximas(false);
     setPagando(d);
   };
+
+  /**
+   * Parcela fixa paga com outro valor (25/09/2026): conta UMA parcela e a diferença é encargo ou
+   * desconto (`20260925120000`). Com "Usar este valor nas próximas" o contrato passa ao valor novo
+   * ANTES do pagamento — a parcela sai inteira nele, sem encargo, e o saldo continua sendo
+   * parcela × restantes (o CHECK do contrato fixo).
+   */
+  const parcelaDoContrato = pagando?.calculation_mode === 'fixed_installments'
+    ? Math.min(Number(pagando.installment_cents ?? 0), Number(pagando.remaining_cents))
+    : 0;
+  const naParcelaFixa = parcelaDoContrato > 0 ? pagamentoDaParcelaFixa(parcelaDoContrato, pagoCents) : null;
+  const podeMudarContrato = Boolean(naParcelaFixa && !naParcelaFixa.erro && naParcelaFixa.diferenca !== 0 && pagando?.installments);
+  const mudaContrato = podeMudarContrato && nasProximas;
 
   const fracao = form ? parseTaxa(form.taxa) : 0;
   const totalDeParcelas = form && /^\d+$/.test(form.parcelas) ? Number(form.parcelas) : 0;
@@ -417,16 +434,45 @@ export default function DebtsScreen() {
   };
 
   const confirmarPagamento = () => {
-    if (!pagando || pagoCents <= 0) return;
-    pagar.mutate(
-      { debtId: pagando.id, amountCents: pagoCents, accountId: contaId },
+    if (!pagando || pagoCents <= 0 || naParcelaFixa?.erro) return;
+    const registrar = () =>
+      pagar.mutate(
+        { debtId: pagando.id, amountCents: pagoCents, accountId: contaId },
+        {
+          onSuccess: () => {
+            toast({
+              message: `Parcela de ${pagando.name} registrada.${mudaContrato ? ` As próximas passam a ${formatBRL(pagoCents)}.` : ''}`,
+              tone: 'success',
+            });
+            volta.aoFechar(() => setPagando(null));
+          },
+          // o sheet FICA aberto: fechar num erro faz o usuário registrar o pagamento de novo
+          onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para registrar o pagamento.'), tone: 'error' }),
+        }
+      );
+    if (!mudaContrato) return registrar();
+    // Contrato primeiro: falhando, nada foi pago. A mesma porta do "Editar dívida", com a trava
+    // de versão (um "Paguei" pelo WhatsApp no meio não é sobrescrito).
+    save.mutate(
       {
-        onSuccess: () => {
-          toast({ message: `Parcela de ${pagando.name} registrada.`, tone: 'success' });
-          volta.aoFechar(() => setPagando(null));
-        },
-        // o sheet FICA aberto: fechar num erro faz o usuário registrar o pagamento de novo
-        onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para registrar o pagamento.'), tone: 'error' }),
+        id: pagando.id,
+        name: pagando.name,
+        kind: pagando.kind,
+        ...simpleDebtValues(pagoCents, String(pagando.installments), pagando.installments_paid),
+        account_id: pagando.account_id,
+        due_day: pagando.due_day,
+        versao: pagando.updated_at ?? null,
+      },
+      {
+        onSuccess: registrar,
+        onError: (error) =>
+          toast({
+            message:
+              (error as { code?: string }).code === 'VERSAO'
+                ? 'A dívida mudou enquanto você pagava (um pagamento pode ter chegado). Feche e abra de novo.'
+                : financeErrorMessage(error, 'Não deu para mudar o valor das próximas parcelas.'),
+            tone: 'error',
+          }),
       }
     );
   };
@@ -748,7 +794,7 @@ export default function DebtsScreen() {
             }
           />
 
-          <ScrollView contentContainerStyle={styles.sheetBody}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
             {schedule.isLoading ? (
               <>
                 <SkeletonHero />
@@ -875,11 +921,22 @@ export default function DebtsScreen() {
 
           {pagando ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
-              {pagando.calculation_mode === 'fixed_installments' ? <Field label="Valor desta parcela">
-                <Money cents={pagoCents} variant="headline" concealable={false} />
-              </Field> : <Field label="Quanto você pagou">
+              {/* Superfície de DECISÃO: o valor que a pessoa confere agora não se esconde. */}
+              <Field
+                label="Quanto você pagou"
+                hint={
+                  !podeMudarContrato || !naParcelaFixa
+                    ? undefined
+                    : mudaContrato
+                      ? `Esta e as próximas parcelas passam a ${formatBRL(pagoCents)}.`
+                      : `Conta como 1 parcela; ${formatBRL(Math.abs(naParcelaFixa.diferenca))} de ${naParcelaFixa.diferenca > 0 ? 'encargo' : 'desconto'}.`
+                }
+                error={naParcelaFixa?.erro ?? undefined}>
                 <MoneyField valueCents={pagoCents} onChangeCents={setPagoCents} />
-              </Field>}
+              </Field>
+              {podeMudarContrato ? (
+                <SwitchRow label="Usar este valor nas próximas" value={nasProximas} onValueChange={setNasProximas} />
+              ) : null}
 
               {/* A conta é a metade do valor da tela: parcela NÃO abate o saldo pelo valor cheio. */}
               {proxima && pagando.calculation_mode !== 'fixed_installments' ? (
@@ -929,8 +986,8 @@ export default function DebtsScreen() {
               <Button
                 label="Registrar pagamento"
                 block
-                loading={pagar.isPending}
-                disabled={pagoCents <= 0}
+                loading={pagar.isPending || save.isPending}
+                disabled={pagoCents <= 0 || Boolean(naParcelaFixa?.erro)}
                 onPress={confirmarPagamento}
               />
             </ScrollView>

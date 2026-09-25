@@ -255,7 +255,7 @@ export default function InvoicesScreen() {
         um FILTRO (escolhe o que a tela mostra), não um valor que vai ser gravado.
       */}
       {cartoes.length > 1 ? (
-        <ScrollView
+        <ScrollView keyboardShouldPersistTaps="handled"
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipsCartoes}>

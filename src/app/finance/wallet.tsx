@@ -367,7 +367,7 @@ export default function WalletScreen() {
     );
 
     corpo = (
-      <DragScrollView
+      <DragScrollView keyboardShouldPersistTaps="handled"
         ref={pagina}
         style={styles.flex}
         onScroll={aoRolarPagina}
