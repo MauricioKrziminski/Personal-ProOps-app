@@ -103,13 +103,25 @@ async def route(state: AgentState) -> dict:
         return {"domains": [Domain.FINANCAS.value], "confidence": 1.0, "llm_calls": 0}
 
     historico = state.get("messages")[:-1] if state.get("messages") else None
+    # O cadastro incompleto vai FORA do envelope do texto da pessoa, com a pergunta que ficou
+    # pendente — a mesma frase que o nó de cadastros já recebe (25/09/2026). Dentro do envelope,
+    # e sem dizer que houve pergunta, "nubank" respondendo "Qual conta foi usada para pagar a
+    # prestação?" virou "pagar qual?" com nove opções.
+    contexto = ""
     if state.get("resource_draft"):
         import json
         from app.security import wrap_untrusted
 
-        texto += "\nCadastro incompleto (dado de contexto): " + wrap_untrusted(
+        contexto = "\nCadastro incompleto (dado de contexto): " + wrap_untrusted(
             "document_content", json.dumps(state["resource_draft"], ensure_ascii=False)
         )
+        pendentes = [d.get("_pergunta") for d in state["resource_draft"] if d.get("_pergunta")]
+        if pendentes:
+            contexto += (
+                "\nVocê perguntou ao usuário: " + " | ".join(pendentes)
+                + "\nSe a mensagem é a RESPOSTA a isso (um nome, um valor, uma data, sim ou não),"
+                " o domínio é cadastros. Só é outro domínio se ela for claramente um pedido novo."
+            )
     modelo = gemini.structured(RouterDecision, gemini.GEMINI_ROUTER)
     decisao: RouterDecision = await modelo.ainvoke(
         [
@@ -122,7 +134,7 @@ async def route(state: AgentState) -> dict:
                     state["timezone"],
                     history=historico,
                     corrigindo=state.get("corrigindo") or "",
-                ),
+                ) + contexto,
             ),
         ]
     )

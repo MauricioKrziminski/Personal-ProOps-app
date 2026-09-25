@@ -773,3 +773,32 @@ async def test_clear_list_pronoun_reviews_both_targets_before_any_write(monkeypa
     assert "120" in proposal["summary"] and "90" in proposal["summary"]
     await graph.ainvoke(Command(resume=True), config)
     assert writes == ["luz", "internet"]
+
+
+@pytest.mark.asyncio
+async def test_roteador_sabe_que_a_mensagem_responde_a_pergunta_do_cadastro(monkeypatch):
+    """ "Qual conta foi usada para pagar a prestação?" → "nubank" (25/09/2026, no app).
+
+    Sem rascunho de finanças aberto, o cadastro incompleto ia ao roteador só como JSON dentro
+    do envelope de dado — e "nubank" virou "pagar qual?" com 9 opções. O nó de cadastros já
+    dizia ao modelo que a mensagem é a RESPOSTA; o roteador precisa da mesma frase.
+    """
+    from app.graph import nodes
+    from app.graph.schemas import RouterDecision
+
+    recebido = []
+
+    async def ainvoke(mensagens):
+        recebido.append(mensagens)
+        return RouterDecision(domains=["cadastros"], confidence=1.0)
+
+    model = type("Model", (), {"ainvoke": staticmethod(ainvoke)})()
+    monkeypatch.setattr(nodes.gemini, "structured", lambda *args: model)
+    await nodes.route({
+        "text": "nubank", "timezone": "America/Sao_Paulo",
+        "resource_draft": [{"type": "resource_pay", "resource": "debts", "name": "carro",
+                            "fields": [], "_pergunta": "Qual conta foi usada para pagar a prestação?"}],
+    })
+    humano = recebido[0][1][1]
+    assert "Você perguntou ao usuário: Qual conta foi usada para pagar a prestação?" in humano
+    assert "cadastros" in humano
