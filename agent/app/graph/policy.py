@@ -317,6 +317,48 @@ def plano_inteiro(target: dict | None) -> bool:
             and bool(cands) and not cands[0].get("installment_snapshot"))
 
 
+BAIXA_DE_FATURA_COM_VALOR = (
+    "Marcar a fatura como paga não muda o valor dela. Para registrar quanto saiu, diga "
+    "*paguei 800 da fatura do nubank*. Não mexi em nada."
+)
+BAIXA_COM_VALOR_UMA_POR_VEZ = (
+    "Com um valor diferente do previsto, dou baixa numa parcela por vez. Me diz qual. "
+    "Não mexi em nada."
+)
+
+
+def valor_pago(action, target: dict | None) -> int | None:
+    """Quanto SAIU numa baixa ("paguei a luz, foi 230"), ou None quando não foi dito.
+
+    Numa conta prevista o valor dito é o pago: a busca de `pendentes` é só por texto, então ele
+    nunca foi pista de alvo ali. Em fatura e compra parcelada só a correção explícita
+    (`new_amount_cents`) conta — lá `amount_cents` pode ter sido pista ("a fatura de 1.200"), e
+    pista não vira dinheiro gravado.
+    """
+    if getattr(action, "type", None) != FinanceActionType.MARK_PAID:
+        return None
+    if action.new_amount_cents is not None:
+        return action.new_amount_cents
+    if (target or {}).get("table") == "transactions":
+        return action.amount_cents
+    return None
+
+
+def _erro_da_baixa(action, target: dict | None) -> str | None:
+    """Baixa com valor que não dá para gravar — recusada antes do SIM (25/09/2026)."""
+    if action.new_amount_cents is None:
+        return None
+    tabela = (target or {}).get("table")
+    if tabela == "card_invoices":
+        return BAIXA_DE_FATURA_COM_VALOR
+    cands = (target or {}).get("candidates") or []
+    if tabela == "installment_plans" and cands:
+        linhas = (cands[0].get("installment_snapshot") or {}).get("rows") or []
+        if len(linhas) != 1:
+            return BAIXA_COM_VALOR_UMA_POR_VEZ
+    return None
+
+
 def erro_de_correcao(action, target: dict | None) -> str | None:
     """Correção que não dá para confirmar — recusada ANTES do SIM, não depois dele.
 
@@ -325,6 +367,8 @@ def erro_de_correcao(action, target: dict | None) -> str | None:
     do app. Snapshot: uma parcela por vez, e parcela travada não muda de dinheiro.
     A tool repete as recusas como segunda trava.
     """
+    if getattr(action, "type", None) == FinanceActionType.MARK_PAID:
+        return _erro_da_baixa(action, target)
     if getattr(action, "type", None) != FinanceActionType.UPDATE_TRANSACTION:
         return None
     # recusa congelada no candidato escolhido num empate (ex.: conversão sem cartão)
@@ -500,6 +544,14 @@ def describe_for_confirmation(
                 if action.new_description:
                     corrections.append(f"nome → {action.new_description}")
             suffix = f": {', '.join(corrections)}" if corrections else ""
+            # Baixa com o valor que de fato saiu: o rótulo já diz o previsto, o sufixo diz o pago.
+            pago = valor_pago(action, target)
+            if pago is not None:
+                linhas = (escolhido.get("installment_snapshot") or {}).get("rows") or []
+                previsto = escolhido.get("amount_cents",
+                                         linhas[0]["amount_cents"] if len(linhas) == 1 else None)
+                if pago != previsto:
+                    suffix = f" com {cents_to_brl(pago)} pagos"
             # Compra inteira sem valor = nome/categoria (data e conta são recusadas em
             # `erro_de_correcao`), e a `update_installment_plan` aplica os dois a TODAS
             # as parcelas, inclusive as pagas — a frase diz isso em vez de prometer o

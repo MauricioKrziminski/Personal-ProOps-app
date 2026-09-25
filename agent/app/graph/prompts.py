@@ -124,7 +124,11 @@ Tipos:
   registro de um pagamento PASSADO, feito fora daqui — mark_paid, mesmo que a frase
   diga que o dinheiro saiu (ele saiu ANTES, não agora). Só "paguei/pagar" descrevendo
   a saída acontecendo AGORA é pay_invoice.
-- mark_paid: baixa numa conta que JÁ estava prevista ("paguei a luz"). Em compra
+- mark_paid: baixa numa conta que JÁ estava prevista ("paguei a luz"). Quando a pessoa diz
+  quanto SAIU, o valor vai em new_amount_cents (a busca é só pelo nome):
+  "paguei a luz, foi 230" / "a luz veio 230, já paguei" -> type=mark_paid, description="luz",
+  new_amount_cents=23000. Sem valor dito, deixe new_amount_cents VAZIO (a baixa usa o previsto).
+  Em compra
   parcelada, use installment_scope, NUNCA current_installment:
   "paguei a 3ª parcela" -> installment_scope="range:3:3" (somente a terceira).
   "Todas as 8 anteriores do carro, marque como pagas" e "As 8 parcelas anteriores criadas do carro, marque como paga" -> description="carro", installment_scope="first:8".

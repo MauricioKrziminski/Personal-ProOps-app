@@ -266,6 +266,9 @@ def veredito(
             "label": rotulo(r),
             "table": tabela,
             **({"when": detalhe(r)} if detalhe else {}),
+            # O valor previsto: a frase da baixa compara com o que a pessoa disse que pagou.
+            **({"amount_cents": int(r["amount_cents"])}
+               if tabela == "transactions" and r.get("amount_cents") is not None else {}),
             **(_candidato_plano(r) if tabela == "installment_plans" else {}),
         }
         for r in linhas[:MOSTRAR]

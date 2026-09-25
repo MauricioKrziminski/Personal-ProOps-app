@@ -369,3 +369,25 @@ async def test_paid_floor_counts_the_highest_paid_installment(fixed_debt_with_pa
     await resources.prepare(fixed_debt_with_payment, action("resource_update", installments_paid=10))
     piso = [q for q in consultas if "public.transactions" in q]
     assert piso and "max(debt_payment_no)" in piso[0]
+
+
+# --- parcela fixa paga com outro valor (25/09/2026, `20260925120000`) --------------------
+
+
+@pytest.mark.asyncio
+async def test_pagar_parcela_fixa_com_outro_valor_diz_o_encargo_ou_o_desconto(fixed_debt):
+    """Conta UMA parcela e a diferença é encargo/desconto — a frase do SIM diz qual."""
+    mais = await resources.prepare(fixed_debt, action("resource_pay", amount_cents=150000))
+    assert "conta como 1 parcela, com R$ 30,00 de encargo" in mais["summary"].replace("\xa0", " ")
+    menos = await resources.prepare(fixed_debt, action("resource_pay", amount_cents=145000))
+    assert "com R$ 20,00 de desconto" in menos["summary"].replace("\xa0", " ")
+    igual = await resources.prepare(fixed_debt, action("resource_pay", amount_cents=147000))
+    assert "encargo" not in igual["summary"] and "desconto" not in igual["summary"]
+
+
+@pytest.mark.asyncio
+async def test_pagar_parcela_fixa_fora_do_limite_pergunta_antes_do_sim(fixed_debt):
+    with pytest.raises(Exception, match="metade da parcela"):
+        await resources.prepare(fixed_debt, action("resource_pay", amount_cents=70000))
+    with pytest.raises(Exception, match="passa de uma parcela"):
+        await resources.prepare(fixed_debt, action("resource_pay", amount_cents=300001))

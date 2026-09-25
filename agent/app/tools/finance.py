@@ -31,6 +31,7 @@ from app.domain.correcao_plano import (
 from app.domain.dates import add_months, format_date_br, local_iso_date, now_utc
 from app.domain.money import cents_to_brl, parse_valor_em_centavos
 from app.domain.recurrence import next_occurrence
+from app.graph import policy
 from app.graph.schemas import FinanceAction, FinanceActionType
 from app.tools import guards
 from app.tools.base import FATURA_ABERTA, ExecContext, ToolResult, ensure_owned
@@ -716,6 +717,13 @@ async def _baixa_em_parcelas(ctx: ExecContext, action: FinanceAction) -> ToolRes
             read_only=True,
         )
 
+    # "paguei a 3ª da tv, foi 120": com UMA parcela revisada, o valor que saiu vai junto
+    # (`policy.erro_de_correcao` recusa valor em várias parcelas antes do SIM). Parcela numa
+    # fatura fechada não muda de valor, e aí nem a baixa acontece — a frase prometia o valor.
+    pago = policy.valor_pago(action, ctx.target)
+    novo = (guards.require_amount(pago, o_que="o valor pago")
+            if pago is not None and len(rows) == 1 and pago != rows[0]["amount_cents"] else None)
+
     # One statement locks and checks EVERY reviewed record before updating ANY.
     # A changed amount/date/status, removed row or ownership mismatch rejects all.
     updated = await db.fetch_one(
@@ -736,22 +744,49 @@ async def _baixa_em_parcelas(ctx: ExecContext, action: FinanceAction) -> ToolRes
               and t.account_id is not distinct from r.account_id
               and t.invoice_id is not distinct from r.invoice_id
         ), changed as (
-            update public.transactions t set status='cleared',paid_at=%s
+            update public.transactions t set status='cleared',paid_at=%s,
+                   amount_cents=coalesce(%s::bigint, t.amount_cents)
             from locked l where t.id=l.id and l.status::text<>'cleared'
               and (select n from valid)=%s
-            returning t.id
+              and (%s::bigint is null or not private.parcela_travada(l.status, l.invoice_id))
+            returning t.id, t.amount_cents, t.installment_plan_id, t.workspace_id
+        ), plano as (
+            update public.installment_plans p
+               set total_cents = c.amount_cents + coalesce((select sum(x.amount_cents)
+                     from public.transactions x
+                     where x.installment_plan_id = p.id and x.workspace_id = p.workspace_id
+                       and x.id <> c.id), 0),
+                   updated_at = now()
+            from changed c
+            where %s::bigint is not null and p.id = c.installment_plan_id
+              and p.workspace_id = c.workspace_id
         ) select (select n from valid) as matched, (select count(*) from changed) as changed
         """,
         json.dumps(rows),
         ctx.workspace_id,
         cands[0]["id"],
         local_iso_date(ctx.timezone),
+        novo,
         len(rows),
+        novo,
+        novo,
     )
     if not updated or updated["matched"] != len(rows):
         return ToolResult(
             "As parcelas mudaram desde a confirmação. Não alterei nada; peça a baixa novamente.",
             read_only=True,
+        )
+    if novo is not None:
+        if not updated["changed"]:
+            return ToolResult(
+                "🔒 Essa parcela já está paga ou numa fatura fechada: o valor não muda mais. "
+                "Não dei baixa.",
+                read_only=True,
+            )
+        return ToolResult(
+            f"✅ {cands[0].get('label', 'Parcela')} — {cents_to_brl(novo)} "
+            f"(previsto {cents_to_brl(rows[0]['amount_cents'])}). Parcela marcada como paga.",
+            result_id=cands[0]["id"],
         )
     return ToolResult(
         f"✅ {cands[0].get('label', 'Parcelas')} — {cents_to_brl(snapshot['total_cents'])}. "
@@ -775,13 +810,49 @@ async def mark_paid(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     # pergunta como todo o resto — quem resolve é a Fase Cognitiva.
     conta = await db.fetch_one(
         """
-        select id, description, category, amount_cents
+        select id, description, category, amount_cents, installment_plan_id
         from public.transactions where id = %s and workspace_id = %s
         """,
         cands[0]["id"], ctx.workspace_id,
     )
     if not conta:
         return ToolResult("🤷 Não achei essa conta em aberto.", read_only=True)
+    nome = conta["description"] or conta["category"] or "conta"
+
+    # "paguei a luz, foi 230" (25/09/2026): o valor que saiu vai junto da baixa, numa escrita só
+    # — o mesmo que a folha "Quanto saiu?" do app. Parcela numa fatura fechada não muda de valor
+    # (a régua de `update_installment_plan`), e aí nada fica pago: a frase do SIM prometia o valor.
+    pago = policy.valor_pago(action, ctx.target)
+    if pago is not None and pago != conta["amount_cents"]:
+        pago = guards.require_amount(pago, o_que="o valor pago")
+        feito = await db.fetch_one(
+            """
+            with u as (
+                update public.transactions set amount_cents = %s, status = 'cleared', paid_at = %s
+                where id = %s and workspace_id = %s and not private.parcela_travada(status, invoice_id)
+                returning id, amount_cents, installment_plan_id, workspace_id
+            ), plano as (
+                update public.installment_plans p
+                   set total_cents = u.amount_cents + coalesce((select sum(t.amount_cents)
+                         from public.transactions t
+                         where t.installment_plan_id = p.id and t.workspace_id = p.workspace_id
+                           and t.id <> u.id), 0),
+                       updated_at = now()
+                from u where p.id = u.installment_plan_id and p.workspace_id = u.workspace_id
+            )
+            select id from u
+            """,
+            pago, local_iso_date(ctx.timezone), conta["id"], ctx.workspace_id,
+        )
+        if not feito:
+            return ToolResult(
+                f"🔒 {nome} está numa fatura fechada: o valor não muda mais. Não dei baixa.",
+                read_only=True,
+            )
+        return ToolResult(
+            f"✅ Baixa dada: {nome} — {cents_to_brl(pago)} (previsto {cents_to_brl(conta['amount_cents'])}).",
+            result_id=conta["id"],
+        )
 
     # `paid_at`, NUNCA `occurred_at`. Reescrever a data do lançamento fazia a
     # conta de agosto paga em setembro migrar de mês em todo relatório — o mês
@@ -797,7 +868,6 @@ async def mark_paid(ctx: ExecContext, action: FinanceAction) -> ToolResult:
         conta["id"],
         ctx.workspace_id,
     )
-    nome = conta["description"] or conta["category"] or "conta"
     return ToolResult(
         f"✅ Baixa dada: {nome} — {cents_to_brl(conta['amount_cents'])}.",
         result_id=conta["id"],

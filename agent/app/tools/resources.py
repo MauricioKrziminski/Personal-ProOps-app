@@ -949,6 +949,19 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                     "Se foi um pagamento único de amortização agora, me confirme o "
                     "valor dizendo que é amortização. Ainda não registrei nada."
                 )
+            # Parcela fixa paga com outro valor conta UMA parcela (`20260925120000`): a diferença
+            # é encargo ou desconto, e a frase do SIM diz qual. Os limites são os do trigger,
+            # levantados antes da pergunta em vez de depois do SIM.
+            if old.get("calculation_mode") == "fixed_installments" and parcela:
+                base = min(parcela, old.get("remaining_cents") or parcela)
+                if pago * 2 < base:
+                    _error("Esse valor é menos da metade da parcela. Confere o valor pago? "
+                           "Ainda não registrei nada.")
+                if pago >= 2 * base:
+                    _error("Esse valor passa de uma parcela. Para pagar mais de uma, registre "
+                           "uma de cada vez. Ainda não registrei nada.")
+                if pago != base:
+                    prepared["diferenca_parcela"] = pago - base
             values.setdefault("paid_at", local_iso_date(ctx.timezone))
             if not values.get("account_id"):
                 values["account_id"] = (
@@ -1185,6 +1198,11 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
     )
     if prepared.get("calculation_mode") == "fixed_installments":
         prepared["summary"] += "; parcelas fixas, juros incluídos no valor e taxa não informada"
+    if diferenca := prepared.get("diferenca_parcela"):
+        prepared["summary"] += (
+            f"; conta como 1 parcela, com {cents_to_brl(abs(diferenca))} de "
+            f"{'encargo' if diferenca > 0 else 'desconto'}"
+        )
     if prepared.get("target_label"):
         prepared["summary"] += "; orçamento de " + prepared["target_label"]
     if action.type == Op.DELETE and action.resource == "reminders":

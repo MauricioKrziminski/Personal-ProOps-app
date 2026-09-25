@@ -528,6 +528,23 @@ teto de 252):
 **Ordem de deploy:** as migrations `20260923160000` e `20260923170000` vêm antes do agente — sem ela `delete_debt` não
 existe e o `first_due_date` bate numa coluna que não há.
 
+## Pagar com o valor que de fato saiu (25/09/2026)
+
+Pedido do dono do produto: *"às vezes eu posso ter pago menos ou mais em uma parcela, dívida ou
+lançamento"*. `FinanceAction` segue no teto de 252: o valor pago reusa `new_amount_cents`.
+
+| app | agente |
+|---|---|
+| "Paguei"/"Recebi" confirma o valor (folha "Quanto saiu?", `useConfirmarBaixa`) | `mark_paid` com `new_amount_cents` — *"paguei a luz, foi 230"* (sonda `probe_baixa_com_valor.py`, 5/5 no Gemini real). Numa conta prevista `amount_cents` também serve (`policy.valor_pago`: a busca de `pendentes` é só por texto). O SIM diz "com R$ 230,00 pagos" e a tool grava valor e baixa numa escrita, com a trava `parcela_travada`. UMA parcela de compra também (`_baixa_em_parcelas`, total do plano junto); várias parcelas com valor, ou fatura quitada fora do app com valor, são recusadas antes do SIM. |
+| "Usar este valor nas próximas" (série) | recorrente: `resource_update recurring` com o valor, que propaga por `update_recurring_series` (já fazia); parcela de compra: `update_transaction` sobre a compra inteira (já fazia). |
+| Pagar parcela FIXA com outro valor (folha de Dívidas) | `resource_pay debts` com o valor pago: o SIM diz "conta como 1 parcela, com R$ X de encargo/desconto" e os limites do trigger (metade até menos do dobro) viram pergunta antes do SIM. |
+| "Usar este valor nas próximas" na dívida, e "Este e as próximas parcelas" ao editar um pagamento | `resource_update debts installment_cents` (principal e saldo rederivados, já fazia). Só o pagamento: `update_transaction` sobre ele — o trigger calcula o encargo. |
+| Formulário de pagamento de dívida sem tipo, sem "vou pagar depois" e sem cartão | não se aplica: é trava de tela para o que o trigger da dívida sempre recusaria. |
+
+**Ordem de deploy:** a migration `20260925120000` antes do agente e do app — sem ela o banco
+recusa qualquer valor diferente da parcela fixa (o trigger antigo), e a frase do SIM prometeria
+um encargo que o banco não aceita.
+
 ## Dicas no lugar e "Como usar o ProOps" (24/09/2026)
 
 Spec: `docs/superpowers/specs/2026-09-24-dicas-e-guia-design.md`.
