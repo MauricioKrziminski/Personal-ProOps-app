@@ -1,15 +1,15 @@
-import { StyleSheet, Text, View } from 'react-native';
+import type { ReactNode } from 'react';
+import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { ComNegrito } from '@/components/ui/forte';
 import { Icon } from '@/components/ui/icon';
-import { Fonts } from '@/constants/theme';
 import { Motion, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
-import { parseInlineBold } from '@/lib/agent-chat';
 
 interface EmptyStateProps {
   /**
@@ -17,7 +17,8 @@ interface EmptyStateProps {
    * bandeja: "ainda não tem nada aqui".
    */
   icon?: SymbolViewProps['name'];
-  title: string;
+  /** Texto, ou texto com o nome citado em `<Forte>` ("Nada encontrado para **mercado**"). */
+  title: ReactNode;
   /**
    * A dica ACIONÁVEL. Normalmente o atalho do WhatsApp que preenche esta tela. O exemplo do que
    * mandar vai em `*negrito*`, como no WhatsApp — nunca entre « » (25/09/2026).
@@ -93,18 +94,7 @@ export function EmptyState({ icon, title, hint, action, compacto = false }: Empt
   );
 }
 
-/** Os trechos `*assim*` da dica em semibold — o mesmo leitor do chat do agente. */
-function ComNegrito({ texto }: { texto: string }) {
-  return parseInlineBold(texto).map((t, i) => (
-    <Text key={i} style={t.bold ? styles.forte : undefined}>
-      {t.text}
-    </Text>
-  ));
-}
-
 const styles = StyleSheet.create({
-  // Peso é FAMÍLIA (§3): `fontWeight` no Android cai no regular com negrito sintético.
-  forte: { fontFamily: Fonts.semibold },
   container: {
     alignItems: 'center',
     gap: Space.sm,

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
@@ -13,7 +13,8 @@ import { useTheme, useScheme } from '@/hooks/use-theme';
 type Tone = 'info' | 'success' | 'error';
 
 interface Toast {
-  message: string;
+  /** Texto, ou texto com o nome citado em `<Forte>` ("Pasta **Mercado** arquivada."). */
+  message: ReactNode;
   tone: Tone;
   action?: { label: string; onPress: () => void };
 }

@@ -127,15 +127,23 @@ export function fraseDaParcela(item: ItemDaPrevia, cartao: boolean): string | nu
 }
 
 /** Por que a linha NÃO nasceu marcada — a frase que sustenta o "já está no app". */
-export function motivoDaLinha(item: ItemDaPrevia, cartao: boolean): string | null {
+/**
+ * O motivo da linha, com o nome do lançamento do app À PARTE: a linha o desenha em negrito depois
+ * de um travessão (era entre « », 25/09/2026). À parte e não marcado com `*`: descrição de extrato
+ * tem asterisco de verdade ("IFD*IFOOD").
+ */
+export function motivoDaLinha(item: ItemDaPrevia, cartao: boolean): { texto: string; nome: string | null } | null {
   const g = grupoDe(item, cartao);
-  if (g === 'fora') return motivoDeFora(item, cartao);
+  if (g === 'fora') {
+    const texto = motivoDeFora(item, cartao);
+    return texto ? { texto, nome: null } : null;
+  }
   if (g === 'no_app' || g === 'talvez') {
     const alvo = item.transactions;
     const nota = item.match_note ?? (g === 'talvez' ? 'parecido com um lançamento do app' : 'já está no app');
     // A nota da camada semântica já nomeia o lançamento ("é Energia no app, …"): repetir o nome
     // no fim dizia a mesma coisa duas vezes na mesma linha.
-    return alvo?.description && !nota.includes(alvo.description) ? `${nota} — ${alvo.description}` : nota;
+    return { texto: nota, nome: alvo?.description && !nota.includes(alvo.description) ? alvo.description : null };
   }
   return null;
 }

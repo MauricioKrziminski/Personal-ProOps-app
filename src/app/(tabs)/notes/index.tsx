@@ -14,6 +14,7 @@ import { useFolderMenu } from '@/components/notes/use-folder-menu';
 import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
 import { Dica } from '@/components/ui/dica';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Forte } from '@/components/ui/forte';
 import { SearchField } from '@/components/ui/search-field';
 import { BlockHeader } from '@/components/ui/block-header';
 import { TextField } from '@/components/ui/field';
@@ -370,7 +371,7 @@ export default function NotesScreen() {
   ) : q ? (
     <EmptyState
       icon="magnifyingglass"
-      title={`Nada encontrado para ${q}`}
+      title={<>Nada encontrado para <Forte>{q}</Forte></>}
       hint="Se você já apagou, ainda dá tempo de resgatar."
       action={{ label: 'Buscar na lixeira', onPress: () => router.push('/notes/trash') }}
     />

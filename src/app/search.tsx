@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Chip } from '@/components/finance/chip';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Forte } from '@/components/ui/forte';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
@@ -206,7 +207,7 @@ export default function SearchScreen() {
       {nothing ? (
         <EmptyState
           icon="magnifyingglass"
-          title={`Nada encontrado para ${term}`}
+          title={<>Nada encontrado para <Forte>{term}</Forte></>}
           hint="Tente outra palavra"
         />
       ) : null}

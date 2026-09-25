@@ -14,6 +14,7 @@ import { Card } from '@/components/ui/card';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { ThemedText } from '@/components/themed-text';
+import { ComNegrito } from '@/components/ui/forte';
 import { HeaderMenu } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -378,7 +379,8 @@ export default function ImportScreen() {
               {falha.titulo}
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              {falha.detalhe}
+              {/* A frase é do servidor (nossa): o nome do campo vem em `*negrito*`. */}
+              <ComNegrito texto={falha.detalhe} />
             </ThemedText>
           </Card>
         ) : null}

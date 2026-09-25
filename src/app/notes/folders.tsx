@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Stack, router } from 'expo-router';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field, TextField } from '@/components/ui/field';
+import { Forte } from '@/components/ui/forte';
 import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
@@ -86,7 +87,7 @@ export default function FoldersScreen() {
   const [editing, setEditing] = useState<NoteFolder | null>(null);
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('folder');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ReactNode>(null);
   /** Alvo de cada sheet — a pasta, nunca um booleano: os dois servem qualquer linha da árvore. */
   const [pintando, setPintando] = useState<NoteFolder | null>(null);
   const [etiquetando, setEtiquetando] = useState<NoteFolder | null>(null);
@@ -117,7 +118,7 @@ export default function FoldersScreen() {
     // atualizaria a pasta existente em silêncio em vez de reclamar.
     const clash = (folders.data ?? []).find((f) => f.name === normalized && f.id !== editing?.id);
     if (clash) {
-      setError(`Já existe uma pasta chamada ${normalized}.`);
+      setError(<>Já existe uma pasta chamada <Forte>{normalized}</Forte>.</>);
       return;
     }
 
@@ -128,7 +129,7 @@ export default function FoldersScreen() {
     } catch (e) {
       // 23505 = outro aparelho criou a mesma pasta entre a checagem e o insert.
       if ((e as { code?: string }).code === '23505') {
-        setError(`Já existe uma pasta chamada ${normalized}.`);
+        setError(<>Já existe uma pasta chamada <Forte>{normalized}</Forte>.</>);
         return;
       }
       toast({ message: 'Não deu para salvar a pasta.', tone: 'error' });
@@ -195,7 +196,7 @@ export default function FoldersScreen() {
       {
         onSuccess: () =>
           toast({
-            message: `Pasta ${folder.name} arquivada.`,
+            message: <>Pasta <Forte>{folder.name}</Forte> arquivada.</>,
             tone: 'success',
             action: {
               label: 'Desfazer',
@@ -214,7 +215,7 @@ export default function FoldersScreen() {
         // Com "Desfazer": é o que deixa fixar valer ao arrastar até o fim (Deslizavel).
         onSuccess: () =>
           toast({
-            message: folder.pinned ? `Pasta ${folder.name} desafixada.` : `Pasta ${folder.name} fixada.`,
+            message: <>Pasta <Forte>{folder.name}</Forte> {folder.pinned ? 'desafixada' : 'fixada'}.</>,
             tone: 'success',
             action: { label: 'Desfazer', onPress: () => updateFolder.mutate({ id: folder.id, pinned: folder.pinned }, { onError: () => toast({ message: 'Não deu para desfazer.', tone: 'error' }) }) },
           }),
@@ -249,7 +250,7 @@ export default function FoldersScreen() {
   const folderEditor = (
       <Card>
         <View style={styles.form}>
-          <Field label={editing ? `Renomear ${editing.name}` : 'Nova pasta'} error={error ?? undefined}>
+          <Field label={editing ? <>Renomear <Forte>{editing.name}</Forte></> : 'Nova pasta'} error={error ?? undefined}>
             <TextField
               value={name}
               onChangeText={(text) => {

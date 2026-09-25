@@ -12,6 +12,7 @@ import { useFolderMenu } from '@/components/notes/use-folder-menu';
 import { TagPicker } from '@/components/notes/tag-picker';
 import { Dica } from '@/components/ui/dica';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { fecharDeslizavelAberto } from '@/components/ui/deslizavel';
 import { DragScrollView } from '@/components/ui/drag-scroll';
@@ -373,7 +374,7 @@ export default function FolderScreen() {
               ) : fixadas.length === 0 && subpastas.length === 0 ? (
                 <EmptyState
                   icon="tray"
-                  title={`A pasta ${folder.name} está vazia`}
+                  title={<>A pasta <Forte>{folder.name}</Forte> está vazia</>}
                   hint="Toque no lápis aí em cima para escrever a primeira — ela já nasce aqui dentro."
                 />
               ) : null}

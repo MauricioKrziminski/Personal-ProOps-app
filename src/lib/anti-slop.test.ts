@@ -1382,3 +1382,17 @@ test('Formulário aberto por link remonta quando o registro muda (key pelo id)',
   const lembrete = readFileSync(join(SRC, 'app/reminder-form.tsx'), 'utf8');
   assert.match(lembrete, /<ReminderForm\s+key=\{/);
 });
+
+test('o nome que ficava entre « » vai em <Forte>, não solto na frase', () => {
+  // 25/09/2026: *"eu pedi para retirar o « » e trocar por negrito a palavra que ficava dentro,
+  // agora não tem nada"*. A primeira passada tirou as aspas e deixou o nome cru. O nome é DADO
+  // (busca, pasta, descrição de extrato), então vai como filho de `Forte` — nunca como `*${x}*`.
+  const soltos: string[] = [];
+  const frase = /`(Nada encontrado para|A pasta|Pasta|Já existe uma pasta chamada|Renomear) \$\{/;
+  for (const arquivo of walk(SRC).filter((f) => /\.tsx?$/.test(f) && !/\.test\.ts$/.test(f))) {
+    readFileSync(arquivo, 'utf8').split('\n').forEach((linha, i) => {
+      if (frase.test(linha)) soltos.push(`${arquivo.slice(SRC.length)}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(soltos, []);
+});

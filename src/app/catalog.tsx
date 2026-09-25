@@ -12,6 +12,7 @@ import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
+import { Forte } from '@/components/ui/forte';
 import { Segmented } from '@/components/ui/segmented';
 import { Chip } from '@/components/finance/chip';
 import { supportsLiquidGlass } from '@/components/ui/glass-backdrop';
@@ -263,7 +264,7 @@ export default function CatalogScreen() {
           <Field label="Descrição" hint="Como isso aparece no extrato">
             <TextField placeholder="Mercado do bairro" />
           </Field>
-          <Field label="Nome da conta" error="Já existe uma conta chamada Nubank.">
+          <Field label="Nome da conta" error={<>Já existe uma conta chamada <Forte>Nubank</Forte>.</>}>
             <TextField placeholder="Nubank" defaultValue="Nubank" invalid />
           </Field>
           <Field label="Valor">

@@ -3,6 +3,7 @@ import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { Forte } from '@/components/ui/forte';
 import { useBRL } from '@/components/ui/conceal';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
@@ -21,7 +22,8 @@ interface Props {
   /** A compra parcelada que a linha vai criar ("Parcela 2/12 · cria a compra de 12x…"). */
   parcela?: string | null;
   /** Por que ela nasceu desmarcada ("mesmo valor — «Posto»", "Pagamento da fatura"). */
-  motivo?: string | null;
+  /** O motivo e, à parte, o nome do lançamento do app — desenhado em negrito (`motivoDaLinha`). */
+  motivo?: { texto: string; nome: string | null } | null;
   /** Recebem o `id`: callbacks ESTÁVEIS, para o `memo` valer numa lista de até 500 linhas. */
   onToggle: (id: string) => void;
   onLongPress: (id: string) => void;
@@ -54,7 +56,7 @@ export const ImportRow = memo(function ImportRow({
       onLongPress={() => onLongPress(id)}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: marcado }}
-      accessibilityLabel={[titulo, valor, subtitulo, parcela, motivo].filter(Boolean).join(', ')}
+      accessibilityLabel={[titulo, valor, subtitulo, parcela, motivo?.texto, motivo?.nome].filter(Boolean).join(', ')}
       accessibilityActions={[{ name: 'longpress', label: 'Mais opções' }]}
       onAccessibilityAction={() => onLongPress(id)}>
       {({ pressed }) => (
@@ -80,7 +82,13 @@ export const ImportRow = memo(function ImportRow({
               <View style={styles.motivo}>
                 <Icon name="info.circle" size="xs" color="textSecondary" />
                 <ThemedText type="footnote" themeColor="textSecondary" style={styles.motivoTexto}>
-                  {motivo}
+                  {motivo.texto}
+                  {motivo.nome ? (
+                    <>
+                      {' — '}
+                      <Forte>{motivo.nome}</Forte>
+                    </>
+                  ) : null}
                 </ThemedText>
               </View>
             ) : null}

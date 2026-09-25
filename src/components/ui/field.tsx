@@ -42,9 +42,12 @@ const FOCUS_BORDER_MS = 160;
 const FocoDoCampo = createContext<SharedValue<number> | null>(null);
 
 interface FieldProps {
-  /** Label VISÍVEL. Placeholder não é label — some quando o usuário digita. */
-  label: string;
-  error?: string;
+  /**
+   * Label VISÍVEL. Placeholder não é label — some quando o usuário digita. Nome citado nele ou no
+   * erro vai em `<Forte>` ("Renomear **Mercado**"), nunca entre « ».
+   */
+  label: React.ReactNode;
+  error?: React.ReactNode;
   hint?: string;
   children: React.ReactNode;
 }
