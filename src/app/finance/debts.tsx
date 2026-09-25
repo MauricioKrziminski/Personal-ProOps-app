@@ -175,6 +175,13 @@ export default function DebtsScreen() {
   const debts = useDebts();
   const [estrategia, setEstrategia] = useState<'avalanche' | 'snowball'>('avalanche');
   const payoff = usePayoffStrategy(estrategia);
+  /**
+   * A ordem já chegou uma vez? Antes disso "Por onde começar" é só forma; depois, trocar a
+   * estratégia mantém título e seletor (é o controle tocado) e só as linhas viram esqueleto.
+   * Estado, não ref, e ajustado no render — o mesmo idioma de `useTelaPronta`.
+   */
+  const [ordemJaVeio, setOrdemJaVeio] = useState(false);
+  if (payoff.data && !ordemJaVeio) setOrdemJaVeio(true);
   const accounts = useAccounts();
   const save = useSaveDebt();
   const archive = useArchiveDebt();
@@ -614,6 +621,18 @@ export default function DebtsScreen() {
     </>
   ) : null;
 
+  /** As linhas da ordem enquanto ela chega — na primeira carga e na troca de estratégia. */
+  const ordemEsqueleto = lista.map((d) => (
+    <View key={d.id} style={styles.ordemLinha}>
+      <Skeleton width={18} height={18} />
+      <View style={styles.ordemTexto}>
+        <Skeleton width="70%" height={18} />
+        <Skeleton width="50%" height={14} />
+      </View>
+      <Skeleton width={76} height={22} />
+    </View>
+  ));
+
   const debtContext = (
     <View style={styles.paneBody}>
       {debts.isError ? (
@@ -640,7 +659,16 @@ export default function DebtsScreen() {
         />
       ) : null}
 
-      {lista.length > 1 && !payoff.isError ? (
+      {lista.length > 1 && !payoff.isError && !ordemJaVeio && payoff.isLoading ? (
+        // Primeira carga: texto nunca aparece em esqueleto (25/09/2026) — título, seletor e
+        // linhas são forma, nas alturas do bloco pronto.
+        <Card style={styles.ordem}>
+          <Skeleton width="40%" height={19} />
+          <Skeleton height={40} radius={Radius.pill} />
+          {estrategia === 'avalanche' ? <Skeleton width="60%" height={19} /> : null}
+          {ordemEsqueleto}
+        </Card>
+      ) : lista.length > 1 && !payoff.isError ? (
         <Card style={styles.ordem}>
           <ThemedText type="smallBold">Por onde começar</ThemedText>
           <Segmented
@@ -656,16 +684,7 @@ export default function DebtsScreen() {
               Sem taxa informada fica por último
             </ThemedText>
           ) : null}
-          {payoff.isLoading ? lista.map((d) => (
-            <View key={d.id} style={styles.ordemLinha}>
-              <Skeleton width={18} height={18} />
-              <View style={styles.ordemTexto}>
-                <Skeleton width="70%" height={18} />
-                <Skeleton width="50%" height={14} />
-              </View>
-              <Skeleton width={76} height={22} />
-            </View>
-          )) : (payoff.data ?? []).map((p, i) => (
+          {payoff.isLoading ? ordemEsqueleto : (payoff.data ?? []).map((p, i) => (
             <Animated.View
               key={p.debt_id}
               layout={transicaoDeLayout}
@@ -733,7 +752,9 @@ export default function DebtsScreen() {
     />
   ) : null;
 
-  const debtListContent = (
+  // Com as dívidas chegando, nada embaixo do esqueleto: "Arquivadas · N" pintava sob ele e depois
+  // pulava para baixo da lista (25/09/2026).
+  const debtListContent = debts.isLoading ? null : (
     <View style={styles.paneBody}>
       {lista.map(cartaoDivida)}
       {semAtivas && temArquivadas ? secaoArquivadas : null}

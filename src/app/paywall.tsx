@@ -180,6 +180,10 @@ export default function PaywallScreen() {
       <View style={styles.bloco}>
         {naWeb ? (
           <ThemedText type="smallBold">Assinatura só pelo aplicativo</ThemedText>
+        ) : plano.isLoading ? (
+          // O rótulo depende do plano ("Começar N dias grátis" vira "Seu plano atual"): enquanto
+          // ele chega o botão é forma, na altura do `Button` md (25/09/2026).
+          <Skeleton height={50} radius={Radius.pill} />
         ) : (
           <Button
             // Oferecer "dias grátis" do plano que a pessoa JÁ tem era a oferta de teste para quem

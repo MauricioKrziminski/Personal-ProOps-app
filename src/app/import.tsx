@@ -425,7 +425,9 @@ export default function ImportScreen() {
           />
         )}
 
-        {plano.isPending || semPro ? null : (
+        {/* Com as contas chegando, o botão e "Escolha a conta primeiro" esperam junto: texto
+            não aparece ao lado de esqueleto (25/09/2026). */}
+        {plano.isPending || semPro || accountsQuery.isPending ? null : (
           <>
             <Button
               label={importar.isPending ? 'Lendo o arquivo…' : 'Escolher arquivo'}
@@ -601,7 +603,8 @@ export default function ImportScreen() {
 
       {fechado && sobrando.isError ? <ErrorCard onRetry={() => void sobrando.refetch()} /> : null}
 
-      {fechado && (sobrando.data?.length ?? 0) > 0 ? (
+      {/* Espera o esqueleto de cima sair: chegando antes dos itens, a seção nascia embaixo dele. */}
+      {fechado && !isLoading && (sobrando.data?.length ?? 0) > 0 ? (
         <View style={styles.bloco}>
           <Section title="Está no app e não veio no arquivo">
             {sobra.visiveis.map((t) => (

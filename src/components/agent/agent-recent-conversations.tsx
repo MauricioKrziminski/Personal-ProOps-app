@@ -1,15 +1,15 @@
 import { router } from 'expo-router';
 import { memo, useCallback } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
 import { ConversationRow } from '@/components/agent/conversation-row';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
-import { Skeleton } from '@/components/ui/skeleton';
 import { readingPaneWidths } from '@/design/adaptive-window';
-import { HitTarget, Radius, Space } from '@/design/tokens';
+import { HitTarget, Motion, Radius, Space } from '@/design/tokens';
 import { useAgentConversations } from '@/hooks/use-agent-chat';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -35,22 +35,21 @@ export const AgentRecentConversations = memo(function AgentRecentConversations()
   // Afirmar "não há conversa" exige a consulta ter dado certo (frontend.md): desligada ou com
   // erro, `!isLoading` também é verdade.
   if (lista.isSuccess && recentes.length === 0) return null;
-  // Consulta DESLIGADA (agente não configurado neste build) fica `isPending` para sempre:
-  // sem este corte o bloco seria um esqueleto eterno (frontend.md, "O portão da tela").
-  if (lista.isPending && lista.fetchStatus === 'idle') return null;
+  /*
+    ⚠️ **Carregando, o bloco não existe — nem rótulo, nem esqueleto** (25/09/2026). Era "Recentes"
+    sobre três esqueletos, e quem não tinha conversa via o bloco carregar e sumir (*"texto nunca
+    deve aparecer em skeleton"*). Esqueleto promete conteúdo, e aqui ele pode não vir. O bloco
+    mora no FIM da entrada, abaixo do compositor e dos atalhos: chegar depois não empurra nada.
+    Vale também para a consulta DESLIGADA (agente fora deste build), que fica `isPending` para sempre.
+  */
+  if (lista.isPending) return null;
 
   return (
-    <View style={styles.root}>
+    <Animated.View entering={FadeIn.duration(Motion.duration.base).reduceMotion(ReduceMotion.System)} style={styles.root}>
       <ThemedText type="smallBold" themeColor="textSecondary" accessibilityRole="header">
         Recentes
       </ThemedText>
-      {lista.isLoading ? (
-        <Card style={styles.card}>
-          <View style={styles.esqueleto} accessibilityLabel="Carregando conversas recentes">
-            {Array.from({ length: RECENTES }, (_, i) => <Skeleton key={i} height={56} />)}
-          </View>
-        </Card>
-      ) : lista.isError ? (
+      {lista.isError ? (
         // A seção que falha diz que falhou (design.md §7) — sem travar o compositor acima.
         <View style={styles.erro}>
           <ThemedText type="small" themeColor="textSecondary">
@@ -83,7 +82,7 @@ export const AgentRecentConversations = memo(function AgentRecentConversations()
           </Pressable>
         </Card>
       )}
-    </View>
+    </Animated.View>
   );
 });
 
@@ -91,7 +90,6 @@ const styles = StyleSheet.create({
   root: { gap: Space.md },
   // Lista de linhas: quem separa uma conversa da outra é a própria linha, não o respiro do card.
   card: { paddingVertical: Space.xs, paddingHorizontal: Space.sm, gap: 0 },
-  esqueleto: { gap: Space.sm, paddingVertical: Space.sm },
   erro: { gap: Space.md, alignItems: 'flex-start' },
   verTodas: {
     minHeight: HitTarget,

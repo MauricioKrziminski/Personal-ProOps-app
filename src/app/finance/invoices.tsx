@@ -205,6 +205,14 @@ export default function InvoicesScreen() {
         Não foi possível carregar as faturas. Tente novamente para abrir um contexto real.
       </ThemedText>
     </Card>
+  ) : accounts.isLoading || invoices.isLoading ? (
+    // Texto nunca aparece em esqueleto (25/09/2026): "Selecione uma fatura…" pintava enquanto a
+    // lista chegava. `isLoading`, não `isPending`: sem cartão a consulta fica desligada e pendente.
+    <Card style={styles.supportCard}>
+      <Skeleton width="40%" height={16} />
+      <Skeleton width="60%" height={30} />
+      <Skeleton width="80%" height={19} />
+    </Card>
   ) : selectedInvoice ? (
     <Card style={styles.supportCard}>
       <HeroLabel>Fatura em foco</HeroLabel>

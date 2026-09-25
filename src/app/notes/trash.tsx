@@ -19,7 +19,7 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { Deslizavel } from '@/components/ui/deslizavel';
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
-import { SkeletonRow } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Space } from '@/design/tokens';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
@@ -202,12 +202,17 @@ export default function TrashScreen() {
   const tabletContext = (
     <Card style={styles.context}>
       <ThemedText type="subtitle">Recuperação</ThemedText>
-      <View style={styles.contextStat}>
-        <ThemedText type="subtitle">{notes.length}</ThemedText>
-        <ThemedText type="caption" themeColor="textSecondary">
-          {notes.length === 1 ? 'nota carregada' : 'notas carregadas'}
-        </ThemedText>
-      </View>
+      {/* Carregando, a contagem é forma: "0 notas carregadas" virava outro número (25/09/2026). */}
+      {list.isLoading ? (
+        <Skeleton width={96} height={44} />
+      ) : (
+        <View style={styles.contextStat}>
+          <ThemedText type="subtitle">{notes.length}</ThemedText>
+          <ThemedText type="caption" themeColor="textSecondary">
+            {notes.length === 1 ? 'nota carregada' : 'notas carregadas'}
+          </ThemedText>
+        </View>
+      )}
     </Card>
   );
 

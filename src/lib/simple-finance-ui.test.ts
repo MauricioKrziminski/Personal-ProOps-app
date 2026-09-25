@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[] } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -38,7 +38,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   /** Com que limite cada lista paginada no servidor foi pedida — é como se vê o "Ver mais" pedir mais. */
   const pedidosDeLimite: [string, number | undefined][] = [];
   const mutation = (operation: string) => ({ isPending: false, reset() {}, mutate(value: any, opts?: any) { writes.push({ operation, value }); pedidos.push({ operation, value, opts }); } });
-  const animation = { duration: () => animation, delay: () => animation };
+  const animation = { duration: () => animation, delay: () => animation, reduceMotion: () => animation };
   const finance = new Proxy({
     DEBT_KINDS: [{ value: 'financing', label: 'Financiamento' }, { value: 'loan', label: 'Empréstimo' }],
     SUGGESTED_CATEGORIES: [],
@@ -78,7 +78,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useCycleLines: () => ({ ...query, data: options.cycleLines ?? [] }),
     // A tela do ciclo mostra o esqueleto enquanto não tem a série — sem este dublê ela nunca
     // chega a renderizar linha nenhuma, e o teste passaria a medir o esqueleto.
-    useCycleSeries: () => ({ ...query, isPending: false, data: [options.cycleRow ?? {
+    // `cycleSeriesPending`: a série de OUTRO mês chegando (a troca de mês, com o portão já aberto).
+    useCycleSeries: () => options.cycleSeriesError ? { ...query, isError: true, isPending: false, data: undefined, refetch: async () => { refetches.push('serie'); } } : options.cycleSeriesPending ? { ...query, isLoading: true, isPending: true, data: undefined } : ({ ...query, isPending: false, data: [options.cycleRow ?? {
       mes: '2026-09-01', ini: '2026-08-11', fim: '2026-09-10', estado: 'fechado',
       comecei_com: 86797, entrou: 633062, saiu: 719787, resultado: 72,
       caixa_no_fim: 72, faltou_pagar: 37164, confere: true,
@@ -147,7 +148,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       refetch: async () => { refetches.push('bills'); },
     }),
     useUpcomingCardCharges: () => ({ ...query, isSuccess: true, data: options.charges ?? [] }),
-    useBudgetsStatus: () => ({ ...query, isSuccess: true, data: options.budgets ?? [] }),
+    // `budgetsPending`: os limites do mês chegando (a troca de mês, com o portão já aberto).
+    useBudgetsStatus: () => options.budgetsPending ? { ...query, isLoading: true, isPending: true, isSuccess: false, data: undefined } : ({ ...query, isSuccess: true, data: options.budgets ?? [] }),
     useSpendablePath: () => ({ ...query, isSuccess: true, data: [] }),
     useCycle: () => ({ ...query, isSuccess: true, data: options.cycle ?? { de: '2026-09-01', ate: '2026-09-30', mes: '2026-09', diasAteOFim: 22 } }),
     useAccountBalances: () => ({
@@ -190,7 +192,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       };
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', useWindowDimensions: () => ({ width: 384, height: 800 }), Platform: { OS: 'android', select: (o: any) => o.android ?? o.default } };
-      if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInDown: animation, FadeOut: animation, FadeIn: animation, LinearTransition: animation, useAnimatedRef: () => ({ current: null }) };
+      if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInDown: animation, FadeOut: animation, FadeIn: animation, ReduceMotion: { System: 'system' }, LinearTransition: animation, useAnimatedRef: () => ({ current: null }) };
       if (name === 'expo-haptics') return { selectionAsync() {}, notificationAsync() {}, NotificationFeedbackType: { Success: 'success', Warning: 'warning' } };
       // `back` é navegação como qualquer outra e ENTRA na lista: é o que prende o "fechar um
       // formulário que outra tela abriu devolve para ela" (`useVoltarQuandoFechar`).
@@ -257,7 +259,10 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
         useArchivedCount: () => ({ ...query, isSuccess: true, data: options.arquivadas ?? 0 }),
       } as Record<string, any>, { get: (target, key) => key in target ? target[key as string] : () => mutation(String(key)) });
       if (name === '@/hooks/use-agent-chat') return {
-        useAgentConversations: () => ({ ...query, isSuccess: true, hasNextPage: false, fetchNextPage() {}, data: { pages: [{ items: options.conversations ?? [] }] } }),
+        useAgentConversations: () =>
+          options.conversationsPending
+            ? { ...query, isPending: true, isLoading: true, isSuccess: false, fetchStatus: 'fetching', hasNextPage: false, fetchNextPage() {}, data: undefined }
+            : { ...query, isSuccess: true, hasNextPage: false, fetchNextPage() {}, data: { pages: [{ items: options.conversations ?? [] }] } },
         useRenameAgentConversation: () => mutation('renameConversation'),
         useDeleteAgentConversation: () => mutation('deleteConversation'),
       };
@@ -267,7 +272,9 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
         useGlobalSearch: (_q: string, limite?: number) => {
           pedidosDeLimite.push(['busca', limite]);
           const r = (data: any[]) => ({ ...query, isSuccess: true, isLoading: false, data });
-          return { notes: r(options.buscaNotas ?? []), transactions: r([]), reminders: r([]), enabled: true, term: 'mercado' };
+          // `buscaPendente`: as notas já responderam, lançamentos e lembretes ainda não (1ª busca).
+          const chegando = { ...query, isLoading: true, isSuccess: false, data: undefined };
+          return { notes: r(options.buscaNotas ?? []), transactions: options.buscaPendente ? chegando : r([]), reminders: options.buscaPendente ? chegando : r([]), enabled: true, term: 'mercado' };
         },
       };
       if (name === '@/lib/search') return { noteTitle: (texto: string) => texto.split('\n')[0], notePreview: () => '' };
@@ -2152,4 +2159,79 @@ test('Lançamento de parcela de dívida: embaixo do total, a parcela + o encargo
   const menu = ui.nodes().find((n: any) => n.type === 'HeaderActions')?.props.menu;
   assert.ok(menu, 'o "…" existe');
   assert.ok(!menu.actions.some((a: any) => a.label === 'Duplicar'), 'sem Duplicar no pagamento de dívida');
+});
+
+test('Agente: as conversas recentes não desenham texto nem esqueleto enquanto carregam', () => {
+  // "quando eu abro a tela e fica carregando o skeleton, ele aparece 'recentes' e se não tiver
+  // nada, ele aparece como carregando e depois some" (25/09/2026). O bloco fica no fim da entrada,
+  // abaixo do compositor e dos atalhos: chegar depois não empurra nada.
+  const arquivo = 'src/components/agent/agent-recent-conversations.tsx';
+  const carregando = screen(arquivo, { componente: 'AgentRecentConversations', conversationsPending: true });
+  assert.deepEqual(carregando.nodes(), [], 'carregando: nada na tela');
+  const vazio = screen(arquivo, { componente: 'AgentRecentConversations', conversations: [] });
+  assert.deepEqual(vazio.nodes(), [], 'sem conversa: o bloco não existe');
+  const com = screen(arquivo, {
+    componente: 'AgentRecentConversations',
+    conversations: [{ id: 'c1', title: 'Mercado', preview: null, last_message_at: '2026-09-25T10:00:00Z' }],
+  });
+  assert.ok(JSON.stringify(com.nodes().map((n: any) => n.props.children)).includes('Recentes'));
+});
+
+// "texto nunca deve aparecer em skeleton" (25/09/2026): enquanto um bloco carrega, ele é só
+// forma — título, rótulo, contagem e legenda incluídos. Fica o controle que a pessoa tocou.
+test('Financeiro: carregando o período, o rótulo do herói é forma — "Atualizando período" saiu', () => {
+  const buscando = screen(financeiroFile, { rangePending: true });
+  const heroi = buscando.nodes().find((n: any) => n.type === 'HeroPanel');
+  assert.equal(heroi.props.label?.type, 'Skeleton', 'o rótulo vira forma junto com o valor');
+  assert.equal(heroi.props.value.type, 'Skeleton');
+  assert.ok(!JSON.stringify(buscando.nodes().map((n: any) => n.props)).includes('Atualizando'));
+  const pronto = screen(financeiroFile);
+  assert.equal(typeof pronto.nodes().find((n: any) => n.type === 'HeroPanel').props.label, 'string', 'sem este, o de cima não distinguiria nada');
+});
+
+test('Financeiro: com a série do mês chegando, Entra e Sai não deixam o rótulo sobre um vazio', () => {
+  const chegando = screen(financeiroFile, { cycleSeriesPending: true });
+  for (const lado of ['Entra', 'Sai']) {
+    const tile = chegando.nodes().find((n: any) => n.type === 'Tile' && n.props.label === lado);
+    assert.equal(tile.props.value?.type, 'Skeleton', `${lado}: o valor é forma enquanto o ciclo chega`);
+  }
+  // O número do herói sai da série: sem ela, "Saldo projetado · R$ 0,00" pintava e depois trocava.
+  assert.equal(chegando.nodes().find((n: any) => n.type === 'HeroPanel').props.label?.type, 'Skeleton');
+  const pronto = screen(financeiroFile);
+  assert.equal(pronto.nodes().find((n: any) => n.type === 'Tile' && n.props.label === 'Entra').props.value.type, 'Money');
+});
+
+test('Orçamentos: com os limites chegando, nem o rótulo do destaque nem "Sem limite definido"', () => {
+  // Sem os limites, `semLimite` era TODA categoria com gasto — a lista errada, que sumia depois.
+  const gastos = [{ category: 'mercado', kind: 'expense', total_cents: 5000, count: 1 }];
+  const ui = screen('src/app/finance/budgets.tsx', { budgetsPending: true, saiuNoCiclo: gastos });
+  assert.ok(!JSON.stringify(ui.nodes().map((n: any) => n.props.children)).includes('Ainda dá para gastar'), 'o rótulo do destaque é forma');
+  assert.ok(!ui.nodes().some((n: any) => n.type === 'SectionHead' && n.props.title === 'Sem limite definido'));
+  assert.ok(!ui.nodes().some((n: any) => n.type === 'Button' && n.props.label === 'Definir limite'));
+  assert.ok(tipos(ui).includes('Skeleton'));
+  const pronto = screen('src/app/finance/budgets.tsx', { saiuNoCiclo: gastos });
+  assert.ok(pronto.nodes().some((n: any) => n.type === 'SectionHead' && n.props.title === 'Sem limite definido'), 'sem este, o de cima não distinguiria nada');
+});
+
+test('Busca: na primeira busca, só o esqueleto até as três responderem — nada de seção pela metade', () => {
+  const notas = [{ id: 'n1', content: 'mercado', folder_id: null, source: 'app', updated_at: '2026-09-20T10:00:00Z' }];
+  const chegando = screen('src/app/search.tsx', { buscaPendente: true, buscaNotas: notas });
+  assert.ok(tipos(chegando).includes('SkeletonRow'));
+  assert.ok(!chegando.nodes().some((n: any) => n.type === 'Section'), 'as notas que já chegaram esperam as outras');
+  assert.ok(!chegando.nodes().some((n: any) => n.type === 'VerMais'));
+  assert.ok(chegando.nodes().some((n: any) => n.type === 'Chip'), 'os chips são o controle e ficam');
+  const pronta = screen('src/app/search.tsx', { buscaNotas: notas });
+  assert.ok(pronta.nodes().some((n: any) => n.type === 'Section' && n.props.title === 'Notas'));
+});
+
+test('Financeiro: a série do mês falhando mostra o erro no herói e refaz a série — nunca "R$ 0,00"', () => {
+  // O número do herói e o Entra/Sai saem do `cycle_series`. Falhando, o herói pintava
+  // "Saldo projetado · R$ 0,00" e os blocos ficavam com o rótulo sobre um vazio (25/09/2026).
+  const ui = screen('src/app/(tabs)/finance/index.tsx', { cycleSeriesError: true });
+  const erro = ui.nodes().find((n: any) => n.type === 'ErrorCard');
+  assert.ok(erro, 'card de erro no lugar do herói');
+  assert.ok(!ui.nodes().some((n: any) => n.type === 'HeroPanel'), 'sem herói com número inventado');
+  assert.ok(!ui.nodes().some((n: any) => n.type === 'Tile' && ['Entra', 'Sai'].includes(n.props.label)), 'sem Entra/Sai vazios');
+  erro.props.onRetry();
+  assert.ok(ui.refetches.includes('serie'), 'o "Tentar de novo" refaz a série');
 });

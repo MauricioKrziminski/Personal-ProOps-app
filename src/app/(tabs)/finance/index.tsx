@@ -225,8 +225,12 @@ export default function FinanceScreen() {
 
   const cicloFalhou = cycle.isError && !cycle.data;
   const bordasChegando = !range.pronto && !range.isError;
-  const heroLoading = bordasChegando || summary.isLoading || (isCurrent && forecast.isLoading);
-  const heroError = cicloFalhou || range.isError || summary.isError || (isCurrent && forecast.isError);
+  // `serie` entra: é dela que sai o número do herói (`descricao`) — sem ela, a troca de mês
+  // pintava "Saldo projetado · R$ 0,00" até o `cycle_series` chegar.
+  const heroLoading = bordasChegando || serie.isLoading || summary.isLoading || (isCurrent && forecast.isLoading);
+  // A série falhando sem dado nenhum é erro do herói: sem ela o número seria um "R$ 0,00" inventado.
+  const serieFalhou = serie.isError && !serie.data;
+  const heroError = cicloFalhou || serieFalhou || range.isError || summary.isError || (isCurrent && forecast.isError);
   const isEmpty =
     summary.isSuccess && recent.isSuccess && (summary.data ?? []).length === 0 && (recent.data ?? []).length === 0;
 
@@ -236,6 +240,7 @@ export default function FinanceScreen() {
       ...(cicloFalhou ? [cycle.refetch()] : []),
       ...(range.isError ? [range.refetch()] : []),
       ...(previousRange.isError ? [previousRange.refetch()] : []),
+      ...(serieFalhou ? [serie.refetch()] : []),
       ...(range.pronto ? [summary.refetch()] : []),
       ...(previousRange.pronto ? [previous.refetch()] : []),
     ]);
@@ -308,7 +313,10 @@ export default function FinanceScreen() {
         ) : (
           <HeroPanel
             surface="live"
-            label={heroLoading ? 'Atualizando período' : descricao?.label ?? 'Saldo projetado'}
+            // Texto nunca aparece em esqueleto (25/09/2026): carregando, o rótulo também é forma.
+            label={heroLoading
+              ? <Skeleton width="40%" height={16} tone="hero" />
+              : descricao?.label ?? 'Saldo projetado'}
             value={heroLoading
               ? <Skeleton width="70%" height={46} tone="hero" />
               : <CountUpMoney cents={descricao?.cents ?? 0} variant="heroMoney" tone={cicloRuim ? 'onHeroDanger' : 'onHero'} />}
@@ -369,26 +377,30 @@ export default function FinanceScreen() {
 
   const actionsBlock = (
     <>
-      <TileRow>
-        <Tile
-          valorGrande
-          icon="arrow.down.left"
-          label="Entra"
-          value={ciclo ? <Money cents={entrou} variant="title2" tone="success" /> : undefined}
-          caption={sub.entra || undefined}
-          footer={entrou > 0 ? <ProgressBar value={entrouRealizado} max={entrou} tone="strong" /> : undefined}
-          onPress={() => abrirCiclo('entra')}
-        />
-        <Tile
-          valorGrande
-          icon="arrow.up.right"
-          label="Sai"
-          value={ciclo ? <Money cents={saiu} variant="title2" /> : undefined}
-          caption={sub.sai || undefined}
-          footer={saiu > 0 ? <ProgressBar value={saiuRealizado} max={saiu} tone="strong" /> : undefined}
-          onPress={() => abrirCiclo('sai')}
-        />
-      </TileRow>
+      {/* Com a série falhando, o erro do herói já tem o "Tentar de novo": Entra/Sai sem número não aparecem. */}
+      {serieFalhou ? null : (
+        <TileRow>
+          <Tile
+            valorGrande
+            icon="arrow.down.left"
+            label="Entra"
+            // Sem o ciclo ainda, o valor é forma — o rótulo não fica sobre um vazio (25/09/2026).
+            value={ciclo ? <Money cents={entrou} variant="title2" tone="success" /> : serie.isLoading ? <Skeleton width="60%" height={24} /> : undefined}
+            caption={sub.entra || undefined}
+            footer={entrou > 0 ? <ProgressBar value={entrouRealizado} max={entrou} tone="strong" /> : undefined}
+            onPress={() => abrirCiclo('entra')}
+          />
+          <Tile
+            valorGrande
+            icon="arrow.up.right"
+            label="Sai"
+            value={ciclo ? <Money cents={saiu} variant="title2" /> : serie.isLoading ? <Skeleton width="60%" height={24} /> : undefined}
+            caption={sub.sai || undefined}
+            footer={saiu > 0 ? <ProgressBar value={saiuRealizado} max={saiu} tone="strong" /> : undefined}
+            onPress={() => abrirCiclo('sai')}
+          />
+        </TileRow>
+      )}
       {cards.isError ? (
         <ErrorCard onRetry={cards.refetch} />
       ) : (cards.data ?? []).length > 0 ? (

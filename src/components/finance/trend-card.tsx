@@ -130,20 +130,26 @@ export function TrendCard({
   return (
     <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
       <View style={styles.cabeca}>
-        <View style={styles.legenda}>
-          <View style={styles.chave}>
-            <View style={[styles.amostra, { backgroundColor: theme.text }]} />
-            <ThemedText type="caption" themeColor="textSecondary">entrou</ThemedText>
+        {/* Texto nunca aparece em esqueleto (25/09/2026): trocando a janela, a legenda vira forma
+            — da mesma altura, para o seletor logo abaixo não pular. */}
+        {loading ? (
+          <Skeleton width="55%" height={16} />
+        ) : (
+          <View style={styles.legenda}>
+            <View style={styles.chave}>
+              <View style={[styles.amostra, { backgroundColor: theme.text }]} />
+              <ThemedText type="caption" themeColor="textSecondary">entrou</ThemedText>
+            </View>
+            <View style={styles.chave}>
+              <View style={[styles.amostra, { backgroundColor: theme.chart4 }]} />
+              <ThemedText type="caption" themeColor="textSecondary">saiu</ThemedText>
+            </View>
+            <View style={styles.chave}>
+              <View style={[styles.amostra, { backgroundColor: theme.surface, borderColor: theme.separator, borderWidth: 1 }]} />
+              <ThemedText type="caption" themeColor="textSecondary">previsto</ThemedText>
+            </View>
           </View>
-          <View style={styles.chave}>
-            <View style={[styles.amostra, { backgroundColor: theme.chart4 }]} />
-            <ThemedText type="caption" themeColor="textSecondary">saiu</ThemedText>
-          </View>
-          <View style={styles.chave}>
-            <View style={[styles.amostra, { backgroundColor: theme.surface, borderColor: theme.separator, borderWidth: 1 }]} />
-            <ThemedText type="caption" themeColor="textSecondary">previsto</ThemedText>
-          </View>
-        </View>
+        )}
         <Segmented options={JANELAS} value={janela} onChange={onJanela} />
       </View>
 

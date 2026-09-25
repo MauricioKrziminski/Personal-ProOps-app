@@ -59,7 +59,13 @@ export default function SearchScreen() {
     [notes.data, transactions.data, reminders.data, limite]
   );
 
-  const show = (s: Scope) => scope === 'tudo' || scope === s;
+  const loading = enabled && (notes.isLoading || transactions.isLoading || reminders.isLoading);
+  /**
+   * Na primeira busca, só o esqueleto até as TRÊS chegarem (25/09/2026): a seção que respondia
+   * antes pintava embaixo dele, e as outras entravam depois empurrando tudo. Os chips ficam — são
+   * o controle.
+   */
+  const show = (s: Scope) => !loading && (scope === 'tudo' || scope === s);
   const cut = <T,>(rows: T[] | undefined) =>
     scope === 'tudo' ? (rows ?? []).slice(0, PREVIEW) : (rows ?? []).slice(0, limite);
   /** Em "Tudo", o "Ver mais" abre a seção; dentro dela, pede mais 20 ao servidor. */
@@ -76,7 +82,6 @@ export default function SearchScreen() {
       />
     );
 
-  const loading = enabled && (notes.isLoading || transactions.isLoading || reminders.isLoading);
   const nothing =
     enabled &&
     !loading &&

@@ -447,7 +447,8 @@ export default function BudgetsScreen() {
     <ErrorBand message="Não deu para carregar os orçamentos." onRetry={status.refetch} />
   ) : status.isLoading ? (
     <Card style={styles.hero}>
-      <HeroLabel>Ainda dá para gastar</HeroLabel>
+      {/* Texto nunca aparece em esqueleto (25/09/2026): o rótulo também é forma. */}
+      <Skeleton width="45%" height={16} />
       <Skeleton width="70%" height={32} />
       <Skeleton width="45%" height={18} />
     </Card>
@@ -503,7 +504,9 @@ export default function BudgetsScreen() {
 
   const budgetContextContent = (
     <>
-      {periodoFalhou || resumo.isError ? (
+      {/* Sem os limites, "sem limite" seria TODA categoria com gasto — a lista errada, que some
+          quando eles chegam. Carregando, a seção não existe (25/09/2026). */}
+      {status.isLoading ? null : periodoFalhou || resumo.isError ? (
         <ErrorBand
           message="Não deu para ver em que você gastou sem limite."
           onRetry={() => { void refazerResumo(); }}

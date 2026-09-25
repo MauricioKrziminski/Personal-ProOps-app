@@ -596,141 +596,150 @@ export default function NoteDetailScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           contentInsetAdjustmentBehavior="automatic">
-          {/* Barra de propriedades: só a pasta é editável — tag se edita digitando `#` no corpo. */}
-          <View style={styles.props}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Pasta: ${folder?.name ?? 'sem pasta'}. Toque para mudar.`}
-              hitSlop={8}
-              onPress={() => {
-                Haptics.selectionAsync();
-                setPickerOpen(true);
-              }}
-              style={[styles.chip, { backgroundColor: vidro ? 'transparent' : cores.accentSoft }]}>
-              {vidro ? <GlassBackdrop fallbackColor={cores.accentSoft} radius={Radius.pill} /> : null}
-              <Icon name={symbol(folder?.icon)} size="sm" color="tint" />
-              <ThemedText type="smallBold" themeColor="tint">
-                {folder?.name ?? 'Sem pasta'}
-              </ThemedText>
-            </Pressable>
-
-            {tags.map((tag) => (
-              <Pressable
-                key={tag}
-                accessibilityRole="button"
-                accessibilityLabel={`Tag ${tag}. Toque para tirar da nota.`}
-                hitSlop={CHIP_SLOP}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  tirarTag(tag);
-                }}
-                style={[
-                  styles.tagChip,
-                  { backgroundColor: vidro ? 'transparent' : cores.backgroundElement },
-                ]}>
-                {vidro ? (
-                  <GlassBackdrop fallbackColor={cores.backgroundElement} radius={Radius.pill} />
-                ) : null}
-                <ThemedText type="footnote">#{tag}</ThemedText>
-                <Icon name="xmark" size={12} color="textSecondary" />
-              </Pressable>
-            ))}
-
-            {/*
-              A cor é um DISCO, e ele só existe depois do primeiro autosave: `useUpdateNote` grava
-              por id, e em nota nova ainda não há id. Sem cor ele é um anel vazio — a mesma forma
-              do "Sem cor" do seletor, para o controle não mudar de silhueta ao ganhar cor.
-            */}
-            {savedId ? (
+          {/* Barra de propriedades: só a pasta é editável — tag se edita digitando `#` no corpo.
+              Com a nota chegando ela é forma: "Sem pasta", "+ tag" e o disco pintavam antes de a
+              nota dizer a pasta e a cor dela — texto nunca aparece em esqueleto (25/09/2026). */}
+          {note.isLoading ? (
+            <View style={styles.props}>
+              <Skeleton width={96} height={28} radius={Radius.pill} />
+              <Skeleton width={56} height={26} radius={Radius.pill} />
+            </View>
+          ) : (
+            <View style={styles.props}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={
-                  note.data?.color ? `Cor ${note.data.color}. Toque para mudar.` : 'Escolher cor'
-                }
-                hitSlop={13}
+                accessibilityLabel={`Pasta: ${folder?.name ?? 'sem pasta'}. Toque para mudar.`}
+                hitSlop={8}
                 onPress={() => {
                   Haptics.selectionAsync();
-                  setColorOpen(true);
+                  setPickerOpen(true);
                 }}
-                style={[
-                  styles.disco,
-                  {
-                    backgroundColor: tinta ?? 'transparent',
-                    borderColor: tinta ?? theme.separator,
-                  },
-                ]}
-              />
-            ) : null}
+                style={[styles.chip, { backgroundColor: vidro ? 'transparent' : cores.accentSoft }]}>
+                {vidro ? <GlassBackdrop fallbackColor={cores.accentSoft} radius={Radius.pill} /> : null}
+                <Icon name={symbol(folder?.icon)} size="sm" color="tint" />
+                <ThemedText type="smallBold" themeColor="tint">
+                  {folder?.name ?? 'Sem pasta'}
+                </ThemedText>
+              </Pressable>
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Adicionar tag"
-              hitSlop={CHIP_SLOP}
-              onPress={() => {
-                Haptics.selectionAsync();
-                setTagPickerOpen(true);
-              }}
-              style={[
-                styles.tagChip,
-                { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.separator },
-              ]}>
-              {vidro ? (
-                <GlassBackdrop fallbackColor={cores.backgroundElement} radius={Radius.pill} />
+              {tags.map((tag) => (
+                <Pressable
+                  key={tag}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Tag ${tag}. Toque para tirar da nota.`}
+                  hitSlop={CHIP_SLOP}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    tirarTag(tag);
+                  }}
+                  style={[
+                    styles.tagChip,
+                    { backgroundColor: vidro ? 'transparent' : cores.backgroundElement },
+                  ]}>
+                  {vidro ? (
+                    <GlassBackdrop fallbackColor={cores.backgroundElement} radius={Radius.pill} />
+                  ) : null}
+                  <ThemedText type="footnote">#{tag}</ThemedText>
+                  <Icon name="xmark" size={12} color="textSecondary" />
+                </Pressable>
+              ))}
+
+              {/*
+                A cor é um DISCO, e ele só existe depois do primeiro autosave: `useUpdateNote` grava
+                por id, e em nota nova ainda não há id. Sem cor ele é um anel vazio — a mesma forma
+                do "Sem cor" do seletor, para o controle não mudar de silhueta ao ganhar cor.
+              */}
+              {savedId ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    note.data?.color ? `Cor ${note.data.color}. Toque para mudar.` : 'Escolher cor'
+                  }
+                  hitSlop={13}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setColorOpen(true);
+                  }}
+                  style={[
+                    styles.disco,
+                    {
+                      backgroundColor: tinta ?? 'transparent',
+                      borderColor: tinta ?? theme.separator,
+                    },
+                  ]}
+                />
               ) : null}
-              <Icon name="plus" size={12} color="tint" />
-              <ThemedText type="footnote" themeColor="tint">
-                tag
-              </ThemedText>
-            </Pressable>
 
-            {/* O lembrete desta nota, quando existe e ainda vai tocar — tocar abre para editar. */}
-            {lembrete.data?.active ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Lembrete ${quandoToca(lembrete.data.next_run_at)}. Toque para editar.`}
+                accessibilityLabel="Adicionar tag"
                 hitSlop={CHIP_SLOP}
                 onPress={() => {
                   Haptics.selectionAsync();
-                  void abrirLembrete();
+                  setTagPickerOpen(true);
                 }}
                 style={[
                   styles.tagChip,
-                  { backgroundColor: vidro ? 'transparent' : cores.backgroundElement },
+                  { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.separator },
                 ]}>
                 {vidro ? (
                   <GlassBackdrop fallbackColor={cores.backgroundElement} radius={Radius.pill} />
                 ) : null}
-                <Icon name="bell" size={12} color="textSecondary" />
-                <ThemedText type="footnote" style={tabular}>
-                  {quandoToca(lembrete.data.next_run_at)}
+                <Icon name="plus" size={12} color="tint" />
+                <ThemedText type="footnote" themeColor="tint">
+                  tag
                 </ThemedText>
               </Pressable>
-            ) : lembrete.isError ? (
-              <Pressable
-                accessibilityRole="button"
-                hitSlop={CHIP_SLOP}
-                onPress={() => void lembrete.refetch()}>
-                <ThemedText type="footnote" themeColor="danger">
-                  Não deu para ver o lembrete · Tentar de novo
-                </ThemedText>
-              </Pressable>
-            ) : null}
 
-            {savedFlash ? (
-              <Animated.View
-                entering={FadeIn.duration(Motion.duration.fast)}
-                exiting={FadeOut.duration(Motion.duration.exit)}>
+              {/* O lembrete desta nota, quando existe e ainda vai tocar — tocar abre para editar. */}
+              {lembrete.data?.active ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Lembrete ${quandoToca(lembrete.data.next_run_at)}. Toque para editar.`}
+                  hitSlop={CHIP_SLOP}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    void abrirLembrete();
+                  }}
+                  style={[
+                    styles.tagChip,
+                    { backgroundColor: vidro ? 'transparent' : cores.backgroundElement },
+                  ]}>
+                  {vidro ? (
+                    <GlassBackdrop fallbackColor={cores.backgroundElement} radius={Radius.pill} />
+                  ) : null}
+                  <Icon name="bell" size={12} color="textSecondary" />
+                  <ThemedText type="footnote" style={tabular}>
+                    {quandoToca(lembrete.data.next_run_at)}
+                  </ThemedText>
+                </Pressable>
+              ) : lembrete.isError ? (
+                <Pressable
+                  accessibilityRole="button"
+                  hitSlop={CHIP_SLOP}
+                  onPress={() => void lembrete.refetch()}>
+                  <ThemedText type="footnote" themeColor="danger">
+                    Não deu para ver o lembrete · Tentar de novo
+                  </ThemedText>
+                </Pressable>
+              ) : null}
+
+              {savedFlash ? (
+                <Animated.View
+                  entering={FadeIn.duration(Motion.duration.fast)}
+                  exiting={FadeOut.duration(Motion.duration.exit)}>
+                  <ThemedText type="footnote" themeColor="textSecondary">
+                    Salvo
+                  </ThemedText>
+                </Animated.View>
+              ) : note.data ? (
                 <ThemedText type="footnote" themeColor="textSecondary">
-                  Salvo
+                  {note.data.source === 'whatsapp' ? 'via WhatsApp' : 'no app'} ·{' '}
+                  {relativeBR(note.data.updated_at)}
                 </ThemedText>
-              </Animated.View>
-            ) : note.data ? (
-              <ThemedText type="footnote" themeColor="textSecondary">
-                {note.data.source === 'whatsapp' ? 'via WhatsApp' : 'no app'} ·{' '}
-                {relativeBR(note.data.updated_at)}
-              </ThemedText>
-            ) : null}
-          </View>
+              ) : null}
+            </View>
+          )}
 
           {note.isLoading ? (
             <View style={styles.loading}>

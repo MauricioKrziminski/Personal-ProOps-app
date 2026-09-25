@@ -21,8 +21,11 @@ interface HeroPanelProps {
   top?: React.ReactNode;
   /** Badge ou pílula de status opcional na linha do rótulo. */
   badge?: React.ReactNode;
-  /** Rótulo curto — **sempre antes do valor** (`HeroLabel`, §2 de design.md). */
-  label: string;
+  /**
+   * Rótulo curto — **sempre antes do valor** (`HeroLabel`, §2 de design.md). Carregando, a tela
+   * passa um `Skeleton` no lugar: texto nunca aparece em esqueleto (25/09/2026).
+   */
+  label: React.ReactNode;
   /** O número. Normalmente um `<Money variant="heroMoney" concealable />`. */
   value: React.ReactNode;
   /**
@@ -123,9 +126,13 @@ export function HeroPanel({
           {/* O cartão todo abre o menu; os controles internos mantêm suas ações próprias. */}
           <View style={styles.body}>
             <View style={styles.labelRow}>
-              <ThemedText type="meta" themeColor="onHeroMuted" style={styles.shrinkLabel}>
-                {label}
-              </ThemedText>
+              {typeof label === 'string' ? (
+                <ThemedText type="meta" themeColor="onHeroMuted" style={styles.shrinkLabel}>
+                  {label}
+                </ThemedText>
+              ) : (
+                label
+              )}
               {badge}
               {/*
                 Os dois chips andam JUNTOS, num grupo só.

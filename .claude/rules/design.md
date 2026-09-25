@@ -682,6 +682,12 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
 
 1. **Loading** — `Skeleton` com **a forma do conteúdo final**. Nunca spinner de tela cheia para
    atualização parcial.
+   ⚠️ **Texto nunca aparece em esqueleto** (25/09/2026, *"texto nunca deve aparecer em
+   skeleton"*). Enquanto um bloco carrega, o título, a contagem, a legenda e o botão DELE viram
+   forma ou somem junto. Era "Recentes" sobre três esqueletos no Agente — e, sem conversa, o bloco
+   carregava e sumia. Bloco que pode não existir depois de carregar não desenha esqueleto nenhum:
+   esqueleto promete conteúdo. Ficam na tela o controle que a pessoa acabou de tocar (período,
+   filtro, abas), o título da página e as seções já carregadas.
 2. **Empty** — `EmptyState`: ícone SF, título, e uma **dica acionável** (normalmente o atalho do
    WhatsApp). Composto, não um parágrafo cinza.
    ⚠️ **Lista vazia que não é a única coisa da tela: o que existe vem PRIMEIRO e o vazio é

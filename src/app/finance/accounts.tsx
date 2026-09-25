@@ -484,7 +484,8 @@ export default function AccountsScreen() {
       {hero}
       {accountsError}
       {accountSections}
-      {defaultAccount}
+      {/* Como no tablet: com o esqueleto na tela, nada aparece embaixo dele (25/09/2026). */}
+      {!balances.isLoading ? defaultAccount : null}
       {noAccount}
       {empty}
     </>

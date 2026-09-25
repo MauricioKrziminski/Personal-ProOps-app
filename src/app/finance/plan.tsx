@@ -169,15 +169,19 @@ export default function PlanScreen() {
     </Section>
   ) : null;
 
+  // Sem o plano, o convite é forma: rótulo, dica e um "Convidar" desligado pintavam ao lado do
+  // esqueleto (25/09/2026). Forma e não nada: no tablet este é o painel PRINCIPAL.
   const people = (
     <>
-      <View style={styles.bloco}>
-        <Field label="Convidar alguém" hint="Vê e lança tudo no mesmo financeiro">
-          <TextField value={telefone} onChangeText={setTelefone} placeholder="(51) 99999-8888" keyboardType="phone-pad" autoComplete="tel" />
-        </Field>
-        <Button label={convidar.isPending ? 'Convidando…' : 'Convidar'} icon="person.badge.plus" loading={convidar.isPending} disabled={!podeConvidar} onPress={() => convidar.mutate({ phone: telefone, role: 'member' }, { onSuccess: () => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); setTelefone(''); toast({ message: 'Convite enviado.', tone: 'success' }); }, onError: () => toast({ message: 'Não deu para convidar. Confira se o número já não tem convite.', tone: 'error' }) })} block />
-        {noLimite ? <ThemedText type="footnote" themeColor="textSecondary">Seu plano já está no limite de pessoas.</ThemedText> : null}
-      </View>
+      {isLoading && !isError ? <Skeleton height={120} radius={Radius.md} /> : (
+        <View style={styles.bloco}>
+          <Field label="Convidar alguém" hint="Vê e lança tudo no mesmo financeiro">
+            <TextField value={telefone} onChangeText={setTelefone} placeholder="(51) 99999-8888" keyboardType="phone-pad" autoComplete="tel" />
+          </Field>
+          <Button label={convidar.isPending ? 'Convidando…' : 'Convidar'} icon="person.badge.plus" loading={convidar.isPending} disabled={!podeConvidar} onPress={() => convidar.mutate({ phone: telefone, role: 'member' }, { onSuccess: () => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); setTelefone(''); toast({ message: 'Convite enviado.', tone: 'success' }); }, onError: () => toast({ message: 'Não deu para convidar. Confira se o número já não tem convite.', tone: 'error' }) })} block />
+          {noLimite ? <ThemedText type="footnote" themeColor="textSecondary">Seu plano já está no limite de pessoas.</ThemedText> : null}
+        </View>
+      )}
       {convites.isError ? <View style={[styles.aviso, { backgroundColor: theme.surface }]}><ThemedText type="small" themeColor="danger">Não deu para ler os convites.</ThemedText><Button label="Tentar de novo" variant="secondary" size="sm" onPress={() => convites.refetch()} /></View> : null}
       {convites.isLoading ? <SkeletonRow /> : null}
       {pendentes.length > 0 ? <Section title="Convites pendentes">{pendentes.map((convite) => <Row key={convite.id} title={telefoneBR(convite.phone)} subtitle="pendente" icon="paperplane" chevron={false} onPress={() => confirmDestructive('Revogar este convite?', 'Revogar', () => revogar.mutate(convite.id, { onSuccess: () => toast({ message: 'Convite revogado.', tone: 'success' }), onError: () => toast({ message: 'Não deu para revogar o convite.', tone: 'error' }) }))} />)}</Section> : null}

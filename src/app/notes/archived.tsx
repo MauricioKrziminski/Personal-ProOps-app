@@ -13,7 +13,7 @@ import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Card } from '@/components/ui/card';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
-import { SkeletonRow } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Space } from '@/design/tokens';
 import {
@@ -231,20 +231,29 @@ export default function ArchivedScreen() {
   const tabletContext = (
     <Card style={styles.context}>
       <ThemedText type="subtitle">Arquivo</ThemedText>
-      <View style={styles.contextStats}>
-        <View style={styles.contextStat}>
-          <ThemedText type="subtitle">{listaPastas.length}</ThemedText>
-          <ThemedText type="caption" themeColor="textSecondary">
-            {listaPastas.length === 1 ? 'pasta' : 'pastas'}
-          </ThemedText>
+      {/* Carregando, as contagens são forma: "0 pastas · 0 notas" virava outro número depois
+          (25/09/2026). O título do painel não depende de consulta e fica. */}
+      {carregando ? (
+        <View style={styles.contextStats}>
+          <Skeleton width={56} height={44} />
+          <Skeleton width={56} height={44} />
         </View>
-        <View style={styles.contextStat}>
-          <ThemedText type="subtitle">{listaNotas.length}</ThemedText>
-          <ThemedText type="caption" themeColor="textSecondary">
-            {listaNotas.length === 1 ? 'nota' : 'notas'}
-          </ThemedText>
+      ) : (
+        <View style={styles.contextStats}>
+          <View style={styles.contextStat}>
+            <ThemedText type="subtitle">{listaPastas.length}</ThemedText>
+            <ThemedText type="caption" themeColor="textSecondary">
+              {listaPastas.length === 1 ? 'pasta' : 'pastas'}
+            </ThemedText>
+          </View>
+          <View style={styles.contextStat}>
+            <ThemedText type="subtitle">{listaNotas.length}</ThemedText>
+            <ThemedText type="caption" themeColor="textSecondary">
+              {listaNotas.length === 1 ? 'nota' : 'notas'}
+            </ThemedText>
+          </View>
         </View>
-      </View>
+      )}
     </Card>
   );
 

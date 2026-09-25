@@ -12,7 +12,7 @@ import { Card } from '@/components/ui/card';
 import { Field, TextField } from '@/components/ui/field';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
-import { SkeletonRow } from '@/components/ui/skeleton';
+import { SkeletonList } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Space, tabular } from '@/design/tokens';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
@@ -104,12 +104,8 @@ export default function MembersScreen() {
 
   const people = (
     <>
-      {membros.isLoading ? (
-        <Section title="Quem está aqui">
-          <SkeletonRow />
-          <SkeletonRow />
-        </Section>
-      ) : null}
+      {/* Texto nunca aparece em esqueleto (25/09/2026): o título da seção também é forma. */}
+      {membros.isLoading ? <SkeletonList linhas={2} /> : null}
 
       {membros.isError ? (
         <Section title="Quem está aqui">
