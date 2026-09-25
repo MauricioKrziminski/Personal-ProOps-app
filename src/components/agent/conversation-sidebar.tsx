@@ -76,6 +76,7 @@ export function ConversationSidebar({ selectedId }: { selectedId?: string }) {
 const styles = StyleSheet.create({
   list: { flex: 1 },
   content: { padding: Space.lg, paddingBottom: Space.xxxl },
-  header: { gap: Space.lg, paddingBottom: Space.md },
+  // Título a `Space.md` do que vem embaixo (§2), como em todo cabeçalho de bloco.
+  header: { gap: Space.md, paddingBottom: Space.md },
   empty: { gap: Space.md, paddingVertical: Space.lg },
 });

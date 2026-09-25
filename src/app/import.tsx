@@ -544,6 +544,7 @@ export default function ImportScreen() {
                       variant="ghost"
                       size="sm"
                       onPress={() => marcarGrupo(ids, !todos)}
+                      style={styles.acaoDoGrupo}
                     />
                   }
                 />
@@ -713,6 +714,11 @@ const styles = StyleSheet.create({
   bloco: {
     gap: Space.md,
   },
+  /**
+   * O botão fantasma tem 36 de altura contra os 19 do título: sem a margem negativa ele esticava a
+   * linha e o rótulo ficava ~20 do card, não `Space.md` (§2). O toque continua com os 36.
+   */
+  acaoDoGrupo: { marginVertical: -Space.sm },
   /* Só o recuo: o TAMANHO vem de `type="footnote"` no próprio texto. */
   rodape: {
     paddingHorizontal: Space.lg,

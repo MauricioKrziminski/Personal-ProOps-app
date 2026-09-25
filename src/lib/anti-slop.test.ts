@@ -1114,29 +1114,44 @@ test('LinearTransition só mora em components/motion/transicao.ts', () => {
   Metas e no "Tipo" da importação, e 12 nas raízes. Uma medida só, a mesma entre cards irmãos.
   O `SectionHead` não tem espaço próprio: quem o dá é o `View` em volta, e é ele que este teste lê.
 */
-test('título de seção fica a Space.md do conteúdo, no Section e em volta de todo SectionHead', () => {
+/*
+  ⚠️ **E o `BlockHeader` também** (25/09/2026). O teste só lia `<SectionHead`, e as raízes usam
+  `BlockHeader`: em Notas, "Fixadas" morava num `View` sem `gap` e encostava no primeiro card, e
+  "Notas"/"Pastas" tiravam o respiro de uma caixa de 44pt centrada — ~10, não 12 (*"eu não tinha
+  pedido para padronizar em todos os lugares do app esse gap entre o label e o card"*). O pai pode
+  ser um `View`/`Animated.View` com `styles.x` de `gap: Space.md`, ou o `<Bloco>` da tela, cujo
+  estilo também é conferido.
+*/
+test('título de seção fica a Space.md do conteúdo, no Section e em volta de todo SectionHead e BlockHeader', () => {
   const row = readFileSync(join(SRC, 'components/ui/row.tsx'), 'utf8');
   const fora: string[] = [];
   if (!/\n  section: \{\s*gap: Space\.md,/.test(row)) fora.push('src/components/ui/row.tsx (Section)');
-  for (const f of walk(SRC).filter((p) => !p.endsWith('section-head.tsx'))) {
+  const temGap = (texto: string, estilo: string) =>
+    new RegExp(`\\b${estilo}: \\{[^}]*gap: Space\\.md\\b`).test(texto);
+  for (const f of walk(SRC).filter((p) => !/(section-head|block-header)\.tsx$/.test(p))) {
     const texto = readFileSync(f, 'utf8');
-    if (!texto.includes('<SectionHead')) continue;
+    if (!/<(SectionHead|BlockHeader)\b/.test(texto)) continue;
     const linhas = texto.split('\n');
     linhas.forEach((linha, i) => {
-      if (!linha.includes('<SectionHead')) return;
-      // O pai é o primeiro `View` aberto acima (um `Pressable` em volta só do título não conta).
-      let estilo: string | null = null;
-      for (let j = i - 1; j >= Math.max(0, i - 8); j--) {
+      if (!/<(SectionHead|BlockHeader)\b/.test(linha)) return;
+      // O pai é o primeiro `View` (ou `Bloco`) aberto acima — um `Pressable` em volta só do
+      // título não conta. 40 linhas: há comentário longo entre o pai e o título em Notas.
+      let ok = false;
+      for (let j = i - 1; j >= Math.max(0, i - 40); j--) {
+        if (/<Bloco\b/.test(linhas[j])) {
+          ok = /function Bloco\b[\s\S]*?style=\{styles\.bloco\}/.test(texto) && temGap(texto, 'bloco');
+          break;
+        }
         if (!/<(Animated\.)?View\b/.test(linhas[j])) continue;
         const tag = linhas.slice(j, j + 4).join(' ');
-        estilo = tag.match(/style=\{\[?\s*styles\.(\w+)/)?.[1] ?? '';
+        const estilo = tag.match(/style=\{\[?\s*styles\.(\w+)/)?.[1] ?? '';
+        ok = Boolean(estilo) && temGap(texto, estilo);
         break;
       }
-      const ok = estilo && new RegExp(`\\b${estilo}: \\{[^}]*gap: Space\\.md\\b`).test(texto);
       if (!ok) fora.push(`${f.replace(SRC, 'src')}:${i + 1}`);
     });
   }
-  assert.deepEqual(fora, [], 'SectionHead sem gap Space.md no View em volta');
+  assert.deepEqual(fora, [], 'título de seção sem gap Space.md no View em volta');
 });
 
 /**

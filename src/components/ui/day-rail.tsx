@@ -47,6 +47,7 @@ const styles = StyleSheet.create({
   no: { width: 12, height: 12, marginTop: 2, borderRadius: Radius.pill, borderWidth: 2 },
   fio: { width: 2, flex: 1, marginTop: Space.xs, borderRadius: Radius.pill },
   fioFinal: { marginBottom: Space.xl },
-  corpo: { flex: 1, minWidth: 0, gap: Space.sm, paddingBottom: Space.lg },
+  // Rótulo do dia a `Space.md` do primeiro card, e os cards a `md` entre si — a régua de §2.
+  corpo: { flex: 1, minWidth: 0, gap: Space.md, paddingBottom: Space.lg },
   ultimo: { paddingBottom: 0 },
 });

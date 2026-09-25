@@ -368,24 +368,27 @@ export default function ProfileScreen() {
             (`useAiMonthStats`). Sem dizer isso, "0 lançamentos" num perfil com dezenas de
             lançamentos lia como defeito (24/09/2026). "no WhatsApp" tem a largura de
             "lançamentos": a conta da quebra abaixo continua valendo. */}
-        <ThemedText type="caption" themeColor="onHeroMuted">
-          Neste mês
-        </ThemedText>
-        <View style={[styles.idStats, { flexWrap: 'wrap' }]}>
-          <Stat
-            valor={ia.data ? String(ia.data.lancamentos) : '—'}
-            rotulo={'lançamentos\nno WhatsApp'}
-          />
-          <Stat valor={ia.data ? String(ia.data.notas) : '—'} rotulo={'notas\nno WhatsApp'} />
-          <Stat
-            valor={plan.data ? String(plan.data.ai_messages_month) : '—'}
-            rotulo={
-              plan.data
-                ? `${plan.data.ai_messages_whatsapp} WhatsApp\n${plan.data.ai_messages_app} no app`
-                : 'mensagens de IA no mês'
-            }
-            limite={plan.data ? plan.data.max_ai_messages_month : null}
-          />
+        {/* O rótulo fica a `Space.md` dos números que ele nomeia (§2), não a `lg` do card. */}
+        <View style={styles.idMes}>
+          <ThemedText type="caption" themeColor="onHeroMuted">
+            Neste mês
+          </ThemedText>
+          <View style={[styles.idStats, { flexWrap: 'wrap' }]}>
+            <Stat
+              valor={ia.data ? String(ia.data.lancamentos) : '—'}
+              rotulo={'lançamentos\nno WhatsApp'}
+            />
+            <Stat valor={ia.data ? String(ia.data.notas) : '—'} rotulo={'notas\nno WhatsApp'} />
+            <Stat
+              valor={plan.data ? String(plan.data.ai_messages_month) : '—'}
+              rotulo={
+                plan.data
+                  ? `${plan.data.ai_messages_whatsapp} WhatsApp\n${plan.data.ai_messages_app} no app`
+                  : 'mensagens de IA no mês'
+              }
+              limite={plan.data ? plan.data.max_ai_messages_month : null}
+            />
+          </View>
         </View>
       </View>
 
@@ -742,6 +745,7 @@ const styles = StyleSheet.create({
     paddingVertical: Space.xs,
     borderRadius: Radius.pill,
   },
+  idMes: { gap: Space.md },
   idStats: { flexDirection: 'row', gap: Space.sm },
   stat: {
     flexGrow: 1,

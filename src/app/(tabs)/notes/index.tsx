@@ -521,7 +521,7 @@ export default function NotesScreen() {
         </View>
 
         {pastas.length > 0 ? (
-          <View onLayout={(e) => setTopoPastas(e.nativeEvent.layout.y)}>
+          <View style={styles.secao} onLayout={(e) => setTopoPastas(e.nativeEvent.layout.y)}>
             {/* ⚠️ **Sem "Segure para mover" aqui.** A dica morava no slot de AÇÃO do cabeçalho,
                 onde ela era permanente, mais longa que o próprio rótulo e competia com ele —
                 parte de "tela feia" em 14/09/2026. §7b já diz que explicação vai abaixo do que
@@ -543,7 +543,7 @@ export default function NotesScreen() {
               accessibilityRole="button"
               accessibilityState={{ expanded: !pastasRecolhidas }}
               accessibilityLabel={`Pastas, ${pastas.length}`}
-              style={styles.alvoRecolher}
+              hitSlop={ALCANCE_DO_ROTULO}
               onPress={() => {
                 Haptics.selectionAsync();
                 setPastasRecolhidas(!pastasRecolhidas);
@@ -585,7 +585,7 @@ export default function NotesScreen() {
         {notes.length > 1 ? <Dica id="notas-ordem" tela="notas" bico="baixo" /> : null}
 
         {fixadas.length > 0 ? (
-          <View onLayout={(e) => setTopoFixadas(e.nativeEvent.layout.y)}>
+          <View style={styles.secao} onLayout={(e) => setTopoFixadas(e.nativeEvent.layout.y)}>
             {/* Mesmo motivo do rótulo de baixo: sozinho ele nomearia a lista inteira, e o
                 alfinete de cada cartão já diz o que a seção diria. */}
             {soltas.length > 0 ? <BlockHeader title="Fixadas" count={fixadas.length} /> : null}
@@ -608,13 +608,11 @@ export default function NotesScreen() {
           </View>
         ) : null}
 
-        <View onLayout={(e) => setTopoSoltas(e.nativeEvent.layout.y)}>
+        <View style={styles.secao} onLayout={(e) => setTopoSoltas(e.nativeEvent.layout.y)}>
           {/* No tablet, o rótulo identifica a lista abaixo da grade de pastas; no celular,
               aparece apenas quando há duas seções de notas para separar. */}
           {(fixadas.length > 0 && soltas.length > 0) || (tablet && soltas.length > 0) ? (
-            <View style={styles.cabecalhoNotas}>
-              <BlockHeader title={procurando ? 'Resultados' : 'Notas'} count={soltas.length} />
-            </View>
+            <BlockHeader title={procurando ? 'Resultados' : 'Notas'} count={soltas.length} />
           ) : null}
 
           {soltas.length > 0 ? (
@@ -733,14 +731,19 @@ export default function NotesScreen() {
   );
 }
 
+/** O rótulo "Pastas" é um botão: o toque alcança 44pt (§11) sem a caixa empurrar o layout. */
+const ALCANCE_DO_ROTULO = { top: 10, bottom: 10 };
+
 const styles = StyleSheet.create({
   tabletShell: { paddingHorizontal: Space.lg },
   libraryScroll: { flex: 1 },
   conteudoTablet: { maxWidth: 960, paddingHorizontal: 0, alignSelf: 'center' },
-  /** O rótulo é um botão: alvo de 44pt (§11), não a altura natural de uma linha de `caption`. */
-  alvoRecolher: { minHeight: HitTarget, justifyContent: 'center' },
-  /** Mesmo respiro vertical do cabeçalho de Pastas, sem tornar Notas um botão. */
-  cabecalhoNotas: { minHeight: HitTarget, justifyContent: 'center' },
+  /**
+   * Pastas, Fixadas e Notas: rótulo a `Space.md` do que ele nomeia, como em todo o app (§2).
+   * "Fixadas" morava num `View` sem `gap` e encostava no primeiro card; "Notas" e "Pastas" tiravam
+   * o respiro de uma caixa de 44pt centrada — ~10 e não 12, e 34 do bloco de cima (25/09/2026).
+   */
+  secao: { gap: Space.md },
   conteudo: {
     gap: Space.xl,
     paddingHorizontal: Space.lg,

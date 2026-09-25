@@ -1015,7 +1015,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Space.md,
-    paddingVertical: Space.sm,
+    // O dia fica a `Space.md` dos lançamentos dele e mais longe do grupo de cima — com `sm` nos
+    // dois lados ele ficava no meio, sem dizer a qual grupo pertence (§2, 25/09/2026).
+    paddingTop: Space.lg,
+    paddingBottom: Space.md,
   },
   dayTitle: {
     letterSpacing: 0.2,
