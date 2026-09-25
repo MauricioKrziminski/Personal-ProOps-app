@@ -431,3 +431,31 @@ async def test_nome_que_nao_existe_pergunta_listando_os_que_existem(monkeypatch)
     texto = erro.value.mensagem_usuario
     assert "*moto*" in texto and "Carro" in texto and "Empréstimo Nubank" in texto
     assert "Nada foi alterado" in texto
+
+
+@pytest.mark.asyncio
+async def test_conta_citada_casa_sem_maiuscula_e_o_nao_achei_lista_as_contas(monkeypatch):
+    """ "Qual conta foi usada?" → "nubank", com a conta "Nubank" (25/09/2026, no app)."""
+    consultas = []
+
+    async def fetch(sql, *args):
+        consultas.append(sql)
+        if "public.debts" in sql:
+            return [{"id": "debt", "row_version": "3", "name": "Carro", "account_id": None,
+                     "principal_cents": 7056000, "remaining_cents": 5880000, "archived": False,
+                     "installments": 48, "installments_paid": 8, "installment_cents": 147000,
+                     "interest_rate_monthly": 0, "calculation_mode": "fixed_installments"}]
+        if "from public.accounts" in sql and "order by" in sql:
+            return [{"label": "Nubank"}, {"label": "Poupança"}]
+        return []
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    ctx = ExecContext("user", "workspace", None, "America/Sao_Paulo", "itau", "app:1")
+    with pytest.raises(Level1Error) as erro:
+        await resources.prepare(ctx, action("resource_pay", amount_cents=147000, account_id="itau"))
+    busca = next(s for s in consultas if "from public.accounts" in s and "id::text" in s)
+    assert "extensions.unaccent(lower(name)) = extensions.unaccent(lower(%s))" in busca
+    texto = erro.value.mensagem_usuario
+    assert "*itau*" in texto and "Nubank" in texto and "Poupança" in texto
+    lista = next(s for s in consultas if "from public.accounts" in s and "order by" in s)
+    assert "type <> 'credit_card'" in lista, "pagar dívida com cartão seria recusado: ele nem aparece"

@@ -1067,7 +1067,10 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             rows = await db.fetch(
                 "select id, name"
                 + (", type" if linked_table == "accounts" else "")
-                + f" from public.{linked_table} where workspace_id = %s and (id::text = %s or name = %s)"
+                # Sem maiúscula e sem acento, como o nome do cadastro (25/09/2026): "nubank"
+                # respondendo "Qual conta?" não achava a conta "Nubank".
+                + f" from public.{linked_table} where workspace_id = %s and (id::text = %s"
+                " or extensions.unaccent(lower(name)) = extensions.unaccent(lower(%s)))"
                 + (" and not archived" if linked_table == "accounts" else ""),
                 ctx.workspace_id,
                 values[key],
@@ -1085,8 +1088,20 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                 display[key] = f"{prepared['pasta_nova']} (nova)"
                 continue
             if len(rows) != 1:
+                # Citou e não existe (ou empatou): a pergunta mostra o que existe.
+                # Onde cartão é recusado logo abaixo (conta pagadora), ele não entra na lista.
+                sem_cartao = linked_table == "accounts" and (
+                    key == "payment_account_id" or action.resource == "debts")
+                nomes = [r["name"] for r in rows] or [r["label"] for r in await db.fetch(
+                    f"select name as label from public.{linked_table} where workspace_id = %s"
+                    + (" and not archived" if linked_table == "accounts" else "")
+                    + (" and type <> 'credit_card'" if sem_cartao else "")
+                    + " order by name limit 8",
+                    ctx.workspace_id,
+                )]
                 _error(
-                    f"Não encontrei {LABELS[key]} nesse espaço. Informe o nome exato."
+                    f"Não encontrei {LABELS[key]} com o nome *{values[key]}*. "
+                    + (f"Tenho: {', '.join(nomes)}. Qual é?" if nomes else "Informe o nome exato.")
                 )
             row = rows[0]
             if (key == "payment_account_id" or action.resource == "debts") and row.get(
