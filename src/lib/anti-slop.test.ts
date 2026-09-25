@@ -1356,6 +1356,12 @@ test('Pagamento de dívida não troca de tipo, não vira "vou pagar depois" nem 
   assert.match(fonte, /\{!tipoTravado && \(/);
   assert.match(fonte, /const podeAdiar = [^;]*!editing\?\.debt_id/);
   assert.match(fonte, /filter\(\(a\) => !editing\?\.debt_id \|\| a\.type !== 'credit_card'\)/, 'nem sai de cartão');
+  // Nem vira série: a parcela já é projetada pelo cronograma da dívida, e uma recorrente ao lado
+  // dela contaria o mesmo dinheiro duas vezes na projeção (25/09/2026).
+  assert.match(fonte, /editing\.recurring_id \|\| editing\.installment_plan_id \|\| editing\.debt_id/, 'nem vira série');
+  // "Este e as próximas parcelas": o CONTRATO muda antes e o pagamento é gravado no sucesso dele —
+  // a ordem da folha de pagar, que faz o trigger gravar a parcela inteira no valor novo (25/09/2026).
+  assert.match(fonte, /salvarDivida\.mutate\([\s\S]{0,600}?onSuccess: \(\) =>\s*gravar\(/, 'contrato antes do pagamento');
 });
 
 test('Formulário de lançamento só diz "Cadastrar uma conta" com as contas carregadas e vazias', () => {

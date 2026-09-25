@@ -21,6 +21,7 @@ import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
+  DEBT_KINDS,
   SUGGESTED_CATEGORIES,
   useAccounts,
   useDeleteTransaction,
@@ -34,6 +35,7 @@ import {
 } from '@/hooks/use-finance';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
+import { detalheDoPagamento } from '@/lib/confirmar-baixa';
 import { confirmDestructive } from '@/lib/item-actions';
 import { dueLabel, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
@@ -258,6 +260,9 @@ export default function TransactionDetailScreen() {
   const signedAmount = tx.kind === 'expense' ? -tx.amount_cents : tx.amount_cents;
   const hoje = localISODate();
   const estado = estadoDaLinha(tx, hoje);
+  // Pagamento de dívida: o que o valor pago carrega, embaixo do total (parcela + encargo/desconto,
+  // ou amortização + juros). Lido da linha, então muda junto quando o valor é corrigido.
+  const detalheDaDivida = detalheDoPagamento(tx, tx.debts?.calculation_mode, brl);
 
   const mainContent = (
     <>
@@ -273,6 +278,11 @@ export default function TransactionDetailScreen() {
             tone={tx.kind === 'income' ? 'success' : tx.kind === 'transfer' ? 'textSecondary' : 'text'}
             signed={tx.kind !== 'transfer'}
           />
+          {detalheDaDivida ? (
+            <ThemedText type="small" style={tabular}>
+              {detalheDaDivida}
+            </ThemedText>
+          ) : null}
           <ThemedText type="small" themeColor="textSecondary" style={tabular}>
             {[longDate(tx.occurred_at), tx.category, accountLabel].filter(Boolean).join(' · ')}
           </ThemedText>
@@ -335,8 +345,23 @@ export default function TransactionDetailScreen() {
         ) : null}
       </Section>
 
-      {(tx.invoice_id || tx.installment_plan_id || tx.recurring_id) && (
+      {(tx.invoice_id || tx.installment_plan_id || tx.recurring_id || tx.debt_id) && (
         <Section title="Faz parte de">
+          {tx.debt_id ? (
+            <Row
+              title={
+                tx.debt_payment_no && tx.debts?.installments
+                  ? `Parcela ${tx.debt_payment_no} de ${tx.debts.installments}`
+                  : tx.debt_payment_no
+                    ? `Parcela ${tx.debt_payment_no}`
+                    : 'Pagamento de dívida'
+              }
+              subtitle={tx.debts?.name ?? 'Ver dívida'}
+              icon={DEBT_KINDS.find((k) => k.value === tx.debts?.kind)?.icon ?? 'doc.text'}
+              accessibilityLabel="Ver a dívida que este pagamento abateu"
+              onPress={() => router.push({ pathname: '/finance/debts', params: { id: tx.debt_id! } })}
+            />
+          ) : null}
           {tx.invoice_id ? (
             <Row
               title={
@@ -464,7 +489,11 @@ export default function TransactionDetailScreen() {
                 onPress: () => patch({ category: option }),
               })),
             },
-            { label: 'Duplicar', icon: 'plus.square.on.square', onPress: duplicate },
+            // Pagamento de dívida não duplica: a cópia seria um gasto solto, sem baixar a dívida.
+            // A próxima parcela se paga no "Paguei" de Dívidas.
+            ...(tx.debt_id
+              ? []
+              : [{ label: 'Duplicar', icon: 'plus.square.on.square' as const, onPress: duplicate }]),
             ...(tx.installment_plan_id
               ? [
                   {

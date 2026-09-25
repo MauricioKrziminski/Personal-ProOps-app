@@ -77,3 +77,27 @@ export function correcaoDoPagamento(
   }
   return { erro: null, perguntaAsProximas: false };
 }
+
+/**
+ * A linha embaixo do total, no detalhe de um pagamento de dívida (25/09/2026): o que o valor pago
+ * carrega. Sai da LINHA, nunca do contrato — `debt_principal_cents` é a parcela que este
+ * pagamento quitou (o contrato pode ter mudado depois, com "Usar este valor nas próximas"), e o
+ * resto é encargo/desconto (parcela fixa) ou juros (com juros). Corrigir o valor depois muda a
+ * frase junto: o trigger mantém a parcela e recalcula a diferença.
+ */
+export function detalheDoPagamento(
+  pagamento: { amount_cents: number; debt_principal_cents: number | null },
+  modo: 'amortized' | 'fixed_installments' | null | undefined,
+  fmt: (cents: number) => string,
+): string | null {
+  const parcela = pagamento.debt_principal_cents;
+  if (parcela == null || !modo) return null;
+  const diferenca = pagamento.amount_cents - parcela;
+  if (diferenca === 0) return null;
+  if (modo === 'amortized') {
+    return diferenca > 0 ? `Amortização de ${fmt(parcela)} + ${fmt(diferenca)} de juros` : null;
+  }
+  return diferenca > 0
+    ? `Parcela de ${fmt(parcela)} + ${fmt(diferenca)} de encargo`
+    : `Parcela de ${fmt(parcela)} − ${fmt(-diferenca)} de desconto`;
+}

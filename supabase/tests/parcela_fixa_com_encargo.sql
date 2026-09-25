@@ -14,7 +14,9 @@
 -- antigo continua recusado. 5: dívida COM JUROS continua abatendo o valor pago, e corrigir um
 -- pagamento antigo dela continua recusado (o desvio do modo fixo não vaza). 6: o valor de UMA
 -- parcela tem limite — da metade até menos do dobro —, senão R$ 0,01 quitaria uma parcela e três
--- parcelas pagas juntas contariam como uma.
+-- parcelas pagas juntas contariam como uma. 7: "Este e as próximas parcelas" — o contrato passa
+-- ao valor novo ANTES e o pagamento MAIS RECENTE, corrigido para esse valor, vira a parcela inteira
+-- nele (sem encargo), como na folha de pagar; num pagamento antigo o encargo continua.
 
 \set ON_ERROR_STOP on
 begin;
@@ -22,7 +24,7 @@ set local timezone to 'America/Sao_Paulo';
 
 do $$
 declare
-  ws uuid; u uuid; conta uuid; d uuid; dj uuid; p1 uuid; p2 uuid;
+  ws uuid; u uuid; conta uuid; d uuid; dj uuid; d7 uuid; p1 uuid; p2 uuid; q1 uuid; q2 uuid;
   l record;
 begin
   select w.id, m.user_id into ws, u
@@ -135,6 +137,43 @@ begin
   exception when others then
     if sqlerrm like '6:%' then raise; end if;
   end;
+
+  -- 7. parcela de 100, duas pagas a 100; a pessoa corrige a ÚLTIMA para 110 com "Este e as
+  -- próximas": o app muda o contrato primeiro (110 × 4 restantes) e depois o pagamento
+  insert into public.debts (workspace_id, user_id, name, kind, calculation_mode, principal_cents,
+    remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, due_day)
+  values (ws, u, 'teste parcela nova', 'financing', 'fixed_installments', 60000, 60000, 0, 6, 0, 10000, 10)
+  returning id into d7;
+  perform public.pay_debt_installment(d7, 10000, conta, current_date);
+  select id into q1 from public.transactions where debt_id = d7 and debt_payment_no = 1;
+  perform public.pay_debt_installment(d7, 10000, conta, current_date);
+  select id into q2 from public.transactions where debt_id = d7 and debt_payment_no = 2;
+  update public.debts set principal_cents = 66000, remaining_cents = 44000, installment_cents = 11000,
+    installments_paid = 2 where id = d7;
+  update public.transactions set amount_cents = 11000 where id = q2;
+  select debt_principal_cents, debt_interest_cents, debt_balance_after_cents into l
+  from public.transactions where id = q2;
+  if l.debt_principal_cents <> 11000 or l.debt_interest_cents <> 0 or l.debt_balance_after_cents <> 44000 then
+    raise exception '7: a última deveria virar parcela de 11000 sem encargo, veio principal % encargo % saldo %',
+      l.debt_principal_cents, l.debt_interest_cents, l.debt_balance_after_cents;
+  end if;
+  select installments_paid, remaining_cents into l from public.debts where id = d7;
+  if l.installments_paid <> 2 or l.remaining_cents <> 44000 then
+    raise exception '7: a dívida não muda — pagas % saldo %', l.installments_paid, l.remaining_cents;
+  end if;
+  -- o pagamento ANTIGO corrigido para o valor novo continua uma parcela de 100 com encargo
+  update public.transactions set amount_cents = 11000 where id = q1;
+  select debt_principal_cents, debt_interest_cents into l from public.transactions where id = q1;
+  if l.debt_principal_cents <> 10000 or l.debt_interest_cents <> 1000 then
+    raise exception '7: o antigo deveria seguir parcela 10000 + encargo 1000, veio % %',
+      l.debt_principal_cents, l.debt_interest_cents;
+  end if;
+  -- e apagar a última depois disso devolve UMA parcela nova (sem o ramo, "Corrija primeiro…")
+  delete from public.transactions where id = q2;
+  select installments_paid, remaining_cents into l from public.debts where id = d7;
+  if l.installments_paid <> 1 or l.remaining_cents <> 55000 then
+    raise exception '7: apagar a última devolve UMA parcela nova — pagas % saldo %', l.installments_paid, l.remaining_cents;
+  end if;
 end $$;
 
 rollback;

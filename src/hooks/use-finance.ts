@@ -79,6 +79,11 @@ export type Transaction = Pick<
    * Só leitura — nenhuma escrita espalha a linha lida, então o campo embutido não vira coluna.
    */
   installment_plans?: { first_occurred_at: string } | null;
+  /**
+   * A dívida de um pagamento, embutida só no DETALHE (`useTransaction`): o modo diz se a diferença
+   * entre o valor pago e a parcela é encargo/desconto ou juros (`detalheDoPagamento`). Só leitura.
+   */
+  debts?: Pick<Debt, 'name' | 'kind' | 'calculation_mode' | 'installments'> | null;
 };
 
 /**
@@ -492,7 +497,7 @@ export function useTransaction(id: string | undefined) {
       // no lugar do "esse lançamento não existe mais".
       const { data, error } = await supabase
         .from('transactions')
-        .select(TRANSACTION_COLUMNS)
+        .select(`${TRANSACTION_COLUMNS}, debts(name, kind, calculation_mode, installments)`)
         .eq('id', id!)
         .maybeSingle();
       if (error) throw error;

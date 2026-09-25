@@ -618,7 +618,7 @@ function TransactionForm({
     const patch = patchDaSerie(values);
     const naSerie = Boolean(editing?.installment_plan_id || editing?.recurring_id);
 
-    const gravar = (escopo: 'one' | 'future', depois?: () => void) =>
+    const gravar = (escopo: 'one' | 'future', depois?: () => void, seFalhar?: string) =>
       save.mutate(
       {
         id: editing?.id,
@@ -667,20 +667,23 @@ function TransactionForm({
           router.back();
         },
         // Erro NUNCA fecha o modal: o que foi digitado continua na tela.
-        onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para salvar. Tenta de novo.'), tone: 'error' }),
+        onError: (error) => toast({ message: financeErrorMessage(error, seFalhar ?? 'Não deu para salvar. Tenta de novo.'), tone: 'error' }),
       },
     );
 
     if (correcaoDaDivida.erro) return;
     /**
      * Parcela fixa com valor novo: "Só este pagamento" conta uma parcela e a diferença vira
-     * encargo/desconto; "Este e as próximas" também passa o contrato ao valor novo, pela mesma
-     * porta do "Editar dívida" (com a trava de versão). O pagamento é gravado primeiro — é o que
-     * a pessoa abriu para corrigir.
+     * encargo/desconto; "Este e as próximas" passa o contrato ao valor novo, pela mesma porta do
+     * "Editar dívida" (com a trava de versão), e SÓ ENTÃO grava o pagamento — a ordem da folha de
+     * pagar. Com o contrato já no valor novo, o trigger (`20260925140000`) grava o pagamento mais
+     * recente como a parcela inteira nele, sem encargo (25/09/2026: o detalhe dizia "Parcela de
+     * R$ 105 + R$ 5 de encargo" para quem tinha dito que a parcela passou a R$ 110).
      */
     if (correcaoDaDivida.perguntaAsProximas && divida?.installments) {
       const valor = values.amount_cents;
-      const mudarContrato = () =>
+      const oMaisRecente = editing?.debt_payment_no === divida.installments_paid;
+      const contratoEPagamento = () =>
         salvarDivida.mutate(
           {
             id: divida.id,
@@ -692,26 +695,31 @@ function TransactionForm({
             versao: divida.updated_at ?? null,
           },
           {
-            onSuccess: () => {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              router.back();
-              toast({ message: `As próximas parcelas de ${divida.name} passam a ${formatBRL(valor)}.`, tone: 'success' });
-            },
-            // O pagamento JÁ mudou: dizer só "não deu para salvar" seria mentira.
+            onSuccess: () =>
+              gravar(
+                'one',
+                () => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  router.back();
+                  toast({ message: `As parcelas de ${divida.name} passam a ${formatBRL(valor)}.`, tone: 'success' });
+                },
+                // O contrato JÁ mudou: dizer só "não deu para salvar" seria mentira.
+                'Mudei as próximas parcelas, mas não consegui salvar este pagamento. Tenta de novo.',
+              ),
             onError: () =>
-              toast({
-                message: 'Salvei este pagamento, mas não consegui mudar as próximas parcelas. Tenta de novo em Editar dívida.',
-                tone: 'error',
-              }),
+              toast({ message: 'Não consegui mudar as parcelas. Nada foi salvo — tenta de novo.', tone: 'error' }),
           },
         );
+      const diferenca = valor > (editing?.debt_principal_cents ?? valor) ? 'encargo' : 'desconto';
       showItemActions(
         'Aplicar em quais?',
         [
           { label: 'Só este pagamento', onPress: () => gravar('one') },
-          { label: 'Este e as próximas parcelas', onPress: () => gravar('one', mudarContrato) },
+          { label: 'Este e as próximas parcelas', onPress: contratoEPagamento },
         ],
-        `Só este: a diferença fica como ${valor > (editing?.debt_principal_cents ?? valor) ? 'encargo' : 'desconto'} deste pagamento.`,
+        oMaisRecente
+          ? `Só este: a diferença fica como ${diferenca} deste pagamento. Este e as próximas: a parcela passa a ${formatBRL(valor)}.`
+          : `Só este: a diferença fica como ${diferenca} deste pagamento. Este e as próximas: ele fica com o ${diferenca}, e as próximas passam a ${formatBRL(valor)}.`,
       );
       return;
     }
@@ -1197,9 +1205,10 @@ function TransactionForm({
           série. Era só na criação, e por isso não havia caminho para transformar um gasto que já
           existe em recorrente — foi a queixa *"queria colocar o Cabelo Marcelao como recorrente
           mas quando vou em editar o lançamento, eu não consigo"*. Quem já tem série não vê o
-          botão: ali o caminho é editar a série, não criar uma segunda.
+          botão: ali o caminho é editar a série, não criar uma segunda. Nem o PAGAMENTO DE DÍVIDA:
+          a parcela já vem do cronograma da dívida, e uma recorrente ao lado contaria duas vezes.
         */}
-        {!editing || !(editing.recurring_id || editing.installment_plan_id) ? (
+        {!editing || !(editing.recurring_id || editing.installment_plan_id || editing.debt_id) ? (
           <View style={styles.errorActions}>
             <Button label="Repetir lançamento" variant="secondary" size="sm" onPress={() => {
               const values = getValues();

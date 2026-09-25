@@ -2126,3 +2126,30 @@ test('a prestação da agenda abre A dívida dela, na Hoje e na Projeção — n
   projecao.interact(() => linha.props.onPress());
   assert.deepEqual(copia(projecao.navigations.at(-1)), { pathname: '/finance/debts', params: { id: 'd1' } });
 });
+
+test('Lançamento de parcela de dívida: embaixo do total, a parcela + o encargo; e o vínculo com a dívida', () => {
+  // "quando eu clicar no lançamento, em baixo do valor total tem que mostrar o valor da parcela
+  // mais desconto ou mais encargo" (25/09/2026). A frase sai da LINHA: corrigido o valor, muda.
+  const pagamento = (amount: number) => ({
+    id: 'pg-1', kind: 'expense', amount_cents: amount, occurred_at: '2026-09-15', description: 'Parcela Carro',
+    category: 'dívidas', account_id: null, status: 'cleared', source: 'app', created_at: '2026-09-15T12:00:00Z',
+    recurring_id: null, installment_plan_id: null, invoice_id: null,
+    debt_id: 'd1', debt_payment_no: 3, debt_principal_cents: 10500, debt_balance_after_cents: 0,
+    debts: { name: 'Carro', kind: 'financing', calculation_mode: 'fixed_installments', installments: 12 },
+  });
+  const textos = (amount: number) => {
+    const ui = screen('src/app/finance/[txId].tsx', { txs: [pagamento(amount)], params: { txId: 'pg-1' } });
+    return { ui, t: JSON.stringify(ui.nodes().filter((n: any) => n.type === 'ThemedText').map((n: any) => n.props.children)) };
+  };
+  assert.match(textos(11000).t.replace(/\s/g, ' '), /Parcela de R\$ 105[.,]00 \+ R\$ 5[.,]00 de encargo/);
+  assert.match(textos(10000).t.replace(/\s/g, ' '), /Parcela de R\$ 105[.,]00 − R\$ 5[.,]00 de desconto/);
+  assert.doesNotMatch(textos(10500).t, /encargo|desconto/, 'pago igual à parcela: nada a detalhar');
+  const { ui } = textos(11000);
+  const divida = ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'Parcela 3 de 12');
+  assert.ok(divida, 'Faz parte de: a dívida');
+  assert.equal(divida.props.subtitle, 'Carro');
+  // "Duplicar" criaria um gasto "Parcela Carro" solto, sem baixar a dívida: pagar é em Dívidas.
+  const menu = ui.nodes().find((n: any) => n.type === 'HeaderActions')?.props.menu;
+  assert.ok(menu, 'o "…" existe');
+  assert.ok(!menu.actions.some((a: any) => a.label === 'Duplicar'), 'sem Duplicar no pagamento de dívida');
+});

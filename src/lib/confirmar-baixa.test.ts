@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { correcaoDoPagamento, pagamentoDaParcelaFixa, planoDaBaixa } from './confirmar-baixa.ts';
+import { correcaoDoPagamento, detalheDoPagamento, pagamentoDaParcelaFixa, planoDaBaixa } from './confirmar-baixa.ts';
 
 /**
  * "Paguei" confirma o valor (25/09/2026, pedido do dono do produto: *"às vezes eu posso ter pago
@@ -87,4 +87,39 @@ test('dívida com juros: só o pagamento mais recente muda de valor', () => {
 
 test('pagamento sem o histórico da dívida não muda de valor por aqui', () => {
   assert.match(correcaoDoPagamento(fixa, { ...pago, debt_principal_cents: null }, 150000).erro ?? '', /histórico/);
+});
+
+/**
+ * O detalhe do lançamento diz o que o valor pago carrega (25/09/2026, pedido do dono do produto:
+ * *"em baixo do valor total tem que mostrar o valor da parcela mais desconto ou mais encargo"*).
+ * Sai do que o banco gravou na linha: a parcela é `debt_principal_cents` e a diferença é o resto
+ * do valor — corrigir o valor depois muda a frase junto, porque o trigger mantém a parcela.
+ */
+const fmt = (c: number) => `R$ ${(c / 100).toFixed(2).replace('.', ',')}`;
+
+test('parcela fixa paga a mais: parcela + encargo', () => {
+  assert.equal(
+    detalheDoPagamento({ amount_cents: 11000, debt_principal_cents: 10500 }, 'fixed_installments', fmt),
+    'Parcela de R$ 105,00 + R$ 5,00 de encargo',
+  );
+});
+
+test('parcela fixa paga a menos: parcela − desconto', () => {
+  assert.equal(
+    detalheDoPagamento({ amount_cents: 10000, debt_principal_cents: 10500 }, 'fixed_installments', fmt),
+    'Parcela de R$ 105,00 − R$ 5,00 de desconto',
+  );
+});
+
+test('com juros: o que abate o saldo + os juros do mês', () => {
+  assert.equal(
+    detalheDoPagamento({ amount_cents: 100500, debt_principal_cents: 90000 }, 'amortized', fmt),
+    'Amortização de R$ 900,00 + R$ 105,00 de juros',
+  );
+});
+
+test('sem diferença, sem histórico ou fora de dívida: nada embaixo do total', () => {
+  assert.equal(detalheDoPagamento({ amount_cents: 10500, debt_principal_cents: 10500 }, 'fixed_installments', fmt), null);
+  assert.equal(detalheDoPagamento({ amount_cents: 10500, debt_principal_cents: null }, 'fixed_installments', fmt), null);
+  assert.equal(detalheDoPagamento({ amount_cents: 10500, debt_principal_cents: 10000 }, null, fmt), null);
 });

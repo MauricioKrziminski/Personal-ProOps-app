@@ -44,7 +44,11 @@
     Corrigir o valor de um pagamento de parcela fixa vale em QUALQUER pagamento (o saldo não
     depende do valor); com juros, só no mais recente. No app, "Usar este valor nas próximas"
     passa o contrato ao valor novo ANTES de pagar (a parcela sai inteira nele), e editar o valor
-    de um pagamento pergunta "Só este pagamento / Este e as próximas parcelas".
+    de um pagamento pergunta "Só este pagamento / Este e as próximas parcelas". A segunda segue a
+    MESMA ordem (`20260925140000`): contrato primeiro, pagamento depois — e o trigger grava o
+    pagamento MAIS RECENTE como a parcela inteira no valor novo, sem encargo. O detalhe do
+    lançamento mostra "Parcela de R$ X + R$ Y de encargo" (ou "− desconto"; com juros,
+    "Amortização + juros") lendo a LINHA (`detalheDoPagamento`), nunca o contrato.
   - **Excluir por completo é `public.delete_debt`**: trava a dívida, apaga os pagamentos
     (`transactions.debt_id`, com um desvio local à transação no `tg_transactions_debt_payment`) e a
     dívida. Idempotente. Apagar a dívida direto FALHA quando há pagamento: a FK `set null` dispara
