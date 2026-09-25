@@ -415,7 +415,12 @@ export default function BudgetsScreen() {
     `range` e `regua.cycle` entram como CONSULTA: o resumo espera as bordas, e o mês exibido sai
     do ciclo. Ver `tela-pronta.ts` para o skeleton eterno que um booleano aqui produziria.
   */
-  const pronta = useTelaPronta(status, rows, resumo, regua.cycle, range);
+  /*
+    ⚠️ **O resumo NÃO segura a tela** (25/09/2026): ele só alimenta "Sem limite definido", no fim,
+    e vem no fim de uma cadeia (ciclo → bordas → resumo). No portão, a tela inteira esperava as três
+    em série — medido no emulador, ~1,6 s a mais de esqueleto. Pendente, a seção não desenha nada.
+  */
+  const pronta = useTelaPronta(status, rows, regua.cycle, range);
 
   /** Sem período utilizável, "Sem limite definido" não tem como responder. */
   const periodoFalhou = (regua.cycle.isError && !regua.cycle.data) || range.isError;

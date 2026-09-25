@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -160,7 +160,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       refetch: async () => { refetches.push('balances'); },
     }),
     // A MESMA função serve as duas fatias da Hoje; o que as separa é a janela pedida.
-    useTransactionsSummary: (from: string, to: string) => ({
+    useTransactionsSummary: (from: string, to: string) => options.resumoPendente ? { ...query, isPending: true, isLoading: true, isSuccess: false, fetchStatus: 'fetching', data: undefined } : ({
       ...query,
       isSuccess: true,
       data: from === to ? (options.saiuHoje ?? []) : (options.saiuNoCiclo ?? []),
@@ -2244,4 +2244,15 @@ test('Financeiro: a série do mês falhando mostra o erro no herói e refaz a s�
   assert.ok(!ui.nodes().some((n: any) => n.type === 'Tile' && ['Entra', 'Sai'].includes(n.props.label)), 'sem Entra/Sai vazios');
   erro.props.onRetry();
   assert.ok(ui.refetches.includes('serie'), 'o "Tentar de novo" refaz a série');
+});
+
+test('Orçamentos: o resumo chegando não segura a tela — só "Sem limite definido" espera ele', () => {
+  // 25/09/2026: o resumo vem no fim de uma cadeia (ciclo → bordas → resumo) e só serve à seção do
+  // fim. No portão, a tela inteira ficava no esqueleto esperando as três em série.
+  const budgets = [{ category: 'mercado', limit_cents: 100000, spent_cents: 20000, committed_cents: 0, budget_id: 'b1', month: null }];
+  const ui = screen('src/app/finance/budgets.tsx', { budgets, resumoPendente: true });
+  assert.equal(telaPronta(...ui.gates.at(-1)!), true, 'o resumo buscando não segura o portão');
+  const textos = JSON.stringify(ui.nodes().filter((n: any) => n.type === 'ThemedText').map((n: any) => n.props.children));
+  assert.match(textos, /mercado/, 'a lista de limites já aparece');
+  assert.doesNotMatch(textos, /Sem limite definido/, 'a seção do resumo espera sem texto');
 });
