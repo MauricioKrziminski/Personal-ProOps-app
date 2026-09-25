@@ -1411,3 +1411,11 @@ test('o nome que ficava entre « » vai em <Forte>, não solto na frase', () => 
   }
   assert.deepEqual(soltos, []);
 });
+
+test('a cascata do Screen não embrulha o que não ocupa lugar na tela', () => {
+  // 25/09/2026: com `stagger`, `Stack.Screen`, `HeaderActions` e as folhas viravam caixas vazias
+  // que o `gap` espaçava — Orçamentos com 48dp de vão no topo, Projeção com 72dp.
+  const fonte = readFileSync(join(SRC, 'components/ui/screen.tsx'), 'utf8');
+  assert.match(fonte, /const SEM_CAIXA = new Set<unknown>\(\[Stack\.Screen, HeaderActions, HeaderMenu, Sheet\]\)/);
+  assert.match(fonte, /if \(!isValidElement\(filho\) \|\| SEM_CAIXA\.has\(filho\.type\)\) return filho;/);
+});

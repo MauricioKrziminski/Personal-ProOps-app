@@ -26,6 +26,8 @@ import { MaxContentWidth } from '@/constants/theme';
 import { bottomScrollInset, rootContentMaxWidth } from '@/design/adaptive-window';
 import { useAppHeaderHeight } from '@/components/ui/app-header';
 import { GlassReady } from '@/components/ui/glass-backdrop';
+import { HeaderActions, HeaderMenu } from '@/components/ui/header-actions';
+import { Sheet } from '@/components/ui/sheet';
 import { progressoDeEntrada, useRelogioDeEntrada } from '@/components/motion/entrada';
 import { TAB_BAR_SPACE } from '@/components/ui/pill-tab-bar';
 import { RolagemDaTela } from '@/components/ui/screen-scroll';
@@ -371,12 +373,20 @@ export function Screen({
  * bloco acumularia meio segundo até o último — e aí a cascata deixa de ser "a tela montando" e
  * vira "o rodapé está demorando".
  */
+/**
+ * ⚠️ **Nem o que não ocupa lugar na tela** (25/09/2026): `Stack.Screen`, `HeaderActions` e
+ * `HeaderMenu` só escrevem opções no header, e o `Sheet` é um `Modal` (fora do fluxo aberto, nada
+ * fechado). Embrulhados, viravam caixas vazias que o `gap` espaçava: 48dp de vão acima do primeiro
+ * bloco em Orçamentos, 72dp na Projeção, 24dp a mais antes do rodapé do Perfil.
+ */
+const SEM_CAIXA = new Set<unknown>([Stack.Screen, HeaderActions, HeaderMenu, Sheet]);
+
 function Cascata({ children }: { children: ReactNode }) {
   let i = 0;
   return (
     <>
       {Children.map(children, (filho) => {
-        if (!isValidElement(filho)) return filho;
+        if (!isValidElement(filho) || SEM_CAIXA.has(filho.type)) return filho;
         const indice = i++;
         return <BlocoDaCascata indice={indice}>{filho}</BlocoDaCascata>;
       })}
