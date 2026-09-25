@@ -22,6 +22,7 @@ import { Icon } from '@/components/ui/icon';
 import { TAB_BAR_SPACE } from '@/components/ui/pill-tab-bar';
 import { fecharDeslizavelAberto } from '@/components/ui/deslizavel';
 import { DragScrollView } from '@/components/ui/drag-scroll';
+import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -44,6 +45,7 @@ import {
   type Note,
   type NoteFolder,
   type NoteSort,
+  useArchivedCount,
 } from '@/hooks/use-notes';
 import { SORT_LABEL, useNoteSort } from '@/hooks/use-note-sort';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
@@ -163,6 +165,7 @@ export default function NotesScreen() {
     sort,
   });
   const foldersQuery = useNoteFolders();
+  const arquivadas = useArchivedCount();
   const tagsQuery = useNoteTags();
 
   const save = useSaveNote();
@@ -623,6 +626,21 @@ export default function NotesScreen() {
         </View>
 
         {list.isFetchingNextPage ? <NoteSkeleton /> : null}
+
+        {/*
+          A porta das arquivadas (24/09/2026): *"notas arquivadas vão para onde?"* — só existia o
+          item "Arquivadas" dentro do ⋯. No fim da lista, como "Arquivadas" em Dívidas; some sem
+          nada arquivado e durante a busca (ali a lista é resultado, não a aba).
+        */}
+        {!procurando && arquivadas.data ? (
+          <Section>
+            <Row
+              icon="archivebox"
+              title={`Arquivadas · ${arquivadas.data}`}
+              onPress={() => router.push('/notes/archived')}
+            />
+          </Section>
+        ) : null}
       </DragScrollView>
   );
 

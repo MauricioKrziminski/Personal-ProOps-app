@@ -131,7 +131,7 @@ const ROTA_DA_TELA = {
 // Sem `/finance/cycle`: o link do ciclo carrega a régua do `cycle_now` (finance.md), e quem leva
 // até ele com a régua certa é o painel da Hoje — o item "Tocar no painel".
 type Rota = (typeof ROTA_DA_TELA)[Tela] | '/agent/new' | '/import' | '/finance/forecast'
-  | '/finance/goals' | '/finance/budgets' | '/reminders';
+  | '/finance/goals' | '/finance/budgets' | '/reminders' | '/notes/archived';
 
 export type ItemDoGuia =
   | { titulo: string; texto: string; dica: DicaId }
@@ -175,6 +175,7 @@ export const GUIA: readonly { titulo: string; itens: readonly ItemDoGuia[] }[] =
       { titulo: 'Lembrete que repete', texto: '“me lembra todo dia 5”.', href: '/reminders' },
       { titulo: 'Pastas', texto: 'Segure e arraste para mudar de lugar.', dica: 'notas-pastas' },
       { titulo: 'A ordem das notas', texto: 'Segure o ≡ e arraste.', dica: 'notas-ordem' },
+      { titulo: 'Notas arquivadas', texto: 'No fim da aba Notas; de lá elas voltam.', href: '/notes/archived' },
     ],
   },
   {

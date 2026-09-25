@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[] } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -243,6 +243,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
         useNoteFolders: () => ({ ...query, isSuccess: true, data: options.folders ?? [] }),
         useNotesList: () => ({ ...query, isSuccess: true, data: { pages: [options.notes ?? []] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }),
         folderTree: (lista: any[]) => lista.map((f) => ({ ...f, depth: 0 })),
+        useArchivedCount: () => ({ ...query, isSuccess: true, data: options.arquivadas ?? 0 }),
       } as Record<string, any>, { get: (target, key) => key in target ? target[key as string] : () => mutation(String(key)) });
       if (name === '@/hooks/use-agent-chat') return {
         useAgentConversations: () => ({ ...query, isSuccess: true, hasNextPage: false, fetchNextPage() {}, data: { pages: [{ items: options.conversations ?? [] }] } }),
@@ -1872,4 +1873,14 @@ const nota = (id: string, pinned = false) => ({ id, content: `Nota ${id}`, pinne
 test('Notas: a dica do arrasto aparece com notas na tela, e some com a lista vazia', () => {
   assert.deepEqual(dicas(screen(notasFile, { notes: [nota('n1')] })), ['lista-arrasto']);
   assert.deepEqual(dicas(screen(notasFile, { notes: [] })), []);
+});
+
+test('Notas: o arquivado tem porta no fim da aba, com a contagem, e ela some sem nada arquivado', () => {
+  const ui = screen(notasFile, { notes: [nota('n1')], arquivadas: 2 });
+  const porta = ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'Arquivadas · 2');
+  assert.ok(porta, 'a linha "Arquivadas · 2" precisa aparecer');
+  porta.props.onPress();
+  assert.equal(ui.navigations.at(-1), '/notes/archived');
+  const sem = screen(notasFile, { notes: [nota('n1')] });
+  assert.ok(!sem.nodes().some((n: any) => n.type === 'Row' && String(n.props.title).startsWith('Arquivadas')));
 });

@@ -170,3 +170,11 @@ Carteira, nas Contas, na ordem das notas e nas pastas, e o passo "O que dá para
 onboarding (spec, seção 3). Conferido no Android: onboarding com as cinco etapas (o dev@ teve o
 "onboarding concluído" desmarcado por alguns minutos e remarcado ao concluir), Financeiro,
 Carteira, Contas e Notas.
+
+**Terceira rodada.** *"Notas arquivadas vão para onde?"* — só existia o item "Arquivadas" dentro do
+⋯. Agora a aba Notas termina com **"Arquivadas · N"** (notas e pastas, contagem sob `['notes']`,
+que o tempo real e toda escrita atualizam), e o guia ganhou o item. *"Por que no Android não
+consigo arrastar?"* — os dois sistemas usam o mesmo `Deslizavel`, sem nada só do iPhone: o s26
+tinha voltado de um snapshot antigo depois de cair (app velho na memória, logado no `dev@`).
+Recarregado, arrasta para os dois lados. Conferido no s26 com uma nota arquivada de teste
+(`9bd2c144-…`, apagada pelo ID em seguida).

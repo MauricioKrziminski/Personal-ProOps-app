@@ -468,6 +468,25 @@ export function usePurgeNote() {
   });
 }
 
+/**
+ * Quanto há em Arquivadas (notas e pastas) — a porta "Arquivadas · N" no fim da aba Notas. Só a
+ * contagem, sem trazer nada; mora sob `['notes']`, então toda escrita de nota a atualiza.
+ */
+export function useArchivedCount() {
+  return useQuery({
+    queryKey: ['notes', 'archived', 'count'],
+    queryFn: async (): Promise<number> => {
+      const [notas, pastas] = await Promise.all([
+        supabase.from('notes').select('id', { count: 'exact', head: true }).not('archived_at', 'is', null).is('deleted_at', null),
+        supabase.from('note_folders').select('id', { count: 'exact', head: true }).not('archived_at', 'is', null),
+      ]);
+      if (notas.error) throw notas.error;
+      if (pastas.error) throw pastas.error;
+      return (notas.count ?? 0) + (pastas.count ?? 0);
+    },
+  });
+}
+
 export function useNoteFolders() {
   useRealtimeInvalidate('note_folders', ['notes']);
 
