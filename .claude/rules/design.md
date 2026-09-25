@@ -628,10 +628,16 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
     fica por cima (`zIndex`). Nada encolhe, esmaece ou muda de escala — o ícone só é descoberto.
     Passando do painel aberto, os botões esticam por igual; até o fim, a ponta desliza sobre os
     outros em ~0,3 s, sem quique, com o conteúdo colado na borda do card.
-  - **Soltar até o fim numa ação que TIRA o item da lista** (a ponta da esquerda com `desfaz`:
-    Arquivar) faz o card seguir até sair da tela, com a ponta cobrindo a linha inteira, e a linha
-    some quando a ação chega; se ela falhar, o card volta em 3 s. Apagar (confirma), "Mais" e a
-    direita (ação rápida) voltam para o lugar.
+  - **Soltar até o fim: o card SEMPRE sai da tela e só então a ação roda** (24/09/2026, *"a opção
+    leva até o fim do card como se o card desaparecesse… com a transição abrindo o que tiver que
+    abrir"*). A ponta cobre a linha inteira, o card desliza para fora e, no fim da saída, abre o
+    menu ("Mais"), a confirmação (Apagar) ou faz a ação. O que TIRA o item da lista (a ponta da
+    esquerda com `desfaz`: Arquivar) fica fora até o item sumir — se a ação falhar, volta em 3 s;
+    o resto volta logo, por trás do que abriu.
+  - ⚠️ **O fundo da `linha` mora no invólucro que sai** (`Saida`), não no `childrenContainerStyle`
+    da biblioteca: aquele fica parado no painel aberto e cobria metade da ponta com a linha vazia.
+  - ⚠️ **Cada botão tem base OPACA** sob a cor: o `dangerSoft` é translúcido, e cobrindo o "Mais"
+    até o fim deixava ver o ícone e o rótulo dele através.
   ⚠️ Os botões do painel são `Gesture.Tap` **simultâneos ao observador do dedo**: o `Pressable`
   do gesture-handler perdia o toque para o `Gesture.Manual` no iPhone (24/09/2026).
   ⚠️ **O FAB sobe acima do toast** (`useSubirAcimaDoToast`): os dois moravam no mesmo lugar e o

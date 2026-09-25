@@ -178,3 +178,12 @@ consigo arrastar?"* — os dois sistemas usam o mesmo `Deslizavel`, sem nada só
 tinha voltado de um snapshot antigo depois de cair (app velho na memória, logado no `dev@`).
 Recarregado, arrasta para os dois lados. Conferido no s26 com uma nota arquivada de teste
 (`9bd2c144-…`, apagada pelo ID em seguida).
+
+**Quarta rodada.** *"quando eu arrasto tudo, a opção leva até o fim do card como se o card
+desaparecesse… com a transição abrindo o que tiver que abrir"* — até o fim, o card agora SEMPRE sai
+da tela com a ponta cobrindo a linha, e a ação (menu, confirmação, ação) roda quando a saída
+termina; o que não tira o item da lista volta por trás do que abriu. Achados no teste: o fundo da
+linha (Lançamentos) ficava parado no contêiner da biblioteca e cobria metade da ponta, e o
+`dangerSoft` translúcido deixava ver o "Mais" através do "Apagar". Conferido no iPhone e no s26
+com Apagar → Cancelar (nada apagado). Três dicas encurtadas por deixarem uma palavra sozinha na
+largura do iPhone, com teste.

@@ -26,7 +26,7 @@ export const DICAS = [
     id: 'fin-grafico',
     telas: ['financeiro'],
     icone: 'hand.draw',
-    texto: 'Arraste no gráfico para ver o saldo de cada dia.',
+    texto: 'Arraste no gráfico: o saldo de cada dia.',
   },
   {
     id: 'fin-painel',
@@ -44,7 +44,7 @@ export const DICAS = [
     id: 'carteira',
     telas: ['carteira'],
     icone: 'wallet.pass',
-    texto: 'Deslize para ver os cartões. Toque para escolher.',
+    texto: 'Deslize para folhear. Toque para escolher.',
   },
   {
     // UMA dica para as duas listas: quem aprendeu a arrastar numa, sabe na outra.
@@ -63,7 +63,7 @@ export const DICAS = [
     id: 'notas-pastas',
     telas: ['notas'],
     icone: 'folder',
-    texto: 'Segure uma pasta e arraste para mudar de lugar.',
+    texto: 'Segure uma pasta e arraste para movê-la.',
   },
   {
     id: 'fatura-cartao',

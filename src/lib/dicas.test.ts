@@ -79,3 +79,13 @@ test('o passo "O que dá para fazer" do onboarding: seis linhas curtas, e foto e
   // o Agente do app só recebe texto: prometer foto nele seria mentir
   assert.match(O_QUE_DA_PARA_FAZER[0].texto, /No WhatsApp, até foto e áudio/);
 });
+
+test('nenhuma dica deixa uma palavra sozinha na linha do iPhone', () => {
+  // A coluna de texto da dica no iPhone (402pt, fonte 14) leva ~43 caracteres. Entre 43 e 54 a
+  // frase transborda por uma ou duas palavras — foi assim que "dia.", "escolher." e "lugar."
+  // ficaram sozinhas (24/09/2026). Ou cabe numa linha, ou ocupa duas de verdade.
+  for (const d of DICAS) {
+    const n = d.texto.length;
+    assert.ok(n <= 42 || n >= 55, `${d.id}: ${n} caracteres ("${d.texto}")`);
+  }
+});
