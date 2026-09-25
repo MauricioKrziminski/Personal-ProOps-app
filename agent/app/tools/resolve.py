@@ -170,28 +170,28 @@ _FONTES: dict[str, dict] = {
     "notes": {
         "table": "notes",
         "sql": """select id, content from public.notes
-                  where workspace_id = %s and deleted_at is null and content ilike %s
+                  where workspace_id = %s and deleted_at is null and extensions.unaccent(content) ilike extensions.unaccent(%s)
                   order by updated_at desc limit %s""",
         "label": _primeira_linha,
     },
     "reminders": {
         "table": "reminders",
         "sql": """select id, title from public.reminders
-                  where workspace_id = %s and title ilike %s
+                  where workspace_id = %s and extensions.unaccent(title) ilike extensions.unaccent(%s)
                   order by created_at desc limit %s""",
         "label": lambda r: r["title"],
     },
     "goals": {
         "table": "goals",
         "sql": """select id, name from public.goals
-                  where workspace_id = %s and name ilike %s
+                  where workspace_id = %s and extensions.unaccent(name) ilike extensions.unaccent(%s)
                   order by created_at desc limit %s""",
         "label": lambda r: r["name"],
     },
     "assets": {
         "table": "assets",
         "sql": """select id, name from public.assets
-                  where workspace_id = %s and name ilike %s
+                  where workspace_id = %s and extensions.unaccent(name) ilike extensions.unaccent(%s)
                   order by created_at desc limit %s""",
         "label": lambda r: r["name"],
     },
@@ -209,7 +209,7 @@ _FONTES: dict[str, dict] = {
                   left join public.accounts a
                     on a.id = p.account_id and a.workspace_id = p.workspace_id
                   where p.workspace_id = %s
-                    and (coalesce(p.description,'') ilike %s or coalesce(p.merchant,'') ilike %s)
+                    and (extensions.unaccent(coalesce(p.description,'')) ilike extensions.unaccent(%s) or extensions.unaccent(coalesce(p.merchant,'')) ilike extensions.unaccent(%s))
                   order by p.created_at desc limit %s""",
         "dois_termos": True,
         "label": _rotulo_plano,
@@ -228,7 +228,7 @@ _FONTES: dict[str, dict] = {
                   from public.card_invoices ci
                   join public.accounts a
                     on a.id = ci.account_id and a.workspace_id = ci.workspace_id
-                  where ci.workspace_id = %s and ci.{FATURA_ABERTA} and a.name ilike %s
+                  where ci.workspace_id = %s and ci.{FATURA_ABERTA} and extensions.unaccent(a.name) ilike extensions.unaccent(%s)
                     and private.invoice_open_cents(ci.id) > 0
                   order by ci.due_date limit %s""",
         "label": _rotulo_fatura,
@@ -239,7 +239,7 @@ _FONTES: dict[str, dict] = {
         "sql": """select id, kind, amount_cents, category, description, occurred_at
                   from public.transactions
                   where workspace_id = %s and status = 'pending'
-                    and (coalesce(description,'') ilike %s or coalesce(category,'') ilike %s)
+                    and (extensions.unaccent(coalesce(description,'')) ilike extensions.unaccent(%s) or extensions.unaccent(coalesce(category,'')) ilike extensions.unaccent(%s))
                   order by coalesce(due_at, occurred_at) limit %s""",
         "label": _rotulo_tx,
         "detalhe": _detalhe_tx,
@@ -311,13 +311,14 @@ async def por_transacao(
     if action.amount_cents:
         linhas = [t for t in linhas if t["amount_cents"] == action.amount_cents]
         filtrou = True
+    # Sem acento dos dois lados (25/09/2026): no celular se digita "saude" e "gas".
     if action.category:
-        alvo = action.category.lower()
-        linhas = [t for t in linhas if (t["category"] or "").lower() == alvo]
+        alvo = matching.normalize(action.category)
+        linhas = [t for t in linhas if matching.normalize(t["category"]) == alvo]
         filtrou = True
     termo = clean_term(action.description)
     if termo:
-        t_low = termo.lower().strip()
+        t_low = matching.normalize(termo) or termo.lower().strip()
         # ⚠️ `merchant` entra aqui porque ele é NOME, igual à descrição — e porque a busca do
         # APP (`use-finance.ts`) já casa os três (`description`, `merchant`, `category`).
         # Sem ele o agente respondia "não achei nada com «nuuvem»" para uma compra cujo
@@ -326,9 +327,9 @@ async def por_transacao(
         # descartar o campo (`create_installment_plan_with_history` nunca recebia `p_merchant`).
         por_texto_ = [
             t for t in linhas
-            if t_low in (t["description"] or "").lower()
-            or t_low in ((t.get("merchant") or "")).lower()
-            or t_low in (t["category"] or "").lower()
+            if t_low in matching.normalize(t["description"])
+            or t_low in matching.normalize(t.get("merchant"))
+            or t_low in matching.normalize(t["category"])
         ]
         if por_texto_:
             linhas, filtrou = por_texto_, True

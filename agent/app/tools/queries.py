@@ -837,7 +837,7 @@ async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
         select kind, amount_cents, description, category, rrule, next_run_at, end_date, active
         from public.recurring_transactions
         where workspace_id = %s
-          and (%s = '' or description ilike %s or category ilike %s)
+          and (%s = '' or extensions.unaccent(description) ilike extensions.unaccent(%s) or extensions.unaccent(category) ilike extensions.unaccent(%s))
         order by active desc, next_run_at, kind
         limit 20
         """,
@@ -850,10 +850,8 @@ async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     # que existe foi o defeito que criou este tool; repetir isso por causa de uma palavra
     # diferente seria o mesmo erro com outra roupa.
     #
-    # ⚠️ **`ilike` não ignora acento**: "emprestimo" não casa "Empréstimo". É teto conhecido, e
-    # a queda para a lista inteira é justamente a rede — o pior caso vira o comportamento de
-    # antes do filtro, nunca um "não achei". Resolver de verdade pede a extensão `unaccent`,
-    # que é migration; só vale a pena se aparecer no uso real.
+    # Os dois lados passam por `unaccent` (25/09/2026): "emprestimo" casa "Empréstimo". Era teto
+    # conhecido até aparecer no uso real ("conta de gas" contra "conta de gás").
     se_esvaziou = ""
     if alvo and not linhas_sql:
         se_esvaziou = f"Não achei recorrência com “{alvo}”. Estas são todas:\n"
@@ -939,7 +937,7 @@ async def query_debts(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
                interest_rate_monthly, installments, installments_paid, due_day
         from public.debts
         where workspace_id = %s and archived = false
-          and (%s = '' or name ilike %s)
+          and (%s = '' or extensions.unaccent(name) ilike extensions.unaccent(%s))
         order by remaining_cents desc
         limit 20
     """

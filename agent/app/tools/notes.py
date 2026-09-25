@@ -247,7 +247,7 @@ async def query_reminders(ctx: ExecContext, action: NotesAction) -> ToolResult:
     ]
     args: list = [ctx.workspace_id]
     if termo:
-        sql.append("and title ilike %s")
+        sql.append("and extensions.unaccent(title) ilike extensions.unaccent(%s)")
         args.append(f"%{termo}%")
     if action.query_from:
         sql.append("and next_run_at >= %s")

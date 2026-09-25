@@ -636,7 +636,7 @@ async def _preparar_adiamento(ctx: ExecContext, action: ResourceAction, prepared
                ci.due_date < %s::date as vencida
         from public.card_invoices ci
         join public.accounts a on a.id = ci.account_id and a.workspace_id = ci.workspace_id
-        where ci.workspace_id = %s and a.name ilike %s
+        where ci.workspace_id = %s and extensions.unaccent(a.name) ilike extensions.unaccent(%s)
           and ci.status not in ('paid','rolled')
           and private.invoice_open_cents(ci.id) > 0
         order by ci.due_date
@@ -732,7 +732,7 @@ async def _notas_parecidas(ctx: ExecContext, termo: str, lixeira) -> list[dict]:
     """
     return await db.fetch(
         "select *, xmin::text as row_version from public.notes "
-        "where workspace_id = %s and content ilike %s"
+        "where workspace_id = %s and extensions.unaccent(content) ilike extensions.unaccent(%s)"
         + _where("notes", lixeira)
         + " order by updated_at desc limit 6",
         ctx.workspace_id,

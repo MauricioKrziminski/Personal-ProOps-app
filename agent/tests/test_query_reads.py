@@ -315,7 +315,7 @@ class TestBuscaPorNome:
         sql, args = chamadas[0]
         assert "drop table" not in sql
         assert "%'; drop table x --%" in args
-        assert "ilike %s" in sql
+        assert "ilike extensions.unaccent(%s)" in sql
 
     @pytest.mark.asyncio
     async def test_filtra_e_ordena_pela_proxima_data(self, monkeypatch):

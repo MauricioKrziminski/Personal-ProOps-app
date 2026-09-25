@@ -246,9 +246,9 @@ async def reference_window(
             and (
               (p.termo is null and p.cents is null and p.dia is null)
               or (p.termo is not null
-                  and (t.description ilike '%%' || p.termo || '%%'
-                       or t.merchant ilike '%%' || p.termo || '%%'
-                       or t.category ilike '%%' || p.termo || '%%'))
+                  and (extensions.unaccent(t.description) ilike '%%' || extensions.unaccent(p.termo) || '%%'
+                       or extensions.unaccent(t.merchant) ilike '%%' || extensions.unaccent(p.termo) || '%%'
+                       or extensions.unaccent(t.category) ilike '%%' || extensions.unaccent(p.termo) || '%%'))
               or (p.cents is not null and t.amount_cents = p.cents)
               or (p.dia is not null and t.occurred_at = p.dia)
             )
