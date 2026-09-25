@@ -298,7 +298,9 @@ export default function ReminderFormScreen() {
   }
 
   return (
+    // Outro lembrete (ou outro ponto de partida) é outro formulário — ver o de lançamento.
     <ReminderForm
+      key={`${params.id ?? 'novo'}:${params.noteId ?? ''}:${params.title ?? ''}`}
       editing={query.data}
       fallbackTitle={params.title}
       noteId={params.noteId}

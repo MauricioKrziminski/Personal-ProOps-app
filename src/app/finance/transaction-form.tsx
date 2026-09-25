@@ -210,7 +210,10 @@ export default function TransactionFormScreen() {
   // o form abre em branco, que é o comportamento de criar.
   const editing = query.data ?? undefined;
   return (
+    // Outro id é outro formulário: aberto por link sobre um já aberto, a tela era reaproveitada
+    // e o `useForm` (que só lê os valores na montagem) seguia com o lançamento anterior.
     <TransactionForm
+      key={params.id ?? 'novo'}
       editing={editing}
       plano={plano.data ?? undefined}
     />

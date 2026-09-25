@@ -1366,3 +1366,13 @@ test('Formulário de lançamento só diz "Cadastrar uma conta" com as contas car
   // A ordem é o que conta: carregando → esqueleto; erro → tentar de novo; só então o vazio.
   assert.match(fonte, /contas\.isPending \? \(\s*<Skeleton[\s\S]{0,200}?contas\.isError \? \([\s\S]{0,200}?\(accounts \?\? \[\]\)\.length === 0 \? \(/);
 });
+
+test('Formulário aberto por link remonta quando o registro muda (key pelo id)', () => {
+  // 25/09/2026: abrir `/finance/transaction-form?id=B` com o formulário de A aberto reaproveitava
+  // a tela — o `useForm` só lê os valores na montagem, e ela seguia com os dados de A. Com a
+  // `key`, outro id é outro formulário.
+  const lancamento = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  assert.match(lancamento, /<TransactionForm\s+key=\{params\.id \?\? 'novo'\}/);
+  const lembrete = readFileSync(join(SRC, 'app/reminder-form.tsx'), 'utf8');
+  assert.match(lembrete, /<ReminderForm\s+key=\{/);
+});
