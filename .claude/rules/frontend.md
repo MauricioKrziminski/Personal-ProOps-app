@@ -261,9 +261,10 @@ vocabulário comum das duas plataformas.
 
 ### Formulário que OUTRA tela abriu devolve para ela ao fechar
 
-⚠️ **Três telas hospedam formulário num `Sheet`, e chegar neles de fora é um `push` na tela da
+⚠️ **Quatro telas hospedam formulário num `Sheet`, e chegar neles de fora é um `push` na tela da
 LISTA com um parâmetro** — `/finance/recurring?edit=`, `/finance/installments?edit=`,
-`/finance/debts?create=financing`. Fechando o sheet, a lista ficava: a pessoa era largada numa
+`/finance/debts?create=financing` e `/finance/accounts?create=1|cartao` (todo "Cadastrar conta",
+"Cadastrar cartão" e "Novo cartão" de outra tela, 25/09/2026: antes caíam na lista). Fechando o sheet, a lista ficava: a pessoa era largada numa
 tela que ela nunca pediu. A queixa foi literal (15/09/2026): *"cliquei em editar a compra
 inteira e quando eu clico em voltar, ao invés de voltar para a tela onde eu estava, ele me leva
 para a tela de Parceladas"*.

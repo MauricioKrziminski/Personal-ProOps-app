@@ -178,7 +178,7 @@ export default function ReportsScreen() {
             title="Nenhuma conta cadastrada"
             subtitle="Cadastre para o saldo de 31/12 sair aqui"
             icon="banknote"
-            onPress={() => router.push('/finance/accounts')}
+            onPress={() => router.push('/finance/accounts?create=1')}
           />
         )}
       </Section>

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
@@ -2299,4 +2299,67 @@ test('Nova pasta: cria com o nome normalizado, recusa nome repetido e, dentro de
   assert.ok(sub.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Nova subpasta'));
   await digitarECriar(sub, 'viagem');
   assert.equal(sub.writes.at(-1).value.parentId, 'f1', 'a subpasta nasce dentro da pasta aberta');
+});
+
+/**
+ * "Cadastrar conta" de um formulário sem conta abre o FORMULÁRIO da conta, não a lista
+ * (25/09/2026): a pessoa ainda tinha que achar o "+" lá, e fechar a largava em Contas.
+ */
+test('Contas: ?create=1 abre "Nova conta" direto, e fechar ou salvar devolve para quem abriu', () => {
+  const folhaAberta = (ui: any) => ui.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible);
+  assert.equal(folhaAberta(screen('src/app/finance/accounts.tsx', { params: {} })), false, 'pela lista, fechada');
+  const ui = screen('src/app/finance/accounts.tsx', { params: { create: '1' } });
+  assert.equal(folhaAberta(ui), true, 'o formulário já abre');
+  ui.interact((nodes) => nodes.find((n) => n.type === 'TaskHeader').props.onClose());
+  assert.equal(folhaAberta(ui), false);
+  assert.deepEqual(copia(ui.navigations.at(-1)), { back: true }, 'volta para o formulário que pediu a conta');
+});
+
+/** Todo "Cadastrar conta/cartão" e "Novo cartão" leva ao FORMULÁRIO, nunca à lista de Contas. */
+test('Cadastrar conta ou cartão, de qualquer tela, abre o formulário já no tipo certo', () => {
+  const arquivos = (readdirSync('src/app', { recursive: true }) as string[]).filter((f) => f.endsWith('.tsx')).map((f) => `src/app/${f}`);
+  const soltos: string[] = [];
+  for (const f of arquivos) {
+    const linhas = readFileSync(f, 'utf8').split('\n');
+    linhas.forEach((l, i) => {
+      if (!l.includes("'/finance/accounts'")) return;
+      if (/Cadastr|Novo cartão/.test(linhas.slice(Math.max(0, i - 6), i + 1).join('\n'))) soltos.push(`${f}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(soltos, [], 'botão de cadastrar que cai na lista');
+  const cartao = screen('src/app/finance/accounts.tsx', { params: { create: 'cartao' } });
+  assert.ok(cartao.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible), 'o formulário abre');
+  assert.ok(cartao.nodes().some((n: any) => n.props?.value === 'credit_card'), 'o tipo já nasce Cartão de crédito');
+  assert.ok(cartao.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Novo cartão'), 'o título diz cartão');
+});
+
+/** A compra que nasceu SEM conta continua editável, como o banco já permite (`finance.md`). */
+test('Parcelada sem conta: editar o nome salva sem exigir conta; com conta, a conta continua obrigatória', () => {
+  const plano = (account_id: string | null) => ({ id: 'p1', title: 'tv', description: 'tv', merchant: null, category: 'casa', account_id, total_cents: 90000, installments: 3, installment_cents: 30000, first_occurred_at: '2026-10-10', active: true, paid: 0, remaining_cents: 90000, locked: 0, locked_cents: 0, locked_paid: 0, parcels: [] });
+  const salvar = (ui: any) => ui.nodes().find((n: any) => n.type === 'TaskHeader' && n.props.action)?.props.action.props;
+  const semConta = screen('src/app/finance/installments.tsx', { params: { edit: 'p1' }, plans: [plano(null)], forecastAccounts: [] });
+  assert.ok(salvar(semConta) && !salvar(semConta).disabled, 'sem conta nenhuma, a compra sem conta salva');
+  const comConta = screen('src/app/finance/installments.tsx', { params: { edit: 'p1' }, plans: [plano('c1')], forecastAccounts: [{ id: 'c1', name: 'Nubank', type: 'credit_card' }] });
+  assert.ok(salvar(comConta) && !salvar(comConta).disabled, 'com a conta dela, salva');
+});
+
+/**
+ * O limite se põe em QUALQUER categoria que a pessoa usa (25/09/2026): a folha tinha só as 13
+ * sugeridas, e "roupa" ou "despesas eventuais" não davam para escolher — a mesma lista fechada que
+ * o `CategoryPicker` resolveu no lançamento. E a categoria que chega pelo "Definir limite" aparece
+ * escolhida.
+ */
+test('Orçamentos: a categoria do limite é o seletor de categorias, com as do usuário e a que já veio', () => {
+  const ui = screen('src/app/finance/budgets.tsx', { params: {} });
+  ui.press('Novo limite');
+  const campo = () => ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Categoria');
+  const seletor = () => {
+    const achados: any[] = [];
+    const andar = (n: any) => { if (Array.isArray(n)) return n.forEach(andar); if (n?.props) { if (n.type === 'CategoryPicker' || n.type?.name === 'CategoryPicker') achados.push(n); andar(n.props.children); } };
+    andar(campo());
+    return achados[0];
+  };
+  assert.ok(seletor(), 'Categoria usa o CategoryPicker');
+  ui.interact(() => seletor().props.onChange('roupa'));
+  assert.equal(seletor().props.value, 'roupa', 'a categoria própria fica escolhida');
 });

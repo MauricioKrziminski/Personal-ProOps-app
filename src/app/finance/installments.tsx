@@ -104,7 +104,7 @@ interface FormPlano {
   unidade: UnidadeDoValor;
   parcelaCents: number | null;
   /** Como a compra abriu — é o que "cada parcela" mostra antes de qualquer edição. */
-  original: { totalCents: number; installments: number; parcelaCents: number };
+  original: { totalCents: number; installments: number; parcelaCents: number; accountId: string | null };
 }
 
 function formDoPlano(plano: InstallmentPlanSummary): FormPlano {
@@ -126,6 +126,7 @@ function formDoPlano(plano: InstallmentPlanSummary): FormPlano {
       totalCents: plano.total_cents,
       installments: plano.installments,
       parcelaCents: plano.installment_cents,
+      accountId: plano.account_id,
     },
   };
 }
@@ -417,7 +418,9 @@ export default function InstallmentsScreen() {
   );
   // Conta obrigatória: sem ela o `set_invoice` apaga o `invoice_id` das N parcelas e a compra
   // de cartão vira despesa solta. O banco recusa; a tela evita chegar lá.
-  const contaOk = Boolean(form?.accountId);
+  // A compra que NASCEU sem conta continua editável sem uma (o banco já aceita): exigir a conta
+  // ali travava o Salvar para quem não tem conta nenhuma cadastrada.
+  const contaOk = Boolean(form?.accountId || !form?.original.accountId);
   const podeSalvar = Boolean(form && tituloOk && totalOk && contaOk && isValidBRDate(form.inicio));
   // ⚠️ `faixaDeParcelas` é a régua (`finance-form.ts`): sem "À vista" com parcela travada,
   // porque a RPC recusaria.

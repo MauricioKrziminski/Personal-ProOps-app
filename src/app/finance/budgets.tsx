@@ -5,7 +5,7 @@ import { Stack, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
 import { useBRL } from '@/components/ui/conceal';
-import { Chip } from '@/components/finance/chip';
+import { CategoryPicker } from '@/components/finance/category-picker';
 import { useMonthRuler } from '@/components/finance/month-ruler';
 import { PeriodBar } from '@/components/finance/period-bar';
 import { ThemedText } from '@/components/themed-text';
@@ -33,8 +33,6 @@ import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Space, tabular } from '@/design/tokens';
 import {
-  INCOME_CATEGORIES,
-  SUGGESTED_CATEGORIES,
   useBudgetsStatus,
   useCycleMonth,
   useDeleteBudget,
@@ -106,10 +104,6 @@ interface FormState {
   /** Em edição a categoria é a identidade do orçamento: fixa, não editável. */
   editing: boolean;
 }
-
-const CATEGORIAS_DESPESA = SUGGESTED_CATEGORIES.filter(
-  (c) => !(INCOME_CATEGORIES as readonly string[]).includes(c)
-);
 
 /** `2026-08` → `agosto` (para o rótulo da ação de remover e das legendas). */
 function nomeDoMes(month: string): string {
@@ -639,16 +633,9 @@ export default function BudgetsScreen() {
                 {form.editing ? (
                   <ThemedText type="default">{form.category}</ThemedText>
                 ) : (
-                  <View style={styles.chips}>
-                    {CATEGORIAS_DESPESA.map((c) => (
-                      <Chip
-                        key={c}
-                        label={c}
-                        selected={form.category === c}
-                        onPress={() => setForm({ ...form, category: form.category === c ? null : c })}
-                      />
-                    ))}
-                  </View>
+                  // O mesmo seletor do lançamento (25/09/2026): com as 13 sugeridas em chips, as
+                  // categorias que a pessoa usa ("roupa", "despesas eventuais") não davam limite.
+                  <CategoryPicker value={form.category} onChange={(category) => setForm({ ...form, category })} />
                 )}
               </Field>
 
@@ -737,10 +724,5 @@ const styles = StyleSheet.create({
     gap: Space.xl,
     padding: Space.lg,
     paddingBottom: Space.xxxl,
-  },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Space.sm,
   },
 });

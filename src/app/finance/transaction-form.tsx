@@ -953,7 +953,7 @@ function TransactionForm({
                   label="Cadastrar uma conta"
                   variant="secondary"
                   size="sm"
-                  onPress={() => router.push('/finance/accounts')}
+                  onPress={() => router.push('/finance/accounts?create=1')}
                 />
               ) : (
                 <AccountPicker
@@ -979,7 +979,9 @@ function TransactionForm({
           )}
         />
 
-        {kind === 'transfer' && (
+        {/* Sem conta nenhuma, o "Cadastrar uma conta" de cima responde pelas duas: o destino seria
+            uma lista vazia. */}
+        {kind === 'transfer' && !(contas.isSuccess && (accounts ?? []).length === 0) && (
           <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
             <Controller
               control={control}

@@ -421,7 +421,7 @@ export default function ImportScreen() {
             icon="creditcard"
             title="Cadastre a conta ou o cartão primeiro"
             hint="A importação precisa saber de onde é o arquivo."
-            action={{ label: 'Cadastrar', onPress: () => router.push('/finance/accounts') }}
+            action={{ label: 'Cadastrar', onPress: () => router.push('/finance/accounts?create=1') }}
           />
         )}
 

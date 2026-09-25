@@ -352,7 +352,7 @@ export default function CardsScreen() {
           icon="creditcard"
           title="Nenhum cartão cadastrado"
           hint="Cadastre o cartão com o dia que fecha e o dia que vence. Aí é só mandar *parcelei a geladeira em 12x no Nubank* no WhatsApp."
-          action={{ label: 'Cadastrar cartão', onPress: () => router.push('/finance/accounts') }}
+          action={{ label: 'Cadastrar cartão', onPress: () => router.push('/finance/accounts?create=cartao') }}
         />
       ) : null}
     </>
@@ -446,7 +446,7 @@ export default function CardsScreen() {
       />
 
       <HeaderActions
-        actions={[{ label: 'Novo cartão', icon: 'plus', onPress: () => router.push('/finance/accounts') }]}
+        actions={[{ label: 'Novo cartão', icon: 'plus', onPress: () => router.push('/finance/accounts?create=cartao') }]}
       />
 
       {tablet ? tabletBody : compactBody}

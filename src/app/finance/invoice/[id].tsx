@@ -668,7 +668,7 @@ export default function InvoiceScreen() {
                   label: 'Cadastrar conta',
                   onPress: () => {
                     setPagando(false);
-                    router.push('/finance/accounts');
+                    router.push('/finance/accounts?create=1');
                   },
                 }}
               />

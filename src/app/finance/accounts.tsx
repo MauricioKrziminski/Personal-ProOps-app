@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { useBRL } from '@/components/ui/conceal';
@@ -44,6 +44,7 @@ import {
   type Account,
   type AccountBalance,
 } from '@/hooks/use-finance';
+import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { saldoDaConta } from '@/lib/accounts';
 import { confirmDestructive } from '@/lib/item-actions';
 
@@ -155,7 +156,15 @@ export default function AccountsScreen() {
   const definirPadrao = useSetDefaultAccount();
   const save = useSaveAccount();
   const archive = useArchiveAccount();
-  const [form, setForm] = useState<FormState | null>(null);
+  // `?create=1` (conta) e `?create=cartao` vêm do "Cadastrar conta/cartão" de outra tela: abre o
+  // formulário direto, já no tipo, e fechar ou salvar devolve para ela (25/09/2026) — antes caía
+  // na lista, a pessoa ainda tinha que achar o "+", e ali ficava.
+  const params = useLocalSearchParams<{ create?: string }>();
+  const criando = params.create === '1' || params.create === 'cartao';
+  const [form, setForm] = useState<FormState | null>(() =>
+    criando ? { ...FORM_VAZIO, type: params.create === 'cartao' ? 'credit_card' : FORM_VAZIO.type } : null,
+  );
+  const volta = useVoltarQuandoFechar(criando);
 
   // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
   // falha, e sem este corte a tela seguia afirmando números embaixo da faixa de erro.
@@ -262,7 +271,7 @@ export default function AccountsScreen() {
       {
         onSuccess: () => {
           toast({ message: form.id ? 'Conta atualizada.' : 'Conta criada.', tone: 'success' });
-          setForm(null);
+          volta.aoFechar(() => setForm(null));
         },
         onError: () =>
           toast({
@@ -538,11 +547,11 @@ export default function AccountsScreen() {
 
       {tablet ? tabletBody : compactBody}
 
-      <Sheet visible={form !== null} onClose={() => setForm(null)}>
+      <Sheet visible={form !== null} onClose={() => volta.aoFechar(() => setForm(null))}>
 
           <TaskHeader
-            title={form?.id ? 'Editar conta' : 'Nova conta'}
-            onClose={() => setForm(null)}
+            title={`${form?.id ? 'Editar' : form?.type === 'credit_card' ? 'Novo' : 'Nova'} ${form?.type === 'credit_card' ? 'cartão' : 'conta'}`}
+            onClose={() => volta.aoFechar(() => setForm(null))}
             action={
               <Button
                 label="Salvar"

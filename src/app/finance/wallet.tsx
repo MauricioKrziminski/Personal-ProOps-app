@@ -281,7 +281,7 @@ export default function WalletScreen() {
           icon="creditcard"
           title="Nenhum cartão cadastrado"
           hint="Cadastre o cartão com o dia que fecha e o dia que vence."
-          action={{ label: 'Cadastrar cartão', onPress: () => router.push('/finance/accounts') }}
+          action={{ label: 'Cadastrar cartão', onPress: () => router.push('/finance/accounts?create=cartao') }}
         />
       </View>
     );

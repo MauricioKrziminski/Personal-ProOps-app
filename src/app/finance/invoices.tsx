@@ -438,7 +438,7 @@ export default function InvoicesScreen() {
           icon="creditcard"
           title="Nenhum cartão cadastrado"
           hint="Cadastre o cartão com o dia que fecha e o dia que vence — a primeira fatura nasce junto com a primeira compra."
-          action={{ label: 'Cadastrar cartão', onPress: () => router.push('/finance/accounts') }}
+          action={{ label: 'Cadastrar cartão', onPress: () => router.push('/finance/accounts?create=cartao') }}
         />
       ) : null}
 
