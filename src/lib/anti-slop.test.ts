@@ -1283,3 +1283,32 @@ test('Nenhum « » em texto do app: o termo vai em negrito ou a frase se reescre
   }
   assert.deepEqual(achados, []);
 });
+
+test('O input invisível do Valor não prende o arrasto: não alinha o texto à direita', () => {
+  // 25/09/2026: arrastar começando na caixa do R$ não rolava o formulário (medido no s26, com e sem
+  // teclado). O `EditText` do Android segura o gesto quando ele PODE ROLAR, e um de linha única
+  // alinhado à direita sempre pode (o texto mora na ponta de uma área larguíssima). A caixa é o
+  // maior alvo do formulário: era onde o dedo caía, e a tela não descia.
+  const fonte = readFileSync(join(SRC, 'components/ui/field.tsx'), 'utf8');
+  const captura = fonte.slice(fonte.indexOf('  captura: {'), fonte.indexOf('},', fonte.indexOf('  captura: {')));
+  assert.doesNotMatch(captura, /textAlign: 'right'/, 'alinhado à direita, o EditText do Android sempre "pode rolar" na horizontal');
+});
+
+test('Campo centralizado ou à direita não prende o arrasto no Android (TextField)', () => {
+  // 25/09/2026: o campo de quantidade ("A cada quantos meses", parcelas) é centralizado entre − e
+  // +, e arrastar começando nele não rolava o formulário. No Android o `EditText` de linha única
+  // alinhado ao centro/direita sempre "pode rolar" na horizontal e não solta o gesto. O `TextField`
+  // desenha esses como multilinha de UMA linha, que quebra em vez de rolar.
+  const fonte = readFileSync(join(SRC, 'components/ui/field.tsx'), 'utf8');
+  const campo = fonte.slice(fonte.indexOf('export const TextField'), fonte.indexOf('interface DateFieldProps'));
+  assert.match(campo, /Platform\.OS === 'android'/);
+  assert.match(campo, /multiline: true/);
+  assert.match(campo, /submitBehavior: 'blurAndSubmit'/);
+});
+
+test('O toast sobe acima do teclado: erro de formulário não some atrás dele', () => {
+  // 25/09/2026: editar o valor de um pagamento e tocar em Salvar "não fazia nada" — o banco
+  // recusava e o toast com o motivo nascia no pé da tela, ATRÁS do teclado aberto.
+  const fonte = readFileSync(join(SRC, 'components/ui/toast.tsx'), 'utf8');
+  assert.match(fonte, /<KeyboardStickyView/);
+});

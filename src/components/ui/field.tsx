@@ -200,6 +200,19 @@ export const TextField = forwardRef<TextInput, TextInputProps & { invalid?: bool
     const { focar, desfocar, moldura } = useCaixa(invalid);
     const { caixa, input } = repartir(style);
     /*
+      ⚠️ **No Android, campo de UMA linha alinhado ao centro ou à direita prende o arrasto**
+      (25/09/2026). O `EditText` segura o gesto que começa nele enquanto ele PODE ROLAR, e o de
+      linha única assim alinhado sempre pode: o texto mora na ponta de uma área larguíssima. Era o
+      campo de quantidade entre − e + — arrastar começando nele não descia o formulário. Multilinha
+      de UMA linha quebra em vez de rolar e solta o gesto; o "enviar" do teclado continua
+      enviando e fechando (`blurAndSubmit`), como no campo de uma linha.
+    */
+    const alinhamento = StyleSheet.flatten(input)?.textAlign;
+    const soltaOArrasto =
+      Platform.OS === 'android' && !rest.multiline && (alinhamento === 'center' || alinhamento === 'right')
+        ? ({ multiline: true, numberOfLines: 1, submitBehavior: 'blurAndSubmit' } as const)
+        : null;
+    /*
       ⚠️ **No iOS o placeholder entra um quadro DEPOIS da montagem** (medido em 16/09/2026). Na tela
       de login montada depois de sair da conta, o rótulo interno do `UITextField` nascia com o
       layout de outro campo: o "voce@exemplo.com" ficava 16pt abaixo, cortado pela borda, e a
@@ -232,6 +245,7 @@ export const TextField = forwardRef<TextInput, TextInputProps & { invalid?: bool
         style={[styles.input, { color: theme.text }, input]}
         placeholder={Platform.OS === 'ios' ? marcador : placeholder}
         {...rest}
+        {...soltaOArrasto}
       />,
       caixa
     );
@@ -530,7 +544,14 @@ const styles = StyleSheet.create({
    */
   captura: {
     ...StyleSheet.absoluteFill,
-    textAlign: 'right',
+    /*
+      ⚠️ **Sem alinhar o texto à direita: é isto que deixa a tela rolar** (25/09/2026). O `EditText` do
+      Android segura o arrasto que começa nele enquanto ele PODE ROLAR, e um de linha única
+      alinhado à direita sempre pode — o texto mora na ponta de uma área larguíssima. Arrastar
+      começando no R$ não descia o formulário (medido no s26, com e sem teclado), e a caixa é o
+      maior alvo dele. O texto deste input nunca aparece (os dígitos são desenhados à parte),
+      então o alinhamento não servia a ninguém.
+    */
     fontSize: Type.money.fontSize,
     opacity: 0.02,
   },

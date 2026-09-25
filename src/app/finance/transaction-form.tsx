@@ -1197,10 +1197,6 @@ const styles = StyleSheet.create({
     gap: Space.sm,
     alignItems: 'center',
   },
-  dateField: {
-    minWidth: 140,
-    textAlign: 'center',
-  },
   pendingCard: {
     gap: Space.lg,
   },
