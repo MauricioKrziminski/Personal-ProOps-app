@@ -58,3 +58,19 @@ export function bottomPillInset(
 ) {
   return platform === 'android' && hasTopBar ? pillSpace : 0;
 }
+
+/**
+ * O respiro no PÉ de uma rolagem de tela: a área segura de baixo + o respiro + a pílula do
+ * Android nas raízes de aba. Uma conta só — o `Screen` e a raiz que rola por conta própria (Notas)
+ * leem daqui. Notas tinha a sua e esquecia a área segura no iOS: a última linha ficava embaixo da
+ * barra de abas e a rolagem não descia mais (25/09/2026).
+ */
+export function bottomScrollInset(
+  platform: string,
+  hasTopBar: boolean,
+  safeBottom: number,
+  breathing: number,
+  pillSpace: number,
+) {
+  return safeBottom + breathing + bottomPillInset(platform, hasTopBar, pillSpace);
+}

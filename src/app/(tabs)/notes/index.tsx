@@ -28,6 +28,8 @@ import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { useBoolPref } from '@/hooks/use-bool-pref';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { bottomScrollInset } from '@/design/adaptive-window';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaxContentWidth } from '@/constants/theme';
 import { HitTarget, Radius, Space } from '@/design/tokens';
 import {
@@ -112,6 +114,7 @@ export default function NotesScreen() {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const vidro = supportsLiquidGlass();
   const toast = useToast();
 
@@ -428,7 +431,17 @@ export default function NotesScreen() {
         }
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.conteudo, tablet && styles.conteudoTablet]}
+        /*
+          ⚠️ **O pé é a conta do `Screen`** (`bottomScrollInset`): aqui a rolagem é nossa, então a
+          conta também. No Android a dock é ABSOLUTA e desenha por cima; no iOS a barra de abas
+          flutua sobre a área segura. A conta própria de antes esquecia a área segura no iOS, e
+          "Arquivadas" ficava embaixo da barra sem a rolagem descer mais (25/09/2026).
+        */
+        contentContainerStyle={[
+          styles.conteudo,
+          { paddingBottom: bottomScrollInset(Platform.OS, true, insets.bottom, Space.xxl, TAB_BAR_SPACE) },
+          tablet && styles.conteudoTablet,
+        ]}
         scrollEventThrottle={16}
         onScroll={({ nativeEvent: e }) => {
           const fim = e.contentSize.height - e.layoutMeasurement.height - e.contentOffset.y;
@@ -730,12 +743,6 @@ const styles = StyleSheet.create({
   conteudo: {
     gap: Space.xl,
     paddingHorizontal: Space.lg,
-    /**
-     * ⚠️ **A dock do Android é ABSOLUTA e desenha POR CIMA da lista.** O `Screen` só soma esse
-     * respiro no ramo COM rolagem própria dele; aqui a rolagem é nossa, então a conta é nossa.
-     * Sem isto a última nota fica escondida atrás da pílula — não dá para ler nem tocar.
-     */
-    paddingBottom: Space.xxxl + (Platform.OS === 'android' ? TAB_BAR_SPACE : 0),
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',

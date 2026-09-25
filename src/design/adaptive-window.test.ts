@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   bottomPillInset,
+  bottomScrollInset,
   chartWidthForPane,
   classifyWindow,
   rootContentMaxWidth,
@@ -95,4 +96,12 @@ test('library and reading panes only split when both reading minimums fit', () =
 test('an invoice card skeleton uses the bounded reading column, not the full tablet window', () => {
   assert.equal(chartWidthForPane(Math.min(384, rootContentMaxWidth(384, false)), 16), 352);
   assert.equal(chartWidthForPane(Math.min(1200, rootContentMaxWidth(1200, false)), 16), 768);
+});
+
+test('o pé da rolagem soma a área segura no iOS: a última linha não fica sob a barra de abas', () => {
+  // 25/09/2026: Notas rolava sozinha e pulava a área segura no iOS — "Arquivadas" morava
+  // embaixo da barra flutuante e a rolagem não descia mais.
+  assert.equal(bottomScrollInset('ios', true, 34, 32, 76), 66);
+  assert.equal(bottomScrollInset('android', true, 24, 32, 76), 132);
+  assert.equal(bottomScrollInset('android', false, 24, 32, 76), 56);
 });

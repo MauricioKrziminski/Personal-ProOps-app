@@ -23,7 +23,7 @@ import { Stack } from 'expo-router';
 
 import { IOS_26_OU_MAIS } from '@/constants/platform';
 import { MaxContentWidth } from '@/constants/theme';
-import { bottomPillInset, rootContentMaxWidth } from '@/design/adaptive-window';
+import { bottomScrollInset, rootContentMaxWidth } from '@/design/adaptive-window';
 import { useAppHeaderHeight } from '@/components/ui/app-header';
 import { GlassReady } from '@/components/ui/glass-backdrop';
 import { progressoDeEntrada, useRelogioDeEntrada } from '@/components/motion/entrada';
@@ -161,12 +161,11 @@ export function Screen({
   });
 
   const background = fundo ?? (grouped ? theme.groupedBackground : theme.background);
-  /**
-   * No Android a raiz de aba precisa reservar a altura da `PillTabBar`, que é absoluta e
-   * desenha POR CIMA do conteúdo. `topBar` é o sinal de que esta é uma raiz de aba — telas
-   * empurradas não têm barra e não devem ganhar o respiro.
-   */
-  const tabBarSpace = bottomPillInset(Platform.OS, Boolean(topBar), TAB_BAR_SPACE);
+  /*
+    O pé da rolagem sai de `bottomScrollInset`: no Android a raiz de aba reserva a `PillTabBar`,
+    que é absoluta e desenha POR CIMA do conteúdo (`topBar` é o sinal de raiz de aba). A mesma
+    conta vale para quem rola por conta própria (Notas).
+  */
   /** A altura do FAB mais o respiro dele, para nenhum conteúdo terminar embaixo do botão. */
   const fabSpace = floatingAction ? FAB_CLEARANCE : 0;
   const padding = [
@@ -187,7 +186,7 @@ export function Screen({
         telas empurradas passa `paddingTop` próprio — conferido em 11/09/2026.
       */
       paddingTop: topBar ? headerHeight + Space.sm : Space.sm,
-      paddingBottom: insets.bottom + Space.xxl + tabBarSpace + fabSpace,
+      paddingBottom: bottomScrollInset(Platform.OS, Boolean(topBar), insets.bottom, Space.xxl, TAB_BAR_SPACE) + fabSpace,
     },
     contentStyle,
   ];
