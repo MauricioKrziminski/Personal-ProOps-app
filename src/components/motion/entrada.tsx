@@ -89,17 +89,25 @@ type Relogio = {
  *   renderizar o estilo final explícito, e o React o escreve na view pelo caminho normal.
  * - **Coberto, esconde na hora** — por baixo da trava ou da cortina ninguém vê a troca.
  */
-export function useRelogioDeEntrada(atrasoMs: number, duracaoMs: number): Relogio {
+export function useRelogioDeEntrada(atrasoMs: number, duracaoMs: number, nascerNoLugar = false): Relogio {
   const { liberada, geracao } = useEntrada();
   const reduzir = useReducedMotion();
-  const relogio = useSharedValue(0);
+  /*
+    ⚠️ **Nascer no lugar** (25/09/2026): o conteúdo que SUBSTITUI um esqueleto na mesma tela não
+    entra de novo do invisível. Medido no emulador, Orçamentos: esqueleto → ~0,8 s de tela em
+    branco → conteúdo de uma vez. A montagem pesada ocupava a thread, a animação de 280 ms perdia o
+    começo e o bloco ficava em opacidade 0 até o teto (o fim chegou em ~1,7 s). O esqueleto já disse
+    "carregando"; a entrada volta a tocar quando o app fica visível de novo (a geração seguinte).
+  */
+  const [noLugarNaGeracao] = useState(nascerNoLugar && liberada ? geracao : null);
+  const relogio = useSharedValue(noLugarNaGeracao === null ? 0 : 1);
   /*
     O tempo é o da MONTAGEM. Na cascata o atraso vem da posição do bloco, e ela muda quando um
     bloco condicional aparece acima (o fim do loading): com o atraso vivo nas dependências, os
     blocos de baixo sumiriam e entrariam de novo no meio da leitura.
   */
   const [tempo] = useState({ atrasoMs, duracaoMs });
-  const [assentadoEm, setAssentadoEm] = useState<number | null>(null);
+  const [assentadoEm, setAssentadoEm] = useState<number | null>(noLugarNaGeracao);
 
   // Layout, não passivo: o bloco nasce invisível, e o efeito passivo pode rodar bem depois da
   // pintura quando a tela que chega é pesada (o corpo ficava ~0,5 s vazio no Android).
@@ -107,6 +115,10 @@ export function useRelogioDeEntrada(atrasoMs: number, duracaoMs: number): Relogi
     cancelAnimation(relogio);
     if (!liberada) {
       relogio.set(0);
+      return;
+    }
+    if (geracao === noLugarNaGeracao) {
+      relogio.set(1);
       return;
     }
     const atraso = reduzir ? 0 : tempo.atrasoMs;
@@ -120,7 +132,7 @@ export function useRelogioDeEntrada(atrasoMs: number, duracaoMs: number): Relogi
     );
     const teto = setTimeout(() => setAssentadoEm(geracao), atraso + duracao + FOLGA_DO_TETO_MS);
     return () => clearTimeout(teto);
-  }, [liberada, geracao, reduzir, tempo, relogio]);
+  }, [liberada, geracao, reduzir, tempo, relogio, noLugarNaGeracao]);
 
   return { relogio, assentado: liberada && assentadoEm === geracao };
 }

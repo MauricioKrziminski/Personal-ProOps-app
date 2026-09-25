@@ -1439,3 +1439,15 @@ test('nome citado nem exemplo vão entre aspas: negrito onde o app desenha, fras
   }
   assert.deepEqual(achados, []);
 });
+
+test('o conteúdo que substitui o esqueleto nasce no lugar, sem voltar ao invisível', () => {
+  // 25/09/2026, medido no emulador: Orçamentos ia do esqueleto a ~0,8 s de tela em branco. A
+  // cascata recomeçava do opacidade 0 e a montagem pesada engolia a animação até o teto. A entrada
+  // continua tocando quando o app fica visível (a geração seguinte do relógio).
+  const tela = readFileSync(join(SRC, 'components/ui/screen.tsx'), 'utf8');
+  assert.match(tela, /const \[nasceuSemCascata\] = useState\(!stagger\)/);
+  assert.match(tela, /<Cascata noLugar=\{nasceuSemCascata\}>/);
+  const entrada = readFileSync(join(SRC, 'components/motion/entrada.tsx'), 'utf8');
+  assert.match(entrada, /export function useRelogioDeEntrada\(atrasoMs: number, duracaoMs: number, nascerNoLugar = false\)/);
+  assert.match(entrada, /if \(geracao === noLugarNaGeracao\) \{\s*relogio\.set\(1\);\s*return;/);
+});

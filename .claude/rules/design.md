@@ -536,6 +536,12 @@ Olhando só a cortina, com a trava ligada a cascata tocava inteira por baixo del
   `withDelay`). Com efeito passivo, a tela que chega pesada ficava ~0,5 s com o corpo vazio.
 - **O tempo é o da montagem.** O atraso vem da posição do bloco, e ela muda quando um bloco
   condicional aparece acima; com ele vivo nas dependências, os de baixo sumiam e entravam de novo.
+- ⚠️ **O conteúdo que substitui o ESQUELETO nasce no lugar** (25/09/2026). O `Screen` que abriu
+  sem `stagger` (a fase do esqueleto do portão) passa `noLugar` à cascata: medido em Orçamentos, o
+  conteúdo recomeçava da opacidade 0 e a montagem pesada engolia a animação — ~0,8 s de tela em
+  branco entre o esqueleto e o conteúdo. A entrada volta a tocar na geração seguinte (app visível
+  de novo). E a cascata não embrulha o que não ocupa lugar (`Stack.Screen`, ações do header,
+  `Sheet`): cada caixa vazia levava o `gap` e abria vão no topo.
 - ⚠️ **O repouso é escrito pelo React** (`assentado`). No Android uma atualização do Reanimated
   já se perdeu: o Financeiro ficou com o corpo inteiro invisível depois de trocar de aba, com os
   blocos na árvore. Terminada a entrada (ou estourado o teto), o bloco renderiza o estilo final

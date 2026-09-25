@@ -149,6 +149,9 @@ export function Screen({
   const theme = useTheme();
   const { width } = useAdaptiveWindow();
   const [pulling, setPulling] = useState(false);
+  // A tela que abriu no ESQUELETO (sem cascata) e passa ao conteúdo: ele nasce no lugar — ver
+  // `useRelogioDeEntrada`. É a mesma instância de `Screen` nas duas fases do portão.
+  const [nasceuSemCascata] = useState(!stagger);
   const insets = useSafeAreaInsets();
   const headerHeight = useAppHeaderHeight();
   const rolagem = useSharedValue(0);
@@ -321,7 +324,7 @@ export function Screen({
           }}
         /> : undefined
       }>
-      {stagger ? <Cascata>{children}</Cascata> : children}
+      {stagger ? <Cascata noLugar={nasceuSemCascata}>{children}</Cascata> : children}
     </KeyboardAwareScrollView>
   );
 
@@ -381,14 +384,18 @@ export function Screen({
  */
 const SEM_CAIXA = new Set<unknown>([Stack.Screen, HeaderActions, HeaderMenu, Sheet]);
 
-function Cascata({ children }: { children: ReactNode }) {
+function Cascata({ children, noLugar }: { children: ReactNode; noLugar: boolean }) {
   let i = 0;
   return (
     <>
       {Children.map(children, (filho) => {
         if (!isValidElement(filho) || SEM_CAIXA.has(filho.type)) return filho;
         const indice = i++;
-        return <BlocoDaCascata indice={indice}>{filho}</BlocoDaCascata>;
+        return (
+          <BlocoDaCascata indice={indice} noLugar={noLugar}>
+            {filho}
+          </BlocoDaCascata>
+        );
       })}
     </>
   );
@@ -403,11 +410,12 @@ const SUBIDA_DO_BLOCO = 12;
  * `entering` (que só toca na montagem): coberto pela trava, o bloco se esconde e entra de novo
  * quando ela sai, sem remontar a tela.
  */
-function BlocoDaCascata({ indice, children }: { indice: number; children: ReactNode }) {
+function BlocoDaCascata({ indice, noLugar, children }: { indice: number; noLugar: boolean; children: ReactNode }) {
   const reduzir = useReducedMotion();
   const { relogio, assentado } = useRelogioDeEntrada(
     Math.min(indice * 60, Motion.stagger.cap),
-    Motion.duration.slow
+    Motion.duration.slow,
+    noLugar
   );
   const estilo = useAnimatedStyle(() => {
     const e = progressoDeEntrada(relogio.get());
