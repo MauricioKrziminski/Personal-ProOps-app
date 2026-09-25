@@ -1,8 +1,4 @@
-import { useContext } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
-import Animated from 'react-native-reanimated';
-
-import { DeslocamentoDoArrasto, useCantosDoArrasto } from '@/components/ui/arrasto-contexto';
 
 import { Elevation, Radius, Space, type ElevationLevel } from '@/design/tokens';
 import { useTheme, useScheme } from '@/hooks/use-theme';
@@ -21,37 +17,27 @@ interface CardProps {
  * sombra. O destaque de uma raiz de aba é o `HeroPanel` (o negativo da página); o de uma tela
  * secundária é este `Card`. Card de lista é este aqui.
  */
-export function Card(props: CardProps) {
-  // Dentro de um arrasto de card, a superfície perde o canto do lado que abre (`arrasto-contexto`).
-  return useContext(DeslocamentoDoArrasto) ? <CardNoArrasto {...props} /> : <CardChapado {...props} />;
-}
-
-function CardNoArrasto({ children, elevation = 'none', style }: CardProps) {
-  const cantos = useCantosDoArrasto(Radius.md);
-  return (
-    <Animated.View style={[useEstiloDoCard(elevation), style, cantos]}>
-      {/* Só o card de FORA encosta no painel; um card dentro dele fica como é. */}
-      <DeslocamentoDoArrasto.Provider value={null}>{children}</DeslocamentoDoArrasto.Provider>
-    </Animated.View>
-  );
-}
-
-function CardChapado({ children, elevation = 'none', style }: CardProps) {
-  return <View style={[useEstiloDoCard(elevation), style]}>{children}</View>;
-}
-
-function useEstiloDoCard(elevation: ElevationLevel): ViewStyle {
+export function Card({ children, elevation = 'none', style }: CardProps) {
   const theme = useTheme();
   const scheme = useScheme();
-  return {
-    backgroundColor: theme.surface,
-    borderRadius: Radius.md,
-    borderCurve: 'continuous',
-    // O fio de 1px é a assinatura do Concreto: sem sombra, é ele que diz onde o card
-    // termina. 1dp e não `hairlineWidth`, que é um pixel físico e some em escala.
-    borderWidth: 1,
-    borderColor: theme.cardBorder,
-    padding: Space.lg,
-    boxShadow: Elevation[scheme][elevation],
-  };
+
+  return (
+    <View
+      style={[
+        {
+          backgroundColor: theme.surface,
+          borderRadius: Radius.md,
+          borderCurve: 'continuous',
+          // O fio de 1px é a assinatura do Concreto: sem sombra, é ele que diz onde o card
+          // termina. 1dp e não `hairlineWidth`, que é um pixel físico e some em escala.
+          borderWidth: 1,
+          borderColor: theme.cardBorder,
+          padding: Space.lg,
+          boxShadow: Elevation[scheme][elevation],
+        },
+        style,
+      ]}>
+      {children}
+    </View>
+  );
 }

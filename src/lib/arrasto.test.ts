@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { BOTAO, abriuOLado, aparicao, deslocamentoDaPonta, executaAoSoltar, largurasDoPainel, pontasDoPainel, cardAberto, ladosDoArrasto, larguraDoBotao, limiarAteOFim, passouAteOFim, passouHaPouco, temArrasto, traducaoNoSoltar, ladoDoSoltar } from './arrasto.ts';
+import { BOTAO, abriuOLado, botaoNoArrasto, sobraSobOCard, executaAoSoltar, pontasDoPainel, cardAberto, ladosDoArrasto, larguraDoBotao, limiarAteOFim, passouAteOFim, passouHaPouco, temArrasto, traducaoNoSoltar, ladoDoSoltar } from './arrasto.ts';
 
 const a = (label: string, extra: Record<string, unknown> = {}) => ({ label, onPress: () => {}, ...extra });
 
@@ -48,27 +48,46 @@ test('a ponta é a do painel DESENHADO: só "Mais" à esquerda, "Mais" é a pont
   assert.deepEqual(pontasDoPainel([], []), { direita: null, esquerda: null });
 });
 
-test('o painel acompanha o dedo: os botões dividem o revelado; até o fim, a ponta toma tudo', () => {
-  assert.deepEqual(largurasDoPainel(100, 2, 0, 'esquerda'), [50, 50]);
-  assert.deepEqual(largurasDoPainel(300, 2, 1, 'esquerda'), [0, 300], 'a ponta da esquerda é a última');
-  assert.deepEqual(largurasDoPainel(300, 2, 1, 'direita'), [300, 0], 'a da direita é a primeira');
-  assert.deepEqual(largurasDoPainel(200, 2, 0.5, 'esquerda'), [50, 150], 'a mola passa pelo meio');
-  assert.deepEqual(largurasDoPainel(-5, 3, 0, 'esquerda'), [0, 0, 0], 'fechado não desenha nada');
+/*
+ * O movimento do WhatsApp no iPhone (gravação do dono do produto, 24/09/2026, quadro a quadro):
+ * cada botão tem a largura NATURAL e o conteúdo centrado nela; eles saem de baixo do card em
+ * degraus (o botão j começa em j·revelado/n) e o de fora fica POR CIMA do de dentro. Nada encolhe
+ * nem esmaece — o ícone só é descoberto. Passando do painel, os botões esticam por igual; até o
+ * fim, a ponta desliza sobre os outros até a borda do card, com o conteúdo colado nela.
+ */
+const B = 88;
+const R = 18;
+const naMao = (j: number, n: number, r: number, c = 0) => botaoNoArrasto(j, n, r, B, c, R);
+
+test('pouco arrastado: cada botão na largura natural, saindo de baixo do card em degraus', () => {
+  // o colado no card entra sob o canto dele (recuo = o raio), o de fora começa na metade do revelado
+  assert.deepEqual(naMao(0, 2, 40), { inicio: -18, largura: 106, recuo: 18, conteudo: 0 });
+  assert.deepEqual(naMao(1, 2, 40), { inicio: 20, largura: 88, recuo: 0, conteudo: 0 });
 });
 
-test('até o fim, o ícone da ponta segue a borda do card', () => {
-  assert.equal(deslocamentoDaPonta(300, 88, 1, 'esquerda'), -106, 'para a esquerda, junto do card');
-  assert.equal(deslocamentoDaPonta(300, 88, 1, 'direita'), 106);
-  assert.equal(deslocamentoDaPonta(300, 88, 0, 'esquerda'), 0, 'sem o até o fim, no centro do botão');
-  assert.equal(deslocamentoDaPonta(60, 88, 1, 'esquerda'), 0, 'nunca passa do próprio botão');
+test('aberto: os botões encostam um no outro, cada um na largura natural', () => {
+  // o de dentro vai até a borda de fora, POR BAIXO do de fora: se um quadro de um chegar antes do
+  // outro (medido no Android), o que aparece entre eles é botão, nunca o fundo da tela
+  assert.deepEqual(naMao(0, 2, 176), { inicio: -18, largura: 194, recuo: 18, conteudo: 0 });
+  assert.deepEqual(naMao(1, 2, 176), { inicio: 88, largura: 88, recuo: 0, conteudo: 0 });
 });
 
-test('o conteúdo do botão aparece junto com o espaço dele', () => {
-  assert.equal(aparicao(0, 88), 0);
-  assert.equal(aparicao(88, 88), 1);
-  assert.equal(aparicao(200, 88), 1);
-  const meio = aparicao(60, 88);
-  assert.ok(meio > 0 && meio < 1);
+test('passando do painel, os botões esticam por igual e o conteúdo fica no meio de cada um', () => {
+  assert.deepEqual(naMao(0, 2, 240), { inicio: -18, largura: 258, recuo: 18, conteudo: 16 });
+  assert.deepEqual(naMao(1, 2, 240), { inicio: 120, largura: 120, recuo: 0, conteudo: 16 });
+});
+
+test('até o fim, a ponta cobre o painel até o card, com o conteúdo colado na borda dele', () => {
+  assert.deepEqual(naMao(1, 2, 240, 1), { inicio: -18, largura: 258, recuo: 18, conteudo: 0 });
+  // o de dentro fica onde estava, coberto pela ponta
+  assert.deepEqual(naMao(0, 2, 240, 1), { inicio: 0, largura: 240, recuo: 0, conteudo: 16 });
+  // no meio da mola, a ponta está no meio do caminho
+  assert.equal(naMao(1, 2, 240, 0.5).inicio, 60 - 9);
+});
+
+test('fechado, nada entra sob o card; um botão só é colado e ponta ao mesmo tempo', () => {
+  assert.deepEqual(naMao(0, 2, 0), { inicio: 0, largura: 88, recuo: 0, conteudo: 0 });
+  assert.equal(naMao(0, 1, 60, 0.5).recuo, 18);
 });
 
 test('temArrasto: só quando há algo para mostrar', () => {
@@ -195,4 +214,21 @@ test('soltar do lado oposto ao painel aberto nunca executa; do mesmo lado, conti
   assert.equal(ladoDoSoltar('direita', 250), 'direita');
   assert.equal(ladoDoSoltar('direita', -300), null);
   assert.equal(ladoDoSoltar('esquerda', 120), null);
+});
+
+test('o painel entra por baixo do canto do card: a sobra é do botão colado nele, e da ponta até o fim', () => {
+  // esquerda: o card fica à esquerda do painel, então o botão colado nele é o primeiro ("Mais").
+  assert.deepEqual([0, 1].map((i) => sobraSobOCard(i, 2, 'esquerda', 30, 0, 18)), [18, 0]);
+  // direita: o card fica à direita, o colado nele é o último.
+  assert.deepEqual([0, 1].map((i) => sobraSobOCard(i, 2, 'direita', 30, 0, 18)), [0, 18]);
+  // até o fim a ponta toma o painel, e o canto passa a ser dela.
+  assert.deepEqual([0, 1].map((i) => sobraSobOCard(i, 2, 'esquerda', 30, 1, 18)), [0, 18]);
+  // um botão só: ele é a ponta e o colado, a sobra inteira é dele.
+  assert.equal(sobraSobOCard(0, 1, 'esquerda', 30, 0.5, 18), 18);
+});
+
+test('fechado, nada aparece no canto do card: a sobra cresce com o que o card revelou', () => {
+  assert.equal(sobraSobOCard(0, 2, 'esquerda', 0, 0, 18), 0);
+  assert.equal(sobraSobOCard(0, 2, 'esquerda', 6, 0, 18), 6);
+  assert.equal(sobraSobOCard(0, 2, 'esquerda', 40, 0, 18), 18);
 });

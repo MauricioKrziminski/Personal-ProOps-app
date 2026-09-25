@@ -12,12 +12,11 @@ import Animated, {
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
-  withSpring,
+  withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
-import { DeslocamentoDoArrasto } from '@/components/ui/arrasto-contexto';
 import { Icon } from '@/components/ui/icon';
 import { DentroDeArrasto } from '@/components/ui/money';
 import { Motion, Radius, Space } from '@/design/tokens';
@@ -25,10 +24,8 @@ import { usarDica } from '@/hooks/use-dicas';
 import { useTheme } from '@/hooks/use-theme';
 import {
   abriuOLado,
-  aparicao,
+  botaoNoArrasto,
   cardAberto,
-  deslocamentoDaPonta,
-  largurasDoPainel,
   pontasDoPainel,
   fecharCardAberto,
   ladosDoArrasto,
@@ -80,10 +77,12 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
   const direita = useLado();
   const esquerdaSV = useLado();
   const inicio = useSharedValue(0);
+  // O deslocamento que a biblioteca aplica, espelhado pelo painel; e a SAÍDA: até o fim numa ação
+  // que tira o item da lista, o card segue até sair da tela (NaN = parado no gesto).
+  const tx = useSharedValue(0);
+  const saida = useSharedValue(Number.NaN);
   const armado = useSharedValue(false);
   const abertoAntes = useSharedValue<'direita' | 'esquerda' | null>(null);
-  // O deslocamento do card, para a superfície dele perder o canto do lado que abre.
-  const deslocamento = useSharedValue(0);
 
   // Sem ações o gesto fica DESLIGADO, não desmontado: montar e desmontar o arrasto quando as
   // ações chegam (Contas, com a conta carregando) remontava o card inteiro.
@@ -106,9 +105,9 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
   useEffect(() => {
     atual.current = { direita: lados.direita, esquerda, pontas };
   });
-  const tocar = useCallback((acao: ItemAction) => {
+  const tocar = useCallback((acao: ItemAction, saindo = false) => {
     const viva = [...atual.current.direita, ...atual.current.esquerda].find((x) => x.label === acao.label) ?? acao;
-    eu.current?.close();
+    if (!saindo) eu.current?.close();
     viva.onPress?.();
   }, []);
   // O botão do painel avisa pelo RÓTULO: o toque chega da thread da UI, e a ação (com funções
@@ -132,12 +131,29 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
     feito.current = pedido;
     const { pontas } = atual.current;
     const ponta = pedido.lado === 'direita' ? pontas.direita : pontas.esquerda;
-    if (ponta) tocar(ponta);
-  }, [pedido, tocar]);
+    if (!ponta) return;
+    const saindo = !Number.isNaN(saida.get());
+    tocar(ponta, saindo);
+    if (!saindo) return;
+    // Saindo, o card desmonta sem passar pelo "fechou": a dica do arrasto é encerrada aqui.
+    usarDica('lista-arrasto');
+    // O item sai da lista quando a ação chega ao banco e o card desmonta junto. Se ele ainda estiver
+    // aqui depois disso (a ação falhou e o toast já disse), ele volta para o lugar.
+    const volta = setTimeout(() => {
+      eu.current?.reset();
+      saida.set(withTiming(0, { duration: Motion.duration.slow, easing: Motion.easing.out }, (fim) => {
+        if (fim) saida.set(Number.NaN);
+      }));
+    }, 3000);
+    return () => clearTimeout(volta);
+  }, [pedido, tocar, saida]);
   const nDireita = lados.direita.length;
   const nEsquerda = esquerda.length;
   const pontaD = Boolean(pontas.direita);
   const pontaE = Boolean(pontas.esquerda);
+  // Sai da tela só o que TIRA o item da lista sem perguntar: a ponta da esquerda com "Desfazer"
+  // (Arquivar). Apagar confirma antes, "Mais" abre o menu e a direita é ação rápida — voltam.
+  const saiEsquerda = Boolean(pontas.esquerda?.desfaz);
   const soltura = useMemo<Soltura>(
     () => ({
       inicio,
@@ -149,8 +165,11 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
       botoes: { direita: nDireita, esquerda: nEsquerda },
       ponta: { direita: pontaD, esquerda: pontaE },
       botao,
+      tx,
+      saida,
+      sai: { direita: false, esquerda: saiEsquerda },
     }),
-    [inicio, armado, abertoAntes, largura, direita, esquerdaSV, nDireita, nEsquerda, pontaD, pontaE, botao],
+    [inicio, armado, abertoAntes, largura, direita, esquerdaSV, nDireita, nEsquerda, pontaD, pontaE, botao, tx, saida, saiEsquerda],
   );
   // Este gesto só observa o dedo: nunca ativa, e corre junto do arrasto da biblioteca.
   const dedo = useMemo(
@@ -172,17 +191,17 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
 
   const renderDireita = useCallback(
     (_p: SharedValue<number>, translation: SharedValue<number>) => (
-      <Painel lado="direita" acoes={lados.direita} temPonta={pontaDireita} botao={botao} translation={translation} largura={largura} estado={direita} tocar={tocarRotulo} dedo={dedo} deslocamento={deslocamento} />
+      <Painel lado="direita" acoes={lados.direita} temPonta={pontaDireita} botao={botao} translation={translation} largura={largura} estado={direita} tocar={tocarRotulo} dedo={dedo} tx={tx} saida={saida} />
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a assinatura É a dependência da lista
-    [chaveDireita, pontaDireita, botao, largura, direita, tocarRotulo, dedo, deslocamento],
+    [chaveDireita, pontaDireita, botao, largura, direita, tocarRotulo, dedo, tx, saida],
   );
   const renderEsquerda = useCallback(
     (_p: SharedValue<number>, translation: SharedValue<number>) => (
-      <Painel lado="esquerda" acoes={esquerda} temPonta={pontaEsquerda} botao={botao} translation={translation} largura={largura} estado={esquerdaSV} tocar={tocarRotulo} dedo={dedo} deslocamento={deslocamento} />
+      <Painel lado="esquerda" acoes={esquerda} temPonta={pontaEsquerda} botao={botao} translation={translation} largura={largura} estado={esquerdaSV} tocar={tocarRotulo} dedo={dedo} tx={tx} saida={saida} />
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a assinatura É a dependência da lista
-    [chaveEsquerda, pontaEsquerda, botao, largura, esquerdaSV, tocarRotulo, dedo, deslocamento],
+    [chaveEsquerda, pontaEsquerda, botao, largura, esquerdaSV, tocarRotulo, dedo, tx, saida],
   );
 
   return (
@@ -236,10 +255,7 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
             cardAberto.fechou(meu);
           }}>
           <DentroDeArrasto.Provider value>
-            {/* Só o card de canto próprio precisa: a linha de uma `Section` já é reta. */}
-            <DeslocamentoDoArrasto.Provider value={forma === 'card' ? deslocamento : null}>
-              {children}
-            </DeslocamentoDoArrasto.Provider>
+            <Saida tx={tx} saida={saida}>{children}</Saida>
           </DentroDeArrasto.Provider>
         </ReanimatedSwipeable>
       </View>
@@ -260,6 +276,10 @@ type Soltura = {
   botoes: { direita: number; esquerda: number };
   ponta: { direita: boolean; esquerda: boolean };
   botao: number;
+  tx: SharedValue<number>;
+  saida: SharedValue<number>;
+  /** Até o fim deste lado tira o item da lista: o card segue até sair da tela. */
+  sai: { direita: boolean; esquerda: boolean };
 };
 
 function marcarInicio(s: Soltura, e: GestureTouchEvent) {
@@ -303,6 +323,15 @@ function ladoQueExecuta(s: Soltura, e: GestureTouchEvent): 'direita' | 'esquerda
     temPonta: s.ponta[lado],
     botao: s.botao,
   });
+  if (executa && s.sai[lado]) {
+    // Na thread da UI, no mesmo quadro do soltar: esperar o JS deixava a mola da biblioteca puxar
+    // o card de volta por um instante antes de ele sair.
+    s.saida.set(s.tx.get());
+    s.saida.set(withTiming(lado === 'esquerda' ? -s.largura.get() : s.largura.get(), {
+      duration: Motion.duration.base,
+      easing: Motion.easing.out,
+    }));
+  }
   return executa ? lado : null;
 }
 
@@ -311,6 +340,18 @@ function useLado(): Lado {
   const desligouEm = useSharedValue(0);
   const abriu = useSharedValue(false);
   return useMemo(() => ({ passou, desligouEm, abriu }), [passou, desligouEm, abriu]);
+}
+
+/**
+ * O card durante a SAÍDA (até o fim numa ação que tira o item da lista): ele segue até sair da tela
+ * em vez de voltar para o lugar, e só então some — como no WhatsApp. Fora disso, não mexe em nada.
+ */
+function Saida({ tx, saida, children }: { tx: SharedValue<number>; saida: SharedValue<number>; children: ReactNode }) {
+  const estilo = useAnimatedStyle(() => {
+    const s = saida.get();
+    return { transform: [{ translateX: Number.isNaN(s) ? 0 : s - tx.get() }] };
+  });
+  return <Animated.View style={estilo}>{children}</Animated.View>;
 }
 
 function Painel({
@@ -323,7 +364,8 @@ function Painel({
   estado,
   tocar,
   dedo,
-  deslocamento,
+  tx,
+  saida,
 }: {
   lado: 'direita' | 'esquerda';
   acoes: ItemAction[];
@@ -334,17 +376,22 @@ function Painel({
   estado: Lado;
   tocar: (label: string) => void;
   dedo: GestureType;
-  deslocamento: SharedValue<number>;
+  tx: SharedValue<number>;
+  saida: SharedValue<number>;
 }) {
   const theme = useTheme();
-  // 0 → 1 numa mola quando o dedo passa do "até o fim": é ela que faz a ponta tomar o painel.
+  // 0 → 1 quando o dedo passa do "até o fim": é ele que faz a ponta cobrir o painel.
   const cheio = useSharedValue(0);
-  // O quanto o card revelou DESTE lado — a largura que os botões dividem.
-  const revelado = useDerivedValue(() => Math.max(0, lado === 'direita' ? translation.get() : -translation.get()));
   useAnimatedReaction(
     () => translation.get(),
-    (v) => deslocamento.set(v),
+    (v) => tx.set(v),
   );
+  // O quanto o card revelou DESTE lado — na saída, o quanto ele já andou para fora.
+  const revelado = useDerivedValue(() => {
+    const s = saida.get();
+    const t = Number.isNaN(s) ? translation.get() : s;
+    return Math.max(0, lado === 'direita' ? t : -t);
+  });
   // Um toque por gesto, no idioma do sistema: seleção ao cruzar o ponto de ABRIR, impacto leve
   // ao cruzar o ponto de "até o fim" (é ali que soltar passa a executar). Quem avisa o resultado
   // é o toast da ação, como no menu.
@@ -361,16 +408,27 @@ function Painel({
     (agora, antes) => {
       if (agora === (antes ?? false)) return;
       estado.passou.set(agora);
-      cheio.set(withSpring(agora ? 1 : 0, Motion.spring.snap));
       if (agora) runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
       else estado.desligouEm.set(Date.now());
     },
   );
-  // A faixa desenhada cresce com o dedo a partir da borda de fora; a `View` de fora mantém a
-  // largura do painel ABERTO, que é o que a biblioteca mede para saber onde o card para.
-  const faixa = useAnimatedStyle(() => ({ width: revelado.get() }));
+  // A ponta cobre o painel até o fim E durante a saída: soltando, a biblioteca assenta o card no
+  // painel aberto e o "até o fim" desliga — sem a saída aqui, os botões voltavam esticados na linha
+  // inteira com o card já fora da tela.
+  useAnimatedReaction(
+    () =>
+      passouAteOFim(translation.get(), lado, largura.get(), acoes.length, temPonta, botao) || !Number.isNaN(saida.get()),
+    (agora, antes) => {
+      if (agora === (antes ?? false)) return;
+      // Sem quique: no WhatsApp a ponta desliza sobre os outros em ~0,3 s e assenta.
+      cheio.set(withTiming(agora ? 1 : 0, { duration: Motion.duration.slow, easing: Motion.easing.out }));
+    },
+  );
+  // A faixa mora na borda de FORA e cresce com o dedo; o `Radius.md` a mais é o pedaço que entra
+  // sob o canto do card (`botaoNoArrasto`, `recuo`). A `View` de fora mantém a largura do painel
+  // ABERTO, que é o que a biblioteca mede para saber onde o card para.
+  const faixa = useAnimatedStyle(() => ({ width: revelado.get() + Math.min(Radius.md, revelado.get()) }));
   const n = acoes.length;
-  const ponta = lado === 'direita' ? 0 : n - 1;
 
   return (
     <View style={{ width: n * botao }}>
@@ -383,6 +441,8 @@ function Painel({
             : lado === 'direita'
               ? { fundo: theme.tintFill, tinta: 'onTint' as const }
               : { fundo: theme.backgroundSelected, tinta: 'text' as const };
+          // Contado a partir do CARD: à esquerda do painel o colado é o primeiro; à direita, o último.
+          const j = lado === 'esquerda' ? i : n - 1 - i;
           return (
             <BotaoDoPainel
               key={acao.label}
@@ -391,15 +451,14 @@ function Painel({
               tocar={tocar}
               botao={botao}
               fundo={cor.fundo}
-              indice={i}
+              j={j}
               n={n}
               lado={lado}
-              ehPonta={temPonta && i === ponta}
               revelado={revelado}
               cheio={cheio}
               // Dois neutros lado a lado ("Mais" e "Arquivar") liam como um bloco só: um fio da cor
-              // do fundo separa um botão do outro, na altura inteira. É `View`, não borda.
-              fio={i > 0 ? theme.background : null}>
+              // do fundo na borda de dentro do de fora. É `View`, não borda.
+              fio={j > 0 ? theme.background : null}>
               {acao.icon ? <Icon name={acao.icon} size="md" color={cor.tinta} /> : null}
               <ThemedText type="caption" themeColor={cor.tinta} style={styles.rotulo}>
                 {acao.curto ?? acao.label}
@@ -422,9 +481,8 @@ function Painel({
  * não serve: dentro do `ReanimatedSwipeable` o gesto nativo do arrasto fica com o toque. Um
  * caminho só, nas duas plataformas.
  *
- * **O efeito** (24/09/2026, *"estilo o do WhatsApp… fluido e clean"*): os botões dividem o que o
- * card revelou, o ícone e o rótulo aparecem junto com o espaço (fade e escala) e, até o fim, a
- * ponta toma o painel com o ícone colado na borda do card (`lib/arrasto.ts`).
+ * **O movimento é o do WhatsApp no iPhone** (`botaoNoArrasto`): largura natural, conteúdo parado
+ * no meio dela, saindo de baixo do card em degraus, o de fora por cima (`zIndex = j`).
  */
 function BotaoDoPainel({
   label,
@@ -432,10 +490,9 @@ function BotaoDoPainel({
   tocar,
   botao,
   fundo,
-  indice,
+  j,
   n,
   lado,
-  ehPonta,
   revelado,
   cheio,
   fio,
@@ -446,10 +503,9 @@ function BotaoDoPainel({
   tocar: (label: string) => void;
   botao: number;
   fundo: string;
-  indice: number;
+  j: number;
   n: number;
   lado: 'direita' | 'esquerda';
-  ehPonta: boolean;
   revelado: SharedValue<number>;
   cheio: SharedValue<number>;
   fio: string | null;
@@ -467,21 +523,22 @@ function BotaoDoPainel({
         }),
     [dedo, apertado, tocar, label],
   );
-  const caixa = useAnimatedStyle(() => ({
-    width: largurasDoPainel(revelado.get(), n, cheio.get(), lado)[indice],
-    // Press-in de botão (design.md §5): a opacidade cai enquanto o dedo está em cima.
-    opacity: apertado.get() ? 0.7 : 1,
-  }));
-  const conteudo = useAnimatedStyle(() => {
-    const w = largurasDoPainel(revelado.get(), n, cheio.get(), lado)[indice];
-    const p = aparicao(w, botao);
+  const caixa = useAnimatedStyle(() => {
+    const r = revelado.get();
+    const g = botaoNoArrasto(j, n, r, botao, cheio.get(), Radius.md);
+    // A faixa começa `min(raio, r)` antes da borda do card; o início do botão conta a partir dela.
+    const x = Math.min(Radius.md, r) + g.inicio;
     return {
-      opacity: p,
-      transform: [
-        { translateX: ehPonta ? deslocamentoDaPonta(revelado.get(), botao, cheio.get(), lado) : 0 },
-        { scale: 0.6 + 0.4 * p },
-      ],
+      ...(lado === 'esquerda' ? { left: x } : { right: x }),
+      width: g.largura,
+      // Press-in de botão (design.md §5): a opacidade cai enquanto o dedo está em cima.
+      opacity: apertado.get() ? 0.7 : 1,
     };
+  });
+  const conteudo = useAnimatedStyle(() => {
+    const g = botaoNoArrasto(j, n, revelado.get(), botao, cheio.get(), Radius.md);
+    const x = g.recuo + g.conteudo;
+    return lado === 'esquerda' ? { left: x } : { right: x };
   });
   return (
     <GestureDetector gesture={toque}>
@@ -492,8 +549,8 @@ function BotaoDoPainel({
         // O leitor de tela ativa pela ação, não pelo gesto.
         accessibilityActions={[{ name: 'activate' }]}
         onAccessibilityAction={() => tocar(label)}
-        style={[styles.botao, { backgroundColor: fundo }, caixa]}>
-        {fio ? <View style={[styles.fio, { backgroundColor: fio }]} /> : null}
+        style={[styles.botao, { backgroundColor: fundo, zIndex: j }, caixa]}>
+        {fio ? <View style={[styles.fio, lado === 'esquerda' ? styles.fioNaEsquerda : styles.fioNaDireita, { backgroundColor: fio }]} /> : null}
         <Animated.View style={[styles.conteudo, { width: botao }, conteudo]}>{children}</Animated.View>
       </Animated.View>
     </GestureDetector>
@@ -502,13 +559,17 @@ function BotaoDoPainel({
 
 const styles = StyleSheet.create({
   // A faixa mora na borda de FORA do painel e cresce para dentro com o dedo.
-  faixa: { position: 'absolute', top: 0, bottom: 0, flexDirection: 'row' },
+  faixa: { position: 'absolute', top: 0, bottom: 0, overflow: 'hidden' },
   faixaNaDireita: { right: 0 },
   faixaNaEsquerda: { left: 0 },
   // `overflow: hidden`: o botão que encolhe (os outros, até o fim) não deixa o conteúdo vazar.
-  botao: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  conteudo: { alignItems: 'center', justifyContent: 'center', gap: Space.xs, paddingHorizontal: Space.xs },
-  fio: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 1 },
+  // Cada botão é absoluto na faixa (`botaoNoArrasto`); o de fora cobre o de dentro.
+  botao: { position: 'absolute', top: 0, bottom: 0, overflow: 'hidden' },
+  // O conteúdo fica na largura natural, parado: o botão só o DESCOBRE.
+  conteudo: { position: 'absolute', top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: Space.xs, paddingHorizontal: Space.xs },
+  fio: { position: 'absolute', top: 0, bottom: 0, width: 1 },
+  fioNaEsquerda: { left: 0 },
+  fioNaDireita: { right: 0 },
   // Rótulo não parte palavra nem trunca: centraliza e quebra entre palavras (design.md §3).
   rotulo: { textAlign: 'center', flexShrink: 0, maxWidth: '100%' },
   recorteCard: { borderRadius: Radius.md, borderCurve: 'continuous', overflow: 'hidden' },

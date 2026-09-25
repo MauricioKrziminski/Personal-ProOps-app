@@ -29,38 +29,71 @@ export function pontasDoPainel<T>(direita: T[], esquerda: T[]): { direita: T | n
 }
 
 /**
- * A largura de cada botão enquanto o dedo arrasta (o efeito do WhatsApp, 24/09/2026): os botões
- * dividem o que o card já revelou, e passado o "até o fim" (`cheio` vai de 0 a 1 numa mola) a
- * PONTA toma o painel inteiro e os outros somem. A ponta da esquerda é a última; a da direita, a
- * primeira.
+ * O quanto o botão `i` (contado a partir do card) entra por BAIXO dele (24/09/2026). O painel é uma peça só atrás do card:
+ * o lado dele que encosta no card continua sob o canto arredondado, e é o canto do card que
+ * desenha a borda — côncava, seguindo a curva (*"a borda está para fora, tem que ser para
+ * dentro"*). A sobra é do botão colado no card e, até o fim, da ponta, que toma o painel. Cresce
+ * com o revelado: fechado, nada aparece no canto.
  */
-export function largurasDoPainel(revelado: number, n: number, cheio: number, lado: 'direita' | 'esquerda'): number[] {
+export function sobraSobOCard(
+  i: number,
+  n: number,
+  lado: 'direita' | 'esquerda',
+  revelado: number,
+  cheio: number,
+  raio: number,
+): number {
   'worklet';
-  const r = Math.max(0, revelado);
+  const colado = lado === 'direita' ? n - 1 : 0;
   const ponta = lado === 'direita' ? 0 : n - 1;
-  const larguras: number[] = [];
-  for (let i = 0; i < n; i++) {
-    const igual = r / n;
-    larguras.push(igual + ((i === ponta ? r : 0) - igual) * cheio);
-  }
-  return larguras;
+  const peso = (i === colado ? 1 - cheio : 0) + (i === ponta ? cheio : 0);
+  return Math.min(raio, Math.max(0, revelado)) * peso;
 }
+
+export type BotaoNoArrasto = {
+  /** Onde o botão começa, a partir da borda do card (negativo = sob o canto dele). */
+  inicio: number;
+  /** A largura inteira, com o recuo. */
+  largura: number;
+  /** O pedaço do lado do card que fica sob o canto dele: o conteúdo começa depois dele. */
+  recuo: number;
+  /** Onde a caixa do conteúdo (`botao` de largura) começa, depois do recuo. */
+  conteudo: number;
+};
 
 /**
- * Até o fim, o conteúdo da ponta (ícone e rótulo) acompanha a borda do card em vez de ficar no
- * meio do painel largo — é o que faz o gesto "puxar" a ação. Positivo = para a direita.
+ * Onde desenhar o botão `j` do painel — `j` contado a partir do CARD (0 é o colado nele, `n - 1` é
+ * a ponta) —, o movimento do WhatsApp no iPhone (gravação do dono do produto, 24/09/2026):
+ *
+ * - cada botão tem a largura NATURAL (`botao`) com o conteúdo centrado nela, e sai de baixo do
+ *   card em degraus: o botão `j` começa em `j · revelado / n`. O de fora fica POR CIMA (a tela dá
+ *   `zIndex = j`), então o ícone é só descoberto — nada encolhe nem esmaece;
+ * - passando do painel aberto, os botões esticam por igual;
+ * - até o fim (`cheio` de 0 a 1 numa mola), a ponta desliza sobre os outros até a borda do card, e
+ *   o conteúdo dela gruda nessa borda.
  */
-export function deslocamentoDaPonta(revelado: number, botao: number, cheio: number, lado: 'direita' | 'esquerda'): number {
+export function botaoNoArrasto(
+  j: number,
+  n: number,
+  revelado: number,
+  botao: number,
+  cheio: number,
+  raio: number,
+): BotaoNoArrasto {
   'worklet';
-  const sobra = Math.max(0, revelado - botao) / 2;
-  // `|| 0`: sem o até o fim a conta dá -0 à esquerda.
-  return (lado === 'direita' ? sobra : -sobra) * cheio || 0;
-}
-
-/** 0 → 1: o ícone e o rótulo aparecem junto com o espaço do botão (fade e escala). */
-export function aparicao(largura: number, botao: number): number {
-  'worklet';
-  return Math.min(1, Math.max(0, (largura - botao * 0.35) / (botao * 0.65)));
+  const r = Math.max(0, revelado);
+  const passo = r / n;
+  const ponta = j === n - 1;
+  // Pela régua de `sobraSobOCard`, que conta a partir do lado `esquerda` (colado = 0).
+  const recuo = sobraSobOCard(j, n, 'esquerda', r, cheio, raio);
+  const inicio = ponta ? j * passo * (1 - cheio) : j * passo;
+  // O espaço do botão: é nele que o conteúdo fica no meio.
+  const vaga = ponta ? Math.max(botao, r - inicio) : Math.max(botao, passo);
+  const conteudo = ((vaga - botao) / 2) * (ponta ? 1 - cheio : 1);
+  // O de dentro vai até a borda de fora, POR BAIXO dos de fora: no Android a posição de um botão
+  // já chegou um quadro depois da do outro, e entre os dois aparecia o fundo da tela.
+  const largura = ponta ? vaga : Math.max(vaga, r - inicio);
+  return { inicio: inicio - recuo, largura: largura + recuo, recuo, conteudo };
 }
 
 /** O card tem algo para mostrar ao arrastar? Sem nada, o `Deslizavel` nem monta o gesto. */

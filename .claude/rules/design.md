@@ -616,11 +616,22 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
     `useDesfazerBaixa`). Ação nova na borda que muda dado sem confirmar nasce com o "Desfazer";
   - `icon` em toda ação revelada e `curto` (uma palavra) quando o rótulo não cabe nos 88dp.
   O toque longo não muda. `ItemLink` aplica sozinho; os outros cards envolvem com a mesma lista.
-  **O painel é peça do card** ("tudo junto", escolha do dono do produto em 24/09/2026): aberto, o
-  card perde o canto do lado que abre (`useCantosDoArrasto`, lido por `Card` e pelo cartão da
-  nota) e o conjunto só arredonda nas pontas. **O movimento é o do WhatsApp**: os botões dividem o
-  que o card revelou, ícone e rótulo aparecem com o espaço, e até o fim a ponta toma o painel com
-  o ícone colado na borda do card (`largurasDoPainel`, `deslocamentoDaPonta`, com teste).
+  **O painel mora ATRÁS do card e o movimento é o do WhatsApp no iPhone** (24/09/2026, gravação
+  do dono do produto estudada quadro a quadro; *"copie somente a animação do WhatsApp"*):
+  - **Visual (nosso):** o card mantém os cantos; o painel é UMA peça, botões grudados (fio de 1px
+    entre dois neutros), ponta de fora arredondada, e o lado do card entra SOB o canto dele
+    (`recuo` = `Radius.md`) — a borda que se vê é a curva do card, côncava (*"a borda está para
+    fora, tem que ser para dentro"*). Tirar o canto do card ("tudo junto", a primeira tentativa)
+    e botões em pílula separados foram os dois recusados.
+  - **Movimento (do WhatsApp):** cada botão tem a largura NATURAL com o conteúdo parado no meio e
+    sai de baixo do card em degraus (`botaoNoArrasto`, `lib/arrasto.ts`, com teste); o de fora
+    fica por cima (`zIndex`). Nada encolhe, esmaece ou muda de escala — o ícone só é descoberto.
+    Passando do painel aberto, os botões esticam por igual; até o fim, a ponta desliza sobre os
+    outros em ~0,3 s, sem quique, com o conteúdo colado na borda do card.
+  - **Soltar até o fim numa ação que TIRA o item da lista** (a ponta da esquerda com `desfaz`:
+    Arquivar) faz o card seguir até sair da tela, com a ponta cobrindo a linha inteira, e a linha
+    some quando a ação chega; se ela falhar, o card volta em 3 s. Apagar (confirma), "Mais" e a
+    direita (ação rápida) voltam para o lugar.
   ⚠️ Os botões do painel são `Gesture.Tap` **simultâneos ao observador do dedo**: o `Pressable`
   do gesture-handler perdia o toque para o `Gesture.Manual` no iPhone (24/09/2026).
   ⚠️ **O FAB sobe acima do toast** (`useSubirAcimaDoToast`): os dois moravam no mesmo lugar e o
