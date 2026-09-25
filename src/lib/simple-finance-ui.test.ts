@@ -16,6 +16,10 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
+  // Como no React: `setState` DURANTE o render (o `?edit=`/`?id=` consumido quando o dado chega)
+  // desenha de novo na hora, antes de a tela valer.
+  let renderizando = false;
+  let deNovo = false;
   const writes: { operation: string; value: any }[] = [];
   const confirmations: (() => void)[] = [];
   const actions: { label: string; onPress: () => void }[] = [];
@@ -172,7 +176,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
       if (name === 'react') return {
         Fragment: Symbol.for('react.fragment'),
-        useState(initial: any) { const index = cursor++; if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial; return [state[index], (value: any) => { state[index] = typeof value === 'function' ? value(state[index]) : value; }]; },
+        useState(initial: any) { const index = cursor++; if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial; return [state[index], (value: any) => { state[index] = typeof value === 'function' ? value(state[index]) : value; if (renderizando) deNovo = true; }]; },
         useMemo: (fn: () => unknown) => fn(),
         useCallback: (fn: unknown) => fn,
         useRef: (v: unknown) => ({ current: v }),
@@ -348,7 +352,13 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     if (node.type === 'HeaderActions' && Array.isArray(node.props.actions))
       node.props.actions.forEach((a: any) => nodes.push({ type: 'Button', props: a }));
   };
-  const render = () => { cursor = 0; nodes = []; visit(Component(options.props ?? {})); };
+  const render = () => {
+    for (let vez = 0; vez < 5; vez++) {
+      cursor = 0; nodes = []; deNovo = false; renderizando = true;
+      try { visit(Component(options.props ?? {})); } finally { renderizando = false; }
+      if (!deNovo) return;
+    }
+  };
   render();
   return {
     writes, pedidos, toasts, pedidosDeLimite, avisos, confirmations, actions, navigations, refetches, gates,
@@ -839,6 +849,28 @@ test('e quem abriu o formulário PELA PRÓPRIA tela continua nela', () => {
   ui.interact((nodes) => nodes.find((n) => n.type === 'EmptyState').props.action.onPress());
   ui.interact((nodes) => nodes.find((n) => n.type === 'TaskHeader').props.onClose());
   assert.deepEqual(ui.navigations, []);
+});
+
+test('o detalhe da dívida aberto por OUTRA tela (?id=) devolve para ela ao fechar', () => {
+  // O pagamento de uma dívida (Editar lançamento) e a prestação no ciclo abrem ESTA dívida.
+  const fora = screen(debtsFile, { create: false, debts: [carro], params: { id: 'd1' } });
+  fora.interact((nodes) => nodes.find((n) => n.type === 'TaskHeader' && n.props.title === 'Carro').props.onClose());
+  assert.deepEqual(fora.navigations, [{ back: true }]);
+
+  // E o que se abriu a partir dele também: pagar a parcela e fechar volta para onde se estava.
+  const pagando = screen(debtsFile, {
+    create: false, debts: [carro], params: { id: 'd1' },
+    debtSchedule: [{ installment_no: 9, due_date: '2026-10-05', payment_cents: 147000, interest_cents: null, principal_cents: null, balance_cents: 0 }],
+  });
+  pagando.press('Paguei esta parcela');
+  pagando.interact((nodes) => nodes.find((n) => n.type === 'TaskHeader' && /^Pagar/.test(n.props.title)).props.onClose());
+  assert.deepEqual(pagando.navigations, [{ back: true }]);
+
+  // Quem abriu pela própria lista continua nela.
+  const lista = screen(debtsFile, { create: false, debts: [carro], params: {} });
+  lista.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onPress());
+  lista.interact((nodes) => nodes.find((n) => n.type === 'TaskHeader' && n.props.title === 'Carro').props.onClose());
+  assert.deepEqual(lista.navigations, []);
 });
 
 test('editing a legacy amortized financing preserves its mode and remaining-term semantics', () => {

@@ -202,4 +202,6 @@ pagamento de dívida, "É pagamento de uma dívida." vinha grudado no "Ver dívi
 o bloco virou UMA linha "Pagamento de uma dívida ›" que abre ESTA dívida, não a lista. Na mesma
 tela: "R$ 0,00 disso são juros" em vermelho numa dívida sem juros, e "juros 0%" no "Por onde
 começar" — os dois saíram ("sem juros", como a linha da dívida). Conferido no iPhone com uma dívida
-e um pagamento de teste no `dev@`, apagados pelo ID depois.
+e um pagamento de teste no `dev@`, apagados pelo ID depois. Abrir a dívida por `?id=` (daqui ou da
+prestação no ciclo) agora devolve para quem abriu ao fechar o detalhe, ou o pagamento feito a partir
+dele — antes largava a pessoa na lista de Dívidas.

@@ -194,6 +194,16 @@ export default function DebtsScreen() {
   const [pagandoId, setPagandoId] = useState<string | null>(null);
   const detalhe = debts.data?.find((debt) => debt.id === detalheId) ?? null;
   const pagando = debts.data?.find((debt) => debt.id === pagandoId) ?? null;
+  /**
+   * Quem chegou por `?id=` (o pagamento no "Editar lançamento", a prestação no ciclo) veio de
+   * outra tela: fechar o detalhe — ou o pagamento e a edição abertos a partir dele — devolve para
+   * lá. Marcado NO RENDER, quando a dívida chega, como o `?edit=` de Parceladas.
+   */
+  const [idConsumido, setIdConsumido] = useState(false);
+  if (params.id && !idConsumido && debts.data?.some((debt) => debt.id === params.id)) {
+    setIdConsumido(true);
+    volta.marcar();
+  }
   const setDetalhe = (debt: Debt | null) => setDetalheId(debt?.id ?? null);
   const setPagando = (debt: Debt | null) => setPagandoId(debt?.id ?? null);
   const [pagoCents, setPagoCents] = useState(0);
@@ -413,7 +423,7 @@ export default function DebtsScreen() {
       {
         onSuccess: () => {
           toast({ message: `Parcela de ${pagando.name} registrada.`, tone: 'success' });
-          setPagando(null);
+          volta.aoFechar(() => setPagando(null));
         },
         // o sheet FICA aberto: fechar num erro faz o usuário registrar o pagamento de novo
         onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para registrar o pagamento.'), tone: 'error' }),
@@ -727,10 +737,10 @@ export default function DebtsScreen() {
       {tablet ? tabletBody : compactBody}
 
       {/* Amortização — sheet, não acordeão: um financiamento em 60x tem 60 linhas. */}
-      <Sheet visible={detalhe !== null} onClose={() => setDetalhe(null)}>
+      <Sheet visible={detalhe !== null} onClose={() => volta.aoFechar(() => setDetalhe(null))}>
           <TaskHeader
             title={detalhe?.name ?? 'Dívida'}
-            onClose={() => setDetalhe(null)}
+            onClose={() => volta.aoFechar(() => setDetalhe(null))}
             action={
               detalhe ? (
                 <HeaderIconButton icon="ellipsis" label="Mais ações" onPress={() => acoesDaDivida(detalhe, true)} />
@@ -857,10 +867,10 @@ export default function DebtsScreen() {
       </Sheet>
 
       {/* Pagar parcela — sheet com a conta explicada ANTES de confirmar. */}
-      <Sheet visible={pagando !== null} onClose={() => setPagando(null)}>
+      <Sheet visible={pagando !== null} onClose={() => volta.aoFechar(() => setPagando(null))}>
           <TaskHeader
             title={pagando ? `Pagar ${pagando.name}` : 'Pagar'}
-            onClose={() => setPagando(null)}
+            onClose={() => volta.aoFechar(() => setPagando(null))}
           />
 
           {pagando ? (
