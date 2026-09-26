@@ -4,7 +4,7 @@ import { MaxContentWidth } from '@/constants/theme';
 import { chartWidthForPane, rootContentMaxWidth } from '@/design/adaptive-window';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useIsFocused, useLocalSearchParams } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
@@ -44,6 +44,7 @@ import {
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { formatNumberBR } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
+import { passoDaVolta, type Volta } from '@/lib/reabrir-ao-voltar';
 import { confirmDestructive } from '@/lib/item-actions';
 import { estadoDaLinha } from '@/lib/settle-labels';
 import { STATUS_DA_FATURA } from '@/lib/card-status';
@@ -270,7 +271,8 @@ export default function InvoiceScreen() {
     // a mesma conta todo mês. Só vale se ela ainda for uma pagadora válida (pode ter sido
     // arquivada ou virado cartão), senão o banco recusaria e o usuário não saberia por quê.
     const sugerida = pagadoras.find((a) => a.id === cartao?.payment_account_id);
-    setPayerId(sugerida?.id ?? null);
+    // Uma conta só (a que acabou de ser cadastrada daqui, por exemplo) já vem escolhida.
+    setPayerId(sugerida?.id ?? (pagadoras.length === 1 ? pagadoras[0].id : null));
     setDataBR(formatDateBR(localISODate()));
     setValorCents(falta);
     setPagando(true);
@@ -283,6 +285,17 @@ export default function InvoiceScreen() {
     if (!pagamentoPedido.current || !podePagar || !accounts.data) return;
     pagamentoPedido.current = false;
     abrirPagamento();
+  });
+
+  // "Cadastrar conta" de dentro do pagamento (25/09/2026): a folha fecha para a tela da conta abrir
+  // — o `Sheet` não sobrevive a perder o foco — e REABRE quando a fatura volta ao foco, já com a
+  // conta nova. Sem isto a pessoa voltava para a fatura e tinha que tocar em pagar de novo.
+  const focada = useIsFocused();
+  const reabrirPagamento = useRef<Volta>('nada');
+  useEffect(() => {
+    const passo = passoDaVolta(reabrirPagamento.current, focada);
+    reabrirPagamento.current = passo.estado;
+    if (passo.abrir) abrirPagamento();
   });
 
   const registrar = () => {
@@ -689,6 +702,7 @@ export default function InvoiceScreen() {
                 action={{
                   label: 'Cadastrar conta',
                   onPress: () => {
+                    reabrirPagamento.current = 'pedido';
                     setPagando(false);
                     router.push('/finance/accounts?create=1');
                   },

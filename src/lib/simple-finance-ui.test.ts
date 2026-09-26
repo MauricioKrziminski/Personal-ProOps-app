@@ -198,7 +198,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === 'expo-haptics') return { selectionAsync() {}, notificationAsync() {}, NotificationFeedbackType: { Success: 'success', Warning: 'warning' } };
       // `back` é navegação como qualquer outra e ENTRA na lista: é o que prende o "fechar um
       // formulário que outra tela abriu devolve para ela" (`useVoltarQuandoFechar`).
-      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => options.params ?? ({ ...(file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), ...(options.create !== false ? { create: 'financing' } : {}) }), useFocusEffect: () => {}, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }) } };
+      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => options.params ?? ({ ...(file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), ...(options.create !== false ? { create: 'financing' } : {}) }), useFocusEffect: () => {}, useIsFocused: () => true, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }) } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
       if (name === '@/hooks/use-aos-poucos') return load('src/hooks/use-aos-poucos.ts');
