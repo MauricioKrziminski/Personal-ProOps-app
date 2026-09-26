@@ -101,8 +101,13 @@ interface FormState {
   limitCents: number;
   scope: 'default' | 'month';
   rollover: boolean;
-  /** Em edição a categoria é a identidade do orçamento: fixa, não editável. */
   editing: boolean;
+  /**
+   * Editando: a chave do limite que abriu (categoria + mês dele, nulo = todo mês). O salvar muda
+   * AQUELE limite (`edit_budget`) — categoria inclusive, desde 26/09/2026 ("tudo que se cria se
+   * edita"); o upsert de antes criava outro.
+   */
+  antes?: { category: string; month: string | null };
 }
 
 /** `2026-08` → `agosto` (para o rótulo da ação de remover e das legendas). */
@@ -218,6 +223,7 @@ export default function BudgetsScreen() {
       scope: b.month ? 'month' : 'default',
       rollover: Boolean(b.rollover),
       editing: true,
+      antes: { category: b.category, month: b.month ?? null },
     });
 
   const verLancamentos = (category: string) =>
@@ -230,6 +236,7 @@ export default function BudgetsScreen() {
       limit_cents: form.limitCents,
       rollover: form.rollover,
       month: form.scope === 'month' ? month : null,
+      antes: form.antes,
     };
     save.mutate(entrada, {
       onSuccess: () => {
@@ -630,13 +637,8 @@ export default function BudgetsScreen() {
           {form ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
               <Field label="Categoria">
-                {form.editing ? (
-                  <ThemedText type="default">{form.category}</ThemedText>
-                ) : (
-                  // O mesmo seletor do lançamento (25/09/2026): com as 13 sugeridas em chips, as
-                  // categorias que a pessoa usa ("roupa", "despesas eventuais") não davam limite.
-                  <CategoryPicker value={form.category} onChange={(category) => setForm({ ...form, category })} />
-                )}
+                {/* O mesmo seletor do lançamento (25/09/2026), criando e editando (26/09/2026). */}
+                <CategoryPicker value={form.category} onChange={(category) => setForm({ ...form, category })} />
               </Field>
 
               {/*

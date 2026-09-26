@@ -2810,7 +2810,24 @@ export function useSaveBudget() {
       rollover?: boolean;
       /** YYYY-MM para sobrescrever só aquele mês; omitido = limite padrão. */
       month?: string | null;
+      /**
+       * Editando: a chave do limite que abriu (categoria + mês do limite, nulo = todo mês). Vai por
+       * `edit_budget` (`20260926150000`), que muda AQUELE limite — o upsert criava outro.
+       */
+      antes?: { category: string; month: string | null };
     }) => {
+      if (input.antes) {
+        const { error } = await supabase.rpc('edit_budget', {
+          p_category_antes: input.antes.category,
+          p_month_antes: input.antes.month,
+          p_category: input.category,
+          p_limit_cents: input.limit_cents,
+          p_rollover: input.rollover ?? false,
+          p_month: input.month ? primeiroDiaDoMes(input.month) : undefined,
+        });
+        if (error) throw error;
+        return;
+      }
       // Via RPC, não upsert: os unique de `budgets` são PARCIAIS (month null vs
       // not null) e o Postgres só casa índice parcial se o ON CONFLICT repetir o
       // predicado — que o PostgREST não tem como mandar. Fazia todo salvamento

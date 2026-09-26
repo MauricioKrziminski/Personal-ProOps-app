@@ -152,6 +152,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     }),
     useUpcomingCardCharges: () => ({ ...query, isSuccess: true, data: options.charges ?? [] }),
     // `budgetsPending`: os limites do mês chegando (a troca de mês, com o portão já aberto).
+    useSaveBudget: () => mutation('saveBudget'),
+    useDeleteBudget: () => mutation('deleteBudget'),
     useBudgetsStatus: () => options.budgetsPending ? { ...query, isLoading: true, isPending: true, isSuccess: false, data: undefined } : ({ ...query, isSuccess: true, data: options.budgets ?? [] }),
     useSpendablePath: () => ({ ...query, isSuccess: true, data: [] }),
     useCycle: () => ({ ...query, isSuccess: true, data: options.cycle ?? { de: '2026-09-01', ate: '2026-09-30', mes: '2026-09', diasAteOFim: 22 } }),
@@ -2636,4 +2638,18 @@ test('Dívidas: o "Paguei" tem a data do pagamento, e ela vai para o banco', () 
   ui.interact(() => data().props.onChange('20/09/2026'));
   ui.press('Registrar pagamento');
   assert.equal(ui.writes[0].value.paidAt, '2026-09-20');
+});
+
+test('Orçamento: editar muda AQUELE limite — a categoria também, pela chave de quando abriu', () => {
+  // 26/09/2026: a categoria era só texto na edição, e trocar "Vale para" criava outro limite.
+  const ui = screen('src/app/finance/budgets.tsx', { budgets: [{ category: 'mercado', limit_cents: 100_00, base_limit_cents: 100_00, rollover_cents: 0, spent_cents: 40_00, committed_cents: 0, month: null }] });
+  const card = deslizaveis(ui)[0];
+  ui.interact(() => card.props.acoes.find((x: any) => x.label === 'Editar limite').onPress());
+  const seletor = ui.nodes().find((n: any) => n.type === 'CategoryPicker' || n.type?.name === 'CategoryPicker');
+  assert.ok(seletor, 'a categoria é o seletor, não texto');
+  ui.interact(() => seletor.props.onChange('supermercado'));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'TaskHeader').props.action.props.onPress());
+  const gravado = ui.pedidos.at(-1).value;
+  assert.equal(gravado.category, 'supermercado');
+  assert.deepEqual(JSON.parse(JSON.stringify(gravado.antes)), { category: 'mercado', month: null });
 });
