@@ -25,6 +25,10 @@
 --    paga em parte não reabre por aqui: a parcela continua paga, e a frase diz como desfazer.
 --    Tudo numa transação só — a tela manda uma chamada.
 --
+-- 3. O gatilho da fatura (`set_invoice`) deixa a linha onde está quando nada que decide a fatura
+--    mudou — conta, data, workspace. O formulário manda a linha inteira, e renomear uma compra de
+--    uma fatura ADIADA a levava para a fatura seguinte.
+--
 -- A assinatura ganhou um argumento com default: a de 8 argumentos SAI (uma versão só; chamada
 -- com 8 argumentos, como a do agente, cai na nova). Teste: `supabase/tests/reparcelar_a_compra.sql`
 -- e `supabase/tests/editar_como_criar.sql`.
@@ -363,3 +367,80 @@ $$;
 
 revoke execute on function public.update_installment_plan(uuid, bigint, integer, date, text, text, text, uuid, integer) from public, anon;
 grant execute on function public.update_installment_plan(uuid, bigint, integer, date, text, text, text, uuid, integer) to authenticated;
+
+-- ── 3. o gatilho da fatura não mexe no que não mudou ─────────────────────────────────────────
+create or replace function public.tg_transactions_set_invoice()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $function$
+declare
+  card record;
+  win record;
+  inv_id uuid;
+  _i int;
+  seguinte uuid;
+  old_due date;
+begin
+  -- Nada que decide a fatura mudou: a linha fica onde está (`20260926130000`). `UPDATE OF`
+  -- dispara com a coluna só MENCIONADA, e o formulário do lançamento manda a linha inteira —
+  -- renomear uma compra de uma fatura ADIADA a levava para a fatura seguinte (o laço de "adiada
+  -- não recebe cobrança nova"), com o dinheiro junto e sem nada na tela dizer.
+  if tg_op = 'UPDATE'
+     and new.account_id is not distinct from old.account_id
+     and new.occurred_at is not distinct from old.occurred_at
+     and new.workspace_id is not distinct from old.workspace_id
+     and new.invoice_id is not distinct from old.invoice_id
+     and (old.invoice_id is not null or new.due_at is not distinct from old.due_at) then
+    if old.invoice_id is not null then
+      new.due_at := old.due_at;
+    end if;
+    return new;
+  end if;
+
+  if tg_op = 'UPDATE' and old.invoice_id is not null then
+    select due_date into old_due from public.card_invoices where id = old.invoice_id;
+  end if;
+  select a.type, a.closing_day, a.due_day, a.workspace_id, a.user_id, a.closing_day_inclusive
+    into card
+    from public.accounts a where a.id = new.account_id;
+  if new.account_id is not null then
+    if card.workspace_id is distinct from new.workspace_id then
+      raise exception 'Conta precisa pertencer ao workspace do lançamento';
+    end if;
+  end if;
+  if new.account_id is null or card.type is distinct from 'credit_card'
+     or card.closing_day is null or card.due_day is null then
+    new.invoice_id := null;
+    if tg_op = 'UPDATE' and old.invoice_id is not null
+       and new.due_at is not distinct from old.due_at and old.due_at = old_due then
+      new.due_at := null;
+    end if;
+    return new;
+  end if;
+  -- a borda do dia do fechamento é do CARTÃO (`20260911140000`)
+  select * into win from private.invoice_window(
+    card.closing_day, card.due_day, new.occurred_at, coalesce(card.closing_day_inclusive, false));
+  insert into public.card_invoices
+    (workspace_id, user_id, account_id, reference_month, closing_date, due_date)
+  values (card.workspace_id, coalesce(new.user_id, card.user_id), new.account_id,
+          win.reference_month, win.closing_date, win.due_date)
+  on conflict (account_id, reference_month) do nothing;
+  select ci.id into inv_id from public.card_invoices ci
+    where ci.account_id = new.account_id and ci.reference_month = win.reference_month;
+
+  -- fatura adiada não recebe cobrança nova. Segue para onde o saldo dela foi.
+  for _i in 1..12 loop
+    select ci.rolled_into_invoice_id into seguinte
+      from public.card_invoices ci where ci.id = inv_id and ci.status = 'rolled';
+    exit when seguinte is null;
+    inv_id := seguinte;
+    seguinte := null;
+  end loop;
+
+  new.invoice_id := inv_id;
+  select ci.due_date into new.due_at from public.card_invoices ci where ci.id = inv_id;
+  return new;
+end;
+$function$;

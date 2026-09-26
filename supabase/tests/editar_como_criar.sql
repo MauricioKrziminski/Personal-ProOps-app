@@ -8,6 +8,7 @@
 -- 3. Recusas com o motivo: número abaixo da última paga, à vista com parcela paga.
 -- 4. Compra no CARTÃO: as já pagas quitam a fatura vencida que é só delas, e reabrem junto; a
 --    fatura paga de verdade não reabre; data e cartão não mudam com parcela paga na fatura.
+-- 5. Renomear uma compra de fatura adiada não a leva para a fatura seguinte.
 -- Datas relativas a hoje: o teste não envelhece. Roda numa transação e dá rollback.
 
 \set ON_ERROR_STOP on
@@ -145,6 +146,29 @@ begin
 
   select sum(amount_cents) into v from public.transactions where installment_plan_id = plano;
   if v <> 30000 then raise exception '4: a soma das parcelas é % (30000)', v; end if;
+
+  -- ── 5. renomear uma compra de fatura ADIADA não a leva para a fatura seguinte ─────────
+  declare
+    compra uuid;
+    adiada uuid;
+    seguinte uuid;
+  begin
+    insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, account_id, occurred_at, source)
+      values (w, u, 'expense', 5000, 'Mercado', card2, hoje - 40, 'app') returning id, invoice_id into compra, adiada;
+    insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, account_id, occurred_at, source)
+      values (w, u, 'expense', 100, 'Outra', card2, hoje - 5, 'app') returning invoice_id into seguinte;
+    if adiada = seguinte then raise exception '5: o teste precisa de duas faturas'; end if;
+    update public.card_invoices set status = 'rolled', rolled_into_invoice_id = seguinte where id = adiada;
+    -- o formulário manda a linha inteira: conta e data MENCIONADAS, iguais
+    update public.transactions set description = 'Mercado do mês', account_id = card2, occurred_at = hoje - 40
+     where id = compra;
+    select invoice_id into l from public.transactions where id = compra;
+    if l.invoice_id <> adiada then raise exception '5: renomear levou a compra da fatura adiada para outra'; end if;
+    -- mudar a data de verdade continua mudando a fatura
+    update public.transactions set occurred_at = hoje - 5 where id = compra;
+    select invoice_id into l from public.transactions where id = compra;
+    if l.invoice_id <> seguinte then raise exception '5: mudar a data não mudou a fatura'; end if;
+  end;
 end $$;
 
 rollback;
