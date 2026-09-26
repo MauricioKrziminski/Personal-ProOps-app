@@ -16,6 +16,7 @@ from app.graph.policy import (
     describe_for_confirmation,
     dominio_incerto,
     erro_de_correcao,
+    abertas_com,
     muda_numero_de_parcelas,
     needs_confirmation,
     par_de_substituicao,
@@ -817,10 +818,10 @@ def _perguntar_unidade(state: AgentState, i: int, acao, alvo: dict) -> tuple[dic
                       "results": [*state.get("results", []),
                                   "Ainda não mudei nada. Me pede a correção de novo."]}
     novo = acao.new_amount_cents
-    # nº de parcelas novo junto ("a tv foi 3000 em 12x"): só chega aqui sem parcela
-    # travada, então "cada parcela" multiplica pelo N NOVO
+    # nº de parcelas novo junto ("a tv foi 3000 em 12x"): "cada parcela" multiplica pelas que
+    # ficam em ABERTO com o N novo — as pagas continuam como estão (`20260926130000`)
     n = acao.installments if muda_numero_de_parcelas(acao, cand) else cand["plan_installments"]
-    editaveis = n if muda_numero_de_parcelas(acao, cand) else cand["editaveis"]
+    editaveis = abertas_com(cand, n) if muda_numero_de_parcelas(acao, cand) else cand["editaveis"]
     por_parcela = cand["travado_cents"] + novo * editaveis
     escolha = interrupt({
         "kind": "choice",

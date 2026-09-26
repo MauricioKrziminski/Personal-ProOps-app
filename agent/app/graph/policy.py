@@ -22,6 +22,9 @@ from app.domain.correcao_plano import (
     e_conversao,
     e_desparcelar,
     muda_numero_de_parcelas,
+    abaixo_da_paga,
+    abertas_com,
+    fatura_travada,
     plano_travado,
 )
 from app.domain.dates import format_date_br
@@ -187,7 +190,7 @@ def _frase_correcao_plano(action: FinanceAction, target: dict, escolhido: dict) 
     suffix += f"; {', '.join(outras)} em todas as parcelas" if outras else ""
     n = action.installments if muda_n else escolhido.get("plan_installments")
     if unit == "parcela":
-        editaveis = n if muda_n else escolhido["editaveis"]
+        editaveis = abertas_com(escolhido, n) if muda_n else escolhido["editaveis"]
         novo_total = escolhido["travado_cents"] + novo * editaveis
         if muda_n:
             return (f"corrigir {label}: {n}x de {cents_to_brl(novo)} "
@@ -291,12 +294,22 @@ def _frase_plano(action: FinanceAction, target: dict, escolhido: dict) -> str:
         if total is None:
             # candidato de antes do deploy (a política recusa antes; aqui só não quebra)
             partes.append(f"de {escolhido['plan_installments']}x para {n}x")
+        elif int(escolhido.get("travado_cents") or 0) > 0:
+            # com parcela paga (`20260926130000`): as pagas ficam, o resto se reparte
+            abertas = abertas_com(escolhido, n)
+            restante = total - int(escolhido["travado_cents"])
+            pagas = int(escolhido.get("travadas") or 0)
+            resto = " (a última acerta os centavos)" if abertas and restante % abertas else ""
+            partes.append(f"de {escolhido['plan_installments']}x para {n}x — "
+                          f"{'a paga fica' if pagas == 1 else f'as {pagas} pagas ficam'} e "
+                          f"{'a em aberto fica' if abertas == 1 else f'as {abertas} em aberto ficam'} com "
+                          f"{cents_to_brl(restante // max(abertas, 1))}{resto}")
         else:
             resto = " (a última acerta os centavos)" if total % n else ""
             partes.append(f"de {escolhido['plan_installments']}x para {n}x de "
                           f"{cents_to_brl(total // n)}{resto}")
     if action.new_occurred_at:
-        # sem parcela travada a RPC refaz TODAS as datas a partir da 1ª: a frase diz isso
+        # a RPC refaz as datas a partir da 1ª (com parcela paga fora do cartão, ela acompanha)
         partes.append(f"1ª parcela em {format_date_br(action.new_occurred_at)} "
                       "(as outras seguem de mês em mês)")
     conta, _ = conta_nova_do_plano(action, target, escolhido)
@@ -417,8 +430,17 @@ def erro_de_correcao(action, target: dict | None) -> str | None:
                 # candidato de antes do deploy: sem a trava congelada o SIM não sabe o efeito
                 return "Ainda não mudei nada. Me pede de novo."
             if cand["travado_cents"] > 0:
+                # A régua da `20260926130000`: o número muda com parcela paga (não abaixo da
+                # última), à vista não, e data/conta só prendem com parcela paga na fatura.
                 nome = _nome_do_plano(cand)
-                return desparcelar_travada(nome) if desparcela else plano_travado(nome)
+                if desparcela:
+                    return desparcelar_travada(nome)
+                if cand.get("travadas_fatura") is None:
+                    return plano_travado(nome)
+                if cand["travadas_fatura"] > 0 and (action.new_occurred_at or conta):
+                    return fatura_travada(nome)
+                if muda_parcelas and action.installments < int(cand.get("ultima_travada") or 0):
+                    return abaixo_da_paga(nome, int(cand["ultima_travada"]))
         return None
     if n_plano is not None and muda_parcelas:
         return MUDAR_PARCELAS

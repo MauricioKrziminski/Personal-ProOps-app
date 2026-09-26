@@ -413,21 +413,27 @@ class TestEdicaoPlano:
 
     @pytest.mark.asyncio
     async def test_estrutura_com_parcela_paga_agora_nao_chama_a_rpc(self, monkeypatch):
-        """Entre a pergunta e o SIM uma fatura foi paga: a trava é relida e recusa."""
+        """Entre a pergunta e o SIM uma fatura foi paga: a trava é relida — a data não muda
+        mais (a parcela sairia da fatura), mas o número de parcelas sim (`20260926130000`)."""
         rpc = []
 
         async def fetch_one(sql, *args):
             if "update_installment_plan" in sql:
                 rpc.append(args)
-            return {**PLANO_COMPLETO, "editaveis": 9, "travado_cents": 30000, "primeira": None}
+            return {**PLANO_COMPLETO, "editaveis": 9, "travado_cents": 30000, "primeira": None,
+                    "travadas": 1, "travadas_fatura": 1, "ultima_travada": 1}
 
         monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
         ctx = _ctx_plano()
         ctx.target["candidates"][0].update(plan_installments=10, total_cents=300000,
                                            editaveis=10, travado_cents=0)
         r = await finance.update_transaction(
+            ctx, FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, new_occurred_at="2026-11-01"))
+        assert r.read_only and "a data e o cartão não mudam" in r.message and rpc == []
+
+        r = await finance.update_transaction(
             ctx, FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, installments=12))
-        assert r.read_only and "não mudam mais" in r.message and rpc == []
+        assert not r.read_only and len(rpc) == 1 and rpc[0][2] == 12
 
     @pytest.mark.asyncio
     async def test_snapshot_de_uma_linha_corrige_so_aquela_linha(self, monkeypatch):

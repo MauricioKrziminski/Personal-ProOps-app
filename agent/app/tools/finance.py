@@ -26,7 +26,8 @@ from app.domain.correcao_plano import (
     conta_nova_do_plano,
     desparcelar_travada,
     muda_numero_de_parcelas,
-    plano_travado,
+    abaixo_da_paga,
+    fatura_travada,
 )
 from app.domain.dates import add_months, format_date_br, local_iso_date, now_utc
 from app.domain.money import cents_to_brl, parse_valor_em_centavos
@@ -47,6 +48,13 @@ TRAVAS_DO_PLANO = """cross join lateral (
             select count(*) filter (where not private.parcela_travada(t.status, t.invoice_id)) as editaveis,
                    coalesce(sum(t.amount_cents) filter (
                      where private.parcela_travada(t.status, t.invoice_id)), 0) as travado_cents,
+                   -- a régua da `20260926130000`: o número muda com parcela paga (não abaixo da
+                   -- última), e data/conta só prendem com parcela paga numa FATURA de cartão
+                   count(*) filter (where private.parcela_travada(t.status, t.invoice_id)) as travadas,
+                   count(*) filter (where private.parcela_travada(t.status, t.invoice_id)
+                                      and t.invoice_id is not null) as travadas_fatura,
+                   coalesce(max(t.installment_no) filter (
+                     where private.parcela_travada(t.status, t.invoice_id)), 0) as ultima_travada,
                    -- a parcela 1 REAL (editada à mão ou não): o desparcelar a mantém, com o id
                    min(t.occurred_at) filter (where t.installment_no = 1) as parcela1_em,
                    (array_agg(t.id) filter (where t.installment_no = 1))[1] as parcela1_id
@@ -1142,7 +1150,7 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
     plano = await db.fetch_one(
         f"""
         select p.id, p.total_cents, p.installments, p.first_occurred_at, p.description,
-               p.category, p.merchant, p.account_id, x.editaveis, x.travado_cents,
+               p.category, p.merchant, p.account_id, x.editaveis, x.travado_cents, x.travadas, x.travadas_fatura, x.ultima_travada,
                -- a data REAL da parcela 1 (editada à mão ou não): sem parcela travada a
                -- RPC recalcula TODAS as datas a partir desta. Com parcela travada a RPC
                -- exige a do plano (e não mexe em data nenhuma), daí o `case`.
@@ -1160,8 +1168,12 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
         return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
     nome_atual = plano["description"] or plano["merchant"] or "a compra"
     if estrutura and int(plano["travado_cents"] or 0) > 0:
-        # lido AGORA: entre a pergunta e o SIM uma fatura pode ter sido paga
-        return ToolResult(plano_travado(nome_atual), read_only=True)
+        # lido AGORA: entre a pergunta e o SIM uma fatura pode ter sido paga — a mesma régua
+        # da política e da RPC (`20260926130000`)
+        if int(plano["travadas_fatura"] or 0) > 0 and (action.new_occurred_at or conta):
+            return ToolResult(fatura_travada(nome_atual), read_only=True)
+        if muda_n and action.installments < int(plano["ultima_travada"] or 0):
+            return ToolResult(abaixo_da_paga(nome_atual, int(plano["ultima_travada"])), read_only=True)
     congelado = cands[0].get("total_cents")
     if (estrutura and action.new_amount_cents is None and congelado is not None
             and int(congelado) != int(plano["total_cents"])):
@@ -1181,8 +1193,9 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
             total = valor
         else:
             # lido AGORA, não do que a frase do SIM congelou: entre a pergunta e o SIM
-            # uma fatura pode ter sido paga. N novo só existe sem trava: todas mudam.
-            editaveis = parcelas if muda_n else int(plano["editaveis"] or 0)
+            # uma fatura pode ter sido paga. Com N novo, as em aberto são N − travadas.
+            editaveis = (max(0, parcelas - int(plano["travadas"] or 0)) if muda_n
+                         else int(plano["editaveis"] or 0))
             if editaveis == 0:
                 return ToolResult(NADA_EDITAVEL, read_only=True)
             total = int(plano["travado_cents"] or 0) + valor * editaveis
@@ -1245,7 +1258,7 @@ async def _desparcelar(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     plano = await db.fetch_one(
         f"""
         select p.id, p.total_cents, p.installments, p.first_occurred_at, p.description,
-               p.category, p.merchant, p.account_id, x.editaveis, x.travado_cents,
+               p.category, p.merchant, p.account_id, x.editaveis, x.travado_cents, x.travadas, x.travadas_fatura, x.ultima_travada,
                x.parcela1_em, x.parcela1_id
         from public.installment_plans p
         {TRAVAS_DO_PLANO}

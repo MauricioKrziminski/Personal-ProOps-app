@@ -153,6 +153,10 @@ def _candidato_plano(row: dict) -> dict:
         "total_cents": row.get("total_cents"),
         "editaveis": row.get("editaveis"),
         "travado_cents": row.get("travado_cents"),
+        # a régua da `20260926130000`: quantas travam, quantas numa fatura, e a última travada
+        "travadas": row.get("travadas"),
+        "travadas_fatura": row.get("travadas_fatura"),
+        "ultima_travada": row.get("ultima_travada"),
         # a frase do desparcelar: a data da parcela 1 e o cartão, congelados
         "parcela1_em": str(row["parcela1_em"]) if row.get("parcela1_em") else None,
         "account_name": row.get("account_name"),
@@ -202,7 +206,7 @@ _FONTES: dict[str, dict] = {
     "planos": {
         "table": "installment_plans",
         "sql": f"""select p.id, p.description, p.merchant, p.total_cents, p.installments,
-                         p.first_occurred_at, x.editaveis, x.travado_cents, x.parcela1_em,
+                         p.first_occurred_at, x.editaveis, x.travado_cents, x.travadas, x.travadas_fatura, x.ultima_travada, x.parcela1_em,
                          a.name as account_name, p.account_id
                   from public.installment_plans p
                   {_TRAVAS_DO_PLANO}
@@ -425,7 +429,7 @@ async def _com_plano(workspace_id, candidatos: list[dict]) -> list[dict]:
     rows = await db.fetch(
         """
         select t.id as tx_id, p.id as plan_id, p.description, p.merchant, p.total_cents, p.installments,
-               p.first_occurred_at, x.editaveis, x.travado_cents, x.parcela1_em,
+               p.first_occurred_at, x.editaveis, x.travado_cents, x.travadas, x.travadas_fatura, x.ultima_travada, x.parcela1_em,
                a.name as account_name, p.account_id
         from public.transactions t
         join public.installment_plans p on p.id = t.installment_plan_id

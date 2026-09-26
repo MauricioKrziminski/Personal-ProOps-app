@@ -652,9 +652,10 @@ async def test_escolher_a_parcela_mantem_a_tabela_de_transacoes(monkeypatch, gra
     assert final["targets"][0]["table"] == "transactions"
 
 
+# No cartão, com 2 parcelas pagas na fatura: o número muda, a data e o cartão não (`20260926130000`).
 PLANO_TV = {"id": "p1", "label": "Tudo (10x) — TV", "table": "installment_plans",
             "plan_installments": 10, "total_cents": 300000, "editaveis": 8,
-            "travado_cents": 60000}
+            "travado_cents": 60000, "travadas": 2, "travadas_fatura": 2, "ultima_travada": 2}
 
 
 def _plano_found(monkeypatch):
@@ -800,7 +801,7 @@ async def test_data_de_compra_com_parcela_paga_recusa_antes_do_sim(monkeypatch, 
         config=cfg,
     )
     assert "__interrupt__" not in final
-    assert any("a conta, a data e o número de parcelas não mudam mais" in r
+    assert any("a data e o cartão não mudam" in r
                for r in final["results"])
 
 @pytest.mark.asyncio
@@ -822,7 +823,7 @@ async def test_data_de_plano_escolhido_no_empate_para_antes_do_sim(monkeypatch, 
     )
     final = await grafo.ainvoke(Command(resume="p1"), config=cfg)
     assert "__interrupt__" not in final
-    assert any("a conta, a data e o número de parcelas não mudam mais" in r
+    assert any("a data e o cartão não mudam" in r
                for r in final["results"])
 
 
@@ -884,7 +885,7 @@ async def test_conta_de_plano_com_parcela_paga_recusa_antes_do_sim(monkeypatch, 
         config={"configurable": {"thread_id": "conta-plano"}},
     )
     assert "__interrupt__" not in final
-    assert any("a conta, a data e o número de parcelas não mudam mais" in r
+    assert any("a data e o cartão não mudam" in r
                for r in final["results"])
 
 

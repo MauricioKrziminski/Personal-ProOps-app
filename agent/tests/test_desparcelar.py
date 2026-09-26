@@ -129,10 +129,13 @@ def test_reparcelar_para_outro_n_sem_parcela_paga_segue_para_o_sim():
     assert erro_de_correcao(FinanceAction(type=UPD, installments=12), _plano()) is None
 
 
-def test_reparcelar_com_parcela_paga_recusa_antes_do_sim():
-    erro = erro_de_correcao(FinanceAction(type=UPD, installments=12),
-                            _plano(editaveis=7, travado_cents=90000))
-    assert "o número de parcelas não mudam mais" in erro or "não mudam mais" in erro
+def test_reparcelar_com_parcela_paga_vale_e_nao_fica_abaixo_da_ultima():
+    """26/09/2026: o número muda com parcela paga — as pagas ficam, o resto se reparte."""
+    pagas = dict(editaveis=7, travado_cents=90000, travadas=3, travadas_fatura=3, ultima_travada=3)
+    assert erro_de_correcao(FinanceAction(type=UPD, installments=12), _plano(**pagas)) is None
+    assert "não fica abaixo" in erro_de_correcao(FinanceAction(type=UPD, installments=2), _plano(**pagas))
+    frase = describe_for_confirmation(FinanceAction(type=UPD, installments=12), _plano(**pagas))
+    assert "as 3 pagas ficam e as 9 em aberto ficam com R$ 233,33" in frase, frase
 
 
 def test_frase_do_sim_diz_o_efeito_inteiro():
@@ -433,8 +436,11 @@ def test_conta_que_casa_com_duas_e_nenhuma_e_a_da_compra_pergunta():
 def test_mudar_conta_com_parcela_paga_recusa_com_a_regra_da_rpc():
     acao = FinanceAction(type=UPD, new_account="inter")
     alvo = _no_cartao(new_account_opcoes=[{"id": "acc-inter", "name": "Inter"}])
-    alvo["candidates"][0].update(travado_cents=30000, editaveis=9)
-    assert "a conta, a data e o número de parcelas não mudam mais" in erro_de_correcao(acao, alvo)
+    alvo["candidates"][0].update(travado_cents=30000, editaveis=9, travadas=1, travadas_fatura=1, ultima_travada=1)
+    assert "a data e o cartão não mudam" in erro_de_correcao(acao, alvo)
+    # fora do cartão (sem parcela paga numa fatura), a conta muda
+    alvo["candidates"][0].update(travadas_fatura=0)
+    assert erro_de_correcao(acao, alvo) is None
 
 
 def test_reparcelar_diz_o_contrato_novo():

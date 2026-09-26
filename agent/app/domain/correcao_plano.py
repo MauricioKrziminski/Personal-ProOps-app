@@ -45,11 +45,28 @@ VALOR_COM_DESPARCELAR = ("Não entendi se é para voltar a compra para à vista 
 
 
 def plano_travado(nome: str) -> str:
-    """Conta, data da 1ª parcela e nº de parcelas travam com QUALQUER parcela paga (ou
-    em fatura fechada/paga em parte) — a regra 2 de `update_installment_plan`."""
-    return (f"A compra {nome} já tem parcela paga ou numa fatura fechada: a conta, a data e "
-            "o número de parcelas não mudam mais. Dá para corrigir o total, o nome e a "
-            "categoria." + NADA)
+    """Só para candidato de ANTES da `20260926130000` (sem as travas novas congeladas): a
+    frase do SIM dele não sabe dizer o efeito de mudar a estrutura da compra."""
+    return (f"A compra {nome} já tem parcela paga: me pede a correção de novo, que eu refaço "
+            "a conta com o que está pago." + NADA)
+
+
+def fatura_travada(nome: str) -> str:
+    """Data e cartão com parcela paga numa FATURA de cartão: ela sairia da fatura em que foi
+    paga (`20260926130000` — o número de parcelas muda, isto não)."""
+    return (f"A compra {nome} tem parcela paga na fatura do cartão: a data e o cartão não "
+            "mudam, senão ela sairia da fatura em que foi paga. O número de parcelas, o valor, "
+            "o nome e a categoria mudam." + NADA)
+
+
+def abaixo_da_paga(nome: str, ultima: int) -> str:
+    return (f"A parcela {ultima} de {nome} já está paga: o número de parcelas não fica abaixo "
+            "dela." + NADA)
+
+
+def abertas_com(cand: dict, n: int) -> int:
+    """Quantas ficam em aberto com N parcelas: as travadas continuam como estão."""
+    return max(0, n - int(cand.get("travadas") or 0))
 
 
 def conta_ambigua(nomes: list[str]) -> str:
