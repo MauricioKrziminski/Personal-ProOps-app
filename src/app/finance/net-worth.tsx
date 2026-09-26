@@ -21,6 +21,7 @@ import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
+import { Deslizavel } from '@/components/ui/deslizavel';
 import { SelectField } from '@/components/ui/select-field';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
@@ -44,7 +45,7 @@ import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { formatBRL } from '@/hooks/use-items';
 import { formatNumberBR } from '@/lib/dates';
-import { confirmDestructive } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 
 /**
  * Patrimônio — "estou ficando mais rico ou mais pobre?".
@@ -251,23 +252,31 @@ export default function NetWorthScreen() {
         }),
     });
 
+  // Editar e arquivar na própria linha, como nas outras listas (25/09/2026): arquivar só existia
+  // dentro do formulário de edição.
+  const acoesDoBem = (b: Asset): ItemAction[] => [
+    { label: 'Editar', icon: 'pencil', arrasto: 'direita', onPress: () => abrirEdicao(b) },
+    { label: 'Arquivar', icon: 'archivebox', arrasto: 'esquerda', onPress: () => arquivar(b) },
+  ];
   const linhaBem = (b: Asset) => (
-    <Row
-      key={b.id}
-      title={b.name}
-      subtitle={ASSET_CLASSES.find((c) => c.value === b.class)?.label}
-      icon={CLASSE_ICONE[b.class]}
-      onPress={() => abrirEdicao(b)}
-      accessibilityLabel={`${b.name}, ${b.is_liability ? 'dívida de' : 'vale'} ${formatBRL(b.current_value_cents)}. Toque para atualizar o valor.`}
-      trailing={
-        <Money
-          cents={b.is_liability ? -b.current_value_cents : b.current_value_cents}
-          variant="ticker"
-          tone={b.is_liability ? 'danger' : 'text'}
-          signed={b.is_liability}
-        />
-      }
-    />
+    <Deslizavel key={b.id} titulo={b.name} acoes={acoesDoBem(b)}>
+      <Row
+        title={b.name}
+        subtitle={ASSET_CLASSES.find((c) => c.value === b.class)?.label}
+        icon={CLASSE_ICONE[b.class]}
+        onPress={() => abrirEdicao(b)}
+        onLongPress={() => showItemActions(b.name, acoesDoBem(b))}
+        accessibilityLabel={`${b.name}, ${b.is_liability ? 'dívida de' : 'vale'} ${formatBRL(b.current_value_cents)}. Toque para atualizar o valor.`}
+        trailing={
+          <Money
+            cents={b.is_liability ? -b.current_value_cents : b.current_value_cents}
+            variant="ticker"
+            tone={b.is_liability ? 'danger' : 'text'}
+            signed={b.is_liability}
+          />
+        }
+      />
+    </Deslizavel>
   );
 
   /*

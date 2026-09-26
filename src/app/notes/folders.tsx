@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -103,6 +103,20 @@ export default function FoldersScreen() {
     setIcon(folder.icon ?? 'folder');
     setError(null);
   };
+
+  /**
+   * `?edit=<pasta>` — o "Renomear e mover" de DENTRO de uma pasta (25/09/2026): chega com ELA no
+   * editor do topo, em vez de a pessoa caçar a pasta na árvore. Uma vez só (`edicaoAberta`).
+   */
+  const params = useLocalSearchParams<{ edit?: string }>();
+  const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
+  if (params.edit && params.edit !== edicaoAberta) {
+    const alvo = folders.data?.find((f) => f.id === params.edit);
+    if (alvo) {
+      setEdicaoAberta(params.edit);
+      startEdit(alvo);
+    }
+  }
 
   const submit = async () => {
     // A regra de nome (vazio, repetido, corrida entre aparelhos) mora em `useSalvarPasta` — a mesma

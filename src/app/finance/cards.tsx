@@ -11,6 +11,7 @@ import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Forte } from '@/components/ui/forte';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
@@ -19,11 +20,12 @@ import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
+import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
-import { useCardSummary, type CardSummary } from '@/hooks/use-finance';
+import { useArchiveAccount, useCardSummary, type CardSummary } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR } from '@/hooks/use-items';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
-import { showItemActions, type ItemAction } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { Deslizavel } from '@/components/ui/deslizavel';
 import {
   diasAte as daysUntil,
@@ -147,6 +149,20 @@ export default function CardsScreen() {
   const tablet = windowClass !== 'compact';
   const cards = useCardSummary();
   const abrirNaCarteira = useAbrirNaCarteira();
+  const toast = useToast();
+  const archive = useArchiveAccount();
+  // Editar e arquivar ONDE o cartão está (25/09/2026) — só existiam em Contas.
+  const arquivar = (card: CardSummary) =>
+    confirmDestructive(
+      `Arquivar o cartão ${card.name}?`,
+      'Arquivar',
+      () =>
+        archive.mutate(card.account_id, {
+          onSuccess: () => toast({ message: <>Cartão <Forte>{card.name}</Forte> arquivado.</>, tone: 'success' }),
+          onError: () => toast({ message: <>Não deu para arquivar <Forte>{card.name}</Forte>.</>, tone: 'error' }),
+        }),
+      'Os lançamentos são mantidos.',
+    );
 
   // Ordem de urgência, não alfabética: atrasada primeiro, depois quem vence antes.
   // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
@@ -274,6 +290,8 @@ export default function CardsScreen() {
                 ...(podePagar && totalFatura > 0
                   ? [{ label: 'Paguei', icon: 'checkmark.circle' as const, arrasto: 'direita' as const, onPress: () => irParaFatura(card, true) }]
                   : []),
+                { label: 'Editar cartão', icon: 'pencil', onPress: () => router.push(`/finance/accounts?edit=${card.account_id}`) },
+                { label: 'Arquivar cartão', icon: 'archivebox', destructive: true, onPress: () => arquivar(card) },
               ]}
               accessibilityLabel={`${card.name}, ${estado ? `fatura ${estado.toLowerCase()}` : 'sem fatura aberta'}, ${formatBRL(totalFatura)}${card.due_date ? `, ${prazoLabel(card.due_date, 'vence')}` : ''}`}>
               <View style={styles.cardHead}>

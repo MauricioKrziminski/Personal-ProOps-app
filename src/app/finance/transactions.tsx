@@ -637,6 +637,7 @@ export default function TransactionsScreen() {
     );
   }
 
+  const contaDoFiltro = contaFiltrada ? accounts.data?.find((a) => a.id === contaFiltrada) : undefined;
   const menu = (
     <HeaderMenu
           title="Mais opções"
@@ -676,10 +677,21 @@ export default function TransactionsScreen() {
                 })),
               ],
             },
+            // Olhando UMA conta, ela se edita daqui, e o extrato importado já vai para ela (25/09/2026).
+            ...(contaDoFiltro
+              ? [
+                  {
+                    label: contaDoFiltro.type === 'credit_card' ? 'Editar cartão' : 'Editar conta',
+                    icon: 'pencil' as const,
+                    onPress: () => router.push(`/finance/accounts?edit=${contaDoFiltro.id}`),
+                  },
+                ]
+              : []),
             {
               label: 'Importar extrato',
               icon: 'square.and.arrow.down',
-              onPress: () => router.push('/import'),
+              onPress: () =>
+                router.push(contaDoFiltro ? { pathname: '/import', params: { conta: contaDoFiltro.id } } : '/import'),
             },
             {
               label: 'Regras',
@@ -917,7 +929,13 @@ export default function TransactionsScreen() {
       <Button
         label="Lançar"
         icon="plus"
-        onPress={() => router.push({ pathname: '/finance/transaction-form', params: { month } })}
+        onPress={() =>
+          router.push({
+            pathname: '/finance/transaction-form',
+            // Olhando uma conta, o lançamento novo nasce nela.
+            params: { month, ...(contaDoFiltro ? { conta: contaDoFiltro.id } : {}) },
+          })
+        }
         style={{ boxShadow: Elevation[scheme].floating }}
       />
     </Animated.View>

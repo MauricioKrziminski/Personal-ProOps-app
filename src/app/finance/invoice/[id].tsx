@@ -520,10 +520,18 @@ export default function InvoiceScreen() {
         actions={
           fatura
             ? [
+                // Criar e editar onde o cartão está (25/09/2026): a compra nova já nasce nele.
                 {
+                  label: 'Nova compra neste cartão',
+                  icon: 'plus',
+                  onPress: () =>
+                    router.push({ pathname: '/finance/transaction-form', params: { conta: fatura.account_id } }),
+                },
+                {
+                  // As faturas DESTE cartão: sem o `account`, a lista abria no primeiro cartão.
                   label: 'Ver todas as faturas',
                   icon: 'calendar',
-                  onPress: () => router.push('/finance/invoices'),
+                  onPress: () => router.push({ pathname: '/finance/invoices', params: { account: fatura.account_id } }),
                 },
                 {
                   // De onde a fatura mora, com o cartão já escolhido (23/09/2026).
@@ -536,6 +544,11 @@ export default function InvoiceScreen() {
                   icon: 'checkmark.circle',
                   disabled: paga,
                   onPress: quitarSemCaixa,
+                },
+                {
+                  label: 'Editar cartão',
+                  icon: 'pencil',
+                  onPress: () => router.push(`/finance/accounts?edit=${fatura.account_id}`),
                 },
               ]
             : []

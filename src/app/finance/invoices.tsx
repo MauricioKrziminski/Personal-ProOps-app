@@ -4,6 +4,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import { HeaderMenu } from '@/components/ui/header-actions';
 import { useBRL } from '@/components/ui/conceal';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -469,6 +470,31 @@ export default function InvoicesScreen() {
         options={{
           title: 'Faturas',
         }}
+      />
+      {/* O cartão das faturas na tela se edita, importa e ganha compra daqui (25/09/2026). */}
+      <HeaderMenu
+        title="Mais opções"
+        actions={
+          atual
+            ? [
+                {
+                  label: 'Nova compra neste cartão',
+                  icon: 'plus',
+                  onPress: () => router.push({ pathname: '/finance/transaction-form', params: { conta: atual.id } }),
+                },
+                {
+                  label: 'Importar fatura',
+                  icon: 'square.and.arrow.down',
+                  onPress: () => router.push({ pathname: '/import', params: { conta: atual.id } }),
+                },
+                {
+                  label: 'Editar cartão',
+                  icon: 'pencil',
+                  onPress: () => router.push(`/finance/accounts?edit=${atual.id}`),
+                },
+              ]
+            : []
+        }
       />
       {tablet ? tabletBody : compactBody}
     </Screen>

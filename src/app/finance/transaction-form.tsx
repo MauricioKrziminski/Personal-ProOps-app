@@ -149,7 +149,7 @@ const schema = z
 type FormValues = z.infer<typeof schema>;
 
 export default function TransactionFormScreen() {
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; conta?: string }>();
   const query = useTransaction(params.id);
   // A parcela edita o valor da COMPRA: sem o plano (travadas, total) o campo não sabe o que
   // "cada parcela" alcança. Espera junto com a linha, na mesma tela de esqueleto.
@@ -214,9 +214,10 @@ export default function TransactionFormScreen() {
     // Outro id é outro formulário: aberto por link sobre um já aberto, a tela era reaproveitada
     // e o `useForm` (que só lê os valores na montagem) seguia com o lançamento anterior.
     <TransactionForm
-      key={params.id ?? 'novo'}
+      key={params.id ?? `novo:${params.conta ?? ''}`}
       editing={editing}
       plano={plano.data ?? undefined}
+      conta={editing ? undefined : params.conta}
     />
   );
 }
@@ -224,10 +225,16 @@ export default function TransactionFormScreen() {
 function TransactionForm({
   editing,
   plano,
+  conta,
 }: {
   editing?: Transaction;
   /** A compra desta parcela, quando `editing` é parcela e o plano carregou. */
   plano?: InstallmentPlanSummary;
+  /**
+   * `?conta=` — "Nova compra neste cartão" na fatura, "Lançar" nos lançamentos de uma conta: o
+   * lançamento novo nasce nela. Só vale se ela está entre as contas da pessoa.
+   */
+  conta?: string;
 }) {
   const insets = useSafeAreaInsets();
   const { windowClass } = useAdaptiveWindow();
@@ -251,7 +258,7 @@ function TransactionForm({
       category: editing?.category ?? null,
       description: editing?.description ?? '',
       merchant: editing?.merchant ?? null,
-      account_id: editing?.account_id ?? null,
+      account_id: editing?.account_id ?? (conta && accounts?.some((a) => a.id === conta) ? conta : null),
       counterparty_account_id: editing?.counterparty_account_id ?? null,
       installments: 1,
       paid_installments: '0',

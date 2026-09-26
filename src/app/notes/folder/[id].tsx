@@ -7,6 +7,7 @@ import { Chip } from '@/components/finance/chip';
 import { ColorPicker } from '@/components/notes/color-picker';
 import { FolderGrid } from '@/components/notes/folder-grid';
 import { FolderPicker } from '@/components/notes/folder-picker';
+import { confirmarApagarPasta } from '@/components/notes/note-actions';
 import { NovaPastaSheet } from '@/components/notes/nova-pasta';
 import { NoteList } from '@/components/notes/note-list';
 import { useFolderMenu } from '@/components/notes/use-folder-menu';
@@ -32,6 +33,7 @@ import {
   useRestoreNote,
   useToggleNotePin,
   useTrashNote,
+  useDeleteFolder,
   useUpdateFolder,
   useUpdateNote,
   type Note,
@@ -92,6 +94,7 @@ export default function FolderScreen() {
   const restore = useRestoreNote();
   const updateNote = useUpdateNote();
   const updateFolder = useUpdateFolder();
+  const deleteFolder = useDeleteFolder();
   const reorderNotes = useReorderNotes();
   const reorderFolders = useReorderFolders();
 
@@ -162,6 +165,17 @@ export default function FolderScreen() {
   const menuDaSubpasta = useFolderMenu({ onColor: setPintandoPasta });
 
   const pronta = useTelaPronta(list, foldersQuery);
+
+  // Apagar mora onde a pasta está (25/09/2026) — o ladrilho já tinha; de dentro dela, não.
+  const apagar = () => {
+    if (!folder) return;
+    confirmarApagarPasta(folder, () =>
+      deleteFolder.mutate(folder.id, {
+        onSuccess: () => router.back(),
+        onError: () => toast({ message: 'Não deu para apagar a pasta.', tone: 'error' }),
+      }),
+    );
+  };
 
   const arquivar = () => {
     if (!folder) return;
@@ -249,9 +263,11 @@ export default function FolderScreen() {
                   {
                     label: 'Renomear e mover',
                     icon: 'pencil',
-                    onPress: () => router.push('/notes/folders'),
+                    // Chega com ESTA pasta no editor (25/09/2026), não na árvore inteira.
+                    onPress: () => router.push(`/notes/folders?edit=${folder.id}`),
                   },
                   { label: 'Arquivar', icon: 'archivebox', onPress: arquivar },
+                  { label: 'Apagar pasta', icon: 'trash', destructive: true, onPress: apagar },
                 ],
               }
             : undefined

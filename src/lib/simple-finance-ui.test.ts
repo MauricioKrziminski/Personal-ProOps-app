@@ -1496,7 +1496,12 @@ test('Cartões: fatura aberta arrasta Importar fatura; a carteira fica à esquer
   const card = ui.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'PressCard');
   const raiz = card.type(card.props);
   assert.equal(raiz.type, 'Deslizavel', 'o cartão está num Deslizavel');
-  assert.deepEqual(ladosDe(raiz), { direita: ['Importar fatura'], esquerda: ['Abrir na carteira'], mais: false, pontaDireita: 'Importar fatura', pontaEsquerda: 'Abrir na carteira' });
+  // Editar e arquivar o cartão (25/09/2026) moram no "Mais" — as pontas não mudam.
+  assert.deepEqual(ladosDe(raiz), { direita: ['Importar fatura'], esquerda: ['Abrir na carteira'], mais: true, pontaDireita: 'Importar fatura', pontaEsquerda: 'Abrir na carteira' });
+  const rotulos = raiz.props.acoes.map((a: any) => a.label);
+  assert.ok(rotulos.includes('Editar cartão') && rotulos.includes('Arquivar cartão'), rotulos.join(', '));
+  ui.interact(() => raiz.props.acoes.find((a: any) => a.label === 'Editar cartão').onPress());
+  assert.equal(ui.navigations.at(-1), '/finance/accounts?edit=card-1');
 });
 
 test('Cartões: "Paguei" abre a fatura já no pagamento, não só a fatura', () => {
@@ -2445,4 +2450,38 @@ test('Carteira: o cartão escolhido se edita e um novo se cria ali mesmo', () =>
   const fonte = readFileSync('src/app/finance/wallet.tsx', 'utf8');
   assert.ok(/\/finance\/accounts\?edit=\$\{ativo\.account_id\}/.test(fonte), 'Editar este cartão abre o formulário DELE');
   assert.ok(/title="Novo cartão"[\s\S]{0,120}\/finance\/accounts\?create=cartao/.test(fonte), 'Novo cartão abre o formulário já como cartão');
+});
+
+/** Criar e editar onde a coisa está (25/09/2026, *"verifique todas as telas que estão assim"*). */
+test('Fatura: o "…" cria compra NESTE cartão, edita o cartão e leva às faturas dele', () => {
+  const ui = screen('src/app/finance/invoice/[id].tsx');
+  const menu = ui.nodes().find((n: any) => n.type === 'HeaderMenu')?.props.actions ?? [];
+  const acao = (label: string) => menu.find((a: any) => a.label === label);
+  assert.ok(acao('Nova compra neste cartão') && acao('Editar cartão') && acao('Ver todas as faturas'), menu.map((a: any) => a.label).join(', '));
+  ui.interact(() => acao('Nova compra neste cartão').onPress());
+  const nova = copia(ui.navigations.at(-1));
+  assert.equal(nova.pathname, '/finance/transaction-form');
+  assert.ok(nova.params.conta, 'a compra nasce no cartão da fatura');
+  ui.interact(() => acao('Ver todas as faturas').onPress());
+  assert.equal(copia(ui.navigations.at(-1)).params.account, nova.params.conta, 'as faturas DESTE cartão');
+});
+
+test('Lançamentos de uma conta: o "…" edita a conta, e Lançar e Importar já vão para ela', () => {
+  const conta = { id: 'c1', name: 'Nubank', type: 'checking' };
+  const ui = screen(transacoesFile, { params: { accountId: 'c1' }, forecastAccounts: [conta] });
+  const menu = ui.nodes().find((n: any) => n.type === 'HeaderMenu')?.props.actions ?? [];
+  const editar = menu.find((a: any) => a.label === 'Editar conta');
+  assert.ok(editar, menu.map((a: any) => a.label).join(', '));
+  ui.interact(() => editar.onPress());
+  assert.equal(ui.navigations.at(-1), '/finance/accounts?edit=c1');
+  ui.interact(() => menu.find((a: any) => a.label === 'Importar extrato').onPress());
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/import', params: { conta: 'c1' } });
+});
+
+test('Hoje: "Lançar" cria lançamento, lembrete ou nota ali mesmo', () => {
+  const ui = screen(hojeFile);
+  const fab = ui.nodes().find((n: any) => n.type === 'ExtendedFab' && n.props.label === 'Lançar');
+  assert.ok(fab, 'a Hoje tem o Lançar');
+  ui.interact(() => fab.props.onPress());
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Gasto ou receita', 'Lembrete', 'Nota']);
 });

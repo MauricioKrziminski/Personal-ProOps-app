@@ -16,6 +16,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Forte } from '@/components/ui/forte';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
@@ -350,7 +351,7 @@ export default function InstallmentsScreen() {
           ]
         : []),
       ...(plano.account_id
-        ? [{ label: 'Ver o cartão', onPress: () => router.push('/finance/cards') }]
+        ? [{ label: 'Ver o cartão', onPress: () => router.push({ pathname: '/finance/wallet', params: { card: plano.account_id! } }) }]
         : []),
       {
         label: 'Apagar a compra inteira',
@@ -730,6 +731,7 @@ export default function InstallmentsScreen() {
           icon="creditcard"
           title="Nenhuma compra parcelada"
           hint={'Quando você lançar uma compra em 10x,\nela aparece aqui com quanto falta.'}
+          action={{ label: 'Lançar compra', onPress: () => router.push('/finance/transaction-form') }}
         />
       ) : null}
     </>
@@ -750,8 +752,12 @@ export default function InstallmentsScreen() {
 
   return (
     <Screen grouped wide={tablet} onRefresh={() => Promise.all([plans.refetch(), accounts.refetch()])}>
-      {/* Sem headerRight de propósito: parcelamento nasce da compra, não desta tela. */}
       <Stack.Screen options={{ title: 'Parceladas' }} />
+      {/* O parcelamento nasce da COMPRA: o "+" abre o lançamento, onde se escolhe em quantas vezes
+          (25/09/2026 — antes esta tela não criava nada, e quem estava nela tinha que sair). */}
+      <HeaderActions
+        actions={[{ label: 'Nova compra', icon: 'plus', onPress: () => router.push('/finance/transaction-form') }]}
+      />
 
       {tablet ? tabletBody : compactBody}
 

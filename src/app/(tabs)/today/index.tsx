@@ -17,6 +17,7 @@ import { BudgetRings } from '@/components/finance/budget-rings';
 import { CashAccounts } from '@/components/finance/cash-accounts';
 import { ThemedText } from '@/components/themed-text';
 import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
+import { ExtendedFab } from '@/components/ui/extended-fab';
 import { BlockHeader } from '@/components/ui/block-header';
 import { Dica } from '@/components/ui/dica';
 import { useBRL } from '@/components/ui/conceal';
@@ -572,7 +573,24 @@ export default function TodayScreen() {
       stagger
       wide={tablet}
       topBar={<CabecalhoDaHoje />}
-      overlay={baixa.folha}
+      overlay={
+        <>
+          {baixa.folha}
+          {/* Criar ONDE se vê o dia (25/09/2026): a Hoje mostra lançamentos, lembretes e notas e
+              não criava nenhum — o mesmo "Lançar" do Financeiro, com o que a Hoje mostra. */}
+          <ExtendedFab
+            label="Lançar"
+            icon="plus"
+            onPress={() =>
+              showItemActions('Lançar', [
+                { label: 'Gasto ou receita', onPress: () => router.push('/finance/transaction-form') },
+                { label: 'Lembrete', onPress: () => router.push('/reminder-form') },
+                { label: 'Nota', onPress: () => router.push('/notes/new') },
+              ])
+            }
+          />
+        </>
+      }
       onRefresh={() =>
         Promise.all([
           gasto.refetch(),

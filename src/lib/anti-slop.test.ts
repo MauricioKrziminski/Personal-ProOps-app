@@ -1393,7 +1393,8 @@ test('Formulário aberto por link remonta quando o registro muda (key pelo id)',
   // a tela — o `useForm` só lê os valores na montagem, e ela seguia com os dados de A. Com a
   // `key`, outro id é outro formulário.
   const lancamento = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
-  assert.match(lancamento, /<TransactionForm\s+key=\{params\.id \?\? 'novo'\}/);
+  // Novo lançamento aberto numa conta (`?conta=`) é outro formulário também (25/09/2026).
+  assert.match(lancamento, /<TransactionForm\s+key=\{params\.id \?\? `novo:\$\{params\.conta \?\? ''\}`\}/);
   const lembrete = readFileSync(join(SRC, 'app/reminder-form.tsx'), 'utf8');
   assert.match(lembrete, /<ReminderForm\s+key=\{/);
 });
