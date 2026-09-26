@@ -90,8 +90,9 @@ CORPO e confiava neles — qualquer autenticado escrevia no workspace de outro.
 - **Os crons saíram do pg_cron para o Cloud Scheduler** (`/cron/reminders` a cada minuto, levando
   junto o sweep da fila; `/cron/finance-scheduler` de hora em hora; `/cron/alerts` diário). O
   Scheduler autentica com OIDC: não há mais token para vazar.
-- A chave anon literal da `0003` continua no histórico do git — **rotacionar**. Nunca voltar a
-  escrever token em migration.
+- Nunca escrever token em migration. A chave literal que ficou na `0003` é a anon de produção,
+  que é pública por desenho (vai dentro do app); rotacioná-la trocaria o segredo JWT do projeto,
+  derrubando toda sessão e o app instalado até um build novo.
 
 ## Realtime & fila
 

@@ -86,14 +86,15 @@
   - Na OCORRÊNCIA de uma série (fora do cartão) o formulário do lançamento tem UMA data, o
     vencimento, e o botão "Editar a série".
 
-  **Era 90 dias até 10/09/2026, e 90 dias fazia a projeção MENTIR** — não "acabar". A parcela
-  é linha real e continuava aparecendo; a receita recorrente, não. Abrir outubro de 2027 mostrava
-  as parcelas sem o salário, e o saldo despencava para um número que nunca existiu. O padrão da
-  indústria é híbrido: a REGRA é a fonte da verdade, uma janela vira linha de verdade (editável,
-  conciliável) e o resto se expande da regra — o Google Calendar pré-computa ~1 ano, o Asana 30
-  dias. Aqui a janela virou 365 dias, que é ~12 linhas por série.
+  **A janela é de um ano porque uma janela curta faz a projeção MENTIR** — não "acabar". A
+  parcela é linha real e continua aparecendo; a receita recorrente além da janela, não: com 90
+  dias, outubro de 2027 mostrava as parcelas sem o salário, e o saldo despencava para um número
+  que nunca existiu. O padrão da indústria é híbrido: a REGRA é a fonte da verdade, uma janela
+  vira linha de verdade (editável, conciliável) e o resto se expande da regra — o Google Calendar
+  pré-computa ~1 ano, o Asana 30 dias. Aqui são 365 dias, ~12 linhas por série.
 
-  **Passar de 90 para 365 dias quebrou TODA leitura de "o mais recente", e em silêncio.**
+  **Com um ano materializado, ordenar por `created_at` quebra TODA leitura de "o mais recente",
+  e em silêncio.**
   O cron grava as ocorrências do ano inteiro NO MESMO INSTANTE: quem ordena por `created_at`
   passa a ver só futuro. Medido em produção em 10/09/2026, com 200 linhas futuras contra 103
   passadas:
@@ -179,13 +180,12 @@ ele é **11/08 a 10/09**: recebe, gasta, e no dia 10 paga tudo. Lido de 1 a 31, 
 20 aparece num balde e a fatura que ele paga com esse salário no seguinte — e nenhum número da
 tela bate com a planilha dele.
 
-`workspaces.cycle_close_day` (`20260911020000`), **null = último dia do mês**, que é
-exatamente o comportamento anterior.
+`workspaces.cycle_close_day` (`20260911020000`), **null = último dia do mês**, que é o mês
+civil.
 
-> **Mudou em 23/09/2026: vai até o 31** (`20260923140000`). O teto era 28 "para o dia existir em
-> fevereiro", e a grade do Perfil parava no 28 (*"o mês vai só até o dia 28 em vez de ir até o
-> 31"*). Hoje `cycle_bounds` faz o clamp com `private.day_in_month` — a mesma regra do vencimento
-> do cartão: 29 e 30 fecham no último dia do mês mais curto. Com o clamp, fechar no 31 É fechar no
+> **O dia de fechamento vai de 1 a 31** (`20260923140000`). `cycle_bounds` faz o clamp com
+> `private.day_in_month` — a mesma regra do vencimento do cartão:
+> 29 e 30 fecham no último dia do mês mais curto. Com o clamp, fechar no 31 É fechar no
 > último dia, então **o 31 grava `null`** (o `check` vai até 30) e o `null` acende o 31 na grade.
 > Um valor por significado. `supabase/tests/mes_fecha_ate_o_31.sql` prende as bordas em fevereiro
 > (bissexto e não), nos meses de 30 dias e que todo dia cai em exatamente um ciclo.
@@ -333,7 +333,7 @@ O que o dono do produto queria da régua "fatura" (*"ver os lançamentos por fat
 ciclo"*) veio da **fatura virar linha**, não de um período novo — o modelo do Organizze, cujo
 "Saldo diário" conta o cartão como uma despesa única "Fatura Mês Ano", pelo vencimento.
 
-Mercado, medido: Finny tem dia configurável **1 a 28** (o teto que foi daqui até 23/09/2026); Goodbudget e Lunch
+Mercado, medido: Finny tem dia configurável **1 a 28**; Goodbudget e Lunch
 Money também; **Monarch e Copilot só têm mês civil**; e o **YNAB recusa por decisão de desenho** —
 a resposta deles para quem recebe fora do dia 1 é "orce um mês à frente", para a borda deixar de
 importar.
@@ -540,11 +540,11 @@ compra, não a única tela que responde quanto resta.
 - Compra **antes** do dia de fechamento cai na fatura do próprio mês; **no** dia do fechamento e
   depois, na do mês seguinte — a janela é `[fechamento anterior, fechamento atual)`. Dia 31 em mês
   curto cai no último dia (`private.day_in_month`).
-  > Isto era `<=` até 09/09/2026 e estava errado por um ciclo inteiro. Prova nos dois lados, mesmo
-  > cartão: a fatura Nubank de 10/09 ("Período vigente: 03 AGO a 03 SET") contém as compras de
-  > 03 AGO, e o OFX da de outubro (`DTSTART 20260903`) contém as de 03 SET. Era a causa de as
-  > parcelas postadas no dia do fechamento aparecerem um mês fora. Migration
-  > `20260909050000`, conciliação em `docs/bugs/2026-09-09-conciliacao-setembro.md`.
+  > Esse é o PADRÃO; o cartão que inclui o dia do fechamento liga `closing_day_inclusive` (ver
+  > *Em qual fatura cai a compra feita NO dia do fechamento*). Prova do padrão, mesmo cartão: a
+  > fatura Nubank de 10/09 ("Período vigente: 03 AGO a 03 SET") contém as compras de 03 AGO, e o
+  > OFX da de outubro (`DTSTART 20260903`) contém as de 03 SET. Migration `20260909050000`,
+  > conciliação em `docs/bugs/2026-09-09-conciliacao-setembro.md`.
 - Cartão é conta comum em partida dobrada: a compra deixa o saldo do cartão negativo (dívida) e o **pagamento da fatura é `transfer`** da conta pagadora para o cartão (RPC `pay_invoice`). Pagamento de fatura **nunca** é despesa nova — o gasto já contou na compra.
 - **Pagar e quitar são efeitos diferentes e a interface tem que distinguir os dois.** `pay_invoice`
   move dinheiro (aceita valor parcial); `settle_invoice` marca a fatura como paga SEM criar

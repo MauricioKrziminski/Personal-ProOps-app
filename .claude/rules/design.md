@@ -42,17 +42,17 @@ canto `Radius.lg`, sem degradê nem brilho (Suave, 16/09/2026). O degradê verde
 (`GradientSurface`) foi da direção anterior e saiu do código; a hierarquia agora vem da
 amplitude — um bloco escuro sobre papel claro — e do número grande em peso 500.
 
-> **Mudou em 17/09/2026 nas raízes, a pedido do dono do produto** (*"quero algo bem bonito… nada
-> de coisa comum"*; perguntado sobre as três regras abaixo: *"liberar o que ficar melhor"*).
+> **Nas raízes de aba valem três exceções**, a pedido do dono do produto (*"quero algo bem
+> bonito… nada de coisa comum"*; sobre as três regras: *"liberar o que ficar melhor"*).
 > Spec: `docs/superpowers/specs/2026-09-17-hoje-financeiro-conversa-design.md`.
 >
 > - **Um destaque por tela** → na Hoje convivem o herói e os Primeiros passos.
 > - **Sem degradê/brilho em conteúdo** → o herói das raízes usa `surface="live"`
 >   (`InkSurface`: luz larga que segue a rolagem + grão fino, dois canvases, custo zero parado).
-> - **Vidro só na chrome** → era a decisão para conteúdo das raízes; em 18/09/2026 os controles
->   interativos do iOS receberam Liquid Glass nativo. Os cartões de dados continuam opacos.
+> - **Vidro só na chrome** → os controles interativos do iOS também usam Liquid Glass nativo;
+>   os cartões de dados continuam opacos.
 >
-> A estrutura das raízes passou a ser **"Conversa organizada"**: o app fala nos blocos com o selo
+> A estrutura das raízes é a **"Conversa organizada"**: o app fala nos blocos com o selo
 > da marca (`BlockHeader voice="app"`), a pessoa fala em balões com o texto REAL que mandou, e o
 > registro que a fala virou encaixa embaixo. Cabeçalho de bloco nas raízes é `BlockHeader`, não
 > `SectionHead`.
@@ -205,13 +205,9 @@ numérico não tem a tecla "/". Cinco formulários nasceram assim.
 (`src/components/ui/task-header.tsx`): pegador, **✕ à esquerda**, título, ação opcional à direita.
 Montar um à mão é bloqueado por `anti-slop.test.ts` (todo `<Sheet>` abre com `<TaskHeader>`).
 
-> **Mudou em 13/09/2026, e o ✕ TROCOU DE LADO.** Era `SheetHeader`, com o ✕ à direita, e
-> conviviam **três mecanismos e seis implementações**: 18 sheets com o ✕ à direita, 3 telas modais
-> com ele à esquerda **sem um único token de espaço** (um `<Pressable hitSlop={12}>` cru no
-> `_layout.tsx` — a queixa literal, *"ta colado o titulo no botao de fechar"*), e 4 cabeçalhos à
-> mão com 4 paddings, título em 15/21 contra 20/26, ✕ de 24px contra 16px e **dois contrapesos
-> mortos de 72px**. Decisão do dono do produto: **✕ à esquerda, ação primária à direita, uma
-> regra para as duas superfícies.**
+> **✕ à esquerda, ação primária à direita, a mesma regra para sheet e tela modal** (decisão do
+> dono do produto). Com um cabeçalho montado por tela, cada uma escolhia lado, espaço e tamanho
+> do ✕, e o título colava no botão (*"ta colado o titulo no botao de fechar"*).
 
 **Ação NÃO fica ancorada sobre o scroll — ela mora no FIM do conteúdo** (15/09/2026,
 decisão do dono do produto, revertendo o desenho anterior). A tela da fatura tinha três botões
@@ -725,13 +721,12 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
 3. **Error** — inline e específico, com "Tentar de novo" que refaz a query.
 4. **Conteúdo longo** — texto que **quebra** sem quebrar layout. Quem cede é o LAYOUT.
 
-**Isto mudou em 07/09/2026, e mudou de sinal.** A regra dizia "texto que TRUNCA sem quebrar
-layout", e o resultado num aparelho real foi um Perfil com três linhas seguidas terminando antes
-do sentido: "Avisos financeiros no c…", "Você negou a permissão. Libe…", "Trocar número do
-WhatsA…". A queixa do dono do produto foi literal — *"como que o usuário vai saber se ele não
-consegue nem ler"*. Foram removidas **44** truncagens.
+**Por que quebrar e não truncar:** num aparelho real, truncar deixou um Perfil com três linhas
+seguidas terminando antes do sentido — "Avisos financeiros no c…", "Você negou a permissão.
+Libe…", "Trocar número do WhatsA…" —, e a queixa foi literal: *"como que o usuário vai saber se
+ele não consegue nem ler"*.
 
-A régua nova:
+A régua:
 
 - **Identificador nunca trunca** — nome, título, rótulo, valor, mensagem de erro. Não coube? A
   linha quebra, a célula cresce (`minWidth`, não `width`), a pílula desce para a linha de baixo.

@@ -1,6 +1,7 @@
 ---
 description: Tira ou restaura um checkpoint dos dados (produção por padrão)
 argument-hint: "[salvar | voltar | listar]"
+disable-model-invocation: true
 ---
 
 Gerencie o checkpoint dos dados com `scripts/checkpoint.py`. Ação pedida: **$ARGUMENTS**

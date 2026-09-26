@@ -200,10 +200,7 @@ Ele foi removido (`update_transaction`, `agent/app/tools/finance.py`); dar baixa
   alterar item existente, valor acima de `HITL_AMOUNT_THRESHOLD_CENTS`, compromisso futuro,
   confiança < 0,6 — e o resto cai em **"registro novo"**.
 
-  > **Era diferente até 21/09/2026:** só deleções, valor acima de R$ 1.000, alvo resolvido e
-  > confiança < 0,6 disparavam `interrupt()`; o gasto do dia a dia, a nota e o lembrete simples
-  > gravavam direto (e o `safe_node` os gravava ANTES da pergunta num lote misto). Hoje o
-  > `safe_node` só roda leitura.
+  O `safe_node` só roda leitura: num lote misto, nada é gravado antes da pergunta.
 
   **Custos aceitos:** cada registro custa um toque a mais. No WhatsApp a confirmação sai como
   botão dentro da janela de 24h (grátis), e o clique é igualdade exata (zero modelo). A

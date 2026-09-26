@@ -141,8 +141,9 @@ planejar, mesmo sem ter aberto arquivo nenhum.
 | `.claude/rules/agent.md`, `ai-gemini.md`, `whatsapp.md` | `agent/**` |
 | `.claude/rules/supabase.md` | `supabase/**`, `scripts/supabase-target*` |
 
-Não importe estas regras com `@` aqui: o import força a carga no início e anula o `paths:`
-(testado em 26/09/2026).
+Não importe estas regras com `@` aqui: o import força a carga no início e anula o `paths:`.
+E criar um arquivo novo na área sem ter lido nenhum NÃO carrega a regra (os dois testados em
+26/09/2026) — por isso a leitura antes de planejar.
 
 ## Plano de desenvolvimento vigente
 
