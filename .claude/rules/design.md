@@ -711,6 +711,10 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
    grande no centro e "Arquivadas · 1" solto embaixo (*"está horrível… esse layout tem que ser em
    todas as telas"*); Metas, Parceladas, Recorrentes e Lembretes com só concluídas/terminadas/
    pausadas nem diziam que não havia nada ativo. `simple-finance-ui.test.ts` prende as cinco.
+   ⚠️ **E a decisão é por CHAMADA, no app inteiro** (25/09/2026, a terceira vez — Organizar pastas,
+   com "Sem pasta" embaixo do vazio; a varredura achou 23 iguais). Todo `<EmptyState>` sem
+   `compacto` está em `VAZIO_GRANDE_PERMITIDO` (`anti-slop.test.ts`) com o motivo de ser a única
+   coisa da tela; um novo quebra o build até alguém decidir.
 3. **Error** — inline e específico, com "Tentar de novo" que refaz a query.
 4. **Conteúdo longo** — texto que **quebra** sem quebrar layout. Quem cede é o LAYOUT.
 
