@@ -40,6 +40,7 @@ import {
   useArchiveAccount,
   useDefaultAccount,
   useSaveAccount,
+  useContaTemLancamentos,
   useSetDefaultAccount,
   type Account,
   type AccountBalance,
@@ -164,6 +165,8 @@ export default function AccountsScreen() {
   const [form, setForm] = useState<FormState | null>(() =>
     criando ? { ...FORM_VAZIO, type: params.create === 'cartao' ? 'credit_card' : FORM_VAZIO.type } : null,
   );
+  /** Editando uma conta com lançamento: cartão não vira conta nem o contrário (`20260926170000`). */
+  const temLancamentos = useContaTemLancamentos(form?.id).data === true;
   const volta = useVoltarQuandoFechar(criando);
 
   // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
@@ -598,13 +601,19 @@ export default function AccountsScreen() {
                 De quebra o campo ganha o GLIFO por tipo, que é o que separa cartão
                 de conta antes de qualquer texto — o mesmo motivo do `AccountPicker`.
               */}
-              <Field label="Tipo">
+              <Field
+                label="Tipo"
+                hint={temLancamentos ? (form.type === 'credit_card' ? 'Com lançamentos, o cartão continua cartão' : 'Com lançamentos, a conta não vira cartão') : undefined}>
                 <SelectField
-                  options={ACCOUNT_TYPES.map((t) => ({
-                    id: t.value,
-                    label: t.label,
-                    icon: t.icon,
-                  }))}
+                  options={ACCOUNT_TYPES
+                    // Com lançamento, só dentro da mesma família: as compras do cartão moram em
+                    // faturas, e a conta não tem fatura (o banco recusa, com o motivo).
+                    .filter((t) => !temLancamentos || (t.value === 'credit_card') === (form.type === 'credit_card'))
+                    .map((t) => ({
+                      id: t.value,
+                      label: t.label,
+                      icon: t.icon,
+                    }))}
                   value={form.type}
                   /* Nenhuma opção tem `id: null`, então o campo nunca devolve nulo. */
                   onChange={(id) => setForm({ ...form, type: id as Account['type'] })}
@@ -631,7 +640,9 @@ export default function AccountsScreen() {
                     <View style={styles.diaCampo}>
                       <Field
                         label="Fecha dia"
-                        error={form.closingDay && !diaValido(form.closingDay) ? 'De 1 a 31' : undefined}>
+                        error={form.closingDay && !diaValido(form.closingDay) ? 'De 1 a 31' : undefined}
+                        // Editando: as faturas abertas se refazem com o dia novo (`20260926170000`)
+                        hint={form.id ? 'Refaz as faturas em aberto' : undefined}>
                         <TextField
                           value={form.closingDay}
                           onChangeText={(v) =>
@@ -673,7 +684,7 @@ export default function AccountsScreen() {
                   */}
                   <Field
                     label="Compra no dia do fechamento"
-                    hint="Só vale para compras novas">
+                    hint={form.id ? 'Refaz as faturas em aberto' : undefined}>
                     <Segmented
                       value={form.fechamentoInclusivo ? 'atual' : 'seguinte'}
                       onChange={(v) =>

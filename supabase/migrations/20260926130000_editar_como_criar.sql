@@ -389,7 +389,10 @@ begin
   -- dispara com a coluna só MENCIONADA, e o formulário do lançamento manda a linha inteira —
   -- renomear uma compra de uma fatura ADIADA a levava para a fatura seguinte (o laço de "adiada
   -- não recebe cobrança nova"), com o dinheiro junto e sem nada na tela dizer.
+  -- (`proops.refazer_fatura` é o cartão com fechamento/vencimento editados pedindo a régua nova
+  -- para as compras em aberto — `20260926170000`.)
   if tg_op = 'UPDATE'
+     and coalesce(current_setting('proops.refazer_fatura', true), '') <> 'on'
      and new.account_id is not distinct from old.account_id
      and new.occurred_at is not distinct from old.occurred_at
      and new.workspace_id is not distinct from old.workspace_id
@@ -440,6 +443,18 @@ begin
     inv_id := seguinte;
     seguinte := null;
   end loop;
+
+  -- Refazendo pela régua nova (cartão com o fechamento editado, `20260926170000`): a compra em
+  -- aberto que cairia numa fatura já fechada, paga ou paga em parte FICA onde estava — lá ela
+  -- sumiria do caixa, cobrada numa fatura que não vai ser paga de novo.
+  if tg_op = 'UPDATE' and coalesce(current_setting('proops.refazer_fatura', true), '') = 'on'
+     and old.invoice_id is not null and inv_id is distinct from old.invoice_id
+     and exists (select 1 from public.card_invoices ci
+                  where ci.id = inv_id and (ci.status <> 'open' or ci.paid_cents > 0)) then
+    new.invoice_id := old.invoice_id;
+    select ci.due_date into new.due_at from public.card_invoices ci where ci.id = old.invoice_id;
+    return new;
+  end if;
 
   new.invoice_id := inv_id;
   select ci.due_date into new.due_at from public.card_invoices ci where ci.id = inv_id;

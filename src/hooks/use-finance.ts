@@ -2647,6 +2647,25 @@ export function useSaveRecurringSeries() {
   });
 }
 
+/**
+ * A conta já tem lançamento? (26/09/2026) Com lançamento, cartão não vira conta nem o contrário
+ * (`20260926170000`: as compras do cartão moram em faturas) — a tela só oferece o que vale.
+ */
+export function useContaTemLancamentos(id: string | null | undefined) {
+  return useQuery({
+    queryKey: ['accounts', 'tem-lancamentos', id],
+    enabled: Boolean(id),
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .or(`account_id.eq.${id},counterparty_account_id.eq.${id}`);
+      if (error) throw error;
+      return (count ?? 0) > 0;
+    },
+  });
+}
+
 /** Cria ou edita (mesma forma de useSaveTransaction: com `id` vira update). */
 export function useSaveAccount() {
   const invalidate = useInvalidateFinance();

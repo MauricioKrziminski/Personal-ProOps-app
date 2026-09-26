@@ -42,7 +42,11 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   const finance = new Proxy({
     DEBT_KINDS: [{ value: 'financing', label: 'Financiamento' }, { value: 'loan', label: 'Empréstimo' }],
     SUGGESTED_CATEGORIES: [],
-    ACCOUNT_TYPES: [{ value: 'checking', label: 'Conta corrente', icon: 'building.columns' }],
+    ACCOUNT_TYPES: [
+      { value: 'checking', label: 'Conta corrente', icon: 'building.columns' },
+      { value: 'savings', label: 'Poupança', icon: 'banknote' },
+      { value: 'credit_card', label: 'Cartão de crédito', icon: 'creditcard' },
+    ],
     INCOME_CATEGORIES: [],
     ASSET_CLASSES: [{ value: 'investment', label: 'Investimento', icon: 'chart.line.uptrend.xyaxis' }],
     useDebts: () => ({ ...query, data: options.debts ?? [] }),
@@ -131,6 +135,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     usePayDebtInstallment: () => mutation('payDebt'),
     useDeleteTransaction: () => mutation('deleteTransaction'),
     useSaveAccount: () => mutation('saveAccount'),
+    useContaTemLancamentos: () => ({ ...query, isSuccess: true, data: Boolean(options.contaTemLancamentos) }),
     useArchiveDebt: () => mutation('archiveDebt'),
     useUnarchiveDebt: () => mutation('unarchiveDebt'),
     useDeleteDebt: () => mutation('deleteDebt'),
@@ -2663,4 +2668,13 @@ test('Orçamento: editar muda AQUELE limite — a categoria também, pela chave 
   const gravado = ui.pedidos.at(-1).value;
   assert.equal(gravado.category, 'supermercado');
   assert.deepEqual(JSON.parse(JSON.stringify(gravado.antes)), { category: 'mercado', month: null });
+});
+
+test('Conta: com lançamentos, o tipo só troca na mesma família; editando o cartão, os dias refazem as faturas abertas', () => {
+  // 26/09/2026: a troca cartão ↔ conta deixava as faturas órfãs; e "Fecha dia" só valia para compras novas.
+  const cartao = { id: 'c1', name: 'Nubank', type: 'credit_card', initial_balance_cents: 0, closing_day: 3, due_day: 10, credit_limit_cents: 500000, payment_account_id: null, archived: false };
+  const ui = screen('src/app/finance/accounts.tsx', { params: { edit: 'c1' }, forecastAccounts: [cartao], contaTemLancamentos: true });
+  const tipo = ui.nodes().find((n: any) => n.type === 'SelectField' && n.props.options.some((o: any) => o.id === 'credit_card'));
+  assert.deepEqual(JSON.parse(JSON.stringify(tipo.props.options.map((o: any) => o.id))), ['credit_card'], 'o cartão com lançamento não vira conta');
+  assert.equal(ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Fecha dia').props.hint, 'Refaz as faturas em aberto');
 });
