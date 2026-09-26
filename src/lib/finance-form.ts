@@ -105,15 +105,16 @@ export function podeParcelar(
  * `converter` chama uma RPC que ADOTA a linha existente como parcela 1 — o `id` não muda, e
  * chamar de novo é recusa, nunca um segundo plano.
  */
-export type DestinoDoSalvar = 'criarPlano' | 'converter' | 'salvar' | 'editarCompra';
+export type DestinoDoSalvar = 'criarPlano' | 'converter' | 'salvar';
 
+/**
+ * (A compra de uma PARCELA não passa mais por aqui: desde 26/09/2026 ela se edita em "A compra
+ * toda", no topo do formulário, pelos campos de Parceladas — e "Só esta parcela" é só ela.)
+ */
 export function destinoDoSalvar(
   editing: (ComContrato & { id: string }) | null | undefined,
-  values: { installments: number; account_id: string | null; valorDaCompraMudou?: boolean },
+  values: { installments: number; account_id: string | null },
 ): DestinoDoSalvar {
-  // Parcela cujo VALOR mudou: quem reparte é a compra (`update_installment_plan`), nunca o
-  // `update` de uma linha — é a regra de parcela travada que mora lá.
-  if (editing?.installment_plan_id && values.valorDaCompraMudou) return 'editarCompra';
   if (values.installments <= 1 || !values.account_id) return 'salvar';
   if (!editing) return 'criarPlano';
   // Cinto: a fileira nem aparece para quem já tem contrato, mas converter uma parcela criaria

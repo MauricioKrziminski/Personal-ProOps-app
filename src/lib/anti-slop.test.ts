@@ -1566,8 +1566,8 @@ test('Ocorrência de série: uma data só (o vencimento), e o caminho para edita
   // No cartão o `due_at` é o vencimento da fatura: lá continuam sendo duas coisas.
   assert.match(fonte, /const umaData = Boolean\(editing\?\.recurring_id && !editing\.invoice_id\)/);
   assert.match(fonte, /const dataEVencimento = umaData && podeAdiar && pending/);
-  assert.match(fonte, /dataEVencimento \? dueFieldLabel\(kind\)/, 'o campo de data vira "Vence em"');
-  assert.match(fonte, /\{dataEVencimento \? null : \(\s*<View style=\{styles\.chipRow\}>/, 'sem o "Ontem" num vencimento');
+  assert.match(fonte, /dataEVencimento\s*\?\s*dueFieldLabel\(kind\)/, 'o campo de data vira "Vence em"');
+  assert.match(fonte, /\{dataEVencimento \|\| parcelaNaFatura \? null : \(\s*<View style=\{styles\.chipRow\}>/, 'sem o "Ontem" num vencimento');
   assert.match(fonte, /\{umaData \? null : \(\s*<Controller\s+control=\{control\}\s+name="due_at"/, 'sem o segundo campo');
   assert.match(fonte, /if \(umaData\) setValue\('due_at', br\)/, 'o vencimento escondido anda com a data');
   // Uma tela só (26/09/2026): "Só esta | Esta e as próximas" no topo, e a série com os MESMOS
@@ -1575,6 +1575,12 @@ test('Ocorrência de série: uma data só (o vencimento), e o caminho para edita
   assert.match(fonte, /\{ value: 'uma', label: 'Só esta' \},\s*\{ value: 'serie', label: 'Esta e as próximas' \}/);
   assert.match(fonte, /<CamposDaSerie form=\{formSerie\}/);
   assert.doesNotMatch(fonte, /label="Editar a série"/);
+  // E a PARCELA também (26/09/2026): "Só esta parcela | A compra toda", com os campos de Parceladas;
+  // a pergunta no Salvar e o botão que levava a Parceladas saíram.
+  assert.match(fonte, /\{ value: 'uma', label: 'Só esta parcela' \},\s*\{ value: 'compra', label: 'A compra toda' \}/);
+  assert.match(fonte, /<CamposDaCompra form=\{formCompra\}/);
+  assert.doesNotMatch(fonte, /Aplicar em quais\?[\s\S]{0,120}'Só esta'/);
+  assert.doesNotMatch(fonte, /label="Editar parcelas e datas da compra"/);
   // As linhas antes da regra: o calendário novo muda a data desta linha (mesmo id).
   assert.match(fonte, /salvarSerie\.mutate\(\s*\{ id: editing\.id, scope: 'future', patch: linhas \},\s*\{\s*onSuccess: \(\) => gravarRegra\(true\)/);
   // "Repetir lançamento" leva o estabelecimento: a série passou a guardá-lo (`20260926120000`).

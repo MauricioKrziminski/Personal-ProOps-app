@@ -772,36 +772,6 @@ export function useUpdateInstallmentPlan() {
   });
 }
 
-/**
- * O valor da compra mudou NO FORMULÁRIO DE UMA PARCELA.
- *
- * Duas escritas, em ordem, porque são dois donos: o dinheiro é da COMPRA
- * (`update_installment_plan`, que só redistribui o que está em aberto) e a data é da PARCELA.
- * Sem a segunda, a RPC — que reescreve o calendário quando nada foi pago — levaria a data desta
- * parcela de volta para a do contrato, e a tela teria mostrado uma coisa e gravado outra.
- */
-export function useEditarCompraPelaParcela() {
-  const invalidate = useInvalidateFinance();
-  const editarCompra = useUpdateInstallmentPlan();
-  return useMutation({
-    mutationFn: async (input: {
-      compra: Parameters<typeof editarCompra.mutateAsync>[0];
-      parcela: { id: string; patch: Partial<Pick<TransactionInput, 'occurred_at' | 'status' | 'due_at' | 'auto_confirm'>> };
-    }) => {
-      await editarCompra.mutateAsync(input.compra);
-      if (Object.keys(input.parcela.patch).length === 0) return;
-      const { error } = await supabase
-        .from('transactions')
-        .update(input.parcela.patch)
-        .eq('id', input.parcela.id)
-        .select('id')
-        .single();
-      // A compra JÁ mudou: quem chama precisa dizer isso, não "não deu para salvar".
-      if (error) throw Object.assign(error, { compraSalva: true });
-    },
-    onSuccess: invalidate,
-  });
-}
 
 /**
  * Um lançamento que já existe vira compra parcelada.

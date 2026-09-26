@@ -15,6 +15,7 @@ import { Note } from '@/components/ui/note';
 import { Row, Section } from '@/components/ui/row';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { CamposDaSerie } from '@/components/finance/serie-form';
+import { CamposDaCompra } from '@/components/finance/compra-form';
 import { ThemedText } from '@/components/themed-text';
 import { Forte } from '@/components/ui/forte';
 import { Button } from '@/components/ui/button';
@@ -34,7 +35,7 @@ import {
   useAccounts,
   useConvertToInstallments,
   useCreateInstallmentPlan,
-  useEditarCompraPelaParcela,
+  useUpdateInstallmentPlan,
   useInstallmentPlan,
   useDebts,
   useDeleteTransaction,
@@ -50,23 +51,17 @@ import {
 } from '@/hooks/use-finance';
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
 import { mudancasDaOcorrencia, serieDaOcorrencia, validaSerie, type SerieForm } from '@/lib/serie';
+import { compraDoRegistro, payloadDaCompra, validaCompra, type CompraForm } from '@/lib/compra';
 import {
   destinoDoSalvar,
-  digitarValor,
   faixaDeParcelas,
   financeErrorMessage,
   installmentHistory,
-  nomeDaCompra,
-  parcelasAbertas,
-  recusaDoValor,
   podeParcelar,
   simpleDebtValues,
   totalDigitado,
   UNIDADES_DO_VALOR,
-  valorExibido,
-  type Contrato,
   type UnidadeDoValor,
-  type ValorDaCompra,
 } from '@/lib/finance-form';
 import { QuantityField } from '@/components/ui/quantity-field';
 import {
@@ -327,65 +322,27 @@ function TransactionForm({
   // O campo "Data" É o vencimento: rótulo "Vence em" e sem o atalho "Ontem" (vencimento não é compra).
   const dataEVencimento = umaData && podeAdiar && pending;
   /*
-    ⚠️ **O valor de uma PARCELA edita a COMPRA, com a unidade dita** (23/09/2026).
+    ⚠️ **Numa PARCELA, "Só esta parcela | A compra toda" é escolhido no TOPO** (26/09/2026, a
+    mesma tela só da série). "A compra toda" desenha os MESMOS campos de Parceladas
+    (`CamposDaCompra`: nome, valor em cada parcela ou total, conta, número, data da 1ª, parcelas
+    já pagas) e grava pela `update_installment_plan`. "Só esta parcela" mexe só nela — o valor
+    passa pela RPC do escopo, que refaz o total da compra.
 
-    Até aqui o campo ficava `readOnly` numa parcela: ele mostrava a PARCELA e a pessoa sabia o
-    TOTAL, e 104,99 digitado numa parcela de 52,49 com "esta e as futuras" recalculava a compra
-    para R$ 209,98 — uma compra que nunca existiu. A trava protegia disso escondendo o campo, e
-    a queixa foi *"eu tento clicar e o campo parece ser desabilitado… tinha que ter a opção de
-    colocar o valor de cada parcela"*.
-
-    O defeito era a AMBIGUIDADE, não a edição: agora a pessoa diz o que o número é (**Cada
-    parcela | Total da compra**) e o salvar vai para `update_installment_plan` — a mesma RPC do
-    agente e de Parceladas, que só redistribui o que está em aberto (parcela paga ou em fatura
-    fechada não muda). O total é a verdade (`ValorDaCompra`): trocar a unidade sem digitar não
-    muda a compra.
+    Até aqui o valor de uma parcela editava a COMPRA, com a unidade dita (23/09/2026), e a pergunta
+    "só esta ou as próximas" vinha no Salvar; número, data da 1ª e as já pagas só em Parceladas.
   */
   const naCompra = Boolean(editing?.installment_plan_id);
-  const contrato: Contrato | null = plano
-    ? { parcelas: plano.installments, travadas: plano.locked, travadoCents: plano.locked_cents }
-    : null;
-  const abertas = contrato ? parcelasAbertas(contrato) : 0;
-  /** Parcela sem o plano carregado, ou com tudo pago: aí o valor não tem o que mudar. */
-  const valorTravado = naCompra && (!contrato || abertas === 0);
   /**
-   * Criando/convertendo: a unidade REINTERPRETA o número digitado ("250 é cada parcela").
-   * Editando uma parcela: ela só muda a RÉGUA do campo — o valor da compra não se mexe.
+   * Esta parcela está numa FATURA de cartão paga, adiada ou paga em parte: o valor e a data dela
+   * não mudam — mudar a tiraria da fatura em que foi paga. Fora do cartão, a paga se corrige à
+   * mão (é o registro da pessoa).
    */
-  const [unidade, setUnidade] = useState<UnidadeDoValor>(naCompra ? 'parcela' : 'total');
-  const [compra, setCompra] = useState<ValorDaCompra | null>(() =>
-    plano ? { totalCents: plano.total_cents, parcelaCents: null } : null,
-  );
-  /**
-   * O total de quando o formulário abriu. Comparar com o `plano` VIVO faria um refetch (outra
-   * tela, o agente) parecer edição desta — e o salvar gravaria o total velho por cima.
-   */
-  const [totalOriginal] = useState(() => plano?.total_cents ?? 0);
-  /** O que "cada parcela" mostra antes de qualquer edição: esta, se ainda muda; senão a próxima. */
-  const parcelaAtual =
-    plano && editing && !plano.locked_ids.includes(editing.id)
-      ? editing.amount_cents
-      : (plano?.installment_cents ?? 0);
-  const valorDaCompraMudou = Boolean(plano && compra && compra.totalCents !== totalOriginal);
-  /** Cada parcela em aberto precisa de pelo menos um centavo — a mesma recusa da RPC, antes dela. */
-  const erroDoValorDaCompra =
-    compra && contrato && abertas > 0 && compra.totalCents - contrato.travadoCents < abertas
-      ? recusaDoValor(contrato.travadas)
-      : undefined;
-  const dicaDoValorDaCompra = ((): string | undefined => {
-    if (!naCompra) return undefined;
-    if (!plano || !contrato || !compra) return 'Não deu para carregar a compra desta parcela.';
-    if (abertas === 0) return 'Tudo pago: valor travado';
-    if (!valorDaCompraMudou) {
-      return unidade === 'parcela'
-        ? `Parcela ${editing?.installment_no ?? '?'} de ${plano.installments} · compra de ${formatBRL(totalOriginal)}`
-        : `Compra em ${plano.installments}x · parcela de ${formatBRL(parcelaAtual)}`;
-    }
-    const cada = valorExibido(compra, 'parcela', contrato, parcelaAtual, totalOriginal);
-    return abertas === plano.installments
-      ? `${plano.installments}x de ${formatBRL(cada)} · total ${formatBRL(compra.totalCents)}`
-      : `As ${abertas} em aberto ficam com ${formatBRL(cada)} · total ${formatBRL(compra.totalCents)}`;
-  })();
+  const parcelaNaFatura = Boolean(naCompra && editing?.invoice_id && plano?.locked_ids.includes(editing.id));
+  /** Criando/convertendo em N×: a unidade REINTERPRETA o número digitado ("250 é cada parcela"). */
+  const [unidade, setUnidade] = useState<UnidadeDoValor>('total');
+  const [formCompra, setFormCompra] = useState<CompraForm | null>(null);
+  const atualizarCompra = useUpdateInstallmentPlan();
+  const compraOk = validaCompra(formCompra).podeSalvar;
 
   /**
    * ⚠️ **Parcelar também vale EDITANDO.** A régua mora em `finance-form.ts`, com teste — aqui
@@ -465,10 +422,46 @@ function TransactionForm({
     );
   };
 
-  const editarCompra = useEditarCompraPelaParcela();
+  /**
+   * "A compra toda": os campos de Parceladas, a mesma RPC. "À vista" apaga as outras parcelas —
+   * confirmação destrutiva que NOMEIA o estrago (`design.md §6`), como em Parceladas.
+   */
+  const salvarCompraToda = () => {
+    if (!formCompra || !compraOk) return;
+    const compra = formCompra;
+    const gravarCompra = () =>
+      atualizarCompra.mutate(payloadDaCompra(compra, brToISO(compra.inicio)), {
+        onSuccess: () => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          router.back();
+          toast({
+            message:
+              compra.installments === 1
+                ? `Desfiz o parcelamento: sobrou um lançamento de ${formatBRL(compra.totalCents)}.`
+                : 'Compra atualizada.',
+            tone: 'success',
+          });
+        },
+        onError: (error) =>
+          toast({ message: financeErrorMessage(error, 'Não deu para editar a compra. Tenta de novo.'), tone: 'error' }),
+      });
+    if (compra.installments === 1) {
+      const somem = Math.max(compra.original.installments - 1, 0);
+      confirmDestructive(
+        'Desfazer o parcelamento?',
+        'Desfazer',
+        gravarCompra,
+        somem === 1
+          ? `A outra parcela some e sobra um lançamento de ${formatBRL(compra.totalCents)}. Isso não volta.`
+          : `As outras ${somem} parcelas somem e sobra um lançamento de ${formatBRL(compra.totalCents)}. Isso não volta.`,
+      );
+      return;
+    }
+    gravarCompra();
+  };
   const salvarDivida = useSaveDebt();
   const saving =
-    save.isPending || createPlan.isPending || converter.isPending || editarCompra.isPending || salvarDivida.isPending ||
+    save.isPending || createPlan.isPending || converter.isPending || atualizarCompra.isPending || salvarDivida.isPending ||
     salvarSerie.isPending || editarSerie.isPending;
 
   /**
@@ -481,26 +474,6 @@ function TransactionForm({
   const correcaoDaDivida =
     divida && editing ? correcaoDoPagamento(divida, editing, amountCents) : { erro: null, perguntaAsProximas: false };
 
-  /**
-   * O que mudou E vale para a série inteira. Data fica de fora: ela é de cada
-   * ocorrência, e propagar empilharia todas as parcelas no mesmo dia.
-   *
-   * Chave só entra quando o valor MUDOU — mandar o objeto inteiro faria "corrigi só
-   * o nome" reescrever a categoria das 40 parcelas com o que estava no formulário.
-   */
-  const patchDaSerie = (values: FormValues) => {
-    if (!editing) return {};
-    const patch: Record<string, unknown> = {};
-    if (values.amount_cents !== editing.amount_cents) patch.amount_cents = values.amount_cents;
-    if ((values.category ?? null) !== editing.category) patch.category = values.category ?? null;
-    const desc = values.description.trim();
-    if (desc !== editing.description) patch.description = desc;
-    const merc = values.merchant?.trim() || null;
-    if (merc !== editing.merchant) patch.merchant = merc;
-    if ((values.account_id ?? null) !== editing.account_id) patch.account_id = values.account_id ?? null;
-    return patch;
-  };
-
   const onSubmit = handleSubmit((values) => {
     /**
      * UMA escrita, e qual delas é decisão pura (`destinoDoSalvar`, com teste). As três são
@@ -509,7 +482,6 @@ function TransactionForm({
     const destino = destinoDoSalvar(editing, {
       installments: values.installments,
       account_id: values.account_id,
-      valorDaCompraMudou,
     });
     // O que o número digitado vale como TOTAL — criando e convertendo, a unidade o reinterpreta.
     const totalDaCompraNova = totalDigitado(values.amount_cents, unidade, values.installments);
@@ -536,64 +508,6 @@ function TransactionForm({
     const autoConfirm = podeAdiar
       ? (adiado ? values.auto_confirm : false)
       : (editing?.auto_confirm ?? false);
-
-    /**
-     * O valor de uma PARCELA mudou: quem grava é a compra. Nome, estabelecimento, categoria e
-     * conta vão junto, porque a RPC é um `set` da compra inteira — o que a pessoa não mexeu
-     * vai com o valor que a compra já tem, nunca com o da linha (o título da linha tem o
-     * "(2/10)", e mandá-lo como nome da compra gravaria "tv (2/10) (2/10)").
-     */
-    if (destino === 'editarCompra' && editing && plano && compra) {
-      if (erroDoValorDaCompra) return;
-      const titulo = values.description.trim();
-      const merchant = values.merchant?.trim() || null;
-      const data = brToISO(values.occurred_at);
-      // O que é da LINHA: a data (a RPC refaz o calendário quando nada foi pago) e o caixa.
-      const patchParcela: {
-        occurred_at?: string;
-        status?: Transaction['status'];
-        due_at?: string | null;
-        auto_confirm?: boolean;
-      } = {};
-      if (data !== editing.occurred_at || plano.locked === 0) patchParcela.occurred_at = data;
-      if (podeAdiar && status !== editing.status) patchParcela.status = status;
-      if (podeAdiar && dueAt !== editing.due_at) patchParcela.due_at = dueAt;
-      if (podeAdiar && autoConfirm !== editing.auto_confirm) patchParcela.auto_confirm = autoConfirm;
-      editarCompra.mutate(
-        {
-          compra: {
-            planId: plano.id,
-            totalCents: compra.totalCents,
-            installments: plano.installments,
-            firstOccurredAt: plano.first_occurred_at,
-            description: titulo !== editing.description ? nomeDaCompra(titulo) || plano.description : plano.description,
-            merchant: merchant !== editing.merchant ? merchant : plano.merchant,
-            category: (values.category ?? null) !== editing.category ? values.category : plano.category,
-            accountId: (values.account_id ?? null) !== editing.account_id ? values.account_id : plano.account_id,
-          },
-          parcela: { id: editing.id, patch: patchParcela },
-        },
-        {
-          onSuccess: () => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            router.back();
-            toast({
-              message: `Compra atualizada: total de ${formatBRL(compra.totalCents)}.`,
-              tone: 'success',
-            });
-          },
-          onError: (error) =>
-            toast({
-              message:
-                error && typeof error === 'object' && 'compraSalva' in error
-                  ? 'Mudei o valor da compra, mas não a data desta parcela. Tenta de novo.'
-                  : financeErrorMessage(error, 'Não deu para mudar o valor da compra. Tenta de novo.'),
-              tone: 'error',
-            }),
-        },
-      );
-      return;
-    }
 
     // parcelado NOVO: quem cria as N transações (e resolve a fatura de cada uma) é o banco, não
     // o app — mesma regra usada pelo WhatsApp.
@@ -696,11 +610,13 @@ function TransactionForm({
       return;
     }
 
-    const patch = patchDaSerie(values);
-    // A ocorrência de série escolhe no topo ("Só esta | Esta e as próximas"): aqui já é "Só esta".
-    const naSerie = Boolean(editing?.installment_plan_id);
-
-    const gravar = (escopo: 'one' | 'future', depois?: () => void, seFalhar?: string) =>
+    // Série e compra escolhem no TOPO ("Só esta | Esta e as próximas", "Só esta parcela | A compra
+    // toda"): aqui é sempre esta linha só.
+    const fechar = () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+    };
+    const gravar = (depois?: () => void, seFalhar?: string) =>
       save.mutate(
       {
         id: editing?.id,
@@ -720,33 +636,27 @@ function TransactionForm({
       },
       {
         onSuccess: () => {
-          // A âncora já foi gravada com o formulário inteiro (inclusive data, que não
-          // se propaga). A RPC leva o resto da série — e reescreve a âncora com os
-          // mesmos valores, que é barato e mantém UM caminho para a regra do lote.
           if (depois) {
             depois();
             return;
           }
-          if (escopo === 'future' && editing) {
+          // "Só esta parcela" com valor novo: o total da compra é a soma das parcelas, e quem o
+          // refaz é a RPC do escopo (a mesma da série), com a parcela no valor já gravado.
+          if (naCompra && editing && values.amount_cents !== editing.amount_cents) {
             salvarSerie.mutate(
-              { id: editing.id, scope: 'future', patch },
+              { id: editing.id, scope: 'one', patch: { amount_cents: values.amount_cents } },
               {
-                onSuccess: (quantas) => {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  router.back();
-                  toast({ message: `Alterei ${quantas} ${quantas === 1 ? 'lançamento' : 'lançamentos'} desta série.`, tone: 'success' });
-                },
-                // A âncora JÁ mudou aqui: dizer só "não deu para salvar" seria mentira.
+                onSuccess: fechar,
+                // A parcela JÁ mudou: dizer só "não deu para salvar" seria mentira.
                 onError: (error) => toast({
-                  message: financeErrorMessage(error, 'Salvei este, mas não consegui aplicar nos futuros. Tenta de novo.'),
+                  message: financeErrorMessage(error, 'Salvei a parcela, mas não consegui refazer o total da compra. Tenta de novo.'),
                   tone: 'error',
                 }),
               },
             );
             return;
           }
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          router.back();
+          fechar();
         },
         // Erro NUNCA fecha o modal: o que foi digitado continua na tela.
         onError: (error) => toast({ message: financeErrorMessage(error, seFalhar ?? 'Não deu para salvar. Tenta de novo.'), tone: 'error' }),
@@ -779,7 +689,6 @@ function TransactionForm({
           {
             onSuccess: () =>
               gravar(
-                'one',
                 () => {
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                   router.back();
@@ -796,7 +705,7 @@ function TransactionForm({
       showItemActions(
         'Aplicar em quais?',
         [
-          { label: 'Só este pagamento', onPress: () => gravar('one') },
+          { label: 'Só este pagamento', onPress: () => gravar() },
           { label: 'Este e as próximas parcelas', onPress: contratoEPagamento },
         ],
         oMaisRecente
@@ -806,20 +715,7 @@ function TransactionForm({
       return;
     }
 
-    // A pergunta é no SALVAR, não na abertura: só aqui se sabe se mudou algum campo
-    // que faz sentido propagar. Sem mudança propagável, não há escolha a fazer.
-    if (naSerie && Object.keys(patch).length > 0) {
-      showItemActions(
-        'Aplicar em quais?',
-        [
-          { label: 'Só esta', onPress: () => gravar('one') },
-          { label: 'Esta e as próximas', onPress: () => gravar('future') },
-        ],
-        'As anteriores não mudam — só se você editar cada uma.',
-      );
-      return;
-    }
-    gravar('one');
+    gravar();
   });
 
   const onDelete = () => {
@@ -849,9 +745,9 @@ function TransactionForm({
           <Button
             label={saving ? 'Salvando…' : 'Salvar'}
             size="sm"
-            disabled={saving || !!correcaoDaDivida.erro || (formSerie !== null && !serieOk)}
+            disabled={saving || !!correcaoDaDivida.erro || (formSerie !== null && !serieOk) || (formCompra !== null && !compraOk)}
             loading={saving}
-            onPress={formSerie ? salvarAsProximas : onSubmit}
+            onPress={formSerie ? salvarAsProximas : formCompra ? salvarCompraToda : onSubmit}
           />
         }
       />
@@ -892,8 +788,19 @@ function TransactionForm({
               onChange={(v) => setFormSerie(v === 'serie' ? serieDaOcorrencia(serie, editing) : null)}
             />
           </Field>
+        ) : editing?.installment_plan_id && plano ? (
+          <Field label="Editar">
+            <Segmented
+              options={[
+                { value: 'uma', label: 'Só esta parcela' },
+                { value: 'compra', label: 'A compra toda' },
+              ]}
+              value={formCompra ? 'compra' : 'uma'}
+              onChange={(v) => setFormCompra(v === 'compra' ? compraDoRegistro(plano) : null)}
+            />
+          </Field>
         ) : editing && (editing.recurring_id || editing.installment_plan_id) ? (
-          // Sem a série carregada (ou na parcela), a nota diz o que é; o seletor chega com ela.
+          // Sem a série (ou a compra) carregada, a nota diz o que é; o seletor chega com ela.
           <Note icon="arrow.triangle.branch">
             {editing.recurring_id
               ? 'Faz parte de uma série.'
@@ -903,6 +810,8 @@ function TransactionForm({
 
         {formSerie ? (
           <CamposDaSerie form={formSerie} onChange={setFormSerie} contas={accounts ?? []} rotuloDaData="Vence em" />
+        ) : formCompra ? (
+          <CamposDaCompra form={formCompra} onChange={setFormCompra} contas={accounts ?? []} />
         ) : (
         <>
 
@@ -981,42 +890,23 @@ function TransactionForm({
           )}
         />
 
-        {naCompra ? (
-          <Field label="Valor" error={erroDoValorDaCompra} hint={dicaDoValorDaCompra}>
-            {valorTravado ? null : (
-              <Segmented options={UNIDADES_DO_VALOR} value={unidade} onChange={setUnidade} />
-            )}
-            <MoneyField
-              valueCents={
-                compra && contrato
-                  ? valorExibido(compra, unidade, contrato, parcelaAtual, totalOriginal)
-                  : (editing?.amount_cents ?? 0)
-              }
-              onChangeCents={(v) => {
-                if (contrato) setCompra(digitarValor(v, unidade, contrato));
-              }}
-              readOnly={valorTravado}
-              invalid={!!erroDoValorDaCompra}
-              accessibilityLabel={unidade === 'parcela' ? 'Valor de cada parcela' : 'Valor total da compra'}
-            />
-          </Field>
-        ) : (
           <Controller
             control={control}
             name="amount_cents"
             render={({ field }) => (
               <Field
                 label="Valor"
-                error={errors.amount_cents?.message ?? correcaoDaDivida.erro ?? undefined}>
+                error={errors.amount_cents?.message ?? correcaoDaDivida.erro ?? undefined}
+                hint={parcelaNaFatura ? 'Paga na fatura do cartão: o valor desta parcela não muda' : undefined}>
                 <MoneyField
                   valueCents={field.value}
                   onChangeCents={field.onChange}
+                  readOnly={parcelaNaFatura}
                   invalid={!!errors.amount_cents || !!correcaoDaDivida.erro}
                 />
               </Field>
             )}
           />
-        )}
 
 
         {kind !== 'transfer' && (
@@ -1033,6 +923,9 @@ function TransactionForm({
           </Animated.View>
         )}
 
+        {/* Numa parcela a conta é da COMPRA: muda em "A compra toda" (uma parcela sozinha noutro
+            cartão não existe). */}
+        {naCompra ? null : (
         <Controller
           control={control}
           name="account_id"
@@ -1076,6 +969,7 @@ function TransactionForm({
             </Field>
           )}
         />
+        )}
 
         {/* Sem conta nenhuma, o "Cadastrar uma conta" de cima responde pelas duas: o destino seria
             uma lista vazia. */}
@@ -1197,7 +1091,15 @@ function TransactionForm({
           name="occurred_at"
           render={({ field }) => (
             <Field
-              label={podeParcelarAqui && installmentCount > 1 ? 'Data da primeira parcela' : dataEVencimento ? dueFieldLabel(kind) : 'Data'}
+              label={
+                podeParcelarAqui && installmentCount > 1
+                  ? 'Data da primeira parcela'
+                  : dataEVencimento
+                    ? dueFieldLabel(kind)
+                    // Ao lado do "Vence em", "Data" sozinha não dizia de quê (26/09/2026)
+                    : podeAdiar && pending && kind === 'expense' ? 'Data da compra' : 'Data'
+              }
+              hint={parcelaNaFatura ? 'Paga na fatura do cartão: a data desta parcela não muda' : undefined}
               error={errors.occurred_at?.message ?? (umaData ? errors.due_at?.message : undefined)}>
               {/*
                 ⚠️ **O campo tem a linha inteira; o atalho fica ACIMA dele.** Espremido na mesma
@@ -1210,7 +1112,7 @@ function TransactionForm({
                 verdade, não eco do estado.
               */}
               <View style={styles.dateBlock}>
-                {dataEVencimento ? null : (
+                {dataEVencimento || parcelaNaFatura ? null : (
                   <View style={styles.chipRow}>
                     <Chip
                       label="Ontem"
@@ -1219,12 +1121,16 @@ function TransactionForm({
                     />
                   </View>
                 )}
-                <DatePickerField
-                  value={field.value}
-                  onChange={mudaData}
-                  accessibilityLabel="Data do lançamento"
-                  invalid={!!errors.occurred_at}
-                />
+                {parcelaNaFatura ? (
+                  <TextField editable={false} value={field.value} accessibilityLabel="Data do lançamento" />
+                ) : (
+                  <DatePickerField
+                    value={field.value}
+                    onChange={mudaData}
+                    accessibilityLabel="Data do lançamento"
+                    invalid={!!errors.occurred_at}
+                  />
+                )}
               </View>
             </Field>
           )}
@@ -1337,26 +1243,6 @@ function TransactionForm({
               <Button label="Financiamento" variant="secondary" size="sm" onPress={() => router.push({ pathname: '/finance/debts', params: { create: 'financing' } })} />
             ) : null}
           </View>
-        ) : null}
-
-        {/*
-          Número de parcelas, data da 1ª e conta são da COMPRA inteira — em Parceladas. Mora no
-          rodapé com as outras ações sobre o registro (não é campo). ⚠️ **`replace`, não
-          `push`**: voltando para cá, o formulário ainda carregaria o título velho, e um
-          "Salvar" desfaria parte do que acabou de ser feito.
-        */}
-        {editing?.installment_plan_id ? (
-          <Button
-            label="Editar parcelas e datas da compra"
-            variant="secondary"
-            size="sm"
-            onPress={() =>
-              router.replace({
-                pathname: '/finance/installments',
-                params: { edit: editing.installment_plan_id! },
-              })
-            }
-          />
         ) : null}
 
         {editing ? (

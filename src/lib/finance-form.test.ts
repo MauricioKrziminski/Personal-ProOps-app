@@ -186,12 +186,10 @@ test('o nome da compra é o da parcela sem o "(k/N)"', () => {
   assert.equal(nomeDaCompra('Sem sufixo'), 'Sem sufixo');
 });
 
-test('mudar o valor de uma parcela edita a COMPRA; o resto continua no update da linha', () => {
+test('uma parcela salva só ela — a compra toda se edita no topo do formulário (26/09/2026)', () => {
   const parcela = { id: 'tx', installment_plan_id: 'p' };
-  assert.equal(destinoDoSalvar(parcela, { installments: 1, account_id: 'c', valorDaCompraMudou: true }), 'editarCompra');
-  assert.equal(destinoDoSalvar(parcela, { installments: 1, account_id: 'c', valorDaCompraMudou: false }), 'salvar');
-  // lançamento simples não tem compra para editar
-  assert.equal(destinoDoSalvar({ id: 'tx' }, { installments: 1, account_id: 'c', valorDaCompraMudou: true }), 'salvar');
+  assert.equal(destinoDoSalvar(parcela, { installments: 1, account_id: 'c' }), 'salvar');
+  assert.equal(destinoDoSalvar(parcela, { installments: 3, account_id: 'c' }), 'salvar', 'parcela nunca vira outra compra');
 });
 
 // ── financiamento maleável (23/09/2026) ────────────────────────────────────
