@@ -1,17 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
-import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Field, TextField } from '@/components/ui/field';
 import { Forte } from '@/components/ui/forte';
 import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
@@ -33,19 +31,20 @@ import { useScheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 import { actionSheet, confirmarApagarPasta, notesLabel, symbol } from '@/components/notes/note-actions';
 import { ColorPicker } from '@/components/notes/color-picker';
-import { GradeDeIcones, useSalvarPasta } from '@/components/notes/nova-pasta';
+import { NovaPastaSheet } from '@/components/notes/nova-pasta';
 import { TagPicker } from '@/components/notes/tag-picker';
 import { noteInk } from '@/design/note-colors';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
- * Organizar pastas — criar, renomear, trocar ícone, cor, tags, mover, arquivar e apagar.
+ * Organizar pastas — a ÁRVORE inteira: renomear e trocar ícone, cor, tags, fixar, mover para
+ * dentro de outra, arquivar e apagar. Criar NÃO mora aqui (25/09/2026): tem a folha "Nova pasta"
+ * no "…" de Notas, e o editor que ficava no topo desta tela repetia aquela.
  *
  * ## Por que ela continua existindo depois de a pasta virar LUGAR
  *
  * A grade da home mostra a RAIZ e a tela de uma pasta mostra as filhas dela; nenhuma das duas
- * mostra a ÁRVORE inteira, que é o que se precisa ver para mover "Trabalho / 2026" de lugar. É
- * também onde uma pasta nasce sem haver uma nota para movê-la.
+ * mostra a ÁRVORE inteira, que é o que se precisa ver para mover "Trabalho / 2026" de lugar.
  *
  * ⚠️ **Aqui NÃO se arrasta, e é decisão.** Reordenar já existe onde a conta é exata — a grade da
  * raiz, na home, e a grade das subpastas, dentro de uma pasta. Sobre esta lista, que é uma
@@ -76,37 +75,18 @@ export default function FoldersScreen() {
   const folders = useNoteFolders();
   const loose = useLooseNotesCount();
   const saveFolder = useSaveFolder();
-  const { salvar, salvando } = useSalvarPasta(folders.data ?? []);
   const deleteFolder = useDeleteFolder();
   const updateFolder = useUpdateFolder();
 
-  const [editing, setEditing] = useState<NoteFolder | null>(null);
-  const [name, setName] = useState('');
-  const [icon, setIcon] = useState('folder');
-  const [error, setError] = useState<ReactNode>(null);
+  /** A pasta na folha de renomear — a MESMA folha de "Nova pasta" (`NovaPastaSheet`). */
+  const [editando, setEditando] = useState<NoteFolder | null>(null);
   /** Alvo de cada sheet — a pasta, nunca um booleano: os dois servem qualquer linha da árvore. */
   const [pintando, setPintando] = useState<NoteFolder | null>(null);
   const [etiquetando, setEtiquetando] = useState<NoteFolder | null>(null);
 
-  const reset = () => {
-    setEditing(null);
-    setName('');
-    setIcon('folder');
-    setError(null);
-  };
-
-  // Renomear e trocar ícone caem no MESMO editor do topo: são o mesmo formulário, e um modal só
-  // para trocar um símbolo seria uma tela a mais para uma ação de um toque.
-  const startEdit = (folder: NoteFolder) => {
-    setEditing(folder);
-    setName(folder.name);
-    setIcon(folder.icon ?? 'folder');
-    setError(null);
-  };
-
   /**
-   * `?edit=<pasta>` — o "Renomear e mover" de DENTRO de uma pasta (25/09/2026): chega com ELA no
-   * editor do topo, em vez de a pessoa caçar a pasta na árvore. Uma vez só (`edicaoAberta`).
+   * `?edit=<pasta>` — o "Renomear e mover" de DENTRO de uma pasta (25/09/2026): chega com a folha
+   * de renomear DELA aberta, em vez de a pessoa caçar a pasta na árvore. Uma vez só.
    */
   const params = useLocalSearchParams<{ edit?: string }>();
   const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
@@ -114,25 +94,14 @@ export default function FoldersScreen() {
     const alvo = folders.data?.find((f) => f.id === params.edit);
     if (alvo) {
       setEdicaoAberta(params.edit);
-      startEdit(alvo);
+      setEditando(alvo);
     }
   }
-
-  const submit = async () => {
-    // A regra de nome (vazio, repetido, corrida entre aparelhos) mora em `useSalvarPasta` — a mesma
-    // da folha "Nova pasta" da aba Notas.
-    const r = await salvar({ id: editing?.id, nome: name, icone: icon });
-    if (r.erro) {
-      setError(r.erro);
-      return;
-    }
-    if (r.id) reset();
-  };
 
   const confirmDelete = (folder: NoteFolder) => {
     confirmarApagarPasta(folder, () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      if (editing?.id === folder.id) reset();
+      if (editando?.id === folder.id) setEditando(null);
       deleteFolder.mutate(folder.id, {
         onError: () => toast({ message: 'Não deu para apagar a pasta.', tone: 'error' }),
       });
@@ -219,7 +188,7 @@ export default function FoldersScreen() {
 
   /** O menu da pasta, UMA lista para o toque (longo ou curto) e o arrasto. */
   const acoesDaPasta = (folder: NoteFolder): ItemAction[] => [
-    { label: 'Renomear ou trocar ícone', onPress: () => startEdit(folder) },
+    { label: 'Renomear ou trocar ícone', onPress: () => setEditando(folder) },
     { label: 'Cor', onPress: () => setPintando(folder) },
     { label: 'Tags', onPress: () => setEtiquetando(folder) },
     { label: folder.pinned ? 'Desafixar' : 'Fixar', icon: folder.pinned ? 'pin.slash' : 'pin', arrasto: 'direita', desfaz: true, onPress: () => fixar(folder) },
@@ -237,42 +206,6 @@ export default function FoldersScreen() {
    */
   const list = folders.data ?? [];
   const arvore = folderTree(list);
-
-  // One editor instance: on a wide window it stays beside the hierarchy; on a narrow window
-  // it returns above the list, preserving the existing creation flow and keyboard behavior.
-  const folderEditor = (
-      <Card>
-        <View style={styles.form}>
-          <Field label={editing ? <>Renomear <Forte>{editing.name}</Forte></> : 'Nova pasta'} error={error ?? undefined}>
-            <TextField
-              value={name}
-              onChangeText={(text) => {
-                setName(text);
-                setError(null);
-              }}
-              placeholder="Ex.: mercado"
-              autoCapitalize="none"
-              maxLength={40}
-              invalid={!!error}
-              accessibilityLabel="Nome da pasta"
-              onSubmitEditing={() => void submit()}
-            />
-          </Field>
-
-          <GradeDeIcones valor={icon} onChange={setIcon} />
-
-          <View style={styles.formActions}>
-            <Button
-              label={editing ? 'Salvar' : 'Criar pasta'}
-              size="sm"
-              loading={salvando}
-              onPress={() => void submit()}
-            />
-            {editing ? <Button label="Cancelar" variant="ghost" size="sm" onPress={reset} /> : null}
-          </View>
-        </View>
-      </Card>
-  );
 
   const folderLibrary = (
     <>
@@ -300,7 +233,7 @@ export default function FoldersScreen() {
         <EmptyState
           icon="folder"
           title="Nenhuma pasta ainda"
-          hint="Pastas aparecem sozinhas quando você manda *anotar: comprar leite #mercado* no WhatsApp — ou cria uma aqui."
+          hint="Crie em *Nova pasta*, no … de Notas, ou mande *anotar: comprar leite #mercado* no WhatsApp."
         />
       ) : (
         <Section>
@@ -364,13 +297,6 @@ export default function FoldersScreen() {
     </>
   );
 
-  const compactOrganizer = (
-    <>
-      {folderEditor}
-      {folderLibrary}
-    </>
-  );
-
   return (
     <Screen grouped wide onRefresh={() => Promise.all([folders.refetch(), loose.refetch()])}>
       <Stack.Screen options={{ title: 'Organizar pastas' }} />
@@ -390,11 +316,14 @@ export default function FoldersScreen() {
         }}
       />
 
-      <AdaptivePanes
-        testID="folder-organizer-panes"
-        main={folderLibrary}
-        support={folderEditor}
-        singlePaneContent={compactOrganizer}
+      {folderLibrary}
+
+      <NovaPastaSheet
+        key={editando?.id ?? 'fechada'}
+        visible={editando !== null}
+        pasta={editando}
+        pastas={list}
+        onClose={() => setEditando(null)}
       />
 
       <ColorPicker
@@ -437,14 +366,6 @@ export default function FoldersScreen() {
 const styles = StyleSheet.create({
   trailing: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   disco: { width: 12, height: 12, borderRadius: 6 },
-  form: {
-    gap: Space.lg,
-  },
-  formActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.md,
-  },
   errorCard: {
     alignItems: 'center',
     gap: Space.md,

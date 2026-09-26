@@ -92,25 +92,32 @@ export function GradeDeIcones({ valor, onChange }: { valor: string; onChange: (i
 }
 
 /**
- * "Nova pasta" onde a pessoa está (25/09/2026): *"se eu estou na tela de notas e quero criar pasta,
- * eu tenho que ter um botão de criar pasta"* — criar só existia dentro de "Organizar pastas".
- * `paiId` faz dela uma subpasta. Criada, a folha fecha e o aviso diz o nome.
+ * A folha da pasta: CRIAR e RENOMEAR são o mesmo formulário (25/09/2026). Criar mora onde a pessoa
+ * está — o "…" de Notas e o menu de uma pasta (`paiId` faz dela subpasta) —, e renomear/trocar o
+ * ícone abre esta mesma folha com `pasta`. Organizar pastas deixou de criar: tinha um editor
+ * próprio no topo que repetia este.
+ *
+ * Com `pasta`, o nome e o ícone nascem dela e a pasta-mãe NÃO muda (mudar de nível é "Mover para
+ * dentro de…"). Quem abre para editar troca a `key` ao trocar de pasta, para os campos nascerem
+ * de novo.
  */
 export function NovaPastaSheet({
   visible,
   onClose,
   pastas,
   paiId,
+  pasta,
 }: {
   visible: boolean;
   onClose: () => void;
   pastas: NoteFolder[];
   paiId?: string;
+  pasta?: NoteFolder | null;
 }) {
   const toast = useToast();
   const { salvar, salvando } = useSalvarPasta(pastas);
-  const [nome, setNome] = useState('');
-  const [icone, setIcone] = useState('folder');
+  const [nome, setNome] = useState(pasta?.name ?? '');
+  const [icone, setIcone] = useState(pasta?.icon ?? 'folder');
   const [erro, setErro] = useState<ReactNode>(null);
 
   const fechar = () => {
@@ -121,22 +128,26 @@ export function NovaPastaSheet({
   };
 
   const criar = async () => {
-    const r = await salvar({ nome, icone, paiId: paiId ?? null });
+    // Editando, a pasta-mãe fica como está (`undefined` não escreve `parent_id`).
+    const r = await salvar({ id: pasta?.id, nome, icone, paiId: pasta ? undefined : (paiId ?? null) });
     if (r.erro) {
       setErro(r.erro);
       return;
     }
     if (!r.id) return;
-    toast({ message: <>Pasta <Forte>{normalizeFolderName(nome)}</Forte> criada.</>, tone: 'success' });
+    toast({
+      message: <>Pasta <Forte>{normalizeFolderName(nome)}</Forte> {pasta ? 'salva' : 'criada'}.</>,
+      tone: 'success',
+    });
     fechar();
   };
 
   return (
     <Sheet visible={visible} onClose={fechar}>
       <TaskHeader
-        title={paiId ? 'Nova subpasta' : 'Nova pasta'}
+        title={pasta ? 'Renomear pasta' : paiId ? 'Nova subpasta' : 'Nova pasta'}
         onClose={fechar}
-        action={<Button label="Criar" size="sm" loading={salvando} onPress={() => void criar()} />}
+        action={<Button label={pasta ? 'Salvar' : 'Criar'} size="sm" loading={salvando} onPress={() => void criar()} />}
       />
       <ScrollView contentContainerStyle={styles.corpo} keyboardShouldPersistTaps="handled">
         <Field label="Nome" error={erro ?? undefined}>

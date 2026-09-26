@@ -399,7 +399,6 @@ const GHOST_PERMITIDO = new Set([
   'src/app/import.tsx', // "Marcar todos": ação de cabeçalho da lista da prévia
   'src/app/link-email.tsx', // "Cancelar"/"Trocar e-mail" e "Reenviar código", pares do passo
   'src/app/link-phone.tsx', // idem, com o número
-  'src/app/notes/folders.tsx', // "Cancelar" ao lado de "Salvar"
   'src/app/onboarding.tsx', // "Agora não" sob "Continuar"
   'src/app/signup.tsx', // "Já tenho conta" sob "Criar conta"; "Reenviar código"
   'src/components/auth/email-login-screen.tsx', // "Criar conta" sob "Entrar"; links da linha

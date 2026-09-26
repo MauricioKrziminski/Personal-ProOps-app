@@ -2484,3 +2484,24 @@ test('Hoje: "Lançar" cria lançamento, lembrete ou nota ali mesmo', () => {
   ui.interact(() => fab.props.onPress());
   assert.deepEqual(ui.actions.map((a: any) => a.label), ['Gasto ou receita', 'Lembrete', 'Nota']);
 });
+
+/** Organizar pastas não cria (25/09/2026): renomear abre a MESMA folha de "Nova pasta". */
+test('Organizar pastas: sem criar; Renomear abre a folha da pasta, que salva sem mexer na pasta-mãe', async () => {
+  const pasta = { id: 'f1', name: 'trabalho', icon: 'briefcase', color: null, pinned: false, parent_id: 'p0', notes_count: 2, tags: [] };
+  const ui = screen('src/app/notes/folders.tsx', { folders: [pasta] });
+  const textos = JSON.stringify(ui.nodes().map((n: any) => [n.props?.label, n.props?.title]));
+  assert.doesNotMatch(textos, /Criar pasta|Nova pasta/, 'nada de criar aqui');
+  const card = deslizaveis(ui)[0];
+  ui.interact(() => card.props.acoes.find((a: any) => a.label === 'Renomear ou trocar ícone').onPress());
+  const folha = ui.nodes().find((n: any) => n.type?.name === 'NovaPastaSheet');
+  assert.equal(folha.props.visible, true);
+  assert.equal(folha.props.pasta.id, 'f1');
+
+  const editar = screen('src/components/notes/nova-pasta.tsx', { componente: 'NovaPastaSheet', props: { visible: true, onClose: () => {}, pastas: [pasta], pasta } });
+  assert.ok(editar.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Renomear pasta'));
+  assert.ok(editar.nodes().some((n: any) => n.type === 'TextField' && n.props.value === 'trabalho'), 'o nome dela no campo');
+  editar.interact((nodes: any[]) => nodes.find((n) => n.type === 'TextField' && n.props.accessibilityLabel === 'Nome da pasta').props.onChangeText('trabalho 2'));
+  editar.interact((nodes: any[]) => nodes.find((n) => n.type === 'TaskHeader').props.action.props.onPress());
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(copia(editar.writes.at(-1)), { operation: 'useSaveFolder', value: { id: 'f1', name: 'trabalho 2', icon: 'briefcase' } }, 'sem parentId: a pasta fica onde está');
+});
