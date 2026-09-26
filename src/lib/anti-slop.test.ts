@@ -1601,3 +1601,13 @@ test('O dia de um timestamp na tela é o LOCAL, nunca o recorte do UTC', () => {
   // card e o formulário da série diziam 05/10. `dataLocalDe` é o caminho.
   assert.deepEqual(offenders(/(next_run_at|created_at|updated_at|paid_at)\??\.slice\(0, ?10\)/), []);
 });
+
+test('Juros do Pix no crédito também se edita: abre com o juro que nasceu junto e acompanha a compra', () => {
+  // 26/09/2026, "tudo que se cria se edita": o campo só existia criando.
+  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  assert.doesNotMatch(fonte, /const mostraJuros = [^;]*!editing &&/, 'o campo não some na edição');
+  assert.match(fonte, /fee_cents: jurosDoPix\?\.amount_cents \?\? 0/);
+  assert.match(fonte, /juros: editing && mostraJuros \? \{ id: jurosDoPix\?\.id \?\? null, cents: values\.fee_cents \}/);
+  const hook = readFileSync(join(SRC, 'hooks/use-finance.ts'), 'utf8');
+  assert.match(hook, /export function useJurosDoPix/);
+});

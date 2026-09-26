@@ -2448,13 +2448,75 @@ export interface TransactionInput {
  * Quem resolve a fatura das duas é o trigger `set_invoice`: mesma conta e mesma data caem
  * no mesmo ciclo, sem o app calcular nada.
  */
+/** O texto que marca a linha de juros do Pix no crédito — é por ele que a edição a acha. */
+export const DESCRICAO_JUROS_DO_PIX = 'Juros do Pix no crédito';
+
+/**
+ * A linha de juros do Pix que nasceu junto com esta compra (26/09/2026: *"tudo que se cria se
+ * edita"*). Ela é gravada solta, na mesma conta e data, com a descrição fixa — sem coluna de
+ * vínculo —, então é por esses três que a edição a encontra.
+ */
+export function useJurosDoPix(tx: Transaction | null | undefined) {
+  const procura = Boolean(tx?.invoice_id && tx.kind === 'expense' && tx.description !== DESCRICAO_JUROS_DO_PIX && !tx.installment_plan_id);
+  return useQuery({
+    queryKey: ['transactions', 'juros-do-pix', tx?.id],
+    enabled: procura,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('id, amount_cents')
+        .eq('account_id', tx!.account_id!)
+        .eq('occurred_at', tx!.occurred_at)
+        .eq('category', 'juros')
+        .eq('description', DESCRICAO_JUROS_DO_PIX)
+        .neq('id', tx!.id)
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useSaveTransaction() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async ({ id, fee_cents, ...input }: TransactionInput & { id?: string; fee_cents?: number }) => {
+    mutationFn: async ({
+      id,
+      fee_cents,
+      juros,
+      ...input
+    }: TransactionInput & {
+      id?: string;
+      fee_cents?: number;
+      /** Editando: a linha de juros do Pix desta compra (`useJurosDoPix`) e o valor novo dela. */
+      juros?: { id: string | null; cents: number };
+    }) => {
       if (id) {
         const { error } = await supabase.from('transactions').update(input).eq('id', id).select('id').single();
         if (error) throw error;
+        // O juro acompanha a compra: valor novo, data e conta dela; zero apaga; sem linha, nasce.
+        if (juros?.id && juros.cents > 0) {
+          const { error: e } = await supabase
+            .from('transactions')
+            .update({ amount_cents: juros.cents, occurred_at: input.occurred_at, account_id: input.account_id })
+            .eq('id', juros.id);
+          if (e) throw Object.assign(e, { compraSalva: true });
+        } else if (juros?.id) {
+          const { error: e } = await supabase.from('transactions').delete().eq('id', juros.id);
+          if (e) throw Object.assign(e, { compraSalva: true });
+        } else if (juros && juros.cents > 0) {
+          const { error: e } = await supabase.from('transactions').insert({
+            ...input,
+            user_id: await userId(),
+            source: 'app' as const,
+            amount_cents: juros.cents,
+            category: 'juros',
+            description: DESCRICAO_JUROS_DO_PIX,
+            merchant: null,
+          });
+          if (e) throw Object.assign(e, { compraSalva: true });
+        }
         return;
       }
       const uid = await userId();
@@ -2467,7 +2529,7 @@ export function useSaveTransaction() {
           ...compra,
           amount_cents: fee_cents,
           category: 'juros',
-          description: 'Juros do Pix no crédito',
+          description: DESCRICAO_JUROS_DO_PIX,
           // O favorecido é da compra, não do juro: o juro é do banco.
           merchant: null,
         });

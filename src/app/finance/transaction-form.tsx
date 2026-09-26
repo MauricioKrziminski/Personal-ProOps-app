@@ -45,6 +45,8 @@ import {
   useSaveRecurringSeries,
   useSaveTransactionScoped,
   useTransaction,
+  useJurosDoPix,
+  DESCRICAO_JUROS_DO_PIX,
   type InstallmentPlanSummary,
   type Transaction,
   type TransactionKind,
@@ -155,8 +157,12 @@ export default function TransactionFormScreen() {
   const planoId = query.data?.installment_plan_id;
   const plano = useInstallmentPlan(planoId);
   const esperandoPlano = Boolean(planoId) && plano.isPending;
+  // O juro do Pix desta compra, se houver: o campo abre com ele (26/09/2026, "tudo que se cria se
+  // edita"). Mesmo esqueleto — `useForm` só lê os valores na montagem.
+  const juros = useJurosDoPix(query.data);
+  const esperandoJuros = juros.fetchStatus === 'fetching' && juros.isPending;
 
-  if (params.id && (query.isLoading || esperandoPlano)) {
+  if (params.id && (query.isLoading || esperandoPlano || esperandoJuros)) {
     return (
       <Screen scroll={false}>
         <TaskHeader title="Editar lançamento" onClose={() => router.back()} />
@@ -216,6 +222,7 @@ export default function TransactionFormScreen() {
       key={params.id ?? `novo:${params.conta ?? ''}`}
       editing={editing}
       plano={plano.data ?? undefined}
+      jurosDoPix={juros.data ?? null}
       conta={editing ? undefined : params.conta}
     />
   );
@@ -224,11 +231,14 @@ export default function TransactionFormScreen() {
 function TransactionForm({
   editing,
   plano,
+  jurosDoPix,
   conta,
 }: {
   editing?: Transaction;
   /** A compra desta parcela, quando `editing` é parcela e o plano carregou. */
   plano?: InstallmentPlanSummary;
+  /** A linha de juros do Pix que nasceu com esta compra (`useJurosDoPix`). */
+  jurosDoPix?: { id: string; amount_cents: number } | null;
   /**
    * `?conta=` — "Nova compra neste cartão" na fatura, "Lançar" nos lançamentos de uma conta: o
    * lançamento novo nasce nela. Só vale se ela está entre as contas da pessoa.
@@ -271,7 +281,7 @@ function TransactionForm({
       counterparty_account_id: editing?.counterparty_account_id ?? null,
       installments: 1,
       paid_installments: '0',
-      fee_cents: 0,
+      fee_cents: jurosDoPix?.amount_cents ?? 0,
       auto_confirm: editing?.auto_confirm ?? false,
       occurred_at: isoToBR(dataDaSerie ?? editing?.occurred_at ?? localISODate()),
       pending: editing?.status === 'pending',
@@ -307,7 +317,12 @@ function TransactionForm({
    * receita, ou parcelar), e o salvar gravava uma segunda linha de juros que a tela não mostrava
    * mais — virando receita de juros, ou transferência (22/09/2026).
    */
-  const mostraJuros = isCard && kind === 'expense' && !editing && installmentCount === 1;
+  // Editando também (26/09/2026): o juro esquecido se soma depois, e o que existe se corrige. Não
+  // em parcela, série ou pagamento de dívida — esses têm o próprio contrato.
+  const mostraJuros =
+    isCard && kind === 'expense' && installmentCount === 1 &&
+    !(editing?.installment_plan_id || editing?.recurring_id || editing?.debt_id) &&
+    editing?.description !== DESCRICAO_JUROS_DO_PIX;
   /**
    * Conta a pagar não existe em cartão: a compra já entra na fatura e o caixa sai quando a
    * fatura vence. Marcar `pending` aqui contaria o MESMO gasto duas vezes na projeção.
@@ -637,6 +652,7 @@ function TransactionForm({
         due_at: dueAt,
         // Campo que não aparece não escreve (finance.md): juro só onde a pergunta existe
         fee_cents: mostraJuros ? values.fee_cents : 0,
+        juros: editing && mostraJuros ? { id: jurosDoPix?.id ?? null, cents: values.fee_cents } : undefined,
         auto_confirm: autoConfirm,
       },
       {
@@ -664,7 +680,14 @@ function TransactionForm({
           fechar();
         },
         // Erro NUNCA fecha o modal: o que foi digitado continua na tela.
-        onError: (error) => toast({ message: financeErrorMessage(error, seFalhar ?? 'Não deu para salvar. Tenta de novo.'), tone: 'error' }),
+        onError: (error) =>
+          toast({
+            message:
+              error && typeof error === 'object' && 'compraSalva' in error
+                ? 'Salvei a compra, mas não o juro do Pix. Tenta de novo.'
+                : financeErrorMessage(error, seFalhar ?? 'Não deu para salvar. Tenta de novo.'),
+            tone: 'error',
+          }),
       },
     );
 
@@ -1068,7 +1091,8 @@ function TransactionForm({
           e é assim que ficam aqui: duas linhas, mesma fatura, os juros em `juros`.
 
           Vazio = compra normal. Não é um modo: é um campo a mais que só aparece onde a
-          pergunta faz sentido (gasto em cartão, à vista, sendo criado agora).
+          pergunta faz sentido (gasto em cartão, à vista). Editando, ele abre com o juro que nasceu
+          junto (`useJurosDoPix`), e mudar, zerar ou somar depois vale.
         */}
         {mostraJuros && (
           <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
