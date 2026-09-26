@@ -17,7 +17,7 @@ import { Stack } from 'expo-router';
  * RAIZ (`src/app/_layout.tsx`), que fica ACIMA do grupo de abas.
  *
  * **A URL não mudou.** `(tabs)` é um GRUPO e nunca entrou no caminho, então
- * `src/app/(tabs)/finance/cards.tsx` e `src/app/finance/cards.tsx` são os dois `/finance/cards` —
+ * o antigo `src/app/(tabs)/finance/cards.tsx` e o atual `src/app/finance/cards.tsx` são os dois `/finance/cards` —
  * nenhum `router.push` precisou ser reescrito.
  */
 export const unstable_settings = {

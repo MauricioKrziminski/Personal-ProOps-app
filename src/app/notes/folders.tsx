@@ -228,7 +228,8 @@ export default function FoldersScreen() {
           <Row
             title="Sem pasta"
             icon="tray"
-            chevron={false}
+            // A aba Notas É a caixa das soltas (`folderId: null`): a contagem abre o que ela conta.
+            onPress={() => router.navigate('/notes')}
             trailing={
               <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
                 {loose.data ?? 0}

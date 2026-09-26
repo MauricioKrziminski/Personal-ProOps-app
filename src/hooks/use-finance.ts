@@ -2571,6 +2571,43 @@ export function useSaveTransactionScoped() {
   });
 }
 
+/**
+ * Editar a série. Vai por RPC porque não é UM update: a regra manda nas ocorrências
+ * que ainda não existem e as já materializadas (90 dias à frente, `pending`) precisam
+ * acompanhar — senão os próximos três meses ficam com o valor velho e o quarto com o
+ * novo. As passadas não mudam, que é a regra que o dono do produto pediu.
+ */
+export function useSaveRecurringSeries() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async ({ id, patch }: {
+      id: string;
+      patch: {
+        amount_cents?: number;
+        category?: string | null;
+        description?: string | null;
+        merchant?: string | null;
+        kind?: 'expense' | 'income';
+        account_id?: string | null;
+        auto_confirm?: boolean;
+        end_date?: string | null;
+        /** O calendário vai junto: regra nova e o próximo vencimento (`20260926120000`). */
+        rrule?: string;
+        next_run_at?: string;
+      };
+    }) => {
+      const { data, error } = await supabase.rpc('update_recurring_series', {
+        p_recurring_id: id,
+        p_patch: patch,
+        p_propagate: true,
+      });
+      if (error) throw error;
+      return Number(data ?? 0);
+    },
+    onSuccess: invalidate,
+  });
+}
+
 /** Cria ou edita (mesma forma de useSaveTransaction: com `id` vira update). */
 export function useSaveAccount() {
   const invalidate = useInvalidateFinance();

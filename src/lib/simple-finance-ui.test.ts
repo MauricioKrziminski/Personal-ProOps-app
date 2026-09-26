@@ -170,6 +170,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     }),
     useMarkPaid: () => mutation('markPaid'),
     useSaveTransactionScoped: () => mutation('saveScoped'),
+    useSaveRecurringSeries: () => mutation('saveRecurringSeries'),
     useTransaction: (id: string) => ({ ...query, isSuccess: true, data: (options.txs ?? [{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared', recurring_id: null, installment_plan_id: null }]).find((t: any) => t.id === id) ?? null }),
     usePayInvoice: () => mutation('payInvoice'),
     useInvoice: () => ({ ...query, data: {
@@ -220,6 +221,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       // O "Paguei" que confirma o valor (25/09/2026): carregado DE VERDADE, é a regra em teste.
       if (name === '@/components/finance/confirmar-baixa') return load('src/components/finance/confirmar-baixa.tsx');
       if (name === '@/lib/confirmar-baixa') return load('src/lib/confirmar-baixa.ts');
+      // Os campos da série (26/09/2026): a folha de Recorrentes e o "Esta e as próximas" do lançamento.
+      if (name === '@/components/finance/serie-form') return load('src/components/finance/serie-form.tsx');
       if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useReminders: () => ({ ...query, isSuccess: true, data: { pages: [options.reminders ?? []], pageParams: [0] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }), useToggleReminder: () => mutation('toggleReminder'), useDeleteReminder: () => mutation('deleteReminder') };
       if (name === '@/hooks/use-session') return { useSession: () => ({ session: { user: { id: 'user-1' } } }) };
       if (name === '@/hooks/use-profile') return { useProfile: () => ({ ...query, isSuccess: true, data: { display_name: 'Gabriel Almeida', phone: null } }) };
@@ -342,6 +345,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       for (const slot of ['cycle', 'actions', 'ledger', 'breakdown']) visit(node.props[slot]);
     }
     if (node.type === 'FinanceAnalysisPanes') visit(node.props.compact);
+    // `CamposDaSerie` é um grupo de campos sem hook: desenhado aqui, a tela é a que a pessoa vê.
+    if (typeof node.type === 'function' && node.type.name === 'CamposDaSerie') visit(node.type(node.props));
     // No celular o `AdaptivePanes` desenha o slot de uma coluna só (Pastas, Recorrentes…).
     if (node.type === 'AdaptivePanes') visit(node.props.singlePaneContent ?? node.props.main);
     visit(node.props.ListHeaderComponent);
@@ -2580,4 +2585,12 @@ test('Dívida de parcela fixa também tem "Tipo" (e grava o escolhido)', () => {
   const select = ui.nodes().find((n: any) => n.type === 'SelectField' && n.props.options.some((o: any) => o.id === 'loan'));
   ui.interact(() => select.props.onChange('loan'));
   assert.equal(ui.nodes().find((n: any) => n.type === 'SelectField' && n.props.options.some((o: any) => o.id === 'loan')).props.value, 'loan');
+});
+
+test('Organizar pastas: "Sem pasta" abre as notas soltas (a aba Notas)', () => {
+  // A linha tinha ícone e contagem como as outras e não fazia nada ao toque.
+  const ui = screen('src/app/notes/folders.tsx', { folders: [] });
+  const semPasta = ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'Sem pasta');
+  ui.interact(() => semPasta.props.onPress());
+  assert.equal(ui.navigations.at(-1), '/notes');
 });

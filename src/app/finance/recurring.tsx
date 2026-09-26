@@ -5,7 +5,7 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
-import { CategoryPicker } from '@/components/finance/category-picker';
+import { CamposDaSerie, SERIE_VAZIA, serieDoRegistro, validaSerie, type SerieForm } from '@/components/finance/serie-form';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet } from '@/components/ui/sheet';
@@ -14,8 +14,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
-import { Field, MoneyField, TextField } from '@/components/ui/field';
-import { DatePickerField } from '@/components/finance/date-picker-field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Screen } from '@/components/ui/screen';
@@ -25,8 +23,6 @@ import { VerMais } from '@/components/ui/ver-mais';
 import { useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Search } from '@/components/ui/search';
-import { SwitchRow } from '@/components/ui/switch-row';
-import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
@@ -34,6 +30,7 @@ import {
   useAccounts,
   useDeleteRecurring,
   useRecurringTransactions,
+  useSaveRecurringSeries,
   useToggleRecurring,
   type RecurringTransaction,
 } from '@/hooks/use-finance';
@@ -43,13 +40,11 @@ import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useDebounced } from '@/hooks/use-debounced';
 import { semAcento } from '@/lib/text';
-import { QuantityField } from '@/components/ui/quantity-field';
-import { brToISO, dataLocalDe, ehUltimoDiaDoMes, fimQueSegueOInicio, isValidBRDate, isoToBR, localDateTime, localISODate } from '@/lib/dates';
+import { brToISO, dataLocalDe, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
-import { financeErrorMessage, validRecurringRange } from '@/lib/finance-form';
+import { financeErrorMessage } from '@/lib/finance-form';
 import { describeRRule } from '@/lib/rrule-text';
 import { supabase } from '@/lib/supabase';
-import { AccountPicker } from '@/components/finance/account-picker';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
@@ -65,72 +60,6 @@ import { transicaoDeLayout } from '@/components/motion/transicao';
  *   (`cleared` se a data já passou e `auto_confirm` for true), com unique
  *   `(recurring_id, occurred_at)` garantindo que rodar duas vezes não duplica.
  */
-
-interface FormState {
-  /**
-   * Presente = está EDITANDO uma série que já existe. Todos os campos da criação continuam na tela
-   * (26/09/2026, *"ter todos os campos de quando eu crio ao editar, podendo editar tudo"*): mudar a
-   * repetição ou o vencimento refaz as ocorrências futuras em aberto.
-   */
-  id?: string;
-  /**
-   * A pessoa mexeu em "Repete", "A cada quantos meses" ou no vencimento. Só então a regra vai no
-   * salvar: comparar a regra montada com a gravada mudaria o calendário de uma série vinda do
-   * WhatsApp que a pessoa nem tocou (a regra de lá nem sempre tem a forma que o app monta).
-   */
-  agendaMudou?: boolean;
-  kind: 'expense' | 'income';
-  amountCents: number;
-  description: string;
-  /** Opcional, como no lançamento: nem toda conta fixa tem um estabelecimento. */
-  merchant: string;
-  category: string | null;
-  accountId: string | null;
-  preset: 'monthly' | 'weekly' | 'yearly';
-  /**
-   * Só no preset mensal: vence no ÚLTIMO dia do mês, não num dia fixo.
-   *
-   * ⚠️ Não é o mesmo que "dia 31": fevereiro não tem 31, e uma série ancorada no 31 pula os
-   * meses curtos. `BYMONTHDAY=-1` é o que a RRULE tem para isto, e o `dateutil` do agente já
-   * resolve — devolve 30/09, 31/10, 30/11, 31/12. Foi o caso do Fundacred, que vence no último
-   * dia e estava cadastrado no dia 4.
-   */
-  /** Só no preset mensal: `A cada N meses`. */
-  intervalo: string;
-  /** dd/mm/aaaa — vira `dtstart` E o `next_run_at` inicial. */
-  inicio: string;
-  /** dd/mm/aaaa, opcional: é como se encerra uma assinatura sem apagar o histórico. */
-  fim: string;
-  autoConfirm: boolean;
-}
-
-const DIAS_RRULE = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-
-/**
- * A RRULE sai do preset + da data de início — nunca de um campo de texto livre, que seria um
- * gerador de série quebrada. A frase de volta vem do mesmo `describeRRule` das séries da IA.
- */
-function montaRRule(
-  preset: FormState['preset'],
-  inicio: Date,
-  intervalo: number,
-): string {
-  if (preset === 'weekly') return `FREQ=WEEKLY;BYDAY=${DIAS_RRULE[inicio.getDay()]}`;
-  if (preset === 'yearly')
-    return `FREQ=YEARLY;BYMONTH=${inicio.getMonth() + 1};BYMONTHDAY=${inicio.getDate()}`;
-  const passo = intervalo > 1 ? `;INTERVAL=${intervalo}` : '';
-  /*
-    ⚠️ **A data DIZ se é "todo dia N" ou "todo último dia do mês".** Havia um campo só para
-    perguntar isso ("Vence quando: Dia do mês | Último dia"), e ele era um controle que a própria
-    data já respondia — quem escolhe 31/10 quer o fim do mês, quem escolhe 05/10 quer o dia 5.
-    Pior: ele renderizava ANTES de "Começa em", o campo que lhe dá sentido.
-
-    `-1` não é cosmético ao lado de 31: `BYMONTHDAY=31` PULA fevereiro e os meses de 30 dias.
-  */
-  return `FREQ=MONTHLY${passo};BYMONTHDAY=${
-    ehUltimoDiaDoMes(inicio) ? -1 : inicio.getDate()
-  }`;
-}
 
 /**
  * Destaque dos 30 dias: sai das ocorrências JÁ materializadas, nunca de uma soma dos
@@ -195,43 +124,6 @@ function useCreateRecurring() {
   });
 }
 
-/**
- * Editar a série. Vai por RPC porque não é UM update: a regra manda nas ocorrências
- * que ainda não existem e as já materializadas (90 dias à frente, `pending`) precisam
- * acompanhar — senão os próximos três meses ficam com o valor velho e o quarto com o
- * novo. As passadas não mudam, que é a regra que o dono do produto pediu.
- */
-function useSaveRecurringSeries() {
-  const invalidate = useInvalidateFinance();
-  return useMutation({
-    mutationFn: async ({ id, patch }: {
-      id: string;
-      patch: {
-        amount_cents?: number;
-        category?: string | null;
-        description?: string | null;
-        merchant?: string | null;
-        kind?: 'expense' | 'income';
-        account_id?: string | null;
-        auto_confirm?: boolean;
-        end_date?: string | null;
-        /** O calendário vai junto: regra nova e o próximo vencimento (`20260926120000`). */
-        rrule?: string;
-        next_run_at?: string;
-      };
-    }) => {
-      const { data, error } = await supabase.rpc('update_recurring_series', {
-        p_recurring_id: id,
-        p_patch: patch,
-        p_propagate: true,
-      });
-      if (error) throw error;
-      return Number(data ?? 0);
-    },
-    onSuccess: invalidate,
-  });
-}
-
 /** Faixa de erro por seção. Seção que falha DIZ que falhou — nunca some. */
 function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
@@ -244,43 +136,6 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
     </Card>
   );
 }
-
-/**
- * O formulário aberto sobre uma série existente, com os campos da criação: a repetição sai da
- * regra gravada e a data é o PRÓXIMO vencimento (é o que a pessoa quer mudar — o Fundacred vencia
- * no dia 4 e é no último dia do mês).
- */
-function formDaSerie(r: RecurringTransaction): FormState {
-  const intervalo = /INTERVAL=(\d+)/.exec(r.rrule)?.[1] ?? '1';
-  return {
-    id: r.id,
-    kind: r.kind === 'income' ? 'income' : 'expense',
-    amountCents: Number(r.amount_cents),
-    description: r.description ?? '',
-    merchant: r.merchant ?? '',
-    category: r.category,
-    accountId: r.account_id,
-    preset: r.rrule.includes('FREQ=WEEKLY') ? 'weekly' : r.rrule.includes('FREQ=YEARLY') ? 'yearly' : 'monthly',
-    intervalo,
-    inicio: isoToBR(dataLocalDe(r.next_run_at)),
-    fim: r.end_date ? isoToBR(r.end_date) : '',
-    autoConfirm: r.auto_confirm,
-  };
-}
-
-const FORM_VAZIO: FormState = {
-  kind: 'expense',
-  amountCents: 0,
-  description: '',
-  merchant: '',
-  category: null,
-  accountId: null,
-  preset: 'monthly',
-  intervalo: '1',
-  inicio: isoToBR(localISODate()),
-  fim: '',
-  autoConfirm: true,
-};
 
 export default function RecurringScreen() {
   const params = useLocalSearchParams<{ create?: string; edit?: string; kind?: string; amount?: string; description?: string; merchant?: string; category?: string; account?: string; start?: string }>();
@@ -300,8 +155,8 @@ export default function RecurringScreen() {
   // `?create=1` já nasce vindo de fora (é o "Repetir lançamento" e o atalho do Financeiro).
   const volta = useVoltarQuandoFechar(params.create === '1');
 
-  const [form, setForm] = useState<FormState | null>(() => params.create === '1' ? {
-    ...FORM_VAZIO, kind: params.kind === 'income' ? 'income' : 'expense',
+  const [form, setForm] = useState<SerieForm | null>(() => params.create === '1' ? {
+    ...SERIE_VAZIA, kind: params.kind === 'income' ? 'income' : 'expense',
     amountCents: Number(params.amount) > 0 ? Number(params.amount) : 0,
     description: params.description ?? '', merchant: params.merchant ?? '', category: params.category || null,
     accountId: params.account || null,
@@ -349,22 +204,7 @@ export default function RecurringScreen() {
     .filter((t) => t.kind === 'income')
     .reduce((s, t) => s + Number(t.amount_cents), 0);
 
-  const inicioDate = form ? localDateTime(form.inicio, '09:00') : null;
-  const inicioOk = Boolean(form && isValidBRDate(form.inicio) && inicioDate);
-  const fimOk = form ? form.fim === '' || (isValidBRDate(form.fim) && inicioOk && brToISO(form.fim) >= brToISO(form.inicio)) : false;
-  /*
-    ⚠️ O título ficava de FORA da guarda e a lista caía em "sem descrição" — a série
-    nascia anônima e se materializava em uma linha por mês, todas sem nome. É o mesmo
-    defeito do lançamento (15/09/2026), e aqui ele se multiplica por 12.
-  */
-  const tituloOk = (form?.description.trim().length ?? 0) > 0;
-  // Mudando o calendário de uma série, o próximo vencimento é daqui para a frente: o passado fica.
-  const agendaNoPassado = Boolean(form?.id && form.agendaMudou && inicioOk && brToISO(form.inicio) < localISODate());
-  const podeSalvar = Boolean(form && tituloOk && form.amountCents > 0 && inicioOk && fimOk && validRecurringRange(brToISO(form.inicio), form.fim ? brToISO(form.fim) : '', form.preset === 'monthly' ? form.intervalo : '1'));
-  const rrulePrevia =
-    form && inicioDate
-      ? montaRRule(form.preset, inicioDate, Number(form.intervalo) || 1)
-      : null;
+  const { inicioDate, agendaNoPassado, podeSalvar, rrulePrevia } = validaSerie(form);
 
   const salvar = () => {
     if (!form) return;
@@ -438,7 +278,7 @@ export default function RecurringScreen() {
     );
   };
 
-  const abrirEdicao = (r: RecurringTransaction) => setForm(formDaSerie(r));
+  const abrirEdicao = (r: RecurringTransaction) => setForm(serieDoRegistro(r));
 
   /**
    * `?edit=<id>` abre a edição direto, como `?create=1` já abria a criação — dá destino
@@ -453,7 +293,7 @@ export default function RecurringScreen() {
     const alvo = lista.find((r) => r.id === params.edit);
     if (alvo) {
       setEdicaoAberta(params.edit);
-      setForm(formDaSerie(alvo));
+      setForm(serieDoRegistro(alvo));
       volta.marcar();
     }
   }
@@ -671,7 +511,7 @@ export default function RecurringScreen() {
           title="Nada ativo se repetindo"
           action={{
             label: 'Nova recorrência',
-            onPress: () => setForm({ ...FORM_VAZIO, inicio: isoToBR(localISODate()) }),
+            onPress: () => setForm({ ...SERIE_VAZIA, inicio: isoToBR(localISODate()) }),
           }}
           compacto
         />
@@ -683,7 +523,7 @@ export default function RecurringScreen() {
           hint={'Manda no WhatsApp: *todo dia 5 pago 1200 de aluguel*\n— ou toca em + para cadastrar aqui.'}
           action={{
             label: 'Nova recorrência',
-            onPress: () => setForm({ ...FORM_VAZIO, inicio: isoToBR(localISODate()) }),
+            onPress: () => setForm({ ...SERIE_VAZIA, inicio: isoToBR(localISODate()) }),
           }}
         />
       ) : null}
@@ -727,7 +567,7 @@ export default function RecurringScreen() {
           {
             label: 'Nova recorrência',
             icon: 'plus',
-            onPress: () => setForm({ ...FORM_VAZIO, inicio: isoToBR(localISODate()) }),
+            onPress: () => setForm({ ...SERIE_VAZIA, inicio: isoToBR(localISODate()) }),
           },
         ]}
       />
@@ -746,8 +586,7 @@ export default function RecurringScreen() {
                 label={form?.id ? 'Salvar' : 'Criar'}
                 size="sm"
                 loading={create.isPending || editar.isPending}
-                // Editando, o calendário só pesa quando a pessoa mexeu nele (`agendaMudou`).
-                disabled={form?.id ? !(tituloOk && form.amountCents > 0 && fimOk && (!form.agendaMudou ? true : podeSalvar && !agendaNoPassado)) : !podeSalvar}
+                disabled={!podeSalvar}
                 onPress={salvar}
               />
             }
@@ -755,169 +594,7 @@ export default function RecurringScreen() {
 
           {form ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
-              <Field label="Tipo">
-                {/* Editável também na edição desde `20260926120000`: a série grava `kind` e as futuras
-                    em aberto vão junto. O padrão do "entra como pago" só acompanha numa série nova. */}
-                <Segmented
-                  options={[
-                    { value: 'expense', label: 'Despesa' },
-                    { value: 'income', label: 'Receita' },
-                  ]}
-                  value={form.kind}
-                  onChange={(kind) =>
-                    setForm(form.id ? { ...form, kind } : { ...form, kind, autoConfirm: kind !== 'income' })
-                  }
-                />
-              </Field>
-
-              <Field
-                label="Título"
-                error={form.description.length > 0 && !tituloOk ? 'Escreva um título' : undefined}>
-                <TextField
-                  value={form.description}
-                  onChangeText={(description) => setForm({ ...form, description })}
-                  placeholder="Ex.: Aluguel"
-                  invalid={form.description.length > 0 && !tituloOk}
-                />
-              </Field>
-
-              {/* A ordem do formulário de evento: título → estabelecimento → valor (frontend.md). */}
-              <Field label="Estabelecimento">
-                <TextField
-                  value={form.merchant}
-                  onChangeText={(merchant) => setForm({ ...form, merchant })}
-                  placeholder="Ex.: Imobiliária Centro"
-                  accessibilityLabel="Estabelecimento"
-                />
-              </Field>
-
-              <Field label="Valor">
-                <MoneyField
-                  valueCents={form.amountCents}
-                  onChangeCents={(amountCents) => setForm({ ...form, amountCents })}
-                />
-              </Field>
-
-              <Field label="Categoria">
-                <CategoryPicker
-                  value={form.category}
-                  onChange={(category) => setForm({ ...form, category })}
-                />
-              </Field>
-
-              <Field label="Conta">
-                <AccountPicker
-                  accounts={accounts.data ?? []}
-                  value={form.accountId}
-                  onChange={(accountId: string | null) => setForm({ ...form, accountId })}
-                  emptyLabel="Não informar"
-                />
-              </Field>
-
-              {/* Editando, os mesmos campos da criação: mexer em qualquer um marca `agendaMudou`. */}
-              <Field label="Repete">
-                <Segmented
-                  // Rótulos de UMA palavra: a 384dp × 1,3 "Toda semana" quebrava
-                  // em duas linhas dentro da célula e as três ficavam de alturas
-                  // diferentes. `Segmented` é para 2 a 4 opções CURTAS (§1 do
-                  // design), e "curtas" se mede na régua de verificação, não na
-                  // largura do emulador padrão.
-                  options={[
-                    { value: 'monthly', label: 'Mensal' },
-                    { value: 'weekly', label: 'Semanal' },
-                    { value: 'yearly', label: 'Anual' },
-                  ]}
-                  value={form.preset}
-                  onChange={(preset) => setForm({ ...form, preset, agendaMudou: Boolean(form.id) })}
-                />
-              </Field>
-
-              {form.preset === 'monthly' ? (
-                <Field label="A cada quantos meses">
-                  {/* Campo de quantidade (`QuantityField`): "0" não existe, então não há erro a mostrar. */}
-                  <QuantityField
-                    value={Number(form.intervalo) || 1}
-                    max={99}
-                    accessibilityLabel="A cada quantos meses"
-                    onChange={(n) => setForm({ ...form, intervalo: String(n), agendaMudou: Boolean(form.id) || form.agendaMudou })}
-                  />
-                </Field>
-              ) : null}
-
-              <Field
-                // Editando, a data é o PRÓXIMO vencimento: o último dia do mês vira "todo último dia".
-                label={form.id ? 'Próximo vencimento' : 'Começa em'}
-                hint={
-                  form.id
-                    ? form.agendaMudou
-                      ? `Refaz as em aberto ${form.preset === 'weekly' ? 'da semana' : form.preset === 'yearly' ? 'do ano' : 'do mês'} desta data em diante`
-                      : undefined
-                    : inicioOk && brToISO(form.inicio) < localISODate() ? 'Já lança as passadas' : undefined
-                }
-                error={
-                  form.inicio && !inicioOk
-                    ? 'Data inválida (dd/mm/aaaa)'
-                    : agendaNoPassado ? 'Escolha hoje ou uma data depois' : undefined
-                }>
-                <DatePickerField
-                  value={form.inicio}
-                  // O "Termina em" anda junto quando o início passaria dele (`fimQueSegueOInicio`):
-                  // era um erro esperando a pessoa consertar à mão (22/09/2026).
-                  onChange={(inicio) => setForm({
-                    ...form,
-                    inicio,
-                    agendaMudou: Boolean(form.id) || form.agendaMudou,
-                    fim: isValidBRDate(inicio) && isValidBRDate(form.inicio) && isValidBRDate(form.fim)
-                      ? isoToBR(fimQueSegueOInicio(brToISO(form.inicio), brToISO(inicio), brToISO(form.fim)))
-                      : form.fim,
-                  })}
-                  placeholder="Escolher o início"
-                  accessibilityLabel={form.id ? 'Próximo vencimento da série' : 'Data de início da série'}
-                  min={form.id ? localISODate() : undefined}
-                  invalid={(Boolean(form.inicio) && !inicioOk) || agendaNoPassado}
-                />
-              </Field>
-
-              {/*
-                ⚠️ **O placeholder era uma DATA PLAUSÍVEL (`31/12/2026`), e o campo lia como
-                preenchido.** `placeholderTextColor` é `textSecondary`, a mesma cor de subtítulo:
-                num campo chamado "Termina em", uma data cinza dentro da caixa é indistinguível de
-                um valor gravado. A leitura do dono do produto em 09/09/2026 foi literal — *"como
-                assim 'Termina em'? Se é recorrente não termina"* —, ou seja, ele entendeu que o
-                salário dele pararia no fim do ano.
-
-                O placeholder diz o que o vazio SIGNIFICA ("Sem fim"). A série sem fim é o
-                caso normal (salário, aluguel); a data existe para as que realmente acabam —
-                financiamento de 48x, assinatura com cancelamento marcado.
-              */}
-              <Field
-                label="Termina em"
-                error={form.fim && !fimOk ? 'Informe data válida igual ou posterior ao início' : undefined}>
-                <DatePickerField
-                  value={form.fim}
-                  onChange={(fim) => setForm({ ...form, fim })}
-                  placeholder="Sem fim"
-                  accessibilityLabel="Data em que a série termina"
-                  min={inicioOk ? brToISO(form.inicio) : undefined}
-                  invalid={Boolean(form.fim) && !fimOk}
-                />
-              </Field>
-
-              {/*
-                Receita e despesa NÃO falam a mesma língua aqui. O texto antigo era todo de
-                despesa ("entra como pago", "você dizer que pagou") num campo que aparece para
-                os dois — o mesmo defeito que `settle-labels.ts` já tinha corrigido em outro
-                lugar ("ninguém paga um salário que vai receber").
-
-                E o padrão inverte: despesa recorrente é boleto que você sabe que sai; receita
-                de terceiro é Pix que pode não chegar. Por isso receita nova nasce DESLIGADA —
-                ver `FORM_VAZIO` e o `20260909110000`.
-              */}
-              <SwitchRow
-                label={form.kind === 'income' ? 'Entra como recebido na data' : 'Entra como pago na data'}
-                value={form.autoConfirm}
-                onValueChange={(autoConfirm) => setForm({ ...form, autoConfirm })}
-              />
+              <CamposDaSerie form={form} onChange={setForm} contas={accounts.data ?? []} />
             </ScrollView>
           ) : null}
       </Sheet>
