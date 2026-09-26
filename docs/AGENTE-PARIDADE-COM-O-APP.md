@@ -104,8 +104,22 @@ A recorrência fechou no mesmo dia: `resource_update` sobre `recurring` já exis
 UPDATE só na REGRA. Como o `finance-scheduler` materializa 90 dias à frente e o unique
 `(recurring_id, occurred_at)` impede reescrita, os três meses seguintes ficavam com o valor velho
 e o quarto com o novo. Agora, quando o patch toca valor, categoria, descrição ou conta, a execução
-cai na mesma RPC do botão do app; `active`, `rrule` e afins seguem no UPDATE normal, porque a RPC
-os recusa de propósito.
+cai na mesma RPC do botão do app; `active` segue no UPDATE normal.
+
+> **Mudou em 26/09/2026** (`20260926120000`): a RPC passou a aceitar tipo, estabelecimento e o
+> CALENDÁRIO (`rrule` + `next_run_at`, juntos). No app a série se edita inteira — Repete, A cada,
+> Próximo vencimento, Tipo, Estabelecimento. No agente, `rrule`/`dtstart` e `kind` vão pela RPC
+> (`resources._editar_serie`): o próximo vencimento é o início dito (ou a próxima ocorrência dele,
+> se já passou) e a RPC refaz as futuras em aberto. Pelo UPDATE cru o calendário velho ficava
+> materializado por um ano ao lado do novo. Regra fora do que o app monta (diária, vários dias
+> da semana) é recusada com a frase da RPC. **Estabelecimento da série não está no catálogo do
+> agente** — somar campo ao prompt de cadastros exige a rodada paga de `evaluate_answer_forms.py`;
+> o agente segue gravando o nome da série, e a ocorrência herda o estabelecimento que a série já
+> tiver.
+>
+> **Ordem de deploy:** a `20260926120000` antes do agente (o agendador passa a ler
+> `recurring_transactions.merchant`, e a coluna ausente derruba a rodada do cron inteira) e antes
+> do app (que lê a coluna na lista de Recorrentes).
 
 ## Fora do escopo — decisão, não esquecimento
 

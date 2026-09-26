@@ -12,6 +12,8 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
+import psycopg
+
 from app import db
 from app.domain.dates import format_date_br, now_utc, to_instant, local_iso_date
 from app.domain.money import cents_to_brl, MAX_CENTS
@@ -1512,7 +1514,7 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
                 *args,
             )
         elif action.resource == "recurring" and action.type == Op.UPDATE and (
-            values.keys() & _SERIE_PROPAGA
+            values.keys() & (_SERIE_PROPAGA | _SERIE_CALENDARIO)
         ):
             row = await _editar_serie(ctx, proposal, values)
         else:
@@ -1536,9 +1538,11 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
 
 
 # O que, mudando na REGRA, tem que alcançar as ocorrências já materializadas.
-# `rrule`/`dtstart`/`active` ficam de fora: cadência e âncora não se propagam (remontariam
-# o calendário) e pausar não reescreve nada do que já existe.
-_SERIE_PROPAGA = {"amount_cents", "category", "description", "account_id"}
+# Pausar (`active`) não reescreve nada do que já existe.
+_SERIE_PROPAGA = {"amount_cents", "category", "description", "account_id", "kind"}
+# O calendário vai pela MESMA RPC desde `20260926120000`: ela refaz as futuras em aberto. Pelo
+# UPDATE cru, o calendário velho ficava materializado por um ano ao lado do novo.
+_SERIE_CALENDARIO = {"rrule", "dtstart", "next_run_at"}
 
 
 async def _editar_serie(ctx: ExecContext, proposal: dict, values: dict):
@@ -1549,17 +1553,42 @@ async def _editar_serie(ctx: ExecContext, proposal: dict, values: dict):
     meses ficariam com o valor velho e o quarto com o novo. `update_recurring_series` é a
     MESMA RPC que a tela chama — repetir a regra aqui criaria a cópia que diverge.
 
-    Só as chaves propagáveis vão no patch; `active`, `rrule` e afins continuam no UPDATE
-    normal da mesma chamada, porque a RPC os recusa de propósito.
+    Mudar a regra ou o início manda a regra e o PRÓXIMO vencimento juntos, como a tela: o
+    início dito no passado vira a próxima ocorrência dele. `active` e afins continuam no UPDATE
+    normal da mesma chamada.
     """
     import json
 
     patch = {k: v for k, v in values.items() if k in _SERIE_PROPAGA}
-    resto = {k: v for k, v in values.items() if k not in _SERIE_PROPAGA}
-    row = await db.fetch_one(
-        "select public.update_recurring_series(%s, %s::jsonb, true) as futuras",
-        proposal["id"], json.dumps(patch, default=str),
-    )
+    resto = {k: v for k, v in values.items() if k not in _SERIE_PROPAGA | _SERIE_CALENDARIO}
+    if values.keys() & _SERIE_CALENDARIO:
+        atual = await db.fetch_one(
+            "select rrule, dtstart from public.recurring_transactions where id = %s and workspace_id = %s",
+            proposal["id"], ctx.workspace_id,
+        )
+        if atual is None:
+            raise Level1Error("Essa recorrência mudou depois da proposta. Peça novamente.")
+        regra = values.get("rrule") or atual["rrule"]
+        agora = now_utc()
+        inicio = datetime.fromisoformat(values["dtstart"]) if values.get("dtstart") else None
+        proxima = (
+            inicio
+            if inicio and inicio >= agora
+            else next_occurrence(regra, agora, ctx.timezone, inicio or atual["dtstart"])
+        )
+        if proxima is None:
+            raise Level1Error("Essa repetição não tem próximas ocorrências. Ainda não mudei nada.")
+        patch["rrule"] = regra
+        patch["next_run_at"] = proxima.isoformat()
+    try:
+        row = await db.fetch_one(
+            "select public.update_recurring_series(%s, %s::jsonb, true) as futuras",
+            proposal["id"], json.dumps(patch, default=str),
+        )
+    except psycopg.errors.RaiseException as err:
+        # P0001: a recusa da RPC já está escrita para a pessoa (mesmo padrão de _corrigir_plano)
+        motivo = (err.diag.message_primary or str(err)).strip().rstrip(".")
+        raise Level1Error(f"❌ {motivo}. Ainda não mudei nada.") from err
     if row is None:
         raise Level1Error("Essa recorrência mudou depois da proposta. Peça novamente.")
     if resto:

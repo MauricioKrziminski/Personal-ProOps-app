@@ -46,7 +46,7 @@ import { semAcento } from '@/lib/text';
 import { QuantityField } from '@/components/ui/quantity-field';
 import { brToISO, ehUltimoDiaDoMes, fimQueSegueOInicio, isValidBRDate, isoToBR, localDateTime, localISODate } from '@/lib/dates';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
-import { validRecurringRange } from '@/lib/finance-form';
+import { financeErrorMessage, validRecurringRange } from '@/lib/finance-form';
 import { describeRRule } from '@/lib/rrule-text';
 import { supabase } from '@/lib/supabase';
 import { AccountPicker } from '@/components/finance/account-picker';
@@ -56,8 +56,9 @@ import { transicaoDeLayout } from '@/components/motion/transicao';
  * Recorrentes — "o que vai sair da minha conta todo mês sem eu fazer nada?".
  *
  * Como a série funciona (e por que a tela respeita isso):
- * - **RRULE + `dtstart`**: `dtstart` é a âncora imutável. A UI nunca o edita depois de criado —
- *   mudar o início é criar outra série.
+ * - **RRULE + `dtstart`**: `dtstart` é a âncora. Editar a repetição ou o próximo vencimento
+ *   (26/09/2026) muda a regra e a âncora para o próximo vencimento, e as ocorrências FUTURAS em
+ *   aberto são refeitas (`update_recurring_series`); o passado não muda.
  * - **`next_run_at` é a próxima ocorrência FUTURA**; `materialized_until` é controle do cron e não
  *   aparece na tela.
  * - O `finance-scheduler` materializa **90 dias à frente** como `transactions` `pending`
@@ -67,17 +68,22 @@ import { transicaoDeLayout } from '@/components/motion/transicao';
 
 interface FormState {
   /**
-   * Presente = está EDITANDO uma série que já existe. A frequência e a âncora saem
-   * da tela nesse modo: `dtstart` é imutável por desenho e trocar a frequência
-   * implicaria remontar o calendário já materializado — isso continua sendo apagar
-   * e criar de novo, que é honesto.
+   * Presente = está EDITANDO uma série que já existe. Todos os campos da criação continuam na tela
+   * (26/09/2026, *"ter todos os campos de quando eu crio ao editar, podendo editar tudo"*): mudar a
+   * repetição ou o vencimento refaz as ocorrências futuras em aberto.
    */
   id?: string;
-  /** Só no modo edição: a cadência que a série já tem, para mostrar (não para editar). */
-  rrule?: string;
+  /**
+   * A pessoa mexeu em "Repete", "A cada quantos meses" ou no vencimento. Só então a regra vai no
+   * salvar: comparar a regra montada com a gravada mudaria o calendário de uma série vinda do
+   * WhatsApp que a pessoa nem tocou (a regra de lá nem sempre tem a forma que o app monta).
+   */
+  agendaMudou?: boolean;
   kind: 'expense' | 'income';
   amountCents: number;
   description: string;
+  /** Opcional, como no lançamento: nem toda conta fixa tem um estabelecimento. */
+  merchant: string;
   category: string | null;
   accountId: string | null;
   preset: 'monthly' | 'weekly' | 'yearly';
@@ -157,9 +163,8 @@ function useRecurringUpcoming(days = 30) {
 }
 
 /**
- * Criar série. Editar NÃO passa por aqui: mudar o valor precisa reescrever, na mesma transação, as
- * ocorrências `pending` já materializadas — isso é a RPC `save_recurring`, que ainda não existe.
- * Duas chamadas do app deixariam a série nova com 90 dias de lançamentos antigos.
+ * Criar série. Editar NÃO passa por aqui: mudar a série reescreve, na mesma transação, as
+ * ocorrências `pending` já materializadas — é a RPC `update_recurring_series`.
  */
 function useCreateRecurring() {
   const invalidate = useInvalidateFinance();
@@ -168,6 +173,7 @@ function useCreateRecurring() {
       kind: 'expense' | 'income';
       amount_cents: number;
       description: string | null;
+      merchant: string | null;
       category: string | null;
       account_id: string | null;
       rrule: string;
@@ -179,7 +185,7 @@ function useCreateRecurring() {
       if (erroSessao || !sessao.user) throw erroSessao ?? new Error('sem sessão');
       const { error } = await supabase.from('recurring_transactions').insert({
         ...input,
-        // âncora imutável da série: sem ela a hora de parede deriva a cada rodada do cron
+        // âncora da série: sem ela a hora de parede deriva a cada rodada do cron
         dtstart: input.next_run_at,
         user_id: sessao.user.id,
       });
@@ -204,9 +210,14 @@ function useSaveRecurringSeries() {
         amount_cents?: number;
         category?: string | null;
         description?: string | null;
+        merchant?: string | null;
+        kind?: 'expense' | 'income';
         account_id?: string | null;
         auto_confirm?: boolean;
         end_date?: string | null;
+        /** O calendário vai junto: regra nova e o próximo vencimento (`20260926120000`). */
+        rrule?: string;
+        next_run_at?: string;
       };
     }) => {
       const { data, error } = await supabase.rpc('update_recurring_series', {
@@ -235,23 +246,23 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 /**
- * O formulário aberto sobre uma série existente. Frequência e âncora ficam de fora
- * (`dtstart` é imutável e mudar a cadência implicaria remontar o que já foi materializado);
- * o `rrule` vai junto só para o resumo continuar legível.
+ * O formulário aberto sobre uma série existente, com os campos da criação: a repetição sai da
+ * regra gravada e a data é o PRÓXIMO vencimento (é o que a pessoa quer mudar — o Fundacred vencia
+ * no dia 4 e é no último dia do mês).
  */
 function formDaSerie(r: RecurringTransaction): FormState {
+  const intervalo = /INTERVAL=(\d+)/.exec(r.rrule)?.[1] ?? '1';
   return {
     id: r.id,
-    rrule: r.rrule,
     kind: r.kind === 'income' ? 'income' : 'expense',
     amountCents: Number(r.amount_cents),
     description: r.description ?? '',
+    merchant: r.merchant ?? '',
     category: r.category,
     accountId: r.account_id,
-    preset: 'monthly',
-    // Edição não mostra frequência (dtstart é imutável por desenho), então o valor não é lido.
-    intervalo: '1',
-    inicio: isoToBR((r.dtstart ?? r.next_run_at).slice(0, 10)),
+    preset: r.rrule.includes('FREQ=WEEKLY') ? 'weekly' : r.rrule.includes('FREQ=YEARLY') ? 'yearly' : 'monthly',
+    intervalo,
+    inicio: isoToBR(r.next_run_at.slice(0, 10)),
     fim: r.end_date ? isoToBR(r.end_date) : '',
     autoConfirm: r.auto_confirm,
   };
@@ -261,6 +272,7 @@ const FORM_VAZIO: FormState = {
   kind: 'expense',
   amountCents: 0,
   description: '',
+  merchant: '',
   category: null,
   accountId: null,
   preset: 'monthly',
@@ -271,7 +283,7 @@ const FORM_VAZIO: FormState = {
 };
 
 export default function RecurringScreen() {
-  const params = useLocalSearchParams<{ create?: string; edit?: string; kind?: string; amount?: string; description?: string; category?: string; account?: string; start?: string }>();
+  const params = useLocalSearchParams<{ create?: string; edit?: string; kind?: string; amount?: string; description?: string; merchant?: string; category?: string; account?: string; start?: string }>();
   const theme = useTheme();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
@@ -291,7 +303,7 @@ export default function RecurringScreen() {
   const [form, setForm] = useState<FormState | null>(() => params.create === '1' ? {
     ...FORM_VAZIO, kind: params.kind === 'income' ? 'income' : 'expense',
     amountCents: Number(params.amount) > 0 ? Number(params.amount) : 0,
-    description: params.description ?? '', category: params.category || null,
+    description: params.description ?? '', merchant: params.merchant ?? '', category: params.category || null,
     accountId: params.account || null,
     inicio: params.start && isValidBRDate(params.start) ? params.start : isoToBR(localISODate()),
   } : null);
@@ -346,6 +358,8 @@ export default function RecurringScreen() {
     defeito do lançamento (15/09/2026), e aqui ele se multiplica por 12.
   */
   const tituloOk = (form?.description.trim().length ?? 0) > 0;
+  // Mudando o calendário de uma série, o próximo vencimento é daqui para a frente: o passado fica.
+  const agendaNoPassado = Boolean(form?.id && form.agendaMudou && inicioOk && brToISO(form.inicio) < localISODate());
   const podeSalvar = Boolean(form && tituloOk && form.amountCents > 0 && inicioOk && fimOk && validRecurringRange(brToISO(form.inicio), form.fim ? brToISO(form.fim) : '', form.preset === 'monthly' ? form.intervalo : '1'));
   const rrulePrevia =
     form && inicioDate
@@ -371,6 +385,14 @@ export default function RecurringScreen() {
       if (!antes || form.autoConfirm !== antes.auto_confirm) patch.auto_confirm = form.autoConfirm;
       const fim = form.fim ? brToISO(form.fim) : null;
       if (!antes || fim !== antes.end_date) patch.end_date = fim;
+      const merchant = form.merchant.trim() || null;
+      if (!antes || merchant !== (antes.merchant ?? null)) patch.merchant = merchant;
+      if (!antes || form.kind !== antes.kind) patch.kind = form.kind;
+      if (form.agendaMudou) {
+        if (!inicioDate || !rrulePrevia || agendaNoPassado) return;
+        patch.rrule = rrulePrevia;
+        patch.next_run_at = inicioDate.toISOString();
+      }
       if (Object.keys(patch).length === 0) {
         volta.aoFechar(() => setForm(null));
         return;
@@ -387,7 +409,7 @@ export default function RecurringScreen() {
             });
             volta.aoFechar(() => setForm(null));
           },
-          onError: () => toast({ message: 'Não deu para alterar a série.', tone: 'error' }),
+          onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para alterar a série.'), tone: 'error' }),
         },
       );
       return;
@@ -398,6 +420,7 @@ export default function RecurringScreen() {
         kind: form.kind,
         amount_cents: form.amountCents,
         description: form.description.trim(),
+        merchant: form.merchant.trim() || null,
         category: form.category,
         account_id: form.accountId,
         rrule: rrulePrevia,
@@ -723,9 +746,8 @@ export default function RecurringScreen() {
                 label={form?.id ? 'Salvar' : 'Criar'}
                 size="sm"
                 loading={create.isPending || editar.isPending}
-                // Editando, a validação de calendário não se aplica: frequência e âncora
-                // não estão na tela. O que precisa valer é valor > 0 e o fim opcional.
-                disabled={form?.id ? !(tituloOk && form.amountCents > 0 && fimOk) : !podeSalvar}
+                // Editando, o calendário só pesa quando a pessoa mexeu nele (`agendaMudou`).
+                disabled={form?.id ? !(tituloOk && form.amountCents > 0 && fimOk && (!form.agendaMudou ? true : podeSalvar && !agendaNoPassado)) : !podeSalvar}
                 onPress={salvar}
               />
             }
@@ -734,24 +756,18 @@ export default function RecurringScreen() {
           {form ? (
             <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
               <Field label="Tipo">
-                {/*
-                  ⚠️ Na EDIÇÃO o tipo é só leitura: `update_recurring_series` não grava `kind`, e
-                  o controle trocava os rótulos da tela sem mudar a série — "Série alterada." com
-                  ela ainda despesa (22/09/2026). Controle que não grava não aparece.
-                */}
-                {form.id ? (
-                  <ThemedText type="default">{form.kind === 'income' ? 'Receita' : 'Despesa'}</ThemedText>
-                ) : (
-                  <Segmented
-                    options={[
-                      { value: 'expense', label: 'Despesa' },
-                      { value: 'income', label: 'Receita' },
-                    ]}
-                    value={form.kind}
-                    // Trocar o tipo leva o padrão junto: a série é nova.
-                    onChange={(kind) => setForm({ ...form, kind, autoConfirm: kind !== 'income' })}
-                  />
-                )}
+                {/* Editável também na edição desde `20260926120000`: a série grava `kind` e as futuras
+                    em aberto vão junto. O padrão do "entra como pago" só acompanha numa série nova. */}
+                <Segmented
+                  options={[
+                    { value: 'expense', label: 'Despesa' },
+                    { value: 'income', label: 'Receita' },
+                  ]}
+                  value={form.kind}
+                  onChange={(kind) =>
+                    setForm(form.id ? { ...form, kind } : { ...form, kind, autoConfirm: kind !== 'income' })
+                  }
+                />
               </Field>
 
               <Field
@@ -762,6 +778,16 @@ export default function RecurringScreen() {
                   onChangeText={(description) => setForm({ ...form, description })}
                   placeholder="Ex.: Aluguel"
                   invalid={form.description.length > 0 && !tituloOk}
+                />
+              </Field>
+
+              {/* A ordem do formulário de evento: título → estabelecimento → valor (frontend.md). */}
+              <Field label="Estabelecimento">
+                <TextField
+                  value={form.merchant}
+                  onChangeText={(merchant) => setForm({ ...form, merchant })}
+                  placeholder="Ex.: Imobiliária Centro"
+                  accessibilityLabel="Estabelecimento"
                 />
               </Field>
 
@@ -788,14 +814,7 @@ export default function RecurringScreen() {
                 />
               </Field>
 
-              {form.id ? (
-                // Editando: a frequência e a âncora saem da tela. `dtstart` é imutável
-                // por desenho e mudar a cadência implicaria remontar o que já foi
-                // materializado — o resumo fica, para a pessoa saber o que está mexendo.
-                <ThemedText type="small" themeColor="textSecondary">
-                  {describeRRule(form.rrule ?? '')} · desde {form.inicio}
-                </ThemedText>
-              ) : (
+              {/* Editando, os mesmos campos da criação: mexer em qualquer um marca `agendaMudou`. */}
               <Field label="Repete">
                 <Segmented
                   // Rótulos de UMA palavra: a 384dp × 1,3 "Toda semana" quebrava
@@ -809,28 +828,35 @@ export default function RecurringScreen() {
                     { value: 'yearly', label: 'Anual' },
                   ]}
                   value={form.preset}
-                  onChange={(preset) => setForm({ ...form, preset })}
+                  onChange={(preset) => setForm({ ...form, preset, agendaMudou: Boolean(form.id) })}
                 />
               </Field>
-              )}
 
-              {!form.id && form.preset === 'monthly' ? (
+              {form.preset === 'monthly' ? (
                 <Field label="A cada quantos meses">
                   {/* Campo de quantidade (`QuantityField`): "0" não existe, então não há erro a mostrar. */}
                   <QuantityField
                     value={Number(form.intervalo) || 1}
                     max={99}
                     accessibilityLabel="A cada quantos meses"
-                    onChange={(n) => setForm({ ...form, intervalo: String(n) })}
+                    onChange={(n) => setForm({ ...form, intervalo: String(n), agendaMudou: Boolean(form.id) || form.agendaMudou })}
                   />
                 </Field>
               ) : null}
 
-              {form.id ? null : (
               <Field
-                label="Começa em"
-                hint={inicioOk && brToISO(form.inicio) < localISODate() ? 'Já lança as passadas' : undefined}
-                error={form.inicio && !inicioOk ? 'Data inválida (dd/mm/aaaa)' : undefined}>
+                // Editando, a data é o PRÓXIMO vencimento: o último dia do mês vira "todo último dia".
+                label={form.id ? 'Próximo vencimento' : 'Começa em'}
+                hint={
+                  form.id
+                    ? form.agendaMudou ? 'Refaz as próximas em aberto; as passadas ficam' : undefined
+                    : inicioOk && brToISO(form.inicio) < localISODate() ? 'Já lança as passadas' : undefined
+                }
+                error={
+                  form.inicio && !inicioOk
+                    ? 'Data inválida (dd/mm/aaaa)'
+                    : agendaNoPassado ? 'Escolha hoje ou uma data depois' : undefined
+                }>
                 <DatePickerField
                   value={form.inicio}
                   // O "Termina em" anda junto quando o início passaria dele (`fimQueSegueOInicio`):
@@ -838,16 +864,17 @@ export default function RecurringScreen() {
                   onChange={(inicio) => setForm({
                     ...form,
                     inicio,
+                    agendaMudou: Boolean(form.id) || form.agendaMudou,
                     fim: isValidBRDate(inicio) && isValidBRDate(form.inicio) && isValidBRDate(form.fim)
                       ? isoToBR(fimQueSegueOInicio(brToISO(form.inicio), brToISO(inicio), brToISO(form.fim)))
                       : form.fim,
                   })}
                   placeholder="Escolher o início"
-                  accessibilityLabel="Data de início da série"
-                  invalid={Boolean(form.inicio) && !inicioOk}
+                  accessibilityLabel={form.id ? 'Próximo vencimento da série' : 'Data de início da série'}
+                  min={form.id ? localISODate() : undefined}
+                  invalid={(Boolean(form.inicio) && !inicioOk) || agendaNoPassado}
                 />
               </Field>
-              )}
 
               {/*
                 ⚠️ **O placeholder era uma DATA PLAUSÍVEL (`31/12/2026`), e o campo lia como

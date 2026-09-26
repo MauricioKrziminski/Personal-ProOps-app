@@ -249,6 +249,16 @@ function TransactionForm({
   const converter = useConvertToInstallments();
   const remove = useDeleteTransaction();
 
+  /*
+    ⚠️ **Na ocorrência de uma SÉRIE a data É o vencimento** (26/09/2026). O agendador grava
+    `occurred_at = due_at`, e a tela mostrava as duas — "Data" e "Vence em" — para o mesmo dia; o
+    Fundacred ficou com 04/09 e 30/09 e a pergunta foi *"tem duas datas… a outra que eu não sei o
+    que é"*. Aqui há um campo só, e o vencimento escondido anda junto com ele.
+  */
+  // Fora do cartão: lá `due_at` é o vencimento da FATURA, e a data da compra é outra coisa.
+  const umaData = Boolean(editing?.recurring_id && !editing.invoice_id);
+  const dataDaSerie = umaData && editing?.status === 'pending' ? (editing.due_at ?? editing.occurred_at) : null;
+
   const { control, handleSubmit, setValue, getValues, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),
     // `editing` já chegou resolvido pelo gate — sem `useEffect`+`reset`, sem corrida.
@@ -264,9 +274,9 @@ function TransactionForm({
       paid_installments: '0',
       fee_cents: 0,
       auto_confirm: editing?.auto_confirm ?? false,
-      occurred_at: isoToBR(editing?.occurred_at ?? localISODate()),
+      occurred_at: isoToBR(dataDaSerie ?? editing?.occurred_at ?? localISODate()),
       pending: editing?.status === 'pending',
-      due_at: editing?.due_at ? isoToBR(editing.due_at) : null,
+      due_at: dataDaSerie ? isoToBR(dataDaSerie) : editing?.due_at ? isoToBR(editing.due_at) : null,
     },
   });
 
@@ -278,6 +288,10 @@ function TransactionForm({
   const installmentCount = useWatch({ control, name: 'installments' });
   const pending = useWatch({ control, name: 'pending' });
   const errors = formState.errors;
+  const mudaData = (br: string) => {
+    setValue('occurred_at', br, { shouldValidate: true });
+    if (umaData) setValue('due_at', br);
+  };
 
   // "ontem" congelado na abertura do modal: ler o relógio durante o render é impuro
   // (React Compiler) e o modal é efêmero. "hoje" saiu junto com o chip dele — quem põe a data de
@@ -306,6 +320,8 @@ function TransactionForm({
    */
   // Pagamento de dívida é sempre PAGO (trigger da dívida): adiar seria recusado pelo banco.
   const podeAdiar = kind !== 'transfer' && !isCard && installmentCount <= 1 && !editing?.debt_id;
+  // O campo "Data" É o vencimento: rótulo "Vence em" e sem o atalho "Ontem" (vencimento não é compra).
+  const dataEVencimento = umaData && podeAdiar && pending;
   /*
     ⚠️ **O valor de uma PARCELA edita a COMPRA, com a unidade dita** (23/09/2026).
 
@@ -1105,7 +1121,9 @@ function TransactionForm({
           control={control}
           name="occurred_at"
           render={({ field }) => (
-            <Field label={podeParcelarAqui && installmentCount > 1 ? "Data da primeira parcela" : "Data"} error={errors.occurred_at?.message}>
+            <Field
+              label={podeParcelarAqui && installmentCount > 1 ? 'Data da primeira parcela' : dataEVencimento ? dueFieldLabel(kind) : 'Data'}
+              error={errors.occurred_at?.message ?? (umaData ? errors.due_at?.message : undefined)}>
               {/*
                 ⚠️ **O campo tem a linha inteira; o atalho fica ACIMA dele.** Espremido na mesma
                 fileira, o valor quebrava no meio do ano ("13/09/2 026") — o seletor tem ícone e
@@ -1117,16 +1135,18 @@ function TransactionForm({
                 verdade, não eco do estado.
               */}
               <View style={styles.dateBlock}>
-                <View style={styles.chipRow}>
-                  <Chip
-                    label="Ontem"
-                    selected={occurredAt === yesterday}
-                    onPress={() => setValue('occurred_at', yesterday, { shouldValidate: true })}
-                  />
-                </View>
+                {dataEVencimento ? null : (
+                  <View style={styles.chipRow}>
+                    <Chip
+                      label="Ontem"
+                      selected={occurredAt === yesterday}
+                      onPress={() => mudaData(yesterday)}
+                    />
+                  </View>
+                )}
                 <DatePickerField
                   value={field.value}
-                  onChange={(br) => setValue('occurred_at', br, { shouldValidate: true })}
+                  onChange={mudaData}
                   accessibilityLabel="Data do lançamento"
                   invalid={!!errors.occurred_at}
                 />
@@ -1156,12 +1176,16 @@ function TransactionForm({
                         { value: 'yes', label: caixaLabels(kind).aFazer },
                       ]}
                       value={field.value ? 'yes' : 'no'}
-                      onChange={(v) => field.onChange(v === 'yes')}
+                      onChange={(v) => {
+                        field.onChange(v === 'yes');
+                        if (umaData && v === 'yes') setValue('due_at', getValues('occurred_at'));
+                      }}
                     />
                   )}
                 />
                 {pending ? (
                   <Animated.View entering={FadeIn.duration(Motion.duration.base)} style={styles.pendingCard}>
+                    {umaData ? null : (
                     <Controller
                       control={control}
                       name="due_at"
@@ -1179,6 +1203,7 @@ function TransactionForm({
                         </Field>
                       )}
                     />
+                    )}
 
                     {/*
                       O interruptor de "entra sozinho na data". Só existe em PREVISTO porque é
@@ -1225,6 +1250,7 @@ function TransactionForm({
               const destino = { pathname: '/finance/recurring' as const, params: {
                 create: '1', kind: values.kind === 'income' ? 'income' : 'expense',
                 amount: String(values.amount_cents), description: values.description,
+                merchant: values.merchant?.trim() ?? '',
                 category: values.category ?? '', account: values.account_id ?? '', start: values.occurred_at,
               } };
               // Criando, o formulário é descartável e `replace` evita voltar para um rascunho
@@ -1244,6 +1270,17 @@ function TransactionForm({
           `push`**: voltando para cá, o formulário ainda carregaria o título velho, e um
           "Salvar" desfaria parte do que acabou de ser feito.
         */}
+        {/* A série inteira (repetição, vencimento, tipo, tudo) se edita na tela dela — `replace` pelo
+            mesmo motivo do botão da compra, logo abaixo. */}
+        {editing?.recurring_id ? (
+          <Button
+            label="Editar a série"
+            variant="secondary"
+            size="sm"
+            onPress={() => router.replace({ pathname: '/finance/recurring', params: { edit: editing.recurring_id! } })}
+          />
+        ) : null}
+
         {editing?.installment_plan_id ? (
           <Button
             label="Editar parcelas e datas da compra"

@@ -1558,3 +1558,29 @@ test('vazio grande só onde ele é a única coisa da tela; com outra coisa, é c
   const velhos = Object.entries(VAZIO_GRANDE_PERMITIDO).flatMap(([f, ts]) => ts.filter((t) => !usados.has(`${f}|${t}`)).map((t) => `${f}: ${t}`));
   assert.deepEqual(velhos, [], 'entrada da lista que não existe mais');
 });
+
+test('Ocorrência de série: uma data só (o vencimento), e o caminho para editar a série', () => {
+  // 26/09/2026, o Fundacred: *"tem duas datas, uma de vencimento e a outra que eu não sei o que
+  // é"*. O agendador grava `occurred_at = due_at`; a tela mostrava as duas.
+  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  // No cartão o `due_at` é o vencimento da fatura: lá continuam sendo duas coisas.
+  assert.match(fonte, /const umaData = Boolean\(editing\?\.recurring_id && !editing\.invoice_id\)/);
+  assert.match(fonte, /const dataEVencimento = umaData && podeAdiar && pending/);
+  assert.match(fonte, /dataEVencimento \? dueFieldLabel\(kind\)/, 'o campo de data vira "Vence em"');
+  assert.match(fonte, /\{dataEVencimento \? null : \(\s*<View style=\{styles\.chipRow\}>/, 'sem o "Ontem" num vencimento');
+  assert.match(fonte, /\{umaData \? null : \(\s*<Controller\s+control=\{control\}\s+name="due_at"/, 'sem o segundo campo');
+  assert.match(fonte, /if \(umaData\) setValue\('due_at', br\)/, 'o vencimento escondido anda com a data');
+  // A série inteira (repetição, vencimento) se edita na tela dela, a um toque daqui.
+  assert.match(fonte, /label="Editar a série"[\s\S]{0,200}?pathname: '\/finance\/recurring', params: \{ edit: editing\.recurring_id! \}/);
+  // "Repetir lançamento" leva o estabelecimento: a série passou a guardá-lo (`20260926120000`).
+  assert.match(fonte, /merchant: values\.merchant\?\.trim\(\) \?\? ''/);
+});
+
+test('Em parcela, "Editar" abre a COMPRA em toda lista que oferece Editar', () => {
+  // 26/09/2026: `[txId]` e Lançamentos abriam a compra; o Financeiro e a fatura abriam a linha —
+  // a mesma palavra levando a lugares diferentes conforme a tela.
+  for (const arquivo of ['app/(tabs)/finance/index.tsx', 'app/finance/invoice/[id].tsx', 'app/finance/[txId].tsx', 'app/finance/transactions.tsx']) {
+    const fonte = readFileSync(join(SRC, arquivo), 'utf8');
+    assert.match(fonte, /tx\.installment_plan_id\s*\?\s*router\.push\(\{\s*pathname: '\/finance\/installments',\s*params: \{ edit: tx\.installment_plan_id \}/, arquivo);
+  }
+});

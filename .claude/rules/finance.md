@@ -64,7 +64,23 @@
     (`transactions.debt_id`, com um desvio local à transação no `tg_transactions_debt_payment`) e a
     dívida. Idempotente. Apagar a dívida direto FALHA quando há pagamento: a FK `set null` dispara
     o trigger, que recusa "desvincular".
-- **`recurring_transactions`**: RRULE + `dtstart` (âncora imutável) + `next_run_at` (próxima ocorrência FUTURA, é o que o app mostra) + `materialized_until` (controle do cron). Materializadas **um ano à frente** pelo `finance-scheduler` como `pending`, com `source='recurring'`. Idempotência pelo unique `(recurring_id, occurred_at)`.
+- **`recurring_transactions`**: RRULE + `dtstart` (âncora) + `next_run_at` (próxima ocorrência FUTURA, é o que o app mostra) + `materialized_until` (controle do cron) + `merchant` (o estabelecimento, que cada ocorrência herda). Materializadas **um ano à frente** pelo `finance-scheduler` como `pending`, com `source='recurring'`. Idempotência pelo unique `(recurring_id, occurred_at)`.
+
+  **A série se edita INTEIRA** (`update_recurring_series`, `20260926120000`, *"ter todos os
+  campos de quando eu crio ao editar"*): valor, título, estabelecimento, tipo, categoria, conta,
+  fim e o CALENDÁRIO. Calendário novo (`rrule` + `next_run_at`, sempre juntos, só o que o
+  `montaRRule` do app monta) apaga as futuras em aberto, põe a âncora no próximo vencimento e
+  zera `materialized_until` — o agendador gera de novo. O passado, a atrasada e a paga não mudam.
+  - ⚠️ **"Futura em aberto" é pelo VENCIMENTO fora do cartão**: o Fundacred de setembro tinha data
+    04/09 e vencimento 30/09; pela data ele ficaria e nasceria outro 30/09 ao lado. No cartão
+    `due_at` é o vencimento da FATURA e a compra de ontem já aconteceu: lá vale a data.
+  - ⚠️ **A paga adiantada segura o calendário**: o próximo vencimento vem num período (semana,
+    mês, ano) depois dela, senão o mês pago ganharia uma segunda cobrança.
+  - Até o agendador rodar (1 h em produção), a projeção lê a regra só no mensal simples
+    (`recurring_projection_for`); reagendada para semanal, anual ou "a cada N meses", a série
+    some da projeção até a rodada.
+  - Na OCORRÊNCIA de uma série (fora do cartão) o formulário do lançamento tem UMA data, o
+    vencimento, e o botão "Editar a série".
 
   ⚠️ **Era 90 dias até 10/09/2026, e 90 dias fazia a projeção MENTIR** — não "acabar". A parcela
   é linha real e continuava aparecendo; a receita recorrente, não. Abrir outubro de 2027 mostrava

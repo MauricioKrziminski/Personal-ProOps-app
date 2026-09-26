@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 import pytest
 from app.graph.schemas import ResourceAction, ResourceActionType, ResourceField
 from app.tools import resources
@@ -455,6 +457,46 @@ async def test_editar_recorrencia_propaga_pelas_futuras(monkeypatch):
     )
     assert any("update_recurring_series" in s for s in sqls), sqls
     assert not any(s.startswith("update public.recurring_transactions set") for s in sqls)
+
+
+@pytest.mark.asyncio
+async def test_mudar_o_dia_da_serie_vai_pela_rpc_com_o_proximo_vencimento(monkeypatch):
+    """Regra nova pelo UPDATE cru deixava o calendário velho materializado por um ano.
+
+    Pela RPC (`20260926120000`) ela vai com o PRÓXIMO vencimento, e a RPC refaz as futuras.
+    """
+    import json
+
+    async def fetch(*a):
+        return [_linha(kind="expense", amount_cents=150000, description="Aluguel",
+                       category="moradia", account_id=None, rrule="FREQ=MONTHLY;BYMONTHDAY=5",
+                       dtstart="2026-01-05T09:00:00Z", auto_confirm=True, active=True)]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    acao = action(resource="recurring", kind="resource_update", rrule="FREQ=MONTHLY;BYMONTHDAY=-1")
+    prepared = await resources.prepare(ctx(), acao)
+
+    chamadas = []
+
+    async def fetch_one(sql, *args):
+        chamadas.append((sql, args))
+        if sql.startswith("select rrule, dtstart"):
+            return {"rrule": "FREQ=MONTHLY;BYMONTHDAY=5",
+                    "dtstart": datetime(2026, 1, 5, 12, 0, tzinfo=UTC)}
+        return {"futuras": 0}
+
+    monkeypatch.setattr(resources.db, "fetch_one", fetch_one)
+    await resources.execute(
+        ExecContext("user", "workspace", None, "America/Sao_Paulo", "", "app:1",
+                    target={"prepared": prepared}),
+        acao,
+    )
+    rpc = [args for sql, args in chamadas if "update_recurring_series" in sql]
+    assert rpc, chamadas
+    patch = json.loads(rpc[0][1])
+    assert patch["rrule"] == "FREQ=MONTHLY;BYMONTHDAY=-1"
+    assert datetime.fromisoformat(patch["next_run_at"]) > datetime.now(UTC)
+    assert not any(sql.startswith("update public.recurring_transactions set") for sql, _ in chamadas)
 
 
 @pytest.mark.asyncio

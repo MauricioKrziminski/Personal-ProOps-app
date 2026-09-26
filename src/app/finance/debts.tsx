@@ -929,18 +929,25 @@ export default function DebtsScreen() {
               <Field label="Conta que paga">
                 <AccountPicker accounts={pagadoras} value={form.accountId} onChange={(accountId: string | null) => setForm({ ...form, accountId })} emptyLabel="Não informar" />
               </Field>
+              {/*
+                `Chip` é filtro de lista — muitos, ligáveis, resposta imediata. Aqui são cinco
+                opções mutuamente exclusivas GRAVADAS num campo, que é o papel do `SelectField`:
+                colapsado ele mostra o valor, e a forma de cada tipo vem do glifo em `DEBT_KINDS`.
+                Nos DOIS modos (26/09/2026): só existia no "com juros", e a dívida de parcela fixa
+                não tinha como trocar de tipo depois de criada.
+              */}
+              <Field label="Tipo">
+                <SelectField
+                  options={DEBT_KINDS.map((k) => ({ id: k.value, label: k.label, icon: k.icon }))}
+                  value={form.kind}
+                  onChange={(kind) => setForm({ ...form, kind: (kind ?? 'loan') as Debt['kind'] })}
+                  placeholder="Escolher"
+                />
+              </Field>
               {!form.id && <Segmented
                 options={[{ value: 'fixed_installments', label: 'Parcela fixa' }, { value: 'amortized', label: 'Com juros ao mês' }]}
                 value={form.calculationMode}
-                // O "Tipo" só aparece no modo com juros. Voltando para parcela fixa, o tipo escolhido
-                // lá ficaria escondido e seria gravado; volta ao padrão com que o formulário abriu.
-                onChange={(calculationMode) => setForm({
-                  ...form,
-                  calculationMode,
-                  ...(calculationMode === 'fixed_installments'
-                    ? { kind: params.create === 'financing' ? 'financing' : FORM_VAZIO.kind }
-                    : {}),
-                })}
+                onChange={(calculationMode) => setForm({ ...form, calculationMode })}
               />}
               {form.calculationMode === 'fixed_installments' ? <>
                 <Field label="Valor">
@@ -999,20 +1006,6 @@ export default function DebtsScreen() {
                   ) : null}
                 </Card>}
               </> : <>
-
-              {/*
-                `Chip` é filtro de lista — muitos, ligáveis, resposta imediata. Aqui são cinco
-                opções mutuamente exclusivas GRAVADAS num campo, que é o papel do `SelectField`:
-                colapsado ele mostra o valor, e a forma de cada tipo vem do glifo em `DEBT_KINDS`.
-              */}
-              <Field label="Tipo">
-                <SelectField
-                  options={DEBT_KINDS.map((k) => ({ id: k.value, label: k.label, icon: k.icon }))}
-                  value={form.kind}
-                  onChange={(kind) => setForm({ ...form, kind: (kind ?? 'loan') as Debt['kind'] })}
-                  placeholder="Escolher"
-                />
-              </Field>
 
               <Field label="Quanto você deve hoje">
                 <MoneyField

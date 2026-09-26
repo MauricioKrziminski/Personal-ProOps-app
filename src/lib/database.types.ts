@@ -1648,6 +1648,7 @@ export type Database = {
           kind: string
           last_error: string | null
           materialized_until: string | null
+          merchant: string | null
           next_run_at: string
           rrule: string
           run_attempts: number
@@ -1670,6 +1671,7 @@ export type Database = {
           kind: string
           last_error?: string | null
           materialized_until?: string | null
+          merchant?: string | null
           next_run_at: string
           rrule: string
           run_attempts?: number
@@ -1692,6 +1694,7 @@ export type Database = {
           kind?: string
           last_error?: string | null
           materialized_until?: string | null
+          merchant?: string | null
           next_run_at?: string
           rrule?: string
           run_attempts?: number

@@ -90,6 +90,9 @@ class TestQueryTransactionsFiltroConta:
 
         monkeypatch.setattr(db, "accounts", accounts)
         monkeypatch.setattr(db, "fetch", fetch)
+        # A janela da fatura sai de HOJE: com o relógio real o teste quebrou em 26/09/2026, o
+        # primeiro dia depois do fechamento. O cenário é o de 30/08, dentro da fatura 26/08–25/09.
+        monkeypatch.setattr(queries, "local_iso_date", lambda tz, *a: "2026-08-30")
 
         action = FinanceQuery(
             type=FinanceQueryType.QUERY_TRANSACTIONS,

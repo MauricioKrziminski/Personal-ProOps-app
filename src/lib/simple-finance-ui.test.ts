@@ -557,7 +557,7 @@ test('E se: Ver resultado depois de Somar não duplica a hipótese já adicionad
 test('new financing: Nome and Conta first, the name is required and the typed one is saved', () => {
   const ui = screen(debtsFile);
   // 23/09/2026: "Nome e conta" era uma linha recolhida no FIM, e o nome caía em "Financiamento 2".
-  assert.deepEqual(ui.nodes().filter((n) => n.type === 'Field').map((n) => n.props.label), ['Nome', 'Conta que paga', 'Valor', 'Total de parcelas', 'Parcelas já pagas', 'Primeira parcela']);
+  assert.deepEqual(ui.nodes().filter((n) => n.type === 'Field').map((n) => n.props.label), ['Nome', 'Conta que paga', 'Tipo', 'Valor', 'Total de parcelas', 'Parcelas já pagas', 'Primeira parcela']);
   assert.equal(ui.nodes().some((n) => n.type === 'Row' && n.props.title === 'Nome e conta'), false);
   assert.equal(ui.button('Salvar').props.disabled, true);
   ui.fill('Valor', 147000);
@@ -2520,4 +2520,64 @@ test('Pasta: o "…" renomeia na folha da pasta e move sem ir a Organizar pastas
   assert.equal(folha?.props.visible, true);
   assert.equal(folha.props.pasta.id, 'f1');
   assert.equal(ui.navigations.length, 0, 'nada de navegar para Organizar pastas');
+});
+
+test('Série: editar tem os campos da criação, e só o calendário mexido vai com regra e vencimento', () => {
+  // 26/09/2026: *"ao clicar nele e em editar, eu não consigo editar a data de vencimento?? … ter
+  // todos os campos de quando eu crio ao editar"*. Repete, a cada, vencimento, tipo e estabelecimento.
+  const hoje = new Date();
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const br = (d: Date) => iso(d).split('-').reverse().join('/');
+  const proxima = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 4, 12);
+  const serie = {
+    id: 'rec-1', description: 'Fundacred', merchant: null, kind: 'expense', amount_cents: 119885,
+    rrule: 'FREQ=MONTHLY;BYMONTHDAY=4', dtstart: '2026-09-01T12:00:00Z', next_run_at: proxima.toISOString(),
+    active: true, account_id: null, category: 'estudo', end_date: null, auto_confirm: false,
+  };
+  const abrir = () => screen('src/app/finance/recurring.tsx', { recurring: [serie], params: { edit: 'rec-1' } });
+  const salvar = (ui: any) => ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'TaskHeader').props.action.props.onPress());
+  const campo = (ui: any, label: string) => ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === label);
+
+  const ui = abrir();
+  for (const label of ['Tipo', 'Título', 'Estabelecimento', 'Repete', 'A cada quantos meses', 'Próximo vencimento', 'Termina em']) {
+    assert.ok(campo(ui, label), `"${label}" na edição`);
+  }
+  const data = () => ui.nodes().find((n: any) => n.type === 'DatePickerField' && n.props.accessibilityLabel === 'Próximo vencimento da série');
+  assert.equal(data().props.value, br(proxima), 'a data é o PRÓXIMO vencimento, não o início da série');
+
+  // Só o valor: a regra não vai (uma série do WhatsApp não muda de calendário sem a pessoa pedir).
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(120000));
+  salvar(ui);
+  const soValor = ui.pedidos.at(-1).value.patch;
+  assert.equal(soValor.amount_cents, 120000);
+  assert.equal('rrule' in soValor, false);
+
+  // O vencimento no último dia do mês que vem: a regra vira "todo último dia" e vai com a data.
+  const ui2 = abrir();
+  const ultimo = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0);
+  ui2.interact((nodes: any[]) => nodes.find((n) => n.type === 'DatePickerField' && n.props.accessibilityLabel === 'Próximo vencimento da série').props.onChange(br(ultimo)));
+  ui2.interact((nodes: any[]) => nodes.find((n) => n.type === 'Field' && n.props.label === 'Estabelecimento').props.children.props.onChangeText('Fundacred SA'));
+  salvar(ui2);
+  const calendario = ui2.pedidos.at(-1).value.patch;
+  assert.equal(calendario.rrule, 'FREQ=MONTHLY;BYMONTHDAY=-1');
+  assert.equal(iso(new Date(calendario.next_run_at)), iso(ultimo));
+  assert.equal(calendario.merchant, 'Fundacred SA');
+
+  // Vencimento no passado não salva, e diz por quê.
+  const ui3 = abrir();
+  const ontem = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 1);
+  ui3.interact((nodes: any[]) => nodes.find((n) => n.type === 'DatePickerField' && n.props.accessibilityLabel === 'Próximo vencimento da série').props.onChange(br(ontem)));
+  assert.equal(ui3.nodes().find((n: any) => n.type === 'TaskHeader').props.action.props.disabled, true);
+  assert.ok(ui3.nodes().some((n: any) => n.type === 'Field' && n.props.label === 'Próximo vencimento' && n.props.error));
+});
+
+test('Dívida de parcela fixa também tem "Tipo" (e grava o escolhido)', () => {
+  // 26/09/2026: o campo só existia no modo "com juros"; a parcela fixa não trocava de tipo nunca.
+  const ui = screen('src/app/finance/debts.tsx', { params: { create: 'financing' } });
+  const tipo = ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Tipo');
+  assert.ok(tipo, '"Tipo" no modo parcela fixa');
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Segmented' && n.props.value === 'fixed_installments'), 'é o modo parcela fixa');
+  const select = ui.nodes().find((n: any) => n.type === 'SelectField' && n.props.options.some((o: any) => o.id === 'loan'));
+  ui.interact(() => select.props.onChange('loan'));
+  assert.equal(ui.nodes().find((n: any) => n.type === 'SelectField' && n.props.options.some((o: any) => o.id === 'loan')).props.value, 'loan');
 });

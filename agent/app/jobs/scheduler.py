@@ -124,7 +124,7 @@ async def materialize_horizon(agora) -> int:
     series = await db.fetch(
         """
         select r.id, r.user_id, r.workspace_id, r.kind, r.amount_cents, r.currency,
-               r.category, r.description, r.account_id, r.rrule, r.next_run_at,
+               r.category, r.description, r.merchant, r.account_id, r.rrule, r.next_run_at,
                r.dtstart, r.end_date, r.auto_confirm, r.materialized_until,
                p.timezone
         from public.recurring_transactions r
@@ -167,12 +167,14 @@ async def materialize_horizon(agora) -> int:
                         """
                         insert into public.transactions
                           (user_id, workspace_id, kind, amount_cents, currency, category,
-                           description, account_id, occurred_at, due_at, source, status,
+                           description, merchant, account_id, occurred_at, due_at, source, status,
                            recurring_id, auto_confirm)
-                        values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'recurring', %s, %s, %s)
+                        values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'recurring', %s, %s, %s)
                         """,
                         rec["user_id"], rec["workspace_id"], rec["kind"], rec["amount_cents"],
-                        rec["currency"], rec["category"], rec["description"], rec["account_id"],
+                        rec["currency"], rec["category"], rec["description"],
+                        # o estabelecimento da série (`20260926120000`) vai para cada ocorrência
+                        rec.get("merchant"), rec["account_id"],
                         dia, dia,
                         "cleared" if (ja_aconteceu and rec["auto_confirm"]) else "pending",
                         rec["id"],
@@ -202,13 +204,17 @@ async def materialize_horizon(agora) -> int:
                 update public.recurring_transactions
                 set dtstart = %s, materialized_until = coalesce(%s, materialized_until),
                     next_run_at = %s, active = %s, run_attempts = 0, last_error = null
-                where id = %s
+                where id = %s and rrule = %s and dtstart is not distinct from %s
                 """,
                 dtstart,
                 ultima,
                 (ultima or rec["next_run_at"]) if encerrou else proxima,
                 not encerrou,
                 rec["id"],
+                # Só se a regra ainda é a que foi lida: reagendada no meio desta rodada
+                # (`update_recurring_series`), gravar isto por cima desfaria o reset dela.
+                rec["rrule"],
+                rec["dtstart"],
             )
         except Exception as err:  # noqa: BLE001
             log.exception("série %s falhou", rec["id"])

@@ -522,7 +522,11 @@ export default function FinanceScreen() {
                       label: 'Editar',
                       icon: 'pencil',
                       arrasto: 'direita',
-                      onPress: () => router.push({ pathname: '/finance/transaction-form', params: { id: tx.id, month } }),
+                      // Em parcela, "Editar" abre a COMPRA — a régua de `[txId]` e de Lançamentos.
+                      onPress: () =>
+                        tx.installment_plan_id
+                          ? router.push({ pathname: '/finance/installments', params: { edit: tx.installment_plan_id } })
+                          : router.push({ pathname: '/finance/transaction-form', params: { id: tx.id, month } }),
                     },
                     { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => confirmDelete(tx) },
                   ]}>

@@ -167,6 +167,8 @@ export type RecurringTransaction = Pick<
   | 'dtstart'
   | 'end_date'
   | 'auto_confirm'
+  // O estabelecimento da série (`20260926120000`): o "Repetir lançamento" o perdia.
+  | 'merchant'
 > & { kind: 'expense' | 'income' };
 
 export type MonthlyCashflow = Fns['monthly_cashflow']['Returns'][number];
@@ -425,7 +427,7 @@ export function useGoals() {
 }
 
 const RECURRING_COLUMNS =
-  'id, kind, amount_cents, currency, category, description, account_id, rrule, next_run_at, active, run_attempts, last_error, created_at, dtstart, end_date, auto_confirm';
+  'id, kind, amount_cents, currency, category, description, merchant, account_id, rrule, next_run_at, active, run_attempts, last_error, created_at, dtstart, end_date, auto_confirm';
 
 /**
  * As categorias que o usuário realmente usa, mais usada primeiro.
