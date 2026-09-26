@@ -34,7 +34,9 @@ export function useVoltarQuandoFechar(inicial = false) {
       fechar();
       if (veioDeFora) {
         setVeioDeFora(false);
-        router.back();
+        // Aberto por link (notificação, deep link) a tela É a primeira da pilha: não há para onde
+        // voltar, e o `back` virava "GO_BACK was not handled". Aí a lista fica, que é o destino certo.
+        if (router.canGoBack()) router.back();
       }
     },
   };

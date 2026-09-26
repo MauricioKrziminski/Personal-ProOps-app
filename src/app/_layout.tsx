@@ -78,6 +78,13 @@ const queryClient = new QueryClient({
 
 
 /**
+ * Link direto para uma tela empurrada (`appproops:///finance/recurring?edit=…`, com o app
+ * fechado) abria a tela SOZINHA na pilha: o ✕ e o voltar não tinham para onde ir ("The action
+ * 'GO_BACK' was not handled", visto no s26 em 26/09/2026). Com a âncora, as abas nascem embaixo.
+ */
+export const unstable_settings = { anchor: '(tabs)' };
+
+/**
  * O provider de tema envolve TUDO, e por isso a árvore do app mora num componente separado:
  * `useScheme()` e `useBarStyle()` só existem dentro dele.
  */

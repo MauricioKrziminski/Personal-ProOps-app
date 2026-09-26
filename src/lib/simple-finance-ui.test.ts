@@ -212,7 +212,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === 'expo-haptics') return { selectionAsync() {}, notificationAsync() {}, NotificationFeedbackType: { Success: 'success', Warning: 'warning' } };
       // `back` é navegação como qualquer outra e ENTRA na lista: é o que prende o "fechar um
       // formulário que outra tela abriu devolve para ela" (`useVoltarQuandoFechar`).
-      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => options.params ?? ({ ...(file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), ...(options.create !== false ? { create: 'financing' } : {}) }), useFocusEffect: () => {}, useIsFocused: () => true, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }) } };
+      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => options.params ?? ({ ...(file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), ...(options.create !== false ? { create: 'financing' } : {}) }), useFocusEffect: () => {}, useIsFocused: () => true, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }), canGoBack: () => !options.primeiraDaPilha } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
       if (name === '@/hooks/use-aos-poucos') return load('src/hooks/use-aos-poucos.ts');
@@ -894,6 +894,14 @@ test('fechar um formulário que OUTRA tela abriu devolve para aquela tela', () =
   assert.equal(cabecalhos.length, 1, 'só o sheet do formulário está aberto');
   ui.interact(() => cabecalhos[0].props.onClose());
   assert.deepEqual(ui.navigations, [{ back: true }]);
+});
+
+test('aberto por link, como a primeira tela da pilha, fechar o formulário fica na lista', () => {
+  // Deep link (notificação) abre a lista já com o sheet: não há tela atrás, e o `back` virava
+  // "The action 'GO_BACK' was not handled" (visto no s26 em 26/09/2026).
+  const ui = screen(debtsFile, { primeiraDaPilha: true });
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'TaskHeader').props.onClose());
+  assert.deepEqual(ui.navigations, []);
 });
 
 test('e quem abriu o formulário PELA PRÓPRIA tela continua nela', () => {
