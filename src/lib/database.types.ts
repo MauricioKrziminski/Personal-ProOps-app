@@ -3053,6 +3053,7 @@ export type Database = {
           p_first_occurred_at: string
           p_installments: number
           p_merchant?: string
+          p_paid_installments?: number
           p_plan_id: string
           p_total_cents: number
         }

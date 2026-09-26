@@ -8,7 +8,8 @@
 -- que a revisão da migration achou:
 --
 --   1. nada pago → o contrato inteiro é reescrito (total, número, datas, nome);
---   2. com parcela paga → só o saldo EM ABERTO se redistribui, e número/data/conta travam;
+--   2. com parcela paga → só o saldo EM ABERTO se redistribui; o NÚMERO muda (`20260926130000`),
+--      e data/conta travam quando a paga está numa fatura de cartão (ela sairia da fatura);
 --   3. a soma das parcelas é SEMPRE o total;
 --   4. fatura parcialmente paga trava a parcela (senão o "quanto falta" da fatura fica negativo);
 --   5. mudar a data não pode empurrar parcela para dentro de uma fatura já fechada.
@@ -94,17 +95,15 @@ begin
   select description into txt from public.transactions where installment_plan_id = plano and installment_no = 1;
   if txt <> 'Nuuvem mensal (1/2)' then raise exception 'a parcela paga não foi renomeada: %', txt; end if;
 
-  -- ── 4. com parcela paga: número, data e conta TRAVAM ─────────────────────
-  begin
-    perform public.update_installment_plan(plano, 12000, 3, date '2026-11-05', 'Nuuvem mensal', 'assinaturas', 'Nuuvem', card);
-    raise exception 'FALHOU: mudar o número de parcelas com uma paga tinha que ser recusado';
-  exception when others then
-    -- ⚠️ Conferir a FRASE, não só que levantou: um `when others` mudo passa por um typo de
-    -- coluna do mesmo jeito que pela recusa, e o teste ficaria verde sem a trava existir.
-    if sqlerrm like 'FALHOU:%' or position('o número de parcelas não muda mais' in sqlerrm) = 0 then
-      raise exception 'recusa errada (esperava «o número de parcelas não muda mais»): %', sqlerrm;
-    end if;
-  end;
+  -- ── 4. com parcela paga: o NÚMERO muda (a paga fica); data e cartão TRAVAM ─
+  perform public.update_installment_plan(plano, 12000, 3, date '2026-11-05', 'Nuuvem mensal', 'assinaturas', 'Nuuvem', card);
+  select count(*) into n from public.transactions where installment_plan_id = plano;
+  if n <> 3 then raise exception 'mudar o número com uma paga devia deixar 3 parcelas, deixou %', n; end if;
+  select amount_cents into v from public.transactions where installment_plan_id = plano and installment_no = 1;
+  if v <> 4000 then raise exception 'a parcela PAGA mudou de valor ao reparcelar: %', v; end if;
+  select sum(amount_cents) into v from public.transactions where installment_plan_id = plano and installment_no > 1;
+  if v <> 8000 then raise exception 'as em aberto deviam somar 8000, somam %', v; end if;
+  perform public.update_installment_plan(plano, 12000, 2, date '2026-11-05', 'Nuuvem mensal', 'assinaturas', 'Nuuvem', card);
 
   begin
     perform public.update_installment_plan(plano, 12000, 2, date '2026-12-05', 'Nuuvem mensal', 'assinaturas', 'Nuuvem', card);
@@ -112,8 +111,8 @@ begin
   exception when others then
     -- ⚠️ Conferir a FRASE, não só que levantou: um `when others` mudo passa por um typo de
     -- coluna do mesmo jeito que pela recusa, e o teste ficaria verde sem a trava existir.
-    if sqlerrm like 'FALHOU:%' or position('a data da primeira parcela não muda mais' in sqlerrm) = 0 then
-      raise exception 'recusa errada (esperava «a data da primeira parcela não muda mais»): %', sqlerrm;
+    if sqlerrm like 'FALHOU:%' or position('a data da primeira não muda' in sqlerrm) = 0 then
+      raise exception 'recusa errada (esperava «a data da primeira não muda»): %', sqlerrm;
     end if;
   end;
 
@@ -123,8 +122,8 @@ begin
   exception when others then
     -- ⚠️ Conferir a FRASE, não só que levantou: um `when others` mudo passa por um typo de
     -- coluna do mesmo jeito que pela recusa, e o teste ficaria verde sem a trava existir.
-    if sqlerrm like 'FALHOU:%' or position('a conta não muda mais' in sqlerrm) = 0 then
-      raise exception 'recusa errada (esperava «a conta não muda mais»): %', sqlerrm;
+    if sqlerrm like 'FALHOU:%' or position('o cartão não muda' in sqlerrm) = 0 then
+      raise exception 'recusa errada (esperava «o cartão não muda»): %', sqlerrm;
     end if;
   end;
 
@@ -162,22 +161,18 @@ begin
 
   -- ── 6. fatura PARCIALMENTE paga trava a parcela ──────────────────────────
   -- Sem isto a soma das linhas cai abaixo de `paid_cents`, `invoice_open_cents` fica negativo
-  -- e `pay_invoice` recusa a quitação para sempre — e nada disso aparece na tela.
+  -- e `pay_invoice` recusa a quitação para sempre — e nada disso aparece na tela. O número muda;
+  -- o VALOR da parcela da fatura paga em parte, não.
   plano := public.create_installment_plan_with_history(card, 10000, 2, date '2027-03-05', 0, 'Parcial', null, null);
   select invoice_id into fatura from public.transactions where installment_plan_id = plano and installment_no = 1;
   if fatura is null then raise exception 'a parcela devia ter caído numa fatura'; end if;
   update public.card_invoices set paid_cents = 1000 where id = fatura;
 
-  begin
-    perform public.update_installment_plan(plano, 20000, 4, date '2027-03-05', 'Parcial', null, null, card);
-    raise exception 'FALHOU: parcela em fatura parcialmente paga tinha que travar o número';
-  exception when others then
-    -- ⚠️ Conferir a FRASE, não só que levantou: um `when others` mudo passa por um typo de
-    -- coluna do mesmo jeito que pela recusa, e o teste ficaria verde sem a trava existir.
-    if sqlerrm like 'FALHOU:%' or position('o número de parcelas não muda mais' in sqlerrm) = 0 then
-      raise exception 'recusa errada (esperava «o número de parcelas não muda mais»): %', sqlerrm;
-    end if;
-  end;
+  perform public.update_installment_plan(plano, 20000, 4, date '2027-03-05', 'Parcial', null, null, card);
+  select amount_cents into v from public.transactions where installment_plan_id = plano and installment_no = 1;
+  if v <> 5000 then raise exception 'a parcela da fatura paga em parte mudou de valor: %', v; end if;
+  select count(*) into n from public.transactions where installment_plan_id = plano and amount_cents = 5000;
+  if n <> 4 then raise exception 'as 3 em aberto deviam dividir 15000 em 5000 (% de 5000)', n; end if;
 
   -- ── 7. a data nova não pode jogar parcela em fatura já fechada ───────────
   plano := public.create_installment_plan_with_history(card, 10000, 2, date '2027-07-05', 0, 'Fechada', null, null);

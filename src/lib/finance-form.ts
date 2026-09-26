@@ -244,6 +244,47 @@ export function parcelaDoTotalDoContrato(totalCents: number, n: number): number 
   return Math.round(totalCents / n);
 }
 
+/** Os campos da dívida que mudam de sentido com o modo. */
+export interface CamposDoModo {
+  calculationMode: 'amortized' | 'fixed_installments';
+  /** No fixo é o TOTAL do contrato; com juros são as que FALTAM. */
+  parcelas: string;
+  installmentsPaid: number;
+  unidade: UnidadeDoValor;
+  valorCents: number;
+  remainingCents: number;
+  principalCents: number;
+  installmentCents: number;
+}
+
+/**
+ * Trocar o modo da dívida (26/09/2026, *"o modo da dívida ele deve poder alterar também"*). O que
+ * a pessoa já tem atravessa — a parcela, o que falta, as pagas —, e "parcelas" troca de sentido:
+ * 48 no total com 10 pagas vira 38 que faltam, e volta a 48.
+ */
+export function camposNoOutroModo(f: CamposDoModo, modo: CamposDoModo['calculationMode']): Partial<CamposDoModo> {
+  if (modo === f.calculationMode) return {};
+  const n = /^\d+$/.test(f.parcelas) ? Number(f.parcelas) : null;
+  if (modo === 'amortized') {
+    const parcela = f.unidade === 'total' && n ? parcelaDoTotalDoContrato(f.valorCents, n) : f.valorCents;
+    const faltam = n !== null ? Math.max(n - f.installmentsPaid, 0) : null;
+    return {
+      calculationMode: 'amortized',
+      parcelas: faltam !== null ? String(faltam) : f.parcelas,
+      installmentCents: parcela || f.installmentCents,
+      remainingCents: parcela > 0 && faltam !== null ? parcela * faltam : f.remainingCents,
+      principalCents: parcela > 0 && n ? parcela * n : f.principalCents,
+    };
+  }
+  const parcela = f.installmentCents || (n ? Math.round(f.remainingCents / n) : 0);
+  return {
+    calculationMode: 'fixed_installments',
+    parcelas: n !== null ? String(n + f.installmentsPaid) : f.parcelas,
+    unidade: 'parcela',
+    valorCents: parcela,
+  };
+}
+
 /** A data da parcela nº 1 do contrato, dada a próxima em aberto (`pagas + 1`). */
 export function ancoraDoContrato(proximaISO: string, pagas: number): string {
   return addMonthsISO(proximaISO, -pagas);

@@ -61,6 +61,7 @@ import {
   parcelaDoTotalDoContrato,
   proximaNoCronograma,
   simpleDebtValues,
+  camposNoOutroModo,
   type UnidadeDoValor,
 } from '@/lib/finance-form';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
@@ -944,11 +945,13 @@ export default function DebtsScreen() {
                   placeholder="Escolher"
                 />
               </Field>
-              {!form.id && <Segmented
+              {/* Também na edição (26/09/2026, *"o modo da dívida ele deve poder alterar também"*): a
+                  parcela, o que falta e as pagas atravessam, e "parcelas" troca de sentido. */}
+              <Segmented
                 options={[{ value: 'fixed_installments', label: 'Parcela fixa' }, { value: 'amortized', label: 'Com juros ao mês' }]}
                 value={form.calculationMode}
-                onChange={(calculationMode) => setForm({ ...form, calculationMode })}
-              />}
+                onChange={(calculationMode) => setForm({ ...form, ...camposNoOutroModo(form, calculationMode) })}
+              />
               {form.calculationMode === 'fixed_installments' ? <>
                 <Field label="Valor">
                   <Segmented options={UNIDADES_DA_DIVIDA} value={form.unidade} onChange={mudarUnidade} />

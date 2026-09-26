@@ -3,12 +3,8 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { AccountPicker } from '@/components/finance/account-picker';
-import { CategoryPicker } from '@/components/finance/category-picker';
-import { DatePickerField } from '@/components/finance/date-picker-field';
 import { useBRL } from '@/components/ui/conceal';
 import { Button } from '@/components/ui/button';
-import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { monthLabel, monthShort, shiftMonth } from '@/components/finance/month-picker';
@@ -36,21 +32,10 @@ import {
   type InstallmentPlanSummary,
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
-import { brToISO, isValidBRDate, isoToBR } from '@/lib/dates';
-import {
-  digitarValor,
-  faixaDeParcelas,
-  financeErrorMessage,
-  parcelaDoTotal,
-  totalPorParcela,
-  valorExibido,
-  type Contrato,
-  recusaDoValor,
-  UNIDADES_DO_VALOR,
-  type UnidadeDoValor,
-} from '@/lib/finance-form';
-import { Segmented } from '@/components/ui/segmented';
-import { QuantityField } from '@/components/ui/quantity-field';
+import { brToISO } from '@/lib/dates';
+import { financeErrorMessage } from '@/lib/finance-form';
+import { compraDoRegistro, payloadDaCompra, validaCompra, type CompraForm } from '@/lib/compra';
+import { CamposDaCompra } from '@/components/finance/compra-form';
 import { estadoDaLinha } from '@/lib/settle-labels';
 import { useToast } from '@/components/ui/toast';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
@@ -72,91 +57,6 @@ import { transicaoDeLayout } from '@/components/motion/transicao';
  */
 
 const MESES_COMPROMETIDOS = 12;
-
-/**
- * O formulário de REPARCELAR — a compra inteira, não uma parcela dela.
- *
- * ⚠️ `travadas` é `plano.locked`, **não** `plano.paid`. Elas divergem, e a primeira versão desta
- * tela usou a errada: no staging a compra "Carro Peças" mostrava `paid = 0`, a tela oferecia
- * trocar 3x por 4x e a RPC recusava com "já tem 1 parcela paga" — uma parcela dentro de fatura
- * fechada. Botão habilitado que o servidor rejeita é o espelho do botão desabilitado que não
- * explica: nos dois a pessoa não tem como saber o que fazer. A régua da tela é a MESMA do banco
- * (`private.parcela_travada`).
- */
-interface FormPlano {
-  id: string;
-  description: string;
-  merchant: string;
-  category: string | null;
-  accountId: string | null;
-  totalCents: number;
-  installments: number;
-  /** `dd/mm/aaaa`, como a pessoa digita. */
-  inicio: string;
-  /** Parcelas que não mudam mais (pagas ou em fatura fechada) e quanto elas somam. */
-  travadas: number;
-  travadasPagas: number;
-  travadoCents: number;
-  /**
-   * O que o número do Valor é (23/09/2026, *"tinha que ter a opção de colocar o valor de cada
-   * parcela"*). O total continua sendo a verdade; a parcela digitada fica à parte para trocar
-   * a unidade não mexer em centavo nenhum (`ValorDaCompra`).
-   */
-  unidade: UnidadeDoValor;
-  parcelaCents: number | null;
-  /** Como a compra abriu — é o que "cada parcela" mostra antes de qualquer edição. */
-  original: { totalCents: number; installments: number; parcelaCents: number; accountId: string | null };
-}
-
-function formDoPlano(plano: InstallmentPlanSummary): FormPlano {
-  return {
-    id: plano.id,
-    description: plano.description ?? '',
-    merchant: plano.merchant ?? '',
-    category: plano.category,
-    accountId: plano.account_id,
-    totalCents: plano.total_cents,
-    installments: plano.installments,
-    inicio: isoToBR(plano.first_occurred_at),
-    travadas: plano.locked,
-    travadasPagas: plano.locked_paid,
-    travadoCents: plano.locked_cents,
-    unidade: 'total',
-    parcelaCents: null,
-    original: {
-      totalCents: plano.total_cents,
-      installments: plano.installments,
-      parcelaCents: plano.installment_cents,
-      accountId: plano.account_id,
-    },
-  };
-}
-
-function contratoDo(form: FormPlano): Contrato {
-  return { parcelas: form.installments, travadas: form.travadas, travadoCents: form.travadoCents };
-}
-
-/** "Cada parcela" hoje: a parcela real enquanto nada mudou; com N trocado, a divisão nova. */
-function valorDoCampo(form: FormPlano): number {
-  const c = contratoDo(form);
-  const hoje =
-    form.installments === form.original.installments
-      ? form.original.parcelaCents
-      : parcelaDoTotal(form.totalCents, c);
-  return valorExibido(form, form.unidade, c, hoje, form.original.totalCents);
-}
-
-/**
- * POR QUE a compra travou, em vez de "já fechadas": parcela paga e fatura paga em parte pedem
- * saídas diferentes (22/09/2026 — a trava da wardogs tinha duas causas possíveis e a dica era a
- * mesma frase para as duas).
- */
-function motivoDaTrava(travadas: number, pagas: number, total: number): string {
-  const naFatura = travadas - pagas;
-  if (naFatura === 0) return `${pagas} de ${total} já ${pagas === 1 ? 'paga' : 'pagas'}`;
-  const fatura = `${naFatura} em fatura paga em parte ou adiada`;
-  return pagas === 0 ? `${naFatura} de ${total} ${naFatura === 1 ? 'está' : 'estão'} em fatura paga em parte ou adiada` : `${pagas} já ${pagas === 1 ? 'paga' : 'pagas'} e ${fatura}`;
-}
 
 const ALTURA_BARRA = 88;
 /** Largura fixa de cada mês na faixa rolável. */
@@ -202,7 +102,7 @@ export default function InstallmentsScreen() {
   const [verTerminadas, setVerTerminadas] = useState(false);
   const params = useLocalSearchParams<{ edit?: string }>();
   const editar = useUpdateInstallmentPlan();
-  const [form, setForm] = useState<FormPlano | null>(null);
+  const [form, setForm] = useState<CompraForm | null>(null);
   /** Qual `?edit=` já foi consumido — sem isto, fechar o sheet reabriria no render seguinte. */
   const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
   const volta = useVoltarQuandoFechar();
@@ -332,7 +232,7 @@ export default function InstallmentsScreen() {
         curto: 'Editar',
         icon: 'pencil' as const,
         arrasto: 'direita',
-        onPress: () => setForm(formDoPlano(plano)),
+        onPress: () => setForm(compraDoRegistro(plano)),
       },
       {
         label: aberto === plano.id ? 'Esconder parcelas' : 'Ver parcelas',
@@ -401,45 +301,19 @@ export default function InstallmentsScreen() {
     const alvo = lista.find((p) => p.id === params.edit);
     if (alvo) {
       setEdicaoAberta(params.edit);
-      setForm(formDoPlano(alvo));
+      setForm(compraDoRegistro(alvo));
       // Quem chegou por `?edit=` veio de outra tela, e é para lá que fechar devolve.
       volta.marcar();
     }
   }
 
-  // Com parcela paga, o que resta editar é o dinheiro em aberto e o nome — a regra do nicho
-  // (o OnBalance trava o número de parcelas depois do primeiro pagamento). Quem RECUSA é a
-  // RPC; aqui a tela só evita oferecer o que vai voltar como erro.
-  const travado = (form?.travadas ?? 0) > 0;
-  const tituloOk = (form?.description.trim().length ?? 0) > 0;
-  const emAberto = form ? Math.max(0, form.installments - form.travadas) : 0;
-  const restante = form ? form.totalCents - form.travadoCents : 0;
-  const totalOk = Boolean(
-    form && form.totalCents >= form.installments && (!travado || restante >= emAberto),
-  );
-  // Conta obrigatória: sem ela o `set_invoice` apaga o `invoice_id` das N parcelas e a compra
-  // de cartão vira despesa solta. O banco recusa; a tela evita chegar lá.
-  // A compra que NASCEU sem conta continua editável sem uma (o banco já aceita): exigir a conta
-  // ali travava o Salvar para quem não tem conta nenhuma cadastrada.
-  const contaOk = Boolean(form?.accountId || !form?.original.accountId);
-  const podeSalvar = Boolean(form && tituloOk && totalOk && contaOk && isValidBRDate(form.inicio));
-  // ⚠️ `faixaDeParcelas` é a régua (`finance-form.ts`): sem "À vista" com parcela travada,
-  // porque a RPC recusaria.
-  const faixaParcelas = faixaDeParcelas(form?.travadas ?? 0);
+  // A régua é a de `update_installment_plan` (`lib/compra.ts`): a tela só oferece o que o banco aceita.
+  const { podeSalvar } = validaCompra(form);
 
   const salvarPlano = () => {
     if (!form || !podeSalvar) return;
     const nome = form.description.trim();
-    const payload = () => ({
-      planId: form.id,
-      totalCents: form.totalCents,
-      installments: form.installments,
-      firstOccurredAt: brToISO(form.inicio),
-      description: nome,
-      merchant: form.merchant.trim() || null,
-      category: form.category,
-      accountId: form.accountId,
-    });
+    const payload = () => payloadDaCompra(form, brToISO(form.inicio));
     const acoes = {
       onSuccess: () => {
         volta.aoFechar(() => setForm(null));
@@ -783,131 +657,7 @@ export default function InstallmentsScreen() {
         />
         {form ? (
           <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
-            <Field
-              label="Título"
-              error={tituloOk ? undefined : 'Escreva um título para esta compra'}>
-              <TextField
-                value={form.description}
-                onChangeText={(description) => setForm({ ...form, description })}
-                placeholder="Ex.: Fone de ouvido"
-                accessibilityLabel="Título da compra"
-                invalid={!tituloOk}
-              />
-            </Field>
-
-            <Field label="Estabelecimento">
-              <TextField
-                value={form.merchant}
-                onChangeText={(merchant) => setForm({ ...form, merchant })}
-                placeholder="Ex.: Padaria do Zé"
-                accessibilityLabel="Estabelecimento"
-              />
-            </Field>
-
-            <Field
-              label="Valor"
-              error={totalOk ? undefined : recusaDoValor(form.travadas)}
-              hint={
-                form.unidade === 'parcela'
-                  ? `${travado ? `Vale para as ${emAberto} em aberto` : `${form.installments}x`} · total ${formatBRL(form.totalCents)}`
-                  : travado
-                    ? `${formatBRL(form.travadoCents)} já fechado`
-                    : undefined
-              }>
-              {/* Sempre na tela: sumir no "À vista" subiria o formulário embaixo do "−". */}
-              <Segmented
-                options={UNIDADES_DO_VALOR}
-                value={form.unidade}
-                onChange={(unidade) => setForm({ ...form, unidade })}
-              />
-              <MoneyField
-                valueCents={valorDoCampo(form)}
-                onChangeCents={(v) =>
-                  setForm({ ...form, ...digitarValor(v, form.unidade, contratoDo(form)) })
-                }
-                invalid={!totalOk}
-                accessibilityLabel={
-                  form.unidade === 'parcela' ? 'Valor de cada parcela' : 'Valor total da compra'
-                }
-              />
-            </Field>
-
-            <Field label="Categoria">
-              <CategoryPicker
-                value={form.category}
-                onChange={(category) => setForm({ ...form, category })}
-              />
-            </Field>
-
-            <Field label="Conta" error={contaOk ? undefined : 'Escolha a conta desta compra'}>
-              {travado ? (
-                <TextField
-                  editable={false}
-                  value={(form.accountId ? contaPorId.get(form.accountId) : null) ?? 'Sem conta'}
-                  accessibilityLabel="Conta da compra"
-                />
-              ) : (
-                <AccountPicker
-                  accounts={accounts.data ?? []}
-                  value={form.accountId}
-                  onChange={(accountId: string | null) => setForm({ ...form, accountId })}
-                  placeholder="Escolher a conta da compra"
-                />
-              )}
-            </Field>
-
-            <Field
-              label="Parcelas"
-              hint={
-                travado
-                  ? `${motivoDaTrava(form.travadas, form.travadasPagas, form.installments)} — número, data e conta não mudam.`
-                  : form.installments === 1
-                    ? undefined
-                    : `${form.installments}x de ${formatBRL(Math.floor(form.totalCents / form.installments))}`
-              }>
-              {travado ? (
-                <TextField
-                  editable={false}
-                  value={`${form.installments}x`}
-                  accessibilityLabel="Número de parcelas"
-                />
-              ) : (
-                <QuantityField
-                  value={form.installments}
-                  min={faixaParcelas.min}
-                  max={faixaParcelas.max}
-                  accessibilityLabel="Número de parcelas"
-                  onChange={(n) =>
-                    setForm({
-                      ...form,
-                      installments: n,
-                      // Quem digitou "cada parcela" continua com aquela parcela: o total segue o N.
-                      totalCents:
-                        form.parcelaCents !== null
-                          ? totalPorParcela(form.parcelaCents, { ...contratoDo(form), parcelas: n })
-                          : form.totalCents,
-                    })
-                  }
-                />
-              )}
-            </Field>
-
-            <Field label="Data da primeira parcela">
-              {travado ? (
-                <TextField
-                  editable={false}
-                  value={form.inicio}
-                  accessibilityLabel="Data da primeira parcela"
-                />
-              ) : (
-                <DatePickerField
-                  value={form.inicio}
-                  onChange={(inicio) => setForm({ ...form, inicio })}
-                  accessibilityLabel="Data da primeira parcela"
-                  invalid={!isValidBRDate(form.inicio)}
-                />
-              )}
-            </Field>
+            <CamposDaCompra form={form} onChange={setForm} contas={accounts.data ?? []} />
           </ScrollView>
         ) : null}
       </Sheet>

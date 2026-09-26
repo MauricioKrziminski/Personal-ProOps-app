@@ -165,15 +165,14 @@ begin
     raise exception '4. as outras duas deveriam ficar pendentes';
   end if;
 
-  -- 4a. e com parcela paga o número de parcelas trava — inclusive para dissolver.
-  --     ⚠️ a frase confere 'o número de parcelas não muda mais', não só 'não muda mais': essa
-  --     segunda aparece em TRÊS mensagens (número, data, conta) e passaria com qualquer uma.
+  -- 4a. com parcela paga, dissolver (à vista) é recusado — à vista é um pagamento só, e uma parte
+  --     já foi paga separada (`20260926130000`: o número em si passou a mudar com parcela paga).
   begin
     perform public.update_installment_plan(plano, 30000, 1, '2026-06-05', 'Pneu', null, null, corrente);
     raise exception 'FALHOU: 4a. dissolver com parcela paga tinha que ser recusado';
   exception when others then
-    if sqlerrm like 'FALHOU:%' or position('o número de parcelas não muda mais' in sqlerrm) = 0 then
-      raise exception '4a. recusa errada (esperava «o número de parcelas não muda mais»): %', sqlerrm;
+    if sqlerrm like 'FALHOU:%' or position('à vista seria um pagamento só' in sqlerrm) = 0 then
+      raise exception '4a. recusa errada (esperava «à vista seria um pagamento só»): %', sqlerrm;
     end if;
   end;
 

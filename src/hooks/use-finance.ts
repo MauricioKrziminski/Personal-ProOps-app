@@ -752,6 +752,8 @@ export function useUpdateInstallmentPlan() {
       category: string | null;
       merchant: string | null;
       accountId: string | null;
+      /** "Parcelas já pagas" (`20260926130000`): só quando mudou — ausente, nada muda nelas. */
+      paidInstallments?: number | null;
     }) => {
       const { error } = await supabase.rpc('update_installment_plan', {
         p_plan_id: input.planId,
@@ -762,6 +764,7 @@ export function useUpdateInstallmentPlan() {
         p_category: input.category ?? undefined,
         p_merchant: input.merchant ?? undefined,
         p_account_id: input.accountId ?? undefined,
+        p_paid_installments: input.paidInstallments ?? undefined,
       });
       if (error) throw error;
     },
@@ -2903,6 +2906,15 @@ export interface InstallmentPlanSummary {
    * diz o que a pessoa pode fazer a respeito.
    */
   locked_paid: number;
+  /** Das travadas, quantas estão numa fatura de cartão: elas prendem a data e a conta da compra. */
+  locked_in_invoice: number;
+  /** A maior parcela travada: o número de parcelas não fica abaixo dela (`20260926130000`). */
+  last_locked_no: number;
+  /**
+   * A última parcela paga junto com uma fatura DE VERDADE (com pagamento, adiada ou paga em parte):
+   * "parcelas já pagas" não desce abaixo dela. A fatura que o app quitou à mão reabre junto.
+   */
+  paid_floor: number;
   /** Quais são as travadas — o formulário da parcela precisa saber se ELA ainda muda. */
   locked_ids: string[];
   first_occurred_at: string;
@@ -2976,10 +2988,16 @@ async function buscarPlanos(apenas?: string): Promise<InstallmentPlanSummary[]> 
    */
   const { data: fechadas, error: erroFaturas } = await supabase
     .from('card_invoices')
-    .select('id')
+    .select('id, status, paid_cents, settled_manually')
     .or('status.in.(paid,rolled),paid_cents.gt.0');
   if (erroFaturas) throw erroFaturas;
   const faturaFechada = new Set((fechadas ?? []).map((f) => f.id));
+  // Paga de verdade: a quitada à mão pelo app (histórico) não conta — ela reabre junto.
+  const faturaPagaDeVerdade = new Set(
+    (fechadas ?? [])
+      .filter((f) => f.status === 'rolled' || f.paid_cents > 0 || (f.status === 'paid' && !f.settled_manually))
+      .map((f) => f.id),
+  );
 
   const porPlano = new Map<string, InstallmentParcel[]>();
   for (const row of rows) {
@@ -3023,6 +3041,11 @@ async function buscarPlanos(apenas?: string): Promise<InstallmentPlanSummary[]> 
       locked: travadas.length,
       locked_cents: travadas.reduce((soma, p) => soma + p.amount_cents, 0),
       locked_paid: travadas.filter((p) => p.status === 'cleared').length,
+      locked_in_invoice: travadas.filter((p) => p.invoice_id).length,
+      last_locked_no: travadas.reduce((maior, p) => Math.max(maior, p.installment_no ?? 0), 0),
+      paid_floor: parcels
+        .filter((p) => p.status === 'cleared' && p.invoice_id && faturaPagaDeVerdade.has(p.invoice_id))
+        .reduce((maior, p) => Math.max(maior, p.installment_no ?? 0), 0),
       locked_ids: travadas.map((p) => p.id),
       first_occurred_at: plan.first_occurred_at,
       last_occurred_at: parcels.reduce<string | null>(

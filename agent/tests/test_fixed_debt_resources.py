@@ -213,9 +213,10 @@ async def test_simples_sem_parcela_pergunta_a_parcela_e_nao_o_principal(workspac
 
 
 @pytest.mark.asyncio
-async def test_modo_de_calculo_nao_muda_depois_de_criado(fixed_debt):
-    with pytest.raises(Level1Error, match="não muda"):
-        await resources.prepare(fixed_debt, action("resource_update", calculation_mode="amortized"))
+async def test_modo_de_calculo_muda_depois_de_criado(fixed_debt):
+    """26/09/2026: *"o modo da dívida ele deve poder alterar também"* — era recusado."""
+    prepared = await resources.prepare(fixed_debt, action("resource_update", calculation_mode="amortized"))
+    assert prepared["values"]["calculation_mode"] == "amortized"
 
 
 @pytest.mark.asyncio
@@ -476,3 +477,25 @@ async def test_frase_do_sim_usa_o_nome_cadastrado_nao_o_digitado(fixed_debt):
         type="resource_pay", resource="debts", name="carro",
         fields=[ResourceField(name="amount_cents", value="147000")]))
     assert "dívida/financiamento Carro" in proposta["summary"]
+
+
+def test_trocar_o_modo_da_divida_deriva_o_contrato_fixo():
+    """26/09/2026: o modo muda — para parcela fixa, o contrato sai do que a dívida já tem."""
+    from app.tools.resources import _converter_modo_da_divida
+
+    old = {"calculation_mode": "amortized", "installments": 48, "installments_paid": 10,
+           "installment_cents": 147000, "remaining_cents": 5_000_000}
+    values = {"calculation_mode": "fixed_installments"}
+    _converter_modo_da_divida(values, old)
+    assert values["installment_cents"] == 147000
+    assert values["principal_cents"] == 147000 * 48
+    assert values["remaining_cents"] == 147000 * 38
+    assert values["interest_rate_monthly"] == "0"
+
+    sem_parcela = {"calculation_mode": "fixed_installments"}
+    _converter_modo_da_divida(sem_parcela, {**old, "installment_cents": None})
+    assert sem_parcela["installment_cents"] == round(5_000_000 / 38)
+
+    para_juros = {"calculation_mode": "amortized"}
+    _converter_modo_da_divida(para_juros, {**old, "calculation_mode": "fixed_installments"})
+    assert para_juros == {"calculation_mode": "amortized"}

@@ -227,3 +227,22 @@ test('a próxima parcela que o formulário mostra é a do cronograma: nunca no p
   // Carência: a do contrato está no futuro e ganha.
   assert.equal(proximaNoCronograma('2026-12-05', 0, 5, '2026-09-24'), '2026-12-05');
 });
+
+test('A dívida troca de modo sem perder o que já tem: "parcelas" troca de sentido', async () => {
+  const { camposNoOutroModo } = await import('./finance-form.ts');
+  const fixa = { calculationMode: 'fixed_installments' as const, parcelas: '48', installmentsPaid: 10, unidade: 'parcela' as const,
+    valorCents: 147000, remainingCents: 147000 * 38, principalCents: 147000 * 48, installmentCents: 147000 };
+  const juros = { ...fixa, ...camposNoOutroModo(fixa, 'amortized') };
+  assert.equal(juros.calculationMode, 'amortized');
+  assert.equal(juros.parcelas, '38', '48 no total com 10 pagas: faltam 38');
+  assert.equal(juros.remainingCents, 147000 * 38);
+  assert.equal(juros.installmentCents, 147000);
+  const deVolta = { ...juros, ...camposNoOutroModo(juros, 'fixed_installments') };
+  assert.equal(deVolta.parcelas, '48');
+  assert.equal(deVolta.valorCents, 147000);
+  assert.equal(deVolta.unidade, 'parcela');
+  // "Total a pagar" digitado vira a parcela do contrato
+  const peloTotal = camposNoOutroModo({ ...fixa, unidade: 'total', valorCents: 147000 * 48 }, 'amortized');
+  assert.equal(peloTotal.installmentCents, 147000);
+  assert.deepEqual(camposNoOutroModo(fixa, 'fixed_installments'), {});
+});

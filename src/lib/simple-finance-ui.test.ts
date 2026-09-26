@@ -61,6 +61,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useImportBatches: (limite?: number) => { pedidosDeLimite.push(['batches', limite]); return { ...query, isSuccess: true, data: options.batches ?? [] }; },
     useAlertsSent: (limite?: number) => { pedidosDeLimite.push(['alerts', limite]); return { ...query, isSuccess: true, data: options.alerts ?? [] }; },
     useInstallmentPlans: () => ({ ...query, isSuccess: true, data: options.plans ?? [] }),
+    useUpdateInstallmentPlan: () => mutation('updateInstallmentPlan'),
     useInstallmentPlan: (id?: string) => ({ ...query, isSuccess: true, data: (options.plans ?? []).find((p: any) => p.id === id) ?? null }),
     useGoalContributions: () => ({ ...query, isSuccess: true, data: options.contributions ?? [] }),
     useGoalDeposit: () => mutation('goalDeposit'),
@@ -223,6 +224,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@/lib/confirmar-baixa') return load('src/lib/confirmar-baixa.ts');
       // Os campos da série (26/09/2026): a folha de Recorrentes e o "Esta e as próximas" do lançamento.
       if (name === '@/components/finance/serie-form') return load('src/components/finance/serie-form.tsx');
+      // E os da compra (26/09/2026): a folha de Parceladas e o "A compra toda" do lançamento.
+      if (name === '@/components/finance/compra-form') return load('src/components/finance/compra-form.tsx');
       if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useReminders: () => ({ ...query, isSuccess: true, data: { pages: [options.reminders ?? []], pageParams: [0] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }), useToggleReminder: () => mutation('toggleReminder'), useDeleteReminder: () => mutation('deleteReminder') };
       if (name === '@/hooks/use-session') return { useSession: () => ({ session: { user: { id: 'user-1' } } }) };
       if (name === '@/hooks/use-profile') return { useProfile: () => ({ ...query, isSuccess: true, data: { display_name: 'Gabriel Almeida', phone: null } }) };
@@ -250,7 +253,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/serie') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/serie' || name === '@/lib/compra') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/components/ui/glass-backdrop') return { GlassBackdrop: 'GlassBackdrop', supportsLiquidGlass: () => false };
       if (name === '@/hooks/use-note-sort') return { SORT_LABEL: {}, useNoteSort: () => ['manual', () => {}] };
@@ -347,7 +350,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     }
     if (node.type === 'FinanceAnalysisPanes') visit(node.props.compact);
     // `CamposDaSerie` é um grupo de campos sem hook: desenhado aqui, a tela é a que a pessoa vê.
-    if (typeof node.type === 'function' && node.type.name === 'CamposDaSerie') visit(node.type(node.props));
+    if (typeof node.type === 'function' && (node.type.name === 'CamposDaSerie' || node.type.name === 'CamposDaCompra')) visit(node.type(node.props));
     // No celular o `AdaptivePanes` desenha o slot de uma coluna só (Pastas, Recorrentes…).
     if (node.type === 'AdaptivePanes') visit(node.props.singlePaneContent ?? node.props.main);
     visit(node.props.ListHeaderComponent);
@@ -907,7 +910,9 @@ test('editing a legacy amortized financing preserves its mode and remaining-term
   ui.interact((nodes) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onLongPress());
   ui.interact(() => ui.actions.find((a) => a.label === 'Editar')!.onPress());
   assert.ok(ui.nodes().some((n) => n.type === 'Field' && n.props.label === 'Juros por mês'));
-  assert.ok(!ui.nodes().some((n) => n.type === 'Segmented'));
+  // O modo também se edita (26/09/2026) — e abre no modo que a dívida tem.
+  const modo = ui.nodes().find((n) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'amortized'));
+  assert.equal(modo?.props.value, 'amortized');
   ui.press('Salvar');
   assert.equal(ui.writes[0].value.id, 'old-debt');
   assert.equal(ui.writes[0].value.calculation_mode, 'amortized');
@@ -2343,7 +2348,7 @@ test('Cadastrar conta ou cartão, de qualquer tela, abre o formulário já no ti
 
 /** A compra que nasceu SEM conta continua editável, como o banco já permite (`finance.md`). */
 test('Parcelada sem conta: editar o nome salva sem exigir conta; com conta, a conta continua obrigatória', () => {
-  const plano = (account_id: string | null) => ({ id: 'p1', title: 'tv', description: 'tv', merchant: null, category: 'casa', account_id, total_cents: 90000, installments: 3, installment_cents: 30000, first_occurred_at: '2026-10-10', active: true, paid: 0, remaining_cents: 90000, locked: 0, locked_cents: 0, locked_paid: 0, parcels: [] });
+  const plano = (account_id: string | null) => ({ id: 'p1', title: 'tv', description: 'tv', merchant: null, category: 'casa', account_id, total_cents: 90000, installments: 3, installment_cents: 30000, first_occurred_at: '2026-10-10', active: true, paid: 0, remaining_cents: 90000, locked: 0, locked_cents: 0, locked_paid: 0, locked_in_invoice: 0, last_locked_no: 0, paid_floor: 0, parcels: [] });
   const salvar = (ui: any) => ui.nodes().find((n: any) => n.type === 'TaskHeader' && n.props.action)?.props.action.props;
   const semConta = screen('src/app/finance/installments.tsx', { params: { edit: 'p1' }, plans: [plano(null)], forecastAccounts: [] });
   assert.ok(salvar(semConta) && !salvar(semConta).disabled, 'sem conta nenhuma, a compra sem conta salva');
@@ -2594,4 +2599,27 @@ test('Organizar pastas: "Sem pasta" abre as notas soltas (a aba Notas)', () => {
   const semPasta = ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'Sem pasta');
   ui.interact(() => semPasta.props.onPress());
   assert.equal(ui.navigations.at(-1), '/notes');
+});
+
+test('Editar a compra: as já pagas se editam, o número muda com parcela paga, e data e conta só prendem pela fatura', () => {
+  // 26/09/2026: *"parcelas já pagas ele deve poder alterar no editar também"*.
+  const plano = (extra: Record<string, unknown> = {}) => ({
+    id: 'p1', title: 'tv', description: 'tv', merchant: null, category: 'casa', account_id: 'c1', total_cents: 100000,
+    installments: 10, installment_cents: 10000, first_occurred_at: '2026-06-05', active: true, paid: 2, remaining_cents: 80000,
+    locked: 2, locked_cents: 20000, locked_paid: 2, locked_in_invoice: 0, last_locked_no: 2, paid_floor: 0, parcels: [], ...extra,
+  });
+  const abrir = (extra?: Record<string, unknown>) =>
+    screen('src/app/finance/installments.tsx', { params: { edit: 'p1' }, plans: [plano(extra)], forecastAccounts: [{ id: 'c1', name: 'Conta', type: 'checking' }] });
+  const quantidade = (ui: any, rotulo: string) => ui.nodes().find((n: any) => n.type === 'QuantityField' && n.props.accessibilityLabel === rotulo);
+
+  const ui = abrir();
+  assert.equal(quantidade(ui, 'Número de parcelas').props.min, 2, 'com 2 pagas o número muda, só não fica abaixo delas');
+  assert.ok(ui.nodes().some((n: any) => n.type === 'DatePickerField' && n.props.accessibilityLabel === 'Data da primeira parcela'), 'fora do cartão a data muda');
+  ui.interact(() => quantidade(ui, 'Parcelas já pagas').props.onChange(4));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'TaskHeader').props.action.props.onPress());
+  assert.equal(ui.pedidos.at(-1).value.paidInstallments, 4);
+
+  const naFatura = abrir({ locked_in_invoice: 1, paid_floor: 1 });
+  assert.ok(naFatura.nodes().some((n: any) => n.type === 'TextField' && n.props.accessibilityLabel === 'Data da primeira parcela' && n.props.editable === false), 'parcela paga na fatura prende a data');
+  assert.equal(quantidade(naFatura, 'Parcelas já pagas').props.min, 1, 'a paga com a fatura não reabre por aqui');
 });

@@ -503,13 +503,6 @@ def validate_fields(action: ResourceAction) -> dict:
         data_dita = values.get("next_due_date") or values.get("first_due_date")
         if data_dita:
             values["due_day"] = int(data_dita[8:10])
-    if action.type != Op.CREATE and "calculation_mode" in values:
-        # Mesma regra do trigger `tg_debts_calculation_mode`: dito aqui, o usuário
-        # lê o motivo em vez de uma exceção do Postgres.
-        _error(
-            "O modo de cálculo de um financiamento não muda depois de criado. "
-            "Cadastre outro contrato se for o caso."
-        )
     # `mes` fica de fora: ele não se cria (a linha já existe) e o CREATE que o
     # modelo manda para "muda meu ciclo" é tratado como UPDATE. Sem a guarda,
     # `REQUIRED["mes"]` era KeyError no meio do turno.
@@ -579,6 +572,28 @@ def _debt_mode(values: dict) -> tuple[str, ...]:
     modo = values.get("calculation_mode") or ("amortized" if detalhado else "fixed_installments")
     values["calculation_mode"] = modo
     return DEBT_REQUIRED[modo]
+
+
+def _converter_modo_da_divida(values: dict, old: dict) -> None:
+    """Trocar o modo da dívida (26/09/2026): o que ela já tem atravessa, como no app
+    (`camposNoOutroModo`). Para parcela fixa o `check` exige a parcela, o total e as pagas —
+    saem do pedido ou da dívida, e o resto é derivado. Com juros, saldo e principal ficam."""
+    if values["calculation_mode"] != "fixed_installments":
+        return
+    total = values.get("installments") or old.get("installments")
+    pagas = int(values.get("installments_paid", old.get("installments_paid")) or 0)
+    if not total:
+        _error("Para virar parcela fixa, diga quantas parcelas o contrato tem.")
+    parcela = values.get("installment_cents") or old.get("installment_cents")
+    if not parcela:
+        faltam = int(total) - pagas
+        if faltam <= 0:
+            _error("Diga o valor de cada parcela para virar parcela fixa.")
+        parcela = round(int(old["remaining_cents"]) / faltam)
+    values["installment_cents"] = int(parcela)
+    values["installments"] = int(total)
+    values["installments_paid"] = pagas
+    _derive_fixed_installments(values)
 
 
 def _derive_fixed_installments(values: dict) -> None:
@@ -1036,6 +1051,9 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             _error(
                 'Para mudar a avaliação, peça "atualize o valor do bem"; isso registra também o histórico.'
             )
+        if (action.resource == "debts" and values.get("calculation_mode")
+                and values["calculation_mode"] != old.get("calculation_mode")):
+            _converter_modo_da_divida(values, old)
         merged = {**old, **values}
     else:
         merged = values
