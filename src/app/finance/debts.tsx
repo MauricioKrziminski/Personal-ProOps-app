@@ -53,7 +53,7 @@ import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { pagamentoDaParcelaFixa } from '@/lib/confirmar-baixa';
 import { brToISO, formatNumberBR, isoToBR } from '@/lib/dates';
 import { paidInstallments, porAno, secoesDaLinha, type ItemDaLinha } from '@/lib/debt-history';
-import { aoVoltarParaDivida, lerAoVoltar } from '@/lib/volta-da-parcela';
+import { lerAoVoltar } from '@/lib/volta-da-parcela';
 import {
   ancoraDoContrato,
   debtTerm,
@@ -66,7 +66,6 @@ import {
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { DebtTimeline } from '@/components/finance/debt-timeline';
-import { HeaderIconButton } from '@/components/ui/app-header';
 import { RingGauge } from '@/components/ui/ring-gauge';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { transicaoDeLayout } from '@/components/motion/transicao';
@@ -197,25 +196,18 @@ export default function DebtsScreen() {
   // Quem chegou por `?create=financing` veio do lançamento ou do Financeiro — fechar devolve.
   const volta = useVoltarQuandoFechar(params.create === 'financing');
   /**
-   * `?id=<dívida>` já abre o detalhe. O extrato do mês mandava a prestação para a LISTA — o
-   * `ref_id` de linha projetada é id de dívida, não de lançamento —, e quem tem cinco
-   * financiamentos tinha que caçar qual era.
+   * A FICHA da dívida é uma TELA — `/finance/debts?id=<dívida>` —, não uma folha (25/09/2026). Era
+   * um `Sheet`: abrir uma parcela fechava a ficha e voltar a reabria (*"para que fechar e não só
+   * voltar?"*). Como tela, a parcela e o lançamento empilham por cima e "voltar" só volta, e quem
+   * chega de fora (o pagamento no lançamento, a prestação no ciclo) cai direto nela. O mesmo
+   * componente desenha as duas — sem `id` a lista, com `id` a ficha —, e as folhas de pagar e de
+   * editar servem às duas.
    */
-  const [detalheId, setDetalheId] = useState<string | null>(() => params.id ?? null);
+  const fichaId = params.id;
   const [pagandoId, setPagandoId] = useState<string | null>(null);
-  const detalhe = debts.data?.find((debt) => debt.id === detalheId) ?? null;
+  const detalhe = fichaId ? (debts.data?.find((debt) => debt.id === fichaId) ?? null) : null;
   const pagando = debts.data?.find((debt) => debt.id === pagandoId) ?? null;
-  /**
-   * Quem chegou por `?id=` (o pagamento no "Editar lançamento", a prestação no ciclo) veio de
-   * outra tela: fechar o detalhe — ou o pagamento e a edição abertos a partir dele — devolve para
-   * lá. Marcado NO RENDER, quando a dívida chega, como o `?edit=` de Parceladas.
-   */
-  const [idConsumido, setIdConsumido] = useState(false);
-  if (params.id && !idConsumido && debts.data?.some((debt) => debt.id === params.id)) {
-    setIdConsumido(true);
-    volta.marcar();
-  }
-  const setDetalhe = (debt: Debt | null) => setDetalheId(debt?.id ?? null);
+  const abrirFicha = (d: Debt) => router.push({ pathname: '/finance/debts', params: { id: d.id } });
   const setPagando = (debt: Debt | null) => setPagandoId(debt?.id ?? null);
   const [pagoCents, setPagoCents] = useState(0);
   const [contaId, setContaId] = useState<string | null>(null);
@@ -290,7 +282,6 @@ export default function DebtsScreen() {
     });
 
   const abrirPagamento = (d: Debt) => {
-    setDetalhe(null);
     setPagoCents(Number((detalhe?.id === d.id ? schedule.data?.[0]?.payment_cents : null) ?? d.installment_cents ?? 0));
     setContaId(d.account_id);
     setNasProximas(false);
@@ -299,34 +290,26 @@ export default function DebtsScreen() {
 
   /**
    * Toda parcela abre (25/09/2026): a paga com lançamento abre o LANÇAMENTO (editar, apagar); a
-   * futura e a só contada, a tela da parcela. A ficha fecha antes — é um Modal, e a tela nova
-   * ficaria por baixo — e reabre quando a pessoa volta (`volta-da-parcela.ts`).
+   * futura e a só contada, a tela da parcela. As duas empilham sobre a ficha — voltar é voltar.
    */
   const abrirParcela = (item: ItemDaLinha) => {
     if (!detalhe) return;
-    aoVoltarParaDivida({ divida: detalhe.id, acao: 'abrir' });
-    setDetalhe(null);
     if (item.txId) router.push({ pathname: '/finance/[txId]', params: { txId: item.txId } });
     else router.push({ pathname: '/finance/debt-installment', params: { debt: detalhe.id, n: String(item.n) } });
   };
-  // Voltando da parcela: a ficha reabre onde estava, ou já no pagamento ("Paguei esta parcela").
-  // ⚠️ Com `useCallback` e SÓ no foco: sem ele o efeito roda a cada render, e o aviso gravado no
-  // toque era consumido ali mesmo, antes de a tela sair — voltar não reabria nada (visto no iPhone).
+  // "Paguei esta parcela" na tela da parcela volta para a ficha JÁ no pagamento
+  // (`volta-da-parcela.ts`). ⚠️ `useCallback`: sem ele o efeito roda a cada render, não só no foco.
   const listaDeDividas = debts.data;
   useFocusEffect(
     useCallback(() => {
       const pedido = lerAoVoltar();
       const d = pedido ? listaDeDividas?.find((x) => x.id === pedido.divida) : null;
       if (!pedido || !d) return;
-      if (pedido.acao === 'abrir') {
-        setDetalheId(d.id);
-        return;
-      }
       setPagoCents(pedido.cents ?? Number(d.installment_cents ?? 0));
       setContaId(d.account_id);
       setNasProximas(false);
       setPagandoId(d.id);
-    }, [listaDeDividas, setDetalheId, setPagoCents, setContaId, setNasProximas, setPagandoId]),
+    }, [listaDeDividas, setPagoCents, setContaId, setNasProximas, setPagandoId]),
   );
 
   /**
@@ -525,12 +508,15 @@ export default function DebtsScreen() {
    */
   const arquivar = (d: Debt) =>
     archive.mutate(d.id, {
-      onSuccess: () =>
+      onSuccess: () => {
         toast({
           message: <>Arquivei <Forte>{d.name}</Forte>.</>,
           tone: 'success',
           action: { label: 'Desfazer', onPress: () => desarquivar(d) },
-        }),
+        });
+        // Arquivada, ela sai das ativas: a ficha dela não tem mais o que mostrar.
+        if (fichaId === d.id) router.back();
+      },
       onError: () => toast({ message: <>Não deu para arquivar <Forte>{d.name}</Forte>.</>, tone: 'error' }),
     });
 
@@ -566,7 +552,7 @@ export default function DebtsScreen() {
       () =>
         excluirDivida.mutate(d.id, {
           onSuccess: () => {
-            if (detalheId === d.id) setDetalhe(null);
+            if (fichaId === d.id) router.back();
             toast({ message: <>Excluí <Forte>{d.name}</Forte>.</>, tone: 'success' });
           },
           onError: (error) =>
@@ -587,14 +573,8 @@ export default function DebtsScreen() {
       ? []
       : [{ label: 'Pagar parcela', curto: 'Pagar', icon: 'banknote' as const, arrasto: 'direita' as const, onPress: () => abrirPagamento(d) }]),
     // No detalhe já se está vendo as parcelas: a ação sai, o resto é a MESMA lista.
-    ...(noDetalhe ? [] : [{ label: 'Ver as parcelas', onPress: () => setDetalhe(d) }]),
-    {
-      label: 'Editar',
-      onPress: () => {
-        setDetalhe(null);
-        abrirEdicao(d);
-      },
-    },
+    ...(noDetalhe ? [] : [{ label: 'Ver as parcelas', onPress: () => abrirFicha(d) }]),
+    { label: 'Editar', onPress: () => abrirEdicao(d) },
     { label: 'Arquivar', icon: 'archivebox', arrasto: 'esquerda', desfaz: true, onPress: () => arquivar(d) },
     { label: 'Excluir por completo', destructive: true, onPress: () => void excluir(d) },
   ];
@@ -625,7 +605,7 @@ export default function DebtsScreen() {
         <PressableScale
           accessibilityRole="button"
           accessibilityLabel={`${d.name}, ${tipo}, deve ${brl(restante)}, ${juros}${parcelas ? `, ${parcelas}` : ''}`}
-          onPress={() => setDetalhe(d)}
+          onPress={() => abrirFicha(d)}
           onLongPress={() => acoesDaDivida(d)}>
           <Card style={styles.divida}>
             <View style={styles.dividaTopo}>
@@ -822,151 +802,9 @@ export default function DebtsScreen() {
     />
   );
 
-  return (
-    <Screen
-      grouped
-      wide={tablet}
-      onRefresh={() => Promise.all([debts.refetch(), payoff.refetch(), accounts.refetch(), arquivadas.refetch(), ...(detalheId || pagandoId ? [schedule.refetch()] : [])])}>
-      <Stack.Screen
-        options={{
-          title: 'Dívidas',
-        }}
-      />
-
-      <HeaderActions actions={[{ label: 'Nova dívida', icon: 'plus', onPress: abrirNova }]} />
-
-      {tablet ? tabletBody : compactBody}
-
-      {/* Amortização — sheet, não acordeão: um financiamento em 60x tem 60 linhas. */}
-      <Sheet visible={detalhe !== null} onClose={() => volta.aoFechar(() => setDetalhe(null))}>
-          <TaskHeader
-            title={detalhe?.name ?? 'Dívida'}
-            onClose={() => volta.aoFechar(() => setDetalhe(null))}
-            action={
-              detalhe ? (
-                <HeaderIconButton icon="ellipsis" label="Mais ações" onPress={() => acoesDaDivida(detalhe, true)} />
-              ) : undefined
-            }
-          />
-
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
-            {schedule.isLoading ? (
-              <>
-                <SkeletonHero />
-                <SkeletonList linhas={6} />
-              </>
-            ) : null}
-
-            {schedule.isError ? (
-              <ErrorBand
-                message="Não deu para carregar as parcelas."
-                onRetry={schedule.refetch}
-              />
-            ) : null}
-
-            {proxima && detalhe ? (
-              <Card style={styles.proxima}>
-                <View style={styles.contrato}>
-                  {detalhe.installments ? (
-                    <RingGauge
-                      value={detalhe.installments_paid / detalhe.installments}
-                      size={76}
-                      stroke={7}
-                      accessibilityLabel={`${detalhe.installments_paid} de ${detalhe.installments} parcelas pagas`}>
-                      <ThemedText type="headline" style={tabular}>
-                        {detalhe.installments_paid}
-                      </ThemedText>
-                    </RingGauge>
-                  ) : null}
-                  <View style={styles.contratoTexto}>
-                    <HeroLabel>Falta pagar</HeroLabel>
-                    <Money cents={Number(detalhe.remaining_cents)} variant="money" />
-                    {detalhe.installments ? (
-                      <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                        {`${detalhe.installments_paid} de ${detalhe.installments} pagas`}
-                      </ThemedText>
-                    ) : null}
-                  </View>
-                </View>
-                {/* Rótulo e valor no MESMO tamanho: em tamanhos diferentes a linha de base desalinhava. */}
-                <View style={styles.proximaLinha}>
-                  <ThemedText type="default" themeColor="textSecondary" style={tabular}>
-                    {`Próxima · ${isoToBR(proxima.due_date)}`}
-                  </ThemedText>
-                  <Money cents={Number(proxima.payment_cents)} variant="body" />
-                </View>
-                {detalhe.calculation_mode !== 'fixed_installments' && Number(proxima.interest_cents) > 0 && (
-                  <ThemedText type="small" themeColor="danger">
-                    <Money cents={Number(proxima.interest_cents)} variant="subhead" tone="danger" /> disso
-                    são juros
-                  </ThemedText>
-                )}
-                <Button
-                  label="Paguei esta parcela"
-                  block
-                  onPress={() => abrirPagamento(detalhe)}
-                />
-              </Card>
-            ) : null}
-
-            {!schedule.isLoading && !schedule.isError && !proxima ? (
-              <EmptyState
-                icon="calendar"
-                title={
-                  detalhe && Number(detalhe.remaining_cents) <= 0
-                    ? 'Nada em aberto. Dívida quitada.'
-                    : 'Sem parcelas para mostrar'
-                }
-                hint={
-                  detalhe && Number(detalhe.remaining_cents) > 0
-                    ? 'Informe quantas parcelas faltam para eu montar a tabela.'
-                    : undefined
-                }
-                action={
-                  detalhe && Number(detalhe.remaining_cents) > 0
-                    ? {
-                        label: 'Editar dívida',
-                        onPress: () => {
-                          const d = detalhe;
-                          setDetalhe(null);
-                          abrirEdicao(d);
-                        },
-                      }
-                    : undefined
-                }
-              />
-            ) : null}
-
-            {payments.isError ? (
-              <ErrorBand message="Não deu para carregar os pagamentos." onRetry={payments.refetch} />
-            ) : null}
-
-            {/*
-              Só com os pagamentos E o cronograma respondidos: sem os pagamentos, todo pagamento
-              lançado apareceria como "por volta de" (estimado) e trocaria de rótulo ao chegar.
-            */}
-            {detalhe && payments.isSuccess && !schedule.isLoading &&
-            (historico.length > 0 || (schedule.data ?? []).length > 0) ? (
-              <>
-                {aSeguir.visiveis.length > 0 ? (
-                  <View style={styles.secaoDaLinha}>
-                    <SectionHead title="A seguir" inset={false} />
-                    <DebtTimeline anos={porAno(aSeguir.visiveis)} onItemPress={abrirParcela} />
-                    <VerMais restantes={aSeguir.restantes} onPress={aSeguir.verMais} />
-                  </View>
-                ) : null}
-                {jaPagas.visiveis.length > 0 ? (
-                  <View style={styles.secaoDaLinha}>
-                    <SectionHead title="Já pagas" inset={false} />
-                    <DebtTimeline anos={porAno(jaPagas.visiveis)} onItemPress={abrirParcela} />
-                    <VerMais restantes={jaPagas.restantes} onPress={jaPagas.verMais} />
-                  </View>
-                ) : null}
-              </>
-            ) : null}
-          </ScrollView>
-      </Sheet>
-
+  // As folhas de pagar e de editar: por cima da lista E da ficha.
+  const folhas = (
+    <>
       {/* Pagar parcela — sheet com a conta explicada ANTES de confirmar. */}
       <Sheet visible={pagando !== null} onClose={() => volta.aoFechar(() => setPagando(null))}>
           <TaskHeader
@@ -1293,6 +1131,177 @@ export default function DebtsScreen() {
             </ScrollView>
           ) : null}
       </Sheet>
+    </>
+  );
+
+  /** A ficha de UMA dívida — o que era a folha "Amortização", agora a tela dela. */
+  const fichaConteudo = (
+    <>
+      {schedule.isLoading ? (
+        <>
+          <SkeletonHero />
+          <SkeletonList linhas={6} />
+        </>
+      ) : null}
+
+      {schedule.isError ? (
+        <ErrorBand
+          message="Não deu para carregar as parcelas."
+          onRetry={schedule.refetch}
+        />
+      ) : null}
+
+      {proxima && detalhe ? (
+        <Card style={styles.proxima}>
+          <View style={styles.contrato}>
+            {detalhe.installments ? (
+              <RingGauge
+                value={detalhe.installments_paid / detalhe.installments}
+                size={76}
+                stroke={7}
+                accessibilityLabel={`${detalhe.installments_paid} de ${detalhe.installments} parcelas pagas`}>
+                <ThemedText type="headline" style={tabular}>
+                  {detalhe.installments_paid}
+                </ThemedText>
+              </RingGauge>
+            ) : null}
+            <View style={styles.contratoTexto}>
+              <HeroLabel>Falta pagar</HeroLabel>
+              <Money cents={Number(detalhe.remaining_cents)} variant="money" />
+              {detalhe.installments ? (
+                <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                  {`${detalhe.installments_paid} de ${detalhe.installments} pagas`}
+                </ThemedText>
+              ) : null}
+            </View>
+          </View>
+          {/* Rótulo e valor no MESMO tamanho: em tamanhos diferentes a linha de base desalinhava. */}
+          <View style={styles.proximaLinha}>
+            <ThemedText type="default" themeColor="textSecondary" style={tabular}>
+              {`Próxima · ${isoToBR(proxima.due_date)}`}
+            </ThemedText>
+            <Money cents={Number(proxima.payment_cents)} variant="body" />
+          </View>
+          {detalhe.calculation_mode !== 'fixed_installments' && Number(proxima.interest_cents) > 0 && (
+            <ThemedText type="small" themeColor="danger">
+              <Money cents={Number(proxima.interest_cents)} variant="subhead" tone="danger" /> disso
+              são juros
+            </ThemedText>
+          )}
+          <Button
+            label="Paguei esta parcela"
+            block
+            onPress={() => abrirPagamento(detalhe)}
+          />
+        </Card>
+      ) : null}
+
+      {!schedule.isLoading && !schedule.isError && !proxima ? (
+        <EmptyState
+          icon="calendar"
+          title={
+            detalhe && Number(detalhe.remaining_cents) <= 0
+              ? 'Nada em aberto. Dívida quitada.'
+              : 'Sem parcelas para mostrar'
+          }
+          hint={
+            detalhe && Number(detalhe.remaining_cents) > 0
+              ? 'Informe quantas parcelas faltam para eu montar a tabela.'
+              : undefined
+          }
+          action={
+            detalhe && Number(detalhe.remaining_cents) > 0
+              ? { label: 'Editar dívida', onPress: () => abrirEdicao(detalhe) }
+              : undefined
+          }
+        />
+      ) : null}
+
+      {payments.isError ? (
+        <ErrorBand message="Não deu para carregar os pagamentos." onRetry={payments.refetch} />
+      ) : null}
+
+      {/*
+        Só com os pagamentos E o cronograma respondidos: sem os pagamentos, todo pagamento
+        lançado apareceria como "por volta de" (estimado) e trocaria de rótulo ao chegar.
+      */}
+      {detalhe && payments.isSuccess && !schedule.isLoading &&
+      (historico.length > 0 || (schedule.data ?? []).length > 0) ? (
+        <>
+          {aSeguir.visiveis.length > 0 ? (
+            <View style={styles.secaoDaLinha}>
+              <SectionHead title="A seguir" inset={false} />
+              <DebtTimeline anos={porAno(aSeguir.visiveis)} onItemPress={abrirParcela} />
+              <VerMais restantes={aSeguir.restantes} onPress={aSeguir.verMais} />
+            </View>
+          ) : null}
+          {jaPagas.visiveis.length > 0 ? (
+            <View style={styles.secaoDaLinha}>
+              <SectionHead title="Já pagas" inset={false} />
+              <DebtTimeline anos={porAno(jaPagas.visiveis)} onItemPress={abrirParcela} />
+              <VerMais restantes={jaPagas.restantes} onPress={jaPagas.verMais} />
+            </View>
+          ) : null}
+        </>
+      ) : null}
+    </>
+  );
+
+  if (fichaId) {
+    return (
+      <Screen
+        grouped
+        wide={tablet}
+        onRefresh={() => Promise.all([debts.refetch(), schedule.refetch(), payments.refetch(), accounts.refetch()])}>
+        <Stack.Screen options={{ title: detalhe?.name ?? 'Dívida' }} />
+        {/* Editar à direita e o resto no "…", como no lançamento. */}
+        <HeaderActions
+          actions={detalhe ? [{ label: 'Editar', onPress: () => abrirEdicao(detalhe) }] : []}
+          menu={
+            detalhe
+              ? { title: detalhe.name, actions: listaDaDivida(detalhe, true).filter((a) => a.label !== 'Editar') }
+              : undefined
+          }
+        />
+        {debts.isLoading ? (
+          <>
+            <SkeletonHero />
+            <SkeletonList linhas={6} />
+          </>
+        ) : debts.isError ? (
+          <ErrorBand message="Não deu para carregar a dívida." onRetry={debts.refetch} />
+        ) : !detalhe ? (
+          <EmptyState
+            icon="questionmark.folder"
+            title="Essa dívida não existe mais"
+            hint="Ela pode ter sido arquivada ou excluída."
+            action={{ label: 'Voltar', onPress: () => router.back() }}
+          />
+        ) : (
+          fichaConteudo
+        )}
+        {folhas}
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen
+      grouped
+      wide={tablet}
+      onRefresh={() => Promise.all([debts.refetch(), payoff.refetch(), accounts.refetch(), arquivadas.refetch(), ...(pagandoId ? [schedule.refetch()] : [])])}>
+      <Stack.Screen
+        options={{
+          title: 'Dívidas',
+        }}
+      />
+
+      <HeaderActions actions={[{ label: 'Nova dívida', icon: 'plus', onPress: abrirNova }]} />
+
+      {tablet ? tabletBody : compactBody}
+
+
+      {folhas}
     </Screen>
   );
 }

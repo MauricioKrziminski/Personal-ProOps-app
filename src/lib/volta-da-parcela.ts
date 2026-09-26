@@ -1,15 +1,11 @@
 /**
- * O que a ficha da dívida faz quando a pessoa volta de uma parcela (25/09/2026).
+ * "Paguei esta parcela" na tela de uma parcela volta para a ficha da dívida JÁ no pagamento
+ * (25/09/2026). A folha de pagar mora na ficha (é ela que sabe a conta, o valor e "usar nas
+ * próximas"); a tela da parcela deixa este recado e volta, e a ficha o lê ao ganhar o foco.
  *
- * A ficha é um `Sheet` — um `Modal` —, e outra tela empurrada por cima dela ficaria POR BAIXO (no
- * Android é outra janela; no iOS, um controlador apresentado). Então tocar numa parcela fecha a
- * ficha e navega; sem este aviso, voltar largava a pessoa na lista de Dívidas. A tela da parcela
- * troca o pedido quando o botão dela é "Paguei esta parcela".
- *
- * Um aviso só, lido e apagado quando Dívidas volta ao foco — não é estado de tela, é o recado de
- * uma navegação para a seguinte.
+ * Um recado só, lido e apagado — não é estado de tela, é o pedido de uma navegação para a seguinte.
  */
-export type AoVoltar = { divida: string; acao: 'abrir' | 'pagar'; cents?: number };
+export type AoVoltar = { divida: string; acao: 'pagar'; cents?: number };
 
 let pendente: AoVoltar | null = null;
 

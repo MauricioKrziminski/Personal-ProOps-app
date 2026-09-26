@@ -198,7 +198,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === 'expo-haptics') return { selectionAsync() {}, notificationAsync() {}, NotificationFeedbackType: { Success: 'success', Warning: 'warning' } };
       // `back` é navegação como qualquer outra e ENTRA na lista: é o que prende o "fechar um
       // formulário que outra tela abriu devolve para ela" (`useVoltarQuandoFechar`).
-      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => options.params ?? ({ id: 'invoice-1', ...(options.create !== false ? { create: 'financing' } : {}) }), useFocusEffect: () => {}, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }) } };
+      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => options.params ?? ({ ...(file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), ...(options.create !== false ? { create: 'financing' } : {}) }), useFocusEffect: () => {}, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }) } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
       if (name === '@/hooks/use-aos-poucos') return load('src/hooks/use-aos-poucos.ts');
@@ -715,14 +715,16 @@ test('delete for good asks with the consequence first, then deletes', async () =
   assert.deepEqual(ui.writes.at(-1), { operation: 'deleteDebt', value: 'd1' });
 });
 
-test('the detail has the "…" with the same actions as the long press', () => {
-  const ui = screen(debtsFile, { create: false, debts: [carro] });
-  ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onPress());
-  const menu = ui.nodes().find((n) => n.type === 'HeaderIconButton' && n.props.label === 'Mais ações');
-  assert.ok(menu, 'o detalhe tem o "…" no alto');
-  ui.interact(() => menu.props.onPress());
-  // no detalhe "Ver as parcelas" sai: é o que já se está vendo
-  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Editar', 'Arquivar', 'Excluir por completo']);
+test('a ficha da dívida é uma tela: Editar no topo e o resto no "…", com as ações do toque longo', () => {
+  // 25/09/2026: era uma folha — abrir uma parcela fechava a ficha e voltar a reabria.
+  const lista = screen(debtsFile, { create: false, debts: [carro], params: {} });
+  lista.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onPress());
+  assert.deepEqual(copia(lista.navigations.at(-1)), { pathname: '/finance/debts', params: { id: 'd1' } }, 'tocar empilha a ficha');
+  const ui = screen(debtsFile, { create: false, debts: [carro], params: { id: 'd1' } });
+  const cabeca = ui.nodes().find((n: any) => n.type === 'HeaderActions');
+  assert.deepEqual(copia(cabeca.props.actions.map((a: any) => a.label)), ['Editar']);
+  // na ficha "Ver as parcelas" sai: é o que já se está vendo
+  assert.deepEqual(copia(cabeca.props.menu.actions.map((a: any) => a.label)), ['Arquivar', 'Excluir por completo']);
 });
 
 test('detalhe da dívida: "A seguir" começa na próxima, 20 por vez, e "Já pagas" vem da mais recente', () => {
@@ -730,8 +732,7 @@ test('detalhe da dívida: "A seguir" começa na próxima, 20 por vez, e "Já pag
     installment_no: 9 + i, due_date: `${2026 + Math.floor((9 + i) / 12)}-${String(((9 + i) % 12) + 1).padStart(2, '0')}-05`,
     payment_cents: 147000, interest_cents: null, principal_cents: null, balance_cents: 0,
   }));
-  const ui = screen(debtsFile, { create: false, debts: [{ ...carro, installments_paid: 8 }], debtSchedule: futuras });
-  ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onPress());
+  const ui = screen(debtsFile, { create: false, debts: [{ ...carro, installments_paid: 8 }], debtSchedule: futuras, params: { id: 'd1' } });
   const linhas = () => ui.nodes().filter((n: any) => n.type === 'DebtTimeline');
   const seguir = () => linhas()[0].props.anos.flatMap((a: any) => a.itens);
   assert.equal(seguir()[0].n, 9, 'a próxima no topo');
@@ -751,8 +752,8 @@ test('detalhe da dívida: juros de R$ 0,00 não viram linha vermelha; juros de v
       create: false,
       debts: [{ ...carro, calculation_mode: 'amortized', interest_rate_monthly: juros ? 0.0199 : 0 }],
       debtSchedule: [{ installment_no: 9, due_date: '2026-10-05', payment_cents: 147000, interest_cents: juros, principal_cents: 147000, balance_cents: 0 }],
+      params: { id: 'd1' },
     });
-    ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onPress());
     return texto(ui);
   };
   assert.doesNotMatch(abrir(0), /são juros/, 'sem juros, nada a avisar');
@@ -883,26 +884,16 @@ test('e quem abriu o formulário PELA PRÓPRIA tela continua nela', () => {
   assert.deepEqual(ui.navigations, []);
 });
 
-test('o detalhe da dívida aberto por OUTRA tela (?id=) devolve para ela ao fechar', () => {
-  // O pagamento de uma dívida (Editar lançamento) e a prestação no ciclo abrem ESTA dívida.
-  const fora = screen(debtsFile, { create: false, debts: [carro], params: { id: 'd1' } });
-  fora.interact((nodes) => nodes.find((n) => n.type === 'TaskHeader' && n.props.title === 'Carro').props.onClose());
-  assert.deepEqual(fora.navigations, [{ back: true }]);
-
-  // E o que se abriu a partir dele também: pagar a parcela e fechar volta para onde se estava.
-  const pagando = screen(debtsFile, {
+test('na ficha da dívida, pagar e fechar a folha fica na ficha — nada de voltar sozinho', () => {
+  // A ficha é a tela (`?id=`): quem chegou de fora volta pelo "voltar" dela, não por fechar a folha.
+  const ui = screen(debtsFile, {
     create: false, debts: [carro], params: { id: 'd1' },
     debtSchedule: [{ installment_no: 9, due_date: '2026-10-05', payment_cents: 147000, interest_cents: null, principal_cents: null, balance_cents: 0 }],
   });
-  pagando.press('Paguei esta parcela');
-  pagando.interact((nodes) => nodes.find((n) => n.type === 'TaskHeader' && /^Pagar/.test(n.props.title)).props.onClose());
-  assert.deepEqual(pagando.navigations, [{ back: true }]);
-
-  // Quem abriu pela própria lista continua nela.
-  const lista = screen(debtsFile, { create: false, debts: [carro], params: {} });
-  lista.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onPress());
-  lista.interact((nodes) => nodes.find((n) => n.type === 'TaskHeader' && n.props.title === 'Carro').props.onClose());
-  assert.deepEqual(lista.navigations, []);
+  ui.press('Paguei esta parcela');
+  ui.interact((nodes) => nodes.find((n) => n.type === 'TaskHeader' && /^Pagar/.test(n.props.title)).props.onClose());
+  assert.deepEqual(ui.navigations, []);
+  assert.ok(ui.nodes().some((n: any) => n.type === 'DebtTimeline'), 'a ficha continua na tela');
 });
 
 test('editing a legacy amortized financing preserves its mode and remaining-term semantics', () => {
@@ -2401,8 +2392,8 @@ test('Apagar lançamento: a recusa do banco aparece com a frase dele, a falha de
 /**
  * Toda parcela da dívida abre (25/09/2026, *"se eu clicar em qualquer uma dessas parcelas, tem que
  * abrir os detalhes dela… e as pagas também, na tela que eu posso editar, deletar"*): a paga com
- * lançamento abre o LANÇAMENTO; a futura e a só contada abrem a tela da parcela. A ficha fecha
- * antes (é um Modal) e reabre ao voltar.
+ * lançamento abre o LANÇAMENTO; a futura e a só contada abrem a tela da parcela — por cima da
+ * ficha, que é uma tela.
  */
 test('Dívida: tocar numa parcela paga abre o lançamento; numa futura, a tela da parcela', () => {
   const ui = screen(debtsFile, {
@@ -2416,7 +2407,10 @@ test('Dívida: tocar numa parcela paga abre o lançamento; numa futura, a tela d
   const abrir = (n: number) => ui.interact(() => linhas().find((l: any) => l.props.anos.some((a: any) => a.itens.some((i: any) => i.n === n))).props.onItemPress(itemDe(n)));
   abrir(8);
   assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/[txId]', params: { txId: 'tx-8' } });
-  assert.equal(ui.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Carro'), false, 'a ficha fecha antes de navegar');
+  abrir(9);
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/debt-installment', params: { debt: 'd1', n: '9' } });
+  // A ficha é uma tela: a parcela empilha por cima, nada fecha nem reabre.
+  assert.ok(linhas().length >= 2, 'a ficha continua montada por baixo');
 });
 
 test('Parcela da dívida: a próxima mostra valor e vencimento, e "Paguei esta parcela" volta para pagar', () => {
