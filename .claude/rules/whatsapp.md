@@ -1,3 +1,8 @@
+---
+paths:
+  - "agent/**"
+---
+
 # WhatsApp — Meta Cloud API oficial
 
 **Decisão imutável: só a Meta Cloud API oficial. Nunca Baileys ou qualquer cliente não-oficial.**
@@ -11,12 +16,10 @@ O helper Deno equivalente foi apagado em 09/09/2026 junto com `supabase/function
   em `messages_queue`, agenda o debounce. Qualquer trabalho a mais é risco de reentrega, e
   reentrega multiplicada por processamento pesado é como um webhook vira tempestade.
 - **HMAC obrigatório**: `verify_meta_signature` (SHA-256 constant-time com `WHATSAPP_APP_SECRET`)
-  sobre o corpo CRU, antes de qualquer parse. Assinatura inválida = 401. Vale também para o corpo
-  repassado pelo roteador Strangler: o Python **revalida**, não confia no Deno.
+  sobre o corpo CRU, antes de qualquer parse. Assinatura inválida = 401.
 - **Dedupe** por `messages_queue.wa_message_id` unique, no MESMO insert que enfileira. Eram dois
   inserts sem transação, e a falha do segundo fazia a mensagem sumir para sempre.
-- Nunca propagar erro interno para a Meta (evita retry storm) — logar e responder 200. **A exceção
-  é o roteador Strangler**: repasse que falha devolve não-200 DE PROPÓSITO, para a Meta reentregar.
+- Nunca propagar erro interno para a Meta (evita retry storm) — logar e responder 200.
 - **Debounce de 3s pelo Cloud Tasks**, nunca timer em memória: mensagens picotadas viram UM lote e
   UMA resposta, e o container continua podendo dormir.
 

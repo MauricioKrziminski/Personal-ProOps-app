@@ -1,3 +1,8 @@
+---
+paths:
+  - "agent/**"
+---
+
 # Agente Python — FastAPI + LangGraph (`agent/`)
 
 O serviço que recebe do WhatsApp, decide e escreve. Substituiu o par
@@ -58,19 +63,19 @@ uma lista de palavras decidindo o que a pessoa quis.
 | `route()`: `status_request`/`creating`/`explicit_debt` decidiam desambiguação | "quitei as anteriores da moto" não casava e a pergunta nunca aparecia | `financial_entity` (que o modelo preenche) + a consulta ao banco |
 | `interpret_choice` era o único intérprete de "qual deles?" | só número, ordinal e rótulo exato; "o do mercado" virava intenção nova | regex continua como fast-path grátis, e a falha cai em `escolher_candidato` |
 
-⚠️ **Um SIM não resolve uma pergunta "qual deles?"** (09/09/2026, medido em produção).
+**Um SIM não resolve uma pergunta "qual deles?"** (09/09/2026, medido em produção).
 `decide()` cai no classificador de SIM/NÃO quando o de ESCOLHA não casa — e ele não tem índice
 para devolver, então o `approved: True` volta sem `candidate_id`, o grafo não acha o candidato e
 responde "não mexi em nada", matando a pergunta e as opções junto. Prova:
 `pending_actions` com `kind=choice`, `cand=9`, `status=approved` e nenhuma escrita. Numa pergunta
 de escolha só a RECUSA age; a aprovação mantém a pendência e repete a lista numerada.
 
-⚠️ **Pergunta com 3+ candidatos vira lista do WhatsApp, e a lista ESCONDE as opções** atrás de um
+**Pergunta com 3+ candidatos vira lista do WhatsApp, e a lista ESCONDE as opções** atrás de um
 toque em "Escolher". O corpo tem que repetir a lista numerada — senão a tela mostra a pergunta e
 nenhuma resposta possível, e a pessoa tenta responder por escrito (que é o caminho caro e o que
 mais erra). O caminho de botões (≤2 candidatos) já fazia isso.
 
-⚠️ **Demonstrativo aponta para o que a CONVERSA escreveu, não para a linha mais nova do banco**
+**Demonstrativo aponta para o que a CONVERSA escreveu, não para a linha mais nova do banco**
 (09/09/2026). "Apague esse lançamento" logo depois de "gastei 20 no café" tem antecedente, e ele
 é o café. O estado do grafo carrega `last_write_id` (escrito por `executar` e por `seguras`, lido
 por `alvos`), e a janela não precisa de constante em minutos: o checkpoint é chaveado pelo
@@ -80,19 +85,19 @@ DISSE um termo de busca nunca é redirecionado para o antecedente, e apagar/corr
 passando pelo `interrupt()` — o que mudou é o usuário parar de escolher entre nove opções para
 dizer o que ele já tinha dito.
 
-⚠️ **Ponteiro e termo de busca se separam por uma lista de substantivos só** (`_SUBSTANTIVO` em
+**Ponteiro e termo de busca se separam por uma lista de substantivos só** (`_SUBSTANTIVO` em
 `domain/reference.py`). Eram duas listas divergentes: `_VAGO` conhecia "esse item" e não conhecia
 "esse lançamento", então o ponteiro virava busca literal por `%esse lançamento%`. O padrão é
 ancorado no texto INTEIRO de propósito — como substring destruiria "essa nota da reunião", que é
 nome legítimo. E o substantivo opcional pende do GRUPO de demonstrativos: escrito como
 `a|b|c(\s+N)?` a alternância corta antes do parêntese e só `c` aceita substantivo.
 
-⚠️ **Candidato de empate precisa do que o DISTINGUE.** Uma série recorrente produz ocorrências que
+**Candidato de empate precisa do que o DISTINGUE.** Uma série recorrente produz ocorrências que
 só diferem na data, e a lista saía com quatro linhas escritas `receita de R$ 4.000,00 em *salário*
 (Salário PJ)`, idênticas. `veredito` recebe `detalhe`; para transação é a data. Isso também é o
 que o classificador semântico vê, então "o de outubro" só passa a ser respondível depois disso.
 
-⚠️ **Escolha semântica só vale em lista de REGISTROS (`kind == "choice"`).** Em
+**Escolha semântica só vale em lista de REGISTROS (`kind == "choice"`).** Em
 `soft_warning` os "candidatos" são AÇÕES (Confirmar / Trocar de Cartão), e deixar um
 classificador de escolha pescar "Confirmar" de uma hesitação ressuscita o defeito de
 "clicar Trocar de Cartão autoriza a compra".
@@ -101,9 +106,9 @@ classificador de escolha pescar "Confirmar" de uma hesitação ressuscita o defe
 inferir o que a pessoa quis dizer PORQUE ela vê o efeito e aprova antes da escrita.
 Afrouxar um lado sem o outro é o que transforma "entendeu bem" em "apagou errado".
 
-⚠️ **Duas cópias do mesmo defeito saíram em 21/09/2026: regex generalizando conta e nome
+**Duas cópias do mesmo defeito saíram em 21/09/2026: regex generalizando conta e nome
 a partir de qualquer palavra.** `extract_account_fallback` (`agent/app/tools/guards.py:148`, único
-chamador `nodes.py:288`) tinha um ramo genérico `no|na|pelo <palavra>` que virava conta: "Na
+chamador em `nodes.py`) tinha um ramo genérico `no|na|pelo <palavra>` que virava conta: "Na
 verdade eu comprei em 2x no cartão" inferia o cartão *verdade*, "paguei na hora" virava *hora*.
 Hoje ele só aceita a ESTRUTURA `no|na|pelo|pela|com o|com a cartão [de crédito/débito] [do|da]
 <nome>` — fora dela, `account` fica vazio e `required.py` pergunta. `extract_description_fallback`
@@ -139,17 +144,17 @@ resolvido** para uma ação que já existe → tipo de ação novo, que hoje **n
 
 ## Correção de compra parcelada, sem menu (21/09/2026)
 
-⚠️ **`update_transaction` NUNCA dá baixa.** Havia um desvio para `_baixa_em_parcelas` dentro
+**`update_transaction` NUNCA dá baixa.** Havia um desvio para `_baixa_em_parcelas` dentro
 dela — corrigir ("muda a 3ª parcela para 300") também marcava parcelas como pagas, em silêncio.
-Ele foi removido (`agent/app/tools/finance.py:856`); dar baixa é caminho de `mark_paid`
-(`agent/app/tools/finance.py:724`), nunca efeito colateral de um UPDATE.
+Ele foi removido (`update_transaction`, `agent/app/tools/finance.py`); dar baixa é caminho de `mark_paid`
+(`agent/app/tools/finance.py`), nunca efeito colateral de um UPDATE.
 
 - **O menu "Mudar parcelas pagas" / "Excluir plano" saiu.** Corrigir o VALOR da compra inteira
   pergunta "é o total da compra ou cada parcela?" (`interrupt` `kind=choice,
   purpose=amount_unit`, helper `_perguntar_unidade`) em vez de abrir um menu de ações — a
   resposta congela `amount_unit` no alvo, e só então o SIM confirma. Sem a unidade — checkpoint
   antigo, de antes do deploy, sem `editaveis` — a correção é RECUSADA ("Não sei se o valor era o
-  total da compra ou cada parcela... me pede a correção de novo.", `agent/app/tools/finance.py:992-993`),
+  total da compra ou cada parcela... me pede a correção de novo.", `finance._corrigir_plano`),
   nunca executada com um default (parcela × total é uma ordem de grandeza de diferença); a
   pergunta só volta a aparecer se a pessoa reenviar a correção.
 - **Toda correção da compra inteira passa por `update_installment_plan`** (valor em qualquer
@@ -213,7 +218,7 @@ Ele foi removido (`agent/app/tools/finance.py:856`); dar baixa é caminho de `ma
   frase de efeito da confirmação comum ("Registrar R$ 3.000,00 de tv em 10x no cartão Nubank
   Cartão… mesmo assim?"). Só o estouro do limite não diz o que está sendo aprovado.
 
-  ⚠️ **E a CITADA sai resolvida, com o tipo** (22/09/2026): "gastei 104,99 no nubank cartão" foi
+  **E a CITADA sai resolvida, com o tipo** (22/09/2026): "gastei 104,99 no nubank cartão" foi
   gravado na CONTA corrente "Nubank" e a frase dizia só "no nubank". Duas causas, as duas
   corrigidas: o prompt mandava tirar a palavra "cartão" do nome (agora preserva), e o casador
   achava "Nubank" por substring em "cartão do nubank". `resolve_account` passa o tipo ESCRITO no
@@ -224,7 +229,7 @@ Ele foi removido (`agent/app/tools/finance.py:856`); dar baixa é caminho de `ma
   **A frase diz a conta que o usuário NÃO citou.** A regra "a resposta diz o que foi decidido
   por ela" passou a valer na pergunta: `resolve.conta_padrao` congela o nome da conta padrão
   no alvo (a política é pura e não vai ao banco) e a frase sai "registrar gasto de R$ 45,00 em
-  mercado, na conta Nubank" — ou "…, sem conta" quando o workspace não tem padrão. ⚠️ Por
+  mercado, na conta Nubank" — ou "…, sem conta" quando o workspace não tem padrão. Por
   isso "item existente" em `needs_confirmation` é alvo com `status`, não qualquer dict.
   **O ID vai congelado junto, e é ele que a tool grava** (`finance._conta_padrao`, com
   `ensure_owned`): relendo o padrão no SIM, trocá-lo no app entre a pergunta e a resposta
@@ -259,10 +264,10 @@ Ele foi removido (`agent/app/tools/finance.py:856`); dar baixa é caminho de `ma
 - A pergunta descreve o **efeito**, não o nome interno da ação. Ninguém confirma
   "delete_transaction"; todo mundo entende "apagar o gasto de R$ 45".
 
-⚠️ **Lote que CRIA algo novo e MUDA o que já existe é UM SIM atômico** (`policy.par_de_substituicao`,
+**Lote que CRIA algo novo e MUDA o que já existe é UM SIM atômico** (`policy.par_de_substituicao`,
 21/09/2026) — é a REDE DE SEGURANÇA para quando o modelo devolve apagar/corrigir + criar no
 MESMO lote, não o caminho normal de uma correção. Hoje o prompt já ensina que "na verdade eu
-comprei em 2x no cartão" é UMA `update_transaction` com `installments=2` (`agent/app/graph/prompts.py:141-143`,
+comprei em 2x no cartão" é UMA `update_transaction` com `installments=2` (`agent/app/graph/prompts.py`,
 "NUNCA delete_transaction + create_*: a compra é a mesma, só muda a forma de pagar"), mas antes
 da Task 5 o modelo respondia com o par — foi o incidente das wardogs: "Na verdade eu comprei em
 2x no cartao" voltou `[delete_transaction(wardogs, found), create_installment_purchase(2x)]`, e
@@ -275,11 +280,11 @@ dois efeitos juntos. Três regras:
 - **Nada é gravado antes da pergunta.** Com o par incompleto (falta valor, cartão não existe), o
   `_gate` para ANTES do `interrupt()`, sem montar rascunho — "Ainda não apaguei nem criei nada."
   O motivo de não montar rascunho é estrutural, não de contexto perdido: `_rascunho`
-  (`agent/app/graph/nodes.py:632-650`) guarda **uma** ação só. Guardando a criação, a outra
+  (`agent/app/graph/nodes.py`) guarda **uma** ação só. Guardando a criação, a outra
   metade (apagar/corrigir) se perderia — completar o rascunho depois criaria a compra nova ao
   lado da antiga, ou, se o apagar já tivesse rodado, a compra nunca nasceria.
 - **Criação primeiro, e o resto só roda se ela escreveu** (`nodes._executar`,
-  `agent/app/graph/nodes.py:1082`): as ações do par são reordenadas com os `create_*` na frente
+  `agent/app/graph/nodes.py`): as ações do par são reordenadas com os `create_*` na frente
   antes de rodar; se uma criação volta `read_only` (erro, exceção), o apagar/corrigir E as
   criações seguintes do par são PULADOS — "⚠️ Não apaguei X porque não consegui registrar Y."
 - **Retentativa sem `result_id` não conta como escrita.** A idempotência (`executed_actions`)
@@ -306,7 +311,7 @@ pergunta.** Deduzir é a terceira coisa, e ela não existe.
 | campo obrigatório faltando | pergunta ("Para cadastrar X, informe Y. **Ainda não salvei nada.**") |
 | dois itens candidatos | `interrupt()` com a lista — já era assim |
 
-⚠️ **Nome dito sem maiúscula e sem acento é o MESMO nome** (25/09/2026). No celular se digita
+**Nome dito sem maiúscula e sem acento é o MESMO nome** (25/09/2026). No celular se digita
 "gas", "nubank", "carro"; o `ilike` e o `name = %s` do catálogo não achavam "conta de gás",
 "Nubank", "Carro" — e a pessoa via "não encontrei" para o que existe. Toda busca por nome passa
 por `extensions.unaccent` (a extensão da `0038`) e o catálogo compara
@@ -314,13 +319,13 @@ por `extensions.unaccent` (a extensão da `0038`) e o catálogo compara
 "não encontrei" de cadastro e de conta citada LISTA o que existe (cartão fora da lista onde ele
 seria recusado), e a frase do SIM usa o nome como está no app, não como foi digitado.
 
-⚠️ **A resposta a uma pergunta de cadastro chega ao roteador COMO resposta.** O cadastro
+**A resposta a uma pergunta de cadastro chega ao roteador COMO resposta.** O cadastro
 incompleto ia ao roteador dentro do envelope do texto e sem dizer que houve pergunta: "nubank"
 respondendo "Qual conta foi usada para pagar a prestação?" virou "pagar qual?" com nove opções.
 Hoje ele vai fora do envelope, com "Você perguntou ao usuário: …" — a mesma frase que o nó de
 cadastros já recebia (`scripts/probe_resposta_ao_cadastro.py`, 4/4 no Gemini real).
 
-⚠️ **`resolve_account` devolvia `None` para as três situações e ninguém distinguia.**
+**`resolve_account` devolvia `None` para as três situações e ninguém distinguia.**
 Os chamadores faziam `resolve_account(...) or default_account(...)`, então "gastei 45
 no bradesco", sem Bradesco cadastrado, gravava na conta padrão — calado. Pior: o ramo
 de casamento EXATO fazia `return certos[0]["id"]` sem contar quantas casaram, e com
@@ -330,24 +335,24 @@ escolha. Hoje empate devolve `None` e **`conta_citada`** (`app/tools/finance.py`
 quem transforma "citou e não achei" em pergunta. Gasto, receita, transferência,
 parcelamento e pagamento de fatura passam por ela.
 
-⚠️ **Fallback copiado de outro caminho não herda o motivo dele.** A conta padrão do
+**Fallback copiado de outro caminho não herda o motivo dele.** A conta padrão do
 workspace decide onde cai o gasto do dia a dia de quem não citou conta; ela foi copiada
 para `_conta_que_paga` e lá decidiria a ORIGEM de uma transferência de mil reais que a
 pessoa não citou — com a frase do SIM sem dizer qual era. Saiu. `payment_account_id`
 ficou, porque é campo que o usuário preencheu no cartão.
 
-⚠️ **A resposta diz o que foi DECIDIDO por ela.** "✅ Fatura paga" não contava de qual
+**A resposta diz o que foi DECIDIDO por ela.** "✅ Fatura paga" não contava de qual
 conta o dinheiro saiu, num movimento que muda dois saldos. Toda escolha que o agente
 fez sozinho (ainda que por preferência gravada) aparece na frase.
 
-⚠️ **A frase da confirmação descreve a AÇÃO, não a tabela do alvo.** `pay_invoice`
+**A frase da confirmação descreve a AÇÃO, não a tabela do alvo.** `pay_invoice`
 passou a resolver a fatura como alvo e herdou a frase de `mark_paid`: o agente
 perguntava *"marcar como paga, SEM tirar do caixa?"* para a ação que TIRA do caixa —
 na tela que o usuário aprova. Condição por `action.type`, sempre.
 
 ### Perguntar não basta: a pergunta precisa ter RESPOSTA (15/09/2026)
 
-⚠️ **"Qual delas?" sem rascunho é um beco, e ele era pior que não perguntar.** Medido:
+**"Qual delas?" sem rascunho é um beco, e ele era pior que não perguntar.** Medido:
 
     paguei 45 no mercado com o cartao
     🤔 "cartao" casa com mais de uma: *Cartão da casa*, *Cartão da viagem*… Qual delas?
@@ -364,29 +369,29 @@ de slot `account`. A partir daí tudo que já existia vale: a pergunta vira list
 botões, a resposta digitada cai em `draft.interpretar`, e um nome que não existe vira
 oferta de cadastro. Mesmo formato que `resource_node` já usava para cadastro incompleto.
 
-⚠️ **UMA pergunta por turno.** "comprei uma tv em 10x no itau" respondia *"faltou o
+**UMA pergunta por turno.** "comprei uma tv em 10x no itau" respondia *"faltou o
 valor"* **e** *"não achei o cartão itau"* no mesmo balão, e a pessoa não sabe qual das
 duas responder. `contas_citadas` recebe `pular` com os índices que `_incompletas` já
 bloqueou — `faltando` declara a ordem (valor primeiro, cartão depois) e a pergunta do
 cartão volta sozinha no turno seguinte.
 
-⚠️ **A resposta VENCE no campo perguntado** (`draft.mesclar`). A guarda "não sobrescreve
+**A resposta VENCE no campo perguntado** (`draft.mesclar`). A guarda "não sobrescreve
 o que já estava lá" travava exatamente o caso novo: a ação guardada tinha
 `account = "cartao"`, a escolha na lista era descartada e a mesma pergunta voltava em
 loop. Só o VALOR mantém a guarda — ali, um campo já preenchido quer dizer que a pergunta
 não era para existir, e para dinheiro manter o que estava é o lado seguro do erro.
 
-⚠️ **Nem todo slot `account` é CARTÃO.** A régua mora em `_CONTAS_CITADAS`
+**Nem todo slot `account` é CARTÃO.** A régua mora em `_CONTAS_CITADAS`
 (`resolve.conta_e_cartao`) e é a MESMA que valida a citação — perguntar por uma lista
 diferente da que valida é oferecer o que a validação vai recusar. Dela saem também a
 ausência de "É financiamento" fora do parcelamento e o texto ("conta" x "cartão").
 
-⚠️ **Numa lista, um cartão e uma conta corrente têm a mesma cara.** A linha leva o TIPO
+**Numa lista, um cartão e uma conta corrente têm a mesma cara.** A linha leva o TIPO
 por extenso (e o dia de fechamento no cartão) — é a mesma resposta que o `AccountPicker`
 do app deu ao salário de R$ 4.000 lançado dentro da fatura. Em lista SÓ de cartões o
 tipo some: seria a mesma palavra em toda linha.
 
-⚠️ **Só o campo `account` vira rascunho, e a restrição EVITA um loop pior que o beco.**
+**Só o campo `account` vira rascunho, e a restrição EVITA um loop pior que o beco.**
 O rascunho conhece um campo: `parse_slot_click`, `_cartao_do_rascunho`, `draft.mesclar` e
 o CHECK de `draft_actions.slot` falam todos de `account`. Marcando também a falha de
 `counterparty_account`, a resposta seria gravada no campo errado — em "transferi 100 da

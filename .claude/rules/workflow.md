@@ -12,7 +12,7 @@
 2. `npx expo lint` limpo.
 3. `npm test` verde (`node --test`, sem framework — helpers puros de data/dinheiro do app).
 
-   ⚠️ **Olhe o código de saída, não a contagem.** O resumo do `node --test` tem linhas separadas
+   **Olhe o código de saída, não a contagem.** O resumo do `node --test` tem linhas separadas
    para `pass` e `fail`, e filtrar a saída (`| grep pass`, `| head`) esconde a segunda: em
    09/09/2026 um `pass 329` foi lido como verde com `fail 1` embaixo, e o build da tag quebrou no
    CI. `npm test` já sai diferente de zero quando falha — use isso.
@@ -46,10 +46,10 @@
    torna `xcrun simctl io booted screenshot` uma sequência determinística — não existe gesto de
    rolagem por linha de comando, então a tela é montada inteira e deslocada por `translateY`.
 
-   ⚠️ **A vitrine é para CONFERIR, não para gerar material.** **No iOS a dock não aparece de jeito
+   **A vitrine é para CONFERIR, não para gerar material.** **No iOS a dock não aparece de jeito
    nenhum**,
    porque `NativeTabs` é a barra do SISTEMA e só existe dentro de um navegador de abas real (no
-   Android dá para montar a `CurvedTabBar` à mão, e a vitrine já faz).
+   Android dá para montar a `PillTabBar` à mão, e a vitrine já faz).
 
    **Para print de divulgação, use o app de verdade no simulador:** `npx expo start --dev-client`,
    `xcrun simctl launch booted com.proops.personal`, e na tela de login o botão **"Entrar como
@@ -58,14 +58,14 @@
    app inteiro, com dock e sem chrome, e **sem dado financeiro real no print**. O aviso amarelo do
    LogBox some com um toque no X e não existe em release.
 
-   ⚠️ Fixture nova precisa casar a chave EXATA do hook: `useNotesList` é `useInfiniteQuery` (o
+   Fixture nova precisa casar a chave EXATA do hook: `useNotesList` é `useInfiniteQuery` (o
    cache guarda `{pages, pageParams}`) e `budgets_status` é consultada com duas chaves diferentes
    (o DIA na Hoje, o MÊS no Financeiro). Chave errada não quebra — cai no estado de erro, em
    silêncio.
 6. Mudou o agente → subir local (`docker compose up`) e mandar `scripts/fake_meta.py` com payload
    ASSINADO. Testar com o HMAC desligado esconderia justamente o erro mais caro daquele endpoint.
 
-   ⚠️ **Suba com o override de não-envio, senão o teste manda WhatsApp de verdade.** O telefone
+   **Suba com o override de não-envio, senão o teste manda WhatsApp de verdade.** O telefone
    do staging é o número REAL do Gabriel, e o agente responde no fim do caminho:
    `docker compose -f docker-compose.yml -f docker-compose.sem-envio.yml up`. O override só troca
    o `WHATSAPP_TOKEN` por um inválido — `try_send` é best-effort, então a resposta para no log e
@@ -95,7 +95,7 @@
   rota do agente.
 - App: builds via EAS (`eas.json`: development/preview/staging/distribution/production).
 
-  ⚠️ **A TAG é o build — não são dois passos.** `publish-android-release.yml` dispara em
+  **A TAG é o build — não são dois passos.** `publish-android-release.yml` dispara em
   `push` de tag `v*`: compila o APK, confere a assinatura contra `EXPECTED_SIGNER_SHA256` e
   publica a release (APK + `update.json` + `native-compatibility.json`) no repositório de
   distribuição. Ninguém roda `eas build` à mão para soltar versão. Leva ~10 min.
@@ -104,7 +104,7 @@
   `app.json.version` para a nova → commit `chore: vX.Y.Z` → `push origin main` → tag LEVE nesse
   commit → `push origin vX.Y.Z`.
 
-  ⚠️ **`runtimeVersion.policy` é `appVersion`, então bump de versão FECHA a porta do OTA.** Um
+  **`runtimeVersion.policy` é `appVersion`, então bump de versão FECHA a porta do OTA.** Um
   update publicado como 1.3.31 não alcança quem está em 1.3.30 — para isso existe
   `publish-android-ota.yml`, que é `workflow_dispatch` e recebe a `native_tag` de uma nativa já
   publicada. Mudança só de JS sem bump = OTA; com bump = build.

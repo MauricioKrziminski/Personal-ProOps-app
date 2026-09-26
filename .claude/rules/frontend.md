@@ -9,7 +9,7 @@ Expo SDK 57 (managed), código em `src/`, paths `@/*` → `src/*` e `@/assets/*`
 - Auth gate fica no `_layout.tsx` raiz (`Stack.Protected` por `useSession`). Sem sessão existem
   `login` (e-mail e senha), `signup`, `forgot-password` e `login-whatsapp` (Phone OTP); com sessão
   nenhuma delas existe. Não duplicar checagem de sessão em telas.
-  ⚠️ **`verifyOtp` de recuperação já devolve SESSÃO**, e no cliente principal o portão
+  **`verifyOtp` de recuperação já devolve SESSÃO**, e no cliente principal o portão
   desmontaria a tela com a senha ainda por escolher. Por isso `forgot-password` (e-mail →
   código → senha nova) roda `verifyOtp` e `updateUser` num cliente DESCARTÁVEL
   (`criarClienteDeRecuperacao`, só memória) e só depois da troca entrega a sessão ao principal
@@ -28,7 +28,7 @@ Expo SDK 57 (managed), código em `src/`, paths `@/*` → `src/*` e `@/assets/*`
 
 ### O portão da tela só aceita CONSULTA
 
-⚠️ **`useTelaPronta` recebia `Consulta | boolean`, e o booleano prendia a tela no skeleton para
+**`useTelaPronta` recebia `Consulta | boolean`, e o booleano prendia a tela no skeleton para
 sempre** (16/09/2026). Financeiro e Lançamentos passavam `range.pronto`, que é
 `Boolean(cycle_range.data)`: com o `cycle_range` falhando ele ficava `false` e a tela não saía do
 esqueleto — sem card de erro, sem "Tentar de novo", sem log. Reproduzido no emulador injetando a
@@ -63,7 +63,7 @@ card de erro e a recuperação.
   - **Form de EVENTO** (lançamento, recorrente): tipo → **título → estabelecimento → valor** →
     categoria → conta → como se divide (parcelas, juros do Pix) → quando → extras.
   - **Form de ENTIDADE** (conta, dívida, meta, bem): nome → tipo → valores → cronograma → conta.
-  - ⚠️ **O campo que NOMEIA o registro vem primeiro e leva o `autoFocus`** — a régua de
+  - **O campo que NOMEIA o registro vem primeiro e leva o `autoFocus`** — a régua de
     entidade, generalizada em 15/09/2026. Ela já valia em 4 das 6 telas (`accounts`, `goals`,
     `debts`, `net-worth` abrem no "Nome", com o foco nele); só os dois formulários de EVENTO
     abriam pelo valor, e a linha acima dizia que estava certo. Eram duas decisões do mesmo repo
@@ -100,14 +100,14 @@ inteiro de uma vez.
 
 ### Quantidade é campo ABERTO, nunca lista de atalhos (22/09/2026)
 
-⚠️ *"essas coisas assim nunca devem ser fixadas, deve ser totalmente aberta"* — do "Adiantar"
+*"essas coisas assim nunca devem ser fixadas, deve ser totalmente aberta"* — do "Adiantar"
 que ia do 3 direto para o 6. Havia a mesma lista em mais cinco lugares: parcelas do lançamento
 (sem 5x, 7x, 8x), do editor da compra e do "E se…", e "a cada N" / "quantas vezes" do lembrete.
 O caminho único é `QuantityField` (`src/components/ui/quantity-field.tsx`): digita qualquer
 número, − / + para o ajuste, `min`/`max` da régua real (`faixaDeParcelas`: 1..72, mínimo 2 com
 parcela travada).
 
-⚠️ **O limite que MUDA por causa de outro campo ajusta o valor sozinho — nunca vira erro**
+**O limite que MUDA por causa de outro campo ajusta o valor sozinho — nunca vira erro**
 (22/09/2026, segunda decisão do mesmo dia). Escolher 8 parcelas e mudar o mês do pagamento para
 um em que restam 5 primeiro virou erro que travava a hipótese; o dono do produto pediu o
 contrário: *"sempre que for possível ser automático, fazer automático ao invés de mostrar erro"*.
@@ -118,7 +118,7 @@ número assentado é UM só e todos leem dele:
   toda quantidade do app, sem a tela lembrar.
 - No Adiantar, `quantasQueCabem` (`lib/anticipation.ts`) alimenta campo, valor e hipótese; a
   escolha original fica guardada e voltar o mês devolve as 8.
-  ⚠️ **A régua do que dá para adiantar é o MÊS, não o dia** (`adiantaveisNoMes`, no `select` de
+  **A régua do que dá para adiantar é o MÊS, não o dia** (`adiantaveisNoMes`, no `select` de
   `useAnticipationCandidates`). O pagamento cai no dia 1º do mês escolhido, e com a régua do dia
   a parcela de 10/10 seguia "adiantável" pagando em outubro — a tv mostrava 9 em setembro E em
   outubro. A parcela do próprio mês sai nele de todo jeito; cada mês à frente tira uma.
@@ -150,7 +150,7 @@ campo sumia, ou tela que mostrava uma coisa e gravava outra:
 
 ### O campo que NOMEIA o registro: "Nome" em entidade, "Título" em evento
 
-⚠️ **"Descrição" não é título, e ter os dois confunde** (15/09/2026). A queixa foi literal —
+**"Descrição" não é título, e ter os dois confunde** (15/09/2026). A queixa foi literal —
 *"tem que ter titulo obrigatorio, descricao nao é titulo… Esta muito confuso o que é titulo e o
 que é descriçao, normalmente o titulo vem em cima e com o label titulo… As vezes nao é
 estabelecimento que ele vai lançar e sim um titulo de uma compra"*.
@@ -174,7 +174,7 @@ divide → quando (ver a régua acima).
 
 ### Campo obrigatório é campo que BLOQUEIA — e "obrigatório" não é `NOT NULL`
 
-⚠️ **A régua não é o banco, é o registro sair USÁVEL** (15/09/2026). Auditar por `NOT NULL sem
+**A régua não é o banco, é o registro sair USÁVEL** (15/09/2026). Auditar por `NOT NULL sem
 default` responde a pergunta errada: a compra parcelada que sumiu do app **salvou limpa no
 banco**, e era justamente esse o defeito. O que faltava não era uma coluna, era o NOME.
 
@@ -191,7 +191,7 @@ banco**, e era justamente esse o defeito. O que faltava não era uma coluna, era
 - **Botão desabilitado sem dizer por quê é o defeito espelho** (§7b do design: erro abaixo do
   campo). Um "Salvar" cinza que não explica é a mesma frustração com outra cara.
 
-⚠️ **`recurring` era o pior caso e passou batido na primeira varredura**: `podeSalvar` cobria
+**`recurring` era o pior caso e passou batido na primeira varredura**: `podeSalvar` cobria
 valor e datas e **não** o nome, então a série nascia anônima e o materializador a transformava
 em doze linhas "sem descrição" — o defeito do lançamento multiplicado por 12.
 
@@ -204,7 +204,7 @@ incompleto com `writes.length === 0`.
 
 ### Uma intenção, um rótulo — vale dentro do MESMO arquivo
 
-⚠️ `debts.tsx` sozinho tinha **três** rótulos para a conta pagadora ("Conta para pagar", "Conta
+`debts.tsx` sozinho tinha **três** rótulos para a conta pagadora ("Conta para pagar", "Conta
 para pagar (opcional)", "Conta que paga"), **dois** para o valor mensal do contrato ("Valor da
 parcela", "Valor da prestação") e **dois** para o histórico ("Parcelas já pagas", "Quantas
 parcelas já foram pagas?"). São modos diferentes do mesmo cadastro, não conceitos diferentes.
@@ -261,7 +261,7 @@ vocabulário comum das duas plataformas.
 
 ### Formulário que OUTRA tela abriu devolve para ela ao fechar
 
-⚠️ **Quatro telas hospedam formulário num `Sheet`, e chegar neles de fora é um `push` na tela da
+**Quatro telas hospedam formulário num `Sheet`, e chegar neles de fora é um `push` na tela da
 LISTA com um parâmetro** — `/finance/recurring?edit=`, `/finance/installments?edit=`,
 `/finance/debts?create=financing` e `/finance/accounts?create=1|cartao` (todo "Cadastrar conta",
 "Cadastrar cartão" e "Novo cartão" de outra tela, 25/09/2026: antes caíam na lista). Fechando o sheet, a lista ficava: a pessoa era largada numa
@@ -275,7 +275,7 @@ também a tela que só existia para hospedá-lo**: `useVoltarQuandoFechar`
 `onClose` do `Sheet` e o sucesso do salvar). Quem abriu pela própria lista continua na lista —
 só volta quem veio de fora, e `simple-finance-ui.test.ts` prende os dois lados.
 
-⚠️ Não confundir com a guarda de `?edit=` já consumido (`edicaoAberta`), que existe para o sheet
+Não confundir com a guarda de `?edit=` já consumido (`edicaoAberta`), que existe para o sheet
 não reabrir no render seguinte. São duas perguntas diferentes sobre o mesmo parâmetro.
 
 **Formulário novo que se abre por parâmetro nasce com isso** — senão a régua volta a divergir
@@ -283,7 +283,7 @@ tela a tela, que é como ela nasceu.
 
 ### Os botões do Agente têm DOIS prefixos, e a tela conhecia um só
 
-⚠️ **`pa:` é HITL; `ds:` é RASCUNHO — e a tela descartava todo `ds:`** (15/09/2026). A queixa
+**`pa:` é HITL; `ds:` é RASCUNHO — e a tela descartava todo `ds:`** (15/09/2026). A queixa
 veio de um print: *"escolha ou diga o nome do cartão"* com nada para escolher. O motor já
 mandava a lista de cartões (o MESMO payload que vira botão no WhatsApp); `parseUiActions`
 (`src/lib/agent-chat.ts`) saía cedo quando não havia `pending_id`, e rascunho não tem nenhum.
@@ -308,7 +308,7 @@ Três regras que caem disso:
 
 ### Com o teclado aberto, o primeiro toque num botão É o toque (25/09/2026)
 
-⚠️ **Toda rolagem declara `keyboardShouldPersistTaps="handled"`** (`always` só na barra de
+**Toda rolagem declara `keyboardShouldPersistTaps="handled"`** (`always` só na barra de
 formatação da nota, que mora sobre o teclado). No padrão `never` a rolagem pega o primeiro toque
 para fechar o teclado, e o botão não recebe nada — medido no s26: "Registrar pagamento" tocado com
 o teclado aberto só fechava o teclado, sem `pressIn`. E vale para as FOLHAS: o `Sheet` é um

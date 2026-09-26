@@ -3,7 +3,7 @@
 ## Dinheiro
 
 - **Sempre `amount_cents` bigint inteiro e positivo. Nunca float, nunca decimal, nunca `parseFloat`.** Sinal/direção vem do `kind`, não do valor.
-- Moeda default BRL. Exibição só via `formatBRL` (app) / `centsToBRL` (functions).
+- Moeda default BRL. Exibição só via `formatBRL` (app) / `cents_to_brl` (agente).
 
 ## Modelo (v1)
 
@@ -28,7 +28,7 @@
     <parcela pagas+1 do contrato>)` — a carência de 3 meses aparece, e o atrasado continua como
     sempre. `null` é o comportamento antigo. O app pergunta a PRÓXIMA parcela e grava
     `first = próxima − pagas`.
-  - ⚠️ **Com âncora, "já pagou neste ciclo" NÃO empurra nem esconde nada** (`20260923170000`).
+  - **Com âncora, "já pagou neste ciclo" NÃO empurra nem esconde nada** (`20260923170000`).
     O ramo do ciclo existe para a dívida sem âncora, que não sabe qual parcela foi paga; com
     âncora quem sabe é o contrato (o trigger conta cada pagamento). Mantido, ele pulava a 10ª
     quando a 9ª era paga com atraso dentro do mesmo ciclo — no cronograma (o `greatest` ficava
@@ -36,7 +36,7 @@
     linha). Os dois lugares perguntam `first_due_date is null` antes de olhar o ciclo.
   - **O contrato de parcela fixa se edita mesmo com "Paguei" lançado** (decisão do dono do
     produto, 23/09/2026): o `check` segura a aritmética; o pagamento anterior à edição vira
-    histórico. ⚠️ **Apagar o pagamento MAIS RECENTE continua valendo** (`20260925150000`): em
+    histórico. **Apagar o pagamento MAIS RECENTE continua valendo** (`20260925150000`): em
     parcela fixa ele desfaz UMA parcela pelo contrato (parcela × restantes), sem conferir o saldo
     que o pagamento guardou — conferindo, o "Paguei" seguido de "Editar dívida" ficava impossível
     de apagar (visto em produção em 25/09/2026). Com juros a conferência continua.
@@ -72,10 +72,10 @@
   `montaRRule` do app monta) apaga as em aberto do PERÍODO (semana, mês, ano) do próximo
   vencimento em diante, põe a âncora nele e zera `materialized_until` — o agendador gera de novo.
   A em aberto de um mês anterior é outra conta e fica; o passado, a atrasada e a paga não mudam.
-  - ⚠️ **"Futura em aberto" é pelo VENCIMENTO fora do cartão**: o Fundacred de setembro tinha data
+  - **"Futura em aberto" é pelo VENCIMENTO fora do cartão**: o Fundacred de setembro tinha data
     04/09 e vencimento 30/09; pela data ele ficaria e nasceria outro 30/09 ao lado. No cartão
     `due_at` é o vencimento da FATURA e a compra de ontem já aconteceu: lá vale a data.
-  - ⚠️ **O que FICA segura o calendário** (paga, atrasada, compra de cartão já feita): o próximo
+  - **O que FICA segura o calendário** (paga, atrasada, compra de cartão já feita): o próximo
     vencimento vem num período depois dela, senão aquele mês ganharia uma segunda cobrança. É o
     Fundacred de produção: setembro pago com vencimento 30/09 recusa "próximo em 30/09".
   - `next_run_at` é timestamp: a tela lê o dia LOCAL (`dataLocalDe`). O Fundacred de produção tem
@@ -86,14 +86,14 @@
   - Na OCORRÊNCIA de uma série (fora do cartão) o formulário do lançamento tem UMA data, o
     vencimento, e o botão "Editar a série".
 
-  ⚠️ **Era 90 dias até 10/09/2026, e 90 dias fazia a projeção MENTIR** — não "acabar". A parcela
+  **Era 90 dias até 10/09/2026, e 90 dias fazia a projeção MENTIR** — não "acabar". A parcela
   é linha real e continuava aparecendo; a receita recorrente, não. Abrir outubro de 2027 mostrava
   as parcelas sem o salário, e o saldo despencava para um número que nunca existiu. O padrão da
   indústria é híbrido: a REGRA é a fonte da verdade, uma janela vira linha de verdade (editável,
   conciliável) e o resto se expande da regra — o Google Calendar pré-computa ~1 ano, o Asana 30
   dias. Aqui a janela virou 365 dias, que é ~12 linhas por série.
 
-  ⚠️ **Passar de 90 para 365 dias quebrou TODA leitura de "o mais recente", e em silêncio.**
+  **Passar de 90 para 365 dias quebrou TODA leitura de "o mais recente", e em silêncio.**
   O cron grava as ocorrências do ano inteiro NO MESMO INSTANTE: quem ordena por `created_at`
   passa a ver só futuro. Medido em produção em 10/09/2026, com 200 linhas futuras contra 103
   passadas:
@@ -138,7 +138,7 @@
 
 ## O "hoje" do banco não é o hoje do usuário
 
-⚠️ **O Postgres do Supabase roda em UTC, e das 21h à meia-noite `current_date` já é amanhã.**
+**O Postgres do Supabase roda em UTC, e das 21h à meia-noite `current_date` já é amanhã.**
 Medido em 10/09/2026 às 21h03 BRT: aparelho e Mac diziam `10/09`, o banco dizia `11/09`. Nas
 três horas finais de todo dia a projeção começava amanhã (largando o que ainda vence hoje), "o
 que vence" perdia o dia, e o ciclo virava cedo — com fechamento no dia 10, às 21h do dia 10 o
@@ -150,18 +150,18 @@ DURAÇÃO da chamada. O corpo não muda, o default do banco não muda, e como a 
 que a função chamar, a porta pública leva o fuso certo para a árvore inteira. Provado antes de
 aplicar: `cycle_now` devolvia `diasAteOFim` 19 em UTC e 20 com o fuso.
 
-⚠️ **Não mude o fuso do BANCO.** A doc do Supabase é explícita — *"strongly recommend keeping
+**Não mude o fuso do BANCO.** A doc do Supabase é explícita — *"strongly recommend keeping
 it [UTC]"* —, e `alter database` arrastaria junto `auth`, `storage`, `realtime` e os
 checkpoints do LangGraph.
 
-⚠️ **O fuso é fixo, e é decisão.** O produto é brasileiro em todas as pontas e não existe
+**O fuso é fixo, e é decisão.** O produto é brasileiro em todas as pontas e não existe
 coluna de fuso. Quando existir, o caminho é `private.today(ws_ids)` lendo
 `workspaces.timezone`, e as 24 linhas viram `reset timezone`.
 
 **Função nova que use `current_date` precisa do `set timezone` junto** — senão ela volta a
 enxergar o dia do UTC, e o sintoma aparece só depois das 21h.
 
-⚠️ **`default current_date` na ASSINATURA não é alcançado pelo `set timezone`** — default de
+**`default current_date` na ASSINATURA não é alcançado pelo `set timezone`** — default de
 parâmetro é avaliado no CHAMADOR, antes de a GUC da função valer. São 7 funções assim
 (`pay_invoice`, `settle_invoice`, `goal_deposit`, `pay_debt_installment`, `update_asset_value`,
 `budgets_status`, `_budgets_status`) e hoje nenhuma corre risco: **todo chamador passa a data
@@ -172,7 +172,7 @@ conserta: o jeito é passar a data, ou trocar o default por `null` + `coalesce` 
 
 ## O mês financeiro fecha no dia que o usuário paga, não no dia 31
 
-⚠️ **"Do dia 1 ao 31" é uma suposição, e para quem paga tudo num dia só ela corta o ciclo ao
+**"Do dia 1 ao 31" é uma suposição, e para quem paga tudo num dia só ela corta o ciclo ao
 meio.** O caso do dono do produto (10/09/2026): salário no dia 5 e no 20, e as DUAS faturas
 vencendo dia 10 — Nubank (fecha dia 3) e BB (fecha no último dia). O período que importa para
 ele é **11/08 a 10/09**: recebe, gasta, e no dia 10 paga tudo. Lido de 1 a 31, o salário do dia
@@ -195,18 +195,18 @@ exatamente o comportamento anterior.
 `date_trunc('month', ...)` que existiam viraram uma chamada. `private.cycle_month_of` responde
 a outra metade: a que ciclo um DIA pertence.
 
-⚠️ **O rótulo é o mês em que o ciclo TERMINA.** "Setembro" com fechamento no dia 10 é
+**O rótulo é o mês em que o ciclo TERMINA.** "Setembro" com fechamento no dia 10 é
 11/08–10/09, porque é assim que o usuário fala ("o que eu pago em setembro"). A consequência é
 que `date_trunc('month', current_date)` deixa de servir para "mês corrente": no dia 15/09 o
 ciclo corrente já se chama outubro, e ancorar no mês civil deixaria a tela um ciclo atrasada
 durante 20 dias por mês.
 
-⚠️ **Isto é parâmetro de LEITURA e não encosta na regra de fatura.** Em qual fatura uma compra
+**Isto é parâmetro de LEITURA e não encosta na regra de fatura.** Em qual fatura uma compra
 cai continua sendo o `closing_day` do cartão pelo trigger `set_invoice`, e a projeção continua
 tirando o dinheiro do caixa na data de VENCIMENTO. Compra no Nubank dia 04/09 cai na fatura que
 vence 10/10 — antes e depois. O ciclo só move a régua que corta os gráficos.
 
-⚠️ **O app PERGUNTA o ciclo, nunca calcula** (`cycle_now`, `cycle_range`). Reescrever a
+**O app PERGUNTA o ciclo, nunca calcula** (`cycle_now`, `cycle_range`). Reescrever a
 aritmética em TypeScript seria a segunda cópia da regra, e o modo de falha é mudo: o painel
 pediria N dias de projeção enquanto o banco agrupa outra borda, e os dois números da tela
 discordariam sem erro nenhum. Foi quase o que aconteceu — o painel já seguia o ciclo enquanto a
@@ -215,7 +215,7 @@ linha "entrou · saiu" logo abaixo dele ainda somava 01 a 31.
 Padrão do nicho, não invenção: YNAB, Monarch, Mobills e Organizze todos têm dia de
 início/fechamento do mês configurável.
 
-⚠️ **E a régua é ESCOLHA, não configuração de mão única** (`20260911130000`). `cycle_close_day`
+**E a régua é ESCOLHA, não configuração de mão única** (`20260911130000`). `cycle_close_day`
 sozinho fixava a leitura: quem configurava o dia 10 via 11/08–10/09 em todo lugar, e o único
 caminho de volta era apagar a configuração. `workspaces.cycle_view` (`cycle` | `civil`) separa
 "qual é o meu ciclo" de "como eu quero ver agora" — o Perfil mostra os dois, e trocar a régua
@@ -227,24 +227,24 @@ cinco leituras que perguntam o dia a ela (`month_lines_for`, `month_summary_for`
 `date_trunc('month')` que já era o caminho de quem nunca configurou ciclo. Zero argumento novo,
 zero segunda aritmética de "onde o mês começa".
 
-⚠️ **`budgets_status_for` era a quinta leitura e tinha ficado para trás.** Ela seguia em
+**`budgets_status_for` era a quinta leitura e tinha ficado para trás.** Ela seguia em
 `date_trunc('month')` enquanto as outras quatro migraram na `20260911021000`: na tela do
 Financeiro o painel somava 11/08–10/09 e o bloco de orçamento logo abaixo somava 01–30/09, os
 dois escritos "setembro". Na Hoje e no badge da dock era pior — `useBudgetsStatus()` manda HOJE,
 e no dia 11/09 o ciclo corrente já se chama outubro.
 
-⚠️ **`budgets.month` é o RÓTULO; `occurred_at` é a JANELA.** Com ciclo os dois deixam de ser o
+**`budgets.month` é o RÓTULO; `occurred_at` é a JANELA.** Com ciclo os dois deixam de ser o
 mesmo valor (rótulo `01/09`, janela `11/08`–`10/09`), e comparar `b.month` com o início da janela
 faz o limite personalizado do mês sumir da tela sem erro nenhum.
 
-⚠️ **A chave `budgets-status` não se conserta sozinha na troca de régua.** As outras são chaveadas
+**A chave `budgets-status` não se conserta sozinha na troca de régua.** As outras são chaveadas
 por `from`/`to`, que mudam junto; a do orçamento é chaveada pelo rótulo, que é o mesmo `2026-09`
 nas duas réguas. Ela está em `REGUA_MUDOU` (`use-finance.ts`), a lista que os DOIS setters
 invalidam.
 
 ## Um resumo resume o que está LOGO ABAIXO dele
 
-⚠️ **Número de outra lente no topo de uma lista é mentira, e já foi escrito dos dois jeitos.**
+**Número de outra lente no topo de uma lista é mentira, e já foi escrito dos dois jeitos.**
 O card de Lançamentos somou a lista (e virou cópia do painel da home: dois resultados idênticos
 em telas vizinhas, nada dizendo que respondiam a perguntas diferentes) e depois passou a ler
 `cycle_series` para bater com a home — e aí parou de bater com a lista a 200px dele. Medido no
@@ -256,10 +256,10 @@ vira LINK, com a lente escrita — em Lançamentos, "por data da compra" no card
 pagamento" no rodapé que leva ao ciclo. As duas leituras estão certas; o que não pode é a de
 outra lente ocupar o topo desta.
 
-⚠️ **Com filtro ativo o card SOME.** `transactions_summary` soma o período inteiro e a lista
+**Com filtro ativo o card SOME.** `transactions_summary` soma o período inteiro e a lista
 filtrada soma menos — mantê-lo ali recria o mesmo defeito com outra cara.
 
-⚠️ **Número de outra JANELA também precisa de caminho, não só número de outra lente**
+**Número de outra JANELA também precisa de caminho, não só número de outra lente**
 (16/09/2026). O painel da Hoje escreve "Compromissos até 10/10/2026 · R$ 8.274,68" e logo abaixo
 "O que vence" lista **7 dias**. Não é erro de soma — são perguntas diferentes, e a separação está
 decidida no comentário do `HeroPanel` ("aqui é quanto dá para gastar AGORA"). O defeito era a
@@ -276,13 +276,13 @@ O conserto é o item "Ver o que fecha o ciclo" no menu do painel, apontando para
 — a lista que já existe, agrupada, com a fatura abrindo nas compras. **Alargar a janela dos 7
 dias seria o conserto errado**: a Hoje viraria a tela do ciclo com outro nome.
 
-⚠️ **E o link não bastou: a COMPRA que ainda vai postar não estava em tela nenhuma.** O ramo
+**E o link não bastou: a COMPRA que ainda vai postar não estava em tela nenhuma.** O ramo
 avulso de `upcoming_bills` exige `invoice_id is null` — correto, é o que impede contar duas vezes
 o que já está somado dentro da fatura —, e o efeito colateral é que a parcela e a assinatura com
 data futura somem de toda leitura de "o que vem". Medido: `DAS` (20/09) e `Carro Peças (2/3)`
 (22/09) não apareciam em lugar nenhum da Hoje.
 
-⚠️ **E a FATURA não responde isso.** Mostrá-la ("Fatura Nubank · R$ 3.751,22") foi tentado e
+**E a FATURA não responde isso.** Mostrá-la ("Fatura Nubank · R$ 3.751,22") foi tentado e
 recusado: *"eu não quero a fatura em si, quero os próximos lançamentos previstos dentro da
 fatura"*. O total é um número fechado sobre o que já foi gasto; o que ajuda a decidir hoje é o
 que ainda vai ENTRAR nele. `useUpcomingCardCharges` lê isso direto (fatura aberta → transações
@@ -290,12 +290,12 @@ com `occurred_at >= hoje`), **limitado** — a fatura tem dezenas de linhas e a 
 extrato do cartão —, e fica fora do contador "Vencendo" e do badge da aba: nada ali vence, é
 compra que vai postar, e badge é contagem do que dá para resolver agora.
 
-⚠️ **O link carrega `mes` e `view` do próprio `cycle_now`, nunca um default.** Com `view` fixo,
+**O link carrega `mes` e `view` do próprio `cycle_now`, nunca um default.** Com `view` fixo,
 quem está na régua civil abriria um período diferente do que o rodapé acabou de nomear — a mesma
 discordância entre duas leituras que esta seção inteira persegue. E o `tipo` acompanha o que o
 número CONTA: `comprometido_no_ciclo` é `sum(out_cents)`, então o destino abre em "Saiu".
 
-⚠️ **E o PERCENTUAL é a mesma regra: numerador e denominador saem da MESMA coluna**
+**E o PERCENTUAL é a mesma regra: numerador e denominador saem da MESMA coluna**
 (15/09/2026). "Onde o dinheiro foi" escrevia **"0% do mês" nas seis categorias** — o divisor era
 o REALIZADO (`total_cents − pending_cents`) enquanto cada linha mostrava `total_cents`. No ciclo
 corrente quase nada está `cleared` (compra no cartão só é baixada quando a fatura é paga), então
@@ -303,7 +303,7 @@ o divisor era ZERO e o `> 0 ?` devolvia o mesmo 0% para todas. Não é "um pouco
 percentual igual em todas as linhas apaga exatamente a comparação que o bloco existe para fazer.
 O divisor é a soma das linhas mostradas.
 
-⚠️ **A lista precisa da janela JÁ RESOLVIDA, nunca de um `YYYY-MM` para ela mesma recortar.**
+**A lista precisa da janela JÁ RESOLVIDA, nunca de um `YYYY-MM` para ela mesma recortar.**
 `useTransactions` chamava `monthBounds()` (o mês CIVIL) enquanto o resumo da mesma tela pedia a
 janela a `useMonthRange`, que respeita a régua. Com fechamento no dia 10 as duas discordavam em
 ~20 dias: a lista de "outubro" trazia 4 lançamentos do ciclo SEGUINTE e escondia 6 do ciclo que
@@ -321,7 +321,7 @@ tela**: `MonthRuler` (`Mês | Ciclo`) vive em `useState` e morre com ela, e as l
 mantém o agente e APK antigo funcionando sem tocar em nada. `20260911170000` levou o argumento a
 **19 funções**.
 
-⚠️ **Não existe uma terceira opção "por fatura", e isso é resultado de pesquisa.** O artigo que
+**Não existe uma terceira opção "por fatura", e isso é resultado de pesquisa.** O artigo que
 DEFENDE alinhar orçamento ao ciclo do cartão entrega a frase que mata a ideia: *"if you have
 several cards with different closing dates, you cannot align to all of them, and picking one
 means the others are still misaligned"*. O fechamento é interno do cartão — com três cartões há
@@ -345,7 +345,7 @@ coisas na tela do Mês: o bloco **"Faturas do período"** (uma linha por fatura,
 tela da fatura, que já lista as compras) e a etiqueta **"cai na fatura de DD/MM"** em cada linha
 de cartão.
 
-⚠️ **Nenhum número muda.** As colunas são informativas e o bloco é agrupamento no cliente, sobre
+**Nenhum número muda.** As colunas são informativas e o bloco é agrupamento no cliente, sobre
 as linhas que já vieram. A tela continua em COMPETÊNCIA, porque é ela que alimenta orçamento e
 categoria: mover a compra para o mês da fatura faria agosto fechar folgado e setembro estourar
 por uma compra que a pessoa não lembra de ter feito ali. Tirar as compras da lista para deixar só
@@ -356,13 +356,13 @@ no dia 3 e ciclo fechando no 10, **toda compra feita entre os dias 4 e 10 é con
 paga no seguinte**. A pergunta do dono do produto foi exatamente essa, e a resposta certa não era
 remanejar número — era dizer, na linha, para onde ela vai.
 
-⚠️ **O recorte "Para onde o dinheiro foi" abre em MEIO, não em natureza.** A lista logo acima já
+**O recorte "Para onde o dinheiro foi" abre em MEIO, não em natureza.** A lista logo acima já
 está agrupada por natureza, e abrir o recorte na mesma régua dizia a mesma coisa duas vezes na
 mesma tela. Por meio é o bloco "Saídas" da planilha do dono do produto.
 
 ## Ciclo FECHADO conta só o que aconteceu (`20260925130000`)
 
-⚠️ **Conta pendente num ciclo que já fechou não é saída dele.** `cash_events` contava o aluguel
+**Conta pendente num ciclo que já fechou não é saída dele.** `cash_events` contava o aluguel
 que venceu em 01/09 e não foi pago como saída do ciclo 11/08–10/09 — e o ramo 4 já o trazia para
 o ciclo atual como "(atrasado)". Na tela, "comecei + entrou − saiu" não chegava ao "sobrou na
 conta" (R$ 2.014,30 de diferença no staging) e `linha_do_tempo.sql` falhava. Hoje, em janela com
@@ -376,7 +376,7 @@ eles aparecem no ciclo atual como atrasados e somam no "faltou pagar".
 
 ## A fatura ATRASADA é atômica no ciclo; a do ciclo abre
 
-⚠️ **A tela do ciclo abria TODA fatura nas compras dela** (15/09/2026), e o sintoma foi imediato:
+**A tela do ciclo abria TODA fatura nas compras dela** (15/09/2026), e o sintoma foi imediato:
 no ciclo de 11/09 a 10/10 apareciam compras de **25/08 e 31/08**. A fatura atrasada cai neste
 ciclo pelo VENCIMENTO; as compras dela aconteceram no ciclo anterior, e expandi-las trazia datas
 de fora para dentro de um período fechado.
@@ -388,12 +388,12 @@ A regra separa os dois casos, e a diferença é de MODELO, não de layout:
 | **atrasada** | um card, e nada mais | é dívida a quitar. *"A fatura é uma só, eu não escolho quais lançamentos eu fiquei de pagar da fatura"* — no caixa paga-se a fatura, nunca a compra, e abri-la sugere uma escolha que não existe |
 | **do ciclo** (a vencer) | abre nas compras dela | é o que ele está acumulando agora. Traz TODAS, **inclusive as de alguns dias antes do início do ciclo**: a fatura atual não começa na borda do ciclo, começa no fechamento do cartão |
 
-⚠️ **Quem separa é a coluna `atrasada` de `cycle_lines`** (`20260915120000`), não o sufixo
+**Quem separa é a coluna `atrasada` de `cycle_lines`** (`20260915120000`), não o sufixo
 "(atrasada)" do título nem o `day`. O título é frase, e ler estado de dentro de um rótulo quebra
 quando alguém reescreve a frase; o `day` chega clampado em `greatest(due_date, current_date)`,
 então fatura que vence HOJE e fatura vencida têm o mesmo dia.
 
-⚠️ **A consulta da expansão é condicionada ao que vai ser DESENHADO.** `useInvoice` recebe o id
+**A consulta da expansão é condicionada ao que vai ser DESENHADO.** `useInvoice` recebe o id
 só quando a linha abre — com "é fatura" como condição, uma tela de seis faturas atrasadas dispara
 seis consultas cujo resultado é jogado fora.
 
@@ -407,11 +407,11 @@ Dois caminhos para a MESMA pergunta, e os dois aplicam num toque só, fechando o
 fileira de `Chip` com os atalhos (30 dias … 10 anos) e um **calendário** para a data exata. Piso
 de amanhã (hoje não é horizonte) e teto do `clamp_forecast_days` — 10 anos.
 
-⚠️ **Não existe "de quando"**: uma projeção de caixa parte do saldo que existe AGORA, e começar
+**Não existe "de quando"**: uma projeção de caixa parte do saldo que existe AGORA, e começar
 em outra data exigiria o saldo daquela data — que é justamente o que ela está calculando. A tela
 escreve "de hoje até <data>" em vez de oferecer um campo que só aceita um valor.
 
-⚠️ **O campo de texto mascarado saiu, e a lição não é sobre máscara** (11/09/2026). Ele foi
+**O campo de texto mascarado saiu, e a lição não é sobre máscara** (11/09/2026). Ele foi
 pedido duas vezes pelo dono do produto — *"parece que se eu clicar no campo 'projetar até' iria
 abrir um calendário e nada acontece"* e depois *"se eu ainda clico em 'Outra data', eu não
 consigo mudar a data, tinha que abrir um calendar pick ou algo assim"*. Um campo `dd/mm/aaaa`
@@ -424,7 +424,7 @@ O calendário é `Calendar` (`src/components/finance/calendar.tsx`), escrito à 
 `Modal` dentro de `Modal` no Android é a mesma armadilha que fez o `SelectField` abrir no lugar.
 A aritmética da grade é `monthGrid` em `src/lib/dates.ts`, com teste.
 
-⚠️ **Campo de data em texto continua existindo em cinco formulários, e ele precisa de MÁSCARA**
+**Campo de data em texto continua existindo em cinco formulários, e ele precisa de MÁSCARA**
 — o caminho único é `DateField` (`src/components/ui/field.tsx`), nunca `TextField` cru: o teclado
 `number-pad` do iOS **não tem a tecla "/"**, então um campo que espera a barra digitada só aceita
 texto colado. Em 11/09/2026 havia SEIS campos de data e só um tinha máscara — e esse um carregava
@@ -445,17 +445,17 @@ O default é `false` = o comportamento que já valia. **Trocar a chave não rees
 trigger só roda em insert/update da transação, então compra já classificada mantém o
 `invoice_id`. Remanejar retroativamente mexeria em fatura paga e em mês fechado.
 
-⚠️ **A borda anda UM dia, não o ciclo.** `p_inclusive` soma 1 à data de corte em vez de trocar
+**A borda anda UM dia, não o ciclo.** `p_inclusive` soma 1 à data de corte em vez de trocar
 `<` por `<=` — uma expressão só, em vez de dois ramos que divergem. O teste confere que os dois
 modos concordam nos outros 27 dias do mês.
 
-⚠️ **O trigger se chama `public.tg_transactions_set_invoice()`; `set_invoice` é o nome do
+**O trigger se chama `public.tg_transactions_set_invoice()`; `set_invoice` é o nome do
 TRIGGER.** Escrever `create or replace function private.set_invoice()` CRIA uma função órfã —
 sem erro, sem aviso, com a migration aplicando limpa — e a coluna nova nasce inerte. Quem pegou
 foi `supabase/tests/regua_e_dia_do_fechamento.sql`, que insere a compra e confere o vencimento da
 fatura em que ela caiu: testar `invoice_window` direto passava com o defeito de pé.
 
-⚠️ **`CREATE OR REPLACE FUNCTION` preserva dono e permissões — e SÓ isso.** Toda cláusula que a
+**`CREATE OR REPLACE FUNCTION` preserva dono e permissões — e SÓ isso.** Toda cláusula que a
 definição nova não repetir é APAGADA: foi assim que o trigger perdeu `security definer` e
 `cycle_now` perdeu o `set timezone` que a `20260911030000` tinha pendurado por `alter function`
 (o bug das 21h–00h voltando em silêncio). **Fuso e `security definer` vão no CABEÇALHO**, nunca
@@ -463,7 +463,7 @@ por `alter` depois — pendurados, eles morrem no próximo replace.
 
 ## "Quanto sobrou" tem UMA definição, e ela inclui o que não é transação
 
-⚠️ **Nem tudo que sai do caixa é linha em `transactions`.** A parcela de financiamento sai do
+**Nem tudo que sai do caixa é linha em `transactions`.** A parcela de financiamento sai do
 CRONOGRAMA (`private.debt_schedule_for`) e a recorrente além do horizonte materializado sai da
 REGRA (`private.recurring_projection_for`). Quem ignora essas duas fontes mostra um mês melhor do
 que ele é — e não dá erro nenhum, só um número otimista.
@@ -484,12 +484,12 @@ reparou antes de nós. `monthly_cashflow` passou a agregar `month_lines_for`
 Custo medido em produção: 146–256 ms para 6–24 meses, contra ~20 ms da soma crua. É uma
 chamada por montagem de tela, cacheada pelo TanStack Query.
 
-⚠️ **A hachura "a pagar" mudou de régua junto**, de `status='pending'` para `not settled` — a
+**A hachura "a pagar" mudou de régua junto**, de `status='pending'` para `not settled` — a
 mesma coluna de "O mês inteiro". A diferença é a compra de cartão com fatura em aberto: `cleared`
 na linha, mas o dinheiro ainda não saiu. Setembro: 3.433,01 → 4.961,01. Para um gráfico de FLUXO
 DE CAIXA a régua nova é a certa.
 
-⚠️ **Isto não reescreveu o passado, e o motivo é frágil:** `debt_schedule_for` devolve o
+**Isto não reescreveu o passado, e o motivo é frágil:** `debt_schedule_for` devolve o
 cronograma a partir da PRÓXIMA parcela. Se um dia ela passar a devolver as já pagas,
 `private.debt_paid_in_month` não segura — ela procura transação com `debt_id`, e as 8 parcelas
 pagas do carro moram só no cadastro (`debt_installments_undocumented`). Seria história reescrita
@@ -514,7 +514,7 @@ compra, não a única tela que responde quanto resta.
 
 ## Agregações
 
-- Toda leitura agregada via RPC (padrão duplo interna/wrapper de `supabase.md`): `transactions_summary`, `monthly_cashflow`, `account_balances`, `budgets_status`. Não somar transações no cliente nem em TS das functions.
+- Toda leitura agregada via RPC (padrão duplo interna/wrapper de `supabase.md`): `transactions_summary`, `monthly_cashflow`, `account_balances`, `budgets_status`. Não somar transações no cliente nem no agente.
 - **Previsto e realizado são colunas SEPARADAS, e o total nunca muda de significado**
   (09/09/2026). `account_balances` ganhou `cleared_cents`/`pending_in_cents`/`pending_out_cents`,
   `transactions_summary` ganhou `pending_cents`, `monthly_cashflow` ganhou
@@ -523,12 +523,12 @@ compra, não a única tela que responde quanto resta.
   três telas e o agente somam eles, e trocar o que uma coluna quer dizer é a quebra que não dá
   erro, só número errado. O realizado sai por subtração.
 
-  ⚠️ **A tela é que escolhe qual coluna usar, e o cartão é o motivo.** Numa conta de dinheiro o
+  **A tela é que escolhe qual coluna usar, e o cartão é o motivo.** Numa conta de dinheiro o
   saldo honesto é `cleared_cents`; num `credit_card` a parcela futura `pending` **é** dívida já
   assumida e o número certo é `balance_cents`. Filtrar `cleared` dentro do agregado forçaria um
   `case` de tipo de conta na soma — regra de produto vazando para dentro do SQL.
 
-  ⚠️ **`month_summary` tem TRÊS definições que se alinham por POSIÇÃO** (`select *` em
+  **`month_summary` tem TRÊS definições que se alinham por POSIÇÃO** (`select *` em
   `public.month_summary` e `public._month_summary` sobre `private.month_summary_for`). Coluna
   nova entra nas três, no mesmo lugar, ou a tela mostra despesa no lugar de receita sem erro
   nenhum.
@@ -551,7 +551,7 @@ compra, não a única tela que responde quanto resta.
   transferência, para o pagamento que aconteceu fora do app. No app são dois botões; no WhatsApp,
   `pay_invoice` e `mark_paid` com a fatura como alvo. Confirmar "a fatura do Nubank" não separa os
   dois — a frase do SIM diz se o caixa se move.
-- ⚠️ **`card_summary` tem dois números da fatura corrente, e eles não são o mesmo**
+- **`card_summary` tem dois números da fatura corrente, e eles não são o mesmo**
   (`20260917120000`): `invoice_total_cents` é BRUTO (a soma das compras, o número grande do
   cartão) e `invoice_open_cents` é o que FALTA (líquido do `paid_cents`). Quem subtrai a corrente
   de `unpaid_total_cents` — que é líquido — usa o segundo; com o bruto, um pagamento parcial fazia
@@ -561,13 +561,13 @@ compra, não a única tela que responde quanto resta.
   lançamento QUE JÁ EXISTE como parcela 1 — o `id` não muda, e chamar de novo é recusa, nunca um
   segundo plano.
 
-  ⚠️ **A parcela herda o nome do ESTABELECIMENTO quando não há descrição**
+  **A parcela herda o nome do ESTABELECIMENTO quando não há descrição**
   (`20260915190000`). O texto de cada linha era `coalesce(p_description, 'Compra parcelada')`,
   que força nome próprio sempre: quem preencheu só "Estabelecimento" via **"Compra parcelada
   (1/2)"** na fatura, porque quem lê a linha é `tx.description ?? tx.merchant` e o primeiro
   termo nunca era nulo. Hoje é `coalesce(p_description, p_merchant, 'Compra parcelada')`.
 
-  ⚠️ **E o app não mandava `p_merchant`.** `useCreateInstallmentPlan` monta o payload da RPC
+  **E o app não mandava `p_merchant`.** `useCreateInstallmentPlan` monta o payload da RPC
   campo a campo e o 8º parâmetro não estava lá — o formulário tem o campo, a pessoa preenche, e
   o valor morria no hook, sem erro: a RPC tem default `null`, a compra entra no valor certo e na
   fatura certa, só o nome some. Medido em produção em 15/09/2026: de 311 transações UMA tinha
@@ -580,21 +580,21 @@ compra, não a única tela que responde quanto resta.
   nunca teve o problema porque ele ESPALHA o objeto — **payload montado campo a campo é payload
   que esquece campo, em silêncio**.
 
-  ⚠️ **O passado não é reescrito.** Plano que nasceu sem nome continua sem nome; o caminho é
+  **O passado não é reescrito.** Plano que nasceu sem nome continua sem nome; o caminho é
   editar a parcela com escopo "esta e as futuras", que propaga `merchant`.
 
-  ⚠️ **E o PLANO tem nome próprio, que também pode morar no `merchant`.** `_rotulo_plano` lia
+  **E o PLANO tem nome próprio, que também pode morar no `merchant`.** `_rotulo_plano` lia
   só `description`, e `_FONTES["planos"]` filtrava só por ela: "apaga a nuuvem por completo"
   não achava a compra inteira, e quando ela chegava pelo agrupamento das parcelas a pergunta
   saía escrita **"Tudo (2x) — compra parcelada"**. É a mesma régua da linha (`description ??
   merchant`).
 
-  ⚠️ **Esta linha já afirmou que o app fazia igual, e ele NÃO fazia.** `useInstallmentPlans`
+  **Esta linha já afirmou que o app fazia igual, e ele NÃO fazia.** `useInstallmentPlans`
   era `plan.merchant || plan.description` — invertido —, então uma compra com os dois
   preenchidos aparecia com um nome em Parceladas e outro na fatura. Corrigido em 15/09/2026
   junto com o reparcelamento: **`description || merchant` nos dois lados.**
 
-  ⚠️ **A busca do agente tinha que acompanhar.** `resolve.por_transacao` casava só `description`
+  **A busca do agente tinha que acompanhar.** `resolve.por_transacao` casava só `description`
   e `category`, enquanto a busca do app (`use-finance.ts`) sempre casou os três — com o nome
   passando a existir em `merchant`, o agente responderia "não achei nada com «nuuvem»" para uma
   compra que existe. `FinanceAction` **não** ganha campo `merchant` (o schema está no teto
@@ -602,13 +602,13 @@ compra, não a única tela que responde quanto resta.
 
 ### Reparcelar: editar a COMPRA, não a parcela (`20260915210000`)
 
-⚠️ **O formulário do lançamento edita uma PARCELA, e por muito tempo esse era o único caminho.**
+**O formulário do lançamento edita uma PARCELA, e por muito tempo esse era o único caminho.**
 A queixa foi literal: *"eu queria colocar o valor total de novo e parcelado em 2x mas ele veio
 com o valor 52,49 preenchido e nao consigo mudar a parcela"*. Total e número de parcelas são do
 CONTRATO; quem os edita é `public.update_installment_plan`, pelo sheet "Editar a compra" de
 Parceladas (`/finance/installments?edit=<plano>`).
 
-⚠️ **O VALOR, desde 23/09/2026, também se edita no formulário da parcela — com a unidade DITA.**
+**O VALOR, desde 23/09/2026, também se edita no formulário da parcela — com a unidade DITA.**
 O campo era `readOnly` numa parcela (a pessoa digitava o total num campo que era da parcela), e
 a queixa foi *"eu tento clicar e o campo parece ser desabilitado… tinha que ter a opção de
 colocar o valor de cada parcela"*. Hoje os três lugares que recebem o valor de uma compra
@@ -637,41 +637,41 @@ parcela com saldo em aberto. Daí as três regras:
    a transação inteira volta — o modo de falha desta classe não é erro na tela, é um total que
    deixa de ser a soma do que está embaixo dele.
 
-⚠️ **"Travada" tem TRÊS causas, e a terceira é a que não aparece em teste nenhum**
+**"Travada" tem TRÊS causas, e a terceira é a que não aparece em teste nenhum**
 (`private.parcela_travada`, régua única): `status = 'cleared'`; fatura `paid` ou `rolled`; e
 fatura com **`paid_cents > 0`** — o pagamento PARCIAL, que deixa a fatura aberta e as linhas
 pendentes. Baixar o total de uma compra ali derruba `private.invoice_open_cents`
 (`sum(linhas) − paid_cents`) para negativo e `pay_invoice` passa a recusar a quitação com
 `aberto <= 0`: a fatura fica impossível de fechar, sem uma linha de erro em lugar nenhum.
 
-⚠️ **`travadas = 0` fala do estado de ANTES, não do destino.** Recuar a data da primeira parcela
+**`travadas = 0` fala do estado de ANTES, não do destino.** Recuar a data da primeira parcela
 (ou trocar o cartão) faz o `set_invoice` pendurar uma parcela `pending` numa fatura já fechada —
 e ali ela SOME de toda leitura de caixa, porque todas filtram `status not in ('paid','rolled')`.
 É o espelho do bug que a `20260909071000` fechou. A função reconfere a régua depois de
 reescrever e recusa.
 
-⚠️ **Omitir a conta não pode ZERAR a conta.** Os parâmetros têm `default null` para o chamador
+**Omitir a conta não pode ZERAR a conta.** Os parâmetros têm `default null` para o chamador
 não precisar mandar categoria nem estabelecimento; a conta é outra coisa — sem ela `set_invoice`
 apaga o `invoice_id` das N parcelas e a compra de cartão vira despesa solta. A função recusa
 quando o plano TINHA conta e o argumento veio nulo (plano que já nasceu sem conta continua
 editável).
 
-⚠️ **A categoria muda em TODAS as parcelas, inclusive as pagas, e isso é decisão declarada.**
+**A categoria muda em TODAS as parcelas, inclusive as pagas, e isso é decisão declarada.**
 `update_transaction_scoped` diz "o passado só muda à mão", e ali está certo porque o que propaga
 é VALOR. Aqui a categoria é atributo da COMPRA: deixar 3 parcelas em "eletrônicos" e 9 em "lazer"
 parte o relatório dessa compra em dois para sempre. O efeito colateral conhecido é
 `budgets_status_for` remanejar o orçamento de um mês fechado — para a verdade, e sem número
 materializado.
 
-⚠️ **As parcelas em aberto são ATUALIZADAS, não recriadas.** Apagar e inserir trocaria os `id`s,
+**As parcelas em aberto são ATUALIZADAS, não recriadas.** Apagar e inserir trocaria os `id`s,
 e o `last_write_id` do agente, um `pending_actions` pendente e qualquer referência futura
 apontariam para linha morta. Insert só quando o número CRESCE; delete só quando ele encolhe.
 
-⚠️ **O título do plano é `description || merchant`, a mesma régua da linha.** Era
+**O título do plano é `description || merchant`, a mesma régua da linha.** Era
 `merchant || description` só em `useInstallmentPlans`, então uma compra com os dois preenchidos
 aparecia com um nome em Parceladas e outro na fatura.
 
-⚠️ **`p_installments = 1` é "À vista", e DISSOLVE o plano** (`20260920120000`). A parcela 1
+**`p_installments = 1` é "À vista", e DISSOLVE o plano** (`20260920120000`). A parcela 1
 sobrevive com o TOTAL e o MESMO `id` (referência viva para o agente e para o HITL); as outras
 somem. A ordem importa por causa do `on delete cascade` de `transactions.installment_plan_id`:
 solta o sobrevivente → apaga as parcelas irmãs → apaga o plano — apagar o plano primeiro levaria
@@ -679,7 +679,7 @@ o sobrevivente junto, em silêncio. **Com qualquer parcela travada o banco recus
 guarda de `parcela_travada` que já protege o número de parcelas: `1 <> N` cai nele), o que torna
 converter um lançamento JÁ BAIXADO uma operação de MÃO ÚNICA — daí o aviso destrutivo na tela.
 
-⚠️ **O agente REPARCELA desde 21/09/2026** (a exclusão anterior caiu a pedido do dono do
+**O agente REPARCELA desde 21/09/2026** (a exclusão anterior caiu a pedido do dono do
 produto: *"ele tem que mudar diretamente pelo agente mesmo, sem eu precisar abrir o app"*). N
 novo sai do `installments` que o schema já tinha — sobre a compra inteira, diferente do N atual —
 e a frase do SIM mostra o contrato ("de 10x para 12x de R$ 250,00"); conta e data da 1ª parcela
@@ -704,7 +704,7 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
   > chamada por dia, 3 anos com rascunho custava 1.769 ms e 10 anos passaria de 6 s. Depois da
   > `20260910234500`, 10 anos com duas hipóteses custa **68 ms**.
 
-  ⚠️ **A leitura do app passa por `forecast_json`, não pelas RPCs `setof`.** O PostgREST corta
+  **A leitura do app passa por `forecast_json`, não pelas RPCs `setof`.** O PostgREST corta
   a resposta em **1000 linhas** e o corte é MUDO: a série chega menor, o app soma "entra/sai" e
   tira o saldo do fim em cima do pedaço, e escreve o rótulo do horizonte pedido por cima. Medido
   em 10/09/2026 pela API autenticada: pedindo 3.650 dias vinham 1.000, último dia 05/06/2029,
@@ -715,7 +715,7 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
   tela voltar a chamá-las. **Qualquer leitura nova que possa passar de 1000 linhas nasce
   agregada ou em JSON** — não dá para ver esse defeito no SQL, só na tela.
 
-  ⚠️ **"O mês inteiro" NÃO tem teto, e isso é desenho, não esquecimento.** Já foi levantado
+  **"O mês inteiro" NÃO tem teto, e isso é desenho, não esquecimento.** Já foi levantado
   duas vezes como inconsistência ("a Projeção para em N anos e o mês navega para sempre").
   Medido em produção em 10/09/2026: `month_lines_for` em março/2035 devolve as MESMAS 6
   entradas (R$ 7.566,52) de outubro/2026, com 15 linhas marcadas `projected` — a recorrente é
@@ -724,10 +724,10 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
   ("um teto criaria a única fronteira do app que o usuário descobriria batendo nela"). O teto da
   Projeção limita o TAMANHO DA SÉRIE, não a honestidade do dado — são coisas diferentes.
 
-  ⚠️ **Teto de LEITURA não é janela de ESCRITA.** O materializador segue gravando UM ano
+  **Teto de LEITURA não é janela de ESCRITA.** O materializador segue gravando UM ano
   (`HORIZON_DAYS = 365`); tudo além é calculado. Subir o teto não grava uma linha.
 
-  ⚠️ **Não crie um segundo teto em código de aplicação.** Já aconteceu duas vezes. Na
+  **Não crie um segundo teto em código de aplicação.** Já aconteceu duas vezes. Na
   primeira, o 365 estava cravado dentro de `cash_flow_forecast` E de `_cash_flow_forecast`: a
   tela parava em "6 meses", "O mês inteiro" navegava para 2028 e mostrava tudo, e o seletor de
   mês do rascunho — que só oferece os meses DA JANELA — tornava impossível supor uma receita em
@@ -759,11 +759,11 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
   responde entrada E saída, e o veredito sai da própria série simulada (`primeiroNegativo` sobre
   `serie`), não de uma segunda RPC.
 
-  ⚠️ **O rascunho move o CAIXA, e só.** Não remonta fatura (`set_invoice`), orçamento
+  **O rascunho move o CAIXA, e só.** Não remonta fatura (`set_invoice`), orçamento
   (`_budgets_status`) nem cronograma de dívida (`debt_schedule_for`) — reproduzir essas regras no
   cliente ou numa segunda função seria a cópia que diverge. A tela diz isso ao usuário.
 
-  ⚠️ **Ele vive em `useState` da Projeção e em lugar nenhum mais** — nem banco, nem
+  **Ele vive em `useState` da Projeção e em lugar nenhum mais** — nem banco, nem
   AsyncStorage, e `gcTime: 0` no hook para não ressuscitar do cache. Sair da tela apaga, que é o
   contrato com o usuário. A hipótese nunca começa ANTES de hoje (a projeção começa hoje, e uma
   data passada entrava no saldo sem ter dia na janela para aparecer em "entra/sai").
@@ -772,7 +772,7 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
   (`20260921120000`, spec `2026-09-21-e-se-adiantar-parcelas-design.md`). Compra parcelada,
   financiamento e recorrente de saída: uma saída no dia do pagamento + um `mode: 'cancel'` (uma
   ocorrência, valor NEGATIVO) por parcela tirada, todos com o mesmo `grupo` — a lista mostra
-  uma linha e "Tirar" leva o grupo. ⚠️ **O dia do cancelamento vem do banco**
+  uma linha e "Tirar" leva o grupo. **O dia do cancelamento vem do banco**
   (`anticipation_candidates`), pela régua de `cash_flow_forecast`: parcela de cartão sai no
   vencimento da FATURA. Cancelar no dia da parcela criaria uma saída fantasma num dia e deixaria
   a verdadeira no outro — sem erro, só saldo errado. Provado no staging: pelo valor nominal, o
@@ -793,7 +793,7 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
 - `cash_flow_forecast(days)`, `upcoming_bills(days)` e `affordability(amount_cents, installments)` — pares interna/wrapper. `affordability` **compõe** com a projeção (interna chama interna, wrapper chama wrapper): não duplicar a query grande.
 - **`transactions.auto_confirm` decide quem vira `cleared` sozinho na data** (`20260909110000`).
   A coluna mora na LINHA, não só na série: o materializador cria ocorrência com data passada já
-  `cleared` (`scheduler.py:101`) sem passar pelo promote, então uma regra que vivesse só em
+  `cleared` (`scheduler.materialize_horizon`) sem passar pelo promote, então uma regra que vivesse só em
   `_promote_due_transactions` não cobriria esse caminho. A ocorrência HERDA o valor da série.
   **Receita nasce `false`** — Pix de terceiro precisa de comprovação; salário é o caso em que
   ligar faz sentido, e é escolha explícita do usuário, não inferência de categoria. Parcela de
@@ -830,7 +830,7 @@ confirmar.
   recorrência**. Sem o primeiro, a tela mostra um total que não é a soma do que está embaixo dele;
   sem o segundo, os 90 dias materializados ficam com o valor novo e o mês seguinte volta com o
   velho (o unique `(recurring_id, occurred_at)` impede o cron de reescrever).
-- ⚠️ **Formulário não escreve campo que ele não mostra.** Em cartão o "vou pagar depois" não
+- **Formulário não escreve campo que ele não mostra.** Em cartão o "vou pagar depois" não
   existe, e o form derivava `status` desse campo ausente: editar o NOME de uma parcela futura dava
   baixa nela, mudando a projeção e o total da fatura sem nada na tela dizer isso. Onde o campo não
   aparece, o valor é o que já era.
@@ -847,7 +847,7 @@ patrimônio. `roll_invoice` é a terceira (`20260911040000`).
   12.499/2025) — e ela acerta a ordem de grandeza, **não o centavo**. Medido contra a cobrança
   real do Nubank em agosto/2026: sobre R$ 333,72 a fórmula dá R$ 2,12 e o emissor cobrou
   R$ 2,13. A diferença é contagem de dias e arredondamento do banco, que não são públicos.
-  ⚠️ Este arquivo já afirmou "IOF é exato" — era afirmação forte demais e foi corrigida.
+  Este arquivo já afirmou "IOF é exato" — era afirmação forte demais e foi corrigida.
 - **A taxa de juros NÃO fica num campo** (`20260911060000`). O dono do produto barrou o desenho
   antes de ir para produção: *"esse valor pode mudar também à medida que o tempo passa, por isso
   não queria deixar fixo"*. E os números dele provam: a cobrança real foi **12,876%**, não os
@@ -858,11 +858,11 @@ patrimônio. `roll_invoice` é a terceira (`20260911040000`).
   `accounts.rotativo_rate_monthly` sobrou como taxa de PARTIDA, só enquanto não há o que
   observar; sem as duas, o app não estima juros e diz isso.
 
-  ⚠️ **Linha `(estimado)` não alimenta a estimativa.** Sem esse filtro o palpite de um mês vira
+  **Linha `(estimado)` não alimenta a estimativa.** Sem esse filtro o palpite de um mês vira
   a "observação" do seguinte e o número nunca mais se corrige — um laço que parece aprendizado
   e é só eco.
 
-⚠️ **Regra de terceiro não vira trava de digitação.** A primeira versão recusava adiar uma
+**Regra de terceiro não vira trava de digitação.** A primeira versão recusava adiar uma
 fatura que já tinha recebido um saldo adiado, citando a Resolução CMN 4.549/2017 (o rotativo
 dura um ciclo). O dono do produto apontou o furo — *"o Nubank consegue, ele mescla o pendente
 na fatura como se fosse um lançamento"* — e ele estava certo: **a 4.549 obriga o BANCO**. Com a
@@ -871,7 +871,7 @@ a única saída seria de novo marcar como paga uma fatura não paga. Hoje `roll_
 `segundo_ciclo` e a tela AVISA. A única recusa que ficou é adiar a MESMA fatura duas vezes, que
 é idempotência de verdade.
 
-⚠️ **Duas contagens duplas, e as duas são mudas.**
+**Duas contagens duplas, e as duas são mudas.**
 1. **Caixa**: a fatura adiada continua `status <> 'paid'`, então ela pesaria no vencimento E o
    principal pesaria de novo na fatura seguinte. São **15 ocorrências em 9 funções** — o filtro
    virou `status not in ('paid','rolled')`. `supabase/tests/roll_invoice.sql` prende o
@@ -882,17 +882,17 @@ a única saída seria de novo marcar como paga uma fatura não paga. Hoje `roll_
    `transactions.rollover_of_invoice_id`. Sem isso a compra de agosto inflaria setembro e comeria
    o orçamento duas vezes. **Juros e IOF são gasto novo e contam em todo lugar.**
 
-⚠️ **A interface nunca escreve "rolada".** O dono do produto recusou o jargão — *"eu não saberia
+**A interface nunca escreve "rolada".** O dono do produto recusou o jargão — *"eu não saberia
 o que seria rolada"*. O status no banco é `rolled`; na tela é **"Adiada"**, e a linha diz
 **"Foi para a fatura de 10/11"**, que é o que aconteceu.
 
-⚠️ **Fatura ADIADA não recebe cobrança nova — `set_invoice` segue a corrente.** Achado pelo
+**Fatura ADIADA não recebe cobrança nova — `set_invoice` segue a corrente.** Achado pelo
 teste de três ciclos seguidos, e é dinheiro sumindo em silêncio: a adiada sai da projeção, então
 os juros e o IOF REAIS que chegam na importação do extrato, datados dentro daquele ciclo, iam
 para dentro dela e desapareciam. O emissor faz o mesmo que a correção: fechada a fatura e
 mandado o saldo ao rotativo, o que vem depois é cobrado na próxima.
 
-⚠️ **`to_char(d, 'TMMonth')` escreve em INGLÊS aqui.** O `TM` traduz pelo `lc_time` da sessão, e
+**`to_char(d, 'TMMonth')` escreve em INGLÊS aqui.** O `TM` traduz pelo `lc_time` da sessão, e
 o Postgres do Supabase roda em `C`. Saiu "Saldo em rotativo de July" no primeiro teste com dados
 reais. Quem traduz mês é `private.mes_pt` — array literal, exato, sem depender de configuração
 global.
@@ -921,7 +921,7 @@ motivo (teto de `FinanceAction`) e o custo aceito.
 
 - **Limite de plano mora em `private.plan_limits`, num lugar só.** Espalhar número de plano pelo código é como o produto acaba cobrando de um jeito e entregando de outro.
 - `plan_status()` devolve plano + consumo do mês + limites numa chamada: serve a tela E o gate da
-  IA em `_check_limits` (`agent/app/worker.py`). ⚠️ O consumo do mês é `count(*)` de `ai_events` —
+  IA em `conversation.check_limits` (`agent/app/conversation.py`). O consumo do mês é `count(*)` de `ai_events` —
   o agente que não gravar lá derruba o paywall em silêncio.
 - Cancelamento é **uma chamada, sem formulário** (`cancel_subscription`). Dificultar cancelamento é a reclamação nº1 contra os concorrentes no Reclame Aqui — não repetir.
 - Convite de membro é por **telefone** (o mesmo vínculo do WhatsApp), normalizado com DDI para casar com `profiles.phone`.
@@ -930,7 +930,7 @@ motivo (teto de `FinanceAction`) e o custo aceito.
 
 - Transferência não conta como receita nem despesa em resumos (excluir `kind='transfer'` das agregações de fluxo).
 - Undo via WhatsApp (`undo_last`) apaga apenas a transação mais recente do usuário e responde o que apagou.
-- Conta citada por nome no WhatsApp resolve por `ilike`; sem match → `account_id null` (o lançamento nunca falha por conta desconhecida).
+- Conta citada por nome que não casa com nenhuma, ou casa com mais de uma, vira pergunta (`conta_citada`, `agent.md` → *Na dúvida, PERGUNTA*); sem conta citada, vale a conta padrão do workspace, ou nenhuma.
 
 ## Importação de extrato/fatura — prévia e conciliação em cascata (22/09/2026)
 
@@ -943,7 +943,7 @@ Plano: `docs/superpowers/plans/2026-09-22-importacao-inteligente.md`.
   (`agent/app/domain/reconcile.py`, com teste): id do banco → idêntico → parcela k/N →
   saldo adiado → transferência/pagamento de fatura → mesmo valor em 3 dias → nome parecido →
   `talvez` (empate NUNCA escolhe: pergunta). Lançamento SEM conta (WhatsApp) é candidato.
-- ⚠️ **Nome diferente E valor diferente: a camada SEMÂNTICA** (22/09/2026). Na fatura real da
+- **Nome diferente E valor diferente: a camada SEMÂNTICA** (22/09/2026). Na fatura real da
   conta `teste@` três linhas passavam como novas: "ANDREA F M SILVA ODONTOLOGIA" R$ 193,57 ×
   "Manutenção dentista" previsto R$ 177,01; "RECEITA FEDERAL" 88,68 × "DAS" 88,85; rotativo
   371,66 × 371,64. Palavra nenhuma liga razão social a apelido. O que as camadas de estrutura não

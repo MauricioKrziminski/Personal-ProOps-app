@@ -1,3 +1,9 @@
+---
+paths:
+  - "supabase/**"
+  - "scripts/supabase-target*"
+---
+
 # Supabase — schema, RLS, functions
 
 > **O Supabase é BANCO e FILA, não onde a lógica roda** (desde 30/08/2026). Quem processa é o
@@ -6,7 +12,7 @@
 
 ## Migrations
 
-- **Toda** mudança de schema via migration numerada em `supabase/migrations/` (`NNNN_descricao.sql`). Nunca SQL direto no banco de produção; nunca editar migration já aplicada — criar a próxima.
+- **Toda** mudança de schema via migration em `supabase/migrations/` (`<AAAAMMDDHHMMSS>_descricao.sql`; as `NNNN_` vão só até a `0057`). Nunca SQL direto no banco de produção; nunca editar migration já aplicada — criar a próxima.
 - **Antes de qualquer `db push`, confirme o alvo: `scripts/supabase-target.sh`.** Ele imprime o
   ref linkado e o ref do `.env.local` e sai 1 se discordarem. São dois projetos de nome parecido
   (`kwriuifcwyvdrxtspjiz` = produção, `utkqoiigimqzeenxkxdl` = staging) e a confusão já custou
@@ -30,7 +36,7 @@
 - **O schema `langgraph` fica FORA do `public`** e sem grant para `anon`/`authenticated`: as
   tabelas de checkpoint guardam o conteúdo das conversas (valores, contas, notas), e em `public`
   elas seriam legíveis pelo PostgREST com a anon key. Mesmo motivo do schema `private`.
-- ⚠️ **O serviço Python conecta com papel que IGNORA RLS.** A RLS continua protegendo o APP;
+- **O serviço Python conecta com papel que IGNORA RLS.** A RLS continua protegendo o APP;
   para o agente, escopo de workspace virou código (`ensure_owned`, filtro obrigatório). Ver
   `agent.md`.
 
@@ -51,7 +57,7 @@ Para auditar: `select indexname, indexdef from pg_indexes where schemaname='publ
 Cada agregação existe como par interna + wrapper:
 
 1. **Interna** `_nome(uid uuid, ...)` — recebe o user_id resolvido do telefone e expande para os workspaces dele com `public._workspace_ids(uid)` — `security definer set search_path = public`, com `revoke execute ... from public, anon, authenticated`. É a que o **serviço Python** chama, passando o user_id resolvido. O wrapper `security invoker` depende de `auth.uid()`, que é null lá — chamá-lo do agente devolveria vazio, em silêncio.
-2. **Wrapper** `nome(...)` — `security invoker` com a **query inline** filtrando `workspace_id in (select private.my_workspace_ids())`, sob RLS. É o que o app usa via `supabase.rpc()`. ⚠️ O wrapper NÃO pode chamar a interna: EXECUTE é checado contra o role do chamador (authenticated), que foi revogado da interna — chamaria permission denied. A pequena duplicação da query é intencional.
+2. **Wrapper** `nome(...)` — `security invoker` com a **query inline** filtrando `workspace_id in (select private.my_workspace_ids())`, sob RLS. É o que o app usa via `supabase.rpc()`. O wrapper NÃO pode chamar a interna: EXECUTE é checado contra o role do chamador (authenticated), que foi revogado da interna — chamaria permission denied. A pequena duplicação da query é intencional.
 
 Funções `security definer` sempre com `set search_path = public` e revoke explícito (padrão do `0002_security_hardening.sql`).
 
@@ -64,11 +70,11 @@ Funções `security definer` sempre com `set search_path = public` e revoke expl
 você quer é uma rota no FastAPI: ela tem o mesmo alcance, testes em pytest, e não cria uma
 segunda cópia da regra de negócio — que é o problema que este corte existiu para matar.
 
-⚠️ **`service_role` saiu do repositório junto.** Ele vivia no `adminClient()` das functions. O
+**`service_role` saiu do repositório junto.** Ele vivia no `adminClient()` das functions. O
 agente conecta com papel próprio e o escopo de workspace virou código (`ensure_owned`, filtro
 obrigatório). Não reintroduza `service_role` no app: a RLS é o que protege o cliente.
 
-⚠️ **O app não chama servidor por `functions.invoke`.** O caminho é `agentFetch`
+**O app não chama servidor por `functions.invoke`.** O caminho é `agentFetch`
 (`src/lib/agent-api.ts`), que manda o JWT do Supabase e deixa o servidor tirar o usuário do
 `sub`. A última chamada que sobrou (`import-statement`) recebia `user_id` e `workspace_id` no
 CORPO e confiava neles — qualquer autenticado escrevia no workspace de outro.

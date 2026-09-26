@@ -1,3 +1,10 @@
+---
+paths:
+  - "src/**"
+  - "plugins/**"
+  - "app.json"
+---
+
 # Design — fidelidade nativa iOS 26 / Material 3 (obrigatório)
 
 O app senta na tela ao lado do Apple Wallet e do Things. É assim que ele é julgado, em segundos.
@@ -50,7 +57,7 @@ amplitude — um bloco escuro sobre papel claro — e do número grande em peso 
 > registro que a fala virou encaixa embaixo. Cabeçalho de bloco nas raízes é `BlockHeader`, não
 > `SectionHead`.
 
-⚠️ **`Canvas` do Skia NÃO aceita `onLayout`** (avisa "is not supported" em runtime e o desenho
+**`Canvas` do Skia NÃO aceita `onLayout`** (avisa "is not supported" em runtime e o desenho
 não posiciona). Quem mede é uma `View` em volta; o canvas só preenche.
 
 **A faixa de rodapé que SANGRA até as bordas** é o segundo padrão repetido do export (painel de
@@ -63,7 +70,7 @@ contexto. Em card comum sai por `marginHorizontal/-Bottom` negativos + `overflow
 > Cartões de conteúdo continuam opacos. Controles interativos do iOS podem usar Liquid Glass
 > nativo; a `NativeTabs` permanece a barra do sistema.
 
-⚠️ **Estado que depende da TINTA do vidro nunca depende de o vidro pintar** (23/09/2026). Um
+**Estado que depende da TINTA do vidro nunca depende de o vidro pintar** (23/09/2026). Um
 `GlassView` montado enquanto um ancestral ainda está em `FadeIn` não pinta — no iPhone escuro o
 dia escolhido do "Meu mês" ficou com o número `onTint` (escuro) sobre vidro escuro, invisível.
 Por isso `GlassBackdrop` com `tintColor` pinta a cor sólida (`fallbackColor`) POR BAIXO do vidro:
@@ -110,18 +117,18 @@ Suave (não existe nos vídeos).
   da velocidade do dedo. Com `snapToInterval` a troca terminava num puxão. Trocar de cartão e
   arrastar para fechar são UM gesto que decide o eixo — aninhados, no iOS um cancelava o outro.
 
-⚠️ **A face do cartão CRESCE com a fonte do sistema** (07/09/2026). Conteúdo de texto num bloco
+**A face do cartão CRESCE com a fonte do sistema** (07/09/2026). Conteúdo de texto num bloco
 de proporção fixa: a mesma escala entra na altura da face, no `peek` da pilha e no carrossel.
 Vale para qualquer bloco de altura fixa com texto dentro; a alternativa (apertar o teto de escala
 até caber) é desligar o Dynamic Type com outro nome.
 
-⚠️ **A cor DO BANCO** (03/09/2026, decisão do dono do produto) mora em
+**A cor DO BANCO** (03/09/2026, decisão do dono do produto) mora em
 `src/design/card-brands.ts`, allowlisted no `anti-slop.test.ts`: a cor de um emissor não tem par
 light/dark porque não é nossa. **Fora do cartão, cor de terceiro continua proibida** — roxo lê
 como Nubank em qualquer outro lugar da tela; dentro da forma de um cartão de crédito o usuário
 espera a marca do emissor.
 
-⚠️ **`withSpring` só é interceptado quando é o valor DIRETO da propriedade de estilo.**
+**`withSpring` só é interceptado quando é o valor DIRETO da propriedade de estilo.**
 `withSpring(a) * b` devolve `NaN` e a view some sem um único erro no log — foi assim que a
 carteira inteira ficou invisível. A conta vai DENTRO: `withSpring(a * b)`.
 
@@ -140,12 +147,12 @@ Card comum é `Card` (`src/components/ui/card.tsx`): opaco, `Elevation`, `Radius
 VALOR, a lista é o que aparece quando se vai trocá-lo. Aberto de cara, seis contas comiam meia
 tela antes de o usuário pedir nada.
 
-⚠️ **Ele abre NO LUGAR, não em `formSheet`.** O sheet seria o mecanismo natural para "escolha
+**Ele abre NO LUGAR, não em `formSheet`.** O sheet seria o mecanismo natural para "escolha
 curta" (§8), mas quatro dos formulários que usam este campo já vivem dentro de um `Sheet` —
 recorrentes, dívidas (×3), regras e importação. `Modal` dentro de `Modal` no Android é uma janela
 dentro de outra, com teclado e botão voltar disputando qual fecha.
 
-⚠️ **Enquanto a lista está aberta, o valor SOME.** Mantê-lo visível duplicava a opção escolhida —
+**Enquanto a lista está aberta, o valor SOME.** Mantê-lo visível duplicava a opção escolhida —
 o valor em cima e a mesma linha marcada logo abaixo, coladas —, e com "Não informar" (que é o
 padrão e a primeira opção) isso lia como defeito. Fechar é escolher; a linha marcada mostra o que
 tocar para sair sem mudar nada.
@@ -165,7 +172,7 @@ O tipo de conta era `Segmented` de 5 e quebrava "Investimento" ao meio; o tipo d
 um formulário. Os três viraram `SelectField`, e o teste de anti-slop quebra o build se um
 `Segmented` passar de quatro opções.
 
-⚠️ **Chip ao lado de um campo só existe se levar a um valor que o campo NÃO tem** (15/09/2026).
+**Chip ao lado de um campo só existe se levar a um valor que o campo NÃO tem** (15/09/2026).
 O padrão "fileira de chips + o input do mesmo dado logo abaixo" põe dois controles para uma
 informação só, e o chip que aponta para o DEFAULT nasce aceso repetindo o que o campo já mostra.
 A queixa foi literal: *"o campo de data já vem pré-selecionado hoje e tem o chip 'hoje'... não faz
@@ -182,7 +189,7 @@ Ficou "Ontem" no lançamento: leva a um valor que o campo não tem, então é at
 > campo de `HH:MM` digitado saiu: sem ":" no teclado numérico do iPhone, apagado ele não voltava a
 > ser hora nenhuma. **Escolher uma HORA é `TimePicker`**, como escolher uma data é `Calendar`.
 
-⚠️ **O glifo mora na LISTA DE OPÇÕES, não na tela.** `ACCOUNT_TYPES`, `DEBT_KINDS` e
+**O glifo mora na LISTA DE OPÇÕES, não na tela.** `ACCOUNT_TYPES`, `DEBT_KINDS` e
 `ASSET_CLASSES` carregam `icon`; o formulário e a linha da lista leem dali. Com o mapa na tela,
 duas telas mostravam formas diferentes para o mesmo tipo, e um tipo novo nascia caindo no `circle`
 genérico do Android.
@@ -206,7 +213,7 @@ Montar um à mão é bloqueado por `anti-slop.test.ts` (todo `<Sheet>` abre com 
 > mortos de 72px**. Decisão do dono do produto: **✕ à esquerda, ação primária à direita, uma
 > regra para as duas superfícies.**
 
-⚠️ **Ação NÃO fica ancorada sobre o scroll — ela mora no FIM do conteúdo** (15/09/2026,
+**Ação NÃO fica ancorada sobre o scroll — ela mora no FIM do conteúdo** (15/09/2026,
 decisão do dono do produto, revertendo o desenho anterior). A tela da fatura tinha três botões
 com três legendas num bloco irmão da lista, fixo no rodapé da janela; o argumento escrito era
 "a ação primária não some quando a fatura tem 200 linhas". Na mão, ~180dp permanentes com as
@@ -222,7 +229,7 @@ pequeno no canto), o **compositor do Agente** (é campo de entrada, como o do Wh
 **barra de formatação da nota** (toolbar acima do teclado). O que a regra proíbe é faixa de AÇÃO
 sobre conteúdo que rola.
 
-⚠️ **O rodapé do onboarding entrou junto, e ele mostra a armadilha.** Ele parecia exceção —
+**O rodapé do onboarding entrou junto, e ele mostra a armadilha.** Ele parecia exceção —
 é o avanço de um assistente, não ação sobre uma lista —, mas o próprio comentário do arquivo
 registrava que o passo dos avisos PASSA da tela em 384dp × fonte 1,3, que é o cenário de
 verificação do repo; ali o desenho é exatamente o recusado. O padrão que resolve já existia em
@@ -230,7 +237,7 @@ verificação do repo; ali o desenho é exatamente o recusado. O padrão que res
 `marginTop: 'auto'` no rodapé — encostado na base quando o conteúdo é curto, rolando junto
 quando não é.
 
-⚠️ **E o irmão que cresce não pode ser `flex: 1`.** `flex: 1` é `grow 1 / shrink 1 / basis 0`:
+**E o irmão que cresce não pode ser `flex: 1`.** `flex: 1` é `grow 1 / shrink 1 / basis 0`:
 com um rodapé disputando a mesma coluna, o Yoga prefere ENCOLHER o bloco de cima a deixar o
 conteúdo transbordar — e num `ScrollView` encolher quer dizer que a barra nunca aparece e o
 conteúdo é cortado em silêncio. É a mesma mecânica do `flexShrink` do `ThemedText` (§3). O par é
@@ -244,7 +251,7 @@ menu de contexto e dois toques longos brigam; **toque longo de 220 ms** no ladri
 grade, que não tem menu — soltar sem ter andado abre o `showItemActions`, como na tela inicial do
 iOS.
 
-⚠️ **O scroll em volta tem que ser o `ScrollView` do `react-native-gesture-handler`**
+**O scroll em volta tem que ser o `ScrollView` do `react-native-gesture-handler`**
 (`DragScrollView`, `src/components/ui/drag-scroll.tsx`). Com o `ScrollView` da RN o gesto do
 filho simplesmente **não ativa no Android** — o scroll nativo captura o toque antes dos 4px e o
 `onStart` nunca roda, sem erro e sem log. E o pan declara `.blocksExternalGesture(scrollRef)`: é
@@ -252,7 +259,7 @@ a relação que o RNGH documenta para filho ganhar do pai, resolvida ANTES do pr
 `scrollEnabled={false}` durante o arrasto continua, como segunda trava — ele responde ao
 `onStart`, que sai por `runOnJS` e chega um render depois.
 
-⚠️ **A faixa do auto-scroll mede a área ALCANÇÁVEL, não a altura do scroll** (14/09/2026). Nas
+**A faixa do auto-scroll mede a área ALCANÇÁVEL, não a altura do scroll** (14/09/2026). Nas
 raízes de aba o `ScrollView` passa POR BAIXO da dock flutuante: ele mede 888dp, mas os últimos
 ~98dp são a pílula e, abaixo dela, a área de gesto do sistema — que nem entrega o `MOVE` ao app.
 Com a faixa de 88dp contada do pé do scroll ela começava em 800 e o dedo só chegava a 777: o
@@ -262,13 +269,13 @@ no `paddingBottom` do conteúdo. A aritmética é `velocidadeAutoScroll` em `reo
 teste — o caso que prende o bug é o ponto alcançável dando `v > 0` com a dock descontada e `0`
 sem ela.
 
-⚠️ **E o quanto o conteúdo andou é MEDIDO, nunca o quanto foi pedido.** Somar
+**E o quanto o conteúdo andou é MEDIDO, nunca o quanto foi pedido.** Somar
 `destino - offset` ao dedo no mesmo quadro em que se pede o `scrollTo` assume que ele aconteceu;
 no fim do conteúdo o pedido é clampado e a soma continua. Medido: `dy` foi de 433 para **181.534**
 em três quadros com o offset parado, e o ladrilho saiu voando da tela. Comparar o offset com o do
 quadro anterior conserta os dois fins sem saber onde o conteúdo termina.
 
-⚠️ **Na GRADE o slot mora DENTRO do transform.** Com `left`/`top` estáticos, soltar produzia dois
+**Na GRADE o slot mora DENTRO do transform.** Com `left`/`top` estáticos, soltar produzia dois
 movimentos ao mesmo tempo (o layout pulando para o slot novo e o transform voltando a zero) e o
 ladrilho teleportava. Uma expressão só para a posição, e não há salto.
 
@@ -284,7 +291,7 @@ que só aparecem quando existem os dois), **forma** (um glifo por tipo num ladri
 fixa, escaneável sem ler) e **palavra** (o tipo embaixo do nome, e no cartão o dia de fechamento,
 que é o dado que decide em qual fatura a compra cai).
 
-⚠️ **Sem cor de emissor aqui.** A liberação da cor da marca vale DENTRO da forma de um cartão de
+**Sem cor de emissor aqui.** A liberação da cor da marca vale DENTRO da forma de um cartão de
 crédito; numa linha de lista ela volta a ser cor de terceiro competindo com o único accent. E o
 nome vem CRU no seletor — `accountLabel` (que emenda "· Cartão") é para onde só cabe uma linha,
 como os chips do lançamento. Repetir o sufixo numa linha que já tem o tipo embaixo ensina a
@@ -316,7 +323,7 @@ pessoa a não ler o sufixo.
 | entre linhas irmãs de um card | `Space.md` (12) | `Card` e `Row` |
 | entre rótulo e valor colados | `Space.xs` (4) / `half` (2) | par de texto |
 
-⚠️ **Espaçamento já era todo tokenizado** — 13 literais crus no repo inteiro em 13/09/2026. O que
+**Espaçamento já era todo tokenizado** — 13 literais crus no repo inteiro em 13/09/2026. O que
 estava bagunçado não era o valor, era *qual* token cada tela escolhia — e, principalmente, as
 **duas telas que escreviam o próprio padding** em vez de usar o `Screen`: a Hoje (96dp de vazio
 empilhado em volta do empty state, `+ Space.md` no topo contra `+ Space.sm` de todas as outras) e
@@ -333,7 +340,7 @@ matiz. O verde de 03/09 saiu; verde, vermelho e âmbar são só semântica (dinh
 e atraso, atenção). A seção "o roxo foi testado e devolvido", mais abaixo, continua valendo como
 registro do que não fazer.
 
-⚠️ **Superfície escura tem paleta PRÓPRIA: `heroChip`, `onHeroSuccess`, `onHeroDanger`,
+**Superfície escura tem paleta PRÓPRIA: `heroChip`, `onHeroSuccess`, `onHeroDanger`,
 `onHeroWarning`.** O painel de destaque e o cartão de crédito aberto são escuros nos DOIS temas.
 Pintados com os tokens do tema ativo, o modo claro entregava um botão branco sólido com ícone
 branco dentro — invisível — e vermelho escuro sobre preto. Dentro de superfície escura, use os
@@ -348,14 +355,14 @@ padrão, mais `light` e `dark` explícitos, gravados no `AsyncStorage` e trocado
 travado em dark entre 02 e 03/09/2026 — o desenho do Stitch é OLED e o claro o desmontava —, e a
 trava cobrou caro: metade da paleta ficou sem ninguém olhando.
 
-⚠️ **A escolha vai também para o NATIVO** (`Appearance.setColorScheme`, 17/09/2026). Valendo só no
+**A escolha vai também para o NATIVO** (`Appearance.setColorScheme`, 17/09/2026). Valendo só no
 React, com o app em Claro e o celular no Escuro o diálogo "Sair da conta?" chegava escuro sobre a
 tela clara (medido nos dois), e o mesmo valia para teclado e alertas. No Android o `uiMode` está
 no `configChanges`, então a troca não recria a tela. E o tema NATIVO do Android usa as cores do
 app (`plugins/with-android-theme-colors.js`): fundo da janela no papel/tinta e o acento na tinta
 — os botões dos diálogos e o `Switch` ligado saíam no verde-azulado do template.
 
-⚠️ **`useColorScheme` do `react-native` é PROIBIDO em componente.** Quem responde qual esquema
+**`useColorScheme` do `react-native` é PROIBIDO em componente.** Quem responde qual esquema
 vale é `useScheme()` do provider; o hook da plataforma ignora a escolha do usuário e o componente
 que o usar fica com a elevação do tema errado — em silêncio, porque a cor ainda existe.
 `Card`, `Row`, `Toast` e `Segmented` já foram corrigidos.
@@ -395,17 +402,17 @@ toast, `Dica` e o guia aceitam os dois. No diálogo nativo (sem negrito) a frase
 "Arquivar a meta Viagem?". `anti-slop.test.ts` barra « », “ ” e `"${…}"`; ficam as aspas de
 CITAÇÃO da fala da pessoa na Hoje.
 
-⚠️ **Nenhuma palavra parte ao meio.** `ThemedText` traz `android_hyphenationFrequency="none"`, e
+**Nenhuma palavra parte ao meio.** `ThemedText` traz `android_hyphenationFrequency="none"`, e
 os primitivos de duas colunas (`Row`) **quebram a linha e mandam o valor para baixo** em vez de
 espremer o título. A doc do Android é explícita: `none` não impede a quebra quando a palavra é
 mais larga que a caixa — quem resolve é o layout. Sem isso a lista de lançamentos escrevia
 "Ferramenta / s" e "Passagem / aérea" com fonte grande, que é pior que reticências.
 
-⚠️ **`textBreakStrategy="balanced"` foi testado e devolvido** (07/09/2026): equilibrar o
+**`textBreakStrategy="balanced"` foi testado e devolvido** (07/09/2026): equilibrar o
 comprimento das linhas move os pontos de quebra, e no painel da Hoje empurrou o separador para o
 começo da linha seguinte ("· Projeção positiva"). Um "·" abrindo linha lê como marcador de lista.
 
-⚠️ **Todo texto ENCOLHE — `ThemedText` traz `flexShrink: 1` na base** (07/09/2026). O Yoga usa
+**Todo texto ENCOLHE — `ThemedText` traz `flexShrink: 1` na base** (07/09/2026). O Yoga usa
 `flexShrink: 0` por padrão, ao contrário do flexbox do navegador: numa linha, o texto nunca cedia,
 mantinha a largura natural e **empurrava o irmão para fora do card**, que tem `overflow: 'hidden'`
 e corta. Foi assim que o botão de olho do `HeroPanel` apareceu "cortado à direita" num aparelho
@@ -413,7 +420,7 @@ com fonte grande, e a mesma mecânica valia para as ~400 chamadas do componente.
 ceder desliga na chamada: `Money` (quebrar no meio dos dígitos é pior que estourar a caixa) e o
 título de uma linha que precisa quebrar a linha inteira, abaixo.
 
-⚠️ **Texto dentro de um contêiner com `entering` do Reanimated precisa de `flexShrink: 0`**
+**Texto dentro de um contêiner com `entering` do Reanimated precisa de `flexShrink: 0`**
 (15/09/2026, medido no APK de RELEASE, não no dev). O título da tela de bloqueio chegava na tela
 escrito **"App"** — a palavra "bloqueado" não era pintada. O bundle Hermes trazia a string inteira
 e a árvore de acessibilidade também (`"App bloqueado"`, 617px de largura): o que falhava era a
@@ -428,12 +435,12 @@ O mesmo `type="title"` de duas palavras ("Criar conta", no cadastro) pinta intei
 há animação no contêiner do texto. **Identificador dentro de `Animated.View` com `entering`
 desliga o encolhimento na chamada.**
 
-⚠️ **`flexShrink: 0` é o que faz `flexWrap` funcionar numa linha com texto.** Medido: com
+**`flexShrink: 0` é o que faz `flexWrap` funcionar numa linha com texto.** Medido: com
 `flexShrink: 1` o Yoga prefere ENCOLHER a quebrar, então ligar `flexWrap` não muda nada e o título
 continua sumindo. O padrão para "título + pílula na mesma linha" é `flexWrap: 'wrap'` na linha e
 `flexShrink: 0, maxWidth: '100%'` no título — lado a lado quando cabe, pílula embaixo quando não.
 
-⚠️ **Dinheiro NÃO encolhe por padrão; quem encolhe é o bloco de geometria FIXA** (24/09/2026).
+**Dinheiro NÃO encolhe por padrão; quem encolhe é o bloco de geometria FIXA** (24/09/2026).
 Em 23/09 o `Money` passou a `adjustsFontSizeToFit` em todo lugar (a face do cartão partia
 "R$ 1.423,0" / "0"), e no iPhone isso cobrou caro: o texto que encolhe numa passada de layout
 estreita não volta a crescer, e valores soltos no ciclo ficaram minúsculos. Onde há espaço a `Row`
@@ -441,7 +448,7 @@ manda o valor para baixo do título; onde não há — face do cartão, ladrilho
 primitivo liga `DinheiroEncolhe` (ou `encolhe` na chamada). `simple-finance-ui.test.ts` prende o
 padrão e os três lugares.
 
-⚠️ **Frase com dinheiro dentro é UM texto, com o `Money` aninhado** (23/09/2026). Montada em
+**Frase com dinheiro dentro é UM texto, com o `Money` aninhado** (23/09/2026). Montada em
 peças soltas numa linha `flexWrap` — "R$ 0,00" · "de" · "R$ 30.000,00" · "· faltam" · valor —,
 cada peça quebrava sozinha, o `Money` encolhia para caber (`adjustsFontSizeToFit`) e a linha de
 base desalinhava: a tela de Metas a 384dp × fonte 1,3 (*"olha as letras cortando e ficando tudo
@@ -469,7 +476,7 @@ nunca "Confirmar" na tela seguinte.
 
 - `Icon` (`src/components/ui/icon.tsx`) é o único caminho. Nenhuma outra biblioteca de ícone
   entra no projeto.
-- ⚠️ **No Android o ícone é TEXTO, e texto cresce com a fonte do sistema.** O `SymbolView` só é
+- **No Android o ícone é TEXTO, e texto cresce com a fonte do sistema.** O `SymbolView` só é
   nativo no iOS; fora dele ele renderiza `<Text style={{fontSize: size, lineHeight: size}}>` dentro
   de uma `View` de `size × size`. O `<Text>` passa pelo `fontScale` do aparelho, a `View` não —
   então a 1,3× o glifo é desenhado maior que a caixa e **sobra para fora**. Dentro de um chip
@@ -510,20 +517,20 @@ Barra de progresso e gráfico **animam** quando o valor muda — valor que salta
 barra **nasce no valor real**: crescer de zero na montagem dependia de a mola rodar, e no Android
 ela ficou parada logo depois de o app voltar ao primeiro plano, com um limite usado de 0% na tela.
 
-⚠️ **`exiting` não sabe POR QUE o componente desmontou — então saída que muda de lista é
+**`exiting` não sabe POR QUE o componente desmontou — então saída que muda de lista é
 cross-fade** (14/09/2026). Em Notas, FIXADAS e SOLTAS são duas listas: fixar DESMONTA o cartão de
 uma e MONTA na outra, e o `SlideOutRight` planejado para "arquivar" disparava igual no fixar — o
 cartão voava para fora da tela antes de reaparecer no topo, contando "tirei isto daqui"
 justamente na ação que o traz para cima. Direção só pode ser usada quando o componente tem UMA
 razão possível para sair. Na dúvida, cross-fade, que é o que §5 já manda para saída sem direção.
 
-⚠️ **Animação presa ao MOUNT dispara em todo mount — o que quase nunca é o que se quis dizer.**
+**Animação presa ao MOUNT dispara em todo mount — o que quase nunca é o que se quis dizer.**
 O pulso do alfinete ("acabou de ser fixado") funcionava, mas abrir a aba fazia todos os
 alfinetes pularem de uma vez: movimento permanente sem propósito. E prendê-lo a uma transição
 false→true nunca dispararia, porque o cartão que chega na outra lista é NOVO. Quando o estado
 muda de lista, quem conta a chegada é o `entering` da linha — o ícone fica parado.
 
-⚠️ **A tab bar do Android é a exceção declarada à regra da frequência** (07/09/2026, decisão do
+**A tab bar do Android é a exceção declarada à regra da frequência** (07/09/2026, decisão do
 dono do produto). Ela usa `Motion.spring.tab` (1000 ms, `dampingRatio 0.62`), não `snap`: ~180 ms
 de percurso, ~10% de ultrapassagem e ~500 ms até assentar. Com `snap` o indicador atravessava as
 cinco abas em **~130 ms** e parava seco — não lia como "rápido", lia como teleporte, e foi a queixa
@@ -546,24 +553,24 @@ Olhando só a cortina, com a trava ligada a cascata tocava inteira por baixo del
   `withDelay`). Com efeito passivo, a tela que chega pesada ficava ~0,5 s com o corpo vazio.
 - **O tempo é o da montagem.** O atraso vem da posição do bloco, e ela muda quando um bloco
   condicional aparece acima; com ele vivo nas dependências, os de baixo sumiam e entravam de novo.
-- ⚠️ **O conteúdo que substitui o ESQUELETO nasce no lugar** (25/09/2026). O `Screen` que abriu
+- **O conteúdo que substitui o ESQUELETO nasce no lugar** (25/09/2026). O `Screen` que abriu
   sem `stagger` (a fase do esqueleto do portão) passa `noLugar` à cascata: medido em Orçamentos, o
   conteúdo recomeçava da opacidade 0 e a montagem pesada engolia a animação — ~0,8 s de tela em
   branco entre o esqueleto e o conteúdo. A entrada volta a tocar na geração seguinte (app visível
   de novo). E a cascata não embrulha o que não ocupa lugar (`Stack.Screen`, ações do header,
   `Sheet`): cada caixa vazia levava o `gap` e abria vão no topo.
-- ⚠️ **O repouso é escrito pelo React** (`assentado`). No Android uma atualização do Reanimated
+- **O repouso é escrito pelo React** (`assentado`). No Android uma atualização do Reanimated
   já se perdeu: o Financeiro ficou com o corpo inteiro invisível depois de trocar de aba, com os
   blocos na árvore. Terminada a entrada (ou estourado o teto), o bloco renderiza o estilo final
   explícito — e isso não depende de o Reanimated chegar à tela. Mesma lição da barra de progresso
   que nasce no valor real.
-- ⚠️ **Animação de LAYOUT (`layout=`) não existe no Android** (23/09/2026). A view com
+- **Animação de LAYOUT (`layout=`) não existe no Android** (23/09/2026). A view com
   `LinearTransition` ficava PRESA no primeiro quadro — desenhada e tocável na posição e no tamanho
   antigos quando o conteúdo acima mudava de altura: o `SelectField` por cima do próprio rótulo,
   a data e o "Já saiu do caixa" por cima da lista de contas, com o toque nas opções sem chegar.
   O caminho único é `transicaoDeLayout` (`components/motion/transicao.ts`): deslize no iOS,
   reorganização de uma vez no Android. **Nunca escrever `LinearTransition` numa tela.**
-- ⚠️ **O `Segmented` do Android segue a mesma regra, e com uma volta a mais** (23/09/2026): o
+- **O `Segmented` do Android segue a mesma regra, e com uma volta a mais** (23/09/2026): o
   polegar ficava preso num quadro do meio (uma bolinha solta, ou esticado sobre as duas células).
   Trocar só o `style` da MESMA view animada para estilo comum NÃO resolve — a view guarda o que o
   Reanimated escreveu nela. Parado, o polegar é OUTRA view (`View` comum por `left`); a animada
@@ -585,7 +592,7 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
 - **Haptics é pontuação**, um por ação do usuário, no mesmo frame do visual: `selectionAsync` ao
   passar de opção, `impactAsync(Light)` ao encaixar, `notificationAsync` no resultado. Nunca em
   scroll, nunca em loop, nunca como único feedback.
-- ⚠️ **`refreshing` é do GESTO, nunca de `isRefetching`** (14/09/2026). `refreshing={x.isRefetching}`
+- **`refreshing` é do GESTO, nunca de `isRefetching`** (14/09/2026). `refreshing={x.isRefetching}`
   parece a leitura óbvia e transforma toda invalidação em spinner: em Notas, cada fixar, colorir,
   arquivar e arrastar abria o `RefreshControl` sozinho e empurrava a tela ~60pt para baixo — salto
   de layout em toda ação, medido no simulador. O indicador nasce de um `useState` que o `onRefresh`
@@ -596,7 +603,7 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
 - **Mutation que falha precisa aparecer.** Toast + rollback visível. Falha silenciosa é
   reprovação — vale para delete, toggle, arquivar e pagar, não só para salvar.
 
-  ⚠️ **E o toast disparado de dentro de um `Sheet` não aparecia — nas 22 telas que usam sheet**
+  **E o toast disparado de dentro de um `Sheet` não aparecia — nas 22 telas que usam sheet**
   (medido no emulador em 15/09/2026: o `onError` recebeu o erro do banco e a tela não pintou um
   pixel). O `Modal` do React Native é uma JANELA separada no Android e um view controller
   apresentado no iOS; o host do toast vive na árvore raiz, então ele era desenhado ATRÁS da
@@ -607,7 +614,7 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
   **Não é pôr o toast num `Modal` próprio**: no Android uma janela transparente come todos os
   toques enquanto está no ar, e o sheet ficaria intocável por 3,2 s.
 
-  ⚠️ **As telas `presentation: 'modal'` tinham o mesmo defeito no iOS** — medido em 17/09/2026
+  **As telas `presentation: 'modal'` tinham o mesmo defeito no iOS** — medido em 17/09/2026
   no formulário de lançamento: o toast disparou e nada apareceu. Ali a tela é um VC apresentado
   sobre a raiz. A correção é `<ToastDoModal/>` no fim da tela (`ui/toast.tsx`): no iOS ele desenha
   o toast, no Android não desenha nada, porque lá o modal mora no mesmo contêiner e o da raiz já
@@ -653,24 +660,24 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
     sumir (~0,2 s) e as de baixo sobem — esperando, a faixa ficava ~1 s parada e a linha sumia de
     uma vez (medido no s26). Se a ação falhar, a linha reabre e o card volta em 3 s. O resto volta
     logo, por trás do que abriu.
-  - ⚠️ **O fundo da `linha` mora no invólucro que sai** (`Saida`), não no `childrenContainerStyle`
+  - **O fundo da `linha` mora no invólucro que sai** (`Saida`), não no `childrenContainerStyle`
     da biblioteca: aquele fica parado no painel aberto e cobria metade da ponta com a linha vazia.
-  - ⚠️ **Cada botão tem base OPACA** sob a cor: o `dangerSoft` é translúcido, e cobrindo o "Mais"
+  - **Cada botão tem base OPACA** sob a cor: o `dangerSoft` é translúcido, e cobrindo o "Mais"
     até o fim deixava ver o ícone e o rótulo dele através.
-  ⚠️ Os botões do painel são `Gesture.Tap` **simultâneos ao observador do dedo**: o `Pressable`
+  Os botões do painel são `Gesture.Tap` **simultâneos ao observador do dedo**: o `Pressable`
   do gesture-handler perdia o toque para o `Gesture.Manual` no iPhone (24/09/2026).
-  ⚠️ **O FAB sobe acima do toast** (`useSubirAcimaDoToast`): os dois moravam no mesmo lugar e o
+  **O FAB sobe acima do toast** (`useSubirAcimaDoToast`): os dois moravam no mesmo lugar e o
   "Desfazer" do toast caía no "Lançar".
   Grade (pasta em grade) não arrasta: o toque longo já é o arrasto de reordenar.
-  ⚠️ Os botões do painel NÃO são o `Pressable` da RN: ele não recebe o toque dentro do
+  Os botões do painel NÃO são o `Pressable` da RN: ele não recebe o toque dentro do
   `ReanimatedSwipeable` no Android (ver o `Tap` acima).
-  ⚠️ **Dentro de um card arrastável o valor NÃO é selecionável** (`DentroDeArrasto`, em
+  **Dentro de um card arrastável o valor NÃO é selecionável** (`DentroDeArrasto`, em
   `money.tsx`): no Android o arrasto que começava em cima do número selecionava a palavra, e o
   toque longo ali é o menu do card. Não "devolver" o `selectable`.
-  ⚠️ Os dois painéis leem o MESMO deslocamento: toda conta de "passou do ponto" é por lado
+  Os dois painéis leem o MESMO deslocamento: toda conta de "passou do ponto" é por lado
   (`passouAteOFim`, `abriuOLado` em `lib/arrasto.ts`). Pelo valor absoluto, arrastar a nota para
   a esquerda fixava em vez de arquivar.
-  ⚠️ **"Até o fim" é decidido NO SOLTAR, na thread da UI, pelo dedo** (24/09/2026): um gesto
+  **"Até o fim" é decidido NO SOLTAR, na thread da UI, pelo dedo** (24/09/2026): um gesto
   que só observa (`Gesture.Manual`, simultâneo ao do arrasto) lê o quanto o dedo andou no próprio
   evento e soma o painel que já estava aberto (`traducaoNoSoltar`). Ler o deslocamento do card no
   `onSwipeableWillOpen` pegava a mola já andando, e um valor gravado na UI às vezes chegava ao JS
@@ -687,7 +694,7 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
   Mudança pedida antes de o aparelho responder (abrir o app num link) fica numa fila e é aplicada
   por cima do que foi lido (`use-dicas.test.ts`). Só volta pelo
   "Mostrar" do guia (`/guia`). Guardada por usuário no aparelho (`dicas:<userId>`).
-  ⚠️ **Some quando o gesto TERMINA, nunca no meio dele.** Encerrada no `onSwipeableWillOpen`, a
+  **Some quando o gesto TERMINA, nunca no meio dele.** Encerrada no `onSwipeableWillOpen`, a
   dica da lista sumia com o painel abrindo: a lista subia ~200dp e os botões do painel andavam
   sob o dedo. É no `onSwipeableClose`. Dica nova que some pelo uso segue a mesma pergunta: o que
   está embaixo do dedo se move quando ela sai?
@@ -698,7 +705,7 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
 
 1. **Loading** — `Skeleton` com **a forma do conteúdo final**. Nunca spinner de tela cheia para
    atualização parcial.
-   ⚠️ **Texto nunca aparece em esqueleto** (25/09/2026, *"texto nunca deve aparecer em
+   **Texto nunca aparece em esqueleto** (25/09/2026, *"texto nunca deve aparecer em
    skeleton"*). Enquanto um bloco carrega, o título, a contagem, a legenda e o botão DELE viram
    forma ou somem junto. Era "Recentes" sobre três esqueletos no Agente — e, sem conversa, o bloco
    carregava e sumia. Bloco que pode não existir depois de carregar não desenha esqueleto nenhum:
@@ -706,19 +713,19 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
    filtro, abas), o título da página e as seções já carregadas.
 2. **Empty** — `EmptyState`: ícone SF, título, e uma **dica acionável** (normalmente o atalho do
    WhatsApp). Composto, não um parágrafo cinza.
-   ⚠️ **Lista vazia que não é a única coisa da tela: o que existe vem PRIMEIRO e o vazio é
+   **Lista vazia que não é a única coisa da tela: o que existe vem PRIMEIRO e o vazio é
    `EmptyState compacto`, um card de linha depois dele** (24/09/2026). Dívidas desenhava o vazio
    grande no centro e "Arquivadas · 1" solto embaixo (*"está horrível… esse layout tem que ser em
    todas as telas"*); Metas, Parceladas, Recorrentes e Lembretes com só concluídas/terminadas/
    pausadas nem diziam que não havia nada ativo. `simple-finance-ui.test.ts` prende as cinco.
-   ⚠️ **E a decisão é por CHAMADA, no app inteiro** (25/09/2026, a terceira vez — Organizar pastas,
+   **E a decisão é por CHAMADA, no app inteiro** (25/09/2026, a terceira vez — Organizar pastas,
    com "Sem pasta" embaixo do vazio; a varredura achou 23 iguais). Todo `<EmptyState>` sem
    `compacto` está em `VAZIO_GRANDE_PERMITIDO` (`anti-slop.test.ts`) com o motivo de ser a única
    coisa da tela; um novo quebra o build até alguém decidir.
 3. **Error** — inline e específico, com "Tentar de novo" que refaz a query.
 4. **Conteúdo longo** — texto que **quebra** sem quebrar layout. Quem cede é o LAYOUT.
 
-⚠️ **Isto mudou em 07/09/2026, e mudou de sinal.** A regra dizia "texto que TRUNCA sem quebrar
+**Isto mudou em 07/09/2026, e mudou de sinal.** A regra dizia "texto que TRUNCA sem quebrar
 layout", e o resultado num aparelho real foi um Perfil com três linhas seguidas terminando antes
 do sentido: "Avisos financeiros no c…", "Você negou a permissão. Libe…", "Trocar número do
 WhatsA…". A queixa do dono do produto foi literal — *"como que o usuário vai saber se ele não
@@ -735,7 +742,7 @@ A régua nova:
 cada entrada exige escrever POR QUE aquele texto não é identificador. Sem o teste a contagem volta
 a subir sozinha, como já aconteceu com hex e `fontSize`.
 
-⚠️ **`Row` não tem mais `subtitleLines`.** O prop existia para "deixar duas linhas nesta tela", que
+**`Row` não tem mais `subtitleLines`.** O prop existia para "deixar duas linhas nesta tela", que
 é a decisão que produzia o problema — subtítulo agora ocupa quantas linhas precisar, em todo lugar.
 
 **Cada seção da tela tem o seu.** Tela com 4 queries não pode esconder o erro de 3 delas atrás do
@@ -743,13 +750,13 @@ estado da primeira: seção que falha diz que falhou, não some.
 
 ## 7b. Texto explicativo — o rótulo e a explicação não podem ter o mesmo peso
 
-⚠️ **`Field` empatava os dois** (11/09/2026): rótulo e `hint` eram ambos `small` +
+**`Field` empatava os dois** (11/09/2026): rótulo e `hint` eram ambos `small` +
 `textSecondary`, e com 89 usos de `hint=` o formulário virava uma parede de cinza de 15px onde
 nada dizia o que era campo e o que era explicação. O `hint` desceu para `footnote` (13px) —
 um degrau abaixo do rótulo —, e `error` e `hint` deixaram de se excluir: o erro apagava a
 explicação justamente quando ela mais importa.
 
-⚠️ **Indicador de erro não pode depender de UM PIXEL sobreviver** (15/09/2026). A borda de
+**Indicador de erro não pode depender de UM PIXEL sobreviver** (15/09/2026). A borda de
 `invalid` nos inputs era `StyleSheet.hairlineWidth` — 1 pixel FÍSICO, invisível enquanto o campo
 é válido e portanto sem custo aparente. Sob qualquer reescala ela se desfaz: na janela reduzida
 do emulador as arestas retas somem e restam **quatro cantinhos vermelhos soltos**, que foi a
@@ -777,7 +784,7 @@ que "voltar" faz depois.
 
 - **Header é do navegador — exceto nas cinco RAÍZES de aba e nas telas MODAIS.**
 
-  ⚠️ **As três telas `presentation: 'modal'` são `headerShown: false` desde 13/09/2026** e
+  **As três telas `presentation: 'modal'` são `headerShown: false` desde 13/09/2026** e
   desenham `TaskHeader` no conteúdo, igual aos sheets. Não é preferência:
   `react-native-screens` (`ScreenStackHeaderConfig.kt:374-382`) roda `toolbar.title = null`
   sempre que existe um subview `LEFT` customizado — e o ✕ era exatamente isso. No Android
@@ -789,7 +796,7 @@ que "voltar" faz depois.
   **Tela EMPURRADA continua com o header do navegador** e `<Stack.Title>` — **título compacto e
   FIXO, sem large title** — e o `ScrollView` continua precisando ser a raiz dela.
 
-  ⚠️ **O header não desce com a tela, e no iOS 26 ele é translúcido desde o primeiro quadro**
+  **O header não desce com a tela, e no iOS 26 ele é translúcido desde o primeiro quadro**
   (19/09/2026, decisão do dono do produto: *"nunca vi o header descer junto com a tela"*). Duas
   mudanças, uma de produto e uma de estabilidade:
 
@@ -821,7 +828,7 @@ que "voltar" faz depois.
   baixo. Quem reserva a altura é a tela, por `useAppHeaderHeight()` — o `Screen` já faz isso
   quando recebe `topBar`, e as raízes com scroll próprio somam à mão.
 
-  ⚠️ **Isto já foi decidido nos dois sentidos.** Entre 30/08 e 03/09/2026 a faixa foi trocada por
+  **Isto já foi decidido nos dois sentidos.** Entre 30/08 e 03/09/2026 a faixa foi trocada por
   uma micro-etiqueta de contexto + display grande, com o argumento de que a marca no topo gasta a
   faixa mais nobre da tela dizendo o que a pessoa já sabe. O argumento continua de pé em abstrato;
   o desenho é do dono do produto e as quatro telas do export têm esta barra. **Não "corrigir" de
@@ -834,7 +841,7 @@ que "voltar" faz depois.
   informação. Barra desenhada à mão dentro do `ScrollView` continua proibida: o `AppHeader` fica
   FORA dele.
 
-  ⚠️ **E o scroll da tela empurrada tem que ser a RAIZ dela.** Hoje o motivo é o scroll edge
+  **E o scroll da tela empurrada tem que ser a RAIZ dela.** Hoje o motivo é o scroll edge
   effect do vidro no iOS 26, que procura o scroll pelo mesmo caminho raso; o registro abaixo é de
   quando o sintoma era o large title (11/09/2026). O iOS procura o scroll view da interação do título grande andando pelos
   PRIMEIROS SUBVIEWS a partir da raiz, e a busca é rasa: com uma `View` no meio ele não acha,
@@ -889,7 +896,7 @@ que "voltar" faz depois.
   leva `primary` (vira `variant: 'done'`, o negrito do sistema); sem ele o "Salvar" fica menos
   proeminente que o "Cancelar" ao lado.
 
-  ⚠️ **Botão e menu "…" na mesma tela saem de UMA chamada:
+  **Botão e menu "…" na mesma tela saem de UMA chamada:
   `<HeaderActions actions={[...]} menu={{ title, actions }} />`** (10/09/2026). Montar
   `<HeaderActions>` e `<HeaderMenu>` lado a lado parecia óbvio e estava errado: os dois escrevem
   `headerRight`, `setOptions` faz merge raso, e a mesma chave escrita duas vezes não soma — **o
@@ -910,7 +917,7 @@ que "voltar" faz depois.
 - **Porta de mão única** (login, onboarding concluído, compra) sai da pilha com `Stack.Protected`
   + `replace` — voltar nunca reentra no estado antigo.
 - **Abas são pares.** Nada de slide entre abas; re-tap na aba ativa volta à raiz.
-- ⚠️ **A tab bar aparece SÓ nas cinco raízes** (07/09/2026, decisão do dono do produto). Toda tela
+- **A tab bar aparece SÓ nas cinco raízes** (07/09/2026, decisão do dono do produto). Toda tela
   empurrada mora no `<Stack>` da RAIZ (`src/app/_layout.tsx`), fora de `(tabs)` — 23 arquivos
   saíram de `(tabs)/finance/`, `(tabs)/notes/`, `(tabs)/profile/` e `(tabs)/agent/`. Aninhadas nas
   abas, elas ficavam POR BAIXO da dock: ela aparecia dentro da conversa do agente, da fatura, do
@@ -921,27 +928,24 @@ que "voltar" faz depois.
   **A URL não mudou em nenhuma delas** — `(tabs)` é um GRUPO e nunca entrou no caminho, então
   `/finance/cards` continua `/finance/cards` e nenhum `router.push` foi reescrito. Cada pilha de
   aba ficou com uma tela só (a raiz); o título das empurradas vive no `_layout.tsx` da raiz.
-
-  Efeito colateral a lembrar: quem reservava `CURVED_BAR_SPACE` numa tela secundária passou a
-  deixar uma faixa vazia do tamanho da dock. Foi o caso do `ChatComposer`.
 - **A tab bar tem DUAS implementações, uma por plataforma.** No iOS é a `NativeTabs`
   (`app-tabs.tsx`) em Liquid Glass, com `tintColor` = `tint`. No Android é a `PillTabBar`
   (`app-tabs.android.tsx` → `components/ui/pill-tab-bar.tsx`, Suave 16/09/2026): uma **pílula
   escura** (`heroSurface`) com um **círculo claro que desliza** até o ícone ativo, rótulos nas
   cinco abas, badge por cima. Substituiu o berço recortado (`CurvedTabBar`).
 
-  ⚠️ **O ícone dentro do círculo é RECORTADO, não trocado.** O círculo tem `overflow: hidden` e
+  **O ícone dentro do círculo é RECORTADO, não trocado.** O círculo tem `overflow: hidden` e
   carrega uma segunda fileira de ícones escuros transladada ao contrário: o ícone escuro aparece
   exatamente onde o círculo está, inclusive no meio do caminho. Trocar a cor por estado fazia o
   indicador chegar carregando o ícone errado.
 
-  ⚠️ **O CONTEÚDO da barra segue a POSIÇÃO, nunca a rota** (03/09/2026). A mola parte do dedo, na
+  **O CONTEÚDO da barra segue a POSIÇÃO, nunca a rota** (03/09/2026). A mola parte do dedo, na
   UI thread; `activeIndex` vem do expo-router e só chega quando a tela de destino monta. Tudo que
   desenha (círculo, ícones, cor do rótulo) deriva da posição; `activeIndex` fica para a mola, o
   guarda do toque e a acessibilidade. Para VER isso: toque numa aba e capture um quadro
   imediatamente — a barra deve LIDERAR a navegação, não segui-la.
 
-  ⚠️ **O rótulo tem sobra além do slot** (14dp): a 384dp × fonte 1,3 "Financeiro" não cabia na
+  **O rótulo tem sobra além do slot** (14dp): a 384dp × fonte 1,3 "Financeiro" não cabia na
   coluna, e o `adjustsFontSizeToFit` do Android não encolhe um `Animated.Text` com confiança.
 
 - **`backgroundColor` na `NativeTabs` é proibido no iOS.** Dar cor de fundo torna a barra opaca e
@@ -1109,7 +1113,7 @@ Dois, e só dois — o que os apps do nicho (Copilot, Monarch, YNAB) põem na te
 | **Livre** | iOS pequeno/médio + bloqueio (inline, retangular); Android 2×2 redimensionável | o herói da Hoje: "Livre até dd/mm", o valor, o veredito do dia; largo = + compromissos do ciclo e a próxima conta |
 | **O que vence** | iOS médio/grande; Android 4×2 | o total, o atrasado numa FAIXA só, as próximas com selo de data, "+N a vencer" |
 
-⚠️ **Retrato v2 (22/09/2026): menos texto.** A v1 listava cada atrasada numa linha vermelha com
+**Retrato v2 (22/09/2026): menos texto.** A v1 listava cada atrasada numa linha vermelha com
 "venceu dd/mm" — seis linhas vermelhas iguais eram o widget inteiro (*"não esse monte de
 texto"*). O atrasado virou UM resumo (quantas e quanto) e a lista é só o que vai vencer, cada
 uma com um selo de data (dia grande, mês pequeno; hoje inverte). Nome de conta nunca corta:
@@ -1124,25 +1128,25 @@ para uma linha e cortava); `minimumScaleFactor` foi medido e devolvido — encol
 - **O desenho é o herói**: bloco de tinta nos dois temas, `onHero*` por cima (as cores viajam
   nas props, resolvidas para hex sólido), Plus Jakarta no Android (embutida pelo plugin),
   vermelho só para atrasado. O número NUNCA trunca: `tamanhoQueCabe` reduz a fonte.
-- ⚠️ **`'use no memo'` no topo dos arquivos de widget.** O React Compiler transformava o
+- **`'use no memo'` no topo dos arquivos de widget.** O React Compiler transformava o
   componente em hook e o Android quebrava com "Invalid Hook Call".
-- ⚠️ **Toque abre o app DONO, sem URL** (`OPEN_APP`; iOS sem `widgetURL`): o scheme
+- **Toque abre o app DONO, sem URL** (`OPEN_APP`; iOS sem `widgetURL`): o scheme
   `appproops` é o mesmo nas três variantes e o sistema abria o seletor de app.
-- ⚠️ **`publicar.tsx`, `.ios.tsx` e `.android.tsx` na MESMA extensão**: o Metro resolve por
+- **`publicar.tsx`, `.ios.tsx` e `.android.tsx` na MESMA extensão**: o Metro resolve por
   extensão antes de plataforma, e com a base em `.ts` o Android rodava o no-op.
 - É **nativo**: entra em build (tag), não em OTA. `plugins/with-work-runtime-alinhado.js` segura
   o conflito de `work-runtime-ktx` que o Glance do `expo-widgets` traz no Android.
-- ⚠️ **As libs de widget só carregam com o módulo NATIVO presente** (`index.js`,
+- **As libs de widget só carregam com o módulo NATIVO presente** (`index.js`,
   `publicar.*.tsx`): as duas o exigem na importação, e JS novo num binário de antes dos widgets
   (OTA para a nativa errada) fechava o app na abertura — medido no simulador. `try` em volta do
   `require` NÃO serve: o Metro manda o erro ao `reportFatalError` e não relança. Pergunta antes
   (`requireOptionalNativeModule('ExpoWidgets')`, `TurboModuleRegistry.get('AndroidWidget')`).
-- ⚠️ **O retrato vai ao iOS SEM `null`** (`semNulos` em `propsDoWidget`): as preferências do App
+- **O retrato vai ao iOS SEM `null`** (`semNulos` em `propsDoWidget`): as preferências do App
   Group recusam o retrato INTEIRO por um `null` só ("Exception in HostFunction"). No iPhone de
   produção o widget ficou sem retrato ("Please adopt containerBackground API") e, ao sair da
   conta, seguia mostrando o dinheiro de quem saiu. E os widgets desenham um estado neutro com
   fundo quando as props chegam VAZIAS (galeria, ou widget posto antes da 1ª publicação).
-- ⚠️ **O cache é limpo ANTES da troca de usuário** (`SessionProvider aoTrocarDeUsuario`), nunca
+- **O cache é limpo ANTES da troca de usuário** (`SessionProvider aoTrocarDeUsuario`), nunca
   num `useEffect` da raiz: efeito de pai roda depois dos filhos, e o `clear()` matava as consultas
   que o sincronizador tinha acabado de criar — o widget ficava "Entre no app" com a pessoa logada.
 - Instalou pacote com plugin de Babel (o `'widget'` do `expo-widgets`)? `expo start --clear`:

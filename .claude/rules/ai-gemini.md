@@ -1,3 +1,8 @@
+---
+paths:
+  - "agent/**"
+---
+
 # IA — Gemini (classificação) + Groq (áudio)
 
 **Decisão imutável: a IA do produto é Google Gemini. Nunca usar Claude API.** STT é Groq Whisper.
@@ -41,7 +46,7 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   do router nem do parse. Daí `GEMINI_GATE`, que é o antigo `GEMINI_ESCALATE` finalmente ligado em
   alguma coisa. `tests/test_confirm_semantic.py` quebra se o portão cair para o padrão.
 
-  ⚠️ **O Lite do parse é o 3.1, não o 3.5, e a diferença é DINHEIRO.** Em "48x de 1470" o
+  **O Lite do parse é o 3.1, não o 3.5, e a diferença é DINHEIRO.** Em "48x de 1470" o
   3.5-flash-lite devolveu `705600` em vez de `7056000` — uma ordem de grandeza — em 1 de 3
   execuções. `parse_valor_em_centavos` **não** protege: a rede só entra quando a IA OMITE o valor,
   não quando ela erra. Medido em 15 amostras por modelo: 3.1-lite 15/15, 3.5-lite 14/15.
@@ -49,7 +54,7 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   requisições/dia no nível gratuito, e escalonamento automático estourava isso rápido; perguntar
   "confirma?" é grátis e, quando o modelo entendeu errado, é a resposta mais útil de qualquer
   forma.
-- ⚠️ **Modelo FORA DO AR é outra coisa: router, parse e batch têm reserva no Flash**
+- **Modelo FORA DO AR é outra coisa: router, parse e batch têm reserva no Flash**
   (`gemini.structured` → `with_fallbacks`, 22/09/2026). O Lite respondeu `503 high demand` e
   `ReadTimeout` por horas, e sem reserva TODA mensagem virava "Não consegui processar". A reserva
   só roda quando a chamada FALHA — não é escalonamento por confiança, e não remover achando que
@@ -75,7 +80,7 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   `FinanceAction` está cheio — capacidade nova ali sai por ALVO resolvido (foi assim que quitar
   fatura sem caixa virou `mark_paid` sobre `card_invoices`) ou pelo catálogo de `ResourceAction`,
   que segue em 5×5 e aceita campo novo de graça. Ver `docs/AGENTE-PARIDADE-COM-O-APP.md`.
-- Por isso Finanças são **dois** schemas: escrita/correção (13×14) e consulta (7×9). Escrita e
+- Por isso Finanças são **dois** schemas: escrita/correção (18×14, no teto de 252) e consulta (10×12). Escrita e
   correção ficam juntas de propósito — separá-las obrigaria o router a decidir se "o mercado de
   ontem foi 120" é lançamento novo ou correção, e errar isso cria a duplicata que o produto
   inteiro luta para evitar.
@@ -104,7 +109,7 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   (A cópia morta `finance.resolve_transaction` foi apagada em 15/09/2026 — ela tinha o mesmo
   defeito abaixo e zero chamadores.)
 
-  ⚠️ **Termo que o usuário DEU e não casa com nada é "não achei", nunca "então toma a lista".**
+  **Termo que o usuário DEU e não casa com nada é "não achei", nunca "então toma a lista".**
   O filtro por texto tinha uma guarda legítima — termo que não bate não pode ZERAR uma busca que
   já achou por valor — e ela estava escrita como `if por_texto:` sem `else`: quando o termo era a
   ÚNICA pista, o filtro se descartava em silêncio, `filtrou` ficava `False` e a função caía na
@@ -116,7 +121,7 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   Hoje é `elif not filtrou: return "none", []`, no ramo do texto **e** no da data, e o `elif`
   guarda o caso para o qual a guarda foi escrita.
 
-  ⚠️ **E o "não achei" CITA o termo** (`registry._sem_alvo`). "Não achei esse item por aqui" é a
+  **E o "não achei" CITA o termo** (`registry._sem_alvo`). "Não achei esse item por aqui" é a
   frase de quem não apontou nada; devolvê-la a quem escreveu um nome faz a pessoa remandar a mesma
   mensagem. O termo sai de `resolve.termo_de`, que é o MESMO caminho que `for_actions` usa para
   resolver — duas cadeias de campos divergiriam, e divergir aqui é a frase voltar a ser genérica.
@@ -135,21 +140,12 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   quando estão ligadas, porque modelo trocado em silêncio é medição que deixa de valer sem
   ninguém perceber. Papel desconhecido levanta, em vez de cair num default.
 
-  ⚠️ **Eram TRÊS mecanismos, e um era arma carregada** (11/09/2026): além da tabela existia
-  `settings.gemini_model`, com default **Flash**, lido em `llm()` ANTES do padrão do papel.
-  Uma chamada sem argumento — ou `GEMINI_MODEL` no ambiente — tirava router e parse do Lite
-  (500/dia grátis) e punha no Flash (20/dia), calado. Ele foi removido, e
-  `tests/test_schemas.py` quebra o build se um nome de modelo voltar a aparecer fora da
-  tabela.
-
-  ⚠️ **E voltou** — commit `2c849a4` (19/09/2026) reintroduziu `GEMINI_MODEL` global (código,
-  `.env.example`, `agent/.env`, `agent/.env.production`), e ele chegou a rodar em produção e
-  staging (o gate de confirmação inteiro migrou para o Lite, a combinação que a suíte já tinha
-  medido reprovando "apaga todos"). Removido de novo em 21/09/2026 (Task 0 de
-  `docs/superpowers/plans/2026-09-21-agente-sem-engessar-e-conversa-na-hora.md`): `settings.gemini_model`
-  saiu de `config.py`, `gemini.modelo()` só lê `GEMINI_MODEL_<PAPEL>`, e a variável saiu do Cloud
-  Run dos dois serviços (`--remove-env-vars GEMINI_MODEL`). **Não recriar.** Se a necessidade
-  voltar a aparecer, o mecanismo já existe por papel — global é o que já quebrou duas vezes.
+  **Não existe modelo global, e ele não volta.** Um `GEMINI_MODEL` (ou `settings.gemini_model`)
+  lido antes do papel já tirou router e parse do Lite (500/dia grátis) para o Flash (20/dia) em
+  silêncio e, noutra vez, levou o gate de confirmação para o Lite em produção — a combinação que
+  a suíte reprova (o Lite aprova "apaga todos"). A troca de modelo é por papel
+  (`GEMINI_MODEL_<PAPEL>`), e `tests/test_schemas.py` quebra o build se um nome de modelo
+  aparecer fora da tabela.
 
   | quando | comando |
   |---|---|
@@ -157,7 +153,7 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   | a execução que APROVA | `evaluate_answer_forms.py`, sem flag, **uma vez** |
   | sonda de turno inteiro | `probe_pergunta_ou_supoe.py` — já é toda Lite |
 
-  ⚠️ **NEM `ai_events` NEM o Langfuse enxergam as suítes — só a fatura enxerga** (medido em
+  **NEM `ai_events` NEM o Langfuse enxergam as suítes — só a fatura enxerga** (medido em
   15/09/2026). Entre 08 e 11/09 a API do Gemini recebeu **5.923 chamadas** (Cloud Monitoring,
   `serviceruntime.googleapis.com/api/request_count` no projeto `gen-lang-client-0373931877`) e o
   Langfuse traçou **~500**: os scripts de avaliação e os `probe_*` chamam o modelo fora do grafo,
@@ -171,7 +167,7 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   (in/out) = **US$ 0,000459/chamada**; `gemini-3.7-flash` US$ 0,75/3,75 = **US$ 0,002253/chamada**,
   4,9× mais caro. Um turno completo (router + parse) custa **US$ 0,0009**.
 
-  ⚠️ **A execução que APROVA não cabe num dia com a chave do staging** (medido em 23/09/2026).
+  **A execução que APROVA não cabe num dia com a chave do staging** (medido em 23/09/2026).
   Desde 21/09 o `agent/.env` usa um projeto SEM faturamento (a cota grátis vale por projeto): o
   Flash dá **20 chamadas/dia** e a suíte manda ~40 ao gate. Na rodada de 23/09 vieram 49 × `429
   RESOURCE_EXHAUSTED` no `gemini-3.7-flash` e o gate caiu no "não aprovado" de segurança — 95/148,
@@ -181,14 +177,14 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   esgotada pela suíte, as confirmações digitadas no staging também caem no "não aprovado" até
   a cota voltar.
 
-  ⚠️ **`--barato` não aprova nada.** O gate está no Flash porque o Lite FOI MEDIDO e reprova
+  **`--barato` não aprova nada.** O gate está no Flash porque o Lite FOI MEDIDO e reprova
   8 dos 94 casos — e uma das quedas é do lado que não pode cair ("apaga todos" voltou
   `approved: True`). Ler 86/94 do modo barato como regressão é perder tempo; lê-lo como
   aprovação é pior.
 
   Toda sonda imprime quantas chamadas vai fazer ANTES de fazer.
 
-- ⚠️ **O custo NÃO está no tráfego, está nas suítes.** Em 09/09/2026 a produção tinha 29 chamadas
+- **O custo NÃO está no tráfego, está nas suítes.** Em 09/09/2026 a produção tinha 29 chamadas
   em `ai_events` desde que existe, e o staging 130 — e mesmo assim 04/09 custou R$ 10. Quem gasta é
   `evaluate_answer_forms.py` (~94 chamadas por execução) mais os `probe_*`, e **nenhum deles grava
   em `ai_events`**: não aparecem em contagem nenhuma. Com o gate em Flash, cada execução completa é
@@ -203,7 +199,7 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   quantas mensagens de IA o workspace gastou no mês. Não gravar derruba o paywall em silêncio, e
   contar fast-path (saudação, SIM/NÃO) cobraria mensagem que não gastou token.
 - Tracing detalhado (nós, arestas, tools, tokens) vai para o **Langfuse**. **Só isso: `ai_events` não é tela.** Havia uma "Atividade da IA" listando modelo, confiança em % e as ações geradas, mais um bloco igual no detalhe do lançamento; os dois foram removidos em 30/08/2026. Nome de modelo e confiança são telemetria de quem CONSTRÓI o produto, e mostrar isso pede ao usuário que audite a IA em vez de confiar nela. O que o usuário precisa é ver o item certo e poder corrigi-lo onde ele mora — o que já existe no próprio item e no `undo_last` do WhatsApp.
-- Duas camadas, com propósitos diferentes, ambas em `_check_limits` (`app/worker.py`), **antes** de
+- Duas camadas, com propósitos diferentes, ambas em `conversation.check_limits` (chamada por `app/worker.py`), **antes** de
   gastar Groq/Gemini: a **hora** protege o custo contra rajada (contagem em `ai_events`); o **mês**
   é o produto (`_plan_status`). Estourou → responde e marca a mensagem done.
 - **Nunca dormir esperando 429 dentro do worker**: prende a conversa em `processing`. Falha rápido
@@ -224,7 +220,7 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
 - Foto de cupom, print de Pix e PDF de fatura entram no **mesmo nó de domínio e no mesmo schema** —
   nunca um segundo prompt só para imagem. Limite de 8MB e MIME na allowlist (`VISION_MIME` em
   `app/worker.py`). Anexo pula o router e vai direto para finanças (é quase sempre cupom/fatura).
-- Importação de extrato (OFX/CSV) tem prompt próprio e enxuto: `categorize_batch` manda o lote
+- Importação de extrato (OFX/CSV) tem prompt próprio e enxuto: `gemini.classify_statement_lines` manda o lote
   INTEIRO numa chamada e recebe um array na mesma ordem. O índice é o contrato.
 - **Regra do usuário ganha da IA**: `_match_rule` roda depois do parse (WhatsApp) e antes do Gemini
   (importação, economizando chamada). É a resposta à queixa de "categorizou errado e não dá para

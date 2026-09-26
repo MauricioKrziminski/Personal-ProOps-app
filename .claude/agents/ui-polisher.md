@@ -12,12 +12,13 @@ contra ele, não contra o seu gosto.
 
 Checklist de auditoria:
 
-1. **Superfície**: glass só na chrome e em **UM** card de destaque por tela (via `GlassCard`,
-   nunca `GlassView`/`BlurView` cru). Dois `GlassCard` de conteúdo na mesma tela é ❌. Card de
-   lista é `Card` opaco.
+1. **Superfície**: conteúdo opaco (`Card`); o destaque da tela é **UM** `HeroPanel`, não vidro.
+   Vidro só na chrome e nos controles interativos do iOS (`GlassBackdrop`, nunca
+   `GlassView`/`BlurView` cru). Dois destaques de conteúdo na mesma tela é ❌.
 2. **Tokens**: zero hex hardcoded (tudo via `useTheme()`), zero `fontSize` solto (tudo via
    `ThemedText type=`), raio só da escala `Radius` com `borderCurve: 'continuous'`, elevação via
-   `Elevation`/`boxShadow` (nunca `shadow*`/`elevation` legado), espaço via `Spacing`.
+   `Elevation`/`boxShadow` (nunca `shadow*`/`elevation` legado), espaço via `Space`, e o ritmo
+   vertical vem do `<Screen>`.
    Funciona em dark **e** light.
 3. **Ícones**: `Icon` (`expo-symbols`). **Emoji na chrome é ❌** — botão, aba, empty state, linha,
    título. Emoji só em conteúdo do usuário. Glyph de texto (`‹`, `＋`) fazendo papel de ícone é ❌.
@@ -31,10 +32,10 @@ Checklist de auditoria:
    respeitado.
 6. **Feedback**: haptics em ação importante, um por ação. **Toda mutation tem tratamento de
    falha visível** (toast + rollback) — delete, toggle, arquivar e pagar inclusive. Confirmação
-   destrutiva em action sheet nativo; ação de item em context menu nativo (`Link.Menu`), não
-   `onLongPress` + `Alert`.
-7. **Navegação**: header do navegador (`<Stack.Title>`, large title), busca via
-   `<Stack.SearchBar>`, presentation coerente com o significado (modal / formSheet / action
+   destrutiva por `confirmDestructive`; ação de item por `ItemLink`/`showItemActions` (context
+   menu no iOS, opções no Android), nunca `Alert` cru na tela.
+7. **Navegação**: tela empurrada com `<Stack.Title>` compacto (sem `headerLargeTitle`), raiz de
+   aba com `AppHeader`, busca no slot `search` do `<Screen>`, presentation coerente com o significado (modal / formSheet / action
    sheet). Barra de header desenhada à mão dentro do `ScrollView` é ❌.
 8. **Dinheiro e datas**: valores em centavos via `formatBRL`/`MoneyField`, com
    `fontVariant: ['tabular-nums']`. Datas via `formatDateBR`. Qualquer `parseFloat` em dinheiro
