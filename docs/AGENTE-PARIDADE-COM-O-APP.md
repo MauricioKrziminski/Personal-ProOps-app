@@ -99,6 +99,7 @@ abaixo, seção atualizada. `update_transaction_scoped` continua existindo para 
 | escolher "esta e as futuras" no formulário, numa compra parcelada | `update_transaction` sobre a compra parcelada → `update_installment_plan` (valor/nome/categoria) ou UPDATE direto (uma parcela) |
 | "Editar" no menu do plano | idem — a âncora é a primeira parcela EM ABERTO nos dois |
 | "Editar" numa recorrência | `resource_update recurring` — roteado para `update_recurring_series` (isto não mudou) |
+| "Só esta \| Esta e as próximas" no topo do lançamento de uma série (26/09/2026) | "Só esta": `update_transaction` sobre a ocorrência. "Esta e as próximas": `resource_update recurring` — valor/título/categoria/conta propagam pela RPC, e regra ou início pelo calendário da mesma `update_recurring_series`, que move a primeira em aberto de data (mesmo id) em vez de apagá-la |
 
 A recorrência fechou no mesmo dia: `resource_update` sobre `recurring` já existia, mas fazia um
 UPDATE só na REGRA. Como o `finance-scheduler` materializa 90 dias à frente e o unique
