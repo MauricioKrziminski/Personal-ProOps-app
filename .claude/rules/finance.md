@@ -36,7 +36,10 @@
     linha). Os dois lugares perguntam `first_due_date is null` antes de olhar o ciclo.
   - **O contrato de parcela fixa se edita mesmo com "Paguei" lançado** (decisão do dono do
     produto, 23/09/2026): o `check` segura a aritmética; o pagamento anterior à edição vira
-    histórico e não se corrige/apaga mais sozinho.
+    histórico. ⚠️ **Apagar o pagamento MAIS RECENTE continua valendo** (`20260925150000`): em
+    parcela fixa ele desfaz UMA parcela pelo contrato (parcela × restantes), sem conferir o saldo
+    que o pagamento guardou — conferindo, o "Paguei" seguido de "Editar dívida" ficava impossível
+    de apagar (visto em produção em 25/09/2026). Com juros a conferência continua.
   - **Parcela fixa paga com outro valor conta UMA parcela** (`20260925120000`, decisão do dono do
     produto): o saldo cai o valor da parcela, como o banco vê, e a diferença mora em
     `debt_interest_cents` — positiva é encargo, negativa é desconto. Limite: da metade até menos

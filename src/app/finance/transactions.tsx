@@ -50,6 +50,7 @@ import { usarDica } from '@/hooks/use-dicas';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { mesmoMes } from '@/lib/dates';
+import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive } from '@/lib/item-actions';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
 import { dueInline, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
@@ -429,7 +430,7 @@ export default function TransactionsScreen() {
       () =>
         remove.mutate(tx.id, {
           onSuccess: () => toast({ message: `Apaguei ${what}.`, tone: 'success' }),
-          onError: () => toast({ message: 'Não deu para apagar. Tenta de novo.', tone: 'error' }),
+          onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para apagar. Tenta de novo.'), tone: 'error' }),
         }),
       `${what}. Isso não volta.`
     );

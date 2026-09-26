@@ -545,7 +545,9 @@ lançamento"*. `FinanceAction` segue no teto de 252: o valor pago reusa `new_amo
 **Ordem de deploy:** as migrations `20260925120000`, `20260925130000` e `20260925140000` antes
 do agente e do app — sem a primeira o banco recusa qualquer valor diferente da parcela fixa (o
 trigger antigo), e a frase do SIM prometeria um encargo que o banco não aceita. Sem a terceira
-nada quebra: "Este e as próximas" só grava o pagamento com o encargo, como antes.
+nada quebra: "Este e as próximas" só grava o pagamento com o encargo, como antes. A `20260925150000`
+vai junto (independe de agente e app): apagar o pagamento mais recente de parcela fixa depois de
+editar o contrato era recusado — visto em produção no mesmo dia.
 
 ## Dicas no lugar e "Como usar o ProOps" (24/09/2026)
 

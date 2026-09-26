@@ -58,6 +58,7 @@ import { orcamentosApertados } from '@/lib/budget-tight';
 import { cartaoDaPilha } from '@/lib/card-status';
 import { describeCycle, describeRealizado } from '@/lib/cycle-label';
 import { isoToBR, mesmoMes } from '@/lib/dates';
+import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 
 /**
@@ -253,7 +254,7 @@ export default function FinanceScreen() {
       () =>
         remove.mutate(tx.id, {
           onSuccess: () => toast({ message: `Apaguei ${what}.`, tone: 'success' }),
-          onError: () => toast({ message: 'Não deu para apagar. Tenta de novo.', tone: 'error' }),
+          onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para apagar. Tenta de novo.'), tone: 'error' }),
         }),
       `${what}. Isso não volta.`
     );

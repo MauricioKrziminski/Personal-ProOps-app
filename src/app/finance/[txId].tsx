@@ -37,6 +37,7 @@ import {
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { detalheDoPagamento } from '@/lib/confirmar-baixa';
+import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive } from '@/lib/item-actions';
 import { dueLabel, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
@@ -180,8 +181,8 @@ export default function TransactionDetailScreen() {
             router.back();
             toast({ message: <>Apaguei <Forte>{nome}</Forte> e as parcelas.</>, tone: 'success' });
           },
-          onError: () =>
-            toast({ message: 'Não deu para apagar a compra. Tenta de novo.', tone: 'error' }),
+          onError: (error) =>
+            toast({ message: financeErrorMessage(error, 'Não deu para apagar a compra. Tenta de novo.'), tone: 'error' }),
         }),
       `Some ${quantas > 0 ? `${quantas} parcelas` : 'todas as parcelas'}${plano ? `, ${formatBRL(plano.total_cents)} no total` : ''} — de todos os meses. Isso não volta.`,
     );
@@ -201,7 +202,7 @@ export default function TransactionDetailScreen() {
             router.back();
             toast({ message: `Apaguei ${what}.`, tone: 'success' });
           },
-          onError: () => toast({ message: 'Não deu para apagar. Tenta de novo.', tone: 'error' }),
+          onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para apagar. Tenta de novo.'), tone: 'error' }),
         }),
       `${what}. Isso não volta.`
     );

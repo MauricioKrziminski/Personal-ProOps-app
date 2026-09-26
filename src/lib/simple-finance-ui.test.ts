@@ -127,6 +127,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useMonthBreakdown: () => ({ ...query, data: [] }),
     useSaveDebt: () => mutation('saveDebt'),
     usePayDebtInstallment: () => mutation('payDebt'),
+    useDeleteTransaction: () => mutation('deleteTransaction'),
     useArchiveDebt: () => mutation('archiveDebt'),
     useUnarchiveDebt: () => mutation('unarchiveDebt'),
     useDeleteDebt: () => mutation('deleteDebt'),
@@ -2362,4 +2363,29 @@ test('Orçamentos: a categoria do limite é o seletor de categorias, com as do u
   assert.ok(seletor(), 'Categoria usa o CategoryPicker');
   ui.interact(() => seletor().props.onChange('roupa'));
   assert.equal(seletor().props.value, 'roupa', 'a categoria própria fica escolhida');
+});
+
+/**
+ * Apagar que o BANCO recusa diz o motivo (25/09/2026, em produção): o pagamento do financiamento
+ * não apagava e o aviso era só "Não deu para apagar. Tenta de novo." — tentar de novo falhava sempre.
+ */
+test('Apagar lançamento: a recusa do banco aparece com a frase dele, a falha de rede segue genérica', () => {
+  const tx = {
+    id: 'pg-1', kind: 'expense', amount_cents: 10000, occurred_at: '2026-09-15', description: 'Parcela Carro',
+    category: 'dívidas', account_id: null, status: 'cleared', source: 'app', created_at: '2026-09-15T12:00:00Z',
+    recurring_id: null, installment_plan_id: null, invoice_id: null,
+    debt_id: 'd1', debt_payment_no: 2, debt_principal_cents: 10000, debt_balance_after_cents: 0,
+    debts: { name: 'Carro', kind: 'financing', calculation_mode: 'fixed_installments', installments: 12 },
+  };
+  for (const [erro, esperado] of [
+    [{ code: 'P0001', message: 'Apague primeiro o pagamento mais recente desta dívida' }, 'Apague primeiro o pagamento mais recente desta dívida'],
+    [{ code: 'PGRST301', message: 'JWT expired' }, 'Não deu para apagar. Tenta de novo.'],
+  ] as const) {
+    const ui = screen('src/app/finance/[txId].tsx', { txs: [tx], params: { txId: 'pg-1' } });
+    const menu = ui.nodes().find((n: any) => n.type === 'HeaderActions').props.menu;
+    ui.interact(() => menu.actions.find((a: any) => a.label === 'Apagar').onPress());
+    ui.interact(() => ui.confirmations.at(-1)());
+    ui.interact(() => ui.pedidos.at(-1).opts.onError(Object.assign(new Error(erro.message), erro)));
+    assert.equal(ui.toasts.at(-1)?.message, esperado);
+  }
 });

@@ -381,8 +381,8 @@ export default function InstallmentsScreen() {
       () =>
         removePlan.mutate(plano.id, {
           onSuccess: () => toast({ message: <>Apaguei <Forte>{plano.title}</Forte> e as parcelas.</>, tone: 'success' }),
-          onError: () =>
-            toast({ message: 'Não deu para apagar a compra. Tenta de novo.', tone: 'error' }),
+          onError: (error) =>
+            toast({ message: financeErrorMessage(error, 'Não deu para apagar a compra. Tenta de novo.'), tone: 'error' }),
         }),
       `Some as ${plano.installments} parcelas de ${plano.title}, ${formatBRL(plano.total_cents)} no total — de todos os meses. Isso não volta.`,
     );

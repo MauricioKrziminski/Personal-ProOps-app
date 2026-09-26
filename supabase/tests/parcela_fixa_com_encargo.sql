@@ -16,7 +16,8 @@
 -- parcela tem limite — da metade até menos do dobro —, senão R$ 0,01 quitaria uma parcela e três
 -- parcelas pagas juntas contariam como uma. 7: "Este e as próximas parcelas" — o contrato passa
 -- ao valor novo ANTES e o pagamento MAIS RECENTE, corrigido para esse valor, vira a parcela inteira
--- nele (sem encargo), como na folha de pagar; num pagamento antigo o encargo continua.
+-- nele (sem encargo), como na folha de pagar; num pagamento antigo o encargo continua. 8: pagar,
+-- editar o contrato e apagar o pagamento (produção, 25/09/2026) devolve UMA parcela — era recusado.
 
 \set ON_ERROR_STOP on
 begin;
@@ -24,7 +25,7 @@ set local timezone to 'America/Sao_Paulo';
 
 do $$
 declare
-  ws uuid; u uuid; conta uuid; d uuid; dj uuid; d7 uuid; p1 uuid; p2 uuid; q1 uuid; q2 uuid;
+  ws uuid; u uuid; conta uuid; d uuid; dj uuid; d7 uuid; d8 uuid; p1 uuid; p2 uuid; q1 uuid; q2 uuid; r1 uuid;
   l record;
 begin
   select w.id, m.user_id into ws, u
@@ -87,7 +88,7 @@ begin
     delete from public.transactions where id = p1;
     raise exception '4: apagar o pagamento antigo deveria ser recusado';
   exception when others then
-    if sqlerrm like '4:%' then raise; end if;
+    if sqlerrm not like 'Apague primeiro%' then raise; end if;
   end;
   -- apagar o mais recente devolve UMA parcela
   delete from public.transactions where id = p2;
@@ -173,6 +174,22 @@ begin
   select installments_paid, remaining_cents into l from public.debts where id = d7;
   if l.installments_paid <> 1 or l.remaining_cents <> 55000 then
     raise exception '7: apagar a última devolve UMA parcela nova — pagas % saldo %', l.installments_paid, l.remaining_cents;
+  end if;
+
+  -- 8. o caso de produção: 11 × 100, paga uma, e o contrato vira 12 × 100 com 1 paga — o saldo é
+  -- recalculado (110000) e o pagamento guardou 100000. Apagar o único pagamento devolve a parcela.
+  insert into public.debts (workspace_id, user_id, name, kind, calculation_mode, principal_cents,
+    remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, due_day)
+  values (ws, u, 'teste apagar depois de editar', 'financing', 'fixed_installments', 110000, 110000, 0, 11, 0, 10000, 5)
+  returning id into d8;
+  perform public.pay_debt_installment(d8, 10000, conta, current_date);
+  select id into r1 from public.transactions where debt_id = d8;
+  update public.debts set principal_cents = 120000, remaining_cents = 110000, installments = 12,
+    installments_paid = 1 where id = d8;
+  delete from public.transactions where id = r1;
+  select installments_paid, remaining_cents into l from public.debts where id = d8;
+  if l.installments_paid <> 0 or l.remaining_cents <> 120000 then
+    raise exception '8: apagar depois de editar devolve UMA parcela — pagas % saldo %', l.installments_paid, l.remaining_cents;
   end if;
 end $$;
 

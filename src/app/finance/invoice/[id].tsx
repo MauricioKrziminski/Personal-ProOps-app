@@ -43,6 +43,7 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { formatNumberBR } from '@/lib/dates';
+import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive } from '@/lib/item-actions';
 import { estadoDaLinha } from '@/lib/settle-labels';
 import { STATUS_DA_FATURA } from '@/lib/card-status';
@@ -319,7 +320,7 @@ export default function InvoiceScreen() {
       onConfirm: () =>
         remove.mutate(tx.id, {
           onSuccess: () => toast({ message: 'Compra apagada.', tone: 'success' }),
-          onError: () => toast({ message: 'Não deu para apagar a compra.', tone: 'error' }),
+          onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para apagar a compra.'), tone: 'error' }),
         }),
     });
 
