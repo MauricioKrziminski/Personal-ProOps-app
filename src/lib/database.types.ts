@@ -2759,6 +2759,15 @@ export type Database = {
         }[]
       }
       delete_debt: { Args: { p_debt_id: string }; Returns: number }
+      edit_goal_contribution: {
+        Args: {
+          p_amount_cents: number
+          p_contribution_id: string
+          p_note?: string
+          p_occurred_at: string
+        }
+        Returns: number
+      }
       edit_budget: {
         Args: {
           p_category: string

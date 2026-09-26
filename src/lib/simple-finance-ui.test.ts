@@ -64,6 +64,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useUpdateInstallmentPlan: () => mutation('updateInstallmentPlan'),
     useInstallmentPlan: (id?: string) => ({ ...query, isSuccess: true, data: (options.plans ?? []).find((p: any) => p.id === id) ?? null }),
     useGoalContributions: () => ({ ...query, isSuccess: true, data: options.contributions ?? [] }),
+    useEditGoalContribution: () => mutation('editGoalContribution'),
     useGoalDeposit: () => mutation('goalDeposit'),
     useDeleteImportBatch: () => mutation('deleteImportBatch'),
     useRecentTransactions: () => (options.recent ? { ...query, isSuccess: true, data: options.recent } : query),
@@ -1626,10 +1627,20 @@ test('Aporte: no extrato da meta arrasta Desfazer à esquerda, e ele confirma an
   ui.interact(() => meta.props.acoes.find((x: any) => x.label === 'Ver extrato').onPress());
   const aporte = deslizaveis(ui).find((d: any) => d.props.acoes.some((x: any) => x.label === 'Desfazer'));
   assert.ok(aporte, 'o aporte do extrato está num Deslizavel');
-  assert.deepEqual(ladosDe(aporte), { direita: [], esquerda: ['Desfazer'], mais: false, pontaDireita: null, pontaEsquerda: 'Desfazer' });
-  ui.interact(() => aporte.props.acoes[0].onPress());
+  // Editar à direita (26/09/2026, "tudo que se cria se edita"), Desfazer à esquerda.
+  assert.deepEqual(ladosDe(aporte), { direita: ['Editar'], esquerda: ['Desfazer'], mais: false, pontaDireita: 'Editar', pontaEsquerda: 'Desfazer' });
+  ui.interact(() => aporte.props.acoes.find((x: any) => x.label === 'Desfazer').onPress());
   assert.deepEqual(ui.writes, [], 'nada move antes da confirmação');
   assert.equal(ui.confirmations.length, 1);
+
+  // Editar abre DENTRO da folha do extrato e salva AQUELE aporte, com a data escolhida
+  const doExtrato = () => deslizaveis(ui).find((d: any) => d.props.acoes.some((x: any) => x.label === 'Desfazer'));
+  ui.interact(() => doExtrato().props.acoes.find((x: any) => x.label === 'Editar').onPress());
+  assert.ok(ui.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Editar aporte'));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(120000));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'DatePickerField' && n.props.accessibilityLabel === 'Data do aporte').props.onChange('02/09/2026'));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'TaskHeader').props.action.props.onPress());
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.pedidos.at(-1).value)), { id: 'c1', amountCents: 120000, occurredAt: '2026-09-02', note: null });
 });
 
 test('Parcelada: arrasta Editar a compra à direita e Apagar a compra inteira à esquerda; o resto no Mais', () => {

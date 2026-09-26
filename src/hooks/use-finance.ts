@@ -2724,16 +2724,35 @@ export function useSaveGoal() {
 export function useGoalDeposit() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async ({ goal, amountCents, note }: {
+    mutationFn: async ({ goal, amountCents, note, occurredAt }: {
       goal: Goal;
       amountCents: number;
       note?: string;
+      /** Quando (26/09/2026): era sempre hoje. Sem ela, hoje no relógio da pessoa. */
+      occurredAt?: string;
     }) => {
       const { error } = await supabase.rpc('goal_deposit', {
         p_goal_id: goal.id,
         p_amount_cents: amountCents,
-        p_occurred_at: localISODate(),
+        p_occurred_at: occurredAt ?? localISODate(),
         p_note: note ?? undefined,
+      });
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Muda AQUELE aporte (`20260926160000`): valor, data e nota, com a trava de não negativar a meta. */
+export function useEditGoalContribution() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (input: { id: string; amountCents: number; occurredAt: string; note: string | null }) => {
+      const { error } = await supabase.rpc('edit_goal_contribution', {
+        p_contribution_id: input.id,
+        p_amount_cents: input.amountCents,
+        p_occurred_at: input.occurredAt,
+        p_note: input.note ?? undefined,
       });
       if (error) throw error;
     },

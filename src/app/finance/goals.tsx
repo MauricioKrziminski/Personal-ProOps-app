@@ -30,14 +30,18 @@ import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useArchiveGoal,
+  useEditGoalContribution,
   useGoalContributions,
   useGoalDeposit,
   useGoals,
   useSaveGoal,
   type Goal,
+  type GoalContribution,
 } from '@/hooks/use-finance';
-import { brToISO, formatBRL, isValidBRDate, isoToBR, mesCurto } from '@/lib/dates';
+import { Segmented } from '@/components/ui/segmented';
+import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate, mesCurto } from '@/lib/dates';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
+import { financeErrorMessage } from '@/lib/finance-form';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 
@@ -101,12 +105,23 @@ export default function GoalsScreen() {
   const goals = useGoals();
   const save = useSaveGoal();
   const deposit = useGoalDeposit();
+  const editarAporte = useEditGoalContribution();
   const archive = useArchiveGoal();
 
   const [form, setForm] = useState<FormState | null>(null);
   const [aporteSelecionado, setAporte] = useState<Goal | null>(null);
   const [aporteCents, setAporteCents] = useState(0);
   const [aporteNota, setAporteNota] = useState('');
+  /** Quando (26/09/2026): era sempre hoje. */
+  const [aporteData, setAporteData] = useState(() => isoToBR(localISODate()));
+  /**
+   * O aporte do extrato em edição (26/09/2026, "tudo que se cria se edita"): era só "Desfazer",
+   * que lançava um estorno ao lado. A edição abre DENTRO da folha do extrato — uma folha sobre a
+   * outra é janela dentro de janela no Android.
+   */
+  const [aporteEmEdicao, setAporteEmEdicao] = useState<{
+    id: string; tipo: 'guardou' | 'retirou'; cents: number; nota: string; data: string;
+  } | null>(null);
   const [extratoSelecionado, setExtrato] = useState<Goal | null>(null);
   const [concluidasAbertas, setConcluidasAbertas] = useState(false);
 
@@ -142,7 +157,33 @@ export default function GoalsScreen() {
   const abrirAporte = (g: Goal) => {
     setAporteCents(0);
     setAporteNota('');
+    setAporteData(isoToBR(localISODate()));
     setAporte(g);
+  };
+
+  const abrirEdicaoDoAporte = (c: GoalContribution) =>
+    setAporteEmEdicao({
+      id: c.id,
+      tipo: Number(c.amount_cents) < 0 ? 'retirou' : 'guardou',
+      cents: Math.abs(Number(c.amount_cents)),
+      nota: c.note ?? '',
+      data: isoToBR(c.occurred_at),
+    });
+
+  const salvarAporte = () => {
+    const e = aporteEmEdicao;
+    if (!e || e.cents <= 0 || !isValidBRDate(e.data)) return;
+    editarAporte.mutate(
+      { id: e.id, amountCents: e.tipo === 'retirou' ? -e.cents : e.cents, occurredAt: brToISO(e.data), note: e.nota.trim() || null },
+      {
+        onSuccess: () => {
+          toast({ message: 'Aporte corrigido.', tone: 'success' });
+          setAporteEmEdicao(null);
+        },
+        // o banco diz o motivo (retirar mais que o guardado); a folha fica aberta com o valor
+        onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para corrigir o aporte.'), tone: 'error' }),
+      },
+    );
   };
 
   const prazoOk = form ? form.deadline === '' || isValidBRDate(form.deadline) : false;
@@ -182,7 +223,7 @@ export default function GoalsScreen() {
     const antes = Number(aporte.saved_cents);
     const depois = antes + sinal * aporteCents;
     deposit.mutate(
-      { goal: aporte, amountCents: sinal * aporteCents, note: aporteNota.trim() || undefined },
+      { goal: aporte, amountCents: sinal * aporteCents, note: aporteNota.trim() || undefined, occurredAt: brToISO(aporteData) },
       {
         onSuccess: () => {
           const bateu = depois >= Number(aporte.target_cents) && antes < Number(aporte.target_cents);
@@ -475,6 +516,10 @@ export default function GoalsScreen() {
                 />
               </Field>
 
+              <Field label="Quando">
+                <DatePickerField value={aporteData} onChange={setAporteData} max={localISODate()} accessibilityLabel="Data do aporte" />
+              </Field>
+
               <View style={styles.acoesAporte}>
                 <Button
                   label="Guardar"
@@ -494,19 +539,59 @@ export default function GoalsScreen() {
               </View>
 
               <ThemedText type="small" themeColor="textSecondary">
-                Não conta como gasto · data de hoje
+                Não conta como gasto
               </ThemedText>
             </ScrollView>
           ) : null}
       </Sheet>
 
       {/* Extrato — sheet próprio, lista completa (não o acordeão truncado em 8 linhas). */}
-      <Sheet visible={extrato !== null} onClose={() => setExtrato(null)}>
+      <Sheet visible={extrato !== null} onClose={() => { setAporteEmEdicao(null); setExtrato(null); }}>
           <TaskHeader
-            title={extrato ? `Extrato de ${extrato.name}` : 'Extrato'}
-            onClose={() => setExtrato(null)}
+            title={aporteEmEdicao ? 'Editar aporte' : extrato ? `Extrato de ${extrato.name}` : 'Extrato'}
+            // Editando, o ✕ volta ao extrato; na lista, fecha a folha.
+            onClose={() => (aporteEmEdicao ? setAporteEmEdicao(null) : setExtrato(null))}
+            action={
+              aporteEmEdicao ? (
+                <Button
+                  label="Salvar"
+                  size="sm"
+                  loading={editarAporte.isPending}
+                  disabled={aporteEmEdicao.cents <= 0 || !isValidBRDate(aporteEmEdicao.data)}
+                  onPress={salvarAporte}
+                />
+              ) : undefined
+            }
           />
 
+          {aporteEmEdicao ? (
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
+              <Field label="Tipo">
+                <Segmented
+                  options={[
+                    { value: 'guardou', label: 'Guardei' },
+                    { value: 'retirou', label: 'Retirei' },
+                  ]}
+                  value={aporteEmEdicao.tipo}
+                  onChange={(tipo) => setAporteEmEdicao({ ...aporteEmEdicao, tipo })}
+                />
+              </Field>
+              <Field label="Valor">
+                <MoneyField valueCents={aporteEmEdicao.cents} onChangeCents={(cents) => setAporteEmEdicao({ ...aporteEmEdicao, cents })} />
+              </Field>
+              <Field label="Nota">
+                <TextField value={aporteEmEdicao.nota} onChangeText={(nota) => setAporteEmEdicao({ ...aporteEmEdicao, nota })} placeholder="Ex.: sobra do salário" />
+              </Field>
+              <Field label="Quando">
+                <DatePickerField
+                  value={aporteEmEdicao.data}
+                  onChange={(data) => setAporteEmEdicao({ ...aporteEmEdicao, data })}
+                  max={localISODate()}
+                  accessibilityLabel="Data do aporte"
+                />
+              </Field>
+            </ScrollView>
+          ) : (
           <ScrollView keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.sheetBody}
             // Rolar o extrato fecha o aporte arrastado que estiver aberto (Deslizavel).
@@ -530,9 +615,12 @@ export default function GoalsScreen() {
                 key={mes}
                 title={`${new Date(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)) - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })} · ${brl(grupo.total)}`}>
                 {(grupo.itens ?? []).map((c) => {
-                  // O aporte só tem "Desfazer": ele vai à esquerda, e o toque longo lê a mesma lista.
+                  // Editar à direita, Desfazer à esquerda; o toque longo lê a mesma lista.
                   const acoesDoAporte: ItemAction[] = extrato
-                    ? [{ label: 'Desfazer', icon: 'arrow.uturn.backward', destructive: true, arrasto: 'esquerda', onPress: () => desfazerAporte(extrato, Number(c.amount_cents)) }]
+                    ? [
+                        { label: 'Editar', icon: 'pencil', arrasto: 'direita', onPress: () => abrirEdicaoDoAporte(c) },
+                        { label: 'Desfazer', icon: 'arrow.uturn.backward', destructive: true, arrasto: 'esquerda', onPress: () => desfazerAporte(extrato, Number(c.amount_cents)) },
+                      ]
                     : [];
                   return (
                   <Deslizavel key={c.id} titulo={isoToBR(c.occurred_at)} acoes={acoesDoAporte}>
@@ -571,6 +659,7 @@ export default function GoalsScreen() {
               />
             ) : null}
           </ScrollView>
+          )}
       </Sheet>
 
       {/* Criar / editar */}
