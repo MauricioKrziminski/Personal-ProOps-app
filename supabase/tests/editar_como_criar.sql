@@ -9,6 +9,7 @@
 -- 4. Compra no CARTÃO: as já pagas quitam a fatura vencida que é só delas, e reabrem junto; a
 --    fatura paga de verdade não reabre; data e cartão não mudam com parcela paga na fatura.
 -- 5. Renomear uma compra de fatura adiada não a leva para a fatura seguinte.
+-- 6. Parcelar um lançamento que já existe pergunta as já pagas, como a criação.
 -- Datas relativas a hoje: o teste não envelhece. Roda numa transação e dá rollback.
 
 \set ON_ERROR_STOP on
@@ -168,6 +169,21 @@ begin
     update public.transactions set occurred_at = hoje - 5 where id = compra;
     select invoice_id into l from public.transactions where id = compra;
     if l.invoice_id <> seguinte then raise exception '5: mudar a data não mudou a fatura'; end if;
+  end;
+
+  -- ── 6. parcelar um lançamento que já existe, com 2 já pagas ─────────────────────────────
+  declare
+    avulso uuid;
+  begin
+    insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, account_id, occurred_at, source, status)
+      values (w, u, 'expense', 30000, 'Geladeira', cc, hoje - 60, 'app', 'cleared') returning id into avulso;
+    plano := public.convert_transaction_to_installments(avulso, 30000, 3, hoje - 60, 'Geladeira', 'casa', null, cc, 2);
+    select count(*) filter (where status = 'cleared' and installment_no <= 2) as pagas,
+           count(*) filter (where status = 'pending' and installment_no = 3) as aberta into l
+      from public.transactions where installment_plan_id = plano;
+    if l.pagas <> 2 or l.aberta <> 1 then raise exception '6: pagas % (2), aberta % (1)', l.pagas, l.aberta; end if;
+    select count(*) into n from pg_proc where proname = 'convert_transaction_to_installments';
+    if n <> 1 then raise exception '6: % versões da conversão (1)', n; end if;
   end;
 end $$;
 

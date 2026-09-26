@@ -350,8 +350,11 @@ function TransactionForm({
    * compra aparecer duas vezes na fatura (19/09/2026).
    */
   const podeParcelarAqui = podeParcelar(kind, accountId, editing);
-  /** Histórico ("3 das 12 já foram pagas") é da CRIAÇÃO. Ver o ⚠️ da migration. */
-  const podeInformarHistorico = podeParcelarAqui && !editing;
+  /**
+   * Histórico ("3 das 12 já foram pagas"): na criação E ao parcelar um lançamento que já existe
+   * (26/09/2026, `convert_transaction_to_installments` com as já pagas) — o mesmo campo.
+   */
+  const podeInformarHistorico = podeParcelarAqui;
   /** Achado B: esconde o Segmented de tipo numa linha de série — ver o ⚠️ no Controller de `kind`. */
   const naSerieEditada = Boolean(editing?.installment_plan_id || editing?.recurring_id);
   /** Pagamento de dívida também: o trigger da dívida exige despesa PAGA, e recusaria a troca. */
@@ -568,6 +571,8 @@ function TransactionForm({
             category: values.category,
             merchant: values.merchant?.trim() || null,
             accountId: contaParaConverter,
+            paidInstallments:
+              installmentHistory(values.paid_installments, values.installments, brToISO(values.occurred_at), localISODate()) || null,
           },
           {
             onSuccess: () => {

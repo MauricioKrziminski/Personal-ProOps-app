@@ -802,6 +802,8 @@ export function useConvertToInstallments() {
       category: string | null;
       merchant: string | null;
       accountId: string;
+      /** "Parcelas já pagas", como na criação (`20260926130000`). */
+      paidInstallments?: number | null;
     }) => {
       const { error } = await supabase.rpc('convert_transaction_to_installments', {
         p_transaction_id: input.transactionId,
@@ -812,6 +814,7 @@ export function useConvertToInstallments() {
         p_category: input.category ?? undefined,
         p_merchant: input.merchant ?? undefined,
         p_account_id: input.accountId,
+        p_paid_installments: input.paidInstallments ?? undefined,
       });
       if (error) throw error;
     },
