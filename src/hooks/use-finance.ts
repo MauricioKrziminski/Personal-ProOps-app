@@ -2066,12 +2066,13 @@ export function useSaveDebt() {
 export function usePayDebtInstallment() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async (input: { debtId: string; amountCents: number; accountId?: string | null }) => {
+    mutationFn: async (input: { debtId: string; amountCents: number; accountId?: string | null; paidAt?: string }) => {
       const { error } = await supabase.rpc('pay_debt_installment', {
         p_debt_id: input.debtId,
         p_amount_cents: input.amountCents,
         p_account_id: input.accountId ?? undefined,
-        p_paid_at: localISODate(),
+        // Quando a folha não diz, hoje no relógio da pessoa (o default da assinatura é o do UTC).
+        p_paid_at: input.paidAt ?? localISODate(),
       });
       if (error) throw error;
     },

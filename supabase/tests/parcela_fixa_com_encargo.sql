@@ -83,18 +83,19 @@ begin
     raise exception '3: dívida pagas % saldo %', l.installments_paid, l.remaining_cents;
   end if;
 
-  -- 4. apagar um ANTIGO continua recusado (o saldo depende da ordem)
-  begin
-    delete from public.transactions where id = p1;
-    raise exception '4: apagar o pagamento antigo deveria ser recusado';
-  exception when others then
-    if sqlerrm not like 'Apague primeiro%' then raise; end if;
-  end;
-  -- apagar o mais recente devolve UMA parcela
-  delete from public.transactions where id = p2;
+  -- 4. apagar um ANTIGO vale (`20260926140000`): devolve UMA parcela e o seguinte vira o nº 1
+  delete from public.transactions where id = p1;
   select installments_paid, remaining_cents into l from public.debts where id = d;
   if l.installments_paid <> 1 or l.remaining_cents <> 110000 then
     raise exception '4: dívida pagas % saldo %', l.installments_paid, l.remaining_cents;
+  end if;
+  select debt_payment_no into l from public.transactions where id = p2;
+  if l.debt_payment_no <> 1 then raise exception '4: o seguinte devia virar o nº 1 (%)', l.debt_payment_no; end if;
+  -- e apagar o que sobrou devolve a outra
+  delete from public.transactions where id = p2;
+  select installments_paid, remaining_cents into l from public.debts where id = d;
+  if l.installments_paid <> 0 or l.remaining_cents <> 120000 then
+    raise exception '4: dívida pagas % saldo % depois de apagar os dois', l.installments_paid, l.remaining_cents;
   end if;
 
   -- 5. com juros: o valor pago continua abatendo (juros do mês primeiro)
@@ -109,13 +110,21 @@ begin
       l.remaining_cents;
   end if;
   perform public.pay_debt_installment(dj, 20000, conta, current_date);
-  begin
-    update public.transactions set amount_cents = 25000
-    where debt_id = dj and debt_payment_no = 1;
-    raise exception '5: corrigir pagamento antigo de dívida com juros deveria ser recusado';
-  exception when others then
-    if sqlerrm like '5:%' then raise; end if;
-  end;
+  -- corrigir o ANTIGO vale (`20260926140000`): +5000 de principal nele, e o saldo depois dele, o
+  -- do seguinte e o da dívida caem 5000; os juros cobrados ficam
+  update public.transactions set amount_cents = 25000
+  where debt_id = dj and debt_payment_no = 1;
+  select debt_principal_cents, debt_interest_cents, debt_balance_after_cents into l
+    from public.transactions where debt_id = dj and debt_payment_no = 1;
+  if l.debt_principal_cents <> 24000 or l.debt_interest_cents <> 1000 or l.debt_balance_after_cents <> 76000 then
+    raise exception '5: o antigo ficou principal % juros % saldo %', l.debt_principal_cents, l.debt_interest_cents, l.debt_balance_after_cents;
+  end if;
+  select debt_balance_after_cents, debt_interest_cents into l from public.transactions where debt_id = dj and debt_payment_no = 2;
+  if l.debt_balance_after_cents <> 56810 or l.debt_interest_cents <> 810 then
+    raise exception '5: o seguinte ficou saldo % juros % (56810 / 810)', l.debt_balance_after_cents, l.debt_interest_cents;
+  end if;
+  select remaining_cents into l from public.debts where id = dj;
+  if l.remaining_cents <> 56810 then raise exception '5: a dívida ficou em % (56810)', l.remaining_cents; end if;
 
   -- 6. limites de UMA parcela no modo fixo (parcela de 10000)
   begin
@@ -133,7 +142,9 @@ begin
   perform public.pay_debt_installment(d, 5000, conta, current_date);   -- metade: aceita
   perform public.pay_debt_installment(d, 19999, conta, current_date);  -- quase o dobro: aceita
   begin
-    update public.transactions set amount_cents = 30000 where id = p1;
+    -- (o p1 do caso 4 foi apagado: a correção vai no de 5000, que acabou de entrar)
+    update public.transactions set amount_cents = 30000 where debt_id = d and amount_cents = 5000;
+    if not found then raise exception '6: o pagamento de 5000 não existe (o teste não prova nada)'; end if;
     raise exception '6: corrigir para o triplo deveria ser recusado';
   exception when others then
     if sqlerrm like '6:%' then raise; end if;

@@ -212,6 +212,8 @@ export default function DebtsScreen() {
   const setPagando = (debt: Debt | null) => setPagandoId(debt?.id ?? null);
   const [pagoCents, setPagoCents] = useState(0);
   const [contaId, setContaId] = useState<string | null>(null);
+  /** Quando saiu (26/09/2026): era sempre hoje — pagou ontem e lançou hoje ficava com a data errada. */
+  const [pagoEm, setPagoEm] = useState(() => isoToBR(localISODate()));
   const [nasProximas, setNasProximas] = useState(false);
 
   // Lazy: só a dívida aberta (detalhe ou pagamento) puxa a tabela Price.
@@ -286,6 +288,7 @@ export default function DebtsScreen() {
     setPagoCents(Number((detalhe?.id === d.id ? schedule.data?.[0]?.payment_cents : null) ?? d.installment_cents ?? 0));
     setContaId(d.account_id);
     setNasProximas(false);
+    setPagoEm(isoToBR(localISODate()));
     setPagando(d);
   };
 
@@ -309,8 +312,9 @@ export default function DebtsScreen() {
       setPagoCents(pedido.cents ?? Number(d.installment_cents ?? 0));
       setContaId(d.account_id);
       setNasProximas(false);
+      setPagoEm(isoToBR(localISODate()));
       setPagandoId(d.id);
-    }, [listaDeDividas, setPagoCents, setContaId, setNasProximas, setPagandoId]),
+    }, [listaDeDividas, setPagoCents, setContaId, setNasProximas, setPagandoId, setPagoEm]),
   );
 
   /**
@@ -462,7 +466,7 @@ export default function DebtsScreen() {
     if (!pagando || pagoCents <= 0 || naParcelaFixa?.erro) return;
     const registrar = () =>
       pagar.mutate(
-        { debtId: pagando.id, amountCents: pagoCents, accountId: contaId },
+        { debtId: pagando.id, amountCents: pagoCents, accountId: contaId, paidAt: brToISO(pagoEm) },
         {
           onSuccess: () => {
             toast({
@@ -874,6 +878,15 @@ export default function DebtsScreen() {
                   value={contaId}
                   onChange={setContaId}
                   emptyLabel="Não informar"
+                />
+              </Field>
+
+              <Field label="Quando">
+                <DatePickerField
+                  value={pagoEm}
+                  onChange={setPagoEm}
+                  max={localISODate()}
+                  accessibilityLabel="Data do pagamento"
                 />
               </Field>
 

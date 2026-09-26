@@ -2623,3 +2623,17 @@ test('Editar a compra: as já pagas se editam, o número muda com parcela paga, 
   assert.ok(naFatura.nodes().some((n: any) => n.type === 'TextField' && n.props.accessibilityLabel === 'Data da primeira parcela' && n.props.editable === false), 'parcela paga na fatura prende a data');
   assert.equal(quantidade(naFatura, 'Parcelas já pagas').props.min, 1, 'a paga com a fatura não reabre por aqui');
 });
+
+test('Dívidas: o "Paguei" tem a data do pagamento, e ela vai para o banco', () => {
+  // 26/09/2026: a data era sempre hoje — pagou ontem e lançou hoje ficava errado.
+  const ui = screen(debtsFile, {
+    create: false, debts: [carro], params: { id: 'd1' },
+    debtSchedule: [{ installment_no: 9, due_date: '2026-10-05', payment_cents: 147000, interest_cents: null, principal_cents: null, balance_cents: 0 }],
+  });
+  ui.press('Paguei esta parcela');
+  const data = () => ui.nodes().find((n: any) => n.type === 'DatePickerField' && n.props.accessibilityLabel === 'Data do pagamento');
+  assert.ok(data(), 'a folha pergunta quando');
+  ui.interact(() => data().props.onChange('20/09/2026'));
+  ui.press('Registrar pagamento');
+  assert.equal(ui.writes[0].value.paidAt, '2026-09-20');
+});
