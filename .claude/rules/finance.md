@@ -627,9 +627,10 @@ Total da compra** (`UnidadeDoValor`, `lib/finance-form.ts`, com teste):
 - **numa compra que existe** ela só troca a RÉGUA do campo: o total é a verdade
   (`ValorDaCompra`), "cada parcela" vale para as EM ABERTO (`travadoCents + x·abertas`, a mesma
   conta do `_perguntar_unidade` do agente) e trocar a unidade sem digitar não move um centavo;
-- mudar o valor numa parcela SALVA NA COMPRA (`destinoDoSalvar` → `editarCompra`,
-  `useEditarCompraPelaParcela`): a RPC com o nome da COMPRA (nunca o "(2/10)" da linha) e, em
-  seguida, a data desta parcela — a RPC refaz o calendário quando nada foi pago.
+- editar uma parcela pergunta **Só esta parcela | A compra toda** no topo do formulário
+  (`lib/compra.ts`, campos em `components/finance/compra-form.tsx` — os MESMOS de "Editar a
+  compra" em Parceladas). "Só esta" muda a linha (valor pela RPC de escopo `one`, que refaz o
+  total do plano); "A compra toda" vai por `update_installment_plan`.
 
 **É o padrão do nicho, e ele vem com uma qualificação que todos repetem** (pesquisado em
 15/09/2026): o Organizze recebe total + parcelas na criação (e põe o resto da divisão na
@@ -638,9 +639,13 @@ desabilita o número de parcelas depois do primeiro pagamento**; o Oracle Financ
 parcela com saldo em aberto. Daí as três regras:
 
 1. **Parcela travada não se move** — nem valor, nem data, nem conta, nem existência.
-2. **O número de parcelas, a data da primeira e a conta só mudam enquanto NADA foi pago.** Com
-   qualquer parcela travada, sobra editar o total (que redistribui só o saldo em aberto), o
-   título, o estabelecimento e a categoria.
+2. **Com parcela paga, o NÚMERO de parcelas muda** (as pagas ficam; o que falta do total se
+   reparte entre as em aberto, nunca abaixo da última paga) e **as parcelas já pagas também**
+   (`p_paid_installments`, `20260926130000`: aumentar dá baixa nas primeiras e quita a fatura
+   vencida que só tem parcelas pagas desta compra; diminuir reabre, e reabre junto a fatura que o
+   app quitou à mão por causa delas). **Data da 1ª e conta** só mudam sem parcela numa FATURA
+   paga, adiada ou paga em parte — mudar a tiraria da fatura em que foi paga. "À vista" com
+   parcela paga continua recusado.
 3. **A soma das parcelas é conferida no fim.** Não fechando com `total_cents`, a função levanta e
    a transação inteira volta — o modo de falha desta classe não é erro na tela, é um total que
    deixa de ser a soma do que está embaixo dele.
@@ -842,6 +847,36 @@ confirmar.
   existe, e o form derivava `status` desse campo ausente: editar o NOME de uma parcela futura dava
   baixa nela, mudando a projeção e o total da fatura sem nada na tela dizer isso. Onde o campo não
   aparece, o valor é o que já era.
+
+## Tudo que se cria se edita — e o que se faz com a fatura se desfaz (26/09/2026)
+
+A régua é a de `frontend.md`: o formulário de editar tem os campos da criação, e a trava que
+fica tem motivo lógico escrito na frase. O que isso mudou no domínio:
+
+- **Pagamento da fatura** (`20260926180000`): `transactions.pays_invoice_id` liga a transferência
+  à fatura, e o trigger `sync_invoice_payment` (AFTER UPDATE/DELETE, nunca INSERT — `pay_invoice`
+  já soma) leva a diferença a `paid_cents`: editar o valor ou a data, ou apagar o pagamento, quita,
+  reabre (as linhas que a quitação baixou voltam a `pending`) ou move a data de pagamento. Fatura
+  ADIADA recusa mudar o pagamento ("desfaça o adiamento antes"), exceto em cascata (apagar a conta
+  ou o espaço). "Marcar como paga" se desfaz (`unsettle_invoice`); "Jogar para a próxima" também
+  (`unroll_invoice`: tira o saldo, os juros e o IOF da fatura seguinte — pela data, categoria e
+  nome que `roll_invoice` dá; a que a pessoa renomeou fica), recusado se a seguinte já foi paga
+  ou adiada, e no cartão que adia sozinho com a fatura vencida (o cron a adiaria de novo).
+- **Cartão**: mudar fechamento, vencimento ou "compra no dia do fechamento" refaz as faturas
+  ABERTAS e sem pagamento (datas novas, compras de novo pelo `set_invoice`, a vazia sai;
+  `20260926170000`). Fechada, paga, paga em parte ou adiada fica. O tipo troca livre entre
+  contas; cartão ↔ conta só sem lançamento (as compras do cartão moram em faturas).
+- **`set_invoice` não mexe na linha quando conta, data e workspace não mudaram** — o formulário
+  manda a linha inteira, e renomear uma compra de uma fatura adiada a levava para a seguinte.
+- **Dívida**: o modo (parcela fixa ↔ com juros) muda — `camposNoOutroModo` leva parcela, o que
+  falta e as pagas para o outro modo. Pagamento de dívida se edita e se apaga, qualquer um
+  (`20260926140000`): data livre; apagar um antigo devolve o principal dele e renumera os
+  seguintes; corrigir o valor de um antigo com juros desce a diferença pelo saldo dos seguintes.
+  Recusado com motivo: pagamento antigo sem histórico de amortização, valor que não cobre os juros
+  do mês, saldo negativo.
+- **Orçamento**: `edit_budget` edita AQUELE limite (categoria e alcance), em vez do upsert que
+  criava outro (`20260926150000`). **Meta**: o aporte tem data e se edita
+  (`edit_goal_contribution`, mesma trava de não ficar negativa; `20260926160000`).
 
 ## Rotativo — a fatura vencida que vai para a próxima
 

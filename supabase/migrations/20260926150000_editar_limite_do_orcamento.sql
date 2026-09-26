@@ -52,6 +52,16 @@ begin
     raise exception 'Esse limite não existe mais.';
   end if;
 
+  -- A categoria nova não pode tomar a de outro limite no alcance de destino (o `save_budget`
+  -- abaixo é upsert e sobrescreveria calado).
+  if categoria <> antes.category and exists (
+    select 1 from public.budgets b
+     where b.workspace_id = ws and b.category = categoria and b.month is not distinct from mes
+  ) then
+    raise exception 'Já existe um limite de % %.', categoria,
+      case when mes is null then 'para todo mês' else 'para este mês' end;
+  end if;
+
   if mes_antes is not null and mes is null then
     -- "Só este mês" → "Todo mês": o deste mês sai e o de todo mês vale para ele também.
     delete from public.budgets b where b.id = antes.id;
@@ -62,14 +72,7 @@ begin
     return public.save_budget(categoria, p_limit_cents, p_rollover, mes);
   end if;
 
-  -- Mesmo alcance: muda o próprio limite — e a categoria não pode tomar a de outro.
-  if categoria <> antes.category and exists (
-    select 1 from public.budgets b
-     where b.workspace_id = ws and b.category = categoria and b.month is not distinct from mes
-  ) then
-    raise exception 'Já existe um limite de % %.', categoria,
-      case when mes is null then 'para todo mês' else 'para este mês' end;
-  end if;
+  -- Mesmo alcance: muda o próprio limite (a categoria já foi conferida acima).
   update public.budgets b set
     category = categoria,
     limit_cents = p_limit_cents,

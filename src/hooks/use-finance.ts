@@ -55,6 +55,8 @@ export type Transaction = Pick<
   | 'installment_no'
   | 'merchant'
   | 'debt_id'
+  // A fatura que esta transferência paga: apagar ou mudar o valor refaz a fatura (`20260926180000`).
+  | 'pays_invoice_id'
   // O razão do pagamento de dívida (escrito pelo trigger): é o que diz ao "Editar lançamento" se
   // o valor pode mudar e quanto da parcela ele quitou.
   | 'debt_payment_no'
@@ -133,8 +135,11 @@ export type CardSummary = Omit<
 export type CardInvoice = Pick<
   Tables['card_invoices']['Row'],
   | 'id' | 'account_id' | 'reference_month' | 'closing_date' | 'due_date' | 'status' | 'paid_at'
-  | 'paid_cents'
+  | 'paid_cents' | 'settled_manually' | 'rolled_into_invoice_id'
 > & { status: InvoiceStatus };
+
+/** A transferência que pagou (parte de) uma fatura — `transactions.pays_invoice_id`. */
+export type PagamentoDaFatura = Pick<Tables['transactions']['Row'], 'id' | 'amount_cents' | 'occurred_at' | 'account_id'>;
 
 export type AccountBalance = Fns['account_balances']['Returns'][number];
 
@@ -178,7 +183,7 @@ export type TxSummaryRow = Omit<Fns['transactions_summary']['Returns'][number], 
 };
 
 const TRANSACTION_COLUMNS =
-  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_balance_after_cents, auto_confirm, rollover_of_invoice_id, installment_plans(first_occurred_at)';
+  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_balance_after_cents, auto_confirm, rollover_of_invoice_id, pays_invoice_id, installment_plans(first_occurred_at)';
 
 export interface TransactionFilters {
   /**
@@ -561,11 +566,11 @@ export function useCardSummary() {
 export function invoiceQuery(invoiceId: string) {
   return {
     queryKey: ['invoice', invoiceId] as const,
-    queryFn: async (): Promise<{ invoice: CardInvoice; transactions: Transaction[] }> => {
-      const [invoiceRes, txRes] = await Promise.all([
+    queryFn: async (): Promise<{ invoice: CardInvoice; transactions: Transaction[]; pagamentos: PagamentoDaFatura[] }> => {
+      const [invoiceRes, txRes, pagamentosRes] = await Promise.all([
         supabase
           .from('card_invoices')
-          .select('id, account_id, reference_month, closing_date, due_date, status, paid_at, paid_cents')
+          .select('id, account_id, reference_month, closing_date, due_date, status, paid_at, paid_cents, settled_manually, rolled_into_invoice_id')
           .eq('id', invoiceId)
           .single(),
         supabase
@@ -573,12 +578,20 @@ export function invoiceQuery(invoiceId: string) {
           .select(TRANSACTION_COLUMNS)
           .eq('invoice_id', invoiceId)
           .order('occurred_at', { ascending: false }),
+        // Os pagamentos: é por eles que o pagamento se edita e se apaga (`20260926180000`).
+        supabase
+          .from('transactions')
+          .select('id, amount_cents, occurred_at, account_id')
+          .eq('pays_invoice_id', invoiceId)
+          .order('occurred_at', { ascending: false }),
       ]);
       if (invoiceRes.error) throw invoiceRes.error;
       if (txRes.error) throw txRes.error;
+      if (pagamentosRes.error) throw pagamentosRes.error;
       return {
         invoice: invoiceRes.data as CardInvoice,
         transactions: txRes.data as Transaction[],
+        pagamentos: pagamentosRes.data as PagamentoDaFatura[],
       };
     },
   };
@@ -656,6 +669,30 @@ export function useRollInvoice() {
       const { data, error } = await supabase.rpc('roll_invoice', { p_invoice_id: invoiceId });
       if (error) throw error;
       return data as unknown as RollResult;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Desfaz o "Marcar como paga": a fatura volta a ficar em aberto, com as compras previstas. */
+export function useUnsettleInvoice() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const { error } = await supabase.rpc('unsettle_invoice', { p_invoice_id: invoiceId });
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Desfaz o "Jogar para a próxima": o saldo, os juros e o IOF saem da fatura seguinte. */
+export function useUnrollInvoice() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const { error } = await supabase.rpc('unroll_invoice', { p_invoice_id: invoiceId });
+      if (error) throw error;
     },
     onSuccess: invalidate,
   });
@@ -1286,10 +1323,15 @@ export function useUpdateImportItem() {
        * quem confere antes de entrar, que é o que esta tela existe para fazer.
        */
       kind?: 'income' | 'expense';
+      /** O título que a linha vai gravar (a compra parcelada leva o nome do estabelecimento). */
+      description?: string;
+      merchant?: string;
     }) => {
-      const patch: { suggested_category?: string | null; kind?: string } = {};
+      const patch: { suggested_category?: string | null; kind?: string; description?: string; merchant?: string } = {};
       if ('category' in input) patch.suggested_category = input.category ?? null;
       if (input.kind) patch.kind = input.kind;
+      if (input.description !== undefined) patch.description = input.description;
+      if (input.merchant !== undefined) patch.merchant = input.merchant;
       const { error } = await supabase.from('import_items').update(patch).eq('id', input.id);
       if (error) throw error;
     },

@@ -545,6 +545,29 @@ teto de 252):
 **Ordem de deploy:** as migrations `20260923160000` e `20260923170000` vêm antes do agente — sem ela `delete_debt` não
 existe e o `first_due_date` bate numa coluna que não há.
 
+## Tudo que se cria se edita (26/09/2026)
+
+Regra do dono do produto para o app inteiro (`frontend.md`). O que cada botão novo de editar ou
+desfazer é no agente — `FinanceAction` segue no teto de 252, então nada disto somou campo lá:
+
+| app | agente |
+|---|---|
+| Parcela: "Só esta parcela \| A compra toda" e os campos da criação (`CamposDaCompra`) | "Só esta": `update_transaction` sobre a parcela. "A compra toda": `update_transaction` sobre a compra → `update_installment_plan`, com as MESMAS travas novas do banco (`TRAVAS_DO_PLANO`: nº de parcelas muda com parcela paga, nunca abaixo da última paga; data e conta só sem parcela em fatura paga/adiada/paga em parte) |
+| "Parcelas já pagas" na edição da compra e ao parcelar um lançamento que existe (`p_paid_installments`) | aumentar = `mark_paid` sobre as parcelas (`_baixa_em_parcelas`, já fazia). **Diminuir (reabrir parcela paga) — lacuna declarada:** não há ação de "desfazer baixa" no schema; o custo é pedir no app |
+| Modo da dívida (parcela fixa ↔ com juros) na edição | `resource_update debts calculation_mode` → `_converter_modo_da_divida` (a trava do agente caiu junto com a do banco) |
+| Pagamento de dívida: editar valor/data e apagar QUALQUER um | `update_transaction` / `delete_transaction` sobre o pagamento — o trigger da dívida refaz o saldo (`20260926140000`) nos dois caminhos |
+| Orçamento: editar categoria e alcance ("Vale para") | `resource_update budgets` com `category`/`month`; trocar o alcance MOVE o limite como o `edit_budget` do app (`_editar_alcance_do_limite` — a RPC acha o espaço pelo `auth.uid()`, que o agente não tem) |
+| Meta: aporte com data | `goal_deposit` já recebia a data (`occurred_at`). **Editar um aporte já feito — lacuna declarada:** não há alvo em `goal_contributions` no catálogo; pelo agente, o caminho é um aporte negativo, como o "Desfazer" do app |
+| Conta: tipo troca entre corrente/poupança/dinheiro/investimento; cartão: fechamento e vencimento refazem as faturas abertas | `resource_update accounts type` (a recusa caiu); `resource_update cards closing_day/due_day` — o trigger do banco refaz as faturas nos dois caminhos |
+| Pagamento da fatura: editar e apagar (a fatura acompanha) | `update_transaction` / `delete_transaction` sobre o pagamento — o trigger `sync_invoice_payment` refaz `paid_cents` e o status. A recusa da fatura adiada chega escrita (`registry.execute` traduz o P0001 de trigger) |
+| "Desmarcar como paga" e "Desfazer adiamento" na fatura | **lacuna declarada**, pelo mesmo motivo de o agente não adiar fatura: seriam dois tipos novos em `FinanceAction` (teto). O caminho é o menu "…" da fatura |
+| Recorrente: regra do WhatsApp aparece por extenso e se troca num "Substituir" | não se aplica: é a tela não mentir sobre uma regra que o agente escreveu |
+| Importação: título da linha editável na prévia | fora do escopo (revisão de extrato é do app, ver abaixo) |
+
+**Ordem de deploy:** migrations `20260926120000`…`20260926180000` antes do agente e do app. Sem a
+`20260926180000`, o app lê `transactions.pays_invoice_id` (coluna ausente → a fatura não abre) e
+chama `unsettle_invoice`/`unroll_invoice` (ausentes).
+
 ## Pagar com o valor que de fato saiu (25/09/2026)
 
 Pedido do dono do produto: *"às vezes eu posso ter pago menos ou mais em uma parcela, dívida ou

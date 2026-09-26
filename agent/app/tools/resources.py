@@ -1039,14 +1039,8 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             prepared["values"] = values
         elif not values and "set_default" not in prepared:
             _error("O que você quer alterar?")
-        if (
-            action.resource == "accounts"
-            and "type" in values
-            and values["type"] != old["type"]
-        ):
-            _error(
-                "O tipo de uma conta com histórico não pode ser convertido por aqui. Crie outra conta e transfira o saldo."
-            )
+        # O tipo da conta troca livre entre corrente, poupança, dinheiro e investimento
+        # (`20260926170000`); cartão é outro recurso (`cards`), e não vira conta por aqui.
         if action.resource == "assets" and "current_value_cents" in values:
             _error(
                 'Para mudar a avaliação, peça "atualize o valor do bem"; isso registra também o histórico.'
@@ -1535,6 +1529,8 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
             values.keys() & (_SERIE_PROPAGA | _SERIE_CALENDARIO)
         ):
             row = await _editar_serie(ctx, proposal, values)
+        elif action.resource == "budgets" and action.type == Op.UPDATE and "month" in values:
+            row = await _editar_alcance_do_limite(ctx, values, args)
         else:
             row = await db.fetch_one(
                 f"update public.{table} set "
@@ -1553,6 +1549,49 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
     if "set_default" in proposal:
         await _definir_conta_padrao(ctx, proposal["id"], proposal["set_default"])
     return ToolResult("Concluído: " + proposal["summary"] + ".", result_id=row["id"])
+
+
+async def _editar_alcance_do_limite(ctx: ExecContext, values: dict, args: list):
+    """Trocar "todo mês" ↔ "só um mês" MOVE o limite, como o `edit_budget` do app (`20260926150000`).
+
+    O UPDATE cru convertia: o limite de todo mês virava o de um mês só (e os outros meses ficavam
+    sem limite), e o caminho contrário batia no unique do limite padrão. A RPC do app não serve
+    aqui — ela acha o espaço pelo `auth.uid()`, que o agente não tem.
+    - "todo mês" → um mês: o do mês nasce (ou é atualizado) e o de todo mês FICA;
+    - um mês → "todo mês": o do mês sai e o de todo mês passa a valer (criado ou atualizado).
+    """
+    antes = await db.fetch_one(
+        "select * from public.budgets where id = %s and workspace_id = %s and xmin::text = %s",
+        *args,
+    )
+    if antes is None:
+        return None
+    mes = values.get("month") or None
+    categoria = values.get("category", antes["category"])
+    limite = values.get("limit_cents", antes["limit_cents"])
+    rollover = values.get("rollover", antes["rollover"])
+    if (antes["month"] is None) == (mes is None):  # mesmo alcance: muda o próprio limite
+        return await db.fetch_one(
+            "update public.budgets set " + ", ".join(f"{k} = %s" for k in values)
+            + " where id = %s and workspace_id = %s returning id",
+            *values.values(), antes["id"], ctx.workspace_id,
+        )
+    if antes["month"] is not None and mes is None:
+        await db.execute("delete from public.budgets where id = %s and workspace_id = %s",
+                         antes["id"], ctx.workspace_id)
+        return await db.fetch_one(
+            "insert into public.budgets (workspace_id, user_id, category, limit_cents, rollover, month) "
+            "values (%s, %s, %s, %s, %s, null) on conflict (workspace_id, category) where month is null "
+            "do update set limit_cents = excluded.limit_cents, rollover = excluded.rollover returning id",
+            ctx.workspace_id, ctx.user_id, categoria, limite, rollover,
+        )
+    return await db.fetch_one(
+        "insert into public.budgets (workspace_id, user_id, category, limit_cents, rollover, month) "
+        "values (%s, %s, %s, %s, %s, date_trunc('month', %s::date)::date) "
+        "on conflict (workspace_id, category, month) where month is not null "
+        "do update set limit_cents = excluded.limit_cents, rollover = excluded.rollover returning id",
+        ctx.workspace_id, ctx.user_id, categoria, limite, rollover, mes,
+    )
 
 
 # O que, mudando na REGRA, tem que alcançar as ocorrências já materializadas.

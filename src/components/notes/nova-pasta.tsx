@@ -188,7 +188,7 @@ export function NovaPastaSheet({
   return (
     <Sheet visible={visible} onClose={fechar}>
       <TaskHeader
-        title={pasta ? 'Renomear pasta' : paiId ? 'Nova subpasta' : 'Nova pasta'}
+        title={pasta ? 'Editar pasta' : paiId ? 'Nova subpasta' : 'Nova pasta'}
         onClose={fechar}
         action={<Button label={pasta ? 'Salvar' : 'Criar'} size="sm" loading={salvando} onPress={() => void criar()} />}
       />

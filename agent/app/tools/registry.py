@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import logging
 
+import psycopg
+
 from app import db
 from app.graph.schemas import (
     READ_ONLY,
@@ -175,6 +177,15 @@ async def execute(ctx: ExecContext, action: FinanceAction | FinanceQuery | Notes
         if not somente_leitura:
             await db.release_execution(ctx.source_message_id, ctx.action_index)
         return ToolResult(err.mensagem_usuario, read_only=True)
+    except psycopg.errors.RaiseException as err:
+        # P0001 de um TRIGGER (a fatura adiada recusando mudar o pagamento, o cartão que não vira
+        # conta): a recusa já vem escrita para a pessoa — "deu erro, tenta de novo" mandaria
+        # repetir o que não se resolve repetindo. A transação voltou inteira.
+        log.info("o banco recusou %s: %s", action.type, err.diag.message_primary)
+        if not somente_leitura:
+            await db.release_execution(ctx.source_message_id, ctx.action_index)
+        motivo = (err.diag.message_primary or str(err)).strip().rstrip(".")
+        return ToolResult(f"❌ {motivo}. Ainda não mudei nada.", read_only=True)
     except Exception:  # noqa: BLE001
         log.exception("ação %s falhou", action.type)
         if not somente_leitura:

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mudancasDaOcorrencia, serieDaOcorrencia, serieDoRegistro, type OcorrenciaDaSerie, type SerieGravada } from './serie.ts';
+import { montaRRule, mudancasDaOcorrencia, regraDoApp, serieDaOcorrencia, serieDoRegistro, type OcorrenciaDaSerie, type SerieGravada } from './serie.ts';
 
 // O Fundacred de produção (26/09/2026): dia 4 no cadastro, vence no último dia do mês.
 const fundacred: SerieGravada = {
@@ -48,5 +48,18 @@ test('A série no formulário: o próximo é o dia LOCAL, e a repetição sai da
     assert.equal(serieDoRegistro({ ...fundacred, rrule: 'FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=4' }).intervalo, '3');
   } finally {
     process.env.TZ = antes;
+  }
+});
+
+test('regra que o app não desenha fica própria: o formulário não a reescreve', () => {
+  // "todo dia" e "dias 5 e 20" vêm do WhatsApp; mostrar "Mensal" para elas mentiria.
+  const base = { id: 's1', kind: 'expense', amount_cents: 100, description: 'X', merchant: null, category: null, account_id: null, next_run_at: '2026-10-05T12:00:00Z', end_date: null, auto_confirm: true };
+  assert.equal(serieDoRegistro({ ...base, rrule: 'FREQ=DAILY' }).regraPropria, 'FREQ=DAILY');
+  assert.equal(serieDoRegistro({ ...base, rrule: 'FREQ=MONTHLY;BYMONTHDAY=5,20' }).regraPropria, 'FREQ=MONTHLY;BYMONTHDAY=5,20');
+  assert.equal(serieDoRegistro({ ...base, rrule: 'FREQ=MONTHLY;BYMONTHDAY=5' }).regraPropria, undefined);
+  assert.equal(serieDoRegistro({ ...base, rrule: 'FREQ=WEEKLY;BYDAY=MO' }).regraPropria, undefined);
+  // o que o app monta é sempre do app
+  for (const d of [new Date(2026, 9, 5), new Date(2026, 9, 31), new Date(2026, 1, 28)]) {
+    for (const preset of ['monthly', 'weekly', 'yearly'] as const) assert.ok(regraDoApp(montaRRule(preset, d, 3)), preset);
   }
 });

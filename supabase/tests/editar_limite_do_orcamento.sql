@@ -5,6 +5,7 @@
 -- 1. Mesmo alcance: a categoria muda (a linha é a mesma), e não toma a de outro limite.
 -- 2. "Só este mês" → "Todo mês": o deste mês sai e o de todo mês passa a valer para ele.
 -- 3. "Todo mês" → "Só este mês": o deste mês nasce e o de todo mês fica.
+-- 4. Trocando o alcance, a categoria nova não sobrescreve outro limite.
 -- Roda numa transação e dá rollback.
 
 \set ON_ERROR_STOP on
@@ -60,6 +61,14 @@ begin
          count(*) filter (where month = mes and limit_cents = 20000) as deste into l
     from public.budgets where category = 'lazer';
   if l.todo <> 1 or l.deste <> 1 then raise exception '3: todo mês % (1), este mês % (1)', l.todo, l.deste; end if;
+
+  -- ── 4. trocando o alcance, a categoria nova não toma a de outro limite ────────────────
+  begin
+    perform public.edit_budget('lazer', mes, 'supermercado', 10000, false, null);
+    raise exception 'FALHOU: sobrescreveu o limite de supermercado';
+  exception when others then
+    if sqlerrm not like 'Já existe um limite de supermercado para todo mês%' then raise exception '4: recusa errada: %', sqlerrm; end if;
+  end;
 end $$;
 
 rollback;

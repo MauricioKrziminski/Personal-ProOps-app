@@ -115,7 +115,8 @@ begin
   select t.status, ci.status as fatura into l
     from public.transactions t join public.card_invoices ci on ci.id = t.invoice_id
    where t.installment_plan_id = plano and t.installment_no = 2;
-  if l.status <> 'pending' or l.fatura <> 'open' then raise exception '4: a 2ª % / fatura % (pending/open)', l.status, l.fatura; end if;
+  -- a fatura já passou do fechamento: volta FECHADA (é o que o cron faria), atrasada
+  if l.status <> 'pending' or l.fatura <> 'closed' then raise exception '4: a 2ª % / fatura % (pending/closed)', l.status, l.fatura; end if;
 
   -- data e cartão não mudam com parcela paga na fatura
   begin

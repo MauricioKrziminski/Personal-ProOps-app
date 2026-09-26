@@ -1881,6 +1881,7 @@ export type Database = {
           occurred_at: string
           paid_at: string | null
           recurring_id: string | null
+          pays_invoice_id: string | null
           rollover_of_invoice_id: string | null
           source: string
           status: string
@@ -1913,6 +1914,7 @@ export type Database = {
           occurred_at?: string
           paid_at?: string | null
           recurring_id?: string | null
+          pays_invoice_id?: string | null
           rollover_of_invoice_id?: string | null
           source?: string
           status?: string
@@ -1945,6 +1947,7 @@ export type Database = {
           occurred_at?: string
           paid_at?: string | null
           recurring_id?: string | null
+          pays_invoice_id?: string | null
           rollover_of_invoice_id?: string | null
           source?: string
           status?: string
@@ -3019,6 +3022,14 @@ export type Database = {
       }
       settle_invoice: {
         Args: { p_invoice_id: string; p_paid_at?: string }
+        Returns: string
+      }
+      unroll_invoice: {
+        Args: { p_invoice_id: string }
+        Returns: string
+      }
+      unsettle_invoice: {
+        Args: { p_invoice_id: string }
         Returns: string
       }
       spendable: {

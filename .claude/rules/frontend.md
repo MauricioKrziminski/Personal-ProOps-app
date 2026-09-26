@@ -77,6 +77,22 @@ card de erro e a recuperação.
 - Decimal em texto (percentual, taxa, meses) só por `formatNumberBR` — vírgula, nunca ponto.
   Havia três cópias disso e uma tela sem nenhuma, escrevendo `90.4%` ao lado de `90,4%`.
 
+### Tudo que se cria se edita (26/09/2026)
+
+*"tudo que ele conseguir criar ele deve poder editar (que realmente fizer sentido)"* — regra do
+dono do produto para o app inteiro.
+
+- **Editar abre os MESMOS campos da criação**, do mesmo componente (`CamposDaSerie`,
+  `CamposDaCompra`): duas cópias divergem, e foi assim que editar ficou sem metade dos campos.
+- **Trava no banco é decisão nossa, não lei.** Onde a edição faz sentido, a trava sai e o banco
+  recalcula. A que fica tem motivo LÓGICO (a parcela paga numa fatura quitada não muda de fatura)
+  e a frase diz o motivo e o caminho ("desfaça o pagamento da fatura").
+- **O que tem ação tem desfazer**: pagar, quitar à mão, adiar, dar baixa — cada um se desfaz pelo
+  próprio registro (apagar/editar o pagamento) ou por uma ação "Desfazer…"/"Desmarcar…".
+- **Registro que o app não sabe desenhar** (regra de repetição do WhatsApp) aparece por extenso e
+  se troca num toque consciente ("Substituir"), nunca num formulário que mente o valor.
+- Botão novo de editar = linha nova em `docs/AGENTE-PARIDADE-COM-O-APP.md`.
+
 ### Lista: do mais recente para o mais antigo, e aos poucos (24/09/2026)
 
 *"em tudo tem que ser do mais recente para o mais antigo… sempre preze pelo lazy loading,

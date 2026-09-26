@@ -10,11 +10,15 @@
 import { CategoryPicker } from '@/components/finance/category-picker';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { DatePickerField } from '@/components/finance/date-picker-field';
+import { ThemedText } from '@/components/themed-text';
+import { Button } from '@/components/ui/button';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { QuantityField } from '@/components/ui/quantity-field';
 import { Segmented } from '@/components/ui/segmented';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { brToISO, fimQueSegueOInicio, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
+import { confirmDestructive } from '@/lib/item-actions';
+import { describeRRule } from '@/lib/rrule-text';
 import { validaSerie, type SerieForm } from '@/lib/serie';
 
 export function CamposDaSerie({
@@ -41,7 +45,7 @@ export function CamposDaSerie({
             só acompanha numa série nova. */}
         <Segmented
           options={[
-            { value: 'expense', label: 'Despesa' },
+            { value: 'expense', label: 'Gasto' },
             { value: 'income', label: 'Receita' },
           ]}
           value={form.kind}
@@ -85,6 +89,30 @@ export function CamposDaSerie({
         />
       </Field>
 
+      {form.regraPropria ? (
+        // Regra que o app não sabe desenhar: por extenso, e trocar é um toque consciente — a
+        // regra da IA não volta. O vencimento só muda junto com ela.
+        <Field label="Repete" hint={`Próximo vencimento ${form.inicio}`}>
+          <ThemedText type="small" themeColor="textSecondary">
+            {describeRRule(form.regraPropria)}
+          </ThemedText>
+          <Button
+            label="Substituir"
+            variant="secondary"
+            size="sm"
+            onPress={() =>
+              confirmDestructive(
+                'Substituir esta repetição?',
+                'Substituir',
+                () => onChange({ ...form, regraPropria: undefined, agendaMudou: true }),
+                `A repetição ${describeRRule(form.regraPropria ?? null)} não volta.`,
+              )
+            }
+          />
+        </Field>
+      ) : null}
+
+      {form.regraPropria ? null : (
       <Field label="Repete">
         <Segmented
           // Rótulos de UMA palavra: a 384dp × 1,3 "Toda semana" quebrava em duas linhas dentro da
@@ -98,8 +126,9 @@ export function CamposDaSerie({
           onChange={(preset) => mudaAgenda({ preset })}
         />
       </Field>
+      )}
 
-      {form.preset === 'monthly' ? (
+      {form.preset === 'monthly' && !form.regraPropria ? (
         <Field label="A cada quantos meses">
           {/* Campo de quantidade (`QuantityField`): "0" não existe, então não há erro a mostrar. */}
           <QuantityField
@@ -111,6 +140,7 @@ export function CamposDaSerie({
         </Field>
       ) : null}
 
+      {form.regraPropria ? null : (
       <Field
         // Editando, a data é o próximo vencimento: o último dia do mês vira "todo último dia".
         label={editando ? rotuloDaData : 'Começa em'}
@@ -138,6 +168,7 @@ export function CamposDaSerie({
           invalid={(Boolean(form.inicio) && !inicioOk) || agendaNoPassado}
         />
       </Field>
+      )}
 
       {/*
         ⚠️ O placeholder era uma DATA PLAUSÍVEL (`31/12/2026`) e o campo lia como preenchido — *"como

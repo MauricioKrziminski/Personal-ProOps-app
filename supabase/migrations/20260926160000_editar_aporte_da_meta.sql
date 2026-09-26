@@ -25,7 +25,8 @@ declare
   meta record;
   novo bigint;
 begin
-  select c.* into aporte from public.goal_contributions c where c.id = p_contribution_id;
+  -- `for update`: dois "Salvar" ao mesmo tempo descontariam o valor antigo duas vezes
+  select c.* into aporte from public.goal_contributions c where c.id = p_contribution_id for update;
   if aporte.id is null then
     raise exception 'Esse aporte não existe mais.';
   end if;

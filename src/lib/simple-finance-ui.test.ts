@@ -56,6 +56,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useImportItems: () => ({ ...query, isSuccess: true, data: options.importItems ?? [] }),
     useImportBatch: () => ({ ...query, isSuccess: true, data: options.importBatch ?? { status: 'open', account_id: 'conta-1', accounts: { type: 'checking' } } }),
     useImportUnmatched: () => ({ ...query, isSuccess: true, data: options.unmatched ?? [] }),
+    useUpdateImportItem: () => mutation('updateImportItem'),
     // Só responde quando o teste dá os lançamentos: respondido e vazio, o Financeiro afirmaria
     // "Ainda não tem movimento", e o teste das bordas falhando depende de ele NÃO afirmar.
     useRules: () => ({ ...query, isSuccess: true, data: options.rules ?? [] }),
@@ -149,6 +150,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useSaveAsset: () => mutation('saveAsset'),
     useArchiveAsset: () => mutation('archiveAsset'),
     useSettleInvoice: () => mutation('settleInvoice'),
+    useUnsettleInvoice: () => mutation('unsettleInvoice'),
+    useUnrollInvoice: () => mutation('unrollInvoice'),
     useUpcomingBills: () => ({
       ...query,
       isSuccess: !options.billsError,
@@ -183,8 +186,9 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useTransaction: (id: string) => ({ ...query, isSuccess: true, data: (options.txs ?? [{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared', recurring_id: null, installment_plan_id: null }]).find((t: any) => t.id === id) ?? null }),
     usePayInvoice: () => mutation('payInvoice'),
     useInvoice: () => ({ ...query, data: {
-      invoice: { id: 'invoice-1', account_id: 'card-1', status: options.invoiceStatus ?? 'closed', reference_month: '2026-08-01', closing_date: '2026-08-10', due_date: '2026-08-20', paid_at: options.invoiceStatus === 'paid' ? '2026-08-18' : null },
+      invoice: { id: 'invoice-1', account_id: 'card-1', status: options.invoiceStatus ?? 'closed', reference_month: '2026-08-01', closing_date: '2026-08-10', due_date: '2026-08-20', paid_at: options.invoiceStatus === 'paid' ? '2026-08-18' : null, settled_manually: Boolean(options.settledManually) },
       transactions: [{ id: 'purchase-1', kind: 'expense', amount_cents: 147000, occurred_at: '2026-08-01' }],
+      pagamentos: options.pagamentos ?? [],
     } }),
   }, { get: (target, key) => key in target ? target[key as keyof typeof target] : () => query });
   const load = (path: string): any => {
@@ -574,7 +578,7 @@ test('E se: Ver resultado depois de Somar não duplica a hipótese já adicionad
 test('new financing: Nome and Conta first, the name is required and the typed one is saved', () => {
   const ui = screen(debtsFile);
   // 23/09/2026: "Nome e conta" era uma linha recolhida no FIM, e o nome caía em "Financiamento 2".
-  assert.deepEqual(ui.nodes().filter((n) => n.type === 'Field').map((n) => n.props.label), ['Nome', 'Conta que paga', 'Tipo', 'Valor', 'Total de parcelas', 'Parcelas já pagas', 'Primeira parcela']);
+  assert.deepEqual(ui.nodes().filter((n) => n.type === 'Field').map((n) => n.props.label), ['Nome', 'Conta que paga', 'Tipo', 'Cobrança', 'Valor', 'Total de parcelas', 'Parcelas já pagas', 'Primeira parcela']);
   assert.equal(ui.nodes().some((n) => n.type === 'Row' && n.props.title === 'Nome e conta'), false);
   assert.equal(ui.button('Salvar').props.disabled, true);
   ui.fill('Valor', 147000);
@@ -954,6 +958,31 @@ test('the docked card carries the invoice summary and the explaining lines', () 
   assert.equal(doca.props.atualId, 'invoice-1');
   const texto = JSON.stringify(doca.props.children);
   assert.ok(texto.includes('Paga em'), 'a linha "Paga em" mora sob a face');
+});
+
+test('Fatura: tudo que se faz com ela se desfaz — pagamento, quitar à mão e adiar', () => {
+  // 26/09/2026: "tudo que se cria se edita". O pagamento abre no lançamento (editar/apagar refaz a
+  // fatura no banco); quitar à mão e adiar ganham o desfazer no menu.
+  const menu = (ui: any) => ui.nodes().find((n: any) => n.type === 'HeaderActions').props.menu.actions;
+  const rotulos = (ui: any) => menu(ui).map((a: any) => a.label);
+
+  const paga = screen('src/app/finance/invoice/[id].tsx', { invoiceStatus: 'paid', pagamentos: [{ id: 'pg-1', amount_cents: 147000, occurred_at: '2026-08-18', account_id: 'cc' }] });
+  assert.ok(rotulos(paga).includes('Ver o pagamento') && !rotulos(paga).includes('Marcar como paga') && !rotulos(paga).includes('Desmarcar como paga'));
+  menu(paga).find((a: any) => a.label === 'Ver o pagamento').onPress();
+  assert.deepEqual(JSON.parse(JSON.stringify(paga.navigations.at(-1))), { pathname: '/finance/[txId]', params: { txId: 'pg-1', month: '2026-08' } });
+
+  const quitada = screen('src/app/finance/invoice/[id].tsx', { invoiceStatus: 'paid', settledManually: true });
+  menu(quitada).find((a: any) => a.label === 'Desmarcar como paga').onPress();
+  assert.equal(quitada.writes.length, 0, 'confirma antes');
+  quitada.confirmations[0]();
+  assert.equal(quitada.writes[0].operation, 'unsettleInvoice');
+  assert.equal(quitada.writes[0].value, 'invoice-1');
+
+  const adiada = screen('src/app/finance/invoice/[id].tsx', { invoiceStatus: 'rolled' });
+  assert.ok(!rotulos(adiada).includes('Marcar como paga'));
+  menu(adiada).find((a: any) => a.label === 'Desfazer adiamento').onPress();
+  adiada.confirmations[0]();
+  assert.equal(adiada.writes[0].operation, 'unrollInvoice');
 });
 
 test('a paid invoice does not expose settlement or payment buttons', () => {
@@ -1717,6 +1746,20 @@ test('Importar: a prévia desenha cada grupo aos poucos, e "Marcar todos" contin
   assert.equal(mais.props.restantes, 25);
   ui.interact(() => mais.props.onPress());
   assert.equal(linhas().length, 40);
+});
+
+test('Importar: a linha se edita antes de importar — título, tipo e categoria', () => {
+  // 26/09/2026, "tudo que se cria se edita": o título que a importação vai gravar muda na prévia.
+  const itens = [{ id: 'i1', status: 'pending', kind: 'expense', nature: 'compra', amount_cents: 1990, occurred_at: '2026-09-10', description: 'PAG*IFOOD 123', suggested_category: 'restaurante' }];
+  const ui = screen(importFile, { params: { batch: 'b1' }, forecastAccounts: contasDoImport, importItems: itens });
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'ImportRow').props.onLongPress('i1'));
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Editar').onPress());
+  const campo = () => ui.nodes().find((n: any) => n.type === 'TextField' && n.props.accessibilityLabel === 'Título');
+  assert.equal(campo().props.value, 'PAG*IFOOD 123');
+  ui.interact(() => campo().props.onChangeText('iFood'));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Sheet').props.onClose());
+  const gravou = ui.writes.find((w: any) => w.operation === 'updateImportItem');
+  assert.deepEqual(JSON.parse(JSON.stringify(gravou.value)), { id: 'i1', description: 'iFood' });
 });
 
 test('Importar: "Está no app e não veio no arquivo" vem do mais recente para o mais antigo, aos poucos', () => {
@@ -2529,7 +2572,7 @@ test('Organizar pastas: sem criar; Renomear abre a folha da pasta, que salva sem
   assert.equal(folha.props.pasta.id, 'f1');
 
   const editar = screen('src/components/notes/nova-pasta.tsx', { componente: 'NovaPastaSheet', props: { visible: true, onClose: () => {}, pastas: [pasta], pasta } });
-  assert.ok(editar.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Renomear pasta'));
+  assert.ok(editar.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Editar pasta'));
   assert.ok(editar.nodes().some((n: any) => n.type === 'TextField' && n.props.value === 'trabalho'), 'o nome dela no campo');
   editar.interact((nodes: any[]) => nodes.find((n) => n.type === 'TextField' && n.props.accessibilityLabel === 'Nome da pasta').props.onChangeText('trabalho 2'));
   editar.interact((nodes: any[]) => nodes.find((n) => n.type === 'TaskHeader').props.action.props.onPress());

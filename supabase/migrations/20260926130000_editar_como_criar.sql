@@ -58,7 +58,8 @@ begin
    where ci.id in (select t.invoice_id from public.transactions t
                     where t.installment_plan_id = p_plan_id and t.status = 'cleared'
                       and t.invoice_id is not null)
-     and ci.status = 'open'
+     -- `closed` também: o cron fecha de hora em hora toda fatura com o fechamento no passado
+     and ci.status in ('open', 'closed')
      and ci.paid_cents = 0
      and ci.due_date < current_date
      and not exists (select 1 from public.transactions o
@@ -66,15 +67,21 @@ begin
                         and (o.status <> 'cleared' or o.installment_plan_id is distinct from p_plan_id));
   get diagnostics n = row_count;
 
+  -- As linhas levam a data da quitação: é por ela que "Desmarcar como paga" as acha
+  -- (`unsettle_invoice`). Sem condição de `paid_at` nulo — o `set_paid_at` já as preencheu com o
+  -- dia da compra quando viraram `cleared`.
   update public.transactions t
      set paid_at = ci.due_date
     from public.card_invoices ci
-   where t.invoice_id = ci.id and t.installment_plan_id = p_plan_id
-     and ci.status = 'paid' and ci.settled_manually and t.paid_at is null;
+   where t.invoice_id = ci.id and t.installment_plan_id = p_plan_id and t.status = 'cleared'
+     and ci.status = 'paid' and ci.settled_manually and ci.paid_at = ci.due_date;
   return n;
 end;
 $$;
-revoke execute on function private.quitar_faturas_do_plano(uuid) from public, anon, authenticated;
+revoke execute on function private.quitar_faturas_do_plano(uuid) from public, anon;
+-- `update_installment_plan` e `convert_transaction_to_installments` são security invoker: o app
+-- chama como `authenticated` (mesmo grant do `quitar_faturas_do_historico`).
+grant execute on function private.quitar_faturas_do_plano(uuid) to authenticated;
 
 drop function if exists public.update_installment_plan(uuid, bigint, integer, date, text, text, text, uuid);
 
@@ -162,7 +169,8 @@ begin
       -- a fatura que o app quitou à mão SÓ por causa desta compra reabre junto (o inverso do quitar)
       if reabrir.invoice_id is not null and reabrir.fatura_status = 'paid' then
         update public.card_invoices ci
-           set status = 'open', paid_at = null, settled_manually = false
+           set status = case when ci.closing_date < current_date then 'closed' else 'open' end,
+               paid_at = null, settled_manually = false
          where ci.id = reabrir.invoice_id;
       end if;
       update public.transactions t set status = 'pending', paid_at = null where t.id = reabrir.id;

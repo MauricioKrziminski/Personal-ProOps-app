@@ -33,6 +33,7 @@ import { formatDateBR } from '@/hooks/use-items';
 import { useBRL } from '@/components/ui/conceal';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { CategoryPicker } from '@/components/finance/category-picker';
+import { Field, TextField } from '@/components/ui/field';
 import {
   useAccounts,
   useFinishImport,
@@ -166,6 +167,8 @@ export default function ImportScreen() {
   const semPro = plano.data?.plan === 'free';
   const [falha, setFalha] = useState<FalhaImport | null>(null);
   const [editando, setEditando] = useState<ImportItem | null>(null);
+  // O título que a pessoa está escrevendo na linha aberta (grava ao terminar ou ao fechar).
+  const [titulo, setTitulo] = useState('');
   /** `null` = ainda a seleção sugerida (`selecaoInicial`); tocar numa linha a torna explícita. */
   const [marcados, setMarcados] = useState<Set<string> | null>(null);
 
@@ -290,6 +293,28 @@ export default function ImportScreen() {
     );
   };
 
+  /** Abre a linha para editar: título, tipo e categoria, como no lançamento. */
+  const abrirLinha = (item: ImportItem) => {
+    setTitulo(nomeDoItem(item) === 'Sem descrição' ? '' : nomeDoItem(item));
+    setEditando(item);
+  };
+
+  /** O título vai para o campo que É o nome da linha: o estabelecimento na compra parcelada. */
+  const salvarTitulo = (item: ImportItem) => {
+    const novo = titulo.trim();
+    if (!novo || novo === nomeDoItem(item)) return;
+    const campo = item.installments && item.merchant ? { merchant: novo } : { description: novo };
+    atualizar.mutate(
+      { id: item.id, ...campo },
+      { onError: () => toast({ message: 'Não deu para trocar o título.', tone: 'error' }) },
+    );
+  };
+
+  const fecharLinha = () => {
+    if (editando) salvarTitulo(editando);
+    setEditando(null);
+  };
+
   const trocarSentido = (item: ImportItem, kind: 'income' | 'expense') => {
     if (item.kind === kind) return;
     setEditando({ ...item, kind });
@@ -306,6 +331,7 @@ export default function ImportScreen() {
   };
 
   const trocarCategoria = (item: ImportItem, cat: string | null) => {
+    salvarTitulo(item);
     setEditando(null);
     atualizar.mutate(
       { id: item.id, category: cat },
@@ -324,7 +350,7 @@ export default function ImportScreen() {
     if (!item) return;
     const alvo = item.transactions;
     showItemActions(nomeDoItem(item), [
-      { label: 'Trocar categoria ou tipo', onPress: () => setEditando(item) },
+      { label: 'Editar', onPress: () => abrirLinha(item) },
       ...(alvo
         ? [{ label: 'Abrir o lançamento do app', onPress: () => router.push(`/finance/${alvo.id}`) }]
         : []),
@@ -654,11 +680,8 @@ export default function ImportScreen() {
       ) : null}
 
       {/* Trocar categoria e sentido: sheet, não accordion que empurra a lista. */}
-      <Sheet visible={editando !== null} onClose={() => setEditando(null)}>
-          <TaskHeader
-            title={editando ? nomeDoItem(editando) : 'Categoria'}
-            onClose={() => setEditando(null)}
-          />
+      <Sheet visible={editando !== null} onClose={fecharLinha}>
+          <TaskHeader title="Editar" onClose={fecharLinha} />
 
           <ScrollView keyboardShouldPersistTaps="handled"
             contentContainerStyle={[styles.sheetBody, { paddingBottom: insets.bottom + Space.xxl }]}
@@ -668,6 +691,16 @@ export default function ImportScreen() {
               campos do projeto manda o controle que decide vir antes do que ele decide.
               Existe porque o OFX do BB marca saída como `CREDIT` — ver `useUpdateImportItem`.
             */}
+            <Field label="Título">
+              <TextField
+                value={titulo}
+                onChangeText={setTitulo}
+                onEndEditing={() => editando && salvarTitulo(editando)}
+                placeholder="Ex.: iFood"
+                accessibilityLabel="Título"
+              />
+            </Field>
+
             <View style={styles.sentido}>
               <SectionHead title="Tipo" />
               <Segmented

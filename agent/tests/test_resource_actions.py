@@ -387,6 +387,17 @@ async def test_conta_padrao_sai_de_values_e_escreve_no_workspace(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_tipo_da_conta_troca_entre_contas(monkeypatch):
+    # 26/09/2026: "tudo que se cria se edita" — a poupança vira corrente sem recusa.
+    async def fetch(*a):
+        return [_linha(name="Nubank", type="savings", archived=False)]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    prepared = await resources.prepare(ctx(), action(resource="accounts", kind="resource_update", type="checking"))
+    assert prepared["values"]["type"] == "checking"
+
+
+@pytest.mark.asyncio
 async def test_restaurar_nota_procura_na_lixeira_e_zera_deleted_at(monkeypatch):
     consultas = []
 
@@ -717,3 +728,38 @@ async def test_mandar_para_a_lixeira_nao_escreve_timestamp_na_confirmacao(monkey
     prepared = await resources.prepare(ctx(), nota(kind="resource_delete"))
     assert "lixeira" in prepared["summary"]
     assert "T" not in prepared["summary"].split("—")[-1]  # sem ISO na cara do usuário
+
+
+@pytest.mark.asyncio
+async def test_limite_de_todo_mes_para_um_mes_fica_e_nasce_o_do_mes(monkeypatch):
+    # O mesmo efeito do `edit_budget` do app: "todo mês" → "só outubro" não apaga o de todo mês.
+    escritas = []
+
+    async def fetch_one(sql, *args):
+        escritas.append(sql)
+        if sql.startswith("select * from public.budgets"):
+            return {"id": "b1", "category": "mercado", "month": None, "limit_cents": 80000, "rollover": False}
+        return {"id": "b2"}
+
+    async def execute(sql, *args):
+        escritas.append(sql)
+
+    monkeypatch.setattr(resources.db, "fetch_one", fetch_one)
+    monkeypatch.setattr(resources.db, "execute", execute)
+    row = await resources._editar_alcance_do_limite(ctx(), {"month": "2026-10-01"}, ["b1", "workspace", "1"])
+    assert row == {"id": "b2"}
+    assert not any(s.startswith("delete") for s in escritas), "o de todo mês fica"
+    assert "where month is not null" in escritas[-1]
+
+    escritas.clear()
+
+    async def fetch_one_mes(sql, *args):
+        escritas.append(sql)
+        if sql.startswith("select * from public.budgets"):
+            return {"id": "b2", "category": "mercado", "month": "2026-10-01", "limit_cents": 50000, "rollover": False}
+        return {"id": "b1"}
+
+    monkeypatch.setattr(resources.db, "fetch_one", fetch_one_mes)
+    await resources._editar_alcance_do_limite(ctx(), {"month": None}, ["b2", "workspace", "1"])
+    assert escritas[1].startswith("delete from public.budgets"), "o do mês sai"
+    assert "where month is null" in escritas[-1]

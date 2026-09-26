@@ -205,7 +205,7 @@ export default function TransactionDetailScreen() {
           },
           onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para apagar. Tenta de novo.'), tone: 'error' }),
         }),
-      `${what}. Isso não volta.`
+      tx.pays_invoice_id ? `${what}. O valor volta a faltar na fatura.` : `${what}. Isso não volta.`
     );
   };
 
@@ -493,8 +493,9 @@ export default function TransactionDetailScreen() {
               })),
             },
             // Pagamento de dívida não duplica: a cópia seria um gasto solto, sem baixar a dívida.
-            // A próxima parcela se paga no "Paguei" de Dívidas.
-            ...(tx.debt_id
+            // A próxima parcela se paga no "Paguei" de Dívidas. O de FATURA também: a cópia seria
+            // uma transferência para o cartão que a fatura não conta — paga-se de novo na fatura.
+            ...(tx.debt_id || tx.pays_invoice_id
               ? []
               : [{ label: 'Duplicar', icon: 'plus.square.on.square' as const, onPress: duplicate }]),
             ...(tx.installment_plan_id

@@ -960,11 +960,13 @@ export default function DebtsScreen() {
               </Field>
               {/* Também na edição (26/09/2026, *"o modo da dívida ele deve poder alterar também"*): a
                   parcela, o que falta e as pagas atravessam, e "parcelas" troca de sentido. */}
-              <Segmented
-                options={[{ value: 'fixed_installments', label: 'Parcela fixa' }, { value: 'amortized', label: 'Com juros ao mês' }]}
-                value={form.calculationMode}
-                onChange={(calculationMode) => setForm({ ...form, ...camposNoOutroModo(form, calculationMode) })}
-              />
+              <Field label="Cobrança">
+                <Segmented
+                  options={[{ value: 'fixed_installments', label: 'Parcela fixa' }, { value: 'amortized', label: 'Com juros ao mês' }]}
+                  value={form.calculationMode}
+                  onChange={(calculationMode) => setForm({ ...form, ...camposNoOutroModo(form, calculationMode) })}
+                />
+              </Field>
               {form.calculationMode === 'fixed_installments' ? <>
                 <Field label="Valor">
                   <Segmented options={UNIDADES_DA_DIVIDA} value={form.unidade} onChange={mudarUnidade} />
@@ -1032,7 +1034,7 @@ export default function DebtsScreen() {
 
               <Field
                 label="Valor original"
-                hint="Zero se ainda não pagou nada">
+                hint="Em branco, vale o que você deve hoje">
                 <MoneyField
                   valueCents={form.principalCents}
                   onChangeCents={(principalCents) => setForm({ ...form, principalCents })}
@@ -1082,7 +1084,7 @@ export default function DebtsScreen() {
                 </View>
               ) : null}
 
-              <Field label="Valor da parcela">
+              <Field label="Valor da parcela" hint="Em branco, sai dos juros e das parcelas">
                 <MoneyField valueCents={form.installmentCents} onChangeCents={(installmentCents) => setForm({ ...form, installmentCents })} />
               </Field>
               <Field label="Parcelas que faltam">

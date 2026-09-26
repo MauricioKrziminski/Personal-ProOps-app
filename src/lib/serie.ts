@@ -17,6 +17,12 @@ export interface SerieForm {
    * WhatsApp que a pessoa nem tocou (a regra de lá nem sempre tem a forma que o app monta).
    */
   agendaMudou?: boolean;
+  /**
+   * A regra gravada quando o app NÃO sabe desenhá-la (veio do WhatsApp: "todo dia", "dias 5 e
+   * 20", "segunda e quarta"). Os campos de repetição somem e ela aparece por extenso; trocar é um
+   * toque consciente ("Substituir"). Mostrar "Mensal" para uma regra diária mentiria.
+   */
+  regraPropria?: string;
   kind: 'expense' | 'income';
   amountCents: number;
   description: string;
@@ -70,6 +76,17 @@ export function montaRRule(preset: SerieForm['preset'], inicio: Date, intervalo:
 }
 
 /**
+ * As formas que `montaRRule` escreve — a mesma régua do banco (`update_recurring_series`,
+ * `20260926120000`). Fora dela a regra é "própria" e o formulário não a reescreve.
+ */
+const REGRA_DO_APP =
+  /^FREQ=(MONTHLY(;INTERVAL=([2-9]|[1-9][0-9]))?;BYMONTHDAY=(-1|[1-9]|[12][0-9]|3[01])|WEEKLY;BYDAY=(SU|MO|TU|WE|TH|FR|SA)|YEARLY;BYMONTH=([1-9]|1[0-2]);BYMONTHDAY=([1-9]|[12][0-9]|3[01]))$/;
+
+export function regraDoApp(rrule: string): boolean {
+  return REGRA_DO_APP.test(rrule.trim());
+}
+
+/**
  * Uma série existente no formulário: a repetição sai da regra gravada e a data é o PRÓXIMO
  * vencimento, no dia LOCAL (`next_run_at` é timestamp: 05/10 00:00 UTC é 04/10 em Brasília).
  */
@@ -87,6 +104,7 @@ export function serieDoRegistro(r: SerieGravada): SerieForm {
     inicio: isoToBR(dataLocalDe(r.next_run_at)),
     fim: r.end_date ? isoToBR(r.end_date) : '',
     autoConfirm: r.auto_confirm,
+    ...(regraDoApp(r.rrule) ? {} : { regraPropria: r.rrule }),
   };
 }
 

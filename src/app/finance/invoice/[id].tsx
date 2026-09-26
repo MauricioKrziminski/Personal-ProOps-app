@@ -39,13 +39,15 @@ import {
   usePayInvoice,
   useRollInvoice,
   useSettleInvoice,
+  useUnrollInvoice,
+  useUnsettleInvoice,
   type Transaction,
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { formatNumberBR } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { passoDaVolta, type Volta } from '@/lib/reabrir-ao-voltar';
-import { confirmDestructive } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { estadoDaLinha } from '@/lib/settle-labels';
 import { STATUS_DA_FATURA } from '@/lib/card-status';
 import { accountLabel } from '@/lib/accounts';
@@ -125,6 +127,8 @@ export default function InvoiceScreen() {
   const pay = usePayInvoice();
   const settle = useSettleInvoice();
   const roll = useRollInvoice();
+  const unsettle = useUnsettleInvoice();
+  const unroll = useUnrollInvoice();
   const remove = useDeleteTransaction();
 
   const [pagando, setPagando] = useState(false);
@@ -142,6 +146,7 @@ export default function InvoiceScreen() {
     () => (invoice.isError ? [] : (invoice.data?.transactions ?? [])),
     [invoice.data, invoice.isError]
   );
+  const pagamentos = invoice.isError ? [] : (invoice.data?.pagamentos ?? []);
   const cartao = (accounts.data ?? []).find((a) => a.id === fatura?.account_id);
   // O nome pinta a face (a cor do emissor sai dele). Os cartões da Carteira já estão em cache;
   // as contas talvez não — sem este segundo caminho o cartão chegaria cinza e trocaria de cor.
@@ -364,6 +369,49 @@ export default function InvoiceScreen() {
     );
   };
 
+  /**
+   * Tudo que se faz com a fatura se desfaz (26/09/2026, *"tudo que se cria se edita"*). O
+   * pagamento se edita e se apaga no próprio lançamento — o banco refaz a fatura
+   * (`20260926180000`) —; quitar à mão e adiar se desfazem aqui.
+   */
+  const verPagamentos = () => {
+    const abrir = (p: (typeof pagamentos)[number]) =>
+      router.push({ pathname: '/finance/[txId]', params: { txId: p.id, month: p.occurred_at.slice(0, 7) } });
+    if (pagamentos.length === 1) return abrir(pagamentos[0]);
+    showItemActions(
+      'Pagamentos',
+      pagamentos.map((p) => ({ label: `${formatBRL(p.amount_cents)} em ${formatDateBR(p.occurred_at)}`, onPress: () => abrir(p) })),
+    );
+  };
+
+  const desmarcarPaga = () => {
+    if (!fatura) return;
+    confirmDestructive(
+      'Desmarcar como paga?',
+      'Desmarcar',
+      () =>
+        unsettle.mutate(fatura.id, {
+          onSuccess: () => toast({ message: 'A fatura voltou a ficar em aberto.', tone: 'success' }),
+          onError: (erro) => toast({ message: financeErrorMessage(erro, 'Não deu para desmarcar. Tenta de novo.'), tone: 'error' }),
+        }),
+      'A fatura volta a ficar em aberto e as compras dela voltam a previstas.',
+    );
+  };
+
+  const desfazerAdiamento = () => {
+    if (!fatura) return;
+    confirmDestructive(
+      'Desfazer o adiamento?',
+      'Desfazer',
+      () =>
+        unroll.mutate(fatura.id, {
+          onSuccess: () => toast({ message: 'A fatura voltou a ficar em aberto.', tone: 'success' }),
+          onError: (erro) => toast({ message: financeErrorMessage(erro, 'Não deu para desfazer. Tenta de novo.'), tone: 'error' }),
+        }),
+      'O saldo, os juros e o IOF saem da fatura seguinte, e esta volta a ficar em aberto.',
+    );
+  };
+
   const cabecalho = (
     <View style={styles.header}>
       {/* Andar entre meses. Antes o mês só existia como TÍTULO: para ver a fatura
@@ -560,12 +608,18 @@ export default function InvoiceScreen() {
                     icon: 'square.and.arrow.down',
                     onPress: () => router.push({ pathname: '/import', params: { conta: fatura.account_id } }),
                   },
-                  {
-                    label: 'Marcar como paga',
-                    icon: 'checkmark.circle',
-                    disabled: paga,
-                    onPress: quitarSemCaixa,
-                  },
+                  ...(pagamentos.length > 0
+                    ? [{ label: pagamentos.length === 1 ? 'Ver o pagamento' : 'Ver os pagamentos', icon: 'arrow.left.arrow.right' as const, onPress: verPagamentos }]
+                    : []),
+                  ...(!paga && !adiada
+                    ? [{ label: 'Marcar como paga', icon: 'checkmark.circle' as const, onPress: quitarSemCaixa }]
+                    : []),
+                  ...(paga && fatura.settled_manually
+                    ? [{ label: 'Desmarcar como paga', icon: 'arrow.uturn.backward' as const, onPress: desmarcarPaga }]
+                    : []),
+                  ...(adiada
+                    ? [{ label: 'Desfazer adiamento', icon: 'arrow.uturn.backward' as const, onPress: desfazerAdiamento }]
+                    : []),
                   {
                     label: 'Editar cartão',
                     icon: 'pencil',
