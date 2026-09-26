@@ -159,7 +159,7 @@ export default function AccountsScreen() {
   // `?create=1` (conta) e `?create=cartao` vêm do "Cadastrar conta/cartão" de outra tela: abre o
   // formulário direto, já no tipo, e fechar ou salvar devolve para ela (25/09/2026) — antes caía
   // na lista, a pessoa ainda tinha que achar o "+", e ali ficava.
-  const params = useLocalSearchParams<{ create?: string }>();
+  const params = useLocalSearchParams<{ create?: string; edit?: string }>();
   const criando = params.create === '1' || params.create === 'cartao';
   const [form, setForm] = useState<FormState | null>(() =>
     criando ? { ...FORM_VAZIO, type: params.create === 'cartao' ? 'credit_card' : FORM_VAZIO.type } : null,
@@ -240,6 +240,19 @@ export default function AccountsScreen() {
         a.rotativo_rate_monthly == null ? '' : formatNumberBR(a.rotativo_rate_monthly * 100),
     });
   };
+  /**
+   * `?edit=<conta>` vem de fora (a Carteira, "Editar este cartão"): abre a edição DAQUELA conta
+   * quando a lista chega, uma vez só (`edicaoAberta`), e fechar devolve para quem pediu.
+   */
+  const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
+  if (params.edit && params.edit !== edicaoAberta && form === null) {
+    const alvo = accounts.data?.find((a) => a.id === params.edit);
+    if (alvo) {
+      setEdicaoAberta(params.edit);
+      volta.marcar();
+      abrirEdicao(alvo);
+    }
+  }
 
   const ehCartao = form?.type === 'credit_card';
   const nomeOk = (form?.name.trim().length ?? 0) >= 1;

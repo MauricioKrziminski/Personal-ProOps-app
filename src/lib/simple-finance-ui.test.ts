@@ -128,6 +128,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useSaveDebt: () => mutation('saveDebt'),
     usePayDebtInstallment: () => mutation('payDebt'),
     useDeleteTransaction: () => mutation('deleteTransaction'),
+    useSaveAccount: () => mutation('saveAccount'),
     useArchiveDebt: () => mutation('archiveDebt'),
     useUnarchiveDebt: () => mutation('unarchiveDebt'),
     useDeleteDebt: () => mutation('deleteDebt'),
@@ -2427,4 +2428,21 @@ test('Parcela da dívida: a próxima mostra valor e vencimento, e "Paguei esta p
   proxima.press('Paguei esta parcela');
   assert.deepEqual(copia(proxima.navigations.at(-1)), { back: true });
   assert.throws(() => tela('10').button('Paguei esta parcela'), 'só a próxima se paga — pagamento é em ordem');
+});
+
+/** Editar um cartão de fora (Carteira, fatura) abre o formulário DELE e devolve ao fechar. */
+test('Contas: ?edit=<id> abre a edição daquela conta, com o título do tipo, e fechar devolve', () => {
+  const nubank = { id: 'c1', name: 'Nubank Cartão', type: 'credit_card', initial_balance_cents: 0, closing_day: 3, due_day: 10, credit_limit_cents: 500000, payment_account_id: null, closing_day_inclusive: false, rotativo_auto: false, rotativo_rate_monthly: null, created_at: '2026-01-01' };
+  const ui = screen('src/app/finance/accounts.tsx', { params: { edit: 'c1' }, forecastAccounts: [nubank] });
+  const cabeca = ui.nodes().find((n: any) => n.type === 'TaskHeader');
+  assert.equal(cabeca?.props.title, 'Editar cartão');
+  assert.ok(ui.nodes().some((n: any) => n.props?.value === 'Nubank Cartão'), 'o nome dele no campo');
+  ui.interact(() => cabeca.props.onClose());
+  assert.deepEqual(copia(ui.navigations.at(-1)), { back: true });
+});
+
+test('Carteira: o cartão escolhido se edita e um novo se cria ali mesmo', () => {
+  const fonte = readFileSync('src/app/finance/wallet.tsx', 'utf8');
+  assert.ok(/\/finance\/accounts\?edit=\$\{ativo\.account_id\}/.test(fonte), 'Editar este cartão abre o formulário DELE');
+  assert.ok(/title="Novo cartão"[\s\S]{0,120}\/finance\/accounts\?create=cartao/.test(fonte), 'Novo cartão abre o formulário já como cartão');
 });

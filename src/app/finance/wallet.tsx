@@ -298,6 +298,13 @@ export default function WalletScreen() {
             }
           />
           <Row icon="creditcard" title="Todos os cartões" onPress={() => router.push('/finance/cards')} />
+          {/* Editar e criar ONDE o cartão está (25/09/2026): antes era Contas → achar → segurar. */}
+          <Row
+            icon="pencil"
+            title="Editar este cartão"
+            onPress={() => router.push(`/finance/accounts?edit=${ativo.account_id}`)}
+          />
+          <Row icon="plus" title="Novo cartão" onPress={() => router.push('/finance/accounts?create=cartao')} />
         </Section>
       </Animated.View>
     );
