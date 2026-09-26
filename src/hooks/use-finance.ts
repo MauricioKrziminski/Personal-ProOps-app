@@ -1609,7 +1609,7 @@ export function useDebtPayments(debtId: string | undefined) {
     queryFn: async (): Promise<DebtPaymentRow[]> => {
       const { data, error } = await supabase
         .from('transactions')
-        .select('debt_payment_no, occurred_at, amount_cents')
+        .select('id, debt_payment_no, occurred_at, amount_cents')
         .eq('debt_id', debtId!)
         .order('occurred_at');
       if (error) throw error;

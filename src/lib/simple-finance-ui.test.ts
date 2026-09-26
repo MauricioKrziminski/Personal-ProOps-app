@@ -197,7 +197,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === 'expo-haptics') return { selectionAsync() {}, notificationAsync() {}, NotificationFeedbackType: { Success: 'success', Warning: 'warning' } };
       // `back` é navegação como qualquer outra e ENTRA na lista: é o que prende o "fechar um
       // formulário que outra tela abriu devolve para ela" (`useVoltarQuandoFechar`).
-      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => options.params ?? ({ id: 'invoice-1', ...(options.create !== false ? { create: 'financing' } : {}) }), router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }) } };
+      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => options.params ?? ({ id: 'invoice-1', ...(options.create !== false ? { create: 'financing' } : {}) }), useFocusEffect: () => {}, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }) } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
       if (name === '@/hooks/use-aos-poucos') return load('src/hooks/use-aos-poucos.ts');
@@ -252,6 +252,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@/hooks/use-note-sort') return { SORT_LABEL: {}, useNoteSort: () => ['manual', () => {}] };
       if (name === '@/components/notes/use-folder-menu') return { useFolderMenu: () => () => {} };
       if (name === '@/components/notes/nova-pasta') return load('src/components/notes/nova-pasta.tsx');
+      if (name === '@/lib/volta-da-parcela') return load('src/lib/volta-da-parcela.ts');
       if (name === '@/lib/rrule-text') return { describeRRule: () => 'todo mês' };
       if (name === '@/hooks/use-archived-folders') return { useArchivedFolders: () => ({ ...query, isSuccess: true, data: options.pastasArquivadas ?? [] }) };
       if (name === '@/hooks/use-notes') return new Proxy({
@@ -2388,4 +2389,42 @@ test('Apagar lançamento: a recusa do banco aparece com a frase dele, a falha de
     ui.interact(() => ui.pedidos.at(-1).opts.onError(Object.assign(new Error(erro.message), erro)));
     assert.equal(ui.toasts.at(-1)?.message, esperado);
   }
+});
+
+/**
+ * Toda parcela da dívida abre (25/09/2026, *"se eu clicar em qualquer uma dessas parcelas, tem que
+ * abrir os detalhes dela… e as pagas também, na tela que eu posso editar, deletar"*): a paga com
+ * lançamento abre o LANÇAMENTO; a futura e a só contada abrem a tela da parcela. A ficha fecha
+ * antes (é um Modal) e reabre ao voltar.
+ */
+test('Dívida: tocar numa parcela paga abre o lançamento; numa futura, a tela da parcela', () => {
+  const ui = screen(debtsFile, {
+    create: false, debts: [carro], params: { id: 'd1' },
+    debtPayments: [{ id: 'tx-8', debt_payment_no: 8, occurred_at: '2026-09-05', amount_cents: 147000 }],
+    debtSchedule: [{ installment_no: 9, due_date: '2026-10-05', payment_cents: 147000, interest_cents: null, principal_cents: null, balance_cents: 5733000 }],
+  });
+  const linhas = () => ui.nodes().filter((n: any) => n.type === 'DebtTimeline');
+  assert.ok(linhas().length >= 2, 'A seguir e Já pagas');
+  const itemDe = (n: number) => linhas().flatMap((l: any) => l.props.anos.flatMap((a: any) => a.itens)).find((i: any) => i.n === n);
+  const abrir = (n: number) => ui.interact(() => linhas().find((l: any) => l.props.anos.some((a: any) => a.itens.some((i: any) => i.n === n))).props.onItemPress(itemDe(n)));
+  abrir(8);
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/[txId]', params: { txId: 'tx-8' } });
+  assert.equal(ui.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Carro'), false, 'a ficha fecha antes de navegar');
+});
+
+test('Parcela da dívida: a próxima mostra valor e vencimento, e "Paguei esta parcela" volta para pagar', () => {
+  const tela = (n: string) => screen('src/app/finance/debt-installment.tsx', {
+    debts: [carro], params: { debt: 'd1', n },
+    debtPayments: [],
+    debtSchedule: [
+      { installment_no: 9, due_date: '2026-10-05', payment_cents: 147000, interest_cents: null, principal_cents: null, balance_cents: 5733000 },
+      { installment_no: 10, due_date: '2026-11-05', payment_cents: 147000, interest_cents: null, principal_cents: null, balance_cents: 5586000 },
+    ],
+  });
+  const proxima = tela('9');
+  const textos = JSON.stringify(proxima.nodes().filter((n: any) => n.type === 'ThemedText' || n.type === 'Row').map((n: any) => [n.props.children, n.props.title, n.props.subtitle]));
+  assert.match(textos, /05\/10\/2026/);
+  proxima.press('Paguei esta parcela');
+  assert.deepEqual(copia(proxima.navigations.at(-1)), { back: true });
+  assert.throws(() => tela('10').button('Paguei esta parcela'), 'só a próxima se paga — pagamento é em ordem');
 });

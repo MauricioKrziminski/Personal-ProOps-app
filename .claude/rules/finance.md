@@ -52,6 +52,11 @@
     pagamento MAIS RECENTE como a parcela inteira no valor novo, sem encargo. O detalhe do
     lançamento mostra "Parcela de R$ X + R$ Y de encargo" (ou "− desconto"; com juros,
     "Amortização + juros") lendo a LINHA (`detalheDoPagamento`), nunca o contrato.
+  - **Toda parcela da linha do tempo abre** (25/09/2026): a paga com lançamento abre o LANÇAMENTO
+    (editar, apagar); a futura, a próxima e a só contada abrem `/finance/debt-installment` (valor,
+    vencimento, juros/amortização e saldo depois, da MESMA conta da ficha). A ficha é um Modal:
+    fecha antes de navegar e reabre na volta (`lib/volta-da-parcela.ts`), já no pagamento quando o
+    toque foi "Paguei esta parcela" — que só a próxima tem, porque pagar é em ordem.
   - **Excluir por completo é `public.delete_debt`**: trava a dívida, apaga os pagamentos
     (`transactions.debt_id`, com um desvio local à transação no `tg_transactions_debt_payment`) e a
     dívida. Idempotente. Apagar a dívida direto FALHA quando há pagamento: a FK `set null` dispara

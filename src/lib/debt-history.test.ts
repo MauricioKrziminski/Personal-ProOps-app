@@ -120,3 +120,17 @@ test('a linha do tempo se divide em "a seguir" (a próxima primeiro) e "já paga
   assert.deepEqual(porAno(aSeguir).map((a) => a.ano), ['2026', '2027']);
   assert.deepEqual(porAno(pagas).map((a) => [a.ano, a.itens.map((i) => i.n)]), [['2026', [3, 2, 1]]]);
 });
+
+test('o pagamento lançado leva o id do lançamento até a linha do tempo — é por ele que a parcela paga abre', () => {
+  const historico = paidInstallments({
+    installmentsPaid: 2,
+    installmentCents: 100,
+    nextDueDate: '2026-11-05',
+    payments: [{ id: 'tx-2', debt_payment_no: 2, occurred_at: '2026-10-04', amount_cents: 100 }],
+  });
+  const { pagas } = secoesDaLinha(historico, [
+    { installment_no: 3, due_date: '2026-11-05', payment_cents: 100, interest_cents: null },
+  ]);
+  assert.equal(pagas[0].txId, 'tx-2', 'a registrada abre o lançamento');
+  assert.equal(pagas[1].txId, undefined, 'a só contada não tem lançamento');
+});

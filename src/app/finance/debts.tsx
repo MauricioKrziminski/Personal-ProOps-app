@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { useBRL } from '@/components/ui/conceal';
 import { SelectField } from '@/components/ui/select-field';
@@ -52,7 +52,8 @@ import { formatBRL, localISODate } from '@/hooks/use-items';
 import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { pagamentoDaParcelaFixa } from '@/lib/confirmar-baixa';
 import { brToISO, formatNumberBR, isoToBR } from '@/lib/dates';
-import { paidInstallments, porAno, secoesDaLinha } from '@/lib/debt-history';
+import { paidInstallments, porAno, secoesDaLinha, type ItemDaLinha } from '@/lib/debt-history';
+import { aoVoltarParaDivida, lerAoVoltar } from '@/lib/volta-da-parcela';
 import {
   ancoraDoContrato,
   debtTerm,
@@ -295,6 +296,38 @@ export default function DebtsScreen() {
     setNasProximas(false);
     setPagando(d);
   };
+
+  /**
+   * Toda parcela abre (25/09/2026): a paga com lançamento abre o LANÇAMENTO (editar, apagar); a
+   * futura e a só contada, a tela da parcela. A ficha fecha antes — é um Modal, e a tela nova
+   * ficaria por baixo — e reabre quando a pessoa volta (`volta-da-parcela.ts`).
+   */
+  const abrirParcela = (item: ItemDaLinha) => {
+    if (!detalhe) return;
+    aoVoltarParaDivida({ divida: detalhe.id, acao: 'abrir' });
+    setDetalhe(null);
+    if (item.txId) router.push({ pathname: '/finance/[txId]', params: { txId: item.txId } });
+    else router.push({ pathname: '/finance/debt-installment', params: { debt: detalhe.id, n: String(item.n) } });
+  };
+  // Voltando da parcela: a ficha reabre onde estava, ou já no pagamento ("Paguei esta parcela").
+  // ⚠️ Com `useCallback` e SÓ no foco: sem ele o efeito roda a cada render, e o aviso gravado no
+  // toque era consumido ali mesmo, antes de a tela sair — voltar não reabria nada (visto no iPhone).
+  const listaDeDividas = debts.data;
+  useFocusEffect(
+    useCallback(() => {
+      const pedido = lerAoVoltar();
+      const d = pedido ? listaDeDividas?.find((x) => x.id === pedido.divida) : null;
+      if (!pedido || !d) return;
+      if (pedido.acao === 'abrir') {
+        setDetalheId(d.id);
+        return;
+      }
+      setPagoCents(pedido.cents ?? Number(d.installment_cents ?? 0));
+      setContaId(d.account_id);
+      setNasProximas(false);
+      setPagandoId(d.id);
+    }, [listaDeDividas, setDetalheId, setPagoCents, setContaId, setNasProximas, setPagandoId]),
+  );
 
   /**
    * Parcela fixa paga com outro valor (25/09/2026): conta UMA parcela e a diferença é encargo ou
@@ -918,14 +951,14 @@ export default function DebtsScreen() {
                 {aSeguir.visiveis.length > 0 ? (
                   <View style={styles.secaoDaLinha}>
                     <SectionHead title="A seguir" inset={false} />
-                    <DebtTimeline anos={porAno(aSeguir.visiveis)} />
+                    <DebtTimeline anos={porAno(aSeguir.visiveis)} onItemPress={abrirParcela} />
                     <VerMais restantes={aSeguir.restantes} onPress={aSeguir.verMais} />
                   </View>
                 ) : null}
                 {jaPagas.visiveis.length > 0 ? (
                   <View style={styles.secaoDaLinha}>
                     <SectionHead title="Já pagas" inset={false} />
-                    <DebtTimeline anos={porAno(jaPagas.visiveis)} />
+                    <DebtTimeline anos={porAno(jaPagas.visiveis)} onItemPress={abrirParcela} />
                     <VerMais restantes={jaPagas.restantes} onPress={jaPagas.verMais} />
                   </View>
                 ) : null}

@@ -1,7 +1,8 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { useBRL } from '@/components/ui/conceal';
+import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { HitTarget, Radius, Space, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -23,7 +24,14 @@ const NO = 12;
  * tinta = paga; preenchido de cinza = estimada (veio da contagem, sem lançamento); anel = a
  * próxima; vazio = futura. A próxima é a única linha com fundo — é a resposta da tela.
  */
-export function DebtTimeline({ anos }: { anos: { ano: string; itens: ItemDaLinha[] }[] }) {
+export function DebtTimeline({
+  anos,
+  onItemPress,
+}: {
+  anos: { ano: string; itens: ItemDaLinha[] }[];
+  /** Toda parcela abre (25/09/2026): a paga com lançamento, o lançamento; a outra, a tela dela. */
+  onItemPress?: (item: ItemDaLinha) => void;
+}) {
   const theme = useTheme();
   // Dinheiro dentro de frase obedece ao "esconder saldo" — `Money` é bloco e não cabe aqui.
   const brl = useBRL();
@@ -51,11 +59,17 @@ export function DebtTimeline({ anos }: { anos: { ano: string; itens: ItemDaLinha
                     ? `a próxima · vence ${isoToBR(item.iso)}`
                     : `vence ${isoToBR(item.iso)}`;
             return (
-              <View
+              <Pressable
                 key={item.n}
-                accessible
+                accessibilityRole={onItemPress ? 'button' : undefined}
                 accessibilityLabel={`${item.n}ª parcela, ${quando}, ${brl(item.cents)}`}
-                style={[styles.linha, proxima ? { backgroundColor: theme.backgroundSelected } : null]}>
+                disabled={!onItemPress}
+                onPress={() => onItemPress?.(item)}
+                // Linha de lista: o toque acende o FUNDO, sem escala (design §5).
+                style={({ pressed }) => [
+                  styles.linha,
+                  proxima || pressed ? { backgroundColor: theme.backgroundSelected } : null,
+                ]}>
                 <View style={styles.trilho}>
                   <View
                     style={[
@@ -97,7 +111,8 @@ export function DebtTimeline({ anos }: { anos: { ano: string; itens: ItemDaLinha
                   variant={proxima ? 'headline' : 'body'}
                   tone={item.estado === 'futura' || proxima ? 'text' : 'textSecondary'}
                 />
-              </View>
+                {onItemPress ? <Icon name="chevron.right" size="sm" color="textSecondary" /> : null}
+              </Pressable>
             );
           })}
         </View>

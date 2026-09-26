@@ -1484,3 +1484,11 @@ test('toda tela de dados tem puxar para atualizar', () => {
     .filter((f) => !/onRefresh|RefreshControl/.test(readFileSync(join(SRC, f), 'utf8')));
   assert.deepEqual(faltando, []);
 });
+
+// Horário de verdade (`created_at`, `paid_at`…) cortado com `slice` é o dia em UTC: das 21h à
+// meia-noite ele já é amanhã ("Registrado em 26/09" para o que entrou dia 25, 25/09/2026). O caminho
+// é `dataLocalDe`. Fora da lista: `occurred_at`/`due_at` são DATA, e `next_run_at` é data guardada
+// como meia-noite — cortar é a leitura certa deles.
+test('nenhum horário vira dia por slice (é o dia do UTC)', () => {
+  assert.deepEqual(offenders(/\b(created|updated|paid|deleted|archived|sent|imported|confirmed)_at\??\.slice\(0, ?(10|7)\)/), []);
+});

@@ -400,6 +400,7 @@ function AppTree() {
                   <Stack.Screen name="finance/budgets" options={{ title: 'Orçamentos' }} />
                   <Stack.Screen name="finance/goals" options={{ title: 'Metas' }} />
                   <Stack.Screen name="finance/debts" options={{ title: 'Dívidas' }} />
+                  <Stack.Screen name="finance/debt-installment" options={{ title: 'Parcela' }} />
                   <Stack.Screen name="finance/recurring" options={{ title: 'Recorrentes' }} />
                   <Stack.Screen name="finance/forecast" options={{ title: 'Projeção' }} />
                   <Stack.Screen name="finance/reports" options={{ title: 'Relatórios' }} />

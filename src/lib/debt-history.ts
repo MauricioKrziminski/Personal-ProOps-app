@@ -21,9 +21,12 @@ export interface PaidInstallment {
   payment_cents: number;
   /** Existe um lançamento por trás — a data e o valor são fato, não inferência. */
   registered: boolean;
+  /** O lançamento do pagamento, quando existe — tocar na parcela paga abre ele. */
+  txId?: string;
 }
 
 export interface DebtPaymentRow {
+  id?: string;
   debt_payment_no: number | null;
   occurred_at: string;
   amount_cents: number;
@@ -71,6 +74,7 @@ export function paidInstallments({
             due_date: real.occurred_at.slice(0, 10),
             payment_cents: Number(real.amount_cents),
             registered: true,
+            ...(real.id ? { txId: real.id } : {}),
           }
         : {
             installment_no: n,
@@ -89,6 +93,7 @@ export interface ItemDaLinha {
   cents: number;
   jurosCents: number | null;
   estado: 'paga' | 'estimada' | 'proxima' | 'futura';
+  txId?: string;
 }
 
 /**
@@ -111,6 +116,7 @@ export function linhaDoTempo(
       cents: p.payment_cents,
       jurosCents: null,
       estado: p.registered ? ('paga' as const) : ('estimada' as const),
+      ...(p.txId ? { txId: p.txId } : {}),
     })),
     // O cronograma começa em `pagas + 1`; a parcela que já tem pagamento lançado não é futura.
     ...futuras.filter((p) => !historico.some((h) => h.installment_no === p.installment_no)).map((p, i) => ({
