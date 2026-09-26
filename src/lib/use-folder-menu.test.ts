@@ -19,6 +19,8 @@ function transpilar(caminho: string) {
 function montar() {
   const folhas: { titulo: string; acoes: { label: string; destructive?: boolean; onPress: () => void }[] }[] = [];
   const apagadas: string[] = [];
+  const renomeadas: string[] = [];
+  const movidas: string[] = [];
   const carregar = (caminho: string, extras: Record<string, unknown>) => {
     const mod = { exports: {} as any };
     runInNewContext(transpilar(caminho), {
@@ -41,13 +43,20 @@ function montar() {
     'expo-router': { router: { push: () => {} } },
     'expo-haptics': { impactAsync: () => {}, notificationAsync: () => {}, ImpactFeedbackStyle: {}, NotificationFeedbackType: {} },
     '@/components/notes/note-actions': acoes,
+    '@/components/notes/nova-pasta': { useMoverPasta: () => (f: { id: string }) => movidas.push(f.id) },
     '@/components/ui/toast': { useToast: () => () => {} },
     '@/hooks/use-notes': {
       useUpdateFolder: () => ({ mutate: () => {} }),
       useDeleteFolder: () => ({ mutate: (id: string) => apagadas.push(id) }),
     },
   });
-  return { abrir: menu.useFolderMenu({ onColor: () => {} }), folhas, apagadas };
+  return {
+    abrir: menu.useFolderMenu({ onColor: () => {}, onRename: (f: { id: string }) => renomeadas.push(f.id), pastas: [] }),
+    folhas,
+    apagadas,
+    renomeadas,
+    movidas,
+  };
 }
 
 test('segurar a pasta oferece Apagar, e apagar confirma antes', () => {
@@ -65,4 +74,15 @@ test('segurar a pasta oferece Apagar, e apagar confirma antes', () => {
   assert.equal(sim?.destructive, true);
   sim!.onPress();
   assert.deepEqual(apagadas, ['f1']);
+});
+
+test('segurar a pasta também renomeia e move — sem ir a Organizar pastas (25/09/2026)', () => {
+  const { abrir, folhas, renomeadas, movidas } = montar();
+  abrir({ id: 'f1', name: 'compras', notes_count: 3, pinned: false });
+  const acao = (label: string) => folhas[0].acoes.find((a) => a.label === label);
+  acao('Renomear')!.onPress();
+  acao('Mover para dentro de…')!.onPress();
+  assert.deepEqual(renomeadas, ['f1']);
+  assert.deepEqual(movidas, ['f1']);
+  assert.equal(folhas[0].acoes.at(-1)!.label, 'Apagar', 'apagar continua por último, destrutivo');
 });

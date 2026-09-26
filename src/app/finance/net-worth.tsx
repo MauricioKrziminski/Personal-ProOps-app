@@ -461,7 +461,7 @@ export default function NetWorthScreen() {
         />
       </Section>
       {!bens.isLoading && !bens.isError && (bens.data ?? []).length === 0 ? (
-        <EmptyState
+        <EmptyState compacto
           icon="chart.line.uptrend.xyaxis"
           title={vazioAbsoluto ? 'Seu patrimônio começa aqui' : 'Nenhum bem cadastrado'}
           hint={

@@ -143,7 +143,7 @@ export default function CycleDetailScreen() {
     />
   );
   const movimentos = grupos.length === 0 ? (
-    <EmptyState
+    <EmptyState compacto
       title={lado === 'tudo' ? 'Nada neste ciclo' : lado === 'entra' ? 'Nada entrou' : 'Nada saiu'}
       hint={lado === 'tudo'
         ? 'Nenhum movimento cai neste período.'

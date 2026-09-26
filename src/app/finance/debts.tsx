@@ -1196,26 +1196,6 @@ export default function DebtsScreen() {
         </Card>
       ) : null}
 
-      {!schedule.isLoading && !schedule.isError && !proxima ? (
-        <EmptyState
-          icon="calendar"
-          title={
-            detalhe && Number(detalhe.remaining_cents) <= 0
-              ? 'Nada em aberto. Dívida quitada.'
-              : 'Sem parcelas para mostrar'
-          }
-          hint={
-            detalhe && Number(detalhe.remaining_cents) > 0
-              ? 'Informe quantas parcelas faltam para eu montar a tabela.'
-              : undefined
-          }
-          action={
-            detalhe && Number(detalhe.remaining_cents) > 0
-              ? { label: 'Editar dívida', onPress: () => abrirEdicao(detalhe) }
-              : undefined
-          }
-        />
-      ) : null}
 
       {payments.isError ? (
         <ErrorBand message="Não deu para carregar os pagamentos." onRetry={payments.refetch} />
@@ -1243,6 +1223,29 @@ export default function DebtsScreen() {
             </View>
           ) : null}
         </>
+      ) : null}
+
+      {!schedule.isLoading && !schedule.isError && !proxima ? (
+        <EmptyState
+          icon="calendar"
+          title={
+            detalhe && Number(detalhe.remaining_cents) <= 0
+              ? 'Nada em aberto. Dívida quitada.'
+              : 'Sem parcelas para mostrar'
+          }
+          hint={
+            detalhe && Number(detalhe.remaining_cents) > 0
+              ? 'Informe quantas parcelas faltam para eu montar a tabela.'
+              : undefined
+          }
+          action={
+            detalhe && Number(detalhe.remaining_cents) > 0
+              ? { label: 'Editar dívida', onPress: () => abrirEdicao(detalhe) }
+              : undefined
+          }
+          // Com histórico, "Já pagas" (o que existe) vem antes e o vazio é a linha compacta.
+          compacto={historico.length > 0}
+        />
       ) : null}
     </>
   );

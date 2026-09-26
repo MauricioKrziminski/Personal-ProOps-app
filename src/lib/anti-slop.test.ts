@@ -1492,3 +1492,69 @@ test('toda tela de dados tem puxar para atualizar', () => {
 test('nenhum horário vira dia por slice (é o dia do UTC)', () => {
   assert.deepEqual(offenders(/\b(created|updated|paid|deleted|archived|sent|imported|confirmed)_at\??\.slice\(0, ?(10|7)\)/), []);
 });
+
+/*
+  Vazio GRANDE só onde ele é a ÚNICA coisa da tela (design §7, 25/09/2026). Três vezes o dono do
+  produto achou um card embaixo do texto de vazio — Dívidas, Metas… e Organizar pastas — e a
+  correção era tela a tela. Aqui a decisão é por CHAMADA: todo `<EmptyState>` sem `compacto` tem que
+  estar nesta lista com o motivo; um novo quebra o build até alguém decidir.
+*/
+const VAZIO_GRANDE_PERMITIDO: Record<string, string[]> = {
+  'app/(tabs)/profile/index.tsx': ['Sem sessão'], // inalcançável atrás do portão de sessão
+  'app/catalog.tsx': ['Nada anotado ainda'], // vitrine do primitivo, só em desenvolvimento
+  'app/finance/[txId].tsx': ['Esse lançamento não existe mais'],
+  'app/finance/cards.tsx': ['Nenhum cartão cadastrado'], // no tablet, a outra coluna é outro painel
+  'app/finance/debt-installment.tsx': ['Essa parcela não existe mais'],
+  'app/finance/debts.tsx': ['Essa dívida não existe mais'],
+  'app/finance/goals.tsx': ['Nenhuma meta ainda', 'Você ainda não guardou nada'],
+  'app/finance/installments.tsx': ['Nenhuma compra parcelada'],
+  'app/finance/invoices.tsx': ['Nenhum cartão cadastrado', 'Nenhuma fatura ainda'], // tablet: outro painel
+  'app/finance/recurring.tsx': ['Nada se repete ainda'],
+  'app/finance/reports.tsx': ['Nada lançado em'],
+  'app/finance/rules.tsx': ['Nenhuma regra ainda'],
+  'app/finance/transactions.tsx': ['Nenhum lançamento ainda', 'Nada em'],
+  'app/finance/wallet.tsx': ['Nenhum cartão cadastrado'],
+  'app/import-history.tsx': ['Importação é do Pro', 'Nenhuma importação ainda'],
+  'app/import.tsx': ['Nada para revisar neste arquivo'],
+  'app/notes/archived.tsx': ['Não deu para carregar o arquivo', 'Nada arquivado'], // tablet: outro painel
+  'app/notes/folder/[id].tsx': ['Pasta não encontrada', 'A pasta'], // só os chips de tag (filtro) acima
+  'app/notes/trash.tsx': ['Lixeira vazia'], // só a legenda de 30 dias acima
+  'app/profile/alerts.tsx': ['Nenhum alerta ainda'],
+  'app/reminders.tsx': ['Nenhum lembrete ainda'],
+  'app/search.tsx': ['Procurando o quê?', 'Nada encontrado para'], // só os chips de escopo acima
+  'components/agent/conversation-screen.tsx': ['Não consegui carregar essa conversa'],
+  'components/notes/tag-picker.tsx': ['Nenhuma tag ainda'], // única coisa sob o campo da folha
+};
+
+/** A abertura de `<EmptyState …>` inteira, pulando o que está dentro de `{}` (títulos com JSX). */
+function aberturaDoVazio(codigo: string, inicio: number): string {
+  let chaves = 0;
+  for (let i = inicio; i < codigo.length; i++) {
+    const c = codigo[i];
+    if (c === '{') chaves++;
+    else if (c === '}') chaves--;
+    else if (chaves === 0 && codigo.startsWith('/>', i)) return codigo.slice(inicio, i + 2);
+    else if (chaves === 0 && c === '>' && i > inicio) return codigo.slice(inicio, i + 1);
+  }
+  return codigo.slice(inicio);
+}
+
+test('vazio grande só onde ele é a única coisa da tela; com outra coisa, é compacto', () => {
+  const soltos: string[] = [];
+  const usados = new Set<string>();
+  for (const file of walk(SRC)) {
+    if (!file.endsWith('.tsx')) continue;
+    const rel = file.replace(`${SRC}/`, '');
+    const code = readFileSync(file, 'utf8');
+    for (const m of code.matchAll(/<EmptyState\b/g)) {
+      const tag = aberturaDoVazio(code, m.index!);
+      if (/\bcompacto\b/.test(tag)) continue;
+      const permitido = (VAZIO_GRANDE_PERMITIDO[rel] ?? []).find((t) => tag.includes(t));
+      if (permitido) usados.add(`${rel}|${permitido}`);
+      else soltos.push(`src/${rel}:${code.slice(0, m.index).split('\n').length}`);
+    }
+  }
+  assert.deepEqual(soltos, [], 'vazio grande dividindo a tela com outra coisa: use `compacto` depois do que existe, ou justifique aqui');
+  const velhos = Object.entries(VAZIO_GRANDE_PERMITIDO).flatMap(([f, ts]) => ts.filter((t) => !usados.has(`${f}|${t}`)).map((t) => `${f}: ${t}`));
+  assert.deepEqual(velhos, [], 'entrada da lista que não existe mais');
+});

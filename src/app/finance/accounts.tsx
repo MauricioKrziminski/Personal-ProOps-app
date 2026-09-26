@@ -487,7 +487,7 @@ export default function AccountsScreen() {
   ) : null;
 
   const empty = semNadaCadastrado && !balances.isLoading && !balances.isError ? (
-    <EmptyState
+    <EmptyState compacto
       icon="wallet.bifold"
       title={soTemSemConta ? <>Seus lançamentos estão em <Forte>Sem conta</Forte></> : 'Nenhuma conta ainda'}
       hint={

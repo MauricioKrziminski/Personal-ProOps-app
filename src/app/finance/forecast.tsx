@@ -1001,7 +1001,7 @@ export default function ForecastScreen() {
       ) : null}
 
       {nadaParaProjetar ? (
-        <EmptyState
+        <EmptyState compacto
           icon="chart.line.uptrend.xyaxis"
           title="Ainda não dá para projetar"
           hint={'Cadastre suas contas e manda no WhatsApp *todo dia 5 pago 1200 de aluguel*.\nA partir daí eu mostro quanto sobra em cada dia.'}

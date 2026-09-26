@@ -417,7 +417,7 @@ export default function ImportScreen() {
             <AccountPicker accounts={accounts ?? []} value={accountId} onChange={setAccountId} />
           </View>
         ) : (
-          <EmptyState
+          <EmptyState compacto
             icon="creditcard"
             title="Cadastre a conta ou o cartão primeiro"
             hint="A importação precisa saber de onde é o arquivo."
@@ -587,7 +587,7 @@ export default function ImportScreen() {
       ) : null}
 
       {fechado && !isError && !isLoading ? (
-        <EmptyState
+        <EmptyState compacto
           icon="checkmark.circle"
           title={importados === 0 ? 'Nada importado' : `${importados} ${importados === 1 ? 'lançamento importado' : 'lançamentos importados'}`}
           hint={`${decididos.length - importados} ficaram de fora.`}

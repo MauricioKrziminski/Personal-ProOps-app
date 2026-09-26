@@ -590,7 +590,7 @@ export default function TransactionsScreen() {
   ) : list.isError ? (
     <ErrorCard onRetry={list.refetch} />
   ) : hasFilters ? (
-    <EmptyState
+    <EmptyState compacto
       icon="line.3.horizontal.decrease"
       title={
         search.trim()

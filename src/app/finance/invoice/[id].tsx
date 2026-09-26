@@ -598,7 +598,7 @@ export default function InvoiceScreen() {
         ListFooterComponent={rodape}
         ListEmptyComponent={
           fatura && !invoice.isLoading ? (
-            <EmptyState
+            <EmptyState compacto
               icon="doc.text"
               title="Nenhuma compra nesta fatura"
               hint="Compras no cartão caem aqui sozinhas — é só mandar *paguei 80 no mercado no Nubank* no WhatsApp."
@@ -695,7 +695,7 @@ export default function InvoiceScreen() {
                 onRetry={accounts.refetch}
               />
             ) : pagadoras.length === 0 && !accounts.isLoading ? (
-              <EmptyState
+              <EmptyState compacto
                 icon="building.columns"
                 title="Nenhuma conta para pagar"
                 hint="Cadastre a conta de onde o dinheiro sai para registrar o pagamento."

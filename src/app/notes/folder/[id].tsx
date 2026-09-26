@@ -8,7 +8,7 @@ import { ColorPicker } from '@/components/notes/color-picker';
 import { FolderGrid } from '@/components/notes/folder-grid';
 import { FolderPicker } from '@/components/notes/folder-picker';
 import { confirmarApagarPasta } from '@/components/notes/note-actions';
-import { NovaPastaSheet } from '@/components/notes/nova-pasta';
+import { NovaPastaSheet, useMoverPasta } from '@/components/notes/nova-pasta';
 import { NoteList } from '@/components/notes/note-list';
 import { useFolderMenu } from '@/components/notes/use-folder-menu';
 import { TagPicker } from '@/components/notes/tag-picker';
@@ -162,7 +162,9 @@ export default function FolderScreen() {
     [togglePin, trash, restore, updateNote, toast]
   );
 
-  const menuDaSubpasta = useFolderMenu({ onColor: setPintandoPasta });
+  const [renomeandoPasta, setRenomeandoPasta] = useState<NoteFolder | null>(null);
+  const moverPasta = useMoverPasta(folders);
+  const menuDaSubpasta = useFolderMenu({ onColor: setPintandoPasta, onRename: setRenomeandoPasta, pastas: folders });
 
   const pronta = useTelaPronta(list, foldersQuery);
 
@@ -260,12 +262,10 @@ export default function FolderScreen() {
                   { label: 'Tags', icon: 'tag', onPress: () => setEtiquetando(true) },
                   // Criar a subpasta AQUI, sem passar por "Organizar pastas" (25/09/2026).
                   { label: 'Nova subpasta', icon: 'folder.badge.plus', onPress: () => setCriandoSubpasta(true) },
-                  {
-                    label: 'Renomear e mover',
-                    icon: 'pencil',
-                    // Chega com ESTA pasta no editor (25/09/2026), não na árvore inteira.
-                    onPress: () => router.push(`/notes/folders?edit=${folder.id}`),
-                  },
+                  // Renomear e mover AQUI, cada um fazendo o que diz (25/09/2026): era um "Renomear e
+                  // mover" que abria a folha de renomear, e mover exigia achar a pasta na árvore.
+                  { label: 'Renomear', icon: 'pencil', onPress: () => setRenomeandoPasta(folder) },
+                  { label: 'Mover para dentro de…', icon: 'folder', onPress: () => moverPasta(folder) },
                   { label: 'Arquivar', icon: 'archivebox', onPress: arquivar },
                   { label: 'Apagar pasta', icon: 'trash', destructive: true, onPress: apagar },
                 ],
@@ -398,7 +398,7 @@ export default function FolderScreen() {
                   }
                 />
               ) : list.isError ? (
-                <EmptyState
+                <EmptyState compacto
                   icon="exclamationmark.triangle"
                   title="Não deu para carregar as notas"
                   hint="Pode ter sido a conexão."
@@ -453,6 +453,14 @@ export default function FolderScreen() {
           setTagsEmEdicao(null);
         }}
         onToggle={alternarTag}
+      />
+
+      <NovaPastaSheet
+        key={renomeandoPasta?.id ?? 'renomear'}
+        visible={renomeandoPasta !== null}
+        pasta={renomeandoPasta}
+        pastas={folders}
+        onClose={() => setRenomeandoPasta(null)}
       />
 
       {folder ? (

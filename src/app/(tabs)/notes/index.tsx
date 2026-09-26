@@ -322,7 +322,8 @@ export default function NotesScreen() {
     ]);
   };
 
-  const menuDaPasta = useFolderMenu({ onColor: setPintandoPasta });
+  const [renomeandoPasta, setRenomeandoPasta] = useState<NoteFolder | null>(null);
+  const menuDaPasta = useFolderMenu({ onColor: setPintandoPasta, onRename: setRenomeandoPasta, pastas: folders });
 
   /*
     O PORTÃO DA TELA — três consultas, e todas precisam estar de pé antes de a tela pintar.
@@ -357,12 +358,28 @@ export default function NotesScreen() {
     );
   }
 
+  /*
+    Vazio que divide a tela com outra coisa é a LINHA compacta, depois do que existe (design §7):
+    a grade de pastas fica acima da lista, e "Arquivadas" no fim. Grande, só "Nada anotado ainda"
+    quando a aba não tem mais nada — com arquivadas, ele desce para depois delas (25/09/2026).
+  */
+  const vazioDepoisDasArquivadas = !procurando && Boolean(arquivadas.data);
+  const nadaAnotado = (
+    <EmptyState
+      title="Nada anotado ainda"
+      hint="Escreve aqui em cima — ou manda *anotar: ligar pro dentista* no WhatsApp."
+      compacto={vazioDepoisDasArquivadas}
+    />
+  );
+  const semNadaNaAba =
+    !list.isError && !list.isLoading && !q && !tag && pastas.length === 0 && notes.length === 0;
   const vazio = list.isError ? (
     <EmptyState
       icon="exclamationmark.triangle"
       title="Não deu para carregar as notas"
       hint="Pode ter sido a conexão."
       action={{ label: 'Tentar de novo', onPress: () => list.refetch() }}
+      compacto
     />
   ) : list.isLoading ? (
     <View accessibilityLabel="Carregando notas">
@@ -376,13 +393,15 @@ export default function NotesScreen() {
       title={<>Nada encontrado para <Forte>{q}</Forte></>}
       hint="Se você já apagou, ainda dá tempo de resgatar."
       action={{ label: 'Buscar na lixeira', onPress: () => router.push('/notes/trash') }}
+      compacto
     />
   ) : tag ? (
     <EmptyState
       icon="tag"
-      title={`Nada com #${tag}`}
-      hint="Nenhuma nota e nenhuma pasta usam essa tag agora."
+      title={`Nenhuma nota com #${tag}`}
+      hint={pastas.length > 0 ? 'As pastas com essa tag estão acima.' : 'Nenhuma nota e nenhuma pasta usam essa tag agora.'}
       action={{ label: 'Limpar filtro', onPress: () => setTag(null) }}
+      compacto
     />
   ) : pastas.length > 0 ? (
     // As pastas estão logo acima: o vazio é uma linha depois delas, não o centro da tela.
@@ -392,11 +411,8 @@ export default function NotesScreen() {
       hint="Tudo que você anotou está dentro de uma pasta. Escreve aí em cima para começar outra."
       compacto
     />
-  ) : (
-    <EmptyState
-      title="Nada anotado ainda"
-      hint="Escreve aqui em cima — ou manda *anotar: ligar pro dentista* no WhatsApp."
-    />
+  ) : vazioDepoisDasArquivadas ? null : (
+    nadaAnotado
   );
 
   const biblioteca = (
@@ -643,6 +659,7 @@ export default function NotesScreen() {
             />
           </Section>
         ) : null}
+        {semNadaNaAba && vazioDepoisDasArquivadas ? nadaAnotado : null}
       </DragScrollView>
   );
 
@@ -664,6 +681,13 @@ export default function NotesScreen() {
       {biblioteca}
 
       <NovaPastaSheet visible={criandoPasta} onClose={() => setCriandoPasta(false)} pastas={folders} />
+      <NovaPastaSheet
+        key={renomeandoPasta?.id ?? 'renomear'}
+        visible={renomeandoPasta !== null}
+        pasta={renomeandoPasta}
+        pastas={folders}
+        onClose={() => setRenomeandoPasta(null)}
+      />
 
       <ColorPicker
         visible={pintando !== null}

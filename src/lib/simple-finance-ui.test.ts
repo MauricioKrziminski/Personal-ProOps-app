@@ -2005,6 +2005,8 @@ test('Lista principal vazia com seção secundária: a secundária em cima e o v
   const serie = { id: 's1', description: 'Academia', kind: 'expense', amount_cents: 100, rrule: 'FREQ=MONTHLY;BYMONTHDAY=5', active: false, next_run_at: '2026-10-05T12:00:00Z', dtstart: '2026-01-05', category: null, account_id: null };
   ordem(screen('src/app/finance/recurring.tsx', { recurring: [serie] }), (n: any) => n.type === 'SectionHead' && n.props.title === 'Pausadas');
   ordem(screen('src/app/reminders.tsx', { reminders: [{ id: 'r1', title: 'Remédio', active: false, next_run_at: null, rrule: null }] }), (n: any) => n.type === 'Section' && n.props.title === 'Pausados');
+  // Organizar pastas sem pasta nenhuma: "Sem pasta" é a linha que existe (25/09/2026).
+  ordem(screen('src/app/notes/folders.tsx', { folders: [] }), (n: any) => n.type === 'Row' && n.props.title === 'Sem pasta');
 });
 
 const dicas = (ui: ReturnType<typeof screen>) =>
@@ -2504,4 +2506,18 @@ test('Organizar pastas: sem criar; Renomear abre a folha da pasta, que salva sem
   editar.interact((nodes: any[]) => nodes.find((n) => n.type === 'TaskHeader').props.action.props.onPress());
   await new Promise((r) => setTimeout(r, 0));
   assert.deepEqual(copia(editar.writes.at(-1)), { operation: 'useSaveFolder', value: { id: 'f1', name: 'trabalho 2', icon: 'briefcase' } }, 'sem parentId: a pasta fica onde está');
+});
+
+/** Dentro da pasta, "Renomear" e "Mover para dentro de…" fazem o que dizem, ali (25/09/2026). */
+test('Pasta: o "…" renomeia na folha da pasta e move sem ir a Organizar pastas', () => {
+  const pasta = { id: 'f1', name: 'trabalho', icon: 'folder', color: null, pinned: false, parent_id: null, notes_count: 0, tags: [] };
+  const ui = screen('src/app/notes/folder/[id].tsx', { folders: [pasta], notes: [], params: { id: 'f1' } });
+  const menu = ui.nodes().find((n: any) => n.type === 'HeaderActions')?.props.menu?.actions ?? [];
+  const labels = menu.map((a: any) => a.label);
+  assert.ok(labels.includes('Renomear') && labels.includes('Mover para dentro de…') && !labels.includes('Renomear e mover'), labels.join(', '));
+  ui.interact(() => menu.find((a: any) => a.label === 'Renomear').onPress());
+  const folha = ui.nodes().find((n: any) => n.type?.name === 'NovaPastaSheet' && n.props.pasta);
+  assert.equal(folha?.props.visible, true);
+  assert.equal(folha.props.pasta.id, 'f1');
+  assert.equal(ui.navigations.length, 0, 'nada de navegar para Organizar pastas');
 });

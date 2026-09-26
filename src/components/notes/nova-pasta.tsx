@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
-import { FOLDER_ICONS, symbol } from '@/components/notes/note-actions';
+import { actionSheet, FOLDER_ICONS, symbol } from '@/components/notes/note-actions';
 import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
 import { Forte } from '@/components/ui/forte';
@@ -51,6 +51,49 @@ export function useSalvarPasta(pastas: NoteFolder[]) {
     }
   };
   return { salvar, salvando: saveFolder.isPending };
+}
+
+/** Para onde uma pasta pode ir: nem ela mesma, nem as DESCENDENTES dela (sumiriam da árvore). */
+export function destinosDaPasta(pastas: NoteFolder[], folder: NoteFolder): NoteFolder[] {
+  const descendentes = new Set<string>([folder.id]);
+  let cresceu = true;
+  while (cresceu) {
+    cresceu = false;
+    for (const f of pastas) {
+      if (f.parent_id && descendentes.has(f.parent_id) && !descendentes.has(f.id)) {
+        descendentes.add(f.id);
+        cresceu = true;
+      }
+    }
+  }
+  return pastas.filter((f) => !descendentes.has(f.id));
+}
+
+/**
+ * Mover uma pasta para dentro de outra, ou para a raiz — UMA regra para Organizar pastas, a tela da
+ * pasta e o menu do ladrilho (25/09/2026: só existia na árvore, e o "Renomear e mover" de dentro da
+ * pasta abria uma folha que não movia nada). Falhando, diz — antes a falha era muda.
+ */
+export function useMoverPasta(pastas: NoteFolder[]) {
+  const saveFolder = useSaveFolder();
+  const toast = useToast();
+  return (folder: NoteFolder) => {
+    const destinos = destinosDaPasta(pastas, folder);
+    actionSheet(
+      {
+        title: `Mover a pasta ${folder.name} para`,
+        options: ['Raiz (nenhuma pasta)', ...destinos.map((f) => f.name)],
+      },
+      (index) => {
+        if (index === undefined) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        saveFolder.mutate(
+          { id: folder.id, name: folder.name, icon: folder.icon, parentId: index === 0 ? null : destinos[index - 1].id },
+          { onError: () => toast({ message: 'Não deu para mover a pasta.', tone: 'error' }) },
+        );
+      },
+    );
+  };
 }
 
 /**

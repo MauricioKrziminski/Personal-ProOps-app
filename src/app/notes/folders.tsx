@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -23,15 +23,14 @@ import {
   useDeleteFolder,
   folderTree,
   useNoteFolders,
-  useSaveFolder,
   useUpdateFolder,
   type NoteFolder,
 } from '@/hooks/use-notes';
 import { useScheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
-import { actionSheet, confirmarApagarPasta, notesLabel, symbol } from '@/components/notes/note-actions';
+import { confirmarApagarPasta, notesLabel, symbol } from '@/components/notes/note-actions';
 import { ColorPicker } from '@/components/notes/color-picker';
-import { NovaPastaSheet } from '@/components/notes/nova-pasta';
+import { NovaPastaSheet, useMoverPasta } from '@/components/notes/nova-pasta';
 import { TagPicker } from '@/components/notes/tag-picker';
 import { noteInk } from '@/design/note-colors';
 import { transicaoDeLayout } from '@/components/motion/transicao';
@@ -74,7 +73,6 @@ export default function FoldersScreen() {
   const toast = useToast();
   const folders = useNoteFolders();
   const loose = useLooseNotesCount();
-  const saveFolder = useSaveFolder();
   const deleteFolder = useDeleteFolder();
   const updateFolder = useUpdateFolder();
 
@@ -84,19 +82,6 @@ export default function FoldersScreen() {
   const [pintando, setPintando] = useState<NoteFolder | null>(null);
   const [etiquetando, setEtiquetando] = useState<NoteFolder | null>(null);
 
-  /**
-   * `?edit=<pasta>` — o "Renomear e mover" de DENTRO de uma pasta (25/09/2026): chega com a folha
-   * de renomear DELA aberta, em vez de a pessoa caçar a pasta na árvore. Uma vez só.
-   */
-  const params = useLocalSearchParams<{ edit?: string }>();
-  const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
-  if (params.edit && params.edit !== edicaoAberta) {
-    const alvo = folders.data?.find((f) => f.id === params.edit);
-    if (alvo) {
-      setEdicaoAberta(params.edit);
-      setEditando(alvo);
-    }
-  }
 
   const confirmDelete = (folder: NoteFolder) => {
     confirmarApagarPasta(folder, () => {
@@ -108,42 +93,7 @@ export default function FoldersScreen() {
     });
   };
 
-  /**
-   * Escolhe a pasta-mãe. As opções excluem a própria pasta (não pode ser mãe de si mesma) e as
-   * DESCENDENTES dela — mover "Trabalho" para dentro de "Trabalho / 2026" faria as duas sumirem
-   * da árvore, cada uma esperando a outra aparecer primeiro.
-   */
-  const moverPara = (folder: NoteFolder) => {
-    const descendentes = new Set<string>([folder.id]);
-    let cresceu = true;
-    while (cresceu) {
-      cresceu = false;
-      for (const f of list) {
-        if (f.parent_id && descendentes.has(f.parent_id) && !descendentes.has(f.id)) {
-          descendentes.add(f.id);
-          cresceu = true;
-        }
-      }
-    }
-    const destinos = list.filter((f) => !descendentes.has(f.id));
-
-    actionSheet(
-      {
-        title: `Mover a pasta ${folder.name} para`,
-        options: ['Raiz (nenhuma pasta)', ...destinos.map((f) => f.name)],
-      },
-      (index) => {
-        if (index === undefined) return;
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        saveFolder.mutate({
-          id: folder.id,
-          name: folder.name,
-          icon: folder.icon,
-          parentId: index === 0 ? null : destinos[index - 1].id,
-        });
-      }
-    );
-  };
+  const moverPara = useMoverPasta(folders.data ?? []);
 
   /**
    * Arquivar some da grade e do seletor, e NÃO toca nas notas.
@@ -229,13 +179,7 @@ export default function FoldersScreen() {
           <SkeletonRow />
           <SkeletonRow />
         </Section>
-      ) : list.length === 0 ? (
-        <EmptyState
-          icon="folder"
-          title="Nenhuma pasta ainda"
-          hint="Crie em *Nova pasta*, no … de Notas, ou mande *anotar: comprar leite #mercado* no WhatsApp."
-        />
-      ) : (
+      ) : list.length === 0 ? null : (
         <Section>
           {arvore.map((folder, index) => (
             <Animated.View
@@ -294,6 +238,17 @@ export default function FoldersScreen() {
           />
         </Section>
       )}
+
+      {/* Sem pasta nenhuma: o que existe ("Sem pasta") vem PRIMEIRO e o vazio é a linha compacta
+          depois dele — o vazio grande no alto empurrava o card para baixo do texto (design §7). */}
+      {!folders.isLoading && !folders.isError && list.length === 0 ? (
+        <EmptyState
+          icon="folder"
+          title="Nenhuma pasta ainda"
+          hint="Crie em *Nova pasta*, no … de Notas, ou mande *anotar: comprar leite #mercado* no WhatsApp."
+          compacto
+        />
+      ) : null}
     </>
   );
 

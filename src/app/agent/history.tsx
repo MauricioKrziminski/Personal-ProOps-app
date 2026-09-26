@@ -132,7 +132,7 @@ export default function AgentHistoryScreen() {
           ) : lista.isError ? (
             <RetryConversations onPress={() => void refetch()} />
           ) : (
-            <EmptyState
+            <EmptyState compacto
               icon="bubble.left.and.bubble.right"
               title="Nenhuma conversa ainda"
               hint="Quando você conversar com o agente, o histórico aparece aqui."

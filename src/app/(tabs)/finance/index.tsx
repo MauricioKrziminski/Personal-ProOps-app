@@ -573,7 +573,7 @@ export default function FinanceScreen() {
       ) : null}
 
       {isEmpty ? (
-        <EmptyState
+        <EmptyState compacto
           title="Ainda não tem movimento"
           hint={'Manda *gastei 45 no mercado* no WhatsApp —\nou toca no + para lançar aqui'}
         />
