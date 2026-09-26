@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
+  dataLocalDe,
   brToISO,
   diaCurtoBR,
   diasAte,
@@ -291,4 +292,16 @@ test('horaComoData e timeBR fecham ida e volta; hora inválida não mexe no rel�
   // apagado no meio da digitação: devolve a hora de agora, nunca um Date inválido
   assert.equal(timeBR(horaComoData('', base)), '10:26');
   assert.equal(timeBR(horaComoData('25:00', base)), '10:26');
+});
+
+test('dataLocalDe: o dia de um timestamp é o do RELÓGIO da pessoa, não o do UTC', () => {
+  // 25/09/2026, 21h49 em São Paulo = 00h49 do dia 26 em UTC: o detalhe dizia "Registrado em 26/09".
+  const antes = process.env.TZ;
+  process.env.TZ = 'America/Sao_Paulo';
+  try {
+    assert.equal(dataLocalDe('2026-09-26T00:49:42.933679+00:00'), '2026-09-25');
+    assert.equal(dataLocalDe('2026-09-25T12:00:00Z'), '2026-09-25');
+  } finally {
+    process.env.TZ = antes;
+  }
 });

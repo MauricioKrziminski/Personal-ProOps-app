@@ -27,6 +27,7 @@ import { PASSO } from '@/lib/aos-poucos';
 import { formatDateBR } from '@/hooks/use-items';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { accountLabel } from '@/lib/accounts';
+import { dataLocalDe } from '@/lib/dates';
 import { transicaoDeLayout, transicaoDeLayoutRapida } from '@/components/motion/transicao';
 
 /**
@@ -83,7 +84,7 @@ export default function ImportHistoryScreen() {
   const porMes = useMemo(() => {
     const grupos: [string, ImportBatchSummary[]][] = [];
     for (const lote of batches.data ?? []) {
-      const mes = lote.created_at.slice(0, 7);
+      const mes = dataLocalDe(lote.created_at).slice(0, 7);
       const ultimo = grupos[grupos.length - 1];
       if (ultimo && ultimo[0] === mes) ultimo[1].push(lote);
       else grupos.push([mes, [lote]]);

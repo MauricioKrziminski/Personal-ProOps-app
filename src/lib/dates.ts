@@ -9,6 +9,14 @@ export function localISODate(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/**
+ * O dia de um TIMESTAMP (`created_at`) no relógio da pessoa. `created_at.slice(0, 10)` é o dia em
+ * UTC: das 21h à meia-noite ele já é amanhã — "Registrado em 26/09" para o que entrou dia 25.
+ */
+export function dataLocalDe(timestamp: string): string {
+  return localISODate(new Date(timestamp));
+}
+
 /** Primeiro e último dia de um mês YYYY-MM, em datas locais. */
 export function monthBounds(month: string): { from: string; to: string } {
   const [y, m] = month.split('-').map(Number);

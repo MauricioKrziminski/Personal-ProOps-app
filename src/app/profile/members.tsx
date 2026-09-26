@@ -25,6 +25,7 @@ import {
 } from '@/hooks/use-finance';
 import { useSession } from '@/hooks/use-session';
 import { confirmDestructive } from '@/lib/item-actions';
+import { dataLocalDe } from '@/lib/dates';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
@@ -123,7 +124,7 @@ export default function MembersScreen() {
           {lista.map((membro, index) => {
             const sou = membro.user_id === meuId;
             const papel = PAPEL[membro.role] ?? 'membro';
-            const desde = `desde ${monthLabel(membro.created_at.slice(0, 7))}`;
+            const desde = `desde ${monthLabel(dataLocalDe(membro.created_at).slice(0, 7))}`;
             const titulo = sou
               ? `${meuTelefone ? telefoneBR(meuTelefone) : 'Seu número'} · você`
               : papel === 'dono'

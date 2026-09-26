@@ -40,6 +40,7 @@ import { detalheDoPagamento } from '@/lib/confirmar-baixa';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive } from '@/lib/item-actions';
 import { dueLabel, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
+import { dataLocalDe } from '@/lib/dates';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 
@@ -258,7 +259,7 @@ export default function TransactionDetailScreen() {
   }
 
   const title = tx.description || tx.merchant || tx.category || 'Lançamento';
-  const created = tx.created_at.slice(0, 10);
+  const created = dataLocalDe(tx.created_at);
   const signedAmount = tx.kind === 'expense' ? -tx.amount_cents : tx.amount_cents;
   const hoje = localISODate();
   const estado = estadoDaLinha(tx, hoje);
