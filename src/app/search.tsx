@@ -34,8 +34,8 @@ const PREVIEW = 5;
  * a chrome.
  */
 
-/** Uma prévia de linha, não a nota: ~duas linhas na largura de um celular. */
-const PREVIA = 120;
+/** Uma prévia de linha, não a nota: duas a três linhas na largura de um celular (medido no s26). */
+const PREVIA = 70;
 
 export default function SearchScreen() {
   const [text, setText] = useState('');
