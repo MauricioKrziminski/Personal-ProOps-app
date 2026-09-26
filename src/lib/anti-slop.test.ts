@@ -1584,3 +1584,9 @@ test('Em parcela, "Editar" abre a COMPRA em toda lista que oferece Editar', () =
     assert.match(fonte, /tx\.installment_plan_id\s*\?\s*router\.push\(\{\s*pathname: '\/finance\/installments',\s*params: \{ edit: tx\.installment_plan_id \}/, arquivo);
   }
 });
+
+test('O dia de um timestamp na tela é o LOCAL, nunca o recorte do UTC', () => {
+  // 26/09/2026: o Fundacred de produção tem `next_run_at` 05/10 00:00 UTC (04/10 em Brasília), e o
+  // card e o formulário da série diziam 05/10. `dataLocalDe` é o caminho.
+  assert.deepEqual(offenders(/(next_run_at|created_at|updated_at|paid_at)\??\.slice\(0, ?10\)/), []);
+});

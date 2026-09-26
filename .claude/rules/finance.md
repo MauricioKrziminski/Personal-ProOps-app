@@ -69,13 +69,17 @@
   **A série se edita INTEIRA** (`update_recurring_series`, `20260926120000`, *"ter todos os
   campos de quando eu crio ao editar"*): valor, título, estabelecimento, tipo, categoria, conta,
   fim e o CALENDÁRIO. Calendário novo (`rrule` + `next_run_at`, sempre juntos, só o que o
-  `montaRRule` do app monta) apaga as futuras em aberto, põe a âncora no próximo vencimento e
-  zera `materialized_until` — o agendador gera de novo. O passado, a atrasada e a paga não mudam.
+  `montaRRule` do app monta) apaga as em aberto do PERÍODO (semana, mês, ano) do próximo
+  vencimento em diante, põe a âncora nele e zera `materialized_until` — o agendador gera de novo.
+  A em aberto de um mês anterior é outra conta e fica; o passado, a atrasada e a paga não mudam.
   - ⚠️ **"Futura em aberto" é pelo VENCIMENTO fora do cartão**: o Fundacred de setembro tinha data
     04/09 e vencimento 30/09; pela data ele ficaria e nasceria outro 30/09 ao lado. No cartão
     `due_at` é o vencimento da FATURA e a compra de ontem já aconteceu: lá vale a data.
-  - ⚠️ **A paga adiantada segura o calendário**: o próximo vencimento vem num período (semana,
-    mês, ano) depois dela, senão o mês pago ganharia uma segunda cobrança.
+  - ⚠️ **O que FICA segura o calendário** (paga, atrasada, compra de cartão já feita): o próximo
+    vencimento vem num período depois dela, senão aquele mês ganharia uma segunda cobrança. É o
+    Fundacred de produção: setembro pago com vencimento 30/09 recusa "próximo em 30/09".
+  - `next_run_at` é timestamp: a tela lê o dia LOCAL (`dataLocalDe`). O Fundacred de produção tem
+    05/10 00:00 UTC — 04/10 em Brasília —, e o card dizia "próximo 05/10".
   - Até o agendador rodar (1 h em produção), a projeção lê a regra só no mensal simples
     (`recurring_projection_for`); reagendada para semanal, anual ou "a cada N meses", a série
     some da projeção até a rodada.

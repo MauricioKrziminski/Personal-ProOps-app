@@ -44,7 +44,7 @@ import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useDebounced } from '@/hooks/use-debounced';
 import { semAcento } from '@/lib/text';
 import { QuantityField } from '@/components/ui/quantity-field';
-import { brToISO, ehUltimoDiaDoMes, fimQueSegueOInicio, isValidBRDate, isoToBR, localDateTime, localISODate } from '@/lib/dates';
+import { brToISO, dataLocalDe, ehUltimoDiaDoMes, fimQueSegueOInicio, isValidBRDate, isoToBR, localDateTime, localISODate } from '@/lib/dates';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { financeErrorMessage, validRecurringRange } from '@/lib/finance-form';
 import { describeRRule } from '@/lib/rrule-text';
@@ -262,7 +262,7 @@ function formDaSerie(r: RecurringTransaction): FormState {
     accountId: r.account_id,
     preset: r.rrule.includes('FREQ=WEEKLY') ? 'weekly' : r.rrule.includes('FREQ=YEARLY') ? 'yearly' : 'monthly',
     intervalo,
-    inicio: isoToBR(r.next_run_at.slice(0, 10)),
+    inicio: isoToBR(dataLocalDe(r.next_run_at)),
     fim: r.end_date ? isoToBR(r.end_date) : '',
     autoConfirm: r.auto_confirm,
   };
@@ -525,7 +525,7 @@ export default function RecurringScreen() {
         <Deslizavel titulo={r.description ?? 'Recorrência'} acoes={acoesDaSerie(r)} forma="card">
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel={`${r.description ?? 'recorrência'}, ${receita ? 'receita' : 'despesa'}, ${quando}, próximo em ${isoToBR(r.next_run_at.slice(0, 10))}${r.active ? '' : ', pausado'}`}
+          accessibilityLabel={`${r.description ?? 'recorrência'}, ${receita ? 'receita' : 'despesa'}, ${quando}, próximo em ${isoToBR(dataLocalDe(r.next_run_at))}${r.active ? '' : ', pausado'}`}
           onPress={() => acoes(r)}
           onLongPress={() => acoes(r)}>
           <Card style={[styles.serie, r.active ? null : styles.pausada]}>
@@ -552,7 +552,7 @@ export default function RecurringScreen() {
               </Pressable>
             </View>
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              {quando} · próximo {isoToBR(r.next_run_at.slice(0, 10)).slice(0, 5)}
+              {quando} · próximo {isoToBR(dataLocalDe(r.next_run_at)).slice(0, 5)}
               {r.category ? ` · ${r.category}` : ''}
               {r.active ? '' : ' · pausada'}
             </ThemedText>
@@ -849,7 +849,9 @@ export default function RecurringScreen() {
                 label={form.id ? 'Próximo vencimento' : 'Começa em'}
                 hint={
                   form.id
-                    ? form.agendaMudou ? 'Refaz as próximas em aberto; as passadas ficam' : undefined
+                    ? form.agendaMudou
+                      ? `Refaz as em aberto ${form.preset === 'weekly' ? 'da semana' : form.preset === 'yearly' ? 'do ano' : 'do mês'} desta data em diante`
+                      : undefined
                     : inicioOk && brToISO(form.inicio) < localISODate() ? 'Já lança as passadas' : undefined
                 }
                 error={

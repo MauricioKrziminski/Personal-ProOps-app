@@ -13,10 +13,13 @@
 --    sempre juntos). Mudar o calendário refaz as ocorrências FUTURAS em aberto: as `pending` de
 --    hoje em diante saem, a âncora (`dtstart`) passa a ser o próximo vencimento e
 --    `materialized_until` volta a nulo — o agendador gera de novo pela regra nova (de hora em hora
---    em produção). Até lá a projeção lê a regra só no mensal simples (`recurring_projection_for`):
+--    em produção). Só saem as em aberto a partir do PERÍODO (semana, mês, ano) do próximo
+--    vencimento: a de um mês anterior a ele é outra conta, e ninguém a gera de novo. Até lá a projeção lê a regra só no mensal simples (`recurring_projection_for`):
 --    reagendada para semanal, anual ou "a cada N meses", a série some da projeção até a rodada.
---    A ocorrência já PAGA adiantada segura o calendário: o próximo vencimento vem num período
---    (semana, mês, ano) depois dela — senão o mês pago ganharia uma segunda cobrança. O passado e a ocorrência atrasada não mudam
+--    A ocorrência que FICA (paga, atrasada, compra de cartão já feita) segura o calendário: o
+--    próximo vencimento vem num período depois dela — senão aquele mês ganharia uma segunda
+--    cobrança. O caso é o Fundacred: setembro pago com vencimento 30/09, e "próximo em 30/09"
+--    criaria outro setembro. O passado e a ocorrência atrasada não mudam
 --    ("o passado só muda à mão"); a paga adiantada (`cleared`) também fica.
 --    ⚠️ "Futura em aberto" é pelo VENCIMENTO fora do cartão: o Fundacred de setembro tinha data
 --    04/09 e vencimento 30/09 — pela data ele ficaria, e o agendador criaria outro 30/09 ao lado.
@@ -49,7 +52,7 @@ declare
   serie   record;
   changed bigint := 0;
   proxima timestamptz;
-  paga    date;
+  fica    record;
   periodo text;
 begin
   if p_patch is null or p_patch = '{}'::jsonb then
@@ -90,14 +93,24 @@ begin
   end if;
 
   if p_patch ? 'rrule' then
-    select max(t.occurred_at) into paga
-    from public.transactions t
-    where t.recurring_id = serie.id and t.workspace_id = serie.workspace_id
-      and t.status = 'cleared' and t.occurred_at >= current_date;
     periodo := case when p_patch->>'rrule' like 'FREQ=WEEKLY%' then 'week'
                     when p_patch->>'rrule' like 'FREQ=YEARLY%' then 'year' else 'month' end;
-    if paga is not null and date_trunc(periodo, proxima::date) <= date_trunc(periodo, paga) then
-      raise exception 'A de % já está paga: o próximo vencimento vem depois dela', to_char(paga, 'DD/MM/YYYY');
+    -- A mais recente das que FICAM (tudo menos a em aberto que ainda não venceu). O dia dela é o
+    -- vencimento fora do cartão; no cartão, a data da compra.
+    select x.dia, x.status into fica
+    from (
+      select case when t.invoice_id is null then coalesce(t.due_at, t.occurred_at) else t.occurred_at end as dia,
+             t.status
+      from public.transactions t
+      where t.recurring_id = serie.id and t.workspace_id = serie.workspace_id
+        and not (t.status = 'pending'
+                 and (t.occurred_at >= current_date or (t.invoice_id is null and t.due_at >= current_date)))
+    ) x
+    order by x.dia desc
+    limit 1;
+    if fica.dia is not null and date_trunc(periodo, proxima::date) <= date_trunc(periodo, fica.dia) then
+      raise exception 'A de % %: o próximo vencimento vem depois dela', to_char(fica.dia, 'DD/MM/YYYY'),
+        case when fica.status = 'cleared' then 'já está paga' else 'ainda está em aberto' end;
     end if;
   end if;
 
@@ -124,12 +137,15 @@ begin
   where r.id = serie.id;
 
   if p_patch ? 'rrule' then
-    -- O calendário mudou: as futuras em aberto saem e o agendador as gera de novo pela regra nova.
+    -- O calendário mudou: as em aberto do período do próximo vencimento em diante saem, e o
+    -- agendador as gera de novo pela regra nova.
     delete from public.transactions t
     where t.recurring_id = serie.id
       and t.workspace_id = serie.workspace_id
       and t.status = 'pending'
-      and (t.occurred_at >= current_date or (t.invoice_id is null and t.due_at >= current_date));
+      and (t.occurred_at >= current_date or (t.invoice_id is null and t.due_at >= current_date))
+      and date_trunc(periodo, case when t.invoice_id is null then coalesce(t.due_at, t.occurred_at) else t.occurred_at end)
+          >= date_trunc(periodo, proxima::date);
   end if;
 
   if p_patch ? 'end_date' and p_patch->>'end_date' is not null then
