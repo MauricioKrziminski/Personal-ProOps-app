@@ -33,6 +33,10 @@ const PREVIEW = 5;
  * **Sem card de destaque**: esta tela não tem um número que responda a nada. O único glass aqui é
  * a chrome.
  */
+
+/** Uma prévia de linha, não a nota: ~duas linhas na largura de um celular. */
+const PREVIA = 120;
+
 export default function SearchScreen() {
   const [text, setText] = useState('');
   const [scope, setScope] = useState<Scope>('tudo');
@@ -146,7 +150,7 @@ export default function SearchScreen() {
               <Row
                 key={n.id}
                 title={noteTitle(n.content) || 'Nota sem título'}
-                subtitle={notePreview(n.content) || (n.source === 'whatsapp' ? 'via WhatsApp' : '')}
+                subtitle={notePreview(n.content, PREVIA) || (n.source === 'whatsapp' ? 'via WhatsApp' : '')}
                 icon="note.text"
                 onPress={() => router.push(`/notes/${n.id}`)}
               />

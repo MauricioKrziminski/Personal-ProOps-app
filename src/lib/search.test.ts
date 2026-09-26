@@ -139,3 +139,13 @@ test('o que não é marcação casada continua na tela', () => {
   assert.equal(noteTitle('custou 3 * 4 reais'), 'custou 3 * 4 reais');
   assert.equal(notePreview('titulo\namount_cents e folder_id'), 'amount_cents e folder_id');
 });
+
+test('notePreview com limite corta numa palavra inteira e marca o corte — a lista não vira a nota inteira', () => {
+  // 25/09/2026, a Lixeira: uma nota grande ocupava a tela inteira dentro de uma linha.
+  const corpo = Array.from({ length: 60 }, (_, i) => `palavra${i}`).join(' ');
+  const previa = notePreview(`Afazeres\n${corpo}`, 120);
+  assert.ok(previa.length <= 121, `cortou em ${previa.length}`);
+  assert.ok(previa.endsWith('…'));
+  assert.ok(corpo.startsWith(previa.slice(0, -1)), 'o corte cai numa palavra inteira');
+  assert.equal(notePreview('Título\nlinha 2', 120), 'linha 2', 'curto não muda');
+});

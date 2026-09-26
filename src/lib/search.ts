@@ -60,8 +60,12 @@ export function noteTitle(content: string): string {
   return clean || stripMarkup(first?.trim() ?? '');
 }
 
-/** Corpo sem a primeira linha, para a prévia da lista não repetir o título. */
-export function notePreview(content: string): string {
+/**
+ * Corpo sem a primeira linha, para a prévia da lista não repetir o título. Com `limite`, corta numa
+ * palavra inteira e marca com "…" — a prévia pode ficar pela metade (o texto inteiro está a um
+ * toque, design §7), e sem o corte uma nota grande ocupava a tela da Lixeira inteira numa linha.
+ */
+export function notePreview(content: string, limite?: number): string {
   const lines = content.split('\n');
   const firstIndex = lines.findIndex((line) => line.trim().length > 0);
   const body = lines
@@ -71,7 +75,10 @@ export function notePreview(content: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 
-  return stripTags(body);
+  const previa = stripTags(body);
+  if (!limite || previa.length <= limite) return previa;
+  const corte = previa.slice(0, limite + 1).lastIndexOf(' ');
+  return `${previa.slice(0, corte > 0 ? corte : limite).trimEnd()}…`;
 }
 
 /** Nome de pasta normalizado — o `check` do banco exige `lower(trim())` com no máximo 40. */

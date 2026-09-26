@@ -59,6 +59,10 @@ function notesLabel(count: number): string {
 }
 
 
+
+/** Uma prévia de linha, não a nota: ~duas linhas na largura de um celular. */
+const PREVIA = 120;
+
 export default function TrashScreen() {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
@@ -172,7 +176,7 @@ export default function TrashScreen() {
               <Deslizavel titulo={noteTitle(note.content) || 'Nota'} acoes={acoesDaNota(note)}>
               <Row
                 title={noteTitle(note.content) || 'Nota sem título'}
-                subtitle={notePreview(note.content) || undefined}
+                subtitle={notePreview(note.content, PREVIA) || undefined}
                 icon="note.text"
                 chevron={false}
                 trailing={
