@@ -1,6 +1,7 @@
 /**
- * Os campos da SÉRIE recorrente, e as regras deles, num lugar só (26/09/2026, *"uma tela só de
- * editar componentizada… ter todos os campos de quando eu crio ao editar"*).
+ * Os campos da SÉRIE recorrente num lugar só (26/09/2026, *"uma tela só de editar
+ * componentizada… ter todos os campos de quando eu crio ao editar"*). As regras, puras e com
+ * teste, moram em `lib/serie.ts`.
  *
  * Duas telas desenham isto: a folha de Recorrentes (criar e editar a série) e o formulário do
  * lançamento, quando uma ocorrência é editada em "Esta e as próximas". Duas cópias dos campos
@@ -13,119 +14,8 @@ import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { QuantityField } from '@/components/ui/quantity-field';
 import { Segmented } from '@/components/ui/segmented';
 import { SwitchRow } from '@/components/ui/switch-row';
-import type { RecurringTransaction } from '@/hooks/use-finance';
-import { brToISO, dataLocalDe, ehUltimoDiaDoMes, fimQueSegueOInicio, isValidBRDate, isoToBR, localDateTime, localISODate } from '@/lib/dates';
-import { validRecurringRange } from '@/lib/finance-form';
-
-export interface SerieForm {
-  /**
-   * Presente = está EDITANDO uma série que já existe. Todos os campos da criação continuam na tela:
-   * mudar a repetição ou o vencimento refaz as ocorrências futuras em aberto.
-   */
-  id?: string;
-  /**
-   * A pessoa mexeu em "Repete", "A cada quantos meses" ou no vencimento. Só então a regra vai no
-   * salvar: comparar a regra montada com a gravada mudaria o calendário de uma série vinda do
-   * WhatsApp que a pessoa nem tocou (a regra de lá nem sempre tem a forma que o app monta).
-   */
-  agendaMudou?: boolean;
-  kind: 'expense' | 'income';
-  amountCents: number;
-  description: string;
-  /** Opcional, como no lançamento: nem toda conta fixa tem um estabelecimento. */
-  merchant: string;
-  category: string | null;
-  accountId: string | null;
-  preset: 'monthly' | 'weekly' | 'yearly';
-  /** Só no preset mensal: `A cada N meses`. */
-  intervalo: string;
-  /** dd/mm/aaaa — criando, vira `dtstart` e o `next_run_at`; editando, é o próximo vencimento. */
-  inicio: string;
-  /** dd/mm/aaaa, opcional: é como se encerra uma assinatura sem apagar o histórico. */
-  fim: string;
-  autoConfirm: boolean;
-}
-
-const DIAS_RRULE = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-
-/**
- * A RRULE sai do preset + da data — nunca de um campo de texto livre, que seria um gerador de
- * série quebrada. A frase de volta vem do mesmo `describeRRule` das séries da IA.
- */
-export function montaRRule(preset: SerieForm['preset'], inicio: Date, intervalo: number): string {
-  if (preset === 'weekly') return `FREQ=WEEKLY;BYDAY=${DIAS_RRULE[inicio.getDay()]}`;
-  if (preset === 'yearly') return `FREQ=YEARLY;BYMONTH=${inicio.getMonth() + 1};BYMONTHDAY=${inicio.getDate()}`;
-  const passo = intervalo > 1 ? `;INTERVAL=${intervalo}` : '';
-  /*
-    ⚠️ **A data DIZ se é "todo dia N" ou "todo último dia do mês".** Havia um campo só para
-    perguntar isso ("Vence quando: Dia do mês | Último dia"), e ele era um controle que a própria
-    data já respondia — quem escolhe 31/10 quer o fim do mês, quem escolhe 05/10 quer o dia 5.
-
-    `-1` não é cosmético ao lado de 31: `BYMONTHDAY=31` PULA fevereiro e os meses de 30 dias.
-  */
-  return `FREQ=MONTHLY${passo};BYMONTHDAY=${ehUltimoDiaDoMes(inicio) ? -1 : inicio.getDate()}`;
-}
-
-/**
- * Uma série existente no formulário: a repetição sai da regra gravada e a data é o PRÓXIMO
- * vencimento, no dia LOCAL (`next_run_at` é timestamp: 05/10 00:00 UTC é 04/10 em Brasília).
- */
-export function serieDoRegistro(r: RecurringTransaction): SerieForm {
-  return {
-    id: r.id,
-    kind: r.kind === 'income' ? 'income' : 'expense',
-    amountCents: Number(r.amount_cents),
-    description: r.description ?? '',
-    merchant: r.merchant ?? '',
-    category: r.category,
-    accountId: r.account_id,
-    preset: r.rrule.includes('FREQ=WEEKLY') ? 'weekly' : r.rrule.includes('FREQ=YEARLY') ? 'yearly' : 'monthly',
-    intervalo: /INTERVAL=(\d+)/.exec(r.rrule)?.[1] ?? '1',
-    inicio: isoToBR(dataLocalDe(r.next_run_at)),
-    fim: r.end_date ? isoToBR(r.end_date) : '',
-    autoConfirm: r.auto_confirm,
-  };
-}
-
-export const SERIE_VAZIA: SerieForm = {
-  kind: 'expense',
-  amountCents: 0,
-  description: '',
-  merchant: '',
-  category: null,
-  accountId: null,
-  preset: 'monthly',
-  intervalo: '1',
-  inicio: isoToBR(localISODate()),
-  fim: '',
-  autoConfirm: true,
-};
-
-/** O que o formulário vale agora: o que falta, o que está errado e a regra que ele monta. */
-export function validaSerie(form: SerieForm | null) {
-  const inicioDate = form ? localDateTime(form.inicio, '09:00') : null;
-  const inicioOk = Boolean(form && isValidBRDate(form.inicio) && inicioDate);
-  const fimOk = form
-    ? form.fim === '' || (isValidBRDate(form.fim) && inicioOk && brToISO(form.fim) >= brToISO(form.inicio))
-    : false;
-  /*
-    ⚠️ O título ficava de FORA da guarda e a lista caía em "sem descrição" — a série nascia anônima
-    e se materializava em uma linha por mês, todas sem nome (15/09/2026).
-  */
-  const tituloOk = (form?.description.trim().length ?? 0) > 0;
-  // Mudando o calendário de uma série, o próximo vencimento é daqui para a frente: o passado fica.
-  const agendaNoPassado = Boolean(form?.id && form.agendaMudou && inicioOk && brToISO(form.inicio) < localISODate());
-  const calendarioOk = Boolean(
-    form && inicioOk && validRecurringRange(brToISO(form.inicio), form.fim ? brToISO(form.fim) : '', form.preset === 'monthly' ? form.intervalo : '1'),
-  );
-  const basico = Boolean(form && tituloOk && form.amountCents > 0 && fimOk);
-  // Editando, o calendário só pesa quando a pessoa mexeu nele (`agendaMudou`).
-  const podeSalvar = form?.id
-    ? basico && (!form.agendaMudou || (calendarioOk && !agendaNoPassado))
-    : basico && calendarioOk;
-  const rrulePrevia = form && inicioDate ? montaRRule(form.preset, inicioDate, Number(form.intervalo) || 1) : null;
-  return { inicioDate, inicioOk, fimOk, tituloOk, agendaNoPassado, podeSalvar, rrulePrevia };
-}
+import { brToISO, fimQueSegueOInicio, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
+import { validaSerie, type SerieForm } from '@/lib/serie';
 
 export function CamposDaSerie({
   form,

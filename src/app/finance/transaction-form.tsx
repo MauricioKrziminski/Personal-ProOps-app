@@ -14,6 +14,7 @@ import { Chip } from '@/components/finance/chip';
 import { Note } from '@/components/ui/note';
 import { Row, Section } from '@/components/ui/row';
 import { DatePickerField } from '@/components/finance/date-picker-field';
+import { CamposDaSerie } from '@/components/finance/serie-form';
 import { ThemedText } from '@/components/themed-text';
 import { Forte } from '@/components/ui/forte';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,8 @@ import {
   useDeleteTransaction,
   useSaveDebt,
   useSaveTransaction,
+  useRecurringTransactions,
+  useSaveRecurringSeries,
   useSaveTransactionScoped,
   useTransaction,
   type InstallmentPlanSummary,
@@ -46,6 +49,7 @@ import {
   type TransactionKind,
 } from '@/hooks/use-finance';
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
+import { mudancasDaOcorrencia, serieDaOcorrencia, validaSerie, type SerieForm } from '@/lib/serie';
 import {
   destinoDoSalvar,
   digitarValor,
@@ -409,10 +413,63 @@ function TransactionForm({
     }
   };
 
+  /*
+    ⚠️ **Numa ocorrência de série, "Só esta | Esta e as próximas" é escolhido no TOPO** (26/09/2026,
+    *"uma tela só de editar componentizada, tendo a possibilidade nessa tela de alterar uma ou
+    todas e ter todos os campos de quando eu crio"*). Era uma pergunta no Salvar, sobre os campos
+    da linha só — sem repetição, sem vencimento da série, sem tipo —, e a série se editava em outra
+    tela. "Esta e as próximas" troca o corpo pelos MESMOS campos da folha de Recorrentes.
+    `formSerie` nulo é "Só esta".
+  */
+  const series = useRecurringTransactions();
+  const serie = editing?.recurring_id ? series.data?.find((r) => r.id === editing.recurring_id) : undefined;
+  const [formSerie, setFormSerie] = useState<SerieForm | null>(null);
+  const editarSerie = useSaveRecurringSeries();
+  const serieOk = validaSerie(formSerie).podeSalvar;
+
+  /**
+   * Duas escritas, nesta ordem (`mudancasDaOcorrencia`, com teste): as LINHAS desta em diante
+   * (a mesma RPC do escopo "future", ancorada nesta ocorrência, que também atualiza a regra) e só
+   * depois a REGRA — o calendário novo muda esta linha de data, com o mesmo id.
+   */
+  const salvarAsProximas = () => {
+    if (!formSerie || !editing || !serie || !serieOk) return;
+    const { linhas, regra } = mudancasDaOcorrencia(formSerie, editing, serie);
+    const feito = () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+      toast({ message: 'Alterei esta e as próximas.', tone: 'success' });
+    };
+    const gravarRegra = (linhasJaGravadas: boolean) => {
+      if (Object.keys(regra).length === 0) return feito();
+      editarSerie.mutate(
+        { id: serie.id, patch: regra },
+        {
+          onSuccess: feito,
+          // As linhas JÁ mudaram: a frase diz as duas coisas, com o motivo do banco (a de setembro
+          // já paga, a repetição que o app não monta).
+          onError: (error) => {
+            const motivo = financeErrorMessage(error, 'Não deu para mudar a repetição. Tenta de novo.');
+            toast({ message: linhasJaGravadas ? `Salvei os valores, mas não a repetição: ${motivo}` : motivo, tone: 'error' });
+          },
+        },
+      );
+    };
+    if (Object.keys(linhas).length === 0) return gravarRegra(false);
+    salvarSerie.mutate(
+      { id: editing.id, scope: 'future', patch: linhas },
+      {
+        onSuccess: () => gravarRegra(true),
+        onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para salvar. Tenta de novo.'), tone: 'error' }),
+      },
+    );
+  };
+
   const editarCompra = useEditarCompraPelaParcela();
   const salvarDivida = useSaveDebt();
   const saving =
-    save.isPending || createPlan.isPending || converter.isPending || editarCompra.isPending || salvarDivida.isPending;
+    save.isPending || createPlan.isPending || converter.isPending || editarCompra.isPending || salvarDivida.isPending ||
+    salvarSerie.isPending || editarSerie.isPending;
 
   /**
    * Pagamento de dívida (25/09/2026): o banco decide o que o valor novo pode ser, e a tela diz
@@ -640,7 +697,8 @@ function TransactionForm({
     }
 
     const patch = patchDaSerie(values);
-    const naSerie = Boolean(editing?.installment_plan_id || editing?.recurring_id);
+    // A ocorrência de série escolhe no topo ("Só esta | Esta e as próximas"): aqui já é "Só esta".
+    const naSerie = Boolean(editing?.installment_plan_id);
 
     const gravar = (escopo: 'one' | 'future', depois?: () => void, seFalhar?: string) =>
       save.mutate(
@@ -755,7 +813,7 @@ function TransactionForm({
         'Aplicar em quais?',
         [
           { label: 'Só esta', onPress: () => gravar('one') },
-          { label: 'Esta e as futuras', onPress: () => gravar('future') },
+          { label: 'Esta e as próximas', onPress: () => gravar('future') },
         ],
         'As anteriores não mudam — só se você editar cada uma.',
       );
@@ -791,9 +849,9 @@ function TransactionForm({
           <Button
             label={saving ? 'Salvando…' : 'Salvar'}
             size="sm"
-            disabled={saving || !!correcaoDaDivida.erro}
+            disabled={saving || !!correcaoDaDivida.erro || (formSerie !== null && !serieOk)}
             loading={saving}
-            onPress={onSubmit}
+            onPress={formSerie ? salvarAsProximas : onSubmit}
           />
         }
       />
@@ -818,18 +876,35 @@ function TransactionForm({
           </Section>
         ) : null}
         {/*
-          ⚠️ **Um lançamento que JÁ é de uma série precisa dizer isso na tela.** A pergunta de
-          escopo ("Só esta / Esta e as futuras") só aparece no Salvar — e, sem esta nota, quem
-          abre o lançamento não tem como saber que ele se repete: a queixa foi literal
-          (13/09/2026), *"ele não mostra como recorrente para eu colocar aqui"*.
+          ⚠️ **Um lançamento que JÁ é de uma série precisa dizer isso na tela** — a queixa foi
+          literal (13/09/2026), *"ele não mostra como recorrente para eu colocar aqui"*. Na
+          ocorrência de recorrente é o seletor "Só esta | Esta e as próximas" (26/09/2026); na
+          parcela, a nota, e a pergunta de escopo continua no Salvar.
         */}
-        {editing && (editing.recurring_id || editing.installment_plan_id) ? (
+        {editing?.recurring_id && serie ? (
+          <Field label="Editar">
+            <Segmented
+              options={[
+                { value: 'uma', label: 'Só esta' },
+                { value: 'serie', label: 'Esta e as próximas' },
+              ]}
+              value={formSerie ? 'serie' : 'uma'}
+              onChange={(v) => setFormSerie(v === 'serie' ? serieDaOcorrencia(serie, editing) : null)}
+            />
+          </Field>
+        ) : editing && (editing.recurring_id || editing.installment_plan_id) ? (
+          // Sem a série carregada (ou na parcela), a nota diz o que é; o seletor chega com ela.
           <Note icon="arrow.triangle.branch">
             {editing.recurring_id
               ? 'Faz parte de uma série.'
               : 'É parcela de uma compra.'}
           </Note>
         ) : null}
+
+        {formSerie ? (
+          <CamposDaSerie form={formSerie} onChange={setFormSerie} contas={accounts ?? []} rotuloDaData="Vence em" />
+        ) : (
+        <>
 
         {/*
           Tipo primeiro porque ele decide QUAIS campos existem: transferência troca
@@ -1270,17 +1345,6 @@ function TransactionForm({
           `push`**: voltando para cá, o formulário ainda carregaria o título velho, e um
           "Salvar" desfaria parte do que acabou de ser feito.
         */}
-        {/* A série inteira (repetição, vencimento, tipo, tudo) se edita na tela dela — `replace` pelo
-            mesmo motivo do botão da compra, logo abaixo. */}
-        {editing?.recurring_id ? (
-          <Button
-            label="Editar a série"
-            variant="secondary"
-            size="sm"
-            onPress={() => router.replace({ pathname: '/finance/recurring', params: { edit: editing.recurring_id! } })}
-          />
-        ) : null}
-
         {editing?.installment_plan_id ? (
           <Button
             label="Editar parcelas e datas da compra"
@@ -1305,6 +1369,8 @@ function TransactionForm({
             block
           />
         ) : null}
+        </>
+        )}
       </KeyboardAwareScrollView>
       <ToastDoModal />
     </Screen>

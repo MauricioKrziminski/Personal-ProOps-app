@@ -4,7 +4,8 @@
 --     -v ON_ERROR_STOP=1 -f - < supabase/tests/serie_recorrente_edita_tudo.sql
 --
 -- 1. Mudar o calendário (rrule + próximo vencimento) tira as EM ABERTO do mês do próximo vencimento
---    em diante; as de meses antes dele, o passado, a atrasada e a paga ficam. A série fica com a
+--    em diante — a primeira delas MUDA de data e fica com o mesmo id; as de meses antes dele, o
+--    passado, a atrasada e a paga ficam. A série fica com a
 --    regra nova, a âncora no próximo vencimento e `materialized_until` nulo (o agendador gera de
 --    novo). A compra de cartão já feita fica. Outra série do mesmo workspace não é tocada. 2. Calendário no passado, regra que o app
 --    não monta (inclusive INTERVAL=0 e dia 0), regra sem o próximo vencimento e vencimento no mês da
@@ -34,6 +35,7 @@ declare
   proxima timestamptz := (date_trunc('month', current_date + 100) + interval '2 month - 1 day')::date + time '09:00';
   l record;
   n bigint;
+  movida uuid;
 begin
   insert into auth.users (id, email) values (u, 'teste-serie@example.invalid') on conflict (id) do nothing;
   insert into public.profiles (id) values (u) on conflict (id) do nothing;
@@ -70,9 +72,14 @@ begin
     (w, u, 'expense', 119885, 'Fundacred', cc, hoje + 100, hoje + 100, 'cleared', 'recurring', s),
     -- o Fundacred de setembro: data no passado, vencimento daqui a 4 dias
     (w, u, 'expense', 119885, 'Fundacred', cc, hoje - 22, hoje + 4, 'pending', 'recurring', s),
-    -- as do mês do próximo vencimento em diante: estas saem
-    (w, u, 'expense', 119885, 'Fundacred', cc, date_trunc('month', proxima)::date + 3, date_trunc('month', proxima)::date + 3, 'pending', 'recurring', s),
+    -- a do mês seguinte ao do próximo vencimento: sai
     (w, u, 'expense', 119885, 'Fundacred', cc, (date_trunc('month', proxima) + interval '1 month')::date + 3, (date_trunc('month', proxima) + interval '1 month')::date + 3, 'pending', 'recurring', s);
+  -- a do mês do próximo vencimento: muda para a data nova e fica com o mesmo id
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, account_id,
+                                   occurred_at, due_at, status, source, recurring_id)
+    values (w, u, 'expense', 119885, 'Fundacred', cc, date_trunc('month', proxima)::date + 3,
+            date_trunc('month', proxima)::date + 3, 'pending', 'recurring', s)
+    returning id into movida;
   -- a do cartão de ontem: `set_invoice` a põe na fatura e o vencimento é o da fatura
   insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, account_id,
                                    occurred_at, status, source, recurring_id)
@@ -98,9 +105,13 @@ begin
          count(*) filter (where occurred_at = hoje - 22) as setembro,
          count(*) filter (where account_id = cartao) as do_cartao
     into l from public.transactions where recurring_id = s;
-  if l.do_mes_em_diante <> 0 or l.antes_dele <> 3 or l.passado <> 3 or l.adiantada <> 1 or l.setembro <> 1 or l.do_cartao <> 1 then
-    raise exception '1: do mês em diante % (0), antes dele % (3), passado % (3), adiantada % (1), setembro % (1), cartão % (1)',
+  if l.do_mes_em_diante <> 1 or l.antes_dele <> 3 or l.passado <> 3 or l.adiantada <> 1 or l.setembro <> 1 or l.do_cartao <> 1 then
+    raise exception '1: do mês em diante % (1, a movida), antes dele % (3), passado % (3), adiantada % (1), setembro % (1), cartão % (1)',
       l.do_mes_em_diante, l.antes_dele, l.passado, l.adiantada, l.setembro, l.do_cartao;
+  end if;
+  select occurred_at, due_at into l from public.transactions where id = movida;
+  if l.occurred_at is distinct from proxima::date or l.due_at is distinct from proxima::date then
+    raise exception '1: a primeira do mês não mudou para a data nova com o mesmo id (% / %)', l.occurred_at, l.due_at;
   end if;
   select rrule, dtstart, next_run_at, materialized_until into l from public.recurring_transactions where id = s;
   if l.rrule <> 'FREQ=MONTHLY;BYMONTHDAY=-1' or l.dtstart <> proxima or l.next_run_at <> proxima
@@ -142,12 +153,12 @@ begin
                                    occurred_at, due_at, status, source, recurring_id) values
     (w, u, 'expense', 119885, 'Fundacred', cc, hoje + 45, hoje + 45, 'pending', 'recurring', s),
     (w, u, 'expense', 119885, 'Fundacred', cc, hoje + 200, hoje + 200, 'pending', 'recurring', s);
-  -- em aberto e ainda não vencidas: +10, +40, +70, a de vencimento +4, +45 e +200
+  -- em aberto e ainda não vencidas: +10, +40, +70, a de vencimento +4, a movida, +45 e +200
   n := public.update_recurring_series(s, jsonb_build_object('kind', 'income', 'merchant', 'Fundacred SA'));
-  if n <> 6 then raise exception '3: esperadas 6 futuras alteradas, vieram %', n; end if;
+  if n <> 7 then raise exception '3: esperadas 7 futuras alteradas, vieram %', n; end if;
   select count(*) into n from public.transactions
    where recurring_id = s and status = 'pending' and kind = 'income' and merchant = 'Fundacred SA';
-  if n <> 6 then raise exception '3: futuras sem o tipo/estabelecimento novos (%)', n; end if;
+  if n <> 7 then raise exception '3: futuras sem o tipo/estabelecimento novos (%)', n; end if;
   select count(*) into n from public.transactions where recurring_id = s and occurred_at < hoje and kind = 'expense' and account_id = cc;
   if n <> 2 then raise exception '3: o passado mudou de tipo'; end if;
   select merchant into l from public.recurring_transactions where id = s;
@@ -186,10 +197,12 @@ begin
   end;
   perform public.update_recurring_series(s3, jsonb_build_object('rrule', 'FREQ=MONTHLY;BYMONTHDAY=-1',
     'next_run_at', (date_trunc('month', hoje + 4) + interval '2 month - 1 day')::date + time '09:00'));
-  select count(*) filter (where status = 'pending') as outubro, count(*) filter (where status = 'cleared') as setembro
+  select count(*) filter (where status = 'pending'
+                            and occurred_at = (date_trunc('month', hoje + 4) + interval '2 month - 1 day')::date) as outubro,
+         count(*) filter (where status = 'cleared') as setembro
     into l from public.transactions where recurring_id = s3;
-  if l.outubro <> 0 or l.setembro <> 1 then
-    raise exception '6: outubro em aberto % (0, sai para renascer no fim do mês), setembro pago % (1)', l.outubro, l.setembro;
+  if l.outubro <> 1 or l.setembro <> 1 then
+    raise exception '6: outubro no fim do mês % (1, a mesma linha movida), setembro pago % (1)', l.outubro, l.setembro;
   end if;
 
   -- 7. a atrasada deste mês também segura (só dá para montar fora do dia 1º)

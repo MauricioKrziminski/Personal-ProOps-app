@@ -5,7 +5,8 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
-import { CamposDaSerie, SERIE_VAZIA, serieDoRegistro, validaSerie, type SerieForm } from '@/components/finance/serie-form';
+import { CamposDaSerie } from '@/components/finance/serie-form';
+import { SERIE_VAZIA, serieDoRegistro, validaSerie, type SerieForm } from '@/lib/serie';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet } from '@/components/ui/sheet';

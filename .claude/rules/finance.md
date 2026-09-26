@@ -69,9 +69,12 @@
   **A série se edita INTEIRA** (`update_recurring_series`, `20260926120000`, *"ter todos os
   campos de quando eu crio ao editar"*): valor, título, estabelecimento, tipo, categoria, conta,
   fim e o CALENDÁRIO. Calendário novo (`rrule` + `next_run_at`, sempre juntos, só o que o
-  `montaRRule` do app monta) apaga as em aberto do PERÍODO (semana, mês, ano) do próximo
-  vencimento em diante, põe a âncora nele e zera `materialized_until` — o agendador gera de novo.
-  A em aberto de um mês anterior é outra conta e fica; o passado, a atrasada e a paga não mudam.
+  `montaRRule` do app monta) mexe nas em aberto do PERÍODO (semana, mês, ano) do próximo
+  vencimento em diante: a PRIMEIRA muda de data e fica com o mesmo id (as em aberto são
+  atualizadas, não recriadas — é a linha aberta na tela), as outras saem, a âncora vai para o
+  próximo vencimento e `materialized_until` zera — o agendador gera o resto e pula a movida pelo
+  unique. A em aberto de um mês anterior é outra conta e fica; o passado, a atrasada e a paga não
+  mudam.
   - **"Futura em aberto" é pelo VENCIMENTO fora do cartão**: o Fundacred de setembro tinha data
     04/09 e vencimento 30/09; pela data ele ficaria e nasceria outro 30/09 ao lado. No cartão
     `due_at` é o vencimento da FATURA e a compra de ontem já aconteceu: lá vale a data.
@@ -83,8 +86,13 @@
   - Até o agendador rodar (1 h em produção), a projeção lê a regra só no mensal simples
     (`recurring_projection_for`); reagendada para semanal, anual ou "a cada N meses", a série
     some da projeção até a rodada.
-  - Na OCORRÊNCIA de uma série (fora do cartão) o formulário do lançamento tem UMA data, o
-    vencimento, e o botão "Editar a série".
+  - **Uma tela só na ocorrência**: o formulário do lançamento de uma série abre com "Só esta |
+    Esta e as próximas" no topo. "Só esta" edita a linha, com UMA data (o vencimento, fora do
+    cartão). "Esta e as próximas" desenha os MESMOS campos da folha de Recorrentes
+    (`CamposDaSerie`) e grava em duas partes, nesta ordem (`mudancasDaOcorrencia`, `lib/serie.ts`):
+    valor, título, estabelecimento, categoria e conta desta em diante por
+    `update_transaction_scoped` (ancorada nela), e só depois tipo, fim, "entra como pago" e o
+    calendário por `update_recurring_series`. Tipo vale para todas as em aberto da série.
 
   **A janela é de um ano porque uma janela curta faz a projeção MENTIR** — não "acabar". A
   parcela é linha real e continua aparecendo; a receita recorrente além da janela, não: com 90

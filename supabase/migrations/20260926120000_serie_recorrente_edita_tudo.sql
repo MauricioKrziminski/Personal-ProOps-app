@@ -13,8 +13,9 @@
 --    sempre juntos). Mudar o calendário refaz as ocorrências FUTURAS em aberto: as `pending` de
 --    hoje em diante saem, a âncora (`dtstart`) passa a ser o próximo vencimento e
 --    `materialized_until` volta a nulo — o agendador gera de novo pela regra nova (de hora em hora
---    em produção). Só saem as em aberto a partir do PERÍODO (semana, mês, ano) do próximo
---    vencimento: a de um mês anterior a ele é outra conta, e ninguém a gera de novo. Até lá a projeção lê a regra só no mensal simples (`recurring_projection_for`):
+--    em produção). Só mexe nas em aberto a partir do PERÍODO (semana, mês, ano) do próximo
+--    vencimento — a de um mês anterior a ele é outra conta, e ninguém a gera de novo —, e a
+--    primeira delas MUDA de data em vez de sair: o id fica (é a linha aberta na tela). Até lá a projeção lê a regra só no mensal simples (`recurring_projection_for`):
 --    reagendada para semanal, anual ou "a cada N meses", a série some da projeção até a rodada.
 --    A ocorrência que FICA (paga, atrasada, compra de cartão já feita) segura o calendário: o
 --    próximo vencimento vem num período depois dela — senão aquele mês ganharia uma segunda
@@ -54,6 +55,7 @@ declare
   proxima timestamptz;
   fica    record;
   periodo text;
+  movida  uuid;
 begin
   if p_patch is null or p_patch = '{}'::jsonb then
     raise exception 'Nada para alterar';
@@ -137,15 +139,38 @@ begin
   where r.id = serie.id;
 
   if p_patch ? 'rrule' then
-    -- O calendário mudou: as em aberto do período do próximo vencimento em diante saem, e o
-    -- agendador as gera de novo pela regra nova.
+    -- O calendário mudou. A PRIMEIRA em aberto do período do próximo vencimento em diante muda de
+    -- data e fica com o MESMO id — "as em aberto são atualizadas, não recriadas" (finance.md): é
+    -- o lançamento aberto na tela, o `last_write_id` do agente, um pendente de confirmação. As
+    -- outras saem e o agendador as gera pela regra nova; a movida ele pula pelo unique
+    -- `(recurring_id, occurred_at)`, porque ela já está na data da primeira ocorrência nova.
+    select t.id into movida
+    from public.transactions t
+    where t.recurring_id = serie.id
+      and t.workspace_id = serie.workspace_id
+      and t.status = 'pending'
+      and (t.occurred_at >= current_date or (t.invoice_id is null and t.due_at >= current_date))
+      and date_trunc(periodo, case when t.invoice_id is null then coalesce(t.due_at, t.occurred_at) else t.occurred_at end)
+          >= date_trunc(periodo, proxima::date)
+    order by case when t.invoice_id is null then coalesce(t.due_at, t.occurred_at) else t.occurred_at end
+    limit 1;
+
+    -- Antes de mover: uma delas pode já estar na data nova, e o unique recusaria a movida.
     delete from public.transactions t
     where t.recurring_id = serie.id
       and t.workspace_id = serie.workspace_id
       and t.status = 'pending'
       and (t.occurred_at >= current_date or (t.invoice_id is null and t.due_at >= current_date))
       and date_trunc(periodo, case when t.invoice_id is null then coalesce(t.due_at, t.occurred_at) else t.occurred_at end)
-          >= date_trunc(periodo, proxima::date);
+          >= date_trunc(periodo, proxima::date)
+      and t.id is distinct from movida;
+
+    if movida is not null then
+      update public.transactions t
+         set occurred_at = proxima::date,
+             due_at = case when t.invoice_id is null then proxima::date else t.due_at end
+       where t.id = movida;
+    end if;
   end if;
 
   if p_patch ? 'end_date' and p_patch->>'end_date' is not null then

@@ -1570,8 +1570,13 @@ test('Ocorrência de série: uma data só (o vencimento), e o caminho para edita
   assert.match(fonte, /\{dataEVencimento \? null : \(\s*<View style=\{styles\.chipRow\}>/, 'sem o "Ontem" num vencimento');
   assert.match(fonte, /\{umaData \? null : \(\s*<Controller\s+control=\{control\}\s+name="due_at"/, 'sem o segundo campo');
   assert.match(fonte, /if \(umaData\) setValue\('due_at', br\)/, 'o vencimento escondido anda com a data');
-  // A série inteira (repetição, vencimento) se edita na tela dela, a um toque daqui.
-  assert.match(fonte, /label="Editar a série"[\s\S]{0,200}?pathname: '\/finance\/recurring', params: \{ edit: editing\.recurring_id! \}/);
+  // Uma tela só (26/09/2026): "Só esta | Esta e as próximas" no topo, e a série com os MESMOS
+  // campos da folha de Recorrentes. O botão que levava a outra tela saiu.
+  assert.match(fonte, /\{ value: 'uma', label: 'Só esta' \},\s*\{ value: 'serie', label: 'Esta e as próximas' \}/);
+  assert.match(fonte, /<CamposDaSerie form=\{formSerie\}/);
+  assert.doesNotMatch(fonte, /label="Editar a série"/);
+  // As linhas antes da regra: o calendário novo muda a data desta linha (mesmo id).
+  assert.match(fonte, /salvarSerie\.mutate\(\s*\{ id: editing\.id, scope: 'future', patch: linhas \},\s*\{\s*onSuccess: \(\) => gravarRegra\(true\)/);
   // "Repetir lançamento" leva o estabelecimento: a série passou a guardá-lo (`20260926120000`).
   assert.match(fonte, /merchant: values\.merchant\?\.trim\(\) \?\? ''/);
 });
