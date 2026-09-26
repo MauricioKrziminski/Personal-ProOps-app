@@ -313,8 +313,10 @@ export default function NotesScreen() {
           ),
       },
       // Criar pasta mora no "…" (25/09/2026): a pílula no cabeçalho de Pastas ficou feia, e sem
-      // pasta nenhuma era um título sobre nada. Organizar segue no menu de cada pasta.
+      // pasta nenhuma era um título sobre nada. "Organizar" fica ao lado — é a única tela com a
+      // ÁRVORE inteira (mover uma pasta para dentro de outra, renomear, ícone, cor, tags, apagar).
       { label: 'Nova pasta', icon: 'folder.badge.plus', onPress: () => setCriandoPasta(true) },
+      { label: 'Organizar pastas', icon: 'folder', onPress: () => router.push('/notes/folders') },
       { label: 'Arquivadas', icon: 'archivebox', onPress: () => router.push('/notes/archived') },
       { label: 'Lixeira', icon: 'trash', onPress: () => router.push('/notes/trash') },
     ]);

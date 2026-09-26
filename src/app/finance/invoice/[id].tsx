@@ -20,7 +20,7 @@ import { Icon } from '@/components/ui/icon';
 import { useBRL } from '@/components/ui/conceal';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
-import { HeaderMenu } from '@/components/ui/header-actions';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { InvoiceDock } from '@/components/finance/invoice-dock';
 import { InvoicePager } from '@/components/finance/invoice-pager';
 import { Screen } from '@/components/ui/screen';
@@ -515,44 +515,52 @@ export default function InvoiceScreen() {
         }}
       />
 
-      <HeaderMenu
-        title="Mais opções"
+      {/* A fatura LISTA compras: criar uma é o "+" do topo, como em toda lista (25/09/2026), e ela
+          já nasce neste cartão. O resto fica no "…". */}
+      <HeaderActions
         actions={
           fatura
             ? [
-                // Criar e editar onde o cartão está (25/09/2026): a compra nova já nasce nele.
                 {
-                  label: 'Nova compra neste cartão',
+                  label: 'Nova compra',
                   icon: 'plus',
                   onPress: () =>
                     router.push({ pathname: '/finance/transaction-form', params: { conta: fatura.account_id } }),
                 },
-                {
-                  // As faturas DESTE cartão: sem o `account`, a lista abria no primeiro cartão.
-                  label: 'Ver todas as faturas',
-                  icon: 'calendar',
-                  onPress: () => router.push({ pathname: '/finance/invoices', params: { account: fatura.account_id } }),
-                },
-                {
-                  // De onde a fatura mora, com o cartão já escolhido (23/09/2026).
-                  label: 'Importar fatura',
-                  icon: 'square.and.arrow.down',
-                  onPress: () => router.push({ pathname: '/import', params: { conta: fatura.account_id } }),
-                },
-                {
-                  label: 'Marcar como paga',
-                  icon: 'checkmark.circle',
-                  disabled: paga,
-                  onPress: quitarSemCaixa,
-                },
-                {
-                  label: 'Editar cartão',
-                  icon: 'pencil',
-                  onPress: () => router.push(`/finance/accounts?edit=${fatura.account_id}`),
-                },
               ]
             : []
         }
+        menu={{
+          title: 'Mais opções',
+          actions:
+            fatura
+              ? [
+                  {
+                    // As faturas DESTE cartão: sem o `account`, a lista abria no primeiro cartão.
+                    label: 'Ver todas as faturas',
+                    icon: 'calendar',
+                    onPress: () => router.push({ pathname: '/finance/invoices', params: { account: fatura.account_id } }),
+                  },
+                  {
+                    // De onde a fatura mora, com o cartão já escolhido (23/09/2026).
+                    label: 'Importar fatura',
+                    icon: 'square.and.arrow.down',
+                    onPress: () => router.push({ pathname: '/import', params: { conta: fatura.account_id } }),
+                  },
+                  {
+                    label: 'Marcar como paga',
+                    icon: 'checkmark.circle',
+                    disabled: paga,
+                    onPress: quitarSemCaixa,
+                  },
+                  {
+                    label: 'Editar cartão',
+                    icon: 'pencil',
+                    onPress: () => router.push(`/finance/accounts?edit=${fatura.account_id}`),
+                  },
+                ]
+              : [],
+        }}
       />
 
       <FlatList keyboardShouldPersistTaps="handled"

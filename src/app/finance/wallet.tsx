@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Dica } from '@/components/ui/dica';
 import { Card } from '@/components/ui/card';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
+import { HeaderIconButton } from '@/components/ui/app-header';
 import { useBRL } from '@/components/ui/conceal';
 import { CountUpMoney } from '@/components/ui/count-up-money';
 import { DragScrollView } from '@/components/ui/drag-scroll';
@@ -298,13 +299,13 @@ export default function WalletScreen() {
             }
           />
           <Row icon="creditcard" title="Todos os cartões" onPress={() => router.push('/finance/cards')} />
-          {/* Editar e criar ONDE o cartão está (25/09/2026): antes era Contas → achar → segurar. */}
+          {/* Editar ONDE o cartão está (25/09/2026): antes era Contas → achar → segurar. Criar um
+              novo é o "+" do topo, como em toda lista do app. */}
           <Row
             icon="pencil"
             title="Editar este cartão"
             onPress={() => router.push(`/finance/accounts?edit=${ativo.account_id}`)}
           />
-          <Row icon="plus" title="Novo cartão" onPress={() => router.push('/finance/accounts?create=cartao')} />
         </Section>
       </Animated.View>
     );
@@ -391,7 +392,18 @@ export default function WalletScreen() {
   return (
     <Screen wide={tablet} scroll={false}>
       <View style={styles.flex}>
-        <TaskHeader title="Carteira" onClose={fechar} telaCheia />
+        <TaskHeader
+          title="Carteira"
+          onClose={fechar}
+          telaCheia
+          action={
+            <HeaderIconButton
+              icon="plus"
+              label="Novo cartão"
+              onPress={() => router.push('/finance/accounts?create=cartao')}
+            />
+          }
+        />
         {corpo}
       </View>
     </Screen>

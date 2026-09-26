@@ -2282,7 +2282,8 @@ test('Notas: "Nova pasta" no "…" abre a folha ali mesmo, com e sem pastas, e o
     assert.equal(folha()?.props.visible, false, 'fechada até o toque');
     ui.interact((nodes) => nodes.find((n) => n.type === 'HeaderIconButton' && n.props.label === 'Mais opções').props.onPress());
     const labels = ui.actions.map((a: any) => a.label);
-    assert.ok(labels.includes('Nova pasta') && !labels.includes('Organizar pastas'), labels.join(', '));
+    // As duas no "…": criar, e a árvore inteira para organizar (que ficou sem porta — 25/09/2026).
+    assert.ok(labels.includes('Nova pasta') && labels.includes('Organizar pastas'), labels.join(', '));
     ui.interact(() => ui.actions.find((a: any) => a.label === 'Nova pasta').onPress());
     assert.equal(folha()?.props.visible, true, 'a folha "Nova pasta" abriu na própria aba');
   }
@@ -2449,16 +2450,20 @@ test('Contas: ?edit=<id> abre a edição daquela conta, com o título do tipo, e
 test('Carteira: o cartão escolhido se edita e um novo se cria ali mesmo', () => {
   const fonte = readFileSync('src/app/finance/wallet.tsx', 'utf8');
   assert.ok(/\/finance\/accounts\?edit=\$\{ativo\.account_id\}/.test(fonte), 'Editar este cartão abre o formulário DELE');
-  assert.ok(/title="Novo cartão"[\s\S]{0,120}\/finance\/accounts\?create=cartao/.test(fonte), 'Novo cartão abre o formulário já como cartão');
+  assert.ok(/<HeaderIconButton\s+icon="plus"\s+label="Novo cartão"[\s\S]{0,120}\/finance\/accounts\?create=cartao/.test(fonte), 'Novo cartão é o "+" do topo, e abre o formulário já como cartão');
+  assert.ok(!/title="Novo cartão"/.test(fonte), 'sem linha "Novo cartão" no corpo');
 });
 
 /** Criar e editar onde a coisa está (25/09/2026, *"verifique todas as telas que estão assim"*). */
-test('Fatura: o "…" cria compra NESTE cartão, edita o cartão e leva às faturas dele', () => {
+test('Fatura: "+" cria compra NESTE cartão; o "…" edita o cartão e leva às faturas dele', () => {
   const ui = screen('src/app/finance/invoice/[id].tsx');
-  const menu = ui.nodes().find((n: any) => n.type === 'HeaderMenu')?.props.actions ?? [];
+  const cabeca = ui.nodes().find((n: any) => n.type === 'HeaderActions');
+  const mais = cabeca?.props.actions.find((a: any) => a.label === 'Nova compra');
+  assert.equal(mais?.icon, 'plus', 'criar é o "+" do topo');
+  const menu = cabeca.props.menu?.actions ?? [];
   const acao = (label: string) => menu.find((a: any) => a.label === label);
-  assert.ok(acao('Nova compra neste cartão') && acao('Editar cartão') && acao('Ver todas as faturas'), menu.map((a: any) => a.label).join(', '));
-  ui.interact(() => acao('Nova compra neste cartão').onPress());
+  assert.ok(acao('Editar cartão') && acao('Ver todas as faturas'), menu.map((a: any) => a.label).join(', '));
+  ui.interact(() => mais.onPress());
   const nova = copia(ui.navigations.at(-1));
   assert.equal(nova.pathname, '/finance/transaction-form');
   assert.ok(nova.params.conta, 'a compra nasce no cartão da fatura');
