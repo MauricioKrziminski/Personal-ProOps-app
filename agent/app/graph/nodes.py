@@ -457,7 +457,12 @@ Catálogo:
         if pendentes:
             user += ("\n\nVocê perguntou ao usuário: " + " | ".join(pendentes)
                      + "\nA mensagem dele é a RESPOSTA a isso: preencha o campo correspondente"
-                     " do cadastro pendente em vez de tratá-la como pedido novo.")
+                     " do cadastro pendente em vez de tratá-la como pedido novo."
+                     # "Qual fatura? junho/2026, maio/2026" respondido com "a de junho" voltava
+                     # sem mês nenhum: o mês não é campo de `fields`, é o `target_month`, e nada
+                     # aqui dizia isso (27/09/2026, staging).
+                     " Se a pergunta pede o MÊS (de uma fatura, de um orçamento), ele vai em"
+                     " target_month=YYYY-MM-01, com o ano da opção que a pergunta listou.")
     if state.get('preset') and state.get('resource_actions'):
         # Ação já montada fora do grafo (a compra parcelada que virou
         # financiamento). Reextrair gastaria uma chamada para chegar a um

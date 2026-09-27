@@ -308,6 +308,9 @@ async def test_a_pergunta_chega_ao_modelo_no_turno_seguinte(monkeypatch):
     humano = capturado[0][-1][1]
     assert "Você perguntou ao usuário: Informe dia de fechamento." in humano
     assert "RESPOSTA" in humano
+    # "Qual fatura? junho/2026, maio/2026" respondido com "a de junho" voltava sem mês: o mês
+    # mora em `target_month`, não em `fields`, e o turno da resposta tem que dizer isso.
+    assert "target_month=YYYY-MM-01" in humano
 
 
 @pytest.mark.asyncio

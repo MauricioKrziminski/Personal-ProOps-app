@@ -192,11 +192,10 @@ export function Screen({
       */
       paddingTop: topBar ? headerHeight + Space.sm : Space.sm,
       paddingBottom: bottomScrollInset(Platform.OS, Boolean(topBar), insets.bottom, Space.xxl, TAB_BAR_SPACE) + fabSpace,
-      // Deitado, o recorte da câmera (dobrável, alguns tablets) é inset de um dos LADOS.
-      paddingLeft: Space.lg + insets.left,
-      paddingRight: Space.lg + insets.right,
     },
     contentStyle,
+    // Deitado, o recorte da câmera (dobrável, alguns tablets) é inset de um dos LADOS.
+    laterais(contentStyle, Space.lg, insets),
   ];
 
   /** Onde a busca vira faixa — ver o prop `search`. No iOS empurrado ela é a barra nativa. */
@@ -266,8 +265,9 @@ export function Screen({
             style={[
               styles.root,
               wide ? styles.wideContent : null,
-              { paddingTop: headerHeight, paddingLeft: insets.left, paddingRight: insets.right },
+              { paddingTop: headerHeight },
               contentStyle,
+              laterais(contentStyle, 0, insets),
             ]}>
             {faixa}
             {children}
@@ -445,6 +445,18 @@ function BlocoDaCascata({ indice, noLugar, children }: { indice: number; noLugar
       <GlassReady ready={assentado}>{children}</GlassReady>
     </Animated.View>
   );
+}
+
+/**
+ * A calha que a tela pediu (ou a padrão) MAIS a borda segura de cada lado. No Yoga `paddingLeft`
+ * ganha de `paddingHorizontal` em qualquer ordem: somar a borda por fora apagaria a calha que
+ * Notas e Agente pedem no tablet.
+ */
+function laterais(estilo: StyleProp<ViewStyle>, padrao: number, bordas: { left: number; right: number }) {
+  const s = StyleSheet.flatten(estilo) ?? {};
+  const num = (v: unknown) => (typeof v === 'number' ? v : undefined);
+  const lado = (proprio: unknown) => num(proprio) ?? num(s.paddingHorizontal) ?? num(s.padding) ?? padrao;
+  return { paddingLeft: lado(s.paddingLeft) + bordas.left, paddingRight: lado(s.paddingRight) + bordas.right };
 }
 
 const styles = StyleSheet.create({
