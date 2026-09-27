@@ -60,6 +60,19 @@ Postgres reabre toda função NOVA: migration que cria função em public contin
 `revoke execute ... from public, anon`, e `supabase/tests/anon_sem_execute.sql` acusa a que
 esquecer.
 
+**Produção e staging ALINHADOS em `20260927130000`** — aplicadas em produção pelo Gabriel em
+27/09/2026 (`db push --project-ref`, depois de `migration list --project-ref` mostrar as duas só no
+`local`) e conferidas na fonte: `schema_migrations` devolve `20260927130000`, `20260927120000`;
+`update_recurring_series` com o laço que desliza o calendário; o gatilho
+`linhas_da_fatura_liquidada` ligado; `_liquidar_faturas_vencidas` e o gatilho sem `execute` para
+`authenticated` e `anon`; e a fatura adiada do Nubank de setembro com as 37 linhas pagas (as 7
+parcelas do app, antes em aberto, com `paid_at` 10/09) e nenhuma linha pendente em fatura adiada
+ou paga em parte e vencida. Seguida a ordem migrations → agente → app no mesmo dia: agente
+`agente-00086-4wl` (`/health` 200, `/cron/reminders` 200) e depois a tag `v1.3.52` e o build no
+iPhone. `20260927120000`: mudar o dia de uma série desliza para o primeiro mês livre em vez de
+recusar; a parcela paga fora do cartão fica no dia dela quando a data da compra muda.
+`20260927130000`: fatura adiada, ou paga em parte e vencida, dá baixa nas compras e parcelas dela.
+
 **Produção e staging ALINHADOS em `20260926180000`** — aplicadas em produção pelo Gabriel em
 27/09/2026 (`db push --project-ref`, depois de `migration list --project-ref` mostrar as onze só
 no `local`) e conferidas na fonte: `schema_migrations` devolve `20260926180000`,
