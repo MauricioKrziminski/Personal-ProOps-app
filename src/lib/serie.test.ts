@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { montaRRule, mudancasDaOcorrencia, regraDoApp, serieDaOcorrencia, serieDoRegistro, type OcorrenciaDaSerie, type SerieGravada } from './serie.ts';
+import { avisoDeDeslize, montaRRule, mudancasDaOcorrencia, regraDoApp, serieDaOcorrencia, serieDoRegistro, validaSerie, type OcorrenciaDaSerie, type SerieGravada } from './serie.ts';
+import { diaAmbiguo } from './dates.ts';
 
 // O Fundacred de produção (26/09/2026): dia 4 no cadastro, vence no último dia do mês.
 const fundacred: SerieGravada = {
@@ -62,4 +63,36 @@ test('regra que o app não desenha fica própria: o formulário não a reescreve
   for (const d of [new Date(2026, 9, 5), new Date(2026, 9, 31), new Date(2026, 1, 28)]) {
     for (const preset of ['monthly', 'weekly', 'yearly'] as const) assert.ok(regraDoApp(montaRRule(preset, d, 3)), preset);
   }
+});
+
+test('30/09 não diz "dia 30" ou "último dia": o formulário pergunta, e sem resposta vale o dia', () => {
+  const trinta = new Date(2026, 8, 30);
+  assert.equal(diaAmbiguo(trinta), true);
+  assert.equal(diaAmbiguo(new Date(2026, 9, 31)), false, '31 é sempre o último');
+  assert.equal(diaAmbiguo(new Date(2026, 9, 30)), false, '30/10 não é o último de outubro');
+  assert.equal(diaAmbiguo(new Date(2027, 1, 28)), true);
+  assert.equal(montaRRule('monthly', trinta, 1), 'FREQ=MONTHLY;BYMONTHDAY=30');
+  assert.equal(montaRRule('monthly', trinta, 1, true), 'FREQ=MONTHLY;BYMONTHDAY=-1');
+  assert.equal(montaRRule('monthly', new Date(2026, 9, 31), 1), 'FREQ=MONTHLY;BYMONTHDAY=-1');
+  const form = { ...serieDoRegistro(fundacred), inicio: '30/09/2026', agendaMudou: true };
+  assert.equal(validaSerie(form).perguntaUltimoDia, true);
+  assert.equal(validaSerie({ ...form, inicio: '15/10/2026' }).perguntaUltimoDia, false);
+  assert.equal(serieDoRegistro({ ...fundacred, rrule: 'FREQ=MONTHLY;BYMONTHDAY=-1' }).ultimoDia, true);
+});
+
+test('Esta e as próximas numa ocorrência PAGA parte do próximo vencimento, não da data dela', () => {
+  const antes = process.env.TZ;
+  process.env.TZ = 'America/Sao_Paulo';
+  try {
+    const setembroPago = { ...outubro, occurred_at: '2026-09-04', due_at: '2026-09-04', status: 'cleared' };
+    assert.equal(serieDaOcorrencia(fundacred, setembroPago).inicio, '04/10/2026');
+    assert.equal(serieDaOcorrencia(fundacred, { ...setembroPago, status: 'pending' }).inicio, '04/09/2026');
+  } finally {
+    process.env.TZ = antes;
+  }
+});
+
+test('A data que o banco deslizou vira aviso; a mesma data, nada', () => {
+  assert.equal(avisoDeDeslize('2026-09-30', '2026-09-30'), null);
+  assert.equal(avisoDeDeslize('2026-09-30', '2026-10-31'), 'Setembro já tinha a cobrança dela: a próxima fica em 31/10/2026.');
 });

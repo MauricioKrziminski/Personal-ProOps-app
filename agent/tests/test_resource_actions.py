@@ -514,6 +514,42 @@ async def test_mudar_o_dia_da_serie_vai_pela_rpc_com_o_proximo_vencimento(monkey
 
 
 @pytest.mark.asyncio
+async def test_serie_que_deslizou_diz_onde_caiu(monkeypatch):
+    """O banco desliza a série para depois do mês que já tem cobrança (`20260927120000`).
+
+    A frase do SIM trazia a data pedida; a resposta diz a que valeu.
+    """
+    from datetime import timedelta
+
+    async def fetch(*a):
+        return [_linha(kind="expense", amount_cents=150000, description="Aluguel",
+                       category="moradia", account_id=None, rrule="FREQ=MONTHLY;BYMONTHDAY=5",
+                       dtstart="2026-01-05T09:00:00Z", auto_confirm=True, active=True)]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    acao = action(resource="recurring", kind="resource_update", rrule="FREQ=MONTHLY;BYMONTHDAY=-1")
+    prepared = await resources.prepare(ctx(), acao)
+    deslizou = {}
+
+    async def fetch_one(sql, *args):
+        if sql.startswith("select rrule, dtstart"):
+            return {"rrule": "FREQ=MONTHLY;BYMONTHDAY=5", "dtstart": datetime(2026, 1, 5, 12, 0, tzinfo=UTC)}
+        if sql.startswith("select next_run_at"):
+            return {"next_run_at": deslizou["valeu"]}
+        if "update_recurring_series" in sql:
+            deslizou["valeu"] = datetime.fromisoformat(json.loads(args[1])["next_run_at"]) + timedelta(days=31)
+        return {"futuras": 0}
+
+    import json
+    monkeypatch.setattr(resources.db, "fetch_one", fetch_one)
+    r = await resources.execute(
+        ExecContext("user", "workspace", None, "America/Sao_Paulo", "", "app:1", target={"prepared": prepared}),
+        acao,
+    )
+    assert "já tinha a cobrança dela: a próxima fica em" in r.message
+
+
+@pytest.mark.asyncio
 async def test_pausar_serie_nao_passa_pela_rpc(monkeypatch):
     """`active` não é campo propagável: pausar não reescreve ocorrência nenhuma."""
     async def fetch(*a):

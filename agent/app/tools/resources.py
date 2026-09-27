@@ -15,7 +15,7 @@ from uuid import UUID
 import psycopg
 
 from app import db
-from app.domain.dates import format_date_br, now_utc, to_instant, local_iso_date
+from app.domain.dates import format_date_br, now_utc, to_instant, local_iso_date, tz
 from app.domain.money import cents_to_brl, MAX_CENTS
 from app.domain.recurrence import next_occurrence
 from app.domain.categories import normalize
@@ -1770,7 +1770,7 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
         )
     if "set_default" in proposal:
         await _definir_conta_padrao(ctx, proposal["id"], proposal["set_default"])
-    return ToolResult("Concluído: " + proposal["summary"] + ".", result_id=row["id"])
+    return ToolResult("Concluído: " + proposal["summary"] + "." + (row.get("aviso") or ""), result_id=row["id"])
 
 
 async def _editar_alcance_do_limite(ctx: ExecContext, values: dict, args: list):
@@ -1870,6 +1870,20 @@ async def _editar_serie(ctx: ExecContext, proposal: dict, values: dict):
         raise Level1Error(f"❌ {motivo}. Ainda não mudei nada.") from err
     if row is None:
         raise Level1Error("Essa recorrência mudou depois da proposta. Peça novamente.")
+    aviso = ""
+    if "next_run_at" in patch:
+        # O banco desliza o calendário para depois do mês que já tem a sua cobrança
+        # (`20260927120000`): a frase do SIM trazia a data PEDIDA, e a resposta diz a que valeu.
+        depois = await db.fetch_one(
+            "select next_run_at from public.recurring_transactions where id = %s and workspace_id = %s",
+            proposal["id"], ctx.workspace_id,
+        )
+        pedida = datetime.fromisoformat(str(patch["next_run_at"])).astimezone(tz(ctx.timezone)).date()
+        valeu = (depois["next_run_at"].astimezone(tz(ctx.timezone)).date()
+                 if depois and depois.get("next_run_at") else pedida)
+        if valeu != pedida:
+            aviso = (f" {_mes_da_fatura(pedida).capitalize()} já tinha a cobrança dela: a próxima fica em "
+                     f"{format_date_br(valeu)}.")
     if resto:
         await db.execute(
             "update public.recurring_transactions set "
@@ -1877,7 +1891,7 @@ async def _editar_serie(ctx: ExecContext, proposal: dict, values: dict):
             + " where id = %s and workspace_id = %s",
             *resto.values(), proposal["id"], ctx.workspace_id,
         )
-    return {"id": proposal["id"]}
+    return {"id": proposal["id"], "aviso": aviso}
 
 
 async def _definir_conta_padrao(ctx: ExecContext, account_id: str, virar_padrao: bool) -> None:

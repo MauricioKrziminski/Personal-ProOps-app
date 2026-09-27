@@ -1,10 +1,11 @@
--- Tudo que se cria se edita (`20260926130000`).
+-- Tudo que se cria se edita (`20260926130000`, `20260927120000`).
 --
 --   agent/.venv/bin/python scripts/sql-test.py supabase/tests/editar_como_criar.sql
 --
 -- 1. A dívida troca de modo (parcela fixa ↔ com juros) nos dois sentidos.
 -- 2. Compra em CONTA com parcela paga: "parcelas já pagas" sobe e desce, o número de parcelas
---    muda (as pagas ficam, o resto se reparte), e a data e a conta mudam — a paga acompanha.
+--    muda (as pagas ficam, o resto se reparte), e a data e a conta mudam — a paga acompanha a
+--    conta, mas fica no dia em que venceu (a data nova vale para as em aberto).
 -- 3. Recusas com o motivo: número abaixo da última paga, à vista com parcela paga.
 -- 4. Compra no CARTÃO: as já pagas quitam a fatura vencida que é só delas, e reabrem junto; a
 --    fatura paga de verdade não reabre; data e cartão não mudam com parcela paga na fatura.
@@ -70,11 +71,17 @@ begin
     raise exception '2: parcelas % (6), pago % (20000), em aberto de 5.000: % (4)', l.n, l.pago, l.de5000;
   end if;
 
-  -- data e conta mudam com parcela paga FORA do cartão — e a paga acompanha
+  -- data e conta mudam com parcela paga FORA do cartão: a paga acompanha a CONTA, mas fica no dia
+  -- em que venceu; as em aberto seguem o calendário novo
   perform public.update_installment_plan(plano, 40000, 6, hoje + 12, 'Curso', 'estudo', null, cc2, null);
-  select count(*) filter (where account_id = cc2) as na_outra, min(occurred_at) as primeira into l
-    from public.transactions where installment_plan_id = plano;
-  if l.na_outra <> 6 or l.primeira <> hoje + 12 then raise exception '2: conta % (6 na outra), 1ª em % (%)', l.na_outra, l.primeira, hoje + 12; end if;
+  select count(*) filter (where account_id = cc2) as na_outra,
+         count(*) filter (where status = 'cleared' and occurred_at = private.add_months(hoje + 5, installment_no - 1)) as pagas_no_dia,
+         count(*) filter (where status = 'pending' and occurred_at = private.add_months(hoje + 12, installment_no - 1)) as abertas_novas
+    into l from public.transactions where installment_plan_id = plano;
+  if l.na_outra <> 6 or l.pagas_no_dia <> 2 or l.abertas_novas <> 4 then
+    raise exception '2: conta % (6 na outra), pagas no dia delas % (2), em aberto no calendário novo % (4)',
+      l.na_outra, l.pagas_no_dia, l.abertas_novas;
+  end if;
 
   -- as já pagas DESCEM de 2 para 1: a 2ª reabre
   perform public.update_installment_plan(plano, 40000, 6, hoje + 12, 'Curso', 'estudo', null, cc2, 1);

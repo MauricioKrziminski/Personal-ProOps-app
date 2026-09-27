@@ -10,6 +10,7 @@
 import { CategoryPicker } from '@/components/finance/category-picker';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { DatePickerField } from '@/components/finance/date-picker-field';
+import { DiaOuUltimo } from '@/components/finance/dia-ou-ultimo';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
@@ -33,7 +34,7 @@ export function CamposDaSerie({
   /** Editando, o nome da data: "Próximo vencimento" na série; "Vence em" na ocorrência. */
   rotuloDaData?: string;
 }) {
-  const { inicioOk, fimOk, tituloOk, agendaNoPassado } = validaSerie(form);
+  const { inicioOk, fimOk, tituloOk, agendaNoPassado, inicioDate, perguntaUltimoDia } = validaSerie(form);
   const editando = Boolean(form.id);
   const mudaAgenda = (parte: Partial<SerieForm>) => onChange({ ...form, ...parte, agendaMudou: editando || form.agendaMudou });
   const periodo = form.preset === 'weekly' ? 'da semana' : form.preset === 'yearly' ? 'do ano' : 'do mês';
@@ -142,7 +143,7 @@ export function CamposDaSerie({
 
       {form.regraPropria ? null : (
       <Field
-        // Editando, a data é o próximo vencimento: o último dia do mês vira "todo último dia".
+        // Editando, a data é o próximo vencimento. O último dia de um mês curto pergunta abaixo.
         label={editando ? rotuloDaData : 'Começa em'}
         hint={
           editando
@@ -169,6 +170,10 @@ export function CamposDaSerie({
         />
       </Field>
       )}
+
+      {perguntaUltimoDia && inicioDate ? (
+        <DiaOuUltimo dia={inicioDate.getDate()} ultimo={Boolean(form.ultimoDia)} onChange={(ultimoDia) => mudaAgenda({ ultimoDia })} />
+      ) : null}
 
       {/*
         ⚠️ O placeholder era uma DATA PLAUSÍVEL (`31/12/2026`) e o campo lia como preenchido — *"como

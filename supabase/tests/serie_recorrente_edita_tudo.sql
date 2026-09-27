@@ -1,4 +1,4 @@
--- A série recorrente se edita inteira (`20260926120000`).
+-- A série recorrente se edita inteira (`20260926120000`, `20260927120000`).
 --
 --   docker exec -i supabase_db_app-proops psql -U postgres -d postgres \
 --     -v ON_ERROR_STOP=1 -f - < supabase/tests/serie_recorrente_edita_tudo.sql
@@ -8,12 +8,12 @@
 --    passado, a atrasada e a paga ficam. A série fica com a
 --    regra nova, a âncora no próximo vencimento e `materialized_until` nulo (o agendador gera de
 --    novo). A compra de cartão já feita fica. Outra série do mesmo workspace não é tocada. 2. Calendário no passado, regra que o app
---    não monta (inclusive INTERVAL=0 e dia 0), regra sem o próximo vencimento e vencimento no mês da
---    paga adiantada são recusados. 3. Tipo e estabelecimento vão para as
+--    não monta (inclusive INTERVAL=0 e dia 0) e regra sem o próximo vencimento são recusados; o
+--    vencimento no mês da paga adiantada DESLIZA para o mês seguinte (nunca recusa). 3. Tipo e estabelecimento vão para as
 --    futuras em aberto. 4. "Termina em" mais cedo tira as futuras depois do fim. 5. Fim antes de uma
---    atrasada não a apaga. 6. O Fundacred de produção: setembro PAGO com vencimento 30/09 recusa
---    "próximo em 30/09" e aceita o fim do mês seguinte, refazendo o de outubro. 7. A atrasada do
---    mês também segura o calendário.
+--    atrasada não a apaga. 6. O Fundacred de produção: setembro PAGO com vencimento 30/09 e
+--    "próximo em 30/09" vira o fim do mês seguinte, refazendo o de outubro. 7. A atrasada do mês
+--    também segura o calendário: a série começa no mês seguinte.
 -- Datas relativas a hoje: o teste não envelhece. Roda numa transação e dá rollback.
 
 \set ON_ERROR_STOP on
@@ -88,16 +88,10 @@ begin
    where recurring_id = s and account_id = cartao and invoice_id is not null;
   if n <> 1 then raise exception '1: a compra do cartão não entrou na fatura (o teste não prova nada)'; end if;
 
-  -- 1. o calendário muda: último dia do mês, a partir do mês depois da paga adiantada.
-  --    Antes, no mesmo mês dela, é recusado — o mês pago ganharia uma segunda cobrança.
-  begin
-    perform public.update_recurring_series(s, jsonb_build_object('rrule', 'FREQ=MONTHLY;BYMONTHDAY=-1',
-      'next_run_at', (date_trunc('month', current_date + 100) + interval '1 month - 1 day')::date + time '09:00'));
-    raise exception '1: vencimento no mês da paga adiantada deveria ser recusado';
-  exception when others then if sqlerrm not like 'A de % já está paga%' then raise; end if;
-  end;
-  perform public.update_recurring_series(s,
-    jsonb_build_object('rrule', 'FREQ=MONTHLY;BYMONTHDAY=-1', 'next_run_at', proxima));
+  -- 1. o calendário muda: último dia do mês. Pedido NO mês da paga adiantada, ele desliza para o
+  --    mês seguinte (`proxima`) — o mês pago ganharia uma segunda cobrança, e recusar era o erro.
+  perform public.update_recurring_series(s, jsonb_build_object('rrule', 'FREQ=MONTHLY;BYMONTHDAY=-1',
+    'next_run_at', (date_trunc('month', current_date + 100) + interval '1 month - 1 day')::date + time '09:00'));
   select count(*) filter (where status = 'pending' and occurred_at >= date_trunc('month', proxima)) as do_mes_em_diante,
          count(*) filter (where status = 'pending' and occurred_at >= hoje and occurred_at < date_trunc('month', proxima)) as antes_dele,
          count(*) filter (where occurred_at < hoje and account_id = cc) as passado,
@@ -189,14 +183,13 @@ begin
     (w, u, 'expense', 119885, 'Fundacred', cc, hoje - 22, hoje + 4, 'cleared', 'recurring', s3),
     (w, u, 'expense', 119885, 'Fundacred', cc, (date_trunc('month', hoje + 4) + interval '1 month')::date + 3,
      (date_trunc('month', hoje + 4) + interval '1 month')::date + 3, 'pending', 'recurring', s3);
-  begin
-    perform public.update_recurring_series(s3, jsonb_build_object('rrule', 'FREQ=MONTHLY;BYMONTHDAY=-1',
-      'next_run_at', (hoje + 4) + time '09:00'));
-    raise exception '6: vencimento no mês já pago deveria ser recusado';
-  exception when others then if sqlerrm not like 'A de % já está paga: o próximo vencimento vem depois dela' then raise; end if;
-  end;
+  -- "próximo em 30/09" com setembro pago: desliza para o fim de outubro, com a hora pedida.
   perform public.update_recurring_series(s3, jsonb_build_object('rrule', 'FREQ=MONTHLY;BYMONTHDAY=-1',
-    'next_run_at', (date_trunc('month', hoje + 4) + interval '2 month - 1 day')::date + time '09:00'));
+    'next_run_at', (hoje + 4) + time '09:00'));
+  select next_run_at into l from public.recurring_transactions where id = s3;
+  if l.next_run_at <> (date_trunc('month', hoje + 4) + interval '2 month - 1 day')::date + time '09:00' then
+    raise exception '6: a série não deslizou para o fim do mês seguinte (%)', l.next_run_at;
+  end if;
   select count(*) filter (where status = 'pending'
                             and occurred_at = (date_trunc('month', hoje + 4) + interval '2 month - 1 day')::date) as outubro,
          count(*) filter (where status = 'cleared') as setembro
@@ -215,13 +208,90 @@ begin
     insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, account_id,
                                      occurred_at, due_at, status, source, recurring_id)
       values (w, u, 'expense', 1000, 'Luz', cc, hoje - 1, hoje - 1, 'pending', 'recurring', s4);
-    begin
-      perform public.update_recurring_series(s4, jsonb_build_object('rrule', 'FREQ=MONTHLY;BYMONTHDAY=-1',
-        'next_run_at', hoje + time '09:00'));
-      raise exception '7: vencimento no mês da atrasada deveria ser recusado';
-    exception when others then if sqlerrm not like 'A de % ainda está em aberto%' then raise; end if;
-    end;
+    perform public.update_recurring_series(s4, jsonb_build_object('rrule', 'FREQ=MONTHLY;BYMONTHDAY=-1',
+      'next_run_at', hoje + time '09:00'));
+    select next_run_at into l from public.recurring_transactions where id = s4;
+    if l.next_run_at::date <> (date_trunc('month', hoje) + interval '2 month - 1 day')::date then
+      raise exception '7: a atrasada deste mês segura: a série vai para o fim do mês seguinte (%)', l.next_run_at;
+    end if;
+    select count(*) into n from public.transactions where recurring_id = s4 and occurred_at = hoje - 1 and status = 'pending';
+    if n <> 1 then raise exception '7: a atrasada saiu do lugar'; end if;
   end if;
+
+  -- 8. o caso de 27/09/2026: "todo dia 4" com o 4 deste mês PAGO; a pessoa pede o dia do último
+  --    dia deste mês (30 em setembro). Desliza para o mesmo dia no mês seguinte; a paga fica, e a
+  --    em aberto do mês seguinte muda de data com o MESMO id.
+  --    9. "a cada 2 meses" anda 2. 10. semanal anda uma semana.
+  declare
+    s5 uuid := gen_random_uuid();
+    s6 uuid := gen_random_uuid();
+    s7 uuid := gen_random_uuid();
+    paga uuid;
+    aberta uuid;
+    fim_mes date := (date_trunc('month', hoje) + interval '1 month - 1 day')::date;
+    dia int := extract(day from (date_trunc('month', hoje) + interval '1 month - 1 day'))::int;
+    esperado date := private.day_in_month((date_trunc('month', hoje) + interval '1 month')::date,
+                                          extract(day from (date_trunc('month', hoje) + interval '1 month - 1 day'))::int);
+  begin
+    insert into public.recurring_transactions
+      (id, workspace_id, user_id, kind, amount_cents, category, description, account_id, rrule,
+       next_run_at, dtstart, materialized_until, active, auto_confirm)
+    values (s5, w, u, 'expense', 5000, 'casa', 'Internet', cc, 'FREQ=MONTHLY;BYMONTHDAY=1',
+            (date_trunc('month', hoje) + interval '1 month')::date, hoje - 90, hoje + 300, true, false);
+    insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, account_id,
+                                     occurred_at, due_at, status, source, recurring_id)
+      values (w, u, 'expense', 5000, 'Internet', cc, date_trunc('month', hoje)::date, date_trunc('month', hoje)::date,
+              'cleared', 'recurring', s5)
+      returning id into paga;
+    insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, account_id,
+                                     occurred_at, due_at, status, source, recurring_id)
+      values (w, u, 'expense', 5000, 'Internet', cc, (date_trunc('month', hoje) + interval '1 month')::date,
+              (date_trunc('month', hoje) + interval '1 month')::date, 'pending', 'recurring', s5)
+      returning id into aberta;
+    perform public.update_recurring_series(s5, jsonb_build_object('rrule', 'FREQ=MONTHLY;BYMONTHDAY=' || dia,
+      'next_run_at', fim_mes + time '09:00'));
+    select next_run_at into l from public.recurring_transactions where id = s5;
+    if l.next_run_at <> esperado + time '09:00' then
+      raise exception '8: dia % deveria ir para % (foi %)', dia, esperado, l.next_run_at;
+    end if;
+    select occurred_at into l from public.transactions where id = paga;
+    if l.occurred_at <> date_trunc('month', hoje)::date then raise exception '8: a paga saiu do dia dela (%)', l.occurred_at; end if;
+    select occurred_at into l from public.transactions where id = aberta;
+    if l.occurred_at <> esperado then raise exception '8: a em aberto não foi para % com o mesmo id (%)', esperado, l.occurred_at; end if;
+    select count(*) into n from public.transactions where recurring_id = s5 and date_trunc('month', occurred_at) = date_trunc('month', hoje);
+    if n <> 1 then raise exception '8: o mês pago ganhou outra cobrança (%)', n; end if;
+
+    insert into public.recurring_transactions
+      (id, workspace_id, user_id, kind, amount_cents, category, description, account_id, rrule,
+       next_run_at, dtstart, materialized_until, active, auto_confirm)
+    values (s6, w, u, 'expense', 5000, 'casa', 'Revisão', cc, 'FREQ=MONTHLY;INTERVAL=2;BYMONTHDAY=1',
+            (date_trunc('month', hoje) + interval '2 month')::date, hoje - 90, hoje + 300, true, false);
+    insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, account_id,
+                                     occurred_at, due_at, status, source, recurring_id)
+      values (w, u, 'expense', 5000, 'Revisão', cc, date_trunc('month', hoje)::date, date_trunc('month', hoje)::date,
+              'cleared', 'recurring', s6);
+    perform public.update_recurring_series(s6, jsonb_build_object('rrule', 'FREQ=MONTHLY;INTERVAL=2;BYMONTHDAY=' || dia,
+      'next_run_at', fim_mes + time '09:00'));
+    select next_run_at into l from public.recurring_transactions where id = s6;
+    if l.next_run_at::date <> private.day_in_month((date_trunc('month', hoje) + interval '2 month')::date, dia) then
+      raise exception '9: a cada 2 meses deveria andar 2 (%)', l.next_run_at;
+    end if;
+
+    insert into public.recurring_transactions
+      (id, workspace_id, user_id, kind, amount_cents, category, description, account_id, rrule,
+       next_run_at, dtstart, materialized_until, active, auto_confirm)
+    values (s7, w, u, 'expense', 3000, 'casa', 'Feira', cc, 'FREQ=WEEKLY;BYDAY=MO',
+            hoje + 7, hoje - 90, hoje + 300, true, false);
+    insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, account_id,
+                                     occurred_at, due_at, status, source, recurring_id)
+      values (w, u, 'expense', 3000, 'Feira', cc, hoje, hoje, 'cleared', 'recurring', s7);
+    perform public.update_recurring_series(s7, jsonb_build_object('rrule', 'FREQ=WEEKLY;BYDAY=FR',
+      'next_run_at', hoje + time '09:00'));
+    select next_run_at into l from public.recurring_transactions where id = s7;
+    if date_trunc('week', l.next_run_at::date) <> date_trunc('week', hoje) + interval '1 week' then
+      raise exception '10: semanal deveria ir para a semana seguinte (%)', l.next_run_at;
+    end if;
+  end;
 end $$;
 
 rollback;

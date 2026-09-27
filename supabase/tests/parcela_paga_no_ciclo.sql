@@ -24,7 +24,10 @@ declare
   ws uuid; usr uuid; conta uuid; divida uuid;
   fim_ciclo date; prox date; linhas int; dia_venc int;
 begin
-  select id into usr from auth.users limit 1;
+  -- Usuário PRÓPRIO: `auth.users limit 1` não tem ordem e pode cair numa conta com dados de verdade.
+  usr := '00000000-0000-0000-0000-000000000c04';
+  insert into auth.users (id, email) values (usr, 'teste-parcela-paga-no-ciclo@example.invalid') on conflict (id) do nothing;
+  insert into public.profiles (id) values (usr) on conflict (id) do nothing;
   -- fechamento no dia 10: o ciclo corrente atravessa a virada do mês civil, que é justamente
   -- onde as duas réguas discordam
   insert into public.workspaces (name, owner_id, cycle_close_day)

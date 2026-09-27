@@ -5,7 +5,8 @@ import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClie
 import type { ProjecaoMensal } from '@/lib/forecast-months';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
-import { localISODate, monthBounds, primeiroDiaDoMes } from '@/lib/dates';
+import { dataLocalDe, localISODate, monthBounds, primeiroDiaDoMes } from '@/lib/dates';
+import { avisoDeDeslize } from '@/lib/serie';
 import type { Consulta } from '@/lib/tela-pronta';
 import type { DebtPaymentRow } from '@/lib/debt-history';
 import { agentFetch } from '@/lib/agent-api';
@@ -241,11 +242,11 @@ export function useTransactions(filters: TransactionFilters) {
     queryKey: ['transactions', 'list', filters],
     initialPageParam: 0,
     queryFn: async ({ pageParam }): Promise<Transaction[]> => {
-      let query = supabase
-        .from('transactions')
-        .select(TRANSACTION_COLUMNS)
-        .gte('occurred_at', from)
-        .lte('occurred_at', to)
+      let query = supabase.from('transactions').select(TRANSACTION_COLUMNS);
+      // "Ver ocorrências" de uma recorrente é a SÉRIE inteira, não um mês dela (27/09/2026: abria
+      // o mês do próximo vencimento, e a série recém-criada, sem nada nele, parecia vazia).
+      if (!filters.recurringId) query = query.gte('occurred_at', from).lte('occurred_at', to);
+      query = query
         .order('occurred_at', { ascending: false })
         .order('created_at', { ascending: false })
         // Desempate estável. Duas linhas com a mesma data E o mesmo `created_at` (lote de
@@ -291,7 +292,7 @@ export function useTransactions(filters: TransactionFilters) {
     },
     getNextPageParam: (last, all) =>
       last.length < TRANSACTION_PAGE ? undefined : all.length * TRANSACTION_PAGE,
-    enabled: filters.pronto !== false,
+    enabled: filters.pronto !== false || Boolean(filters.recurringId),
   });
 }
 
@@ -2683,7 +2684,18 @@ export function useSaveRecurringSeries() {
         p_propagate: true,
       });
       if (error) throw error;
-      return Number(data ?? 0);
+      // O calendário pedido num mês que já tem a sua cobrança desliza para o seguinte
+      // (`20260927120000`): relê onde a série caiu para a tela dizer.
+      let aviso: string | null = null;
+      if (patch.next_run_at) {
+        const { data: depois } = await supabase
+          .from('recurring_transactions')
+          .select('next_run_at')
+          .eq('id', id)
+          .maybeSingle();
+        if (depois?.next_run_at) aviso = avisoDeDeslize(dataLocalDe(patch.next_run_at), dataLocalDe(depois.next_run_at));
+      }
+      return { quantas: Number(data ?? 0), aviso };
     },
     onSuccess: invalidate,
   });

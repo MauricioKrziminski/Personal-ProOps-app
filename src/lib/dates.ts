@@ -281,6 +281,15 @@ export function ehUltimoDiaDoMes(d: Date): boolean {
   return d.getDate() === new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
 }
 
+/**
+ * O último dia de um mês de MENOS de 31 dias (30/09, 28/02, 29/02): "todo dia 30" ou "todo último
+ * dia do mês"? A data não responde, e a diferença aparece nos meses de 31. 31/xx não é ambíguo:
+ * o dia 31 é sempre o último.
+ */
+export function diaAmbiguo(d: Date): boolean {
+  return ehUltimoDiaDoMes(d) && d.getDate() < 31;
+}
+
 const DIAS_CURTOS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'] as const;
 const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'] as const;
 

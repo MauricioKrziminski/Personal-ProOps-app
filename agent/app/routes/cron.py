@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
+from app.domain.dates import now_utc
 from app.jobs import alerts, checkpoints, reminders, scheduler
 from app.routes.worker import sweep
 from app.security import require_internal
@@ -30,7 +31,12 @@ async def run_reminders() -> dict:
         resgate = await sweep()
     except Exception:  # noqa: BLE001
         resgate = {"error": "sweep falhou"}
-    return {"reminders": lembretes, "sweep": resgate}
+    # Série recém-criada ganha as ocorrências no minuto, não na rodada de hora em hora.
+    try:
+        novas = await scheduler.materialize_horizon(now_utc(), so_novas=True)
+    except Exception:  # noqa: BLE001
+        novas = {"error": "materializar as novas falhou"}
+    return {"reminders": lembretes, "sweep": resgate, "recorrentes_novas": novas}
 
 
 @router.post("/finance-scheduler")

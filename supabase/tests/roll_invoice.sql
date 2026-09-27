@@ -17,7 +17,11 @@ declare
   r jsonb;
   n int; v bigint; taxa_aprendida numeric;
 begin
-  select id into usr from auth.users limit 1;
+  -- Usuário PRÓPRIO: `auth.users limit 1` não tem ordem e, no staging, passou a devolver uma conta
+  -- com dados de verdade — o caixa dela entrava na asserção 5 (27/09/2026).
+  usr := '00000000-0000-0000-0000-000000000b11';
+  insert into auth.users (id, email) values (usr, 'teste-rotativo@example.invalid') on conflict (id) do nothing;
+  insert into public.profiles (id) values (usr) on conflict (id) do nothing;
   insert into public.workspaces (name, owner_id) values ('teste rotativo', usr) returning id into ws;
   insert into public.workspace_members (workspace_id, user_id, role) values (ws, usr, 'owner');
 

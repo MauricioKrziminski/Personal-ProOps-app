@@ -82,3 +82,5 @@ async def test_um_passo_que_falha_nao_derruba_os_outros(monkeypatch):
     # O erro NÃO some: vai para a resposta do cron, que é o que o Cloud Logging guarda.
     assert "roll_overdue" in r["errors"]
     assert any("_promote_due_transactions" in s for s in chamados)
+    # a baixa das faturas adiadas/pagas em parte roda mesmo com o rotativo quebrado
+    assert r["lines_settled"] == 7 and any("_liquidar_faturas_vencidas" in s for s in chamados)

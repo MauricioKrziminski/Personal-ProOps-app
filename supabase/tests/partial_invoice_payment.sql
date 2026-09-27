@@ -43,17 +43,20 @@ begin
   insert into public.accounts (id, workspace_id, user_id, name, type, closing_day, due_day, credit_limit_cents)
     values (card, w, u, 'Cartão teste', 'credit_card', 3, 10, 1000000);
 
-  -- duas compras: 1.000,00 + 500,00. O trigger set_invoice cria a fatura.
+  -- duas compras: 1.000,00 + 500,00. O trigger set_invoice cria a fatura. Hoje, para a fatura
+  -- ser A VENCER: paga em parte depois do vencimento, a fatura dá baixa nas compras
+  -- (`20260927130000`, `fatura_liquidada_baixa_as_linhas.sql`) — com as datas fixas de agosto este
+  -- teste passou a testar o outro caso quando setembro virou.
   insert into public.transactions (workspace_id, user_id, account_id, kind, amount_cents, description, occurred_at, source, status)
-    values (w, u, card, 'expense', 100000, 'Compra A', '2026-08-10', 'app', 'cleared'),
-           (w, u, card, 'expense',  50000, 'Compra B', '2026-08-20', 'app', 'pending');
+    values (w, u, card, 'expense', 100000, 'Compra A', current_date, 'app', 'cleared'),
+           (w, u, card, 'expense',  50000, 'Compra B', current_date, 'app', 'pending');
   select invoice_id into fat from public.transactions where account_id = card limit 1;
 
   assert private.invoice_open_cents(fat) = 150000,
     format('fatura nova deveria dever 150000, deve %s', private.invoice_open_cents(fat));
 
   -- ── pagamento parcial ────────────────────────────────────────────────────
-  perform public.pay_invoice(fat, cc, date '2026-09-05', 40000);
+  perform public.pay_invoice(fat, cc, current_date, 40000);
   assert private.invoice_open_cents(fat) = 110000,
     format('depois de 400,00 deveria faltar 110000, falta %s', private.invoice_open_cents(fat));
   assert (select status from public.card_invoices where id = fat) <> 'paid',
@@ -76,12 +79,12 @@ begin
   assert saldo = -aberto, format('saldo do cartão (%s) discorda das faturas em aberto (%s)', saldo, -aberto);
 
   -- ── segundo parcial, depois a quitação ───────────────────────────────────
-  perform public.pay_invoice(fat, cc, date '2026-09-06', 10000);
+  perform public.pay_invoice(fat, cc, current_date, 10000);
   assert private.invoice_open_cents(fat) = 100000,
     format('depois de mais 100,00 deveria faltar 100000, falta %s', private.invoice_open_cents(fat));
 
   -- sem valor, paga o que falta
-  perform public.pay_invoice(fat, cc, date '2026-09-07');
+  perform public.pay_invoice(fat, cc, current_date);
   assert (select status from public.card_invoices where id = fat) = 'paid', 'deveria ter quitado';
   assert private.invoice_open_cents(fat) = 0, 'fatura quitada deveria ter zero em aberto';
   assert not exists (select 1 from public.transactions where invoice_id = fat and status = 'pending'),

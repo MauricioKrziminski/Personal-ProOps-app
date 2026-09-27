@@ -9,6 +9,7 @@ obrigava no Deno.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 
 from dateutil.rrule import rrulestr
@@ -16,6 +17,23 @@ from dateutil.rrule import rrulestr
 from app.domain.dates import UTC, tz
 
 log = logging.getLogger(__name__)
+
+# "todo dia 30" num mês sem dia 30. A RRULE ao pé da letra PULA o mês (a `dateutil` dá 30/01,
+# 30/03 — fevereiro some, e com ele o aluguel da projeção), enquanto o resto do sistema cai no
+# último dia (`private.day_in_month`: vencimento de cartão, parcela de dívida, a projeção além do
+# horizonte). 27/09/2026. A regra GRAVADA não muda: a troca é só na hora de expandir, por
+# `BYMONTHDAY=28,…,N;BYSETPOS=-1` — "o último destes dias que existir no mês". Um dia só; lista
+# de dias ("5,30", do lembrete) fica como está.
+_DIA_ALTO = re.compile(r"(?<![^;:])BYMONTHDAY=(29|30|31)(?=;|$)")
+
+
+def _dia_que_cabe(regra: str) -> str:
+    if "BYSETPOS" in regra or not re.search(r"FREQ=(MONTHLY|YEARLY)", regra):
+        return regra
+    return _DIA_ALTO.sub(
+        lambda m: "BYMONTHDAY=" + ",".join(str(d) for d in range(28, int(m.group(1)) + 1)) + ";BYSETPOS=-1",
+        regra,
+    )
 
 
 def next_occurrence(
@@ -38,7 +56,7 @@ def next_occurrence(
 
     try:
         regra = rrulestr(
-            recurrence if recurrence.startswith("RRULE:") else f"RRULE:{recurrence}",
+            _dia_que_cabe(recurrence if recurrence.startswith("RRULE:") else f"RRULE:{recurrence}"),
             dtstart=base,
         )
         proxima = regra.after(depois, inc=False)

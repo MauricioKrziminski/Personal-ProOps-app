@@ -79,8 +79,22 @@
     04/09 e vencimento 30/09; pela data ele ficaria e nasceria outro 30/09 ao lado. No cartão
     `due_at` é o vencimento da FATURA e a compra de ontem já aconteceu: lá vale a data.
   - **O que FICA segura o calendário** (paga, atrasada, compra de cartão já feita): o próximo
-    vencimento vem num período depois dela, senão aquele mês ganharia uma segunda cobrança. É o
-    Fundacred de produção: setembro pago com vencimento 30/09 recusa "próximo em 30/09".
+    vencimento vem num período depois dela, senão aquele mês ganharia uma segunda cobrança — e
+    desde 27/09/2026 o banco **desliza, não recusa** (`20260927120000`): "dia 4 → dia 31" com
+    setembro pago vira "próximo 31/10", no dia da regra (`day_in_month`), e a tela diz onde caiu
+    ("Setembro já tinha a cobrança dela: a próxima fica em 31/10/2026", `avisoDeDeslize`; o
+    agente diz o mesmo). Recusar era o erro: a pessoa queria mudar o dia da série INTEIRA. Aberta
+    pela ocorrência PAGA, "Esta e as próximas" parte do próximo vencimento, não da data dela.
+  - **"Todo dia 30" nunca pula fevereiro.** A RRULE ao pé da letra pula o mês sem o dia, e o
+    agendador pulava; hoje ele expande `BYMONTHDAY=29|30|31` como "o último destes que existir"
+    (`recurrence._dia_que_cabe`), a mesma régua do `day_in_month`. A regra gravada não muda.
+    Escolhida a data no último dia de um mês curto (30/09, 28/02), o formulário PERGUNTA "Todo
+    dia 30 | Último dia do mês" (`DiaOuUltimo`, também no financiamento); sem resposta vale o dia.
+  - **Série nova ganha as ocorrências no minuto**, não na rodada de hora em hora: o cron de
+    lembretes materializa as nunca materializadas (`materialize_horizon(so_novas=True)`). Antes a
+    série criada ficava até 1 h sem nenhuma linha — "Ver ocorrências" vazio e a projeção só com o
+    mês da regra (produção, 27/09/2026). "Ver ocorrências" é a série INTEIRA: "A seguir" (a
+    próxima primeiro, com a atrasada em aberto no topo) e "Anteriores".
   - `next_run_at` é timestamp: a tela lê o dia LOCAL (`dataLocalDe`). O Fundacred de produção tem
     05/10 00:00 UTC — 04/10 em Brasília —, e o card dizia "próximo 05/10".
   - Até o agendador rodar (1 h em produção), a projeção lê a regra só no mensal simples
@@ -559,6 +573,14 @@ compra, não a única tela que responde quanto resta.
   transferência, para o pagamento que aconteceu fora do app. No app são dois botões; no WhatsApp,
   `pay_invoice` e `mark_paid` com a fatura como alvo. Confirmar "a fatura do Nubank" não separa os
   dois — a frase do SIM diz se o caixa se move.
+- **Fatura ADIADA, ou paga EM PARTE e vencida, dá baixa nas compras e parcelas dela**
+  (`20260927130000`, pedido do dono do produto): `paid_at` = o vencimento. O que faltou é saldo
+  adiado ou atraso da FATURA, não da compra — em produção, a fatura adiada do Nubank de setembro
+  tinha as 30 compras importadas pagas e as 7 parcelas do app "em aberto". Aplica o gatilho
+  `linhas_da_fatura_liquidada` (adiar, desfazer, pagar ou apagar o pagamento) e a rodada de hora
+  em hora (`_liquidar_faturas_vencidas`, a parcial que vence com o dia); deixando de estar
+  liquidada, volta a `pending` o que ELA baixou (`paid_at` = vencimento, fora da importação).
+  Nenhum número de caixa muda: projeção e "livre" leem a fatura, não o status da linha.
 - **`card_summary` tem dois números da fatura corrente, e eles não são o mesmo**
   (`20260917120000`): `invoice_total_cents` é BRUTO (a soma das compras, o número grande do
   cartão) e `invoice_open_cents` é o que FALTA (líquido do `paid_cents`). Quem subtrai a corrente
@@ -644,7 +666,9 @@ parcela com saldo em aberto. Daí as três regras:
    (`p_paid_installments`, `20260926130000`: aumentar dá baixa nas primeiras e quita a fatura
    vencida que só tem parcelas pagas desta compra; diminuir reabre, e reabre junto a fatura que o
    app quitou à mão por causa delas). **Data da 1ª e conta** só mudam sem parcela numa FATURA
-   paga, adiada ou paga em parte — mudar a tiraria da fatura em que foi paga. "À vista" com
+   paga, adiada ou paga em parte — mudar a tiraria da fatura em que foi paga. A data nova vale
+   para as EM ABERTO: a paga fora do cartão fica no dia em que venceu (`20260927120000`; ela ia
+   junto, e a de 04/09 virava 30/09, paga e no futuro) — a conta dela acompanha. "À vista" com
    parcela paga continua recusado.
 3. **A soma das parcelas é conferida no fim.** Não fechando com `total_cents`, a função levanta e
    a transação inteira volta — o modo de falha desta classe não é erro na tela, é um total que

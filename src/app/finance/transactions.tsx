@@ -37,6 +37,7 @@ import {
   useAccounts,
   useDeleteTransaction,
   useRecentTransactions,
+  useRecurringTransactions,
   useMonthRange,
   useTransactions,
   useCycleSeries,
@@ -107,6 +108,8 @@ const SOURCE_FILTER: { value: TransactionSource; label: string }[] = [
 
 interface DaySection {
   title: string;
+  /** Só nas ocorrências de uma série: o rótulo que abre o grupo ("A seguir", "Anteriores"). */
+  grupo?: string;
   /** Receitas − despesas do dia (transferência não conta). */
   net: number;
   data: Transaction[];
@@ -136,6 +139,23 @@ function toSections(rows: Transaction[]): DaySection[] {
     if (tx.kind === 'expense') section.net -= tx.amount_cents;
   }
   return sections;
+}
+
+/**
+ * "Ver ocorrências" de uma série: contrato com passado e futuro (`frontend.md`, lista do mais
+ * recente) — "A seguir" com a próxima primeiro, depois "Anteriores" com a mais recente primeiro.
+ * Em ordem de data pura a tela abria em agosto do ano que vem (27/09/2026). O banco pagina do
+ * futuro para o passado, então "A seguir" chega inteiro na primeira página e "Anteriores" cresce
+ * com a rolagem.
+ */
+function toSeriesSections(rows: Transaction[], hoje: string): DaySection[] {
+  // A atrasada em aberto (fora do cartão) é o que falta pagar: vai para o topo de "A seguir".
+  const falta = (tx: Transaction) => tx.occurred_at >= hoje || (tx.status === 'pending' && !tx.invoice_id);
+  const aSeguir = toSections(rows.filter(falta).reverse());
+  const anteriores = toSections(rows.filter((tx) => !falta(tx)));
+  if (aSeguir[0]) aSeguir[0].grupo = 'A seguir';
+  if (anteriores[0]) anteriores[0].grupo = 'Anteriores';
+  return [...aSeguir, ...anteriores];
 }
 
 export default function TransactionsScreen() {
@@ -334,7 +354,10 @@ export default function TransactionsScreen() {
   // `toSections` agrupa em varredura linear, então o dia que atravessa a fronteira de duas
   // páginas continua sendo uma seção só depois do `flat()`.
   const rows = useMemo(() => list.data?.pages.flat() ?? [], [list.data]);
-  const sections = useMemo(() => toSections(rows), [rows]);
+  const sections = useMemo(
+    () => (params.recurringId ? toSeriesSections(rows, hoje) : toSections(rows)),
+    [rows, params.recurringId, hoje]
+  );
 
   /** Id da conta filtrada; `undefined` na lista global e também em "Sem conta". */
   const contaFiltrada = accountId === undefined || accountId === NO_ACCOUNT ? undefined : accountId;
@@ -361,6 +384,11 @@ export default function TransactionsScreen() {
     : null;
 
   /** Título da tela quando ela está filtrada por conta — não é o rótulo de uma conta. */
+  // "Ver ocorrências" de uma recorrente: a série inteira, com o nome dela no título.
+  const series = useRecurringTransactions();
+  const nomeDaSerie = params.recurringId
+    ? (series.data?.find((r) => r.id === params.recurringId)?.description ?? 'Ocorrências')
+    : undefined;
   const tituloDaConta =
     accountId === undefined
       ? undefined
@@ -460,7 +488,8 @@ export default function TransactionsScreen() {
           da tela Contas (`saldoDaConta`). */}
       {saldoDaContaFiltrada}
 
-      <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} />
+      {/* A série inteira não tem mês: a régua recortaria o que "Ver ocorrências" pediu inteiro. */}
+      {params.recurringId ? null : <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} />}
 
       {/*
         ⚠️ **Com filtro ativo o card SOME.** Ele soma o período inteiro; a lista filtrada soma
@@ -589,6 +618,10 @@ export default function TransactionsScreen() {
     </View>
   ) : list.isError ? (
     <ErrorCard onRetry={list.refetch} />
+  ) : params.recurringId && !hasFilters ? (
+    // Série recém-criada ou com o calendário refeito: o agendador gera as ocorrências em até um
+    // minuto, e a lista se atualiza sozinha quando elas chegam.
+    <EmptyState compacto icon="repeat" title="Esta recorrente ainda não tem ocorrências" />
   ) : hasFilters ? (
     <EmptyState compacto
       icon="line.3.horizontal.decrease"
@@ -730,6 +763,12 @@ export default function TransactionsScreen() {
             );
           }}
           renderSectionHeader={({ section }) => (
+            <View style={{ backgroundColor: theme.groupedBackground }}>
+            {section.grupo ? (
+              <ThemedText type="headline" accessibilityRole="header" style={styles.grupoDaSerie}>
+                {section.grupo}
+              </ThemedText>
+            ) : null}
             <View style={[styles.dayHeader, { backgroundColor: theme.groupedBackground }]}>
               <ThemedText
                 type="small"
@@ -739,6 +778,7 @@ export default function TransactionsScreen() {
                 {section.title}
               </ThemedText>
               <Money cents={section.net} variant="footnote" tone="textSecondary" signed />
+            </View>
             </View>
           )}
           renderItem={({ item: tx, index, section }) => {
@@ -961,7 +1001,7 @@ export default function TransactionsScreen() {
       wide={wideWorkspace}
       search={wideWorkspace ? undefined : busca}>
       <Stack.Screen
-        options={{ title: tituloDaConta ?? 'Lançamentos' }}
+        options={{ title: nomeDaSerie ?? tituloDaConta ?? 'Lançamentos' }}
       />
       {menu}
       {wideWorkspace ? (
@@ -1043,6 +1083,7 @@ const styles = StyleSheet.create({
   dayTitle: {
     letterSpacing: 0.2,
   },
+  grupoDaSerie: { paddingTop: Space.lg },
   rowHost: {
     overflow: 'hidden',
   },

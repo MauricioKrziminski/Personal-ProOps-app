@@ -410,17 +410,17 @@ function TransactionForm({
   const salvarAsProximas = () => {
     if (!formSerie || !editing || !serie || !serieOk) return;
     const { linhas, regra } = mudancasDaOcorrencia(formSerie, editing, serie);
-    const feito = () => {
+    const feito = (aviso?: string | null) => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
-      toast({ message: 'Alterei esta e as próximas.', tone: 'success' });
+      toast({ message: aviso ?? 'Alterei esta e as próximas.', tone: 'success' });
     };
     const gravarRegra = (linhasJaGravadas: boolean) => {
       if (Object.keys(regra).length === 0) return feito();
       editarSerie.mutate(
         { id: serie.id, patch: regra },
         {
-          onSuccess: feito,
+          onSuccess: ({ aviso }) => feito(aviso),
           // As linhas JÁ mudaram: a frase diz as duas coisas, com o motivo do banco (a de setembro
           // já paga, a repetição que o app não monta).
           onError: (error) => {

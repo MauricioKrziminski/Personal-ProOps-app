@@ -13,7 +13,10 @@ do $$
 declare
   ws uuid; usr uuid; meta uuid; v bigint; recusou boolean;
 begin
-  select id into usr from auth.users limit 1;
+  -- Usuário PRÓPRIO: `auth.users limit 1` não tem ordem e pode cair numa conta com dados de verdade.
+  usr := '00000000-0000-0000-0000-000000000c03';
+  insert into auth.users (id, email) values (usr, 'teste-goal-withdraw@example.invalid') on conflict (id) do nothing;
+  insert into public.profiles (id) values (usr) on conflict (id) do nothing;
   insert into public.workspaces (name, owner_id) values ('teste meta', usr) returning id into ws;
   insert into public.workspace_members (workspace_id, user_id, role) values (ws, usr, 'owner');
   insert into public.goals (workspace_id, user_id, name, target_cents)

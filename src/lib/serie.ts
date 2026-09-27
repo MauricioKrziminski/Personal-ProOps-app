@@ -2,7 +2,7 @@
  * As regras da SÉRIE recorrente, puras (os campos moram em `components/finance/serie-form.tsx`).
  * Aqui fica o que tem conta: a RRULE que o formulário monta, o que ele vale e o que o salvar grava.
  */
-import { brToISO, dataLocalDe, ehUltimoDiaDoMes, isValidBRDate, isoToBR, localDateTime, localISODate } from './dates.ts';
+import { brToISO, dataLocalDe, diaAmbiguo, ehUltimoDiaDoMes, isValidBRDate, isoToBR, localDateTime, localISODate } from './dates.ts';
 import { validRecurringRange } from './finance-form.ts';
 
 export interface SerieForm {
@@ -35,6 +35,12 @@ export interface SerieForm {
   intervalo: string;
   /** dd/mm/aaaa — criando, vira `dtstart` e o `next_run_at`; editando, é o próximo vencimento. */
   inicio: string;
+  /**
+   * Só quando a data é o último dia de um mês de menos de 31 (30/09, 28/02): "todo dia 30" ou
+   * "todo último dia do mês"? A data sozinha não responde (27/09/2026, pergunta do dono do
+   * produto) — e a diferença aparece nos meses de 31 dias. Ausente = o dia da data.
+   */
+  ultimoDia?: boolean;
   /** dd/mm/aaaa, opcional: é como se encerra uma assinatura sem apagar o histórico. */
   fim: string;
   autoConfirm: boolean;
@@ -61,18 +67,21 @@ const DIAS_RRULE = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
  * A RRULE sai do preset + da data — nunca de um campo de texto livre, que seria um gerador de
  * série quebrada. A frase de volta vem do mesmo `describeRRule` das séries da IA.
  */
-export function montaRRule(preset: SerieForm['preset'], inicio: Date, intervalo: number): string {
+export function montaRRule(preset: SerieForm['preset'], inicio: Date, intervalo: number, ultimoDia = false): string {
   if (preset === 'weekly') return `FREQ=WEEKLY;BYDAY=${DIAS_RRULE[inicio.getDay()]}`;
   if (preset === 'yearly') return `FREQ=YEARLY;BYMONTH=${inicio.getMonth() + 1};BYMONTHDAY=${inicio.getDate()}`;
   const passo = intervalo > 1 ? `;INTERVAL=${intervalo}` : '';
   /*
-    ⚠️ **A data DIZ se é "todo dia N" ou "todo último dia do mês".** Havia um campo só para
-    perguntar isso ("Vence quando: Dia do mês | Último dia"), e ele era um controle que a própria
-    data já respondia — quem escolhe 31/10 quer o fim do mês, quem escolhe 05/10 quer o dia 5.
+    ⚠️ **Quase sempre a data diz se é "todo dia N" ou "todo último dia do mês"**: quem escolhe
+    31/10 quer o fim do mês, quem escolhe 05/10 quer o dia 5. A exceção é o último dia de um mês
+    curto (30/09, 28/02): "dia 30" ou "último dia"? Ali o formulário PERGUNTA (`ultimoDia`,
+    `diaAmbiguo`), e sem resposta vale o dia da data.
 
-    `-1` não é cosmético ao lado de 31: `BYMONTHDAY=31` PULA fevereiro e os meses de 30 dias.
+    `-1` e 31 caem no mesmo dia desde que o agendador deixou de pular o mês curto (27/09/2026,
+    `recurrence._dia_que_cabe`); o 31 continua virando `-1` porque é a forma que a projeção lê.
   */
-  return `FREQ=MONTHLY${passo};BYMONTHDAY=${ehUltimoDiaDoMes(inicio) ? -1 : inicio.getDate()}`;
+  const fimDoMes = inicio.getDate() === 31 || (ultimoDia && ehUltimoDiaDoMes(inicio));
+  return `FREQ=MONTHLY${passo};BYMONTHDAY=${fimDoMes ? -1 : inicio.getDate()}`;
 }
 
 /**
@@ -102,6 +111,7 @@ export function serieDoRegistro(r: SerieGravada): SerieForm {
     preset: r.rrule.includes('FREQ=WEEKLY') ? 'weekly' : r.rrule.includes('FREQ=YEARLY') ? 'yearly' : 'monthly',
     intervalo: /INTERVAL=(\d+)/.exec(r.rrule)?.[1] ?? '1',
     inicio: isoToBR(dataLocalDe(r.next_run_at)),
+    ultimoDia: /BYMONTHDAY=-1(;|$)/.test(r.rrule),
     fim: r.end_date ? isoToBR(r.end_date) : '',
     autoConfirm: r.auto_confirm,
     ...(regraDoApp(r.rrule) ? {} : { regraPropria: r.rrule }),
@@ -144,8 +154,11 @@ export function validaSerie(form: SerieForm | null) {
   const podeSalvar = form?.id
     ? basico && (!form.agendaMudou || (calendarioOk && !agendaNoPassado))
     : basico && calendarioOk;
-  const rrulePrevia = form && inicioDate ? montaRRule(form.preset, inicioDate, Number(form.intervalo) || 1) : null;
-  return { inicioDate, inicioOk, fimOk, tituloOk, agendaNoPassado, podeSalvar, rrulePrevia };
+  const rrulePrevia =
+    form && inicioDate ? montaRRule(form.preset, inicioDate, Number(form.intervalo) || 1, form.ultimoDia) : null;
+  /** "Todo dia 30 | Último dia do mês" só aparece quando a data não responde sozinha. */
+  const perguntaUltimoDia = Boolean(form && form.preset === 'monthly' && !form.regraPropria && inicioDate && diaAmbiguo(inicioDate));
+  return { inicioDate, inicioOk, fimOk, tituloOk, agendaNoPassado, podeSalvar, rrulePrevia, perguntaUltimoDia };
 }
 
 /** A ocorrência aberta no formulário do lançamento. */
@@ -158,12 +171,17 @@ export interface OcorrenciaDaSerie {
   occurred_at: string;
   due_at: string | null;
   invoice_id: string | null;
+  status?: string;
 }
 
 /**
  * "Esta e as próximas" aberto numa ocorrência: o formulário da série com os valores DESTA linha
  * (é o que a pessoa está vendo) e, como data, o vencimento dela — fora do cartão; no cartão, a data
  * da compra (lá `due_at` é o vencimento da fatura).
+ *
+ * ⚠️ Linha PAGA: a data é o próximo vencimento da série. A paga fica onde está, e partir da data
+ * dela fazia a pessoa escolher o dia novo no mês que já tem a cobrança — "dia 4 → dia 30" com
+ * setembro pago virava "30/09" (27/09/2026). O banco desliza de todo jeito; aqui ele não precisa.
  */
 export function serieDaOcorrencia(serie: SerieGravada, linha: OcorrenciaDaSerie): SerieForm {
   return {
@@ -173,7 +191,10 @@ export function serieDaOcorrencia(serie: SerieGravada, linha: OcorrenciaDaSerie)
     merchant: linha.merchant ?? '',
     category: linha.category,
     accountId: linha.account_id,
-    inicio: isoToBR(!linha.invoice_id && linha.due_at ? linha.due_at : linha.occurred_at),
+    inicio:
+      linha.status === 'cleared'
+        ? isoToBR(dataLocalDe(serie.next_run_at))
+        : isoToBR(!linha.invoice_id && linha.due_at ? linha.due_at : linha.occurred_at),
   };
 }
 
@@ -220,4 +241,15 @@ export function mudancasDaOcorrencia(form: SerieForm, linha: OcorrenciaDaSerie, 
     regra.next_run_at = inicioDate.toISOString();
   }
   return { linhas, regra };
+}
+
+/**
+ * O banco não recusa mais o dia novo no mês que já tem a sua cobrança: desliza para o mês
+ * seguinte (`20260927120000`). A tela diz onde a série caiu — a data pedida não valeu.
+ */
+export function avisoDeDeslize(pedidaISO: string, valeuISO: string): string | null {
+  if (pedidaISO === valeuISO) return null;
+  const [y, m] = pedidaISO.split('-').map(Number);
+  const mes = new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long' });
+  return `${mes.charAt(0).toUpperCase()}${mes.slice(1)} já tinha a cobrança dela: a próxima fica em ${isoToBR(valeuISO)}.`;
 }

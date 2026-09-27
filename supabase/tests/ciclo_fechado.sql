@@ -19,7 +19,10 @@ declare
   v_mes date := (date_trunc('month', current_date) - interval '1 month')::date;
   r record;
 begin
-  select id into usr from auth.users limit 1;
+  -- Usuário PRÓPRIO: `auth.users limit 1` não tem ordem e pode cair numa conta com dados de verdade.
+  usr := '00000000-0000-0000-0000-000000000c01';
+  insert into auth.users (id, email) values (usr, 'teste-ciclo-fechado@example.invalid') on conflict (id) do nothing;
+  insert into public.profiles (id) values (usr) on conflict (id) do nothing;
   insert into public.workspaces (name, owner_id) values ('teste ciclo fechado', usr) returning id into ws;
   insert into public.workspace_members (workspace_id, user_id, role) values (ws, usr, 'owner');
   insert into public.accounts (workspace_id, user_id, name, type, initial_balance_cents)

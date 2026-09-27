@@ -28,6 +28,9 @@ function loadHooks(client: QueryClient, entry = 'src/hooks/use-finance.ts', depe
       if (name === '@/lib/agent-api') return {};
       if (name === '@/lib/supabase') return { supabase: { rpc: async () => ({ error: null }) } };
       if (name.startsWith('@/lib/') && existsSync(`src/lib/${name.slice(6)}.ts`)) return load(`src/lib/${name.slice(6)}.ts`);
+      // `import` relativo de dentro de `src/lib` (`./dates.ts`): sem isto o módulo carregado recebe
+      // `{}` e quebra quando usa o helper na carga (`serie.ts` monta `SERIE_VAZIA` com a data).
+      if (name.startsWith('./') && file.startsWith('src/lib/') && existsSync(`src/lib/${name.slice(2)}`)) return load(`src/lib/${name.slice(2)}`);
       return {};
     }, console, setTimeout, clearTimeout });
     return module.exports;

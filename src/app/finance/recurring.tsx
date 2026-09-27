@@ -241,11 +241,11 @@ export default function RecurringScreen() {
       editar.mutate(
         { id: form.id, patch },
         {
-          onSuccess: (quantas) => {
+          onSuccess: ({ quantas, aviso }) => {
             toast({
-              message: quantas > 0
+              message: aviso ?? (quantas > 0
                 ? `Série alterada e ${quantas} ${quantas === 1 ? 'ocorrência futura' : 'ocorrências futuras'} junto.`
-                : 'Série alterada.',
+                : 'Série alterada.'),
               tone: 'success',
             });
             volta.aoFechar(() => setForm(null));
@@ -336,7 +336,7 @@ export default function RecurringScreen() {
         onPress: () =>
           router.push({
             pathname: '/finance/transactions',
-            params: { recurringId: r.id, month: r.next_run_at.slice(0, 7) },
+            params: { recurringId: r.id },
           }),
       },
       {

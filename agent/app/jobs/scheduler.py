@@ -45,6 +45,8 @@ log = logging.getLogger(__name__)
 HORIZON_DAYS = 365
 MAX_OCCURRENCES_PER_SERIES = 200
 MAX_SERIES_PER_RUN = 200
+# O cron de 1 minuto só pega série nunca materializada; o normal é zero ou uma.
+MAX_NOVAS_POR_MINUTO = 20
 DEFAULT_TIMEZONE = "America/Sao_Paulo"
 
 
@@ -80,6 +82,10 @@ async def run() -> dict:
     # para a próxima. Ordem importa — adiar antes de fechar deixaria a fatura do ciclo corrente
     # fora do alcance da varredura.
     adiadas = await _passo("roll_overdue", "select public._roll_overdue_invoices() as n", erros)
+    # A fatura paga em parte que venceu, e a adiada: as compras e parcelas dela ficam pagas
+    # (`20260927130000`). O gatilho cobre as mudanças da fatura; o vencimento que passa com o
+    # dia só esta rodada vê.
+    liquidadas = await _passo("liquidar", "select public._liquidar_faturas_vencidas() as n", erros)
     promovidas = await _passo("promote", "select public._promote_due_transactions() as n", erros)
     fotos = await _passo("snapshot", "select public._snapshot_net_worth() as n", erros)
 
@@ -87,6 +93,7 @@ async def run() -> dict:
         "created": criadas,
         "invoices_closed": fechadas,
         "invoices_rolled": adiadas,
+        "lines_settled": liquidadas,
         "promoted": promovidas,
         "snapshots": fotos,
     }
@@ -95,7 +102,7 @@ async def run() -> dict:
     return resultado
 
 
-async def materialize_horizon(agora) -> int:
+async def materialize_horizon(agora, so_novas: bool = False) -> int:
     """Cria as ocorrências que ainda faltam dentro do horizonte.
 
     ⚠️ **A query pega quem PRECISA de trabalho, e os mais atrasados primeiro.**
@@ -120,6 +127,13 @@ async def materialize_horizon(agora) -> int:
     `active` — ele só indexa as séries que o cron pode querer.
     """
     horizonte = agora + timedelta(days=HORIZON_DAYS)
+    # `so_novas`: o cron de 1 minuto passa aqui só pelas séries que NUNCA foram materializadas
+    # (recém-criadas, ou com o calendário refeito por `update_recurring_series`, que zera a
+    # coluna). Esperando a rodada de hora em hora, a série nova ficava até 60 min sem nenhuma
+    # ocorrência: a projeção só mostrava o mês da regra e "Ver ocorrências" abria vazio
+    # (27/09/2026, produção). As já materializadas continuam na rodada de hora em hora.
+    # ponytail: série cuja primeira ocorrência cai além do horizonte segue nula e é relida a cada
+    # minuto (um `limit` pequeno segura o custo); marcar "sem ocorrência" se isso aparecer.
 
     series = await db.fetch(
         """
@@ -132,12 +146,14 @@ async def materialize_horizon(agora) -> int:
         where r.active = true
           and (r.materialized_until is null or r.materialized_until < %s)
           and (r.end_date is null or r.end_date >= %s)
+          and (not %s or r.materialized_until is null)
         order by r.materialized_until asc nulls first
         limit %s
         """,
         horizonte,
         agora.date(),
-        MAX_SERIES_PER_RUN,
+        so_novas,
+        MAX_NOVAS_POR_MINUTO if so_novas else MAX_SERIES_PER_RUN,
     )
     criadas = 0
 

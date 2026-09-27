@@ -21,7 +21,10 @@ declare
   ws uuid; usr uuid; cartao uuid; outra uuid; lote uuid;
   r record;
 begin
-  select id into usr from auth.users limit 1;
+  -- Usuário PRÓPRIO: `auth.users limit 1` não tem ordem e pode cair numa conta com dados de verdade.
+  usr := '00000000-0000-0000-0000-000000000c02';
+  insert into auth.users (id, email) values (usr, 'teste-import-near-match@example.invalid') on conflict (id) do nothing;
+  insert into public.profiles (id) values (usr) on conflict (id) do nothing;
   insert into public.workspaces (name, owner_id) values ('teste import', usr) returning id into ws;
   insert into public.workspace_members (workspace_id, user_id, role) values (ws, usr, 'owner');
   insert into public.accounts (workspace_id, user_id, name, type, closing_day, due_day, initial_balance_cents)

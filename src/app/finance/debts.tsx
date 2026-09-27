@@ -17,6 +17,7 @@ import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { QuantityField } from '@/components/ui/quantity-field';
 import { DatePickerField } from '@/components/finance/date-picker-field';
+import { DiaOuUltimo } from '@/components/finance/dia-ou-ultimo';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
@@ -51,7 +52,7 @@ import {
 import { formatBRL, localISODate } from '@/hooks/use-items';
 import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { pagamentoDaParcelaFixa } from '@/lib/confirmar-baixa';
-import { brToISO, formatNumberBR, isoToBR } from '@/lib/dates';
+import { brToISO, diaAmbiguo, formatNumberBR, isoToBR } from '@/lib/dates';
 import { paidInstallments, porAno, secoesDaLinha, type ItemDaLinha } from '@/lib/debt-history';
 import { lerAoVoltar } from '@/lib/volta-da-parcela';
 import {
@@ -385,6 +386,18 @@ export default function DebtsScreen() {
     const diaVencimento = dia === ultimoDoMes && atual > dia ? atual : dia;
     setForm({ ...form, ancora: ancoraDoContrato(iso, form.installmentsPaid), diaVencimento: String(diaVencimento) });
   };
+  /**
+   * A "Próxima parcela" no último dia de um mês curto (30/09) não diz se o contrato vence no dia
+   * 30 ou no fim do mês — `due_day` 30 ou 31 (o 31 é o último dia pelo `day_in_month`).
+   */
+  const dataDaProxima = proximaISO ? new Date(Number(proximaISO.slice(0, 4)), Number(proximaISO.slice(5, 7)) - 1, Number(proximaISO.slice(8, 10))) : null;
+  const perguntaUltimoDia = form && dataDaProxima && diaAmbiguo(dataDaProxima) ? (
+    <DiaOuUltimo
+      dia={dataDaProxima.getDate()}
+      ultimo={Number(form.diaVencimento) === 31}
+      onChange={(ultimo) => setForm({ ...form, diaVencimento: String(ultimo ? 31 : dataDaProxima.getDate()) })}
+    />
+  ) : null;
   const mudarPagas = (n: number) => {
     if (!form) return;
     // Pagas além do total assentam no total: é o teto que existe.
@@ -1013,6 +1026,7 @@ export default function DebtsScreen() {
                     invalid={faltaData}
                   />
                 </Field>
+                {perguntaUltimoDia}
                 {/* O contrato que VAI ser gravado: com "Total a pagar" a parcela arredonda. */}
                 {simpleValues && <Card style={styles.resumo}>
                   <ThemedText type="small" style={tabular}>{`${simpleValues.installments}× de ${brl(parcelaCents)} = ${brl(simpleValues.principal_cents)}`}</ThemedText>
@@ -1107,6 +1121,7 @@ export default function DebtsScreen() {
                   />
                 </Field>
               ) : null}
+              {form.parcelas !== '' ? perguntaUltimoDia : null}
               {/*
                 ⚠️ **Vem DEPOIS de "Parcelas que faltam", porque é esse campo que o cria.**
                 Ele renderizava ACIMA, gated em `form.parcelas !== ''` — então digitar o número
