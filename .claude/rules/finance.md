@@ -876,7 +876,10 @@ fica tem motivo lógico escrito na frase. O que isso mudou no domínio:
   do mês, saldo negativo.
 - **Orçamento**: `edit_budget` edita AQUELE limite (categoria e alcance), em vez do upsert que
   criava outro (`20260926150000`). **Meta**: o aporte tem data e se edita
-  (`edit_goal_contribution`, mesma trava de não ficar negativa; `20260926160000`).
+  (`edit_goal_contribution`, mesma trava de não ficar negativa; `20260926160000`) — pelo agente,
+  `resource_update goals` com os campos do aporte.
+- **Parcelas já pagas pelo agente**: `update_transaction` com `already_paid_count` sobre a compra,
+  pelo 9º argumento de `update_installment_plan` (para mais ou para menos).
 
 ## Rotativo — a fatura vencida que vai para a próxima
 
@@ -944,8 +947,9 @@ global.
 cartão pago em dia nunca mais apareceria como atrasado. O cron roda um dia DEPOIS do vencimento
 (`due_date < current_date`, nunca `<=`): pagar no próprio dia é o normal.
 
-**O agente NÃO adia fatura** — lacuna declarada em `docs/AGENTE-PARIDADE-COM-O-APP.md`, com o
-motivo (teto de `FinanceAction`) e o custo aceito.
+**O agente adia e desfaz pelo cadastro do cartão**, não por `FinanceAction` (teto de 252):
+`resource_roll` adia; `resource_update cards` com `fatura_paga=false` / `fatura_adiada=false`
+desmarca a quitação e desfaz o adiamento (`docs/AGENTE-PARIDADE-COM-O-APP.md`).
 
 ## Patrimônio
 

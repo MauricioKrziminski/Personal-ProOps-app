@@ -157,6 +157,9 @@ def _candidato_plano(row: dict) -> dict:
         "travadas": row.get("travadas"),
         "travadas_fatura": row.get("travadas_fatura"),
         "ultima_travada": row.get("ultima_travada"),
+        # "Parcelas já pagas" (a contagem e o piso que a fatura paga segura)
+        "pagas": row.get("pagas"),
+        "piso_pagas": row.get("piso_pagas"),
         # a frase do desparcelar: a data da parcela 1 e o cartão, congelados
         "parcela1_em": str(row["parcela1_em"]) if row.get("parcela1_em") else None,
         "account_name": row.get("account_name"),
@@ -206,7 +209,7 @@ _FONTES: dict[str, dict] = {
     "planos": {
         "table": "installment_plans",
         "sql": f"""select p.id, p.description, p.merchant, p.total_cents, p.installments,
-                         p.first_occurred_at, x.editaveis, x.travado_cents, x.travadas, x.travadas_fatura, x.ultima_travada, x.parcela1_em,
+                         p.first_occurred_at, x.editaveis, x.travado_cents, x.travadas, x.travadas_fatura, x.ultima_travada, x.pagas, x.piso_pagas, x.parcela1_em,
                          a.name as account_name, p.account_id
                   from public.installment_plans p
                   {_TRAVAS_DO_PLANO}
@@ -429,7 +432,7 @@ async def _com_plano(workspace_id, candidatos: list[dict]) -> list[dict]:
     rows = await db.fetch(
         """
         select t.id as tx_id, p.id as plan_id, p.description, p.merchant, p.total_cents, p.installments,
-               p.first_occurred_at, x.editaveis, x.travado_cents, x.travadas, x.travadas_fatura, x.ultima_travada, x.parcela1_em,
+               p.first_occurred_at, x.editaveis, x.travado_cents, x.travadas, x.travadas_fatura, x.ultima_travada, x.pagas, x.piso_pagas, x.parcela1_em,
                a.name as account_name, p.account_id
         from public.transactions t
         join public.installment_plans p on p.id = t.installment_plan_id
@@ -737,8 +740,11 @@ async def for_actions(
         # quando alguém quer apagar tudo.
         # Desparcelar também busca direto nos PLANOS: a TV de 10 meses atrás está fora da
         # janela dos 40. Sem plano com o nome, segue para a linha avulsa (e "já é à vista").
+        # "Parcelas já pagas" numa compra que existe é da COMPRA inteira (o campo do app).
         if not ante and acao.type in _ACEITA_PLANO and (
-                wants_whole_plan(bruto, texto_cru) or e_desparcelar(acao)):
+                wants_whole_plan(bruto, texto_cru) or e_desparcelar(acao)
+                or (acao.type == FinanceActionType.UPDATE_TRANSACTION
+                    and acao.already_paid_count is not None)):
             estado, cands = await por_texto("planos", workspace_id, termo or "")
             if cands:
                 resolved = {

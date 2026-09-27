@@ -130,7 +130,7 @@ class FinanceAction(BaseModel):
     )
     already_paid_count: int | None = Field(
         None,
-        description="CREATION only: explicitly reported number of initial installments already paid, including zero. Current position/date alone does not prove payment.",
+        description="Explicitly reported number of installments already paid, including zero: on creation, the initial ones; on update_transaction of an EXISTING purchase, the corrected total. Current position/date alone does not prove payment.",
     )
     recurrence: str | None = Field(
         None,
@@ -437,7 +437,7 @@ class ResourceField(BaseModel):
 
 
 class ResourceAction(BaseModel):
-    target_month: str | None = Field(None, description="Só para localizar orçamento existente: YYYY-MM-01 ou default (padrão). Não é o novo mês.")
+    target_month: str | None = Field(None, description="Só para LOCALIZAR: o orçamento existente (YYYY-MM-01 ou default) ou a fatura de um mês (YYYY-MM-01). Não é o novo mês.")
     type: ResourceActionType
     resource: str = Field(description='Recurso do catálogo: accounts, cards, debts, goals, budgets, assets, recurring, rules, notes, reminders, folders.')
     name: str | None = Field(None, description='Nome do novo item ou nome EXATO do item existente. Não inventar IDs.')

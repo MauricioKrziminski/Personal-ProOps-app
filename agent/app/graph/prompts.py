@@ -37,6 +37,8 @@ Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
 - "financas": REGISTRAR ou CORRIGIR dinheiro — gasto, receita, transferência,
   compra parcelada, pagamento de fatura, meta, aporte, valor de bem, regra de
   categorização, e também apagar/corrigir algo já lançado. Marcar parcelas de compra JÁ CRIADAS como pagas é financas.
+  Corrigir quantas parcelas de uma compra já foram pagas também é financas; CORRIGIR um aporte
+  JÁ feito numa meta (valor, data ou nota dele) é cadastros.
   Não infira financiamento só porque o item é carro/moto: preencha financial_entity para o sistema conferir o tipo do registro.
 - "financas_consulta": PERGUNTAR sobre dinheiro, sem registrar nada — "quanto
   gastei?", "qual meu saldo?", "quanto tá a fatura?", "vou ficar no vermelho?",
@@ -52,6 +54,11 @@ Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
   Financiamento é dívida, não compra no cartão. Resposta a campos de cadastro pertence aqui.
   Pagamento de prestação de dívida/financiamento existente também pertence a cadastros,
   para amortizar a dívida; não é pagamento de fatura nem gasto avulso.
+  CORRIGIR um aporte que já foi feito numa meta ("o aporte de ontem na viagem foi 200, não 100",
+  "muda a data do último aporte da reserva") é cadastros (a meta); guardar mais é financas.
+  ADIAR a fatura do cartão ("joga a fatura pra próxima"), DESMARCAR a fatura que foi marcada
+  como paga ("desmarca a fatura do nubank como paga") e DESFAZER o adiamento ("desfaz o
+  adiamento da fatura") são cadastros (o cartão). Pagar ou marcar como paga continua financas.
   ⚠️ A fronteira com "financas_consulta" é o que a pessoa quer SABER, não o substantivo:
   perguntar VALOR, QUANDO cai ou QUANTO falta é sempre "financas_consulta" — "quais minhas
   recorrências?", "quando cai meu salário?", "quanto falta da dívida?", "quanto devo?".
@@ -162,6 +169,13 @@ Tipos:
   ("em 2x no cartão Inter") -> new_account="Inter". NUNCA delete_transaction + create_*:
   a compra é a mesma, só muda a forma de pagar.
   "a 3ª parcela" de uma compra parcelada -> current_installment=3, nunca installments=3.
+  CORRIGIR QUANTAS PARCELAS JÁ FORAM PAGAS de uma compra que já existe (a contagem estava
+  errada, para mais ou para menos) -> update_transaction com description = o nome da compra e
+  already_paid_count = o total de pagas que ela deve ter:
+  "na verdade só paguei 2 parcelas da tv" -> description="tv", already_paid_count=2.
+  "a geladeira tem 3 pagas, não 5" -> description="geladeira", already_paid_count=3.
+  "nenhuma parcela do sofá foi paga ainda" -> description="sofá", already_paid_count=0.
+  Dar baixa numa parcela que acabou de ser paga continua mark_paid ("paguei a 3ª parcela").
   DESPARCELAR (a compra parcelada volta a ser à vista) é update_transaction com
   installments=1 e description = o nome da compra, NUNCA delete_transaction (apagar some com
   a compra; desparcelar a mantém inteira num lançamento só):

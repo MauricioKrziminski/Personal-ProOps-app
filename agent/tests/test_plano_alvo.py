@@ -233,8 +233,9 @@ class TestEdicaoPlano:
         leitura = chamadas[0]
         assert "parcela_travada" in leitura[0] and "workspace_id = %s" in leitura[0]
         rpc = [a for q, a in chamadas if "update_installment_plan" in q]
+        # o 9º é "parcelas já pagas": nulo quando a pessoa não falou delas
         assert rpc == [("plano-1", 90000 + 30000 * 7, 10, "2026-05-15", "TV",
-                        "eletrônicos", "Magalu", "acc-1")]
+                        "eletrônicos", "Magalu", "acc-1", None)]
         assert not any("update_transaction_scoped" in q for q, _ in chamadas)
         assert not r.read_only
 
@@ -328,7 +329,7 @@ class TestEdicaoPlano:
         assert chamadas == []
 
     @pytest.mark.asyncio
-    async def test_valor_total_chama_update_installment_plan_com_os_8_argumentos(self, monkeypatch):
+    async def test_valor_total_chama_update_installment_plan_com_os_9_argumentos(self, monkeypatch):
         """A RPC SOBRESCREVE com nulo: os campos que a pessoa não citou vão com o valor atual."""
         chamadas = []
 
@@ -349,7 +350,7 @@ class TestEdicaoPlano:
         rpc = [c for c in chamadas if "update_installment_plan" in c[0]]
         assert len(rpc) == 1
         assert rpc[0][1] == ("plano-1", 240000, 10, "2026-05-15", "TV da sala",
-                             "eletrônicos", "Magalu", "acc-1")
+                             "eletrônicos", "Magalu", "acc-1", None)
         assert not r.read_only and "R$ 2.400,00" in r.message
 
     @pytest.mark.asyncio
@@ -385,7 +386,7 @@ class TestEdicaoPlano:
     ])
     async def test_data_conta_e_parcelas_da_compra_vao_pela_rpc(self, monkeypatch, campos, esperado):
         """21/09/2026: eram "muda em Editar a compra no app". Agora vão pela MESMA RPC,
-        com os 8 argumentos e só o pedido trocado."""
+        com os 9 argumentos e só o pedido trocado."""
         rpc = []
 
         async def fetch_one(sql, *args):
@@ -407,7 +408,8 @@ class TestEdicaoPlano:
             ctx, FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, **campos))
         assert not r.read_only, r.message
         total, parcelas, primeira, conta = esperado
-        (plano, t, n, p1, desc, cat, merch, acc), = rpc
+        (plano, t, n, p1, desc, cat, merch, acc, pagas), = rpc
+        assert pagas is None
         assert (t, n, str(p1), acc) == (total, parcelas, primeira, conta)
         assert (desc, cat, merch) == ("TV", "eletrônicos", "Magalu")
 

@@ -64,6 +64,17 @@ def abaixo_da_paga(nome: str, ultima: int) -> str:
             "dela." + NADA)
 
 
+def pagas_na_fatura(nome: str, piso: int) -> str:
+    """Reabrir parcela paga junto com uma fatura de verdade: a RPC recusa, e a frase diz como
+    desfazer (apagar o pagamento da fatura reabre as parcelas dela, `20260926180000`)."""
+    return (f"Em {nome}, as parcelas até a {piso}ª foram pagas junto com a fatura do cartão e "
+            "continuam pagas. Para reabrir, desfaça o pagamento da fatura." + NADA)
+
+
+def pagas_fora_da_faixa(n: int) -> str:
+    return f"As parcelas já pagas precisam ficar entre 0 e {n}." + NADA
+
+
 def abertas_com(cand: dict, n: int) -> int:
     """Quantas ficam em aberto com N parcelas: as travadas continuam como estão."""
     return max(0, n - int(cand.get("travadas") or 0))

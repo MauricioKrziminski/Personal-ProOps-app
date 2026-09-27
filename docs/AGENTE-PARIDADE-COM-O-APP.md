@@ -553,18 +553,20 @@ desfazer é no agente — `FinanceAction` segue no teto de 252, então nada dist
 | app | agente |
 |---|---|
 | Parcela: "Só esta parcela \| A compra toda" e os campos da criação (`CamposDaCompra`) | "Só esta": `update_transaction` sobre a parcela. "A compra toda": `update_transaction` sobre a compra → `update_installment_plan`, com as MESMAS travas novas do banco (`TRAVAS_DO_PLANO`: nº de parcelas muda com parcela paga, nunca abaixo da última paga; data e conta só sem parcela em fatura paga/adiada/paga em parte) |
-| "Parcelas já pagas" na edição da compra e ao parcelar um lançamento que existe (`p_paid_installments`) | aumentar = `mark_paid` sobre as parcelas (`_baixa_em_parcelas`, já fazia). **Diminuir (reabrir parcela paga) — lacuna declarada:** não há ação de "desfazer baixa" no schema; o custo é pedir no app |
+| "Parcelas já pagas" na edição da compra e ao parcelar um lançamento que existe (`p_paid_installments`) | `update_transaction` sobre a compra com `already_paid_count` (o campo só mudou de descrição — o teto de 252 não mexe): "na verdade só paguei 2 da tv" → a MESMA `update_installment_plan` com o 9º argumento, para mais ou para menos. A frase do SIM diz quais voltam a previstas ou recebem baixa; abaixo das pagas junto com uma fatura de verdade é recusado antes do SIM (`piso_pagas`). "paguei a 3ª parcela" continua `mark_paid` |
 | Modo da dívida (parcela fixa ↔ com juros) na edição | `resource_update debts calculation_mode` → `_converter_modo_da_divida` (a trava do agente caiu junto com a do banco) |
 | Pagamento de dívida: editar valor/data e apagar QUALQUER um | `update_transaction` / `delete_transaction` sobre o pagamento — o trigger da dívida refaz o saldo (`20260926140000`) nos dois caminhos |
 | Orçamento: editar categoria e alcance ("Vale para") | `resource_update budgets` com `category`/`month`; trocar o alcance MOVE o limite como o `edit_budget` do app (`_editar_alcance_do_limite` — a RPC acha o espaço pelo `auth.uid()`, que o agente não tem) |
-| Meta: aporte com data | `goal_deposit` já recebia a data (`occurred_at`). **Editar um aporte já feito — lacuna declarada:** não há alvo em `goal_contributions` no catálogo; pelo agente, o caminho é um aporte negativo, como o "Desfazer" do app |
+| Meta: aporte com data, e editar um aporte já feito | `goal_deposit` já recebia a data. Editar: `resource_update goals` com os campos virtuais `aporte_do_dia` (ou `ultimo`), `novo_valor_do_aporte`, `nova_data_do_aporte`, `nova_nota_do_aporte` → `edit_goal_contribution`. Mora no cadastro da meta porque `update_transaction` com `target_ref` voltava SEM os valores no Gemini real, em toda redação medida (`scripts/probe_tudo_se_edita.py`) |
 | Conta: tipo troca entre corrente/poupança/dinheiro/investimento; cartão: fechamento e vencimento refazem as faturas abertas | `resource_update accounts type` (a recusa caiu); `resource_update cards closing_day/due_day` — o trigger do banco refaz as faturas nos dois caminhos |
 | Pagamento da fatura: editar e apagar (a fatura acompanha) | `update_transaction` / `delete_transaction` sobre o pagamento — o trigger `sync_invoice_payment` refaz `paid_cents` e o status. A recusa da fatura adiada chega escrita (`registry.execute` traduz o P0001 de trigger) |
-| "Desmarcar como paga" e "Desfazer adiamento" na fatura | **lacuna declarada**, pelo mesmo motivo de o agente não adiar fatura: seriam dois tipos novos em `FinanceAction` (teto). O caminho é o menu "…" da fatura |
+| "Desmarcar como paga" e "Desfazer adiamento" na fatura | `resource_update cards` com `fatura_paga=false` / `fatura_adiada=false` (campos virtuais, simétricos ao `resource_roll`; `target_month` escolhe o mês) → `unsettle_invoice` / `unroll_invoice`. Fatura paga COM pagamento manda apagar o pagamento; cartão que adia sozinho e fatura seguinte já paga são recusados antes do SIM |
 | Recorrente: regra do WhatsApp aparece por extenso e se troca num "Substituir" | não se aplica: é a tela não mentir sobre uma regra que o agente escreveu |
 | Importação: título da linha editável na prévia | fora do escopo (revisão de extrato é do app, ver abaixo) |
 
-**Ordem de deploy:** migrations `20260926120000`…`20260926180000` antes do agente e do app. Sem a
+**Medido no Gemini real** (`scripts/probe_tudo_se_edita.py`, 26/26 no Flash-Lite; e as seções de
+extração de `evaluate_answer_forms.py`). **Ordem de deploy:** migrations `20260926120000`…`20260926180000` antes do agente e do app
+(o agente chama `unsettle_invoice`, `unroll_invoice` e o 9º argumento de `update_installment_plan`). Sem a
 `20260926180000`, o app lê `transactions.pays_invoice_id` (coluna ausente → a fatura não abre) e
 chama `unsettle_invoice`/`unroll_invoice` (ausentes).
 

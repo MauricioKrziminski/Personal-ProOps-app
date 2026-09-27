@@ -28,6 +28,7 @@ from app.domain.correcao_plano import (
     muda_numero_de_parcelas,
     abaixo_da_paga,
     fatura_travada,
+    pagas_na_fatura,
 )
 from app.domain.dates import add_months, format_date_br, local_iso_date, now_utc
 from app.domain.money import cents_to_brl, parse_valor_em_centavos
@@ -55,6 +56,16 @@ TRAVAS_DO_PLANO = """cross join lateral (
                                       and t.invoice_id is not null) as travadas_fatura,
                    coalesce(max(t.installment_no) filter (
                      where private.parcela_travada(t.status, t.invoice_id)), 0) as ultima_travada,
+                   -- "Parcelas já pagas" do app: as baixadas, e o piso — a última paga junto com
+                   -- uma fatura de verdade (paga com pagamento, adiada ou paga em parte), que a
+                   -- RPC da compra não reabre
+                   count(*) filter (where t.status = 'cleared') as pagas,
+                   coalesce(max(t.installment_no) filter (
+                     where t.status = 'cleared' and exists (
+                       select 1 from public.card_invoices ci
+                        where ci.id = t.invoice_id
+                          and (ci.status = 'rolled' or ci.paid_cents > 0
+                               or (ci.status = 'paid' and not ci.settled_manually)))), 0) as piso_pagas,
                    -- a parcela 1 REAL (editada à mão ou não): o desparcelar a mantém, com o id
                    min(t.occurred_at) filter (where t.installment_no = 1) as parcela1_em,
                    (array_agg(t.id) filter (where t.installment_no = 1))[1] as parcela1_id
@@ -1128,7 +1139,10 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
     if erro_conta:
         raise Level1Error(erro_conta)
     muda_n = muda_numero_de_parcelas(action, cands[0])
-    estrutura = bool(muda_n or action.new_occurred_at or conta)
+    # "Parcelas já pagas" (o campo do app): a RPC dá baixa nas primeiras N ou reabre as outras
+    muda_pagas = (action.already_paid_count is not None
+                  and action.already_paid_count != cands[0].get("pagas"))
+    estrutura = bool(muda_n or action.new_occurred_at or conta or muda_pagas)
     unidade = (ctx.target or {}).get("amount_unit")
     if action.new_amount_cents is not None and unidade not in ("total", "parcela"):
         return ToolResult(
@@ -1150,7 +1164,7 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
     plano = await db.fetch_one(
         f"""
         select p.id, p.total_cents, p.installments, p.first_occurred_at, p.description,
-               p.category, p.merchant, p.account_id, x.editaveis, x.travado_cents, x.travadas, x.travadas_fatura, x.ultima_travada,
+               p.category, p.merchant, p.account_id, x.editaveis, x.travado_cents, x.travadas, x.travadas_fatura, x.ultima_travada, x.pagas, x.piso_pagas,
                -- a data REAL da parcela 1 (editada à mão ou não): sem parcela travada a
                -- RPC recalcula TODAS as datas a partir desta. Com parcela travada a RPC
                -- exige a do plano (e não mexe em data nenhuma), daí o `case`.
@@ -1174,6 +1188,8 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
             return ToolResult(fatura_travada(nome_atual), read_only=True)
         if muda_n and action.installments < int(plano["ultima_travada"] or 0):
             return ToolResult(abaixo_da_paga(nome_atual, int(plano["ultima_travada"])), read_only=True)
+    if muda_pagas and action.already_paid_count < int(plano["piso_pagas"] or 0):
+        return ToolResult(pagas_na_fatura(nome_atual, int(plano["piso_pagas"])), read_only=True)
     congelado = cands[0].get("total_cents")
     if (estrutura and action.new_amount_cents is None and congelado is not None
             and int(congelado) != int(plano["total_cents"])):
@@ -1207,9 +1223,10 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
     conta_id = conta["id"] if conta else plano["account_id"]
     try:
         await db.fetch_one(
-            "select public.update_installment_plan(%s, %s, %s, %s, %s, %s, %s, %s) as mexidas",
+            "select public.update_installment_plan(%s, %s, %s, %s, %s, %s, %s, %s, %s) as mexidas",
             plano["id"], total, parcelas, primeira,
             descricao, categoria, plano["merchant"], conta_id,
+            action.already_paid_count if muda_pagas else None,
         )
     except psycopg.errors.RaiseException as err:
         # Só P0001 (o `raise exception` da RPC, escrito para a pessoa). Aqui e não no
@@ -1227,6 +1244,8 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
         partes.append(f"1ª parcela em {format_date_br(primeira)}")
     if conta:
         partes.append(f"conta → *{conta['name']}*")
+    if muda_pagas:
+        partes.append(f"parcelas pagas {int(plano['pagas'] or 0)} → {action.already_paid_count}")
     texto = f"✏️ Corrigi *{nome}*: {', '.join(partes) or 'sem mudança de valor'}"
     if action.new_amount_cents is not None and not muda_n:
         texto += f" em {parcelas}x — as já pagas ficaram como estavam"
@@ -1258,7 +1277,7 @@ async def _desparcelar(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     plano = await db.fetch_one(
         f"""
         select p.id, p.total_cents, p.installments, p.first_occurred_at, p.description,
-               p.category, p.merchant, p.account_id, x.editaveis, x.travado_cents, x.travadas, x.travadas_fatura, x.ultima_travada,
+               p.category, p.merchant, p.account_id, x.editaveis, x.travado_cents, x.travadas, x.travadas_fatura, x.ultima_travada, x.pagas, x.piso_pagas,
                x.parcela1_em, x.parcela1_id
         from public.installment_plans p
         {TRAVAS_DO_PLANO}

@@ -25,6 +25,8 @@ from app.domain.correcao_plano import (
     abaixo_da_paga,
     abertas_com,
     fatura_travada,
+    pagas_fora_da_faixa,
+    pagas_na_fatura,
     plano_travado,
 )
 from app.domain.dates import format_date_br
@@ -186,6 +188,8 @@ def _frase_correcao_plano(action: FinanceAction, target: dict, escolhido: dict) 
               if not o.startswith(("conta →", "data →"))]
     # "as pagas ficam como estão" vale para o VALOR; nome e categoria da compra mudam
     # em todas as parcelas, inclusive as pagas (Reparcelar, finance.md)
+    if muda_pagas(action, escolhido):
+        estrutura.append(_frase_pagas(action, escolhido))
     suffix = "".join(f"; {e}" for e in estrutura)
     suffix += f"; {', '.join(outras)} em todas as parcelas" if outras else ""
     n = action.installments if muda_n else escolhido.get("plan_installments")
@@ -282,6 +286,25 @@ def _frase_desparcelar(action: FinanceAction, target: dict, escolhido: dict) -> 
     )
 
 
+def muda_pagas(action, escolhido: dict | None) -> bool:
+    """"Parcelas já pagas" numa compra que existe, diferente do que ela tem hoje."""
+    return (getattr(action, "type", None) == FinanceActionType.UPDATE_TRANSACTION
+            and getattr(action, "already_paid_count", None) is not None
+            and action.already_paid_count != (escolhido or {}).get("pagas"))
+
+
+def _frase_pagas(action: FinanceAction, escolhido: dict) -> str:
+    """O efeito da contagem nova: quais voltam a previstas ou quais recebem baixa."""
+    antes, depois = int(escolhido.get("pagas") or 0), int(action.already_paid_count)
+    if depois < antes:
+        quais = (f"a {antes}ª volta" if antes - depois == 1
+                 else f"as parcelas {depois + 1} a {antes} voltam")
+        return f"parcelas pagas {antes} → {depois} ({quais} a previstas)"
+    quais = (f"a {depois}ª recebe" if depois - antes == 1
+             else f"as parcelas {antes + 1} a {depois} recebem")
+    return f"parcelas pagas {antes} → {depois} ({quais} baixa)"
+
+
 def _frase_plano(action: FinanceAction, target: dict, escolhido: dict) -> str:
     """Compra inteira SEM valor novo: nº de parcelas, 1ª parcela, conta, nome, categoria.
 
@@ -319,6 +342,8 @@ def _frase_plano(action: FinanceAction, target: dict, escolhido: dict) -> str:
         partes.append(f"nome → {action.new_description}")
     if action.new_category:
         partes.append(f"categoria → {action.new_category}")
+    if muda_pagas(action, escolhido):
+        partes.append(_frase_pagas(action, escolhido))
     return f"corrigir a compra {_nome_do_plano(escolhido)}: {', '.join(partes)}"
 
 
@@ -396,9 +421,13 @@ def erro_de_correcao(action, target: dict | None) -> str | None:
     desparcela = e_desparcelar(action) and plano_inteiro(target)
     muda_parcelas = (bool(action.installments) and action.installments != n_plano
                      and not desparcela and (n_plano is not None or action.installments >= 2))
+    # "Parcelas já pagas" só vale sobre a COMPRA (no empate, com uma compra entre as opções)
+    pede_pagas = (getattr(action, "already_paid_count", None) is not None and (
+        (target or {}).get("table") == "installment_plans"
+        or any(c.get("table") == "installment_plans" for c in cands)))
     if not any([action.new_amount_cents is not None, action.new_category, action.new_occurred_at,
                 action.new_description, action.new_account, muda_parcelas, desparcela,
-                pede_desparcelar(action, target)]):
+                pede_desparcelar(action, target), pede_pagas]):
         # linha AVULSA escolhida (inclusive num empate misto com uma compra): nada a desparcelar
         if (e_desparcelar(action) and (target or {}).get("status") == "found" and cands
                 and cands[0].get("table", target.get("table")) == "transactions"
@@ -421,8 +450,17 @@ def erro_de_correcao(action, target: dict | None) -> str | None:
         if desparcela and action.new_amount_cents is not None:
             return VALOR_COM_DESPARCELAR
         estrutura = bool(action.new_occurred_at or conta or muda_parcelas or desparcela)
+        pagas_novas = muda_pagas(action, cand)
+        if action.already_paid_count is not None and not desparcela:
+            n = action.installments if muda_parcelas else cand.get("plan_installments")
+            if cand.get("pagas") is None:
+                return "Ainda não mudei nada. Me pede de novo."
+            if not 0 <= action.already_paid_count <= int(n or 0):
+                return pagas_fora_da_faixa(int(n or 0))
+            if action.already_paid_count < int(cand.get("piso_pagas") or 0):
+                return pagas_na_fatura(_nome_do_plano(cand), int(cand["piso_pagas"]))
         if not (estrutura or action.new_amount_cents is not None or action.new_description
-                or action.new_category):
+                or action.new_category or pagas_novas):
             # a conta dita é a que a compra já tem, e não sobrou mais nada a mudar
             return SEM_CORRECAO
         if estrutura:
@@ -536,7 +574,8 @@ def describe_for_confirmation(
             if (isinstance(action, FinanceAction) and plano_inteiro(target)
                     and action.type == FinanceActionType.UPDATE_TRANSACTION
                     and (muda_numero_de_parcelas(action, escolhido) or action.new_occurred_at
-                         or conta_nova_do_plano(action, target, escolhido)[0])):
+                         or conta_nova_do_plano(action, target, escolhido)[0]
+                         or muda_pagas(action, escolhido))):
                 return _frase_plano(action, target, escolhido)
             if (
                 target.get("table") == "transactions"
