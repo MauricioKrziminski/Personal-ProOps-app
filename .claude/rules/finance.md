@@ -140,6 +140,11 @@
   cravava "90 dias" logo abaixo de um comentário dizendo que a janela vinha de `HORIZON_DAYS`;
   `tests/test_query_reads.py` quebra se voltar a cravar.
 
+  **A ocorrência PASSADA que já existe solta é ADOTADA, não criada de novo** (`scheduler._adotar_gemea`,
+  27/09/2026): mesmo espaço, tipo, valor, conta, dia e título, sem série dona. Em produção a
+  pessoa apagou o Fundacred (o setembro pago ficou, é histórico) e o recriou a partir de 04/09
+  com "entra como pago": nasceu outro 04/09 pago e a conta corrente caiu R$ 1.198,85 a mais.
+
   **Apagar a série leva junto as ocorrências futuras ainda `pending`** (trigger
   `recurring_drop_future`, `20260909090000`) — a FK é `on delete set null`, e sem o trigger elas
   ficavam órfãs pesando na projeção. Histórico e ocorrência ATRASADA ficam: a primeira aconteceu,

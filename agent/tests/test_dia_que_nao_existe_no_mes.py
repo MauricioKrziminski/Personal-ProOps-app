@@ -73,3 +73,39 @@ async def test_cron_de_minuto_so_materializa_serie_nunca_materializada(monkeypat
     assert visto["args"][-2:] == (True, scheduler.MAX_NOVAS_POR_MINUTO)
     await scheduler.materialize_horizon(datetime(2026, 9, 27, 12, tzinfo=UTC))
     assert visto["args"][-2:] == (False, scheduler.MAX_SERIES_PER_RUN)
+
+
+@pytest.mark.asyncio
+async def test_serie_recriada_adota_o_mes_pago_em_vez_de_duplicar(monkeypatch):
+    """Apagou a série (o setembro pago ficou) e recriou a partir de 04/09: não nasce outro 04/09."""
+    from uuid import uuid4
+
+    from app.jobs import scheduler
+
+    serie = {
+        "id": uuid4(), "user_id": uuid4(), "workspace_id": uuid4(), "kind": "expense",
+        "amount_cents": 119885, "currency": "BRL", "category": "estudo", "description": "Fundacred",
+        "merchant": None, "account_id": uuid4(), "rrule": "FREQ=MONTHLY;BYMONTHDAY=4",
+        "next_run_at": datetime(2026, 9, 4, 12, tzinfo=UTC), "dtstart": datetime(2026, 9, 4, 12, tzinfo=UTC),
+        "end_date": None, "auto_confirm": True, "materialized_until": None, "timezone": "America/Sao_Paulo",
+    }
+    escritas, procuras = [], []
+
+    async def fetch(sql, *args):
+        return [serie]
+
+    async def fetch_one(sql, *args):
+        procuras.append(args[4])  # o dia procurado
+        return {"id": "setembro-antigo"} if args[4] == "2026-09-04" else None
+
+    async def execute(sql, *args):
+        escritas.append(sql.split()[0] + (" adota" if "recurring_id = %s where id" in sql else ""))
+
+    monkeypatch.setattr(scheduler.db, "fetch", fetch)
+    monkeypatch.setattr(scheduler.db, "fetch_one", fetch_one)
+    monkeypatch.setattr(scheduler.db, "execute", execute)
+    await scheduler.materialize_horizon(datetime(2026, 9, 27, 15, tzinfo=UTC), so_novas=True)
+
+    assert escritas[0] == "update adota", "setembro já existia solto: é adotado"
+    assert procuras == ["2026-09-04"], "só a ocorrência PASSADA procura gêmea"
+    assert escritas.count("insert") == 12, "outubro/2026 a setembro/2027 nascem normalmente"

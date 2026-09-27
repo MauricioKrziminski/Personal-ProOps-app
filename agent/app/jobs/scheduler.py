@@ -102,6 +102,35 @@ async def run() -> dict:
     return resultado
 
 
+async def _adotar_gemea(rec, dia: str) -> bool:
+    """A ocorrência PASSADA que já existe como lançamento solto é adotada, não criada de novo.
+
+    27/09/2026, produção: a pessoa apagou a série do Fundacred (o setembro PAGO ficou — é histórico,
+    `recurring_drop_future` só leva as futuras em aberto) e a recriou começando em 04/09 com "entra
+    como pago". O agendador lançou outro 04/09 pago ao lado, e a conta corrente caiu R$ 1.198,85 a
+    mais. O mesmo vale para quem lança a conta à mão e depois cria a série. Gêmea = mesmo espaço,
+    tipo, valor, conta, dia e título (sem acento e caixa), e nenhuma série dona.
+    """
+    gemea = await db.fetch_one(
+        """
+        select id from public.transactions
+        where workspace_id = %s and recurring_id is null and kind = %s and amount_cents = %s
+          and account_id is not distinct from %s and occurred_at = %s
+          and extensions.unaccent(lower(coalesce(description, ''))) = extensions.unaccent(lower(coalesce(%s, '')))
+        order by created_at
+        limit 1
+        """,
+        rec["workspace_id"], rec["kind"], rec["amount_cents"], rec["account_id"], dia, rec["description"],
+    )
+    if not gemea:
+        return False
+    await db.execute(
+        "update public.transactions set recurring_id = %s where id = %s and recurring_id is null",
+        rec["id"], gemea["id"],
+    )
+    return True
+
+
 async def materialize_horizon(agora, so_novas: bool = False) -> int:
     """Cria as ocorrências que ainda faltam dentro do horizonte.
 
@@ -178,6 +207,11 @@ async def materialize_horizon(agora, so_novas: bool = False) -> int:
                     break
 
                 ja_aconteceu = occ <= agora
+                if ja_aconteceu and await _adotar_gemea(rec, dia):
+                    cursor = occ
+                    ultima = occ
+                    geradas += 1
+                    continue
                 try:
                     await db.execute(
                         """
