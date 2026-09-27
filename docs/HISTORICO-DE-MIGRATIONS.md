@@ -60,6 +60,23 @@ Postgres reabre toda função NOVA: migration que cria função em public contin
 `revoke execute ... from public, anon`, e `supabase/tests/anon_sem_execute.sql` acusa a que
 esquecer.
 
+**Produção e staging ALINHADOS em `20260926180000`** — aplicadas em produção pelo Gabriel em
+27/09/2026 (`db push --project-ref`, depois de `migration list --project-ref` mostrar as onze só
+no `local`) e conferidas na fonte: `schema_migrations` devolve `20260926180000`,
+`20260926170000`; `unsettle_invoice`, `unroll_invoice`, `edit_budget`,
+`edit_goal_contribution`, `update_installment_plan` (9 argumentos) e `update_recurring_series`
+com `execute` para `authenticated` e sem para `anon`; os helpers `private` que funções
+`security invoker` chamam com `execute` para `authenticated`; o trigger `sync_invoice_payment`
+ligado; e os 4 pagamentos de fatura com `pays_invoice_id` apontando para a fatura (nenhum
+`payment_transaction_id` sem o par). Seguida a ordem migrations → agente → app no mesmo dia:
+agente `agente-00084-xbs` (`/health` 200) e depois a tag `v1.3.51` e o build no iPhone.
+`20260925120000`–`20260925150000`: parcela fixa paga com outro valor (encargo/desconto), ciclo
+fechado só com o que aconteceu, "este e as próximas" no pagamento, apagar o pagamento mais
+recente de parcela fixa. `20260926120000`–`20260926170000`: tudo que se cria se edita (série
+recorrente inteira, parcelas pagas na compra, pagamento de dívida, limite do orçamento, aporte da
+meta, cartão refazendo as faturas abertas). `20260926180000`: o pagamento da fatura se edita e se
+apaga, e "Marcar como paga" e o adiamento se desfazem.
+
 ⚠️ **OTA/build do chat exige a revisão nova do agente em produção** (21/09/2026): o app novo
 manda `id` no `POST /internal/chat/conversations` para abrir a conversa na hora, e o agente
 antigo (`extra='forbid'`) recusa com 422 — TODA primeira mensagem falha. Sem migration: é só
