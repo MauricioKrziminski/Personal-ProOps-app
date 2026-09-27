@@ -113,7 +113,8 @@ export function CamposDaCompra({
         />
       </Field>
 
-      <Field label="Data da primeira parcela" hint={dataLivre ? undefined : motivo}>
+      {/* O motivo inteiro já está na Conta, logo acima: aqui só o efeito (menos texto). */}
+      <Field label="Data da primeira parcela" hint={dataLivre ? undefined : 'Não muda, pelo mesmo motivo da conta'}>
         {dataLivre ? (
           <DatePickerField
             value={form.inicio}
