@@ -109,3 +109,22 @@ async def test_serie_recriada_adota_o_mes_pago_em_vez_de_duplicar(monkeypatch):
     assert escritas[0] == "update adota", "setembro já existia solto: é adotado"
     assert procuras == ["2026-09-04"], "só a ocorrência PASSADA procura gêmea"
     assert escritas.count("insert") == 12, "outubro/2026 a setembro/2027 nascem normalmente"
+
+
+@pytest.mark.asyncio
+async def test_reparo_tira_a_gerada_e_devolve_a_antiga_para_a_serie(monkeypatch):
+    from app.jobs import scheduler
+
+    ordem = []
+
+    async def fetch(sql, *args):
+        return [{"gerada": "nova-04-09", "solta": "antiga-04-09", "recurring_id": "serie"}]
+
+    async def execute(sql, *args):
+        ordem.append((sql.split()[0], args))
+
+    monkeypatch.setattr(scheduler.db, "fetch", fetch)
+    monkeypatch.setattr(scheduler.db, "execute", execute)
+    assert await scheduler.reparar_gemeas() == 1
+    # a gerada sai ANTES da adoção: o unique (recurring_id, occurred_at) recusaria o contrário
+    assert ordem == [("delete", ("nova-04-09",)), ("update", ("serie", "antiga-04-09"))]

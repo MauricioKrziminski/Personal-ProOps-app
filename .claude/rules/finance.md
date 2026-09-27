@@ -144,6 +144,9 @@
   27/09/2026): mesmo espaço, tipo, valor, conta, dia e título, sem série dona. Em produção a
   pessoa apagou o Fundacred (o setembro pago ficou, é histórico) e o recriou a partir de 04/09
   com "entra como pago": nasceu outro 04/09 pago e a conta corrente caiu R$ 1.198,85 a mais.
+  A duplicata que nasceu antes disso o agendador desfaz (`scheduler.reparar_gemeas`, aprovado
+  pelo dono do produto): a gerada sai e a solta de `source='recurring'` (só série apagada deixa
+  uma) volta para a série — par idêntico, estado igual, a solta criada antes.
 
   **Apagar a série leva junto as ocorrências futuras ainda `pending`** (trigger
   `recurring_drop_future`, `20260909090000`) — a FK é `on delete set null`, e sem o trigger elas

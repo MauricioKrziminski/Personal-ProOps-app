@@ -86,6 +86,12 @@ async def run() -> dict:
     # (`20260927130000`). O gatilho cobre as mudanças da fatura; o vencimento que passa com o
     # dia só esta rodada vê.
     liquidadas = await _passo("liquidar", "select public._liquidar_faturas_vencidas() as n", erros)
+    try:
+        gemeas = await reparar_gemeas()
+    except Exception as erro:  # noqa: BLE001 — um passo não derruba os outros
+        log.exception("cron: passo gemeas falhou")
+        erros["gemeas"] = str(erro)
+        gemeas = 0
     promovidas = await _passo("promote", "select public._promote_due_transactions() as n", erros)
     fotos = await _passo("snapshot", "select public._snapshot_net_worth() as n", erros)
 
@@ -94,12 +100,55 @@ async def run() -> dict:
         "invoices_closed": fechadas,
         "invoices_rolled": adiadas,
         "lines_settled": liquidadas,
+        "twins_repaired": gemeas,
         "promoted": promovidas,
         "snapshots": fotos,
     }
     if erros:
         resultado["errors"] = erros
     return resultado
+
+
+async def reparar_gemeas() -> int:
+    """Desfaz a duplicata que nasceu ANTES de `_adotar_gemea` existir (27/09/2026).
+
+    Série apagada deixa as ocorrências passadas soltas (`recurring_id` nulo, `source='recurring'`
+    — só uma série apagada produz isso); recriada, o agendador gerava a mesma ocorrência ao lado.
+    Aqui a GERADA sai e a antiga volta para a série. Só o par idêntico: mesmo espaço, tipo, valor,
+    conta, dia, título (sem acento e caixa) e estado, com a solta criada ANTES. Aprovado pelo dono
+    do produto para o Fundacred de 04/09 de produção, que tirava R$ 1.198,85 a mais da conta.
+    """
+    pares = await db.fetch(
+        """
+        select g.id as gerada, o.id as solta, g.recurring_id
+        from public.transactions g
+        join public.transactions o
+          on o.workspace_id = g.workspace_id and o.recurring_id is null and o.source = 'recurring'
+         and o.kind = g.kind and o.amount_cents = g.amount_cents and o.status = g.status
+         and o.account_id is not distinct from g.account_id and o.occurred_at = g.occurred_at
+         and extensions.unaccent(lower(coalesce(o.description, '')))
+             = extensions.unaccent(lower(coalesce(g.description, '')))
+         and o.created_at < g.created_at
+        where g.recurring_id is not null and g.source = 'recurring'
+        limit 50
+        """
+    )
+    reparados = 0
+    vistas: set = set()
+    for par in pares:
+        if par["solta"] in vistas or par["gerada"] in vistas:
+            continue
+        vistas.update({par["solta"], par["gerada"]})
+        # Primeiro sai a gerada: o unique `(recurring_id, occurred_at)` recusaria a adoção antes.
+        await db.execute(
+            "delete from public.transactions where id = %s and recurring_id is not null", par["gerada"]
+        )
+        await db.execute(
+            "update public.transactions set recurring_id = %s where id = %s and recurring_id is null",
+            par["recurring_id"], par["solta"],
+        )
+        reparados += 1
+    return reparados
 
 
 async def _adotar_gemea(rec, dia: str) -> bool:
