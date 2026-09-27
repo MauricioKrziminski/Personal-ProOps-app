@@ -117,7 +117,8 @@ export function TaskHeader({
 const styles = StyleSheet.create({
   head: {
     paddingHorizontal: Space.lg,
-    // `paddingTop` é inline: soma o inset do Android.
+    // `paddingTop` é inline: soma o inset do Android. As laterais seguras são do contêiner — o
+    // `Sheet` ou o `Screen` da tela modal.
     paddingBottom: Space.md,
     gap: Space.md,
   },

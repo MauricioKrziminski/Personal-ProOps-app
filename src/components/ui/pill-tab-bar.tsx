@@ -29,6 +29,12 @@ const DIAMETRO = 36;
 const TOPO = 7;
 /** Calha lateral: a barra flutua, não encosta nas bordas. */
 const SIDE = Space.lg;
+/**
+ * A pílula não passa disto. No tablet deitado ela ia de uma borda à outra (~1250dp) com os cinco
+ * ícones a 250dp um do outro — o dedo viaja a tela inteira para trocar de aba. Centrada e
+ * limitada, ela fica do tamanho de uma barra de celular grande, como a dock do sistema.
+ */
+const BAR_MAX = 560;
 /** A subida da barra na entrada: logo depois dos primeiros blocos da tela. */
 const ATRASO_DA_BARRA_MS = 120;
 const DURACAO_DA_BARRA_MS = 520;
@@ -100,7 +106,7 @@ export function PillTabBar({
   const insets = useSafeAreaInsets();
   const { width: tela } = useWindowDimensions();
 
-  const barW = tela - SIDE * 2;
+  const barW = Math.min(tela - insets.left - insets.right - SIDE * 2, BAR_MAX);
   const interna = barW - PAD * 2;
   const slot = interna / tabs.length;
   const alvo = larguraDoAlvo(slot);
@@ -135,7 +141,12 @@ export function PillTabBar({
   return (
     <Animated.View
       pointerEvents="box-none"
-      style={[styles.raiz, { paddingBottom: insets.bottom + Space.sm }, assentado ? styles.noLugar : entrada]}>
+      style={[
+        styles.raiz,
+        // Centrada na área SEGURA: deitado, o recorte da câmera é inset de um dos lados.
+        { paddingBottom: insets.bottom + Space.sm, paddingLeft: insets.left, paddingRight: insets.right },
+        assentado ? styles.noLugar : entrada,
+      ]}>
       <View
         style={[
           styles.pilula,

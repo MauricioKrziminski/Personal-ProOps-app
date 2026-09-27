@@ -40,7 +40,18 @@ export function AndroidActionSheet() {
       statusBarTranslucent
       navigationBarTranslucent
       onRequestClose={close}>
-      <View style={[styles.overlay, { backgroundColor: theme.overlay }]}>
+      {/* As bordas do sistema (barra de navegação ou de tarefas, recorte deitado) ficam livres, e no
+          tablet o menu não se estica pela tela inteira: fica centrado, na largura de um menu. */}
+      <View
+        style={[
+          styles.overlay,
+          {
+            backgroundColor: theme.overlay,
+            paddingTop: insets.top + Space.md,
+            paddingLeft: insets.left + Space.md,
+            paddingRight: insets.right + Space.md,
+          },
+        ]}>
         <Pressable accessibilityLabel="Fechar" style={StyleSheet.absoluteFill} onPress={close} />
         <View
           style={[
@@ -114,7 +125,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    marginHorizontal: Space.md,
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 560,
     borderRadius: Radius.xl,
     borderCurve: 'continuous',
     overflow: 'hidden',

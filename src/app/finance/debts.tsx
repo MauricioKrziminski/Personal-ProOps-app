@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
@@ -8,7 +8,7 @@ import { SelectField } from '@/components/ui/select-field';
 import { ThemedText } from '@/components/themed-text';
 import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -818,7 +818,7 @@ export default function DebtsScreen() {
           />
 
           {pagando ? (
-            <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+            <SheetScroll contentContainerStyle={styles.sheetBody}>
               {/* Superfície de DECISÃO: o valor que a pessoa confere agora não se esconde. */}
               <Field
                 label="Quanto você pagou"
@@ -897,7 +897,7 @@ export default function DebtsScreen() {
                 disabled={pagoCents <= 0 || Boolean(naParcelaFixa?.erro)}
                 onPress={confirmarPagamento}
               />
-            </ScrollView>
+            </SheetScroll>
           ) : null}
       </Sheet>
 
@@ -918,7 +918,7 @@ export default function DebtsScreen() {
           />
 
           {form ? (
-            <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+            <SheetScroll contentContainerStyle={styles.sheetBody}>
               {/* Os pagamentos lançados são o piso das "pagas": sem eles o Salvar espera — e diz por quê. */}
               {form.id && payments.isError ? (
                 <ErrorBand
@@ -1139,7 +1139,7 @@ export default function DebtsScreen() {
                 </ThemedText>
               )}
               </>}
-            </ScrollView>
+            </SheetScroll>
           ) : null}
       </Sheet>
     </>

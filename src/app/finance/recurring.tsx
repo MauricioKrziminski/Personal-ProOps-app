@@ -1,6 +1,6 @@
 import { useInvalidateFinance } from '@/hooks/use-finance';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -9,7 +9,7 @@ import { CamposDaSerie } from '@/components/finance/serie-form';
 import { SERIE_VAZIA, serieDoRegistro, validaSerie, type SerieForm } from '@/lib/serie';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -594,9 +594,9 @@ export default function RecurringScreen() {
           />
 
           {form ? (
-            <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+            <SheetScroll contentContainerStyle={styles.sheetBody}>
               <CamposDaSerie form={form} onChange={setForm} contas={accounts.data ?? []} />
-            </ScrollView>
+            </SheetScroll>
           ) : null}
       </Sheet>
     </Screen>

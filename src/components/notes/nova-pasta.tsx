@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { actionSheet, FOLDER_ICONS, symbol } from '@/components/notes/note-actions';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
 import { Forte } from '@/components/ui/forte';
 import { Icon } from '@/components/ui/icon';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useToast } from '@/components/ui/toast';
 import { HitTarget, Radius, Space } from '@/design/tokens';
@@ -192,7 +192,7 @@ export function NovaPastaSheet({
         onClose={fechar}
         action={<Button label={pasta ? 'Salvar' : 'Criar'} size="sm" loading={salvando} onPress={() => void criar()} />}
       />
-      <ScrollView contentContainerStyle={styles.corpo} keyboardShouldPersistTaps="handled">
+      <SheetScroll contentContainerStyle={styles.corpo}>
         <Field label="Nome" error={erro ?? undefined}>
           <TextField
             value={nome}
@@ -212,7 +212,7 @@ export function NovaPastaSheet({
         <Field label="Ícone">
           <GradeDeIcones valor={icone} onChange={setIcone} />
         </Field>
-      </ScrollView>
+      </SheetScroll>
     </Sheet>
   );
 }

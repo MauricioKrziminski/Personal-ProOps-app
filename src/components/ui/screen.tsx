@@ -192,6 +192,9 @@ export function Screen({
       */
       paddingTop: topBar ? headerHeight + Space.sm : Space.sm,
       paddingBottom: bottomScrollInset(Platform.OS, Boolean(topBar), insets.bottom, Space.xxl, TAB_BAR_SPACE) + fabSpace,
+      // Deitado, o recorte da câmera (dobrável, alguns tablets) é inset de um dos LADOS.
+      paddingLeft: Space.lg + insets.left,
+      paddingRight: Space.lg + insets.right,
     },
     contentStyle,
   ];
@@ -202,7 +205,12 @@ export function Screen({
     buscaNoHeader ? (
       search
     ) : (
-      <View style={[styles.faixa, { backgroundColor: background }]}>
+      <View
+        style={[
+          styles.faixa,
+          // Sem rolagem, o contêiner em volta já soma as laterais seguras.
+          { backgroundColor: background, paddingLeft: scroll ? insets.left : 0, paddingRight: scroll ? insets.right : 0 },
+        ]}>
         <View style={styles.faixaConteudo}>{search}</View>
       </View>
     )
@@ -228,7 +236,8 @@ export function Screen({
         <>
           <Stack.Screen
             options={{
-              contentStyle: { backgroundColor: background },
+              // A lista é a raiz da tela: as laterais seguras vão no contêiner da pilha.
+              contentStyle: { backgroundColor: background, paddingLeft: insets.left, paddingRight: insets.right },
               // Só o header OPACO recebe cor; o do iOS 26 é translúcido e não pode deixar de ser.
               // O mesmo fundo da tela — `headerStyle` da tela SUBSTITUI o da raiz, então sem cor
               // própria ele repete o `background` do tema, como a raiz (`app/_layout.tsx`).
@@ -253,7 +262,13 @@ export function Screen({
     return (
       <RolagemDaTela.Provider value={rolagem}>
         <View style={[styles.root, { backgroundColor: background }]}>
-          <View style={[styles.root, wide ? styles.wideContent : null, { paddingTop: headerHeight }, contentStyle]}>
+          <View
+            style={[
+              styles.root,
+              wide ? styles.wideContent : null,
+              { paddingTop: headerHeight, paddingLeft: insets.left, paddingRight: insets.right },
+              contentStyle,
+            ]}>
             {faixa}
             {children}
           </View>

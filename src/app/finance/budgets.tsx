@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -11,7 +11,7 @@ import { PeriodBar } from '@/components/finance/period-bar';
 import { ThemedText } from '@/components/themed-text';
 import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -635,7 +635,7 @@ export default function BudgetsScreen() {
           />
 
           {form ? (
-            <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+            <SheetScroll contentContainerStyle={styles.sheetBody}>
               <Field label="Categoria">
                 {/* O mesmo seletor do lançamento (25/09/2026), criando e editando (26/09/2026). */}
                 <CategoryPicker value={form.category} onChange={(category) => setForm({ ...form, category })} />
@@ -670,7 +670,7 @@ export default function BudgetsScreen() {
                 value={form.rollover}
                 onValueChange={(rollover) => setForm({ ...form, rollover })}
               />
-            </ScrollView>
+            </SheetScroll>
           ) : null}
       </Sheet>
     </Screen>

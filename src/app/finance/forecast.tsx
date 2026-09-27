@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -24,7 +24,7 @@ import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { MonthRuler, useMonthRuler } from '@/components/finance/month-ruler';
 import { Calendar } from '@/components/finance/calendar';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Skeleton, SkeletonChart, SkeletonList } from '@/components/ui/skeleton';
 import { MeasuredSparkline } from '@/components/ui/measured-sparkline';
@@ -807,7 +807,7 @@ export default function ForecastScreen() {
 
           O estado morre junto com o sheet: abrir de novo mostra o campo fechado.
         */}
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.horizonteCorpo}>
+        <SheetScroll contentContainerStyle={styles.horizonteCorpo}>
           <View style={styles.horizonteAtalhos}>
             {HORIZONTES.map((h) => (
               <Chip
@@ -849,7 +849,7 @@ export default function ForecastScreen() {
               />
             ) : null}
           </Section>
-        </ScrollView>
+        </SheetScroll>
       </Sheet>
 
       {curveDecision || scenario ? (
@@ -1063,7 +1063,7 @@ export default function ForecastScreen() {
           }
         />
 
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetCorpo}>
+        <SheetScroll contentContainerStyle={styles.sheetCorpo}>
           <Field label="Tipo">
             <Segmented
               options={[
@@ -1179,7 +1179,7 @@ export default function ForecastScreen() {
               onPress={() => aplicarSuposicao(false)}
             />
           )}
-        </ScrollView>
+        </SheetScroll>
       </Sheet>
 
       {baixa.folha}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { FlatList, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { MaxContentWidth } from '@/constants/theme';
 import { chartWidthForPane, rootContentMaxWidth } from '@/design/adaptive-window';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,7 +8,7 @@ import { Stack, router, useIsFocused, useLocalSearchParams } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Card } from '@/components/ui/card';
 import { Dica } from '@/components/ui/dica';
@@ -731,7 +731,7 @@ export default function InvoiceScreen() {
             onClose={() => setPagando(false)}
           />
 
-          <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+          <SheetScroll contentContainerStyle={styles.sheetBody}>
             <Field
               label="Valor"
               error={valorCents > falta ? `Falta ${formatBRL(falta)} nesta fatura.` : undefined}
@@ -812,7 +812,7 @@ export default function InvoiceScreen() {
             <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
               Entra como transferência — o gasto já contou na compra.
             </ThemedText>
-          </ScrollView>
+          </SheetScroll>
       </Sheet>
     </Screen>
   );

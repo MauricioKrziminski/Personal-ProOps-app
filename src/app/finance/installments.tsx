@@ -5,7 +5,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { useBRL } from '@/components/ui/conceal';
 import { Button } from '@/components/ui/button';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { monthLabel, monthShort, shiftMonth } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
@@ -656,9 +656,9 @@ export default function InstallmentsScreen() {
           }
         />
         {form ? (
-          <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+          <SheetScroll contentContainerStyle={styles.sheetBody}>
             <CamposDaCompra form={form} onChange={setForm} contas={accounts.data ?? []} />
-          </ScrollView>
+          </SheetScroll>
         ) : null}
       </Sheet>
     </Screen>

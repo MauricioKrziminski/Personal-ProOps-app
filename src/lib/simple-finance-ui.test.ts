@@ -2727,5 +2727,6 @@ test('Conta: com lançamentos, o tipo só troca na mesma família; editando o ca
   const ui = screen('src/app/finance/accounts.tsx', { params: { edit: 'c1' }, forecastAccounts: [cartao], contaTemLancamentos: true });
   const tipo = ui.nodes().find((n: any) => n.type === 'SelectField' && n.props.options.some((o: any) => o.id === 'credit_card'));
   assert.deepEqual(JSON.parse(JSON.stringify(tipo.props.options.map((o: any) => o.id))), ['credit_card'], 'o cartão com lançamento não vira conta');
-  assert.equal(ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Fecha dia').props.hint, 'Refaz as faturas em aberto');
+  assert.equal(ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Fecha dia').props.hint, 'Mudar os dias refaz as faturas em aberto');
+  assert.equal(ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Compra no dia do fechamento').props.hint, undefined, 'a dica aparece uma vez');
 });

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 
@@ -7,7 +7,7 @@ import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
 import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -498,7 +498,7 @@ export default function GoalsScreen() {
           />
 
           {aporte ? (
-            <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+            <SheetScroll contentContainerStyle={styles.sheetBody}>
               <Field
                 label="Valor"
                 hint={passaDoGuardado
@@ -541,7 +541,7 @@ export default function GoalsScreen() {
               <ThemedText type="small" themeColor="textSecondary">
                 Não conta como gasto
               </ThemedText>
-            </ScrollView>
+            </SheetScroll>
           ) : null}
       </Sheet>
 
@@ -565,7 +565,7 @@ export default function GoalsScreen() {
           />
 
           {aporteEmEdicao ? (
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetBody}>
+            <SheetScroll contentContainerStyle={styles.sheetBody}>
               <Field label="Tipo">
                 <Segmented
                   options={[
@@ -590,9 +590,9 @@ export default function GoalsScreen() {
                   accessibilityLabel="Data do aporte"
                 />
               </Field>
-            </ScrollView>
+            </SheetScroll>
           ) : (
-          <ScrollView keyboardShouldPersistTaps="handled"
+          <SheetScroll
             contentContainerStyle={styles.sheetBody}
             // Rolar o extrato fecha o aporte arrastado que estiver aberto (Deslizavel).
             onScrollBeginDrag={fecharDeslizavelAberto}>
@@ -658,7 +658,7 @@ export default function GoalsScreen() {
                 }}
               />
             ) : null}
-          </ScrollView>
+          </SheetScroll>
           )}
       </Sheet>
 
@@ -679,7 +679,7 @@ export default function GoalsScreen() {
           />
 
           {form ? (
-            <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+            <SheetScroll contentContainerStyle={styles.sheetBody}>
               <Field label="Nome">
                 <TextField
                   value={form.name}
@@ -708,7 +708,7 @@ export default function GoalsScreen() {
                   invalid={Boolean(form.deadline) && !prazoOk}
                 />
               </Field>
-            </ScrollView>
+            </SheetScroll>
           ) : null}
       </Sheet>
     </Screen>

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
@@ -12,7 +11,7 @@ import { FinanceAnalysisPanes } from '@/components/finance/finance-analysis-pane
 import { ThemedText } from '@/components/themed-text';
 import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -529,7 +528,7 @@ export default function NetWorthScreen() {
           />
 
           {form ? (
-            <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+            <SheetScroll contentContainerStyle={styles.sheetBody}>
               <Field label="Nome">
                 <TextField
                   value={form.name}
@@ -599,7 +598,7 @@ export default function NetWorthScreen() {
                     : 'Não deu para salvar. Já existe um bem com esse nome?'}
                 </ThemedText>
               ) : null}
-            </ScrollView>
+            </SheetScroll>
           ) : null}
       </Sheet>
     </Screen>

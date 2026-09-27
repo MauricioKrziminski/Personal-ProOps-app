@@ -331,6 +331,28 @@ o teclado aberto só fechava o teclado, sem `pressIn`. E vale para as FOLHAS: o 
 `Modal`, mas o sistema de responder sobe pela árvore do REACT, e a rolagem da tela por trás é
 ancestral da folha. `anti-slop.test.ts` quebra se uma rolagem nascer sem a prop.
 
+### Teclado e área segura: um mecanismo por superfície (27/09/2026)
+
+*"tem telas que com o teclado aberto eu não consigo scrollar… o teclado tampa o input de baixo"* e
+*"no tablet deitado… a barra de tarefas sobrepõe a parte de baixo do modal"* (Galaxy Tab A11+).
+
+- **Tela**: `Screen` (`KeyboardAwareScrollView`). **Folha**: o corpo com campo é `SheetScroll`,
+  ÚLTIMO filho do `Sheet` — `ScrollView` e `insets.bottom` dentro de `<Sheet>` quebram o
+  `anti-slop.test.ts`.
+- **A folha não encolhe com o teclado.** Com `KeyboardAvoidingView` no `Sheet` E a rolagem
+  abrindo o teclado inteiro, sobrava um vão vazio da altura do teclado no fim do formulário. A
+  rolagem desconta o que fica ABAIXO da folha (`AbaixoDaFolha`): `insets.bottom` no celular,
+  `abaixoDoDialogo` no diálogo do tablet — CONTA, não `measureInWindow`, que no iPhone mediu a
+  folha 62pt fora do lugar durante a subida do teclado. No `formSheet` do iPad o UIKit move a
+  folha sozinho, e ali vale o `automaticallyAdjustKeyboardInsets` (ramo só de iOS).
+- **A barra de tarefas do tablet é `insets.bottom`**, e deitado o recorte da câmera é inset de
+  LADO: `Screen`, `AppHeader`, `PillTabBar` (centrada na área segura, no máximo 560dp), FAB e
+  toast somam `insets.left/right`. O diálogo do tablet cabe dentro da área segura
+  (`tabletSheetFrame`).
+- Para reproduzir: `wm size 1600x2560 && wm density 320`, `settings put system user_rotation 1`,
+  `wm set-ignore-orientation-request true` (o Android 16 ignora a orientação em tela grande) e a
+  navegação por 3 botões — e devolver tudo depois.
+
 ## Estado local
 
 - Preferir estado de servidor (Query) + `useState`. Zustand só se estado global de UI real aparecer (hoje não há nenhum) — não criar store "por via das dúvidas".

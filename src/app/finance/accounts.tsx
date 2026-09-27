@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import type { SymbolViewProps } from 'expo-symbols';
@@ -8,7 +8,7 @@ import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
 import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { ItemLink } from '@/components/ui/item-link';
 import { Button } from '@/components/ui/button';
@@ -580,7 +580,7 @@ export default function AccountsScreen() {
           />
 
           {form ? (
-            <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+            <SheetScroll contentContainerStyle={styles.sheetBody}>
               <Field label="Nome">
                 <TextField
                   value={form.name}
@@ -641,8 +641,9 @@ export default function AccountsScreen() {
                       <Field
                         label="Fecha dia"
                         error={form.closingDay && !diaValido(form.closingDay) ? 'De 1 a 31' : undefined}
-                        // Editando: as faturas abertas se refazem com o dia novo (`20260926170000`)
-                        hint={form.id ? 'Refaz as faturas em aberto' : undefined}>
+                        // Editando: as faturas abertas se refazem com os dias novos (`20260926170000`);
+                        // a dica vale para os dois dias e para a chave logo abaixo, e aparece UMA vez.
+                        hint={form.id ? 'Mudar os dias refaz as faturas em aberto' : undefined}>
                         <TextField
                           value={form.closingDay}
                           onChangeText={(v) =>
@@ -683,8 +684,7 @@ export default function AccountsScreen() {
                     ninguém acorda com a fatura remontada.
                   */}
                   <Field
-                    label="Compra no dia do fechamento"
-                    hint={form.id ? 'Refaz as faturas em aberto' : undefined}>
+                    label="Compra no dia do fechamento">
                     <Segmented
                       value={form.fechamentoInclusivo ? 'atual' : 'seguinte'}
                       onChange={(v) =>
@@ -757,7 +757,7 @@ export default function AccountsScreen() {
                   Não deu para salvar. Já existe uma conta com esse nome?
                 </ThemedText>
               ) : null}
-            </ScrollView>
+            </SheetScroll>
           ) : null}
       </Sheet>
     </Screen>

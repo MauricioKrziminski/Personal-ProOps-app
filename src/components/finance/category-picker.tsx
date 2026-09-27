@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Chip } from '@/components/finance/chip';
 import { ThemedText } from '@/components/themed-text';
 import { Row } from '@/components/ui/row';
 import { SearchField } from '@/components/ui/search-field';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { VerMais } from '@/components/ui/ver-mais';
 import { useAosPoucos } from '@/hooks/use-aos-poucos';
@@ -103,7 +103,7 @@ export function CategoryPicker({
           />
         </View>
 
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <SheetScroll contentContainerStyle={styles.body}>
           {podeCriar ? (
             <Row
               title={termo}
@@ -134,7 +134,7 @@ export function CategoryPicker({
               Nada com esse nome. Digite mais para criar uma categoria.
             </ThemedText>
           ) : null}
-        </ScrollView>
+        </SheetScroll>
       </Sheet>
     </>
   );

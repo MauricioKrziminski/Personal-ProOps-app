@@ -1611,3 +1611,20 @@ test('Juros do Pix no crédito também se edita: abre com o juro que nasceu junt
   const hook = readFileSync(join(SRC, 'hooks/use-finance.ts'), 'utf8');
   assert.match(hook, /export function useJurosDoPix/);
 });
+
+test('Folha com rolagem usa SheetScroll, e o conteúdo dela não soma a área segura', () => {
+  // 26/09/2026, tablet deitado: o campo tocado parava colado no teclado (ou atrás dele) e a
+  // folha descia por trás da barra de tarefas. A rolagem de folha é `SheetScroll` (a mesma do
+  // `Screen`: leva o campo acima do teclado com folga) e a área segura mora no `Sheet` — o
+  // conteúdo que somasse `insets.bottom` teria a borda duas vezes.
+  const fora: string[] = [];
+  for (const file of walk(SRC)) {
+    if (!file.endsWith('.tsx') || file.endsWith('components/ui/sheet.tsx')) continue;
+    const texto = stripComments(readFileSync(file, 'utf8'));
+    for (const m of texto.matchAll(/<Sheet\b[\s\S]*?<\/Sheet>/g)) {
+      if (/<ScrollView\b/.test(m[0])) fora.push(`${file}: ScrollView dentro de <Sheet>`);
+      if (/insets\.bottom/.test(m[0])) fora.push(`${file}: insets.bottom dentro de <Sheet>`);
+    }
+  }
+  assert.deepEqual(fora, []);
+});

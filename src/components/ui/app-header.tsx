@@ -99,7 +99,11 @@ export function AppHeader({ title, action }: AppHeaderProps) {
         (desfoque, véu de cor, marca) é `none` e deixa o gesto passar para o scroll.
       */
       pointerEvents="box-none"
-      style={[styles.bar, { paddingTop: insets.top, borderBottomColor: theme.cardBorder }]}>
+      style={[
+        styles.bar,
+        // As laterais: deitado, o recorte da câmera (dobrável, tablet) fica de um dos lados.
+        { paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right, borderBottomColor: theme.cardBorder },
+      ]}>
       {/*
         Vidro de CHROME (§1): a faixa é reta,
         encosta nas bordas e não tem elevação.

@@ -97,3 +97,8 @@ test('a aba do agente usa os SF Symbols que estão no mapa do Icon', () => {
     assert.ok(icon.includes(`'${sf}'`), `${sf} não está no mapa SF → Material`);
   }
 });
+
+test('a lista lateral da aba do Agente EMPURRA a conversa (com replace ela sumia com as abas)', () => {
+  const lateral = readFileSync('src/components/agent/conversation-sidebar.tsx', 'utf8');
+  assert.match(lateral, /if \(!selectedId\) router\.push\(`\/agent\/\$\{id\}`\)/);
+});

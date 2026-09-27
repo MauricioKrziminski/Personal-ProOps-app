@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/field';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Space, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -61,7 +61,7 @@ export function RenameConversationSheet({
         }
       />
 
-      <View style={styles.corpo}>
+      <SheetScroll contentContainerStyle={styles.corpo}>
         <TextField
           value={titulo}
           onChangeText={setTitulo}
@@ -81,7 +81,7 @@ export function RenameConversationSheet({
             {restantes} caracteres restantes
           </ThemedText>
         ) : null}
-      </View>
+      </SheetScroll>
     </Sheet>
   );
 }

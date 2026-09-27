@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { Button } from '@/components/ui/button';
 import { Field, MoneyField } from '@/components/ui/field';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useToast } from '@/components/ui/toast';
@@ -106,7 +106,7 @@ export function useConfirmarBaixa({ aoConcluir }: { aoConcluir?: (id: string) =>
         }
       />
       {linha ? (
-        <ScrollView contentContainerStyle={styles.corpo} keyboardShouldPersistTaps="handled">
+        <SheetScroll contentContainerStyle={styles.corpo}>
           <Field
             label={receita ? 'Quanto entrou' : 'Quanto saiu'}
             hint={pago !== previsto ? `Previsto: ${formatBRL(previsto)}` : undefined}>
@@ -119,7 +119,7 @@ export function useConfirmarBaixa({ aoConcluir }: { aoConcluir?: (id: string) =>
           <Field label="Quando">
             <DatePickerField value={data} onChange={setData} accessibilityLabel="Data do pagamento" />
           </Field>
-        </ScrollView>
+        </SheetScroll>
       ) : null}
     </Sheet>
   );

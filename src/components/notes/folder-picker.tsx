@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { TextField } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
@@ -69,7 +69,7 @@ export function FolderPicker({
     <Sheet visible={visible} onClose={onClose}>
       <TaskHeader title="Mover para" onClose={onClose} />
 
-      <ScrollView
+      <SheetScroll
         contentContainerStyle={styles.corpo}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
@@ -133,7 +133,7 @@ export function FolderPicker({
             </View>
           )}
         </Section>
-      </ScrollView>
+      </SheetScroll>
     </Sheet>
   );
 }

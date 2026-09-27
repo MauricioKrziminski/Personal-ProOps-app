@@ -19,8 +19,12 @@ export function ConversationSidebar({ selectedId }: { selectedId?: string }) {
     () => query.data?.pages.flatMap((page) => page.items) ?? [],
     [query.data],
   );
+  // Da aba do Agente (nada selecionado) a conversa é EMPURRADA: com `replace` ela tomava o lugar
+  // das abas, nascia sem o voltar e o botão de voltar do Android fechava o app (tablet,
+  // 27/09/2026). Trocar de uma conversa para outra continua `replace`, para a pilha não crescer.
   const open = useCallback((id: string) => {
-    if (id !== selectedId) router.replace(`/agent/${id}`);
+    if (!selectedId) router.push(`/agent/${id}`);
+    else if (id !== selectedId) router.replace(`/agent/${id}`);
   }, [selectedId]);
   const renderConversation = useCallback(
     ({ item }: { item: AgentConversation }) => (

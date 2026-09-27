@@ -195,7 +195,10 @@ function ToastView({
       exiting={FadeOutDown.duration(Motion.duration.exit)}
       pointerEvents="box-none"
       onLayout={(e) => onAltura(e.nativeEvent.layout.height)}
-      style={[styles.host, { bottom: peDoToast(insets.bottom, acimaDaBarra) }]}>
+      style={[
+        styles.host,
+        { bottom: peDoToast(insets.bottom, acimaDaBarra), left: Space.lg + insets.left, right: Space.lg + insets.right },
+      ]}>
       <View
         accessibilityLiveRegion="polite"
         style={[
@@ -231,12 +234,14 @@ function ToastView({
 }
 
 const styles = StyleSheet.create({
+  // No tablet o toast não atravessa a tela: do tamanho de um celular, no centro.
   host: {
     position: 'absolute',
-    left: Space.lg,
-    right: Space.lg,
+    alignItems: 'center',
   },
   card: {
+    width: '100%',
+    maxWidth: 560,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.md,

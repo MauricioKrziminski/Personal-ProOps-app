@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
@@ -11,7 +10,7 @@ import { AgentApiError } from '@/lib/agent-api';
 
 import { ErrorCard } from '@/components/error-card';
 import { Card } from '@/components/ui/card';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { ThemedText } from '@/components/themed-text';
 import { ComNegrito } from '@/components/ui/forte';
@@ -139,7 +138,6 @@ function traduzErro(err: unknown): FalhaImport {
 export default function ImportScreen() {
   const toast = useToast();
   const brl = useBRL();
-  const insets = useSafeAreaInsets();
   // `conta`: quem chega pela fatura, pelos Cartões ou pelo Próximo passo já vem com o cartão.
   const params = useLocalSearchParams<{ batch?: string; conta?: string }>();
 
@@ -683,8 +681,8 @@ export default function ImportScreen() {
       <Sheet visible={editando !== null} onClose={fecharLinha}>
           <TaskHeader title="Editar" onClose={fecharLinha} />
 
-          <ScrollView keyboardShouldPersistTaps="handled"
-            contentContainerStyle={[styles.sheetBody, { paddingBottom: insets.bottom + Space.xxl }]}
+          <SheetScroll
+            contentContainerStyle={[styles.sheetBody, { paddingBottom: Space.xxl }]}
           >
             {/*
               O sentido vem ANTES da categoria: ele muda o que a linha significa, e a ordem dos
@@ -720,7 +718,7 @@ export default function ImportScreen() {
                 onChange={(cat) => editando && trocarCategoria(editando, cat)}
               />
             </View>
-          </ScrollView>
+          </SheetScroll>
       </Sheet>
     </Screen>
   );

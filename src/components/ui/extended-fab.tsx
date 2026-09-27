@@ -70,7 +70,7 @@ export function ExtendedFab({ label, icon, onPress }: { label: string; icon: Ico
       // botão (com a fonte do sistema crescendo, a medida ficava presa na largura antiga e o
       // rótulo saía cortado — "Lanc", medido a 384dp × 1,3). `box-none`: a faixa não rouba toque.
       pointerEvents="box-none"
-      style={[styles.ancora, { bottom: base }, subir]}>
+      style={[styles.ancora, { bottom: base, right: Space.lg + insets.right }, subir]}>
       <PressableScale haptic="light" accessibilityRole="button" accessibilityLabel={label} onPress={onPress}>
         <Animated.View
           style={[
@@ -102,7 +102,7 @@ export function ExtendedFab({ label, icon, onPress }: { label: string; icon: Ico
 }
 
 const styles = StyleSheet.create({
-  ancora: { position: 'absolute', left: 0, right: Space.lg, alignItems: 'flex-end', zIndex: 11, elevation: 11 },
+  ancora: { position: 'absolute', left: 0, alignItems: 'flex-end', zIndex: 11, elevation: 11 },
   pilula: {
     height: ALTURA,
     flexDirection: 'row',

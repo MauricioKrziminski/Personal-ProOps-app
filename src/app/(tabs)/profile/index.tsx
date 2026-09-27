@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -19,7 +19,7 @@ import { SkeletonHero, SkeletonList, SkeletonRow } from '@/components/ui/skeleto
 import { useToast } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { currentMonth } from '@/components/finance/month-picker';
@@ -578,7 +578,7 @@ export default function ProfileScreen() {
             />
           }
         />
-        <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled">
+        <SheetScroll contentContainerStyle={styles.sheetBody}>
           <Field label="Nome">
             <TextField
               value={nameDraft ?? ''}
@@ -589,7 +589,7 @@ export default function ProfileScreen() {
               returnKeyType="done"
             />
           </Field>
-        </ScrollView>
+        </SheetScroll>
       </Sheet>
 
       <View style={styles.footer}>

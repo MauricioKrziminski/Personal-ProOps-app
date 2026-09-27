@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Stack } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
@@ -9,7 +8,7 @@ import { ErrorCard } from '@/components/error-card';
 import { CategoryPicker } from '@/components/finance/category-picker';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { ThemedText } from '@/components/themed-text';
 import { Forte } from '@/components/ui/forte';
@@ -66,7 +65,6 @@ const VAZIO: Rascunho = { pattern: '', category: null, accountId: null };
  */
 export default function RulesScreen() {
   const toast = useToast();
-  const insets = useSafeAreaInsets();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const { data: rules, isLoading, isError, refetch } = useRules();
@@ -285,8 +283,8 @@ export default function RulesScreen() {
             }
           />
 
-          <ScrollView
-            contentContainerStyle={[styles.sheetBody, { paddingBottom: insets.bottom + Space.xxl }]}
+          <SheetScroll
+            contentContainerStyle={[styles.sheetBody, { paddingBottom: Space.xxl }]}
             keyboardShouldPersistTaps="handled"
           >
             <Field
@@ -327,7 +325,7 @@ export default function RulesScreen() {
                 />
               </Field>
             ) : null}
-          </ScrollView>
+          </SheetScroll>
       </Sheet>
     </Screen>
   );

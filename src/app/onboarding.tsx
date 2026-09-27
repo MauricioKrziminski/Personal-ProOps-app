@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { BackHandler, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { BackHandler, Pressable, StyleSheet, View } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -166,7 +167,12 @@ export default function OnboardingScreen() {
   ][passo];
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+    <View
+      style={[
+        styles.root,
+        // As laterais também: celular deitado com o recorte da câmera, e tablet com barra lateral.
+        { backgroundColor: theme.background, paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right },
+      ]}>
       <Stack.Screen options={{ headerShown: false }} />
 
       <View style={styles.topo}>
@@ -212,7 +218,9 @@ export default function OnboardingScreen() {
           Escondê-la (o padrão do resto do app, onde nada corta) deixava o exemplo do aviso
           cortado ao meio parecendo defeito de layout.
         */}
-        <ScrollView
+        {/* O passo do nome tem campo: a rolagem leva ele acima do teclado, como no `Screen`. */}
+        <KeyboardAwareScrollView
+          bottomOffset={Space.xl}
           contentContainerStyle={styles.corpoConteudo}
           keyboardShouldPersistTaps="handled">
           <Animated.View
@@ -256,7 +264,7 @@ export default function OnboardingScreen() {
               <Button label="Agora não" variant="ghost" onPress={pular} block />
             ) : null}
           </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </View>
     </View>
   );

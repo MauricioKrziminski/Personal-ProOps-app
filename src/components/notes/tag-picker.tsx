@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { TextField } from '@/components/ui/field';
 import { Space } from '@/design/tokens';
@@ -56,7 +56,7 @@ export function TagPicker({
     <Sheet visible={visible} onClose={onClose}>
       <TaskHeader title={alvo === 'nota' ? 'Tags da nota' : 'Tags da pasta'} onClose={onClose} />
 
-      <ScrollView
+      <SheetScroll
         contentContainerStyle={styles.corpo}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
@@ -114,7 +114,7 @@ export function TagPicker({
             }
           />
         ) : null}
-      </ScrollView>
+      </SheetScroll>
     </Sheet>
   );
 }
