@@ -21,7 +21,7 @@ import { Motion, Space, tabular } from '@/design/tokens';
 import { usarDica } from '@/hooks/use-dicas';
 import { invoiceQuery, type CardInvoice, type Transaction } from '@/hooks/use-finance';
 import { formatDateBR, localISODate } from '@/hooks/use-items';
-import { STATUS_DA_FATURA, contagemDeLancamentos } from '@/lib/card-status';
+import { STATUS_DA_FATURA, contagemDeLancamentos, contaNaFatura } from '@/lib/card-status';
 
 export type ResumoDaFatura = {
   status: string;
@@ -41,7 +41,7 @@ export function resumoDaFatura(data: { invoice: CardInvoice; transactions: Trans
       data.invoice.due_date < localISODate() && !['paid', 'rolled'].includes(data.invoice.status),
     contagem: data.transactions.length,
     totalCents: data.transactions
-      .filter((t) => t.kind === 'expense')
+      .filter((t) => contaNaFatura(t.kind))
       .reduce((soma, t) => soma + t.amount_cents, 0),
     fecha: data.invoice.closing_date,
     vence: data.invoice.due_date,

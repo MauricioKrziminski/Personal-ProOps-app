@@ -1614,6 +1614,22 @@ test('Juros do Pix no crédito também se edita: abre com o juro que nasceu junt
   assert.match(hook, /export function useJurosDoPix/);
 });
 
+test('Pix no crédito para conta própria: a transferência do cartão tem juro, e ele é despesa no cartão', () => {
+  // 28/09/2026: o Pix de R$ 340 do cartão para o Itaú, com R$ 16,99 de juro, não era representável.
+  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  assert.match(fonte, /const mostraJuros =\s*isCard && \(kind === 'expense' \|\| kind === 'transfer'\)/);
+  const hook = readFileSync(join(SRC, 'hooks/use-finance.ts'), 'utf8');
+  // copiado de uma transferência, o juro herdaria o tipo e o destino — e viraria dinheiro movido
+  assert.match(hook, /function linhaDeJuros[\s\S]{0,200}?kind: 'expense' as const,\s*counterparty_account_id: null,/);
+  assert.match(hook, /if \(fee_cents && fee_cents > 0 && input\.kind !== 'income'\) \{\s*linhas\.push\(linhaDeJuros\(/);
+  assert.match(hook, /tx\?\.invoice_id && contaNaFatura\(tx\.kind\)/, 'a edição acha o juro do Pix também');
+  // a fatura soma o que a lista mostra: despesa E a transferência que sai do cartão
+  for (const arquivo of ['app/finance/invoice/[id].tsx', 'components/finance/invoice-dock.tsx']) {
+    const texto = readFileSync(join(SRC, arquivo), 'utf8');
+    assert.doesNotMatch(texto, /\.filter\(\(t\) => t\.kind === 'expense'/, `${arquivo} soma por contaNaFatura`);
+  }
+});
+
 test('Folha com rolagem usa SheetScroll, e o conteúdo dela não soma a área segura', () => {
   // 26/09/2026, tablet deitado: o campo tocado parava colado no teclado (ou atrás dele) e a
   // folha descia por trás da barra de tarefas. A rolagem de folha é `SheetScroll` (a mesma do

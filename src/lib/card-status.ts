@@ -147,3 +147,13 @@ export function ordemDaPilha<T extends { account_id: string }>(
   if (i <= 0) return cards.slice(0, max);
   return [cards[i], ...cards.slice(0, i), ...cards.slice(i + 1)].slice(0, max);
 }
+
+/**
+ * A linha entra na FATURA? Despesa e a transferência que SAI do cartão (Pix no crédito para conta
+ * própria) — o espelho de `private.conta_na_fatura` (`20260928230000`). Só a linha do próprio
+ * cartão tem `invoice_id`, então quem soma as linhas de uma fatura filtra por aqui, nunca por
+ * `kind === 'expense'` à mão: o Pix aparecia na lista e ficava fora do total.
+ */
+export function contaNaFatura(kind: string): boolean {
+  return kind === 'expense' || kind === 'transfer';
+}

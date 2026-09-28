@@ -323,8 +323,10 @@ function TransactionForm({
    */
   // Editando também (26/09/2026): o juro esquecido se soma depois, e o que existe se corrige. Não
   // em parcela, série ou pagamento de dívida — esses têm o próprio contrato.
+  // Transferência saindo do cartão é o Pix no crédito para conta PRÓPRIA (28/09/2026): o cartão
+  // cobra o juro do mesmo jeito.
   const mostraJuros =
-    isCard && kind === 'expense' && installmentCount === 1 &&
+    isCard && (kind === 'expense' || kind === 'transfer') && installmentCount === 1 &&
     !(editing?.installment_plan_id || editing?.recurring_id || editing?.debt_id) &&
     editing?.description !== DESCRICAO_JUROS_DO_PIX;
   /**

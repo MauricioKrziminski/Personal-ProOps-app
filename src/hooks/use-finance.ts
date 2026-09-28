@@ -1,3 +1,4 @@
+import { contaNaFatura } from '@/lib/card-status';
 import { invalidateFinance, invalidateKeys } from '@/lib/query-invalidation';
 import type { Natureza } from '@/lib/import-preview';
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -2711,7 +2712,8 @@ export const DESCRICAO_JUROS_DO_PIX = 'Juros do Pix no crédito';
  * vínculo —, então é por esses três que a edição a encontra.
  */
 export function useJurosDoPix(tx: Transaction | null | undefined) {
-  const procura = Boolean(tx?.invoice_id && tx.kind === 'expense' && tx.description !== DESCRICAO_JUROS_DO_PIX && !tx.installment_plan_id);
+  // A compra no cartão OU o Pix no crédito para conta própria (transferência que sai do cartão).
+  const procura = Boolean(tx?.invoice_id && contaNaFatura(tx.kind) && tx.description !== DESCRICAO_JUROS_DO_PIX && !tx.installment_plan_id);
   return useQuery({
     queryKey: ['transactions', 'juros-do-pix', tx?.id],
     enabled: procura,
@@ -2730,6 +2732,24 @@ export function useJurosDoPix(tx: Transaction | null | undefined) {
       return data;
     },
   });
+}
+
+/**
+ * A linha de juros do Pix no crédito a partir da linha principal: SEMPRE uma despesa no cartão,
+ * sem destino. Copiada de uma transferência (o Pix para conta própria), ela herdaria `kind` e a
+ * conta de destino — e o juro viraria dinheiro movido para a conta, com o nome de juro.
+ */
+function linhaDeJuros<T extends TransactionInput>(base: T, cents: number) {
+  return {
+    ...base,
+    kind: 'expense' as const,
+    counterparty_account_id: null,
+    amount_cents: cents,
+    category: 'juros',
+    description: DESCRICAO_JUROS_DO_PIX,
+    // O favorecido é da compra, não do juro: o juro é do banco.
+    merchant: null,
+  };
 }
 
 export function useSaveTransaction() {
@@ -2760,15 +2780,9 @@ export function useSaveTransaction() {
           const { error: e } = await supabase.from('transactions').delete().eq('id', juros.id);
           if (e) throw Object.assign(e, { compraSalva: true });
         } else if (juros && juros.cents > 0) {
-          const { error: e } = await supabase.from('transactions').insert({
-            ...input,
-            user_id: await userId(),
-            source: 'app' as const,
-            amount_cents: juros.cents,
-            category: 'juros',
-            description: DESCRICAO_JUROS_DO_PIX,
-            merchant: null,
-          });
+          const { error: e } = await supabase
+            .from('transactions')
+            .insert(linhaDeJuros({ ...input, user_id: await userId(), source: 'app' as const }, juros.cents));
           if (e) throw Object.assign(e, { compraSalva: true });
         }
         return;
@@ -2776,17 +2790,10 @@ export function useSaveTransaction() {
       const uid = await userId();
       const compra = { ...input, user_id: uid, source: 'app' as const };
       const linhas = [compra];
-      // Segunda trava: juro do Pix no crédito é custo de um GASTO. Numa receita ou transferência
-      // ele viraria dinheiro entrando, ou movido, com o nome de juro.
-      if (fee_cents && fee_cents > 0 && input.kind === 'expense') {
-        linhas.push({
-          ...compra,
-          amount_cents: fee_cents,
-          category: 'juros',
-          description: DESCRICAO_JUROS_DO_PIX,
-          // O favorecido é da compra, não do juro: o juro é do banco.
-          merchant: null,
-        });
+      // Segunda trava: juro do Pix no crédito é custo do CARTÃO — da compra ou do Pix para conta
+      // própria (28/09/2026). Numa receita ele viraria dinheiro entrando com o nome de juro.
+      if (fee_cents && fee_cents > 0 && input.kind !== 'income') {
+        linhas.push(linhaDeJuros(compra, fee_cents));
       }
       // Um insert só: meia gravação deixaria o juro sem a compra (ou o contrário) na fatura.
       const { error } = await supabase.from('transactions').insert(linhas);

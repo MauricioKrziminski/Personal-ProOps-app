@@ -49,7 +49,7 @@ import { financeErrorMessage } from '@/lib/finance-form';
 import { passoDaVolta, type Volta } from '@/lib/reabrir-ao-voltar';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { estadoDaLinha } from '@/lib/settle-labels';
-import { STATUS_DA_FATURA } from '@/lib/card-status';
+import { STATUS_DA_FATURA, contaNaFatura } from '@/lib/card-status';
 import { accountLabel } from '@/lib/accounts';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
@@ -63,7 +63,7 @@ import { rotuloDaCompra } from '@/lib/data-da-compra';
  *
  * **O total nunca é materializado** — sai da soma das compras da fatura. A soma ainda é feita no
  * cliente sobre `useInvoice` (o doc pede uma RPC `invoice_total`, que não existe): os filtros são
- * os mesmos do banco (`kind='expense'`), mas o dia em que a lista for paginada essa soma encolhe.
+ * os mesmos do banco (`contaNaFatura`), mas o dia em que a lista for paginada essa soma encolhe.
  */
 
 function mesLabel(iso: string): string {
@@ -161,7 +161,7 @@ export default function InvoiceScreen() {
   );
 
   const total = compras
-    .filter((t) => t.kind === 'expense')
+    .filter((t) => contaNaFatura(t.kind))
     .reduce((soma, t) => soma + t.amount_cents, 0);
 
   /**
@@ -185,7 +185,7 @@ export default function InvoiceScreen() {
   const brl = useBRL();
   const hoje = localISODate();
   const aindaVem = compras
-    .filter((t) => t.kind === 'expense' && t.occurred_at > hoje)
+    .filter((t) => contaNaFatura(t.kind) && t.occurred_at > hoje)
     .reduce((soma, t) => soma + t.amount_cents, 0);
 
   const dias = useMemo(() => {
