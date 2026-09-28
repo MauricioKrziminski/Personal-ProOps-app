@@ -22,9 +22,6 @@ export interface DinheiroDoDiaProps {
   painel: PainelDoDia;
   /** Tocar no número: o menu de sempre (ciclo, projeção, patrimônio, metas). */
   onAbrirMenu: () => void;
-  /** O que saiu e entrou HOJE; `null` enquanto não há resposta (a linha não afirma zero). */
-  hoje: { saiu: number; legenda: string | undefined } | null;
-  onAbrirHoje: () => void;
   /** O caixa das contas; `null` quando os saldos falharam (a tela desenha o erro). */
   caixa: Caixa | null;
   contasAbertas: boolean;
@@ -39,9 +36,9 @@ export interface DinheiroDoDiaProps {
  * `2026-09-28-hoje-o-dia-design.md`).
  *
  * Substitui quatro blocos: o herói de tinta (que mostrava o MESMO número do herói do Financeiro),
- * os ladrilhos Saiu/Entrou hoje (a mesma forma dos ladrilhos Entra/Sai de lá), "Nas contas" e os
- * anéis "No limite" (o mesmo bloco das duas telas). Aqui: quanto cabe por dia, o que já saiu hoje
- * contra o ritmo, quanto existe em conta agora e o orçamento no limite — cada um numa linha.
+ * "Nas contas" e os anéis "No limite" (o mesmo bloco das duas telas). Aqui: quanto cabe por dia,
+ * quanto existe em conta agora e o orçamento no limite. O que saiu em cada dia é a semana, no topo
+ * da Hoje (`SemanaDoDia`), onde o "por dia" deste card é a régua tracejada.
  *
  * ⚠️ **As contas abrem NO LUGAR** e cada uma leva ao extrato dela; o total é a soma exata das
  * linhas (`caixaDasContas`, com teste). Cartão fica de fora: tem fatura, não saldo.
@@ -49,8 +46,6 @@ export interface DinheiroDoDiaProps {
 export function DinheiroDoDia({
   painel,
   onAbrirMenu,
-  hoje,
-  onAbrirHoje,
   caixa,
   contasAbertas,
   onAlternarContas,
@@ -103,18 +98,6 @@ export function DinheiroDoDia({
           <Icon name={concealed ? 'eye.slash' : 'eye'} size="sm" color="text" />
         </Pressable>
       </View>
-
-      {hoje ? (
-        <Row
-          inlineValue
-          icon="arrow.up.right"
-          title="Saiu hoje"
-          subtitle={hoje.legenda}
-          accessibilityLabel={[`Saiu hoje: ${brl(hoje.saiu)}`, hoje.legenda].filter(Boolean).join('. ')}
-          trailing={<Money cents={hoje.saiu} variant="ticker" />}
-          onPress={onAbrirHoje}
-        />
-      ) : null}
 
       {temContas ? (
         <Row

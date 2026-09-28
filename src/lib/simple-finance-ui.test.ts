@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; summaryError?: 'hoje' | 'ciclo'; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -181,9 +181,11 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       refetch: async () => { refetches.push('balances'); },
     }),
     // A MESMA função serve as duas fatias da Hoje; o que as separa é a janela pedida.
-    useTransactionsSummary: (from: string, to: string) => options.summaryError === (from === to ? 'hoje' : 'ciclo')
-      ? { ...query, isError: true, isSuccess: false, data: undefined, refetch: async () => { refetches.push(`summary-${options.summaryError}`); } }
-      : options.resumoPendente ? { ...query, isPending: true, isLoading: true, isSuccess: false, fetchStatus: 'fetching', data: undefined } : ({
+    // A semana da Hoje: o gasto de cada dia (`daily_spending`), de três dias atrás até hoje.
+    useDailySpending: (from: string, to: string) => options.gastosError
+      ? { ...query, isError: true, isSuccess: false, data: undefined, refetch: async () => { refetches.push('gastos'); } }
+      : { ...query, isSuccess: true, data: options.gastos ?? [], janela: [from, to], refetch: async () => { refetches.push('gastos'); } },
+    useTransactionsSummary: (from: string, to: string) => options.resumoPendente ? { ...query, isPending: true, isLoading: true, isSuccess: false, fetchStatus: 'fetching', data: undefined } : ({
       ...query,
       isSuccess: true,
       data: from === to ? (options.saiuHoje ?? []) : (options.saiuNoCiclo ?? []),
@@ -1423,14 +1425,6 @@ test('Hoje: cada leitura do card do dinheiro que falha aparece, e o "Tentar de n
   orcamento.nodes().find((n: any) => n.type === 'ErrorCard').props.onRetry();
   assert.deepEqual(orcamento.refetches, ['budgets']);
 
-  const hoje = screen(hojeFile, { summaryError: 'hoje' });
-  assert.equal(hoje.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.hoje, null, 'sem resposta, a linha não diz R$ 0,00');
-  hoje.nodes().find((n: any) => n.type === 'ErrorCard').props.onRetry();
-  assert.deepEqual(hoje.refetches, ['summary-hoje']);
-
-  // Sem o ciclo a soma seria 0: a legenda NÃO diz "abaixo da média de R$ 0,00/dia".
-  const ciclo = screen(hojeFile, { summaryError: 'ciclo', saiuHoje: [{ kind: 'expense', total_cents: 30_00 }] });
-  assert.equal(ciclo.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.hoje.legenda, undefined);
 });
 
 test('Hoje: sem o ciclo e sem próxima entrada, o card não inventa "1 dia"', () => {
@@ -1446,7 +1440,8 @@ test('Hoje: sem as contas, os próximos dias dizem que falharam em vez de mostra
   });
   assert.ok(!agendaItem(ui, 'DAS'), 'uma lista só com o cartão mentiria');
   const erros = ui.nodes().filter((n: any) => n.type === 'ErrorCard');
-  assert.equal(erros.length, 2, 'o erro no Seu dia e o erro nos próximos dias');
+  // Cada seção que lê as contas diz que falhou (§7): o Seu dia, a semana (as marcas) e os próximos.
+  assert.equal(erros.length, 3, 'o erro no Seu dia, na semana e nos próximos dias');
 });
 
 /** Um horário LOCAL de 08/09 — o dia do dublê de `use-items`. */
@@ -1568,27 +1563,44 @@ test('Hoje: sem conta nenhuma a linha "Em conta" não afirma R$ 0,00', () => {
   assert.deepEqual(copia(ui.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.caixa.linhas), []);
 });
 
-test('Hoje: o ritmo do dia compara hoje com os dias ANTERIORES do ciclo', () => {
-  // ciclo começa 01/09, hoje é 08/09 → 8 dias decorridos, 7 anteriores.
+test('Hoje: a semana vem no topo — três dias para trás pela régua do "saiu hoje", hoje no meio', () => {
+  // 08/09 é o "hoje" do dublê; caixa 3.300 − 300 = 3.000 livres em 22 dias = 13.636 por dia.
   const ui = screen(hojeFile, {
-    saiuHoje: [{ kind: 'expense', total_cents: 200_00 }],
-    saiuNoCiclo: [{ kind: 'expense', total_cents: 900_00 }],
+    spendable: { caixa: 330_000, comprometido_ate_entrada: 30_000, comprometido_no_ciclo: 30_000, proxima_entrada: null },
+    gastos: [
+      { day: '2026-09-05', expense_cents: 5000, income_cents: 0 },
+      { day: '2026-09-08', expense_cents: 20000, income_cents: 400000 },
+    ],
+    bills: [{ ref_id: 'luz', title: 'Luz', due_date: '2026-09-10', amount_cents: 21430, kind: 'transaction', overdue: false }],
   });
-  const hoje = ui.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.hoje;
-  assert.ok(hoje, 'a linha do dia precisa aparecer');
-  // (900 − 200) / 7 = 100 por dia; hoje ficou acima.
-  assert.match(String(hoje.legenda), /^acima da média de R\$ [0-9.,]+\/dia$/);
-  assert.match(String(hoje.legenda), /100/, 'a média por dia aparece na legenda');
+  const filhos = [].concat(ui.nodes().find((n: any) => n.type === 'Screen').props.children).filter(Boolean);
+  assert.equal(filhos[1].key, 'semana', 'logo abaixo da saudação (sem passos pendentes)');
+  const semana = ui.nodes().find((n: any) => n.type === 'SemanaDoDia');
+  assert.deepEqual(copia(semana.props.semana.dias.map((d: any) => [d.day, d.tipo, d.saiu])), [
+    ['2026-09-05', 'passado', 5000], ['2026-09-06', 'passado', 0], ['2026-09-07', 'passado', 0],
+    ['2026-09-08', 'hoje', 20000], ['2026-09-09', 'futuro', 0], ['2026-09-10', 'futuro', 0], ['2026-09-11', 'futuro', 0],
+  ]);
+  assert.equal(semana.props.semana.dias[5].previsto, 21430, 'o que vence dia 10 é a marca daquele dia');
+  assert.equal(semana.props.semana.linha, Math.floor(300_000 / 22), 'a régua é o "por dia" do card do dinheiro');
+  assert.equal(semana.props.escolhido, '2026-09-08', 'abre no dia de hoje');
+  ui.interact(() => semana.props.onEscolher('2026-09-05'));
+  assert.equal(ui.nodes().find((n: any) => n.type === 'SemanaDoDia').props.escolhido, '2026-09-05');
+  ui.nodes().find((n: any) => n.type === 'BlockHeader' && n.props.title === 'Sua semana').props.action.onPress();
+  assert.equal(ui.navigations.at(-1), '/finance/transactions', 'o que saiu continua a um toque dos Lançamentos');
 });
 
-test('Hoje: receita não entra no que "saiu"', () => {
-  const ui = screen(hojeFile, {
-    saiuHoje: [{ kind: 'income', total_cents: 4_000_00 }, { kind: 'expense', total_cents: 30_00 }],
-    saiuNoCiclo: [{ kind: 'expense', total_cents: 100_00 }],
-  });
-  const hoje = ui.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.hoje;
-  assert.equal(hoje.saiu, 30_00);
-  assert.match(hoje.legenda, /entrou R\$ 4000\.00$/, 'o que entrou vem escrito, fora do "saiu"');
+test('Hoje: a semana sem o gasto — ou sem os próximos dias — diz que falhou, e refaz só o que falhou', () => {
+  const ui = screen(hojeFile, { gastosError: true });
+  assert.ok(!tipos(ui).includes('SemanaDoDia'), 'sem resposta, nenhuma barra inventada');
+  ui.nodes().find((n: any) => n.type === 'ErrorCard').props.onRetry();
+  assert.deepEqual(ui.refetches, ['gastos']);
+  const semProximos = screen(hojeFile, { billsError: true });
+  assert.ok(!tipos(semProximos).includes('SemanaDoDia'), 'sem as contas, as marcas diriam "nada previsto"');
+});
+
+test('Hoje: sem "por dia" a semana não desenha régua', () => {
+  const ui = screen(hojeFile, { spendable: { caixa: 10_000, comprometido_ate_entrada: 50_000, comprometido_no_ciclo: 50_000, proxima_entrada: null } });
+  assert.equal(ui.nodes().find((n: any) => n.type === 'SemanaDoDia').props.semana.linha, null);
 });
 
 test('Financeiro: os atalhos do mosaico levam aos mesmos destinos de antes', () => {

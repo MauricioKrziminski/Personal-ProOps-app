@@ -9,6 +9,7 @@ import { DinheiroDoDia } from '@/components/feed/dinheiro-do-dia';
 import { AgoraLinha, GrupoDoDia, RotuloNoGrupo } from '@/components/feed/grupo-do-dia';
 import { LinhaDeLembrete } from '@/components/feed/lembrete-do-dia';
 import { NotasDaHoje } from '@/components/feed/notas-da-hoje';
+import { SemanaDoDia } from '@/components/feed/semana-do-dia';
 import { ProximoPassoCard } from '@/components/feed/proximo-passo';
 import { SetupChecklist } from '@/components/feed/setup-checklist';
 import { TodayTabletCanvas } from '@/components/feed/today-tablet-canvas';
@@ -33,8 +34,8 @@ import {
   useAccountBalances,
   useBudgetsStatus,
   useCycle,
+  useDailySpending,
   useSpendable,
-  useTransactionsSummary,
   useUpcomingBills,
   useUpcomingCardCharges,
 } from '@/hooks/use-finance';
@@ -48,7 +49,7 @@ import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { caixaDasContas } from '@/lib/account-cash';
 import { PASSO } from '@/lib/aos-poucos';
 import { orcamentosApertados } from '@/lib/budget-tight';
-import { diaCurtoBR, diasAte, greetingBR, rotuloDoDia } from '@/lib/dates';
+import { diaCurtoBR, diasAte, greetingBR, rotuloDoDia, somaDias } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
 import { settleLabel } from '@/lib/settle-labels';
 import {
@@ -56,10 +57,11 @@ import {
   iconeDoItem,
   linhasDoDia,
   metaDoItem,
+  semanaDoDia,
   separarLembretes,
   type ItemDaAgenda,
 } from '@/lib/today-sections';
-import { diasDoCiclo, painelDoDia, ritmoDoDia } from '@/lib/today-spend';
+import { painelDoDia } from '@/lib/today-spend';
 
 /**
  * A Hoje — "o dia" (spec `2026-09-28-hoje-o-dia-design.md`).
@@ -73,6 +75,7 @@ import { diasDoCiclo, painelDoDia, ritmoDoDia } from '@/lib/today-spend';
  * |---|---|---|
  * | 1 | saudação e data | o dia de quem abre |
  * | 2 | primeiros passos | só para quem está começando |
+ * | 2b | **a semana** | três dias para trás e três para a frente: o que saiu (barra) contra o que dá por dia (régua), e o que vem (marcas) |
  * | 3 | **Seu dia** | o atrasado numa linha, o que vence/chega hoje e os lembretes com o AGORA |
  * | 4 | **o dinheiro do dia** | quanto cabe por dia, o que saiu hoje, quanto há em conta |
  * | 5 | próximos dias | a semana, uma linha por compromisso |
@@ -134,12 +137,12 @@ export default function TodayScreen() {
   // "Paguei"/"Recebi" confirma o valor numa folha curta antes da baixa (25/09/2026).
   const baixa = useConfirmarBaixa();
   /*
-    O que saiu HOJE e o que saiu no ciclo até hoje: duas fatias da mesma leitura, e é a segunda
-    que dá a régua ("sua média"). A do ciclo só liga quando a borda chega — buscar com um palpite
-    de início daria o ritmo de outro período sob o rótulo deste.
+    A semana: o gasto de cada dia de três dias atrás até hoje, pela MESMA régua do "saiu hoje"
+    (`daily_spending` = `transactions_summary` dia a dia, com teste no banco).
   */
-  const saiuHoje = useTransactionsSummary(hoje, hoje);
-  const saiuNoCiclo = useTransactionsSummary(cycle.data?.de ?? hoje, hoje, Boolean(cycle.data?.de));
+  const gastos = useDailySpending(somaDias(hoje, -3), hoje);
+  /** `null` = hoje. Guardar a DATA de hoje prenderia a escolha no dia de ontem depois da meia-noite. */
+  const [diaEscolhido, setDiaEscolhido] = useState<string | null>(null);
 
   const [atrasadosAbertos, setAtrasadosAbertos] = useState(false);
   const [limiteDoAtrasado, setLimiteDoAtrasado] = useState(PASSO);
@@ -171,27 +174,16 @@ export default function TodayScreen() {
 
   /* `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch falha. */
   const emConta = useMemo(() => caixaDasContas(saldos.isError ? [] : (saldos.data ?? [])), [saldos.isError, saldos.data]);
-  const soma = (resumo: { kind: string; total_cents: number | string }[] | undefined, lado: string) =>
-    (resumo ?? []).filter((l) => l.kind === lado).reduce((t, l) => t + Number(l.total_cents), 0);
-  const entrouHoje = soma(saiuHoje.data, 'income');
-  /* A média só existe com o ciclo em mãos: sem ele a soma seria 0 e a linha diria "média de R$ 0,00". */
-  const temMedia = saiuNoCiclo.isSuccess && Boolean(cycle.data?.de);
-  const ritmo = useMemo(
+  const semana = useMemo(
     () =>
-      ritmoDoDia({
-        hojeCents: soma(saiuHoje.data, 'expense'),
-        cicloCents: soma(saiuNoCiclo.data, 'expense'),
-        diasDecorridos: temMedia && cycle.data?.de ? diasDoCiclo(cycle.data.de, hoje) : 1,
+      semanaDoDia({
+        hoje,
+        gastos: gastos.data ?? [],
+        proximos: agenda.proximos,
+        porDia: painel.modo === 'porDia' ? painel.cents : null,
       }),
-    [saiuHoje.data, saiuNoCiclo.data, cycle.data?.de, hoje, temMedia]
+    [hoje, gastos.data, agenda.proximos, painel.modo, painel.cents]
   );
-  const legendaDeHoje =
-    [
-      ritmo.media === null ? null : `${ritmo.acima ? 'acima' : 'abaixo'} da média de ${brl(ritmo.media)}/dia`,
-      entrouHoje > 0 ? `entrou ${brl(entrouHoje)}` : null,
-    ]
-      .filter(Boolean)
-      .join(' · ') || undefined;
 
   /** As fixadas; sem nenhuma, as mexidas por último. Uma prévia, não a lista: "Todas" leva a ela. */
   const todasAsNotas = useMemo(() => notas.data?.pages.flat() ?? [], [notas.data]);
@@ -203,16 +195,18 @@ export default function TodayScreen() {
   /** O Seu dia só afirma "nada" com as DUAS respostas na mão. */
   const diaCalmo = bills.isSuccess && reminders.isSuccess && linhas.length === 0;
   /** O que o card do dinheiro lê e falhou: um "Tentar de novo" que refaz só o que falhou. */
-  const falhasDoDinheiro = [saldos, budgets, saiuHoje].filter((c) => c.isError);
+  const falhasDoDinheiro = [saldos, budgets].filter((c) => c.isError);
   /** Os próximos dias somam as contas E as compras de cartão: sem uma delas a lista mentiria. */
   const falhasDosProximos = [bills, noCartao].filter((c) => c.isError);
+  /** A semana lê o gasto E os próximos dias (as marcas): sem um deles ela diria "nada previsto". */
+  const falhasDaSemana = [gastos, ...falhasDosProximos].filter((c) => c.isError);
 
   /*
     O PORTÃO DA TELA: a Hoje abre inteira ou não abre. `profile` pode nascer desligada e mesmo
     assim entra — `telaPronta` lê `fetchStatus`.
   */
   const pronta = useTelaPronta(
-    cycle, profile, gasto, bills, noCartao, reminders, budgets, saldos, saiuHoje, saiuNoCiclo, notas, pastas,
+    cycle, profile, gasto, bills, noCartao, reminders, budgets, saldos, gastos, notas, pastas,
     ...setup.consultas, ...proximo.consultas,
   );
 
@@ -350,6 +344,20 @@ export default function TodayScreen() {
     </Bloco>
   ) : null;
 
+  const semanaBlock = (
+    <Bloco key="semana">
+      <BlockHeader
+        title="Sua semana"
+        action={{ label: 'Lançamentos', accessibilityLabel: 'Ver os lançamentos', onPress: () => router.push('/finance/transactions') }}
+      />
+      {falhasDaSemana.length > 0 ? (
+        <ErrorCard onRetry={() => Promise.all(falhasDaSemana.map((c) => c.refetch()))} />
+      ) : (
+        <SemanaDoDia semana={semana} escolhido={diaEscolhido ?? hoje} onEscolher={setDiaEscolhido} />
+      )}
+    </Bloco>
+  );
+
   const diaBlock = (
     <Bloco key="dia">
       <BlockHeader
@@ -409,8 +417,6 @@ export default function TodayScreen() {
         <DinheiroDoDia
           painel={painel}
           onAbrirMenu={abrirMenu}
-          hoje={saiuHoje.isSuccess ? { saiu: ritmo.hoje, legenda: legendaDeHoje } : null}
-          onAbrirHoje={() => router.push('/finance/transactions')}
           caixa={saldos.isError ? null : emConta}
           contasAbertas={contasAbertas}
           onAlternarContas={() => setContasAbertas((v) => !v)}
@@ -502,8 +508,7 @@ export default function TodayScreen() {
           profile.refetch(),
           cycle.refetch(),
           saldos.refetch(),
-          saiuHoje.refetch(),
-          saiuNoCiclo.refetch(),
+          gastos.refetch(),
           notas.refetch(),
           pastas.refetch(),
         ])
@@ -512,6 +517,7 @@ export default function TodayScreen() {
         <TodayTabletCanvas
           saudacao={saudacaoBlock}
           passos={passosBlock}
+          semana={semanaBlock}
           dia={diaBlock}
           dinheiro={dinheiroBlock}
           proximos={proximosBlock}
@@ -520,7 +526,7 @@ export default function TodayScreen() {
       ) : (
         /* Os blocos DIRETO, sem `Fragment`: a cascata do `Screen` faz de todo elemento uma caixa com
            `gap`, e um `Fragment` com `null` dentro era um vão de 24dp (passos escondidos, sem notas). */
-        [saudacaoBlock, passosBlock, diaBlock, dinheiroBlock, proximosBlock, notasBlock]
+        [saudacaoBlock, passosBlock, semanaBlock, diaBlock, dinheiroBlock, proximosBlock, notasBlock]
       )}
     </Screen>
   );

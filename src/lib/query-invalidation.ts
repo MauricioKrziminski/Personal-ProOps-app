@@ -2,7 +2,7 @@ import { focusManager, type QueryClient } from '@tanstack/react-query';
 
 /** Financial writes can change ledger-derived RPCs across months and screens. */
 export const FINANCE_KEYS = [
-  ['transactions'], ['tx-summary'], ['monthly-cashflow'], ['account-balances'],
+  ['transactions'], ['tx-summary'], ['daily-spending'], ['monthly-cashflow'], ['account-balances'],
   ['budgets-status'], ['accounts'], ['goals'], ['budgets'], ['recurring'],
   ['card-summary'], ['invoice'], ['card-invoices'], ['installments'], ['forecast'], ['forecast-drafts'], ['anticipation-candidates'],
   /*

@@ -304,6 +304,12 @@ export function diaCurtoBR(iso: string): string {
   return `${DIAS_CURTOS[semana]}, ${d} ${MESES_CURTOS[m - 1]}`;
 }
 
+/** `2026-09-28` → `seg` — o dia da semana da coluna do gráfico da semana, da mesma tabela. */
+export function diaDaSemanaCurto(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return DIAS_CURTOS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+}
+
 /** `2026-09-17` → `set` — o mês do selo de data (widget), da mesma tabela da agenda. */
 export function mesCurto(iso: string): string {
   return MESES_CURTOS[Number(iso.slice(5, 7)) - 1];

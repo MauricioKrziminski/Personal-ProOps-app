@@ -4,10 +4,12 @@ import { test } from 'node:test';
 import {
   agendaDoDia,
   iconeDoItem,
+  legendaDoDia,
   linhasDoDia,
   metaDoItem,
   pendentesDaHoje,
   resumoDoAtrasado,
+  semanaDoDia,
   separarLembretes,
   type ContaPrevista,
   type ItemDaAgenda,
@@ -182,4 +184,70 @@ test('"por dia" é UMA conta: o card da Hoje e o widget dividem igual', () => {
   const semCiclo = painelDoDia({ livreCents: 50_000, diasLivres: null, ate: null, entrada: null, brl });
   assert.deepEqual({ modo: semCiclo.modo, rotulo: semCiclo.rotulo, legenda: semCiclo.legenda },
     { modo: 'total', rotulo: 'Livre', legenda: '' }, 'sem saber até quando, não inventa "1 dia"');
+});
+
+test('a semana tem hoje no meio: o que saiu para trás, o previsto para a frente', () => {
+  const { dias, teto, linha } = semanaDoDia({
+    hoje: HOJE,
+    gastos: [
+      { day: '2026-09-14', expense_cents: 5000, income_cents: 0 },
+      { day: '2026-09-16', expense_cents: '31240', income_cents: '400000' },
+      { day: HOJE, expense_cents: 116667, income_cents: 0 },
+      // o gasto de amanhã que já está lançado NÃO vira "saiu": o futuro é o previsto
+      { day: '2026-09-18', expense_cents: 999999, income_cents: 0 },
+    ],
+    proximos: [
+      { day: '2026-09-18', itens: [
+        item({ ref_id: 'luz', kind: 'transaction', day: '2026-09-18', cents: 21430 }),
+        item({ ref_id: 'fatura', kind: 'invoice', day: '2026-09-18', cents: 500000 }),
+        item({ ref_id: 'sal', kind: 'income', day: '2026-09-18', cents: 400000 }),
+        item({ ref_id: 'das', kind: 'card', day: '2026-09-18', cents: 7000 }),
+      ] },
+      { day: '2026-09-25', itens: [item({ ref_id: 'longe', day: '2026-09-25' })] },
+    ],
+    porDia: 100000,
+  });
+  assert.deepEqual(dias.map((d) => `${d.semana} ${d.numero} ${d.tipo}`), [
+    'seg 14 passado', 'ter 15 passado', 'qua 16 passado', 'qui 17 hoje', 'sex 18 futuro', 'sáb 19 futuro', 'dom 20 futuro',
+  ]);
+  assert.deepEqual(dias.map((d) => d.saiu), [5000, 0, 31240, 116667, 0, 0, 0]);
+  assert.equal(dias[2].entrou, 400000);
+  assert.equal(dias[4].previsto, 21430 + 500000 + 7000, 'os MESMOS itens dos Próximos dias, fatura inclusive, sem a receita');
+  assert.equal(dias[4].previstos, 3);
+  assert.equal(dias[4].aEntrar, 400000);
+  assert.deepEqual(dias.map((d) => d.acima), [false, false, false, true, false, false, false]);
+  assert.equal(teto, 116667);
+  assert.equal(linha, 100000);
+});
+
+test('semana sem nada ainda tem teto (nunca divide por zero) e sem "por dia" não tem régua', () => {
+  const vazia = semanaDoDia({ hoje: HOJE, gastos: [], proximos: [], porDia: null });
+  assert.equal(vazia.teto, 1);
+  assert.equal(vazia.linha, null);
+  assert.ok(vazia.dias.every((d) => !d.acima));
+  const soRegua = semanaDoDia({ hoje: HOJE, gastos: [], proximos: [], porDia: 270647 });
+  assert.equal(soRegua.teto, 270647, 'a régua cabe no gráfico mesmo sem gasto');
+});
+
+test('a frase do dia diz quando, quanto e o estado — com o esconder saldo', () => {
+  const brl = (c: number) => `R$ ${(c / 100).toFixed(2)}`;
+  const { dias, linha } = semanaDoDia({
+    hoje: HOJE,
+    gastos: [{ day: HOJE, expense_cents: 116667, income_cents: 50000 }, { day: '2026-09-16', expense_cents: 100, income_cents: 0 }],
+    proximos: [{ day: '2026-09-18', itens: [item({ day: '2026-09-18', cents: 21430 })] }],
+    porDia: 100000,
+  });
+  assert.deepEqual(legendaDoDia(dias[3], linha, brl), {
+    quando: 'Hoje', valor: 116667, rotulo: 'saiu', estado: 'acima do que dá por dia · entrou R$ 500.00',
+  });
+  assert.deepEqual(legendaDoDia(dias[2], linha, brl), {
+    quando: 'qua, 16 set', valor: 100, rotulo: 'saiu', estado: 'dentro do que dá por dia',
+  });
+  assert.deepEqual(legendaDoDia(dias[4], linha, brl), { quando: 'sex, 18 set', valor: 21430, rotulo: 'vence', estado: '1 compromisso' });
+  assert.deepEqual(legendaDoDia(dias[5], linha, brl), { quando: 'sáb, 19 set', valor: 0, rotulo: 'nada previsto', estado: null },
+    'dia vazio não diz "vence R$ 0,00"');
+  const soEntra = semanaDoDia({ hoje: HOJE, gastos: [], porDia: null,
+    proximos: [{ day: '2026-09-18', itens: [item({ kind: 'income', day: '2026-09-18', cents: 400000 })] }] });
+  assert.deepEqual(legendaDoDia(soEntra.dias[4], null, brl), { quando: 'sex, 18 set', valor: 400000, rotulo: 'entra', estado: null });
+  assert.equal(legendaDoDia(dias[2], null, brl).estado, null, 'sem régua, sem julgamento');
 });

@@ -383,6 +383,17 @@ function seedClient() {
     proxima_entrada: null,
   });
   client.setQueryData(['upcoming-card-charges', '6'], []);
+  /*
+    A semana da Hoje: `useDailySpending(hoje − 3, hoje)`. Um dia acima do "por dia" (âmbar), um
+    zerado (o ponto na base), a entrada de ontem e o gasto de hoje.
+  */
+  const diaAntes = (n: number) => localISODate(new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() - n));
+  client.setQueryData(['daily-spending', diaAntes(3), hoje], [
+    { day: diaAntes(3), expense_cents: 8740, income_cents: 0 },
+    { day: diaAntes(2), expense_cents: 31990, income_cents: 0 },
+    { day: diaAntes(1), expense_cents: 0, income_cents: 42000 },
+    { day: hoje, expense_cents: 12650, income_cents: 0 },
+  ]);
   client.setQueryData(['agent-activity', '6'], [
     {
       source_message_id: 'wamid.prev-1',

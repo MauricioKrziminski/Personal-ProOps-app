@@ -1,5 +1,5 @@
 import { orcamentosApertados, type OrcamentoLinha } from './budget-tight.ts';
-import { diasAte, isoToBR, localISODate } from './dates.ts';
+import { diaCurtoBR, diaDaSemanaCurto, diasAte, isoToBR, localISODate, somaDias } from './dates.ts';
 
 /**
  * A agenda da Hoje, fora da tela: o que exige ação AGORA e o que vem nos próximos dias.
@@ -250,4 +250,115 @@ export function pendentesDaHoje(v: {
     separarLembretes(v.lembretes, v.hoje).deHoje.length +
     orcamentosApertados(v.orcamentos).filter((o) => o.estourou).length
   );
+}
+
+/** Um dia da semana da Hoje: o que saiu (passado e hoje) ou o que está previsto (futuro). */
+export type DiaDaSemana = {
+  day: string;
+  /** `seg`, `ter`… */
+  semana: string;
+  /** `28` */
+  numero: string;
+  tipo: 'passado' | 'hoje' | 'futuro';
+  /** O gasto do dia — `daily_spending`, a régua de `transactions_summary`. Zero no futuro. */
+  saiu: number;
+  entrou: number;
+  /** Futuro: o que vence ou vai cair no cartão — os MESMOS itens dos Próximos dias, sem receita. */
+  previsto: number;
+  previstos: number;
+  /** Futuro: a receita prevista. */
+  aEntrar: number;
+  /** Gastou mais do que cabe por dia (só com "por dia"). */
+  acima: boolean;
+};
+
+export type Semana = {
+  dias: DiaDaSemana[];
+  /** O valor que ocupa a altura inteira das barras (só passado e hoje). Nunca zero. */
+  teto: number;
+  /** A régua tracejada: o que dá para gastar por dia, ou `null` sem ela. */
+  linha: number | null;
+};
+
+/**
+ * A semana da Hoje (28/09/2026): três dias para trás, hoje no meio, três para a frente.
+ *
+ * ⚠️ **Barra só para o que SAIU; o futuro é MARCA, não barra.** O passado e o hoje são o gasto
+ * pela data do lançamento (a régua do "saiu hoje", `daily_spending`). O futuro é o que vence —
+ * fatura inclusive, que é quando o dinheiro sai do caixa — e isso é OUTRA régua: uma barra de
+ * vencimento ao lado de uma barra de gasto teria a mesma cara e diria outra coisa (uma fatura de
+ * R$ 5.000 viraria "o maior gasto da semana"). Os itens do futuro são os MESMOS dos Próximos dias,
+ * logo abaixo, para a frase e a lista nunca discordarem.
+ */
+export function semanaDoDia(v: {
+  hoje: string;
+  gastos: readonly { day: string; expense_cents: number | string; income_cents: number | string }[];
+  proximos: readonly { day: string; itens: readonly ItemDaAgenda[] }[];
+  porDia: number | null;
+  antes?: number;
+  depois?: number;
+}): Semana {
+  const antes = v.antes ?? 3;
+  const depois = v.depois ?? 3;
+  const gastoDo = new Map(v.gastos.map((g) => [g.day, g]));
+  const itensDo = new Map(v.proximos.map((g) => [g.day, g.itens]));
+
+  const dias: DiaDaSemana[] = [];
+  for (let delta = -antes; delta <= depois; delta++) {
+    const day = somaDias(v.hoje, delta);
+    const tipo = delta < 0 ? 'passado' : delta === 0 ? 'hoje' : 'futuro';
+    const gasto = tipo === 'futuro' ? undefined : gastoDo.get(day);
+    const itens = tipo === 'futuro' ? (itensDo.get(day) ?? []) : [];
+    const saidas = itens.filter((i) => i.kind !== 'income');
+    const saiu = Number(gasto?.expense_cents ?? 0);
+    dias.push({
+      day,
+      semana: diaDaSemanaCurto(day),
+      numero: String(Number(day.slice(8, 10))),
+      tipo,
+      saiu,
+      entrou: Number(gasto?.income_cents ?? 0),
+      previsto: saidas.reduce((t, i) => t + i.cents, 0),
+      previstos: saidas.length,
+      aEntrar: itens.filter((i) => i.kind === 'income').reduce((t, i) => t + i.cents, 0),
+      acima: v.porDia !== null && tipo !== 'futuro' && saiu > v.porDia,
+    });
+  }
+  const maior = Math.max(0, ...dias.map((d) => d.saiu), v.porDia ?? 0);
+  return { dias, teto: Math.max(1, maior), linha: v.porDia };
+}
+
+/**
+ * O que a semana diz do dia escolhido: QUANDO, o valor, e o estado dele. `brl` é o que obedece ao
+ * "esconder saldo".
+ */
+export function legendaDoDia(
+  d: DiaDaSemana,
+  linha: number | null,
+  brl: (cents: number) => string
+): { quando: string; valor: number; rotulo: string; estado: string | null } {
+  const quando = d.tipo === 'hoje' ? 'Hoje' : diaCurtoBR(d.day);
+  if (d.tipo === 'futuro') {
+    // Dia vazio é "nada previsto" — "vence R$ 0,00" diria que algo vence.
+    if (d.previstos === 0 && d.aEntrar === 0) return { quando, valor: 0, rotulo: 'nada previsto', estado: null };
+    if (d.previstos === 0) return { quando, valor: d.aEntrar, rotulo: 'entra', estado: null };
+    return {
+      quando,
+      valor: d.previsto,
+      rotulo: 'vence',
+      estado: [
+        `${d.previstos} ${d.previstos === 1 ? 'compromisso' : 'compromissos'}`,
+        d.aEntrar > 0 ? `entra ${brl(d.aEntrar)}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    };
+  }
+  const estado = [
+    linha === null ? null : d.acima ? 'acima do que dá por dia' : 'dentro do que dá por dia',
+    d.entrou > 0 ? `entrou ${brl(d.entrou)}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return { quando, valor: d.saiu, rotulo: 'saiu', estado: estado || null };
 }

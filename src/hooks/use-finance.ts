@@ -433,6 +433,25 @@ export function useTransactionsSummary(fromDate: string, toDate: string, pronto 
   });
 }
 
+export type DailySpendingRow = Fns['daily_spending']['Returns'][number];
+
+/**
+ * O gasto e a entrada de cada dia de `[from, to]` — a semana da Hoje. A MESMA régua de
+ * `transactions_summary` (`20260928220000`): a barra de hoje é o "saiu hoje". Todo dia da janela
+ * volta, zerado inclusive; o banco recusa janela de mais de 62 dias.
+ */
+export function useDailySpending(fromDate: string, toDate: string) {
+  useRealtimeInvalidate('transactions', ['daily-spending']);
+  return useQuery({
+    queryKey: ['daily-spending', fromDate, toDate],
+    queryFn: async (): Promise<DailySpendingRow[]> => {
+      const { data, error } = await supabase.rpc('daily_spending', { p_from: fromDate, p_to: toDate });
+      if (error) throw error;
+      return (data ?? []) as DailySpendingRow[];
+    },
+  });
+}
+
 export function useMonthlyCashflow(monthsBack = 6, view?: CycleView) {
   useRealtimeInvalidate('transactions', ['monthly-cashflow']);
   return useQuery({

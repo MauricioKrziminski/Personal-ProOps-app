@@ -25,7 +25,7 @@ begin
     'accept_pending_invites','account_balances','agent_activity','annual_by_category','annual_summary',
     'anticipation_candidates','approve_import_items','budgets_status','cancel_subscription','card_summary',
     'categories_used','convert_transaction_to_installments','create_installment_plan_last_day','create_installment_plan_with_history',
-    'cycle_lines','cycle_now','cycle_range','cycle_series','debt_schedule','delete_debt','financial_health',
+    'cycle_lines','cycle_now','cycle_range','cycle_series','daily_spending','debt_schedule','delete_debt','financial_health',
     'finish_import_batch','forecast_json','goal_deposit','import_unmatched','month_breakdown',
     'materialize_recurring_occurrence','month_forecast_json','month_lines','month_summary','monthly_cashflow','my_default_workspace',
     'net_worth','net_worth_series','note_folder_counts','note_folders_reorder','note_tag_counts',

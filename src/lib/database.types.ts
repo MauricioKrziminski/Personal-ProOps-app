@@ -2442,6 +2442,14 @@ export type Database = {
           saiu_realizado: number
         }[]
       }
+      _daily_spending: {
+        Args: { p_from: string; p_to: string; uid: string }
+        Returns: {
+          day: string
+          expense_cents: number
+          income_cents: number
+        }[]
+      }
       _default_workspace: { Args: { uid: string }; Returns: string }
       _forecast_with_drafts: {
         Args: { days: number; drafts: Json; uid: string }
@@ -2840,6 +2848,14 @@ export type Database = {
           resultado: number
           saiu: number
           saiu_realizado: number
+        }[]
+      }
+      daily_spending: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          day: string
+          expense_cents: number
+          income_cents: number
         }[]
       }
       debt_schedule: {

@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { caixaDasContas, type SaldoDeConta } from './account-cash.ts';
-import { diasDoCiclo, ritmoDoDia } from './today-spend.ts';
 
 const saldo = (p: Partial<SaldoDeConta> & { name: string }): SaldoDeConta => ({
   account_id: p.name,
@@ -68,31 +67,4 @@ test('conta zerada e sem nada a receber não vira linha', () => {
     c.linhas.map((l) => l.nome),
     ['Viva', 'Só a receber']
   );
-});
-
-test('a média do ritmo EXCLUI hoje — senão o estouro levanta a própria régua', () => {
-  // 5 dias decorridos, R$ 400 no ciclo, R$ 200 hoje → os 4 dias anteriores somaram 200 = 50/dia.
-  const r = ritmoDoDia({ hojeCents: 200_00, cicloCents: 400_00, diasDecorridos: 5 });
-  assert.equal(r.media, 50_00);
-  assert.equal(r.acima, true);
-  // Se hoje entrasse na conta, a média seria 80 e o dia continuaria "acima" — mas por menos.
-  assert.notEqual(r.media, Math.round(400_00 / 5));
-});
-
-test('no primeiro dia do ciclo não há com o que comparar', () => {
-  const r = ritmoDoDia({ hojeCents: 200_00, cicloCents: 200_00, diasDecorridos: 1 });
-  assert.equal(r.media, null);
-  assert.equal(r.acima, false);
-});
-
-test('dia parado fica abaixo da média, sem virar negativo', () => {
-  const r = ritmoDoDia({ hojeCents: 0, cicloCents: 300_00, diasDecorridos: 4 });
-  assert.equal(r.media, 100_00);
-  assert.equal(r.acima, false);
-});
-
-test('diasDoCiclo conta hoje e atravessa mês', () => {
-  assert.equal(diasDoCiclo('2026-09-11', '2026-09-11'), 1);
-  assert.equal(diasDoCiclo('2026-09-11', '2026-09-17'), 7);
-  assert.equal(diasDoCiclo('2026-08-28', '2026-09-02'), 6);
 });
