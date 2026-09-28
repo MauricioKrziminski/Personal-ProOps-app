@@ -79,8 +79,30 @@ aplicadas **só no staging**; o agente não foi publicado.
 Conferido no simulador: a prevista de 30/10 em primeiro no dia; gravação do toque sem vão
 (todos os quadros com a linha no lugar); "Todos" na dívida com dia 20 → 20/08 e 20/09 e contrato no 20.
 
+Sonda do Gemini real (`scripts/probe_parcelas_no_ultimo_dia.py`, depois de ~20 min de 503 do
+`gemini-3.1-flash-lite`): **7/7** — as quatro redações de "último dia" viram
+`recurrence=FREQ=MONTHLY;BYMONTHDAY=-1`, e "1ª parcela dia 30/10", "300 por parcela" e
+"renomeia" não ganham a regra.
+
+## Terceira rodada — a pergunta de alcance na ficha
+
+*"Quando eu vou dentro de dívida e clico em editar, faz sentido ele ter as 3 perguntas?"* Não fazia:
+na ficha da dívida, em Recorrentes, em "Editar a compra" e no lembrete pela lista a pessoa edita o
+CONTRATO, e o "Só esta" mexia numa ocorrência que ela não escolheu (a próxima parcela, a próxima
+ocorrência gravada, a próxima em aberto). Na dívida era pior: nome, tipo, conta e saldo só aceitavam
+"Todas", e as outras duas opções terminavam em erro.
+
+- Contrato/série: "Das próximas em diante" e "Todas". Ocorrência aberta (lançamento; lembrete pela
+  Hoje): as três.
+- Dívida: `20260928210080` — "Das próximas" muda o contrato em qualquer campo sem reescrever os
+  pagamentos feitos; "Todas" com dia novo leva os pagamentos registrados ao dia novo.
+- Sem pergunta quando a escolha não muda nada (nada alterado, sem passado, nº de parcelas/pagas).
+- Conferido no simulador: ficha da dívida, Recorrentes e "Editar a compra" com duas opções; o
+  mesmo lembrete com duas pela lista e três pela Hoje. Todas as edições canceladas; o lembrete de
+  teste apagado.
+
 ## Pendências
 
-- **Produção**: `20260928210000` a `20260928210070` → agente (agendador e a gravação antes do
+- **Produção**: `20260928210000` a `20260928210080` → agente (agendador e a gravação antes do
   "paguei") → app, só com pedido.
 - Agente: ocorrência além do horizonte de um ano não é encontrada pelo "paguei".

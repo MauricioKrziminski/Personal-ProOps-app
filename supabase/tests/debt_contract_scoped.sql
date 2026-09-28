@@ -91,8 +91,11 @@ begin
   assert r->>'recorded_changed'='1';
   assert (select amount_cents from public.transactions where debt_id=d)=11000,
     'all corrects recorded cash';
-  assert (select occurred_at from public.transactions where debt_id=d)=paid_date,
-    'real payment date is historical fact';
+  -- 28/09/2026, decisão do dono do produto: "Todas" com dia novo leva também o pagamento
+  -- registrado ao dia novo, no próprio mês (`20260928210080`). Antes era "fato histórico".
+  assert (select occurred_at from public.transactions where debt_id=d)
+    = private.day_in_month(paid_date,-1),
+    'all moves the recorded payment to the new day of its own month';
   assert (select count(*) from public.debt_declared_estimates where debt_id=d)=0,
     'all recalculates declared historical estimates';
   assert (select remaining_cents from public.debts where id=d)=22000,

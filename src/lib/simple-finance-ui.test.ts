@@ -367,8 +367,9 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
         },
       };
       if (name === '@/lib/item-actions') return { confirmDestructive: (_title: string, _label: string, callback: () => void, mensagem?: string) => { confirmations.push(callback); avisos.push(mensagem ?? ''); }, showItemActions: (_title: string, entries: any[]) => actions.push(...entries) };
-      if (name === '@/lib/edit-scope') return { askEditScope: (_kind: string, onSelect: (scope: string) => void) => actions.push(
-        { label: 'Só esta parcela', onPress: () => onSelect('one') },
+      if (name === '@/lib/edit-scope') return { askEditScope: (_kind: string, onSelect: (scope: string) => void, _msg?: string, opcoes?: { contrato?: boolean }) => actions.push(
+        // editando o contrato não há "esta" (28/09/2026)
+        ...(opcoes?.contrato ? [] : [{ label: 'Só esta parcela', onPress: () => onSelect('one') }]),
         { label: 'Esta e próximas', onPress: () => onSelect('future') },
         { label: 'Todas', onPress: () => onSelect('all') },
       ) };
@@ -705,27 +706,28 @@ test('editing the paid count keeps the contract calendar: the next date follows 
   const data = ui.nodes().find((n) => n.type === 'Field' && n.props.label === 'Próxima parcela (a 11ª)');
   assert.ok(data, 'o rótulo segue as pagas');
   ui.press('Salvar');
-  assert.equal(ui.writes.length, 0, 'a edição espera uma escolha de alcance');
-  ui.interact(() => ui.actions.find((a: any) => a.label === 'Todas').onPress());
+  // "parcelas já pagas" vale para o contrato inteiro: a escolha de alcance não muda nada, não pergunta
+  assert.ok(!ui.actions.some((a: any) => a.label === 'Todas'));
   const saved = ui.writes[0].value;
   assert.equal(saved.debtId, 'd1');
-  assert.equal(saved.scope, 'all');
+  assert.equal(saved.scope, 'future');
   assert.equal(saved.patch.installments_paid, 10);
   assert.equal(saved.patch.remaining_cents, 147000 * 38);
   assert.equal('first_due_date' in saved.patch, false);
 });
 
-test('debt Save asks for scope and only one changes the selected installment', () => {
+test('na ficha da dívida o Salvar pergunta só próximas ou todas: não há "esta" (28/09/2026)', () => {
   const ui = screen(debtsFile, { create: false, debts: [carro],
     debtSchedule: [{ installment_no: 9, due_date: '2026-10-05', payment_cents: 147000 }] });
   editar(ui);
   ui.fill('Valor', 150000);
   ui.press('Salvar');
   assert.equal(ui.writes.length, 0);
-  ui.interact(() => ui.actions.find((a: any) => a.label === 'Só esta parcela').onPress());
+  assert.ok(!ui.actions.some((a: any) => a.label === 'Só esta parcela'), 'a ficha é o contrato, não uma parcela');
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Esta e próximas').onPress());
   assert.deepEqual(copia(ui.writes[0]), {
     operation: 'saveDebtContractScoped',
-    value: { debtId: 'd1', anchorNo: 9, scope: 'one',
+    value: { debtId: 'd1', anchorNo: 9, scope: 'future',
       patch: { installment_cents: 150000 }, debtRevision: 0, paymentVersions: {},
       requestId: '00000000-0000-4000-8000-000000000001' },
   });
@@ -743,12 +745,12 @@ test('last-day choice from debt editor carries the due-day rule to future instal
   assert.ok(ui.writes[0].value.patch.first_due_date);
 });
 
-test('unchanged debt Save picks scope but performs no mutation', () => {
+test('unchanged debt Save closes without asking and without writing', () => {
   const ui = screen(debtsFile, { create: false, debts: [carro],
     debtSchedule: [{ installment_no: 9, due_date: '2026-10-05', payment_cents: 147000 }] });
   editar(ui);
   ui.press('Salvar');
-  ui.interact(() => ui.actions.find((a: any) => a.label === 'Todas').onPress());
+  assert.ok(!ui.actions.some((a: any) => a.label === 'Todas'), 'nada mudou: nada a perguntar');
   assert.equal(ui.writes.length, 0);
 });
 
@@ -890,7 +892,6 @@ test('editing the paid count of an OLD debt keeps the date its schedule shows (f
   const campo = ui.nodes().find((n) => n.type === 'DatePickerField');
   assert.equal(campo.props.value, '05/10/2026', 'a data mostrada é a do cronograma, não uma deduzida');
   ui.press('Salvar');
-  ui.interact(() => ui.actions.find((a: any) => a.label === 'Todas').onPress());
   assert.equal('first_due_date' in ui.writes[0].value.patch, false, 'sem tocar na data, nada de âncora');
   assert.equal(ui.writes[0].value.patch.installments_paid, 9);
 });
@@ -915,7 +916,6 @@ test('as pagas não descem abaixo da maior parcela já paga pelo app (não só d
   editar(ui);
   ui.fill('Parcelas já pagas', '4');
   ui.press('Salvar');
-  ui.interact(() => ui.actions.find((a: any) => a.label === 'Todas').onPress());
   assert.equal(ui.writes.length, 0, 'o piso conserva o valor original e Save não escreve');
 });
 
@@ -1029,7 +1029,6 @@ test('editing a legacy amortized financing preserves its mode and remaining-term
   const modo = ui.nodes().find((n) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'amortized'));
   assert.equal(modo?.props.value, 'amortized');
   ui.press('Salvar');
-  ui.interact(() => ui.actions.find((a: any) => a.label === 'Todas').onPress());
   assert.equal(ui.writes.length, 0, 'sem mudar campos, o contrato existente fica intacto');
 });
 
@@ -2813,7 +2812,8 @@ test('Série: editar tem os campos da criação, e só o calendário mexido vai 
   ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(120000));
   salvar(ui);
   assert.equal(ui.pedidos.length, 0, 'Salvar pergunta o alcance antes de escrever');
-  assert.equal(ui.actions.slice(-3).length, 3);
+  // a série, não uma ocorrência: "Das próximas em diante" ou "Todas" — sem "Só esta" (28/09/2026)
+  assert.ok(!ui.actions.some((a: any) => a.label === 'Só esta parcela'));
   ui.interact(() => ui.actions.at(-2).onPress());
   const soValor = ui.pedidos.at(-1).value.patch;
   assert.equal(ui.pedidos.at(-1).operation, 'saveRecurringSeries');
@@ -2846,39 +2846,15 @@ test('Série: editar tem os campos da criação, e só o calendário mexido vai 
   const semMudanca = abrir();
   salvar(semMudanca);
   assert.equal(semMudanca.pedidos.length, 0);
-  assert.equal(semMudanca.actions.slice(-3).length, 3, 'até Save sem alteração pergunta o escopo');
-  semMudanca.interact(() => semMudanca.actions.at(-1).onPress());
+  assert.ok(!semMudanca.actions.some((a: any) => a.label === 'Todas'), 'sem alteração não pergunta o alcance');
   assert.equal(semMudanca.pedidos.length, 0, 'sem alteração fecha sem escrever');
 
-  // Só esta usa a próxima ocorrência pendente gravada, conservando o valor digitado no sheet.
-  const uiUma = screen('src/app/finance/recurring.tsx', {
-    recurring: [serie], params: { edit: 'rec-1' },
-    txs: [{ id: 'proxima-1', recurring_id: 'rec-1', status: 'pending', occurred_at: iso(proxima), edit_revision: 0 }],
-  });
-  uiUma.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(125000));
-  salvar(uiUma);
-  await uiUma.actions.at(-3).onPress();
-  assert.deepEqual(copia({ operation: uiUma.pedidos.at(-1).operation, value: uiUma.pedidos.at(-1).value }), {
-    operation: 'saveRecurringOne',
-    value: { id: 'proxima-1', patch: { amount_cents: 125000 }, expectedRevision: 0, requestId: '00000000-0000-4000-8000-000000000001' },
-  });
-
-  const uiSemLinha = abrir();
-  uiSemLinha.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(125000));
-  salvar(uiSemLinha);
-  await uiSemLinha.actions.at(-3).onPress();
-  assert.equal(uiSemLinha.pedidos.length, 0, 'não troca a série quando não há uma ocorrência gravada');
-  assert.ok(uiSemLinha.toasts.at(-1).message.includes('próxima ocorrência pendente'));
-
-  const uiEstrutural = screen('src/app/finance/recurring.tsx', {
-    recurring: [serie], params: { edit: 'rec-1' },
-    txs: [{ id: 'proxima-1', recurring_id: 'rec-1', status: 'pending', occurred_at: iso(proxima), edit_revision: 0 }],
-  });
-  uiEstrutural.interact((nodes: any[]) => nodes.find((n) => n.type === 'DatePickerField' && n.props.accessibilityLabel === 'Próximo vencimento da série').props.onChange(br(ultimo)));
-  salvar(uiEstrutural);
-  await uiEstrutural.actions.at(-3).onPress();
-  assert.equal(uiEstrutural.pedidos.at(-1).operation, 'saveRecurringOne');
-  assert.equal(uiEstrutural.pedidos.at(-1).value.patch.occurred_at, iso(ultimo), 'a data muda só nesta ocorrência');
+  // A ficha é a SÉRIE: não há "Só esta" (28/09/2026). Uma ocorrência se edita pelo lançamento dela.
+  const uiSemEsta = abrir();
+  uiSemEsta.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(125000));
+  salvar(uiSemEsta);
+  assert.deepEqual(uiSemEsta.actions.slice(-2).map((a: any) => a.label), ['Esta e próximas', 'Todas']);
+  assert.ok(!uiSemEsta.actions.some((a: any) => a.label === 'Só esta parcela'));
 
   const filtrada = abrir();
   filtrada.interact((nodes: any[]) => nodes.find((n) => n.type === 'Search').props.onChangeText('não aparece'));
@@ -2934,9 +2910,10 @@ test('Editar a compra: as já pagas se editam, o número muda com parcela paga, 
   assert.ok(ui.nodes().some((n: any) => n.type === 'DatePickerField' && n.props.accessibilityLabel === 'Data da primeira parcela'), 'fora do cartão a data muda');
   ui.interact(() => quantidade(ui, 'Parcelas já pagas').props.onChange(4));
   ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'TaskHeader').props.action.props.onPress());
-  assert.equal(ui.pedidos.length, 0, 'o alcance é escolhido depois de editar');
-  ui.interact(() => ui.actions.at(-1).onPress());
+  // as pagas são da compra toda: nada de "próximas ou todas", direto à confirmação do contrato
   assert.equal(ui.pedidos.length, 0, 'mudar pagas passa pela confirmação do contrato');
+  assert.ok(!ui.actions.some((a: any) => a.label === 'Todas'), 'sem pergunta de alcance');
+  assert.equal(ui.actions.at(-1).label, 'Aplicar ao contrato');
   ui.interact(() => ui.actions.at(-1).onPress());
   assert.equal(ui.pedidos.at(-1).value.paidInstallments, 4);
 

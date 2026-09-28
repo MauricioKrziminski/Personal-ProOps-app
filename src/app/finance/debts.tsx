@@ -491,38 +491,18 @@ export default function DebtsScreen() {
       delete patch.principal_cents;
       delete patch.remaining_cents;
     }
-    const dateChanged = Boolean(proximaISO &&
-      (patch.due_day !== undefined || patch.first_due_date !== undefined) &&
-      (!schedule.data?.[0] || proximaISO !== schedule.data[0].due_date));
     if (form.calculationMode !== original.calculation_mode) {
       toast({ message: 'O modo de cálculo não pode ser alterado. Cadastre outro contrato.', tone: 'error' });
       return;
     }
-    askEditScope('installment', (scope) => {
-      if (!Object.keys(patch).length && !dateChanged) {
-        volta.aoFechar(() => setForm(null));
-        return;
-      }
-      const scopedPatch = { ...patch };
-      if (scope === 'one') {
-        for (const key of Object.keys(scopedPatch)) {
-          if (key !== 'installment_cents' && key !== 'due_day' && key !== 'first_due_date') {
-            toast({ message: 'Este campo vale para o contrato inteiro. Escolha Todas.', tone: 'error' });
-            return;
-          }
-        }
-        delete scopedPatch.due_day;
-        delete scopedPatch.first_due_date;
-        if (dateChanged) scopedPatch.due_date = proximaISO!;
-      } else if (scope === 'future') {
-        for (const key of Object.keys(scopedPatch)) {
-          if (key !== 'installment_cents' && key !== 'due_day' && key !== 'first_due_date') {
-            toast({ message: 'Este campo vale para o contrato inteiro. Escolha Todas.', tone: 'error' });
-            return;
-          }
-        }
-      }
-      if (!Object.keys(scopedPatch).length) {
+    /*
+      Na ficha a pessoa edita o CONTRATO, não uma parcela: "Das próximas parcelas em diante" ou
+      "Todas" (28/09/2026). "Só esta" mexia na próxima parcela, que ninguém escolheu, e nome, conta
+      e saldo só aceitavam "Todas". Sem pagamento feito, ou sem campo que reescreva o passado (valor,
+      dia, conta, nome), as duas dariam o mesmo resultado: salva sem perguntar.
+    */
+    const salvarNo = (scope: 'future' | 'all') => {
+      if (!Object.keys(patch).length) {
         volta.aoFechar(() => setForm(null));
         return;
       }
@@ -532,11 +512,11 @@ export default function DebtsScreen() {
       }
       const versions = Object.fromEntries(paymentVersions.data.map((p) => [p.id, p.edit_revision]));
       const key = JSON.stringify([form.id, original.installments_paid + 1, scope,
-        scopedPatch, original.edit_revision, versions]);
+        patch, original.edit_revision, versions]);
       if (contractAttempt.current?.key !== key)
         contractAttempt.current = { key, id: newClientMessageId() };
       saveScoped.mutate({ debtId: form.id!, anchorNo: original.installments_paid + 1,
-        scope, patch: scopedPatch, debtRevision: original.edit_revision,
+        scope, patch, debtRevision: original.edit_revision,
         paymentVersions: versions, requestId: contractAttempt.current.id }, {
         ...callbacks,
         onSuccess: () => {
@@ -544,7 +524,15 @@ export default function DebtsScreen() {
           callbacks.onSuccess();
         },
       });
-    });
+    };
+    const mexeNoPassado = Number(original.installments_paid ?? 0) > 0 &&
+      ['installment_cents', 'due_day', 'first_due_date', 'account_id', 'name'].some((k) => k in patch);
+    if (!mexeNoPassado) {
+      salvarNo('future');
+      return;
+    }
+    askEditScope('installment', (scope) => salvarNo(scope === 'all' ? 'all' : 'future'),
+      'Todas também corrige os pagamentos já feitos.', { contrato: true });
   };
 
   const confirmarPagamento = () => {

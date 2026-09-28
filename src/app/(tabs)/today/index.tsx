@@ -515,7 +515,7 @@ export default function TodayScreen() {
           <ReminderTimeline
             lembretes={lembretes}
             agora={agora}
-            onOpen={(id) => router.push({ pathname: '/reminder-form', params: { id } })}
+            onOpen={(id) => router.push({ pathname: '/reminder-form', params: { id, ocorrencia: '1' } })}
           />
         </Bloco>
       ) : null}

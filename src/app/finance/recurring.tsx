@@ -32,7 +32,6 @@ import {
   useDeleteRecurring,
   useRecurringTransactions,
   useSaveRecurringAll,
-  useSaveRecurringOne,
   useSaveRecurringSeries,
   useToggleRecurring,
   type RecurringTransaction,
@@ -156,9 +155,7 @@ export default function RecurringScreen() {
   const create = useCreateRecurring();
   const editar = useSaveRecurringSeries();
   const editarTudo = useSaveRecurringAll();
-  const editarUma = useSaveRecurringOne();
   const tentativaTudo = useRef<{ key: string; id: string } | null>(null);
-  const tentativaUma = useRef<{ key: string; id: string } | null>(null);
   const tentativaFuturo = useRef<{ key: string; id: string } | null>(null);
   /** Qual `?edit=` já foi consumido — sem isto, fechar o sheet reabriria no render seguinte. */
   const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
@@ -243,71 +240,24 @@ export default function RecurringScreen() {
         patch.rrule = rrulePrevia;
         patch.next_run_at = inicioDate.toISOString();
       }
-      const linePatch: Parameters<typeof editarUma.mutate>[0]['patch'] = {};
+      const linePatch: Parameters<typeof editarTudo.mutate>[0]['linePatch'] = {};
       if (patch.amount_cents !== undefined) linePatch.amount_cents = patch.amount_cents;
       if (patch.category !== undefined) linePatch.category = patch.category;
       if (patch.description !== undefined) linePatch.description = patch.description;
       if (patch.merchant !== undefined) linePatch.merchant = patch.merchant;
       if (patch.account_id !== undefined) linePatch.account_id = patch.account_id;
 
+      /*
+        Aqui a pessoa edita a SÉRIE, não uma ocorrência (28/09/2026): "Das próximas em diante" ou
+        "Todas". O "Só esta" mexia na próxima ocorrência gravada, que ninguém abriu — uma
+        ocorrência se edita pelo lançamento dela, em Lançamentos ou em "Ver ocorrências".
+      */
+      if (Object.keys(patch).length === 0) {
+        // nada mudou: nada a perguntar
+        volta.aoFechar(() => setForm(null));
+        return;
+      }
       askEditScope('occurrence', async (scope) => {
-        if (Object.keys(patch).length === 0) {
-          volta.aoFechar(() => setForm(null));
-          return;
-        }
-        if (scope === 'one') {
-          if ('end_date' in patch) {
-            toast({
-              message: 'O término pertence à série. Escolha o alcance para próximas ocorrências ou para todas.',
-              tone: 'error',
-            });
-            return;
-          }
-          if (patch.kind !== undefined) linePatch.kind = patch.kind;
-          if (patch.auto_confirm !== undefined) linePatch.auto_confirm = patch.auto_confirm;
-          if (form.agendaMudou) linePatch.occurred_at = brToISO(form.inicio);
-          try {
-            const { data: anchor, error } = await supabase.from('transactions')
-              .select('id, recurring_id, edit_revision, occurred_at')
-              .eq('recurring_id', form.id!)
-              .eq('status', 'pending')
-              .gte('occurred_at', localISODate())
-              .order('occurred_at')
-              .limit(1)
-              .maybeSingle();
-            if (error) throw error;
-            if (!anchor || anchor.recurring_id !== form.id) {
-              toast({
-                message: 'Ainda não há uma próxima ocorrência pendente gravada. Escolha o alcance para próximas ocorrências ou para todas.',
-                tone: 'error',
-              });
-              return;
-            }
-            if (linePatch.occurred_at === anchor.occurred_at) delete linePatch.occurred_at;
-            if (!Object.keys(linePatch).length) {
-              volta.aoFechar(() => setForm(null));
-              return;
-            }
-            const key = JSON.stringify([anchor.id, linePatch, anchor.edit_revision]);
-            if (tentativaUma.current?.key !== key) tentativaUma.current = { key, id: newClientMessageId() };
-            editarUma.mutate({
-              id: anchor.id,
-              patch: linePatch,
-              expectedRevision: anchor.edit_revision,
-              requestId: tentativaUma.current.id,
-            }, {
-              onSuccess: () => {
-                tentativaUma.current = null;
-                toast({ message: 'Próxima ocorrência alterada.', tone: 'success' });
-                volta.aoFechar(() => setForm(null));
-              },
-              onError: (saveError) => toast({ message: financeErrorMessage(saveError, 'Não deu para alterar a ocorrência.'), tone: 'error' }),
-            });
-          } catch (queryError) {
-            toast({ message: financeErrorMessage(queryError, 'Não deu para localizar a próxima ocorrência.'), tone: 'error' });
-          }
-          return;
-        }
         if (scope === 'all') {
           if (!antes || antes.edit_revision == null) {
             toast({ message: 'A recorrência mudou. Abra a edição novamente antes de salvar.', tone: 'error' });
@@ -354,7 +304,7 @@ export default function RecurringScreen() {
           },
           onError: (saveError) => toast({ message: financeErrorMessage(saveError, 'Não deu para alterar a série.'), tone: 'error' }),
         });
-      }, 'Escolha o alcance da mudança. A primeira opção altera a próxima ocorrência pendente já gravada.');
+      }, 'Todas também corrige as ocorrências já passadas.', { contrato: true });
       return;
     }
     if (!podeSalvar || !inicioDate || !rrulePrevia) return;
@@ -692,8 +642,8 @@ export default function RecurringScreen() {
               <Button
                 label={form?.id ? 'Salvar' : 'Criar'}
                 size="sm"
-                loading={create.isPending || editar.isPending || editarTudo.isPending || editarUma.isPending}
-                disabled={!podeSalvar || create.isPending || editar.isPending || editarTudo.isPending || editarUma.isPending}
+                loading={create.isPending || editar.isPending || editarTudo.isPending}
+                disabled={!podeSalvar || create.isPending || editar.isPending || editarTudo.isPending}
                 onPress={salvar}
               />
             }

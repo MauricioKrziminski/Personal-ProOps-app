@@ -259,7 +259,8 @@ export default function ReminderFormScreen() {
   const tablet = windowClass !== 'compact';
   // `title` e `noteId` chegam do menu "Criar lembrete" da nota: o título pré-preenche, e o
   // `noteId` vincula — é ele que faz a nota passar a oferecer "Editar lembrete".
-  const params = useLocalSearchParams<{ id?: string; title?: string; noteId?: string }>();
+  /** `ocorrencia=1`: aberto pela Hoje, no disparo de hoje — é UMA ocorrência, não a série. */
+  const params = useLocalSearchParams<{ id?: string; title?: string; noteId?: string; ocorrencia?: string }>();
   const query = useReminder(params.id);
 
   if (params.id && query.isLoading) {
@@ -313,6 +314,7 @@ export default function ReminderFormScreen() {
       editing={query.data}
       fallbackTitle={params.title}
       noteId={params.noteId}
+      umaOcorrenciaAberta={params.ocorrencia === '1'}
       tablet={tablet}
     />
   );
@@ -322,11 +324,14 @@ function ReminderForm({
   editing,
   fallbackTitle,
   noteId,
+  umaOcorrenciaAberta = false,
   tablet,
 }: {
   editing?: Reminder;
   fallbackTitle?: string;
   noteId?: string;
+  /** Aberto pela Hoje, no disparo de hoje: UMA ocorrência, não a série. */
+  umaOcorrenciaAberta?: boolean;
   tablet: boolean;
 }) {
   const insets = useSafeAreaInsets();
@@ -445,8 +450,14 @@ function ReminderForm({
 
     if (editing?.recurrence || editing?.parent_reminder_id) {
       Keyboard.dismiss();
+      // Pela Hoje (o disparo de hoje) ou numa ocorrência já editada, há "esta": três opções. Pela
+      // lista de Lembretes a pessoa edita a SÉRIE: "Das próximas em diante" ou "Todas" (28/09/2026).
+      const umaOcorrencia = Boolean(editing.parent_reminder_id || umaOcorrenciaAberta);
       askEditScope('reminder', commit,
-        'Só esta muda uma ocorrência. Todas atualiza o histórico armazenado, mas não altera quando ou como lembretes passados foram enviados.');
+        umaOcorrencia
+          ? 'Só esta muda uma ocorrência. Todas atualiza o histórico armazenado, mas não altera quando ou como lembretes passados foram enviados.'
+          : 'Todas atualiza o histórico guardado; lembretes já enviados não mudam.',
+        { contrato: !umaOcorrencia });
       return;
     }
     commit();

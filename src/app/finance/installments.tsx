@@ -367,7 +367,7 @@ export default function InstallmentsScreen() {
       editar.mutate(payload(), acoes);
     };
 
-    askEditScope('installment', (scope) => {
+    const aplicar = (scope: 'future' | 'all') => {
       const decisao = edicaoEscopadaDaCompra(form, plano, scope, numero);
       if (decisao.kind === 'structural-rejection' || decisao.kind === 'protected-rejection') {
         toast({ message: decisao.reason ?? 'Não é possível aplicar essa alteração.', tone: 'error' });
@@ -383,17 +383,25 @@ export default function InstallmentsScreen() {
         ], 'Quantidade, data inicial, conta e parcelas já pagas seguem as regras do contrato. Parcelas já pagas conservam seu valor e sua data.');
         return;
       }
-      const patch = scope === 'one' && decisao.patch.description
-        ? { ...decisao.patch, description: `${decisao.patch.description} (${numero}/${plano.installments})` }
-        : decisao.patch;
-      editarEscopo.mutate({ id: ancora.id, scope, patch, lastDay: decisao.lastDay }, {
+      editarEscopo.mutate({ id: ancora.id, scope, patch: decisao.patch, lastDay: decisao.lastDay }, {
         onSuccess: () => {
           volta.aoFechar(() => setForm(null));
           toast({ message: 'Alteração salva nas parcelas escolhidas.', tone: 'success' });
         },
         onError: acoes.onError,
       });
-    }, `A parcela de referência é a ${numero}/${plano.installments}. A primeira opção altera só ela; a segunda começa nela.`);
+    };
+    /*
+      Aqui a pessoa edita a COMPRA, não uma parcela (28/09/2026): "Das próximas parcelas em diante"
+      (a partir da próxima em aberto) ou "Todas". Nº de parcelas, conta e pagas são sempre da compra
+      toda, e sem parcela antes da próxima as duas opções são a mesma coisa: não pergunta.
+    */
+    if (numero <= 1 || edicaoEscopadaDaCompra(form, plano, 'all', numero).kind === 'contract') {
+      aplicar('all');
+      return;
+    }
+    askEditScope('installment', (scope) => aplicar(scope === 'all' ? 'all' : 'future'),
+      `A próxima em aberto é a ${numero}/${plano.installments}. Todas também corrige as já pagas.`, { contrato: true });
   };
 
   const bloco = (plano: InstallmentPlanSummary, index: number) => {

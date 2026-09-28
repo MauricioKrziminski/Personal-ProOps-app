@@ -92,6 +92,14 @@ dono do produto para o app inteiro.
 - **Registro que o app não sabe desenhar** (regra de repetição do WhatsApp) aparece por extenso e
   se troca num toque consciente ("Substituir"), nunca num formulário que mente o valor.
 - Botão novo de editar = linha nova em `docs/AGENTE-PARIDADE-COM-O-APP.md`.
+- **A pergunta de alcance depende do que a pessoa ABRIU** (28/09/2026, *"faz sentido ele ter as
+  3 perguntas já que eu não estou dentro de uma parcela em específico?"*). Uma ocorrência aberta
+  (o lançamento de uma parcela, ocorrência ou pagamento; o lembrete aberto pela Hoje) pergunta
+  "Só esta / Esta e as próximas / Todas". O contrato ou a série (ficha da dívida, Recorrentes,
+  "Editar a compra", o lembrete pela lista) pergunta só "Das próximas em diante / Todas"
+  (`askEditScope(..., { contrato: true })`). E não pergunta quando a escolha não muda nada:
+  nada alterado, nenhum passado (dívida sem pagamento, compra sem parcela antes da próxima) ou
+  campo que é sempre do contrato inteiro (nº de parcelas, pagas).
 
 ### Lista: do mais recente para o mais antigo, e aos poucos (24/09/2026)
 
