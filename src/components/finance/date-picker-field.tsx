@@ -9,7 +9,7 @@ import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdr
 import { Icon } from '@/components/ui/icon';
 import { Elevation, Radius, Space } from '@/design/tokens';
 import { useScheme, useTheme } from '@/hooks/use-theme';
-import { brToISO, isValidBRDate, isoToBR } from '@/lib/dates';
+import { brToISO, isValidBRDate, isoToBR, localISODate, monthBounds } from '@/lib/dates';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 
 interface Props {
@@ -17,6 +17,8 @@ interface Props {
   value: string | null;
   onChange: (br: string) => void;
   onSelectLastDay?: (br: string) => void;
+  /** O valor atual representa a intenção explícita de fim do mês (`BYMONTHDAY=-1`). */
+  lastDaySelected?: boolean;
   placeholder?: string;
   invalid?: boolean;
   accessibilityLabel: string;
@@ -50,6 +52,7 @@ export function DatePickerField({
   value,
   onChange,
   onSelectLastDay,
+  lastDaySelected = false,
   placeholder = 'Escolher data',
   invalid,
   accessibilityLabel,
@@ -62,6 +65,16 @@ export function DatePickerField({
   const vidro = supportsLiquidGlass() && !aberto;
 
   const iso = value && isValidBRDate(value) ? brToISO(value) : null;
+  const mesSelecionado = iso?.slice(0, 7) ?? localISODate().slice(0, 7);
+  const fimDoMesISO = monthBounds(mesSelecionado).to;
+  const fimDoMesSelecionado = isoToBR(fimDoMesISO);
+  const fimDoMesForaDoLimite = Boolean((min && fimDoMesISO < min) || (max && fimDoMesISO > max));
+
+  const alternarUltimoDia = () => {
+    if (lastDaySelected) onChange(fimDoMesSelecionado);
+    else onSelectLastDay?.(fimDoMesSelecionado);
+    setAberto(false);
+  };
 
   return (
     <Animated.View layout={transicaoDeLayout}>
@@ -110,14 +123,34 @@ export function DatePickerField({
                 onChange(isoToBR(escolhido));
                 setAberto(false);
               }}
-              onSelectLastDay={onSelectLastDay ? (escolhido) => {
-                onSelectLastDay(isoToBR(escolhido));
-                setAberto(false);
-              } : undefined}
               min={min}
               max={max}
             />
           </View>
+        ) : null}
+        {onSelectLastDay ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Último dia de todo mês"
+            accessibilityState={{ selected: lastDaySelected, disabled: fimDoMesForaDoLimite }}
+            disabled={fimDoMesForaDoLimite}
+            onPress={alternarUltimoDia}
+            style={({ pressed }) => [
+              styles.ultimoDia,
+              {
+                backgroundColor: lastDaySelected
+                  ? theme.tintFill
+                  : pressed ? theme.backgroundSelected : theme.backgroundElement,
+                opacity: fimDoMesForaDoLimite ? 0.4 : 1,
+              },
+            ]}>
+            <ThemedText type="smallBold" themeColor={lastDaySelected ? 'onTint' : 'tint'}>
+              Último dia de todo mês
+            </ThemedText>
+            <ThemedText type="caption" themeColor={lastDaySelected ? 'onTint' : 'textSecondary'}>
+              {lastDaySelected ? `Selecionado · ${fimDoMesSelecionado}` : `Usar ${fimDoMesSelecionado}`}
+            </ThemedText>
+          </Pressable>
         ) : null}
       </View>
     </Animated.View>
@@ -130,4 +163,12 @@ const styles = StyleSheet.create({
   /* O valor empurra o chevron para a direita e cede antes dele quando a fonte cresce. */
   valor: { flex: 1 },
   calendario: { borderTopWidth: 1, padding: Space.sm },
+  ultimoDia: {
+    minHeight: 48,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    justifyContent: 'center',
+    gap: 2,
+  },
 });

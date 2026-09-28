@@ -65,6 +65,33 @@ test('estimativa declarada usa o valor salvo para seu número, mas o pagamento r
   assert.equal(linhas[0].registered, false);
 });
 
+test('vencimento histórico salvo permanece estável quando a próxima parcela muda', () => {
+  const overrides = [
+    { installment_no: 1, amount_cents: 10000, due_date: '2026-08-31' },
+    { installment_no: 2, amount_cents: 10000, due_date: '2026-09-30' },
+  ];
+  const before = paidInstallments({
+    installmentsPaid: 2, installmentCents: 10000, nextDueDate: '2026-10-31', overrides,
+  });
+  const after = paidInstallments({
+    installmentsPaid: 2, installmentCents: 12000, nextDueDate: '2026-10-30', overrides,
+  });
+  assert.deepEqual(before.map((row) => row.due_date), ['2026-08-31', '2026-09-30']);
+  assert.deepEqual(after.map((row) => row.due_date), ['2026-08-31', '2026-09-30']);
+  assert.deepEqual(after.map((row) => row.payment_cents), [10000, 10000]);
+});
+
+test('data real do pagamento prevalece sobre a estimativa histórica salva', () => {
+  const rows = paidInstallments({
+    installmentsPaid: 2, installmentCents: 10000, nextDueDate: '2026-10-31',
+    overrides: [{ installment_no: 2, amount_cents: 9000, due_date: '2026-09-30' }],
+    payments: [{ debt_payment_no: 2, occurred_at: '2026-10-02', amount_cents: 10500 }],
+  });
+  assert.equal(rows[1].due_date, '2026-10-02');
+  assert.equal(rows[1].payment_cents, 10500);
+  assert.equal(rows[1].registered, true);
+});
+
 test('nada pago, nada para trás', () => {
   assert.deepEqual(
     paidInstallments({ installmentsPaid: 0, installmentCents: 147000, nextDueDate: '2026-10-08' }),

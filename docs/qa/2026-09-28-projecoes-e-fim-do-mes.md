@@ -1,0 +1,34 @@
+# Regressão: ocorrências previstas e último dia do mês
+
+## Evidência antes da correção (staging, 28/09/2026)
+
+- A série `Assinatura de streaming` (`d1a53364-3a61-4364-b9ad-b566fd7cf037`) foi criada em 03/09 e teve edição `Todos, inclusive passados` para dia 1. Sua regra atual é `FREQ=MONTHLY;BYMONTHDAY=1`, com `dtstart` e próximo vencimento em 01/10. Há somente um lançamento gravado, pendente, em 01/10.
+- `private.recurring_projection_for` calcula 01/11, 01/12 e os meses seguintes. `Lançamentos` e `Ver ocorrências` consultam apenas `public.transactions`, então essas previsões não aparecem nelas. A edição também substituiu `dtstart` pela próxima data, perdendo a âncora do primeiro período para consulta histórica.
+- No simulador iOS, o editor da série abriu e a navegação para novembro de 2026 em `Lançamentos` não apresentou a Assinatura. A consulta à staging distinguiu ausência na tela de ausência de cálculo no banco.
+- O controle `Último dia de todo mês` estava dentro do calendário expandido. Selecionar uma data fechava o calendário e escondia o controle; era fácil confundir o dia 30 fixo com a regra `BYMONTHDAY=-1`.
+- Dívidas já expõem agenda futura por `debt_schedule`, mas parcelas antigas apenas declaradas são inferidas da data da próxima parcela; editar a dívida desloca indevidamente as datas históricas exibidas. Parcelamentos comuns já possuem lançamentos materializados; devem ser verificados para não duplicar projeções.
+
+## Contrato a verificar depois
+
+1. Em janelas de mês/ciclo, a lista mostra os lançamentos gravados e as ocorrências ainda não gravadas com estado explícito. Uma previsão não vira pagamento nem entra no total de lançamentos reais e não oferece `Paguei`, `Editar` ou `Apagar` como se já existisse.
+2. `Ver ocorrências` permite percorrer meses anteriores e posteriores; uma série editada em `Todos` usa a nova regra desde o primeiro período que os dados sustentam. Meses sem data inicial comprovada devem ser identificados como estimativa, nunca como fato pago.
+3. `Só esta` não recria uma previsão na antiga data após mover uma ocorrência. `Esta e as próximas` preserva a regra e os valores anteriores; `Todos` refaz o calendário passado e futuro. Repetir a mesma requisição não muda a agenda outra vez.
+4. Dia 30 e 31 fixos usam a redução para o último dia nos meses curtos, inclusive fevereiro; a intenção `último dia de todo mês` permanece separada e visível com o calendário fechado.
+5. Dívidas mostram as parcelas futuras pela agenda e as datas históricas declaradas estáveis. Pagamentos gravados têm prioridade. Parcelamentos comuns não duplicam parcelas já materializadas. Consultas são limitadas ao período visível e respeitam o espaço do usuário.
+
+## Limite dos dados existentes
+
+`created_at` prova quando a série foi cadastrada, não o primeiro vencimento originalmente escolhido. Para séries antigas sem um campo imutável de início e sem lançamento anterior, não é possível afirmar pagamento ou data de vencimento antes do que foi gravado. A recuperação desse intervalo deve ser rotulada como estimativa ou restringida à evidência disponível.
+
+## Resultado verificado (staging, 28/09/2026)
+
+- O banco agora calcula as ocorrências de recorrências com versões de calendário, uma por janela visível, e mantém as datas históricas declaradas das dívidas em snapshot. `ledger_expected_lines` reúne recorrências ainda não lançadas, parcelas futuras da dívida e parcelas antigas apenas declaradas. A consulta não insere `transactions` e não altera totais ou pagamentos.
+- Em “Ver ocorrências” da Assinatura de streaming, novembro mostra 01/11 e R$ 55,90 no [simulador iOS](../bugs/evidence/2026-09-28/projecao-streaming-ios-novembro.png). Setembro mostra 01/09 como **estimativa retroativa, sem registro** no [AVD Android](../bugs/evidence/2026-09-28/streaming-setembro-estimado-android.png). Outubro, que tem lançamento real em 01/10, não duplica a linha prevista. O primeiro mês anterior recuperável é setembro, mês do cadastro; agosto não tem evidência de existência da série.
+- Em Lançamentos, dezembro civil mostra Assinatura em 01/12, Internet em 15/12 e Carro em 30/12, em ordem de vencimento, no [AVD Android](../bugs/evidence/2026-09-28/projecao-dezembro-android.png). Compras parceladas já materializadas aparecem abaixo como lançamentos reais, uma vez cada. A régua “Ciclo” cobre 11/11–10/12; para ver todo dezembro, a pessoa toca em “Mês”.
+- Na ficha do Carro da conta do AVD, o dia 30 segue 30/01, 28/02 e 30/03, e os dois pagamentos gravados mantêm a data **real** de 30/09 no [histórico](../bugs/evidence/2026-09-28/carro-historico-android.png), mesmo que o contrato tenha outro vencimento. Outro Carro em staging, de outra conta, tem sete parcelas antigas apenas declaradas: agosto/setembro aparecem como estimativas de R$ 1.485,00, outubro/novembro como agenda futura, sem transação falsa. Essa segunda conta foi conferida por consulta autenticada e teste SQL com rollback; não estava autenticada no AVD.
+- O controle [“Último dia de todo mês”](../bugs/evidence/2026-09-28/fim-mes-explicito-android.png) permanece visível com o calendário fechado, assinalado quando representa `BYMONTHDAY=-1`; ao desmarcar, a tela passa à regra [dia fixo](../bugs/evidence/2026-09-28/dia-fixo-android.png). A escolha de 30 ou 31 no calendário não marca fim de mês automaticamente. As regras para fevereiro comum e bissexto foram testadas no SQL e no domínio.
+- O agente iniciou gravação pelo [microfone do AVD](../bugs/evidence/2026-09-28/agente-gravacao-android.png), exibiu “Gravando” e, com silêncio, voltou à composição sem criar mensagem. A revisão editável da transcrição, o segundo áudio, a correção textual numa proposta pendente e o transporte iOS já têm evidência detalhada em [recorrência e áudio](../bugs/2026-09-27-recorrencia-e-audio.md). Não houve fala natural capturada pelo microfone do emulador nesta rodada.
+- Os três testes SQL de projeção/histórico passaram no PostgreSQL de staging com **rollback**. A leitura autenticada de um mês levou 8,1 ms em novembro e 10,3 ms em setembro no `EXPLAIN ANALYZE` do conjunto atual. O app consultou apenas a janela visível, de até 62 dias, e a RPC recusou janela maior. RLS isolou contas distintas.
+- `npm test`: **1.005/1.005**; testes dirigidos do agente: **104/104**; `npx tsc --noEmit`, `npm run lint` e `git diff --check`: sem erros. O teste completo detectou um mock antigo que não conhecia a nova consulta de projeções; o harness foi atualizado e a suíte voltou a passar. A tela também passou a expor falha dos lançamentos reais mesmo quando há previsões, sem duplicar o aviso de falha das previsões.
+
+As três migrações `20260928200010`, `20260928200020` e `20260928200030` foram aplicadas somente à staging `utkqoiigimqzeenxkxdl`. O app do AVD e o simulador iOS usam o código local e essa staging. O iPhone físico e a produção continuam fora desta validação, conforme a ordem pedida pelo usuário.

@@ -154,6 +154,7 @@ export function CamposDaSerie({
           value={form.inicio}
           onChange={(inicio) => onChange(mudaInicioDaSerie(form, inicio, false))}
           onSelectLastDay={form.preset === 'monthly' ? (inicio) => onChange(mudaInicioDaSerie(form, inicio, true)) : undefined}
+          lastDaySelected={form.preset === 'monthly' && Boolean(form.ultimoDia)}
           placeholder="Escolher o início"
           accessibilityLabel={editando ? 'Próximo vencimento da série' : 'Data de início da série'}
           min={editando ? localISODate() : undefined}

@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -117,7 +117,10 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       ? { ...query, data: undefined, isPending: true, fetchStatus: 'idle', hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => {}, refetch: async () => { refetches.push('list'); } }
       // Uma linha: com a lista vazia o card do resumo SOME de propósito (card que soma uma lista
       // vazia é eco — design.md §1), e o caminho feliz não teria o que mostrar.
-      : { ...query, data: { pages: [options.txs ?? [{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared' }]], pageParams: [] }, isPending: false, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => {}, refetch: async () => { refetches.push('list'); } },
+      : options.listError
+        ? { ...query, data: undefined, isError: true, isPending: false, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => {}, refetch: async () => { refetches.push('list'); } }
+        : { ...query, data: { pages: [options.txs ?? [{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared' }]], pageParams: [] }, isPending: false, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => {}, refetch: async () => { refetches.push('list'); } },
+    useExpectedLedgerLines: () => ({ ...query, isError: Boolean(options.expectedError), data: options.expectedError ? undefined : options.expectedLines ?? [], refetch: async () => { refetches.push('expected'); } }),
     useMonthSummary: () => ({ ...query, data: options.monthSummary ?? null }),
     useAccounts: () => ({ ...query, data: options.forecastAccounts ?? [] }),
     useCashFlowForecast: () => ({ ...query, data: [{ day: '2026-09-18', balance_cents: 10000, in_cents: 0, out_cents: 0 }] }),
@@ -294,6 +297,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@/components/notes/use-folder-menu') return { useFolderMenu: () => () => {} };
       if (name === '@/components/notes/nova-pasta') return load('src/components/notes/nova-pasta.tsx');
       if (name === '@/lib/volta-da-parcela') return load('src/lib/volta-da-parcela.ts');
+      if (name === '@/lib/ledger-expected') return load('src/lib/ledger-expected.ts');
+      if (name === '@/components/finance/expected-ledger-lines') return { ExpectedLedgerLines: 'ExpectedLedgerLines' };
       if (name === '@/lib/rrule-text') return { describeRRule: () => 'todo mês' };
       if (name === '@/hooks/use-archived-folders') return { useArchivedFolders: () => ({ ...query, isSuccess: true, data: options.pastasArquivadas ?? [] }) };
       if (name === '@/hooks/use-notes') return new Proxy({
@@ -1146,6 +1151,29 @@ test('Lançamentos com o período resolvido desenha o resumo, sem erro', () => {
   const t = tipos(screen(transacoesFile));
   assert.ok(t.includes('PeriodSummaryCard'), 'o card do resumo tem que aparecer');
   assert.ok(!t.includes('ErrorCard'));
+});
+
+test('Lançamentos mostra a previsão sem esconder falha na leitura dos registros reais', () => {
+  const expectedLine = {
+    origin: 'recurring', ref_id: 'series', due_date: '2026-09-10',
+    amount_cents: 5590, kind: 'expense', description: 'Assinatura', category: null,
+    account_id: null, installment_no: null, installments_total: null, inferred_start: false,
+  };
+  const ui = screen(transacoesFile, { txs: [], expectedLines: [expectedLine], listError: true });
+  const prediction = ui.nodes().find((n: any) => n.type === 'ExpectedLedgerLines');
+  assert.equal(prediction?.props.lines.length, 1);
+  const error = ui.nodes().find((n: any) => n.type === 'ErrorCard');
+  assert.ok(error, 'a previsão não deve esconder o erro dos lançamentos gravados');
+  error.props.onRetry();
+  assert.deepEqual(ui.refetches, ['list']);
+});
+
+test('Lançamentos mostra só uma falha quando a consulta das previsões falha', () => {
+  const ui = screen(transacoesFile, { txs: [], expectedError: true });
+  assert.equal(tipos(ui).filter((type: string) => type === 'ErrorCard').length, 1);
+  assert.ok(!tipos(ui).includes('EmptyState'));
+  ui.nodes().find((n: any) => n.type === 'ErrorCard').props.onRetry();
+  assert.deepEqual(ui.refetches, ['expected']);
 });
 
 

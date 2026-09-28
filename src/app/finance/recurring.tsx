@@ -438,7 +438,7 @@ export default function RecurringScreen() {
         onPress: () =>
           router.push({
             pathname: '/finance/transactions',
-            params: { recurringId: r.id },
+            params: { recurringId: r.id, month: dataLocalDe(r.next_run_at).slice(0, 7) },
           }),
       },
       {

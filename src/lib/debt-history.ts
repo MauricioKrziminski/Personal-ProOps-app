@@ -10,13 +10,13 @@
  * Estas linhas são **apresentação derivada de uma contagem**, nunca lançamento: elas não
  * entram na projeção, não viram `transactions` e não mexem no saldo. Onde existe pagamento
  * de verdade (a RPC `pay_debt_installment` grava um `transactions` com `debt_payment_no`),
- * a data e o valor vêm dele; o resto é a cadência mensal do contrato, andando para trás a
- * partir da próxima parcela em aberto.
+ * a data e o valor vêm dele; o resto usa o vencimento histórico salvo no banco. O cálculo
+ * regressivo a partir da próxima parcela só cobre registros antigos sem snapshot.
  */
 
 export interface PaidInstallment {
   installment_no: number;
-  /** ISO. Real quando `registered`; inferida da cadência mensal quando declarada. */
+  /** ISO. Real quando `registered`; projeção histórica salva quando declarada. */
   due_date: string;
   payment_cents: number;
   /** Existe um lançamento por trás — a data e o valor são fato, não inferência. */
@@ -34,7 +34,9 @@ export interface DebtPaymentRow {
 
 export interface DebtDeclaredEstimateRow {
   installment_no: number;
-  amount_cents: number;
+  amount_cents?: number;
+  /** Snapshot do vencimento histórico, independente da próxima parcela mutável. */
+  due_date?: string | null;
 }
 
 /** Soma meses a uma data ISO, prendendo o dia no último do mês (31/01 − 1 = 31/12, 31/03 − 1 = 28/02). */
@@ -68,7 +70,7 @@ export function paidInstallments({
   for (const p of payments) {
     if (p.debt_payment_no != null) porNumero.set(p.debt_payment_no, p);
   }
-  const estimativasPorNumero = new Map(overrides.map((o) => [o.installment_no, o.amount_cents]));
+  const estimativasPorNumero = new Map(overrides.map((o) => [o.installment_no, o]));
   // Pagamento lançado com número ACIMA das pagas (dado de antes do piso das pagas) é fato: ele
   // entra como pago, e a contagem estimada vai até ele.
   const ate = Math.max(pagas, ...porNumero.keys());
@@ -87,8 +89,8 @@ export function paidInstallments({
           }
         : {
             installment_no: n,
-            due_date: addMonthsISO(ancora, n - (pagas + 1)),
-            payment_cents: estimativasPorNumero.get(n) ?? installmentCents,
+            due_date: estimativasPorNumero.get(n)?.due_date ?? addMonthsISO(ancora, n - (pagas + 1)),
+            payment_cents: estimativasPorNumero.get(n)?.amount_cents ?? installmentCents,
             registered: false,
           },
     );

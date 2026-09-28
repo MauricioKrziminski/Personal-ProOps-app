@@ -1332,7 +1332,11 @@ function TransactionForm({
                   <DatePickerField
                     value={field.value}
                     onChange={mudaData}
-                    onSelectLastDay={editing?.recurring_id ? (br) => mudaData(br, 'ultimo') : undefined}
+                    onSelectLastDay={serie?.rrule.includes('FREQ=MONTHLY') ? (br) => mudaData(br, 'ultimo') : undefined}
+                    lastDaySelected={Boolean(
+                      serie?.rrule.includes('FREQ=MONTHLY') &&
+                      (intencaoDoDia === 'ultimo' || (intencaoDoDia === null && /BYMONTHDAY=-1(;|$)/.test(serie.rrule))),
+                    )}
                     accessibilityLabel="Data do lançamento"
                     invalid={!!errors.occurred_at}
                   />

@@ -691,6 +691,32 @@ export type Database = {
           },
         ]
       }
+      debt_declared_due_dates: {
+        Row: {
+          debt_id: string
+          due_date: string
+          installment_no: number
+        }
+        Insert: {
+          debt_id: string
+          due_date: string
+          installment_no: number
+        }
+        Update: {
+          debt_id?: string
+          due_date?: string
+          installment_no?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debt_declared_due_dates_debt_id_fkey"
+            columns: ["debt_id"]
+            isOneToOne: false
+            referencedRelation: "debts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       debts: {
         Row: {
           account_id: string | null
@@ -2850,6 +2876,20 @@ export type Database = {
           total_cents: number
         }[]
       }
+      expected_recurring_occurrences: {
+        Args: { p_from: string; p_to: string; p_recurring_id?: string | null }
+        Returns: {
+          id: string
+          recurring_id: string
+          due_date: string
+          amount_cents: number
+          kind: string
+          description: string
+          category: string
+          account_id: string | null
+          inferred_start: boolean
+        }[]
+      }
       expire_draft_actions: { Args: never; Returns: number }
       expire_pending_actions: {
         Args: { p_thread_id?: string }
@@ -2899,6 +2939,22 @@ export type Database = {
           occurred_at: string
           source: string
           status: string
+        }[]
+      }
+      ledger_expected_lines: {
+        Args: { p_from: string; p_to: string; p_recurring_id?: string | null }
+        Returns: {
+          origin: string
+          ref_id: string
+          due_date: string
+          amount_cents: number
+          kind: string
+          description: string
+          category: string
+          account_id: string | null
+          installment_no: number | null
+          installments_total: number | null
+          inferred_start: boolean
         }[]
       }
       month_breakdown: {

@@ -8,7 +8,8 @@ import type { Database } from '@/lib/database.types';
 import { dataLocalDe, localISODate, monthBounds, primeiroDiaDoMes } from '@/lib/dates';
 import { avisoDeDeslize } from '@/lib/serie';
 import type { Consulta } from '@/lib/tela-pronta';
-import type { DebtPaymentRow } from '@/lib/debt-history';
+import type { DebtDeclaredEstimateRow, DebtPaymentRow } from '@/lib/debt-history';
+import type { ExpectedLedgerLine } from '@/lib/ledger-expected';
 import { agentFetch } from '@/lib/agent-api';
 import { toIlikeTerm } from '@/lib/search';
 import { ACCOUNT_TYPES } from '@/lib/accounts';
@@ -245,9 +246,10 @@ export function useTransactions(filters: TransactionFilters) {
     initialPageParam: 0,
     queryFn: async ({ pageParam }): Promise<Transaction[]> => {
       let query = supabase.from('transactions').select(TRANSACTION_COLUMNS);
-      // "Ver ocorrências" de uma recorrente é a SÉRIE inteira, não um mês dela (27/09/2026: abria
-      // o mês do próximo vencimento, e a série recém-criada, sem nada nele, parecia vazia).
-      if (!filters.recurringId) query = query.gte('occurred_at', from).lte('occurred_at', to);
+      // Both recorded and calculated occurrences use the visible bounded period.
+      // The old unbounded recurring view could only show recorded rows and hid all
+      // future dates that had not yet been materialized by the scheduler.
+      query = query.gte('occurred_at', from).lte('occurred_at', to);
       query = query
         .order('occurred_at', { ascending: false })
         .order('created_at', { ascending: false })
@@ -294,7 +296,25 @@ export function useTransactions(filters: TransactionFilters) {
     },
     getNextPageParam: (last, all) =>
       last.length < TRANSACTION_PAGE ? undefined : all.length * TRANSACTION_PAGE,
-    enabled: filters.pronto !== false || Boolean(filters.recurringId),
+    enabled: filters.pronto !== false,
+  });
+}
+
+/** Missing, calculated occurrences for the same bounded window as Lançamentos. */
+export function useExpectedLedgerLines(from: string, to: string, pronto: boolean, recurringId?: string) {
+  useRealtimeInvalidate('transactions', ['ledger-expected']);
+  useRealtimeInvalidate('debts', ['ledger-expected']);
+  useRealtimeInvalidate('recurring_transactions', ['ledger-expected']);
+  return useQuery({
+    enabled: pronto,
+    queryKey: ['ledger-expected', from, to, recurringId ?? ''],
+    queryFn: async (): Promise<ExpectedLedgerLine[]> => {
+      const { data, error } = await supabase.rpc('ledger_expected_lines', {
+        p_from: from, p_to: to, p_recurring_id: recurringId ?? undefined,
+      });
+      if (error) throw error;
+      return (data ?? []) as ExpectedLedgerLine[];
+    },
   });
 }
 
@@ -1668,19 +1688,28 @@ export function useDebtPayments(debtId: string | undefined) {
   });
 }
 
-/** Valores históricos apenas declarados que diferem do valor atual do contrato. */
+/** Valores excepcionais e vencimentos históricos salvos por número de parcela. */
 export function useDebtDeclaredEstimates(debtId: string | undefined) {
   useRealtimeInvalidate('debt_declared_estimates', ['debt-declared-estimates']);
+  useRealtimeInvalidate('debt_declared_due_dates', ['debt-declared-estimates']);
   return useQuery({
     enabled: Boolean(debtId),
     queryKey: ['debt-declared-estimates', debtId ?? ''],
-    queryFn: async (): Promise<Pick<Tables['debt_declared_estimates']['Row'], 'installment_no' | 'amount_cents'>[]> => {
-      const { data, error } = await supabase.from('debt_declared_estimates')
-        .select('installment_no, amount_cents')
-        .eq('debt_id', debtId!)
-        .order('installment_no');
-      if (error) throw error;
-      return data;
+    queryFn: async (): Promise<DebtDeclaredEstimateRow[]> => {
+      const [amounts, dates] = await Promise.all([
+        supabase.from('debt_declared_estimates')
+          .select('installment_no, amount_cents').eq('debt_id', debtId!),
+        supabase.from('debt_declared_due_dates')
+          .select('installment_no, due_date').eq('debt_id', debtId!),
+      ]);
+      if (amounts.error) throw amounts.error;
+      if (dates.error) throw dates.error;
+      const byNumber = new Map<number, DebtDeclaredEstimateRow>();
+      for (const row of amounts.data) byNumber.set(row.installment_no, row);
+      for (const row of dates.data) byNumber.set(row.installment_no, {
+        ...byNumber.get(row.installment_no), installment_no: row.installment_no, due_date: row.due_date,
+      });
+      return [...byNumber.values()].sort((a, b) => a.installment_no - b.installment_no);
     },
   });
 }

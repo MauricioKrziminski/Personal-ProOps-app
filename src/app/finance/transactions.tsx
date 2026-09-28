@@ -7,9 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { categoryIcon } from '@/design/category-icons';
 import { ErrorCard } from '@/components/error-card';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
-import { monthTitle, shiftMonth } from '@/components/finance/month-picker';
+import { MonthPicker, monthTitle, shiftMonth } from '@/components/finance/month-picker';
 import { useMonthRuler } from '@/components/finance/month-ruler';
 import { PeriodBar } from '@/components/finance/period-bar';
+import { ExpectedLedgerLines } from '@/components/finance/expected-ledger-lines';
 import { ThemedText } from '@/components/themed-text';
 import { Forte } from '@/components/ui/forte';
 import { HeaderMenu } from '@/components/ui/header-actions';
@@ -42,6 +43,7 @@ import {
   useTransactions,
   useCycleSeries,
   useCycleMonth,
+  useExpectedLedgerLines,
   useTransactionsSummary,
   type Transaction,
   type TransactionKind,
@@ -55,6 +57,7 @@ import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive } from '@/lib/item-actions';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
 import { dueInline, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
+import { filterExpectedLines } from '@/lib/ledger-expected';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
 import { useDebounced } from '@/hooks/use-debounced';
 import { useTheme, useScheme } from '@/hooks/use-theme';
@@ -239,10 +242,13 @@ export default function TransactionsScreen() {
   }, [accountId]);
 
   const regua = useMonthRuler();
-  const mesCorrente = useCycleMonth(regua.view);
+  // A série é percorrida por mês civil: o ciclo financeiro pode atravessar dois
+  // meses e esconder justamente o vencimento que a pessoa está procurando.
+  const view = params.recurringId ? 'civil' : regua.view;
+  const mesCorrente = useCycleMonth(view);
   const month = mesEscolhido ?? mesCorrente;
   const setMonth = setMesEscolhido;
-  const range = useMonthRange(month, regua.view);
+  const range = useMonthRange(month, view);
   const list = useTransactions({
     /*
       ⚠️ **As MESMAS bordas do resumo, não `month`.** O hook recortava o mês civil por conta
@@ -260,6 +266,7 @@ export default function TransactionsScreen() {
     source,
     q: term,
   });
+  const expected = useExpectedLedgerLines(range.from, range.to, range.pronto, params.recurringId);
   const summary = useTransactionsSummary(range.from, range.to, range.pronto);
   /*
     ⚠️ **O card do topo soma a LISTA, e o ciclo virou o link do rodapé.** Ele já foi o contrário
@@ -333,7 +340,7 @@ export default function TransactionsScreen() {
     "Tentar de novo". Como consulta, ele libera quando falha, e a falha aparece no card e na
     lista. `regua.cycle` entra porque é ele que dá NOME ao mês. Ver `tela-pronta.ts`.
   */
-  const pronta = useTelaPronta(summary, serieCiclo, accounts, anyEver, list, regua.cycle, range);
+  const pronta = useTelaPronta(summary, serieCiclo, accounts, anyEver, list, expected, regua.cycle, range);
 
   /** O ciclo corrente não veio: o mês exibido seria o palpite civil, com o nome errado. */
   const cicloFalhou = regua.cycle.isError && !regua.cycle.data;
@@ -348,12 +355,21 @@ export default function TransactionsScreen() {
     Promise.all([
       ...(cicloFalhou ? [regua.cycle.refetch()] : []),
       ...(range.isError ? [range.refetch()] : []),
-      ...(range.pronto ? [summary.refetch(), list.refetch()] : []),
+      ...(range.pronto ? [summary.refetch(), list.refetch(), expected.refetch()] : []),
     ]);
 
   // `toSections` agrupa em varredura linear, então o dia que atravessa a fronteira de duas
   // páginas continua sendo uma seção só depois do `flat()`.
   const rows = useMemo(() => list.data?.pages.flat() ?? [], [list.data]);
+  const expectedLines = useMemo(() => filterExpectedLines(expected.data ?? [], {
+    kind: kind === 'all' ? undefined : kind,
+    status: status === 'all' ? undefined : status,
+    category,
+    accountId: accountId === undefined ? undefined : accountId === NO_ACCOUNT ? null : accountId,
+    source,
+    recurringId: params.recurringId,
+    q: term,
+  }), [expected.data, kind, status, category, accountId, source, params.recurringId, term]);
   const sections = useMemo(
     () => (params.recurringId ? toSeriesSections(rows, hoje) : toSections(rows)),
     [rows, params.recurringId, hoje]
@@ -434,7 +450,7 @@ export default function TransactionsScreen() {
     com zero linhas — ou seja, a tela anunciaria "Nada em outubro" antes de ter perguntado.
   */
   const vazioComAcao =
-    sections.length === 0 && !list.isPending && !list.isError && !neverHadAnything;
+    sections.length === 0 && expectedLines.length === 0 && !list.isPending && !list.isError && !expected.isError && !neverHadAnything;
   /** Não há o que resumir — inclui o mês sem movimento e o "nunca teve nada". */
   const listaVazia = sections.length === 0 && !list.isPending;
 
@@ -488,8 +504,9 @@ export default function TransactionsScreen() {
           da tela Contas (`saldoDaConta`). */}
       {saldoDaContaFiltrada}
 
-      {/* A série inteira não tem mês: a régua recortaria o que "Ver ocorrências" pediu inteiro. */}
-      {params.recurringId ? null : <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} />}
+      {params.recurringId
+        ? <MonthPicker month={month} onChange={setMonth} />
+        : <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} />}
 
       {/*
         ⚠️ **Com filtro ativo o card SOME.** Ele soma o período inteiro; a lista filtrada soma
@@ -598,6 +615,11 @@ export default function TransactionsScreen() {
           />
         ) : null}
       </View>
+      {expected.isError ? (
+        <ErrorCard onRetry={expected.refetch} />
+      ) : (
+        <ExpectedLedgerLines lines={expectedLines} today={hoje} />
+      )}
       {/* Aponta para a primeira linha: só com linhas, e só onde a lista vem logo abaixo. */}
       {sections.length > 0 && !wideWorkspace ? <Dica id="lista-arrasto" tela="lancamentos" bico="baixo" /> : null}
     </View>
@@ -610,15 +632,17 @@ export default function TransactionsScreen() {
   */
   const empty = periodoFalhou ? (
     <ErrorCard onRetry={() => { void refazerPeriodo(); }} />
+  ) : list.isError ? (
+    <ErrorCard onRetry={list.refetch} />
   ) : list.isPending ? (
     <View>
       <SkeletonRow />
       <SkeletonRow />
       <SkeletonRow />
     </View>
-  ) : list.isError ? (
-    <ErrorCard onRetry={list.refetch} />
-  ) : params.recurringId && !hasFilters ? (
+  // The expected-query error already appears in the header. A successful
+  // projection must never conceal a failed read of recorded transactions.
+  ) : expectedLines.length > 0 || expected.isError ? null : params.recurringId && !hasFilters ? (
     // Série recém-criada ou com o calendário refeito: o agendador gera as ocorrências em até um
     // minuto, e a lista se atualiza sozinha quando elas chegam.
     <EmptyState compacto icon="repeat" title="Esta recorrente ainda não tem ocorrências" />
@@ -952,7 +976,9 @@ export default function TransactionsScreen() {
     </ScrollView>
   );
 
-  const fab = vazioComAcao ? null : (
+  // Ver ocorrências is a read of one existing contract. "Lançar" here would create
+  // an unrelated transaction and look like it belonged to that series.
+  const fab = vazioComAcao || params.recurringId ? null : (
     // Com um toast no ar o FAB sobe: o "Desfazer" do toast ficava debaixo dele (24/09/2026).
     <Animated.View style={[styles.fab, { bottom: fabBase }, subirFab]}>
       <Button

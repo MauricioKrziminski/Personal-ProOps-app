@@ -1092,6 +1092,7 @@ export default function DebtsScreen() {
                     value={proximaISO ? isoToBR(proximaISO) : null}
                     onChange={(br) => escolherData(br)}
                     onSelectLastDay={(br) => escolherData(br, true)}
+                    lastDaySelected={diaDoContrato === -1}
                     accessibilityLabel={rotuloDaData}
                     invalid={faltaData}
                   />
@@ -1189,6 +1190,7 @@ export default function DebtsScreen() {
                     value={proximaISO ? isoToBR(proximaISO) : null}
                     onChange={(br) => escolherData(br)}
                     onSelectLastDay={(br) => escolherData(br, true)}
+                    lastDaySelected={diaDoContrato === -1}
                     accessibilityLabel={rotuloDaData}
                     invalid={faltaData}
                   />
