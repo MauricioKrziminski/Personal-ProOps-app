@@ -3,14 +3,16 @@
 Registro, não regra: o que está em cada banco HOJE se confere na fonte (`CLAUDE.md`, *Banco e
 fila*). Entradas movidas do `CLAUDE.md` em 26/09/2026, na ordem em que estavam lá.
 
-**Só no STAGING: `20260928220000_gasto_por_dia`** — aplicada no staging em 28/09/2026
-(`db push`, alvo conferido com `scripts/supabase-target.sh`). Cria `public.daily_spending(p_from,
-p_to)` (o app, sob RLS) e `public._daily_spending(uid, …)` (o agente, revogada): o gasto e a
-entrada de cada dia, pela MESMA régua de `transactions_summary`, para a semana da Hoje. Conferida
-com `scripts/sql-test.py supabase/tests/gasto_por_dia.sql` e `anon_sem_execute.sql`, os dois
-verdes. **Sobe ANTES do app que desenha a semana**: sem ela o `supabase.rpc('daily_spending')`
-volta `PGRST202` e a semana da Hoje mostra o card de erro (o resto da tela funciona). Não mexe
-em nada existente, então pode subir sozinha, sem par.
+**Produção e staging ALINHADOS em `20260928220000`** — as 31 de `20260927212119` a
+`20260928220000` aplicadas em produção pelo Gabriel em 28/09/2026 (`db push --project-ref`,
+depois de `migration list --project-ref` mostrar as 31 só no `local`) e conferidas na fonte:
+`schema_migrations` devolve `20260928220000`, `20260928210080`, `20260928210070`;
+`daily_spending` em uma versão, com `execute` para `authenticated` e sem para `anon`;
+`_daily_spending` sem `execute` para os dois; e nenhuma função de `public` executável por `anon`.
+Seguida a ordem migrations → agente → app no mesmo dia: agente `agente-00092-9kk` (`/health`
+200, `/internal/chat` 401 sem login, `/cron/reminders` 200 na revisão nova) e depois a tag
+`v1.3.53` e o build no iPhone. `20260928220000`: o gasto e a entrada de cada dia, pela régua de
+`transactions_summary`, para a semana da Hoje.
 
 **Produção e staging ALINHADOS em `20260920130000`** — aplicadas em produção pelo Gabriel em
 21/09/2026 e conferidas na fonte (`schema_migrations` devolve `20260920130000`,
