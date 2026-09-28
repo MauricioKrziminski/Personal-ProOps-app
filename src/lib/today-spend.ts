@@ -78,7 +78,8 @@ export type PainelDoDia = {
  */
 export function painelDoDia(v: {
   livreCents: number;
-  diasLivres: number;
+  /** `null` quando não se sabe até quando (sem ciclo e sem próxima entrada): aí não há "por dia". */
+  diasLivres: number | null;
   /** Até quando o livre vale (a próxima entrada, ou o fim do ciclo). */
   ate: string | null;
   /** A próxima entrada de dinheiro, quando existe. */
@@ -86,8 +87,8 @@ export function painelDoDia(v: {
   brl: (cents: number) => string;
 }): PainelDoDia {
   const ddmm = v.ate ? `${v.ate.slice(8, 10)}/${v.ate.slice(5, 7)}` : null;
-  const porDia = porDiaLivre(v.livreCents, v.diasLivres);
-  if (v.diasLivres > 1 && porDia >= POR_DIA_MINIMO) {
+  const porDia = v.diasLivres === null ? 0 : porDiaLivre(v.livreCents, v.diasLivres);
+  if (v.diasLivres !== null && v.diasLivres > 1 && porDia >= POR_DIA_MINIMO) {
     return {
       modo: 'porDia',
       rotulo: 'Dá para gastar por dia',
@@ -96,13 +97,13 @@ export function painelDoDia(v: {
       legenda: ddmm ? `${v.brl(v.livreCents)} livre até ${ddmm}` : `${v.brl(v.livreCents)} livre`,
     };
   }
-  const dias = `${v.diasLivres} ${v.diasLivres === 1 ? 'dia' : 'dias'}`;
-  const entra = v.entrada ? ` · entra dinheiro ${v.entrada.slice(8, 10)}/${v.entrada.slice(5, 7)}` : '';
+  const dias = v.diasLivres === null ? null : `${v.diasLivres} ${v.diasLivres === 1 ? 'dia' : 'dias'}`;
+  const entra = v.entrada ? `entra dinheiro ${v.entrada.slice(8, 10)}/${v.entrada.slice(5, 7)}` : null;
   return {
     modo: 'total',
     rotulo: ddmm ? `Livre até ${ddmm}` : 'Livre',
     cents: v.livreCents,
     negativo: v.livreCents < 0,
-    legenda: `${dias}${entra}`,
+    legenda: [dias, entra].filter(Boolean).join(' · '),
   };
 }

@@ -49,7 +49,7 @@ Não é "quanto eu gastei" — isso é a aba Financeiro. Aqui a resposta é **o 
    cliente é aceitável aqui (mesma precedência de `debts.tsx:119`): é agregação de uma lista já
    carregada, não uma segunda leitura do banco.
    *É o destaque porque é o único número da tela que decide comportamento hoje à noite.*
-4. **"Passando do limite"** — categorias ≥ 80%, ordenadas pelo percentual, em `Card` **opaco**.
+4. **"No limite"** — categorias ≥ 80%, ordenadas pelo percentual, em `Card` **opaco**.
    Barra + categoria + `faltam R$ 120`. Vem antes do resto porque é a única parte acionável.
 5. **"No controle"** — o restante, mesma linha, sem alarme. Colapsável, começa aberta.
 6. **"Sem limite definido"** — categorias com gasto no mês e **sem** orçamento, com uma ação

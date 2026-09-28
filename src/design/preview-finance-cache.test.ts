@@ -27,6 +27,11 @@ test('preview seeds the period queries Finance actually requests', () => {
   });
   const series = client.getQueryData<unknown[]>(['cycle-series', '2026-08', '2026-09', 'cycle']);
   assert.equal(series?.length, 2);
+  assert.deepEqual(
+    (series as { ini: string; fim: string }[]).map((c) => [c.ini, c.fim]),
+    [['2026-07-11', '2026-08-10'], ['2026-08-11', '2026-09-10']],
+    'a série do ciclo tem as bordas do ciclo, não as do mês civil'
+  );
   assert.equal(client.getQueryData<unknown[]>(['cycle-series', '2026-09', '2026-09', 'cycle'])?.length, 1);
   assert.ok(client.getQueryData<unknown[]>(['cycle-lines', '2026-09', 'cycle'])?.length);
 });

@@ -13,7 +13,7 @@ type Estado = Extract<EntradaDoDia, { tipo: 'lembrete' }>['estado'];
 /**
  * Um lembrete no Seu dia: a hora na coluna da agenda, o título, e de onde ele vem.
  *
- * - O que já passou esmaece; o próximo diz "em 2 h".
+ * - O que já passou esmaece; o próximo diz "em 2 h", em tinta — verde é dinheiro que entra (§2).
  * - O que ficou de OUTRO dia (o cron não entregou) diz a data dele, em âmbar — só a hora mentiria
  *   que é de hoje. Foi o "Para hoje" com lembretes de 25 dias antes (28/09/2026).
  *
@@ -41,7 +41,17 @@ export function LinhaDeLembrete({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={[lembrete.title, dia, hora, quando].filter(Boolean).join(', ')}
+      accessibilityLabel={[
+        lembrete.title,
+        dia,
+        hora,
+        quando,
+        passou ? 'já passou' : null,
+        lembrete.recurrence ? 'repete' : null,
+        lembrete.channel === 'whatsapp' ? 'pelo WhatsApp' : null,
+      ]
+        .filter(Boolean)
+        .join(', ')}
       onPress={() => onOpen(lembrete.id)}>
       {({ pressed }) => (
         <View style={[styles.linha, { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' }]}>
@@ -50,7 +60,7 @@ export function LinhaDeLembrete({
               {hora}
             </ThemedText>
             {quando ? (
-              <ThemedText type="caption" themeColor="success">
+              <ThemedText type="caption" themeColor="text">
                 {quando}
               </ThemedText>
             ) : dia ? (

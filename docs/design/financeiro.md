@@ -68,7 +68,7 @@ E o corolário imediato, que é o que realmente move comportamento: **"posso gas
 6. **"Onde o dinheiro foi"** — barras por categoria do mês **com comparação ao mês anterior**
    (a comparação é o que transforma número em informação). Toque na categoria → transações
    filtradas. Fonte: `transactions_summary`.
-7. **"Passando do limite"** — só orçamentos ≥ 80%. Fonte: `budgets_status`.
+7. **"No limite"** — só orçamentos ≥ 80% (o mesmo rótulo da Hoje e de Orçamentos). Fonte: `budgets_status`.
 8. **"Cartões"** — um `Row` por cartão: fatura atual, quanto falta fechar, limite livre.
    Fonte: `card_summary`.
 9. **"Últimos lançamentos"** — 5 itens agrupados por dia, com fonte (`via WhatsApp`) visível e

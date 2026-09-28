@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; summaryError?: 'hoje' | 'ciclo'; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -170,9 +170,9 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     // `budgetsPending`: os limites do mês chegando (a troca de mês, com o portão já aberto).
     useSaveBudget: () => mutation('saveBudget'),
     useDeleteBudget: () => mutation('deleteBudget'),
-    useBudgetsStatus: () => options.budgetsPending ? { ...query, isLoading: true, isPending: true, isSuccess: false, data: undefined } : ({ ...query, isSuccess: true, data: options.budgets ?? [] }),
+    useBudgetsStatus: () => options.budgetsError ? { ...query, isError: true, isSuccess: false, data: undefined, refetch: async () => { refetches.push('budgets'); } } : options.budgetsPending ? { ...query, isLoading: true, isPending: true, isSuccess: false, data: undefined } : ({ ...query, isSuccess: true, data: options.budgets ?? [] }),
     useSpendable: () => options.spendableError ? { ...query, isError: true, data: undefined, refetch: async () => { refetches.push('spendable'); } } : ({ ...query, isSuccess: true, data: options.spendable ?? { caixa: 0, comprometido_ate_entrada: 0, comprometido_no_ciclo: 0, proxima_entrada: null }, refetch: async () => { refetches.push('spendable'); } }),
-    useCycle: () => ({ ...query, isSuccess: true, data: options.cycle ?? { de: '2026-09-01', ate: '2026-09-30', mes: '2026-09', diasAteOFim: 22 } }),
+    useCycle: () => options.cycleError ? { ...query, isError: true, isSuccess: false, data: undefined } : ({ ...query, isSuccess: true, data: options.cycle ?? { de: '2026-09-01', ate: '2026-09-30', mes: '2026-09', diasAteOFim: 22 } }),
     useAccountBalances: () => ({
       ...query,
       isSuccess: !options.balancesError,
@@ -181,7 +181,9 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       refetch: async () => { refetches.push('balances'); },
     }),
     // A MESMA função serve as duas fatias da Hoje; o que as separa é a janela pedida.
-    useTransactionsSummary: (from: string, to: string) => options.resumoPendente ? { ...query, isPending: true, isLoading: true, isSuccess: false, fetchStatus: 'fetching', data: undefined } : ({
+    useTransactionsSummary: (from: string, to: string) => options.summaryError === (from === to ? 'hoje' : 'ciclo')
+      ? { ...query, isError: true, isSuccess: false, data: undefined, refetch: async () => { refetches.push(`summary-${options.summaryError}`); } }
+      : options.resumoPendente ? { ...query, isPending: true, isLoading: true, isSuccess: false, fetchStatus: 'fetching', data: undefined } : ({
       ...query,
       isSuccess: true,
       data: from === to ? (options.saiuHoje ?? []) : (options.saiuNoCiclo ?? []),
@@ -1389,19 +1391,62 @@ test('Hoje: falha nas contas mostra o erro no Seu dia, e o "Tentar de novo" refa
   assert.ok(erro, 'seção que falha diz que falhou (§7)');
   erro.props.onRetry();
   assert.ok(ui.refetches.includes('bills'));
-  assert.ok(!ui.nodes().some((n: any) => n.type === 'ThemedText' && String(n.props.children).startsWith('Nada para hoje')),
-    'sem resposta das contas a tela não afirma que o dia está livre');
+  assert.ok(!diaVazio(ui), 'sem resposta das contas a tela não afirma que o dia está livre');
 });
 
-test('Hoje: dia sem nada diz "Nada para hoje" e o que vem, sem inventar lista', () => {
+const diaVazio = (ui: ReturnType<typeof screen>) =>
+  ui.nodes().some((n: any) => n.type === 'EmptyState' && n.props.title === 'Nada para hoje');
+
+test('Hoje: dia sem nada diz "Nada para hoje" num vazio COMPACTO — o resto da tela continua embaixo', () => {
   const ui = screen(hojeFile, {});
   assert.ok(!tipos(ui).includes('AgendaItem'));
-  assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText' && n.props.children === 'Nada para hoje'));
+  const vazio = ui.nodes().find((n: any) => n.type === 'EmptyState');
+  assert.equal(vazio.props.title, 'Nada para hoje');
+  assert.equal(vazio.props.compacto, true);
   const comAluguel = screen(hojeFile, {
     bills: [{ ref_id: 'alu', title: 'Aluguel', due_date: '2026-09-10', amount_cents: 65000, kind: 'transaction', overdue: false }],
   });
-  assert.ok(comAluguel.nodes().some((n: any) => n.type === 'ThemedText' && n.props.children === 'qui, 10 set: Aluguel'),
-    'o dia calmo aponta o próximo compromisso');
+  assert.ok(diaVazio(comAluguel), 'o que vence daqui a dois dias não é "do dia"');
+  assert.ok(agendaItem(comAluguel, 'Aluguel'), 'ele está nos próximos dias');
+});
+
+test('Hoje: os blocos vão DIRETO para a cascata — um Fragment vazio era um vão de 24dp', () => {
+  const ui = screen(hojeFile, {});
+  const filhos = [].concat(ui.nodes().find((n: any) => n.type === 'Screen').props.children).filter(Boolean);
+  assert.ok(filhos.length >= 3);
+  assert.ok(filhos.every((f: any) => f.type !== Symbol.for('react.fragment')), 'nenhum bloco embrulhado em Fragment');
+});
+
+test('Hoje: cada leitura do card do dinheiro que falha aparece, e o "Tentar de novo" refaz só ela', () => {
+  const orcamento = screen(hojeFile, { budgetsError: true });
+  assert.deepEqual(copia(orcamento.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.apertados), []);
+  orcamento.nodes().find((n: any) => n.type === 'ErrorCard').props.onRetry();
+  assert.deepEqual(orcamento.refetches, ['budgets']);
+
+  const hoje = screen(hojeFile, { summaryError: 'hoje' });
+  assert.equal(hoje.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.hoje, null, 'sem resposta, a linha não diz R$ 0,00');
+  hoje.nodes().find((n: any) => n.type === 'ErrorCard').props.onRetry();
+  assert.deepEqual(hoje.refetches, ['summary-hoje']);
+
+  // Sem o ciclo a soma seria 0: a legenda NÃO diz "abaixo da média de R$ 0,00/dia".
+  const ciclo = screen(hojeFile, { summaryError: 'ciclo', saiuHoje: [{ kind: 'expense', total_cents: 30_00 }] });
+  assert.equal(ciclo.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.hoje.legenda, undefined);
+});
+
+test('Hoje: sem o ciclo e sem próxima entrada, o card não inventa "1 dia"', () => {
+  const ui = screen(hojeFile, { cycleError: true, spendable: { caixa: 50_000, comprometido_ate_entrada: 0, comprometido_no_ciclo: 0, proxima_entrada: null } });
+  const painel = ui.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.painel;
+  assert.deepEqual(copia({ rotulo: painel.rotulo, legenda: painel.legenda }), { rotulo: 'Livre', legenda: '' });
+});
+
+test('Hoje: sem as contas, os próximos dias dizem que falharam em vez de mostrar só o cartão', () => {
+  const ui = screen(hojeFile, {
+    billsError: true,
+    charges: [{ id: 'c-1', title: 'DAS', occurred_at: '2026-09-10', amount_cents: 7000, card: 'Nubank', invoice_id: 'f-9' }],
+  });
+  assert.ok(!agendaItem(ui, 'DAS'), 'uma lista só com o cartão mentiria');
+  const erros = ui.nodes().filter((n: any) => n.type === 'ErrorCard');
+  assert.equal(erros.length, 2, 'o erro no Seu dia e o erro nos próximos dias');
 });
 
 /** Um horário LOCAL de 08/09 — o dia do dublê de `use-items`. */

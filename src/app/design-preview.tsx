@@ -321,20 +321,26 @@ export default function DesignPreviewScreen() {
   );
 }
 
-/** Hoje é 03/09/2026 no ambiente de desenvolvimento; as chaves que levam data usam o dia local. */
+/**
+ * As chaves que levam data usam o dia local. O MÊS da vitrine é o do CICLO que contém hoje: o
+ * ciclo semeado fecha no dia 10 (`seedFinancePeriodPreview`), e com o mês civil a vitrine passava
+ * dos dias 11 ao 31 desenhando um ciclo que já tinha acabado ("Livre até 10/09" num dia 28/09).
+ */
 function seedClient() {
   const hoje = localISODate();
   const agora = new Date();
-  const mes = hoje.slice(0, 7);
-  const ultimoDia = localISODate(new Date(agora.getFullYear(), agora.getMonth() + 1, 0));
-  const anterior = new Date(agora.getFullYear(), agora.getMonth() - 1, 1);
+  const inicioDoMes = new Date(agora.getFullYear(), agora.getMonth() + (agora.getDate() > 10 ? 1 : 0), 1);
+  const mes = localISODate(inicioDoMes).slice(0, 7);
+  const ultimoDia = localISODate(new Date(inicioDoMes.getFullYear(), inicioDoMes.getMonth() + 1, 0));
+  const anterior = new Date(inicioDoMes.getFullYear(), inicioDoMes.getMonth() - 1, 1);
   const mesAnterior = localISODate(anterior).slice(0, 7);
-  const mesSeguinte = localISODate(new Date(agora.getFullYear(), agora.getMonth() + 1, 1)).slice(0, 7);
+  const mesSeguinte = localISODate(new Date(inicioDoMes.getFullYear(), inicioDoMes.getMonth() + 1, 1)).slice(0, 7);
   const ultimoDiaAnterior = localISODate(
     new Date(anterior.getFullYear(), anterior.getMonth() + 1, 0)
   );
-  const fimDoMes = new Date(agora.getFullYear(), agora.getMonth() + 1, 0);
-  const diasRestantes = Math.max(1, fimDoMes.getDate() - agora.getDate());
+  // Até o fechamento do ciclo (dia 10 de `mes`), que é o que `cycle_now.diasAteOFim` responde.
+  const fimDoCiclo = new Date(inicioDoMes.getFullYear(), inicioDoMes.getMonth(), 10);
+  const diasRestantes = Math.max(1, Math.round((fimDoCiclo.getTime() - new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).getTime()) / 86_400_000));
 
   const client = new QueryClient({
     defaultOptions: { queries: { staleTime: Infinity, gcTime: Infinity, retry: false } },

@@ -38,13 +38,14 @@ export function seedFinancePeriodPreview(client: QueryClient, period: PreviewPer
 
   const series: CycleRow[] = [
     {
-      mes: previousStart, ini: previousStart, fim: previousLastDate,
+      // A régua semeada é a do CICLO (fecha no 10): as bordas também, senão a curva terminava no 31.
+      mes: previousStart, ini: `${beforePreviousMonth}-11`, fim: `${previousMonth}-10`,
       estado: 'fechado', comecei_com: 200000, entrou: 800000, saiu: 609000,
       entrou_realizado: 800000, saiu_realizado: 609000, resultado: 391000,
       caixa_no_fim: 391000, faltou_pagar: 0, confere: true,
     },
     {
-      mes: currentStart, ini: currentStart, fim: lastDate,
+      mes: currentStart, ini: `${previousMonth}-11`, fim: `${month}-10`,
       estado: 'aberto', comecei_com: 391000, entrou: 900000, saiu: 1046000,
       entrou_realizado: 480000, saiu_realizado: 520000, resultado: 245000,
       caixa_no_fim: 245000, faltou_pagar: 0, confere: true,

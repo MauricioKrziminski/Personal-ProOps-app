@@ -486,7 +486,7 @@ export default function FinanceScreen() {
         <ErrorCard onRetry={budgets.refetch} />
       ) : apertados.length > 0 ? (
         <View style={styles.bloco}>
-          <BlockHeader title="Passando do limite" count={apertados.length} />
+          <BlockHeader title="No limite" count={apertados.length} />
           <BudgetRings itens={apertados} onPress={() => router.push('/finance/budgets')} />
         </View>
       ) : null}

@@ -480,7 +480,7 @@ export default function BudgetsScreen() {
     <>
       {apertando.length > 0 ? (
         <View style={styles.secao}>
-          <SectionHead title="Passando do limite" />
+          <SectionHead title="No limite" />
           {apertando.map(linhaOrcamento)}
         </View>
       ) : null}

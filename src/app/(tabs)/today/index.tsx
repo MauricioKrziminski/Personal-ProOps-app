@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Fragment, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
@@ -19,8 +19,8 @@ import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
 import { BlockHeader } from '@/components/ui/block-header';
 import { useBRL } from '@/components/ui/conceal';
 import { Dica } from '@/components/ui/dica';
+import { EmptyState } from '@/components/ui/empty-state';
 import { ExtendedFab } from '@/components/ui/extended-fab';
-import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { VerMais } from '@/components/ui/ver-mais';
@@ -48,7 +48,7 @@ import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { caixaDasContas } from '@/lib/account-cash';
 import { PASSO } from '@/lib/aos-poucos';
 import { orcamentosApertados } from '@/lib/budget-tight';
-import { diaCurtoBR, diasAte, greetingBR, isoToBR, rotuloDoDia } from '@/lib/dates';
+import { diaCurtoBR, diasAte, greetingBR, rotuloDoDia } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
 import { settleLabel } from '@/lib/settle-labels';
 import {
@@ -151,7 +151,12 @@ export default function TodayScreen() {
   const livre = caixa - comprometido;
   /** Até quando o "livre" vale: a próxima entrada, ou o fim do ciclo se não houver nenhuma. */
   const ateQuando = proximaEntrada ?? cycle.data?.ate ?? null;
-  const diasLivres = Math.max(1, ateQuando ? diasAte(ateQuando, hoje) : (cycle.data?.diasAteOFim ?? 1));
+  /* Sem ciclo e sem próxima entrada não se sabe até quando: `null`, e o card não inventa "1 dia". */
+  const diasLivres = ateQuando
+    ? Math.max(1, diasAte(ateQuando, hoje))
+    : cycle.data
+      ? Math.max(1, cycle.data.diasAteOFim)
+      : null;
   const painel = painelDoDia({ livreCents: livre, diasLivres, ate: ateQuando, entrada: proximaEntrada, brl });
 
   const agenda = useMemo(
@@ -169,14 +174,16 @@ export default function TodayScreen() {
   const soma = (resumo: { kind: string; total_cents: number | string }[] | undefined, lado: string) =>
     (resumo ?? []).filter((l) => l.kind === lado).reduce((t, l) => t + Number(l.total_cents), 0);
   const entrouHoje = soma(saiuHoje.data, 'income');
+  /* A média só existe com o ciclo em mãos: sem ele a soma seria 0 e a linha diria "média de R$ 0,00". */
+  const temMedia = saiuNoCiclo.isSuccess && Boolean(cycle.data?.de);
   const ritmo = useMemo(
     () =>
       ritmoDoDia({
         hojeCents: soma(saiuHoje.data, 'expense'),
         cicloCents: soma(saiuNoCiclo.data, 'expense'),
-        diasDecorridos: cycle.data?.de ? diasDoCiclo(cycle.data.de, hoje) : 1,
+        diasDecorridos: temMedia && cycle.data?.de ? diasDoCiclo(cycle.data.de, hoje) : 1,
       }),
-    [saiuHoje.data, saiuNoCiclo.data, cycle.data?.de, hoje]
+    [saiuHoje.data, saiuNoCiclo.data, cycle.data?.de, hoje, temMedia]
   );
   const legendaDeHoje =
     [
@@ -195,7 +202,10 @@ export default function TodayScreen() {
   const mostrarPassos = setup.pronto && !passosEscondidos && setup.passos.some((p) => !p.feito);
   /** O Seu dia só afirma "nada" com as DUAS respostas na mão. */
   const diaCalmo = bills.isSuccess && reminders.isSuccess && linhas.length === 0;
-  const proximoCompromisso = agenda.proximos[0]?.itens[0] ?? null;
+  /** O que o card do dinheiro lê e falhou: um "Tentar de novo" que refaz só o que falhou. */
+  const falhasDoDinheiro = [saldos, budgets, saiuHoje].filter((c) => c.isError);
+  /** Os próximos dias somam as contas E as compras de cartão: sem uma delas a lista mentiria. */
+  const falhasDosProximos = [bills, noCartao].filter((c) => c.isError);
 
   /*
     O PORTÃO DA TELA: a Hoje abre inteira ou não abre. `profile` pode nascer desligada e mesmo
@@ -306,7 +316,7 @@ export default function TodayScreen() {
   }
 
   const saudacaoBlock = (
-    <View style={styles.cabecalho}>
+    <View key="saudacao" style={styles.cabecalho}>
       {primeiroNome ? (
         <ThemedText type="title" style={styles.semEncolher}>
           {`${greetingBR()}, ${primeiroNome}`}
@@ -316,39 +326,32 @@ export default function TodayScreen() {
     </View>
   );
 
-  const passosBlock = (
-    <>
-      {mostrarPassos ? (
-        <Bloco>
-          <SetupChecklist
-            passos={setup.passos}
-            onOpen={(p) => router.push(p.href)}
-            onHide={() => esconderPassos(true)}
-          />
-        </Bloco>
-      ) : null}
-      {/*
-        O Próximo passo espera os Primeiros passos: um card de descoberta por vez (23/09/2026).
-        A projeção não tem dado que diga "já viu" — abrir é o que conta, então tocar dispensa.
-      */}
-      {setup.pronto && !mostrarPassos && proximo.passo ? (
-        <Bloco>
-          <ProximoPassoCard
-            passo={proximo.passo}
-            onAbrir={() => {
-              const passo = proximo.passo!;
-              if (passo.id === 'projecao') proximo.dispensar('projecao');
-              router.push(passo.href);
-            }}
-            onDispensar={() => proximo.dispensar(proximo.passo!.id)}
-          />
-        </Bloco>
-      ) : null}
-    </>
-  );
+  /* Um card de descoberta por vez (23/09/2026): o Próximo passo espera os Primeiros passos. A
+     projeção não tem dado que diga "já viu" — abrir é o que conta, então tocar dispensa. */
+  const passosBlock = mostrarPassos ? (
+    <Bloco key="passos">
+      <SetupChecklist
+        passos={setup.passos}
+        onOpen={(p) => router.push(p.href)}
+        onHide={() => esconderPassos(true)}
+      />
+    </Bloco>
+  ) : setup.pronto && proximo.passo ? (
+    <Bloco key="passos">
+      <ProximoPassoCard
+        passo={proximo.passo}
+        onAbrir={() => {
+          const passo = proximo.passo!;
+          if (passo.id === 'projecao') proximo.dispensar('projecao');
+          router.push(passo.href);
+        }}
+        onDispensar={() => proximo.dispensar(proximo.passo!.id)}
+      />
+    </Bloco>
+  ) : null;
 
   const diaBlock = (
-    <Bloco>
+    <Bloco key="dia">
       <BlockHeader
         title="Seu dia"
         voice="app"
@@ -357,7 +360,7 @@ export default function TodayScreen() {
       {/* Cada leitura tem o seu erro (§7): contas e lembretes falham separados. */}
       {bills.isError ? <ErrorCard onRetry={() => bills.refetch()} /> : null}
       {reminders.isError ? <ErrorCard onRetry={() => reminders.refetch()} /> : null}
-      {linhas.length > 0 || diaCalmo ? (
+      {linhas.length > 0 ? (
         <GrupoDoDia>
           {linhas.map((l) => {
             if (l.tipo === 'resumo') {
@@ -383,37 +386,30 @@ export default function TodayScreen() {
               <LinhaDeLembrete key={l.chave} lembrete={l.lembrete} estado={l.estado} agora={agora} onOpen={abrirLembrete} />
             );
           })}
-          {diaCalmo ? (
-            <View style={styles.calmo}>
-              <Icon name="checkmark.circle" size="md" color="success" />
-              <View style={styles.shrink}>
-                <ThemedText type="default">Nada para hoje</ThemedText>
-                <ThemedText type="caption" themeColor="textSecondary">
-                  {proximoCompromisso
-                    ? `${rotuloDoDia(proximoCompromisso.day, hoje)}: ${proximoCompromisso.title}`
-                    : proximaEntrada
-                      ? `entra dinheiro ${isoToBR(proximaEntrada).slice(0, 5)}`
-                      : 'nada vence nos próximos dias'}
-                </ThemedText>
-              </View>
-            </View>
-          ) : null}
         </GrupoDoDia>
+      ) : diaCalmo ? (
+        // O dia vazio não é a tela vazia: o resto dela continua embaixo (§7, vazio compacto).
+        <EmptyState
+          compacto
+          icon="checkmark.circle"
+          title="Nada para hoje"
+          hint="Manda *me lembra amanhã às 9h* para o agente"
+        />
       ) : null}
     </Bloco>
   );
 
   const dinheiroBlock = gasto.isError ? (
-    <Bloco>
+    <Bloco key="dinheiro">
       <ErrorCard onRetry={() => gasto.refetch()} />
     </Bloco>
   ) : (
-    <Bloco>
+    <Bloco key="dinheiro">
       <View style={styles.comDica}>
         <DinheiroDoDia
           painel={painel}
           onAbrirMenu={abrirMenu}
-          hoje={saiuHoje.isError ? null : { saiu: ritmo.hoje, legenda: legendaDeHoje }}
+          hoje={saiuHoje.isSuccess ? { saiu: ritmo.hoje, legenda: legendaDeHoje } : null}
           onAbrirHoje={() => router.push('/finance/transactions')}
           caixa={saldos.isError ? null : emConta}
           contasAbertas={contasAbertas}
@@ -425,24 +421,26 @@ export default function TodayScreen() {
                 : '/finance/transactions'
             )
           }
-          apertados={apertados}
+          apertados={budgets.isError ? [] : apertados}
           onAbrirOrcamentos={() => router.push('/finance/budgets')}
         />
-        {/* Sem saldos a tela não afirma saldo nenhum: o erro, e o "Tentar de novo" só dos saldos. */}
-        {saldos.isError ? <ErrorCard onRetry={() => saldos.refetch()} /> : null}
+        {/* Sem a resposta, a linha não afirma nada: o erro, e o "Tentar de novo" só do que falhou. */}
+        {falhasDoDinheiro.length > 0 ? (
+          <ErrorCard onRetry={() => Promise.all(falhasDoDinheiro.map((c) => c.refetch()))} />
+        ) : null}
         <Dica id="hoje-painel" tela="hoje" />
         {contasAbertas ? <Dica id="conta-extrato" tela="hoje" /> : null}
       </View>
     </Bloco>
   );
 
-  const proximosBlock = noCartao.isError ? (
-    <Bloco>
+  const proximosBlock = falhasDosProximos.length > 0 ? (
+    <Bloco key="proximos">
       <BlockHeader title="Próximos dias" voice="app" />
-      <ErrorCard onRetry={() => noCartao.refetch()} />
+      <ErrorCard onRetry={() => Promise.all(falhasDosProximos.map((c) => c.refetch()))} />
     </Bloco>
   ) : agenda.proximos.length > 0 ? (
-    <Bloco>
+    <Bloco key="proximos">
       <BlockHeader title="Próximos dias" voice="app" />
       <GrupoDoDia>
         {agenda.proximos.flatMap((g) => [
@@ -454,12 +452,12 @@ export default function TodayScreen() {
   ) : null;
 
   const notasBlock = notas.isError ? (
-    <Bloco>
+    <Bloco key="notas">
       <BlockHeader title="Notas" />
       <ErrorCard onRetry={() => notas.refetch()} />
     </Bloco>
   ) : notasDaHoje.length > 0 ? (
-    <Bloco>
+    <Bloco key="notas">
       <BlockHeader
         title={fixadas.length > 0 ? 'Fixadas' : 'Notas recentes'}
         action={{ label: 'Todas', accessibilityLabel: 'Ver todas as notas', onPress: () => router.push('/notes') }}
@@ -520,32 +518,19 @@ export default function TodayScreen() {
           notas={notasBlock}
         />
       ) : (
-        [
-          <Fragment key="saudacao">{saudacaoBlock}</Fragment>,
-          <Fragment key="passos">{passosBlock}</Fragment>,
-          <Fragment key="dia">{diaBlock}</Fragment>,
-          <Fragment key="dinheiro">{dinheiroBlock}</Fragment>,
-          <Fragment key="proximos">{proximosBlock}</Fragment>,
-          <Fragment key="notas">{notasBlock}</Fragment>,
-        ]
+        /* Os blocos DIRETO, sem `Fragment`: a cascata do `Screen` faz de todo elemento uma caixa com
+           `gap`, e um `Fragment` com `null` dentro era um vão de 24dp (passos escondidos, sem notas). */
+        [saudacaoBlock, passosBlock, diaBlock, dinheiroBlock, proximosBlock, notasBlock]
       )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  shrink: { flex: 1, minWidth: 0, gap: Space.half },
   semEncolher: { flexShrink: 0, maxWidth: '100%' },
   cabecalho: { gap: Space.xs },
   bloco: { gap: Space.md },
   /** A dica encosta no que ela explica — mais perto que o `gap` entre blocos. */
   comDica: { gap: Space.sm },
   verMais: { paddingBottom: Space.sm },
-  calmo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.md,
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.md,
-  },
 });

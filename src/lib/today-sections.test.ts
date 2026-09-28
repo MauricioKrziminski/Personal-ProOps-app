@@ -178,4 +178,8 @@ test('"por dia" é UMA conta: o card da Hoje e o widget dividem igual', () => {
     { modo: 'total', rotulo: 'Livre até 29/09', cents: 50_000, legenda: '1 dia · entra dinheiro 29/09' },
     'com um dia só, "por dia" repetiria o total'
   );
+
+  const semCiclo = painelDoDia({ livreCents: 50_000, diasLivres: null, ate: null, entrada: null, brl });
+  assert.deepEqual({ modo: semCiclo.modo, rotulo: semCiclo.rotulo, legenda: semCiclo.legenda },
+    { modo: 'total', rotulo: 'Livre', legenda: '' }, 'sem saber até quando, não inventa "1 dia"');
 });

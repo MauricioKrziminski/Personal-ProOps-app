@@ -46,7 +46,7 @@ amplitude — um bloco escuro sobre papel claro — e do número grande em peso 
 > bonito… nada de coisa comum"*; sobre as três regras: *"liberar o que ficar melhor"*).
 > Spec: `docs/superpowers/specs/2026-09-17-hoje-financeiro-conversa-design.md`.
 >
-> - **Um destaque por tela** → na Hoje convivem o herói e os Primeiros passos.
+> - **Um destaque por tela** → na Hoje convivem o card do dinheiro e os Primeiros passos.
 > - **Sem degradê/brilho em conteúdo** → o herói das raízes usa `surface="live"`
 >   (`InkSurface`: luz larga que segue a rolagem + grão fino, dois canvases, custo zero parado).
 > - **Vidro só na chrome** → os controles interativos do iOS também usam Liquid Glass nativo;
@@ -56,6 +56,17 @@ amplitude — um bloco escuro sobre papel claro — e do número grande em peso 
 > da marca (`BlockHeader voice="app"`), a pessoa fala em balões com o texto REAL que mandou, e o
 > registro que a fala virou encaixa embaixo. Cabeçalho de bloco nas raízes é `BlockHeader`, não
 > `SectionHead`.
+
+> **A Hoje NÃO tem herói de tinta desde 28/09/2026** (spec
+> `docs/superpowers/specs/2026-09-28-hoje-o-dia-design.md`, pedido do dono do produto: *"to
+> sentindo a tela de hoje parecida muito com a financeiro"*). As duas raízes abriam no mesmo bloco
+> escuro com o MESMO número — sem receita prevista, o "livre até o fim do ciclo" É o resultado do
+> ciclo —, seguido dos mesmos ladrilhos e dos mesmos anéis de orçamento. O `HeroPanel` é a
+> assinatura do Financeiro. A Hoje é **o dia**: o topo é o tempo (Seu dia: o atrasado numa linha
+> recolhida, o "dia todo", os lembretes com o AGORA), e o dinheiro vem num card CLARO na escala do
+> dia (`DinheiroDoDia`: quanto cabe por dia, o que saiu hoje, em conta, no limite). **Não devolver
+> herói de tinta, ladrilhos Entra/Sai nem anéis de orçamento à Hoje** — é como ela volta a ser um
+> segundo Financeiro.
 
 **`Canvas` do Skia NÃO aceita `onLayout`** (avisa "is not supported" em runtime e o desenho
 não posiciona). Quem mede é uma `View` em volta; o canvas só preenche.
@@ -954,8 +965,10 @@ que "voltar" faz depois.
   vem da POSIÇÃO, então uma aba fora de ordem manda a pessoa para a tela errada enquanto o
   círculo anima para o lugar certo.
 - **Badge de aba é contagem real ou não existe.** Mesma régua dos atalhos do painel: número que
-  não muda decisão é enfeite. Hoje leva o que vence + lembrete do dia + orçamento estourado, e
-  some com zero.
+  não muda decisão é enfeite. Hoje leva o que vence (SEM receita prevista — ela não vence) +
+  lembrete de HOJE (o que ficou de outro dia aparece na tela, com a data, e não conta) + orçamento
+  estourado, e some com zero. A régua é UMA: `pendentesDaHoje`, atrás de `usePendentesDaHoje`,
+  nas duas tab bars — elas tinham a soma copiada e contavam a receita (28/09/2026).
 - **Criar item de lista é `+` no header**, nunca botão de bloco no corpo — Contas, Cartões,
   Orçamentos, Metas, Dívidas, Recorrentes, Regras e Lembretes. O botão no corpo existe só dentro
   do `EmptyState`, onde não há lista para o `+` do header explicar.
@@ -1105,7 +1118,7 @@ Dois, e só dois — o que os apps do nicho (Copilot, Monarch, YNAB) põem na te
 
 | widget | tamanhos | o que mostra |
 |---|---|---|
-| **Livre** | iOS pequeno/médio + bloqueio (inline, retangular); Android 2×2 redimensionável | o herói da Hoje: "Livre até dd/mm", o valor, o veredito do dia; largo = + compromissos do ciclo e a próxima conta |
+| **Livre** | iOS pequeno/médio + bloqueio (inline, retangular); Android 2×2 redimensionável | o livre até a próxima entrada: "Livre até dd/mm", o valor, o veredito do dia; largo = + compromissos do ciclo e a próxima conta |
 | **O que vence** | iOS médio/grande; Android 4×2 | o total, o atrasado numa FAIXA só, as próximas com selo de data, "+N a vencer" |
 
 **Retrato v2 (22/09/2026): menos texto.** A v1 listava cada atrasada numa linha vermelha com
@@ -1117,7 +1130,7 @@ para uma linha e cortava); `minimumScaleFactor` foi medido e devolvido — encol
 
 - **Um retrato, dois desenhos.** `lib/widget-snapshot.ts` (puro, testado) monta tudo JÁ
   formatado a partir de `spendable` + `cycle_now` + `upcoming_bills`; o veredito é
-  `vereditoDoDia`, a MESMA função da Hoje. `widgets/sincroniza.tsx` publica quando o conteúdo
+  `vereditoDoDia`, e o "por dia" dele é `porDiaLivre` — a MESMA conta do card do dinheiro da Hoje. `widgets/sincroniza.tsx` publica quando o conteúdo
   muda (iOS `updateSnapshot`; Android guarda em AsyncStorage + `requestWidgetUpdate`).
 - **"Esconder saldo" vale no widget**, e sem sessão o retrato vira neutro ("Entre no app").
 - **O desenho é o herói**: bloco de tinta nos dois temas, `onHero*` por cima (as cores viajam

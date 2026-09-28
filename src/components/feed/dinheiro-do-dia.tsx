@@ -67,34 +67,42 @@ export function DinheiroDoDia({
 
   return (
     <Section>
-      <Pressable
-        accessibilityRole="button"
-        // O número é um `TextInput` animado, escondido do leitor: sem isto ele lia rótulo e legenda e pulava o VALOR.
-        accessibilityLabel={`${painel.rotulo}: ${brl(painel.cents)}. ${painel.legenda}`}
-        accessibilityHint="Abre o ciclo, a projeção, o patrimônio e as metas"
-        onPress={onAbrirMenu}>
-        {({ pressed }) => (
-          <View style={[styles.topo, { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' }]}>
-            <View style={styles.rotulo}>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.cresce}>
-                {painel.rotulo}
-              </ThemedText>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={concealed ? 'Mostrar valor' : 'Ocultar valor'}
-                onPress={toggle}
-                hitSlop={Space.sm}
-                style={[styles.olho, { backgroundColor: theme.backgroundElement }]}>
-                <Icon name={concealed ? 'eye.slash' : 'eye'} size="sm" color="text" />
-              </Pressable>
+      {/*
+        O olho é IRMÃO da área tocável, nunca filho: dentro de um `Pressable` acessível o iOS agrupa
+        os filhos e o VoiceOver não alcança o botão de esconder saldo.
+      */}
+      <View>
+        <Pressable
+          accessibilityRole="button"
+          // O número é um `TextInput` animado, escondido do leitor: sem isto ele lia rótulo e legenda e pulava o VALOR.
+          accessibilityLabel={[`${painel.rotulo}: ${brl(painel.cents)}`, painel.legenda].filter(Boolean).join('. ')}
+          accessibilityHint="Abre o ciclo, a projeção, o patrimônio e as metas"
+          onPress={onAbrirMenu}>
+          {({ pressed }) => (
+            <View style={[styles.topo, { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' }]}>
+              <View style={styles.rotulo}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {painel.rotulo}
+                </ThemedText>
+              </View>
+              <CountUpMoney cents={painel.cents} variant="money" tone={painel.negativo ? 'danger' : 'text'} />
+              {painel.legenda ? (
+                <ThemedText type="footnote" themeColor="textSecondary">
+                  {painel.legenda}
+                </ThemedText>
+              ) : null}
             </View>
-            <CountUpMoney cents={painel.cents} variant="money" tone={painel.negativo ? 'danger' : 'text'} />
-            <ThemedText type="footnote" themeColor="textSecondary">
-              {painel.legenda}
-            </ThemedText>
-          </View>
-        )}
-      </Pressable>
+          )}
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={concealed ? 'Mostrar valor' : 'Ocultar valor'}
+          onPress={toggle}
+          hitSlop={Space.sm}
+          style={[styles.olho, { backgroundColor: theme.backgroundElement }]}>
+          <Icon name={concealed ? 'eye.slash' : 'eye'} size="sm" color="text" />
+        </Pressable>
+      </View>
 
       {hoje ? (
         <Row
@@ -151,6 +159,7 @@ export function DinheiroDoDia({
           title="No limite"
           badge={{ label: estourou ? 'passou' : 'perto', tone: estourou ? 'danger' : 'warning' }}
           subtitle={apertados.map((o) => o.categoria).join(', ')}
+          accessibilityLabel={`No limite, ${estourou ? 'passou do limite' : 'perto do limite'}: ${apertados.map((o) => o.categoria).join(', ')}`}
           onPress={onAbrirOrcamentos}
         />
       ) : null}
@@ -160,10 +169,12 @@ export function DinheiroDoDia({
 
 const styles = StyleSheet.create({
   topo: { gap: Space.xs, padding: Space.lg },
-  rotulo: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, minHeight: 32 },
-  cresce: { flex: 1 },
+  /** O rótulo divide a primeira linha com o olho, que mora por cima (irmão da área tocável). */
+  rotulo: { minHeight: 32, justifyContent: 'center', paddingRight: 32 + Space.sm },
   olho: {
-    flexShrink: 0,
+    position: 'absolute',
+    top: Space.lg,
+    right: Space.lg,
     width: 32,
     height: 32,
     borderRadius: Radius.pill,

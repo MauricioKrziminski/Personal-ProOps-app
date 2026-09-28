@@ -1,8 +1,9 @@
 import { Children, Fragment, isValidElement, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
-import { Radius, Space, tabular } from '@/design/tokens';
+import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { horaBR } from '@/lib/dates';
 
@@ -49,7 +50,8 @@ export function RotuloNoGrupo({ texto }: { texto: string }) {
  * §2), e o separador fino ENTRE as linhas.
  *
  * O separador não encosta no AGORA (ele já é um fio) nem vem logo depois de um rótulo de dia (o
- * rótulo abre o que vem embaixo dele).
+ * rótulo abre o que vem embaixo dele). Ele sai JUNTO com a linha que abre: dada a baixa, a linha
+ * esmaece (`AgendaItem`) e um fio parado ali ficaria riscando o vazio.
  */
 export function GrupoDoDia({ children }: { children: ReactNode }) {
   const theme = useTheme();
@@ -61,7 +63,12 @@ export function GrupoDoDia({ children }: { children: ReactNode }) {
     <View style={[styles.grupo, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
       {itens.map((item, i) => (
         <Fragment key={item.key ?? i}>
-          {semFioAntes(i) ? null : <View style={[styles.fio, { backgroundColor: theme.separator }]} />}
+          {semFioAntes(i) ? null : (
+            <Animated.View
+              exiting={FadeOut.duration(Motion.duration.exit)}
+              style={[styles.fio, { backgroundColor: theme.separator }]}
+            />
+          )}
           {item}
         </Fragment>
       ))}
