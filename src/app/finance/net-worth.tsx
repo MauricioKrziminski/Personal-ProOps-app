@@ -9,6 +9,7 @@ import { Stack, router } from 'expo-router';
 import { monthShort } from '@/components/finance/month-picker';
 import { FinanceAnalysisPanes } from '@/components/finance/finance-analysis-panes';
 import { ThemedText } from '@/components/themed-text';
+import { SecaoDeArquivados } from '@/components/ui/secao-de-arquivados';
 import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet, SheetScroll } from '@/components/ui/sheet';
@@ -460,6 +461,14 @@ export default function NetWorthScreen() {
           onPress={() => router.push('/finance/debts')}
         />
       </Section>
+      {!bens.isLoading ? (
+        <SecaoDeArquivados
+          tabela="assets"
+          titulo="Arquivados"
+          subtitulo={(b) => (b.is_liability ? 'dívida arquivada' : 'bem arquivado')}
+          trailing={(b) => <Money cents={Number(b.current_value_cents ?? 0)} variant="subhead" tone="textSecondary" />}
+        />
+      ) : null}
       {!bens.isLoading && !bens.isError && (bens.data ?? []).length === 0 ? (
         <EmptyState compacto
           icon="chart.line.uptrend.xyaxis"

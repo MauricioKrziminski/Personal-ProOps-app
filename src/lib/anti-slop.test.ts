@@ -1507,10 +1507,9 @@ const VAZIO_GRANDE_PERMITIDO: Record<string, string[]> = {
   'app/(tabs)/profile/index.tsx': ['Sem sessão'], // inalcançável atrás do portão de sessão
   'app/catalog.tsx': ['Nada anotado ainda'], // vitrine do primitivo, só em desenvolvimento
   'app/finance/[txId].tsx': ['Esse lançamento não existe mais'],
-  'app/finance/cards.tsx': ['Nenhum cartão cadastrado'], // no tablet, a outra coluna é outro painel
   'app/finance/debt-installment.tsx': ['Essa parcela não existe mais'],
   'app/finance/debts.tsx': ['Essa dívida não existe mais'],
-  'app/finance/goals.tsx': ['Nenhuma meta ainda', 'Você ainda não guardou nada'],
+  'app/finance/goals.tsx': ['Você ainda não guardou nada'],
   'app/finance/installments.tsx': ['Nenhuma compra parcelada'],
   'app/finance/invoices.tsx': ['Nenhum cartão cadastrado', 'Nenhuma fatura ainda'], // tablet: outro painel
   'app/finance/recurring.tsx': ['Nada se repete ainda'],

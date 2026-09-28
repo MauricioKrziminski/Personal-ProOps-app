@@ -1692,6 +1692,60 @@ const DEBT_COLUMNS =
  * nenhum — *"financiamento arquivado vai para onde?"*. Chave debaixo de `['debts']`, então a
  * mesma invalidação das ativas alcança esta.
  */
+/** As tabelas que se arquivam com `archived` e voltam por "Desarquivar". Dívida tem hooks próprios. */
+export type Arquivavel = 'accounts' | 'goals' | 'assets';
+
+const COLUNAS_DO_ARQUIVADO: Record<Arquivavel, string> = {
+  accounts: 'id, name, type, initial_balance_cents',
+  goals: 'id, name, target_cents, saved_cents',
+  assets: 'id, name, is_liability, current_value_cents',
+};
+
+export interface Arquivado {
+  id: string;
+  name: string;
+  type?: string;
+  initial_balance_cents?: number;
+  target_cents?: number;
+  saved_cents?: number;
+  is_liability?: boolean;
+  current_value_cents?: number;
+}
+
+/**
+ * O que foi arquivado numa tabela (28/09/2026). Contas, cartões, metas e bens se arquivavam e
+ * SUMIAM: não havia tela que os listasse nem um "Desarquivar" — o único caminho de volta era o
+ * "Desfazer" do aviso, que dura segundos. Mesmo desenho das dívidas (`useArchivedDebts`).
+ */
+export function useArquivados(tabela: Arquivavel) {
+  useRealtimeInvalidate(tabela, [tabela, 'archived']);
+  return useQuery({
+    queryKey: [tabela, 'archived'],
+    queryFn: async (): Promise<Arquivado[]> => {
+      const { data, error } = await supabase
+        .from(tabela)
+        .select(COLUNAS_DO_ARQUIVADO[tabela])
+        .eq('archived', true)
+        .order('name');
+      if (error) throw error;
+      return (data ?? []) as unknown as Arquivado[];
+    },
+  });
+}
+
+/** Desarquiva; `false` quando o registro não existe mais (apagado em outro aparelho). */
+export function useDesarquivar(tabela: Arquivavel) {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (id: string): Promise<boolean> => {
+      const { data, error } = await supabase.from(tabela).update({ archived: false }).eq('id', id).select('id');
+      if (error) throw error;
+      return (data ?? []).length > 0;
+    },
+    onSuccess: invalidate,
+  });
+}
+
 export function useArchivedDebts() {
   useRealtimeInvalidate('debts', ['debts', 'archived']);
   return useQuery({

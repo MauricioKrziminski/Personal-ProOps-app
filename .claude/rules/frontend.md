@@ -89,6 +89,10 @@ dono do produto para o app inteiro.
   e a frase diz o motivo e o caminho ("desfaça o pagamento da fatura").
 - **O que tem ação tem desfazer**: pagar, quitar à mão, adiar, dar baixa — cada um se desfaz pelo
   próprio registro (apagar/editar o pagamento) ou por uma ação "Desfazer…"/"Desmarcar…".
+- **Todo arquivável tem "Arquivadas · N" com Desarquivar no fim da própria lista** (28/09/2026):
+  contas, cartões, metas e bens se arquivavam e SUMIAM — nenhuma tela os listava, e o único
+  caminho de volta era o "Desfazer" do aviso. O caminho único é `SecaoDeArquivados`
+  (`components/ui/`, com `useArquivados`/`useDesarquivar`); dívidas e notas já tinham o seu.
 - **Registro que o app não sabe desenhar** (regra de repetição do WhatsApp) aparece por extenso e
   se troca num toque consciente ("Substituir"), nunca num formulário que mente o valor.
 - Botão novo de editar = linha nova em `docs/AGENTE-PARIDADE-COM-O-APP.md`.

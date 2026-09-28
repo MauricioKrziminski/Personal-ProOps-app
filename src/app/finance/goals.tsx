@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 
+import { SecaoDeArquivados } from '@/components/ui/secao-de-arquivados';
 import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
 import { Forte } from '@/components/ui/forte';
@@ -29,6 +30,7 @@ import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
+  useArquivados,
   useArchiveGoal,
   useEditGoalContribution,
   useGoalContributions,
@@ -136,6 +138,8 @@ export default function GoalsScreen() {
   // de dizer que não conseguiu carregar. Zerar aqui cobre lista, contadores e destaque de
   // uma vez; os estados vazios já checam `isError` e continuam calados.
   const lista = goals.isError ? [] : (goals.data ?? []);
+  // Com meta arquivada, o vazio deixa de ser a única coisa da tela e vira linha compacta.
+  const temArquivada = (useArquivados('goals').data ?? []).length > 0;
   const abertas = lista.filter((g) => Number(g.saved_cents) < Number(g.target_cents));
   const concluidas = lista.filter((g) => Number(g.saved_cents) >= Number(g.target_cents));
   // Aos poucos, como toda lista do app (24/09/2026).
@@ -442,8 +446,17 @@ export default function GoalsScreen() {
           compacto
         />
       ) : null}
+      {!goals.isLoading ? (
+        <SecaoDeArquivados
+          tabela="goals"
+          titulo="Arquivadas"
+          subtitulo={() => 'meta arquivada'}
+          trailing={(g) => <Money cents={Number(g.saved_cents ?? 0)} variant="subhead" tone="textSecondary" />}
+        />
+      ) : null}
       {!goals.isLoading && !goals.isError && lista.length === 0 ? (
         <EmptyState
+          compacto={temArquivada}
           icon="target"
           title="Nenhuma meta ainda"
           hint={'Manda no WhatsApp: *quero juntar 3000 pra viagem até dezembro*\n— ou toca em + para criar aqui.'}

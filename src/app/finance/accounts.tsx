@@ -4,6 +4,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import type { SymbolViewProps } from 'expo-symbols';
 
+import { SecaoDeArquivados } from '@/components/ui/secao-de-arquivados';
 import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
 import { Forte } from '@/components/ui/forte';
@@ -489,6 +490,15 @@ export default function AccountsScreen() {
     </Section>
   ) : null;
 
+  // O que foi arquivado tem volta daqui (28/09/2026): contas E cartões, cada um dizendo o que é.
+  const arquivadas = (
+    <SecaoDeArquivados
+      tabela="accounts"
+      titulo="Arquivadas"
+      subtitulo={(a) => (a.type === 'credit_card' ? 'cartão arquivado' : 'conta arquivada')}
+    />
+  );
+
   const empty = semNadaCadastrado && !balances.isLoading && !balances.isError ? (
     <EmptyState compacto
       icon="wallet.bifold"
@@ -513,6 +523,7 @@ export default function AccountsScreen() {
       {/* Como no tablet: com o esqueleto na tela, nada aparece embaixo dele (25/09/2026). */}
       {!balances.isLoading ? defaultAccount : null}
       {noAccount}
+      {!balances.isLoading ? arquivadas : null}
       {empty}
     </>
   );
@@ -528,6 +539,7 @@ export default function AccountsScreen() {
       ) : null}
       {!balances.isLoading ? accountSections : null}
       {!balances.isLoading ? noAccount : null}
+      {!balances.isLoading ? arquivadas : null}
       {!balances.isLoading ? empty : null}
     </View>
   );

@@ -5,6 +5,7 @@ import { Stack, router } from 'expo-router';
 import { CardFace, FaceEmVoo } from '@/components/finance/card-face';
 import { useFlight, useFlightAnchor, useFlightHidden } from '@/components/motion/flight-layer';
 import { PressableScale } from '@/components/motion/pressable-scale';
+import { SecaoDeArquivados } from '@/components/ui/secao-de-arquivados';
 import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
@@ -22,7 +23,7 @@ import { ProgressBar } from '@/components/ui/sparkline';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
-import { useArchiveAccount, useCardSummary, type CardSummary } from '@/hooks/use-finance';
+import { useArchiveAccount, useArquivados, useCardSummary, type CardSummary } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR } from '@/hooks/use-items';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
@@ -169,6 +170,8 @@ export default function CardsScreen() {
   // falha, e sem este corte a lista seguia afirmando números embaixo da faixa que acabou
   // de dizer que não conseguiu carregar. Zerar aqui cobre lista, contadores e destaque de
   // uma vez; os estados vazios já checam `isError` e continuam calados.
+  // Com cartão arquivado, o vazio deixa de ser a única coisa da tela e vira linha compacta.
+  const temArquivado = (useArquivados('accounts').data ?? []).some((a) => a.type === 'credit_card');
   const lista = (cards.isError ? [] : [...(cards.data ?? [])]).sort((a, b) => {
     const da = a.due_date ? daysUntil(a.due_date) : Number.MAX_SAFE_INTEGER;
     const db = b.due_date ? daysUntil(b.due_date) : Number.MAX_SAFE_INTEGER;
@@ -365,8 +368,18 @@ export default function CardsScreen() {
         </Section>
       ) : null}
 
+      {!cards.isLoading ? (
+        <SecaoDeArquivados
+          tabela="accounts"
+          titulo="Arquivados"
+          filtro={(a) => a.type === 'credit_card'}
+          subtitulo={() => 'cartão arquivado'}
+        />
+      ) : null}
+
       {!cards.isLoading && !cards.isError && lista.length === 0 ? (
         <EmptyState
+          compacto={temArquivado}
           icon="creditcard"
           title="Nenhum cartão cadastrado"
           hint="Cadastre o cartão com o dia que fecha e o dia que vence. Aí é só mandar *parcelei a geladeira em 12x no Nubank* no WhatsApp."
