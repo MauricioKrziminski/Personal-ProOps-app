@@ -61,6 +61,7 @@ import {
   prependMessagePage,
   type UiOption,
 } from '@/lib/agent-chat';
+import { falaAoVivoDisponivel, ouvir, reconhecedorRecusou, type Escuta } from '@/lib/fala';
 import { confirmDestructive } from '@/lib/item-actions';
 
 
@@ -82,6 +83,9 @@ type Item =
   | { key: string; kind: 'processing' }
   | { key: string; kind: 'failed'; texto: string; retryable: boolean };
 
+/** `listening` é a escuta ao vivo do aparelho; `recording`/`transcribing`, o caminho da Groq. */
+type EstadoDoAudio = 'idle' | 'starting' | 'recording' | 'listening' | 'transcribing';
+
 /**
  * A conversa — a mesma tela para `new` e para `[id]`.
  *
@@ -101,8 +105,10 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
   const lista = useRef<FlashListRef<Item>>(null);
 
   const [texto, setTexto] = useState(initialText);
-  const [audioState, setAudioState] = useState<'idle' | 'starting' | 'recording' | 'transcribing'>('idle');
-  const audioPhase = useRef<'idle' | 'starting' | 'recording' | 'transcribing'>('idle');
+  const [audioState, setAudioState] = useState<EstadoDoAudio>('idle');
+  const audioPhase = useRef<EstadoDoAudio>('idle');
+  /** A escuta ao vivo em curso (`lib/fala.ts`); `null` fora dela. */
+  const escuta = useRef<Escuta | null>(null);
   const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
   const recorderState = useAudioRecorderState(recorder);
   const niveisDaGravacao = useRef<number[]>([]);
@@ -113,6 +119,7 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
     if (audioPhase.current === 'starting' || audioPhase.current === 'recording') {
       void setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
     }
+    escuta.current?.cancelar();
   }, []);
   useEffect(() => {
     if (recorderState.isRecording && typeof recorderState.metering === 'number') {
@@ -250,45 +257,111 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
 
   const [trava] = useState(novaTravaDeToque);
 
-  const mudarAudioState = useCallback((state: 'idle' | 'starting' | 'recording' | 'transcribing') => {
+  const mudarAudioState = useCallback((state: EstadoDoAudio) => {
     audioPhase.current = state;
     setAudioState(state);
   }, []);
 
+  /** O caminho de antes: grava o áudio e, ao parar, transcreve na Groq. */
+  const gravarNaGroq = useCallback(async () => {
+    mudarAudioState('starting');
+    let iniciou = false;
+    let ativouModo = false;
+    try {
+      const permission = await requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Microfone sem acesso',
+          'Permita o microfone nos ajustes do aparelho para gravar áudio.',
+          [
+            { text: 'Agora não', style: 'cancel' },
+            { text: 'Abrir ajustes', onPress: () => { void Linking.openSettings(); } },
+          ],
+        );
+        return;
+      }
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      ativouModo = true;
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      iniciou = true;
+      niveisDaGravacao.current = [];
+      mudarAudioState('recording');
+    } catch {
+      toast({ message: 'Não consegui iniciar a gravação.', tone: 'error' });
+    } finally {
+      if (!iniciou) {
+        if (ativouModo) await setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
+        mudarAudioState('idle');
+      }
+    }
+  }, [mudarAudioState, recorder, toast]);
+
+  /**
+   * Ouve e escreve no campo enquanto a pessoa fala (`lib/fala.ts`). O que já estava digitado fica
+   * na frente; o texto da escuta é refeito inteiro a cada palavra, nunca somado.
+   */
+  const escutar = useCallback(async () => {
+    mudarAudioState('starting');
+    const antes = texto.trim();
+    let acabou = false;
+    try {
+      const e = await ouvir(
+        (falado) => setTexto([antes, falado].filter(Boolean).join(' ')),
+        ({ erro }) => {
+          acabou = true;
+          escuta.current = null;
+          mudarAudioState('idle');
+          // Sem reconhecedor (Siri e ditado desligados): grava e transcreve na Groq, sem erro na
+          // tela — a pessoa tocou para falar, e existe outro jeito de ouvir.
+          if (reconhecedorRecusou(erro)) {
+            void gravarNaGroq();
+            return;
+          }
+          // Parar e o silêncio não são falha: o que foi ouvido já está no campo.
+          if (erro && erro !== 'aborted' && erro !== 'no-speech') {
+            toast({ message: 'Não consegui ouvir. Tente de novo ou digite.', tone: 'error' });
+          }
+        },
+      );
+      if (e === 'negada') {
+        mudarAudioState('idle');
+        Alert.alert(
+          'Microfone sem acesso',
+          'Permita o microfone e o reconhecimento de fala nos ajustes do aparelho.',
+          [
+            { text: 'Agora não', style: 'cancel' },
+            { text: 'Abrir ajustes', onPress: () => { void Linking.openSettings(); } },
+          ],
+        );
+        return;
+      }
+      if (!e) {
+        mudarAudioState('idle');
+        return;
+      }
+      // O reconhecedor pode terminar antes de o `start` voltar (erro na hora): não reabrir.
+      if (acabou) return;
+      escuta.current = e;
+      mudarAudioState('listening');
+    } catch {
+      mudarAudioState('idle');
+      toast({ message: 'Não consegui iniciar a gravação.', tone: 'error' });
+    }
+  }, [gravarNaGroq, mudarAudioState, texto, toast]);
+
   const gravarOuTranscrever = useCallback(async () => {
     if (rodando || audioPhase.current === 'starting' || audioPhase.current === 'transcribing') return;
+    if (audioPhase.current === 'listening') {
+      escuta.current?.parar();
+      return;
+    }
+    if (audioPhase.current === 'idle' && falaAoVivoDisponivel()) {
+      await escutar();
+      return;
+    }
     if (audioPhase.current === 'idle') {
-      mudarAudioState('starting');
-      let iniciou = false;
-      let ativouModo = false;
-      try {
-        const permission = await requestRecordingPermissionsAsync();
-        if (!permission.granted) {
-          Alert.alert(
-            'Microfone sem acesso',
-            'Permita o microfone nos ajustes do aparelho para gravar áudio.',
-            [
-              { text: 'Agora não', style: 'cancel' },
-              { text: 'Abrir ajustes', onPress: () => { void Linking.openSettings(); } },
-            ],
-          );
-          return;
-        }
-        await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-        ativouModo = true;
-        await recorder.prepareToRecordAsync();
-        recorder.record();
-        iniciou = true;
-        niveisDaGravacao.current = [];
-        mudarAudioState('recording');
-      } catch {
-        toast({ message: 'Não consegui iniciar a gravação.', tone: 'error' });
-      } finally {
-        if (!iniciou) {
-          if (ativouModo) await setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
-          mudarAudioState('idle');
-        }
-      }
+      await gravarNaGroq();
       return;
     }
 
@@ -327,7 +400,7 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
       if (!modoRestaurado) await setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
       mudarAudioState('idle');
     }
-  }, [mudarAudioState, recorder, rodando, texto, toast]);
+  }, [escutar, gravarNaGroq, mudarAudioState, recorder, rodando, texto, toast]);
 
 
   const submeter = useCallback(() => {

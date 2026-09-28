@@ -66,6 +66,16 @@
           "enableBackgroundRecording": false
         }
       ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Permita que o ProOps use o microfone para enviar áudio ao agente.",
+          "speechRecognitionPermission": "Permita que o ProOps transcreva o que você fala enquanto grava para o agente.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
+      ],
       "expo-status-bar",
       "expo-web-browser",
       "./plugins/with-android-abis",

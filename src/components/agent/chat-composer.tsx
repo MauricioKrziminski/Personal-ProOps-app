@@ -20,7 +20,8 @@ interface Props {
   sending?: boolean;
   /** Uma pergunta espera resposta nos botões. */
   awaitingAction?: boolean;
-  audioState?: 'idle' | 'starting' | 'recording' | 'transcribing';
+  /** `listening`: a escuta ao vivo do aparelho escreve no campo; `recording`: grava para a Groq. */
+  audioState?: 'idle' | 'starting' | 'recording' | 'listening' | 'transcribing';
   onAudioPress?: () => void;
   /** Na entrada da aba, o campo pertence ao conteúdo em vez de virar outra dock. */
   inline?: boolean;
@@ -64,6 +65,7 @@ export function ChatComposer({
 
   const reservado = insets.bottom;
   const pode = canSubmitMessage(value, { sending, awaitingAction }) && audioState === 'idle';
+  const ouvindo = audioState === 'recording' || audioState === 'listening';
   const vidro = supportsLiquidGlass() && pode;
   const restantes = MAX_MESSAGE_LENGTH - value.trim().length;
 
@@ -99,6 +101,8 @@ export function ChatComposer({
           onChangeText={onChangeText}
           placeholder={awaitingAction ? 'Corrija ou complemente aqui' : 'Escreve o que precisa'}
           multiline
+          // Ouvindo, o texto é da escuta: digitar ao mesmo tempo seria apagado na palavra seguinte.
+          editable={audioState !== 'listening'}
           maxLength={MAX_MESSAGE_LENGTH}
           accessibilityLabel="Mensagem para o agente"
           style={[
@@ -112,16 +116,18 @@ export function ChatComposer({
             onPress={onAudioPress}
             disabled={sending || audioState === 'starting' || audioState === 'transcribing'}
             accessibilityRole="button"
-            accessibilityLabel={audioState === 'recording' ? 'Parar e transcrever áudio' : 'Gravar áudio'}
+            accessibilityLabel={
+              audioState === 'listening' ? 'Parar de ouvir' : audioState === 'recording' ? 'Parar e transcrever áudio' : 'Gravar áudio'
+            }
             accessibilityState={{ disabled: sending || audioState === 'starting' || audioState === 'transcribing' }}
             style={({ pressed }) => [styles.audio, {
-              backgroundColor: audioState === 'recording' ? theme.danger : theme.backgroundElement,
+              backgroundColor: ouvindo ? theme.danger : theme.backgroundElement,
               opacity: pressed ? 0.8 : 1,
             }]}>
             {audioState === 'starting' || audioState === 'transcribing' ? (
               <ThemedText type="caption" themeColor="textSecondary">…</ThemedText>
             ) : (
-              <Icon name={audioState === 'recording' ? 'stop.fill' : 'mic'} size={20} color={audioState === 'recording' ? 'onTint' : 'text'} />
+              <Icon name={ouvindo ? 'stop.fill' : 'mic'} size={20} color={ouvindo ? 'onTint' : 'text'} />
             )}
           </Pressable>
         ) : null}
@@ -149,7 +155,9 @@ export function ChatComposer({
           />
         </Pressable>
       </View>
-      {audioState === 'recording' ? (
+      {audioState === 'listening' ? (
+        <ThemedText type="footnote" themeColor="danger">Ouvindo… Toque no botão vermelho para parar.</ThemedText>
+      ) : audioState === 'recording' ? (
         <ThemedText type="footnote" themeColor="danger">Gravando… Toque no botão vermelho para transcrever.</ThemedText>
       ) : audioState === 'transcribing' ? (
         <ThemedText type="footnote" themeColor="textSecondary">Transcrevendo áudio…</ThemedText>
