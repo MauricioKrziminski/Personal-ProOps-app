@@ -172,10 +172,13 @@ export function HeaderIconButton({
   icon,
   label,
   onPress,
+  ponto = false,
 }: {
   icon: React.ComponentProps<typeof Icon>['name'];
   label: string;
   onPress: () => void;
+  /** Tem coisa nova do outro lado (o sino com alerta não visto). Geometria fixa, como o selo da aba. */
+  ponto?: boolean;
 }) {
   const theme = useTheme();
   const vidro = supportsLiquidGlass();
@@ -183,12 +186,13 @@ export function HeaderIconButton({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={ponto ? `${label}, tem novidade` : label}
       hitSlop={Space.sm}
       onPress={onPress}
       style={[styles.tile, { backgroundColor: vidro ? 'transparent' : theme.backgroundElement }]}>
       {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
       <Icon name={icon} size="md" color="text" />
+      {ponto ? <View style={[styles.ponto, { backgroundColor: theme.danger, borderColor: theme.background }]} /> : null}
     </Pressable>
   );
 }
@@ -232,5 +236,14 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  ponto: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 10,
+    height: 10,
+    borderRadius: Radius.pill,
+    borderWidth: 2,
   },
 });

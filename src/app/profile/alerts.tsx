@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
@@ -10,6 +10,7 @@ import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { categoryIcon } from '@/design/category-icons';
 import { Radius, Space, tabular } from '@/design/tokens';
+import { useAlertasVistos } from '@/hooks/use-alertas-vistos';
 import { useAlertsSent } from '@/hooks/use-finance';
 import { VerMais } from '@/components/ui/ver-mais';
 import { PASSO } from '@/lib/aos-poucos';
@@ -18,6 +19,8 @@ import { formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 import {
   alertChannelLabel,
+  alertaMaisNovo,
+  temAlertaNovo,
   combineAlertDeliveries,
   type AlertHistoryItem,
 } from '@/lib/alert-history';
@@ -86,6 +89,12 @@ export default function AlertsScreen() {
   const [limite, setLimite] = useState(PASSO);
   const alertas = useAlertsSent(limite);
   const dias = porDia(combineAlertDeliveries(alertas.data ?? []));
+  // Abrir o histórico é ver: o mais novo mostrado apaga a bolinha do sino da Hoje.
+  const [vistoAte, marcarVisto] = useAlertasVistos();
+  const maisNovo = alertaMaisNovo(alertas.data ?? []);
+  useEffect(() => {
+    if (maisNovo && temAlertaNovo(maisNovo, vistoAte)) marcarVisto(maisNovo);
+  }, [maisNovo, vistoAte, marcarVisto]);
 
   return (
     <Screen grouped wide={tablet} onRefresh={() => Promise.all([alertas.refetch()])}>

@@ -26,6 +26,7 @@ import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { VerMais } from '@/components/ui/ver-mais';
 import { Motion, Radius, Space } from '@/design/tokens';
+import { useTemAlertaNovo } from '@/hooks/use-alertas-vistos';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useAgora } from '@/hooks/use-agora';
 import { useBoolPref } from '@/hooks/use-bool-pref';
@@ -99,6 +100,7 @@ function Bloco({ children }: { children: React.ReactNode }) {
  * procura em lançamentos, notas e lembretes de uma vez.
  */
 function CabecalhoDaHoje() {
+  const alertaNovo = useTemAlertaNovo();
   return (
     <AppHeader
       title="Hoje"
@@ -106,7 +108,12 @@ function CabecalhoDaHoje() {
         <>
           {/* O que o ProOps mandou sem a pessoa pedir (push e WhatsApp). A tela já existia, mas só
               se chegava a ela pelo Perfil (28/09/2026, *"não deveria ter um sino para essas coisas?"*). */}
-          <HeaderIconButton icon="bell" label="Histórico de alertas" onPress={() => router.push('/profile/alerts')} />
+          <HeaderIconButton
+            icon="bell"
+            label="Histórico de alertas"
+            ponto={alertaNovo}
+            onPress={() => router.push('/profile/alerts')}
+          />
           <HeaderIconButton icon="magnifyingglass" label="Buscar em tudo" onPress={() => router.push('/search')} />
         </>
       }

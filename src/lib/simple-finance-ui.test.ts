@@ -224,6 +224,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       // A preferência gravada vale como `useState` dentro de uma visita; o disco tem teste próprio
       // (`use-preferencia.test.ts`).
       if (name === '@/hooks/use-preferencia') return { umDe: () => () => true, usePreferencia: (_nome: string, padrao: unknown) => react.useState(padrao) };
+      if (name === '@/hooks/use-alertas-vistos') return { useAlertasVistos: () => react.useState(''), useTemAlertaNovo: () => false };
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', useWindowDimensions: () => ({ width: 384, height: 800 }), Platform: { OS: 'android', select: (o: any) => o.android ?? o.default } };
       if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInDown: animation, FadeOut: animation, FadeIn: animation, ReduceMotion: { System: 'system' }, LinearTransition: animation, useAnimatedRef: () => ({ current: null }) };

@@ -63,3 +63,26 @@ export function alertChannelLabel(channels: string[]): string | null {
   if (labels.length === 1) return labels[0] ?? null;
   return `${labels.slice(0, -1).join(', ')} e ${labels.at(-1)}`;
 }
+
+/**
+ * Tem alerta que a pessoa ainda não viu? É a bolinha do sino da Hoje (28/09/2026).
+ *
+ * `vistoAte` é o `created_at` do alerta mais novo que o histórico já mostrou (vazio = nunca abriu).
+ * Compara por INSTANTE, não por texto: o mesmo momento pode vir escrito com fuso diferente.
+ */
+export function temAlertaNovo(maisRecente: string | null | undefined, vistoAte: string): boolean {
+  if (!maisRecente) return false;
+  const novo = Date.parse(maisRecente);
+  if (Number.isNaN(novo)) return false;
+  const visto = vistoAte ? Date.parse(vistoAte) : Number.NaN;
+  return Number.isNaN(visto) || novo > visto;
+}
+
+/** O `created_at` mais novo de uma lista — o que abrir o histórico marca como visto. */
+export function alertaMaisNovo(rows: readonly { created_at: string }[]): string | null {
+  let maior: string | null = null;
+  for (const r of rows) {
+    if (maior === null || Date.parse(r.created_at) > Date.parse(maior)) maior = r.created_at;
+  }
+  return maior;
+}

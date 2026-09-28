@@ -959,6 +959,18 @@ que "voltar" faz depois.
   **O rótulo tem sobra além do slot** (14dp): a 384dp × fonte 1,3 "Financeiro" não cabia na
   coluna, e o `adjustsFontSizeToFit` do Android não encolhe um `Animated.Text` com confiança.
 
+  **As abas são IGUAIS de largura, e o texto se ajusta a elas** (28/09/2026). O tamanho do
+  rótulo sai de `escalaDoRotulo` (`design/tab-pill.ts`): segue a fonte do sistema até 1,15× e
+  cede antes de dois vizinhos ficarem a menos de 8dp. E a aba **"Financeiro" virou "Finanças"**
+  (decisão do dono do produto): com 10 letras entre dois nomes de 6, "Agente" parecia colado nela
+  (12dp de um lado, 27dp do outro a 360dp). Espaçar as abas pelo tamanho do texto foi recusado —
+  desalinharia os ícones e o círculo que desliza. Nome novo de aba = medir `MEIO_PAR_MAIS_LARGO`.
+
+- **O sino da Hoje** abre o histórico de alertas (`/profile/alerts`) e tem a bolinha de NÃO
+  LIDO (`useTemAlertaNovo`: o alerta mais novo depois do último visto, gravado por usuário no
+  aparelho; abrir o histórico apaga). Fica SÓ na Hoje: repetido nas cinco raízes seria o mesmo
+  link cinco vezes, em cabeçalhos que já têm ação própria.
+
 - **`backgroundColor` na `NativeTabs` é proibido no iOS.** Dar cor de fundo torna a barra opaca e
   **desliga o Liquid Glass** — o material que é diretriz do projeto. Cor de fundo, indicador e
   ripple entram por `Platform.select` só no Android; no iOS quem desenha é o sistema, mais

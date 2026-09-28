@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { alertChannelLabel, combineAlertDeliveries } from './alert-history.ts';
+import { alertChannelLabel, alertaMaisNovo, combineAlertDeliveries, temAlertaNovo } from './alert-history.ts';
 
 const base = {
   id: 'push-id',
@@ -43,4 +43,20 @@ test('mantém uma entrega antiga sem canal reconhecido', () => {
 
   assert.deepEqual(result?.channels, []);
   assert.equal(alertChannelLabel(result?.channels ?? []), null);
+});
+
+test('a bolinha do sino: acende com alerta mais novo que o visto, e só com ele', () => {
+  assert.equal(temAlertaNovo(null, ''), false, 'sem alerta nenhum');
+  assert.equal(temAlertaNovo('2026-09-28T12:00:00+00:00', ''), true, 'nunca abriu o histórico');
+  assert.equal(temAlertaNovo('2026-09-28T12:00:00+00:00', '2026-09-28T12:00:00+00:00'), false);
+  assert.equal(temAlertaNovo('2026-09-28T12:00:00+00:00', '2026-09-28T09:00:00-03:00'), false, 'mesmo instante, outro fuso');
+  assert.equal(temAlertaNovo('2026-09-29T12:00:00+00:00', '2026-09-28T12:00:00+00:00'), true);
+});
+
+test('abrir o histórico marca o mais novo da lista, fora de ordem ou não', () => {
+  assert.equal(alertaMaisNovo([]), null);
+  assert.equal(
+    alertaMaisNovo([{ created_at: '2026-09-27T12:00:00Z' }, { created_at: '2026-09-28T12:00:00Z' }, { created_at: '2026-09-26T12:00:00Z' }]),
+    '2026-09-28T12:00:00Z',
+  );
 });
