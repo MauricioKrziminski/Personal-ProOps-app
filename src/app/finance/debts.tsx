@@ -626,8 +626,8 @@ export default function DebtsScreen() {
       /* Sem a contagem, a frase genérica ainda diz o que some. */
     }
     confirmDestructive(
-      `Excluir a dívida ${d.name} por completo?`,
-      'Excluir',
+      `Apagar a dívida ${d.name} por completo?`,
+      'Apagar',
       () =>
         excluirDivida.mutate(d.id, {
           onSuccess: () => {
@@ -635,7 +635,7 @@ export default function DebtsScreen() {
             toast({ message: <>Excluí <Forte>{d.name}</Forte>.</>, tone: 'success' });
           },
           onError: (error) =>
-            toast({ message: financeErrorMessage(error, `Não deu para excluir ${d.name}.`), tone: 'error' }),
+            toast({ message: financeErrorMessage(error, `Não deu para apagar ${d.name}.`), tone: 'error' }),
         }),
       consequencia
     );
@@ -655,13 +655,13 @@ export default function DebtsScreen() {
     ...(noDetalhe ? [] : [{ label: 'Ver as parcelas', onPress: () => abrirFicha(d) }]),
     { label: 'Editar', onPress: () => abrirEdicao(d) },
     { label: 'Arquivar', icon: 'archivebox', arrasto: 'esquerda', desfaz: true, onPress: () => arquivar(d) },
-    { label: 'Excluir por completo', destructive: true, onPress: () => void excluir(d) },
+    { label: 'Apagar por completo', icon: 'trash', destructive: true, onPress: () => void excluir(d) },
   ];
   const acoesDaDivida = (d: Debt, noDetalhe = false) => showItemActions(d.name, listaDaDivida(d, noDetalhe));
 
   const acoesDaArquivada = (d: Debt): ItemAction[] => [
     { label: 'Desarquivar', curto: 'Restaurar', icon: 'arrow.uturn.backward', arrasto: 'direita', onPress: () => desarquivar(d) },
-    { label: 'Excluir por completo', curto: 'Excluir', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => void excluir(d) },
+    { label: 'Apagar por completo', curto: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => void excluir(d) },
   ];
 
   const cartaoDivida = (d: Debt, index: number) => {

@@ -774,7 +774,7 @@ test('unchanged debt Save closes without asking and without writing', () => {
 test('long press on an active debt offers the full set, including delete for good', () => {
   const ui = screen(debtsFile, { create: false, debts: [carro] });
   ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onLongPress());
-  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Pagar parcela', 'Ver as parcelas', 'Editar', 'Arquivar', 'Excluir por completo']);
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Pagar parcela', 'Ver as parcelas', 'Editar', 'Arquivar', 'Apagar por completo']);
 });
 
 test('archived debts have a place to come back from', () => {
@@ -783,7 +783,7 @@ test('archived debts have a place to come back from', () => {
   assert.ok(linha, 'a seção das arquivadas existe');
   ui.interact(() => linha.props.onPress());
   ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Row' && n.props.title === 'Moto').props.onPress());
-  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Desarquivar', 'Excluir por completo']);
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Desarquivar', 'Apagar por completo']);
   ui.interact(() => ui.actions[0].onPress());
   assert.deepEqual(ui.writes.at(-1), { operation: 'unarchiveDebt', value: 'd2' });
 });
@@ -831,7 +831,7 @@ test('without archived debts there is no empty "Arquivadas" row', () => {
 test('delete for good asks with the consequence first, then deletes', async () => {
   const ui = screen(debtsFile, { create: false, debts: [carro] });
   ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onLongPress());
-  ui.interact(() => ui.actions.find((a: any) => a.label === 'Excluir por completo').onPress());
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Apagar por completo').onPress());
   await new Promise((r) => setTimeout(r, 0));
   assert.equal(ui.writes.some((w: any) => w.operation === 'deleteDebt'), false, 'nada sai antes do SIM');
   assert.equal(ui.confirmations.length, 1);
@@ -848,7 +848,7 @@ test('a ficha da dívida é uma tela: Editar no topo e o resto no "…", com as 
   const cabeca = ui.nodes().find((n: any) => n.type === 'HeaderActions');
   assert.deepEqual(copia(cabeca.props.actions.map((a: any) => a.label)), ['Editar']);
   // na ficha "Ver as parcelas" sai: é o que já se está vendo
-  assert.deepEqual(copia(cabeca.props.menu.actions.map((a: any) => a.label)), ['Arquivar', 'Excluir por completo']);
+  assert.deepEqual(copia(cabeca.props.menu.actions.map((a: any) => a.label)), ['Arquivar', 'Apagar por completo']);
 });
 
 test('detalhe da dívida: "A seguir" começa na próxima, 20 por vez, e "Já pagas" vem da mais recente', () => {
@@ -1802,11 +1802,11 @@ test('Contas: a conta arrasta Editar e Arquivar (Ver extrato é o toque)', () =>
   assert.deepEqual(ladosDoLink(link), { direita: ['Editar'], esquerda: ['Arquivar'], mais: false, pontaDireita: 'Editar', pontaEsquerda: 'Arquivar' });
 });
 
-test('Projeção: a conta prevista arrasta Paguei à direita e Editar à esquerda', () => {
+test('Projeção: a conta prevista arrasta Paguei à direita; Editar mora no Mais (a esquerda só tira da lista)', () => {
   const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], bills: [{ ref_id: 'b1', title: 'Aluguel', kind: 'expense', amount_cents: 180000, due_date: '2026-10-05', overdue: false }] });
   const card = deslizaveis(ui).find((n: any) => n.props.titulo === 'Aluguel');
   assert.ok(card, 'a conta prevista está num Deslizavel');
-  assert.deepEqual(ladosDe(card), { direita: ['Paguei'], esquerda: ['Editar'], mais: false, pontaDireita: 'Paguei', pontaEsquerda: 'Editar' });
+  assert.deepEqual(ladosDe(card), { direita: ['Paguei'], esquerda: [], mais: true, pontaDireita: 'Paguei', pontaEsquerda: null });
 });
 
 test('Regras: a regra arrasta Editar e Apagar', () => {
@@ -1821,13 +1821,13 @@ test('Dívidas: arrasta Pagar parcela à direita; Arquivar à esquerda vai até 
   assert.deepEqual(ladosDe(deslizaveis(ui)[0]), { direita: ['Pagar parcela'], esquerda: ['Arquivar'], mais: true, pontaDireita: 'Pagar parcela', pontaEsquerda: 'Arquivar' });
 });
 
-test('Cartões: fatura aberta arrasta Importar fatura; a carteira fica à esquerda', () => {
+test('Cartões: fatura aberta arrasta Importar fatura à direita e Arquivar à esquerda', () => {
   const ui = screen('src/app/finance/cards.tsx', { cards: [{ account_id: 'card-1', name: 'Nubank Cartão', invoice_id: 'invoice-1', invoice_total_cents: 10000, unpaid_total_cents: 10000, closing_date: '2026-10-03', due_date: '2026-10-10', overdue_count: 0 }] });
   const card = ui.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'PressCard');
   const raiz = card.type(card.props);
   assert.equal(raiz.type, 'Deslizavel', 'o cartão está num Deslizavel');
-  // Editar e arquivar o cartão (25/09/2026) moram no "Mais" — as pontas não mudam.
-  assert.deepEqual(ladosDe(raiz), { direita: ['Importar fatura'], esquerda: ['Abrir na carteira'], mais: true, pontaDireita: 'Importar fatura', pontaEsquerda: 'Abrir na carteira' });
+  // A esquerda só tira da lista (28/09/2026): Arquivar; carteira e editar moram no "Mais".
+  assert.deepEqual(ladosDe(raiz), { direita: ['Importar fatura'], esquerda: ['Arquivar cartão'], mais: true, pontaDireita: 'Importar fatura', pontaEsquerda: 'Arquivar cartão' });
   const rotulos = raiz.props.acoes.map((a: any) => a.label);
   assert.ok(rotulos.includes('Editar cartão') && rotulos.includes('Arquivar cartão'), rotulos.join(', '));
   ui.interact(() => raiz.props.acoes.find((a: any) => a.label === 'Editar cartão').onPress());
@@ -1950,23 +1950,23 @@ test('Orçamento: arrasta Editar limite à direita; o resto no Mais', () => {
   assert.deepEqual(ladosDe(card), { direita: ['Editar limite'], esquerda: [], mais: true, pontaDireita: 'Editar limite', pontaEsquerda: null });
 });
 
-test('Aporte: no extrato da meta arrasta Desfazer à esquerda, e ele confirma antes de mover dinheiro', () => {
+test('Aporte: no extrato da meta arrasta Apagar à esquerda, e ele confirma antes de mover dinheiro', () => {
   const ui = screen('src/app/finance/goals.tsx', {
     goals: [{ id: 'g1', name: 'Viagem', target_cents: 500000, saved_cents: 100000, deadline: null, archived: false }],
     contributions: [{ id: 'c1', goal_id: 'g1', amount_cents: 100000, occurred_at: '2026-09-01', note: null }],
   });
   const meta = deslizaveis(ui)[0];
   ui.interact(() => meta.props.acoes.find((x: any) => x.label === 'Ver extrato').onPress());
-  const aporte = deslizaveis(ui).find((d: any) => d.props.acoes.some((x: any) => x.label === 'Desfazer'));
+  const aporte = deslizaveis(ui).find((d: any) => d.props.acoes.some((x: any) => x.label === 'Apagar o aporte'));
   assert.ok(aporte, 'o aporte do extrato está num Deslizavel');
-  // Editar à direita (26/09/2026, "tudo que se cria se edita"), Desfazer à esquerda.
-  assert.deepEqual(ladosDe(aporte), { direita: ['Editar'], esquerda: ['Desfazer'], mais: false, pontaDireita: 'Editar', pontaEsquerda: 'Desfazer' });
-  ui.interact(() => aporte.props.acoes.find((x: any) => x.label === 'Desfazer').onPress());
+  // Editar à direita (26/09/2026, "tudo que se cria se edita"), Apagar à esquerda.
+  assert.deepEqual(ladosDe(aporte), { direita: ['Editar'], esquerda: ['Apagar o aporte'], mais: false, pontaDireita: 'Editar', pontaEsquerda: 'Apagar o aporte' });
+  ui.interact(() => aporte.props.acoes.find((x: any) => x.label === 'Apagar o aporte').onPress());
   assert.deepEqual(ui.writes, [], 'nada move antes da confirmação');
   assert.equal(ui.confirmations.length, 1);
 
   // Editar abre DENTRO da folha do extrato e salva AQUELE aporte, com a data escolhida
-  const doExtrato = () => deslizaveis(ui).find((d: any) => d.props.acoes.some((x: any) => x.label === 'Desfazer'));
+  const doExtrato = () => deslizaveis(ui).find((d: any) => d.props.acoes.some((x: any) => x.label === 'Apagar o aporte'));
   ui.interact(() => doExtrato().props.acoes.find((x: any) => x.label === 'Editar').onPress());
   assert.ok(ui.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Editar aporte'));
   ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(120000));
@@ -2116,7 +2116,7 @@ test('Metas: o extrato vem aos poucos, e o total do mês continua sendo o do mê
     contributions: aportes,
   });
   ui.interact(() => deslizaveis(ui)[0].props.acoes.find((x: any) => x.label === 'Ver extrato').onPress());
-  const doExtrato = () => deslizaveis(ui).filter((d: any) => d.props.acoes.some((x: any) => x.label === 'Desfazer'));
+  const doExtrato = () => deslizaveis(ui).filter((d: any) => d.props.acoes.some((x: any) => x.label === 'Apagar o aporte'));
   assert.equal(doExtrato().length, 20);
   const secao = ui.nodes().find((n: any) => n.type === 'Section' && /setembro/.test(n.props.title ?? ''));
   assert.match(secao.props.title, /R\$ 250\.00$/, 'o total do mês conta os 25');
@@ -3112,17 +3112,17 @@ test('Conta: com lançamentos, o tipo só troca na mesma família; editando o ca
   assert.equal(ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Compra no dia do fechamento').props.hint, undefined, 'a dica aparece uma vez');
 });
 
-test('Dívida arquivada: Desarquivar à direita, Excluir por completo à esquerda', () => {
+test('Dívida arquivada: Desarquivar à direita, Apagar por completo à esquerda', () => {
   const ui = screen('src/app/finance/debts.tsx', {
     archivedDebts: [{ id: 'd1', name: 'Carro', archived: true, remaining_cents: 100000, principal_cents: 100000, kind: 'financing', calculation_mode: 'fixed_installments', interest_rate_monthly: 0, installments: 10, installments_paid: 0 }],
   });
   ui.interact(() => ui.nodes().find((n: any) => n.type === 'Row' && /^Arquivadas/.test(n.props.title)).props.onPress());
   const card = deslizaveis(ui).find((d: any) => d.props.titulo === 'Carro');
   assert.ok(card, 'a dívida arquivada arrasta');
-  assert.deepEqual(ladosDe(card), { direita: ['Desarquivar'], esquerda: ['Excluir por completo'], mais: false, pontaDireita: 'Desarquivar', pontaEsquerda: 'Excluir por completo' });
+  assert.deepEqual(ladosDe(card), { direita: ['Desarquivar'], esquerda: ['Apagar por completo'], mais: false, pontaDireita: 'Desarquivar', pontaEsquerda: 'Apagar por completo' });
 });
 
-test('Arquivados (contas, cartões, metas, bens): Desarquivar à direita, Excluir à esquerda, e excluir confirma', () => {
+test('Arquivados (contas, cartões, metas, bens): Desarquivar à direita, Apagar à esquerda, e apagar confirma', () => {
   const ui = screen('src/components/ui/secao-de-arquivados.tsx', {
     componente: 'SecaoDeArquivados',
     props: { tabela: 'goals', titulo: 'Arquivadas', subtitulo: () => 'meta arquivada' },
@@ -3131,8 +3131,8 @@ test('Arquivados (contas, cartões, metas, bens): Desarquivar à direita, Exclui
   ui.interact(() => ui.nodes().find((n: any) => n.type === 'Row' && /^Arquivadas/.test(n.props.title)).props.onPress());
   const [card] = deslizaveis(ui);
   assert.ok(card, 'o arquivado arrasta');
-  assert.deepEqual(ladosDe(card), { direita: ['Desarquivar'], esquerda: ['Excluir'], mais: false, pontaDireita: 'Desarquivar', pontaEsquerda: 'Excluir' });
-  ui.interact(() => card.props.acoes.find((a: any) => a.label === 'Excluir').onPress());
+  assert.deepEqual(ladosDe(card), { direita: ['Desarquivar'], esquerda: ['Apagar'], mais: false, pontaDireita: 'Desarquivar', pontaEsquerda: 'Apagar' });
+  ui.interact(() => card.props.acoes.find((a: any) => a.label === 'Apagar').onPress());
   assert.equal(ui.writes.length, 0, 'nada sai sem confirmar');
   ui.interact(() => ui.confirmations.at(-1)());
   assert.deepEqual(ui.writes.at(-1), { operation: 'excluir:goals', value: 'g1' });

@@ -278,23 +278,23 @@ export default function CardsScreen() {
               onPress={() => irParaFatura(card)}
               titulo={card.name}
               acoes={[
-                // Arrasto: com a fatura fechada, Paguei à direita e Importar à esquerda; aberta,
-                // Importar à direita. A carteira fica sempre à esquerda (spec 2026-09-23).
-                { label: 'Abrir na carteira', curto: 'Carteira', icon: 'creditcard', arrasto: 'esquerda', onPress: () => abrirNaCarteira(card) },
+                // Arrasto: a direita é Paguei (fatura fechada) ou Importar; a esquerda só tira da
+                // lista, e é o Arquivar (design.md §6, 28/09/2026). O resto mora no "Mais".
+                { label: 'Abrir na carteira', icon: 'creditcard', onPress: () => abrirNaCarteira(card) },
                 // A fatura do banco entra por aqui, com o cartão já escolhido (23/09/2026: *"meu
                 // pai não sabia como importar a fatura"* — não havia caminho a partir do cartão).
                 {
                   label: 'Importar fatura',
                   curto: 'Importar',
                   icon: 'square.and.arrow.down',
-                  arrasto: podePagar && totalFatura > 0 ? 'esquerda' : 'direita',
+                  arrasto: podePagar && totalFatura > 0 ? undefined : 'direita',
                   onPress: () => router.push({ pathname: '/import', params: { conta: card.account_id } }),
                 },
                 ...(podePagar && totalFatura > 0
                   ? [{ label: 'Paguei', icon: 'checkmark.circle' as const, arrasto: 'direita' as const, onPress: () => irParaFatura(card, true) }]
                   : []),
                 { label: 'Editar cartão', icon: 'pencil', onPress: () => router.push(`/finance/accounts?edit=${card.account_id}`) },
-                { label: 'Arquivar cartão', icon: 'archivebox', destructive: true, onPress: () => arquivar(card) },
+                { label: 'Arquivar cartão', curto: 'Arquivar', icon: 'archivebox', destructive: true, arrasto: 'esquerda', onPress: () => arquivar(card) },
               ]}
               accessibilityLabel={`${card.name}, ${estado ? `fatura ${estado.toLowerCase()}` : 'sem fatura aberta'}, ${formatBRL(totalFatura)}${card.due_date ? `, ${prazoLabel(card.due_date, 'vence')}` : ''}`}>
               <View style={styles.cardHead}>

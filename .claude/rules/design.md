@@ -643,6 +643,12 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
   **direita** é a ação rápida, a **esquerda** é tirar da lista, e **"Mais"** (o menu inteiro)
   entra por dentro da esquerda quando sobra ação. Caminho ÚNICO: `Deslizavel`
   (`components/ui/deslizavel.tsx`); a tela só marca as ações que já declara (`ItemAction`):
+  - **Os lados não mudam de sentido em tela nenhuma** (28/09/2026, *"Excluir tem que sempre ser
+    um lado somente… tudo tem que ser somente um lado e padronizado"*): a ESQUERDA só tira o item
+    da lista (Apagar, Arquivar, Lixeira) e a DIREITA nunca é destrutiva — em arquivadas e na
+    lixeira ela é Restaurar. O verbo de apagar é **"Apagar"**, nunca "Excluir". O que não tira da
+    lista e não é a ação rápida (Editar na Projeção, Carteira no cartão) mora no "Mais".
+    `anti-slop.test.ts` lê toda ação com `arrasto:` e quebra se um lado sair da régua;
   - `arrasto: 'direita' | 'esquerda' | 'fora'` — `fora` repete o toque curto e não chama o "Mais";
   - **arrastar até o fim aciona a ação da BORDA do lado, qualquer que seja** (24/09/2026, pedido
     do dono do produto: *"ao arrastar tudo para o lado esquerdo, ele aciona a opção mais à

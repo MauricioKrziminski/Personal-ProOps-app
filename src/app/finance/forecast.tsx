@@ -437,10 +437,10 @@ export default function ForecastScreen() {
               arrasto: 'direita',
               onPress: () => pagar(b.ref_id),
             },
+            // A esquerda só tira da lista (design.md §6): Editar mora no "Mais".
             {
               label: 'Editar',
               icon: 'pencil',
-              arrasto: 'esquerda',
               onPress: () =>
                 router.push({ pathname: '/finance/transaction-form', params: { id: b.ref_id } }),
             },

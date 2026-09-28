@@ -18,7 +18,7 @@ import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item
 
 /** O que some junto com o item — dito na confirmação, antes do toque. */
 const O_QUE_SOME: Record<Arquivavel, string> = {
-  accounts: 'Só dá para excluir sem lançamentos. Não dá para desfazer.',
+  accounts: 'Só dá para apagar sem lançamentos. Não dá para desfazer.',
   goals: 'Os aportes dela saem junto. Não dá para desfazer.',
   assets: 'O histórico de valores sai junto. Não dá para desfazer.',
 };
@@ -36,7 +36,7 @@ interface Props {
 
 /**
  * "Arquivadas · N" no fim da lista, que abre os arquivados no lugar; tocar num deles desarquiva,
- * e o arrasto põe Desarquivar à direita e Excluir à esquerda (28/09/2026). Contas, cartões, metas e bens se arquivavam e SUMIAM — não havia
+ * e o arrasto põe Desarquivar à direita e Apagar à esquerda (28/09/2026). Contas, cartões, metas e bens se arquivavam e SUMIAM — não havia
  * tela que os listasse, e o único caminho de volta era o "Desfazer" do aviso, que dura segundos.
  * É o desenho que as dívidas já tinham. Some sem nada arquivado; com erro, diz que falhou.
  */
@@ -63,7 +63,7 @@ export function SecaoDeArquivados({ tabela, titulo, filtro, subtitulo, trailing 
     });
 
   const exclui = (item: Arquivado) =>
-    confirmDestructive(`Excluir ${item.name}?`, 'Excluir', () =>
+    confirmDestructive(`Apagar ${item.name}?`, 'Apagar', () =>
       excluir.mutate(item.id, {
         onSuccess: (saiu) =>
           toast(
@@ -77,7 +77,7 @@ export function SecaoDeArquivados({ tabela, titulo, filtro, subtitulo, trailing 
               e instanceof ContaComLancamentos ? (
                 <><Forte>{item.name}</Forte> tem {e.quantos} lançamento{e.quantos === 1 ? '' : 's'}: apague-os antes ou deixe arquivada.</>
               ) : (
-                <>Não deu para excluir <Forte>{item.name}</Forte>.</>
+                <>Não deu para apagar <Forte>{item.name}</Forte>.</>
               ),
             tone: 'error',
           }),
@@ -85,7 +85,7 @@ export function SecaoDeArquivados({ tabela, titulo, filtro, subtitulo, trailing 
 
   const acoes = (item: Arquivado): ItemAction[] => [
     { label: 'Desarquivar', curto: 'Restaurar', icon: 'arrow.uturn.backward', arrasto: 'direita', onPress: () => volta(item) },
-    { label: 'Excluir', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => exclui(item) },
+    { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => exclui(item) },
   ];
 
   return (

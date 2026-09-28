@@ -628,11 +628,11 @@ export default function GoalsScreen() {
                 key={mes}
                 title={`${new Date(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)) - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })} · ${brl(grupo.total)}`}>
                 {(grupo.itens ?? []).map((c) => {
-                  // Editar à direita, Desfazer à esquerda; o toque longo lê a mesma lista.
+                  // Editar à direita, Apagar à esquerda; o toque longo lê a mesma lista.
                   const acoesDoAporte: ItemAction[] = extrato
                     ? [
                         { label: 'Editar', icon: 'pencil', arrasto: 'direita', onPress: () => abrirEdicaoDoAporte(c) },
-                        { label: 'Desfazer', icon: 'arrow.uturn.backward', destructive: true, arrasto: 'esquerda', onPress: () => desfazerAporte(extrato, Number(c.amount_cents)) },
+                        { label: 'Apagar o aporte', curto: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => desfazerAporte(extrato, Number(c.amount_cents)) },
                       ]
                     : [];
                   return (

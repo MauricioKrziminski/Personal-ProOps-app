@@ -1645,3 +1645,37 @@ test('Folha com rolagem usa SheetScroll, e o conteúdo dela não soma a área se
   }
   assert.deepEqual(fora, []);
 });
+
+/**
+ * O arrasto tem UMA régua no app inteiro (design.md §6, 28/09/2026: *"Excluir tem que sempre ser
+ * um lado somente… tudo tem que ser somente um lado e padronizado"*): a ESQUERDA só tira o item
+ * da lista (apagar, arquivar, lixeira) e a DIREITA nunca é destrutiva. Lê cada objeto de ação que
+ * declara `arrasto:` e confere o lado contra o que ele faz.
+ */
+test('arrasto: esquerda só tira da lista, direita nunca apaga, e apagar se chama "Apagar"', () => {
+  const erros: string[] = [];
+  for (const file of walk(SRC)) {
+    const text = readFileSync(file, 'utf8');
+    for (const m of text.matchAll(/arrasto:\s*([^,\n}]+)/g)) {
+      // O objeto de ação em volta: do `{` que o abre ao `}` que o fecha.
+      let ini = m.index!;
+      for (let prof = 0; ini > 0; ini--) {
+        if (text[ini] === '}') prof++;
+        if (text[ini] === '{' && prof-- === 0) break;
+      }
+      let fim = m.index!;
+      for (let prof = 0; fim < text.length; fim++) {
+        if (text[fim] === '{') prof++;
+        if (text[fim] === '}' && prof-- === 0) break;
+      }
+      const acao = text.slice(ini, fim + 1);
+      const onde = `${file.slice(SRC.length + 1)}: ${acao.match(/label:\s*([^,\n]+)/)?.[1] ?? '?'}`;
+      const lado = m[1];
+      const tiraDaLista = /destructive:\s*true/.test(acao) || /'archivebox'/.test(acao);
+      if (/'esquerda'/.test(lado) && !tiraDaLista) erros.push(`${onde} — à esquerda sem tirar da lista`);
+      if (/'direita'/.test(lado) && /destructive:\s*true/.test(acao)) erros.push(`${onde} — destrutiva à direita`);
+      if (/'esquerda'|'direita'/.test(lado) && /Excluir/.test(acao)) erros.push(`${onde} — o verbo é "Apagar"`);
+    }
+  }
+  assert.deepEqual(erros, []);
+});

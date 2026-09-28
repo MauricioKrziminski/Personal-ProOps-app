@@ -598,13 +598,13 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
     ? [
         { label: 'Renomear', icon: 'pencil' as const, onPress: () => setRenomeando(true) },
         {
-          label: 'Excluir',
+          label: 'Apagar',
           icon: 'trash' as const,
           destructive: true,
           onPress: () =>
             confirmDestructive(
-              'Excluir conversa?',
-              'Excluir',
+              'Apagar conversa?',
+              'Apagar',
               () =>
                 excluir.mutate(conversationId, {
                   onSuccess: () => router.replace('/agent/history'),
@@ -613,7 +613,7 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
                       message:
                         (e as AgentApiError).status === 409
                           ? 'O turno ainda está terminando. Tenta em instantes.'
-                          : 'Não deu para excluir a conversa.',
+                          : 'Não deu para apagar a conversa.',
                       tone: 'error',
                     }),
                 }),

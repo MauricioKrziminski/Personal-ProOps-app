@@ -65,7 +65,7 @@ export default function AgentHistoryScreen() {
               () =>
                 excluir.mutate(conversa.id, {
                   onError: () =>
-                    toast({ message: 'Não deu para excluir a conversa.', tone: 'error' }),
+                    toast({ message: 'Não deu para apagar a conversa.', tone: 'error' }),
                 }),
               // Dizer o que some, e não só "não dá para desfazer": o histórico e
               // as confirmações pendentes vão junto, e isso não é óbvio.
