@@ -1681,6 +1681,7 @@ export type Database = {
           currency: string
           description: string | null
           dtstart: string | null
+          edit_revision: number
           end_date: string | null
           id: string
           kind: string
@@ -1704,6 +1705,7 @@ export type Database = {
           currency?: string
           description?: string | null
           dtstart?: string | null
+          edit_revision?: number
           end_date?: string | null
           id?: string
           kind: string
@@ -1727,6 +1729,7 @@ export type Database = {
           currency?: string
           description?: string | null
           dtstart?: string | null
+          edit_revision?: number
           end_date?: string | null
           id?: string
           kind?: string
@@ -3158,6 +3161,46 @@ export type Database = {
         Args: { p_transaction_id: string; p_patch: Json }
         Returns: number
       }
+      update_installment_scope: {
+        Args: { p_transaction_id: string; p_scope: string; p_patch: Json }
+        Returns: number
+      }
+      update_recurring_all: {
+        Args: {
+          p_recurring_id: string
+          p_line_patch: Json
+          p_series_patch: Json
+          p_expected_revision: number
+          p_request_id: string
+        }
+        Returns: number
+      }
+      update_debt_contract_scoped: {
+        Args: {
+          p_debt_id: string
+          p_anchor_no: number
+          p_scope: string
+          p_patch: Json
+          p_expected_revision: number
+          p_expected_payment_versions: Json
+          p_request_id: string
+        }
+        Returns: Json
+      }
+      save_reminder_child_scoped: {
+        Args: {
+          p_child_id: string
+          p_parent_id: string
+          p_expected_child_run_at: string
+          p_scope: string
+          p_title: string
+          p_recurrence: string | null
+          p_next_run_at: string
+          p_channel: string
+          p_timezone: string
+        }
+        Returns: undefined
+      }
       update_recurring_series: {
         Args: { p_patch: Json; p_propagate?: boolean; p_recurring_id: string }
         Returns: number
@@ -3168,6 +3211,26 @@ export type Database = {
           p_recurring_id: string
           p_line_patch: Json
           p_series_patch: Json
+        }
+        Returns: number
+      }
+      update_recurring_one: {
+        Args: {
+          p_transaction_id: string
+          p_patch: Json
+          p_expected_revision: number
+          p_request_id: string
+        }
+        Returns: number
+      }
+      update_recurring_future: {
+        Args: {
+          p_transaction_id: string | null
+          p_recurring_id: string
+          p_line_patch: Json
+          p_series_patch: Json
+          p_expected_revision: number
+          p_request_id: string
         }
         Returns: number
       }

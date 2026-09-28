@@ -103,6 +103,8 @@ export function useGlobalSearch(q: string, limite = LIMIT) {
           const { data, error } = await supabase
             .from('reminders')
             .select('id, title, recurrence, next_run_at, active, skip_run_at')
+            // Delivered child snapshots are history, not current search results.
+            .or('parent_reminder_id.is.null,active.eq.true')
             .ilike('title', like)
             .order('next_run_at')
             .limit(limite + 1);

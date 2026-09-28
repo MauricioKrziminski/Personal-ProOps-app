@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { compraDoRegistro, compraParaRevisaoDaParcela, mudarParcelas, payloadDaCompra, validaCompra, type CompraGravada } from './compra.ts';
+import { compraDoRegistro, compraParaRevisaoDaParcela, edicaoEscopadaDaCompra, mudarParcelas, payloadDaCompra, validaCompra, type CompraGravada } from './compra.ts';
 
 // Uma compra de 10x de R$ 100 com as 3 primeiras pagas.
 const tv: CompraGravada = {
@@ -30,13 +30,14 @@ test('As já pagas vão do piso (paga com a fatura) ao número de parcelas', () 
   assert.equal(mudarParcelas({ ...f, pagas: 8 }, 6).pagas, 6);
 });
 
-test('O total cobre o que já foi pago e sobra um centavo por parcela em aberto', () => {
+test('O total mínimo permite corrigir também as parcelas já pagas quando Todas for escolhido', () => {
   const f = compraDoRegistro(tv);
-  assert.equal(validaCompra({ ...f, totalCents: 30006 }).totalOk, false);
-  assert.equal(validaCompra({ ...f, totalCents: 30007 }).totalOk, true);
-  // todas pagas: o total é a soma delas
+  assert.equal(validaCompra({ ...f, totalCents: 9 }).totalOk, false);
+  assert.equal(validaCompra({ ...f, totalCents: 10 }).totalOk, true);
+  assert.equal(edicaoEscopadaDaCompra({ ...f, totalCents: 10 }, tv, 'all').kind, 'scope');
+  // Mudar a estrutura ainda usa o contrato antigo, que conserva valores pagos.
   assert.equal(validaCompra({ ...f, installments: 3, totalCents: 30000 }).totalOk, true);
-  assert.equal(validaCompra({ ...f, installments: 3, totalCents: 31000 }).totalOk, false);
+  assert.equal(edicaoEscopadaDaCompra({ ...f, installments: 3, totalCents: 10 }, tv, 'all').kind, 'structural-rejection');
 });
 
 test('O salvar só manda as pagas quando elas mudaram', () => {
@@ -78,4 +79,46 @@ test('Ao escolher a compra toda no Salvar, o rascunho da parcela chega inteiro �
     occurred_at: '2026-10-05', amount_cents: 10000, description: 'TV (5/10)', merchant: null, category: 'casa',
   });
   assert.equal(rotulada.description, 'TV', 'o número da parcela não entra no título da compra');
+});
+
+test('O total escolhido para esta ou futuras parcelas chega como total do plano, sem transformar em valor mensal', () => {
+  const f = { ...compraDoRegistro(tv), totalCents: 112001, description: 'TV nova' };
+  assert.deepEqual(edicaoEscopadaDaCompra(f, tv, 'future'), {
+    kind: 'scope', patch: { total_cents: 112001, description: 'TV nova' },
+  });
+  assert.deepEqual(edicaoEscopadaDaCompra(f, tv, 'one'), {
+    kind: 'scope', patch: { total_cents: 112001, description: 'TV nova' },
+  });
+});
+
+test('Cada parcela aplica o valor digitado em cada linha do alcance, inclusive as pagas em Todas', () => {
+  const f = { ...compraDoRegistro(tv), unidade: 'parcela' as const, parcelaCents: 12000, totalCents: 114000 };
+  assert.deepEqual(edicaoEscopadaDaCompra(f, tv, 'all'), {
+    kind: 'scope', patch: { amount_cents: 12000 },
+  });
+  assert.deepEqual(edicaoEscopadaDaCompra(f, tv, 'future'), {
+    kind: 'scope', patch: { amount_cents: 12000 },
+  });
+  const entirelyPaid = { ...tv, installments: 3, total_cents: 30000, paid: 3, locked: 3 };
+  const paidForm = { ...compraDoRegistro(entirelyPaid), unidade: 'parcela' as const, parcelaCents: 9000 };
+  assert.deepEqual(edicaoEscopadaDaCompra(paidForm, entirelyPaid, 'all'), {
+    kind: 'scope', patch: { amount_cents: 9000 },
+  });
+});
+
+test('Quantidade e data inicial são contrato: escopos limitados explicam a impossibilidade', () => {
+  const f = { ...compraDoRegistro(tv), installments: 12 };
+  assert.equal(edicaoEscopadaDaCompra(f, tv, 'one').kind, 'structural-rejection');
+  assert.equal(edicaoEscopadaDaCompra(f, tv, 'future').kind, 'structural-rejection');
+  assert.equal(edicaoEscopadaDaCompra(f, tv, 'all').kind, 'contract');
+  assert.equal(edicaoEscopadaDaCompra({ ...compraDoRegistro(tv), inicio: '06/06/2026' }, tv, 'future').kind, 'structural-rejection');
+});
+
+test('Todas inclui parcela paga fora do cartão; fatura protegida continua bloqueada', () => {
+  const f = { ...compraDoRegistro(tv), totalCents: 110000 };
+  assert.deepEqual(edicaoEscopadaDaCompra(f, tv, 'all'), {
+    kind: 'scope', patch: { total_cents: 110000 },
+  });
+  assert.equal(edicaoEscopadaDaCompra(f, { ...tv, locked_in_invoice: 1 }, 'all').kind, 'protected-rejection');
+  assert.equal(edicaoEscopadaDaCompra(compraDoRegistro(tv), tv, 'all').kind, 'no-op');
 });

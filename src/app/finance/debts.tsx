@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -40,12 +40,14 @@ import {
   useArchivedDebts,
   useDebtDeclaredEstimates,
   useDebtPayments,
+  useDebtPaymentVersions,
   useDeleteDebt,
   useDebtSchedule,
   useDebts,
   usePayDebtInstallment,
   usePayoffStrategy,
   useSaveDebt,
+  useSaveDebtContractScoped,
   useUnarchiveDebt,
   type Debt,
 } from '@/hooks/use-finance';
@@ -71,6 +73,8 @@ import { DebtTimeline } from '@/components/finance/debt-timeline';
 import { RingGauge } from '@/components/ui/ring-gauge';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { transicaoDeLayout } from '@/components/motion/transicao';
+import { askEditScope } from '@/lib/edit-scope';
+import { newClientMessageId } from '@/lib/agent-chat';
 
 /**
  * Dívidas — "quanto disso é juro, e por onde eu começo?".
@@ -100,6 +104,7 @@ function parseTaxa(texto: string): number {
 interface FormState {
   calculationMode: 'amortized' | 'fixed_installments';
   id?: string;
+  original?: Debt;
   /** O `updated_at` de quando o formulário abriu: o salvar só grava se a dívida não mudou no meio. */
   versao?: string | null;
   name: string;
@@ -187,6 +192,8 @@ export default function DebtsScreen() {
   if (payoff.data && !ordemJaVeio) setOrdemJaVeio(true);
   const accounts = useAccounts();
   const save = useSaveDebt();
+  const saveScoped = useSaveDebtContractScoped();
+  const contractAttempt = useRef<{ key: string; id: string } | null>(null);
   const archive = useArchiveDebt();
   const unarchive = useUnarchiveDebt();
   const excluirDivida = useDeleteDebt();
@@ -223,6 +230,7 @@ export default function DebtsScreen() {
   // âncora, e os pagamentos lançados são o piso das "pagas".
   const schedule = useDebtSchedule(detalhe?.id ?? pagando?.id ?? form?.id);
   const payments = useDebtPayments(detalhe?.id ?? pagando?.id ?? form?.id);
+  const paymentVersions = useDebtPaymentVersions(form?.id);
   const declaredEstimates = useDebtDeclaredEstimates(detalhe?.id);
 
   // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
@@ -271,6 +279,7 @@ export default function DebtsScreen() {
       ancora: d.first_due_date ?? null,
       pagasOriginal: d.installments_paid,
       id: d.id,
+      original: d,
       versao: d.updated_at,
       name: d.name,
       kind: d.kind,
@@ -428,8 +437,7 @@ export default function DebtsScreen() {
 
   const salvar = () => {
     if (!form || !podeSalvar) return;
-    save.mutate(
-      {
+    const target = {
         id: form.id,
         name: form.name.trim(),
         calculation_mode: form.calculationMode,
@@ -447,13 +455,13 @@ export default function DebtsScreen() {
         // Só com âncora conhecida: sem ela o cronograma segue o jeito antigo, sem data inventada.
         ...(ancoraEfetiva ? { first_due_date: ancoraEfetiva } : {}),
         ...(form.id ? { versao: form.versao ?? null } : {}),
-      },
-      {
+      };
+    const callbacks = {
         onSuccess: () => {
           toast({ message: form.id ? 'Dívida atualizada.' : 'Dívida cadastrada.', tone: 'success' });
           volta.aoFechar(() => setForm(null));
         },
-        onError: (error) =>
+        onError: (error: Error) =>
           toast({
             message:
               (error as { code?: string }).code === 'VERSAO'
@@ -461,8 +469,79 @@ export default function DebtsScreen() {
                 : financeErrorMessage(error, 'Não deu para salvar. Já existe uma dívida com esse nome?'),
             tone: 'error',
           }),
+      };
+    if (!form.id || !form.original) {
+      save.mutate(target, callbacks);
+      return;
+    }
+    const original = form.original;
+    const patch: Record<string, string | number | null> = {};
+    const fields = ['name','kind','principal_cents','remaining_cents','interest_rate_monthly',
+      'installments','installments_paid','installment_cents','account_id','due_day','first_due_date'] as const;
+    for (const field of fields) {
+      const wanted = target[field as keyof typeof target];
+      if (wanted !== undefined && wanted !== original[field as keyof Debt])
+        patch[field] = wanted as string | number | null;
+    }
+    // Fixed-installment principal and balance are derived from the installment amount.
+    if (patch.installment_cents !== undefined && form.calculationMode === 'fixed_installments') {
+      delete patch.principal_cents;
+      delete patch.remaining_cents;
+    }
+    const dateChanged = Boolean(proximaISO &&
+      (patch.due_day !== undefined || patch.first_due_date !== undefined) &&
+      (!schedule.data?.[0] || proximaISO !== schedule.data[0].due_date));
+    if (form.calculationMode !== original.calculation_mode) {
+      toast({ message: 'O modo de cálculo não pode ser alterado. Cadastre outro contrato.', tone: 'error' });
+      return;
+    }
+    askEditScope('installment', (scope) => {
+      if (!Object.keys(patch).length && !dateChanged) {
+        volta.aoFechar(() => setForm(null));
+        return;
       }
-    );
+      const scopedPatch = { ...patch };
+      if (scope === 'one') {
+        for (const key of Object.keys(scopedPatch)) {
+          if (key !== 'installment_cents' && key !== 'due_day' && key !== 'first_due_date') {
+            toast({ message: 'Este campo vale para o contrato inteiro. Escolha Todas.', tone: 'error' });
+            return;
+          }
+        }
+        delete scopedPatch.due_day;
+        delete scopedPatch.first_due_date;
+        if (dateChanged) scopedPatch.due_date = proximaISO!;
+      } else if (scope === 'future') {
+        for (const key of Object.keys(scopedPatch)) {
+          if (key !== 'installment_cents' && key !== 'due_day' && key !== 'first_due_date') {
+            toast({ message: 'Este campo vale para o contrato inteiro. Escolha Todas.', tone: 'error' });
+            return;
+          }
+        }
+      }
+      if (!Object.keys(scopedPatch).length) {
+        volta.aoFechar(() => setForm(null));
+        return;
+      }
+      if (!paymentVersions.data || paymentVersions.isError) {
+        toast({ message: 'Não consegui conferir os pagamentos desta dívida. Tente novamente.', tone: 'error' });
+        return;
+      }
+      const versions = Object.fromEntries(paymentVersions.data.map((p) => [p.id, p.edit_revision]));
+      const key = JSON.stringify([form.id, original.installments_paid + 1, scope,
+        scopedPatch, original.edit_revision, versions]);
+      if (contractAttempt.current?.key !== key)
+        contractAttempt.current = { key, id: newClientMessageId() };
+      saveScoped.mutate({ debtId: form.id!, anchorNo: original.installments_paid + 1,
+        scope, patch: scopedPatch, debtRevision: original.edit_revision,
+        paymentVersions: versions, requestId: contractAttempt.current.id }, {
+        ...callbacks,
+        onSuccess: () => {
+          contractAttempt.current = null;
+          callbacks.onSuccess();
+        },
+      });
+    });
   };
 
   const confirmarPagamento = () => {
@@ -913,7 +992,7 @@ export default function DebtsScreen() {
               <Button
                 label="Salvar"
                 size="sm"
-                loading={save.isPending}
+                loading={save.isPending || saveScoped.isPending}
                 disabled={!podeSalvar}
                 onPress={salvar}
               />

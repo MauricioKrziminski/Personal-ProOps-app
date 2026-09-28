@@ -61,7 +61,7 @@ async def test_job_keeps_the_reminder_calendar(monkeypatch, rule, start, expecte
 
     async def execute(sql, *args):
         updates.append(args)
-        row["recurrence"] = args[3]
+        row["recurrence"] = args[4]
         return 1
 
     async def deliver(due):
@@ -75,8 +75,7 @@ async def test_job_keeps_the_reminder_calendar(monkeypatch, rule, start, expecte
         monkeypatch.setattr(reminders, "now_utc", lambda: row["next_run_at"])
         result = await reminders.run()
         assert result == {"due": 1, "sent": 1, "given_up": 0}
-        assert updates[-1][1] == next_date
-        assert updates[-1][2] is True
+        assert updates[-1][3] == next_date
         row["next_run_at"] = next_date
 
     assert sent == [start, *expected[:-1]]
@@ -127,5 +126,5 @@ async def test_job_persists_implicit_day_after_last_failed_delivery(monkeypatch)
     monkeypatch.setattr(reminders, "now_utc", lambda: at)
 
     assert await reminders.run() == {"due": 1, "sent": 0, "given_up": 1}
-    assert updates[0][2] == instant(2027, 2, 28)
-    assert updates[0][5] == "FREQ=MONTHLY;BYMONTHDAY=31"
+    assert updates[0][3] == instant(2027, 2, 28)
+    assert updates[0][4] == "FREQ=MONTHLY;BYMONTHDAY=31"

@@ -176,6 +176,7 @@ export type RecurringTransaction = Pick<
   | 'auto_confirm'
   // O estabelecimento da série (`20260926120000`): o "Repetir lançamento" o perdia.
   | 'merchant'
+  | 'edit_revision'
 > & { kind: 'expense' | 'income' };
 
 export type MonthlyCashflow = Fns['monthly_cashflow']['Returns'][number];
@@ -434,7 +435,7 @@ export function useGoals() {
 }
 
 const RECURRING_COLUMNS =
-  'id, kind, amount_cents, currency, category, description, merchant, account_id, rrule, next_run_at, active, run_attempts, last_error, created_at, dtstart, end_date, auto_confirm';
+  'id, kind, amount_cents, currency, category, description, merchant, account_id, rrule, next_run_at, active, run_attempts, last_error, created_at, dtstart, end_date, auto_confirm, edit_revision';
 
 /**
  * As categorias que o usuário realmente usa, mais usada primeiro.
@@ -2195,6 +2196,35 @@ export function useSaveDebt() {
   });
 }
 
+/** A ficha edita a parcela numerada com uma única transação no banco. */
+export function useSaveDebtContractScoped() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (input: {
+      debtId: string;
+      anchorNo: number;
+      scope: 'one' | 'future' | 'all';
+      patch: Record<string, string | number | null>;
+      debtRevision: number;
+      paymentVersions: Record<string, number>;
+      requestId: string;
+    }) => {
+      const { data, error } = await supabase.rpc('update_debt_contract_scoped', {
+        p_debt_id: input.debtId,
+        p_anchor_no: input.anchorNo,
+        p_scope: input.scope,
+        p_patch: input.patch,
+        p_expected_revision: input.debtRevision,
+        p_expected_payment_versions: input.paymentVersions,
+        p_request_id: input.requestId,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: invalidate,
+  });
+}
+
 /** Paga uma parcela: a RPC cria a despesa e abate o saldo já descontando juros. */
 export function usePayDebtInstallment() {
   const invalidate = useInvalidateFinance();
@@ -2743,18 +2773,20 @@ export function useSaveTransactionScoped() {
   });
 }
 
-/** Uma parcela e o total da compra são salvos pelo mesmo comando SQL. */
+/** Uma parcela ou um intervalo do plano são salvos em uma única transação SQL. */
 export function useSaveInstallmentOccurrence() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async ({ id, patch }: {
+    mutationFn: async ({ id, scope = 'one', patch }: {
       id: string;
-      patch: Pick<TransactionInput,
+      scope?: 'one' | 'future' | 'all';
+      patch: Partial<Pick<TransactionInput,
         'amount_cents' | 'category' | 'description' | 'merchant' | 'occurred_at' |
-        'status' | 'due_at' | 'auto_confirm'>;
+        'status' | 'due_at' | 'auto_confirm'>> & { total_cents?: number };
     }) => {
-      const { data, error } = await supabase.rpc('update_installment_occurrence', {
+      const { data, error } = await supabase.rpc('update_installment_scope', {
         p_transaction_id: id,
+        p_scope: scope,
         p_patch: patch,
       });
       if (error) throw error;
@@ -2773,8 +2805,10 @@ export function useSaveInstallmentOccurrence() {
 export function useSaveRecurringSeries() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async ({ id, patch }: {
+    mutationFn: async ({ id, patch, expectedRevision, requestId }: {
       id: string;
+      expectedRevision: number;
+      requestId: string;
       patch: {
         amount_cents?: number;
         category?: string | null;
@@ -2789,10 +2823,13 @@ export function useSaveRecurringSeries() {
         next_run_at?: string;
       };
     }) => {
-      const { data, error } = await supabase.rpc('update_recurring_series', {
+      const { data, error } = await supabase.rpc('update_recurring_future', {
+        p_transaction_id: null,
         p_recurring_id: id,
-        p_patch: patch,
-        p_propagate: true,
+        p_line_patch: {},
+        p_series_patch: patch,
+        p_expected_revision: expectedRevision,
+        p_request_id: requestId,
       });
       if (error) throw error;
       // O calendário pedido num mês que já tem a sua cobrança desliza para o seguinte
@@ -2812,13 +2849,75 @@ export function useSaveRecurringSeries() {
   });
 }
 
+/** Corrige o contrato e todas as ocorrências gravadas, inclusive as passadas, numa transação. */
+export function useSaveRecurringAll() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (input: {
+      recurringId: string;
+      linePatch: Partial<Pick<TransactionInput,
+        'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id'>>;
+      seriesPatch: {
+        amount_cents?: number;
+        category?: string | null;
+        description?: string | null;
+        merchant?: string | null;
+        kind?: 'expense' | 'income';
+        account_id?: string | null;
+        auto_confirm?: boolean;
+        end_date?: string | null;
+        rrule?: string;
+        next_run_at?: string;
+      };
+      expectedRevision: number;
+      requestId: string;
+    }) => {
+      const { data, error } = await supabase.rpc('update_recurring_all', {
+        p_recurring_id: input.recurringId,
+        p_line_patch: input.linePatch,
+        p_series_patch: input.seriesPatch,
+        p_expected_revision: input.expectedRevision,
+        p_request_id: input.requestId,
+      });
+      if (error) throw error;
+      return Number(data ?? 0);
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Uma ocorrência gravada: revisão otimista e chave de requisição evitam edições repetidas. */
+export function useSaveRecurringOne() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      patch: Record<string, string | number | boolean | null>;
+      expectedRevision: number;
+      requestId: string;
+    }) => {
+      const { data, error } = await supabase.rpc('update_recurring_one', {
+        p_transaction_id: input.id,
+        p_patch: input.patch,
+        p_expected_revision: input.expectedRevision,
+        p_request_id: input.requestId,
+      });
+      if (error) throw error;
+      return Number(data ?? 0);
+    },
+    onSuccess: invalidate,
+  });
+}
+
 /** Edita linhas e calendário no mesmo comando SQL; falha inteira se uma parte falhar. */
 export function useSaveRecurringOccurrenceAndSeries() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async ({ id, recurringId, linePatch, seriesPatch }: {
+    mutationFn: async ({ id, recurringId, linePatch, seriesPatch, expectedRevision, requestId }: {
       id: string;
       recurringId: string;
+      expectedRevision: number;
+      requestId: string;
       linePatch: Partial<Pick<TransactionInput, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id'>>;
       seriesPatch: {
         amount_cents?: number;
@@ -2833,11 +2932,13 @@ export function useSaveRecurringOccurrenceAndSeries() {
         next_run_at?: string;
       };
     }) => {
-      const { data, error } = await supabase.rpc('update_recurring_occurrence_and_series', {
+      const { data, error } = await supabase.rpc('update_recurring_future', {
         p_transaction_id: id,
         p_recurring_id: recurringId,
         p_line_patch: linePatch,
         p_series_patch: seriesPatch,
+        p_expected_revision: expectedRevision,
+        p_request_id: requestId,
       });
       if (error) throw error;
       let aviso: string | null = null;

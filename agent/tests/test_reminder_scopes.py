@@ -44,7 +44,34 @@ async def test_replaced_occurrence_advances_series_without_delivery(monkeypatch)
     assert delivered == []
     assert result["sent"] == 0
     assert len(updates) == 1
-    assert datetime(2026, 9, 29, 12, tzinfo=timezone.utc) in updates[0][1]
+    assert updates[0][1][3] == datetime(2026, 9, 29, 12, tzinfo=timezone.utc)
+
+
+@pytest.mark.asyncio
+async def test_completed_parent_uses_atomic_history_advance(monkeypatch):
+    updates = []
+
+    async def fetch(sql, *args):
+        return [due(skip_run_at=None)]
+
+    async def execute(sql, *args):
+        updates.append((sql, args))
+        return 1
+
+    async def deliver(row):
+        return None
+
+    monkeypatch.setattr(reminders.db, "fetch", fetch)
+    monkeypatch.setattr(reminders.db, "execute", execute)
+    monkeypatch.setattr(reminders, "_entregar", deliver)
+    monkeypatch.setattr(reminders, "now_utc", lambda: AT)
+
+    await reminders.run()
+
+    assert len(updates) == 1
+    assert "finish_reminder_occurrence" in updates[0][0]
+    assert "'sent'" in updates[0][0]
+    assert AT in updates[0][1]
 
 
 @pytest.mark.asyncio
@@ -70,7 +97,7 @@ async def test_replacement_sends_once_then_deactivates(monkeypatch):
     await reminders.run()
 
     assert delivered == ["replacement"]
-    assert updates[0][1][2] is False
+    assert updates[0][1][3] is None
 
 
 @pytest.mark.asyncio
@@ -110,10 +137,10 @@ async def test_replacement_retry_succeeds_once_without_reactivating_parent(monke
                 if row["active"] and row["next_run_at"] <= AT]
 
     async def execute(sql, *args):
-        if "send_attempts = 0" in sql:
-            row = parent if args[4] == "series" else child
-            row["active"] = args[2]
-            row["next_run_at"] = args[1] or row["next_run_at"]
+        if "finish_reminder_occurrence" in sql:
+            row = parent if args[0] == "series" else child
+            row["active"] = args[3] is not None
+            row["next_run_at"] = args[3] or row["next_run_at"]
             row["skip_run_at"] = None
         else:
             child["send_attempts"] = args[0]

@@ -1571,16 +1571,18 @@ test('Ocorrência de série: uma data só (o vencimento), e o caminho para edita
   assert.match(fonte, /\{umaData \? null : \(\s*<Controller\s+control=\{control\}\s+name="due_at"/, 'sem o segundo campo');
   assert.match(fonte, /if \(umaData\) setValue\('due_at', br\)/, 'o vencimento escondido anda com a data');
   // A pessoa escolhe o alcance ao SALVAR, depois de preencher a mudança no lançamento.
-  assert.match(fonte, /showItemActions\('Salvar alterações em',[\s\S]*?label: 'Só esta ocorrência'[\s\S]*?label: 'Esta e as próximas'/);
+  assert.match(fonte, /askEditScope\('occurrence'/);
+  assert.match(readFileSync(join(SRC, 'lib/edit-scope-model.ts'), 'utf8'), /Só esta ocorrência[\s\S]*?Esta e as próximas/);
   assert.match(fonte, /<CamposDaSerie form=\{formSerie\}/);
   assert.doesNotMatch(fonte, /label="Editar a série"/);
   // Na parcela, a mesma decisão acontece no Salvar; a compra toda abre os campos de revisão.
-  assert.match(fonte, /showItemActions\('Salvar alterações em',[\s\S]*?label: 'Só esta parcela'[\s\S]*?label: 'A compra toda'/);
+  assert.match(fonte, /askEditScope\('installment'/);
+  assert.match(readFileSync(join(SRC, 'lib/edit-scope-model.ts'), 'utf8'), /Só esta parcela[\s\S]*?Esta e as próximas[\s\S]*?Todas, inclusive passadas/);
   assert.match(fonte, /<CamposDaCompra form=\{formCompra\}/);
   assert.doesNotMatch(fonte, /Aplicar em quais\?[\s\S]{0,120}'Só esta'/);
   assert.doesNotMatch(fonte, /label="Editar parcelas e datas da compra"/);
   // Linha e regra na mesma transação SQL; falha de uma não deixa a outra gravada.
-  assert.match(fonte, /editarSerie\.mutate\(\s*\{ id: editing\.id, recurringId: serie\.id, linePatch: linhas, seriesPatch: regra \}/);
+  assert.match(fonte, /editarSerie\.mutate\([\s\S]*?id: editing\.id, recurringId: serie\.id, linePatch: linhas, seriesPatch: regra,[\s\S]*?expectedRevision: serie\.edit_revision, requestId: tentativaFuturoSerie\.current\.id/);
   // "Repetir lançamento" leva o estabelecimento: a série passou a guardá-lo (`20260926120000`).
   assert.match(fonte, /merchant: values\.merchant\?\.trim\(\) \?\? ''/);
 });

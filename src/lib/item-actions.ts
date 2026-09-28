@@ -41,8 +41,8 @@ interface SheetRequest {
  * terceiro botão** — some justamente a última ação, que costuma ser a destrutiva.
  *
  * Por isso o Android renderiza um sheet próprio (`AndroidActionSheet`), montado uma vez no layout
- * raiz. Ele registra aqui o seu setter; se por algum motivo não estiver montado, caímos no `Alert`
- * com no máximo duas ações, que é o que ele exibe sem mentir.
+ * raiz. Ele registra aqui o seu setter; se por algum motivo não estiver montado, o `Alert`
+ * pagina as ações para que a terceira escolha continue alcançável.
  */
 let androidSheet: ((request: SheetRequest | null) => void) | null = null;
 
@@ -94,15 +94,22 @@ export function showItemActions(title: string, actions: ItemAction[], message?: 
     return;
   }
 
-  // Rede de segurança: melhor duas ações honestas do que quatro com a última sumindo.
-  Alert.alert(title, message, [
-    { text: 'Cancelar', style: 'cancel' },
-    ...actions.filter((a) => !a.disabled).slice(0, 2).map((a) => ({
-      text: a.label,
-      style: a.destructive ? ('destructive' as const) : ('default' as const),
-      onPress: () => press(title, a),
-    })),
-  ]);
+  // Rede de segurança: Android mostra no máximo três botões. A paginação preserva todas
+  // as opções se o sheet raiz estiver indisponível durante uma troca de navegação.
+  const enabled = actions.filter((a) => !a.disabled);
+  const showPage = (start: number) => {
+    const remaining = enabled.length - start;
+    Alert.alert(title, message, [
+      { text: 'Cancelar', style: 'cancel' },
+      ...enabled.slice(start, start + (remaining > 2 ? 1 : 2)).map((a) => ({
+        text: a.label,
+        style: a.destructive ? ('destructive' as const) : ('default' as const),
+        onPress: () => press(title, a),
+      })),
+      ...(remaining > 2 ? [{ text: 'Mais opções', onPress: () => showPage(start + 1) }] : []),
+    ]);
+  };
+  showPage(0);
 }
 
 /**

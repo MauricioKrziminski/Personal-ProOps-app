@@ -88,6 +88,7 @@ export function useReminders() {
       const { data, error } = await supabase
         .from('reminders')
         .select('id, title, recurrence, next_run_at, channel, active, skip_run_at, parent_reminder_id, original_run_at')
+        .or('parent_reminder_id.is.null,active.eq.true')
         // pausados também vêm: sem eles não haveria como retomar pelo app
         .order('active', { ascending: false })
         .order('next_run_at')
@@ -130,7 +131,9 @@ export interface ReminderInput {
    * não mexe no vínculo — mandar `null` ali soltaria o lembrete da nota em silêncio.
    */
   note_id?: string | null;
-  scope?: 'one' | 'future';
+  /** Present for a pending one-off override of a recurring reminder. */
+  parent_reminder_id?: string | null;
+  scope?: 'one' | 'future' | 'all';
   expected_next_run_at?: string;
 }
 
@@ -138,8 +141,24 @@ export interface ReminderInput {
 export function useSaveReminder() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, note_id, scope, expected_next_run_at, ...input }: ReminderInput) => {
+    mutationFn: async ({ id, note_id, parent_reminder_id, scope, expected_next_run_at, ...input }: ReminderInput) => {
       if (id) {
+        if (scope && parent_reminder_id) {
+          if (!expected_next_run_at) throw new Error('Falta a data original do lembrete');
+          const { error } = await supabase.rpc('save_reminder_child_scoped', {
+            p_child_id: id,
+            p_parent_id: parent_reminder_id,
+            p_expected_child_run_at: expected_next_run_at,
+            p_scope: scope,
+            p_title: input.title,
+            p_recurrence: input.recurrence,
+            p_next_run_at: input.next_run_at,
+            p_channel: input.channel,
+            p_timezone: input.timezone,
+          });
+          if (error) throw error;
+          return;
+        }
         if (scope) {
           if (!expected_next_run_at) throw new Error('Falta a data original do lembrete');
           const { error } = await supabase.rpc('save_reminder_scoped', {

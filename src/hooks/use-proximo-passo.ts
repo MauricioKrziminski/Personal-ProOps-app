@@ -38,7 +38,8 @@ export function useProximoPasso(userId: string | undefined): {
     queryFn: async () => {
       const [imports, lembretes, notas, parceladas] = await Promise.all([
         contar(supabase.from('import_batches').select('id', { count: 'exact', head: true })),
-        contar(supabase.from('reminders').select('id', { count: 'exact', head: true })),
+        contar(supabase.from('reminders').select('id', { count: 'exact', head: true })
+          .or('parent_reminder_id.is.null,active.eq.true')),
         contar(supabase.from('notes').select('id', { count: 'exact', head: true }).is('deleted_at', null)),
         contar(supabase.from('installment_plans').select('id', { count: 'exact', head: true })),
       ]);

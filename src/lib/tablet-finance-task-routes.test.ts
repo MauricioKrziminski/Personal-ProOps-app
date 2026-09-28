@@ -57,6 +57,6 @@ test('transaction form stays a bounded keyboard aware single column', () => {
   assert.match(source, /KeyboardAwareScrollView/);
   assert.match(source, /maxWidth: MaxContentWidth/);
   assert.doesNotMatch(source, /<AdaptivePanes/);
-  assert.match(source, /showItemActions\(/);
+  assert.match(source, /askEditScope\(/);
   assert.match(source, /confirmDestructive\(/);
 });

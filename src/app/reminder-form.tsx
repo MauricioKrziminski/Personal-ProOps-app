@@ -50,7 +50,8 @@ import {
   rotuloDoDia,
   timeBR,
 } from '@/lib/dates';
-import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { confirmDestructive } from '@/lib/item-actions';
+import { askEditScope } from '@/lib/edit-scope';
 import { describeRRule } from '@/lib/rrule-text';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 
@@ -397,47 +398,55 @@ function ReminderForm({
   const onSubmit = handleSubmit((values) => {
     const at = localDateTime(values.date, values.time);
     if (!at) return;
-    const commit = (scope?: 'one' | 'future') => save.mutate(
-      {
-        id: editing?.id,
-        ...(scope ? { scope, expected_next_run_at: editing?.next_run_at } : {}),
-        title: values.title.trim(),
-        recurrence: scope === 'one'
-          ? values.recurrence
-          : explicitMonthDay(values.recurrence, values.date),
-        next_run_at: at.toISOString(),
-        channel: values.channel,
-        timezone: deviceTimezone(),
-        // só na criação: editar nunca mexe no vínculo
-        ...(editing ? {} : { note_id: noteId ?? null }),
-      },
-      {
-        onSuccess: () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          router.back();
-        },
-        // Erro NUNCA fecha o modal nem limpa os campos.
-        onError: (error) =>
-          toast({
-            // 23505 = `reminders_note_id_key`: dois toques (ou dois aparelhos) no "Criar lembrete"
-            message:
-              error && typeof error === 'object' && 'code' in error && error.code === '23505'
-                ? 'Essa nota já tem um lembrete. Abra ele pelo menu da nota.'
-                : 'Não deu para salvar. Tenta de novo.',
-            tone: 'error',
-          }),
-      },
-    );
-
-    if (editing?.recurrence) {
-      Keyboard.dismiss();
-      showItemActions('Aplicar a edição em quais lembretes?', [
+    const unchanged = !!editing
+      && values.title.trim() === editing.title
+      && values.recurrence === editing.recurrence
+      && values.date === isoToBR(localISODate(new Date(editing.next_run_at)))
+      && values.time === timeBR(new Date(editing.next_run_at))
+      && values.channel === editing.channel;
+    const commit = (scope?: 'one' | 'future' | 'all') => {
+      if (unchanged) {
+        router.back();
+        return;
+      }
+      save.mutate(
         {
-          label: 'Só esta ocorrência',
-          onPress: () => commit('one'),
+          id: editing?.id,
+          parent_reminder_id: editing?.parent_reminder_id,
+          ...(scope ? { scope, expected_next_run_at: editing?.next_run_at } : {}),
+          title: values.title.trim(),
+          recurrence: scope === 'one'
+            ? values.recurrence
+            : explicitMonthDay(values.recurrence, values.date),
+          next_run_at: at.toISOString(),
+          channel: values.channel,
+          timezone: deviceTimezone(),
+          // só na criação: editar nunca mexe no vínculo
+          ...(editing ? {} : { note_id: noteId ?? null }),
         },
-        { label: 'Esta e as próximas', onPress: () => commit('future') },
-      ], 'Só esta altera título, data, hora e canal. Para mudar a repetição, escolha Esta e as próximas.');
+        {
+          onSuccess: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            router.back();
+          },
+          // Erro NUNCA fecha o modal nem limpa os campos.
+          onError: (error) =>
+            toast({
+              // 23505 = `reminders_note_id_key`: dois toques (ou dois aparelhos) no "Criar lembrete"
+              message:
+                error && typeof error === 'object' && 'code' in error && error.code === '23505'
+                  ? 'Essa nota já tem um lembrete. Abra ele pelo menu da nota.'
+                  : 'Não deu para salvar. Tenta de novo.',
+              tone: 'error',
+            }),
+        },
+      );
+    };
+
+    if (editing?.recurrence || editing?.parent_reminder_id) {
+      Keyboard.dismiss();
+      askEditScope('reminder', commit,
+        'Só esta muda uma ocorrência. Todas atualiza o histórico armazenado, mas não altera quando ou como lembretes passados foram enviados.');
       return;
     }
     commit();

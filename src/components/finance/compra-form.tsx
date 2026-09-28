@@ -33,7 +33,7 @@ export function CamposDaCompra({
   onChange: (form: CompraForm) => void;
   contas: Parameters<typeof AccountPicker>[0]['accounts'];
 }) {
-  const { travado, tituloOk, totalOk, contaOk, emAberto, faixa, dataLivre } = validaCompra(form);
+  const { travado, tituloOk, totalOk, contaOk, faixa, dataLivre } = validaCompra(form);
   const motivo = motivoDaTrava(form);
   const nomeDaConta = form.accountId ? (contas.find((c) => c.id === form.accountId)?.name ?? 'Conta') : 'Sem conta';
 
@@ -60,12 +60,12 @@ export function CamposDaCompra({
 
       <Field
         label="Valor"
-        error={totalOk ? undefined : recusaDoValor(form.travadas)}
+        error={totalOk ? undefined : recusaDoValor()}
         hint={
           form.unidade === 'parcela'
-            ? `${travado ? `Vale para as ${emAberto} em aberto` : `${form.installments}x`} · total ${formatBRL(form.totalCents)}`
+            ? `${form.installments}x · o alcance define quais parcelas recebem este valor`
             : travado
-              ? `${formatBRL(form.travadoCents)} já pago`
+              ? `${formatBRL(form.travadoCents)} já pago · o alcance define o novo total`
               : undefined
         }>
         {/* Sempre na tela: sumir no "À vista" subiria o formulário embaixo do "−". */}
@@ -101,7 +101,7 @@ export function CamposDaCompra({
           form.installments === 1
             ? undefined
             : travado
-              ? `As ${emAberto} em aberto dividem ${formatBRL(Math.max(0, form.totalCents - form.travadoCents))}`
+              ? `Ao salvar, escolha se o novo total inclui as ${form.travadas} já pagas`
               : `${form.installments}x de ${formatBRL(Math.floor(form.totalCents / form.installments))}`
         }>
         <QuantityField

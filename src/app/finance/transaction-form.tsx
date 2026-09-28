@@ -44,6 +44,8 @@ import {
   useSaveInstallmentOccurrence,
   useRecurringTransactions,
   useSaveRecurringOccurrenceAndSeries,
+  useSaveRecurringAll,
+  useSaveRecurringOne,
   useTransaction,
   useJurosDoPix,
   DESCRICAO_JUROS_DO_PIX,
@@ -53,7 +55,7 @@ import {
 } from '@/hooks/use-finance';
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
 import { mudaInicioDaSerie, mudancasDaOcorrencia, serieDaOcorrencia, validaSerie, type SerieForm } from '@/lib/serie';
-import { compraDoRegistro, compraParaRevisaoDaParcela, payloadDaCompra, validaCompra, type CompraForm } from '@/lib/compra';
+import { compraDoRegistro, edicaoEscopadaDaCompra, payloadDaCompra, validaCompra, type CompraForm } from '@/lib/compra';
 import {
   destinoDoSalvar,
   faixaDeParcelas,
@@ -71,12 +73,13 @@ import {
   caixaLabels,
   dueFieldLabel,
 } from '@/lib/settle-labels';
-import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { confirmDestructive } from '@/lib/item-actions';
 import { correcaoDoPagamento } from '@/lib/confirmar-baixa';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 import { debtPaymentPatch, selectedDebtPaymentVersions, type DebtPaymentScope } from '@/lib/debt-payment-scope';
 import { newClientMessageId } from '@/lib/agent-chat';
+import { askEditScope } from '@/lib/edit-scope';
 
 /**
  * Novo/editar lançamento — modal do Stack raiz (Cancelar nativo vem do `_layout.tsx`).
@@ -388,6 +391,11 @@ function TransactionForm({
   const [formSerie, setFormSerie] = useState<SerieForm | null>(null);
   const [intencaoDoDia, setIntencaoDoDia] = useState<'fixo' | 'ultimo' | null>(null);
   const editarSerie = useSaveRecurringOccurrenceAndSeries();
+  const editarTodaSerie = useSaveRecurringAll();
+  const editarUmaRecorrencia = useSaveRecurringOne();
+  const tentativaTodaSerie = useRef<{ key: string; id: string } | null>(null);
+  const tentativaUmaRecorrencia = useRef<{ key: string; id: string } | null>(null);
+  const tentativaFuturoSerie = useRef<{ key: string; id: string } | null>(null);
   const serieOk = validaSerie(formSerie).podeSalvar;
   const mudaData = (br: string, intencao: 'fixo' | 'ultimo' = 'fixo') => {
     setValue('occurred_at', br, { shouldValidate: true });
@@ -409,13 +417,74 @@ function TransactionForm({
       toast({ message: aviso ?? 'Alterei esta e as próximas.', tone: 'success' });
     };
     if (Object.keys(linhas).length === 0 && Object.keys(regra).length === 0) return feito();
+    const key = JSON.stringify([editing.id, linhas, regra, serie.edit_revision]);
+    if (tentativaFuturoSerie.current?.key !== key) {
+      tentativaFuturoSerie.current = { key, id: newClientMessageId() };
+    }
     editarSerie.mutate(
-      { id: editing.id, recurringId: serie.id, linePatch: linhas, seriesPatch: regra },
       {
-        onSuccess: ({ aviso }) => feito(aviso),
+        id: editing.id, recurringId: serie.id, linePatch: linhas, seriesPatch: regra,
+        expectedRevision: serie.edit_revision, requestId: tentativaFuturoSerie.current.id,
+      },
+      {
+        onSuccess: ({ aviso }) => {
+          tentativaFuturoSerie.current = null;
+          feito(aviso);
+        },
         onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para salvar. Tenta de novo.'), tone: 'error' }),
       },
     );
+  };
+
+  const rascunhoDaSerie = () => {
+    if (!editing || !serie) return null;
+    const values = getValues();
+    const base = serieDaOcorrencia(serie, {
+      ...editing,
+      amount_cents: values.amount_cents,
+      description: values.description,
+      merchant: values.merchant,
+      category: values.category,
+      account_id: values.account_id,
+    });
+    const alterouData = values.occurred_at !== isoToBR(dataDaSerie ?? editing.occurred_at);
+    return alterouData || intencaoDoDia
+      ? mudaInicioDaSerie(base, values.occurred_at, intencaoDoDia === 'ultimo')
+      : base;
+  };
+
+  const salvarTodaSerie = (form = formSerie ?? rascunhoDaSerie()) => {
+    if (!form || !editing || !serie) return;
+    if (!validaSerie(form).podeSalvar) {
+      toast({ message: 'Confira o vencimento e os dados da série antes de salvar.', tone: 'error' });
+      return;
+    }
+    const { linhas, regra } = mudancasDaOcorrencia(form, editing, serie);
+    if (!Object.keys(linhas).length && !Object.keys(regra).length) {
+      router.back();
+      return;
+    }
+    const key = JSON.stringify([serie.id, linhas, regra, serie.edit_revision]);
+    if (tentativaTodaSerie.current?.key !== key) {
+      tentativaTodaSerie.current = { key, id: newClientMessageId() };
+    }
+    editarTodaSerie.mutate({
+      recurringId: serie.id,
+      linePatch: linhas,
+      seriesPatch: regra,
+      expectedRevision: serie.edit_revision,
+      requestId: tentativaTodaSerie.current.id,
+    }, {
+      onSuccess: () => {
+        tentativaTodaSerie.current = null;
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.back();
+      },
+      onError: (error) => toast({
+        message: financeErrorMessage(error, 'Nada foi salvo. Confira a recorrência e tente novamente.'),
+        tone: 'error',
+      }),
+    });
   };
 
   /**
@@ -460,7 +529,7 @@ function TransactionForm({
   const tentativaPagamento = useRef<{ key: string; id: string } | null>(null);
   const saving =
     save.isPending || createPlan.isPending || converter.isPending || atualizarCompra.isPending || salvarPagamentoDivida.isPending ||
-    salvarParcela.isPending || editarSerie.isPending;
+    salvarParcela.isPending || editarSerie.isPending || editarTodaSerie.isPending || editarUmaRecorrencia.isPending;
 
   /**
    * Pagamento de dívida (25/09/2026): o banco decide o que o valor novo pode ser, e a tela diz
@@ -729,38 +798,109 @@ function TransactionForm({
     });
   })();
 
+  const salvarParcelaEscopada = (scope: 'one' | 'future' | 'all') => handleSubmit((values) => {
+    if (!editing?.installment_plan_id || !plano) return;
+    if (formCompra) {
+      const decisao = edicaoEscopadaDaCompra(formCompra, plano, scope);
+      if (decisao.kind === 'no-op') return router.back();
+      if (decisao.kind === 'structural-rejection' || decisao.kind === 'protected-rejection') {
+        toast({ message: decisao.reason, tone: 'error' });
+        return;
+      }
+      if (decisao.kind === 'contract') return salvarCompraToda();
+      salvarParcela.mutate({ id: editing.id, scope, patch: decisao.patch }, {
+        onSuccess: () => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          router.back();
+        },
+        onError: (error) => toast({
+          message: financeErrorMessage(error, 'Nada foi salvo. Confira as parcelas e tente novamente.'),
+          tone: 'error',
+        }),
+      });
+      return;
+    }
+    const adiado = podeAdiar && values.pending;
+    const status = podeAdiar ? (adiado ? 'pending' : 'cleared') : editing.status;
+    const dueAt = adiado && values.due_at ? brToISO(values.due_at) : editing.due_at;
+    const patch: Parameters<typeof salvarParcela.mutate>[0]['patch'] = {};
+    if (values.amount_cents !== editing.amount_cents) patch.amount_cents = values.amount_cents;
+    if (values.category !== editing.category) patch.category = values.category;
+    if (values.description.trim() !== (editing.description ?? '')) patch.description = values.description.trim();
+    const merchant = values.merchant?.trim() || null;
+    if (merchant !== editing.merchant) patch.merchant = merchant;
+    const date = brToISO(values.occurred_at);
+    if (date !== editing.occurred_at) patch.occurred_at = date;
+    if (status !== editing.status) patch.status = status;
+    if (dueAt !== editing.due_at) patch.due_at = dueAt;
+    if (values.auto_confirm !== editing.auto_confirm) patch.auto_confirm = values.auto_confirm;
+    if (!Object.keys(patch).length) return router.back();
+    salvarParcela.mutate({ id: editing.id, scope, patch }, {
+      onSuccess: () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.back();
+      },
+      onError: (error) => toast({
+        message: financeErrorMessage(error, 'Nada foi salvo. Confira as parcelas e tente novamente.'),
+        tone: 'error',
+      }),
+    });
+  })();
+
   const salvarComAlcance = () => {
     if (editing?.recurring_id && serie) {
-      showItemActions('Salvar alterações em', [
-        {
-          label: 'Só esta ocorrência',
-          onPress: () => {
-            if (formSerie) {
-              setFormSerie(null);
-              toast({ message: 'Revise os campos deste lançamento e toque em Salvar novamente.', tone: 'info' });
-            } else onSubmit();
-          },
-        },
-        {
-          label: 'Esta e as próximas',
-          onPress: () => {
-            if (formSerie) return salvarAsProximas(formSerie);
-            const values = getValues();
-            const base = serieDaOcorrencia(serie, {
-              ...editing,
-              amount_cents: values.amount_cents,
-              description: values.description,
-              merchant: values.merchant,
-              category: values.category,
-              account_id: values.account_id,
-            });
-            const alterouData = values.occurred_at !== isoToBR(dataDaSerie ?? editing.occurred_at);
-            salvarAsProximas(alterouData || intencaoDoDia
-              ? mudaInicioDaSerie(base, values.occurred_at, intencaoDoDia === 'ultimo')
-              : base);
-          },
-        },
-      ], 'Pagamentos anteriores mantêm a data e o valor originais.');
+      askEditScope('occurrence', (scope) => {
+        if (scope === 'all') return salvarTodaSerie();
+        if (scope === 'future') return salvarAsProximas(formSerie ?? rascunhoDaSerie());
+        handleSubmit((values) => {
+          if (!editing) return;
+          if (formSerie && (formSerie.fim ? brToISO(formSerie.fim) : null) !== serie.end_date) {
+            toast({ message: 'O término pertence à série. Escolha o alcance para próximas ocorrências ou para todas.', tone: 'error' });
+            return;
+          }
+          const patch: Record<string, string | number | boolean | null> = {};
+          const amount = formSerie?.amountCents ?? values.amount_cents;
+          const category = formSerie ? formSerie.category : values.category;
+          const description = (formSerie?.description ?? values.description).trim();
+          const merchant = (formSerie?.merchant ?? values.merchant ?? '').trim() || null;
+          const accountId = formSerie ? formSerie.accountId : values.account_id;
+          const kind = formSerie?.kind ?? values.kind;
+          const autoConfirm = formSerie?.autoConfirm ?? values.auto_confirm;
+          const date = formSerie?.agendaMudou ? brToISO(formSerie.inicio) : brToISO(values.occurred_at);
+          if (amount !== editing.amount_cents) patch.amount_cents = amount;
+          if (category !== editing.category) patch.category = category;
+          if (description !== (editing.description ?? '')) patch.description = description;
+          if (merchant !== editing.merchant) patch.merchant = merchant;
+          if (accountId !== editing.account_id) patch.account_id = accountId;
+          if (kind !== editing.kind) patch.kind = kind;
+          if (autoConfirm !== editing.auto_confirm) patch.auto_confirm = autoConfirm;
+          if (date !== editing.occurred_at) patch.occurred_at = date;
+          if (!formSerie && podeAdiar) {
+            const status = values.pending ? 'pending' : 'cleared';
+            if (status !== editing.status) patch.status = status;
+            const dueAt = values.pending && values.due_at ? brToISO(values.due_at) : editing.due_at;
+            if (dueAt !== editing.due_at) patch.due_at = dueAt;
+          }
+          if (!Object.keys(patch).length) return router.back();
+          const key = JSON.stringify([editing.id, patch, editing.edit_revision]);
+          if (tentativaUmaRecorrencia.current?.key !== key) {
+            tentativaUmaRecorrencia.current = { key, id: newClientMessageId() };
+          }
+          editarUmaRecorrencia.mutate({
+            id: editing.id,
+            patch,
+            expectedRevision: editing.edit_revision,
+            requestId: tentativaUmaRecorrencia.current.id,
+          }, {
+            onSuccess: () => {
+              tentativaUmaRecorrencia.current = null;
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              router.back();
+            },
+            onError: (error) => toast({ message: financeErrorMessage(error, 'Nada foi salvo. Confira a ocorrência e tente novamente.'), tone: 'error' }),
+          });
+        })();
+      }, 'Todos corrige também as ocorrências passadas. Uma fatura paga protege valor, conta e data.');
       return;
     }
     if (editing?.recurring_id && !serie) {
@@ -768,39 +908,8 @@ function TransactionForm({
       return;
     }
     if (editing?.installment_plan_id && plano) {
-      showItemActions('Salvar alterações em', [
-        {
-          label: 'Só esta parcela',
-          onPress: () => {
-            if (formCompra) {
-              setFormCompra(null);
-              toast({ message: 'Revise esta parcela e toque em Salvar novamente.', tone: 'info' });
-            } else onSubmit();
-          },
-        },
-        {
-          label: 'A compra toda',
-          onPress: () => {
-            if (formCompra) return salvarCompraToda();
-            const values = getValues();
-            if (plano.locked_in_invoice > 0 && brToISO(values.occurred_at) !== editing.occurred_at) {
-              toast({
-                message: 'A data da compra não muda porque já há parcela em fatura paga. Escolha só esta parcela.',
-                tone: 'error',
-              });
-              return;
-            }
-            setFormCompra(compraParaRevisaoDaParcela(plano, editing, {
-              occurred_at: brToISO(values.occurred_at),
-              amount_cents: values.amount_cents,
-              description: values.description,
-              merchant: values.merchant,
-              category: values.category,
-            }));
-            toast({ message: 'Confira o total e a data da primeira parcela antes de salvar a compra.', tone: 'info' });
-          },
-        },
-      ], 'As parcelas pagas e as faturas fechadas ficam como estão.');
+      askEditScope('installment', salvarParcelaEscopada,
+        `A parcela de referência é a ${editing.installment_no}/${plano.installments}. Uma fatura paga protege valor e data.`);
       return;
     }
     if (editing?.installment_plan_id && !plano) {
@@ -808,11 +917,8 @@ function TransactionForm({
       return;
     }
     if (editing?.debt_id && divida?.installments) {
-      showItemActions('Salvar alterações em', [
-        { label: 'Só este pagamento', onPress: () => salvarPagamento('one') },
-        { label: 'Este e os próximos', onPress: () => salvarPagamento('from_here') },
-        { label: 'Todos, inclusive pagamentos passados', onPress: () => salvarPagamento('all') },
-      ], 'Todos também corrige pagamentos já registrados e recalcula estimativas antigas sem lançamento.');
+      askEditScope('payment', (scope) => salvarPagamento(scope === 'future' ? 'from_here' : scope),
+        'Todos também corrige pagamentos já registrados e recalcula estimativas antigas sem lançamento.');
       return;
     }
     if (editing?.debt_id) {

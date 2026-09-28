@@ -83,32 +83,29 @@ async def run() -> dict:
             lembrete["recurrence"], lembrete["next_run_at"], fuso
         )
         try:
+            delivered_channels: list[str] = []
             skipped = (
                 lembrete["skip_run_at"] is not None
                 and lembrete["skip_run_at"] == lembrete["next_run_at"]
             )
             if not skipped:
-                await _entregar(lembrete)
+                delivered_channels = await _entregar(lembrete) or []
             proxima = next_occurrence(
                 regra, agora, fuso, lembrete["next_run_at"]
             )
             await db.execute(
                 """
-                update public.reminders
-                set send_attempts = 0, last_error = null, updated_at = now(),
-                    skip_run_at = case when skip_run_at = %s then null else skip_run_at end,
-                    next_run_at = coalesce(%s, next_run_at),
-                    active = %s, recurrence = %s
-                where id = %s and next_run_at = %s
-                  and recurrence is not distinct from %s
+                select public.finish_reminder_occurrence(
+                    %s, %s, %s, %s, %s, 'sent', null, %s, %s
+                )
                 """,
-                lembrete["next_run_at"],
-                proxima,
-                proxima is not None,
-                regra,
                 lembrete["id"],
                 lembrete["next_run_at"],
                 lembrete["recurrence"],
+                proxima,
+                regra,
+                delivered_channels,
+                lembrete["title"],
             )
             if not skipped:
                 enviados += 1
@@ -120,26 +117,34 @@ async def run() -> dict:
                 if desistir
                 else None
             )
-            await db.execute(
-                """
-                update public.reminders
-                set send_attempts = %s, last_error = %s, updated_at = now(),
-                    next_run_at = coalesce(%s, next_run_at),
-                    active = case when %s and %s is null then false else active end,
-                    recurrence = %s
-                where id = %s and next_run_at = %s
-                  and recurrence is not distinct from %s
-                """,
-                0 if desistir else tentativas,
-                repr(err)[:2000],
-                proxima,
-                desistir,
-                proxima,
-                regra if desistir else lembrete["recurrence"],
-                lembrete["id"],
-                lembrete["next_run_at"],
-                lembrete["recurrence"],
-            )
+            if desistir:
+                await db.execute(
+                    """
+                    select public.finish_reminder_occurrence(
+                        %s, %s, %s, %s, %s, 'given_up', %s
+                    )
+                    """,
+                    lembrete["id"],
+                    lembrete["next_run_at"],
+                    lembrete["recurrence"],
+                    proxima,
+                    regra,
+                    repr(err)[:2000],
+                )
+            else:
+                await db.execute(
+                    """
+                    update public.reminders
+                    set send_attempts = %s, last_error = %s, updated_at = now()
+                    where id = %s and next_run_at = %s
+                      and recurrence is not distinct from %s and active = true
+                    """,
+                    tentativas,
+                    repr(err)[:2000],
+                    lembrete["id"],
+                    lembrete["next_run_at"],
+                    lembrete["recurrence"],
+                )
             if desistir:
                 desistidos += 1
             log.warning("lembrete %s (tentativa %s): %s", lembrete["id"], tentativas, err)
@@ -147,7 +152,7 @@ async def run() -> dict:
     return {"due": len(vencidos), "sent": enviados, "given_up": desistidos}
 
 
-async def _entregar(lembrete: dict) -> None:
+async def _entregar(lembrete: dict) -> list[str]:
     """Tenta os canais pedidos. Push que falha não anula o WhatsApp.
 
     ⚠️ **O WhatsApp obedece ao portão do Perfil** (`profiles.alerts_whatsapp_enabled`, default
@@ -167,19 +172,19 @@ async def _entregar(lembrete: dict) -> None:
     quer_whatsapp = canal in ("whatsapp", "both")
     pode_whatsapp = bool(lembrete.get("alerts_whatsapp_enabled"))
 
-    entregue = False
+    delivered_channels: list[str] = []
     falhas: list[str] = []
 
     if quer_push and lembrete["expo_push_token"]:
         try:
             await push.send(lembrete["expo_push_token"], "⏰ Lembrete", lembrete["title"], "reminders")
-            entregue = True
+            delivered_channels.append("push")
         except Exception as err:  # noqa: BLE001
             falhas.append(f"push: {err}")
 
     # O fallback (push pedido mas não entregue) era o caminho mais traiçoeiro: sem token de push
     # ele transformava `channel = 'push'` — o default, o canal "grátis" — em template pago.
-    precisa_whatsapp = quer_whatsapp or (not entregue and quer_push)
+    precisa_whatsapp = quer_whatsapp or (not delivered_channels and quer_push)
 
     if precisa_whatsapp and not pode_whatsapp:
         falhas.append("whatsapp: desligado no Perfil (alerts_whatsapp_enabled)")
@@ -190,11 +195,12 @@ async def _entregar(lembrete: dict) -> None:
             await whatsapp.send_template(
                 lembrete["phone"], settings.wa_reminder_template, [lembrete["title"]]
             )
-            entregue = True
+            delivered_channels.append("whatsapp")
         except Exception as err:  # noqa: BLE001
             falhas.append(f"whatsapp: {err}")
 
-    if not entregue:
+    if not delivered_channels:
         raise RuntimeError(
             " | ".join(falhas) or "nenhum canal disponível (sem push token nem telefone)"
         )
+    return delivered_channels

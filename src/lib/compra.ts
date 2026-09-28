@@ -1,7 +1,10 @@
 /**
  * As regras de "Editar a compra", puras (os campos moram em `components/finance/compra-form.tsx`).
  *
- * A régua é a de `update_installment_plan` (`20260926130000`, *"tudo que se cria se edita"*):
+ * A régua do contrato é a de `update_installment_plan` (`20260926130000`, *"tudo que se cria se edita"*).
+ * A edição por escopo usa `update_installment_scope`: valor de parcela bancária já paga pode
+ * ser corrigido com escolha explícita, mas o fechamento de fatura de cartão continua protegido.
+ * No editor do contrato:
  * - com parcela paga, o NÚMERO muda — as pagas ficam e o que falta se reparte —, só não fica
  *   abaixo da última paga, e "à vista" continua fora (uma parte já foi paga separada);
  * - a DATA da 1ª e a CONTA mudam, a não ser que alguma parcela esteja numa fatura de cartão
@@ -44,7 +47,7 @@ export interface CompraForm {
   installments: number;
   /** `dd/mm/aaaa`, como a pessoa digita. */
   inicio: string;
-  /** Parcelas que não mudam de valor (pagas ou em fatura fechada) e quanto elas somam. */
+  /** Parcelas protegidas no editor estrutural do contrato e quanto elas somam. */
   travadas: number;
   travadasPagas: number;
   travadoCents: number;
@@ -98,7 +101,7 @@ export function compraDoRegistro(p: CompraGravada): CompraForm {
 /**
  * O formulário de uma parcela usa valor por parcela e a data DELA; o contrato usa valor total e
  * data da PRIMEIRA. Ao escolher "a compra toda" no Salvar, convertemos a edição antes de mostrar
- * a revisão do contrato. Parcelas já pagas ou travadas conservam seu total original.
+ * a revisão do contrato. A revisão estrutural ainda conserva parcelas já pagas.
  */
 export function compraParaRevisaoDaParcela(
   plano: CompraGravada,
@@ -151,10 +154,9 @@ export function validaCompra(f: CompraForm | null) {
   const travado = (f?.travadas ?? 0) > 0;
   const tituloOk = (f?.description.trim().length ?? 0) > 0;
   const emAberto = f ? Math.max(0, f.installments - f.travadas) : 0;
-  const restante = f ? f.totalCents - f.travadoCents : 0;
-  const totalOk = Boolean(
-    f && f.totalCents >= f.installments && (!travado || (emAberto > 0 ? restante >= emAberto : restante === 0)),
-  );
+  // O alcance só é escolhido no Salvar. Antes dele, o editor não pode pressupor que
+  // pagamentos antigos ficarão fixos: "Todas" pode redistribuir o total inteiro.
+  const totalOk = Boolean(f && f.totalCents >= f.installments);
   // Conta obrigatória quando a compra nasceu com uma: sem ela `set_invoice` apagaria o
   // `invoice_id` das parcelas. A que nasceu sem conta continua editável sem uma.
   const contaOk = Boolean(f?.accountId || !f?.original.accountId);
@@ -199,4 +201,58 @@ export function payloadDaCompra(f: CompraForm, isoDaData: string) {
     accountId: f.accountId,
     paidInstallments: f.pagas !== f.original.pagas ? f.pagas : null,
   };
+}
+
+export type EscopoDaCompra = 'one' | 'future' | 'all';
+
+/** The purchase sheet edits a contract total. The scope RPC distributes that total itself. */
+export function edicaoEscopadaDaCompra(f: CompraForm, original: CompraGravada, scope: EscopoDaCompra):
+  | { kind: 'scope'; patch: { total_cents?: number; amount_cents?: number; description?: string; merchant?: string | null; category?: string | null } }
+  | { kind: 'contract' }
+  | { kind: 'no-op' }
+  | { kind: 'structural-rejection'; reason: string }
+  | { kind: 'protected-rejection'; reason: string } {
+  const changedCount = f.installments !== original.installments;
+  const changedDate = f.inicio !== isoToBR(original.first_occurred_at);
+  const changedAccount = f.accountId !== original.account_id;
+  const changedPaid = f.pagas !== original.paid;
+  const changedTotal = f.totalCents !== original.total_cents;
+  const changedAmount = f.unidade === 'parcela' && f.parcelaCents !== null
+    && f.parcelaCents !== original.installment_cents;
+  const structural = changedCount || changedDate || changedAccount || changedPaid;
+
+  if (structural && scope !== 'all') {
+    return {
+      kind: 'structural-rejection',
+      reason: 'Quantidade, data inicial, conta e parcelas já pagas pertencem ao contrato da compra. Escolha a opção que inclui as passadas para revisar o contrato.',
+    };
+  }
+  if (scope === 'all' && (
+    (original.locked_in_invoice > 0 && (changedTotal || changedAmount || changedDate || changedAccount)) ||
+    (original.locked > 0 && (changedDate || changedAccount))
+  )) {
+    return {
+      kind: 'protected-rejection',
+      reason: 'Há parcela em fatura protegida ou um histórico de data/conta já pago. Essa mudança exige rever o fechamento antes de alterar o contrato.',
+    };
+  }
+  if (structural && original.locked > 0 && changedTotal) {
+    const open = f.installments - original.locked;
+    if (open > 0 ? f.totalCents - original.locked_cents < open
+      : f.totalCents !== original.locked_cents) {
+      return {
+        kind: 'structural-rejection',
+        reason: 'Ao mudar a estrutura do contrato, o total precisa conservar as parcelas já pagas e deixar ao menos um centavo para cada parcela aberta.',
+      };
+    }
+  }
+  if (structural) return { kind: 'contract' };
+
+  const patch: { total_cents?: number; amount_cents?: number; description?: string; merchant?: string | null; category?: string | null } = {};
+  if (changedAmount) patch.amount_cents = f.parcelaCents!;
+  else if (changedTotal) patch.total_cents = f.totalCents;
+  if (f.description.trim() !== (original.description ?? '')) patch.description = f.description.trim();
+  if ((f.merchant.trim() || null) !== original.merchant) patch.merchant = f.merchant.trim() || null;
+  if (f.category !== original.category) patch.category = f.category;
+  return Object.keys(patch).length ? { kind: 'scope', patch } : { kind: 'no-op' };
 }

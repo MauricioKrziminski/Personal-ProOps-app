@@ -61,9 +61,10 @@ def lembrete(**alteracoes):
 
 @pytest.mark.asyncio
 async def test_push_sozinho_nao_encosta_no_whatsapp(canais):
-    await reminders._entregar(lembrete())
+    delivered = await reminders._entregar(lembrete())
     assert canais.push == ["pagar aluguel"]
     assert canais.whatsapp == []
+    assert delivered == ["push"]
 
 
 @pytest.mark.asyncio
@@ -78,10 +79,11 @@ async def test_sem_token_de_push_o_fallback_NAO_vira_template_pago(canais):
 
 @pytest.mark.asyncio
 async def test_com_o_portao_ligado_o_fallback_volta_a_existir(canais):
-    await reminders._entregar(
+    delivered = await reminders._entregar(
         lembrete(expo_push_token=None, alerts_whatsapp_enabled=True)
     )
     assert canais.whatsapp == ["pagar aluguel"]
+    assert delivered == ["whatsapp"]
 
 
 @pytest.mark.asyncio

@@ -161,11 +161,9 @@ export const UNIDADES_DO_VALOR = [
   { value: 'total', label: 'Total da compra' },
 ] as const satisfies readonly { value: UnidadeDoValor; label: string }[];
 
-/** Cada parcela em aberto precisa de um centavo — a recusa da RPC, dita antes dela. */
-export function recusaDoValor(travadas: number): string {
-  return travadas > 0
-    ? 'O total precisa cobrir o que já foi pago e sobrar para as parcelas em aberto'
-    : 'Informe o valor';
+/** A distribuição entre parcelas depende do alcance escolhido ao salvar. */
+export function recusaDoValor(): string {
+  return 'O total precisa reservar ao menos um centavo para cada parcela';
 }
 
 /** Criando ou convertendo em N×: nada foi pago ainda, "parcela" é cada uma das N. */

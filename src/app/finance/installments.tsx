@@ -28,13 +28,15 @@ import {
   useAccounts,
   useDeleteInstallmentPlan,
   useInstallmentPlans,
+  useSaveInstallmentOccurrence,
   useUpdateInstallmentPlan,
   type InstallmentPlanSummary,
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { brToISO } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
-import { compraDoRegistro, payloadDaCompra, validaCompra, type CompraForm } from '@/lib/compra';
+import { compraDoRegistro, edicaoEscopadaDaCompra, payloadDaCompra, validaCompra, type CompraForm } from '@/lib/compra';
+import { askEditScope } from '@/lib/edit-scope';
 import { CamposDaCompra } from '@/components/finance/compra-form';
 import { estadoDaLinha } from '@/lib/settle-labels';
 import { useToast } from '@/components/ui/toast';
@@ -102,6 +104,7 @@ export default function InstallmentsScreen() {
   const [verTerminadas, setVerTerminadas] = useState(false);
   const params = useLocalSearchParams<{ edit?: string }>();
   const editar = useUpdateInstallmentPlan();
+  const editarEscopo = useSaveInstallmentOccurrence();
   const [form, setForm] = useState<CompraForm | null>(null);
   /** Qual `?edit=` já foi consumido — sem isto, fechar o sheet reabriria no render seguinte. */
   const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
@@ -312,6 +315,14 @@ export default function InstallmentsScreen() {
 
   const salvarPlano = () => {
     if (!form || !podeSalvar) return;
+    const plano = lista.find((p) => p.id === form.id);
+    if (!plano) return;
+    const numero = nextPendingInstallment(plano.parcels, plano.installments);
+    const ancora = plano.parcels.find((p) => p.installment_no === numero);
+    if (!ancora) {
+      toast({ message: 'Não encontrei a parcela de referência desta compra.', tone: 'error' });
+      return;
+    }
     const nome = form.description.trim();
     const payload = () => payloadDaCompra(form, brToISO(form.inicio));
     const acoes = {
@@ -339,20 +350,50 @@ export default function InstallmentsScreen() {
      * a de `design.md §6`: confirmação destrutiva NOMEIA o estrago. A parcela 1 sobrevive com o
      * total — é a mesma linha, com o mesmo `id`.
      */
-    if (form.installments === 1) {
-      const original = lista.find((p) => p.id === form.id)?.installments ?? 0;
-      const somem = Math.max(original - 1, 0);
-      confirmDestructive(
-        'Desfazer o parcelamento?',
-        'Desfazer',
-        () => editar.mutate(payload(), acoes),
-        somem === 1
-          ? `A outra parcela some e sobra um lançamento de ${formatBRL(form.totalCents)} em ${form.inicio}. Isso não volta.`
-          : `As outras ${somem} parcelas somem e sobra um lançamento de ${formatBRL(form.totalCents)} em ${form.inicio}. Isso não volta.`,
-      );
-      return;
-    }
-    editar.mutate(payload(), acoes);
+    const salvarContrato = () => {
+      if (form.installments === 1) {
+        const original = lista.find((p) => p.id === form.id)?.installments ?? 0;
+        const somem = Math.max(original - 1, 0);
+        confirmDestructive(
+          'Desfazer o parcelamento?',
+          'Desfazer',
+          () => editar.mutate(payload(), acoes),
+          somem === 1
+            ? `A outra parcela some e sobra um lançamento de ${formatBRL(form.totalCents)} em ${form.inicio}. Isso não volta.`
+            : `As outras ${somem} parcelas somem e sobra um lançamento de ${formatBRL(form.totalCents)} em ${form.inicio}. Isso não volta.`,
+        );
+        return;
+      }
+      editar.mutate(payload(), acoes);
+    };
+
+    askEditScope('installment', (scope) => {
+      const decisao = edicaoEscopadaDaCompra(form, plano, scope);
+      if (decisao.kind === 'structural-rejection' || decisao.kind === 'protected-rejection') {
+        toast({ message: decisao.reason ?? 'Não é possível aplicar essa alteração.', tone: 'error' });
+        return;
+      }
+      if (decisao.kind === 'no-op') {
+        volta.aoFechar(() => setForm(null));
+        return;
+      }
+      if (decisao.kind === 'contract') {
+        showItemActions('Alterar contrato da compra', [
+          { label: 'Aplicar ao contrato', onPress: salvarContrato },
+        ], 'Quantidade, data inicial, conta e parcelas já pagas seguem as regras do contrato. Parcelas já pagas conservam seu valor e sua data.');
+        return;
+      }
+      const patch = scope === 'one' && decisao.patch.description
+        ? { ...decisao.patch, description: `${decisao.patch.description} (${numero}/${plano.installments})` }
+        : decisao.patch;
+      editarEscopo.mutate({ id: ancora.id, scope, patch }, {
+        onSuccess: () => {
+          volta.aoFechar(() => setForm(null));
+          toast({ message: 'Alteração salva nas parcelas escolhidas.', tone: 'success' });
+        },
+        onError: acoes.onError,
+      });
+    }, `A parcela de referência é a ${numero}/${plano.installments}. A primeira opção altera só ela; a segunda começa nela.`);
   };
 
   const bloco = (plano: InstallmentPlanSummary, index: number) => {
@@ -649,8 +690,8 @@ export default function InstallmentsScreen() {
             <Button
               label="Salvar"
               size="sm"
-              loading={editar.isPending}
-              disabled={!podeSalvar || editar.isPending}
+              loading={editar.isPending || editarEscopo.isPending}
+              disabled={!podeSalvar || editar.isPending || editarEscopo.isPending}
               onPress={salvarPlano}
             />
           }

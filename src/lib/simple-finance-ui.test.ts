@@ -133,6 +133,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useCycleMonth: () => '2026-09',
     useMonthBreakdown: () => ({ ...query, data: [] }),
     useSaveDebt: () => mutation('saveDebt'),
+    useSaveDebtContractScoped: () => mutation('saveDebtContractScoped'),
+    useDebtPaymentVersions: () => ({ ...query, isSuccess: true, data: (options.debtPayments ?? []).map((p) => ({ ...p, edit_revision: p.edit_revision ?? 0 })) }),
     usePayDebtInstallment: () => mutation('payDebt'),
     useDeleteTransaction: () => mutation('deleteTransaction'),
     useSaveAccount: () => mutation('saveAccount'),
@@ -185,6 +187,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useConfirmPaymentScoped: () => mutation('confirmPaymentScoped'),
     useSaveTransactionScoped: () => mutation('saveScoped'),
     useSaveRecurringSeries: () => mutation('saveRecurringSeries'),
+    useSaveRecurringAll: () => mutation('saveRecurringAll'),
+    useSaveRecurringOne: () => mutation('saveRecurringOne'),
     useTransaction: (id: string) => ({ ...query, isSuccess: true, data: (options.txs ?? [{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared', recurring_id: null, installment_plan_id: null }]).find((t: any) => t.id === id) ?? null }),
     usePayInvoice: () => mutation('payInvoice'),
     useInvoice: () => ({ ...query, data: {
@@ -217,6 +221,22 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => options.params ?? ({ ...(file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), ...(options.create !== false ? { create: 'financing' } : {}) }), useFocusEffect: () => {}, useIsFocused: () => true, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }), canGoBack: () => !options.primeiraDaPilha } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
+      if (name === '@/lib/supabase' && file.endsWith('finance/recurring.tsx')) return { supabase: {
+        from: () => {
+          const filters: Record<string, unknown> = {};
+          const chain = {
+            select: () => chain,
+            eq: (key: string, value: unknown) => { filters[key] = value; return chain; },
+            gte: (key: string, value: unknown) => { filters[`gte:${key}`] = value; return chain; },
+            order: () => chain,
+            limit: () => chain,
+            maybeSingle: async () => ({ data: (options.txs ?? []).find((tx: any) =>
+              tx.recurring_id === filters.recurring_id && tx.status === filters.status &&
+              tx.occurred_at >= String(filters['gte:occurred_at'])) ?? null, error: null }),
+          };
+          return chain;
+        },
+      } };
       if (name === '@/hooks/use-aos-poucos') return load('src/hooks/use-aos-poucos.ts');
       if (name === '@/hooks/use-lock') return { useLock: () => ({ semTrancar: (fn: () => unknown) => fn() }) };
       // O voo da Carteira é camada da raiz; aqui só a forma dos hooks, inerte.
@@ -335,6 +355,12 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
         useMonthRuler: () => ({ view: 'cycle', setView: () => {}, temCiclo: false, cycle: { data: undefined } }),
       };
       if (name === '@/lib/item-actions') return { confirmDestructive: (_title: string, _label: string, callback: () => void, mensagem?: string) => { confirmations.push(callback); avisos.push(mensagem ?? ''); }, showItemActions: (_title: string, entries: any[]) => actions.push(...entries) };
+      if (name === '@/lib/edit-scope') return { askEditScope: (_kind: string, onSelect: (scope: string) => void) => actions.push(
+        { label: 'Só esta parcela', onPress: () => onSelect('one') },
+        { label: 'Esta e próximas', onPress: () => onSelect('future') },
+        { label: 'Todas', onPress: () => onSelect('all') },
+      ) };
+      if (name === '@/lib/agent-chat') return { newClientMessageId: () => '00000000-0000-4000-8000-000000000001' };
       if (name === '@/components/ui/toast') return { useToast: () => (t: any) => toasts.push(t), useSubirAcimaDoToast: () => ({}) };
       // O provider de "esconder saldo" só existe dentro da árvore real; aqui o valor aparece.
       if (name === '@/components/ui/conceal') return {
@@ -354,6 +380,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     if (!node?.props || (node.type === 'Sheet' && !node.props.visible)) return;
     nodes.push(node);
     visit(node.props.children);
+    if (node.type === 'Screen' && file.endsWith('finance/recurring.tsx')) visit(node.props.search);
     // Tablet adapters hold the existing blocks in named slots, not children. Visit those slots
     // too so the same behavior assertions cover both compositions.
     if (node.type === 'TodayTabletCanvas') {
@@ -652,6 +679,7 @@ const carro = {
   principal_cents: 7056000, remaining_cents: 5880000, interest_rate_monthly: 0, installments: 48,
   installments_paid: 8, installment_cents: 147000, account_id: null, due_day: 5, archived: false,
   first_due_date: '2026-02-05',
+  edit_revision: 0, updated_at: 'v1',
 };
 const editar = (ui: any) => {
   ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onLongPress());
@@ -665,12 +693,51 @@ test('editing the paid count keeps the contract calendar: the next date follows 
   const data = ui.nodes().find((n) => n.type === 'Field' && n.props.label === 'Próxima parcela (a 11ª)');
   assert.ok(data, 'o rótulo segue as pagas');
   ui.press('Salvar');
+  assert.equal(ui.writes.length, 0, 'a edição espera uma escolha de alcance');
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Todas').onPress());
   const saved = ui.writes[0].value;
-  assert.equal(saved.id, 'd1');
-  assert.equal(saved.installments_paid, 10);
-  assert.equal(saved.remaining_cents, 147000 * 38);
-  assert.equal(saved.first_due_date, '2026-02-05');
-  assert.equal(saved.due_day, 5);
+  assert.equal(saved.debtId, 'd1');
+  assert.equal(saved.scope, 'all');
+  assert.equal(saved.patch.installments_paid, 10);
+  assert.equal(saved.patch.remaining_cents, 147000 * 38);
+  assert.equal('first_due_date' in saved.patch, false);
+});
+
+test('debt Save asks for scope and only one changes the selected installment', () => {
+  const ui = screen(debtsFile, { create: false, debts: [carro],
+    debtSchedule: [{ installment_no: 9, due_date: '2026-10-05', payment_cents: 147000 }] });
+  editar(ui);
+  ui.fill('Valor', 150000);
+  ui.press('Salvar');
+  assert.equal(ui.writes.length, 0);
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Só esta parcela').onPress());
+  assert.deepEqual(copia(ui.writes[0]), {
+    operation: 'saveDebtContractScoped',
+    value: { debtId: 'd1', anchorNo: 9, scope: 'one',
+      patch: { installment_cents: 150000 }, debtRevision: 0, paymentVersions: {},
+      requestId: '00000000-0000-4000-8000-000000000001' },
+  });
+});
+
+test('last-day choice from debt editor carries the due-day rule to future installments', () => {
+  const ui = screen(debtsFile, { create: false, debts: [carro],
+    debtSchedule: [{ installment_no: 9, due_date: '2026-10-05', payment_cents: 147000 }] });
+  editar(ui);
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'DatePickerField').props.onSelectLastDay('31/10/2026'));
+  ui.press('Salvar');
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Esta e próximas').onPress());
+  assert.equal(ui.writes[0].value.scope, 'future');
+  assert.equal(ui.writes[0].value.patch.due_day, -1);
+  assert.ok(ui.writes[0].value.patch.first_due_date);
+});
+
+test('unchanged debt Save picks scope but performs no mutation', () => {
+  const ui = screen(debtsFile, { create: false, debts: [carro],
+    debtSchedule: [{ installment_no: 9, due_date: '2026-10-05', payment_cents: 147000 }] });
+  editar(ui);
+  ui.press('Salvar');
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Todas').onPress());
+  assert.equal(ui.writes.length, 0);
 });
 
 test('long press on an active debt offers the full set, including delete for good', () => {
@@ -717,7 +784,10 @@ test('salvar a edição manda a versão que foi aberta, e a dívida que mudou no
   editar(ui);
   ui.fill('Nome', 'Carro novo');
   ui.press('Salvar');
-  assert.equal(ui.writes[0].value.versao, '2026-09-24T10:00:00.123456+00:00');
+  assert.equal(ui.writes.length, 0);
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Todas').onPress());
+  assert.equal(ui.writes[0].value.patch.name, 'Carro novo');
+  assert.equal(ui.writes[0].value.debtRevision, 0);
   ui.interact(() => ui.pedidos.at(-1).opts.onError(Object.assign(new Error('x'), { code: 'VERSAO' })));
   assert.match(ui.toasts.at(-1).message, /mudou enquanto você editava/);
 });
@@ -808,8 +878,9 @@ test('editing the paid count of an OLD debt keeps the date its schedule shows (f
   const campo = ui.nodes().find((n) => n.type === 'DatePickerField');
   assert.equal(campo.props.value, '05/10/2026', 'a data mostrada é a do cronograma, não uma deduzida');
   ui.press('Salvar');
-  assert.equal('first_due_date' in ui.writes[0].value, false, 'sem tocar na data, nada de âncora');
-  assert.equal(ui.writes[0].value.installments_paid, 9);
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Todas').onPress());
+  assert.equal('first_due_date' in ui.writes[0].value.patch, false, 'sem tocar na data, nada de âncora');
+  assert.equal(ui.writes[0].value.patch.installments_paid, 9);
 });
 
 test('editar com os pagamentos sem carregar diz por que o Salvar não liga, e tenta de novo', () => {
@@ -832,7 +903,8 @@ test('as pagas não descem abaixo da maior parcela já paga pelo app (não só d
   editar(ui);
   ui.fill('Parcelas já pagas', '4');
   ui.press('Salvar');
-  assert.equal(ui.writes[0].value.installments_paid, 5);
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Todas').onPress());
+  assert.equal(ui.writes.length, 0, 'o piso conserva o valor original e Save não escreve');
 });
 
 test('diminuir as pagas de uma dívida com âncora nunca mostra uma próxima parcela no passado', () => {
@@ -850,13 +922,15 @@ test('tocar no dia 28 de fevereiro escolhe dia fixo, e a ação explícita prese
   editar(ui);
   ui.fill('Próxima parcela (a 2ª)', '28/02/2026');
   ui.press('Salvar');
-  assert.equal(ui.writes[0].value.due_day, 28, 'tocar 28 é escolher 28 fixo');
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Esta e próximas').onPress());
+  assert.equal(ui.writes[0].value.patch.due_day, 28, 'tocar 28 é escolher 28 fixo');
 
   const ultimo = screen(debtsFile, { create: false, debts: [{ ...carro, due_day: 31, first_due_date: '2026-01-31', installments_paid: 1, remaining_cents: 147000 * 47 }] });
   editar(ultimo);
   ultimo.interact((nodes: any[]) => nodes.find((n) => n.type === 'DatePickerField').props.onSelectLastDay('28/02/2026'));
   ultimo.press('Salvar');
-  assert.equal(ultimo.writes[0].value.due_day, -1);
+  ultimo.interact(() => ultimo.actions.find((a: any) => a.label === 'Esta e próximas').onPress());
+  assert.equal(ultimo.writes[0].value.patch.due_day, -1);
 });
 
 test('editing an OLD debt without its schedule loaded never invents an anchor', () => {
@@ -864,9 +938,10 @@ test('editing an OLD debt without its schedule loaded never invents an anchor', 
   editar(ui);
   ui.fill('Nome', 'Carro novo');
   ui.press('Salvar');
-  assert.equal(ui.writes[0].value.name, 'Carro novo');
-  assert.equal('first_due_date' in ui.writes[0].value, false);
-  assert.equal(ui.writes[0].value.due_day, 5);
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Todas').onPress());
+  assert.equal(ui.writes[0].value.patch.name, 'Carro novo');
+  assert.equal('first_due_date' in ui.writes[0].value.patch, false);
+  assert.equal('due_day' in ui.writes[0].value.patch, false);
 });
 
 test('detailed mode still exposes the financial inputs', () => {
@@ -942,11 +1017,8 @@ test('editing a legacy amortized financing preserves its mode and remaining-term
   const modo = ui.nodes().find((n) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'amortized'));
   assert.equal(modo?.props.value, 'amortized');
   ui.press('Salvar');
-  assert.equal(ui.writes[0].value.id, 'old-debt');
-  assert.equal(ui.writes[0].value.calculation_mode, 'amortized');
-  assert.equal(ui.writes[0].value.installments, 48);
-  assert.equal(ui.writes[0].value.remaining_cents, 5880000);
-  assert.equal(ui.writes[0].value.interest_rate_monthly, 0.0199);
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Todas').onPress());
+  assert.equal(ui.writes.length, 0, 'sem mudar campos, o contrato existente fica intacto');
 });
 
 test('visible invoice settlement confirms then marks paid without issuing an account payment', () => {
@@ -2637,7 +2709,7 @@ test('Pasta: o "…" renomeia na folha da pasta e move sem ir a Organizar pastas
   assert.equal(ui.navigations.length, 0, 'nada de navegar para Organizar pastas');
 });
 
-test('Série: editar tem os campos da criação, e só o calendário mexido vai com regra e vencimento', () => {
+test('Série: editar tem os campos da criação, e só o calendário mexido vai com regra e vencimento', async () => {
   // 26/09/2026: *"ao clicar nele e em editar, eu não consigo editar a data de vencimento?? … ter
   // todos os campos de quando eu crio ao editar"*. Repete, a cada, vencimento, tipo e estabelecimento.
   const hoje = new Date();
@@ -2647,11 +2719,16 @@ test('Série: editar tem os campos da criação, e só o calendário mexido vai 
   const serie = {
     id: 'rec-1', description: 'Fundacred', merchant: null, kind: 'expense', amount_cents: 119885,
     rrule: 'FREQ=MONTHLY;BYMONTHDAY=4', dtstart: '2026-09-01T12:00:00Z', next_run_at: proxima.toISOString(),
-    active: true, account_id: null, category: 'estudo', end_date: null, auto_confirm: false,
+    active: true, account_id: null, category: 'estudo', end_date: null, auto_confirm: false, edit_revision: 4,
   };
   const abrir = () => screen('src/app/finance/recurring.tsx', { recurring: [serie], params: { edit: 'rec-1' } });
   const salvar = (ui: any) => ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'TaskHeader').props.action.props.onPress());
   const campo = (ui: any, label: string) => ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === label);
+
+  const peloMenu = screen('src/app/finance/recurring.tsx', { recurring: [serie], params: {} });
+  peloMenu.interact(() => deslizaveis(peloMenu)[0].props.acoes.find((a: any) => a.label === 'Editar').onPress());
+  assert.equal(peloMenu.actions.length, 0, 'Editar abre o formulário sem pedir o escopo');
+  assert.ok(peloMenu.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible));
 
   const ui = abrir();
   for (const label of ['Tipo', 'Título', 'Estabelecimento', 'Repete', 'A cada quantos meses', 'Próximo vencimento', 'Termina em']) {
@@ -2663,7 +2740,11 @@ test('Série: editar tem os campos da criação, e só o calendário mexido vai 
   // Só o valor: a regra não vai (uma série do WhatsApp não muda de calendário sem a pessoa pedir).
   ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(120000));
   salvar(ui);
+  assert.equal(ui.pedidos.length, 0, 'Salvar pergunta o alcance antes de escrever');
+  assert.equal(ui.actions.slice(-3).length, 3);
+  ui.interact(() => ui.actions.at(-2).onPress());
   const soValor = ui.pedidos.at(-1).value.patch;
+  assert.equal(ui.pedidos.at(-1).operation, 'saveRecurringSeries');
   assert.equal(soValor.amount_cents, 120000);
   assert.equal('rrule' in soValor, false);
 
@@ -2673,7 +2754,13 @@ test('Série: editar tem os campos da criação, e só o calendário mexido vai 
   ui2.interact((nodes: any[]) => nodes.find((n) => n.type === 'DatePickerField' && n.props.accessibilityLabel === 'Próximo vencimento da série').props.onChange(br(ultimo)));
   ui2.interact((nodes: any[]) => nodes.find((n) => n.type === 'Field' && n.props.label === 'Estabelecimento').props.children.props.onChangeText('Fundacred SA'));
   salvar(ui2);
-  const calendario = ui2.pedidos.at(-1).value.patch;
+  ui2.interact(() => ui2.actions.at(-1).onPress());
+  const all = ui2.pedidos.at(-1);
+  assert.equal(all.operation, 'saveRecurringAll');
+  assert.equal(all.value.expectedRevision, 4);
+  assert.equal(all.value.requestId, '00000000-0000-4000-8000-000000000001');
+  assert.equal(all.value.linePatch.merchant, 'Fundacred SA');
+  const calendario = all.value.seriesPatch;
   assert.equal(calendario.rrule, `FREQ=MONTHLY;BYMONTHDAY=${ultimo.getDate()}`);
   assert.equal(iso(new Date(calendario.next_run_at)), iso(ultimo));
   assert.equal(calendario.merchant, 'Fundacred SA');
@@ -2681,7 +2768,53 @@ test('Série: editar tem os campos da criação, e só o calendário mexido vai 
   const uiFim = abrir();
   uiFim.interact((nodes: any[]) => nodes.find((n) => n.type === 'DatePickerField' && n.props.accessibilityLabel === 'Próximo vencimento da série').props.onSelectLastDay(br(ultimo)));
   salvar(uiFim);
+  uiFim.interact(() => uiFim.actions.at(-2).onPress());
   assert.equal(uiFim.pedidos.at(-1).value.patch.rrule, 'FREQ=MONTHLY;BYMONTHDAY=-1');
+
+  const semMudanca = abrir();
+  salvar(semMudanca);
+  assert.equal(semMudanca.pedidos.length, 0);
+  assert.equal(semMudanca.actions.slice(-3).length, 3, 'até Save sem alteração pergunta o escopo');
+  semMudanca.interact(() => semMudanca.actions.at(-1).onPress());
+  assert.equal(semMudanca.pedidos.length, 0, 'sem alteração fecha sem escrever');
+
+  // Só esta usa a próxima ocorrência pendente gravada, conservando o valor digitado no sheet.
+  const uiUma = screen('src/app/finance/recurring.tsx', {
+    recurring: [serie], params: { edit: 'rec-1' },
+    txs: [{ id: 'proxima-1', recurring_id: 'rec-1', status: 'pending', occurred_at: iso(proxima), edit_revision: 0 }],
+  });
+  uiUma.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(125000));
+  salvar(uiUma);
+  await uiUma.actions.at(-3).onPress();
+  assert.deepEqual(copia({ operation: uiUma.pedidos.at(-1).operation, value: uiUma.pedidos.at(-1).value }), {
+    operation: 'saveRecurringOne',
+    value: { id: 'proxima-1', patch: { amount_cents: 125000 }, expectedRevision: 0, requestId: '00000000-0000-4000-8000-000000000001' },
+  });
+
+  const uiSemLinha = abrir();
+  uiSemLinha.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(125000));
+  salvar(uiSemLinha);
+  await uiSemLinha.actions.at(-3).onPress();
+  assert.equal(uiSemLinha.pedidos.length, 0, 'não troca a série quando não há uma ocorrência gravada');
+  assert.ok(uiSemLinha.toasts.at(-1).message.includes('próxima ocorrência pendente'));
+
+  const uiEstrutural = screen('src/app/finance/recurring.tsx', {
+    recurring: [serie], params: { edit: 'rec-1' },
+    txs: [{ id: 'proxima-1', recurring_id: 'rec-1', status: 'pending', occurred_at: iso(proxima), edit_revision: 0 }],
+  });
+  uiEstrutural.interact((nodes: any[]) => nodes.find((n) => n.type === 'DatePickerField' && n.props.accessibilityLabel === 'Próximo vencimento da série').props.onChange(br(ultimo)));
+  salvar(uiEstrutural);
+  await uiEstrutural.actions.at(-3).onPress();
+  assert.equal(uiEstrutural.pedidos.at(-1).operation, 'saveRecurringOne');
+  assert.equal(uiEstrutural.pedidos.at(-1).value.patch.occurred_at, iso(ultimo), 'a data muda só nesta ocorrência');
+
+  const filtrada = abrir();
+  filtrada.interact((nodes: any[]) => nodes.find((n) => n.type === 'Search').props.onChangeText('não aparece'));
+  filtrada.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(125000));
+  salvar(filtrada);
+  filtrada.interact(() => filtrada.actions.at(-1).onPress());
+  assert.equal(filtrada.pedidos.at(-1).operation, 'saveRecurringAll', 'a busca da lista não apaga a versão da série editada');
+  assert.deepEqual(copia(filtrada.pedidos.at(-1).value.seriesPatch), { amount_cents: 125000 });
 
   // Vencimento no passado não salva, e diz por quê.
   const ui3 = abrir();
@@ -2715,7 +2848,10 @@ test('Editar a compra: as já pagas se editam, o número muda com parcela paga, 
   const plano = (extra: Record<string, unknown> = {}) => ({
     id: 'p1', title: 'tv', description: 'tv', merchant: null, category: 'casa', account_id: 'c1', total_cents: 100000,
     installments: 10, installment_cents: 10000, first_occurred_at: '2026-06-05', active: true, paid: 2, remaining_cents: 80000,
-    locked: 2, locked_cents: 20000, locked_paid: 2, locked_in_invoice: 0, last_locked_no: 2, paid_floor: 0, parcels: [], ...extra,
+    locked: 2, locked_cents: 20000, locked_paid: 2, locked_in_invoice: 0, last_locked_no: 2, paid_floor: 0,
+    parcels: Array.from({ length: 10 }, (_, i) => ({ id: `t${i + 1}`, installment_no: i + 1,
+      status: i < 2 ? 'cleared' : 'pending', amount_cents: 10000,
+      occurred_at: new Date(Date.UTC(2026, 5 + i, 5)).toISOString().slice(0, 10) })), ...extra,
   });
   const abrir = (extra?: Record<string, unknown>) =>
     screen('src/app/finance/installments.tsx', { params: { edit: 'p1' }, plans: [plano(extra)], forecastAccounts: [{ id: 'c1', name: 'Conta', type: 'checking' }] });
@@ -2726,6 +2862,10 @@ test('Editar a compra: as já pagas se editam, o número muda com parcela paga, 
   assert.ok(ui.nodes().some((n: any) => n.type === 'DatePickerField' && n.props.accessibilityLabel === 'Data da primeira parcela'), 'fora do cartão a data muda');
   ui.interact(() => quantidade(ui, 'Parcelas já pagas').props.onChange(4));
   ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'TaskHeader').props.action.props.onPress());
+  assert.equal(ui.pedidos.length, 0, 'o alcance é escolhido depois de editar');
+  ui.interact(() => ui.actions.at(-1).onPress());
+  assert.equal(ui.pedidos.length, 0, 'mudar pagas passa pela confirmação do contrato');
+  ui.interact(() => ui.actions.at(-1).onPress());
   assert.equal(ui.pedidos.at(-1).value.paidInstallments, 4);
 
   const naFatura = abrir({ locked_in_invoice: 1, paid_floor: 1 });
