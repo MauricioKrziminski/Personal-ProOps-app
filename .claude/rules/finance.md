@@ -1041,3 +1041,22 @@ Plano: `docs/superpowers/plans/2026-09-22-importacao-inteligente.md`.
 - **`finish_import_batch` grava o marcado e descarta o resto numa transação**, com `for update`
   no lote: dois toques não gravam duas vezes. Reimportar o mesmo arquivo dá zero novos (FITID, ou
   a impressão digital da linha de CSV).
+
+## Previstas na lista, e o toque as grava (28/09/2026)
+
+Lançamentos mistura por data o gravado e o que só existe na regra (`ledger_expected_lines`), no
+MESMO desenho de linha — o bloco à parte foi recusado pelo dono do produto. Tocar numa recorrente
+prevista grava a linha que o agendador gravaria (`materialize_recurring_occurrence`: adota a gêmea
+solta, recusa estimativa retroativa, idempotente); "Apagar" nela é só a marca
+(`skip_recurring_occurrence`, em `recurring_moved_occurrences`, que o agendador respeita).
+
+**A leitura mostra UMA prevista por período** (a da versão mais nova da regra, escolhida ANTES das
+exclusões), fora do trecho que o agendador gerou (1ª linha até `materialized_until`) e nunca num
+período que já tem a cobrança real da série. Cada regra dessas fechou um fantasma visto na tela:
+a versão velha ao lado da nova, o vencimento 30 ao lado da linha de 04, a apagada voltando. E o
+`status` vem do banco: "entra como pago" com data passada nasce `cleared` — nada de "atrasado".
+
+Data de pagamento de dívida com "Este e os próximos"/"Todos" muda o dia do CONTRATO
+(`update_debt_payment_due_day`); os outros pagamentos ficam no dia em que o dinheiro saiu. Parcela
+fora do cartão aceita "último dia de todo mês" (`*_last_day`), e a data da compra não é contrato:
+muda nos três alcances a partir da parcela de referência.

@@ -24,14 +24,14 @@ begin
   from unnest(array[
     'accept_pending_invites','account_balances','agent_activity','annual_by_category','annual_summary',
     'anticipation_candidates','approve_import_items','budgets_status','cancel_subscription','card_summary',
-    'categories_used','convert_transaction_to_installments','create_installment_plan_with_history',
+    'categories_used','convert_transaction_to_installments','create_installment_plan_last_day','create_installment_plan_with_history',
     'cycle_lines','cycle_now','cycle_range','cycle_series','debt_schedule','delete_debt','financial_health',
     'finish_import_batch','forecast_json','goal_deposit','import_unmatched','month_breakdown',
-    'month_forecast_json','month_lines','month_summary','monthly_cashflow','my_default_workspace',
+    'materialize_recurring_occurrence','month_forecast_json','month_lines','month_summary','monthly_cashflow','my_default_workspace',
     'net_worth','net_worth_series','note_folder_counts','note_folders_reorder','note_tag_counts',
     'notes_reorder','pay_debt_installment','pay_invoice','payoff_strategy','plan_status','roll_invoice',
-    'save_budget','settle_invoice','spendable','spendable_path','transactions_summary','upcoming_bills',
-    'update_asset_value','update_installment_plan','update_recurring_series','update_transaction_scoped',
+    'save_budget','settle_invoice','skip_recurring_occurrence','spendable','spendable_path','transactions_summary','upcoming_bills',
+    'update_asset_value','update_debt_payment_due_day','update_installment_plan','update_installment_scope_last_day','update_recurring_series','update_transaction_scoped',
     'year_end_balances',
     -- não são `.rpc()`, mas a escrita de `notes` as avalia como quem escreve (coluna gerada e CHECK)
     'note_tags_of','note_tags_valid'

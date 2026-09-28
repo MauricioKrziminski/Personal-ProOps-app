@@ -8,7 +8,7 @@ import { Icon } from '@/components/ui/icon';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { HitTarget, Radius, Space, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
-import { isoToBR, localISODate, monthBounds, monthGrid } from '@/lib/dates';
+import { isoToBR, localISODate, monthGrid } from '@/lib/dates';
 
 /**
  * As células da grade SEM as semanas vazias do fim.
@@ -34,8 +34,8 @@ interface Props {
   /** Dia marcado, ISO. `null` = nenhum. */
   value: string | null;
   onChange: (iso: string) => void;
-  /** Ação explícita do calendário de recorrência, separada dos números da grade. */
-  onSelectLastDay?: (iso: string) => void;
+  /** Avisa o mês que a grade passou a mostrar (`YYYY-MM`) — o "último dia" do campo segue ele. */
+  onMonthChange?: (mes: string) => void;
   /** Limites inclusivos, ISO. Dia fora deles aparece apagado e não recebe toque. */
   min?: string;
   max?: string;
@@ -67,7 +67,7 @@ interface Props {
  * `Modal` dentro de `Modal` no Android é uma janela dentro de outra, com teclado e botão voltar
  * disputando qual fecha (a mesma razão pela qual o `SelectField` abre no lugar — design.md §1).
  */
-export function Calendar({ value, onChange, onSelectLastDay, min, max }: Props) {
+export function Calendar({ value, onChange, onMonthChange, min, max }: Props) {
   const theme = useTheme();
   const vidro = supportsLiquidGlass();
   const hoje = localISODate();
@@ -95,6 +95,7 @@ export function Calendar({ value, onChange, onSelectLastDay, min, max }: Props) 
         onPress={() => {
           Haptics.selectionAsync();
           setMes(alvo);
+          onMonthChange?.(alvo);
         }}
         style={({ pressed }) => [
           styles.seta,
@@ -184,25 +185,6 @@ export function Calendar({ value, onChange, onSelectLastDay, min, max }: Props) 
         })}
       </View>
       ))}
-      {onSelectLastDay ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Último dia de ${monthTitle(mes)}`}
-          accessibilityState={{ disabled: foraDoLimite(monthBounds(mes).to) }}
-          disabled={foraDoLimite(monthBounds(mes).to)}
-          onPress={() => {
-            Haptics.selectionAsync();
-            onSelectLastDay(monthBounds(mes).to);
-          }}
-          style={({ pressed }) => [
-            styles.ultimoDia,
-            { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement,
-              opacity: foraDoLimite(monthBounds(mes).to) ? 0.4 : 1 },
-          ]}>
-          <ThemedText type="smallBold" themeColor="tint">Último dia de todo mês</ThemedText>
-          <ThemedText type="caption" themeColor="textSecondary">{isoToBR(monthBounds(mes).to)}</ThemedText>
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -267,15 +249,5 @@ const styles = StyleSheet.create({
   },
   bloqueado: {
     opacity: 0.3,
-  },
-  ultimoDia: {
-    minHeight: HitTarget,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Space.md,
-    paddingVertical: Space.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Space.sm,
   },
 });

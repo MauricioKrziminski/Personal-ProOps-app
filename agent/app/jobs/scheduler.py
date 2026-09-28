@@ -173,10 +173,16 @@ async def _adotar_gemea(rec, dia: str) -> bool:
     )
     if not gemea:
         return False
-    await db.execute(
-        "update public.transactions set recurring_id = %s where id = %s and recurring_id is null",
-        rec["id"], gemea["id"],
-    )
+    try:
+        await db.execute(
+            "update public.transactions set recurring_id = %s where id = %s and recurring_id is null",
+            rec["id"], gemea["id"],
+        )
+    except UniqueViolation:
+        # A série já tem esse dia: o app o gravou no toque (`materialize_recurring_occurrence`)
+        # entre a leitura e esta rodada. Sem este `except`, a série travava em `last_error` e
+        # `materialized_until` nunca mais andava.
+        pass
     return True
 
 
@@ -241,6 +247,17 @@ async def materialize_horizon(agora, so_novas: bool = False) -> int:
         dtstart = rec["dtstart"] or rec["next_run_at"]
 
         try:
+            # O dia que a pessoa apagou (ou tirou do lugar com "Só esta") não volta: o app grava a
+            # data em `recurring_moved_occurrences` (`20260928210000`), a mesma lista que a
+            # leitura de previstas respeita. Sem isto, uma série com o calendário refeito
+            # (`materialized_until` zerado) recriaria o dia apagado.
+            suprimidas = {
+                linha["original_date"].isoformat()
+                for linha in await db.fetch(
+                    "select original_date from private.recurring_moved_occurrences where recurring_id = %s",
+                    rec["id"],
+                )
+            }
             # retoma de onde parou; na primeira vez, de um instante ANTES da
             # próxima ocorrência (para que ela mesma seja gerada)
             cursor = rec["materialized_until"] or (rec["next_run_at"] - timedelta(seconds=1))
@@ -254,6 +271,11 @@ async def materialize_horizon(agora, so_novas: bool = False) -> int:
                 dia = local_iso_date(fuso, occ)
                 if rec["end_date"] and dia > rec["end_date"].isoformat():
                     break
+                if dia in suprimidas:
+                    cursor = occ
+                    ultima = occ
+                    geradas += 1
+                    continue
 
                 ja_aconteceu = occ <= agora
                 if ja_aconteceu and await _adotar_gemea(rec, dia):

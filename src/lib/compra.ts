@@ -13,7 +13,7 @@
  * A tela só oferece o que o banco aceita — botão habilitado que o servidor recusa é o espelho do
  * botão desabilitado que não explica.
  */
-import { isValidBRDate, isoToBR } from './dates.ts';
+import { brToISO, isValidBRDate, isoToBR, monthBounds } from './dates.ts';
 import { addMonthsISO } from './debt-history.ts';
 import { MAX_PARCELAS, digitarValor, valorExibido, parcelaDoTotal, type Contrato, type UnidadeDoValor } from './finance-form.ts';
 
@@ -65,6 +65,12 @@ export interface CompraForm {
    */
   unidade: UnidadeDoValor;
   parcelaCents: number | null;
+  /**
+   * "Último dia de todo mês" escolhido no campo da data (28/09/2026). Não é coluna: as parcelas
+   * guardam a própria data, e o salvar leva as do alcance ao fim do mês delas
+   * (`update_installment_scope_last_day`). Fora do cartão.
+   */
+  ultimoDia?: boolean;
   /** Como a compra abriu — "cada parcela" antes de qualquer edição, e o que o salvar compara. */
   original: { totalCents: number; installments: number; parcelaCents: number; accountId: string | null; pagas: number };
 }
@@ -206,34 +212,45 @@ export function payloadDaCompra(f: CompraForm, isoDaData: string) {
 export type EscopoDaCompra = 'one' | 'future' | 'all';
 
 /** The purchase sheet edits a contract total. The scope RPC distributes that total itself. */
-export function edicaoEscopadaDaCompra(f: CompraForm, original: CompraGravada, scope: EscopoDaCompra):
-  | { kind: 'scope'; patch: { total_cents?: number; amount_cents?: number; description?: string; merchant?: string | null; category?: string | null } }
+/**
+ * O que salvar com o alcance escolhido.
+ *
+ * ⚠️ **A data NÃO é contrato** (28/09/2026). Ela era, e com parcela paga nenhum alcance deixava
+ * mudá-la: "Esta e as próximas" mandava escolher "Todas", e "Todas" recusava por haver parcela
+ * paga — a queixa *"tentava editar uma parcela que já tinha 2 pagas e não editava"*. A data
+ * nova é da parcela de referência (`ancoraNo`, a mesma distância da primeira) e as outras do
+ * alcance andam junto (`update_installment_scope`); a paga no banco anda em "Todas", a paga
+ * numa fatura de cartão o banco segura com o motivo.
+ */
+export function edicaoEscopadaDaCompra(f: CompraForm, original: CompraGravada, scope: EscopoDaCompra, ancoraNo = 1):
+  | { kind: 'scope'; lastDay: boolean; patch: { total_cents?: number; amount_cents?: number; description?: string; merchant?: string | null; category?: string | null; occurred_at?: string } }
   | { kind: 'contract' }
   | { kind: 'no-op' }
   | { kind: 'structural-rejection'; reason: string }
   | { kind: 'protected-rejection'; reason: string } {
   const changedCount = f.installments !== original.installments;
-  const changedDate = f.inicio !== isoToBR(original.first_occurred_at);
+  const ultimoDia = Boolean(f.ultimoDia);
+  const changedDate = f.inicio !== isoToBR(original.first_occurred_at) || ultimoDia;
   const changedAccount = f.accountId !== original.account_id;
   const changedPaid = f.pagas !== original.paid;
   const changedTotal = f.totalCents !== original.total_cents;
   const changedAmount = f.unidade === 'parcela' && f.parcelaCents !== null
     && f.parcelaCents !== original.installment_cents;
-  const structural = changedCount || changedDate || changedAccount || changedPaid;
+  const structural = changedCount || changedAccount || changedPaid;
 
   if (structural && scope !== 'all') {
     return {
       kind: 'structural-rejection',
-      reason: 'Quantidade, data inicial, conta e parcelas já pagas pertencem ao contrato da compra. Escolha a opção que inclui as passadas para revisar o contrato.',
+      reason: 'Quantidade, conta e parcelas já pagas pertencem ao contrato da compra. Escolha a opção que inclui as passadas para revisar o contrato.',
     };
   }
   if (scope === 'all' && (
     (original.locked_in_invoice > 0 && (changedTotal || changedAmount || changedDate || changedAccount)) ||
-    (original.locked > 0 && (changedDate || changedAccount))
+    (original.locked > 0 && changedAccount)
   )) {
     return {
       kind: 'protected-rejection',
-      reason: 'Há parcela em fatura protegida ou um histórico de data/conta já pago. Essa mudança exige rever o fechamento antes de alterar o contrato.',
+      reason: 'Há parcela em fatura protegida ou um histórico de conta já pago. Essa mudança exige rever o fechamento antes de alterar o contrato.',
     };
   }
   if (structural && original.locked > 0 && changedTotal) {
@@ -248,11 +265,18 @@ export function edicaoEscopadaDaCompra(f: CompraForm, original: CompraGravada, s
   }
   if (structural) return { kind: 'contract' };
 
-  const patch: { total_cents?: number; amount_cents?: number; description?: string; merchant?: string | null; category?: string | null } = {};
+  const patch: { total_cents?: number; amount_cents?: number; description?: string; merchant?: string | null; category?: string | null; occurred_at?: string } = {};
   if (changedAmount) patch.amount_cents = f.parcelaCents!;
   else if (changedTotal) patch.total_cents = f.totalCents;
   if (f.description.trim() !== (original.description ?? '')) patch.description = f.description.trim();
   if ((f.merchant.trim() || null) !== original.merchant) patch.merchant = f.merchant.trim() || null;
   if (f.category !== original.category) patch.category = f.category;
-  return Object.keys(patch).length ? { kind: 'scope', patch } : { kind: 'no-op' };
+  if (changedDate && isValidBRDate(f.inicio)) {
+    const naAncora = addMonthsISO(brToISO(f.inicio), ancoraNo - 1);
+    // "Só esta" não é regra: o último dia vira a data dela mesma
+    const data = ultimoDia && scope === 'one' ? monthBounds(naAncora.slice(0, 7)).to : naAncora;
+    if (data !== addMonthsISO(original.first_occurred_at, ancoraNo - 1) || !ultimoDia) patch.occurred_at = data;
+  }
+  const lastDay = ultimoDia && scope !== 'one';
+  return Object.keys(patch).length || lastDay ? { kind: 'scope', lastDay, patch } : { kind: 'no-op' };
 }

@@ -22,7 +22,7 @@ function datePicker(props: Record<string, unknown>) {
         useState(initial: unknown) {
           const index = cursor++;
           if (!(index in state)) state[index] = initial;
-          return [state[index], (next: unknown) => { state[index] = next; }];
+          return [state[index], (next: unknown) => { state[index] = typeof next === 'function' ? next(state[index]) : next; }];
         },
       };
       if (name === 'react/jsx-runtime') return runtime;
@@ -99,4 +99,39 @@ test('month-end control stays visible while the calendar is collapsed and toggle
 test('month-end control is omitted when the date field has no monthly action', () => {
   const render = datePicker({ value: '01/10/2026', onChange() {}, accessibilityLabel: 'Data' });
   assert.equal(find(render(), (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Último dia de todo mês'), undefined);
+});
+
+test('month-end control follows the month shown in the open calendar, not the saved date', () => {
+  const lastDayChanges: string[] = [];
+  const render = datePicker({
+    value: '30/09/2026',
+    onChange() {},
+    onSelectLastDay: (value: string) => lastDayChanges.push(value),
+    lastDaySelected: true,
+    accessibilityLabel: 'Vencimento',
+  });
+  let tree = render();
+  find(tree, (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Vencimento').props.onPress();
+  tree = render();
+  find(tree, (node) => node.type === 'Calendar').props.onMonthChange('2026-06');
+  tree = render();
+  const control = find(tree, (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Último dia de todo mês');
+  assert.equal(control.props.accessibilityState.selected, false, 'junho na tela: o fim de setembro gravado não está escolhido ali');
+  control.props.onPress();
+  assert.deepEqual(lastDayChanges, ['30/06/2026']);
+});
+
+test('month-end control jumps to the first allowed month when the saved date is before the minimum', () => {
+  const lastDayChanges: string[] = [];
+  const tree = datePicker({
+    value: '15/06/2026',
+    onChange() {},
+    onSelectLastDay: (value: string) => lastDayChanges.push(value),
+    min: '2026-09-28',
+    accessibilityLabel: 'Próximo vencimento',
+  })();
+  const control = find(tree, (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Último dia de todo mês');
+  assert.equal(control.props.accessibilityState.disabled, false);
+  control.props.onPress();
+  assert.deepEqual(lastDayChanges, ['30/09/2026']);
 });

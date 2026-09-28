@@ -2782,6 +2782,19 @@ export type Database = {
         }
         Returns: string
       }
+      create_installment_plan_last_day: {
+        Args: {
+          p_account_id: string
+          p_category?: string
+          p_description?: string
+          p_installments: number
+          p_merchant?: string
+          p_occurred_at: string
+          p_paid_installments: number
+          p_total_cents: number
+        }
+        Returns: string
+      }
       create_installment_plan_with_history: {
         Args: {
           p_account_id: string
@@ -2955,7 +2968,12 @@ export type Database = {
           installment_no: number | null
           installments_total: number | null
           inferred_start: boolean
+          status: string
         }[]
+      }
+      materialize_recurring_occurrence: {
+        Args: { p_date: string; p_recurring_id: string }
+        Returns: string
       }
       month_breakdown: {
         Args: { p_group_by?: string; p_month: string; p_view?: string }
@@ -3146,6 +3164,10 @@ export type Database = {
         Args: { p_invoice_id: string; p_paid_at?: string }
         Returns: string
       }
+      skip_recurring_occurrence: {
+        Args: { p_date: string; p_recurring_id: string }
+        Returns: undefined
+      }
       unroll_invoice: {
         Args: { p_invoice_id: string }
         Returns: string
@@ -3199,6 +3221,20 @@ export type Database = {
         Args: { p_as_of?: string; p_asset_id: string; p_value_cents: number }
         Returns: number
       }
+      update_debt_payment_due_day: {
+        Args: {
+          p_anchor_id: string
+          p_due_day: number
+          p_expected_anchor_revision: number
+          p_expected_debt_revision: number
+          p_expected_payment_versions: Json
+          p_occurred_at: string
+          p_payment_patch: Json
+          p_request_id: string
+          p_scope: string
+        }
+        Returns: Json
+      }
       update_installment_plan: {
         Args: {
           p_account_id?: string
@@ -3219,6 +3255,10 @@ export type Database = {
       }
       update_installment_scope: {
         Args: { p_transaction_id: string; p_scope: string; p_patch: Json }
+        Returns: number
+      }
+      update_installment_scope_last_day: {
+        Args: { p_patch: Json; p_scope: string; p_transaction_id: string }
         Returns: number
       }
       update_recurring_all: {

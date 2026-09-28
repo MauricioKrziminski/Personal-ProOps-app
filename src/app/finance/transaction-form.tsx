@@ -400,7 +400,7 @@ function TransactionForm({
   const mudaData = (br: string, intencao: 'fixo' | 'ultimo' = 'fixo') => {
     setValue('occurred_at', br, { shouldValidate: true });
     if (umaData) setValue('due_at', br);
-    if (editing?.recurring_id) setIntencaoDoDia(intencao);
+    setIntencaoDoDia(intencao);
   };
 
   /** Linhas e regra são uma transação no banco: nenhum resultado parcial. */
@@ -592,6 +592,7 @@ function TransactionForm({
           // parcelada nascia como "Compra parcelada (1/N)" e o nome não existia em lugar
           // nenhum. Ver o ⚠️ em `useCreateInstallmentPlan`.
           merchant: values.merchant?.trim() || null,
+          lastDay: intencaoDoDia === 'ultimo' && !isCard,
         },
         {
           onSuccess: () => {
@@ -759,15 +760,18 @@ function TransactionForm({
       account_id: values.account_id,
       occurred_at: brToISO(values.occurred_at),
     });
-    if (!Object.keys(patch).length) {
+    /*
+      Com "Este e os próximos"/"Todos", mexer na data muda o VENCIMENTO do contrato (28/09/2026,
+      decisão do dono do produto): o dia escolhido — ou "último dia de todo mês" — vale para as
+      próximas parcelas, e a data deste pagamento muda junto. Os outros pagamentos ficam no dia
+      em que o dinheiro saiu.
+    */
+    const novaData = brToISO(values.occurred_at);
+    const dueDay = scope !== 'one' && (patch.occurred_at || intencaoDoDia)
+      ? (intencaoDoDia === 'ultimo' ? -1 : Number(novaData.slice(8, 10)))
+      : undefined;
+    if (!Object.keys(patch).length && dueDay === undefined) {
       router.back();
-      return;
-    }
-    if (scope !== 'one' && patch.occurred_at) {
-      toast({
-        message: 'A data é a baixa deste pagamento. Salve só este ou altere o vencimento das próximas na dívida.',
-        tone: 'error',
-      });
       return;
     }
     let paymentVersions: Record<string, number>;
@@ -778,16 +782,18 @@ function TransactionForm({
       toast({ message: error instanceof Error ? error.message : 'Atualize os pagamentos e tente novamente.', tone: 'error' });
       return;
     }
-    const key = JSON.stringify([editing.id, scope, patch, divida.edit_revision, editing.edit_revision, paymentVersions]);
+    const key = JSON.stringify([editing.id, scope, patch, dueDay, divida.edit_revision, editing.edit_revision, paymentVersions]);
     if (tentativaPagamento.current?.key !== key) tentativaPagamento.current = { key, id: newClientMessageId() };
     salvarPagamentoDivida.mutate({
       anchorId: editing.id,
       scope,
-      patch,
+      // com o dia do contrato, a data vai sempre (o banco só a grava se mudou)
+      patch: dueDay === undefined ? patch : { ...patch, occurred_at: novaData },
       debtRevision: divida.edit_revision,
       anchorRevision: editing.edit_revision,
       paymentVersions,
       requestId: tentativaPagamento.current.id,
+      dueDay,
     }, {
       onSuccess: () => {
         tentativaPagamento.current = null;
@@ -801,14 +807,14 @@ function TransactionForm({
   const salvarParcelaEscopada = (scope: 'one' | 'future' | 'all') => handleSubmit((values) => {
     if (!editing?.installment_plan_id || !plano) return;
     if (formCompra) {
-      const decisao = edicaoEscopadaDaCompra(formCompra, plano, scope);
+      const decisao = edicaoEscopadaDaCompra(formCompra, plano, scope, editing.installment_no ?? 1);
       if (decisao.kind === 'no-op') return router.back();
       if (decisao.kind === 'structural-rejection' || decisao.kind === 'protected-rejection') {
         toast({ message: decisao.reason, tone: 'error' });
         return;
       }
       if (decisao.kind === 'contract') return salvarCompraToda();
-      salvarParcela.mutate({ id: editing.id, scope, patch: decisao.patch }, {
+      salvarParcela.mutate({ id: editing.id, scope, patch: decisao.patch, lastDay: decisao.lastDay }, {
         onSuccess: () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           router.back();
@@ -834,8 +840,9 @@ function TransactionForm({
     if (status !== editing.status) patch.status = status;
     if (dueAt !== editing.due_at) patch.due_at = dueAt;
     if (values.auto_confirm !== editing.auto_confirm) patch.auto_confirm = values.auto_confirm;
-    if (!Object.keys(patch).length) return router.back();
-    salvarParcela.mutate({ id: editing.id, scope, patch }, {
+    const lastDay = intencaoDoDia === 'ultimo' && scope !== 'one';
+    if (!Object.keys(patch).length && !lastDay) return router.back();
+    salvarParcela.mutate({ id: editing.id, scope, patch, lastDay }, {
       onSuccess: () => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.back();
@@ -918,7 +925,9 @@ function TransactionForm({
     }
     if (editing?.debt_id && divida?.installments) {
       askEditScope('payment', (scope) => salvarPagamento(scope === 'future' ? 'from_here' : scope),
-        'Todos também corrige pagamentos já registrados e recalcula estimativas antigas sem lançamento.');
+        getValues('occurred_at') !== isoToBR(editing.occurred_at) || intencaoDoDia
+          ? 'Com a data nova, Este e os próximos e Todos mudam o dia de vencimento das parcelas.'
+          : 'Todos também corrige pagamentos já registrados e recalcula estimativas antigas sem lançamento.');
       return;
     }
     if (editing?.debt_id) {
@@ -1332,11 +1341,19 @@ function TransactionForm({
                   <DatePickerField
                     value={field.value}
                     onChange={mudaData}
-                    onSelectLastDay={serie?.rrule.includes('FREQ=MONTHLY') ? (br) => mudaData(br, 'ultimo') : undefined}
-                    lastDaySelected={Boolean(
-                      serie?.rrule.includes('FREQ=MONTHLY') &&
-                      (intencaoDoDia === 'ultimo' || (intencaoDoDia === null && /BYMONTHDAY=-1(;|$)/.test(serie.rrule))),
-                    )}
+                    // Tudo que se repete por mês tem o último dia (28/09/2026): série mensal,
+                    // pagamento de dívida e parcela fora do cartão (criando ou editando).
+                    onSelectLastDay={serie?.rrule.includes('FREQ=MONTHLY') || divida?.installments ||
+                      (!isCard && (editing ? Boolean(editing.installment_plan_id) : podeParcelarAqui && installmentCount > 1))
+                      ? (br) => mudaData(br, 'ultimo')
+                      : undefined}
+                    lastDaySelected={
+                      intencaoDoDia === 'ultimo' ||
+                      (intencaoDoDia === null && (
+                        (Boolean(serie?.rrule.includes('FREQ=MONTHLY')) && /BYMONTHDAY=-1(;|$)/.test(serie?.rrule ?? '')) ||
+                        divida?.due_day === -1
+                      ))
+                    }
                     accessibilityLabel="Data do lançamento"
                     invalid={!!errors.occurred_at}
                   />

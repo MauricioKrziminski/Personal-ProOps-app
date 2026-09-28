@@ -368,7 +368,7 @@ export default function InstallmentsScreen() {
     };
 
     askEditScope('installment', (scope) => {
-      const decisao = edicaoEscopadaDaCompra(form, plano, scope);
+      const decisao = edicaoEscopadaDaCompra(form, plano, scope, numero);
       if (decisao.kind === 'structural-rejection' || decisao.kind === 'protected-rejection') {
         toast({ message: decisao.reason ?? 'Não é possível aplicar essa alteração.', tone: 'error' });
         return;
@@ -386,7 +386,7 @@ export default function InstallmentsScreen() {
       const patch = scope === 'one' && decisao.patch.description
         ? { ...decisao.patch, description: `${decisao.patch.description} (${numero}/${plano.installments})` }
         : decisao.patch;
-      editarEscopo.mutate({ id: ancora.id, scope, patch }, {
+      editarEscopo.mutate({ id: ancora.id, scope, patch, lastDay: decisao.lastDay }, {
         onSuccess: () => {
           volta.aoFechar(() => setForm(null));
           toast({ message: 'Alteração salva nas parcelas escolhidas.', tone: 'success' });

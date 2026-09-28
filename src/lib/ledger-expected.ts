@@ -12,6 +12,11 @@ export interface ExpectedLedgerLine {
   installments_total: number | null;
   /** A first period inferred from legacy creation metadata rather than a saved start date. */
   inferred_start: boolean;
+  /**
+   * O estado que a linha terá (`20260928210040`): a recorrente com "entra como pago" que já
+   * passou nasce `cleared`, e a parcela só contada como paga também é.
+   */
+  status: 'pending' | 'cleared';
 }
 
 interface ExpectedFilters {
@@ -30,7 +35,8 @@ export function filterExpectedLines<T extends ExpectedLedgerLine>(
 ): T[] {
   const term = filters.q?.trim().toLocaleLowerCase('pt-BR');
   return lines.filter((line) => {
-    if (filters.status === 'cleared' || filters.kind === 'transfer') return false;
+    if (filters.kind === 'transfer') return false;
+    if (filters.status && line.status !== filters.status) return false;
     if (filters.kind && line.kind !== filters.kind) return false;
     if (filters.category && line.category !== filters.category) return false;
     if (filters.accountId !== undefined && line.account_id !== filters.accountId) return false;
@@ -41,4 +47,43 @@ export function filterExpectedLines<T extends ExpectedLedgerLine>(
   }).sort((a, b) => a.due_date.localeCompare(b.due_date)
     || a.description.localeCompare(b.description, 'pt-BR')
     || a.ref_id.localeCompare(b.ref_id));
+}
+
+/** Uma linha do extrato: o lançamento gravado ou a ocorrência que só existe na regra. */
+export type ItemDoExtrato<T> = { tx: T; prevista?: undefined } | { prevista: ExpectedLedgerLine; tx?: undefined };
+
+/**
+ * Mistura as previstas nas linhas gravadas, na ordem da lista (data decrescente), cada uma no
+ * dia dela (28/09/2026, decisão do dono do produto: eram um bloco à parte no topo).
+ *
+ * A lista é paginada: com mais páginas por vir, só entra a prevista de um dia que a página já
+ * PASSOU — senão ela pararia no fim da lista e pularia de lugar quando a página seguinte chegasse.
+ */
+export function mesclarPrevistas<T extends { occurred_at: string }>(
+  rows: readonly T[], previstas: readonly ExpectedLedgerLine[], temMais: boolean,
+): ItemDoExtrato<T>[] {
+  const piso = temMais && rows.length ? rows[rows.length - 1].occurred_at : null;
+  const entram = previstas
+    .filter((p) => piso === null || p.due_date > piso)
+    .sort((a, b) => b.due_date.localeCompare(a.due_date)
+      || a.description.localeCompare(b.description, 'pt-BR')
+      || a.ref_id.localeCompare(b.ref_id));
+  const itens: ItemDoExtrato<T>[] = [];
+  let i = 0;
+  for (const tx of rows) {
+    while (i < entram.length && entram[i].due_date > tx.occurred_at) itens.push({ prevista: entram[i++] });
+    itens.push({ tx });
+  }
+  while (i < entram.length) itens.push({ prevista: entram[i++] });
+  return itens;
+}
+
+/** A pílula da prevista, na régua de `estadoDaLinha`: a data diz se ela ainda vem ou se passou. */
+export function estadoDaPrevista(
+  line: ExpectedLedgerLine, hoje: string,
+): 'previsto' | 'atrasado' | 'não caiu' | 'estimado' | null {
+  if (line.status === 'cleared') return null;
+  if (line.inferred_start) return 'estimado';
+  if (line.due_date >= hoje) return 'previsto';
+  return line.kind === 'income' ? 'não caiu' : 'atrasado';
 }

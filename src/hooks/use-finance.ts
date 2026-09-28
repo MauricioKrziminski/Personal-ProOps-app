@@ -319,6 +319,42 @@ export function useExpectedLedgerLines(from: string, to: string, pronto: boolean
 }
 
 /**
+ * A ocorrência prevista de uma recorrente vira lançamento — a MESMA linha que o agendador
+ * criaria (`materialize_recurring_occurrence`), idempotente: tocar duas vezes dá o mesmo id.
+ * É o que deixa a prevista abrir o detalhe e receber "Paguei" como qualquer lançamento.
+ */
+export function useMaterializeOccurrence() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async ({ recurringId, date }: { recurringId: string; date: string }): Promise<string> => {
+      const { data, error } = await supabase.rpc('materialize_recurring_occurrence', {
+        p_recurring_id: recurringId, p_date: date,
+      });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/**
+ * Apagar a ocorrência PREVISTA: só a marca de "esta data não acontece" (`skip_recurring_occurrence`),
+ * que a lista e o agendador respeitam — sem gravar uma linha para apagá-la em seguida.
+ */
+export function useSkipOccurrence() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async ({ recurringId, date }: { recurringId: string; date: string }) => {
+      const { error } = await supabase.rpc('skip_recurring_occurrence', {
+        p_recurring_id: recurringId, p_date: date,
+      });
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/**
  * Ano do lançamento MAIS ANTIGO — o começo real da história do usuário.
  *
  * Relatórios oferecia três anos fixos (`anoAtual - 2`), então quem usa o app há mais tempo não
@@ -765,8 +801,11 @@ export function useCreateInstallmentPlan() {
       description: string | null;
       category: string | null;
       merchant: string | null;
+      /** Parcelas no último dia de cada mês (fora do cartão), na mesma transação da criação. */
+      lastDay?: boolean;
     }) => {
-      const { error } = await supabase.rpc('create_installment_plan_with_history', {
+      const { error } = await supabase.rpc(
+        input.lastDay ? 'create_installment_plan_last_day' : 'create_installment_plan_with_history', {
         p_account_id: input.accountId,
         p_total_cents: input.totalCents,
         p_installments: input.installments,
@@ -1742,7 +1781,30 @@ export function useSaveDebtPaymentScoped() {
       anchorRevision: number;
       paymentVersions: Record<string, number>;
       requestId: string;
+      /**
+       * Dia de vencimento do contrato (-1 = último dia de todo mês). Só com "Este e os próximos"
+       * ou "Todos": a data deste pagamento passa a ser o vencimento das próximas, na MESMA
+       * transação dos outros campos (`update_debt_payment_due_day`).
+       */
+      dueDay?: number;
     }) => {
+      if (input.dueDay !== undefined && input.scope !== 'one') {
+        const { occurred_at: occurredAt, ...outros } = input.patch;
+        if (!occurredAt) throw new Error('Falta a data do pagamento');
+        const { data, error } = await supabase.rpc('update_debt_payment_due_day', {
+          p_anchor_id: input.anchorId,
+          p_scope: input.scope,
+          p_payment_patch: outros,
+          p_occurred_at: occurredAt,
+          p_due_day: input.dueDay,
+          p_expected_debt_revision: input.debtRevision,
+          p_expected_anchor_revision: input.anchorRevision,
+          p_expected_payment_versions: input.paymentVersions,
+          p_request_id: input.requestId,
+        });
+        if (error) throw error;
+        return data;
+      }
       const { data, error } = await supabase.rpc('update_debt_payment_scoped', {
         p_anchor_id: input.anchorId,
         p_scope: input.scope,
@@ -2806,14 +2868,17 @@ export function useSaveTransactionScoped() {
 export function useSaveInstallmentOccurrence() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async ({ id, scope = 'one', patch }: {
+    mutationFn: async ({ id, scope = 'one', patch, lastDay = false }: {
       id: string;
       scope?: 'one' | 'future' | 'all';
       patch: Partial<Pick<TransactionInput,
         'amount_cents' | 'category' | 'description' | 'merchant' | 'occurred_at' |
         'status' | 'due_at' | 'auto_confirm'>> & { total_cents?: number };
+      /** "Último dia de todo mês": depois da edição, as parcelas do alcance vão ao fim do mês. */
+      lastDay?: boolean;
     }) => {
-      const { data, error } = await supabase.rpc('update_installment_scope', {
+      const { data, error } = await supabase.rpc(
+        lastDay && scope !== 'one' ? 'update_installment_scope_last_day' : 'update_installment_scope', {
         p_transaction_id: id,
         p_scope: scope,
         p_patch: patch,

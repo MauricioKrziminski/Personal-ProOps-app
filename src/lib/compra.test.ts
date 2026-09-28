@@ -84,40 +84,59 @@ test('Ao escolher a compra toda no Salvar, o rascunho da parcela chega inteiro �
 test('O total escolhido para esta ou futuras parcelas chega como total do plano, sem transformar em valor mensal', () => {
   const f = { ...compraDoRegistro(tv), totalCents: 112001, description: 'TV nova' };
   assert.deepEqual(edicaoEscopadaDaCompra(f, tv, 'future'), {
-    kind: 'scope', patch: { total_cents: 112001, description: 'TV nova' },
+    kind: 'scope', lastDay: false, patch: { total_cents: 112001, description: 'TV nova' },
   });
   assert.deepEqual(edicaoEscopadaDaCompra(f, tv, 'one'), {
-    kind: 'scope', patch: { total_cents: 112001, description: 'TV nova' },
+    kind: 'scope', lastDay: false, patch: { total_cents: 112001, description: 'TV nova' },
   });
 });
 
 test('Cada parcela aplica o valor digitado em cada linha do alcance, inclusive as pagas em Todas', () => {
   const f = { ...compraDoRegistro(tv), unidade: 'parcela' as const, parcelaCents: 12000, totalCents: 114000 };
   assert.deepEqual(edicaoEscopadaDaCompra(f, tv, 'all'), {
-    kind: 'scope', patch: { amount_cents: 12000 },
+    kind: 'scope', lastDay: false, patch: { amount_cents: 12000 },
   });
   assert.deepEqual(edicaoEscopadaDaCompra(f, tv, 'future'), {
-    kind: 'scope', patch: { amount_cents: 12000 },
+    kind: 'scope', lastDay: false, patch: { amount_cents: 12000 },
   });
   const entirelyPaid = { ...tv, installments: 3, total_cents: 30000, paid: 3, locked: 3 };
   const paidForm = { ...compraDoRegistro(entirelyPaid), unidade: 'parcela' as const, parcelaCents: 9000 };
   assert.deepEqual(edicaoEscopadaDaCompra(paidForm, entirelyPaid, 'all'), {
-    kind: 'scope', patch: { amount_cents: 9000 },
+    kind: 'scope', lastDay: false, patch: { amount_cents: 9000 },
   });
 });
 
-test('Quantidade e data inicial são contrato: escopos limitados explicam a impossibilidade', () => {
+test('Quantidade é contrato: escopos limitados explicam a impossibilidade', () => {
   const f = { ...compraDoRegistro(tv), installments: 12 };
   assert.equal(edicaoEscopadaDaCompra(f, tv, 'one').kind, 'structural-rejection');
   assert.equal(edicaoEscopadaDaCompra(f, tv, 'future').kind, 'structural-rejection');
   assert.equal(edicaoEscopadaDaCompra(f, tv, 'all').kind, 'contract');
-  assert.equal(edicaoEscopadaDaCompra({ ...compraDoRegistro(tv), inicio: '06/06/2026' }, tv, 'future').kind, 'structural-rejection');
+});
+
+test('Com 3 pagas a data muda nos três alcances, a partir da parcela de referência', () => {
+  const f = { ...compraDoRegistro(tv), inicio: '20/06/2026' };
+  // referência na 4ª: a mesma distância da primeira nova (20/06 + 3 meses)
+  assert.deepEqual(edicaoEscopadaDaCompra(f, tv, 'future', 4), { kind: 'scope', lastDay: false, patch: { occurred_at: '2026-09-20' } });
+  assert.deepEqual(edicaoEscopadaDaCompra(f, tv, 'one', 4), { kind: 'scope', lastDay: false, patch: { occurred_at: '2026-09-20' } });
+  assert.deepEqual(edicaoEscopadaDaCompra(f, tv, 'all', 4), { kind: 'scope', lastDay: false, patch: { occurred_at: '2026-09-20' } },
+    'pagas no banco andam em Todas');
+  assert.equal(edicaoEscopadaDaCompra(f, { ...tv, locked_in_invoice: 1 }, 'all', 4).kind, 'protected-rejection',
+    'a paga numa fatura de cartão segura a data');
+});
+
+test('Último dia de todo mês: regra no alcance, data própria em Só esta', () => {
+  const f = { ...compraDoRegistro(tv), inicio: '30/06/2026', ultimoDia: true };
+  assert.deepEqual(edicaoEscopadaDaCompra(f, tv, 'future', 4), { kind: 'scope', lastDay: true, patch: { occurred_at: '2026-09-30' } });
+  assert.deepEqual(edicaoEscopadaDaCompra(f, tv, 'one', 4), { kind: 'scope', lastDay: false, patch: { occurred_at: '2026-09-30' } });
+  // só a intenção, sem trocar de mês: nada a mover antes, o banco alinha os dias
+  const mesmoMes = { ...compraDoRegistro({ ...tv, first_occurred_at: '2026-06-30' }), ultimoDia: true };
+  assert.deepEqual(edicaoEscopadaDaCompra(mesmoMes, { ...tv, first_occurred_at: '2026-06-30' }, 'all', 4), { kind: 'scope', lastDay: true, patch: {} });
 });
 
 test('Todas inclui parcela paga fora do cartão; fatura protegida continua bloqueada', () => {
   const f = { ...compraDoRegistro(tv), totalCents: 110000 };
   assert.deepEqual(edicaoEscopadaDaCompra(f, tv, 'all'), {
-    kind: 'scope', patch: { total_cents: 110000 },
+    kind: 'scope', lastDay: false, patch: { total_cents: 110000 },
   });
   assert.equal(edicaoEscopadaDaCompra(f, { ...tv, locked_in_invoice: 1 }, 'all').kind, 'protected-rejection');
   assert.equal(edicaoEscopadaDaCompra(compraDoRegistro(tv), tv, 'all').kind, 'no-op');

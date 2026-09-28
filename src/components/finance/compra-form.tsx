@@ -36,6 +36,7 @@ export function CamposDaCompra({
   const { travado, tituloOk, totalOk, contaOk, faixa, dataLivre } = validaCompra(form);
   const motivo = motivoDaTrava(form);
   const nomeDaConta = form.accountId ? (contas.find((c) => c.id === form.accountId)?.name ?? 'Conta') : 'Sem conta';
+  const cartao = contas.find((c) => c.id === form.accountId)?.type === 'credit_card';
 
   return (
     <>
@@ -118,7 +119,10 @@ export function CamposDaCompra({
         {dataLivre ? (
           <DatePickerField
             value={form.inicio}
-            onChange={(inicio) => onChange({ ...form, inicio })}
+            onChange={(inicio) => onChange({ ...form, inicio, ultimoDia: false })}
+            // No cartão a parcela segue a data da compra: o último dia não vale ali.
+            onSelectLastDay={cartao ? undefined : (inicio) => onChange({ ...form, inicio, ultimoDia: true })}
+            lastDaySelected={Boolean(form.ultimoDia)}
             accessibilityLabel="Data da primeira parcela"
             invalid={!isValidBRDate(form.inicio)}
           />

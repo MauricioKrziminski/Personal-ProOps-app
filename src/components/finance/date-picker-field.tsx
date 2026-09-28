@@ -62,17 +62,26 @@ export function DatePickerField({
   const theme = useTheme();
   const scheme = useScheme();
   const [aberto, setAberto] = useState(false);
+  // O mês que a grade está MOSTRANDO: navegando até junho, "último dia" é 30/06, não o fim do
+  // mês da data gravada (28/09/2026, *"se eu estou em junho no calendário…"*).
+  const [mesVisivel, setMesVisivel] = useState<string | null>(null);
   const vidro = supportsLiquidGlass() && !aberto;
 
   const iso = value && isValidBRDate(value) ? brToISO(value) : null;
-  const mesSelecionado = iso?.slice(0, 7) ?? localISODate().slice(0, 7);
-  const fimDoMesISO = monthBounds(mesSelecionado).to;
-  const fimDoMesSelecionado = isoToBR(fimDoMesISO);
+  const mesDoValor = iso?.slice(0, 7) ?? localISODate().slice(0, 7);
+  const mesPedido = (aberto && mesVisivel) || mesDoValor;
+  // O mês do valor antes do mínimo (o vencimento velho de uma série que o agendador não andou)
+  // desligava o botão: vale o primeiro mês permitido.
+  const mesDoBotao = min && monthBounds(mesPedido).to < min ? min.slice(0, 7) : mesPedido;
+  const fimDoMesISO = monthBounds(mesDoBotao).to;
+  const fimDoMes = isoToBR(fimDoMesISO);
   const fimDoMesForaDoLimite = Boolean((min && fimDoMesISO < min) || (max && fimDoMesISO > max));
+  // Marcado só quando a intenção gravada É este fim de mês; em outro mês o toque escolhe o dele.
+  const marcado = lastDaySelected && iso === fimDoMesISO;
 
   const alternarUltimoDia = () => {
-    if (lastDaySelected) onChange(fimDoMesSelecionado);
-    else onSelectLastDay?.(fimDoMesSelecionado);
+    if (marcado) onChange(fimDoMes);
+    else onSelectLastDay?.(fimDoMes);
     setAberto(false);
   };
 
@@ -91,6 +100,7 @@ export function DatePickerField({
         <Pressable
           onPress={() => {
             Haptics.selectionAsync();
+            setMesVisivel(null);
             setAberto((a) => !a);
           }}
           accessibilityRole="button"
@@ -119,6 +129,7 @@ export function DatePickerField({
           <View style={[styles.calendario, { borderTopColor: theme.cardBorder }]}>
             <Calendar
               value={iso}
+              onMonthChange={setMesVisivel}
               onChange={(escolhido) => {
                 onChange(isoToBR(escolhido));
                 setAberto(false);
@@ -132,23 +143,23 @@ export function DatePickerField({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Último dia de todo mês"
-            accessibilityState={{ selected: lastDaySelected, disabled: fimDoMesForaDoLimite }}
+            accessibilityState={{ selected: marcado, disabled: fimDoMesForaDoLimite }}
             disabled={fimDoMesForaDoLimite}
             onPress={alternarUltimoDia}
             style={({ pressed }) => [
               styles.ultimoDia,
               {
-                backgroundColor: lastDaySelected
+                backgroundColor: marcado
                   ? theme.tintFill
                   : pressed ? theme.backgroundSelected : theme.backgroundElement,
                 opacity: fimDoMesForaDoLimite ? 0.4 : 1,
               },
             ]}>
-            <ThemedText type="smallBold" themeColor={lastDaySelected ? 'onTint' : 'tint'}>
+            <ThemedText type="smallBold" themeColor={marcado ? 'onTint' : 'tint'}>
               Último dia de todo mês
             </ThemedText>
-            <ThemedText type="caption" themeColor={lastDaySelected ? 'onTint' : 'textSecondary'}>
-              {lastDaySelected ? `Selecionado · ${fimDoMesSelecionado}` : `Usar ${fimDoMesSelecionado}`}
+            <ThemedText type="caption" themeColor={marcado ? 'onTint' : 'textSecondary'}>
+              {marcado ? `Selecionado · ${fimDoMes}` : `Usar ${fimDoMes}`}
             </ThemedText>
           </Pressable>
         ) : null}

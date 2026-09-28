@@ -30,7 +30,8 @@ import { aoVoltarParaDivida } from '@/lib/volta-da-parcela';
  * volta para a ficha já no pagamento.
  */
 export default function DebtInstallmentScreen() {
-  const params = useLocalSearchParams<{ debt?: string; n?: string }>();
+  // `origem=lista`: aberta de Lançamentos, não da ficha — "Paguei" leva à ficha em vez de voltar.
+  const params = useLocalSearchParams<{ debt?: string; n?: string; origem?: string }>();
   const n = Number(params.n);
   const debts = useDebts();
   const schedule = useDebtSchedule(params.debt);
@@ -116,7 +117,8 @@ export default function DebtInstallmentScreen() {
 
   const pagar = () => {
     aoVoltarParaDivida({ divida: divida.id, acao: 'pagar', cents: item.cents });
-    router.back();
+    if (params.origem === 'lista') router.replace({ pathname: '/finance/debts', params: { id: divida.id } });
+    else router.back();
   };
 
   return (

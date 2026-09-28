@@ -92,7 +92,7 @@ async def test_serie_recriada_adota_o_mes_pago_em_vez_de_duplicar(monkeypatch):
     escritas, procuras = [], []
 
     async def fetch(sql, *args):
-        return [serie]
+        return [serie] if "from public.recurring_transactions" in sql else []
 
     async def fetch_one(sql, *args):
         procuras.append(args[4])  # o dia procurado
@@ -128,3 +128,71 @@ async def test_reparo_tira_a_gerada_e_devolve_a_antiga_para_a_serie(monkeypatch)
     assert await scheduler.reparar_gemeas() == 1
     # a gerada sai ANTES da adoção: o unique (recurring_id, occurred_at) recusaria o contrário
     assert ordem == [("delete", ("nova-04-09",)), ("update", ("serie", "antiga-04-09"))]
+
+
+def _serie_fundacred():
+    from uuid import uuid4
+
+    return {
+        "id": uuid4(), "user_id": uuid4(), "workspace_id": uuid4(), "kind": "expense",
+        "amount_cents": 119885, "currency": "BRL", "category": "estudo", "description": "Fundacred",
+        "merchant": None, "account_id": uuid4(), "rrule": "FREQ=MONTHLY;BYMONTHDAY=4",
+        "next_run_at": datetime(2026, 10, 4, 12, tzinfo=UTC), "dtstart": datetime(2026, 10, 4, 12, tzinfo=UTC),
+        "end_date": None, "auto_confirm": False, "materialized_until": None, "timezone": "America/Sao_Paulo",
+    }
+
+
+@pytest.mark.asyncio
+async def test_dia_apagado_no_app_nao_volta_pelo_agendador(monkeypatch):
+    """Apagou "só esta" (novembro): o calendário refeito não recria o dia (28/09/2026)."""
+    from datetime import date
+
+    from app.jobs import scheduler
+
+    serie = _serie_fundacred()
+    dias = []
+
+    async def fetch(sql, *args):
+        if "from public.recurring_transactions" in sql:
+            return [serie]
+        return [{"original_date": date(2026, 11, 4)}]
+
+    async def execute(sql, *args):
+        if sql.split()[0] == "insert":
+            dias.append(args[9])
+
+    monkeypatch.setattr(scheduler.db, "fetch", fetch)
+    monkeypatch.setattr(scheduler.db, "execute", execute)
+    await scheduler.materialize_horizon(datetime(2026, 9, 28, 15, tzinfo=UTC), so_novas=True)
+    assert "2026-11-04" not in dias
+    assert "2026-10-04" in dias and "2026-12-04" in dias
+
+
+@pytest.mark.asyncio
+async def test_gemea_ja_adotada_pelo_app_nao_trava_a_serie(monkeypatch):
+    """O app gravou o dia no toque antes da rodada: a adoção bate no unique e a série segue."""
+    from psycopg.errors import UniqueViolation
+
+    from app.jobs import scheduler
+
+    serie = {**_serie_fundacred(), "next_run_at": datetime(2026, 9, 4, 12, tzinfo=UTC),
+             "dtstart": datetime(2026, 9, 4, 12, tzinfo=UTC)}
+    escritas = []
+
+    async def fetch(sql, *args):
+        return [serie] if "from public.recurring_transactions" in sql else []
+
+    async def fetch_one(sql, *args):
+        return {"id": "setembro-solto"} if args[4] == "2026-09-04" else None
+
+    async def execute(sql, *args):
+        if "recurring_id = %s where id" in sql:
+            raise UniqueViolation("já existe")
+        escritas.append(sql.split()[0])
+
+    monkeypatch.setattr(scheduler.db, "fetch", fetch)
+    monkeypatch.setattr(scheduler.db, "fetch_one", fetch_one)
+    monkeypatch.setattr(scheduler.db, "execute", execute)
+    await scheduler.materialize_horizon(datetime(2026, 9, 27, 15, tzinfo=UTC), so_novas=True)
+    assert escritas.count("insert") == 12, "outubro em diante nasce normalmente"
+    assert escritas[-1] == "update", "a série grava materialized_until em vez de last_error"

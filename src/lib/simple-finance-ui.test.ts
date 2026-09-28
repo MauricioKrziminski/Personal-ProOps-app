@@ -299,7 +299,10 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@/components/notes/nova-pasta') return load('src/components/notes/nova-pasta.tsx');
       if (name === '@/lib/volta-da-parcela') return load('src/lib/volta-da-parcela.ts');
       if (name === '@/lib/ledger-expected') return load('src/lib/ledger-expected.ts');
-      if (name === '@/components/finance/expected-ledger-lines') return { ExpectedLedgerLines: 'ExpectedLedgerLines' };
+      if (name === '@/components/finance/expected-ledger-lines') return {
+        LinhaPrevista: 'LinhaPrevista',
+        useAcoesDaPrevista: () => ({ abrir: (line: any) => { refetches.push(`abrir:${line.ref_id}`); }, acoes: () => [] }),
+      };
       if (name === '@/lib/rrule-text') return { describeRRule: () => 'todo mês' };
       if (name === '@/hooks/use-archived-folders') return { useArchivedFolders: () => ({ ...query, isSuccess: true, data: options.pastasArquivadas ?? [] }) };
       if (name === '@/hooks/use-notes') return new Proxy({
@@ -1180,15 +1183,24 @@ test('Lançamentos com o período resolvido desenha o resumo, sem erro', () => {
   assert.ok(!t.includes('ErrorCard'));
 });
 
-test('Lançamentos mostra a previsão sem esconder falha na leitura dos registros reais', () => {
-  const expectedLine = {
-    origin: 'recurring', ref_id: 'series', due_date: '2026-09-10',
-    amount_cents: 5590, kind: 'expense', description: 'Assinatura', category: null,
-    account_id: null, installment_no: null, installments_total: null, inferred_start: false,
-  };
-  const ui = screen(transacoesFile, { txs: [], expectedLines: [expectedLine], listError: true });
-  const prediction = ui.nodes().find((n: any) => n.type === 'ExpectedLedgerLines');
-  assert.equal(prediction?.props.lines.length, 1);
+const assinaturaPrevista = {
+  origin: 'recurring', ref_id: 'series', due_date: '2026-09-10',
+  amount_cents: 5590, kind: 'expense', description: 'Assinatura', category: null,
+  account_id: null, installment_no: null, installments_total: null, inferred_start: false,
+};
+
+test('Lançamentos: a prevista mora na lista, no dia dela, e o toque a abre (28/09/2026)', () => {
+  const ui = screen(transacoesFile, { txs: [], expectedLines: [assinaturaPrevista] });
+  const linha = ui.nodes().find((n: any) => n.type === 'LinhaPrevista');
+  assert.equal(linha?.props.line.ref_id, 'series', 'a prevista é uma linha da lista, não um bloco à parte');
+  linha.props.onAbrir();
+  assert.deepEqual(ui.refetches, ['abrir:series']);
+});
+
+test('Lançamentos mostra a falha na leitura dos registros reais, mesmo com previstas', () => {
+  const ui = screen(transacoesFile, { txs: [], expectedLines: [assinaturaPrevista], listError: true });
+  assert.ok(!ui.nodes().some((n: any) => n.type === 'LinhaPrevista'),
+    'uma lista só de previstas esconderia que os lançamentos não vieram');
   const error = ui.nodes().find((n: any) => n.type === 'ErrorCard');
   assert.ok(error, 'a previsão não deve esconder o erro dos lançamentos gravados');
   error.props.onRetry();

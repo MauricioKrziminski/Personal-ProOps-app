@@ -324,8 +324,11 @@ export default function DebtsScreen() {
   const listaDeDividas = debts.data;
   useFocusEffect(
     useCallback(() => {
+      // Chegando de FORA (o "Paguei" de Lançamentos), a lista ainda não veio: lido agora, o
+      // recado se perderia. O efeito roda de novo quando ela chega.
+      if (!listaDeDividas) return;
       const pedido = lerAoVoltar();
-      const d = pedido ? listaDeDividas?.find((x) => x.id === pedido.divida) : null;
+      const d = pedido ? listaDeDividas.find((x) => x.id === pedido.divida) : null;
       if (!pedido || !d) return;
       setPagoCents(pedido.cents ?? Number(d.installment_cents ?? 0));
       setContaId(d.account_id);
