@@ -934,7 +934,7 @@ async def _preparar_mes(ctx: ExecContext, action: ResourceAction, prepared: dict
         prepared["values"]["cycle_close_day"] is None and not pediu_ultimo
     ):
         _error(
-            "Que dia do mês o seu mês fecha? Diga um dia de 1 a 31 — ou "
+            "Até que dia você paga as suas contas? Diga um dia de 1 a 31 — ou "
             '"último dia do mês" para voltar ao padrão.'
         )
 
@@ -943,9 +943,9 @@ async def _preparar_mes(ctx: ExecContext, action: ResourceAction, prepared: dict
     prepared["row_version"] = linha["row_version"]
     prepared["owner_id"] = str(linha["owner_id"])
     prepared["summary"] = (
-        f"seu mês passa a fechar todo dia {dia}"
+        f"que você paga as contas até o dia {dia} (o seu mês passa a começar no dia seguinte)"
         if dia
-        else "seu mês volta a fechar no último dia do mês"
+        else "que você paga as contas até o último dia do mês (o seu mês volta a ir do dia 1 ao último)"
     )
     return prepared
 
@@ -1589,14 +1589,14 @@ async def _gravar_mes(ctx: ExecContext, proposal: dict) -> ToolResult:
 
     c = await db.cycle(ctx.workspace_id, local_iso_date(ctx.timezone))
     bordas = (
-        f" Agora ele vai de {format_date_br(c['ini'])} a {format_date_br(c['fim'])}."
+        f" Agora o seu mês vai de {format_date_br(c['ini'])} a {format_date_br(c['fim'])}."
         if c
         else ""
     )
     texto = (
-        f"✅ Seu mês agora fecha todo dia {dia}.{bordas}"
+        f"✅ Anotado: você paga as contas até o dia {dia}.{bordas}"
         if dia
-        else f"✅ Seu mês voltou a fechar no último dia do mês.{bordas}"
+        else f"✅ Anotado: você paga as contas até o último dia do mês.{bordas}"
     )
     return ToolResult(texto, result_id=str(ctx.workspace_id))
 
@@ -1616,10 +1616,10 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
             agora = (
                 f"📅 Seu mês ({c['rotulo']}) vai de {format_date_br(c['ini'])} a "
                 f"{format_date_br(c['fim'])} — "
-                + (f"fecha todo dia {c['close_day']}." if c["close_day"]
-                   else "fecha no último dia de cada mês.")
+                + (f"você paga as contas até o dia {c['close_day']}." if c["close_day"]
+                   else "você paga as contas até o último dia do mês.")
                 if c
-                else "📅 Seu mês fecha no último dia de cada mês."
+                else "📅 Seu mês vai do dia 1 ao último dia de cada mês."
             )
             return ToolResult(
                 f"{agora}\nPara mudar, me diz o dia (de 1 a 31) ou "

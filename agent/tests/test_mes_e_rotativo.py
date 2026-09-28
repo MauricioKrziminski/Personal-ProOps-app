@@ -60,7 +60,7 @@ async def test_dono_muda_o_dia_e_ve_as_bordas_novas(monkeypatch):
     ctx = _ctx()
     ctx.target = {"prepared": prep}
     r = await resources.execute(ctx, _acao("10"))
-    assert "fecha todo dia 10" in r.message
+    assert "você paga as contas até o dia 10" in r.message
     assert "11/08/2026" in r.message and "10/09/2026" in r.message, "diz as bordas novas"
     assert escritas and escritas[0][0] == 10
 

@@ -79,7 +79,7 @@ export function CycleDayPicker({
                   accessibilityRole="button"
                   accessibilityState={{ selected: escolhido }}
                   accessibilityLabel={
-                    ultimo ? 'Fechar o mês no último dia' : `Fechar o mês no dia ${dia}`
+                    ultimo ? 'Pago as contas até o último dia do mês' : `Pago as contas até o dia ${dia}`
                   }
                   onPress={() => {
                     Haptics.selectionAsync();

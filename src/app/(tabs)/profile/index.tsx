@@ -201,7 +201,10 @@ export default function ProfileScreen() {
     setEditandoCiclo(false);
   };
 
-  const rotuloCiclo = diaAtual == null ? 'Último dia do mês' : `Fecha todo dia ${diaAtual}`;
+  // A pergunta que a pessoa sabe responder é até que dia ela PAGA; "o mês fecha" é consequência
+  // (28/09/2026: *"muita gente não sabe qual data tem que colocar ali"*). O mesmo texto do
+  // onboarding e do agente (`query_cycle`).
+  const rotuloCiclo = diaAtual == null ? 'Pago as contas até o último dia do mês' : `Pago as contas até o dia ${diaAtual}`;
 
   const cicloConfig = (
     <Section heading="block" title="Meu mês">

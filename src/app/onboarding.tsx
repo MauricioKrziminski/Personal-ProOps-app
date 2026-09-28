@@ -411,8 +411,8 @@ function PassoCiclo({
       <Cabecalho
         entra={entra}
         icone="calendar"
-        titulo="Quando fecha o seu mês?"
-        texto="Começa no dia seguinte ao pagamento"
+        titulo="Até que dia você paga suas contas?"
+        texto="O último dia de pagamento. Seu mês começa no dia seguinte."
       />
       <Animated.View
         entering={entra(

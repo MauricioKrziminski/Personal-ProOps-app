@@ -985,8 +985,8 @@ async def query_cycle(ctx: ExecContext, query: FinanceQuery) -> ToolResult:
     É CONFIGURAÇÃO, não dinheiro: quem responde "quanto sobra até lá" é
     `query_forecast`, que agora usa estas mesmas bordas como horizonte padrão.
 
-    A frase usa o vocabulário da tela ("Fecha todo dia 10" / "Último dia do mês",
-    `profile/index.tsx`), não o jargão da coluna — o usuário nunca viu a palavra
+    A frase usa o vocabulário da tela ("Pago as contas até o dia 10" / "…até o último
+    dia do mês", `profile/index.tsx`), não o jargão da coluna — o usuário nunca viu a palavra
     `cycle_close_day` e não deveria ver agora.
     """
     hoje = local_iso_date(ctx.timezone)
@@ -997,9 +997,9 @@ async def query_cycle(ctx: ExecContext, query: FinanceQuery) -> ToolResult:
     de, ate = format_date_br(c["ini"]), format_date_br(c["fim"])
     dias = int(c["dias_ate_o_fim"])
     quando = (
-        f"fecha todo dia {c['close_day']}"
+        f"você paga as contas até o dia {c['close_day']}"
         if c["close_day"]
-        else "fecha no último dia do mês"
+        else "você paga as contas até o último dia do mês"
     )
     # A segunda linha é uma frase INTEIRA por caso, não um pedaço colado num
     # sufixo fixo: com "para fechar" cravado no fim, o dia do fechamento saía
