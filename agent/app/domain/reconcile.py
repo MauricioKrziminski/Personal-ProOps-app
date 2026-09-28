@@ -45,6 +45,9 @@ JANELA_TRANSFERENCIA = 5
 JANELA_SALDO = 40
 JANELA_ADOCAO = 10
 JANELA_SEMANTICA = 10
+# O texto da linha de juros do Pix no crédito — o MESMO do app (`DESCRICAO_JUROS_DO_PIX`, em
+# `src/hooks/use-finance.ts`); `tests/test_reconcile.py` quebra se os dois divergirem.
+JUROS_DO_PIX = "Juros do Pix no crédito"
 # O previsto (ocorrência de conta fixa) pode vir do banco com outro valor: o DAS e o dentista
 # mudam todo mês. Par com diferença maior que isto nem vai ao modelo.
 VARIACAO_SEMANTICA = 0.3
@@ -361,6 +364,31 @@ def conciliar(
         e_transferencia,
         lambda i, t: "pagamento da fatura já registrado" if cartao else "transferência já registrada",
     )
+
+    # 3b. Pix no crédito: a fatura lista UMA linha (o Pix + o juro, "Pix no Crédito - X 356,99") e
+    # o app grava DUAS no mesmo cartão e dia — a transferência (conta própria) ou o gasto
+    # (terceiro) e o juro. Casa quando a soma dá o centavo; empate não escolhe (28/09/2026).
+    if cartao:
+        juros = [t for t in existentes if t.kind == "expense" and t.description == JUROS_DO_PIX
+                 and t.account_id == conta_id]
+        for i in itens:
+            if i.idx in vereditos or i.kind != "expense":
+                continue
+            for j in juros:
+                if j.id in tomados:
+                    continue
+                base = [t for t in existentes
+                        if t.id not in tomados and t.id != j.id and t.description != JUROS_DO_PIX
+                        and t.kind in ("expense", "transfer") and t.account_id == conta_id
+                        and t.occurred_at == j.occurred_at
+                        and t.amount_cents + j.amount_cents == i.amount_cents
+                        and _dias(i.occurred_at, t.occurred_at) <= JANELA_TRANSFERENCIA]
+                if len(base) == 1:
+                    t = base[0]
+                    tomados.add(j.id)
+                    decide(i, t, "pix_no_credito",
+                           f"Pix no crédito já no app: {_brl(t.amount_cents)} + {_brl(j.amount_cents)} de juros")
+                    break
 
     # 4. mesmo valor, perto
     camada(

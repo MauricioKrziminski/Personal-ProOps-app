@@ -2,7 +2,9 @@
 
 from datetime import date
 
-from app.domain.reconcile import Existente, Item, add_months, conciliar, parse_parcela, semelhanca
+from pathlib import Path
+
+from app.domain.reconcile import JUROS_DO_PIX, Existente, Item, add_months, conciliar, parse_parcela, semelhanca
 
 CARTAO = "cartao-1"
 D = date
@@ -220,3 +222,34 @@ def test_semantica_incerto_ou_diferente_nao_casa():
     for j in ("incerto", "diferente"):
         v = conciliar(itens, existentes, conta_id=CARTAO, cartao=True, julgamentos={(0, "t"): j})
         assert v[0].camada != "semantico", j
+
+
+def test_pix_no_credito_da_fatura_casa_com_o_pix_mais_o_juro():
+    """A fatura do Nubank lista "Pix no Crédito - X 356,99"; o app tem 340 + 16,99 de juros."""
+    itens = [item(0, "Pix no Crédito - Gabriel Almeida Dias", 35699, D(2026, 9, 23)),
+             item(1, "Pix no Crédito - RECEITA FEDERAL", 8868, D(2026, 9, 21))]
+    existentes = [
+        # conta própria: transferência do cartão para o Itaú
+        tx("pix", "Pix no crédito para o Itaú", 34000, D(2026, 9, 23), kind="transfer",
+           counterparty_account_id="itau"),
+        tx("j1", JUROS_DO_PIX, 1699, D(2026, 9, 23)),
+        # terceiro: o gasto no cartão
+        tx("das", "DAS", 8605, D(2026, 9, 21)),
+        tx("j2", JUROS_DO_PIX, 263, D(2026, 9, 21)),
+    ]
+    v = conciliar(itens, existentes, conta_id=CARTAO, cartao=True)
+    um(v[0], status="duplicate", camada="pix_no_credito", transaction_id="pix")
+    um(v[1], status="duplicate", camada="pix_no_credito", transaction_id="das")
+
+
+def test_pix_no_credito_com_duas_bases_possiveis_nao_escolhe():
+    itens = [item(0, "Pix no Crédito - X", 11000, D(2026, 9, 23))]
+    existentes = [tx("a", "A", 10000, D(2026, 9, 23)), tx("b", "B", 10000, D(2026, 9, 23)),
+                  tx("j", JUROS_DO_PIX, 1000, D(2026, 9, 23))]
+    v = conciliar(itens, existentes, conta_id=CARTAO, cartao=True)
+    assert v[0].camada != "pix_no_credito"
+
+
+def test_o_texto_do_juro_e_o_mesmo_do_app():
+    app = (Path(__file__).resolve().parents[2] / "src/hooks/use-finance.ts").read_text()
+    assert f"DESCRICAO_JUROS_DO_PIX = '{JUROS_DO_PIX}'" in app
