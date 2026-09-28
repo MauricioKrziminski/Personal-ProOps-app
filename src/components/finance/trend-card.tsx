@@ -19,6 +19,7 @@ const JANELAS = [
   { value: '6', label: '6 meses' },
   { value: '12', label: '12 meses' },
 ] as const;
+export type JanelaDaTendencia = (typeof JANELAS)[number]['value'];
 /** A altura útil e a largura da barra (traço fino, não bloco). */
 const ALTURA_BARRA = 96;
 const LARGURA_BARRA = 10;
@@ -40,8 +41,8 @@ export function TrendCard({
   loading = false,
 }: {
   meses: readonly MonthlyCashflow[];
-  janela: string;
-  onJanela: (v: string) => void;
+  janela: JanelaDaTendencia;
+  onJanela: (v: JanelaDaTendencia) => void;
   loading?: boolean;
 }) {
   const theme = useTheme();

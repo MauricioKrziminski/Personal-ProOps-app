@@ -205,21 +205,25 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       pagamentos: options.pagamentos ?? [],
     } }),
   }, { get: (target, key) => key in target ? target[key as keyof typeof target] : () => query });
+  const react = {
+    Fragment: Symbol.for('react.fragment'),
+    useState(initial: any) { const index = cursor++; if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial; return [state[index], (value: any) => { state[index] = typeof value === 'function' ? value(state[index]) : value; if (renderizando) deNovo = true; }]; },
+    useMemo: (fn: () => unknown) => fn(),
+    useCallback: (fn: unknown) => fn,
+    useRef: (v: unknown) => ({ current: v }),
+    useEffect: () => {},
+    memo: (componente: unknown) => componente,
+    createContext: (valor: unknown) => ({ valor, Provider: 'Provider' }),
+    useContext: (ctx: any) => ctx?.valor,
+  };
   const load = (path: string): any => {
     const module = { exports: {} as any };
     const code = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
     runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
-      if (name === 'react') return {
-        Fragment: Symbol.for('react.fragment'),
-        useState(initial: any) { const index = cursor++; if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial; return [state[index], (value: any) => { state[index] = typeof value === 'function' ? value(state[index]) : value; if (renderizando) deNovo = true; }]; },
-        useMemo: (fn: () => unknown) => fn(),
-        useCallback: (fn: unknown) => fn,
-        useRef: (v: unknown) => ({ current: v }),
-        useEffect: () => {},
-        memo: (componente: unknown) => componente,
-        createContext: (valor: unknown) => ({ valor, Provider: 'Provider' }),
-        useContext: (ctx: any) => ctx?.valor,
-      };
+      if (name === 'react') return react;
+      // A preferência gravada vale como `useState` dentro de uma visita; o disco tem teste próprio
+      // (`use-preferencia.test.ts`).
+      if (name === '@/hooks/use-preferencia') return { umDe: () => () => true, usePreferencia: (_nome: string, padrao: unknown) => react.useState(padrao) };
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', useWindowDimensions: () => ({ width: 384, height: 800 }), Platform: { OS: 'android', select: (o: any) => o.android ?? o.default } };
       if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInDown: animation, FadeOut: animation, FadeIn: animation, ReduceMotion: { System: 'system' }, LinearTransition: animation, useAnimatedRef: () => ({ current: null }) };
@@ -369,7 +373,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       // precisa para renderizar sem escolher nada.
       if (name === '@/components/finance/month-ruler') return {
         MonthRuler: 'MonthRuler',
-        useMonthRuler: (initialView = 'cycle') => {
+        useMonthRuler: (_tela: string, initialView = 'cycle') => {
           rulerViews.push(initialView);
           return { view: initialView, setView: () => {}, temCiclo: false, cycle: { data: undefined } };
         },

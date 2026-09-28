@@ -143,7 +143,7 @@ export default function BudgetsScreen() {
    * como se fosse o que a pessoa está gastando agora. Quem responde isso é `useCycleMonth` —
    * era este idioma, copiado à mão aqui e no Financeiro, e esquecido na Hoje e em Lançamentos.
    */
-  const regua = useMonthRuler();
+  const regua = useMonthRuler('orcamentos');
   const [mesEscolhido, setMesEscolhido] = useState<string | null>(null);
   const mesCorrente = useCycleMonth(regua.view);
   const month = mesEscolhido ?? mesCorrente;

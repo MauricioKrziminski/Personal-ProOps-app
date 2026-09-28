@@ -364,6 +364,12 @@ ancestral da folha. `anti-slop.test.ts` quebra se uma rolagem nascer sem a prop.
 ## Estado local
 
 - Preferir estado de servidor (Query) + `useState`. Zustand só se estado global de UI real aparecer (hoje não há nenhum) — não criar store "por via das dúvidas".
+- **Escolha de VISUALIZAÇÃO fica gravada** (28/09/2026, *"essas micro configurações têm que salvar
+  sempre"*): régua Mês/Ciclo, horizonte e modo da Projeção, período dos gráficos, estratégia das
+  Dívidas. O caminho é `usePreferencia` (`hooks/use-preferencia.ts`: por usuário, no aparelho,
+  lido na abertura para a tela nascer como a pessoa deixou). **Filtro não entra** (tipo, status,
+  categoria, conta, escopo da busca): filtro que volta sozinho esconde item sem avisar. E o que uma
+  ação da visita muda sozinha (a hipótese do "E se…" esticando o horizonte) não vira preferência.
 
 ## Qualidade
 

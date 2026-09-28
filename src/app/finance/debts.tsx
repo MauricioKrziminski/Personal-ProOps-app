@@ -25,6 +25,7 @@ import { Deslizavel } from '@/components/ui/deslizavel';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { VerMais } from '@/components/ui/ver-mais';
+import { umDe, usePreferencia } from '@/hooks/use-preferencia';
 import { useAosPoucos } from '@/hooks/use-aos-poucos';
 import { Segmented } from '@/components/ui/segmented';
 import { SwitchRow } from '@/components/ui/switch-row';
@@ -181,7 +182,7 @@ export default function DebtsScreen() {
   const params = useLocalSearchParams<{ create?: string; id?: string; edit?: string }>();
   const toast = useToast();
   const debts = useDebts();
-  const [estrategia, setEstrategia] = useState<'avalanche' | 'snowball'>('avalanche');
+  const [estrategia, setEstrategia] = usePreferencia<'avalanche' | 'snowball'>('dividas:estrategia', 'avalanche', umDe(['avalanche', 'snowball']));
   const payoff = usePayoffStrategy(estrategia);
   /**
    * A ordem já chegou uma vez? Antes disso "Por onde começar" é só forma; depois, trocar a

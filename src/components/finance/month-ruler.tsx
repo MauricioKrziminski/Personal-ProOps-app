@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Segmented } from '@/components/ui/segmented';
 import { useCycle, type CycleView } from '@/hooks/use-finance';
+import { umDe, usePreferencia } from '@/hooks/use-preferencia';
 
 /**
  * A régua do período — **mês civil ou o ciclo do usuário**, escolhida EM CADA TELA.
@@ -15,10 +16,13 @@ import { useCycle, type CycleView } from '@/hooks/use-finance';
  * fixa e visualiza por ciclo ou por mês, o usuário escolhe."* O que é global é o DIA (Perfil); o
  * que é da tela é como ela está olhando agora.
  *
- * A escolha vive em `useState` e morre com a tela, de propósito: "como estou olhando agora" é
- * estado de tela, não configuração. Gravar as sete viraria sete colunas, e quem trocasse a régua
- * da Projeção em março abriria o app em junho sem lembrar por que aquela tela discorda das
- * outras.
+ * ## E a escolha de cada tela fica GRAVADA (28/09/2026)
+ *
+ * Ela vivia em `useState` e morria com a tela, e o argumento era "como estou olhando agora não é
+ * configuração". O dono do produto decidiu o contrário: *"toda vez que eu abro Lançamentos, ele
+ * abre selecionado mês; se eu deixei ciclo, ele tem que abrir sempre no ciclo"*. Continua POR
+ * TELA — cada uma com a sua chave em `usePreferencia` (no aparelho, por usuário), nunca uma
+ * coluna global.
  *
  * ## Por que não existe uma terceira opção "Fatura"
  *
@@ -35,8 +39,13 @@ import { useCycle, type CycleView } from '@/hooks/use-finance';
  */
 export type MonthRulerState = ReturnType<typeof useMonthRuler>;
 
-export function useMonthRuler(initialView: CycleView = 'cycle') {
-  const [view, setView] = useState<CycleView>(initialView);
+/** As telas que têm régua; cada uma grava a sua. */
+export type TelaComRegua = 'financeiro' | 'orcamentos' | 'lancamentos' | 'projecao';
+
+const REGUAS = umDe<CycleView>(['civil', 'cycle']);
+
+export function useMonthRuler(tela: TelaComRegua, initialView: CycleView = 'cycle') {
+  const [view, setView] = usePreferencia<CycleView>(`regua:${tela}`, initialView, REGUAS);
   const cycle = useCycle(view);
   const [knownCloseDay, setKnownCloseDay] = useState<number | null>(null);
   // A chave da outra régua pode estar pendente no primeiro toque. Não esconda o

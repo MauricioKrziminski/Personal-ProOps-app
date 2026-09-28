@@ -346,7 +346,8 @@ variável.
 ## A régua do mês é de CADA TELA, e não existe régua "por fatura"
 
 `workspaces.cycle_close_day` é global (o Perfil grava o dia). **Como cada tela está olhando é da
-tela**: `MonthRuler` (`Mês | Ciclo`) vive em `useState` e morre com ela, e as leituras recebem
+tela**: `MonthRuler` (`Mês | Ciclo`) é escolhido por tela e fica GRAVADO por tela (`usePreferencia`,
+`regua:<tela>`, 28/09/2026: *"se eu deixei ciclo, ele tem que abrir sempre no ciclo"*), e as leituras recebem
 `p_view` (`'cycle'` | `'civil'` | null) — `null` cai no `workspaces.cycle_view`, que é o que
 mantém o agente e APK antigo funcionando sem tocar em nada. `20260911170000` levou o argumento a
 **19 funções**.

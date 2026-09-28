@@ -263,7 +263,7 @@ export default function TransactionsScreen() {
 
   // Nesta lista o nome “Julho” deve mostrar também os vencimentos de 31/07.
   // A pessoa ainda pode trocar para Ciclo nesta tela, sem afetar as demais.
-  const regua = useMonthRuler('civil');
+  const regua = useMonthRuler('lancamentos', 'civil');
   // A série é percorrida por mês civil: o ciclo financeiro pode atravessar dois
   // meses e esconder justamente o vencimento que a pessoa está procurando.
   const view = params.recurringId ? 'civil' : regua.view;

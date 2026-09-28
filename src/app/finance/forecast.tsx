@@ -5,6 +5,7 @@ import { Stack, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 import { useBRL } from '@/components/ui/conceal';
+import { umDe, usePreferencia } from '@/hooks/use-preferencia';
 import { FinanceAnalysisPanes } from '@/components/finance/finance-analysis-panes';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
@@ -165,6 +166,9 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
   );
 }
 
+const MODOS = umDe<'dia' | 'mes'>(['dia', 'mes']);
+const ehHorizonte = (v: string | number): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 3650;
+
 export default function ForecastScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
@@ -172,7 +176,13 @@ export default function ForecastScreen() {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
 
-  const [dias, setDias] = useState(90);
+  /**
+   * O horizonte ESCOLHIDO fica gravado; o que uma hipótese do "E se…" esticou vale só na visita,
+   * como a própria hipótese (28/09/2026). Escolher de novo à mão apaga o esticado.
+   */
+  const [diasEscolhidos, escolherDias] = usePreferencia<number>('projecao:dias', 90, ehHorizonte);
+  const [diasDaHipotese, setDiasDaHipotese] = useState<number | null>(null);
+  const dias = diasDaHipotese ?? diasEscolhidos;
   /**
    * Até quando projetar, escolhido à mão — o pedido foi *"deixar um filtro que ele seleciona a
    * data de quando até quando ele quer projetar"*.
@@ -194,7 +204,10 @@ export default function ForecastScreen() {
    * Os dois saem da MESMA série: `agruparPorMes` não refaz conta nenhuma, só lê o acumulado do
    * último dia de cada mês.
    */
-  const [modo, setModo] = useState<'dia' | 'mes'>('dia');
+  const [modoEscolhido, escolherModo] = usePreferencia<'dia' | 'mes'>('projecao:modo', 'dia', MODOS);
+  /** Uma hipótese mostra o resultado no Mês; isso é da visita, não a escolha gravada. */
+  const [modoDaHipotese, setModoDaHipotese] = useState<'mes' | null>(null);
+  const modo = modoDaHipotese ?? modoEscolhido;
   const [mesAberto, setMesAberto] = useState<string | null>(null);
   /**
    * Rascunho de cenário.
@@ -246,7 +259,7 @@ export default function ForecastScreen() {
   // mesmas hipóteses e passa pela mesma `forecast_json` por dentro. Assim a tabela e a curva
   // não têm como discordar por caminho.
   const simulado = useForecastWithDrafts(dias, rascunhos, !emMes);
-  const regua = useMonthRuler();
+  const regua = useMonthRuler('projecao');
   const mensal = useForecastMonths(dias, rascunhos, emMes, regua.view);
   const simulando = rascunhos.length > 0;
   const hipoteses = useMemo(() => agruparHipoteses(rascunhos), [rascunhos]);
@@ -394,7 +407,8 @@ export default function ForecastScreen() {
 
   /** Atalho e calendário desembocam aqui: aplicam e fecham, num gesto só. */
   const aplicarHorizonte = (d: number) => {
-    setDias(Math.min(Math.max(d, 1), 3650));
+    escolherDias(Math.min(Math.max(d, 1), 3650));
+    setDiasDaHipotese(null);
     setCalendarioAberto(false);
     setHorizonteAberto(false);
   };
@@ -498,7 +512,7 @@ export default function ForecastScreen() {
       if (!itemAdiantar || !podeAplicar) {
         if (verResultado && rascunhos.length > 0) {
           setSheetAberto(false);
-          setModo('mes');
+          setModoDaHipotese('mes');
         }
         return;
       }
@@ -508,21 +522,21 @@ export default function ForecastScreen() {
       // parcela tirada, senão a projeção mostraria só o custo.
       const precisa = diasAte(ultimoDia(parcelasAdiantar, pagarEm));
       const maior = HORIZONTES.find((h) => h.dias >= precisa) ?? HORIZONTES[HORIZONTES.length - 1];
-      if (maior.dias > dias) setDias(maior.dias);
+      if (maior.dias > dias) setDiasDaHipotese(maior.dias);
       Haptics.selectionAsync();
       setAdiantarId(null);
       setAdiantarValor(null);
       if (fecha) {
         setSheetAberto(false);
         setEditando(null);
-        setModo('mes');
+        setModoDaHipotese('mes');
       }
       return;
     }
     if (novoValor <= 0 || novoMes === null) {
       if (verResultado && rascunhos.length > 0) {
         setSheetAberto(false);
-        setModo('mes');
+        setModoDaHipotese('mes');
       }
       return;
     }
@@ -543,14 +557,14 @@ export default function ForecastScreen() {
     const alvo = new Date(Number(novoMes.slice(0, 4)), Number(novoMes.slice(5, 7)), 0);
     const precisa = Math.ceil((alvo.getTime() - Date.now()) / 86400000);
     const maior = HORIZONTES.find((h) => h.dias >= precisa) ?? HORIZONTES[HORIZONTES.length - 1];
-    if (maior.dias > dias) setDias(maior.dias);
+    if (maior.dias > dias) setDiasDaHipotese(maior.dias);
 
     Haptics.selectionAsync();
     setNovoValor(0);
     if (fecha) {
       setSheetAberto(false);
       setEditando(null);
-      setModo('mes');
+      setModoDaHipotese('mes');
     }
   };
 
@@ -883,7 +897,10 @@ export default function ForecastScreen() {
                 { value: 'mes', label: 'Por mês' },
               ]}
               value={modo}
-              onChange={(v) => setModo(v)}
+              onChange={(v) => {
+                escolherModo(v);
+                setModoDaHipotese(null);
+              }}
             />
           </View>
           {/* A régua qualifica só o modo Mês: no modo Dia a série é diária e não tem borda de

@@ -33,6 +33,7 @@ import { SincronizaWidgets } from '@/widgets/sincroniza';
 import { ToastProvider } from '@/components/ui/toast';
 import { AppUpdateProvider } from '@/hooks/use-app-update';
 import { ThemeProvider as AppThemeProvider, useBarStyle, useScheme, useTheme } from '@/hooks/use-theme';
+import { carregarPreferencias } from '@/hooks/use-preferencia';
 import { SessionProvider, useSession } from '@/hooks/use-session';
 import { hasCompletedOnboarding } from '@/lib/onboarding';
 import { attachNotificationListeners, configureNotificationHandler } from '@/lib/notifications';
@@ -189,6 +190,12 @@ function AppTree() {
 
   const { session, loading } = useSession();
   const pronto = !loading && (fontsLoaded || !!fontError);
+  // As preferências de tela (régua, horizonte, período) chegam à memória com a sessão, antes de
+  // qualquer tela que as leia: assim a tela nasce como a pessoa deixou, sem trocar um quadro depois.
+  const userId = session?.user.id;
+  useEffect(() => {
+    if (userId) carregarPreferencias(userId);
+  }, [userId]);
   const barStyle = useBarStyle();
   /**
    * A barra de status segue o TEMA e nada mais.

@@ -34,6 +34,7 @@ import { useToast } from '@/components/ui/toast';
 import { categoryIcon } from '@/design/category-icons';
 import { chartWidthForPane } from '@/design/adaptive-window';
 import { Radius, Space } from '@/design/tokens';
+import { umDe, usePreferencia } from '@/hooks/use-preferencia';
 import { useAgentActivity } from '@/hooks/use-agent-activity';
 import { usarDica } from '@/hooks/use-dicas';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
@@ -101,7 +102,7 @@ export default function FinanceScreen() {
   const tablet = windowClass !== 'compact';
   const brl = useBRL();
   const toast = useToast();
-  const regua = useMonthRuler();
+  const regua = useMonthRuler('financeiro');
   const cycle = regua.cycle;
   /**
    * `null` = "siga o ciclo". O mês corrente é o ciclo que contém hoje, não o mês civil (com
@@ -126,7 +127,7 @@ export default function FinanceScreen() {
   const accounts = useAccounts();
   const debts = useDebts();
   const cards = useCardSummary();
-  const [janelaCashflow, setJanelaCashflow] = useState('6');
+  const [janelaCashflow, setJanelaCashflow] = usePreferencia<'6' | '12'>('financeiro:tendencia', '6', umDe(['6', '12']));
   const cashflow = useMonthlyCashflow(Number(janelaCashflow));
   const recent = useRecentTransactions(5);
   const atividade = useAgentActivity(6);

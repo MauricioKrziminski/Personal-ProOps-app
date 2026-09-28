@@ -40,6 +40,7 @@ import {
   useSaveAsset,
   type Asset,
 } from '@/hooks/use-finance';
+import { umDe, usePreferencia } from '@/hooks/use-preferencia';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { formatBRL } from '@/hooks/use-items';
@@ -153,7 +154,7 @@ export default function NetWorthScreen() {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const patrimonio = useNetWorth();
-  const [janela, setJanela] = useState('12');
+  const [janela, setJanela] = usePreferencia<'6' | '12' | '24'>('patrimonio:janela', '12', umDe(['6', '12', '24']));
   const serie = useNetWorthSeries(Number(janela));
   const saude = useFinancialHealth();
   const bens = useAssets();
