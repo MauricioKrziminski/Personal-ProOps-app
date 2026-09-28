@@ -40,6 +40,9 @@ export EXPO_PUBLIC_AGENT_URL="$PROD_AGENT_URL"
 # O ref do banco tem que estar no JS ANTES de ir para o aparelho: um bundle de staging
 # instalado e só depois recusado já estaria no iPhone. Mesmo ambiente, mesmo comando que a fase
 # de bundle do Xcode roda (`export:embed`), numa pasta temporária.
+# `--reset-cache` (28/09/2026): o Metro guarda o `EXPO_PUBLIC_*` JÁ EMBUTIDO no cache de
+# transformação, e depois de um `expo start` (staging, pelo `.env.local`) o bundle saía com o
+# staging apesar do ambiente exportado. Limpo aqui, o cache fica com produção para o Xcode.
 conferir() {
   # URLs, não o ref solto: `lib/environment.ts` carrega o mapa ref → rótulo dos DOIS projetos.
   # `strings`: no Release o bundle é bytecode Hermes, e o `grep` direto não acha o texto nele.
@@ -52,7 +55,7 @@ conferir() {
 }
 previa="$(mktemp -d)"
 trap 'rm -rf "$previa"' EXIT
-npx expo export:embed --platform ios --dev false --entry-file node_modules/expo-router/entry.js \
+npx expo export:embed --platform ios --dev false --reset-cache --entry-file node_modules/expo-router/entry.js \
   --bundle-output "$previa/main.jsbundle" --assets-dest "$previa"
 conferir "$previa/main.jsbundle"
 
