@@ -1,4 +1,14 @@
 import { addMonthsISO } from './debt-history.ts';
+import { isValidBRDate } from './dates.ts';
+
+/** A data da parcela já ocupa o cronograma; outras contas pendentes exigem vencimento. */
+export function vencimentoPendenteValido(
+  pending: boolean,
+  installmentOccurrence: boolean,
+  dueAt: string | null,
+): boolean {
+  return !pending || (installmentOccurrence && !dueAt) || (!!dueAt && isValidBRDate(dueAt));
+}
 
 /** The UI asks for installments remaining; the database stores the original total. */
 export function debtTerm(remaining: string, paid: number): number | null {
@@ -291,17 +301,21 @@ export function ancoraDoContrato(proximaISO: string, pagas: number): string {
   return addMonthsISO(proximaISO, -pagas);
 }
 
+export function vencimentoDaDividaEscolhido(proximaISO: string, pagas: number, ultimo: boolean): { ancora: string; dia: number } {
+  return { ancora: ancoraDoContrato(proximaISO, pagas), dia: ultimo ? -1 : Number(proximaISO.slice(8)) };
+}
+
 /**
  * A data da parcela `pagas + 1`, no dia de vencimento do contrato (clampado no mês curto) — a
  * MESMA conta de `private.debt_schedule_for`: `day_in_month(add_months(first_due_date, pagas),
  * due_day)`. O dia vem à parte porque a âncora pode estar clampada (31/03 com 1 paga ancora em
- * 28/02), e o 31 tem que voltar em março.
+ * 28/02), e o dia fixo tem que voltar em março. -1 identifica explicitamente o último dia.
  */
 export function proximaDoContrato(ancoraISO: string, pagas: number, dia: number): string {
   const mes = addMonthsISO(`${ancoraISO.slice(0, 7)}-01`, pagas);
   const [y, m] = mes.split('-').map(Number);
   const ultimo = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  return `${mes.slice(0, 7)}-${String(Math.min(dia, ultimo)).padStart(2, '0')}`;
+  return `${mes.slice(0, 7)}-${String(dia === -1 ? ultimo : Math.min(dia, ultimo)).padStart(2, '0')}`;
 }
 
 /**

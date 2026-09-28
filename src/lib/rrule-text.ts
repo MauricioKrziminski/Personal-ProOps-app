@@ -77,8 +77,9 @@ export function describeRRule(rrule: string | null): string {
   if (freq === 'MONTHLY' && parts.BYMONTHDAY) {
     const days = parts.BYMONTHDAY.split(',').filter(Boolean);
     /*
-      `-1` é "último dia do mês" na RRULE, e é diferente de "dia 31": fevereiro não tem 31, e
-      uma série ancorada nele pularia os meses curtos. Sem este ramo a frase saía "todo dia -1".
+      `-1` registra a escolha explícita de "último dia do mês". Um número 29/30/31 permanece
+      fixo na regra e o agendador o ajusta somente quando falta esse dia no mês.
+      Sem este ramo a frase saía "todo dia -1".
     */
     if (days.length === 1 && days[0] === '-1') {
       return interval > 1 ? `${base}, no último dia do mês` : 'todo último dia do mês';

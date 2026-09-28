@@ -17,7 +17,6 @@ import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { QuantityField } from '@/components/ui/quantity-field';
 import { DatePickerField } from '@/components/finance/date-picker-field';
-import { DiaOuUltimo } from '@/components/finance/dia-ou-ultimo';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
@@ -39,6 +38,7 @@ import {
   pagamentosDaDivida,
   useArchiveDebt,
   useArchivedDebts,
+  useDebtDeclaredEstimates,
   useDebtPayments,
   useDeleteDebt,
   useDebtSchedule,
@@ -52,15 +52,15 @@ import {
 import { formatBRL, localISODate } from '@/hooks/use-items';
 import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { pagamentoDaParcelaFixa } from '@/lib/confirmar-baixa';
-import { brToISO, diaAmbiguo, formatNumberBR, isoToBR } from '@/lib/dates';
+import { brToISO, formatNumberBR, isoToBR } from '@/lib/dates';
 import { paidInstallments, porAno, secoesDaLinha, type ItemDaLinha } from '@/lib/debt-history';
 import { lerAoVoltar } from '@/lib/volta-da-parcela';
 import {
-  ancoraDoContrato,
   debtTerm,
   financeErrorMessage,
   parcelaDoTotalDoContrato,
   proximaNoCronograma,
+  vencimentoDaDividaEscolhido,
   simpleDebtValues,
   camposNoOutroModo,
   type UnidadeDoValor,
@@ -173,7 +173,7 @@ export default function DebtsScreen() {
   const brl = useBRL();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
-  const params = useLocalSearchParams<{ create?: string; id?: string }>();
+  const params = useLocalSearchParams<{ create?: string; id?: string; edit?: string }>();
   const toast = useToast();
   const debts = useDebts();
   const [estrategia, setEstrategia] = useState<'avalanche' | 'snowball'>('avalanche');
@@ -195,6 +195,7 @@ export default function DebtsScreen() {
   const pagar = usePayDebtInstallment();
 
   const [form, setForm] = useState<FormState | null>(() => params.create === 'financing' ? { ...FORM_VAZIO, kind: 'financing' } : null);
+  const [edicaoAutomatica, setEdicaoAutomatica] = useState<string | null>(null);
   // Quem chegou por `?create=financing` veio do lançamento ou do Financeiro — fechar devolve.
   const volta = useVoltarQuandoFechar(params.create === 'financing');
   /**
@@ -222,6 +223,7 @@ export default function DebtsScreen() {
   // âncora, e os pagamentos lançados são o piso das "pagas".
   const schedule = useDebtSchedule(detalhe?.id ?? pagando?.id ?? form?.id);
   const payments = useDebtPayments(detalhe?.id ?? pagando?.id ?? form?.id);
+  const declaredEstimates = useDebtDeclaredEstimates(detalhe?.id);
 
   // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
   // falha, e sem este corte a lista seguia afirmando números embaixo da faixa que acabou
@@ -246,6 +248,7 @@ export default function DebtsScreen() {
         installmentCents: Number(detalhe.installment_cents ?? proxima?.payment_cents ?? 0),
         nextDueDate: proxima?.due_date ?? null,
         payments: payments.data ?? [],
+        overrides: declaredEstimates.data ?? [],
       })
     : [];
   /**
@@ -284,6 +287,11 @@ export default function DebtsScreen() {
       accountId: d.account_id,
       diaVencimento: d.due_day ? String(d.due_day) : '',
     });
+
+  if (params.edit === '1' && detalhe && edicaoAutomatica !== detalhe.id) {
+    setEdicaoAutomatica(detalhe.id);
+    abrirEdicao(detalhe);
+  }
 
   const abrirPagamento = (d: Debt) => {
     setPagoCents(Number((detalhe?.id === d.id ? schedule.data?.[0]?.payment_cents : null) ?? d.installment_cents ?? 0));
@@ -374,30 +382,12 @@ export default function DebtsScreen() {
   const faltaData = Boolean(form?.parcelas) && !ancoraEfetiva && !(form?.id && diaDoContrato) &&
     (form?.calculationMode === 'fixed_installments' ? parcelaCents > 0 : (form?.remainingCents ?? 0) > 0);
   const rotuloDaData = !form || form.installmentsPaid === 0 ? 'Primeira parcela' : `Próxima parcela (a ${form.installmentsPaid + 1}ª)`;
-  const escolherData = (br: string) => {
+  const escolherData = (br: string, ultimo = false) => {
     if (!form) return;
     const iso = brToISO(br);
-    const dia = Number(iso.slice(8));
-    const [ano, mes] = iso.split('-').map(Number);
-    const ultimoDoMes = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
-    // O último dia de um mês curto (28/02, 30/04) é o dia 31 CLAMPADO: quem já vence no 31 não
-    // pode virar dia 28 para sempre só por ter escolhido a data num mês curto.
-    const atual = Number(form.diaVencimento) || 0;
-    const diaVencimento = dia === ultimoDoMes && atual > dia ? atual : dia;
-    setForm({ ...form, ancora: ancoraDoContrato(iso, form.installmentsPaid), diaVencimento: String(diaVencimento) });
+    const escolhido = vencimentoDaDividaEscolhido(iso, form.installmentsPaid, ultimo);
+    setForm({ ...form, ancora: escolhido.ancora, diaVencimento: String(escolhido.dia) });
   };
-  /**
-   * A "Próxima parcela" no último dia de um mês curto (30/09) não diz se o contrato vence no dia
-   * 30 ou no fim do mês — `due_day` 30 ou 31 (o 31 é o último dia pelo `day_in_month`).
-   */
-  const dataDaProxima = proximaISO ? new Date(Number(proximaISO.slice(0, 4)), Number(proximaISO.slice(5, 7)) - 1, Number(proximaISO.slice(8, 10))) : null;
-  const perguntaUltimoDia = form && dataDaProxima && diaAmbiguo(dataDaProxima) ? (
-    <DiaOuUltimo
-      dia={dataDaProxima.getDate()}
-      ultimo={Number(form.diaVencimento) === 31}
-      onChange={(ultimo) => setForm({ ...form, diaVencimento: String(ultimo ? 31 : dataDaProxima.getDate()) })}
-    />
-  ) : null;
   const mudarPagas = (n: number) => {
     if (!form) return;
     // Pagas além do total assentam no total: é o teto que existe.
@@ -426,7 +416,7 @@ export default function DebtsScreen() {
    * Dívida sem parcelas ("devo 500 pro João") não tem cadência e continua sem exigir.
    */
   const validDueDay = form?.parcelas
-    ? Boolean(ancoraEfetiva) || Boolean(form.id && diaDoContrato && diaDoContrato >= 1 && diaDoContrato <= 31)
+    ? Boolean(ancoraEfetiva) || Boolean(form.id && (diaDoContrato === -1 || (diaDoContrato !== null && diaDoContrato >= 1 && diaDoContrato <= 31)))
     : true;
   const advancedValid = form && nomeOk && (!form.parcelas || form.historyConfirmed) &&
     Number.isInteger(form.installmentsPaid) && form.installmentsPaid >= 0 && form.remainingCents > 0 &&
@@ -1021,12 +1011,15 @@ export default function DebtsScreen() {
                 <Field label={rotuloDaData} error={faltaData ? 'Escolha a data' : undefined}>
                   <DatePickerField
                     value={proximaISO ? isoToBR(proximaISO) : null}
-                    onChange={escolherData}
+                    onChange={(br) => escolherData(br)}
+                    onSelectLastDay={(br) => escolherData(br, true)}
                     accessibilityLabel={rotuloDaData}
                     invalid={faltaData}
                   />
+                  {diaDoContrato ? <ThemedText type="small" themeColor="textSecondary">
+                    {diaDoContrato === -1 ? 'Vence no último dia de cada mês.' : `Vence todo dia ${diaDoContrato}${diaDoContrato > 28 ? '; nos meses curtos, no último dia disponível.' : '.'}`}
+                  </ThemedText> : null}
                 </Field>
-                {perguntaUltimoDia}
                 {/* O contrato que VAI ser gravado: com "Total a pagar" a parcela arredonda. */}
                 {simpleValues && <Card style={styles.resumo}>
                   <ThemedText type="small" style={tabular}>{`${simpleValues.installments}× de ${brl(parcelaCents)} = ${brl(simpleValues.principal_cents)}`}</ThemedText>
@@ -1115,13 +1108,16 @@ export default function DebtsScreen() {
                 <Field label={rotuloDaData} error={faltaData ? 'Escolha a data' : undefined}>
                   <DatePickerField
                     value={proximaISO ? isoToBR(proximaISO) : null}
-                    onChange={escolherData}
+                    onChange={(br) => escolherData(br)}
+                    onSelectLastDay={(br) => escolherData(br, true)}
                     accessibilityLabel={rotuloDaData}
                     invalid={faltaData}
                   />
+                  {diaDoContrato ? <ThemedText type="small" themeColor="textSecondary">
+                    {diaDoContrato === -1 ? 'Vence no último dia de cada mês.' : `Vence todo dia ${diaDoContrato}${diaDoContrato > 28 ? '; nos meses curtos, no último dia disponível.' : '.'}`}
+                  </ThemedText> : null}
                 </Field>
               ) : null}
-              {form.parcelas !== '' ? perguntaUltimoDia : null}
               {/*
                 ⚠️ **Vem DEPOIS de "Parcelas que faltam", porque é esse campo que o cria.**
                 Ele renderizava ACIMA, gated em `form.parcelas !== ''` — então digitar o número
@@ -1226,12 +1222,15 @@ export default function DebtsScreen() {
       {payments.isError ? (
         <ErrorBand message="Não deu para carregar os pagamentos." onRetry={payments.refetch} />
       ) : null}
+      {declaredEstimates.isError ? (
+        <ErrorBand message="Não deu para carregar as estimativas históricas." onRetry={declaredEstimates.refetch} />
+      ) : null}
 
       {/*
         Só com os pagamentos E o cronograma respondidos: sem os pagamentos, todo pagamento
         lançado apareceria como "por volta de" (estimado) e trocaria de rótulo ao chegar.
       */}
-      {detalhe && payments.isSuccess && !schedule.isLoading &&
+      {detalhe && payments.isSuccess && declaredEstimates.isSuccess && !schedule.isLoading &&
       (historico.length > 0 || (schedule.data ?? []).length > 0) ? (
         <>
           {aSeguir.visiveis.length > 0 ? (
@@ -1251,7 +1250,7 @@ export default function DebtsScreen() {
         </>
       ) : null}
 
-      {!schedule.isLoading && !schedule.isError && !proxima ? (
+      {!schedule.isLoading && !schedule.isError && (!detalhe || declaredEstimates.isSuccess) && !proxima ? (
         <EmptyState
           icon="calendar"
           title={
@@ -1281,7 +1280,7 @@ export default function DebtsScreen() {
       <Screen
         grouped
         wide={tablet}
-        onRefresh={() => Promise.all([debts.refetch(), schedule.refetch(), payments.refetch(), accounts.refetch()])}>
+        onRefresh={() => Promise.all([debts.refetch(), schedule.refetch(), payments.refetch(), declaredEstimates.refetch(), accounts.refetch()])}>
         <Stack.Screen options={{ title: detalhe?.name ?? 'Dívida' }} />
         {/* Editar à direita e o resto no "…", como no lançamento. */}
         <HeaderActions

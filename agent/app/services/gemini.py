@@ -160,8 +160,9 @@ def structured(schema: type[T], model: str = GEMINI_PARSE):
     só quando falha, então o custo normal não muda. Não é escalonamento por confiança
     (`ai-gemini.md` proíbe): é o modelo estar fora do ar.
 
-    O PORTÃO não tem reserva, de propósito: a reserva natural seria o Lite, que já foi medido
-    aprovando "apaga todos". Portão que falha devolve None, que vira intenção nova — nunca SIM.
+    O PORTÃO não tem reserva para aprovação: a reserva natural seria o Lite, que já foi medido
+    aprovando "apaga todos". O interpretador de respostas pode tentar uma leitura separada
+    SOMENTE de revisão quando o portão falha; nunca confirma ou executa uma ação por ela.
     """
     papel = model if model in MODELOS else _PAPEL_POR_NOME.get(model, "parse")
     principal = llm(papel).with_structured_output(schema)

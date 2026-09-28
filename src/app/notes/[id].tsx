@@ -695,7 +695,9 @@ export default function NoteDetailScreen() {
               {lembrete.data?.active ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Lembrete ${quandoToca(lembrete.data.next_run_at)}. Toque para editar.`}
+                  accessibilityLabel={lembrete.data.skip_run_at === lembrete.data.next_run_at
+                    ? 'Lembrete: ocorrência editada. Toque para editar a repetição.'
+                    : `Lembrete ${quandoToca(lembrete.data.next_run_at)}. Toque para editar.`}
                   hitSlop={CHIP_SLOP}
                   onPress={() => {
                     Haptics.selectionAsync();
@@ -710,7 +712,9 @@ export default function NoteDetailScreen() {
                   ) : null}
                   <Icon name="bell" size={12} color="textSecondary" />
                   <ThemedText type="footnote" style={tabular}>
-                    {quandoToca(lembrete.data.next_run_at)}
+                    {lembrete.data.skip_run_at === lembrete.data.next_run_at
+                      ? 'Ocorrência editada'
+                      : quandoToca(lembrete.data.next_run_at)}
                   </ThemedText>
                 </Pressable>
               ) : lembrete.isError ? (

@@ -665,6 +665,32 @@ export type Database = {
           },
         ]
       }
+      debt_declared_estimates: {
+        Row: {
+          amount_cents: number
+          debt_id: string
+          installment_no: number
+        }
+        Insert: {
+          amount_cents: number
+          debt_id: string
+          installment_no: number
+        }
+        Update: {
+          amount_cents?: number
+          debt_id?: string
+          installment_no?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debt_declared_estimates_debt_id_fkey"
+            columns: ["debt_id"]
+            isOneToOne: false
+            referencedRelation: "debts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       debts: {
         Row: {
           account_id: string | null
@@ -672,6 +698,7 @@ export type Database = {
           calculation_mode: string
           created_at: string
           due_day: number | null
+          edit_revision: number
           first_due_date: string | null
           id: string
           installment_cents: number | null
@@ -680,6 +707,9 @@ export type Database = {
           interest_rate_monthly: number
           kind: string
           name: string
+          payment_category: string | null
+          payment_description: string | null
+          payment_merchant: string | null
           principal_cents: number
           remaining_cents: number
           started_at: string
@@ -693,6 +723,7 @@ export type Database = {
           calculation_mode?: string
           created_at?: string
           due_day?: number | null
+          edit_revision?: number
           first_due_date?: string | null
           id?: string
           installment_cents?: number | null
@@ -701,6 +732,9 @@ export type Database = {
           interest_rate_monthly?: number
           kind?: string
           name: string
+          payment_category?: string | null
+          payment_description?: string | null
+          payment_merchant?: string | null
           principal_cents: number
           remaining_cents: number
           started_at?: string
@@ -714,6 +748,7 @@ export type Database = {
           calculation_mode?: string
           created_at?: string
           due_day?: number | null
+          edit_revision?: number
           first_due_date?: string | null
           id?: string
           installment_cents?: number | null
@@ -722,6 +757,9 @@ export type Database = {
           interest_rate_monthly?: number
           kind?: string
           name?: string
+          payment_category?: string | null
+          payment_description?: string | null
+          payment_merchant?: string | null
           principal_cents?: number
           remaining_cents?: number
           started_at?: string
@@ -1735,6 +1773,9 @@ export type Database = {
           last_error: string | null
           next_run_at: string
           note_id: string | null
+          original_run_at: string | null
+          parent_reminder_id: string | null
+          skip_run_at: string | null
           recurrence: string | null
           send_attempts: number
           source: string
@@ -1752,6 +1793,9 @@ export type Database = {
           last_error?: string | null
           next_run_at: string
           note_id?: string | null
+          original_run_at?: string | null
+          parent_reminder_id?: string | null
+          skip_run_at?: string | null
           recurrence?: string | null
           send_attempts?: number
           source?: string
@@ -1769,6 +1813,9 @@ export type Database = {
           last_error?: string | null
           next_run_at?: string
           note_id?: string | null
+          original_run_at?: string | null
+          parent_reminder_id?: string | null
+          skip_run_at?: string | null
           recurrence?: string | null
           send_attempts?: number
           source?: string
@@ -1872,6 +1919,7 @@ export type Database = {
           debt_principal_cents: number | null
           description: string | null
           due_at: string | null
+          edit_revision: number
           id: string
           installment_no: number | null
           installment_plan_id: string | null
@@ -1905,6 +1953,7 @@ export type Database = {
           debt_principal_cents?: number | null
           description?: string | null
           due_at?: string | null
+          edit_revision?: number
           id?: string
           installment_no?: number | null
           installment_plan_id?: string | null
@@ -1938,6 +1987,7 @@ export type Database = {
           debt_principal_cents?: number | null
           description?: string | null
           due_at?: string | null
+          edit_revision?: number
           id?: string
           installment_no?: number | null
           installment_plan_id?: string | null
@@ -3011,6 +3061,19 @@ export type Database = {
         Returns: Json
       }
       routes_to_python: { Args: { p_phone: string }; Returns: boolean }
+      save_reminder_scoped: {
+        Args: {
+          p_id: string
+          p_expected_run_at: string
+          p_scope: string
+          p_title: string
+          p_recurrence: string | null
+          p_next_run_at: string
+          p_channel: string
+          p_timezone: string
+        }
+        Returns: undefined
+      }
       save_budget: {
         Args: {
           p_category: string
@@ -3091,13 +3154,47 @@ export type Database = {
         }
         Returns: number
       }
+      update_installment_occurrence: {
+        Args: { p_transaction_id: string; p_patch: Json }
+        Returns: number
+      }
       update_recurring_series: {
         Args: { p_patch: Json; p_propagate?: boolean; p_recurring_id: string }
+        Returns: number
+      }
+      update_recurring_occurrence_and_series: {
+        Args: {
+          p_transaction_id: string
+          p_recurring_id: string
+          p_line_patch: Json
+          p_series_patch: Json
+        }
         Returns: number
       }
       update_transaction_scoped: {
         Args: { p_patch: Json; p_scope: string; p_transaction_id: string }
         Returns: number
+      }
+      confirm_payment_scoped: {
+        Args: {
+          p_transaction_id: string
+          p_paid_at: string
+          p_amount_cents: number
+          p_scope: string
+        }
+        Returns: number
+      }
+      update_debt_payment_scoped: {
+        Args: {
+          p_anchor_id: string
+          p_scope: string
+          p_patch: Json
+          p_expected_debt_revision: number
+          p_expected_anchor_revision: number
+          p_expected_payment_versions: Json
+          p_request_id: string
+        }
+        Returns: Json
       }
       year_end_balances: {
         Args: { p_year: number }

@@ -30,6 +30,7 @@ from app.domain.correcao_plano import (
     plano_travado,
 )
 from app.domain.dates import format_date_br
+from app.domain.matching import sem_conta_explicita
 from app.domain.money import cents_to_brl
 from app.domain.recurrence import descreve_rrule
 from app.graph.schemas import (
@@ -682,7 +683,9 @@ def describe_for_confirmation(
         # que não cai na conta padrão), a frase cala em vez de adivinhar.
         padrao = (target or {}).get("default_account")
         citada = (target or {}).get("cited_account")
-        if action.account and citada:
+        if sem_conta_explicita(action.account) and tipo in {"create_expense", "create_income"}:
+            onde = ", sem conta"
+        elif action.account and citada:
             onde = f", {onde_fica(citada)}"
         elif action.account:
             onde = f", no {action.account}"
@@ -702,10 +705,15 @@ def describe_for_confirmation(
         # Sem `hoje` (chamador que não sabe o fuso), a data aparece sempre que existir.
         quando = (f" em {format_date_br(action.occurred_at)}"
                   if action.occurred_at and action.occurred_at[:10] != hoje else "")
+        categoria = (f", categoria {action.category}"
+                     if tipo in {"create_expense", "create_income"}
+                     and action.description and action.category
+                     and action.description.strip().casefold() != action.category.strip().casefold()
+                     else "")
         repete = f", repete {descreve_rrule(action.recurrence)}" if action.recurrence else ""
         if valor:
-            return f"registrar {o_que}{valor} em {alvo}{quando}{onde}{repete}"
-        return f"registrar {alvo}{quando}{onde}{repete}"
+            return f"registrar {o_que}{valor} em {alvo}{quando}{categoria}{onde}{repete}"
+        return f"registrar {alvo}{quando}{categoria}{onde}{repete}"
 
     alvo = action.search_term or action.content or "esse item"
     if tipo == "delete_note":

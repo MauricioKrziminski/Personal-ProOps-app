@@ -884,25 +884,14 @@ export default function TransactionsScreen() {
                         router.push({ pathname: '/finance/[txId]', params: { txId: tx.id, month } }),
                     },
                     {
-                      /**
-                       * ⚠️ **Em parcela, "Editar" abre a COMPRA, não a linha** — a mesma régua de
-                       * `finance/[txId].tsx`. As duas telas respondiam coisas diferentes para a
-                       * mesma palavra, e o valor da parcela é do contrato desde 15/09/2026.
-                       */
                       label: 'Editar',
                       icon: 'pencil',
                       // Pendente, a direita é o "Paguei"; efetivado, é o Editar.
                       arrasto: tx.status === 'pending' ? undefined : ('direita' as const),
-                      onPress: () =>
-                        tx.installment_plan_id
-                          ? router.push({
-                              pathname: '/finance/installments',
-                              params: { edit: tx.installment_plan_id },
-                            })
-                          : router.push({
-                              pathname: '/finance/transaction-form',
-                              params: { id: tx.id, month },
-                            }),
+                      onPress: () => router.push({
+                        pathname: '/finance/transaction-form',
+                        params: { id: tx.id, month },
+                      }),
                     },
                     { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => confirmDelete(tx) },
                   ]}>

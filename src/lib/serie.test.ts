@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { avisoDeDeslize, montaRRule, mudancasDaOcorrencia, regraDoApp, serieDaOcorrencia, serieDoRegistro, validaSerie, type OcorrenciaDaSerie, type SerieGravada } from './serie.ts';
+import { avisoDeDeslize, montaRRule, mudaInicioDaSerie, mudancasDaOcorrencia, regraDoApp, serieDaOcorrencia, serieDoRegistro, validaSerie, type OcorrenciaDaSerie, type SerieGravada } from './serie.ts';
 import { diaAmbiguo } from './dates.ts';
 
 // O Fundacred de produção (26/09/2026): dia 4 no cadastro, vence no último dia do mês.
@@ -18,7 +18,7 @@ test('Esta e as próximas: valor e vencimento mudados — o valor vai pelas linh
   const { linhas, regra } = mudancasDaOcorrencia(form, outubro, fundacred);
   assert.deepEqual(linhas, { amount_cents: 120000 });
   assert.deepEqual(Object.keys(regra).sort(), ['next_run_at', 'rrule']);
-  assert.equal(regra.rrule, 'FREQ=MONTHLY;BYMONTHDAY=-1', '31/10 é o último dia: todo último dia');
+  assert.equal(regra.rrule, 'FREQ=MONTHLY;BYMONTHDAY=31', 'tocar em 31 fixa o número; último dia é uma ação separada');
   const d = new Date(regra.next_run_at!);
   assert.deepEqual([d.getFullYear(), d.getMonth() + 1, d.getDate()], [2026, 10, 31]);
 });
@@ -65,7 +65,7 @@ test('regra que o app não desenha fica própria: o formulário não a reescreve
   }
 });
 
-test('30/09 não diz "dia 30" ou "último dia": o formulário pergunta, e sem resposta vale o dia', () => {
+test('30/09 continua dia 30 fixo sem a ação explícita de último dia', () => {
   const trinta = new Date(2026, 8, 30);
   assert.equal(diaAmbiguo(trinta), true);
   assert.equal(diaAmbiguo(new Date(2026, 9, 31)), false, '31 é sempre o último');
@@ -73,11 +73,22 @@ test('30/09 não diz "dia 30" ou "último dia": o formulário pergunta, e sem re
   assert.equal(diaAmbiguo(new Date(2027, 1, 28)), true);
   assert.equal(montaRRule('monthly', trinta, 1), 'FREQ=MONTHLY;BYMONTHDAY=30');
   assert.equal(montaRRule('monthly', trinta, 1, true), 'FREQ=MONTHLY;BYMONTHDAY=-1');
-  assert.equal(montaRRule('monthly', new Date(2026, 9, 31), 1), 'FREQ=MONTHLY;BYMONTHDAY=-1');
+  assert.equal(montaRRule('monthly', new Date(2026, 9, 31), 1), 'FREQ=MONTHLY;BYMONTHDAY=31');
   const form = { ...serieDoRegistro(fundacred), inicio: '30/09/2026', agendaMudou: true };
-  assert.equal(validaSerie(form).perguntaUltimoDia, true);
-  assert.equal(validaSerie({ ...form, inicio: '15/10/2026' }).perguntaUltimoDia, false);
+  assert.equal(validaSerie(form).rrulePrevia, 'FREQ=MONTHLY;BYMONTHDAY=30');
   assert.equal(serieDoRegistro({ ...fundacred, rrule: 'FREQ=MONTHLY;BYMONTHDAY=-1' }).ultimoDia, true);
+});
+
+test('calendário escolhe dia fixo até no dia 31; ação própria escolhe fim do mês', () => {
+  assert.equal(montaRRule('monthly', new Date(2026, 9, 31), 1), 'FREQ=MONTHLY;BYMONTHDAY=31');
+  assert.equal(montaRRule('monthly', new Date(2026, 8, 30), 1, true), 'FREQ=MONTHLY;BYMONTHDAY=-1');
+  const anterior = { ...serieDoRegistro({ ...fundacred, rrule: 'FREQ=MONTHLY;BYMONTHDAY=-1' }), inicio: '31/10/2026' };
+  const fixo = mudaInicioDaSerie(anterior, '30/11/2026', false);
+  assert.equal(fixo.ultimoDia, false, 'uma nova escolha no calendário apaga a intenção anterior');
+  assert.equal(validaSerie(fixo).rrulePrevia, 'FREQ=MONTHLY;BYMONTHDAY=30');
+  const ultimo = mudaInicioDaSerie(fixo, '31/12/2026', true);
+  assert.equal(ultimo.ultimoDia, true);
+  assert.equal(validaSerie(ultimo).rrulePrevia, 'FREQ=MONTHLY;BYMONTHDAY=-1');
 });
 
 test('Esta e as próximas numa ocorrência PAGA parte do próximo vencimento, não da data dela', () => {

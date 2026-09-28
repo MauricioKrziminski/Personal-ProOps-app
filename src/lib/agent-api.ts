@@ -14,6 +14,7 @@ import {
   type RetryPolicy,
   retryPolicyFor,
 } from '@/lib/agent-chat';
+import { File } from 'expo-file-system';
 import { supabase } from '@/lib/supabase';
 
 export { appendConversationPage, prependMessagePage };
@@ -136,7 +137,9 @@ async function chamar(
     ...init,
     headers: {
       ...(init.headers ?? {}),
-      'content-type': 'application/json',
+      // O boundary do multipart pertence ao fetch nativo. Fixá-lo aqui faz o
+      // servidor receber um corpo ilegível mesmo com o arquivo correto.
+      ...(init.body instanceof FormData ? {} : { 'content-type': 'application/json' }),
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
   });
@@ -208,6 +211,26 @@ export function listConversations(cursor?: string | null, limit = 20) {
   const q = new URLSearchParams({ limit: String(limit) });
   if (cursor) q.set('cursor', cursor);
   return agentFetch<Page<AgentConversation>>(`/internal/chat/conversations?${q}`);
+}
+
+/** Transcreve sem criar mensagem ou executar ação. A pessoa revisa antes do envio. */
+export async function transcribeAudio(uri: string) {
+  const file = new File(uri);
+  if (!file.exists || file.size === 0) {
+    throw new AgentApiError(422, 'invalid_audio', 'A gravação ficou vazia. Tente novamente.');
+  }
+  if (file.size > 20_000_000) {
+    throw new AgentApiError(413, 'audio_too_large', 'O áudio é grande demais. Grave uma mensagem mais curta.');
+  }
+  const body = new FormData();
+  // Expo SDK 57 exige um File real no multipart. O objeto RN {uri,name,type}
+  // gera Unsupported FormDataPart; converter bytes em Blob também não funciona
+  // no polyfill Android. O servidor valida o MIME inferido e a assinatura ftyp.
+  body.append('file', file);
+  return agentFetch<{ text: string }>('/internal/chat/transcriptions', {
+    method: 'POST',
+    body,
+  });
 }
 
 /**

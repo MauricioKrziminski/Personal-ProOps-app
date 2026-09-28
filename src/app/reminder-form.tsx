@@ -50,7 +50,7 @@ import {
   rotuloDoDia,
   timeBR,
 } from '@/lib/dates';
-import { confirmDestructive } from '@/lib/item-actions';
+import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { describeRRule } from '@/lib/rrule-text';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 
@@ -103,10 +103,8 @@ const MONTH_DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 /**
  * "Último dia do mês" na RRULE.
  *
- * ⚠️ Ele existe porque **o dia 31 não é isso**: `dateutil` (que é quem dispara o lembrete) PULA
- * os meses que não têm o dia — medido, `BYMONTHDAY=31` a partir de janeiro dá 31/01, 31/03,
- * 31/05, sem fevereiro e sem abril. O campo dizia o contrário ("cai no último dia") e a pessoa
- * ficava sem o lembrete justamente nos meses curtos, sem nada na tela avisando.
+ * É uma escolha explícita, diferente de um número fixo. O agendador ajusta dias numéricos
+ * 29/30/31 para o último dia disponível apenas nos meses em que aquele número não existe.
  */
 const ULTIMO_DIA = -1;
 
@@ -202,6 +200,15 @@ function buildRRule(state: RecurrenceState): string | null {
 function isEditableRRule(rrule: string | null): boolean {
   if (!rrule?.trim()) return true;
   return buildRRule(parseRRule(rrule)) === rrule.trim().replace(/^RRULE:/i, '').toUpperCase();
+}
+
+/** A data escolhida é o dia fixo quando a opção mensal não traz BYMONTHDAY. */
+function explicitMonthDay(rrule: string | null, date: string): string | null {
+  if (!rrule || !isEditableRRule(rrule)) return rrule;
+  const state = parseRRule(rrule);
+  const day = Number(date.slice(0, 2));
+  if (state.freq !== 'MONTHLY' || state.bymonthday.length || day < 29) return rrule;
+  return buildRRule({ ...state, bymonthday: [day] });
 }
 
 /** `20261231T000000Z` → `31/12/2026` (só a parte da data importa para o usuário). */
@@ -390,11 +397,14 @@ function ReminderForm({
   const onSubmit = handleSubmit((values) => {
     const at = localDateTime(values.date, values.time);
     if (!at) return;
-    save.mutate(
+    const commit = (scope?: 'one' | 'future') => save.mutate(
       {
         id: editing?.id,
+        ...(scope ? { scope, expected_next_run_at: editing?.next_run_at } : {}),
         title: values.title.trim(),
-        recurrence: values.recurrence,
+        recurrence: scope === 'one'
+          ? values.recurrence
+          : explicitMonthDay(values.recurrence, values.date),
         next_run_at: at.toISOString(),
         channel: values.channel,
         timezone: deviceTimezone(),
@@ -418,6 +428,19 @@ function ReminderForm({
           }),
       },
     );
+
+    if (editing?.recurrence) {
+      Keyboard.dismiss();
+      showItemActions('Aplicar a edição em quais lembretes?', [
+        {
+          label: 'Só esta ocorrência',
+          onPress: () => commit('one'),
+        },
+        { label: 'Esta e as próximas', onPress: () => commit('future') },
+      ], 'Só esta altera título, data, hora e canal. Para mudar a repetição, escolha Esta e as próximas.');
+      return;
+    }
+    commit();
   });
 
   const onToggleActive = (active: boolean) => {
@@ -542,18 +565,26 @@ function ReminderForm({
           ) : null}
         </Card>
 
-        <Controller
-          control={control}
-          name="recurrence"
-          render={({ field, fieldState }) => (
-            <RecurrenceEditor
-              value={field.value}
-              onChange={field.onChange}
-              inicio={date}
-              erro={fieldState.error?.message}
-            />
-          )}
-        />
+        {editing?.parent_reminder_id ? (
+          <Card>
+            <ThemedText type="small" themeColor="textSecondary">
+              Só esta ocorrência. A repetição da série continua separada.
+            </ThemedText>
+          </Card>
+        ) : (
+          <Controller
+            control={control}
+            name="recurrence"
+            render={({ field, fieldState }) => (
+              <RecurrenceEditor
+                value={field.value}
+                onChange={field.onChange}
+                inicio={date}
+                erro={fieldState.error?.message}
+              />
+            )}
+          />
+        )}
 
         <Card>
           <View style={styles.block}>
@@ -912,12 +943,14 @@ function RecurrenceEditor({
             <Field
               label="Em quais dias do mês"
               hint={
-                state.bymonthday.includes(31)
-                  ? 'Dia 31 não dispara em fevereiro nem em meses de 30. Use *Último dia*.'
+                state.bymonthday.length === 1 && state.bymonthday[0] >= 29
+                  ? `Dia ${state.bymonthday[0]}: se não existir no mês, avisa no último dia disponível.`
                   : state.bymonthday.length > 4
                     ? `Isso vai disparar ${state.bymonthday.length} vezes por mês.`
                     : state.bymonthday.length === 0
                       ? 'Vazio: o dia da data acima'
+                      : state.bymonthday.length > 1 && state.bymonthday.some((n) => n >= 29)
+                        ? 'Com vários dias, cada número avisa somente nos meses em que existe.'
                       : undefined
               }>
               <View style={styles.chipRow}>

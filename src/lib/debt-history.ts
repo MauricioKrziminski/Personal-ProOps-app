@@ -32,6 +32,11 @@ export interface DebtPaymentRow {
   amount_cents: number;
 }
 
+export interface DebtDeclaredEstimateRow {
+  installment_no: number;
+  amount_cents: number;
+}
+
 /** Soma meses a uma data ISO, prendendo o dia no último do mês (31/01 − 1 = 31/12, 31/03 − 1 = 28/02). */
 export function addMonthsISO(iso: string, months: number): string {
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
@@ -46,12 +51,15 @@ export function paidInstallments({
   installmentCents,
   nextDueDate,
   payments = [],
+  overrides = [],
 }: {
   installmentsPaid: number;
   installmentCents: number;
   /** Vencimento da próxima parcela em aberto — a âncora da cadência. */
   nextDueDate: string | null | undefined;
   payments?: readonly DebtPaymentRow[];
+  /** Valor preservado de uma parcela apenas declarada, identificado por número. */
+  overrides?: readonly DebtDeclaredEstimateRow[];
 }): PaidInstallment[] {
   const pagas = Math.max(0, Math.trunc(installmentsPaid || 0));
   // Quitada não tem próxima parcela: a cadência anda para trás a partir de hoje.
@@ -60,6 +68,7 @@ export function paidInstallments({
   for (const p of payments) {
     if (p.debt_payment_no != null) porNumero.set(p.debt_payment_no, p);
   }
+  const estimativasPorNumero = new Map(overrides.map((o) => [o.installment_no, o.amount_cents]));
   // Pagamento lançado com número ACIMA das pagas (dado de antes do piso das pagas) é fato: ele
   // entra como pago, e a contagem estimada vai até ele.
   const ate = Math.max(pagas, ...porNumero.keys());
@@ -79,7 +88,7 @@ export function paidInstallments({
         : {
             installment_no: n,
             due_date: addMonthsISO(ancora, n - (pagas + 1)),
-            payment_cents: installmentCents,
+            payment_cents: estimativasPorNumero.get(n) ?? installmentCents,
             registered: false,
           },
     );

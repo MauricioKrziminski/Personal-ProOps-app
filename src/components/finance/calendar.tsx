@@ -8,7 +8,7 @@ import { Icon } from '@/components/ui/icon';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { HitTarget, Radius, Space, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
-import { isoToBR, localISODate, monthGrid } from '@/lib/dates';
+import { isoToBR, localISODate, monthBounds, monthGrid } from '@/lib/dates';
 
 /**
  * As células da grade SEM as semanas vazias do fim.
@@ -34,6 +34,8 @@ interface Props {
   /** Dia marcado, ISO. `null` = nenhum. */
   value: string | null;
   onChange: (iso: string) => void;
+  /** Ação explícita do calendário de recorrência, separada dos números da grade. */
+  onSelectLastDay?: (iso: string) => void;
   /** Limites inclusivos, ISO. Dia fora deles aparece apagado e não recebe toque. */
   min?: string;
   max?: string;
@@ -65,11 +67,12 @@ interface Props {
  * `Modal` dentro de `Modal` no Android é uma janela dentro de outra, com teclado e botão voltar
  * disputando qual fecha (a mesma razão pela qual o `SelectField` abre no lugar — design.md §1).
  */
-export function Calendar({ value, onChange, min, max }: Props) {
+export function Calendar({ value, onChange, onSelectLastDay, min, max }: Props) {
   const theme = useTheme();
   const vidro = supportsLiquidGlass();
   const hoje = localISODate();
   const [mes, setMes] = useState(() => (value ?? hoje).slice(0, 7));
+  const diasVisiveis = semanasVisiveis(mes);
 
   const foraDoLimite = (iso: string) => (min != null && iso < min) || (max != null && iso > max);
   /*
@@ -126,8 +129,10 @@ export function Calendar({ value, onChange, min, max }: Props) {
         ))}
       </View>
 
-      <View style={styles.linha}>
-        {semanasVisiveis(mes).map((iso, i) => {
+      {Array.from({ length: diasVisiveis.length / 7 }, (_, semana) => (
+      <View key={semana} style={styles.linha}>
+        {diasVisiveis.slice(semana * 7, semana * 7 + 7).map((iso, dia) => {
+          const i = semana * 7 + dia;
           if (!iso) return <View key={i} style={styles.celula} />;
           const marcado = iso === value;
           const bloqueado = foraDoLimite(iso);
@@ -178,6 +183,26 @@ export function Calendar({ value, onChange, min, max }: Props) {
           );
         })}
       </View>
+      ))}
+      {onSelectLastDay ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Último dia de ${monthTitle(mes)}`}
+          accessibilityState={{ disabled: foraDoLimite(monthBounds(mes).to) }}
+          disabled={foraDoLimite(monthBounds(mes).to)}
+          onPress={() => {
+            Haptics.selectionAsync();
+            onSelectLastDay(monthBounds(mes).to);
+          }}
+          style={({ pressed }) => [
+            styles.ultimoDia,
+            { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement,
+              opacity: foraDoLimite(monthBounds(mes).to) ? 0.4 : 1 },
+          ]}>
+          <ThemedText type="smallBold" themeColor="tint">Último dia de todo mês</ThemedText>
+          <ThemedText type="caption" themeColor="textSecondary">{isoToBR(monthBounds(mes).to)}</ThemedText>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -210,7 +235,6 @@ const styles = StyleSheet.create({
   },
   linha: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
   },
   /*
     Sete colunas por PORCENTAGEM, não por largura medida: a grade vive dentro de um sheet, cuja
@@ -218,7 +242,7 @@ const styles = StyleSheet.create({
     `aspectRatio` mantém a célula quadrada — a 384dp isso dá ~50pt, acima do alvo de 44.
   */
   celula: {
-    width: `${100 / 7}%`,
+    flex: 1,
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -229,7 +253,7 @@ const styles = StyleSheet.create({
     cabeçalho e o dia 1, visto no emulador. Ela é um rótulo, não um alvo.
   */
   inicialDaSemana: {
-    width: `${100 / 7}%`,
+    flex: 1,
     alignItems: 'center',
     paddingBottom: Space.xs,
   },
@@ -243,5 +267,15 @@ const styles = StyleSheet.create({
   },
   bloqueado: {
     opacity: 0.3,
+  },
+  ultimoDia: {
+    minHeight: HitTarget,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Space.sm,
   },
 });

@@ -12,10 +12,11 @@ eternamente — aconteceu.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 from app import db
 from app.config import get_settings
-from app.domain.dates import now_utc
+from app.domain.dates import now_utc, tz
 from app.domain.recurrence import next_occurrence
 from app.services import push, whatsapp
 
@@ -25,11 +26,45 @@ MAX_SEND_ATTEMPTS = 5
 DEFAULT_TIMEZONE = "America/Sao_Paulo"
 
 
+def _fixed_day_for_implicit_monthly(
+    recurrence: str | None, run_at: datetime, timezone_name: str
+) -> str | None:
+    """Keep the date's numeric day when an older monthly rule omitted BYMONTHDAY.
+
+    Once February is clamped to 28/29, the original 30/31 cannot be recovered
+    from next_run_at. Persisting the explicit day on the first advance preserves it.
+    """
+    if not recurrence:
+        return recurrence
+    chunks = recurrence.removeprefix("RRULE:").split(";")
+    pairs = [chunk.partition("=") for chunk in chunks]
+    if any(not separator or not value for _, separator, value in pairs):
+        return recurrence
+    parts = {key.upper(): value.upper() for key, _, value in pairs}
+    if (
+        len(parts) != len(pairs)
+        or parts.get("FREQ") != "MONTHLY"
+        or set(parts) - {"FREQ", "INTERVAL", "COUNT", "UNTIL"}
+    ):
+        return recurrence
+    day = run_at.astimezone(tz(timezone_name)).day
+    if day < 29:
+        return recurrence
+    suffix_index = next(
+        (i for i, (key, _, _) in enumerate(pairs) if key.upper() in {"COUNT", "UNTIL"}),
+        len(chunks),
+    )
+    chunks.insert(suffix_index, f"BYMONTHDAY={day}")
+    prefix = "RRULE:" if recurrence.startswith("RRULE:") else ""
+    return prefix + ";".join(chunks)
+
+
 async def run() -> dict:
     agora = now_utc()
     vencidos = await db.fetch(
         """
         select r.id, r.user_id, r.title, r.recurrence, r.channel, r.next_run_at,
+               r.skip_run_at, r.parent_reminder_id,
                r.timezone, r.send_attempts, p.phone, p.expo_push_token,
                p.alerts_whatsapp_enabled
         from public.reminders r
@@ -44,29 +79,44 @@ async def run() -> dict:
     enviados = desistidos = 0
     for lembrete in vencidos:
         fuso = lembrete["timezone"] or DEFAULT_TIMEZONE
+        regra = _fixed_day_for_implicit_monthly(
+            lembrete["recurrence"], lembrete["next_run_at"], fuso
+        )
         try:
-            await _entregar(lembrete)
+            skipped = (
+                lembrete["skip_run_at"] is not None
+                and lembrete["skip_run_at"] == lembrete["next_run_at"]
+            )
+            if not skipped:
+                await _entregar(lembrete)
             proxima = next_occurrence(
-                lembrete["recurrence"], agora, fuso, lembrete["next_run_at"]
+                regra, agora, fuso, lembrete["next_run_at"]
             )
             await db.execute(
                 """
                 update public.reminders
                 set send_attempts = 0, last_error = null, updated_at = now(),
+                    skip_run_at = case when skip_run_at = %s then null else skip_run_at end,
                     next_run_at = coalesce(%s, next_run_at),
-                    active = %s
-                where id = %s
+                    active = %s, recurrence = %s
+                where id = %s and next_run_at = %s
+                  and recurrence is not distinct from %s
                 """,
+                lembrete["next_run_at"],
                 proxima,
                 proxima is not None,
+                regra,
                 lembrete["id"],
+                lembrete["next_run_at"],
+                lembrete["recurrence"],
             )
-            enviados += 1
+            if not skipped:
+                enviados += 1
         except Exception as err:  # noqa: BLE001
             tentativas = (lembrete["send_attempts"] or 0) + 1
             desistir = tentativas >= MAX_SEND_ATTEMPTS
             proxima = (
-                next_occurrence(lembrete["recurrence"], agora, fuso, lembrete["next_run_at"])
+                next_occurrence(regra, agora, fuso, lembrete["next_run_at"])
                 if desistir
                 else None
             )
@@ -75,15 +125,20 @@ async def run() -> dict:
                 update public.reminders
                 set send_attempts = %s, last_error = %s, updated_at = now(),
                     next_run_at = coalesce(%s, next_run_at),
-                    active = case when %s and %s is null then false else active end
-                where id = %s
+                    active = case when %s and %s is null then false else active end,
+                    recurrence = %s
+                where id = %s and next_run_at = %s
+                  and recurrence is not distinct from %s
                 """,
                 0 if desistir else tentativas,
                 repr(err)[:2000],
                 proxima,
                 desistir,
                 proxima,
+                regra if desistir else lembrete["recurrence"],
                 lembrete["id"],
+                lembrete["next_run_at"],
+                lembrete["recurrence"],
             )
             if desistir:
                 desistidos += 1

@@ -1,8 +1,10 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, router } from 'expo-router';
+import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
+import { File } from 'expo-file-system';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Platform, Pressable, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -40,9 +42,12 @@ import {
   AgentAuthExpiredError,
   type AgentMessage,
   type AgentTurn,
+  transcribeAudio,
 } from '@/lib/agent-api';
 import {
   abrirConversaNova,
+  audioPossuiSinal,
+  canSubmitMessage,
   compositorTravado,
   conversationRoute,
   falhaDoTurno,
@@ -96,6 +101,27 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
   const lista = useRef<FlashListRef<Item>>(null);
 
   const [texto, setTexto] = useState(initialText);
+  const [audioState, setAudioState] = useState<'idle' | 'starting' | 'recording' | 'transcribing'>('idle');
+  const audioPhase = useRef<'idle' | 'starting' | 'recording' | 'transcribing'>('idle');
+  const [audioReview, setAudioReview] = useState(false);
+  const textoAntesDoAudio = useRef(initialText);
+  const revisaoAntesDoAudio = useRef(false);
+  const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
+  const recorderState = useAudioRecorderState(recorder);
+  const niveisDaGravacao = useRef<number[]>([]);
+  useEffect(() => () => {
+    // O hook libera o gravador ao desmontar; o modo de áudio é global e precisa voltar
+    // se a pessoa sair com o microfone aberto. Outra conversa pode estar montada:
+    // não mexer no modo global quando esta tela já encerrou a gravação.
+    if (audioPhase.current === 'starting' || audioPhase.current === 'recording') {
+      void setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
+    }
+  }, []);
+  useEffect(() => {
+    if (recorderState.isRecording && typeof recorderState.metering === 'number') {
+      niveisDaGravacao.current.push(recorderState.metering);
+    }
+  }, [recorderState.durationMillis, recorderState.isRecording, recorderState.metering]);
   const [erro, setErro] = useState<AgentApiError | null>(null);
   const [desistiu, setDesistiu] = useState(false);
   const [perto, setPerto] = useState(true);
@@ -178,16 +204,9 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
 
   const ultima = mensagens[mensagens.length - 1];
   const pergunta = ultima?.role === 'assistant' ? ultima.ui_payload : null;
-  /**
-   * Uma pergunta de HITL aberta trava o campo: a resposta dela sai dos botões.
-   *
-   * ⚠️ **Pergunta de RASCUNHO não trava, e isso é o desenho.** Ali os botões são
-   * atalho para o que já existe — digitar continua sendo resposta válida, e é
-   * assim que se escolhe um cartão que não coube na lista ou se cria um novo
-   * ("digita o nome de outro cartão"). Travar o campo transformaria a lista de
-   * cartões existentes na única resposta possível.
-   */
-  // Conversa que o servidor ainda não confirmou também trava: a saída é o
+  // HITL aberto aceita texto e áudio de correção, além dos botões. Rascunhos
+  // também aceitam texto; só um turno ainda em voo bloqueia o próximo envio.
+  // Conversa que o servidor ainda não confirmou trava: a saída é o
   // "Tentar novamente", que recria com o mesmo par de ids.
   const esperandoAcao = compositorTravado(mensagens, {
     awaitingAction: Boolean(pergunta?.pending_id && !pergunta.resolved),
@@ -234,9 +253,96 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
 
   const [trava] = useState(novaTravaDeToque);
 
+  const mudarAudioState = useCallback((state: 'idle' | 'starting' | 'recording' | 'transcribing') => {
+    audioPhase.current = state;
+    setAudioState(state);
+  }, []);
+
+  const gravarOuTranscrever = useCallback(async () => {
+    if (rodando || audioPhase.current === 'starting' || audioPhase.current === 'transcribing') return;
+    if (audioPhase.current === 'idle') {
+      mudarAudioState('starting');
+      let iniciou = false;
+      let ativouModo = false;
+      try {
+        const permission = await requestRecordingPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert(
+            'Microfone sem acesso',
+            'Permita o microfone nos ajustes do aparelho para gravar áudio.',
+            [
+              { text: 'Agora não', style: 'cancel' },
+              { text: 'Abrir ajustes', onPress: () => { void Linking.openSettings(); } },
+            ],
+          );
+          return;
+        }
+        await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+        ativouModo = true;
+        await recorder.prepareToRecordAsync();
+        recorder.record();
+        iniciou = true;
+        niveisDaGravacao.current = [];
+        textoAntesDoAudio.current = texto;
+        revisaoAntesDoAudio.current = audioReview;
+        mudarAudioState('recording');
+      } catch {
+        toast({ message: 'Não consegui iniciar a gravação.', tone: 'error' });
+      } finally {
+        if (!iniciou) {
+          if (ativouModo) await setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
+          mudarAudioState('idle');
+        }
+      }
+      return;
+    }
+
+    mudarAudioState('transcribing');
+    let gravacaoUri: string | null = null;
+    let modoRestaurado = false;
+    try {
+      await recorder.stop();
+      try {
+        await setAudioModeAsync({ allowsRecording: false });
+        modoRestaurado = true;
+      } catch { /* o arquivo gravado ainda pode ser transcrito */ }
+      gravacaoUri = recorder.uri;
+      if (!gravacaoUri) throw new Error('recording_without_file');
+      if (!audioPossuiSinal(niveisDaGravacao.current)) {
+        throw new AgentApiError(422, 'empty_audio', 'Não encontrei fala nesse áudio. Tente novamente.');
+      }
+      const { text } = await transcribeAudio(gravacaoUri);
+      const proximo = [texto.trim(), text.trim()].filter(Boolean).join('\n');
+      if (proximo.length > 4_000) {
+        toast({ message: 'O texto ficou longo demais. Apague um trecho e grave novamente.', tone: 'error' });
+        return;
+      }
+      setTexto(proximo);
+      setAudioReview(true);
+    } catch (error) {
+      toast({
+        message: error instanceof AgentApiError ? error.message : 'Não consegui transcrever o áudio. Tente novamente.',
+        tone: 'error',
+      });
+    } finally {
+      if (gravacaoUri) {
+        try { new File(gravacaoUri).delete(); } catch { /* cache da gravação pode já ter sido limpo */ }
+      }
+      if (!modoRestaurado) await setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
+      mudarAudioState('idle');
+    }
+  }, [audioReview, mudarAudioState, recorder, rodando, texto, toast]);
+
+  const descartarAudio = useCallback(() => {
+    setTexto(textoAntesDoAudio.current);
+    setAudioReview(revisaoAntesDoAudio.current);
+  }, []);
+
   const submeter = useCallback(() => {
+    if (audioPhase.current !== 'idle' || rodando || !canSubmitMessage(texto, { sending: rodando })) return;
     const conteudo = texto.trim();
     setTexto('');
+    setAudioReview(false);
     if (conversationId) {
       disparar(turno.iniciar(conteudo));
       return;
@@ -255,7 +361,7 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
       // conversa nova. A rota /agent/new já ocupa um detalhe e é substituída.
       navegar: (id) => (tabMode ? router.push(conversationRoute(id)) : router.replace(conversationRoute(id))),
     });
-  }, [conversationId, criar, disparar, qc, tabMode, texto, trava, turno]);
+  }, [conversationId, criar, disparar, qc, rodando, tabMode, texto, trava, turno]);
 
   const tentarDeNovo = useCallback(() => {
     // O MESMO UUID de antes. Gerar um novo criaria um segundo lançamento do que
@@ -503,6 +609,10 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
                 onSubmit={submeter}
                 sending={rodando}
                 awaitingAction={esperandoAcao}
+                audioState={audioState}
+                audioReview={audioReview}
+                onAudioPress={gravarOuTranscrever}
+                onDiscardAudio={descartarAudio}
               />
             }
           />
@@ -561,6 +671,10 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
             onSubmit={submeter}
             sending={rodando}
             awaitingAction={esperandoAcao}
+            audioState={audioState}
+            audioReview={audioReview}
+            onAudioPress={gravarOuTranscrever}
+            onDiscardAudio={descartarAudio}
           />
         </>
       )}

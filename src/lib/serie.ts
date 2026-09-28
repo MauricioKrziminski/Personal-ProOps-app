@@ -2,7 +2,7 @@
  * As regras da SÉRIE recorrente, puras (os campos moram em `components/finance/serie-form.tsx`).
  * Aqui fica o que tem conta: a RRULE que o formulário monta, o que ele vale e o que o salvar grava.
  */
-import { brToISO, dataLocalDe, diaAmbiguo, ehUltimoDiaDoMes, isValidBRDate, isoToBR, localDateTime, localISODate } from './dates.ts';
+import { brToISO, dataLocalDe, fimQueSegueOInicio, isValidBRDate, isoToBR, localDateTime, localISODate } from './dates.ts';
 import { validRecurringRange } from './finance-form.ts';
 
 export interface SerieForm {
@@ -36,14 +36,26 @@ export interface SerieForm {
   /** dd/mm/aaaa — criando, vira `dtstart` e o `next_run_at`; editando, é o próximo vencimento. */
   inicio: string;
   /**
-   * Só quando a data é o último dia de um mês de menos de 31 (30/09, 28/02): "todo dia 30" ou
-   * "todo último dia do mês"? A data sozinha não responde (27/09/2026, pergunta do dono do
-   * produto) — e a diferença aparece nos meses de 31 dias. Ausente = o dia da data.
+   * Intenção explícita da ação de último dia no calendário. Tocar em qualquer número define
+   * `false`, inclusive nos dias 30 e 31; ausente equivale ao número fixo da data.
    */
   ultimoDia?: boolean;
   /** dd/mm/aaaa, opcional: é como se encerra uma assinatura sem apagar o histórico. */
   fim: string;
   autoConfirm: boolean;
+}
+
+export function mudaInicioDaSerie(form: SerieForm, inicio: string, ultimoDia: boolean): SerieForm {
+  return {
+    ...form,
+    inicio,
+    ultimoDia,
+    agendaMudou: Boolean(form.id || form.agendaMudou),
+    fim:
+      isValidBRDate(inicio) && isValidBRDate(form.inicio) && isValidBRDate(form.fim)
+        ? isoToBR(fimQueSegueOInicio(brToISO(form.inicio), brToISO(inicio), brToISO(form.fim)))
+        : form.fim,
+  };
 }
 
 /** O que a série gravada precisa ter para virar formulário. */
@@ -72,16 +84,10 @@ export function montaRRule(preset: SerieForm['preset'], inicio: Date, intervalo:
   if (preset === 'yearly') return `FREQ=YEARLY;BYMONTH=${inicio.getMonth() + 1};BYMONTHDAY=${inicio.getDate()}`;
   const passo = intervalo > 1 ? `;INTERVAL=${intervalo}` : '';
   /*
-    ⚠️ **Quase sempre a data diz se é "todo dia N" ou "todo último dia do mês"**: quem escolhe
-    31/10 quer o fim do mês, quem escolhe 05/10 quer o dia 5. A exceção é o último dia de um mês
-    curto (30/09, 28/02): "dia 30" ou "último dia"? Ali o formulário PERGUNTA (`ultimoDia`,
-    `diaAmbiguo`), e sem resposta vale o dia da data.
-
-    `-1` e 31 caem no mesmo dia desde que o agendador deixou de pular o mês curto (27/09/2026,
-    `recurrence._dia_que_cabe`); o 31 continua virando `-1` porque é a forma que a projeção lê.
+    O calendário escolhe sempre o número fixo, inclusive 30/09 e 31/10. A ação própria de último
+    dia escolhe `-1`; o agendador clampa 29/30/31 nos meses curtos, sem pular fevereiro.
   */
-  const fimDoMes = inicio.getDate() === 31 || (ultimoDia && ehUltimoDiaDoMes(inicio));
-  return `FREQ=MONTHLY${passo};BYMONTHDAY=${fimDoMes ? -1 : inicio.getDate()}`;
+  return `FREQ=MONTHLY${passo};BYMONTHDAY=${ultimoDia ? -1 : inicio.getDate()}`;
 }
 
 /**
@@ -156,9 +162,7 @@ export function validaSerie(form: SerieForm | null) {
     : basico && calendarioOk;
   const rrulePrevia =
     form && inicioDate ? montaRRule(form.preset, inicioDate, Number(form.intervalo) || 1, form.ultimoDia) : null;
-  /** "Todo dia 30 | Último dia do mês" só aparece quando a data não responde sozinha. */
-  const perguntaUltimoDia = Boolean(form && form.preset === 'monthly' && !form.regraPropria && inicioDate && diaAmbiguo(inicioDate));
-  return { inicioDate, inicioOk, fimOk, tituloOk, agendaNoPassado, podeSalvar, rrulePrevia, perguntaUltimoDia };
+  return { inicioDate, inicioOk, fimOk, tituloOk, agendaNoPassado, podeSalvar, rrulePrevia };
 }
 
 /** A ocorrência aberta no formulário do lançamento. */
@@ -199,14 +203,15 @@ export function serieDaOcorrencia(serie: SerieGravada, linha: OcorrenciaDaSerie)
 }
 
 /**
- * O que salvar "Esta e as próximas" grava, em DUAS partes e nesta ordem:
+ * O que salvar "Esta e as próximas" envia em uma operação atômica:
  *
  * - `linhas` — valor, categoria, título, estabelecimento e conta que MUDARAM em relação a esta
  *   ocorrência. Vão por `update_transaction_scoped` com escopo "future", ancorado NELA: é o
- *   "esta e as próximas" de verdade, e a mesma RPC atualiza a regra da série.
+ *   "esta e as próximas" de verdade, sem alterar as ocorrências pagas.
  * - `regra` — tipo, fim e "entra como pago" que mudaram em relação à série, e o calendário (regra
- *   + próximo vencimento) só se a pessoa mexeu nele. Vão por `update_recurring_series`, DEPOIS:
- *   o calendário novo move esta linha de data, e o escopo das linhas é ancorado nela.
+ *   + próximo vencimento) só se a pessoa mexeu nele. A RPC
+ *   `update_recurring_occurrence_and_series` usa a ocorrência original como âncora,
+ *   atualiza a regra e as linhas juntas, ou desfaz tudo em caso de erro.
  */
 export function mudancasDaOcorrencia(form: SerieForm, linha: OcorrenciaDaSerie, serie: SerieGravada) {
   const linhas: {

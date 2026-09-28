@@ -10,7 +10,7 @@ import { TaskHeader } from '@/components/ui/task-header';
 import { useToast } from '@/components/ui/toast';
 import { Forte } from '@/components/ui/forte';
 import { Space } from '@/design/tokens';
-import { useMarkPaid, useSaveTransactionScoped, useTransaction } from '@/hooks/use-finance';
+import { useConfirmPaymentScoped, useTransaction } from '@/hooks/use-finance';
 import { formatBRL, localISODate } from '@/hooks/use-items';
 import { planoDaBaixa } from '@/lib/confirmar-baixa';
 import { brToISO, isValidBRDate, isoToBR } from '@/lib/dates';
@@ -30,7 +30,7 @@ import { settleDone, settleLabel } from '@/lib/settle-labels';
  * Lançamentos, Projeção e o detalhe) abrem pelo `abrir(id)` e desenham `folha` no fim.
  * A folha lê o lançamento pelo id — valor, série, tipo —, então quem abre não precisa saber disso.
  *
- * A ordem é corrigir e SÓ ENTÃO dar a baixa: falhando a correção, nada é marcado como pago.
+ * Correção e baixa são uma única transação no banco: falhando qualquer etapa, nada muda.
  */
 export function useConfirmarBaixa({ aoConcluir }: { aoConcluir?: (id: string) => void } = {}) {
   const [id, setId] = useState<string | null>(null);
@@ -38,8 +38,7 @@ export function useConfirmarBaixa({ aoConcluir }: { aoConcluir?: (id: string) =>
   const [data, setData] = useState(() => isoToBR(localISODate()));
   const [nasProximas, setNasProximas] = useState(false);
   const tx = useTransaction(id ?? undefined);
-  const corrigir = useSaveTransactionScoped();
-  const markPaid = useMarkPaid();
+  const confirmarPagamento = useConfirmPaymentScoped();
   const toast = useToast();
 
   const linha = id ? tx.data ?? null : null;
@@ -61,31 +60,18 @@ export function useConfirmarBaixa({ aoConcluir }: { aoConcluir?: (id: string) =>
     if (!linha || pago <= 0) return;
     const plano = planoDaBaixa({ previsto, pago, temSerie, nasProximas });
     const paidAt = isValidBRDate(data) ? brToISO(data) : localISODate();
-    const darBaixa = () =>
-      markPaid.mutate(
-        { id: linha.id, paidAt },
-        {
-          onSuccess: () => {
-            fechar();
-            toast({
-              message: <><Forte>{titulo}</Forte>: {settleDone(linha.kind)}{plano.corrigir ? ` com ${formatBRL(pago)}` : ''}.</>,
-              tone: 'success',
-            });
-            aoConcluir?.(linha.id);
-          },
-          onError: () => toast({ message: 'Não deu para dar baixa. Tenta de novo.', tone: 'error' }),
-        }
-      );
-    if (!plano.corrigir) {
-      darBaixa();
-      return;
-    }
-    corrigir.mutate(
-      { id: linha.id, scope: plano.corrigir.scope, patch: { amount_cents: plano.corrigir.amount_cents } },
+    confirmarPagamento.mutate(
+      { id: linha.id, paidAt, amountCents: pago, scope: plano.corrigir?.scope ?? 'one' },
       {
-        onSuccess: darBaixa,
-        onError: (error) =>
-          toast({ message: financeErrorMessage(error, 'Não deu para corrigir o valor.'), tone: 'error' }),
+        onSuccess: () => {
+          fechar();
+          toast({
+            message: <><Forte>{titulo}</Forte>: {settleDone(linha.kind)}{plano.corrigir ? ` com ${formatBRL(pago)}` : ''}.</>,
+            tone: 'success',
+          });
+          aoConcluir?.(linha.id);
+        },
+        onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para dar baixa. Tenta de novo.'), tone: 'error' }),
       }
     );
   };
@@ -99,7 +85,7 @@ export function useConfirmarBaixa({ aoConcluir }: { aoConcluir?: (id: string) =>
           <Button
             label={settleLabel(linha?.kind)}
             size="sm"
-            loading={corrigir.isPending || markPaid.isPending}
+            loading={confirmarPagamento.isPending}
             disabled={!linha || pago <= 0}
             onPress={confirmar}
           />

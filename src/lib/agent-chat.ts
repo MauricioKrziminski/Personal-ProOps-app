@@ -11,6 +11,23 @@
 export const MAX_MESSAGE_LENGTH = 4000;
 export const MAX_TITLE_LENGTH = 80;
 
+/**
+ * O medidor do SDK devolve dBFS (0 é alto). Um toque no simulador gera picos
+ * curtos acima de -20 dB em meio ao silêncio e o transcritor inventa fala.
+ * Exigir um segundo contínuo de sinal (4 leituras a cada ~250 ms) distingue
+ * esses picos de uma fala. Sem medidor disponível, a revisão humana segue
+ * obrigatória.
+ */
+export function audioPossuiSinal(niveis: number[]): boolean {
+  if (niveis.length === 0) return true;
+  let consecutivos = 0;
+  for (const nivel of niveis) {
+    consecutivos = Number.isFinite(nivel) && nivel >= -55 ? consecutivos + 1 : 0;
+    if (consecutivos >= 4) return true;
+  }
+  return false;
+}
+
 /** Distância do fim em que a resposta que chega ainda rola sozinha. */
 export const NEAR_END_PX = 80;
 
@@ -78,17 +95,14 @@ export function canSendMessage(text: string): boolean {
 /**
  * O composer pode enviar agora?
  *
- * Três travas além do tamanho: enquanto um turno roda (`sending`), enquanto uma
- * pergunta espera resposta (`awaitingAction`) e com texto vazio. As duas
- * primeiras existem pela mesma razão — a conversa é serializada por lease no
- * servidor, então uma segunda escrita voltaria 409; barrar aqui evita mostrar
- * um erro que a tela já sabia que ia acontecer.
+ * Enquanto um turno roda, o lease serializa a conversa; um HITL concluído já
+ * soltou o lease e pode receber texto de correção/complemento no mesmo thread.
  */
 export function canSubmitMessage(
   text: string,
   estado: { sending?: boolean; awaitingAction?: boolean } = {},
 ): boolean {
-  return canSendMessage(text) && !estado.sending && !estado.awaitingAction;
+  return canSendMessage(text) && !estado.sending;
 }
 
 export function canSaveTitle(title: string): boolean {
@@ -253,7 +267,6 @@ export function compositorTravado(
   }[],
   estado: { awaitingAction: boolean },
 ): boolean {
-  if (estado.awaitingAction) return true;
   // Falha NÃO retentável (402: o servidor grava a conversa antes de recusar o
   // turno; 422 de servidor antigo) deixa o campo livre — ali não há retry, e
   // quem volta do paywall manda de novo pelo `enviar`.
@@ -723,4 +736,3 @@ export async function authorizedRequest(deps: AuthDeps): Promise<AuthOutcome> {
   }
   return { kind: 'response', response: resposta };
 }
-

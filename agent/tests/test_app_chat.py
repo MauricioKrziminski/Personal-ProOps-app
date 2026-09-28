@@ -165,6 +165,10 @@ class RepoFalso:
         return next((p for p in self.pendentes if p["session_id"] == session_id
                      and p["status"] == "awaiting"), None)
 
+    async def pending_status(self, *, session_id, pending_id):
+        return next((p["status"] for p in self.pendentes
+                     if p["session_id"] == session_id and p["id"] == pending_id), None)
+
     async def mark_chat_deleting(self, session_id, user_id):
         s = await self.chat_session(session_id, user_id)
         if s is None:
@@ -863,6 +867,35 @@ async def test_pergunta_respondida_para_de_parecer_viva(repo):
     balao = next(m for m in repo.mensagens
                  if (m.get("ui_payload") or {}).get("pending_id") == str(p["id"]))
     assert balao["ui_payload"]["resolved"] == "approve"
+
+
+@pytest.mark.asyncio
+async def test_texto_de_correcao_expira_botoes_da_proposta_antiga(repo, monkeypatch):
+    inicial = await app_chat.create_conversation(
+        user_id=USER, client_message_id=uuid4(), content="oi"
+    )
+    sid = inicial.conversation["id"]
+    antiga = _pendencia(repo, sid)
+    balao = {
+        "id": uuid4(), "session_id": sid, "client_message_id": None,
+        "role": "assistant", "content": "Confirma?", "status": "completed",
+        "ui_payload": {"pending_id": str(antiga["id"]), "buttons": []},
+    }
+    repo.mensagens.append(balao)
+
+    async def corrigir(sessao, **kwargs):
+        antiga["status"] = "expired"
+        repo.pendentes.append({**antiga, "id": uuid4(), "status": "awaiting"})
+        # nova proposta pode nascer no mesmo turno
+        return "Agora a proposta é outra"
+
+    monkeypatch.setattr(app_chat.conversation, "run_turn", corrigir)
+    await app_chat.send_message(
+        user_id=USER, session_id=sid, client_message_id=uuid4(),
+        content="corrigindo: foram 2 parcelas",
+    )
+
+    assert balao["ui_payload"]["resolved"] == "expired"
 
 
 @pytest.mark.asyncio

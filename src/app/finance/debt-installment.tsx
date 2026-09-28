@@ -13,7 +13,7 @@ import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { Space, tabular } from '@/design/tokens';
-import { DEBT_KINDS, useDebtPayments, useDebtSchedule, useDebts } from '@/hooks/use-finance';
+import { DEBT_KINDS, useDebtDeclaredEstimates, useDebtPayments, useDebtSchedule, useDebts } from '@/hooks/use-finance';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { isoToBR } from '@/lib/dates';
 import { paidInstallments, secoesDaLinha } from '@/lib/debt-history';
@@ -35,9 +35,10 @@ export default function DebtInstallmentScreen() {
   const debts = useDebts();
   const schedule = useDebtSchedule(params.debt);
   const payments = useDebtPayments(params.debt);
-  const pronta = useTelaPronta(debts, schedule, payments);
+  const declaredEstimates = useDebtDeclaredEstimates(params.debt);
+  const pronta = useTelaPronta(debts, schedule, payments, declaredEstimates);
 
-  const atualizar = () => Promise.all([debts.refetch(), schedule.refetch(), payments.refetch()]);
+  const atualizar = () => Promise.all([debts.refetch(), schedule.refetch(), payments.refetch(), declaredEstimates.refetch()]);
   const titulo = Number.isInteger(n) && n > 0 ? `${n}ª parcela` : 'Parcela';
   const cabecalho = <Stack.Screen options={{ title: titulo }} />;
 
@@ -55,7 +56,7 @@ export default function DebtInstallmentScreen() {
     );
   }
 
-  const falhou = debts.isError || schedule.isError || payments.isError;
+  const falhou = debts.isError || schedule.isError || payments.isError || declaredEstimates.isError;
   if (falhou) {
     return (
       <Screen grouped onRefresh={atualizar}>
@@ -65,6 +66,7 @@ export default function DebtInstallmentScreen() {
             if (debts.isError) void debts.refetch();
             if (schedule.isError) void schedule.refetch();
             if (payments.isError) void payments.refetch();
+            if (declaredEstimates.isError) void declaredEstimates.refetch();
           }}
         />
       </Screen>
@@ -79,6 +81,7 @@ export default function DebtInstallmentScreen() {
         installmentCents: Number(divida.installment_cents ?? futuras[0]?.payment_cents ?? 0),
         nextDueDate: futuras[0]?.due_date ?? null,
         payments: payments.data ?? [],
+        overrides: declaredEstimates.data ?? [],
       })
     : [];
   const secoes = secoesDaLinha(historico, futuras);

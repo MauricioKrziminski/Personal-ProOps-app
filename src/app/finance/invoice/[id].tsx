@@ -689,11 +689,7 @@ export default function InvoiceScreen() {
                         label: 'Editar',
                         icon: 'pencil',
                         arrasto: 'direita',
-                        // Em parcela, "Editar" abre a COMPRA — a régua de `[txId]` e de Lançamentos.
-                        onPress: () =>
-                          tx.installment_plan_id
-                            ? router.push({ pathname: '/finance/installments', params: { edit: tx.installment_plan_id } })
-                            : router.push(`/finance/transaction-form?id=${tx.id}`),
+                        onPress: () => router.push({ pathname: '/finance/transaction-form', params: { id: tx.id } }),
                       },
                       { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => apagar(tx) },
                     ]}>

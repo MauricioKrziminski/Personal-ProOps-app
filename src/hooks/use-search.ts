@@ -45,6 +45,7 @@ export interface ReminderHit {
   recurrence: string | null;
   next_run_at: string;
   active: boolean;
+  skip_run_at?: string | null;
 }
 
 export function useGlobalSearch(q: string, limite = LIMIT) {
@@ -101,12 +102,12 @@ export function useGlobalSearch(q: string, limite = LIMIT) {
           const like = `%${safe}%`;
           const { data, error } = await supabase
             .from('reminders')
-            .select('id, title, recurrence, next_run_at, active')
+            .select('id, title, recurrence, next_run_at, active, skip_run_at')
             .ilike('title', like)
             .order('next_run_at')
             .limit(limite + 1);
           if (error) throw error;
-          return data as unknown as ReminderHit[];
+          return (data as unknown as ReminderHit[]).filter((r) => r.skip_run_at !== r.next_run_at);
         },
       },
     ],

@@ -324,7 +324,9 @@ Tipos:
   se repete ("me lembra de pagar o cartão dia 10" é UMA vez, sem recurrence;
   "todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY;
   "todo último dia do mês"/"todo fim de mês" -> FREQ=MONTHLY;BYMONTHDAY=-1).
-  ⚠️ Fim de mês é BYMONTHDAY=-1, NUNCA 31: o dia 31 pula fevereiro e os meses de 30.
+  ⚠️ Fim de mês explícito é BYMONTHDAY=-1. "Dia 30" e "dia 31" são dias FIXOS;
+  o agendador ajusta ao último dia disponível em meses mais curtos. Não inferir
+  fim de mês só porque o número escolhido é o último dia do mês atual.
 - delete_reminder: cancelar um lembrete. search_term identifica qual.
 - query_reminders: LISTAR lembretes — "quais meus lembretes?", "o que eu tinha pra lembrar
   essa semana?", "tenho algum lembrete do dentista?". search_term filtra por título e

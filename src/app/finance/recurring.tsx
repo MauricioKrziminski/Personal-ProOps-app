@@ -279,7 +279,17 @@ export default function RecurringScreen() {
     );
   };
 
-  const abrirEdicao = (r: RecurringTransaction) => setForm(serieDoRegistro(r));
+  const abrirEdicao = (r: RecurringTransaction) =>
+    showItemActions(`Editar ${r.description ?? 'recorrência'}`, [
+      {
+        label: 'Só uma ocorrência',
+        onPress: () => router.push({ pathname: '/finance/transactions', params: { recurringId: r.id } }),
+      },
+      {
+        label: 'Esta e as próximas',
+        onPress: () => setForm(serieDoRegistro(r)),
+      },
+    ], 'Escolha o alcance antes de mudar o vencimento ou os outros dados.');
 
   /**
    * `?edit=<id>` abre a edição direto, como `?create=1` já abria a criação — dá destino
@@ -595,6 +605,24 @@ export default function RecurringScreen() {
 
           {form ? (
             <SheetScroll contentContainerStyle={styles.sheetBody}>
+              {form.id ? (
+                <Card style={styles.alcance}>
+                  <ThemedText type="smallBold">Esta e as próximas</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    As já pagas ficam como estão. Para mudar só uma, escolha a ocorrência na lista.
+                  </ThemedText>
+                  <Button
+                    label="Escolher uma ocorrência"
+                    variant="secondary"
+                    size="sm"
+                    onPress={() => {
+                      const id = form.id!;
+                      setForm(null);
+                      router.push({ pathname: '/finance/transactions', params: { recurringId: id } });
+                    }}
+                  />
+                </Card>
+              ) : null}
               <CamposDaSerie form={form} onChange={setForm} contas={accounts.data ?? []} />
             </SheetScroll>
           ) : null}
@@ -604,6 +632,10 @@ export default function RecurringScreen() {
 }
 
 const styles = StyleSheet.create({
+  alcance: {
+    gap: Space.sm,
+    alignItems: 'flex-start',
+  },
   paneBody: {
     gap: Space.xl,
     minWidth: 0,

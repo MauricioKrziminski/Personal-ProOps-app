@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +17,6 @@ import { DatePickerField } from '@/components/finance/date-picker-field';
 import { CamposDaSerie } from '@/components/finance/serie-form';
 import { CamposDaCompra } from '@/components/finance/compra-form';
 import { ThemedText } from '@/components/themed-text';
-import { Forte } from '@/components/ui/forte';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
@@ -38,12 +37,13 @@ import {
   useUpdateInstallmentPlan,
   useInstallmentPlan,
   useDebts,
+  useDebtPaymentVersions,
   useDeleteTransaction,
-  useSaveDebt,
+  useSaveDebtPaymentScoped,
   useSaveTransaction,
+  useSaveInstallmentOccurrence,
   useRecurringTransactions,
-  useSaveRecurringSeries,
-  useSaveTransactionScoped,
+  useSaveRecurringOccurrenceAndSeries,
   useTransaction,
   useJurosDoPix,
   DESCRICAO_JUROS_DO_PIX,
@@ -52,17 +52,17 @@ import {
   type TransactionKind,
 } from '@/hooks/use-finance';
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
-import { mudancasDaOcorrencia, serieDaOcorrencia, validaSerie, type SerieForm } from '@/lib/serie';
-import { compraDoRegistro, payloadDaCompra, validaCompra, type CompraForm } from '@/lib/compra';
+import { mudaInicioDaSerie, mudancasDaOcorrencia, serieDaOcorrencia, validaSerie, type SerieForm } from '@/lib/serie';
+import { compraDoRegistro, compraParaRevisaoDaParcela, payloadDaCompra, validaCompra, type CompraForm } from '@/lib/compra';
 import {
   destinoDoSalvar,
   faixaDeParcelas,
   financeErrorMessage,
   installmentHistory,
   podeParcelar,
-  simpleDebtValues,
   totalDigitado,
   UNIDADES_DO_VALOR,
+  vencimentoPendenteValido,
   type UnidadeDoValor,
 } from '@/lib/finance-form';
 import { QuantityField } from '@/components/ui/quantity-field';
@@ -75,6 +75,8 @@ import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { correcaoDoPagamento } from '@/lib/confirmar-baixa';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { transicaoDeLayout } from '@/components/motion/transicao';
+import { debtPaymentPatch, selectedDebtPaymentVersions, type DebtPaymentScope } from '@/lib/debt-payment-scope';
+import { newClientMessageId } from '@/lib/agent-chat';
 
 /**
  * Novo/editar lançamento — modal do Stack raiz (Cancelar nativo vem do `_layout.tsx`).
@@ -110,6 +112,8 @@ const schema = z
     occurred_at: z.string().refine(isValidBRDate, 'Data em dd/mm/aaaa'),
     /** "Isso ainda vai acontecer" — vira `status='pending'`, a base da projeção de caixa. */
     pending: z.boolean(),
+    /** Uma parcela já tem sua data no cronograma; o vencimento extra pode ficar vazio. */
+    installment_occurrence: z.boolean(),
     due_at: z.string().nullable(),
   })
   .superRefine((data, ctx) => {
@@ -132,7 +136,7 @@ const schema = z
       data.account_id !== data.counterparty_account_id,
     { message: 'Origem e destino precisam ser diferentes', path: ['counterparty_account_id'] },
   )
-  .refine((data) => !data.pending || (!!data.due_at && isValidBRDate(data.due_at)), {
+  .refine((data) => vencimentoPendenteValido(data.pending, data.installment_occurrence, data.due_at), {
     message: 'Informe o vencimento em dd/mm/aaaa',
     path: ['due_at'],
   })
@@ -253,7 +257,7 @@ function TransactionForm({
   const accounts = contas.data;
 
   const save = useSaveTransaction();
-  const salvarSerie = useSaveTransactionScoped();
+  const salvarParcela = useSaveInstallmentOccurrence();
   const createPlan = useCreateInstallmentPlan();
   const converter = useConvertToInstallments();
   const remove = useDeleteTransaction();
@@ -285,6 +289,7 @@ function TransactionForm({
       auto_confirm: editing?.auto_confirm ?? false,
       occurred_at: isoToBR(dataDaSerie ?? editing?.occurred_at ?? localISODate()),
       pending: editing?.status === 'pending',
+      installment_occurrence: Boolean(editing?.installment_plan_id),
       due_at: dataDaSerie ? isoToBR(dataDaSerie) : editing?.due_at ? isoToBR(editing.due_at) : null,
     },
   });
@@ -297,10 +302,6 @@ function TransactionForm({
   const installmentCount = useWatch({ control, name: 'installments' });
   const pending = useWatch({ control, name: 'pending' });
   const errors = formState.errors;
-  const mudaData = (br: string) => {
-    setValue('occurred_at', br, { shouldValidate: true });
-    if (umaData) setValue('due_at', br);
-  };
 
   // "ontem" congelado na abertura do modal: ler o relógio durante o render é impuro
   // (React Compiler) e o modal é efêmero. "hoje" saiu junto com o chip dele — quem põe a data de
@@ -336,16 +337,8 @@ function TransactionForm({
   const podeAdiar = kind !== 'transfer' && !isCard && installmentCount <= 1 && !editing?.debt_id;
   // O campo "Data" É o vencimento: rótulo "Vence em" e sem o atalho "Ontem" (vencimento não é compra).
   const dataEVencimento = umaData && podeAdiar && pending;
-  /*
-    ⚠️ **Numa PARCELA, "Só esta parcela | A compra toda" é escolhido no TOPO** (26/09/2026, a
-    mesma tela só da série). "A compra toda" desenha os MESMOS campos de Parceladas
-    (`CamposDaCompra`: nome, valor em cada parcela ou total, conta, número, data da 1ª, parcelas
-    já pagas) e grava pela `update_installment_plan`. "Só esta parcela" mexe só nela — o valor
-    passa pela RPC do escopo, que refaz o total da compra.
-
-    Até aqui o valor de uma parcela editava a COMPRA, com a unidade dita (23/09/2026), e a pergunta
-    "só esta ou as próximas" vinha no Salvar; número, data da 1ª e as já pagas só em Parceladas.
-  */
+  /* Ao salvar uma parcela, a pessoa escolhe entre a linha e a compra inteira. A compra inteira
+     abre `CamposDaCompra` para revisar total, conta, número, data inicial e parcelas já pagas. */
   const naCompra = Boolean(editing?.installment_plan_id);
   /**
    * Esta parcela está numa FATURA de cartão paga, adiada ou paga em parte: o valor e a data dela
@@ -388,53 +381,38 @@ function TransactionForm({
     }
   };
 
-  /*
-    ⚠️ **Numa ocorrência de série, "Só esta | Esta e as próximas" é escolhido no TOPO** (26/09/2026,
-    *"uma tela só de editar componentizada, tendo a possibilidade nessa tela de alterar uma ou
-    todas e ter todos os campos de quando eu crio"*). Era uma pergunta no Salvar, sobre os campos
-    da linha só — sem repetição, sem vencimento da série, sem tipo —, e a série se editava em outra
-    tela. "Esta e as próximas" troca o corpo pelos MESMOS campos da folha de Recorrentes.
-    `formSerie` nulo é "Só esta".
-  */
+  /* A ocorrência começa com os campos da linha. Em Salvar, a pessoa escolhe o alcance; os
+     campos da série, quando abertos, usam o mesmo grupo de Recorrentes. */
   const series = useRecurringTransactions();
   const serie = editing?.recurring_id ? series.data?.find((r) => r.id === editing.recurring_id) : undefined;
   const [formSerie, setFormSerie] = useState<SerieForm | null>(null);
-  const editarSerie = useSaveRecurringSeries();
+  const [intencaoDoDia, setIntencaoDoDia] = useState<'fixo' | 'ultimo' | null>(null);
+  const editarSerie = useSaveRecurringOccurrenceAndSeries();
   const serieOk = validaSerie(formSerie).podeSalvar;
+  const mudaData = (br: string, intencao: 'fixo' | 'ultimo' = 'fixo') => {
+    setValue('occurred_at', br, { shouldValidate: true });
+    if (umaData) setValue('due_at', br);
+    if (editing?.recurring_id) setIntencaoDoDia(intencao);
+  };
 
-  /**
-   * Duas escritas, nesta ordem (`mudancasDaOcorrencia`, com teste): as LINHAS desta em diante
-   * (a mesma RPC do escopo "future", ancorada nesta ocorrência, que também atualiza a regra) e só
-   * depois a REGRA — o calendário novo muda esta linha de data, com o mesmo id.
-   */
-  const salvarAsProximas = () => {
-    if (!formSerie || !editing || !serie || !serieOk) return;
-    const { linhas, regra } = mudancasDaOcorrencia(formSerie, editing, serie);
+  /** Linhas e regra são uma transação no banco: nenhum resultado parcial. */
+  const salvarAsProximas = (form = formSerie) => {
+    if (!form || !editing || !serie) return;
+    if (!validaSerie(form).podeSalvar) {
+      toast({ message: 'Confira o vencimento e os dados da série antes de salvar.', tone: 'error' });
+      return;
+    }
+    const { linhas, regra } = mudancasDaOcorrencia(form, editing, serie);
     const feito = (aviso?: string | null) => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
       toast({ message: aviso ?? 'Alterei esta e as próximas.', tone: 'success' });
     };
-    const gravarRegra = (linhasJaGravadas: boolean) => {
-      if (Object.keys(regra).length === 0) return feito();
-      editarSerie.mutate(
-        { id: serie.id, patch: regra },
-        {
-          onSuccess: ({ aviso }) => feito(aviso),
-          // As linhas JÁ mudaram: a frase diz as duas coisas, com o motivo do banco (a de setembro
-          // já paga, a repetição que o app não monta).
-          onError: (error) => {
-            const motivo = financeErrorMessage(error, 'Não deu para mudar a repetição. Tenta de novo.');
-            toast({ message: linhasJaGravadas ? `Salvei os valores, mas não a repetição: ${motivo}` : motivo, tone: 'error' });
-          },
-        },
-      );
-    };
-    if (Object.keys(linhas).length === 0) return gravarRegra(false);
-    salvarSerie.mutate(
-      { id: editing.id, scope: 'future', patch: linhas },
+    if (Object.keys(linhas).length === 0 && Object.keys(regra).length === 0) return feito();
+    editarSerie.mutate(
+      { id: editing.id, recurringId: serie.id, linePatch: linhas, seriesPatch: regra },
       {
-        onSuccess: () => gravarRegra(true),
+        onSuccess: ({ aviso }) => feito(aviso),
         onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para salvar. Tenta de novo.'), tone: 'error' }),
       },
     );
@@ -477,10 +455,12 @@ function TransactionForm({
     }
     gravarCompra();
   };
-  const salvarDivida = useSaveDebt();
+  const salvarPagamentoDivida = useSaveDebtPaymentScoped();
+  const versoesPagamentos = useDebtPaymentVersions(editing?.debt_id ?? undefined);
+  const tentativaPagamento = useRef<{ key: string; id: string } | null>(null);
   const saving =
-    save.isPending || createPlan.isPending || converter.isPending || atualizarCompra.isPending || salvarDivida.isPending ||
-    salvarSerie.isPending || editarSerie.isPending;
+    save.isPending || createPlan.isPending || converter.isPending || atualizarCompra.isPending || salvarPagamentoDivida.isPending ||
+    salvarParcela.isPending || editarSerie.isPending;
 
   /**
    * Pagamento de dívida (25/09/2026): o banco decide o que o valor novo pode ser, e a tela diz
@@ -630,13 +610,34 @@ function TransactionForm({
       return;
     }
 
-    // Série e compra escolhem no TOPO ("Só esta | Esta e as próximas", "Só esta parcela | A compra
-    // toda"): aqui é sempre esta linha só.
+    // A decisão de escopo já aconteceu no Salvar; este caminho grava só a linha.
     const fechar = () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     };
-    const gravar = (depois?: () => void, seFalhar?: string) =>
+    if (naCompra && editing) {
+      salvarParcela.mutate({
+        id: editing.id,
+        patch: {
+          amount_cents: values.amount_cents,
+          category: values.category,
+          description: values.description.trim(),
+          merchant: values.merchant?.trim() || null,
+          occurred_at: brToISO(values.occurred_at),
+          status,
+          due_at: dueAt,
+          auto_confirm: autoConfirm,
+        },
+      }, {
+        onSuccess: fechar,
+        onError: (error) => toast({
+          message: financeErrorMessage(error, 'Nada foi salvo. Confira a parcela e tente novamente.'),
+          tone: 'error',
+        }),
+      });
+      return;
+    }
+    const gravar = () =>
       save.mutate(
       {
         id: editing?.id,
@@ -657,26 +658,6 @@ function TransactionForm({
       },
       {
         onSuccess: () => {
-          if (depois) {
-            depois();
-            return;
-          }
-          // "Só esta parcela" com valor novo: o total da compra é a soma das parcelas, e quem o
-          // refaz é a RPC do escopo (a mesma da série), com a parcela no valor já gravado.
-          if (naCompra && editing && values.amount_cents !== editing.amount_cents) {
-            salvarSerie.mutate(
-              { id: editing.id, scope: 'one', patch: { amount_cents: values.amount_cents } },
-              {
-                onSuccess: fechar,
-                // A parcela JÁ mudou: dizer só "não deu para salvar" seria mentira.
-                onError: (error) => toast({
-                  message: financeErrorMessage(error, 'Salvei a parcela, mas não consegui refazer o total da compra. Tenta de novo.'),
-                  tone: 'error',
-                }),
-              },
-            );
-            return;
-          }
           fechar();
         },
         // Erro NUNCA fecha o modal: o que foi digitado continua na tela.
@@ -685,66 +666,161 @@ function TransactionForm({
             message:
               error && typeof error === 'object' && 'compraSalva' in error
                 ? 'Salvei a compra, mas não o juro do Pix. Tenta de novo.'
-                : financeErrorMessage(error, seFalhar ?? 'Não deu para salvar. Tenta de novo.'),
+                : financeErrorMessage(error, 'Não deu para salvar. Tenta de novo.'),
             tone: 'error',
           }),
       },
     );
 
     if (correcaoDaDivida.erro) return;
-    /**
-     * Parcela fixa com valor novo: "Só este pagamento" conta uma parcela e a diferença vira
-     * encargo/desconto; "Este e as próximas" passa o contrato ao valor novo, pela mesma porta do
-     * "Editar dívida" (com a trava de versão), e SÓ ENTÃO grava o pagamento — a ordem da folha de
-     * pagar. Com o contrato já no valor novo, o trigger (`20260925140000`) grava o pagamento mais
-     * recente como a parcela inteira nele, sem encargo (25/09/2026: o detalhe dizia "Parcela de
-     * R$ 105 + R$ 5 de encargo" para quem tinha dito que a parcela passou a R$ 110).
-     */
-    if (correcaoDaDivida.perguntaAsProximas && divida?.installments) {
-      const valor = values.amount_cents;
-      const oMaisRecente = editing?.debt_payment_no === divida.installments_paid;
-      const contratoEPagamento = () =>
-        salvarDivida.mutate(
-          {
-            id: divida.id,
-            name: divida.name,
-            kind: divida.kind,
-            ...simpleDebtValues(valor, String(divida.installments), divida.installments_paid),
-            account_id: divida.account_id,
-            due_day: divida.due_day,
-            versao: divida.updated_at ?? null,
-          },
-          {
-            onSuccess: () =>
-              gravar(
-                () => {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  router.back();
-                  toast({ message: <>As parcelas de <Forte>{divida.name}</Forte> passam a {formatBRL(valor)}.</>, tone: 'success' });
-                },
-                // O contrato JÁ mudou: dizer só "não deu para salvar" seria mentira.
-                'Mudei as próximas parcelas, mas não consegui salvar este pagamento. Tenta de novo.',
-              ),
-            onError: () =>
-              toast({ message: 'Não consegui mudar as parcelas. Nada foi salvo — tenta de novo.', tone: 'error' }),
-          },
-        );
-      const diferenca = valor > (editing?.debt_principal_cents ?? valor) ? 'encargo' : 'desconto';
-      showItemActions(
-        'Aplicar em quais?',
-        [
-          { label: 'Só este pagamento', onPress: () => gravar() },
-          { label: 'Este e as próximas parcelas', onPress: contratoEPagamento },
-        ],
-        oMaisRecente
-          ? `Só este: a diferença fica como ${diferenca} deste pagamento. Este e as próximas: a parcela passa a ${formatBRL(valor)}.`
-          : `Só este: a diferença fica como ${diferenca} deste pagamento. Este e as próximas: ele fica com o ${diferenca}, e as próximas passam a ${formatBRL(valor)}.`,
-      );
-      return;
-    }
-
     gravar();
   });
+
+  const salvarPagamento = (scope: DebtPaymentScope) => handleSubmit((values) => {
+    if (!editing || !divida || editing.debt_payment_no === null) return;
+    if (!versoesPagamentos.data || versoesPagamentos.isError) {
+      toast({ message: 'Não consegui carregar os pagamentos desta dívida. Tente novamente.', tone: 'error' });
+      return;
+    }
+    const patch = debtPaymentPatch(editing, {
+      amount_cents: values.amount_cents,
+      category: values.category,
+      description: values.description.trim(),
+      merchant: values.merchant?.trim() || null,
+      account_id: values.account_id,
+      occurred_at: brToISO(values.occurred_at),
+    });
+    if (!Object.keys(patch).length) {
+      router.back();
+      return;
+    }
+    if (scope !== 'one' && patch.occurred_at) {
+      toast({
+        message: 'A data é a baixa deste pagamento. Salve só este ou altere o vencimento das próximas na dívida.',
+        tone: 'error',
+      });
+      return;
+    }
+    let paymentVersions: Record<string, number>;
+    try {
+      paymentVersions = selectedDebtPaymentVersions(
+        versoesPagamentos.data, editing.id, editing.debt_payment_no, scope);
+    } catch (error) {
+      toast({ message: error instanceof Error ? error.message : 'Atualize os pagamentos e tente novamente.', tone: 'error' });
+      return;
+    }
+    const key = JSON.stringify([editing.id, scope, patch, divida.edit_revision, editing.edit_revision, paymentVersions]);
+    if (tentativaPagamento.current?.key !== key) tentativaPagamento.current = { key, id: newClientMessageId() };
+    salvarPagamentoDivida.mutate({
+      anchorId: editing.id,
+      scope,
+      patch,
+      debtRevision: divida.edit_revision,
+      anchorRevision: editing.edit_revision,
+      paymentVersions,
+      requestId: tentativaPagamento.current.id,
+    }, {
+      onSuccess: () => {
+        tentativaPagamento.current = null;
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.back();
+      },
+      onError: (error) => toast({ message: financeErrorMessage(error, 'Nada foi salvo. Confira a dívida e tente novamente.'), tone: 'error' }),
+    });
+  })();
+
+  const salvarComAlcance = () => {
+    if (editing?.recurring_id && serie) {
+      showItemActions('Salvar alterações em', [
+        {
+          label: 'Só esta ocorrência',
+          onPress: () => {
+            if (formSerie) {
+              setFormSerie(null);
+              toast({ message: 'Revise os campos deste lançamento e toque em Salvar novamente.', tone: 'info' });
+            } else onSubmit();
+          },
+        },
+        {
+          label: 'Esta e as próximas',
+          onPress: () => {
+            if (formSerie) return salvarAsProximas(formSerie);
+            const values = getValues();
+            const base = serieDaOcorrencia(serie, {
+              ...editing,
+              amount_cents: values.amount_cents,
+              description: values.description,
+              merchant: values.merchant,
+              category: values.category,
+              account_id: values.account_id,
+            });
+            const alterouData = values.occurred_at !== isoToBR(dataDaSerie ?? editing.occurred_at);
+            salvarAsProximas(alterouData || intencaoDoDia
+              ? mudaInicioDaSerie(base, values.occurred_at, intencaoDoDia === 'ultimo')
+              : base);
+          },
+        },
+      ], 'Pagamentos anteriores mantêm a data e o valor originais.');
+      return;
+    }
+    if (editing?.recurring_id && !serie) {
+      toast({ message: 'A série ainda está carregando. Tente salvar novamente.', tone: 'error' });
+      return;
+    }
+    if (editing?.installment_plan_id && plano) {
+      showItemActions('Salvar alterações em', [
+        {
+          label: 'Só esta parcela',
+          onPress: () => {
+            if (formCompra) {
+              setFormCompra(null);
+              toast({ message: 'Revise esta parcela e toque em Salvar novamente.', tone: 'info' });
+            } else onSubmit();
+          },
+        },
+        {
+          label: 'A compra toda',
+          onPress: () => {
+            if (formCompra) return salvarCompraToda();
+            const values = getValues();
+            if (plano.locked_in_invoice > 0 && brToISO(values.occurred_at) !== editing.occurred_at) {
+              toast({
+                message: 'A data da compra não muda porque já há parcela em fatura paga. Escolha só esta parcela.',
+                tone: 'error',
+              });
+              return;
+            }
+            setFormCompra(compraParaRevisaoDaParcela(plano, editing, {
+              occurred_at: brToISO(values.occurred_at),
+              amount_cents: values.amount_cents,
+              description: values.description,
+              merchant: values.merchant,
+              category: values.category,
+            }));
+            toast({ message: 'Confira o total e a data da primeira parcela antes de salvar a compra.', tone: 'info' });
+          },
+        },
+      ], 'As parcelas pagas e as faturas fechadas ficam como estão.');
+      return;
+    }
+    if (editing?.installment_plan_id && !plano) {
+      toast({ message: 'A compra ainda está carregando. Tente salvar novamente.', tone: 'error' });
+      return;
+    }
+    if (editing?.debt_id && divida?.installments) {
+      showItemActions('Salvar alterações em', [
+        { label: 'Só este pagamento', onPress: () => salvarPagamento('one') },
+        { label: 'Este e os próximos', onPress: () => salvarPagamento('from_here') },
+        { label: 'Todos, inclusive pagamentos passados', onPress: () => salvarPagamento('all') },
+      ], 'Todos também corrige pagamentos já registrados e recalcula estimativas antigas sem lançamento.');
+      return;
+    }
+    if (editing?.debt_id) {
+      toast({ message: 'A dívida ainda está carregando. Tente salvar novamente.', tone: 'error' });
+      return;
+    }
+    onSubmit();
+  };
 
   const onDelete = () => {
     if (!editing) return;
@@ -775,7 +851,7 @@ function TransactionForm({
             size="sm"
             disabled={saving || !!correcaoDaDivida.erro || (formSerie !== null && !serieOk) || (formCompra !== null && !compraOk)}
             loading={saving}
-            onPress={formSerie ? salvarAsProximas : formCompra ? salvarCompraToda : onSubmit}
+            onPress={editing?.recurring_id || editing?.installment_plan_id || editing?.debt_id ? salvarComAlcance : onSubmit}
           />
         }
       />
@@ -802,33 +878,28 @@ function TransactionForm({
         {/*
           ⚠️ **Um lançamento que JÁ é de uma série precisa dizer isso na tela** — a queixa foi
           literal (13/09/2026), *"ele não mostra como recorrente para eu colocar aqui"*. Na
-          ocorrência de recorrente é o seletor "Só esta | Esta e as próximas" (26/09/2026); na
-          parcela, a nota, e a pergunta de escopo continua no Salvar.
+          ocorrência recorrente e na parcela, a pergunta de escopo aparece ao Salvar.
         */}
         {editing?.recurring_id && serie ? (
-          <Field label="Editar">
-            <Segmented
-              options={[
-                { value: 'uma', label: 'Só esta' },
-                { value: 'serie', label: 'Esta e as próximas' },
-              ]}
-              value={formSerie ? 'serie' : 'uma'}
-              onChange={(v) => setFormSerie(v === 'serie' ? serieDaOcorrencia(serie, editing) : null)}
+          <Section>
+            <Row
+              icon="arrow.triangle.branch"
+              title={formSerie ? 'Voltar ao lançamento' : 'Configurar a repetição'}
+              subtitle={formSerie ? 'Revise esta ocorrência separadamente' : 'Frequência, término e demais detalhes'}
+              onPress={() => setFormSerie(formSerie ? null : serieDaOcorrencia(serie, editing))}
             />
-          </Field>
+          </Section>
         ) : editing?.installment_plan_id && plano ? (
-          <Field label="Editar">
-            <Segmented
-              options={[
-                { value: 'uma', label: 'Só esta parcela' },
-                { value: 'compra', label: 'A compra toda' },
-              ]}
-              value={formCompra ? 'compra' : 'uma'}
-              onChange={(v) => setFormCompra(v === 'compra' ? compraDoRegistro(plano) : null)}
+          <Section>
+            <Row
+              icon="arrow.triangle.branch"
+              title={formCompra ? 'Voltar à parcela' : 'Configurar a compra parcelada'}
+              subtitle={formCompra ? 'Revise esta parcela separadamente' : 'Total, parcelas pagas e demais detalhes'}
+              onPress={() => setFormCompra(formCompra ? null : compraDoRegistro(plano))}
             />
-          </Field>
+          </Section>
         ) : editing && (editing.recurring_id || editing.installment_plan_id) ? (
-          // Sem a série (ou a compra) carregada, a nota diz o que é; o seletor chega com ela.
+          // Sem a série (ou a compra) carregada, a nota diz o que é.
           <Note icon="arrow.triangle.branch">
             {editing.recurring_id
               ? 'Faz parte de uma série.'
@@ -848,11 +919,10 @@ function TransactionForm({
           "Categoria" por "Para a conta". Controle que remonta o formulário não pode vir
           depois do que ele remonta.
 
-          ⚠️ **Linha de série não troca de tipo.** `gravar('one')` vai pelo `.update()` cru, que
-          carrega `kind` — justamente a coluna que `update_transaction_scoped` recusa de
-          propósito. Com o Segmented na tela, dava para virar uma parcela de cartão em receita, e
-          a fatura ficava com uma linha que soma para o outro lado. O valor gravado continua
-          sendo `editing.kind`, que é o que o `defaultValues` já traz.
+          ⚠️ **Linha de série ou parcela não troca de tipo.** Com o Segmented na tela, dava
+          para virar uma parcela de cartão em receita, e a fatura ficava com uma linha que
+          soma para o outro lado. O tipo gravado continua sendo `editing.kind`, que é o que
+          o `defaultValues` já traz.
         */}
         {!tipoTravado && (
           <Controller
@@ -1156,6 +1226,7 @@ function TransactionForm({
                   <DatePickerField
                     value={field.value}
                     onChange={mudaData}
+                    onSelectLastDay={editing?.recurring_id ? (br) => mudaData(br, 'ultimo') : undefined}
                     accessibilityLabel="Data do lançamento"
                     invalid={!!errors.occurred_at}
                   />
@@ -1202,6 +1273,7 @@ function TransactionForm({
                       render={({ field }) => (
                         <Field
                           label={dueFieldLabel(kind)}
+                          hint={naCompra ? 'Opcional: a data da parcela já está no cronograma.' : undefined}
                           error={errors.due_at?.message}>
                           <DatePickerField
                             value={field.value}

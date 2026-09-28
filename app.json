@@ -58,6 +58,14 @@
         }
       ],
       "expo-image",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Permita que o ProOps use o microfone para enviar áudio ao agente.",
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
+        }
+      ],
       "expo-status-bar",
       "expo-web-browser",
       "./plugins/with-android-abis",

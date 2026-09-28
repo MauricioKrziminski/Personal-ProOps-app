@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { compraDoRegistro, mudarParcelas, payloadDaCompra, validaCompra, type CompraGravada } from './compra.ts';
+import { compraDoRegistro, compraParaRevisaoDaParcela, mudarParcelas, payloadDaCompra, validaCompra, type CompraGravada } from './compra.ts';
 
 // Uma compra de 10x de R$ 100 com as 3 primeiras pagas.
 const tv: CompraGravada = {
@@ -50,4 +50,32 @@ test('Cada parcela digitada segue o número novo; as pagas não mudam de valor',
   const f = { ...compraDoRegistro(tv), unidade: 'parcela' as const, parcelaCents: 5000 };
   // 3 pagas (30.000) + 9 em aberto de 5.000
   assert.equal(mudarParcelas(f, 12).totalCents, 30000 + 9 * 5000);
+});
+
+test('Ao escolher a compra toda no Salvar, o rascunho da parcela chega inteiro à revisão', () => {
+  const revisao = compraParaRevisaoDaParcela(tv, {
+    installment_no: 5, occurred_at: '2026-10-05', amount_cents: 10000, description: 'TV (5/10)',
+  }, {
+    occurred_at: '2026-10-30', amount_cents: 12000, description: 'TV nova', merchant: 'Loja', category: 'eletrônicos',
+  });
+  assert.equal(revisao.inicio, '30/06/2026');
+  assert.equal(revisao.totalCents, 30000 + 7 * 12000);
+  assert.equal(revisao.description, 'TV nova');
+  assert.equal(revisao.merchant, 'Loja');
+  assert.equal(revisao.category, 'eletrônicos');
+  assert.equal(revisao.pagas, 3);
+
+  const intocada = compraParaRevisaoDaParcela(tv, {
+    installment_no: 5, occurred_at: '2026-10-05', amount_cents: 10000, description: 'TV (5/10)',
+  }, {
+    occurred_at: '2026-10-05', amount_cents: 10000, description: 'TV', merchant: null, category: 'casa',
+  });
+  assert.equal(intocada.totalCents, tv.total_cents);
+  assert.equal(intocada.inicio, '05/06/2026');
+  const rotulada = compraParaRevisaoDaParcela(tv, {
+    installment_no: 5, occurred_at: '2026-10-05', amount_cents: 10000, description: 'TV (5/10)',
+  }, {
+    occurred_at: '2026-10-05', amount_cents: 10000, description: 'TV (5/10)', merchant: null, category: 'casa',
+  });
+  assert.equal(rotulada.description, 'TV', 'o número da parcela não entra no título da compra');
 });

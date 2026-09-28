@@ -11,6 +11,7 @@
  * botão desabilitado que não explica.
  */
 import { isValidBRDate, isoToBR } from './dates.ts';
+import { addMonthsISO } from './debt-history.ts';
 import { MAX_PARCELAS, digitarValor, valorExibido, parcelaDoTotal, type Contrato, type UnidadeDoValor } from './finance-form.ts';
 
 /** O que a compra gravada precisa ter para virar formulário (`InstallmentPlanSummary`). */
@@ -91,6 +92,36 @@ export function compraDoRegistro(p: CompraGravada): CompraForm {
       accountId: p.account_id,
       pagas: p.paid,
     },
+  };
+}
+
+/**
+ * O formulário de uma parcela usa valor por parcela e a data DELA; o contrato usa valor total e
+ * data da PRIMEIRA. Ao escolher "a compra toda" no Salvar, convertemos a edição antes de mostrar
+ * a revisão do contrato. Parcelas já pagas ou travadas conservam seu total original.
+ */
+export function compraParaRevisaoDaParcela(
+  plano: CompraGravada,
+  parcela: { installment_no: number | null; occurred_at: string; amount_cents: number; description: string | null },
+  rascunho: { occurred_at: string; amount_cents: number; description: string; merchant: string | null; category: string | null },
+): CompraForm {
+  const base = compraDoRegistro(plano);
+  const numero = parcela.installment_no ?? 1;
+  const mudouData = rascunho.occurred_at !== parcela.occurred_at;
+  const mudouValor = rascunho.amount_cents !== parcela.amount_cents;
+  const abertas = Math.max(0, plano.installments - plano.locked);
+  const tituloDaCompra = rascunho.description === parcela.description
+    ? base.description
+    : rascunho.description.replace(new RegExp(`\\s+\\(${numero}/${plano.installments}\\)\\s*$`), '').trim();
+  return {
+    ...base,
+    description: tituloDaCompra,
+    merchant: rascunho.merchant ?? '',
+    category: rascunho.category,
+    inicio: mudouData ? isoToBR(addMonthsISO(rascunho.occurred_at, 1 - numero)) : base.inicio,
+    totalCents: mudouValor && abertas > 0
+      ? plano.locked_cents + abertas * rascunho.amount_cents
+      : base.totalCents,
   };
 }
 

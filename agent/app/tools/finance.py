@@ -344,7 +344,10 @@ async def create_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     categoria = guards.clean_category(action.category)
     # Citou conta que não existe (ou ambígua) -> pergunta. Só quem NÃO citou cai
     # na conta padrão, que é preferência do usuário e não dedução nossa.
-    conta = await conta_citada(ctx.workspace_id, action.account) or await _conta_padrao(ctx)
+    if matching.sem_conta_explicita(action.account):
+        conta = None
+    else:
+        conta = await conta_citada(ctx.workspace_id, action.account) or await _conta_padrao(ctx)
     rrule = guards.clean_rrule(action.recurrence)
 
     if rrule:

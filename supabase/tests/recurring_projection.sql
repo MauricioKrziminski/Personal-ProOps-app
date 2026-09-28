@@ -3,14 +3,14 @@
 --   docker exec -i supabase_db_app-proops psql -U postgres -d postgres \
 --     -v ON_ERROR_STOP=1 -f - < supabase/tests/recurring_projection.sql
 --
--- As cinco asserções são os cinco jeitos de errar isto, e nenhum deles dá erro na tela —
+-- As asserções cobrem os jeitos de errar isto, e nenhum deles dá erro na tela —
 -- só um número diferente do que deveria:
 --
 --   • projetar em cima do que o cron já materializou  → salário DOBRADO no mês
 --   • não projetar depois do horizonte                → mês com prestação e sem salário
 --   • BYMONTHDAY=31 em mês curto                      → data estourada (é a divergência real
 --                                                        entre o expansor SQL e o do Python)
---   • RRULE de forma desconhecida                     → projeção ERRADA em vez de ausente
+--   • recorrente semanal aceita pelo app              → datas semanais no horizonte
 --   • end_date ignorado                               → série morta continua projetando
 
 \set ON_ERROR_STOP on
@@ -27,6 +27,7 @@ declare
   s_finda  uuid := '00000000-0000-0000-0000-000000000017';
   n int;
   quando date;
+  dias_semana date[];
 begin
   insert into auth.users (id, email) values (u, 'teste-proj@example.invalid')
     on conflict (id) do nothing;
@@ -51,7 +52,7 @@ begin
   values (s_dia31, w, u, 'expense', 100000, 'Aluguel', cc, 'FREQ=MONTHLY;BYMONTHDAY=31',
           '2026-12-31', true, '2026-01-31', '2026-12-31');
 
-  -- forma que o expansor NÃO conhece
+  -- semanal: a projecao precisa acompanhar a forma aceita pelo app/agendador
   insert into public.recurring_transactions
     (id, workspace_id, user_id, kind, amount_cents, description, account_id, rrule,
      next_run_at, active, dtstart, materialized_until)
@@ -89,12 +90,13 @@ begin
     raise exception 'BYMONTHDAY=31 em fevereiro devia cair em 28/02; veio %', quando;
   end if;
 
-  -- 4. RRULE desconhecida não projeta NADA (falha fechada, não falha errada)
-  select count(*) into n
-  from private.recurring_projection_for(array[w], date '2027-01-01', date '2027-12-31')
+  -- 4. semanal de segunda continua semanal alem do horizonte
+  select array_agg(due_date order by due_date) into dias_semana
+  from private.recurring_projection_for(array[w], date '2027-02-01', date '2027-02-28')
   where recurring_id = s_semana;
-  if n <> 0 then
-    raise exception 'RRULE não suportada projetou % linhas em vez de nenhuma', n;
+  if dias_semana is distinct from array[date '2027-02-01', date '2027-02-08',
+                                         date '2027-02-15', date '2027-02-22'] then
+    raise exception 'semanal de segunda projetou %', dias_semana;
   end if;
 
   -- 5. end_date encerra a projeção

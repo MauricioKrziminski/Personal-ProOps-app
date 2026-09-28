@@ -21,6 +21,10 @@ interface Props {
   sending?: boolean;
   /** Uma pergunta espera resposta nos botões. */
   awaitingAction?: boolean;
+  audioState?: 'idle' | 'starting' | 'recording' | 'transcribing';
+  audioReview?: boolean;
+  onAudioPress?: () => void;
+  onDiscardAudio?: () => void;
   /** Na entrada da aba, o campo pertence ao conteúdo em vez de virar outra dock. */
   inline?: boolean;
 }
@@ -47,6 +51,10 @@ export function ChatComposer({
   onSubmit,
   sending = false,
   awaitingAction = false,
+  audioState = 'idle',
+  audioReview = false,
+  onAudioPress,
+  onDiscardAudio,
   inline = false,
 }: Props) {
   const theme = useTheme();
@@ -54,8 +62,9 @@ export function ChatComposer({
   const [altura, setAltura] = useState(0);
 
   const reservado = insets.bottom;
-  const pode = canSubmitMessage(value, { sending, awaitingAction });
-  const vidro = supportsLiquidGlass() && pode;
+  const pode = canSubmitMessage(value, { sending, awaitingAction }) && audioState === 'idle';
+  const podeEnviarPelaSeta = pode && !audioReview;
+  const vidro = supportsLiquidGlass() && podeEnviarPelaSeta;
   const restantes = MAX_MESSAGE_LENGTH - value.trim().length;
 
   const conteudo = (
@@ -78,11 +87,24 @@ export function ChatComposer({
         </ThemedText>
       ) : null}
 
+      {audioReview ? (
+        <View style={[styles.revisao, { backgroundColor: theme.backgroundElement }]}>
+          <ThemedText type="footnote">Confira o que entendi do áudio. Corrija o texto antes de pedir ao agente.</ThemedText>
+          <Pressable onPress={onDiscardAudio} accessibilityRole="button" accessibilityLabel="Descartar transcrição">
+            <ThemedText type="footnote" themeColor="textSecondary">Descartar</ThemedText>
+          </Pressable>
+        </View>
+      ) : awaitingAction ? (
+        <ThemedText type="footnote" themeColor="textSecondary">
+          Pode corrigir ou complementar a resposta por texto ou áudio.
+        </ThemedText>
+      ) : null}
+
       <View style={[styles.linha, inline && styles.linhaInline]}>
         <TextField
           value={value}
           onChangeText={onChangeText}
-          placeholder="Escreve o que precisa"
+          placeholder={awaitingAction ? 'Corrija ou complemente aqui' : 'Escreve o que precisa'}
           multiline
           maxLength={MAX_MESSAGE_LENGTH}
           accessibilityLabel="Mensagem para o agente"
@@ -93,17 +115,36 @@ export function ChatComposer({
           ]}
         />
 
+        {onAudioPress ? (
+          <Pressable
+            onPress={onAudioPress}
+            disabled={sending || audioState === 'starting' || audioState === 'transcribing'}
+            accessibilityRole="button"
+            accessibilityLabel={audioState === 'recording' ? 'Parar e transcrever áudio' : 'Gravar áudio'}
+            accessibilityState={{ disabled: sending || audioState === 'starting' || audioState === 'transcribing' }}
+            style={({ pressed }) => [styles.audio, {
+              backgroundColor: audioState === 'recording' ? theme.danger : theme.backgroundElement,
+              opacity: pressed ? 0.8 : 1,
+            }]}>
+            {audioState === 'starting' || audioState === 'transcribing' ? (
+              <ThemedText type="caption" themeColor="textSecondary">…</ThemedText>
+            ) : (
+              <Icon name={audioState === 'recording' ? 'stop.fill' : 'mic'} size={20} color={audioState === 'recording' ? 'onTint' : 'text'} />
+            )}
+          </Pressable>
+        ) : null}
+
         <Pressable
           onPress={onSubmit}
-          disabled={!pode}
+          disabled={!podeEnviarPelaSeta}
           accessibilityRole="button"
           accessibilityLabel="Enviar mensagem"
-          accessibilityState={{ disabled: !pode }}
+          accessibilityState={{ disabled: !podeEnviarPelaSeta }}
           style={({ pressed }) => [
             styles.enviar,
             {
-              backgroundColor: vidro ? 'transparent' : pode ? theme.tintFill : theme.backgroundElement,
-              opacity: pressed && pode ? 0.85 : 1,
+              backgroundColor: vidro ? 'transparent' : podeEnviarPelaSeta ? theme.tintFill : theme.backgroundElement,
+              opacity: pressed && podeEnviarPelaSeta ? 0.85 : 1,
             },
           ]}>
           {vidro ? (
@@ -112,10 +153,28 @@ export function ChatComposer({
           <Icon
             name="arrow.up"
             size={20}
-            color={pode ? 'onTint' : 'textSecondary'}
+            color={podeEnviarPelaSeta ? 'onTint' : 'textSecondary'}
           />
         </Pressable>
       </View>
+      {audioState === 'recording' ? (
+        <ThemedText type="footnote" themeColor="danger">Gravando… Toque no botão vermelho para transcrever.</ThemedText>
+      ) : audioState === 'transcribing' ? (
+        <ThemedText type="footnote" themeColor="textSecondary">Transcrevendo áudio…</ThemedText>
+      ) : null}
+      {audioReview ? (
+        <Pressable
+          onPress={onSubmit}
+          disabled={!pode}
+          accessibilityRole="button"
+          accessibilityLabel="Confirmar transcrição e pedir ao agente"
+          accessibilityState={{ disabled: !pode }}
+          style={[styles.confirmarAudio, { backgroundColor: pode ? theme.tintFill : theme.backgroundElement }]}>
+          <ThemedText type="smallBold" style={{ color: pode ? theme.onTint : theme.textSecondary }}>
+            Confirmar texto e pedir ao agente
+          </ThemedText>
+        </Pressable>
+      ) : null}
     </View>
   );
 
@@ -134,6 +193,9 @@ const styles = StyleSheet.create({
   linha: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', flexDirection: 'row', alignItems: 'flex-end', gap: Space.sm },
   linhaInline: { alignItems: 'center' },
   counter: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' },
+  revisao: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', padding: Space.sm, borderRadius: Radius.md, gap: Space.xs },
+  audio: { width: HitTarget, height: HitTarget, borderRadius: Radius.pill, alignItems: 'center', justifyContent: 'center' },
+  confirmarAudio: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', minHeight: HitTarget, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Space.md },
   campo: {
     flex: 1,
     // O campo cresce até cinco linhas; a altura vem do conteúdo medido.

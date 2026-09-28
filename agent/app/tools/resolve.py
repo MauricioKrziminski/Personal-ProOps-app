@@ -1067,6 +1067,11 @@ async def contas_citadas(
             nome = getattr(acao, campo, None)
             if not nome:
                 continue
+            if (campo == "account"
+                    and acao.type in {FinanceActionType.CREATE_EXPENSE,
+                                      FinanceActionType.CREATE_INCOME}
+                    and matching.sem_conta_explicita(nome)):
+                continue
             try:
                 achada = await conta_citada(workspace_id, nome, only_cards=so_cartoes, papel=papel)
                 if achada and campo == "account":

@@ -422,6 +422,36 @@ async def test_unclear_or_model_error_keeps_pending_purchase(monkeypatch, failur
 
 
 @pytest.mark.asyncio
+async def test_gate_indisponivel_ainda_aceita_correcao_sem_aprovar(monkeypatch):
+    async def classificar(texto, resumo, *, model_role="gate", **kwargs):
+        if model_role == "gate":
+            raise RuntimeError("503 UNAVAILABLE")
+        assert model_role == "parse"
+        return {"decision": "revise_proposal"}
+
+    monkeypatch.setattr(confirm, "_classificar_aviso", classificar)
+    uso = {}
+    result = await confirm.decide(
+        {"text": "na verdade foram 2 reais em lazer"}, CONFIRMACAO, uso
+    )
+    assert result == {"approved": False, "revise": True}
+    assert uso["llm_calls"] == 1
+
+
+@pytest.mark.asyncio
+async def test_gate_indisponivel_nunca_usa_aprovacao_do_modelo_de_reserva(monkeypatch):
+    async def classificar(texto, resumo, *, model_role="gate", **kwargs):
+        if model_role == "gate":
+            raise RuntimeError("503 UNAVAILABLE")
+        return {"decision": "approve"}
+
+    monkeypatch.setattr(confirm, "_classificar_aviso", classificar)
+    result = await confirm.decide({"text": "acho que sim"}, CONFIRMACAO)
+    assert result["keep_pending"] is True
+    assert result["approved"] is False
+
+
+@pytest.mark.asyncio
 async def test_quantity_revision_is_not_approval(monkeypatch):
     """"Sim, mas em 24x" refaz a proposta — nunca aprova a de antes."""
     monkeypatch.setattr(

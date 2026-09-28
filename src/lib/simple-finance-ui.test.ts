@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -146,6 +146,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useDebtPayments: () => options.paymentsError
       ? { ...query, isSuccess: false, isError: true, data: undefined, refetch: async () => { refetches.push('payments'); } }
       : { ...query, isSuccess: true, data: options.debtPayments ?? [] },
+    useDebtDeclaredEstimates: () => ({ ...query, isSuccess: true, data: options.declaredEstimates ?? [] }),
     pagamentosDaDivida: async () => ({ count: 0, totalCents: 0 }),
     useSaveAsset: () => mutation('saveAsset'),
     useArchiveAsset: () => mutation('archiveAsset'),
@@ -181,6 +182,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       refetch: async () => { refetches.push('summary'); },
     }),
     useMarkPaid: () => mutation('markPaid'),
+    useConfirmPaymentScoped: () => mutation('confirmPaymentScoped'),
     useSaveTransactionScoped: () => mutation('saveScoped'),
     useSaveRecurringSeries: () => mutation('saveRecurringSeries'),
     useTransaction: (id: string) => ({ ...query, isSuccess: true, data: (options.txs ?? [{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared', recurring_id: null, installment_plan_id: null }]).find((t: any) => t.id === id) ?? null }),
@@ -843,12 +845,18 @@ test('diminuir as pagas de uma dívida com âncora nunca mostra uma próxima par
   assert.equal(campo.props.value, '05/10/2026');
 });
 
-test('a month-end contract keeps day 31 when the chosen date falls in a short month (final review)', () => {
+test('tocar no dia 28 de fevereiro escolhe dia fixo, e a ação explícita preserva fim do mês', () => {
   const ui = screen(debtsFile, { create: false, debts: [{ ...carro, due_day: 31, first_due_date: '2026-01-31', installments_paid: 1, remaining_cents: 147000 * 47 }] });
   editar(ui);
   ui.fill('Próxima parcela (a 2ª)', '28/02/2026');
   ui.press('Salvar');
-  assert.equal(ui.writes[0].value.due_day, 31, 'o 28 de fevereiro é o 31 clampado');
+  assert.equal(ui.writes[0].value.due_day, 28, 'tocar 28 é escolher 28 fixo');
+
+  const ultimo = screen(debtsFile, { create: false, debts: [{ ...carro, due_day: 31, first_due_date: '2026-01-31', installments_paid: 1, remaining_cents: 147000 * 47 }] });
+  editar(ultimo);
+  ultimo.interact((nodes: any[]) => nodes.find((n) => n.type === 'DatePickerField').props.onSelectLastDay('28/02/2026'));
+  ultimo.press('Salvar');
+  assert.equal(ultimo.writes[0].value.due_day, -1);
 });
 
 test('editing an OLD debt without its schedule loaded never invents an anchor', () => {
@@ -1150,7 +1158,7 @@ test('Hoje: o atrasado aparece em Agora e o botão dá baixa no lançamento cert
   ui.interact(() => item.props.action.onPress());
   assert.equal(ui.writes.length, 0, 'abre a confirmação, não dá baixa direto');
   ui.press('Paguei');
-  assert.deepEqual(ui.writes.map((w) => w.operation), ['markPaid']);
+  assert.deepEqual(ui.writes.map((w) => w.operation), ['confirmPaymentScoped']);
   assert.equal(ui.writes[0].value.id, 'luz-1');
 });
 
@@ -1167,7 +1175,10 @@ test('Hoje: "Recebi" pergunta quanto ENTROU; numa série, outro valor pode valer
   assert.equal(chave?.props.label, 'Usar este valor nas próximas');
   ui.interact(() => chave.props.onValueChange(true));
   ui.press('Recebi');
-  assert.deepEqual(copia(ui.writes[0]), { operation: 'saveScoped', value: { id: 'sal-1', scope: 'future', patch: { amount_cents: 410000 } } });
+  assert.equal(ui.writes[0].operation, 'confirmPaymentScoped');
+  assert.equal(ui.writes[0].value.id, 'sal-1');
+  assert.equal(ui.writes[0].value.scope, 'future');
+  assert.equal(ui.writes[0].value.amountCents, 410000);
 });
 
 test('Hoje: fatura atrasada leva para a fatura, nunca dá baixa de lançamento', () => {
@@ -1476,7 +1487,7 @@ test('Lançamentos: pendente arrasta Paguei à direita; efetivado arrasta Editar
   assert.deepEqual(ladosDoLink(efetivado), { direita: ['Editar'], esquerda: ['Apagar'], mais: false, pontaDireita: 'Editar', pontaEsquerda: 'Apagar' });
 });
 
-test('Paguei confirma o valor: o mesmo valor só dá baixa, outro valor corrige antes', () => {
+test('Paguei confirma valor e baixa numa única escrita, inclusive com correção', () => {
   // 25/09/2026, pedido do dono do produto: *"às vezes eu posso ter pago menos ou mais"*.
   const abrir = () => {
     const ui = screen(transacoesFile, { txStatus: 'pending' });
@@ -1488,15 +1499,15 @@ test('Paguei confirma o valor: o mesmo valor só dá baixa, outro valor corrige 
   const campo = igual.nodes().find((n: any) => n.type === 'MoneyField');
   assert.equal(campo?.props.valueCents, 4500, 'o valor nasce no previsto');
   igual.press('Paguei');
-  assert.deepEqual(igual.writes.map((w: any) => w.operation), ['markPaid']);
+  assert.deepEqual(igual.writes.map((w: any) => w.operation), ['confirmPaymentScoped']);
+  assert.equal(igual.writes[0].value.amountCents, 4500);
 
   const outro = abrir();
   outro.interact((nodes) => nodes.find((n: any) => n.type === 'MoneyField').props.onChangeCents(5200));
   outro.press('Paguei');
-  assert.deepEqual(JSON.parse(JSON.stringify(outro.writes[0])), { operation: 'saveScoped', value: { id: 'tx-1', scope: 'one', patch: { amount_cents: 5200 } } });
-  assert.equal(outro.writes.length, 1, 'a baixa espera a correção dar certo');
+  assert.deepEqual(JSON.parse(JSON.stringify(outro.writes[0])), { operation: 'confirmPaymentScoped', value: { id: 'tx-1', scope: 'one', amountCents: 5200, paidAt: outro.writes[0].value.paidAt } });
   outro.interact(() => outro.pedidos[0].opts.onSuccess());
-  assert.equal(outro.writes.at(-1).operation, 'markPaid');
+  assert.equal(outro.writes.length, 1, 'a confirmação inteira usa uma chamada');
 });
 
 test('Financeiro: o último lançamento arrasta Editar e Apagar (Ver detalhe é o toque)', () => {
@@ -2056,6 +2067,11 @@ test('Lançamentos: a linha diz a data da COMPRA, nunca o vencimento da fatura (
     return link.props.children({}).props.subtitle as string;
   };
   for (const t of ['wardogs (1/2)', 'wardogs (2/2)']) assert.doesNotMatch(legenda(t), /fatura/, t);
+  const parcela = ui.nodes().find((n: any) => n.type === 'ItemLink' && n.props.title === 'wardogs (1/2)');
+  ui.interact(() => parcela.props.actions.find((a: any) => a.label === 'Editar').onPress());
+  assert.deepEqual(copia(ui.navigations.at(-1)), {
+    pathname: '/finance/transaction-form', params: { id: 'w1', month: '2026-09' },
+  }, 'Editar a parcela abre a linha, cujo Salvar pergunta o alcance');
   assert.match(legenda('wardogs (2/2)'), /compra em 14\/09/);
   assert.doesNotMatch(legenda('wardogs (1/2)'), /compra em/, 'a parcela 1 já está no dia da compra');
   // Conta a pagar fora do cartão: o vencimento É a data dela.
@@ -2254,6 +2270,10 @@ test('Lançamento de parcela de dívida: embaixo do total, a parcela + o encargo
   const menu = ui.nodes().find((n: any) => n.type === 'HeaderActions')?.props.menu;
   assert.ok(menu, 'o "…" existe');
   assert.ok(!menu.actions.some((a: any) => a.label === 'Duplicar'), 'sem Duplicar no pagamento de dívida');
+  ui.interact(() => menu.actions.find((a: any) => a.label === 'Mudar categoria').onPress());
+  assert.deepEqual(copia(ui.navigations.at(-1)), {
+    pathname: '/finance/transaction-form', params: { id: 'pg-1', month: '2026-09' },
+  }, 'a categoria de um pagamento parcelado passa pela escolha de alcance');
 });
 
 test('Agente: as conversas recentes não desenham texto nem esqueleto enquanto carregam', () => {
@@ -2512,6 +2532,21 @@ test('Parcela da dívida: a próxima mostra valor e vencimento, e "Paguei esta p
   assert.throws(() => tela('10').button('Paguei esta parcela'), 'só a próxima se paga — pagamento é em ordem');
 });
 
+test('Parcela antiga apenas declarada conserva seu valor no detalhe após editar parcelas futuras', () => {
+  const ui = screen('src/app/finance/debt-installment.tsx', {
+    debts: [{ ...carro, installments: 4, installments_paid: 3, installment_cents: 11000 }],
+    params: { debt: 'd1', n: '1' },
+    debtSchedule: [{ installment_no: 4, due_date: '2026-10-05', payment_cents: 11000, interest_cents: null, principal_cents: null, balance_cents: 0 }],
+    debtPayments: [
+      { id: 'p2', debt_payment_no: 2, occurred_at: '2026-08-05', amount_cents: 11000 },
+      { id: 'p3', debt_payment_no: 3, occurred_at: '2026-09-05', amount_cents: 11000 },
+    ],
+    declaredEstimates: [{ installment_no: 1, amount_cents: 10000 }],
+  });
+  const valor = ui.nodes().find((n: any) => n.type === 'Money' && n.props.variant === 'money');
+  assert.equal(valor?.props.cents, 10000);
+});
+
 /** Editar um cartão de fora (Carteira, fatura) abre o formulário DELE e devolve ao fechar. */
 test('Contas: ?edit=<id> abre a edição daquela conta, com o título do tipo, e fechar devolve', () => {
   const nubank = { id: 'c1', name: 'Nubank Cartão', type: 'credit_card', initial_balance_cents: 0, closing_day: 3, due_day: 10, credit_limit_cents: 500000, payment_account_id: null, closing_day_inclusive: false, rotativo_auto: false, rotativo_rate_monthly: null, created_at: '2026-01-01' };
@@ -2632,16 +2667,21 @@ test('Série: editar tem os campos da criação, e só o calendário mexido vai 
   assert.equal(soValor.amount_cents, 120000);
   assert.equal('rrule' in soValor, false);
 
-  // O vencimento no último dia do mês que vem: a regra vira "todo último dia" e vai com a data.
+  // Tocar o número do último dia escolhe dia fixo. A ação própria escolhe -1.
   const ui2 = abrir();
   const ultimo = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0);
   ui2.interact((nodes: any[]) => nodes.find((n) => n.type === 'DatePickerField' && n.props.accessibilityLabel === 'Próximo vencimento da série').props.onChange(br(ultimo)));
   ui2.interact((nodes: any[]) => nodes.find((n) => n.type === 'Field' && n.props.label === 'Estabelecimento').props.children.props.onChangeText('Fundacred SA'));
   salvar(ui2);
   const calendario = ui2.pedidos.at(-1).value.patch;
-  assert.equal(calendario.rrule, 'FREQ=MONTHLY;BYMONTHDAY=-1');
+  assert.equal(calendario.rrule, `FREQ=MONTHLY;BYMONTHDAY=${ultimo.getDate()}`);
   assert.equal(iso(new Date(calendario.next_run_at)), iso(ultimo));
   assert.equal(calendario.merchant, 'Fundacred SA');
+
+  const uiFim = abrir();
+  uiFim.interact((nodes: any[]) => nodes.find((n) => n.type === 'DatePickerField' && n.props.accessibilityLabel === 'Próximo vencimento da série').props.onSelectLastDay(br(ultimo)));
+  salvar(uiFim);
+  assert.equal(uiFim.pedidos.at(-1).value.patch.rrule, 'FREQ=MONTHLY;BYMONTHDAY=-1');
 
   // Vencimento no passado não salva, e diz por quê.
   const ui3 = abrir();

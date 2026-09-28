@@ -46,6 +46,11 @@ def normalize(texto: str | None) -> str:
     return _NAO_ALFANUM.sub(" ", sem_acento.lower()).strip()
 
 
+def sem_conta_explicita(texto: str | None) -> bool:
+    """O usuário dispensou a conta, em vez de omitir o campo para usar a padrão."""
+    return normalize(texto) in {"sem conta", "nenhuma conta", "sem nenhuma conta"}
+
+
 _PALAVRAS_DE_TIPO = {"cartao", "cartoes", "credito", "debito", "conta", "corrente", "de", "do", "da"}
 
 

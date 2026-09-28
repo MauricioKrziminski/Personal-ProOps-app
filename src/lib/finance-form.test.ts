@@ -3,12 +3,31 @@ import test from 'node:test';
 import {
   debtTerm, validRecurringRange, simpleDebtValues, destinoDoSalvar, podeParcelar, temContrato, faixaDeParcelas,
   totalDigitado, totalPorParcela, parcelaDoTotal, valorExibido, digitarValor, nomeDaCompra, type Contrato,
-  ancoraDoContrato, parcelaDoTotalDoContrato, proximaDoContrato, proximaNoCronograma,
+  ancoraDoContrato, parcelaDoTotalDoContrato, proximaDoContrato, proximaNoCronograma, vencimentoDaDividaEscolhido,
+  vencimentoPendenteValido,
 } from './finance-form.ts';
+test('parcela pendente usa seu cronograma sem exigir um segundo vencimento', () => {
+  assert.equal(vencimentoPendenteValido(true, true, null), true);
+  assert.equal(vencimentoPendenteValido(true, false, null), false);
+  assert.equal(vencimentoPendenteValido(true, true, '31/02/2027'), false);
+  assert.equal(vencimentoPendenteValido(true, true, '28/02/2027'), true);
+  assert.equal(vencimentoPendenteValido(false, false, null), true);
+});
 test('remaining installments are added to already paid, never subtracted twice', () => {
   assert.equal(debtTerm('8', 4), 12);
   assert.equal(debtTerm('', 4), null);
   assert.throws(() => debtTerm('0', 4));
+});
+test('data escolhida na dívida é dia fixo; fim do mês exige ação própria', () => {
+  assert.deepEqual(vencimentoDaDividaEscolhido('2026-09-30', 1, false), { ancora: '2026-08-30', dia: 30 });
+  assert.deepEqual(vencimentoDaDividaEscolhido('2026-09-30', 1, true), { ancora: '2026-08-30', dia: -1 });
+  assert.equal(proximaDoContrato('2026-08-30', 6, 30), '2027-02-28');
+  assert.equal(proximaDoContrato('2026-08-30', 7, 30), '2027-03-30');
+  assert.equal(proximaDoContrato('2026-08-30', 6, -1), '2027-02-28');
+  assert.equal(proximaDoContrato('2026-08-30', 7, -1), '2027-03-31');
+  assert.equal(proximaDoContrato('2026-01-31', 1, 31), '2026-02-28');
+  assert.equal(proximaDoContrato('2026-01-31', 2, 31), '2026-03-31');
+  assert.equal(proximaDoContrato('2028-01-31', 1, 30), '2028-02-29');
 });
 test('recurrence end and interval reject invalid schedules', () => {
   assert.equal(validRecurringRange('2026-09-08', '2026-09-07', '1'), false);

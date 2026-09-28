@@ -10,17 +10,16 @@
 import { CategoryPicker } from '@/components/finance/category-picker';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { DatePickerField } from '@/components/finance/date-picker-field';
-import { DiaOuUltimo } from '@/components/finance/dia-ou-ultimo';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { QuantityField } from '@/components/ui/quantity-field';
 import { Segmented } from '@/components/ui/segmented';
 import { SwitchRow } from '@/components/ui/switch-row';
-import { brToISO, fimQueSegueOInicio, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
+import { brToISO, localISODate } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
 import { describeRRule } from '@/lib/rrule-text';
-import { validaSerie, type SerieForm } from '@/lib/serie';
+import { mudaInicioDaSerie, validaSerie, type SerieForm } from '@/lib/serie';
 
 export function CamposDaSerie({
   form,
@@ -34,7 +33,7 @@ export function CamposDaSerie({
   /** Editando, o nome da data: "Próximo vencimento" na série; "Vence em" na ocorrência. */
   rotuloDaData?: string;
 }) {
-  const { inicioOk, fimOk, tituloOk, agendaNoPassado, inicioDate, perguntaUltimoDia } = validaSerie(form);
+  const { inicioOk, fimOk, tituloOk, agendaNoPassado, inicioDate } = validaSerie(form);
   const editando = Boolean(form.id);
   const mudaAgenda = (parte: Partial<SerieForm>) => onChange({ ...form, ...parte, agendaMudou: editando || form.agendaMudou });
   const periodo = form.preset === 'weekly' ? 'da semana' : form.preset === 'yearly' ? 'do ano' : 'do mês';
@@ -143,7 +142,7 @@ export function CamposDaSerie({
 
       {form.regraPropria ? null : (
       <Field
-        // Editando, a data é o próximo vencimento. O último dia de um mês curto pergunta abaixo.
+        // Editando, a data é o próximo vencimento; o calendário tem uma ação própria de fim do mês.
         label={editando ? rotuloDaData : 'Começa em'}
         hint={
           editando
@@ -153,27 +152,22 @@ export function CamposDaSerie({
         error={form.inicio && !inicioOk ? 'Data inválida (dd/mm/aaaa)' : agendaNoPassado ? 'Escolha hoje ou uma data depois' : undefined}>
         <DatePickerField
           value={form.inicio}
-          // O "Termina em" anda junto quando o início passaria dele (`fimQueSegueOInicio`).
-          onChange={(inicio) =>
-            mudaAgenda({
-              inicio,
-              fim:
-                isValidBRDate(inicio) && isValidBRDate(form.inicio) && isValidBRDate(form.fim)
-                  ? isoToBR(fimQueSegueOInicio(brToISO(form.inicio), brToISO(inicio), brToISO(form.fim)))
-                  : form.fim,
-            })
-          }
+          onChange={(inicio) => onChange(mudaInicioDaSerie(form, inicio, false))}
+          onSelectLastDay={form.preset === 'monthly' ? (inicio) => onChange(mudaInicioDaSerie(form, inicio, true)) : undefined}
           placeholder="Escolher o início"
           accessibilityLabel={editando ? 'Próximo vencimento da série' : 'Data de início da série'}
           min={editando ? localISODate() : undefined}
           invalid={(Boolean(form.inicio) && !inicioOk) || agendaNoPassado}
         />
+        {form.preset === 'monthly' && inicioDate ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            {form.ultimoDia
+              ? 'Repete no último dia de todo mês.'
+              : `Repete todo dia ${inicioDate.getDate()}${inicioDate.getDate() > 28 ? '; nos meses curtos, no último dia disponível.' : '.'}`}
+          </ThemedText>
+        ) : null}
       </Field>
       )}
-
-      {perguntaUltimoDia && inicioDate ? (
-        <DiaOuUltimo dia={inicioDate.getDate()} ultimo={Boolean(form.ultimoDia)} onChange={(ultimoDia) => mudaAgenda({ ultimoDia })} />
-      ) : null}
 
       {/*
         ⚠️ O placeholder era uma DATA PLAUSÍVEL (`31/12/2026`) e o campo lia como preenchido — *"como

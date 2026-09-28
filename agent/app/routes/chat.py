@@ -24,22 +24,45 @@ import binascii
 import json
 import logging
 from datetime import datetime
+from pathlib import PurePath
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app import app_chat
 from app.auth import current_user
+from app.services import groq
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/internal/chat", tags=["chat"])
 
 MAX_CONTENT = 4_000
 MAX_TITLE = 80
+MAX_AUDIO_BYTES = 20_000_000
+_AUDIO_MIMES = {
+    # Android associa .m4a a audio/mpeg. A assinatura ftyp abaixo continua
+    # obrigatória, então MP3 renomeado não passa como MPEG-4.
+    ".m4a": {"audio/mp4", "audio/m4a", "audio/x-m4a", "audio/mpeg"},
+    ".mp4": {"audio/mp4", "video/mp4"},
+    ".3gp": {"audio/3gpp", "video/3gpp"},
+    ".mp3": {"audio/mpeg"},
+    ".wav": {"audio/wav", "audio/x-wav", "audio/wave"},
+    ".ogg": {"audio/ogg", "application/ogg"},
+    ".webm": {"audio/webm", "video/webm"},
+}
 
 # Erro de domínio → HTTP. Uma tabela e não `if`s espalhados: o app precisa que
 # esses códigos sejam estáveis para decidir entre paywall, "espera um pouco" e
@@ -213,6 +236,10 @@ class PaginaMensagens(BaseModel):
     next_cursor: str | None = None
 
 
+class TranscricaoOut(BaseModel):
+    text: str
+
+
 # ---------------------------------------------------------------------------
 # cursor opaco
 # ---------------------------------------------------------------------------
@@ -308,6 +335,60 @@ def _traduz(exc: app_chat.ChatError) -> HTTPException:
 # ---------------------------------------------------------------------------
 
 Usuario = Annotated[UUID, Depends(current_user)]
+ArquivoAudio = Annotated[UploadFile, File()]
+
+
+def _formato_audio_valido(extensao: str, audio: bytes) -> bool:
+    """Recusa texto/lixo com nome de áudio antes de enviar bytes ao provedor."""
+    if extensao in {".m4a", ".mp4", ".3gp"}:
+        if len(audio) < 12 or audio[4:8] != b"ftyp":
+            return False
+        marca = audio[8:12]
+        return marca.startswith(b"3g") if extensao == ".3gp" else not marca.startswith(b"3g")
+    if extensao == ".mp3":
+        return audio.startswith(b"ID3") or (len(audio) > 1 and audio[0] == 0xFF and audio[1] & 0xE0 == 0xE0)
+    if extensao == ".wav":
+        return audio.startswith(b"RIFF") and audio[8:12] == b"WAVE"
+    if extensao == ".ogg":
+        return audio.startswith(b"OggS")
+    if extensao == ".webm":
+        return audio.startswith(b"\x1a\x45\xdf\xa3")
+    return False
+
+
+def _erro_audio(status: int, code: str, message: str) -> HTTPException:
+    erro = HTTPException(status_code=status, detail=message)
+    erro.code = code  # type: ignore[attr-defined]
+    return erro
+
+
+@router.post("/transcriptions", response_model=TranscricaoOut)
+async def transcrever_audio(user_id: Usuario, file: ArquivoAudio) -> TranscricaoOut:
+    """Devolve texto para revisão explícita no app; não cria turno ou ação."""
+    extensao = PurePath(file.filename or "").suffix.lower()
+    try:
+        if file.content_type not in _AUDIO_MIMES.get(extensao, set()):
+            raise _erro_audio(415, "unsupported_audio", "Formato de áudio não aceito.")
+        audio = await file.read(MAX_AUDIO_BYTES + 1)
+    finally:
+        await file.close()
+    if len(audio) > MAX_AUDIO_BYTES:
+        raise _erro_audio(413, "audio_too_large", "O áudio é grande demais.")
+    if not audio or not _formato_audio_valido(extensao, audio):
+        raise _erro_audio(422, "invalid_audio", "O arquivo de áudio está vazio ou inválido.")
+
+    try:
+        # Nome controlado pelo servidor: o nome do cliente nunca chega ao Groq.
+        texto = (await groq.transcribe(audio, filename=f"audio{extensao}")).strip()
+    except Exception:  # noqa: BLE001
+        # Nunca expor resposta, corpo ou segredo do provedor.
+        log.warning("Falha na transcrição de áudio do app")
+        raise _erro_audio(502, "transcription_failed", "Não consegui transcrever o áudio.") from None
+    if not texto or not any(char.isalnum() for char in texto):
+        raise _erro_audio(422, "empty_transcription", "Não encontrei fala nesse áudio.")
+    if len(texto) > MAX_CONTENT:
+        raise _erro_audio(422, "transcription_too_long", "Grave um áudio mais curto.")
+    return TranscricaoOut(text=texto)
 
 
 @router.get("/conversations", response_model=PaginaConversas)

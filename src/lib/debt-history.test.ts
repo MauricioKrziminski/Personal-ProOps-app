@@ -48,6 +48,23 @@ test('pagamento registrado ganha a data e o valor REAIS, não a cadência', () =
   assert.equal(linhas[7].registered, false);
 });
 
+test('estimativa declarada usa o valor salvo para seu número, mas o pagamento real prevalece', () => {
+  const linhas = paidInstallments({
+    installmentsPaid: 3,
+    installmentCents: 10000,
+    nextDueDate: '2026-10-08',
+    payments: [{ id: 'tx-2', debt_payment_no: 2, occurred_at: '2026-09-02', amount_cents: 12000 }],
+    overrides: [
+      { installment_no: 1, amount_cents: 11000 },
+      { installment_no: 2, amount_cents: 13000 },
+    ],
+  });
+  assert.deepEqual(linhas.map((l) => l.payment_cents), [11000, 12000, 10000]);
+  assert.equal(linhas[1].registered, true);
+  assert.equal(linhas[1].txId, 'tx-2');
+  assert.equal(linhas[0].registered, false);
+});
+
 test('nada pago, nada para trás', () => {
   assert.deepEqual(
     paidInstallments({ installmentsPaid: 0, installmentCents: 147000, nextDueDate: '2026-10-08' }),

@@ -968,7 +968,7 @@ async def query_debts(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
         if d["installments"]:
             detalhe.append(f"{d['installments_paid']} de {d['installments']} pagas")
         if d["due_day"]:
-            detalhe.append(f"vence dia {d['due_day']}")
+            detalhe.append("vence no último dia do mês" if d["due_day"] == -1 else f"vence dia {d['due_day']}")
         if detalhe:
             partes.append(f"    {' · '.join(detalhe)}")
 

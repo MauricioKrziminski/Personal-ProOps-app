@@ -182,6 +182,7 @@ const MATERIAL: Record<string, MaterialName> = {
   'wand.and.stars': 'auto_fix_high',
   waveform: 'graphic_eq',
   mic: 'mic',
+  'stop.fill': 'stop',
   'fork.knife': 'restaurant',
   'arrow.clockwise': 'sync',
   xmark: 'close',

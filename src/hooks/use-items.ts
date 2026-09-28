@@ -23,6 +23,9 @@ export interface Reminder {
    */
   send_attempts?: number;
   last_error?: string | null;
+  skip_run_at?: string | null;
+  parent_reminder_id?: string | null;
+  original_run_at?: string | null;
 }
 
 const financialTables = new Set([
@@ -84,7 +87,7 @@ export function useReminders() {
     queryFn: async ({ pageParam }): Promise<Reminder[]> => {
       const { data, error } = await supabase
         .from('reminders')
-        .select('id, title, recurrence, next_run_at, channel, active')
+        .select('id, title, recurrence, next_run_at, channel, active, skip_run_at, parent_reminder_id, original_run_at')
         // pausados também vêm: sem eles não haveria como retomar pelo app
         .order('active', { ascending: false })
         .order('next_run_at')
@@ -127,14 +130,31 @@ export interface ReminderInput {
    * não mexe no vínculo — mandar `null` ali soltaria o lembrete da nota em silêncio.
    */
   note_id?: string | null;
+  scope?: 'one' | 'future';
+  expected_next_run_at?: string;
 }
 
 /** Cria ou edita (com `id` vira update), no mesmo formato de useSaveTransaction. */
 export function useSaveReminder() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, note_id, ...input }: ReminderInput) => {
+    mutationFn: async ({ id, note_id, scope, expected_next_run_at, ...input }: ReminderInput) => {
       if (id) {
+        if (scope) {
+          if (!expected_next_run_at) throw new Error('Falta a data original do lembrete');
+          const { error } = await supabase.rpc('save_reminder_scoped', {
+            p_id: id,
+            p_expected_run_at: expected_next_run_at,
+            p_scope: scope,
+            p_title: input.title,
+            p_recurrence: input.recurrence,
+            p_next_run_at: input.next_run_at,
+            p_channel: input.channel,
+            p_timezone: input.timezone,
+          });
+          if (error) throw error;
+          return;
+        }
         // reagendar reativa e zera o contador: a série volta a valer do zero
         const { error } = await supabase
           .from('reminders')
@@ -202,13 +222,13 @@ export function useTodayReminders() {
       const end = new Date(`${today}T23:59:59`);
       const { data, error } = await supabase
         .from('reminders')
-        .select('id, title, recurrence, next_run_at, channel, active')
+        .select('id, title, recurrence, next_run_at, channel, active, skip_run_at, parent_reminder_id, original_run_at')
         .eq('active', true)
         .lte('next_run_at', end.toISOString())
         .order('next_run_at')
         .limit(20);
       if (error) throw error;
-      return data as Reminder[];
+      return (data as Reminder[]).filter((r) => r.skip_run_at !== r.next_run_at);
     },
   });
 }
@@ -226,7 +246,7 @@ export function useNoteReminder(noteId: string | null | undefined) {
     queryFn: async (): Promise<Reminder | null> => {
       const { data, error } = await supabase
         .from('reminders')
-        .select('id, title, recurrence, next_run_at, channel, active')
+        .select('id, title, recurrence, next_run_at, channel, active, skip_run_at, parent_reminder_id, original_run_at')
         .eq('note_id', noteId!)
         .maybeSingle();
       if (error) throw error;
@@ -242,7 +262,7 @@ export function useReminder(id: string | undefined) {
     queryFn: async (): Promise<Reminder> => {
       const { data, error } = await supabase
         .from('reminders')
-        .select('id, title, recurrence, next_run_at, channel, active, send_attempts, last_error')
+        .select('id, title, recurrence, next_run_at, channel, active, skip_run_at, parent_reminder_id, original_run_at, send_attempts, last_error')
         .eq('id', id!)
         .single();
       if (error) throw error;

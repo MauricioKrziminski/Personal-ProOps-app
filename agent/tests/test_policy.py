@@ -74,6 +74,20 @@ def test_frase_da_receita_sem_conta_padrao_diz_sem_conta():
     assert frase == "registrar receita de R$ 500,00 em freela, sem conta"
 
 
+def test_sem_conta_explicitamente_supera_conta_padrao_na_confirmacao():
+    acao = FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=200,
+                         description="gasto", account="sem conta")
+    frase = describe_for_confirmation(acao, {"default_account": {"name": "Poupança"}})
+    assert frase == "registrar gasto de R$ 2,00 em gasto, sem conta"
+
+
+def test_confirmacao_mostra_categoria_distinta_da_descricao():
+    acao = FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=200,
+                         description="café", category="lazer", account="sem conta")
+    frase = describe_for_confirmation(acao, {"default_account": {"name": "Poupança"}})
+    assert frase == "registrar gasto de R$ 2,00 em café, categoria lazer, sem conta"
+
+
 def test_frase_com_conta_citada_usa_a_citada():
     acao = FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=4500,
                          category="mercado", account="Itaú")

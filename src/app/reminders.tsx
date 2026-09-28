@@ -39,7 +39,7 @@ export default function RemindersScreen() {
 
   // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
   // falha, e sem este corte a tela seguia afirmando números embaixo da faixa de erro.
-  const reminders = isError ? [] : (data?.pages.flat() ?? []);
+  const reminders = isError ? [] : (data?.pages.flat() ?? []).filter((r) => !r.parent_reminder_id || r.active);
   const active = reminders.filter((r) => r.active);
   const paused = reminders.filter((r) => !r.active);
 
@@ -87,7 +87,11 @@ export default function RemindersScreen() {
       <Row
         title={r.title}
         subtitle={
-          r.recurrence
+          r.parent_reminder_id
+            ? `Ocorrência editada · ${formatDateBR(r.next_run_at)}`
+            : r.skip_run_at === r.next_run_at
+            ? `${describeRRule(r.recurrence)} · próxima após a ocorrência editada`
+            : r.recurrence
             ? `${describeRRule(r.recurrence)} · próximo ${formatDateBR(r.next_run_at)}`
             : formatDateBR(r.next_run_at)
         }

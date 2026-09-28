@@ -268,12 +268,11 @@ export function monthGrid(month: string): (string | null)[] {
 /**
  * A data é o ÚLTIMO dia do mês dela?
  *
- * É o que decide entre `BYMONTHDAY=31` e `BYMONTHDAY=-1` numa recorrência. O campo "Vence quando"
- * (Dia do mês / Último dia) existia só para perguntar isso, e era um controle que a própria data
- * já respondia: quem escolhe 31/10 quer o fim do mês, e quem escolhe 05/10 quer o dia 5.
+ * Informa se a data é o fim daquele mês. A escolha entre dia numérico fixo e "Último dia"
+ * continua explícita no formulário de recorrência.
  *
- * ⚠️ A diferença não é cosmética. `BYMONTHDAY=31` **pula** fevereiro e os meses de 30 dias (o
- * `dateutil` que dispara lembrete faz exatamente isso); `-1` cai em 28, 30 ou 31 conforme o mês.
+ * O agendador ajusta `BYMONTHDAY=29/30/31` ao último dia disponível nos meses curtos;
+ * `BYMONTHDAY=-1` acompanha o fim de cada mês por definição.
  *
  * `new Date(y, m + 1, 0)` é o dia 0 do mês SEGUINTE, que o JS normaliza para o último dia deste.
  */
@@ -283,8 +282,8 @@ export function ehUltimoDiaDoMes(d: Date): boolean {
 
 /**
  * O último dia de um mês de MENOS de 31 dias (30/09, 28/02, 29/02): "todo dia 30" ou "todo último
- * dia do mês"? A data não responde, e a diferença aparece nos meses de 31. 31/xx não é ambíguo:
- * o dia 31 é sempre o último.
+ * dia do mês"? A data não responde, e a diferença aparece nos meses de 31. O dia 31 também
+ * conserva sua escolha numérica na regra, ainda que suas datas coincidam com "Último dia".
  */
 export function diaAmbiguo(d: Date): boolean {
   return ehUltimoDiaDoMes(d) && d.getDate() < 31;

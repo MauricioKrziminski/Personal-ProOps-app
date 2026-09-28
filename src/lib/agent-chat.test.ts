@@ -10,6 +10,7 @@ import {
   canSendMessage,
   canSaveTitle,
   canSubmitMessage,
+  audioPossuiSinal,
   conversationRoute,
   markResolved,
   parseInlineBold,
@@ -194,6 +195,15 @@ test('isNearChatEnd distingue 80px do fim', () => {
   assert.equal(isNearChatEnd(limite), true, 'exatamente 80px ainda conta como perto');
 });
 
+test('gravação com apenas ruído de fundo não é enviada ao transcritor', () => {
+  assert.equal(audioPossuiSinal([-72, -70, -68, -66]), false);
+  assert.equal(audioPossuiSinal([-120, -18, -28, -53, -78, -120, -18, -25, -49, -74, -120]), false,
+    'picos dos toques no simulador não são fala sustentada');
+  assert.equal(audioPossuiSinal([-72, -31, -43, -48, -50]), true);
+  assert.equal(audioPossuiSinal([-31, -43, Number.NaN, -48, -50]), false);
+  assert.equal(audioPossuiSinal([]), true, 'sem medição no aparelho, o servidor ainda pode transcrever');
+});
+
 // ---------------------------------------------------------------------------
 // erros: o que a tela faz com cada um
 // ---------------------------------------------------------------------------
@@ -324,14 +334,13 @@ test('erro que não é 401 passa direto, sem renovar', async () => {
 // composer
 // ---------------------------------------------------------------------------
 
-test('composer bloqueia vazio, acima do limite, turno ativo e pergunta aberta', () => {
+test('composer bloqueia vazio, acima do limite e turno ativo, mas deixa corrigir proposta aberta', () => {
   assert.equal(canSubmitMessage('oi'), true);
   assert.equal(canSubmitMessage('   '), false, 'só espaço não é mensagem');
   assert.equal(canSubmitMessage('a'.repeat(MAX_MESSAGE_LENGTH + 1)), false);
-  // As duas travas que evitam um 409 que a tela já sabia que viria: a conversa
-  // é serializada por lease no servidor.
+  // O lease barra o turno ativo. HITL aberto aceita correção por texto.
   assert.equal(canSubmitMessage('oi', { sending: true }), false);
-  assert.equal(canSubmitMessage('oi', { awaitingAction: true }), false);
+  assert.equal(canSubmitMessage('corrigindo: dia 30', { awaitingAction: true }), true);
 });
 
 // ---------------------------------------------------------------------------
@@ -732,7 +741,7 @@ test('compositor trava enquanto a conversa não existe no servidor', () => {
   assert.equal(compositorTravado(falha('invalid', 422), { awaitingAction: false }), false);
   assert.equal(compositorTravado([], { awaitingAction: false }), false);
   assert.equal(compositorTravado([{ id: 'u', sequence: 1 }], { awaitingAction: false }), false);
-  assert.equal(compositorTravado([{ id: 'u', sequence: 1 }], { awaitingAction: true }), true);
+  assert.equal(compositorTravado([{ id: 'u', sequence: 1 }], { awaitingAction: true }), false);
 });
 
 test('marcarTurnoLocal renova o created_at quando o patch traz um', () => {

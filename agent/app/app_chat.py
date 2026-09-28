@@ -233,6 +233,11 @@ async def _execute_turn(
         )
         raise RateLimit(limite) if limite == conversation.MUITAS else PlanLimit(limite)
 
+    # Texto novo pode corrigir/cancelar uma proposta HITL sem passar pela rota de
+    # botão. Guardar o id anterior para desativar seus botões depois que o motor
+    # concluir — ele pode criar outra pendência no mesmo turno.
+    pendente_anterior = await repo.open_pending(session_id) if not clicked_id else None
+
     try:
         resposta = None
         if claim.retry:
@@ -269,6 +274,19 @@ async def _execute_turn(
         # A tela precisa saber a QUAL pergunta os botões pertencem: sem isso, um
         # toque numa pergunta antiga resolveria a nova.
         payload = {**payload, "pending_id": str(pendente["id"])}
+
+    if pendente_anterior:
+        estado_anterior = await repo.pending_status(
+            session_id=session_id, pending_id=pendente_anterior["id"]
+        )
+        resolucao = {"expired": "expired", "approved": "approve", "rejected": "reject"}.get(
+            estado_anterior
+        )
+        if resolucao:
+            await repo.resolve_chat_ui_payload(
+                session_id=session_id, pending_id=pendente_anterior["id"],
+                resolution=resolucao,
+            )
 
     # O balão que fez a pergunta de RASCUNHO é carimbado ANTES de o novo entrar:
     # a pergunta seguinte costuma ser do MESMO rascunho ("é cada parcela" →

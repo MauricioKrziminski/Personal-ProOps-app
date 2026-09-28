@@ -136,8 +136,9 @@ class FinanceAction(BaseModel):
         None,
         description=(
             "RRULE. Ex.: FREQ=MONTHLY;BYMONTHDAY=5 (todo dia 5); "
-            "FREQ=MONTHLY;BYMONTHDAY=-1 (todo ÚLTIMO dia do mês — nunca use 31 para isso, "
-            "porque o dia 31 pula fevereiro e os meses de 30 dias)."
+            "FREQ=MONTHLY;BYMONTHDAY=-1 (todo ÚLTIMO dia do mês — use -1 só quando a "
+            "pessoa disser fim/último dia); BYMONTHDAY=30/31 significa dia FIXO 30/31 "
+            "e o agendador usa o último dia disponível nos meses mais curtos."
         ),
     )
     new_amount_cents: int | None = Field(None, description="Valor CORRIGIDO.")

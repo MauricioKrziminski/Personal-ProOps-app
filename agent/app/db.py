@@ -356,6 +356,16 @@ async def open_pending(session_id: UUID) -> dict[str, Any] | None:
     )
 
 
+async def pending_status(*, session_id: UUID, pending_id: UUID) -> str | None:
+    """Estado final de uma pergunta, vinculado à conversa dona dela."""
+    row = await fetch_one(
+        "select status from public.pending_actions where id = %s and session_id = %s",
+        pending_id,
+        session_id,
+    )
+    return row["status"] if row else None
+
+
 async def create_pending(
     *,
     session_id: UUID,

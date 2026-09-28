@@ -95,6 +95,12 @@ def test_first_due_date_sets_the_due_day_when_missing():
     assert valores["due_day"] == 5
 
 
+def test_last_day_is_separate_from_fixed_30_and_31():
+    assert resources.validate_fields(action("resource_update", due_day="último dia"))["due_day"] == -1
+    assert resources.validate_fields(action("resource_update", due_day=30))["due_day"] == 30
+    assert resources.validate_fields(action("resource_update", due_day=31))["due_day"] == 31
+
+
 @pytest.mark.asyncio
 async def test_delete_de_vez_apaga_pagamentos_e_divida(fixed_debt_with_payment, monkeypatch):
     apagar = action("resource_delete", trashed="true")

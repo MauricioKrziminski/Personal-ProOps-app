@@ -1,10 +1,9 @@
 /**
  * O que o "Paguei"/"Recebi" faz depois de a pessoa confirmar o valor (25/09/2026).
  *
- * Mesmo valor do previsto: só a baixa (`useMarkPaid`). Outro valor: primeiro corrige o valor pela
- * mesma porta da edição com escopo (`update_transaction_scoped`) — só este lançamento, ou este e
- * os próximos da série quando ela existe e a pessoa ligou "Usar este valor nas próximas" — e só
- * então dá a baixa. A regra de "próximos" (pendente E da data em diante) mora na RPC.
+ * O formulário escolhe se a correção vale só para esta linha ou também para as próximas em aberto.
+ * `confirm_payment_scoped` corrige o valor e registra a baixa na mesma transação do banco; se a
+ * baixa falhar, a correção também é revertida. A regra de "próximos" mora na RPC de escopo.
  */
 export type PlanoDaBaixa = {
   corrigir: { scope: 'one' | 'future'; amount_cents: number } | null;
@@ -72,8 +71,8 @@ export function correcaoDoPagamento(
     const { erro } = pagamentoDaParcelaFixa(pagamento.debt_principal_cents, novo);
     return { erro, perguntaAsProximas: !erro && Boolean(divida.installments) && novo !== divida.installment_cents };
   }
-  if (pagamento.debt_payment_no !== divida.installments_paid || pagamento.debt_balance_after_cents !== divida.remaining_cents) {
-    return { erro: 'Numa dívida com juros, só o pagamento mais recente muda de valor.', perguntaAsProximas: false };
+  if (novo <= pagamento.amount_cents - pagamento.debt_principal_cents) {
+    return { erro: 'O valor precisa passar dos juros deste pagamento.', perguntaAsProximas: false };
   }
   return { erro: null, perguntaAsProximas: false };
 }

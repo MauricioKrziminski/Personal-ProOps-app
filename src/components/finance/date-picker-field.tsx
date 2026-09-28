@@ -16,6 +16,7 @@ interface Props {
   /** Data em dd/mm/aaaa, o formato do formulário. `null` = vazia. */
   value: string | null;
   onChange: (br: string) => void;
+  onSelectLastDay?: (br: string) => void;
   placeholder?: string;
   invalid?: boolean;
   accessibilityLabel: string;
@@ -48,6 +49,7 @@ interface Props {
 export function DatePickerField({
   value,
   onChange,
+  onSelectLastDay,
   placeholder = 'Escolher data',
   invalid,
   accessibilityLabel,
@@ -108,6 +110,10 @@ export function DatePickerField({
                 onChange(isoToBR(escolhido));
                 setAberto(false);
               }}
+              onSelectLastDay={onSelectLastDay ? (escolhido) => {
+                onSelectLastDay(isoToBR(escolhido));
+                setAberto(false);
+              } : undefined}
               min={min}
               max={max}
             />

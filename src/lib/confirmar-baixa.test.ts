@@ -78,11 +78,13 @@ test('pagamento de parcela fixa: fora do limite diz por quê, e vale em pagament
   assert.equal(correcaoDoPagamento(fixa, antigo, 150000).erro, null, 'no modo fixo o saldo não depende do valor');
 });
 
-test('dívida com juros: só o pagamento mais recente muda de valor', () => {
+test('dívida com juros: pagamento antigo pode mudar, mas o valor deve passar dos juros', () => {
   const juros = { ...fixa, calculation_mode: 'amortized' as const };
   assert.equal(correcaoDoPagamento(juros, pago, 150000).erro, null);
   assert.equal(correcaoDoPagamento(juros, pago, 150000).perguntaAsProximas, false, 'a Price recalcula as próximas sozinha');
-  assert.match(correcaoDoPagamento(juros, { ...pago, debt_payment_no: 3 }, 150000).erro ?? '', /mais recente/);
+  assert.equal(correcaoDoPagamento(juros, { ...pago, debt_payment_no: 3 }, 150000).erro, null,
+    'o banco já recalcula os saldos posteriores quando um pagamento antigo com juros muda');
+  assert.match(correcaoDoPagamento(juros, { ...pago, debt_payment_no: 3, debt_principal_cents: 140000 }, 7000).erro ?? '', /juros/);
 });
 
 test('pagamento sem o histórico da dívida não muda de valor por aqui', () => {

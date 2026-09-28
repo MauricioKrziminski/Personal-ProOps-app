@@ -46,8 +46,8 @@ test('o que não dá para interpretar volta cru, sem inventar', () => {
 });
 
 test('último dia do mês não vira "todo dia -1"', () => {
-  // `BYMONTHDAY=-1` é o que a RRULE tem para "último dia", e é diferente de "dia 31": fevereiro
-  // não tem 31 e a série pularia os meses curtos. Foi o caso do Fundacred (13/09/2026).
+  // `BYMONTHDAY=-1` registra a escolha explícita de "último dia". O agendador também ajusta
+  // o dia 31 nos meses curtos, mas mantém esse número fixo na regra gravada.
   assert.equal(describeRRule('FREQ=MONTHLY;BYMONTHDAY=-1'), 'todo último dia do mês');
   assert.equal(
     describeRRule('FREQ=MONTHLY;INTERVAL=6;BYMONTHDAY=-1'),

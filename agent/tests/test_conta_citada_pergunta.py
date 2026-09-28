@@ -116,6 +116,28 @@ async def test_sem_citar_conta_continua_caindo_na_padrao(contas, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_sem_conta_explicito_nao_procura_nome_nem_usa_a_padrao(contas, monkeypatch):
+    from app.tools import resolve
+
+    acao = FinanceAction(
+        type=FinanceActionType.CREATE_EXPENSE, amount_cents=200,
+        description="gasto", account="sem conta",
+    )
+    assert await resolve.contas_citadas(WS, [acao], [{}]) == [{}]
+
+    escritas = []
+
+    async def fetch_one(sql, *args):
+        escritas.append(args)
+        return {"id": uuid4()}
+
+    monkeypatch.setattr(db, "fetch_one", fetch_one)
+    await finance.create_transaction(_ctx(), acao)
+    assert escritas and PADRAO not in escritas[0]
+    assert escritas[0][-2] is None, "account_id do INSERT deve ser nulo"
+
+
+@pytest.mark.asyncio
 async def test_cartao_que_nao_existe_pergunta_com_a_lista_de_cartoes(contas, monkeypatch):
     monkeypatch.setattr(db, "fetch_one", lambda *a, **k: None)
 

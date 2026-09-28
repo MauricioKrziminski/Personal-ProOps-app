@@ -1373,9 +1373,9 @@ test('Pagamento de dívida não troca de tipo, não vira "vou pagar depois" nem 
   // Nem vira série: a parcela já é projetada pelo cronograma da dívida, e uma recorrente ao lado
   // dela contaria o mesmo dinheiro duas vezes na projeção (25/09/2026).
   assert.match(fonte, /editing\.recurring_id \|\| editing\.installment_plan_id \|\| editing\.debt_id/, 'nem vira série');
-  // "Este e as próximas parcelas": o CONTRATO muda antes e o pagamento é gravado no sucesso dele —
-  // a ordem da folha de pagar, que faz o trigger gravar a parcela inteira no valor novo (25/09/2026).
-  assert.match(fonte, /salvarDivida\.mutate\([\s\S]{0,600}?onSuccess: \(\) =>\s*gravar\(/, 'contrato antes do pagamento');
+  // A correção com alcance é uma única RPC: duas escritas separadas deixavam metade salva.
+  assert.match(fonte, /salvarPagamentoDivida\.mutate\(/, 'pagamentos e contrato na mesma operação');
+  assert.doesNotMatch(fonte, /salvarDivida\.mutate\(/, 'sem duas gravações sequenciais');
 });
 
 test('Formulário de lançamento só diz "Cadastrar uma conta" com as contas carregadas e vazias', () => {
@@ -1570,29 +1570,25 @@ test('Ocorrência de série: uma data só (o vencimento), e o caminho para edita
   assert.match(fonte, /\{dataEVencimento \|\| parcelaNaFatura \? null : \(\s*<View style=\{styles\.chipRow\}>/, 'sem o "Ontem" num vencimento');
   assert.match(fonte, /\{umaData \? null : \(\s*<Controller\s+control=\{control\}\s+name="due_at"/, 'sem o segundo campo');
   assert.match(fonte, /if \(umaData\) setValue\('due_at', br\)/, 'o vencimento escondido anda com a data');
-  // Uma tela só (26/09/2026): "Só esta | Esta e as próximas" no topo, e a série com os MESMOS
-  // campos da folha de Recorrentes. O botão que levava a outra tela saiu.
-  assert.match(fonte, /\{ value: 'uma', label: 'Só esta' \},\s*\{ value: 'serie', label: 'Esta e as próximas' \}/);
+  // A pessoa escolhe o alcance ao SALVAR, depois de preencher a mudança no lançamento.
+  assert.match(fonte, /showItemActions\('Salvar alterações em',[\s\S]*?label: 'Só esta ocorrência'[\s\S]*?label: 'Esta e as próximas'/);
   assert.match(fonte, /<CamposDaSerie form=\{formSerie\}/);
   assert.doesNotMatch(fonte, /label="Editar a série"/);
-  // E a PARCELA também (26/09/2026): "Só esta parcela | A compra toda", com os campos de Parceladas;
-  // a pergunta no Salvar e o botão que levava a Parceladas saíram.
-  assert.match(fonte, /\{ value: 'uma', label: 'Só esta parcela' \},\s*\{ value: 'compra', label: 'A compra toda' \}/);
+  // Na parcela, a mesma decisão acontece no Salvar; a compra toda abre os campos de revisão.
+  assert.match(fonte, /showItemActions\('Salvar alterações em',[\s\S]*?label: 'Só esta parcela'[\s\S]*?label: 'A compra toda'/);
   assert.match(fonte, /<CamposDaCompra form=\{formCompra\}/);
   assert.doesNotMatch(fonte, /Aplicar em quais\?[\s\S]{0,120}'Só esta'/);
   assert.doesNotMatch(fonte, /label="Editar parcelas e datas da compra"/);
-  // As linhas antes da regra: o calendário novo muda a data desta linha (mesmo id).
-  assert.match(fonte, /salvarSerie\.mutate\(\s*\{ id: editing\.id, scope: 'future', patch: linhas \},\s*\{\s*onSuccess: \(\) => gravarRegra\(true\)/);
+  // Linha e regra na mesma transação SQL; falha de uma não deixa a outra gravada.
+  assert.match(fonte, /editarSerie\.mutate\(\s*\{ id: editing\.id, recurringId: serie\.id, linePatch: linhas, seriesPatch: regra \}/);
   // "Repetir lançamento" leva o estabelecimento: a série passou a guardá-lo (`20260926120000`).
   assert.match(fonte, /merchant: values\.merchant\?\.trim\(\) \?\? ''/);
 });
 
-test('Em parcela, "Editar" abre a COMPRA em toda lista que oferece Editar', () => {
-  // 26/09/2026: `[txId]` e Lançamentos abriam a compra; o Financeiro e a fatura abriam a linha —
-  // a mesma palavra levando a lugares diferentes conforme a tela.
+test('Em parcela, Editar abre o lançamento e oferece o alcance ao Salvar', () => {
   for (const arquivo of ['app/(tabs)/finance/index.tsx', 'app/finance/invoice/[id].tsx', 'app/finance/[txId].tsx', 'app/finance/transactions.tsx']) {
     const fonte = readFileSync(join(SRC, arquivo), 'utf8');
-    assert.match(fonte, /tx\.installment_plan_id\s*\?\s*router\.push\(\{\s*pathname: '\/finance\/installments',\s*params: \{ edit: tx\.installment_plan_id \}/, arquivo);
+    assert.match(fonte, /pathname: '\/finance\/transaction-form'/, arquivo);
   }
 });
 

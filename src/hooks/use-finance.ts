@@ -63,6 +63,7 @@ export type Transaction = Pick<
   | 'debt_payment_no'
   | 'debt_principal_cents'
   | 'debt_balance_after_cents'
+  | 'edit_revision'
   // A série da recorrência: é o que diz se "esta e as futuras" faz sentido nesta linha.
   // Já vinha no select desde sempre; faltava só no tipo.
   | 'recurring_id'
@@ -184,7 +185,7 @@ export type TxSummaryRow = Omit<Fns['transactions_summary']['Returns'][number], 
 };
 
 const TRANSACTION_COLUMNS =
-  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_balance_after_cents, auto_confirm, rollover_of_invoice_id, pays_invoice_id, installment_plans(first_occurred_at)';
+  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_balance_after_cents, edit_revision, auto_confirm, rollover_of_invoice_id, pays_invoice_id, installment_plans(first_occurred_at)';
 
 export interface TransactionFilters {
   /**
@@ -1129,6 +1130,29 @@ export function useMarkPaid() {
   });
 }
 
+/** Corrige o valor com escopo e confirma a baixa na mesma transação do banco. */
+export function useConfirmPaymentScoped() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (input: {
+      id: string;
+      paidAt: string;
+      amountCents: number;
+      scope: 'one' | 'future';
+    }) => {
+      const { data, error } = await supabase.rpc('confirm_payment_scoped', {
+        p_transaction_id: input.id,
+        p_paid_at: input.paidAt,
+        p_amount_cents: input.amountCents,
+        p_scope: input.scope,
+      });
+      if (error) throw error;
+      return Number(data ?? 0);
+    },
+    onSuccess: invalidate,
+  });
+}
+
 // ── importação de extrato e regras de categorização ─────────────────────────
 
 export type ImportItem = Pick<
@@ -1543,6 +1567,10 @@ export type Debt = Pick<
   | 'archived'
   | 'first_due_date'
   | 'updated_at'
+  | 'edit_revision'
+  | 'payment_category'
+  | 'payment_description'
+  | 'payment_merchant'
 > & { kind: (typeof DEBT_KINDS)[number]['value']; calculation_mode: 'amortized' | 'fixed_installments' };
 
 export type DebtScheduleRow = Omit<Fns['debt_schedule']['Returns'][number], 'interest_cents' | 'principal_cents'> & { interest_cents: number | null; principal_cents: number | null };
@@ -1567,7 +1595,7 @@ export function useDebts() {
 }
 
 const DEBT_COLUMNS =
-  'id, name, kind, calculation_mode, principal_cents, remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, account_id, due_day, archived, first_due_date, updated_at';
+  'id, name, kind, calculation_mode, principal_cents, remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, account_id, due_day, archived, first_due_date, updated_at, edit_revision, payment_category, payment_description, payment_merchant';
 
 /**
  * As arquivadas (23/09/2026). Arquivar tirava a dívida da lista e não havia volta em lugar
@@ -1636,6 +1664,68 @@ export function useDebtPayments(debtId: string | undefined) {
       if (error) throw error;
       return data;
     },
+  });
+}
+
+/** Valores históricos apenas declarados que diferem do valor atual do contrato. */
+export function useDebtDeclaredEstimates(debtId: string | undefined) {
+  useRealtimeInvalidate('debt_declared_estimates', ['debt-declared-estimates']);
+  return useQuery({
+    enabled: Boolean(debtId),
+    queryKey: ['debt-declared-estimates', debtId ?? ''],
+    queryFn: async (): Promise<Pick<Tables['debt_declared_estimates']['Row'], 'installment_no' | 'amount_cents'>[]> => {
+      const { data, error } = await supabase.from('debt_declared_estimates')
+        .select('installment_no, amount_cents')
+        .eq('debt_id', debtId!)
+        .order('installment_no');
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/** Snapshot de TODAS as baixas para o compare-and-swap da edição com alcance. */
+export function useDebtPaymentVersions(debtId: string | undefined) {
+  useRealtimeInvalidate('transactions', ['debt-payment-versions']);
+  return useQuery({
+    enabled: Boolean(debtId),
+    queryKey: ['debt-payment-versions', debtId ?? ''],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('transactions')
+        .select('id, debt_payment_no, edit_revision')
+        .eq('debt_id', debtId!);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/** Um único comando atômico corrige lançamentos pagos, estimativas e contrato. */
+export function useSaveDebtPaymentScoped() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (input: {
+      anchorId: string;
+      scope: 'one' | 'from_here' | 'all';
+      patch: Partial<Pick<Transaction, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'occurred_at'>>;
+      debtRevision: number;
+      anchorRevision: number;
+      paymentVersions: Record<string, number>;
+      requestId: string;
+    }) => {
+      const { data, error } = await supabase.rpc('update_debt_payment_scoped', {
+        p_anchor_id: input.anchorId,
+        p_scope: input.scope,
+        p_patch: input.patch,
+        p_expected_debt_revision: input.debtRevision,
+        p_expected_anchor_revision: input.anchorRevision,
+        p_expected_payment_versions: input.paymentVersions,
+        p_request_id: input.requestId,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: invalidate,
   });
 }
 
@@ -2653,6 +2743,27 @@ export function useSaveTransactionScoped() {
   });
 }
 
+/** Uma parcela e o total da compra são salvos pelo mesmo comando SQL. */
+export function useSaveInstallmentOccurrence() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async ({ id, patch }: {
+      id: string;
+      patch: Pick<TransactionInput,
+        'amount_cents' | 'category' | 'description' | 'merchant' | 'occurred_at' |
+        'status' | 'due_at' | 'auto_confirm'>;
+    }) => {
+      const { data, error } = await supabase.rpc('update_installment_occurrence', {
+        p_transaction_id: id,
+        p_patch: patch,
+      });
+      if (error) throw error;
+      return Number(data ?? 0);
+    },
+    onSuccess: invalidate,
+  });
+}
+
 /**
  * Editar a série. Vai por RPC porque não é UM update: a regra manda nas ocorrências
  * que ainda não existem e as já materializadas (90 dias à frente, `pending`) precisam
@@ -2694,6 +2805,49 @@ export function useSaveRecurringSeries() {
           .eq('id', id)
           .maybeSingle();
         if (depois?.next_run_at) aviso = avisoDeDeslize(dataLocalDe(patch.next_run_at), dataLocalDe(depois.next_run_at));
+      }
+      return { quantas: Number(data ?? 0), aviso };
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Edita linhas e calendário no mesmo comando SQL; falha inteira se uma parte falhar. */
+export function useSaveRecurringOccurrenceAndSeries() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async ({ id, recurringId, linePatch, seriesPatch }: {
+      id: string;
+      recurringId: string;
+      linePatch: Partial<Pick<TransactionInput, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id'>>;
+      seriesPatch: {
+        amount_cents?: number;
+        category?: string | null;
+        description?: string | null;
+        merchant?: string | null;
+        kind?: 'expense' | 'income';
+        account_id?: string | null;
+        auto_confirm?: boolean;
+        end_date?: string | null;
+        rrule?: string;
+        next_run_at?: string;
+      };
+    }) => {
+      const { data, error } = await supabase.rpc('update_recurring_occurrence_and_series', {
+        p_transaction_id: id,
+        p_recurring_id: recurringId,
+        p_line_patch: linePatch,
+        p_series_patch: seriesPatch,
+      });
+      if (error) throw error;
+      let aviso: string | null = null;
+      if (seriesPatch.next_run_at) {
+        const { data: depois } = await supabase
+          .from('recurring_transactions')
+          .select('next_run_at')
+          .eq('id', recurringId)
+          .maybeSingle();
+        if (depois?.next_run_at) aviso = avisoDeDeslize(dataLocalDe(seriesPatch.next_run_at), dataLocalDe(depois.next_run_at));
       }
       return { quantas: Number(data ?? 0), aviso };
     },
