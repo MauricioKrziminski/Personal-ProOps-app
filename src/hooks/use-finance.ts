@@ -1746,6 +1746,42 @@ export function useDesarquivar(tabela: Arquivavel) {
   });
 }
 
+/** A conta arquivada tem lançamentos: excluí-la os deixaria "Sem conta" e apagaria as faturas. */
+export class ContaComLancamentos extends Error {
+  constructor(public quantos: number) {
+    super('conta com lançamentos');
+  }
+}
+
+/**
+ * Exclui de vez um arquivado (28/09/2026, o lado de "excluir" do arrasto). Meta leva os aportes e
+ * bem leva o histórico de valores (`on delete cascade`) — a tela avisa antes. CONTA só sai sem
+ * lançamento nenhum: com lançamentos a FK os deixaria "Sem conta" e apagaria as faturas do cartão,
+ * mudando os números em silêncio; ela recusa e fica arquivada.
+ *
+ * ponytail: a contagem e o delete são duas chamadas; um lançamento criado entre elas vira "Sem
+ * conta". Se isso importar, mover para uma RPC que confere e apaga na mesma transação.
+ */
+export function useExcluirArquivado(tabela: Arquivavel) {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (id: string): Promise<boolean> => {
+      if (tabela === 'accounts') {
+        const { count, error } = await supabase
+          .from('transactions')
+          .select('id', { count: 'exact', head: true })
+          .or(`account_id.eq.${id},counterparty_account_id.eq.${id}`);
+        if (error) throw error;
+        if (count) throw new ContaComLancamentos(count);
+      }
+      const { data, error } = await supabase.from(tabela).delete().eq('id', id).select('id');
+      if (error) throw error;
+      return (data ?? []).length > 0;
+    },
+    onSuccess: invalidate,
+  });
+}
+
 export function useArchivedDebts() {
   useRealtimeInvalidate('debts', ['debts', 'archived']);
   return useQuery({

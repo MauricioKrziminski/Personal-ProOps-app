@@ -659,11 +659,10 @@ export default function DebtsScreen() {
   ];
   const acoesDaDivida = (d: Debt, noDetalhe = false) => showItemActions(d.name, listaDaDivida(d, noDetalhe));
 
-  const acoesDaArquivada = (d: Debt) =>
-    showItemActions(d.name, [
-      { label: 'Desarquivar', onPress: () => desarquivar(d) },
-      { label: 'Excluir por completo', destructive: true, onPress: () => void excluir(d) },
-    ]);
+  const acoesDaArquivada = (d: Debt): ItemAction[] => [
+    { label: 'Desarquivar', curto: 'Restaurar', icon: 'arrow.uturn.backward', arrasto: 'direita', onPress: () => desarquivar(d) },
+    { label: 'Excluir por completo', curto: 'Excluir', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => void excluir(d) },
+  ];
 
   const cartaoDivida = (d: Debt, index: number) => {
     const restante = Number(d.remaining_cents);
@@ -816,16 +815,18 @@ export default function DebtsScreen() {
         />
         {verArquivadas
           ? listaArquivadas.map((d) => (
-              <View key={d.id} style={styles.arquivada}>
-                <Row
-                  title={d.name}
-                  subtitle="arquivada"
-                  chevron={false}
-                  trailing={<Money cents={Number(d.remaining_cents)} variant="subhead" tone="textSecondary" />}
-                  onPress={() => acoesDaArquivada(d)}
-                  accessibilityLabel={`${d.name}, arquivada. Toque para desarquivar ou excluir.`}
-                />
-              </View>
+              <Deslizavel key={d.id} titulo={d.name} acoes={acoesDaArquivada(d)}>
+                <View style={styles.arquivada}>
+                  <Row
+                    title={d.name}
+                    subtitle="arquivada"
+                    chevron={false}
+                    trailing={<Money cents={Number(d.remaining_cents)} variant="subhead" tone="textSecondary" />}
+                    onPress={() => showItemActions(d.name, acoesDaArquivada(d))}
+                    accessibilityLabel={`${d.name}, arquivada. Toque para desarquivar ou excluir.`}
+                  />
+                </View>
+              </Deslizavel>
             ))
           : null}
       </Section>

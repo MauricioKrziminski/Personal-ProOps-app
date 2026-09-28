@@ -2,11 +2,26 @@ import { useState, type ReactNode } from 'react';
 
 import { ErrorCard } from '@/components/error-card';
 import { Forte } from '@/components/ui/forte';
+import { Deslizavel } from '@/components/ui/deslizavel';
 import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
 import { useToast } from '@/components/ui/toast';
-import { useArquivados, useDesarquivar, type Arquivado, type Arquivavel } from '@/hooks/use-finance';
-import { showItemActions } from '@/lib/item-actions';
+import {
+  ContaComLancamentos,
+  useArquivados,
+  useDesarquivar,
+  useExcluirArquivado,
+  type Arquivado,
+  type Arquivavel,
+} from '@/hooks/use-finance';
+import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
+
+/** O que some junto com o item — dito na confirmação, antes do toque. */
+const O_QUE_SOME: Record<Arquivavel, string> = {
+  accounts: 'Só dá para excluir sem lançamentos. Não dá para desfazer.',
+  goals: 'Os aportes dela saem junto. Não dá para desfazer.',
+  assets: 'O histórico de valores sai junto. Não dá para desfazer.',
+};
 
 interface Props {
   tabela: Arquivavel;
@@ -20,8 +35,8 @@ interface Props {
 }
 
 /**
- * "Arquivadas · N" no fim da lista, que abre os arquivados no lugar; tocar num deles oferece
- * "Desarquivar" (28/09/2026). Contas, cartões, metas e bens se arquivavam e SUMIAM — não havia
+ * "Arquivadas · N" no fim da lista, que abre os arquivados no lugar; tocar num deles desarquiva,
+ * e o arrasto põe Desarquivar à direita e Excluir à esquerda (28/09/2026). Contas, cartões, metas e bens se arquivavam e SUMIAM — não havia
  * tela que os listasse, e o único caminho de volta era o "Desfazer" do aviso, que dura segundos.
  * É o desenho que as dívidas já tinham. Some sem nada arquivado; com erro, diz que falhou.
  */
@@ -29,6 +44,7 @@ export function SecaoDeArquivados({ tabela, titulo, filtro, subtitulo, trailing 
   const toast = useToast();
   const consulta = useArquivados(tabela);
   const desarquivar = useDesarquivar(tabela);
+  const excluir = useExcluirArquivado(tabela);
   const [aberta, setAberta] = useState(false);
 
   if (consulta.isError) return <ErrorCard onRetry={consulta.refetch} />;
@@ -46,6 +62,32 @@ export function SecaoDeArquivados({ tabela, titulo, filtro, subtitulo, trailing 
       onError: () => toast({ message: <>Não deu para desarquivar <Forte>{item.name}</Forte>.</>, tone: 'error' }),
     });
 
+  const exclui = (item: Arquivado) =>
+    confirmDestructive(`Excluir ${item.name}?`, 'Excluir', () =>
+      excluir.mutate(item.id, {
+        onSuccess: (saiu) =>
+          toast(
+            saiu
+              ? { message: <><Forte>{item.name}</Forte> saiu de vez.</>, tone: 'success' }
+              : { message: <><Forte>{item.name}</Forte> não existe mais.</>, tone: 'error' },
+          ),
+        onError: (e) =>
+          toast({
+            message:
+              e instanceof ContaComLancamentos ? (
+                <><Forte>{item.name}</Forte> tem {e.quantos} lançamento{e.quantos === 1 ? '' : 's'}: apague-os antes ou deixe arquivada.</>
+              ) : (
+                <>Não deu para excluir <Forte>{item.name}</Forte>.</>
+              ),
+            tone: 'error',
+          }),
+      }), O_QUE_SOME[tabela]);
+
+  const acoes = (item: Arquivado): ItemAction[] => [
+    { label: 'Desarquivar', curto: 'Restaurar', icon: 'arrow.uturn.backward', arrasto: 'direita', onPress: () => volta(item) },
+    { label: 'Excluir', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => exclui(item) },
+  ];
+
   return (
     <Section>
       <Row
@@ -58,15 +100,17 @@ export function SecaoDeArquivados({ tabela, titulo, filtro, subtitulo, trailing 
       />
       {aberta
         ? itens.map((item) => (
-            <Row
-              key={item.id}
-              title={item.name}
-              subtitle={subtitulo(item)}
-              chevron={false}
-              trailing={trailing?.(item)}
-              onPress={() => showItemActions(item.name, [{ label: 'Desarquivar', icon: 'arrow.uturn.backward', onPress: () => volta(item) }])}
-              accessibilityLabel={`${item.name}, ${subtitulo(item)}. Toque para desarquivar.`}
-            />
+            <Deslizavel key={item.id} titulo={item.name} acoes={acoes(item)}>
+              <Row
+                title={item.name}
+                subtitle={subtitulo(item)}
+                chevron={false}
+                trailing={trailing?.(item)}
+                onPress={() => volta(item)}
+                onLongPress={() => showItemActions(item.name, acoes(item))}
+                accessibilityLabel={`${item.name}, ${subtitulo(item)}. Toque para desarquivar.`}
+              />
+            </Deslizavel>
           ))
         : null}
     </Section>

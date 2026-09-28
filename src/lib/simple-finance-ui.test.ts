@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[] } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -199,6 +199,10 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useSaveRecurringOne: () => mutation('saveRecurringOne'),
     useTransaction: (id: string) => ({ ...query, isSuccess: true, data: (options.txs ?? [{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared', recurring_id: null, installment_plan_id: null }]).find((t: any) => t.id === id) ?? null }),
     usePayInvoice: () => mutation('payInvoice'),
+    useArquivados: () => ({ ...query, isSuccess: true, data: options.arquivados ?? [] }),
+    useDesarquivar: () => mutation('desarquivar'),
+    useExcluirArquivado: (tabela: string) => mutation(`excluir:${tabela}`),
+    ContaComLancamentos: class extends Error {},
     useInvoice: () => ({ ...query, data: {
       invoice: { id: 'invoice-1', account_id: 'card-1', status: options.invoiceStatus ?? 'closed', reference_month: '2026-08-01', closing_date: '2026-08-10', due_date: '2026-08-20', paid_at: options.invoiceStatus === 'paid' ? '2026-08-18' : null, settled_manually: Boolean(options.settledManually) },
       transactions: [{ id: 'purchase-1', kind: 'expense', amount_cents: 147000, occurred_at: '2026-08-01' }],
@@ -1910,11 +1914,18 @@ test('Pasta: arrasta Fixar à direita e Arquivar à esquerda (os dois até o fim
   assert.deepEqual(ladosDe(card), { direita: ['Fixar'], esquerda: ['Arquivar'], mais: true, pontaDireita: 'Fixar', pontaEsquerda: 'Arquivar' });
 });
 
-test('Lixeira: arrasta só Apagar de vez à esquerda (Ver conteúdo é o toque)', () => {
+test('Lixeira: Restaurar à direita, Apagar de vez à esquerda (Ver conteúdo é o toque)', () => {
   const ui = screen('src/app/notes/trash.tsx', { notes: [{ id: 'n1', content: 'Teste', deleted_at: '2026-09-20T12:00:00Z', updated_at: '2026-09-20T12:00:00Z', pinned: false }] });
   const [card] = deslizaveis(ui).length ? deslizaveis(ui) : itemLinks(ui).map((l: any) => ({ props: { acoes: l.props.actions } }));
   assert.ok(card, 'a nota da lixeira arrasta');
-  assert.deepEqual(ladosDe(card), { direita: [], esquerda: ['Apagar de vez'], mais: false, pontaDireita: null, pontaEsquerda: 'Apagar de vez' });
+  assert.deepEqual(ladosDe(card), { direita: ['Restaurar'], esquerda: ['Apagar de vez'], mais: false, pontaDireita: 'Restaurar', pontaEsquerda: 'Apagar de vez' });
+});
+
+test('Arquivadas das notas: Desarquivar à direita, apagar à esquerda', () => {
+  const ui = screen('src/app/notes/archived.tsx', { notes: [{ id: 'n1', content: 'Teste', archived_at: '2026-09-20T12:00:00Z', updated_at: '2026-09-20T12:00:00Z', pinned: false }] });
+  const [card] = deslizaveis(ui);
+  assert.ok(card, 'a nota arquivada arrasta');
+  assert.deepEqual(ladosDe(card), { direita: ['Desarquivar'], esquerda: ['Lixeira'], mais: false, pontaDireita: 'Desarquivar', pontaEsquerda: 'Lixeira' });
 });
 
 test('Conversa: arrasta Renomear à direita e Apagar à esquerda', () => {
@@ -3099,4 +3110,30 @@ test('Conta: com lançamentos, o tipo só troca na mesma família; editando o ca
   assert.deepEqual(JSON.parse(JSON.stringify(tipo.props.options.map((o: any) => o.id))), ['credit_card'], 'o cartão com lançamento não vira conta');
   assert.equal(ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Fecha dia').props.hint, 'Mudar os dias refaz as faturas em aberto');
   assert.equal(ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Compra no dia do fechamento').props.hint, undefined, 'a dica aparece uma vez');
+});
+
+test('Dívida arquivada: Desarquivar à direita, Excluir por completo à esquerda', () => {
+  const ui = screen('src/app/finance/debts.tsx', {
+    archivedDebts: [{ id: 'd1', name: 'Carro', archived: true, remaining_cents: 100000, principal_cents: 100000, kind: 'financing', calculation_mode: 'fixed_installments', interest_rate_monthly: 0, installments: 10, installments_paid: 0 }],
+  });
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'Row' && /^Arquivadas/.test(n.props.title)).props.onPress());
+  const card = deslizaveis(ui).find((d: any) => d.props.titulo === 'Carro');
+  assert.ok(card, 'a dívida arquivada arrasta');
+  assert.deepEqual(ladosDe(card), { direita: ['Desarquivar'], esquerda: ['Excluir por completo'], mais: false, pontaDireita: 'Desarquivar', pontaEsquerda: 'Excluir por completo' });
+});
+
+test('Arquivados (contas, cartões, metas, bens): Desarquivar à direita, Excluir à esquerda, e excluir confirma', () => {
+  const ui = screen('src/components/ui/secao-de-arquivados.tsx', {
+    componente: 'SecaoDeArquivados',
+    props: { tabela: 'goals', titulo: 'Arquivadas', subtitulo: () => 'meta arquivada' },
+    arquivados: [{ id: 'g1', name: 'Viagem' }],
+  });
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'Row' && /^Arquivadas/.test(n.props.title)).props.onPress());
+  const [card] = deslizaveis(ui);
+  assert.ok(card, 'o arquivado arrasta');
+  assert.deepEqual(ladosDe(card), { direita: ['Desarquivar'], esquerda: ['Excluir'], mais: false, pontaDireita: 'Desarquivar', pontaEsquerda: 'Excluir' });
+  ui.interact(() => card.props.acoes.find((a: any) => a.label === 'Excluir').onPress());
+  assert.equal(ui.writes.length, 0, 'nada sai sem confirmar');
+  ui.interact(() => ui.confirmations.at(-1)());
+  assert.deepEqual(ui.writes.at(-1), { operation: 'excluir:goals', value: 'g1' });
 });

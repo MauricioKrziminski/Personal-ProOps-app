@@ -11,6 +11,7 @@ import { VerMais } from '@/components/ui/ver-mais';
 import { Icon } from '@/components/ui/icon';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Card } from '@/components/ui/card';
+import { Deslizavel } from '@/components/ui/deslizavel';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
@@ -28,7 +29,7 @@ import {
 } from '@/hooks/use-notes';
 import { useArchivedFolders } from '@/hooks/use-archived-folders';
 import { relativeBR } from '@/lib/dates';
-import { showItemActions } from '@/lib/item-actions';
+import { showItemActions, type ItemAction } from '@/lib/item-actions';
 import { noteTitle } from '@/lib/search';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { transicaoDeLayout } from '@/components/motion/transicao';
@@ -92,17 +93,17 @@ export default function ArchivedScreen() {
   };
 
   /*
-    Segurar a linha abre o resto (25/09/2026, *"Eu não consigo apagar uma pasta?"*): arquivada,
+    Arrastar: Desarquivar à direita, apagar à esquerda (28/09/2026). Segurar a linha abre o resto (25/09/2026, *"Eu não consigo apagar uma pasta?"*): arquivada,
     ela só sabia voltar. A pasta se apaga (com a mesma confirmação do ladrilho), e a nota vai à
     lixeira com "Desfazer", como na aba Notas — apagar de vez continua só na Lixeira.
   */
-  const acoesDaPasta = (f: NoteFolder) =>
-    showItemActions(f.name, [
-      { label: 'Desarquivar', icon: 'arrow.uturn.backward', onPress: () => desarquivarPasta(f) },
+  const acoesDaPasta = (f: NoteFolder): ItemAction[] => [
+      { label: 'Desarquivar', curto: 'Restaurar', icon: 'arrow.uturn.backward', arrasto: 'direita', onPress: () => desarquivarPasta(f) },
       {
         label: 'Apagar',
         icon: 'trash',
         destructive: true,
+        arrasto: 'esquerda',
         onPress: () =>
           confirmarApagarPasta({ name: f.name, notes_count: null }, () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -111,15 +112,16 @@ export default function ArchivedScreen() {
             });
           }),
       },
-    ]);
+    ];
 
-  const acoesDaNota = (n: Note) =>
-    showItemActions(noteTitle(n.content) || 'Sem título', [
-      { label: 'Desarquivar', icon: 'arrow.uturn.backward', onPress: () => desarquivarNota(n) },
+  const acoesDaNota = (n: Note): ItemAction[] => [
+      { label: 'Desarquivar', curto: 'Restaurar', icon: 'arrow.uturn.backward', arrasto: 'direita', onPress: () => desarquivarNota(n) },
       {
         label: 'Lixeira',
         icon: 'trash',
         destructive: true,
+        arrasto: 'esquerda',
+        desfaz: true,
         onPress: () =>
           trash.mutate(n.id, {
             onSuccess: () =>
@@ -137,7 +139,7 @@ export default function ArchivedScreen() {
             onError: () => toast({ message: 'Não deu para apagar a nota.', tone: 'error' }),
           }),
       },
-    ]);
+    ];
 
   const archiveList = (
     <>
@@ -172,6 +174,7 @@ export default function ArchivedScreen() {
             <Section title="Pastas">
               {listaPastas.map((f) => (
                 <Animated.View key={f.id} layout={transicaoDeLayout}>
+                  <Deslizavel titulo={f.name} acoes={acoesDaPasta(f)}>
                   <Row
                     title={f.name}
                     icon={symbol(f.icon)}
@@ -183,8 +186,9 @@ export default function ArchivedScreen() {
                     accessibilityLabel={`${f.name}, arquivada`}
                     trailing={<Icon name="arrow.uturn.backward" size="md" color="tint" />}
                     onPress={() => desarquivarPasta(f)}
-                    onLongPress={() => acoesDaPasta(f)}
+                    onLongPress={() => showItemActions(f.name, acoesDaPasta(f))}
                   />
+                  </Deslizavel>
                 </Animated.View>
               ))}
             </Section>
@@ -194,6 +198,7 @@ export default function ArchivedScreen() {
             <Section title="Notas">
               {listaNotas.map((n) => (
                 <Animated.View key={n.id} layout={transicaoDeLayout}>
+                  <Deslizavel titulo={noteTitle(n.content) || 'Sem título'} acoes={acoesDaNota(n)}>
                   <Row
                     title={noteTitle(n.content) || 'Sem título'}
                     subtitle={n.archived_at ? `arquivada ${relativeBR(n.archived_at)}` : undefined}
@@ -201,8 +206,9 @@ export default function ArchivedScreen() {
                     accessibilityLabel={`${noteTitle(n.content) || 'Sem título'}, arquivada`}
                     trailing={<Icon name="arrow.uturn.backward" size="md" color="tint" />}
                     onPress={() => desarquivarNota(n)}
-                    onLongPress={() => acoesDaNota(n)}
+                    onLongPress={() => showItemActions(noteTitle(n.content) || 'Sem título', acoesDaNota(n))}
                   />
+                  </Deslizavel>
                 </Animated.View>
               ))}
             </Section>

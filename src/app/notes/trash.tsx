@@ -107,6 +107,7 @@ export default function TrashScreen() {
   /** O menu da nota na lixeira, UMA lista para o toque longo e o arrasto. */
   const acoesDaNota = (note: Note): ItemAction[] => [
     { label: 'Ver conteúdo', arrasto: 'fora', onPress: () => router.push(`/notes/${note.id}`) },
+    { label: 'Restaurar', icon: 'arrow.uturn.backward', arrasto: 'direita', onPress: () => onRestore(note) },
     { label: 'Apagar de vez', curto: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => confirmPurge(note) },
   ];
   const showActions = (note: Note) => showItemActions(noteTitle(note.content) || 'Nota', acoesDaNota(note));
