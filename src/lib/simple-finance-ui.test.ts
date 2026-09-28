@@ -26,6 +26,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   const navigations: any[] = [];
   /** Quais consultas o "Tentar de novo" refez — é assim que se sabe se ele refez a CERTA. */
   const refetches: string[] = [];
+  const rulerViews: string[] = [];
   let forecastDrafts: any[] = [];
   /** O que cada chamada do portão da tela recebeu — o dublê dele abre sempre, então é por aqui que se confere a COMPOSIÇÃO. */
   const gates: any[][] = [];
@@ -357,7 +358,10 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       // precisa para renderizar sem escolher nada.
       if (name === '@/components/finance/month-ruler') return {
         MonthRuler: 'MonthRuler',
-        useMonthRuler: () => ({ view: 'cycle', setView: () => {}, temCiclo: false, cycle: { data: undefined } }),
+        useMonthRuler: (initialView = 'cycle') => {
+          rulerViews.push(initialView);
+          return { view: initialView, setView: () => {}, temCiclo: false, cycle: { data: undefined } };
+        },
       };
       if (name === '@/lib/item-actions') return { confirmDestructive: (_title: string, _label: string, callback: () => void, mensagem?: string) => { confirmations.push(callback); avisos.push(mensagem ?? ''); }, showItemActions: (_title: string, entries: any[]) => actions.push(...entries) };
       if (name === '@/lib/edit-scope') return { askEditScope: (_kind: string, onSelect: (scope: string) => void) => actions.push(
@@ -438,7 +442,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   };
   render();
   return {
-    writes, pedidos, toasts, pedidosDeLimite, avisos, confirmations, actions, navigations, refetches, gates,
+    writes, pedidos, toasts, pedidosDeLimite, avisos, confirmations, actions, navigations, refetches, gates, rulerViews,
     drafts: () => forecastDrafts,
     nodes: () => nodes,
     button(label: string) { const node = nodes.find((n) => n.type === 'Button' && n.props.label === label); assert.ok(node, `visible button: ${label}`); return node; },
@@ -1124,6 +1128,29 @@ test('an asset with a valid name but no value cannot be saved', () => {
 */
 const transacoesFile = 'src/app/finance/transactions.tsx';
 const tipos = (ui: ReturnType<typeof screen>) => ui.nodes().map((n: any) => n.type);
+
+test('Lançamentos abre julho pelo mês civil para incluir um vencimento de 31/07 em julho', () => {
+  const ui = screen(transacoesFile, { params: { month: '2026-07' } });
+  assert.deepEqual(ui.rulerViews, ['civil']);
+  assert.equal(ui.nodes().find((n: any) => n.type === 'PeriodBar')?.props.ruler.view, 'civil');
+  assert.deepEqual(screen('src/app/finance/forecast.tsx').rulerViews, ['cycle'],
+    'a escolha inicial de Lançamentos não altera a régua da Projeção');
+});
+
+test('Lançamentos mantém Lançar no header sem cobrir a recorrência calculada', () => {
+  const ui = screen(transacoesFile, {
+    params: { month: '2026-07' },
+    txs: [],
+    expectedLines: [{
+      origin: 'recurring', ref_id: 'internet', due_date: '2026-07-31',
+      amount_cents: 12000, kind: 'expense', description: 'Internet', category: null,
+      account_id: null, installment_no: null, installments_total: null, inferred_start: false,
+    }],
+  });
+  const action = ui.nodes().find((n: any) => n.type === 'HeaderActions')?.props.actions
+    .find((entry: any) => entry.label === 'Lançar');
+  assert.equal(action?.icon, 'plus');
+});
 
 test('Lançamentos com as bordas do período falhando mostra o erro, não um esqueleto eterno', () => {
   const ui = screen(transacoesFile, { rangeError: true });
@@ -2685,13 +2712,18 @@ test('Fatura: "+" cria compra NESTE cartão; o "…" edita o cartão e leva às 
 test('Lançamentos de uma conta: o "…" edita a conta, e Lançar e Importar já vão para ela', () => {
   const conta = { id: 'c1', name: 'Nubank', type: 'checking' };
   const ui = screen(transacoesFile, { params: { accountId: 'c1' }, forecastAccounts: [conta] });
-  const menu = ui.nodes().find((n: any) => n.type === 'HeaderMenu')?.props.actions ?? [];
+  const header = ui.nodes().find((n: any) => n.type === 'HeaderActions');
+  const menu = header?.props.menu?.actions ?? [];
   const editar = menu.find((a: any) => a.label === 'Editar conta');
   assert.ok(editar, menu.map((a: any) => a.label).join(', '));
   ui.interact(() => editar.onPress());
   assert.equal(ui.navigations.at(-1), '/finance/accounts?edit=c1');
   ui.interact(() => menu.find((a: any) => a.label === 'Importar extrato').onPress());
   assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/import', params: { conta: 'c1' } });
+  ui.interact(() => header.props.actions.find((a: any) => a.label === 'Lançar').onPress());
+  assert.deepEqual(copia(ui.navigations.at(-1)), {
+    pathname: '/finance/transaction-form', params: { month: '2026-09', conta: 'c1' },
+  });
 });
 
 test('Hoje: "Lançar" cria lançamento, lembrete ou nota ali mesmo', () => {

@@ -309,7 +309,7 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
       gravacaoUri = recorder.uri;
       if (!gravacaoUri) throw new Error('recording_without_file');
       if (!audioPossuiSinal(niveisDaGravacao.current)) {
-        throw new AgentApiError(422, 'empty_audio', 'Não encontrei fala nesse áudio. Tente novamente.');
+        throw new AgentApiError(422, 'empty_audio', 'O microfone não captou som. Confira a entrada de áudio e tente novamente.');
       }
       const { text } = await transcribeAudio(gravacaoUri);
       const proximo = [texto.trim(), text.trim()].filter(Boolean).join('\n');

@@ -13,7 +13,7 @@ import { PeriodBar } from '@/components/finance/period-bar';
 import { ExpectedLedgerLines } from '@/components/finance/expected-ledger-lines';
 import { ThemedText } from '@/components/themed-text';
 import { Forte } from '@/components/ui/forte';
-import { HeaderMenu } from '@/components/ui/header-actions';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { ItemLink } from '@/components/ui/item-link';
 import { Search } from '@/components/ui/search';
 import { PeriodSummaryCard } from '@/components/finance/period-summary-card';
@@ -29,9 +29,9 @@ import { Screen } from '@/components/ui/screen';
 import { fecharDeslizavelAberto } from '@/components/ui/deslizavel';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonChart, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
-import { useSubirAcimaDoToast, useToast } from '@/components/ui/toast';
+import { useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
-import { Elevation, Motion, Radius, Space } from '@/design/tokens';
+import { Motion, Radius, Space } from '@/design/tokens';
 import {
   NO_ACCOUNT,
   useAccountBalances,
@@ -60,7 +60,7 @@ import { dueInline, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
 import { filterExpectedLines } from '@/lib/ledger-expected';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
 import { useDebounced } from '@/hooks/use-debounced';
-import { useTheme, useScheme } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/use-theme';
 import { accountLabel, saldoDaConta } from '@/lib/accounts';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { tabletPaneWidths } from '@/design/adaptive-window';
@@ -163,11 +163,8 @@ function toSeriesSections(rows: Transaction[], hoje: string): DaySection[] {
 
 export default function TransactionsScreen() {
   const theme = useTheme();
-  const scheme = useScheme();
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const fabBase = insets.bottom + Space.xxl;
-  const subirFab = useSubirAcimaDoToast(fabBase);
   const { width, windowClass } = useAdaptiveWindow();
   // A barra de filtros precisa caber AO LADO do livro-caixa. No intervalo 840–950dp a janela
   // já é expanded, mas os dois painéis ainda não têm largura útil depois do respiro editorial.
@@ -241,7 +238,9 @@ export default function TransactionsScreen() {
     if (accountId && accountId !== NO_ACCOUNT) usarDica('conta-extrato');
   }, [accountId]);
 
-  const regua = useMonthRuler();
+  // Nesta lista o nome “Julho” deve mostrar também os vencimentos de 31/07.
+  // A pessoa ainda pode trocar para Ciclo nesta tela, sem afetar as demais.
+  const regua = useMonthRuler('civil');
   // A série é percorrida por mês civil: o ciclo financeiro pode atravessar dois
   // meses e esconder justamente o vencimento que a pessoa está procurando.
   const view = params.recurringId ? 'civil' : regua.view;
@@ -439,18 +438,6 @@ export default function TransactionsScreen() {
   const neverHadAnything =
     (anyEver.data ?? []).length === 0 && !anyEver.isLoading && !anyEver.isError;
 
-  // Estado vazio que oferece BOTÃO ("Ver fevereiro", "Limpar filtros") cai exatamente na faixa
-  // do FAB, que é desenhado por cima e come metade do alvo — visto no simulador com
-  // "Ver Fevereiro de 2025" cortado ao meio pelo "Lançar". Nesses dois estados o FAB sai: não há
-  // lista para completar, e a oferta da tela é a do estado vazio. Ele fica no
-  // `neverHadAnything`, cuja dica manda tocar justamente nele.
-  /*
-    ⚠️ **`isPending`, não `isLoading`.** A lista fica `enabled: false` até `useMonthRange`
-    resolver a janela, e nesse intervalo `isLoading` (que é `isPending && isFetching`) é FALSO
-    com zero linhas — ou seja, a tela anunciaria "Nada em outubro" antes de ter perguntado.
-  */
-  const vazioComAcao =
-    sections.length === 0 && expectedLines.length === 0 && !list.isPending && !list.isError && !expected.isError && !neverHadAnything;
   /** Não há o que resumir — inclui o mês sem movimento e o "nunca teve nada". */
   const listaVazia = sections.length === 0 && !list.isPending;
 
@@ -682,8 +669,9 @@ export default function TransactionsScreen() {
     rola por baixo. É a queixa "o título tá descendo junto com a tela", que custou 23 arquivos em
     11/09/2026, e `screen.tsx` documenta a armadilha na própria linha que devolve o Fragment.
 
-    O FAB continua irmão da lista; o fundo vem do `contentStyle` que o `Screen` escreve no
-    navegador, que é de onde ele sempre deveria ter vindo.
+    O fundo vem do `contentStyle` que o `Screen` escreve no navegador. A ação
+    Lançar fica no header nativo: um botão flutuante cobria o valor e a data
+    das recorrências quando o cartão caía no fim da primeira janela visível.
   */
   if (!pronta) {
     return (
@@ -695,10 +683,14 @@ export default function TransactionsScreen() {
   }
 
   const contaDoFiltro = contaFiltrada ? accounts.data?.find((a) => a.id === contaFiltrada) : undefined;
+  const abrirLancamento = () => router.push({
+    pathname: '/finance/transaction-form',
+    params: { month, ...(contaDoFiltro ? { conta: contaDoFiltro.id } : {}) },
+  });
   const menu = (
-    <HeaderMenu
-          title="Mais opções"
-          actions={[
+    <HeaderActions
+          actions={params.recurringId ? [] : [{ label: 'Lançar', icon: 'plus', onPress: abrirLancamento }]}
+          menu={{ title: 'Mais opções', actions: [
             // Submenu, não uma fileira de chips: com oito contas cadastradas o corpo da tela
             // viraria filtro. É o mesmo desenho do "mudar de pasta" das notas.
             {
@@ -755,7 +747,7 @@ export default function TransactionsScreen() {
               icon: 'line.3.horizontal.decrease',
               onPress: () => router.push('/finance/rules'),
             },
-          ]}
+          ] }}
     />
   );
 
@@ -976,41 +968,19 @@ export default function TransactionsScreen() {
     </ScrollView>
   );
 
-  // Ver ocorrências is a read of one existing contract. "Lançar" here would create
-  // an unrelated transaction and look like it belonged to that series.
-  const fab = vazioComAcao || params.recurringId ? null : (
-    // Com um toast no ar o FAB sobe: o "Desfazer" do toast ficava debaixo dele (24/09/2026).
-    <Animated.View style={[styles.fab, { bottom: fabBase }, subirFab]}>
-      <Button
-        label="Lançar"
-        icon="plus"
-        onPress={() =>
-          router.push({
-            pathname: '/finance/transaction-form',
-            // Olhando uma conta, o lançamento novo nasce nela.
-            params: { month, ...(contaDoFiltro ? { conta: contaDoFiltro.id } : {}) },
-          })
-        }
-        style={{ boxShadow: Elevation[scheme].floating }}
-      />
-    </Animated.View>
-  );
-
   /*
     A janela ampla separa apenas a apresentação: a mesma SectionList continua dona da
-    virtualização, paginação, refresh e ações. O wrapper só dá ao FAB uma coluna de referência;
+    virtualização, paginação, refresh e ações. O wrapper limita a largura da lista;
     em compacto/médio `ledger` é a SectionList literal para preservar o large title nativo.
   */
   const ledger = wideWorkspace ? (
     <View style={styles.ledgerPane}>
       {ledgerList}
-      {fab}
     </View>
   ) : ledgerList;
 
   return (
     <Screen
-      floatingAction={!wideWorkspace}
       scroll={false}
       grouped
       wide={wideWorkspace}
@@ -1033,7 +1003,6 @@ export default function TransactionsScreen() {
       ) : (
         ledger
       )}
-      {!wideWorkspace ? fab : null}
       {baixa.folha}
     </Screen>
   );
@@ -1115,10 +1084,6 @@ const styles = StyleSheet.create({
   separator: {
     height: StyleSheet.hairlineWidth,
     marginLeft: Space.xxl,
-  },
-  fab: {
-    position: 'absolute',
-    right: Space.lg,
   },
   saldoConta: { gap: Space.xs },
   saldoLinha: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: Space.sm },

@@ -35,8 +35,8 @@ import { useCycle, type CycleView } from '@/hooks/use-finance';
  */
 export type MonthRulerState = ReturnType<typeof useMonthRuler>;
 
-export function useMonthRuler() {
-  const [view, setView] = useState<CycleView>('cycle');
+export function useMonthRuler(initialView: CycleView = 'cycle') {
+  const [view, setView] = useState<CycleView>(initialView);
   const cycle = useCycle(view);
   const [knownCloseDay, setKnownCloseDay] = useState<number | null>(null);
   // A chave da outra régua pode estar pendente no primeiro toque. Não esconda o

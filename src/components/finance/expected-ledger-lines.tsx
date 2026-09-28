@@ -10,13 +10,10 @@ import { useTheme } from '@/hooks/use-theme';
 import type { ExpectedLedgerLine } from '@/lib/ledger-expected';
 
 function expectationLabel(line: ExpectedLedgerLine, today: string): string {
-  if (line.origin === 'debt_estimate') return 'Parcela informada como paga · sem lançamento';
-  if (line.due_date < today) {
-    return line.inferred_start
-      ? 'Estimativa retroativa · sem registro'
-      : 'Vencimento anterior · sem registro';
-  }
-  return line.origin === 'debt_schedule' ? 'Parcela prevista' : 'Ocorrência prevista';
+  if (line.origin === 'debt_estimate') return 'Informada como paga; valor não lançado';
+  if (line.inferred_start) return 'Data estimada pelo cadastro';
+  const origem = line.origin === 'debt_schedule' ? 'Parcela do contrato' : 'Recorrência';
+  return `${origem}${line.due_date < today ? ' calculada' : ' programada'}`;
 }
 
 /** Calculated dates are deliberately separate from the ledger and its actual totals/actions. */
@@ -29,9 +26,9 @@ export function ExpectedLedgerLines({ lines, today }: {
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
-        <ThemedText type="headline">Previstos sem lançamento</ThemedText>
+        <ThemedText type="headline">Recorrências e parcelas</ThemedText>
         <ThemedText type="footnote" themeColor="textSecondary">
-          Calculados pela recorrência ou pelo contrato. Não são pagamentos registrados.
+          Datas calculadas pelas regras cadastradas. Ainda não há lançamento para elas.
         </ThemedText>
       </View>
       {lines.map((line) => (
@@ -41,7 +38,7 @@ export function ExpectedLedgerLines({ lines, today }: {
           <Row
             title={line.description}
             inlineValue
-            badge={{ label: line.due_date < today ? 'sem registro' : 'previsto' }}
+            badge={{ label: line.due_date < today ? 'sem lançamento' : 'programado' }}
             subtitle={`${formatDateBR(line.due_date)} · ${expectationLabel(line, today)}${line.installment_no ? ` · parcela ${line.installment_no}${line.installments_total ? `/${line.installments_total}` : ''}` : ''}`}
             trailing={<Money cents={line.kind === 'expense' ? -line.amount_cents : line.amount_cents} variant="ticker" signed />}
           />
