@@ -28,6 +28,14 @@ const VAO = 4;
 const MARCAS = 3;
 /** O círculo do número do dia, em dp à fonte padrão: cresce com a fonte do sistema. */
 const CIRCULO = 28;
+/**
+ * Teto da fonte no EIXO (dia da semana, número e círculo). Sete colunas iguais não têm para onde
+ * quebrar — o mesmo motivo do teto da barra de abas. Medido num iPhone de 375pt (coluna de 44pt):
+ * "dom" cabe até 1,66× e o círculo até 1,59×; sem teto, no tamanho de acessibilidade "dom" partia
+ * em "do / m" e o círculo invadia o vizinho (28/09/2026). Os tamanhos comuns (até ~1,35×) passam
+ * inteiros.
+ */
+const TETO_DO_EIXO = 1.5;
 
 /** Anima um deslocamento vertical que NASCE no valor real e só anda quando ele muda (§5). */
 function useDeslocamento(alvo: number) {
@@ -126,7 +134,7 @@ export function SemanaDoDia({
   const dia = semana.dias.find((d) => d.day === escolhido) ?? semana.dias.find((d) => d.tipo === 'hoje')!;
   const frase = legendaDoDia(dia);
   const alturaDaRegua = semana.linha === null ? null : Math.min(ALTURA, Math.round((semana.linha / semana.teto) * ALTURA));
-  const circulo = Math.round(CIRCULO * Math.max(1, fontScale));
+  const circulo = Math.round(CIRCULO * Math.min(Math.max(1, fontScale), TETO_DO_EIXO));
   /** No leitor de tela, o valor escondido é "valor oculto" — `brl` devolveria as bolinhas. */
   const falar = (cents: number) => (concealed ? 'valor oculto' : brl(cents));
 
@@ -219,6 +227,7 @@ export function SemanaDoDia({
                 )}
                 <ThemedText
                   type="caption"
+                  maxFontSizeMultiplier={TETO_DO_EIXO}
                   themeColor={d.tipo === 'hoje' || selecionado ? 'text' : 'textSecondary'}
                   style={styles.semana}>
                   {d.semana}
@@ -238,7 +247,11 @@ export function SemanaDoDia({
                         ? { backgroundColor: theme.backgroundSelected }
                         : null,
                   ]}>
-                  <ThemedText type="small" themeColor={d.tipo === 'hoje' ? 'onTint' : 'text'} style={tabular}>
+                  <ThemedText
+                    type="small"
+                    maxFontSizeMultiplier={TETO_DO_EIXO}
+                    themeColor={d.tipo === 'hoje' ? 'onTint' : 'text'}
+                    style={tabular}>
                     {d.numero}
                   </ThemedText>
                 </View>

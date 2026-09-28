@@ -1208,8 +1208,12 @@ test('o título da linha de extrato tem o mesmo piso de largura do título da Ro
   const row = readFileSync(join(SRC, 'components/ui/row.tsx'), 'utf8');
   const piso = row.match(/\n  labels: \{[^}]*minWidth: (\d+)/)?.[1];
   const extrato = row.match(/tituloDoExtrato: \{[^}]*minWidth: (\d+)/)?.[1];
-  assert.ok(piso && extrato, 'os dois estilos existem');
+  // As linhas do Seu dia (compromisso e atrasado) seguem a mesma régua (28/09/2026).
+  const agenda = readFileSync(join(SRC, 'components/feed/agenda-item.tsx'), 'utf8');
+  const doDia = agenda.match(/\n  titulo: \{[^}]*minWidth: (\d+)/)?.[1];
+  assert.ok(piso && extrato && doDia, 'os três estilos existem');
   assert.equal(Number(extrato), Number(piso));
+  assert.equal(Number(doDia), Number(piso));
 });
 
 test('card que arrasta tem press-in: o filho do Deslizavel é PressableScale ou desenha o pressionado', () => {

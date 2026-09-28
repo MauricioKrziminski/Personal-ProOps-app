@@ -65,7 +65,7 @@ export function AgendaItem({ title, meta, metaTone, cents, valueTone, icon, cart
         )}
       </View>
       <View style={styles.textos}>
-        {/* Título e valor na mesma linha; sem espaço, o valor desce — o título nunca parte (§3). */}
+        {/* Título e valor na mesma linha; o título quebra entre palavras e, abaixo do piso, o valor desce (§3). */}
         <View style={styles.topo}>
           <ThemedText type="default" style={styles.titulo}>
             {title}
@@ -204,8 +204,11 @@ const styles = StyleSheet.create({
   },
   mini: { flexShrink: 0, marginTop: Space.xs },
   textos: { flex: 1, minWidth: 0, gap: Space.xs },
-  topo: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: Space.md, rowGap: Space.half },
-  titulo: { flexShrink: 0, maxWidth: '100%' },
+  topo: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: Space.md, rowGap: Space.half },
+  // A receita do título de extrato da `Row` (piso 134, medido): o título quebra ENTRE palavras ao
+  // lado do valor, e o valor só desce abaixo do piso. Com `flexShrink: 0` o valor descia sempre
+  // que o título não cabia numa linha — "3 contas atrasadas" num iPhone de 393pt (28/09/2026).
+  titulo: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 134 },
   // `marginLeft: auto` mantém o valor e a ação encostados à direita mesmo quando descem de linha.
   direita: { marginLeft: 'auto' },
   base: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: Space.md, rowGap: Space.sm, minHeight: 20 },
