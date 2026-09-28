@@ -57,7 +57,7 @@ import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive } from '@/lib/item-actions';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
 import { dueInline, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
-import { filterExpectedLines, mesclarPrevistas, type ItemDoExtrato } from '@/lib/ledger-expected';
+import { filterExpectedLines, mesclarPrevistas, previstasNaTela, type ItemDoExtrato } from '@/lib/ledger-expected';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
 import { useDebounced } from '@/hooks/use-debounced';
 import { useTheme } from '@/hooks/use-theme';
@@ -122,6 +122,19 @@ interface DaySection {
 }
 
 const dataDoItem = (item: Item) => item.tx?.occurred_at ?? item.prevista!.due_date;
+
+/**
+ * A ocorrência de uma recorrente tem a MESMA chave prevista e gravada (série + dia; o unique
+ * `(recurring_id, occurred_at)` a garante). Com o id da linha, o toque trocava a chave: a linha
+ * era desmontada e remontada com a entrada animada, e o dia ficava com um vão (28/09/2026, visto
+ * quadro a quadro no simulador).
+ */
+const chaveDoItem = ({ tx, prevista }: Item) =>
+  tx
+    ? (tx.recurring_id ? `rec:${tx.recurring_id}:${tx.occurred_at}` : tx.id)
+    : prevista!.origin === 'recurring'
+      ? `rec:${prevista!.ref_id}:${prevista!.due_date}`
+      : `${prevista!.origin}:${prevista!.ref_id}:${prevista!.due_date}`;
 
 /** `2026-08-23` → `sáb, 23 de agosto`. */
 function dayTitle(iso: string): string {
@@ -300,6 +313,12 @@ export default function TransactionsScreen() {
     `tx_count` conta na régua do dinheiro (competência, sem transferência) — que é o que o
     "por data da compra" ao lado promete. `rows.length` não batia com essa régua nem com a outra.
   */
+  // "Paguei" confirma o valor numa folha curta antes da baixa (25/09/2026).
+  const baixa = useConfirmarBaixa();
+  const previstas = useAcoesDaPrevista({ month, pagar: baixa.abrir });
+  // `toSections` agrupa em varredura linear, então o dia que atravessa a fronteira de duas
+  // páginas continua sendo uma seção só depois do `flat()`.
+  const rows = useMemo(() => list.data?.pages.flat() ?? [], [list.data]);
   const expectedLines = useMemo(() => filterExpectedLines(expected.data ?? [], {
     kind: kind === 'all' ? undefined : kind,
     status: status === 'all' ? undefined : status,
@@ -309,6 +328,10 @@ export default function TransactionsScreen() {
     recurringId: params.recurringId,
     q: term,
   }), [expected.data, kind, status, category, accountId, source, params.recurringId, term]);
+  const previstasVisiveis = useMemo(
+    () => previstasNaTela(expectedLines, previstas.emTransito, rows),
+    [expectedLines, previstas.emTransito, rows]
+  );
   const totais = useMemo(() => {
     let entrou = 0;
     let saiu = 0;
@@ -330,7 +353,7 @@ export default function TransactionsScreen() {
       As previstas estão NA lista (misturadas por data), então entram no card — o total do topo
       soma exatamente as linhas de baixo. A que nasce paga (`status`) já aconteceu; o resto é previsto.
     */
-    for (const p of expectedLines) {
+    for (const p of previstasVisiveis) {
       // a mesma régua de `pending_cents` do resumo: o que ainda não saiu do caixa
       const emAberto = p.status === 'cleared' ? 0 : p.amount_cents;
       if (p.kind === 'income') { entrou += p.amount_cents; entrouPrevisto += emAberto; }
@@ -338,7 +361,7 @@ export default function TransactionsScreen() {
       linhas += 1;
     }
     return { entrou, saiu, entrouPrevisto, saiuPrevisto, linhas };
-  }, [summary.data, expectedLines]);
+  }, [summary.data, previstasVisiveis]);
 
   const accounts = useAccounts();
   const saldos = useAccountBalances();
@@ -346,8 +369,6 @@ export default function TransactionsScreen() {
   const brl = useBRL();
   // Um item basta para separar "nunca teve nada" de "este mês não teve nada".
   const anyEver = useRecentTransactions(1);
-  // "Paguei" confirma o valor numa folha curta antes da baixa (25/09/2026).
-  const baixa = useConfirmarBaixa();
   const remove = useDeleteTransaction();
 
   const accountName = useMemo(() => {
@@ -387,13 +408,10 @@ export default function TransactionsScreen() {
       ...(range.pronto ? [summary.refetch(), list.refetch(), expected.refetch()] : []),
     ]);
 
-  // `toSections` agrupa em varredura linear, então o dia que atravessa a fronteira de duas
-  // páginas continua sendo uma seção só depois do `flat()`.
-  const rows = useMemo(() => list.data?.pages.flat() ?? [], [list.data]);
   // Falhou a leitura dos lançamentos: a lista mostra o erro, nunca uma lista só de previstas.
   const itens = useMemo(
-    () => (list.isError ? [] : mesclarPrevistas(rows, expectedLines, Boolean(list.hasNextPage))),
-    [rows, expectedLines, list.hasNextPage, list.isError]
+    () => (list.isError ? [] : mesclarPrevistas(rows, previstasVisiveis, Boolean(list.hasNextPage))),
+    [rows, previstasVisiveis, list.hasNextPage, list.isError]
   );
   const sections = useMemo(
     () => (params.recurringId ? toSeriesSections(itens, hoje) : toSections(itens)),
@@ -477,7 +495,6 @@ export default function TransactionsScreen() {
   };
 
   const pay = (tx: Transaction) => baixa.abrir(tx.id);
-  const previstas = useAcoesDaPrevista({ month, pagar: baixa.abrir });
 
   /** Destrutivo = action sheet nativo. `onLongPress` + `Alert` é proibido nesta tela. */
   const confirmDelete = (tx: Transaction) => {
@@ -781,7 +798,7 @@ export default function TransactionsScreen() {
           // Rolar fecha o card arrastado que estiver aberto (Deslizavel).
           onScrollBeginDrag={fecharDeslizavelAberto}
           sections={sections}
-          keyExtractor={(item) => item.tx?.id ?? `prevista:${item.prevista!.origin}:${item.prevista!.ref_id}:${item.prevista!.due_date}`}
+          keyExtractor={chaveDoItem}
           style={styles.listHost}
           contentInsetAdjustmentBehavior="automatic"
           stickySectionHeadersEnabled

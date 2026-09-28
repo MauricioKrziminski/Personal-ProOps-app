@@ -75,6 +75,12 @@ begin
   select jsonb_object_agg(id::text, edit_revision) into versions from public.transactions where debt_id = d;
   perform public.update_debt_payment_due_day(p2, 'all', '{}'::jsonb, null, 15, dv, av, versions, gen_random_uuid());
   assert (select due_day from public.debts where id = d) = 15;
+  -- "Todos, inclusive pagamentos passados": os registrados vão para o dia 15 do PRÓPRIO mês
+  assert (select occurred_at from public.transactions where id = p1) = base + 14,
+    format('o 1º pagamento vai para o dia 15: %s', (select occurred_at from public.transactions where id = p1));
+  assert extract(day from (select occurred_at from public.transactions where id = p2)) = 15
+    and date_trunc('month', (select occurred_at from public.transactions where id = p2)) = date_trunc('month', current_date),
+    'o 2º também, sem mudar de mês';
   select min(due_date) into proxima from public.debt_schedule(d);
   assert extract(day from proxima) = 15, format('a próxima vence no dia 15: %s', proxima);
 end $$;

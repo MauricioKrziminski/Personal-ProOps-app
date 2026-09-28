@@ -56,22 +56,26 @@ export type ItemDoExtrato<T> = { tx: T; prevista?: undefined } | { prevista: Exp
  * Mistura as previstas nas linhas gravadas, na ordem da lista (data decrescente), cada uma no
  * dia dela (28/09/2026, decisão do dono do produto: eram um bloco à parte no topo).
  *
+ * ⚠️ **No dia dela, a prevista vem ANTES das gravadas** (28/09/2026). A lista ordena o dia do
+ * mais recente para o mais antigo (`created_at`), e o toque cria o lançamento AGORA: no fim do
+ * dia, ela pulava para o topo ao ser tocada — *"eu só toquei nele"*. No topo, o toque não a move.
+ *
  * A lista é paginada: com mais páginas por vir, só entra a prevista de um dia que a página já
- * PASSOU — senão ela pararia no fim da lista e pularia de lugar quando a página seguinte chegasse.
+ * alcançou — senão ela pararia no fim da lista e pularia de lugar quando a página seguinte chegasse.
  */
 export function mesclarPrevistas<T extends { occurred_at: string }>(
   rows: readonly T[], previstas: readonly ExpectedLedgerLine[], temMais: boolean,
 ): ItemDoExtrato<T>[] {
   const piso = temMais && rows.length ? rows[rows.length - 1].occurred_at : null;
   const entram = previstas
-    .filter((p) => piso === null || p.due_date > piso)
+    .filter((p) => piso === null || p.due_date >= piso)
     .sort((a, b) => b.due_date.localeCompare(a.due_date)
       || a.description.localeCompare(b.description, 'pt-BR')
       || a.ref_id.localeCompare(b.ref_id));
   const itens: ItemDoExtrato<T>[] = [];
   let i = 0;
   for (const tx of rows) {
-    while (i < entram.length && entram[i].due_date > tx.occurred_at) itens.push({ prevista: entram[i++] });
+    while (i < entram.length && entram[i].due_date >= tx.occurred_at) itens.push({ prevista: entram[i++] });
     itens.push({ tx });
   }
   while (i < entram.length) itens.push({ prevista: entram[i++] });
@@ -86,4 +90,24 @@ export function estadoDaPrevista(
   if (line.inferred_start) return 'estimado';
   if (line.due_date >= hoje) return 'previsto';
   return line.kind === 'income' ? 'não caiu' : 'atrasado';
+}
+
+const chaveDaPrevista = (p: ExpectedLedgerLine) => `${p.origin}:${p.ref_id}:${p.due_date}`;
+
+/**
+ * As previstas que a tela desenha: as lidas do banco + as tocadas que ainda estão virando
+ * lançamento (`emTransito`), menos as que já têm a linha gravada na lista.
+ *
+ * ⚠️ **O toque não pode abrir um buraco na lista** (28/09/2026). Gravada a ocorrência, a leitura
+ * das previstas voltava ANTES da lista de lançamentos, e por ~1 s a linha não estava em nenhuma
+ * das duas. A tocada fica até a lista trazê-la; a lida some quando a gravada chega — na ordem que
+ * as duas consultas voltarem, a linha não some nem aparece duas vezes.
+ */
+export function previstasNaTela<T extends { occurred_at: string; recurring_id?: string | null }>(
+  lidas: readonly ExpectedLedgerLine[], emTransito: readonly ExpectedLedgerLine[], rows: readonly T[],
+): ExpectedLedgerLine[] {
+  const gravadas = new Set(rows.filter((r) => r.recurring_id).map((r) => `recurring:${r.recurring_id}:${r.occurred_at}`));
+  const lidasChaves = new Set(lidas.map(chaveDaPrevista));
+  return [...lidas, ...emTransito.filter((p) => !lidasChaves.has(chaveDaPrevista(p)))]
+    .filter((p) => !gravadas.has(chaveDaPrevista(p)));
 }

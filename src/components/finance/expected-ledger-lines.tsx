@@ -1,4 +1,6 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
+import { useState } from 'react';
 
 import { Deslizavel } from '@/components/ui/deslizavel';
 import { Money } from '@/components/ui/money';
@@ -34,11 +36,21 @@ export function useAcoesDaPrevista({ month, pagar }: { month: string; pagar: (tx
   const pular = useSkipOccurrence();
   const debts = useDebts();
   const toast = useToast();
+  const queryClient = useQueryClient();
+  // As tocadas que ainda não chegaram gravadas na lista (`previstasNaTela`).
+  const [emTransito, setEmTransito] = useState<ExpectedLedgerLine[]>([]);
+  const sai = (line: ExpectedLedgerLine) =>
+    setEmTransito((lista) => lista.filter((p) => p !== line));
 
   const lancamento = async (line: ExpectedLedgerLine): Promise<string | null> => {
+    setEmTransito((lista) => [...lista, line]);
     try {
-      return await materializar.mutateAsync({ recurringId: line.ref_id, date: line.due_date });
+      const id = await materializar.mutateAsync({ recurringId: line.ref_id, date: line.due_date });
+      // sai quando a lista de lançamentos já a trouxe gravada
+      void queryClient.refetchQueries({ queryKey: ['transactions'], type: 'active' }).finally(() => sai(line));
+      return id;
     } catch (error) {
+      sai(line);
       toast({ message: financeErrorMessage(error, 'Não deu para abrir essa ocorrência. Tenta de novo.'), tone: 'error' });
       return null;
     }
@@ -107,7 +119,7 @@ export function useAcoesDaPrevista({ month, pagar }: { month: string; pagar: (tx
     ];
   };
 
-  return { abrir, acoes };
+  return { abrir, acoes, emTransito };
 }
 
 /**

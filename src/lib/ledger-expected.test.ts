@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { estadoDaPrevista, filterExpectedLines, mesclarPrevistas, type ExpectedLedgerLine } from './ledger-expected.ts';
+import { estadoDaPrevista, filterExpectedLines, mesclarPrevistas, previstasNaTela, type ExpectedLedgerLine } from './ledger-expected.ts';
 
 const recurrence: ExpectedLedgerLine = {
   origin: 'recurring', ref_id: 'series', due_date: '2026-11-01',
@@ -44,11 +44,16 @@ test('previstas entram no dia delas, entre os lançamentos, sem passar da págin
   const early = { ...recurrence, ref_id: 'early', due_date: '2026-11-02' };
   const ids = (itens: ReturnType<typeof mesclarPrevistas>) =>
     itens.map((i) => i.tx ? (i.tx as { id: string }).id : `p:${i.prevista!.due_date}`);
+  // no dia dela a prevista vem ANTES das gravadas: é o lugar que o toque lhe dá (o lançamento
+  // criado agora é o mais recente do dia) — tocar não pode mover a linha (28/09/2026)
   assert.deepEqual(ids(mesclarPrevistas(rows, [early, debt, late], false)),
-    ['a', 'p:2026-12-01', 'b', 'p:2026-11-30', 'c', 'p:2026-11-02']);
+    ['a', 'p:2026-12-01', 'p:2026-11-30', 'b', 'c', 'p:2026-11-02']);
   // com mais páginas, a de 02/11 (antes da última linha carregada) espera a próxima página
   assert.deepEqual(ids(mesclarPrevistas(rows, [early, debt, late], true)),
-    ['a', 'p:2026-12-01', 'b', 'p:2026-11-30', 'c']);
+    ['a', 'p:2026-12-01', 'p:2026-11-30', 'b', 'c']);
+  // a do dia da última linha carregada já tem o lugar certo: o topo daquele dia
+  assert.deepEqual(ids(mesclarPrevistas(rows, [{ ...early, due_date: '2026-11-15' }], true)),
+    ['a', 'b', 'p:2026-11-15', 'c']);
   assert.deepEqual(ids(mesclarPrevistas([], [late], false)), ['p:2026-12-01']);
 });
 
@@ -59,4 +64,15 @@ test('pílula da prevista segue a data, e a estimada nunca se passa por conta a 
   assert.equal(estadoDaPrevista({ ...recurrence, inferred_start: true }, '2026-11-02'), 'estimado');
   assert.equal(estadoDaPrevista({ ...debt, origin: 'debt_estimate', status: 'cleared' }, '2026-12-02'), null);
   assert.equal(estadoDaPrevista({ ...recurrence, status: 'cleared' }, '2026-11-02'), null, 'nasce paga: nada de atrasado');
+});
+
+test('tocar na prevista não abre buraco na lista nem a mostra duas vezes', () => {
+  const gravada = { occurred_at: '2026-11-01', recurring_id: 'series' };
+  // a leitura das previstas voltou primeiro (sem ela), a lista ainda não tem a linha: fica a tocada
+  assert.deepEqual(previstasNaTela([], [recurrence], []), [recurrence]);
+  // a lista trouxe a linha, a leitura ainda é a velha: nada de duplicata
+  assert.deepEqual(previstasNaTela([recurrence], [recurrence], [gravada]), []);
+  assert.deepEqual(previstasNaTela([recurrence, debt], [], [gravada]), [debt]);
+  // sem toque em andamento, a leitura manda
+  assert.deepEqual(previstasNaTela([recurrence], [], []), [recurrence]);
 });

@@ -926,7 +926,7 @@ function TransactionForm({
     if (editing?.debt_id && divida?.installments) {
       askEditScope('payment', (scope) => salvarPagamento(scope === 'future' ? 'from_here' : scope),
         getValues('occurred_at') !== isoToBR(editing.occurred_at) || intencaoDoDia
-          ? 'Com a data nova, Este e os próximos e Todos mudam o dia de vencimento das parcelas.'
+          ? 'Com a data nova, os pagamentos e as parcelas do alcance vão para esse dia.'
           : 'Todos também corrige pagamentos já registrados e recalcula estimativas antigas sem lançamento.');
       return;
     }

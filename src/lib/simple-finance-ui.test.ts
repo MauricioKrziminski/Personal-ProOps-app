@@ -301,7 +301,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@/lib/ledger-expected') return load('src/lib/ledger-expected.ts');
       if (name === '@/components/finance/expected-ledger-lines') return {
         LinhaPrevista: 'LinhaPrevista',
-        useAcoesDaPrevista: () => ({ abrir: (line: any) => { refetches.push(`abrir:${line.ref_id}`); }, acoes: () => [] }),
+        useAcoesDaPrevista: () => ({ abrir: (line: any) => { refetches.push(`abrir:${line.ref_id}`); }, acoes: () => [], emTransito: [] }),
       };
       if (name === '@/lib/rrule-text') return { describeRRule: () => 'todo mês' };
       if (name === '@/hooks/use-archived-folders') return { useArchivedFolders: () => ({ ...query, isSuccess: true, data: options.pastasArquivadas ?? [] }) };
