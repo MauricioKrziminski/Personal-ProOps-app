@@ -10,10 +10,12 @@ export type Tela = 'hoje' | 'contas' | 'financeiro' | 'carteira' | 'lancamentos'
 
 export const DICAS = [
   {
+    // O id continua `hoje-painel` (quem já dispensou não a vê de novo); desde 28/09/2026 a Hoje não
+    // tem painel — a dica mora embaixo do card do dinheiro e aponta para o VALOR.
     id: 'hoje-painel',
     telas: ['hoje'],
     icone: 'hand.tap',
-    texto: 'Toque no painel para ver o que fecha o ciclo, a projeção e as metas.',
+    texto: 'Toque no valor para ver o que fecha o ciclo, a projeção e as metas.',
   },
   {
     // A MESMA dica na Hoje ("Nas contas") e na lista de Contas: aprendeu numa, sabe na outra.
@@ -129,7 +131,7 @@ const ROTA_DA_TELA = {
 } as const satisfies Record<Tela, string>;
 
 // Sem `/finance/cycle`: o link do ciclo carrega a régua do `cycle_now` (finance.md), e quem leva
-// até ele com a régua certa é o painel da Hoje — o item "Tocar no painel".
+// até ele com a régua certa é o valor do card do dinheiro da Hoje — o item "Tocar no valor da Hoje".
 type Rota = (typeof ROTA_DA_TELA)[Tela] | '/agent/new' | '/import' | '/finance/forecast'
   | '/finance/goals' | '/finance/budgets' | '/reminders' | '/notes/archived';
 
@@ -182,7 +184,7 @@ export const GUIA: readonly { titulo: string; itens: readonly ItemDoGuia[] }[] =
     titulo: 'Gestos',
     itens: [
       { titulo: 'Arrastar um card', texto: 'Para os lados: ações rápidas. Segurar: todas.', dica: 'lista-arrasto' },
-      { titulo: 'Tocar no painel', texto: 'Ciclo, projeção e metas.', dica: 'hoje-painel' },
+      { titulo: 'Tocar no valor da Hoje', texto: 'Ciclo, projeção e metas.', dica: 'hoje-painel' },
       { titulo: 'Arrastar no gráfico', texto: 'O saldo de cada dia.', dica: 'fin-grafico' },
     ],
   },
