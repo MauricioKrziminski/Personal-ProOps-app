@@ -262,15 +262,23 @@ export function appUpdateSubtitle(state: AppUpdateState, installedVersionName: s
       return 'Procurando uma versão nova…';
     case 'upToDate':
       return `Versão ${installedVersionName} — está atualizada`;
+    // A versão INSTALADA vem sempre junto da nova: só "Versão 1.3.54 disponível" foi lido como
+    // "estou na 1.3.54" num aparelho que estava na 1.3.52 (28/09/2026).
     case 'available':
-      return withNotes(`Versão ${state.manifest.versionName} disponível`, state.manifest);
+      return withNotes(
+        `Você está na ${installedVersionName}. Toque para baixar a ${state.manifest.versionName}.`,
+        state.manifest,
+      );
     case 'downloading':
       return withNotes(
         state.progress === null ? 'Baixando…' : `Baixando ${state.progress}%`,
         state.manifest,
       );
     case 'ready':
-      return withNotes(`Versão ${state.manifest.versionName} pronta para instalar`, state.manifest);
+      return withNotes(
+        `Você está na ${installedVersionName}. Toque para instalar a ${state.manifest.versionName}.`,
+        state.manifest,
+      );
     case 'permissionRequired':
       return withNotes('Permita a instalação nos Ajustes e toque novamente', state.manifest);
     case 'installing':

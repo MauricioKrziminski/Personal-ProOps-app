@@ -185,6 +185,12 @@ test('apaga o APK parcial quando o hash não confere', async () => {
 test('a interface mostra as notas e só oferece a próxima etapa válida', () => {
   const available: AppUpdateState = { status: 'available', manifest };
   assert.match(appUpdateSubtitle(available, '1.0.0'), /Busca mais rápida/);
+  // A instalada vem junto da nova: sem ela, "Versão 1.3.54 disponível" era lido como a instalada.
+  assert.match(appUpdateSubtitle(available, '1.0.0'), /Você está na 1\.0\.0\. Toque para baixar a /);
+  assert.match(
+    appUpdateSubtitle({ status: 'ready', manifest, fileUri: 'file:///cache/app.apk' }, '1.0.0'),
+    /Você está na 1\.0\.0\. Toque para instalar a /,
+  );
   assert.equal(appUpdateAction(available), 'download');
   assert.equal(
     appUpdateAction({ status: 'downloading', manifest, progress: 42 }),

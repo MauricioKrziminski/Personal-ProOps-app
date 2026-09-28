@@ -175,7 +175,6 @@ jobs:
             --version-name "$VERSION_NAME" \
             --url "$apk_url" \
             --sha256 "$APK_SHA256" \
-            --notes "Atualização $VERSION_NAME do Personal ProOps." \
             --output "$manifest_path"
           node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$manifest_path"
           echo "manifest_path=$manifest_path" >> "$GITHUB_OUTPUT"
@@ -188,8 +187,10 @@ jobs:
           RELEASE_PATH: ${{ steps.apk.outputs.release_path }}
           VERSION_NAME: ${{ steps.apk.outputs.version_name }}
         run: |
-          title="Personal ProOps $VERSION_NAME"
-          notes="Atualização $VERSION_NAME do Personal ProOps."
+          # Nada de nota genérica no update.json: o app a mostrava embaixo de "disponível",
+          # repetindo o número, e a linha lia como a versão instalada (28/09/2026).
+          title="ProOps $VERSION_NAME"
+          notes="ProOps $VERSION_NAME."
 
           if gh release view "$GITHUB_REF_NAME" --repo "$DISTRIBUTION_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" "$RELEASE_PATH" --clobber --repo "$DISTRIBUTION_REPOSITORY"
