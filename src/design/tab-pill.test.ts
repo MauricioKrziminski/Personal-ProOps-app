@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { centroDoSlot, distanciaDaAba, folgaDaMola, larguraDoAlvo, posicaoDesenhada } from './tab-pill.ts';
+import { MEIO_PAR_MAIS_LARGO, VAO_ENTRE_ROTULOS, centroDoSlot, distanciaDaAba, escalaDoRotulo, folgaDaMola, larguraDoAlvo, posicaoDesenhada } from './tab-pill.ts';
 
 // As medidas reais da barra: 384dp de tela, calha de 16, respiro interno de 6, cinco abas.
 const PAD = 6;
@@ -39,4 +39,23 @@ test('o alvo ocupa o slot no celular, mas não a faixa vazia entre ícones no ta
   assert.equal(larguraDoAlvo(slot), slot);
   assert.equal(larguraDoAlvo(247), 96);
   assert.equal(larguraDoAlvo(0), 0);
+});
+
+test('rótulos vizinhos nunca ficam a menos do vão mínimo, em nenhuma largura de celular', () => {
+  // 28/09/2026: a 360dp com a fonte a 1,15× "Financeiro" encostava em "Agente".
+  for (const tela of [320, 360, 384, 393, 411, 440]) {
+    const s = (tela - 16 * 2 - PAD * 2) / 5;
+    for (const fonte of [0.85, 1, 1.15, 1.3, 2]) {
+      const vao = s - MEIO_PAR_MAIS_LARGO * escalaDoRotulo(s, fonte);
+      assert.ok(vao >= VAO_ENTRE_ROTULOS - 1e-9 || escalaDoRotulo(s, fonte) === 0.8, `${tela}dp × ${fonte}: vão ${vao}`);
+    }
+  }
+});
+
+test('com espaço sobrando, o rótulo segue a fonte do sistema até 1,15×', () => {
+  const largo = (440 - 16 * 2 - PAD * 2) / 5;
+  assert.equal(escalaDoRotulo(largo, 1), 1);
+  assert.equal(escalaDoRotulo(largo, 1.15), 1.15);
+  assert.equal(escalaDoRotulo(largo, 1.3), 1.15);
+  assert.ok(escalaDoRotulo((360 - 16 * 2 - PAD * 2) / 5, 1.15) < 1.15, 'a 360dp ela cede');
 });

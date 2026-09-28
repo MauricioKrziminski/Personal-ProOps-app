@@ -37,3 +37,25 @@ export function distanciaDaAba(posicao: number, indice: number): number {
   'worklet';
   return Math.min(1, Math.abs(posicao - indice));
 }
+
+/** O vão mínimo entre dois rótulos vizinhos, em dp. */
+export const VAO_ENTRE_ROTULOS = 8;
+/**
+ * Metade da soma do par de rótulos vizinhos mais largo ("Financeiro" + "Agente") a 12pt em
+ * Plus Jakarta 500, em dp — medido com a própria fonte em 28/09/2026. Trocar o texto de uma aba
+ * exige medir de novo.
+ */
+export const MEIO_PAR_MAIS_LARGO = 51.3;
+
+/**
+ * A escala do rótulo da aba: a da fonte do sistema até 1,15×, mas nunca a ponto de dois vizinhos
+ * ficarem a menos de `VAO_ENTRE_ROTULOS` — e, se nem na fonte normal couber, menor que 1.
+ *
+ * Num Android de 360dp com a fonte a 1,15× "Financeiro" encostava em "Agente" (4dp de vão; a
+ * 320dp eles se sobrepunham) — visto no celular de um usuário em 28/09/2026. O teto fixo
+ * (`maxFontSizeMultiplier`) não sabia a largura da aba.
+ */
+export function escalaDoRotulo(slot: number, fontScale: number): number {
+  const cabe = (slot - VAO_ENTRE_ROTULOS) / MEIO_PAR_MAIS_LARGO;
+  return Math.max(0.8, Math.min(fontScale, 1.15, cabe));
+}

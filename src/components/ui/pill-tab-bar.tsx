@@ -15,7 +15,7 @@ import type { SymbolViewProps } from 'expo-symbols';
 import { progressoDeEntrada, useRelogioDeEntrada } from '@/components/motion/entrada';
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
-import { centroDoSlot, distanciaDaAba, folgaDaMola, larguraDoAlvo, posicaoDesenhada } from '@/design/tab-pill';
+import { centroDoSlot, distanciaDaAba, escalaDoRotulo, folgaDaMola, larguraDoAlvo, posicaoDesenhada } from '@/design/tab-pill';
 import { Elevation, Motion, Radius, Space, Type } from '@/design/tokens';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 
@@ -104,13 +104,14 @@ export function PillTabBar({
   const theme = useTheme();
   const scheme = useScheme();
   const insets = useSafeAreaInsets();
-  const { width: tela } = useWindowDimensions();
+  const { width: tela, fontScale } = useWindowDimensions();
 
   const barW = Math.min(tela - insets.left - insets.right - SIDE * 2, BAR_MAX);
   const interna = barW - PAD * 2;
   const slot = interna / tabs.length;
   const alvo = larguraDoAlvo(slot);
   const folga = folgaDaMola(slot, DIAMETRO, PAD);
+  const escalaDoTexto = escalaDoRotulo(slot, fontScale);
 
   const progresso = useSharedValue(activeIndex);
   const animarPara = useCallback(
@@ -182,6 +183,8 @@ export function PillTabBar({
                   <Rotulo
                     label={tab.label}
                     largura={slot <= 96 ? slot + SOBRA : alvo}
+                    escala={escalaDoTexto}
+                    fontScale={fontScale}
                     indice={i}
                     posicao={posicao}
                     ativo={theme.onHero}
@@ -226,6 +229,8 @@ export function PillTabBar({
 function Rotulo({
   label,
   largura,
+  escala,
+  fontScale,
   indice,
   posicao,
   ativo,
@@ -233,6 +238,9 @@ function Rotulo({
 }: {
   label: string;
   largura: number;
+  /** A escala final do texto (`escalaDoRotulo`), já contando a fonte do sistema. */
+  escala: number;
+  fontScale: number;
   indice: number;
   posicao: SharedValue<number>;
   ativo: string;
@@ -242,18 +250,25 @@ function Rotulo({
     color: interpolateColor(distanciaDaAba(posicao.get(), indice), [0, 1], [ativo, inativo]),
   }));
   return (
-    // Um dos dois `maxFontSizeMultiplier` do app (o outro é o eixo da `SemanaDoDia`), e por um
-    // motivo estrutural: os cinco slots dividem a largura em partes iguais e não há para onde
-    // quebrar. O teto sozinho não bastou — a
-    // 384dp × 1,3 "Financeiro" virava "Financei…" —, e o `adjustsFontSizeToFit` do Android não
-    // encolhe um `Animated.Text` de forma confiável. O rótulo ganha `SOBRA` além do slot: os
-    // vizinhos dos nomes longos são curtos, e o texto não é recortado pela coluna. No tablet,
-    // a largura do rótulo fica dentro do alvo de toque, sem reabrir toda a faixa como alvo.
+    // Os cinco slots dividem a largura em partes iguais e não há para onde quebrar: o tamanho do
+    // texto sai da LARGURA da aba (`escalaDoRotulo`), pedido dividido pela escala do sistema para
+    // o RN multiplicar de volta — o mesmo truque do `Icon` e do `Badge`. O `adjustsFontSizeToFit`
+    // do Android não encolhe um `Animated.Text` de forma confiável. O rótulo ganha `SOBRA` além do
+    // slot: os vizinhos dos nomes longos são curtos, e o texto não é recortado pela coluna. No
+    // tablet, a largura do rótulo fica dentro do alvo de toque, sem reabrir a faixa como alvo.
     <Animated.Text
       pointerEvents="none"
       numberOfLines={1}
-      maxFontSizeMultiplier={1.15}
-      style={[Type.caption, styles.rotulo, { width: largura }, estilo]}>
+      style={[
+        Type.caption,
+        styles.rotulo,
+        {
+          width: largura,
+          fontSize: (Type.caption.fontSize * escala) / fontScale,
+          lineHeight: (Type.caption.lineHeight * escala) / fontScale,
+        },
+        estilo,
+      ]}>
       {label}
     </Animated.Text>
   );
@@ -276,7 +291,7 @@ function Badge({ valor }: { valor: number | undefined }) {
       <ThemedText
         type="meta"
         themeColor="onTint"
-        style={[styles.badgeTexto, { fontSize: Type.meta.fontSize / escala }]}>
+        style={[styles.badgeTexto, { fontSize: Type.meta.fontSize / escala, lineHeight: Type.meta.lineHeight / escala }]}>
         {valor > 9 ? '9+' : String(valor)}
       </ThemedText>
     </View>
@@ -333,8 +348,10 @@ const styles = StyleSheet.create({
     left: '50%',
     marginLeft: 4,
     flexDirection: 'row',
-    minWidth: 18,
-    minHeight: 18,
+    // Geometria FIXA: com a altura da linha escalando e a largura não, a 1,15× o selo saía oval, e
+    // o lado sem a borda escura visível lia como cortado (28/09/2026). Um dígito = círculo.
+    height: 20,
+    minWidth: 20,
     borderRadius: Radius.pill,
     borderWidth: 2,
     paddingHorizontal: Space.xs,
