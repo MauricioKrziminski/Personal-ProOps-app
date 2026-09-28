@@ -57,5 +57,5 @@ test('com espaço sobrando, o rótulo segue a fonte do sistema até 1,15×', () 
   assert.equal(escalaDoRotulo(largo, 1), 1);
   assert.equal(escalaDoRotulo(largo, 1.15), 1.15);
   assert.equal(escalaDoRotulo(largo, 1.3), 1.15);
-  assert.ok(escalaDoRotulo((360 - 16 * 2 - PAD * 2) / 5, 1.15) < 1.15, 'a 360dp ela cede');
+  assert.ok(escalaDoRotulo((320 - 16 * 2 - PAD * 2) / 5, 1.15) < 1.15, 'a 320dp ela cede');
 });

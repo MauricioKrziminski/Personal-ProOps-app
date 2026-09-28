@@ -41,11 +41,11 @@ export function distanciaDaAba(posicao: number, indice: number): number {
 /** O vão mínimo entre dois rótulos vizinhos, em dp. */
 export const VAO_ENTRE_ROTULOS = 8;
 /**
- * Metade da soma do par de rótulos vizinhos mais largo ("Financeiro" + "Agente") a 12pt em
- * Plus Jakarta 500, em dp — medido com a própria fonte em 28/09/2026. Trocar o texto de uma aba
- * exige medir de novo.
+ * Metade da soma do par de rótulos vizinhos mais largo ("Finanças" + "Agente") a 12pt em
+ * Plus Jakarta 500, em dp — medido com a própria fonte em 28/09/2026 (era 51,3 com "Financeiro").
+ * Trocar o texto de uma aba exige medir de novo.
  */
-export const MEIO_PAR_MAIS_LARGO = 51.3;
+export const MEIO_PAR_MAIS_LARGO = 46.7;
 
 /**
  * A escala do rótulo da aba: a da fonte do sistema até 1,15×, mas nunca a ponto de dois vizinhos

@@ -7,7 +7,7 @@ import { ROTULO_DA_ABA, tituloDaAba } from './abas.ts';
 test('A rota (tabs) tem o título da aba ativa — é o que o "voltar" do iOS lê', () => {
   // Sem título, o sistema caía no nome da ROTA: o VoiceOver lia "(tabs)" no voltar de toda tela
   // empurrada, e o header "(tabs)" aparecia no Financeiro depois de voltar com a busca ativa.
-  assert.equal(tituloDaAba(['(tabs)', 'finance']), 'Financeiro');
+  assert.equal(tituloDaAba(['(tabs)', 'finance']), 'Finanças');
   assert.equal(tituloDaAba(['(tabs)', 'today']), 'Hoje');
   assert.equal(tituloDaAba(['(tabs)', 'notes', 'x']), 'Notas');
   assert.equal(tituloDaAba(['(tabs)']), 'Hoje');

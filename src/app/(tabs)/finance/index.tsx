@@ -55,6 +55,7 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
+import { ROTULO_DA_ABA } from '@/lib/abas';
 import { orcamentosApertados } from '@/lib/budget-tight';
 import { cartaoDaPilha } from '@/lib/card-status';
 import { describeCycle, describeRealizado } from '@/lib/cycle-label';
@@ -280,7 +281,7 @@ export default function FinanceScreen() {
 
   if (!pronta) {
     return (
-      <Screen wide={tablet} grouped topBar={<AppHeader title="Financeiro" />}>
+      <Screen wide={tablet} grouped topBar={<AppHeader title={ROTULO_DA_ABA.finance} />}>
         <Skeleton width="55%" height={26} />
         <SkeletonHero />
         <View style={styles.linhaEsqueleto}>
@@ -588,7 +589,7 @@ export default function FinanceScreen() {
       stagger
       wide={tablet}
       grouped
-      topBar={<AppHeader title="Financeiro" />}
+      topBar={<AppHeader title={ROTULO_DA_ABA.finance} />}
       overlay={<ExtendedFab label="Lançar" icon="plus" onPress={lancar} />}
       onRefresh={() =>
         Promise.all([

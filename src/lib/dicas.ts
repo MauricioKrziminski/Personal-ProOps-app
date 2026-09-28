@@ -164,7 +164,7 @@ export const GUIA: readonly { titulo: string; itens: readonly ItemDoGuia[] }[] =
   {
     titulo: 'Planejar',
     itens: [
-      { titulo: 'O ciclo, o que entra e sai', texto: 'Toque no painel do Financeiro.', dica: 'fin-painel' },
+      { titulo: 'O ciclo, o que entra e sai', texto: 'Toque no painel de Finanças.', dica: 'fin-painel' },
       { titulo: 'Projeção e simulação', texto: 'Até quando o dinheiro dura, e se você comprar algo.', href: '/finance/forecast' },
       { titulo: 'Metas', texto: 'Guardar para um objetivo.', href: '/finance/goals' },
       { titulo: 'Orçamentos', texto: 'Um limite por categoria.', href: '/finance/budgets' },

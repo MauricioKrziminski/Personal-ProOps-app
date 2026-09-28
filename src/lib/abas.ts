@@ -5,7 +5,9 @@
 export const ROTULO_DA_ABA = {
   today: 'Hoje',
   notes: 'Notas',
-  finance: 'Financeiro',
+  // "Finanças" desde 28/09/2026: com 10 letras, "Financeiro" ficava visivelmente mais perto de
+  // "Agente" do que "Agente" de "Perfil" (12dp × 27dp a 360dp), com as abas iguais.
+  finance: 'Finanças',
   agent: 'Agente',
   profile: 'Perfil',
 } as const;

@@ -135,7 +135,7 @@ const PASSO_KEY = 'design-preview-step';
 const TABS_ANDROID: PillTab[] = [
   { name: 'today', label: 'Hoje', icon: 'sun.max' },
   { name: 'notes', label: 'Notas', icon: 'note.text' },
-  { name: 'finance', label: 'Financeiro', icon: 'chart.pie' },
+  { name: 'finance', label: 'Finanças', icon: 'chart.pie' },
   { name: 'agent', label: 'Agente', icon: 'bubble.left.and.bubble.right' },
   { name: 'profile', label: 'Perfil', icon: 'person' },
 ];

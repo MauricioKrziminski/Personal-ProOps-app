@@ -517,7 +517,7 @@ async def query_budgets(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     )
     if not rows:
         return ToolResult(
-            "📉 Você ainda não definiu orçamentos. Cria na aba Financeiro do app!", read_only=True
+            "📉 Você ainda não definiu orçamentos. Cria na aba Finanças do app!", read_only=True
         )
     linhas = []
     for r in rows:
