@@ -37,8 +37,9 @@ do ciclo é o resultado do ciclo).
 |---|---|---|---|
 | 1 | saudação | "Boa tarde, Gabriel" + a data | — |
 | 2 | Primeiros passos / Próximo passo | só para quem está começando | o passo |
+| 2b | **Sua semana** (`SemanaDoDia`) | três dias para trás (barra do que saiu, `daily_spending`) e três para a frente (marcas do que vence ou entra), com a régua tracejada do "por dia" e hoje no círculo de tinta | o dia escolhido troca a frase de cima; "Lançamentos" → `/finance/transactions` |
 | 3 | **Seu dia** (`GrupoDoDia`) | 2+ atrasados = UMA linha recolhida (`LinhaDoAtrasado`); vence/chega hoje (`AgendaItem` com Paguei/Recebi/Pagar fatura/Ver dívida); lembretes com hora (`LinhaDeLembrete`) e o AGORA (`AgoraLinha`) | a linha abre o item; a ação resolve; "Lembretes" → `/reminders` |
-| 4 | **dinheiro do dia** (`DinheiroDoDia`) | "Dá para gastar por dia" (ou o livre total, quando por dia não informa) + legenda com o livre; Saiu hoje (ritmo); Em conta (abre as contas no lugar); No limite | valor → menu (ciclo, projeção, patrimônio, metas); Saiu hoje → Lançamentos; conta → extrato dela; No limite → Orçamentos |
+| 4 | **dinheiro do dia** (`DinheiroDoDia`) | "Dá para gastar por dia" (ou o livre total, quando por dia não informa) + legenda com o livre; Em conta (abre as contas no lugar); No limite | valor → menu (ciclo, projeção, patrimônio, metas); conta → extrato dela; No limite → Orçamentos |
 | 5 | Próximos dias | 7 dias agrupados, uma linha por compromisso, sem botão | lançamento, fatura (a compra de cartão abre a fatura em que vai cair) ou dívida |
 | 6 | Fixadas / Notas recentes (`NotasDaHoje`) | as fixadas; sem nenhuma, as mexidas por último (até 8), com a cor da nota ou da pasta | a nota; "Todas" → `/notes` |
 
@@ -52,7 +53,10 @@ dinheiro e as notas à direita; em uma coluna, a ordem do celular.
 - `lib/today-sections.ts` (puro, com teste): `agendaDoDia`, `separarLembretes` (hoje × de outro
   dia pela data LOCAL), `resumoDoAtrasado`, `linhasDoDia` (a ordem do Seu dia e onde cai o AGORA),
   `pendentesDaHoje` (o badge).
-- `lib/today-spend.ts`: `porDiaLivre` (a MESMA conta do widget), `painelDoDia`, `ritmoDoDia`.
+- `lib/today-spend.ts`: `porDiaLivre` (a MESMA conta do widget) e `painelDoDia`.
+- `lib/today-sections.ts`: também `semanaDoDia` (os sete dias, o teto e a régua) e `legendaDoDia`.
+- `daily_spending(de, até)` (`20260928220000`): o gasto e a entrada de cada dia, a régua de
+  `transactions_summary`; janela de até 62 dias, recusada acima disso.
 - `useAgora`: o relógio vira a cada minuto e na volta ao primeiro plano — o AGORA e o "em 2 h" não
   ficam presos na hora em que a aba abriu.
 - `usePendentesDaHoje`: o badge das duas tab bars.

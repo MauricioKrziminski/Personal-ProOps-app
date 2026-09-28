@@ -64,9 +64,14 @@ amplitude — um bloco escuro sobre papel claro — e do número grande em peso 
 > ciclo —, seguido dos mesmos ladrilhos e dos mesmos anéis de orçamento. O `HeroPanel` é a
 > assinatura do Financeiro. A Hoje é **o dia**: o topo é o tempo (Seu dia: o atrasado numa linha
 > recolhida, o "dia todo", os lembretes com o AGORA), e o dinheiro vem num card CLARO na escala do
-> dia (`DinheiroDoDia`: quanto cabe por dia, o que saiu hoje, em conta, no limite). **Não devolver
-> herói de tinta, ladrilhos Entra/Sai nem anéis de orçamento à Hoje** — é como ela volta a ser um
-> segundo Financeiro.
+> dia (`DinheiroDoDia`: quanto cabe por dia, em conta, no limite). **Não devolver herói de tinta,
+> ladrilhos Entra/Sai nem anéis de orçamento à Hoje** — é como ela volta a ser um segundo
+> Financeiro.
+>
+> **O gráfico da Hoje é a SEMANA, não uma curva** (`SemanaDoDia`, 28/09/2026 — *"faça… com visual
+> um pouco diferente do financeiro"*): colunas em cápsula sobre papel para o que saiu em cada dia,
+> a régua tracejada do "por dia" e MARCAS (não barras) para o que vem; o eixo é um calendário, com
+> hoje no círculo de tinta. Curva de saldo sobre tinta é a linguagem do Financeiro.
 
 **`Canvas` do Skia NÃO aceita `onLayout`** (avisa "is not supported" em runtime e o desenho
 não posiciona). Quem mede é uma `View` em volta; o canvas só preenche.

@@ -234,3 +234,37 @@ Todoist (todoist.com/help/articles/plan-your-day-with-the-today-view-UVUXaiSs), 
 (help.sunsama.com/docs/usage-guides/daily-planning), Fantastical
 (macstories.net/reviews/the-new-fantastical-review), Tiimo (tiimoapp.com), At a Glance
 (androidpolice.com/pixel-at-a-glance-finance-sports-rollout-slowly).
+
+## A semana no topo (28/09/2026, segunda rodada)
+
+Pergunta do dono do produto: *"você acha que não faz sentido ter um gráfico logo em cima na
+hoje?"* — e, com a proposta aceita, *"faça… com visual um pouco diferente do financeiro"*.
+
+**O que entrou:** o bloco "Sua semana", logo abaixo da saudação (`SemanaDoDia`). Três dias para
+trás e três para a frente, com hoje no meio:
+
+- **Barra só para o que SAIU** (passado e hoje): o gasto do dia pela MESMA régua do "saiu hoje"
+  (`daily_spending` = `transactions_summary` dia a dia, `20260928220000`, com teste no banco).
+  Cinza para o que passou, tinta para hoje, âmbar acima da régua.
+- **A régua tracejada é o "por dia"** do card do dinheiro (`porDiaLivre`). Sem "por dia", sem
+  régua — e sem julgamento na frase.
+- **O futuro é MARCA, não barra**: um ponto por compromisso (até três, depois "+N") e um verde se
+  entra dinheiro — os MESMOS itens dos Próximos dias. Barra de vencimento (fatura inclusive) ao
+  lado de barra de gasto teria a mesma cara e diria outra coisa.
+- **O eixo é um calendário**: o número de hoje no círculo de tinta; o escolhido num círculo suave.
+  Tocar num dia troca a frase de cima ("sáb, 26 set · saiu R$ 319,90 · acima do que dá por dia";
+  "qua, 30 set · vence R$ 1.550,00 · 2 compromissos"). Não rola até a linha dele nos Próximos
+  dias, como a proposta dizia: a frase já responde, e rolar a tela no toque seria um salto.
+
+**Diferente do Financeiro de propósito:** lá é uma curva de saldo sobre o bloco de tinta ("como o
+ciclo fecha"); aqui, colunas em cápsula sobre papel ("como está a minha semana").
+
+**O que saiu com ela:** a linha "Saiu hoje" do card do dinheiro e o ritmo (`ritmoDoDia`,
+`diasDoCiclo` e as duas leituras de `transactions_summary` da Hoje) — a semana mostra o gasto de
+cada dia contra o que dá por dia, que é a comparação que decide alguma coisa.
+
+**Achados no aparelho:** o círculo do dia escolhido saía QUADRADO no Android — sem fundo o Fabric
+achata a `View` e o raio não volta quando o fundo chega (`collapsable={false}`, provado com e sem,
+os dois depois de recarregar do zero); o "por dia" encavalava o tracejado com fonte grande (desce
+para baixo da régua quando ela está no alto); e trocar para um dia sem estado fazia o gráfico
+pular uma linha (a linha do estado fica sempre reservada — medido: a coluna não se move).

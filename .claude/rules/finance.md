@@ -562,6 +562,11 @@ compra, não a única tela que responde quanto resta.
   `public.month_summary` e `public._month_summary` sobre `private.month_summary_for`). Coluna
   nova entra nas três, no mesmo lugar, ou a tela mostra despesa no lugar de receita sem erro
   nenhum.
+- **`daily_spending(p_from, p_to)` é `transactions_summary` DIA A DIA** (`20260928220000`): sem
+  transferência, pela data do lançamento, com o previsto dentro, todo dia da janela (zerado
+  inclusive), até 62 dias — recusa, nunca corta. É a barra de cada dia da semana da Hoje, e a de
+  hoje é o "saiu hoje": uma régua própria ali seria a segunda cópia que discorda.
+  `supabase/tests/gasto_por_dia.sql` prende a igualdade nos dois lados (gasto e entrada).
 - `expenses_summary(from_date, to_date)` é **wrapper de back-compat** lendo `transactions where kind='expense'` — manter assinatura enquanto houver app antigo em campo.
 
 ## Cartão de crédito
