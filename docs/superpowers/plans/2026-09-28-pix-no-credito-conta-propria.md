@@ -1,7 +1,36 @@
 # Pix no crédito para conta própria (cartão → conta) — plano
 
-Pedido do Gabriel (28/09/2026). Mapeamento feito no STAGING com `pg_get_functiondef`; nada foi
-alterado ainda.
+Pedido do Gabriel (28/09/2026). Mapeamento feito no STAGING com `pg_get_functiondef`.
+
+## Estado (28/09/2026)
+
+| item | estado |
+|---|---|
+| banco (`20260928230000`) + `supabase/tests/pix_no_credito.sql` | **feito**, no STAGING; o teste falha com as funções antigas e passa com as novas |
+| app: formulário (transferência do cartão + juro), fatura e doca somando por `contaNaFatura`, edição | **feito**, conferido no emulador (criar, editar, fatura) |
+| importação: "Pix no Crédito - X 356,99" casa com Pix + juro | **feito** (`reconcile.py`, camada `pix_no_credito`) |
+| rotativo: cobrança real aponta a estimativa (talvez + "Usar o valor do extrato", que tira o "(estimado)") | **feito**; o automático sem toque exige mudar `finish_import_batch` e ficou para depois |
+| produção: `scripts/prod-dados/2026-09-28-pix-no-credito-itau.sql` | **pronto**, quem roda é o Gabriel depois da migration em produção |
+| **agente** | **pendente** — ver abaixo |
+
+### Agente: medido e ainda sem correção
+
+Com o Gemini real (Flash-Lite), *"fiz um pix no crédito de 340 pro itaú"* virou
+`create_expense` de 34000 com `account="itaú"` — um GASTO na conta Itaú, errado nos dois lados. O
+modelo não recebe a lista de contas, então a regra tem de sair da frase. Texto proposto para o
+`FINANCE` (`app/graph/prompts.py`), logo abaixo de `create_transfer`:
+
+    PIX NO CRÉDITO é pagar pelo CARTÃO: o dinheiro sai do cartão (account = o cartão como a pessoa
+    escreveu; se ela não disse qual, account = "cartão"). Para um BANCO ou conta ("pix no crédito de
+    340 pro itaú", "pra minha conta do inter") é create_transfer do cartão para essa conta
+    (counterparty_account = o banco). Para pessoa, empresa ou boleto ("pix no crédito de 88 pra
+    receita federal") é create_expense no cartão. Os juros que o cartão cobra ("e 16,99 de juros")
+    são OUTRO create_expense no mesmo cartão, category="juros", description="Juros do Pix no crédito".
+
+Não foi aplicado porque o Gemini estava em 503/timeout e prompt sem medição não entra
+(`workflow.md`). Para aplicar: colar o texto, medir as quatro frases (conta própria, conta
+própria com juros, "passei do cartão pra minha conta no pix no crédito", boleto por Pix no
+crédito) e rodar `evaluate_answer_forms.py` uma vez.
 
 ## O modelo
 
