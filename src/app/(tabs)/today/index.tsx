@@ -1,91 +1,90 @@
-import { vereditoDoDia } from '@/lib/widget-snapshot';
 import { router } from 'expo-router';
 import { Fragment, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { ErrorCard } from '@/components/error-card';
-import { AgendaItem } from '@/components/feed/agenda-item';
-import { ReminderTimeline } from '@/components/feed/reminder-timeline';
+import { AgendaItem, LinhaDoAtrasado } from '@/components/feed/agenda-item';
+import { DinheiroDoDia } from '@/components/feed/dinheiro-do-dia';
+import { AgoraLinha, GrupoDoDia, RotuloNoGrupo } from '@/components/feed/grupo-do-dia';
+import { LinhaDeLembrete } from '@/components/feed/lembrete-do-dia';
+import { NotasDaHoje } from '@/components/feed/notas-da-hoje';
 import { ProximoPassoCard } from '@/components/feed/proximo-passo';
-import { VerMais } from '@/components/ui/ver-mais';
-import { useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
 import { SetupChecklist } from '@/components/feed/setup-checklist';
-import { TodaySignals, type TodaySignal } from '@/components/feed/today-signals';
 import { TodayTabletCanvas } from '@/components/feed/today-tablet-canvas';
-import { BudgetRings } from '@/components/finance/budget-rings';
-import { CashAccounts } from '@/components/finance/cash-accounts';
+import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
+import { transicaoDeLayout } from '@/components/motion/transicao';
 import { ThemedText } from '@/components/themed-text';
 import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
-import { ExtendedFab } from '@/components/ui/extended-fab';
 import { BlockHeader } from '@/components/ui/block-header';
-import { Dica } from '@/components/ui/dica';
 import { useBRL } from '@/components/ui/conceal';
-import { CountUpMoney } from '@/components/ui/count-up-money';
-import { DayRail } from '@/components/ui/day-rail';
-import { HeroPanel } from '@/components/ui/hero-panel';
+import { Dica } from '@/components/ui/dica';
+import { ExtendedFab } from '@/components/ui/extended-fab';
 import { Icon } from '@/components/ui/icon';
-import { Money } from '@/components/ui/money';
-import { RunwayBar } from '@/components/ui/runway-bar';
 import { Screen } from '@/components/ui/screen';
-import { Skeleton, SkeletonHero, SkeletonList } from '@/components/ui/skeleton';
-import { Tile, TileRow } from '@/components/ui/tile';
+import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
+import { VerMais } from '@/components/ui/ver-mais';
 import { Motion, Radius, Space } from '@/design/tokens';
-import { useBoolPref } from '@/hooks/use-bool-pref';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { useAgora } from '@/hooks/use-agora';
+import { useBoolPref } from '@/hooks/use-bool-pref';
+import { usarDica } from '@/hooks/use-dicas';
 import {
   useAccountBalances,
   useBudgetsStatus,
   useCycle,
   useSpendable,
-  useSpendablePath,
   useTransactionsSummary,
   useUpcomingBills,
   useUpcomingCardCharges,
 } from '@/hooks/use-finance';
 import { localISODate, useTodayReminders } from '@/hooks/use-items';
+import { useNoteFolders, useNotesList } from '@/hooks/use-notes';
 import { useProfile } from '@/hooks/use-profile';
-import { useSession } from '@/hooks/use-session';
-import { usarDica } from '@/hooks/use-dicas';
 import { useProximoPasso } from '@/hooks/use-proximo-passo';
+import { useSession } from '@/hooks/use-session';
 import { useSetupProgress } from '@/hooks/use-setup-progress';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
-import { caixaDasContas, type LinhaDeCaixa } from '@/lib/account-cash';
+import { caixaDasContas } from '@/lib/account-cash';
+import { PASSO } from '@/lib/aos-poucos';
 import { orcamentosApertados } from '@/lib/budget-tight';
 import { diaCurtoBR, diasAte, greetingBR, isoToBR, rotuloDoDia } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
-import { montarPista } from '@/lib/runway';
 import { settleLabel } from '@/lib/settle-labels';
-import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
-import { agendaDoDia, iconeDoItem, metaDoItem, type ItemDaAgenda } from '@/lib/today-sections';
-import { diasDoCiclo, ritmoDoDia } from '@/lib/today-spend';
-import { transicaoDeLayout } from '@/components/motion/transicao';
+import {
+  agendaDoDia,
+  iconeDoItem,
+  linhasDoDia,
+  metaDoItem,
+  separarLembretes,
+  type ItemDaAgenda,
+} from '@/lib/today-sections';
+import { diasDoCiclo, painelDoDia, ritmoDoDia } from '@/lib/today-spend';
 
 /**
- * A Hoje — "Conversa organizada" (spec 2026-09-17).
+ * A Hoje — "o dia" (spec `2026-09-28-hoje-o-dia-design.md`).
  *
- * A ordem é de URGÊNCIA: quanto dá para gastar, o que exige ação, o que já saiu hoje, quanto
- * existe em conta, e só então o que vem.
+ * ⚠️ **Ela deixou de ser um segundo Financeiro.** As duas telas abriam no mesmo bloco de tinta com
+ * o MESMO número (sem receita prevista, o "livre até o fim do ciclo" é o resultado do ciclo),
+ * seguidas dos mesmos ladrilhos e dos mesmos anéis de orçamento. A pesquisa do nicho (Things,
+ * Structured, Fantastical, Todoist, Nubank) ancora a tela inicial no TEMPO:
  *
- * ⚠️ **A "Conversa" e o card "Diga ao agente" saíram em 17/09/2026**, a pedido do dono do
- * produto (*"ficou horrível… troque as seções pra algo que realmente faça sentido, informações
- * úteis"*). Os dois eram os únicos blocos que não respondiam pergunta nenhuma: um repetia de
- * volta o texto que a pessoa acabou de mandar, o outro anunciava uma aba que já existe na dock.
- * No lugar entraram as duas perguntas que ela faz todo dia e a Hoje não respondia — **quanto já
- * saiu hoje** e **quanto tem em conta agora**. A citação da fala continua, onde ela informa: na
- * linha do lançamento, no Financeiro.
+ * | # | bloco | por quê |
+ * |---|---|---|
+ * | 1 | saudação e data | o dia de quem abre |
+ * | 2 | primeiros passos | só para quem está começando |
+ * | 3 | **Seu dia** | o atrasado numa linha, o que vence/chega hoje e os lembretes com o AGORA |
+ * | 4 | **o dinheiro do dia** | quanto cabe por dia, o que saiu hoje, quanto há em conta |
+ * | 5 | próximos dias | a semana, uma linha por compromisso |
+ * | 6 | notas | as fixadas (ou as últimas) — notas são metade do produto |
  *
- * O herói NÃO repete o Financeiro: aqui é "quanto dá para gastar até entrar dinheiro de novo"
- * (`caixa − comprometido_ate_entrada`); lá é "como o ciclo fecha". A identidade que amarra os
- * dois está em `supabase/tests/da_para_gastar.sql`.
+ * O Financeiro continua sendo "como o ciclo fecha"; aqui, nada é número de ciclo no topo.
  */
-
-const linear = transicaoDeLayout;
 
 /** Bloco que some sem dar tranco no resto (§5: mudança de estado). A entrada é do `Screen`. */
 function Bloco({ children }: { children: React.ReactNode }) {
   return (
-    <Animated.View style={styles.bloco} layout={linear} exiting={FadeOut.duration(Motion.duration.exit)}>
+    <Animated.View style={styles.bloco} layout={transicaoDeLayout} exiting={FadeOut.duration(Motion.duration.exit)}>
       {children}
     </Animated.View>
   );
@@ -93,8 +92,8 @@ function Bloco({ children }: { children: React.ReactNode }) {
 
 /**
  * O cabeçalho da Hoje, o mesmo no esqueleto e na tela pronta (o botão não surge do nada quando a
- * tela termina de carregar). A busca global (`/search`) existia sem porta nenhuma no app
- * (24/09/2026): a Hoje é a raiz, e daqui se procura em lançamentos, notas e lembretes de uma vez.
+ * tela termina de carregar). A busca global (`/search`) é daqui: a Hoje é a raiz, e daqui se
+ * procura em lançamentos, notas e lembretes de uma vez.
  */
 function CabecalhoDaHoje() {
   return (
@@ -110,8 +109,9 @@ export default function TodayScreen() {
   const tablet = windowClass !== 'compact';
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
-  const hoje = localISODate();
-  const [agora] = useState(() => Date.now());
+  // O relógio anda: o AGORA e o "em 2 h" não ficam presos na hora em que a aba abriu.
+  const agora = useAgora();
+  const hoje = localISODate(new Date(agora));
 
   const { session } = useSession();
   const profile = useProfile(session?.user?.id);
@@ -125,54 +125,49 @@ export default function TodayScreen() {
   const noCartao = useUpcomingCardCharges(6);
   const reminders = useTodayReminders();
   const budgets = useBudgetsStatus();
+  const saldos = useAccountBalances();
+  const notas = useNotesList({ sort: 'recentes' });
+  const pastas = useNoteFolders();
   const setup = useSetupProgress();
   const proximo = useProximoPasso(session?.user?.id);
   const [passosEscondidos, esconderPassos] = useBoolPref(`hoje:passos-escondidos:${session?.user?.id ?? ''}`);
   // "Paguei"/"Recebi" confirma o valor numa folha curta antes da baixa (25/09/2026).
   const baixa = useConfirmarBaixa();
-  const caminho = useSpendablePath();
-  const saldos = useAccountBalances();
   /*
     O que saiu HOJE e o que saiu no ciclo até hoje: duas fatias da mesma leitura, e é a segunda
-    que dá a régua ("seu ritmo"). A do ciclo só liga quando a borda chega — buscar com um palpite
+    que dá a régua ("sua média"). A do ciclo só liga quando a borda chega — buscar com um palpite
     de início daria o ritmo de outro período sob o rótulo deste.
   */
   const saiuHoje = useTransactionsSummary(hoje, hoje);
   const saiuNoCiclo = useTransactionsSummary(cycle.data?.de ?? hoje, hoje, Boolean(cycle.data?.de));
 
+  const [atrasadosAbertos, setAtrasadosAbertos] = useState(false);
+  const [limiteDoAtrasado, setLimiteDoAtrasado] = useState(PASSO);
+  const [contasAbertas, setContasAbertas] = useState(false);
+
   const caixa = Number(gasto.data?.caixa ?? 0);
   const comprometido = Number(gasto.data?.comprometido_ate_entrada ?? 0);
-  const comprometidoNoCiclo = Number(gasto.data?.comprometido_no_ciclo ?? 0);
   const proximaEntrada = gasto.data?.proxima_entrada ?? null;
   const livre = caixa - comprometido;
   /** Até quando o "livre" vale: a próxima entrada, ou o fim do ciclo se não houver nenhuma. */
   const ateQuando = proximaEntrada ?? cycle.data?.ate ?? null;
   const diasLivres = Math.max(1, ateQuando ? diasAte(ateQuando, hoje) : (cycle.data?.diasAteOFim ?? 1));
+  const painel = painelDoDia({ livreCents: livre, diasLivres, ate: ateQuando, entrada: proximaEntrada, brl });
 
-  /* A Pista lê a MESMA lista que forma o "livre" (`spendable_path`); se a soma não bater, sem entalhes. */
-  const pista = useMemo(
-    () => montarPista(caixa, comprometido, caminho.data ?? [], hoje, ateQuando ?? hoje),
-    [caixa, comprometido, caminho.data, hoje, ateQuando]
-  );
   const agenda = useMemo(
     () => agendaDoDia(bills.data ?? [], noCartao.data ?? [], hoje),
     [bills.data, noCartao.data, hoje]
   );
   const atrasados = agenda.agora.filter((i) => i.atrasado);
   const doDia = agenda.agora.filter((i) => !i.atrasado);
-  // Aos poucos (24/09/2026): o atrasado não tem data mínima e podia encher a Hoje inteira.
-  const janelas = useJanelasPorGrupo('');
-  const jAtrasados = janelas.janelaDe('atrasados', atrasados);
-  const jDoDia = janelas.janelaDe('doDia', doDia);
-  /** O contador "Vencendo" e o badge são SÓ de despesa (receita prevista não vence). */
-  const contas = (bills.data ?? []).filter((b) => b.kind !== 'income');
-  const lembretes = reminders.data ?? [];
+  const lembretes = useMemo(() => separarLembretes(reminders.data ?? [], hoje), [reminders.data, hoje]);
+  const linhas = linhasDoDia({ atrasados, atrasadosAbertos, limiteDoAtrasado, doDia, lembretes, agora });
   const apertados = useMemo(() => orcamentosApertados(budgets.data ?? []), [budgets.data]);
 
   /* `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch falha. */
   const emConta = useMemo(() => caixaDasContas(saldos.isError ? [] : (saldos.data ?? [])), [saldos.isError, saldos.data]);
-  const soma = (linhas: { kind: string; total_cents: number | string }[] | undefined, lado: string) =>
-    (linhas ?? []).filter((l) => l.kind === lado).reduce((t, l) => t + Number(l.total_cents), 0);
+  const soma = (resumo: { kind: string; total_cents: number | string }[] | undefined, lado: string) =>
+    (resumo ?? []).filter((l) => l.kind === lado).reduce((t, l) => t + Number(l.total_cents), 0);
   const entrouHoje = soma(saiuHoje.data, 'income');
   const ritmo = useMemo(
     () =>
@@ -183,95 +178,43 @@ export default function TodayScreen() {
       }),
     [saiuHoje.data, saiuNoCiclo.data, cycle.data?.de, hoje]
   );
+  const legendaDeHoje =
+    [
+      ritmo.media === null ? null : `${ritmo.acima ? 'acima' : 'abaixo'} da média de ${brl(ritmo.media)}/dia`,
+      entrouHoje > 0 ? `entrou ${brl(entrouHoje)}` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ') || undefined;
 
-  /*
-    A segunda linha do herói é o VEREDITO DO DIA: obrigação (devo alguma coisa?) ganha de
-    permissão (posso gastar?). "Por dia" some abaixo de R$ 1,00 — um número ridículo no lugar
-    mais nobre da tela ensina a pessoa a não ler a linha.
-  */
-  const atrasadoCents = atrasados.filter((i) => i.kind !== 'income').reduce((s, i) => s + i.cents, 0);
-  const venceHojeCents = doDia.filter((i) => i.kind !== 'income').reduce((s, i) => s + i.cents, 0);
-  // A MESMA frase dos widgets (`vereditoDoDia`, `lib/widget-snapshot.ts`).
-  const doVeredito = vereditoDoDia({
-    atrasadoCents, venceHojeCents, livreCents: livre, diasLivres, brl,
-  });
-  const veredito: { icon: React.ComponentProps<typeof Icon>['name']; negative: boolean; text: string } =
-    { icon: doVeredito.icone, negative: doVeredito.tom === 'perigo', text: doVeredito.texto };
+  /** As fixadas; sem nenhuma, as mexidas por último. Uma prévia, não a lista: "Todas" leva a ela. */
+  const todasAsNotas = useMemo(() => notas.data?.pages.flat() ?? [], [notas.data]);
+  const fixadas = todasAsNotas.filter((n) => n.pinned);
+  const notasDaHoje = (fixadas.length > 0 ? fixadas : todasAsNotas).slice(0, 8);
+  const corDasPastas = useMemo(() => new Map((pastas.data ?? []).map((p) => [p.id, p.color])), [pastas.data]);
 
   const mostrarPassos = setup.pronto && !passosEscondidos && setup.passos.some((p) => !p.feito);
-  const diaCalmo =
-    bills.isSuccess &&
-    reminders.isSuccess &&
-    agenda.agora.length === 0 &&
-    agenda.proximos.length === 0 &&
-    lembretes.length === 0;
-
-  const vencidas = contas.filter((conta) => conta.overdue).length;
-  const orcamentosEstourados = apertados.filter((item) => item.estourou).length;
-  const sinais: TodaySignal[] = [
-    ...(!bills.isError && contas.length > 0
-      ? [{
-          key: 'bills' as const,
-          count: contas.length,
-          label: 'Vencendo',
-          detail: vencidas > 0 ? `${vencidas} ${vencidas === 1 ? 'atrasada' : 'atrasadas'}` : 'Próximos 7 dias',
-          tone: vencidas > 0 ? 'danger' as const : 'text' as const,
-          destination: 'lançamentos',
-          onPress: () => router.push('/finance/transactions'),
-        }]
-      : []),
-    ...(!reminders.isError && lembretes.length > 0
-      ? [{
-          key: 'reminders' as const,
-          count: lembretes.length,
-          label: 'Lembretes',
-          detail: 'Para hoje',
-          tone: 'text' as const,
-          destination: 'lembretes',
-          onPress: () => router.push('/reminders'),
-        }]
-      : []),
-    ...(!budgets.isError && apertados.length > 0
-      ? [{
-          key: 'budgets' as const,
-          count: apertados.length,
-          label: 'No limite',
-          detail: orcamentosEstourados > 0
-            ? `${orcamentosEstourados} ${orcamentosEstourados === 1 ? 'atingiu' : 'atingiram'} o limite`
-            : 'Perto do limite',
-          tone: 'warning' as const,
-          destination: 'orçamentos',
-          onPress: () => router.push('/finance/budgets'),
-        }]
-      : []),
-  ];
+  /** O Seu dia só afirma "nada" com as DUAS respostas na mão. */
+  const diaCalmo = bills.isSuccess && reminders.isSuccess && linhas.length === 0;
+  const proximoCompromisso = agenda.proximos[0]?.itens[0] ?? null;
 
   /*
-    O PORTÃO DA TELA (Fase 5 do redesenho anterior): a Hoje abre inteira ou não abre. `profile`
-    pode nascer desligada e mesmo assim entra — `telaPronta` lê `fetchStatus`.
+    O PORTÃO DA TELA: a Hoje abre inteira ou não abre. `profile` pode nascer desligada e mesmo
+    assim entra — `telaPronta` lê `fetchStatus`.
   */
   const pronta = useTelaPronta(
-    cycle, profile, gasto, bills, noCartao, reminders, budgets, saldos, saiuHoje, saiuNoCiclo, caminho, ...setup.consultas,
-    ...proximo.consultas,
+    cycle, profile, gasto, bills, noCartao, reminders, budgets, saldos, saiuHoje, saiuNoCiclo, notas, pastas,
+    ...setup.consultas, ...proximo.consultas,
   );
-
-  const pay = (id: string) => baixa.abrir(id);
 
   /*
     `debt` é a prestação de um financiamento e `ref_id` é o id da DÍVIDA: dar baixa de
-    lançamento nele não acharia nada. Fatura e dívida vão para a própria tela; compra no cartão
-    vai para a fatura em que ela vai cair.
+    lançamento nele não acharia nada. Fatura e dívida vão para a própria tela.
   */
   const acaoDoItem = (i: ItemDaAgenda): React.ComponentProps<typeof AgendaItem>['action'] => {
-    if (i.kind === 'card' && i.faturaId) {
-      const id = i.faturaId;
-      return { label: 'Ver fatura', icon: 'chevron.right', onPress: () => router.push({ pathname: '/finance/invoice/[id]', params: { id } }) };
-    }
     if (i.kind === 'card') return undefined;
     if (i.kind === 'invoice') {
       return { label: 'Pagar fatura', icon: 'checkmark', onPress: () => router.push({ pathname: '/finance/invoice/[id]', params: { id: i.ref_id } }) };
     }
-    // `ref_id` da prestação é o id da DÍVIDA: abre ela, não a lista (é ali o "Paguei esta parcela").
     if (i.kind === 'debt') {
       const id = i.ref_id;
       return { label: 'Ver dívida', icon: 'chevron.right', onPress: () => router.push({ pathname: '/finance/debts', params: { id } }) };
@@ -279,19 +222,28 @@ export default function TodayScreen() {
     return {
       label: settleLabel(i.kind === 'income' ? 'income' : 'expense'),
       icon: 'checkmark',
-      onPress: () => pay(i.ref_id),
+      onPress: () => baixa.abrir(i.ref_id),
     };
   };
 
   /**
-   * A linha ABRE o lançamento — quando a conta veio diferente do previsto ("a luz veio 180"),
-   * dar baixa gravaria o valor errado, e sem este caminho não havia como corrigir antes.
+   * Toda linha ABRE o que ela é: o lançamento (quando a conta veio diferente do previsto — "a luz
+   * veio 180" — é ali que se corrige antes da baixa), a fatura, a dívida. A compra no cartão abre a
+   * fatura em que ela vai cair.
    */
-  const abrirItem = (i: ItemDaAgenda) =>
-    i.kind === 'transaction' || i.kind === 'income' || i.kind === 'card'
-      ? () => router.push({ pathname: '/finance/[txId]', params: { txId: i.ref_id } })
-      : undefined;
+  const abrirItem = (i: ItemDaAgenda) => () => {
+    if (i.kind === 'card' && i.faturaId) {
+      router.push({ pathname: '/finance/invoice/[id]', params: { id: i.faturaId } });
+    } else if (i.kind === 'invoice') {
+      router.push({ pathname: '/finance/invoice/[id]', params: { id: i.ref_id } });
+    } else if (i.kind === 'debt') {
+      router.push({ pathname: '/finance/debts', params: { id: i.ref_id } });
+    } else {
+      router.push({ pathname: '/finance/[txId]', params: { txId: i.ref_id } });
+    }
+  };
 
+  /** No Seu dia a linha resolve (Paguei, Pagar fatura…); nos próximos dias ela só abre. */
   const itemDaAgenda = (i: ItemDaAgenda, onde: 'agora' | 'proximos') => {
     const meta = metaDoItem(i, onde);
     return (
@@ -304,16 +256,18 @@ export default function TodayScreen() {
         valueTone={i.kind === 'income' ? 'success' : i.atrasado ? 'danger' : 'text'}
         icon={iconeDoItem(i)}
         cartao={i.cartao}
-        action={acaoDoItem(i)}
+        action={onde === 'agora' ? acaoDoItem(i) : undefined}
         onPress={abrirItem(i)}
       />
     );
   };
 
+  const abrirLembrete = (id: string) => router.push({ pathname: '/reminder-form', params: { id, ocorrencia: '1' } });
+
   /*
-    O toque no herói abre o MENU. As opções são as mesmas nas duas raízes (menu que muda de forma
-    conforme a tela é menu que se lê toda vez). `mes` e `view` saem do próprio `cycle.data`, nunca
-    de um default — o destino tem que mostrar o período que o rodapé nomeou (`finance.md`).
+    O toque no número do dinheiro abre o MENU (o mesmo do herói antigo e do Financeiro). `mes` e
+    `view` saem do próprio `cycle.data`, nunca de um default — o destino tem que mostrar o período
+    que a tela nomeou (`finance.md`).
   */
   const abrirMenu = () => {
     usarDica('hoje-painel');
@@ -341,83 +295,28 @@ export default function TodayScreen() {
     return (
       <Screen wide={tablet} topBar={<CabecalhoDaHoje />}>
         <View style={styles.cabecalho}>
-          <Skeleton width="28%" height={12} />
           <Skeleton width="60%" height={28} />
+          <Skeleton width="28%" height={12} />
         </View>
-        <SkeletonHero />
-        <View style={styles.linhaEsqueleto}>
-          <Skeleton width="31%" height={64} radius={Radius.md} />
-          <Skeleton width="31%" height={64} radius={Radius.md} />
-          <Skeleton width="31%" height={64} radius={Radius.md} />
-        </View>
-        <Skeleton height={64} radius={Radius.pill} />
         <SkeletonList linhas={3} />
+        <Skeleton height={176} radius={Radius.md} />
+        <SkeletonList linhas={2} />
       </Screen>
     );
   }
 
-  const heroBlock = (
-    <>
-      <View style={styles.cabecalho}>
-        {primeiroNome ? (
-          <ThemedText type="title" style={styles.semEncolher}>
-            {`${greetingBR()}, ${primeiroNome}`}
-          </ThemedText>
-        ) : null}
-        <ThemedText type="caption" themeColor="textSecondary">{diaCurtoBR(hoje)}</ThemedText>
-      </View>
-      {gasto.isError ? (
-        <ErrorCard onRetry={() => gasto.refetch()} />
-      ) : (
-        <View style={styles.comDica}>
-        <HeroPanel
-          surface="live"
-          label={ateQuando ? `Livre até ${isoToBR(ateQuando)}` : 'Livre'}
-          concealable
-          value={<CountUpMoney cents={livre} variant="heroMoney" tone={livre < 0 ? 'onHeroDanger' : 'onHero'} />}
-          secondary={veredito}
-          chart={gasto.data ? <RunwayBar pista={pista} ate={ateQuando ?? hoje} entrada={proximaEntrada} /> : undefined}
-          footer={cycle.data?.ate ? (
-            <View style={styles.rodapeHeroi}>
-              <ThemedText type="footnote" themeColor="onHeroMuted" style={styles.shrink}>
-                Compromissos
-              </ThemedText>
-              <Money cents={comprometidoNoCiclo} variant="ticker" tone="onHero" concealable />
-            </View>
-          ) : undefined}
-          onPress={abrirMenu}
-        />
-        <Dica id="hoje-painel" tela="hoje" />
-        </View>
-      )}
-    </>
+  const saudacaoBlock = (
+    <View style={styles.cabecalho}>
+      {primeiroNome ? (
+        <ThemedText type="title" style={styles.semEncolher}>
+          {`${greetingBR()}, ${primeiroNome}`}
+        </ThemedText>
+      ) : null}
+      <ThemedText type="caption" themeColor="textSecondary">{diaCurtoBR(hoje)}</ThemedText>
+    </View>
   );
 
-  const signalsBlock = sinais.length > 0 ? <TodaySignals signals={sinais} /> : null;
-
-  const pulseBlock = saiuHoje.isError ? null : (
-    <TileRow>
-      <Tile
-        icon="arrow.up.right"
-        label="Saiu hoje"
-        value={<Money cents={ritmo.hoje} variant="money" tone="text" concealable />}
-        caption={ritmo.media === null
-          ? undefined
-          : `${ritmo.acima ? 'acima' : 'abaixo'} de ${brl(ritmo.media)}/dia`}
-        accessibilityLabel={`Saiu hoje: ${brl(ritmo.hoje)}`}
-        onPress={() => router.push('/finance/transactions')}
-      />
-      <Tile
-        icon="arrow.down.left"
-        label="Entrou hoje"
-        value={<Money cents={entrouHoje} variant="money" tone={entrouHoje > 0 ? 'success' : 'text'} concealable />}
-        accessibilityLabel={`Entrou hoje: ${brl(entrouHoje)}`}
-        onPress={() => router.push('/finance/transactions')}
-      />
-    </TileRow>
-  );
-
-  const actionsBlock = (
+  const passosBlock = (
     <>
       {mostrarPassos ? (
         <Bloco>
@@ -445,128 +344,133 @@ export default function TodayScreen() {
           />
         </Bloco>
       ) : null}
-      {bills.isError ? (
-        <Bloco>
-          <BlockHeader title="Agora" voice="app" />
-          <ErrorCard onRetry={() => bills.refetch()} />
-        </Bloco>
-      ) : agenda.agora.length > 0 ? (
-        <Bloco>
-          <BlockHeader title="Agora" voice="app" count={agenda.agora.length} />
-          <View>
-            {atrasados.length > 0 ? (
-              <DayRail label="atrasado" tone="danger" last={doDia.length === 0}>
-                {jAtrasados.visiveis.map((i) => itemDaAgenda(i, 'agora'))}
-              </DayRail>
-            ) : null}
-            {doDia.length > 0 ? (
-              <DayRail label="hoje" last>
-                {jDoDia.visiveis.map((i) => itemDaAgenda(i, 'agora'))}
-              </DayRail>
-            ) : null}
-          </View>
-          <VerMais restantes={jAtrasados.restantes} onPress={() => janelas.verMais('atrasados')} />
-          <VerMais restantes={jDoDia.restantes} onPress={() => janelas.verMais('doDia')} />
-        </Bloco>
-      ) : null}
     </>
   );
 
-  const accountsBlock = saldos.isError ? (
-    <Bloco>
-      <BlockHeader title="Nas contas" />
-      <ErrorCard onRetry={() => saldos.refetch()} />
-    </Bloco>
-  ) : emConta.linhas.length > 0 ? (
+  const diaBlock = (
     <Bloco>
       <BlockHeader
-        title="Nas contas"
-        action={{ label: 'Contas', onPress: () => router.push('/finance/accounts') }}
+        title="Seu dia"
+        voice="app"
+        action={{ label: 'Lembretes', accessibilityLabel: 'Ver todos os lembretes', onPress: () => router.push('/reminders') }}
       />
-      <CashAccounts
-        caixa={emConta}
-        onOpen={(l: LinhaDeCaixa) =>
-          router.push(
-            l.id
-              ? { pathname: '/finance/transactions', params: { accountId: l.id } }
-              : '/finance/transactions'
-          )
-        }
-      />
-      {/* Embaixo das contas: acima delas a dica ficava entre o título e o que ele nomeia. */}
-      <Dica id="conta-extrato" tela="hoje" />
+      {/* Cada leitura tem o seu erro (§7): contas e lembretes falham separados. */}
+      {bills.isError ? <ErrorCard onRetry={() => bills.refetch()} /> : null}
+      {reminders.isError ? <ErrorCard onRetry={() => reminders.refetch()} /> : null}
+      {linhas.length > 0 || diaCalmo ? (
+        <GrupoDoDia>
+          {linhas.map((l) => {
+            if (l.tipo === 'resumo') {
+              return (
+                <LinhaDoAtrasado
+                  key={l.chave}
+                  resumo={l.resumo}
+                  aberto={l.aberto}
+                  onAlternar={() => setAtrasadosAbertos((v) => !v)}
+                />
+              );
+            }
+            if (l.tipo === 'item') return itemDaAgenda(l.item, 'agora');
+            if (l.tipo === 'verMais') {
+              return (
+                <View key={l.chave} style={styles.verMais}>
+                  <VerMais restantes={l.restantes} onPress={() => setLimiteDoAtrasado((n) => n + PASSO)} />
+                </View>
+              );
+            }
+            if (l.tipo === 'agora') return <AgoraLinha key={l.chave} agora={agora} />;
+            return (
+              <LinhaDeLembrete key={l.chave} lembrete={l.lembrete} estado={l.estado} agora={agora} onOpen={abrirLembrete} />
+            );
+          })}
+          {diaCalmo ? (
+            <View style={styles.calmo}>
+              <Icon name="checkmark.circle" size="md" color="success" />
+              <View style={styles.shrink}>
+                <ThemedText type="default">Nada para hoje</ThemedText>
+                <ThemedText type="caption" themeColor="textSecondary">
+                  {proximoCompromisso
+                    ? `${rotuloDoDia(proximoCompromisso.day, hoje)}: ${proximoCompromisso.title}`
+                    : proximaEntrada
+                      ? `entra dinheiro ${isoToBR(proximaEntrada).slice(0, 5)}`
+                      : 'nada vence nos próximos dias'}
+                </ThemedText>
+              </View>
+            </View>
+          ) : null}
+        </GrupoDoDia>
+      ) : null}
+    </Bloco>
+  );
+
+  const dinheiroBlock = gasto.isError ? (
+    <Bloco>
+      <ErrorCard onRetry={() => gasto.refetch()} />
+    </Bloco>
+  ) : (
+    <Bloco>
+      <View style={styles.comDica}>
+        <DinheiroDoDia
+          painel={painel}
+          onAbrirMenu={abrirMenu}
+          hoje={saiuHoje.isError ? null : { saiu: ritmo.hoje, legenda: legendaDeHoje }}
+          onAbrirHoje={() => router.push('/finance/transactions')}
+          caixa={saldos.isError ? null : emConta}
+          contasAbertas={contasAbertas}
+          onAlternarContas={() => setContasAbertas((v) => !v)}
+          onAbrirConta={(l) =>
+            router.push(
+              l.id
+                ? { pathname: '/finance/transactions', params: { accountId: l.id } }
+                : '/finance/transactions'
+            )
+          }
+          apertados={apertados}
+          onAbrirOrcamentos={() => router.push('/finance/budgets')}
+        />
+        {/* Sem saldos a tela não afirma saldo nenhum: o erro, e o "Tentar de novo" só dos saldos. */}
+        {saldos.isError ? <ErrorCard onRetry={() => saldos.refetch()} /> : null}
+        <Dica id="hoje-painel" tela="hoje" />
+        {contasAbertas ? <Dica id="conta-extrato" tela="hoje" /> : null}
+      </View>
+    </Bloco>
+  );
+
+  const proximosBlock = noCartao.isError ? (
+    <Bloco>
+      <BlockHeader title="Próximos dias" voice="app" />
+      <ErrorCard onRetry={() => noCartao.refetch()} />
+    </Bloco>
+  ) : agenda.proximos.length > 0 ? (
+    <Bloco>
+      <BlockHeader title="Próximos dias" voice="app" />
+      <GrupoDoDia>
+        {agenda.proximos.flatMap((g) => [
+          <RotuloNoGrupo key={`dia:${g.day}`} texto={rotuloDoDia(g.day, hoje)} />,
+          ...g.itens.map((i) => itemDaAgenda(i, 'proximos')),
+        ])}
+      </GrupoDoDia>
     </Bloco>
   ) : null;
 
-  const comingBlock = (
-    <>
-      {reminders.isError ? (
-        <Bloco>
-          <BlockHeader title="Lembretes" />
-          <ErrorCard onRetry={() => reminders.refetch()} />
-        </Bloco>
-      ) : lembretes.length > 0 ? (
-        <Bloco>
-          <BlockHeader
-            title="Lembretes"
-            count={lembretes.length}
-            action={{ label: 'Todos', onPress: () => router.push('/reminders') }}
-          />
-          <ReminderTimeline
-            lembretes={lembretes}
-            agora={agora}
-            onOpen={(id) => router.push({ pathname: '/reminder-form', params: { id, ocorrencia: '1' } })}
-          />
-        </Bloco>
-      ) : null}
-      {noCartao.isError ? (
-        <Bloco>
-          <BlockHeader title="Próximos dias" voice="app" />
-          <ErrorCard onRetry={() => noCartao.refetch()} />
-        </Bloco>
-      ) : agenda.proximos.length > 0 ? (
-        <Bloco>
-          <BlockHeader title="Próximos dias" voice="app" />
-          <View>
-            {agenda.proximos.map((g, indice) => (
-              <DayRail
-                key={g.day}
-                label={rotuloDoDia(g.day, hoje)}
-                tone={g.itens.every((i) => i.kind === 'income') ? 'success' : 'neutral'}
-                last={indice === agenda.proximos.length - 1}>
-                {g.itens.map((i) => itemDaAgenda(i, 'proximos'))}
-              </DayRail>
-            ))}
-          </View>
-        </Bloco>
-      ) : null}
-      {budgets.isError ? (
-        <Bloco>
-          <BlockHeader title="No limite" />
-          <ErrorCard onRetry={() => budgets.refetch()} />
-        </Bloco>
-      ) : apertados.length > 0 ? (
-        <Bloco>
-          <BlockHeader
-            title="No limite"
-            count={apertados.length}
-            action={{ label: 'Orçamentos', onPress: () => router.push('/finance/budgets') }}
-          />
-          <BudgetRings itens={apertados} onPress={() => router.push('/finance/budgets')} />
-        </Bloco>
-      ) : null}
-      {diaCalmo ? (
-        <View style={styles.calmo}>
-          <Icon name="checkmark.circle" size="sm" color="success" />
-          <ThemedText type="footnote" themeColor="textSecondary" style={styles.shrink}>
-            {proximaEntrada
-              ? `Nada vence hoje · entra dinheiro ${isoToBR(proximaEntrada).slice(0, 5)}`
-              : 'Nada vence nos próximos dias'}
-          </ThemedText>
-        </View>
-      ) : null}
-    </>
-  );
+  const notasBlock = notas.isError ? (
+    <Bloco>
+      <BlockHeader title="Notas" />
+      <ErrorCard onRetry={() => notas.refetch()} />
+    </Bloco>
+  ) : notasDaHoje.length > 0 ? (
+    <Bloco>
+      <BlockHeader
+        title={fixadas.length > 0 ? 'Fixadas' : 'Notas recentes'}
+        action={{ label: 'Todas', accessibilityLabel: 'Ver todas as notas', onPress: () => router.push('/notes') }}
+      />
+      <NotasDaHoje
+        notas={notasDaHoje}
+        corDaPasta={(id) => (id ? (corDasPastas.get(id) ?? null) : null)}
+        onOpen={(id) => router.push({ pathname: '/notes/[id]', params: { id } })}
+      />
+    </Bloco>
+  ) : null;
 
   return (
     <Screen
@@ -576,8 +480,7 @@ export default function TodayScreen() {
       overlay={
         <>
           {baixa.folha}
-          {/* Criar ONDE se vê o dia (25/09/2026): a Hoje mostra lançamentos, lembretes e notas e
-              não criava nenhum — o mesmo "Lançar" do Financeiro, com o que a Hoje mostra. */}
+          {/* Criar ONDE se vê o dia (25/09/2026): a Hoje mostra lançamentos, lembretes e notas. */}
           <ExtendedFab
             label="Lançar"
             icon="plus"
@@ -603,26 +506,27 @@ export default function TodayScreen() {
           saldos.refetch(),
           saiuHoje.refetch(),
           saiuNoCiclo.refetch(),
-          caminho.refetch(),
+          notas.refetch(),
+          pastas.refetch(),
         ])
       }>
       {tablet ? (
         <TodayTabletCanvas
-          hero={heroBlock}
-          signals={signalsBlock}
-          pulse={pulseBlock}
-          actions={actionsBlock}
-          accounts={accountsBlock}
-          coming={comingBlock}
+          saudacao={saudacaoBlock}
+          passos={passosBlock}
+          dia={diaBlock}
+          dinheiro={dinheiroBlock}
+          proximos={proximosBlock}
+          notas={notasBlock}
         />
       ) : (
         [
-          <Fragment key="hero">{heroBlock}</Fragment>,
-          <Fragment key="signals">{signalsBlock}</Fragment>,
-          <Fragment key="pulse">{pulseBlock}</Fragment>,
-          <Fragment key="actions">{actionsBlock}</Fragment>,
-          <Fragment key="accounts">{accountsBlock}</Fragment>,
-          <Fragment key="coming">{comingBlock}</Fragment>,
+          <Fragment key="saudacao">{saudacaoBlock}</Fragment>,
+          <Fragment key="passos">{passosBlock}</Fragment>,
+          <Fragment key="dia">{diaBlock}</Fragment>,
+          <Fragment key="dinheiro">{dinheiroBlock}</Fragment>,
+          <Fragment key="proximos">{proximosBlock}</Fragment>,
+          <Fragment key="notas">{notasBlock}</Fragment>,
         ]
       )}
     </Screen>
@@ -630,25 +534,18 @@ export default function TodayScreen() {
 }
 
 const styles = StyleSheet.create({
-  shrink: { flex: 1, minWidth: 0 },
+  shrink: { flex: 1, minWidth: 0, gap: Space.half },
   semEncolher: { flexShrink: 0, maxWidth: '100%' },
   cabecalho: { gap: Space.xs },
+  bloco: { gap: Space.md },
   /** A dica encosta no que ela explica — mais perto que o `gap` entre blocos. */
   comDica: { gap: Space.sm },
-  bloco: { gap: Space.md },
-  rodapeHeroi: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Space.lg,
-  },
-  linhaEsqueleto: { flexDirection: 'row', justifyContent: 'space-between' },
+  verMais: { paddingBottom: Space.sm },
   calmo: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: Space.sm,
-    paddingVertical: Space.sm,
+    gap: Space.md,
+    paddingHorizontal: Space.lg,
+    paddingVertical: Space.md,
   },
 });

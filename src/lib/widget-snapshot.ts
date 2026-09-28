@@ -17,6 +17,7 @@
  */
 
 import { diasAte, formatBRL, isoToBR, mesCurto } from './dates.ts';
+import { POR_DIA_MINIMO, porDiaLivre } from './today-spend.ts';
 
 export const MASCARA = 'R$ ••••';
 
@@ -39,14 +40,14 @@ export function vereditoDoDia(v: {
   brl: (cents: number) => string;
 }): Veredito {
   const dias = `${v.diasLivres} ${v.diasLivres === 1 ? 'dia' : 'dias'}`;
-  const porDia = v.livreCents > 0 ? Math.floor(v.livreCents / v.diasLivres) : 0;
+  const porDia = porDiaLivre(v.livreCents, v.diasLivres);
   if (v.atrasadoCents > 0) {
     return { tom: 'perigo', icone: 'exclamationmark.triangle', texto: `${v.brl(v.atrasadoCents)} atrasado` };
   }
   if (v.venceHojeCents > 0) {
     return { tom: 'perigo', icone: 'clock', texto: `${v.brl(v.venceHojeCents)} vence hoje` };
   }
-  if (porDia >= 100) {
+  if (porDia >= POR_DIA_MINIMO) {
     return { tom: 'neutro', icone: 'calendar', texto: `≈ ${v.brl(porDia)} por dia · ${dias}` };
   }
   return { tom: 'neutro', icone: 'checkmark.circle', texto: `Nada vence hoje · ${dias} até entrar` };

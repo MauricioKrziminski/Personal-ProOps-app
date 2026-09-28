@@ -4,8 +4,7 @@ import { StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { PillTabBar, type PillTab } from '@/components/ui/pill-tab-bar';
-import { useBudgetsStatus, useUpcomingBills } from '@/hooks/use-finance';
-import { useTodayReminders } from '@/hooks/use-items';
+import { usePendentesDaHoje } from '@/hooks/use-pendentes-da-hoje';
 import { useTheme } from '@/hooks/use-theme';
 import { ROTULO_DA_ABA } from '@/lib/abas';
 
@@ -41,21 +40,9 @@ export default function AppTabs() {
   const theme = useTheme();
   const segments = useSegments();
 
-  // As mesmas queries das telas — o TanStack Query dedupe e serve do cache, então o badge não
-  // custa requisição a mais.
-  const bills = useUpcomingBills(7);
-  const reminders = useTodayReminders();
-  const budgets = useBudgetsStatus();
-
-  const pendentes =
-    (bills.data ?? []).length +
-    (reminders.data ?? []).length +
-    (budgets.data ?? []).filter(
-      (b) =>
-        Number(b.limit_cents) > 0 &&
-        // inclui o comprometido: o badge avisa o que dá para evitar, não o arrependimento
-        (Number(b.spent_cents) + Number(b.committed_cents ?? 0)) / Number(b.limit_cents) >= 1
-    ).length;
+  // A MESMA régua nas duas tab bars (conta a vencer sem receita, lembrete de hoje, orçamento
+  // estourado) — ver `usePendentesDaHoje`.
+  const pendentes = usePendentesDaHoje();
 
   const atual = Math.max(
     0,

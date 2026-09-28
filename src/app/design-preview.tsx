@@ -360,10 +360,8 @@ function seedClient() {
 
   /*
     As leituras das raízes em "conversa organizada" (17/09/2026). Chave EXATA de cada hook: chave
-    errada cai no estado de erro em silêncio. `spendable` guarda a LINHA (o hook devolve `[0]`), e
-    a soma de `spendable-path` é o `comprometido_ate_entrada` — senão a Pista apaga os entalhes.
+    errada cai no estado de erro em silêncio. `spendable` guarda a LINHA (o hook devolve `[0]`).
   */
-  const emQuatroDias = localISODate(new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 4));
   seedFinancePeriodPreview(client, {
     month: mes,
     previousMonth: mesAnterior,
@@ -378,10 +376,6 @@ function seedClient() {
     a_receber_no_ciclo: 42000,
     proxima_entrada: null,
   });
-  client.setQueryData(['spendable-path', ''], [
-    { day: hoje, out_cents: 21430, title: 'Energia', origin: 'transaction', ref_id: 'prev-energia' },
-    { day: emQuatroDias, out_cents: 180000, title: 'Aluguel', origin: 'transaction', ref_id: 'prev-aluguel' },
-  ]);
   client.setQueryData(['upcoming-card-charges', '6'], []);
   client.setQueryData(['agent-activity', '6'], [
     {
@@ -898,6 +892,37 @@ function seedClient() {
           color: null,
           source: 'app',
           tags: ['ideias'],
+        }),
+        nota({
+          id: 'prev-n3',
+          content: 'Reunião com o contador — levar notas fiscais de agosto',
+          pinned: false,
+          color: 'magenta',
+          source: 'whatsapp',
+          tags: ['trabalho'],
+          updated_at: at(8, 5),
+        }),
+      ],
+    ],
+  });
+
+  /*
+    As notas da Hoje (28/09/2026): `useNotesList({ sort: 'recentes' })` — fixadas primeiro, e só
+    elas quando existem. A chave leva o `sort` porque ele não é o padrão (`chaveDaLista`).
+  */
+  client.setQueryData(['notes', 'list', { sort: 'recentes' }], {
+    pageParams: [0],
+    pages: [
+      [
+        nota({}),
+        nota({
+          id: 'prev-n4',
+          content: 'Presente da Ana\n- livro da Chimamanda\n- vale-cinema',
+          pinned: true,
+          color: 'oceano',
+          source: 'whatsapp',
+          tags: [],
+          updated_at: at(9, 40),
         }),
         nota({
           id: 'prev-n3',

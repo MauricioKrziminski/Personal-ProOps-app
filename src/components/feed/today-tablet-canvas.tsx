@@ -5,30 +5,26 @@ import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { PANE_GAP } from '@/design/adaptive-window';
 
 interface TodayTabletCanvasProps {
-  hero: ReactNode;
-  signals: ReactNode;
-  pulse: ReactNode;
-  actions: ReactNode;
-  accounts: ReactNode;
-  coming: ReactNode;
+  saudacao: ReactNode;
+  passos: ReactNode;
+  dia: ReactNode;
+  dinheiro: ReactNode;
+  proximos: ReactNode;
+  notas: ReactNode;
 }
 
-/** One set of real Today blocks, arranged by decision priority at the measured pane width. */
-export function TodayTabletCanvas({
-  hero,
-  signals,
-  pulse,
-  actions,
-  accounts,
-  coming,
-}: TodayTabletCanvasProps) {
+/**
+ * Os MESMOS blocos da Hoje do celular, em duas colunas: à esquerda o dia (o que acontece e o que
+ * vem), à direita o dinheiro e as notas. Uma coluna só repete a ordem do celular.
+ */
+export function TodayTabletCanvas({ saudacao, passos, dia, dinheiro, proximos, notas }: TodayTabletCanvasProps) {
   return (
     <AdaptivePanes
       testID="today-tablet-canvas"
-      main={<View style={styles.column}>{hero}{pulse}{accounts}</View>}
-      support={<View style={styles.column}>{signals}{actions}{coming}</View>}
+      main={<View style={styles.column}>{saudacao}{passos}{dia}{proximos}</View>}
+      support={<View style={styles.column}>{dinheiro}{notas}</View>}
       singlePaneContent={
-        <View style={styles.column}>{hero}{signals}{pulse}{actions}{accounts}{coming}</View>
+        <View style={styles.column}>{saudacao}{passos}{dia}{dinheiro}{proximos}{notas}</View>
       }
     />
   );

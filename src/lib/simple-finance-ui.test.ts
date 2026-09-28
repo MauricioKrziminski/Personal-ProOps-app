@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -171,7 +171,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useSaveBudget: () => mutation('saveBudget'),
     useDeleteBudget: () => mutation('deleteBudget'),
     useBudgetsStatus: () => options.budgetsPending ? { ...query, isLoading: true, isPending: true, isSuccess: false, data: undefined } : ({ ...query, isSuccess: true, data: options.budgets ?? [] }),
-    useSpendablePath: () => ({ ...query, isSuccess: true, data: [] }),
+    useSpendable: () => options.spendableError ? { ...query, isError: true, data: undefined, refetch: async () => { refetches.push('spendable'); } } : ({ ...query, isSuccess: true, data: options.spendable ?? { caixa: 0, comprometido_ate_entrada: 0, comprometido_no_ciclo: 0, proxima_entrada: null }, refetch: async () => { refetches.push('spendable'); } }),
     useCycle: () => ({ ...query, isSuccess: true, data: options.cycle ?? { de: '2026-09-01', ate: '2026-09-30', mes: '2026-09', diasAteOFim: 22 } }),
     useAccountBalances: () => ({
       ...query,
@@ -270,6 +270,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@/hooks/use-proximo-passo') return { useProximoPasso: () => ({ passo: options.proximo ?? null, dispensar: (id: string) => writes.push({ operation: 'dispensarProximo', value: id }), consultas: [] }) };
       if (name === '@/hooks/use-setup-progress') return { useSetupProgress: () => ({ passos: options.setupPassos ?? [], pronto: true, consultas: [] }) };
       if (name === '@/hooks/use-bool-pref') return { useBoolPref: () => [false, () => {}] };
+      // O relógio da Hoje, parado ao meio-dia de 08/09 (o `localISODate` do dublê de use-items).
+      if (name === '@/hooks/use-agora') return { useAgora: () => new Date(2026, 8, 8, 12, 0).getTime() };
       // As dicas: a loja fica fora (aparelho); o que se prende é ONDE a tela as põe e o que o
       // gesto e o "Mostrar" pedem a ela.
       if (name === '@/hooks/use-dicas') return {
@@ -307,7 +309,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@/hooks/use-archived-folders') return { useArchivedFolders: () => ({ ...query, isSuccess: true, data: options.pastasArquivadas ?? [] }) };
       if (name === '@/hooks/use-notes') return new Proxy({
         useNoteFolders: () => ({ ...query, isSuccess: true, data: options.folders ?? [] }),
-        useNotesList: () => ({ ...query, isSuccess: true, data: { pages: [options.notes ?? []] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }),
+        useNotesList: () => options.notesError ? { ...query, isError: true, data: undefined, refetch: async () => { refetches.push('notas'); } } : ({ ...query, isSuccess: true, data: { pages: [options.notes ?? []] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }),
         folderTree: (lista: any[]) => lista.map((f) => ({ ...f, depth: 0 })),
         useArchivedCount: () => ({ ...query, isSuccess: true, data: options.arquivadas ?? 0 }),
       } as Record<string, any>, { get: (target, key) => key in target ? target[key as string] : () => mutation(String(key)) });
@@ -340,6 +342,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === './debt-history.ts' || name === './debt-history') return load('src/lib/debt-history.ts');
       if (name === './finance-form.ts' || name === './finance-form') return load('src/lib/finance-form.ts');
       if (name === './text.ts' || name === './text') return load('src/lib/text.ts');
+      if (name === './budget-tight.ts') return load('src/lib/budget-tight.ts');
+      if (name === './today-spend.ts') return load('src/lib/today-spend.ts');
       // o `month-picker` é `.tsx` e importa React Native; aqui só as funções puras dele
       if (name === '@/components/finance/month-picker') return {
         MonthPicker: 'MonthPicker',
@@ -397,7 +401,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     // Tablet adapters hold the existing blocks in named slots, not children. Visit those slots
     // too so the same behavior assertions cover both compositions.
     if (node.type === 'TodayTabletCanvas') {
-      for (const slot of ['hero', 'signals', 'pulse', 'actions', 'accounts', 'coming']) visit(node.props[slot]);
+      for (const slot of ['saudacao', 'passos', 'dia', 'dinheiro', 'proximos', 'notas']) visit(node.props[slot]);
     }
     if (node.type === 'FinanceTabletCanvas') {
       for (const slot of ['cycle', 'actions', 'ledger', 'breakdown']) visit(node.props[slot]);
@@ -1285,7 +1289,7 @@ const copia = (v: unknown) => JSON.parse(JSON.stringify(v));
 const agendaItem = (ui: ReturnType<typeof screen>, title?: string) =>
   ui.nodes().find((n: any) => n.type === 'AgendaItem' && (!title || n.props.title === title));
 
-test('Hoje: o atrasado aparece em Agora e o botão dá baixa no lançamento certo, depois de confirmar o valor', () => {
+test('Hoje: o atrasado aparece no Seu dia e o botão dá baixa no lançamento certo, depois de confirmar o valor', () => {
   const ui = screen(hojeFile, {
     bills: [{ ref_id: 'luz-1', title: 'Luz', due_date: '2026-09-01', amount_cents: 21000, kind: 'transaction', overdue: true }],
     txs: [{ id: 'luz-1', kind: 'expense', amount_cents: 21000, description: 'Luz', status: 'pending', recurring_id: null, installment_plan_id: null }],
@@ -1334,7 +1338,8 @@ test('Hoje: compra que vai cair no cartão aparece nos próximos dias e abre a f
   });
   const item = agendaItem(ui, 'DAS');
   assert.equal(item.props.cartao, 'Nubank');
-  item.props.action.onPress();
+  assert.equal(item.props.action, undefined, 'nos próximos dias a linha só abre — "Ver fatura" em toda compra era ruído');
+  item.props.onPress();
   assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/invoice/[id]', params: { id: 'f-9' } });
 });
 
@@ -1378,44 +1383,103 @@ test('Hoje: com os Primeiros passos feitos aparece o Próximo passo, e ele leva 
   assert.deepEqual(ui.writes.at(-1), { operation: 'dispensarProximo', value: 'importar' });
 });
 
-test('Hoje: falha nas contas mostra o erro em Agora, e o "Tentar de novo" refaz as contas', () => {
+test('Hoje: falha nas contas mostra o erro no Seu dia, e o "Tentar de novo" refaz as contas', () => {
   const ui = screen(hojeFile, { billsError: true });
   const erro = ui.nodes().find((n: any) => n.type === 'ErrorCard');
   assert.ok(erro, 'seção que falha diz que falhou (§7)');
   erro.props.onRetry();
   assert.ok(ui.refetches.includes('bills'));
-  assert.ok(!ui.nodes().some((n: any) => n.type === 'ThemedText' && String(n.props.children).startsWith('Nada vence')),
-    'sem resposta das contas a tela não afirma que nada vence');
+  assert.ok(!ui.nodes().some((n: any) => n.type === 'ThemedText' && String(n.props.children).startsWith('Nada para hoje')),
+    'sem resposta das contas a tela não afirma que o dia está livre');
 });
 
-test('Hoje: dia sem nada diz que nada vence, sem inventar lista', () => {
+test('Hoje: dia sem nada diz "Nada para hoje" e o que vem, sem inventar lista', () => {
   const ui = screen(hojeFile, {});
   assert.ok(!tipos(ui).includes('AgendaItem'));
-  assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText' && String(n.props.children).startsWith('Nada vence')));
+  assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText' && n.props.children === 'Nada para hoje'));
+  const comAluguel = screen(hojeFile, {
+    bills: [{ ref_id: 'alu', title: 'Aluguel', due_date: '2026-09-10', amount_cents: 65000, kind: 'transaction', overdue: false }],
+  });
+  assert.ok(comAluguel.nodes().some((n: any) => n.type === 'ThemedText' && n.props.children === 'qui, 10 set: Aluguel'),
+    'o dia calmo aponta o próximo compromisso');
 });
 
-test('Hoje: o painel destaca só avisos acionáveis e cada linha mantém seu destino', () => {
+/** Um horário LOCAL de 08/09 — o dia do dublê de `use-items`. */
+const lembreteAs = (id: string, h: number, dia = 8) =>
+  ({ id, title: id, recurrence: null, channel: 'push', next_run_at: new Date(2026, 8, dia, h, 0).toISOString() });
+
+test('Hoje: o que pede atenção mora no Seu dia e no card do dinheiro, cada um com o seu destino', () => {
   const ui = screen(hojeFile, {
     bills: [{ ref_id: 'luz-1', title: 'Luz', due_date: '2026-09-01', amount_cents: 21000, kind: 'transaction', overdue: true }],
-    reminders: [{ id: 'r-1', title: 'Comprar remédio' }],
+    reminders: [lembreteAs('Comprar remédio', 15)],
     budgets: [{ category: 'Mercado', limit_cents: 100_00, spent_cents: 85_00, committed_cents: 0 }],
   });
-  const painel = ui.nodes().find((n: any) => n.type === 'TodaySignals');
-  assert.ok(painel);
-  assert.deepEqual(copia(painel.props.signals.map((s: any) => s.key)), ['bills', 'reminders', 'budgets']);
-  assert.equal(painel.props.signals[0].detail, '1 atrasada');
-  for (const sinal of painel.props.signals) sinal.onPress();
-  assert.deepEqual(copia(ui.navigations), ['/finance/transactions', '/reminders', '/finance/budgets']);
+  assert.ok(agendaItem(ui, 'Luz'), 'o atrasado está no Seu dia');
+  const lembrete = ui.nodes().find((n: any) => n.type === 'LinhaDeLembrete');
+  assert.equal(lembrete.props.estado, 'proximo');
+  lembrete.props.onOpen('Comprar remédio');
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/reminder-form', params: { id: 'Comprar remédio', ocorrencia: '1' } });
 
-  const semOrcamentoNoLimite = screen(hojeFile, {
-    bills: [{ ref_id: 'luz-1', title: 'Luz', due_date: '2026-09-01', amount_cents: 21000, kind: 'transaction', overdue: true }],
-    reminders: [{ id: 'r-1', title: 'Comprar remédio' }],
-  });
-  const doisAvisos = semOrcamentoNoLimite.nodes().find((n: any) => n.type === 'TodaySignals');
-  assert.deepEqual(copia(doisAvisos.props.signals.map((s: any) => s.key)), ['bills', 'reminders']);
+  const dinheiro = ui.nodes().find((n: any) => n.type === 'DinheiroDoDia');
+  assert.deepEqual(copia(dinheiro.props.apertados.map((o: any) => o.categoria)), ['Mercado']);
+  dinheiro.props.onAbrirOrcamentos();
+  assert.equal(ui.navigations.at(-1), '/finance/budgets');
+  ui.nodes().find((n: any) => n.type === 'BlockHeader' && n.props.title === 'Seu dia').props.action.onPress();
+  assert.equal(ui.navigations.at(-1), '/reminders', 'os lembretes todos continuam a um toque');
+  assert.ok(!tipos(ui).includes('TodaySignals') && !tipos(ui).includes('BudgetRings') && !tipos(ui).includes('HeroPanel'),
+    'nada dos blocos que eram iguais aos do Financeiro');
+});
 
-  const semAvisos = screen(hojeFile);
-  assert.ok(!semAvisos.nodes().some((n: any) => n.type === 'TodaySignals'), 'zero não vira card nem deixa vão na cascata');
+test('Hoje: lembrete que ficou de outro dia diz a data dele; o de hoje tem o AGORA antes', () => {
+  // O "Para hoje" listava lembretes de 25 dias antes (28/09/2026).
+  const ui = screen(hojeFile, { reminders: [lembreteAs('seguro', 6, 3), lembreteAs('manhã', 9), lembreteAs('filtro', 15)] });
+  const linhas = ui.nodes().filter((n: any) => n.type === 'LinhaDeLembrete' || n.type === 'AgoraLinha');
+  assert.deepEqual(
+    linhas.map((n: any) => (n.type === 'AgoraLinha' ? 'agora' : `${n.props.lembrete.id}:${n.props.estado}`)),
+    ['seguro:outroDia', 'manhã:passou', 'agora', 'filtro:proximo']
+  );
+});
+
+test('Hoje: o dinheiro vem por dia, com o livre total na legenda, e tocar abre o menu de sempre', () => {
+  // caixa 3.300 − 300 comprometido = 3.000 livres; de 08/09 até o fim do ciclo (30/09) são 22 dias.
+  const ui = screen(hojeFile, { spendable: { caixa: 330_000, comprometido_ate_entrada: 30_000, comprometido_no_ciclo: 30_000, proxima_entrada: null } });
+  const dinheiro = ui.nodes().find((n: any) => n.type === 'DinheiroDoDia');
+  assert.equal(dinheiro.props.painel.rotulo, 'Dá para gastar por dia');
+  assert.equal(dinheiro.props.painel.cents, Math.floor(300_000 / 22));
+  assert.equal(dinheiro.props.painel.legenda, 'R$ 3000.00 livre até 30/09');
+  ui.interact(() => dinheiro.props.onAbrirMenu());
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Ver o que fecha o ciclo', 'Projeção', 'Patrimônio', 'Metas']);
+  assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'usarDica', value: 'hoje-painel' });
+
+  const noVermelho = screen(hojeFile, { spendable: { caixa: 10_000, comprometido_ate_entrada: 50_000, comprometido_no_ciclo: 50_000, proxima_entrada: null } });
+  const painel = noVermelho.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.painel;
+  assert.deepEqual(copia({ rotulo: painel.rotulo, cents: painel.cents, negativo: painel.negativo }), { rotulo: 'Livre até 30/09', cents: -40_000, negativo: true });
+});
+
+test('Hoje: falha no dinheiro do dia diz que falhou, e o "Tentar de novo" refaz só ele', () => {
+  const ui = screen(hojeFile, { spendableError: true });
+  assert.ok(!tipos(ui).includes('DinheiroDoDia'), 'sem resposta a tela não inventa um "por dia"');
+  ui.nodes().find((n: any) => n.type === 'ErrorCard').props.onRetry();
+  assert.deepEqual(ui.refetches, ['spendable']);
+});
+
+test('Hoje: as notas fixadas aparecem; sem fixada, as últimas; e tocar abre a nota', () => {
+  const nota = (id: string, pinned: boolean) => ({ id, content: id, folder_id: null, pinned, color: null, source: 'app', tags: [], updated_at: '2026-09-08T10:00:00Z' });
+  const comFixada = screen(hojeFile, { notes: [nota('mercado', true), nota('ideia', false)] });
+  const faixa = comFixada.nodes().find((n: any) => n.type === 'NotasDaHoje');
+  assert.deepEqual(copia(faixa.props.notas.map((n: any) => n.id)), ['mercado']);
+  assert.ok(comFixada.nodes().some((n: any) => n.type === 'BlockHeader' && n.props.title === 'Fixadas'));
+  faixa.props.onOpen('mercado');
+  assert.deepEqual(copia(comFixada.navigations.at(-1)), { pathname: '/notes/[id]', params: { id: 'mercado' } });
+
+  const semFixada = screen(hojeFile, { notes: [nota('ideia', false), nota('lista', false)] });
+  assert.deepEqual(copia(semFixada.nodes().find((n: any) => n.type === 'NotasDaHoje').props.notas.map((n: any) => n.id)), ['ideia', 'lista']);
+  assert.ok(semFixada.nodes().some((n: any) => n.type === 'BlockHeader' && n.props.title === 'Notas recentes'));
+
+  assert.ok(!tipos(screen(hojeFile, {})).includes('NotasDaHoje'), 'sem nota, sem faixa — e nenhum card "Nova nota" (o Lançar já cria)');
+  const falhou = screen(hojeFile, { notesError: true });
+  falhou.nodes().find((n: any) => n.type === 'ErrorCard').props.onRetry();
+  assert.deepEqual(falhou.refetches, ['notas']);
 });
 
 const saldo = (nome: string, tipo: string, cents: number, aReceber = 0) => ({
@@ -1423,12 +1487,12 @@ const saldo = (nome: string, tipo: string, cents: number, aReceber = 0) => ({
   balance_cents: cents, cleared_cents: cents, pending_in_cents: aReceber, pending_out_cents: 0,
 });
 
-test('Hoje: "Nas contas" soma exatamente as linhas que mostra, e cartão fica de fora', () => {
+test('Hoje: "Em conta" soma exatamente as linhas que mostra, e cartão fica de fora', () => {
   const ui = screen(hojeFile, {
     balances: [saldo('Nubank', 'checking', 120_00), saldo('Cofre', 'savings', 500_00), saldo('Cartão', 'credit_card', -900_00)],
   });
-  const bloco = ui.nodes().find((n: any) => n.type === 'CashAccounts');
-  assert.ok(bloco, 'o bloco das contas precisa aparecer');
+  const bloco = ui.nodes().find((n: any) => n.type === 'DinheiroDoDia');
+  assert.ok(bloco, 'o card do dinheiro precisa aparecer');
   assert.equal(bloco.props.caixa.total, 620_00);
   assert.equal(
     bloco.props.caixa.linhas.reduce((t: number, l: any) => t + l.cents, 0),
@@ -1440,23 +1504,23 @@ test('Hoje: "Nas contas" soma exatamente as linhas que mostra, e cartão fica de
 
 test('Hoje: tocar numa conta abre o extrato DELA', () => {
   const ui = screen(hojeFile, { balances: [saldo('Nubank', 'checking', 120_00)] });
-  const bloco = ui.nodes().find((n: any) => n.type === 'CashAccounts');
-  bloco.props.onOpen(bloco.props.caixa.linhas[0]);
+  const bloco = ui.nodes().find((n: any) => n.type === 'DinheiroDoDia');
+  bloco.props.onAbrirConta(bloco.props.caixa.linhas[0]);
   assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/transactions', params: { accountId: 'Nubank' } });
 });
 
 test('Hoje: falha nos saldos diz que falhou e refaz só os saldos', () => {
   const ui = screen(hojeFile, { balancesError: true });
-  assert.ok(!tipos(ui).includes('CashAccounts'), 'sem resposta a tela não afirma saldo nenhum');
+  assert.equal(ui.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.caixa, null, 'sem resposta a tela não afirma saldo nenhum');
   const erro = ui.nodes().find((n: any) => n.type === 'ErrorCard');
   assert.ok(erro);
   erro.props.onRetry();
   assert.deepEqual(ui.refetches, ['balances']);
 });
 
-test('Hoje: sem conta nenhuma o bloco não desenha um card vazio', () => {
+test('Hoje: sem conta nenhuma a linha "Em conta" não afirma R$ 0,00', () => {
   const ui = screen(hojeFile, {});
-  assert.ok(!tipos(ui).includes('CashAccounts'));
+  assert.deepEqual(copia(ui.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.caixa.linhas), []);
 });
 
 test('Hoje: o ritmo do dia compara hoje com os dias ANTERIORES do ciclo', () => {
@@ -1465,11 +1529,11 @@ test('Hoje: o ritmo do dia compara hoje com os dias ANTERIORES do ciclo', () => 
     saiuHoje: [{ kind: 'expense', total_cents: 200_00 }],
     saiuNoCiclo: [{ kind: 'expense', total_cents: 900_00 }],
   });
-  const tile = ui.nodes().find((n: any) => n.type === 'Tile' && n.props.label === 'Saiu hoje');
-  assert.ok(tile, 'o ladrilho do dia precisa aparecer');
+  const hoje = ui.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.hoje;
+  assert.ok(hoje, 'a linha do dia precisa aparecer');
   // (900 − 200) / 7 = 100 por dia; hoje ficou acima.
-  assert.match(String(tile.props.caption), /^acima de R\$ [0-9.,]+\/dia$/);
-  assert.match(String(tile.props.caption), /100/, "a média por dia aparece na legenda");
+  assert.match(String(hoje.legenda), /^acima da média de R\$ [0-9.,]+\/dia$/);
+  assert.match(String(hoje.legenda), /100/, 'a média por dia aparece na legenda');
 });
 
 test('Hoje: receita não entra no que "saiu"', () => {
@@ -1477,8 +1541,9 @@ test('Hoje: receita não entra no que "saiu"', () => {
     saiuHoje: [{ kind: 'income', total_cents: 4_000_00 }, { kind: 'expense', total_cents: 30_00 }],
     saiuNoCiclo: [{ kind: 'expense', total_cents: 100_00 }],
   });
-  const tile = ui.nodes().find((n: any) => n.type === 'Tile' && n.props.label === 'Saiu hoje');
-  assert.equal(tile.props.value.props.cents, 30_00);
+  const hoje = ui.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.hoje;
+  assert.equal(hoje.saiu, 30_00);
+  assert.match(hoje.legenda, /entrou R\$ 4000\.00$/, 'o que entrou vem escrito, fora do "saiu"');
 });
 
 test('Financeiro: os atalhos do mosaico levam aos mesmos destinos de antes', () => {
@@ -1518,8 +1583,8 @@ test('Hoje tablet reuses its real blocks and retains their destinations', () => 
   assert.equal(tela.props.wide, true);
   const canvas = ui.nodes().find((n: any) => n.type === 'TodayTabletCanvas');
   assert.ok(canvas);
-  assert.ok(tipos(ui).includes('CashAccounts'));
-  assert.ok(ui.nodes().some((n: any) => n.type === 'Tile' && n.props.label === 'Saiu hoje'));
+  assert.ok(tipos(ui).includes('DinheiroDoDia'));
+  assert.ok(ui.nodes().some((n: any) => n.type === 'BlockHeader' && n.props.title === 'Seu dia'));
 });
 
 test('Financeiro tablet keeps the cycle, analysis and all management actions', () => {
@@ -2072,11 +2137,18 @@ test('Arquivadas: segurar a pasta apaga (com confirmação), segurar a nota mand
   assert.deepEqual(ui.writes.at(-1), { operation: 'useTrashNote', value: 'n1' });
 });
 
-test('Hoje: "Agora" com muito atrasado mostra aos poucos, com "Ver mais"', () => {
+test('Hoje: muito atrasado vira UMA linha que abre no lugar, aos poucos, com "Ver mais"', () => {
   const contas = Array.from({ length: 25 }, (_, i) => ({ ref_id: `c${i}`, title: `conta ${i}`, due_date: `2026-08-${String(i + 1).padStart(2, '0')}`, amount_cents: 1000, kind: 'transaction', overdue: true }));
   const ui = screen(hojeFile, { bills: contas });
+  const resumo = ui.nodes().find((n: any) => n.type === 'LinhaDoAtrasado');
+  assert.deepEqual(copia(resumo.props.resumo), { contas: 25, contasCents: 25_000, entradas: 0, entradasCents: 0, desde: '2026-08-01' });
+  assert.equal(ui.nodes().filter((n: any) => n.type === 'AgendaItem').length, 0, 'recolhido: nada de 25 linhas vermelhas');
+  ui.interact(() => resumo.props.onAlternar());
   assert.equal(ui.nodes().filter((n: any) => n.type === 'AgendaItem').length, 20);
-  assert.ok(ui.nodes().some((n: any) => n.type === 'VerMais' && n.props.restantes === 5));
+  const verMais = ui.nodes().find((n: any) => n.type === 'VerMais');
+  assert.equal(verMais.props.restantes, 5);
+  ui.interact(() => verMais.props.onPress());
+  assert.equal(ui.nodes().filter((n: any) => n.type === 'AgendaItem').length, 25);
 });
 
 test('Busca: em "Tudo" cada tipo mostra 5 e "Ver mais" abre o tipo; dentro dele, "Ver mais" pede mais 20', () => {
@@ -2246,11 +2318,14 @@ test('Lista principal vazia com seção secundária: a secundária em cima e o v
 const dicas = (ui: ReturnType<typeof screen>) =>
   ui.nodes().filter((n: any) => n.type === 'Dica').map((n: any) => n.props.id);
 
-test('Hoje: a dica do painel mora no herói, e tocar nele a encerra', () => {
+test('Hoje: a dica do painel mora no card do dinheiro, e tocar no valor a encerra', () => {
   const ui = screen(hojeFile, { balances: [saldo('Nubank', 'checking', 120_00)] });
-  assert.deepEqual(dicas(ui), ['hoje-painel', 'conta-extrato']);
-  ui.nodes().find((n: any) => n.type === 'HeroPanel').props.onPress();
+  assert.deepEqual(dicas(ui), ['hoje-painel']);
+  ui.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.onAbrirMenu();
   assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'usarDica', value: 'hoje-painel' });
+  // A das contas só existe com as contas abertas na tela.
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.onAlternarContas());
+  assert.deepEqual(dicas(ui), ['hoje-painel', 'conta-extrato']);
 });
 
 test('Hoje: sem conta na tela, a dica das contas não é montada', () => {
@@ -2373,7 +2448,8 @@ test('a prestação da agenda abre A dívida dela, na Hoje e na Projeção — n
   // financiamentos caçar qual era (a mesma correção de `cycle-routes`).
   const prestacao = { ref_id: 'd1', title: 'Parcela Carro', due_date: '2026-09-10', amount_cents: 147000, kind: 'debt', overdue: false };
   const hoje = screen(hojeFile, { bills: [prestacao] });
-  hoje.interact(() => agendaItem(hoje, 'Parcela Carro').props.action.onPress());
+  // Vence daqui a dois dias: está nos próximos dias, e a linha abre a dívida.
+  hoje.interact(() => agendaItem(hoje, 'Parcela Carro').props.onPress());
   assert.deepEqual(copia(hoje.navigations.at(-1)), { pathname: '/finance/debts', params: { id: 'd1' } });
 
   const projecao = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], bills: [prestacao] });

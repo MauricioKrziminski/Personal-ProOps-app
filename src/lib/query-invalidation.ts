@@ -28,12 +28,8 @@ export const FINANCE_KEYS = [
     tela até o próximo foco.
   */
   ['cycle'], ['cycle-series'], ['cycle-lines'], ['cycle-range'], ['forecast-months'], ['spendable'],
-  /*
-    A Pista da Hoje (`spendable-path`) é a MESMA lista que forma o `spendable`: se só um dos dois
-    renovar, `montarPista` vê a soma discordar e apaga os entalhes. E a Conversa
-    (`agent-activity`) mostra o registro ATUAL — editar pelo app tem que atualizar o card.
-  */
-  ['spendable-path'], ['agent-activity'],
+  // A citação do Financeiro (`agent-activity`) mostra o registro ATUAL: editar pelo app a renova.
+  ['agent-activity'],
   // O Próximo passo da Hoje conta importações e compras parceladas: importar a fatura ou lançar
   // a parcelada tira o passo na hora (`import_batches` nem está na publicação do realtime).
   ['proximo-passo'],

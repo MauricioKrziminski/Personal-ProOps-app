@@ -9,7 +9,7 @@ import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import * as settleLabels from './settle-labels.ts';
 import * as dates from './dates.ts';
 import * as todaySections from './today-sections.ts';
-import * as runway from './runway.ts';
+import * as aosPoucos from './aos-poucos.ts';
 import * as budgetTight from './budget-tight.ts';
 import * as accountCash from './account-cash.ts';
 import * as todaySpend from './today-spend.ts';
@@ -310,7 +310,7 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
   const routes: unknown[] = [];
   const module = { exports: {} as any };
   const query = { data: [], isLoading: false, isRefetching: false, refetch: async () => {} };
-  const finance = { useCycle: () => ({ ...query, data: null }), useCycleMonth: () => '2026-01', useSpendable: () => ({ ...query, data: { caixa: 72, comprometido_ate_entrada: 0, comprometido_no_ciclo: 832663, a_receber_no_ciclo: 756652, proxima_entrada: '2026-01-20' } }), useCashFlowForecast: () => query, useCycleSeries: () => ({ ...query, data: [] }), useAccountBalances: () => ({ ...query, data: [] }), useUpcomingBills: () => ({ ...query, data: [{ ...bill, title: 'Fatura teste', amount_cents: 147000, due_date: '2026-01-20', overdue: true }] }), useUpcomingCardCharges: () => ({ ...query, data: [] }), useSpendablePath: () => ({ ...query, data: [] }), useTransactionsSummary: () => ({ ...query, data: [] }), useBudgetsStatus: () => query, useRecentTransactions: () => query, useMarkPaid: () => ({ mutate: (...args: unknown[]) => writes.push(args) }) };
+  const finance = { useCycle: () => ({ ...query, data: null }), useCycleMonth: () => '2026-01', useSpendable: () => ({ ...query, data: { caixa: 72, comprometido_ate_entrada: 0, comprometido_no_ciclo: 832663, a_receber_no_ciclo: 756652, proxima_entrada: '2026-01-20' } }), useCashFlowForecast: () => query, useCycleSeries: () => ({ ...query, data: [] }), useAccountBalances: () => ({ ...query, data: [] }), useUpcomingBills: () => ({ ...query, data: [{ ...bill, title: 'Fatura teste', amount_cents: 147000, due_date: '2026-01-20', overdue: true }] }), useUpcomingCardCharges: () => ({ ...query, data: [] }), useTransactionsSummary: () => ({ ...query, data: [] }), useBudgetsStatus: () => query, useRecentTransactions: () => query, useMarkPaid: () => ({ mutate: (...args: unknown[]) => writes.push(args) }) };
   const code = ts.transpileModule(readFileSync('src/app/(tabs)/today/index.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
     if (name === 'react') return { useMemo: (fn: () => unknown) => fn(), useState: (value: unknown) => [typeof value === 'function' ? value() : value, () => {}] };
@@ -329,12 +329,15 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
       useJanelasPorGrupo: () => ({ janelaDe: (_g: string, itens: unknown[]) => ({ visiveis: itens, restantes: 0, proximos: 0 }), verMais: () => {} }),
     };
     if (name === '@/hooks/use-bool-pref') return { useBoolPref: () => [false, () => {}] };
+    if (name === '@/hooks/use-agora') return { useAgora: () => new Date(2026, 8, 8, 12, 0).getTime() };
+    if (name === '@/hooks/use-notes') return { useNotesList: () => ({ ...query, data: { pages: [[]] } }), useNoteFolders: () => query };
     if (name === '@/hooks/use-agent-activity') return { useAgentActivity: () => query };
     // "Paguei" abre a confirmação do valor (25/09/2026): o que importa aqui é QUAL id ela abre.
     if (name === '@/components/finance/confirmar-baixa') return { useConfirmarBaixa: () => ({ abrir: (id: string) => writes.push([{ id }]), folha: null }) };
     // Puros, carregados de verdade pelo mesmo motivo de `dates` e `settle-labels` (abaixo).
     if (name === '@/lib/today-sections') return todaySections;
-    if (name === '@/lib/runway') return runway;
+    // `PASSO` é a janela do atrasado: pelo Proxy ele viraria a string 'PASSO' e a lista, vazia.
+    if (name === '@/lib/aos-poucos') return aosPoucos;
     if (name === '@/lib/budget-tight') return budgetTight;
     if (name === '@/lib/account-cash') return accountCash;
     if (name === '@/lib/today-spend') return todaySpend;

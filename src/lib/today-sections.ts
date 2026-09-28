@@ -1,4 +1,5 @@
-import { diasAte, isoToBR } from './dates.ts';
+import { orcamentosApertados, type OrcamentoLinha } from './budget-tight.ts';
+import { diasAte, isoToBR, localISODate } from './dates.ts';
 
 /**
  * A agenda da Hoje, fora da tela: o que exige ação AGORA e o que vem nos próximos dias.
@@ -128,4 +129,125 @@ export function iconeDoItem(i: ItemDaAgenda): 'creditcard' | 'banknote' | 'arrow
   if (i.kind === 'debt') return 'banknote';
   if (i.kind === 'income') return 'arrow.down.left';
   return 'calendar';
+}
+
+/** Um lembrete como a Hoje o lê (as colunas de `useTodayReminders`). */
+export type LembreteDoDia = {
+  id: string;
+  title: string;
+  next_run_at: string;
+  channel: string;
+  recurrence: string | null;
+};
+
+/**
+ * Os lembretes de HOJE e os que ficaram de outro dia, pela DATA LOCAL do `next_run_at`.
+ *
+ * ⚠️ **"Para hoje" listava lembretes de 25 dias antes** (28/09/2026). `useTodayReminders` só tem
+ * teto (`lte` fim de hoje): o lembrete ativo que o cron não entregou — no staging o cron não
+ * roda; em produção, a entrega falhando — continua com o `next_run_at` no passado e caía na
+ * mesma conta dos de hoje. Ele ainda existe e é mostrado, mas com a data dele, e não conta como
+ * "de hoje" (nem no badge).
+ */
+export function separarLembretes<T extends Pick<LembreteDoDia, 'next_run_at'>>(
+  lista: readonly T[],
+  hoje: string
+): { deHoje: T[]; deOutroDia: T[] } {
+  const deHoje: T[] = [];
+  const deOutroDia: T[] = [];
+  for (const l of lista) (localISODate(new Date(l.next_run_at)) === hoje ? deHoje : deOutroDia).push(l);
+  return { deHoje, deOutroDia };
+}
+
+/** O atrasado numa linha só: quantas contas, quanto, e desde quando. */
+export type ResumoDoAtrasado = {
+  contas: number;
+  contasCents: number;
+  /** Receita prevista que não caiu — não é conta, e não soma no valor das contas. */
+  entradas: number;
+  entradasCents: number;
+  /** O dia da pendência mais antiga. */
+  desde: string;
+};
+
+export function resumoDoAtrasado(itens: readonly ItemDaAgenda[]): ResumoDoAtrasado | null {
+  if (itens.length === 0) return null;
+  const contas = itens.filter((i) => i.kind !== 'income');
+  const entradas = itens.filter((i) => i.kind === 'income');
+  return {
+    contas: contas.length,
+    contasCents: contas.reduce((t, i) => t + i.cents, 0),
+    entradas: entradas.length,
+    entradasCents: entradas.reduce((t, i) => t + i.cents, 0),
+    desde: itens.reduce((m, i) => (i.day < m ? i.day : m), itens[0].day),
+  };
+}
+
+export type EntradaDoDia<L extends LembreteDoDia = LembreteDoDia> =
+  | { tipo: 'resumo'; chave: string; resumo: ResumoDoAtrasado; aberto: boolean }
+  | { tipo: 'item'; chave: string; item: ItemDaAgenda }
+  | { tipo: 'verMais'; chave: string; restantes: number }
+  | { tipo: 'lembrete'; chave: string; lembrete: L; estado: 'passou' | 'proximo' | 'depois' | 'outroDia' }
+  | { tipo: 'agora'; chave: string };
+
+/**
+ * O dia em linhas, na ordem em que ele acontece (spec 2026-09-28): o atrasado, o que é "do dia
+ * todo" (vence ou chega hoje, sem hora), e os lembretes com hora — com o AGORA entre o que já
+ * passou e o que vem, como a linha vermelha de um calendário.
+ *
+ * - **Com 2+ atrasados eles viram UMA linha** (`resumo`) que abre no lugar. Um card vermelho por
+ *   fatura atrasada eram sete no topo da tela; com UM só, o resumo seria eco dele.
+ * - `limiteDoAtrasado` é a janela do "Ver mais": o atrasado não tem data mínima.
+ * - Lembrete de outro dia vem antes dos de hoje, com a data dele.
+ */
+export function linhasDoDia<L extends LembreteDoDia>(v: {
+  atrasados: readonly ItemDaAgenda[];
+  atrasadosAbertos: boolean;
+  limiteDoAtrasado: number;
+  doDia: readonly ItemDaAgenda[];
+  lembretes: { deHoje: readonly L[]; deOutroDia: readonly L[] };
+  agora: number;
+}): EntradaDoDia<L>[] {
+  const linhas: EntradaDoDia<L>[] = [];
+  const resumo = v.atrasados.length >= 2 ? resumoDoAtrasado(v.atrasados) : null;
+  if (resumo) linhas.push({ tipo: 'resumo', chave: 'resumo', resumo, aberto: v.atrasadosAbertos });
+  if (!resumo || v.atrasadosAbertos) {
+    const visiveis = v.atrasados.slice(0, v.limiteDoAtrasado);
+    for (const item of visiveis) linhas.push({ tipo: 'item', chave: item.chave, item });
+    const restantes = v.atrasados.length - visiveis.length;
+    if (restantes > 0) linhas.push({ tipo: 'verMais', chave: 'ver-mais-atrasado', restantes });
+  }
+  for (const item of v.doDia) linhas.push({ tipo: 'item', chave: item.chave, item });
+  for (const lembrete of v.lembretes.deOutroDia) {
+    linhas.push({ tipo: 'lembrete', chave: `lembrete:${lembrete.id}`, lembrete, estado: 'outroDia' });
+  }
+  const deHoje = [...v.lembretes.deHoje].sort((a, b) => a.next_run_at.localeCompare(b.next_run_at));
+  const primeiroQueVem = deHoje.findIndex((l) => new Date(l.next_run_at).getTime() >= v.agora);
+  deHoje.forEach((lembrete, i) => {
+    if (i === primeiroQueVem) linhas.push({ tipo: 'agora', chave: 'agora' });
+    const estado = primeiroQueVem === -1 || i < primeiroQueVem ? 'passou' : i === primeiroQueVem ? 'proximo' : 'depois';
+    linhas.push({ tipo: 'lembrete', chave: `lembrete:${lembrete.id}`, lembrete, estado });
+  });
+  if (deHoje.length > 0 && primeiroQueVem === -1) linhas.push({ tipo: 'agora', chave: 'agora' });
+  return linhas;
+}
+
+/**
+ * O número do badge da aba Hoje — a MESMA régua nas duas tab bars (`usePendentesDaHoje`).
+ *
+ * Conta a vencer (receita prevista não vence), lembrete de HOJE e orçamento estourado. As duas
+ * tab bars somavam `upcoming_bills` inteiro, com a receita dentro, e o lembrete que ficou de
+ * outro dia — contra a regra escrita na própria Hoje.
+ */
+export function pendentesDaHoje(v: {
+  contas: readonly Pick<ContaPrevista, 'kind'>[];
+  lembretes: readonly Pick<LembreteDoDia, 'next_run_at'>[];
+  orcamentos: readonly OrcamentoLinha[];
+  hoje: string;
+}): number {
+  return (
+    v.contas.filter((c) => c.kind !== 'income').length +
+    separarLembretes(v.lembretes, v.hoje).deHoje.length +
+    orcamentosApertados(v.orcamentos).filter((o) => o.estourou).length
+  );
 }
