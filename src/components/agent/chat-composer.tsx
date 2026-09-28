@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,14 +21,19 @@ interface Props {
   /** Uma pergunta espera resposta nos botões. */
   awaitingAction?: boolean;
   audioState?: 'idle' | 'starting' | 'recording' | 'transcribing';
-  audioReview?: boolean;
   onAudioPress?: () => void;
-  onDiscardAudio?: () => void;
   /** Na entrada da aba, o campo pertence ao conteúdo em vez de virar outra dock. */
   inline?: boolean;
 }
 
-/** Cinco linhas de 24pt mais o respiro do campo — daí em diante o campo rola. */
+/**
+ * Cinco linhas de 24pt mais o respiro do campo — daí em diante o campo rola.
+ *
+ * O campo cresce SOZINHO: multilinha sem `height` fixo acompanha o texto entre o piso e este teto,
+ * nas duas plataformas. A altura vinha do `onContentSizeChange` e parava no piso (28/09/2026,
+ * medido no iPhone): quatro linhas rolavam dentro de uma caixa de uma, a primeira cortada na
+ * borda, e tirar o foco movia o texto. Do tamanho do conteúdo, nada muda entre focado e não.
+ */
 const MAX_ALTURA = 24 * 5 + Space.md * 2;
 /** O contador só aparece quando falta pouco. */
 const AVISO = 200;
@@ -52,19 +56,15 @@ export function ChatComposer({
   sending = false,
   awaitingAction = false,
   audioState = 'idle',
-  audioReview = false,
   onAudioPress,
-  onDiscardAudio,
   inline = false,
 }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const [altura, setAltura] = useState(0);
 
   const reservado = insets.bottom;
   const pode = canSubmitMessage(value, { sending, awaitingAction }) && audioState === 'idle';
-  const podeEnviarPelaSeta = pode && !audioReview;
-  const vidro = supportsLiquidGlass() && podeEnviarPelaSeta;
+  const vidro = supportsLiquidGlass() && pode;
   const restantes = MAX_MESSAGE_LENGTH - value.trim().length;
 
   const conteudo = (
@@ -87,14 +87,7 @@ export function ChatComposer({
         </ThemedText>
       ) : null}
 
-      {audioReview ? (
-        <View style={[styles.revisao, { backgroundColor: theme.backgroundElement }]}>
-          <ThemedText type="footnote">Confira o que entendi do áudio. Corrija o texto antes de pedir ao agente.</ThemedText>
-          <Pressable onPress={onDiscardAudio} accessibilityRole="button" accessibilityLabel="Descartar transcrição">
-            <ThemedText type="footnote" themeColor="textSecondary">Descartar</ThemedText>
-          </Pressable>
-        </View>
-      ) : awaitingAction ? (
+      {awaitingAction ? (
         <ThemedText type="footnote" themeColor="textSecondary">
           Pode corrigir ou complementar a resposta por texto ou áudio.
         </ThemedText>
@@ -108,10 +101,9 @@ export function ChatComposer({
           multiline
           maxLength={MAX_MESSAGE_LENGTH}
           accessibilityLabel="Mensagem para o agente"
-          onContentSizeChange={(e) => setAltura(e.nativeEvent.contentSize.height)}
           style={[
             styles.campo,
-            { height: Math.min(Math.max(altura, inline ? HitTarget + Space.xl : HitTarget), MAX_ALTURA) },
+            { height: 'auto', minHeight: inline ? HitTarget + Space.xl : HitTarget, maxHeight: MAX_ALTURA },
           ]}
         />
 
@@ -136,15 +128,15 @@ export function ChatComposer({
 
         <Pressable
           onPress={onSubmit}
-          disabled={!podeEnviarPelaSeta}
+          disabled={!pode}
           accessibilityRole="button"
           accessibilityLabel="Enviar mensagem"
-          accessibilityState={{ disabled: !podeEnviarPelaSeta }}
+          accessibilityState={{ disabled: !pode }}
           style={({ pressed }) => [
             styles.enviar,
             {
-              backgroundColor: vidro ? 'transparent' : podeEnviarPelaSeta ? theme.tintFill : theme.backgroundElement,
-              opacity: pressed && podeEnviarPelaSeta ? 0.85 : 1,
+              backgroundColor: vidro ? 'transparent' : pode ? theme.tintFill : theme.backgroundElement,
+              opacity: pressed && pode ? 0.85 : 1,
             },
           ]}>
           {vidro ? (
@@ -153,7 +145,7 @@ export function ChatComposer({
           <Icon
             name="arrow.up"
             size={20}
-            color={podeEnviarPelaSeta ? 'onTint' : 'textSecondary'}
+            color={pode ? 'onTint' : 'textSecondary'}
           />
         </Pressable>
       </View>
@@ -161,19 +153,6 @@ export function ChatComposer({
         <ThemedText type="footnote" themeColor="danger">Gravando… Toque no botão vermelho para transcrever.</ThemedText>
       ) : audioState === 'transcribing' ? (
         <ThemedText type="footnote" themeColor="textSecondary">Transcrevendo áudio…</ThemedText>
-      ) : null}
-      {audioReview ? (
-        <Pressable
-          onPress={onSubmit}
-          disabled={!pode}
-          accessibilityRole="button"
-          accessibilityLabel="Confirmar transcrição e pedir ao agente"
-          accessibilityState={{ disabled: !pode }}
-          style={[styles.confirmarAudio, { backgroundColor: pode ? theme.tintFill : theme.backgroundElement }]}>
-          <ThemedText type="smallBold" style={{ color: pode ? theme.onTint : theme.textSecondary }}>
-            Confirmar texto e pedir ao agente
-          </ThemedText>
-        </Pressable>
       ) : null}
     </View>
   );
@@ -193,12 +172,10 @@ const styles = StyleSheet.create({
   linha: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', flexDirection: 'row', alignItems: 'flex-end', gap: Space.sm },
   linhaInline: { alignItems: 'center' },
   counter: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' },
-  revisao: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', padding: Space.sm, borderRadius: Radius.md, gap: Space.xs },
   audio: { width: HitTarget, height: HitTarget, borderRadius: Radius.pill, alignItems: 'center', justifyContent: 'center' },
-  confirmarAudio: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', minHeight: HitTarget, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Space.md },
   campo: {
     flex: 1,
-    // O campo cresce até cinco linhas; a altura vem do conteúdo medido.
+    // O campo cresce com o texto até cinco linhas (`MAX_ALTURA`).
     paddingTop: Space.md,
     paddingBottom: Space.md,
     borderRadius: Radius.lg,

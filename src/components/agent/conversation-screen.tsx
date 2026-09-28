@@ -103,9 +103,6 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
   const [texto, setTexto] = useState(initialText);
   const [audioState, setAudioState] = useState<'idle' | 'starting' | 'recording' | 'transcribing'>('idle');
   const audioPhase = useRef<'idle' | 'starting' | 'recording' | 'transcribing'>('idle');
-  const [audioReview, setAudioReview] = useState(false);
-  const textoAntesDoAudio = useRef(initialText);
-  const revisaoAntesDoAudio = useRef(false);
   const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
   const recorderState = useAudioRecorderState(recorder);
   const niveisDaGravacao = useRef<number[]>([]);
@@ -283,8 +280,6 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
         recorder.record();
         iniciou = true;
         niveisDaGravacao.current = [];
-        textoAntesDoAudio.current = texto;
-        revisaoAntesDoAudio.current = audioReview;
         mudarAudioState('recording');
       } catch {
         toast({ message: 'Não consegui iniciar a gravação.', tone: 'error' });
@@ -317,8 +312,9 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
         toast({ message: 'O texto ficou longo demais. Apague um trecho e grave novamente.', tone: 'error' });
         return;
       }
+      // A transcrição cai no campo como texto digitado: a pessoa lê, corrige se quiser, e o
+      // próprio "enviar" é a confirmação — não há um segundo botão para o áudio (28/09/2026).
       setTexto(proximo);
-      setAudioReview(true);
     } catch (error) {
       toast({
         message: error instanceof AgentApiError ? error.message : 'Não consegui transcrever o áudio. Tente novamente.',
@@ -331,18 +327,13 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
       if (!modoRestaurado) await setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
       mudarAudioState('idle');
     }
-  }, [audioReview, mudarAudioState, recorder, rodando, texto, toast]);
+  }, [mudarAudioState, recorder, rodando, texto, toast]);
 
-  const descartarAudio = useCallback(() => {
-    setTexto(textoAntesDoAudio.current);
-    setAudioReview(revisaoAntesDoAudio.current);
-  }, []);
 
   const submeter = useCallback(() => {
     if (audioPhase.current !== 'idle' || rodando || !canSubmitMessage(texto, { sending: rodando })) return;
     const conteudo = texto.trim();
     setTexto('');
-    setAudioReview(false);
     if (conversationId) {
       disparar(turno.iniciar(conteudo));
       return;
@@ -610,9 +601,7 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
                 sending={rodando}
                 awaitingAction={esperandoAcao}
                 audioState={audioState}
-                audioReview={audioReview}
                 onAudioPress={gravarOuTranscrever}
-                onDiscardAudio={descartarAudio}
               />
             }
           />
@@ -672,9 +661,7 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
             sending={rodando}
             awaitingAction={esperandoAcao}
             audioState={audioState}
-            audioReview={audioReview}
             onAudioPress={gravarOuTranscrever}
-            onDiscardAudio={descartarAudio}
           />
         </>
       )}
