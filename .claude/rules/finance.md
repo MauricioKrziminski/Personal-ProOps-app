@@ -595,6 +595,13 @@ compra, não a única tela que responde quanto resta.
   em hora (`_liquidar_faturas_vencidas`, a parcial que vence com o dia); deixando de estar
   liquidada, volta a `pending` o que ELA baixou (`paid_at` = vencimento, fora da importação).
   Nenhum número de caixa muda: projeção e "livre" leem a fatura, não o status da linha.
+- **Linha da fatura é `private.conta_na_fatura(kind)`: despesa E transferência que sai do cartão**
+  (`20260928230000`). O Pix no crédito para conta própria é `transfer` cartão → conta, PAGO (o
+  dinheiro chegou): a fatura o soma (total, aberto, o que vence, projeção, aviso) e o caixa o vê
+  como ENTRADA na conta no dia (`cash_events`, ramo 1b); gasto, orçamento e categoria não o
+  contam. Antes, 20 leituras filtravam `kind = 'expense'` e a fatura ficava R$ 340 menor em
+  silêncio. **Leitura nova de fatura usa o predicado**, nunca `kind = 'expense'` à mão.
+  `supabase/tests/pix_no_credito.sql` prende o "uma vez de cada lado".
 - **`card_summary` tem dois números da fatura corrente, e eles não são o mesmo**
   (`20260917120000`): `invoice_total_cents` é BRUTO (a soma das compras, o número grande do
   cartão) e `invoice_open_cents` é o que FALTA (líquido do `paid_cents`). Quem subtrai a corrente

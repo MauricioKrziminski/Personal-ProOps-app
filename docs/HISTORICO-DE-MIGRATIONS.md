@@ -3,6 +3,11 @@
 Registro, não regra: o que está em cada banco HOJE se confere na fonte (`CLAUDE.md`, *Banco e
 fila*). Entradas movidas do `CLAUDE.md` em 26/09/2026, na ordem em que estavam lá.
 
+**Só no STAGING: `20260928230000_pix_no_credito_na_fatura`** (28/09/2026) — a transferência que
+sai do cartão (Pix no crédito para conta própria) entra na fatura e, no caixa, é entrada na
+conta. Teste: `supabase/tests/pix_no_credito.sql` (6 asserções, local e staging). Em produção
+ela sobe pelo Gabriel (`db push --project-ref`), **antes** do agente e do app que a usam.
+
 **Produção e staging ALINHADOS em `20260928220000`** — as 31 de `20260927212119` a
 `20260928220000` aplicadas em produção pelo Gabriel em 28/09/2026 (`db push --project-ref`,
 depois de `migration list --project-ref` mostrar as 31 só no `local`) e conferidas na fonte:
