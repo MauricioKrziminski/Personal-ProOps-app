@@ -61,6 +61,11 @@ aplicadas **só no staging**; o agente não foi publicado.
   fim do mês), "Só esta" (só a 4ª).
 - Emulador Android (`proops_qatest_20260927`, com `-allow-host-audio`): novembro misturado, ações
   da prevista no toque longo, "Apagar" some e não volta.
+- Também no iOS: "Paguei" na parcela prevista de uma dívida → folha "Pagar …" da ficha, e o
+  pagamento registrado; a parcela aberta pela lista → "Paguei esta parcela" → a mesma folha; novo
+  lançamento em conta corrente, 3x, "Último dia" → 30/09, 31/10, 30/11.
+- Custo da leitura (conta `teste@`, 300 lançamentos, cache quente): `ledger_expected_lines` de um
+  mês ~25 ms, a parte das recorrentes ~10 ms (a primeira chamada fria levou 710 ms).
 
 ## Pendências
 
