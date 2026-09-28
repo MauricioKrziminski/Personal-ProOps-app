@@ -101,7 +101,8 @@
   distribuição. Ninguém roda `eas build` à mão para soltar versão. Leva ~10 min.
 
   A receita é sempre a mesma: portão verde (`tsc`, `lint`, `npm test`, `ruff`, `pytest`) →
-  `app.json.version` para a nova → commit `chore: vX.Y.Z` → `push origin main` → tag LEVE nesse
+  `app.json.version` para a nova (PATCH, MINOR ou MAJOR: a tabela do `CLAUDE.md`, *Versão, build,
+  release e OTA*) → commit `chore: vX.Y.Z` → `push origin main` → tag LEVE nesse
   commit → `push origin vX.Y.Z`.
 
   **`runtimeVersion.policy` é `appVersion`, então bump de versão FECHA a porta do OTA.** Um

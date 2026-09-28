@@ -129,6 +129,46 @@ está até o commit `7e51e40`). Foi decidido de propósito — manter uma cópia
 viva "por segurança" é como a segunda cópia volta a divergir. Lógica nova vai em `agent/`, e o
 app fala com o servidor por `agentFetch`, nunca `functions.invoke` (`supabase.md`).
 
+## Versão, build, release e OTA — o que cada número quer dizer
+
+Quatro coisas diferentes que se confundem, e a confusão já custou release sem critério: de
+v1.3.43 a v1.3.54 TODA release subiu só o último número, inclusive a v1.3.53 (a Hoje
+redesenhada e uma RPC nova) e a v1.3.54 (preferências gravadas), que eram funcionalidade.
+
+| conceito | onde mora | quem mexe |
+|---|---|---|
+| **Versão** (`1.4.0`) — a que o usuário vê (`versionName` / `CFBundleShortVersionString`) | `app.json` → `expo.version` | você, à mão, uma vez por release |
+| **Número de build** (`versionCode` / `buildNumber`) — interno, só cresce | EAS remoto (`appVersionSource: remote` + `autoIncrement`) | **ninguém**: nunca pôr no `app.json` |
+| **Runtime** (`runtimeVersion`) — com que nativo um OTA é compatível | `policy: appVersion` = a própria versão | sai sozinho da versão |
+| **Release** — tag `vX.Y.Z` → APK + `update.json` + `native-compatibility.json` | `publish-android-release.yml` | a tag (ver `workflow.md` → Deploy) |
+
+**Qual número subir (SemVer, `MAJOR.MINOR.PATCH`) — decide pelo MAIOR item da release:**
+
+- **PATCH** (`1.4.0 → 1.4.1`): só correção — defeito, texto, layout, desempenho. Nada novo para a
+  pessoa aprender, nenhum contrato novo.
+- **MINOR** (`1.4.1 → 1.5.0`, PATCH zera): funcionalidade nova ou comportamento visível que
+  muda — tela nova ou redesenhada, preferência nova, fluxo que troca (ex.: tirar a confirmação do
+  áudio), o app passando a chamar RPC ou rota nova. Compatível com o que já existe.
+- **MAJOR** (`1.x → 2.0.0`): quebra — o app antigo em campo deixa de funcionar com o backend, ou
+  a pessoa precisa agir (reinstalar, entrar de novo, refazer cadastro). Evitar: backend e app
+  convivem com versões antigas (ordem migrations → agente → app, e o agente continua aceitando o
+  contrato anterior).
+
+**Regras que não mudam:**
+
+- **Tag = versão, sempre.** O workflow recusa `vX` diferente do `versionName`. Uma versão, uma tag;
+  **número publicado nunca se reaproveita nem se move** (tag só local, nunca enviada, pode ser
+  movida). Precisou corrigir? Versão nova.
+- **Subir a versão FECHA o OTA** para quem está na anterior (`appVersion` = runtime). Por isso:
+  mudança SÓ de JS, sem release nova, pode ir por `publish-android-ota.yml` para a nativa atual;
+  qualquer mudança nativa (plugin, módulo, permissão, SDK, `app.json` nativo) exige versão nova
+  e build — OTA sobre nativo incompatível fecha o app na abertura.
+- **Agente e banco NÃO têm versão do app.** Migration e deploy do agente são contínuos
+  (`HISTORICO-DE-MIGRATIONS.md` e a revisão do Cloud Run são o registro), e por isso têm que
+  continuar servindo a última versão do app que ainda está em campo.
+- O commit da release é só `chore: vX.Y.Z` com o `app.json`; o que entrou nela são os commits
+  entre a tag anterior e esta.
+
 ## Regras detalhadas (obrigatórias)
 
 `frontend.md`, `finance.md` e `workflow.md` carregam em toda sessão. As outras carregam quando um
