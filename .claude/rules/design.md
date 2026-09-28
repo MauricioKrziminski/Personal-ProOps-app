@@ -681,6 +681,12 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
   **O FAB sobe acima do toast** (`useSubirAcimaDoToast`): os dois moravam no mesmo lugar e o
   "Desfazer" do toast caía no "Lançar".
   Grade (pasta em grade) não arrasta: o toque longo já é o arrasto de reordenar.
+  **Um gesto, uma ação** (28/09/2026, *"se eu arrasto para arquivar, ele abre a nota e
+  arquiva"*): o arrasto é do gesture-handler e o toque do card é do React Native, e nenhum cancela
+  o outro sozinho. O invólucro do `Deslizavel` fica com o toque quando o dedo anda para o LADO
+  (`arrastouParaOLado`, `lib/arrasto.ts`) e quando o card já está aberto (`cardAberto.estaAberto`):
+  arrastar nunca abre o item, e tocar no card aberto só o fecha. Os botões do painel são gestos
+  do gesture-handler e seguem valendo.
   Os botões do painel NÃO são o `Pressable` da RN: ele não recebe o toque dentro do
   `ReanimatedSwipeable` no Android (ver o `Tap` acima).
   **Dentro de um card arrastável o valor NÃO é selecionável** (`DentroDeArrasto`, em

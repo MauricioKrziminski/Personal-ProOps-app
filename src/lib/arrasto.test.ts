@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { BOTAO, abriuOLado, botaoNoArrasto, sobraSobOCard, executaAoSoltar, pontasDoPainel, cardAberto, ladosDoArrasto, larguraDoBotao, limiarAteOFim, passouAteOFim, passouHaPouco, temArrasto, traducaoNoSoltar, ladoDoSoltar } from './arrasto.ts';
+import { BOTAO, abriuOLado, botaoNoArrasto, sobraSobOCard, executaAoSoltar, pontasDoPainel, cardAberto, ladosDoArrasto, larguraDoBotao, limiarAteOFim, passouAteOFim, passouHaPouco, temArrasto, traducaoNoSoltar, ladoDoSoltar, arrastouParaOLado } from './arrasto.ts';
 
 const a = (label: string, extra: Record<string, unknown> = {}) => ({ label, onPress: () => {}, ...extra });
 
@@ -231,4 +231,22 @@ test('fechado, nada aparece no canto do card: a sobra cresce com o que o card re
   assert.equal(sobraSobOCard(0, 2, 'esquerda', 0, 0, 18), 0);
   assert.equal(sobraSobOCard(0, 2, 'esquerda', 6, 0, 18), 6);
   assert.equal(sobraSobOCard(0, 2, 'esquerda', 40, 0, 18), 18);
+});
+
+
+test('o toque vira arrasto quando o dedo anda para o LADO — e aí o card não abre o item', () => {
+  // 28/09/2026: arrastar para arquivar abria a nota E arquivava.
+  assert.equal(arrastouParaOLado(3, 0), false, 'tremida do dedo num toque');
+  assert.equal(arrastouParaOLado(-30, 4), true);
+  assert.equal(arrastouParaOLado(30, 40), false, 'rolar a lista na vertical não é arrasto');
+});
+
+test('o card aberto sabe que está aberto: o toque nele só fecha', () => {
+  const a = { close() {} };
+  const b = { close() {} };
+  cardAberto.abriu(a);
+  assert.equal(cardAberto.estaAberto(a), true);
+  assert.equal(cardAberto.estaAberto(b), false);
+  cardAberto.fechou(a);
+  assert.equal(cardAberto.estaAberto(a), false);
 });

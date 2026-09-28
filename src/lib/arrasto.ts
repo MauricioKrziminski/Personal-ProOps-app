@@ -249,7 +249,23 @@ export const cardAberto = {
     fecharCardAberto();
     return true;
   },
+  /** Este card está com o painel aberto — o toque nele fecha, não abre o item. */
+  estaAberto(c: Fechavel): boolean {
+    return aberto === c;
+  },
 };
+
+/** Quantos pontos o dedo anda para o lado antes de o toque virar arrasto. */
+export const ARRASTO_MINIMO = 8;
+
+/**
+ * O dedo andou para o LADO (e mais do que para cima ou para baixo)? A partir daí o toque é do
+ * arrasto e o card não abre o item ao soltar (28/09/2026: arrastar para arquivar abria a nota E
+ * arquivava). Rolar a lista na vertical não conta.
+ */
+export function arrastouParaOLado(dx: number, dy: number): boolean {
+  return Math.abs(dx) > ARRASTO_MINIMO && Math.abs(dx) > Math.abs(dy);
+}
 
 export function fecharCardAberto() {
   const c = aberto;

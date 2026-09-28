@@ -23,6 +23,7 @@ import { Motion, Radius, Space } from '@/design/tokens';
 import { usarDica } from '@/hooks/use-dicas';
 import { useTheme } from '@/hooks/use-theme';
 import {
+  arrastouParaOLado,
   abriuOLado,
   botaoNoArrasto,
   cardAberto,
@@ -68,6 +69,8 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
   // Tela empurrada tem o "voltar" do iPhone na borda esquerda; raiz de aba (`(tabs)`) não tem.
   const temVoltar = useSegments()[0] !== '(tabs)';
   const eu = useRef<SwipeableMethods>(null);
+  // Onde o dedo desceu, e se ele desceu num card já aberto (o toque então só fecha).
+  const toque = useRef({ x: 0, y: 0, fechar: false });
   // Um objeto estável no registro: o `ref` do gesto só existe enquanto o arrasto está montado.
   const meu = useMemo(() => ({ close: () => eu.current?.close() }), []);
   // Saiu da tela (voltar, trocar de aba) ou desmontou: esquece o aberto daqui.
@@ -231,9 +234,26 @@ export function Deslizavel({ titulo, acoes, forma = 'linha', fundo = 'surface', 
     <GestureDetector gesture={dedo}>
       <Animated.View
         collapsable={false}
-        // Um toque num card com OUTRO aberto só fecha o aberto — não navega no mesmo toque. No
-        // próprio card aberto o toque passa: é ele que aperta os botões revelados.
-        onStartShouldSetResponderCapture={() => cardAberto.toqueEmOutro(meu)}
+        /*
+          UMA ação por gesto (28/09/2026, *"se eu arrasto para arquivar, ele abre a nota e
+          arquiva"*). O arrasto é do gesture-handler e o toque do card é do React Native — nenhum
+          cancela o outro sozinho. Aqui o invólucro fica com o toque e o card não abre o item:
+          - num card com OUTRO aberto: só fecha o aberto;
+          - no PRÓPRIO card aberto: só fecha ele (ao soltar). Os botões do painel são gestos do
+            gesture-handler e continuam valendo;
+          - quando o dedo anda para o LADO: o toque vira arrasto (`arrastouParaOLado`), e o card
+            que já tinha começado a ser apertado é cancelado.
+        */
+        onStartShouldSetResponderCapture={(e) => {
+          toque.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY, fechar: cardAberto.estaAberto(meu) };
+          return cardAberto.toqueEmOutro(meu) || toque.current.fechar;
+        }}
+        onMoveShouldSetResponderCapture={(e) =>
+          tem && arrastouParaOLado(e.nativeEvent.pageX - toque.current.x, e.nativeEvent.pageY - toque.current.y)
+        }
+        onResponderRelease={() => {
+          if (toque.current.fechar) eu.current?.close();
+        }}
         style={recolher}>
         {/* Mede o tamanho NATURAL: a caixa de fora é a que encolhe quando o item sai da lista. */}
         <View
