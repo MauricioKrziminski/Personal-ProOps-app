@@ -83,7 +83,7 @@ dinheiro começa antes da metade da tela.
 | rodapé "Compromissos · R$ X" | removido da Hoje — é número do CICLO (Financeiro, "Ver o que fecha o ciclo") |
 | menu do herói: Ver o que fecha o ciclo, Projeção, Patrimônio, Metas | tocar no número do card do dinheiro abre o MESMO menu, com `mes`/`view` do `cycle_now` |
 | olho de esconder saldo | no card do dinheiro |
-| contadores Vencendo / Lembretes / No limite | Seu dia (atrasado + vence hoje + lembretes); "No limite" → linha do card do dinheiro → `/finance/budgets`; "Todos" os lembretes → `/reminders` no cabeçalho do Seu dia |
+| contadores Vencendo / Lembretes / No limite | Seu dia (atrasado + vence hoje + lembretes); "No limite" → linha do card do dinheiro → `/finance/budgets`; botão "Lembretes" no cabeçalho do Seu dia → `/reminders` |
 | Saiu hoje (ritmo) / Entrou hoje | linha "Saiu hoje" do card, com o ritmo e o que entrou na legenda → `/finance/transactions` |
 | Agora: atrasado com Paguei / Recebi / Pagar fatura / Ver dívida; tocar abre o lançamento | Seu dia: com 2+ atrasados, UMA linha recolhida ("7 contas atrasadas · R$ X") que abre no lugar; com 1, a linha dele. Mesmas ações, mesmo destino |
 | vence hoje / chega hoje | "dia todo" do Seu dia, mesmas ações |
@@ -185,6 +185,40 @@ Fixadas                                              Todas ›
 5. **Registro** — `design.md` (§1, §8 badge, §12), `docs/design/hoje.md`, "Como ficou" aqui.
 
 Sem migration, sem agente, sem produção, sem tag.
+
+## Como ficou (28/09/2026)
+
+As cinco fases entraram (`1ea44e0`, `0e7b9b2`). O que difere do desenho acima, e por quê:
+
+- **O dia calmo é `EmptyState compacto`** ("Nada para hoje" + o atalho de pedir um lembrete ao
+  agente), não uma linha desenhada à mão com o próximo compromisso: ela repetia a primeira linha
+  dos Próximos dias logo abaixo (eco), e o título de uma compra de cartão ("IFD*IFOOD") partiria o
+  `*assim*` do texto.
+- **Com UM dia até a entrada, a manchete é o total.** "Por dia" e o livre viram o mesmo número,
+  dito duas vezes — visto na vitrine. E sem ciclo nem próxima entrada, `diasLivres` é `null`: o
+  card não inventa "1 dia".
+- **Cada leitura do card do dinheiro que falha aparece** (saldos, orçamentos, o que saiu hoje),
+  num "Tentar de novo" que refaz só o que falhou; a média do dia só existe com o ciclo em mãos
+  (sem ele a soma é 0 e a linha diria "média de R$ 0,00"). Os Próximos dias falham se as contas OU
+  o cartão falharem — só o cartão seria uma lista que mente.
+- **Os blocos vão direto para a cascata do `Screen`, sem `Fragment`**: cada `Fragment` virava uma
+  caixa com `gap`, mesmo vazio (24dp de vão sem os primeiros passos). A Hoje antiga tinha o mesmo
+  defeito com os contadores vazios.
+- **O olho é irmão da área tocável do número**, não filho: dentro de um `Pressable` acessível o
+  VoiceOver não o alcançava. Todos os rótulos falados levam o VALOR (antes: título e data).
+- **"No limite" é o rótulo das três telas.** O Financeiro dizia "Passando do limite" e Orçamentos
+  dizia "no limite" no topo e "Passando do limite" na seção logo abaixo, para o mesmo conjunto — e
+  "passando" é falso para quem está em 85%.
+- **A vitrine (`design-preview`) usa o mês do CICLO que contém hoje.** Com o mês civil, dos dias 11
+  a 31 ela desenhava um ciclo já fechado ("Livre até 10/09" num dia 28/09) e a curva do Financeiro
+  terminava no dia 31 de um ciclo que fecha no 10.
+- **O cartão de nota cresce com a fonte** (até 1,35×): com 164dp fixos, a 1,3× a prévia virava
+  uma coluna de palavras.
+
+Conferido no Android (claro, escuro, 384dp × fonte 1,3, tablet em pé e deitado) e no iPhone
+(escuro e claro), com os toques: abrir o atrasado, "Paguei" (a folha abre; fechada sem gravar),
+abrir as contas e o extrato de uma, o menu do valor, uma linha dos próximos dias, esconder saldo.
+Portão: `tsc`, `expo lint`, 1026 testes.
 
 ## Fontes da pesquisa
 
