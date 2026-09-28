@@ -302,9 +302,10 @@ export default function TodayScreen() {
           <Skeleton width="60%" height={28} />
           <Skeleton width="28%" height={12} />
         </View>
+        {/* A forma da tela pronta: a semana, o Seu dia, o card do dinheiro. */}
+        <Skeleton height={232} radius={Radius.md} />
         <SkeletonList linhas={3} />
         <Skeleton height={176} radius={Radius.md} />
-        <SkeletonList linhas={2} />
       </Screen>
     );
   }
@@ -353,7 +354,13 @@ export default function TodayScreen() {
       {falhasDaSemana.length > 0 ? (
         <ErrorCard onRetry={() => Promise.all(falhasDaSemana.map((c) => c.refetch()))} />
       ) : (
-        <SemanaDoDia semana={semana} escolhido={diaEscolhido ?? hoje} onEscolher={setDiaEscolhido} />
+        <SemanaDoDia
+          semana={semana}
+          escolhido={diaEscolhido ?? hoje}
+          // Tocar em hoje volta ao `null` ("siga o hoje"): guardar a data prenderia a escolha em
+          // ontem depois da meia-noite.
+          onEscolher={(d) => setDiaEscolhido(d === hoje ? null : d)}
+        />
       )}
     </Bloco>
   );

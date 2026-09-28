@@ -263,8 +263,18 @@ ciclo fecha"); aqui, colunas em cápsula sobre papel ("como está a minha semana
 `diasDoCiclo` e as duas leituras de `transactions_summary` da Hoje) — a semana mostra o gasto de
 cada dia contra o que dá por dia, que é a comparação que decide alguma coisa.
 
-**Achados no aparelho:** o círculo do dia escolhido saía QUADRADO no Android — sem fundo o Fabric
-achata a `View` e o raio não volta quando o fundo chega (`collapsable={false}`, provado com e sem,
-os dois depois de recarregar do zero); o "por dia" encavalava o tracejado com fonte grande (desce
-para baixo da régua quando ela está no alto); e trocar para um dia sem estado fazia o gráfico
-pular uma linha (a linha do estado fica sempre reservada — medido: a coluna não se move).
+**Achados no aparelho e na auditoria de design:**
+
+- O círculo do dia escolhido saía QUADRADO no Android — sem fundo o Fabric achata a `View` e o
+  raio não volta quando o fundo chega (`collapsable={false}`, provado com e sem, os dois depois de
+  recarregar do zero).
+- A legenda "por dia" dentro do gráfico encavalava o tracejado (fonte grande) e podia cair sobre
+  as marcas: virou legenda no topo do card ("--- por dia").
+- Trocar de dia fazia o gráfico pular: a linha do estado fica sempre reservada, "dentro do que dá
+  por dia" não se escreve (a régua e a cor já dizem) e a entrada do dia vai ao lado do valor, num
+  texto só com o `Money` aninhado. Medido: a coluna não se move entre os dias.
+- Um dia enorme esmagava a régua na base: o teto para em 3× o "por dia", e a régua anda junto com
+  as barras quando o teto muda.
+- Com "esconder saldo", o leitor de tela lia as bolinhas: agora diz "valor oculto". O círculo do
+  número cresce com a fonte; o dia que só recebe fica verde, como na lista de baixo; tocar em hoje
+  volta a seguir o hoje (a escolha não fica presa na data depois da meia-noite).

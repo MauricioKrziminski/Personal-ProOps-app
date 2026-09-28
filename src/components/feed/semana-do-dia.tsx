@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { Pressable, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -9,9 +9,10 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
-import { useBRL } from '@/components/ui/conceal';
+import { Card } from '@/components/ui/card';
+import { useBRL, useConceal } from '@/components/ui/conceal';
 import { Money } from '@/components/ui/money';
-import { Motion, Radius, Space, tabular } from '@/design/tokens';
+import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { legendaDoDia, type DiaDaSemana, type Semana } from '@/lib/today-sections';
 
@@ -23,40 +24,38 @@ const LARGURA_DA_BARRA = 14;
 /** Tracejado da régua, em dp. */
 const TRACO = 4;
 const VAO = 4;
+/** Quantas marcas cabem na coluna antes de virar "+N". */
+const MARCAS = 3;
+/** O círculo do número do dia, em dp à fonte padrão: cresce com a fonte do sistema. */
+const CIRCULO = 28;
+
+/** Anima um deslocamento vertical que NASCE no valor real e só anda quando ele muda (§5). */
+function useDeslocamento(alvo: number) {
+  const reduzir = useReducedMotion();
+  const valor = useSharedValue(alvo);
+  const anterior = useRef(alvo);
+  useEffect(() => {
+    if (anterior.current === alvo) return;
+    anterior.current = alvo;
+    valor.set(reduzir ? alvo : withTiming(alvo, { duration: Motion.duration.slow, easing: Motion.easing.out }));
+  }, [alvo, valor, reduzir]);
+  return useAnimatedStyle(() => ({ transform: [{ translateY: valor.get() }] }));
+}
 
 /**
  * Uma coluna da semana. A barra é uma cápsula de altura cheia DESLIZADA para dentro de uma caixa
  * que corta (`translateY`), nunca uma altura animada: só `transform` anima (§5), e esticar com
- * `scaleY` achataria a ponta arredondada. Nasce no valor real e só anima quando ele muda — a lição
- * da barra de progresso que ficou em 0% no Android.
+ * `scaleY` achataria a ponta arredondada. A que passa do teto fica cheia.
  */
 function Barra({ fracao, cor, opacidade }: { fracao: number; cor: string; opacidade: number }) {
-  const reduzir = useReducedMotion();
-  const altura = Math.max(PISO, Math.round(fracao * ALTURA));
-  const deslocamento = useSharedValue(ALTURA - altura);
-  const anterior = useRef(altura);
-
-  useEffect(() => {
-    if (anterior.current === altura) return;
-    anterior.current = altura;
-    deslocamento.set(
-      reduzir
-        ? ALTURA - altura
-        : withTiming(ALTURA - altura, { duration: Motion.duration.slow, easing: Motion.easing.out })
-    );
-  }, [altura, deslocamento, reduzir]);
-
-  const estilo = useAnimatedStyle(() => ({ transform: [{ translateY: deslocamento.get() }] }));
-
+  const altura = Math.min(ALTURA, Math.max(PISO, Math.round(fracao * ALTURA)));
+  const estilo = useDeslocamento(ALTURA - altura);
   return (
     <View style={styles.trilho}>
       <Animated.View style={[styles.barra, { backgroundColor: cor, opacity: opacidade }, estilo]} />
     </View>
   );
 }
-
-/** Quantas marcas cabem na coluna antes de virar "+N". */
-const MARCAS = 3;
 
 /**
  * O dia que vem: MARCAS, não barra — um ponto por compromisso (até três) e um verde se entra
@@ -78,10 +77,22 @@ function Marcas({ dia }: { dia: DiaDaSemana }) {
       {Array.from({ length: pontos }, (_, i) => (
         <View key={i} style={[styles.ponto, { backgroundColor: theme.textSecondary }]} />
       ))}
-      {pontos === 0 && dia.aEntrar === 0 ? (
-        <View style={[styles.ponto, styles.vazio, { borderColor: theme.separator }]} />
-      ) : null}
+      {/* Dia vazio: um ponto CHEIO na cor do fio — contorno com raio de pílula sai quadrado no Android. */}
+      {pontos === 0 && dia.aEntrar === 0 ? <View style={[styles.ponto, { backgroundColor: theme.separator }]} /> : null}
     </View>
+  );
+}
+
+/** A régua tracejada: anda JUNTO com as barras quando o teto muda (mesmo tempo, mesma curva). */
+function Regua({ altura, largura, cor }: { altura: number; largura: number; cor: string }) {
+  const estilo = useDeslocamento(ALTURA - altura);
+  const tracos = largura > 0 ? Math.floor(largura / (TRACO + VAO)) : 0;
+  return (
+    <Animated.View style={[styles.regua, estilo]}>
+      {Array.from({ length: tracos }, (_, i) => (
+        <View key={i} style={[styles.traco, { backgroundColor: cor }]} />
+      ))}
+    </Animated.View>
   );
 }
 
@@ -95,7 +106,8 @@ function Marcas({ dia }: { dia: DiaDaSemana }) {
  *
  * - O que SAIU é barra (cinza; hoje em tinta; acima da régua em âmbar — atenção, não erro).
  * - O que VEM é marca: um ponto por compromisso e um verde se entra dinheiro (`Marcas`).
- * - Tocar num dia troca a frase de cima por ele; o háptico é o de seleção.
+ * - Tocar num dia troca a frase de cima por ele; o háptico é o de seleção. A frase tem sempre a
+ *   mesma altura (uma linha de estado reservada), então o gráfico nunca pula ao trocar de dia.
  */
 export function SemanaDoDia({
   semana,
@@ -108,11 +120,15 @@ export function SemanaDoDia({
 }) {
   const theme = useTheme();
   const brl = useBRL();
+  const { concealed } = useConceal();
+  const { fontScale } = useWindowDimensions();
   const [largura, setLargura] = useState(0);
   const dia = semana.dias.find((d) => d.day === escolhido) ?? semana.dias.find((d) => d.tipo === 'hoje')!;
-  const frase = legendaDoDia(dia, semana.linha, brl);
-  const alturaDaRegua = semana.linha === null ? null : Math.round((semana.linha / semana.teto) * ALTURA);
-  const tracos = largura > 0 ? Math.floor(largura / (TRACO + VAO)) : 0;
+  const frase = legendaDoDia(dia);
+  const alturaDaRegua = semana.linha === null ? null : Math.min(ALTURA, Math.round((semana.linha / semana.teto) * ALTURA));
+  const circulo = Math.round(CIRCULO * Math.max(1, fontScale));
+  /** No leitor de tela, o valor escondido é "valor oculto" — `brl` devolveria as bolinhas. */
+  const falar = (cents: number) => (concealed ? 'valor oculto' : brl(cents));
 
   const medir = (e: LayoutChangeEvent) => {
     const w = e.nativeEvent.layout.width;
@@ -131,16 +147,36 @@ export function SemanaDoDia({
     d.tipo === 'hoje' || d.acima ? 1 : selecionado ? 0.8 : 0.45;
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+    <Card style={styles.card}>
       <View accessibilityLiveRegion="polite" style={styles.frase}>
-        <ThemedText type="footnote" themeColor="textSecondary">
-          {`${frase.quando} · ${frase.rotulo}`}
+        <View style={styles.cabeca}>
+          <ThemedText type="footnote" themeColor="textSecondary" style={styles.cresce}>
+            {`${frase.quando} · ${frase.rotulo}`}
+          </ThemedText>
+          {/* A legenda da régua mora aqui, não no gráfico: lá dentro ela caía sobre as marcas. */}
+          {semana.linha !== null ? (
+            <View style={styles.legenda}>
+              <View style={styles.amostra}>
+                {[0, 1, 2].map((i) => (
+                  <View key={i} style={[styles.traco, { backgroundColor: theme.textSecondary }]} />
+                ))}
+              </View>
+              <ThemedText type="caption" themeColor="textSecondary">
+                por dia
+              </ThemedText>
+            </View>
+          ) : null}
+        </View>
+        {/* UM texto, com o `Money` aninhado: em peças soltas numa linha que quebra, cada uma
+            quebrava sozinha e a linha de base desalinhava (§3). */}
+        <ThemedText type="footnote" themeColor="success">
+          <Money cents={frase.valor} variant="title2" tone={frase.tom} />
+          {frase.entrada ? `  ${frase.entrada.rotulo} ${brl(frase.entrada.valor)}` : null}
         </ThemedText>
-        <Money cents={frase.valor} variant="title2" tone={dia.acima ? 'warning' : 'text'} />
         {/* A linha do estado existe SEMPRE (um espaço quando não há estado): trocar de dia não pode
-            fazer o gráfico pular uma linha para cima. */}
+            fazer o gráfico pular uma linha. */}
         <ThemedText type="caption" themeColor="textSecondary">
-          {frase.estado ?? '\u00a0'}
+          {frase.estado ?? ' '}
         </ThemedText>
       </View>
 
@@ -149,40 +185,23 @@ export function SemanaDoDia({
         <View pointerEvents="none" onLayout={medir} style={styles.fundo}>
           <View style={[styles.base, { backgroundColor: theme.separator }]} />
           {alturaDaRegua !== null ? (
-            <View style={[styles.regua, { bottom: alturaDaRegua }]}>
-              {Array.from({ length: tracos }, (_, i) => (
-                <View key={i} style={[styles.traco, { backgroundColor: theme.textSecondary }]} />
-              ))}
-            </View>
-          ) : null}
-          {alturaDaRegua !== null ? (
-            <ThemedText
-              type="caption"
-              themeColor="textSecondary"
-              // Régua perto do topo: o rótulo vai para BAIXO dela — acima, com fonte grande, ele
-              // encavalava o tracejado.
-              style={[
-                styles.rotuloDaRegua,
-                alturaDaRegua > ALTURA / 2
-                  ? { top: ALTURA - alturaDaRegua + Space.xs }
-                  : { bottom: alturaDaRegua + Space.xs },
-              ]}>
-              por dia
-            </ThemedText>
+            <Regua altura={alturaDaRegua} largura={largura} cor={theme.textSecondary} />
           ) : null}
         </View>
 
         <View style={styles.colunas}>
           {semana.dias.map((d) => {
             const selecionado = d.day === dia.day;
-            const f = legendaDoDia(d, semana.linha, brl);
+            const f = legendaDoDia(d);
+            const valorFalado = f.vazio ? 'nada previsto' : `${f.rotulo} ${falar(f.valor)}`;
             return (
               <Pressable
                 key={d.day}
                 accessibilityRole="button"
                 accessibilityState={{ selected: selecionado }}
                 accessibilityLabel={[
-                  f.rotulo === 'nada previsto' ? `${f.quando}: nada previsto` : `${f.quando}: ${f.rotulo} ${brl(f.valor)}`,
+                  `${f.quando}: ${valorFalado}`,
+                  f.entrada ? `${f.entrada.rotulo} ${falar(f.entrada.valor)}` : null,
                   f.estado,
                 ]
                   .filter(Boolean)
@@ -205,13 +224,14 @@ export function SemanaDoDia({
                   {d.semana}
                 </ThemedText>
                 {/* `collapsable={false}`: sem fundo, o Fabric achata esta View no Android e, quando o
-                    fundo do escolhido chega depois, o raio não volta — o círculo saía QUADRADO. */}
+                    fundo do escolhido chega depois, o raio não volta — o círculo saía QUADRADO
+                    (medido com e sem, os dois depois de recarregar do zero). */}
                 <View
                   collapsable={false}
                   style={[
                     styles.numero,
-                    // Escolhido é um círculo SUAVE, não contorno: borda com raio de pílula sai
-                    // quadrada no Android, e o círculo cheio de tinta já é o hoje.
+                    { minWidth: circulo, height: circulo },
+                    // Escolhido é um círculo SUAVE; o círculo cheio de tinta já é o hoje.
                     d.tipo === 'hoje'
                       ? { backgroundColor: theme.tintFill }
                       : selecionado
@@ -227,29 +247,27 @@ export function SemanaDoDia({
           })}
         </View>
       </View>
-    </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    gap: Space.lg,
-    padding: Space.lg,
-    borderRadius: Radius.md,
-    borderCurve: 'continuous',
-    borderWidth: 1,
-  },
+  card: { gap: Space.lg },
   frase: { gap: Space.half },
+  cabeca: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
+  cresce: { flex: 1 },
+  legenda: { flexDirection: 'row', alignItems: 'center', gap: Space.xs, flexShrink: 0 },
+  amostra: { flexDirection: 'row', gap: 2 },
   grafico: { position: 'relative' },
   /** O fundo cobre só a faixa das barras (a base fica no pé delas, acima dos rótulos). */
   fundo: { position: 'absolute', left: 0, right: 0, top: 0, height: ALTURA },
-  base: { position: 'absolute', left: 0, right: 0, bottom: 0, height: StyleSheet.hairlineWidth },
-  regua: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', gap: VAO, opacity: 0.5 },
+  base: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 1 },
+  /** Nasce no topo do fundo e desce pelo `translateY` até a altura do "por dia". */
+  regua: { position: 'absolute', left: 0, right: 0, top: 0, flexDirection: 'row', gap: VAO, opacity: 0.5 },
   traco: { width: TRACO, height: 1 },
-  rotuloDaRegua: { position: 'absolute', right: 0 },
   colunas: { flexDirection: 'row', justifyContent: 'space-between' },
-  coluna: { flex: 1, alignItems: 'center', gap: Space.xs, minHeight: 44 },
-  trilho: { height: ALTURA, width: LARGURA_DA_BARRA, overflow: 'hidden', justifyContent: 'flex-start' },
+  coluna: { flex: 1, alignItems: 'center', gap: Space.xs, minHeight: HitTarget },
+  trilho: { height: ALTURA, width: LARGURA_DA_BARRA, overflow: 'hidden' },
   barra: {
     height: ALTURA,
     width: LARGURA_DA_BARRA,
@@ -258,12 +276,9 @@ const styles = StyleSheet.create({
   },
   /** As marcas assentam na base, como as barras: a coluna tem a mesma altura nos dois casos. */
   marcas: { height: ALTURA, alignItems: 'center', justifyContent: 'flex-end', gap: Space.xs, paddingBottom: Space.xs },
-  ponto: { width: 7, height: 7, borderRadius: Radius.pill },
-  vazio: { borderWidth: 1, backgroundColor: 'transparent' },
+  ponto: { width: 7, height: 7, borderRadius: Radius.pill, borderCurve: 'continuous' },
   semana: { marginTop: Space.xs },
   numero: {
-    minWidth: 28,
-    height: 28,
     paddingHorizontal: Space.xs,
     borderRadius: Radius.pill,
     borderCurve: 'continuous',

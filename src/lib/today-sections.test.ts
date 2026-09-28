@@ -229,25 +229,38 @@ test('semana sem nada ainda tem teto (nunca divide por zero) e sem "por dia" nã
   assert.equal(soRegua.teto, 270647, 'a régua cabe no gráfico mesmo sem gasto');
 });
 
-test('a frase do dia diz quando, quanto e o estado — com o esconder saldo', () => {
-  const brl = (c: number) => `R$ ${(c / 100).toFixed(2)}`;
-  const { dias, linha } = semanaDoDia({
+test('a frase do dia diz quando, quanto e o estado — "dentro" não se escreve, a entrada vai à parte', () => {
+  const { dias } = semanaDoDia({
     hoje: HOJE,
     gastos: [{ day: HOJE, expense_cents: 116667, income_cents: 50000 }, { day: '2026-09-16', expense_cents: 100, income_cents: 0 }],
-    proximos: [{ day: '2026-09-18', itens: [item({ day: '2026-09-18', cents: 21430 })] }],
+    proximos: [
+      { day: '2026-09-18', itens: [item({ day: '2026-09-18', cents: 21430 }), item({ kind: 'income', day: '2026-09-18', cents: 9000 })] },
+      { day: '2026-09-20', itens: [item({ kind: 'income', day: '2026-09-20', cents: 400000 })] },
+    ],
     porDia: 100000,
   });
-  assert.deepEqual(legendaDoDia(dias[3], linha, brl), {
-    quando: 'Hoje', valor: 116667, rotulo: 'saiu', estado: 'acima do que dá por dia · entrou R$ 500.00',
+  assert.deepEqual(legendaDoDia(dias[3]), {
+    quando: 'Hoje', rotulo: 'saiu', valor: 116667, tom: 'warning', estado: 'acima do que dá por dia',
+    entrada: { rotulo: 'entrou', valor: 50000 }, vazio: false,
   });
-  assert.deepEqual(legendaDoDia(dias[2], linha, brl), {
-    quando: 'qua, 16 set', valor: 100, rotulo: 'saiu', estado: 'dentro do que dá por dia',
+  assert.deepEqual(legendaDoDia(dias[2]), {
+    quando: 'qua, 16 set', rotulo: 'saiu', valor: 100, tom: 'text', estado: null, entrada: null, vazio: false,
   });
-  assert.deepEqual(legendaDoDia(dias[4], linha, brl), { quando: 'sex, 18 set', valor: 21430, rotulo: 'vence', estado: '1 compromisso' });
-  assert.deepEqual(legendaDoDia(dias[5], linha, brl), { quando: 'sáb, 19 set', valor: 0, rotulo: 'nada previsto', estado: null },
-    'dia vazio não diz "vence R$ 0,00"');
-  const soEntra = semanaDoDia({ hoje: HOJE, gastos: [], porDia: null,
-    proximos: [{ day: '2026-09-18', itens: [item({ kind: 'income', day: '2026-09-18', cents: 400000 })] }] });
-  assert.deepEqual(legendaDoDia(soEntra.dias[4], null, brl), { quando: 'sex, 18 set', valor: 400000, rotulo: 'entra', estado: null });
-  assert.equal(legendaDoDia(dias[2], null, brl).estado, null, 'sem régua, sem julgamento');
+  assert.deepEqual(legendaDoDia(dias[4]), {
+    quando: 'sex, 18 set', rotulo: 'vence', valor: 21430, tom: 'text', estado: '1 compromisso',
+    entrada: { rotulo: 'entra', valor: 9000 }, vazio: false,
+  });
+  assert.deepEqual(legendaDoDia(dias[5]), {
+    quando: 'sáb, 19 set', rotulo: 'nada previsto', valor: 0, tom: 'text', estado: null, entrada: null, vazio: true,
+  }, 'dia vazio não diz "vence R$ 0,00"');
+  assert.deepEqual(legendaDoDia(dias[6]), {
+    quando: 'dom, 20 set', rotulo: 'entra', valor: 400000, tom: 'success', estado: null, entrada: null, vazio: false,
+  }, 'dia que só entra é verde, como na lista de baixo');
+});
+
+test('um dia enorme não esmaga a régua: o teto para em 3× o "por dia"', () => {
+  const s = semanaDoDia({ hoje: HOJE, gastos: [{ day: HOJE, expense_cents: 3_000_000, income_cents: 0 }], proximos: [], porDia: 100_000 });
+  assert.equal(s.teto, 300_000);
+  const semRegua = semanaDoDia({ hoje: HOJE, gastos: [{ day: HOJE, expense_cents: 3_000_000, income_cents: 0 }], proximos: [], porDia: null });
+  assert.equal(semRegua.teto, 3_000_000, 'sem régua, o teto é o maior gasto');
 });

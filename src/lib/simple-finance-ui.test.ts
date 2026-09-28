@@ -1585,6 +1585,9 @@ test('Hoje: a semana vem no topo — três dias para trás pela régua do "saiu 
   assert.equal(semana.props.escolhido, '2026-09-08', 'abre no dia de hoje');
   ui.interact(() => semana.props.onEscolher('2026-09-05'));
   assert.equal(ui.nodes().find((n: any) => n.type === 'SemanaDoDia').props.escolhido, '2026-09-05');
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'SemanaDoDia').props.onEscolher('2026-09-08'));
+  assert.equal(ui.nodes().find((n: any) => n.type === 'SemanaDoDia').props.escolhido, '2026-09-08',
+    'tocar em hoje volta a seguir o hoje (não prende a data depois da meia-noite)');
   ui.nodes().find((n: any) => n.type === 'BlockHeader' && n.props.title === 'Sua semana').props.action.onPress();
   assert.equal(ui.navigations.at(-1), '/finance/transactions', 'o que saiu continua a um toque dos Lançamentos');
 });

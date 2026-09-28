@@ -324,41 +324,62 @@ export function semanaDoDia(v: {
       acima: v.porDia !== null && tipo !== 'futuro' && saiu > v.porDia,
     });
   }
-  const maior = Math.max(0, ...dias.map((d) => d.saiu), v.porDia ?? 0);
-  return { dias, teto: Math.max(1, maior), linha: v.porDia };
+  const maior = Math.max(0, ...dias.map((d) => d.saiu));
+  /*
+    O teto é o maior gasto, mas nunca mais que 3× a régua: um dia de R$ 3.000 contra R$ 100 por dia
+    esmagaria a régua na base (e todo o resto da semana junto). A barra que passa do teto fica
+    cheia — o valor exato está na frase de cima.
+  */
+  const teto = v.porDia === null ? maior : Math.min(Math.max(maior, v.porDia), v.porDia * 3);
+  return { dias, teto: Math.max(1, teto), linha: v.porDia };
 }
 
+/** A frase de cima da semana, para o dia escolhido. */
+export type LegendaDoDia = {
+  /** `Hoje` ou `sáb, 26 set`. */
+  quando: string;
+  /** `saiu`, `vence`, `entra` ou `nada previsto`. */
+  rotulo: string;
+  valor: number;
+  tom: 'text' | 'warning' | 'success';
+  /** Uma linha curta, ou `null`: "dentro" não se escreve — a régua e a cor já dizem. */
+  estado: string | null;
+  /** O dinheiro que entrou (ou entra) no dia, ao lado do valor. */
+  entrada: { rotulo: 'entrou' | 'entra'; valor: number } | null;
+  /** Dia que vem sem nada: o leitor de tela diz "nada previsto", não "R$ 0,00". */
+  vazio: boolean;
+};
+
 /**
- * O que a semana diz do dia escolhido: QUANDO, o valor, e o estado dele. `brl` é o que obedece ao
- * "esconder saldo".
+ * O que a semana diz do dia escolhido. Sem dinheiro formatado aqui dentro: quem desenha escolhe
+ * entre o valor e o "valor oculto" do esconder saldo.
  */
-export function legendaDoDia(
-  d: DiaDaSemana,
-  linha: number | null,
-  brl: (cents: number) => string
-): { quando: string; valor: number; rotulo: string; estado: string | null } {
+export function legendaDoDia(d: DiaDaSemana): LegendaDoDia {
   const quando = d.tipo === 'hoje' ? 'Hoje' : diaCurtoBR(d.day);
   if (d.tipo === 'futuro') {
-    // Dia vazio é "nada previsto" — "vence R$ 0,00" diria que algo vence.
-    if (d.previstos === 0 && d.aEntrar === 0) return { quando, valor: 0, rotulo: 'nada previsto', estado: null };
-    if (d.previstos === 0) return { quando, valor: d.aEntrar, rotulo: 'entra', estado: null };
+    if (d.previstos === 0 && d.aEntrar === 0) {
+      return { quando, rotulo: 'nada previsto', valor: 0, tom: 'text', estado: null, entrada: null, vazio: true };
+    }
+    if (d.previstos === 0) {
+      return { quando, rotulo: 'entra', valor: d.aEntrar, tom: 'success', estado: null, entrada: null, vazio: false };
+    }
     return {
       quando,
-      valor: d.previsto,
       rotulo: 'vence',
-      estado: [
-        `${d.previstos} ${d.previstos === 1 ? 'compromisso' : 'compromissos'}`,
-        d.aEntrar > 0 ? `entra ${brl(d.aEntrar)}` : null,
-      ]
-        .filter(Boolean)
-        .join(' · '),
+      valor: d.previsto,
+      tom: 'text',
+      estado: `${d.previstos} ${d.previstos === 1 ? 'compromisso' : 'compromissos'}`,
+      entrada: d.aEntrar > 0 ? { rotulo: 'entra', valor: d.aEntrar } : null,
+      vazio: false,
     };
   }
-  const estado = [
-    linha === null ? null : d.acima ? 'acima do que dá por dia' : 'dentro do que dá por dia',
-    d.entrou > 0 ? `entrou ${brl(d.entrou)}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-  return { quando, valor: d.saiu, rotulo: 'saiu', estado: estado || null };
+  return {
+    quando,
+    rotulo: 'saiu',
+    valor: d.saiu,
+    tom: d.acima ? 'warning' : 'text',
+    estado: d.acima ? 'acima do que dá por dia' : null,
+    entrada: d.entrou > 0 ? { rotulo: 'entrou', valor: d.entrou } : null,
+    vazio: false,
+  };
 }
