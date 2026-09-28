@@ -390,6 +390,35 @@ def conciliar(
                            f"Pix no crédito já no app: {_brl(t.amount_cents)} + {_brl(j.amount_cents)} de juros")
                     break
 
+    # 3c. A ESTIMATIVA de juros/IOF do rotativo que o app lançou ao adiar a fatura
+    # (`roll_invoice`, "… (estimado)", datada no vencimento da adiada) e a cobrança REAL que chega
+    # na fatura seguinte. O valor quase nunca bate, e sem este par a importação criaria a cobrança
+    # ao lado da estimativa (~R$ 50 a mais, 28/09/2026). Não decide sozinha: fica `uncertain`
+    # (desmarcado) e a linha oferece "Usar no app o valor do extrato", que troca a estimativa.
+    if cartao:
+        def estimativa(i: Item, t: Existente) -> bool:
+            if t.id in tomados or t.account_id != conta_id or i.kind != "expense":
+                return False
+            if _dias(i.occurred_at, t.occurred_at) > JANELA_SALDO:
+                return False
+            d = (i.description or "").lower()
+            if t.description == "Juros do rotativo (estimado)":
+                return "rotativo" in d and "iof" not in d
+            if t.description == "IOF do rotativo (estimado)":
+                return "iof" in d and "internacional" not in d
+            return False
+
+        for i in itens:
+            if i.idx in vereditos:
+                continue
+            cs = [t for t in existentes if estimativa(i, t)]
+            if len(cs) == 1:
+                tomados.add(cs[0].id)
+                vereditos[i.idx] = Veredito(
+                    i.idx, "uncertain", "estimativa", cs[0].id,
+                    f"estimativa do app ({_brl(cs[0].amount_cents)}): use o valor do extrato",
+                )
+
     # 4. mesmo valor, perto
     camada(
         "perto",

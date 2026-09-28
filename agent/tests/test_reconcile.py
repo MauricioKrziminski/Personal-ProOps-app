@@ -253,3 +253,17 @@ def test_pix_no_credito_com_duas_bases_possiveis_nao_escolhe():
 def test_o_texto_do_juro_e_o_mesmo_do_app():
     app = (Path(__file__).resolve().parents[2] / "src/hooks/use-finance.ts").read_text()
     assert f"DESCRICAO_JUROS_DO_PIX = '{JUROS_DO_PIX}'" in app
+
+
+def test_cobranca_real_do_rotativo_aponta_a_estimativa_e_nao_duplica():
+    """A estimativa nasce no vencimento da adiada (10/09); a cobrança real chega dias antes ou
+    depois, com outro valor. Ela aponta a estimativa (desmarcada), nunca vira uma segunda."""
+    itens = [item(0, "Juros de pagamento parcial da fatura (rotativo)", 5230, D(2026, 10, 3)),
+             item(1, "IOF de financiamento", 412, D(2026, 10, 3)),
+             item(2, "IOF de compra internacional", 1912, D(2026, 10, 3))]
+    existentes = [tx("j", "Juros do rotativo (estimado)", 4790, D(2026, 9, 10)),
+                  tx("i", "IOF do rotativo (estimado)", 380, D(2026, 9, 10))]
+    v = conciliar(itens, existentes, conta_id=CARTAO, cartao=True)
+    um(v[0], status="uncertain", camada="estimativa", transaction_id="j")
+    um(v[1], status="uncertain", camada="estimativa", transaction_id="i")
+    um(v[2], status="novo")

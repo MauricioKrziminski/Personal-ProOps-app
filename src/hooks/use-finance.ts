@@ -1489,6 +1489,16 @@ export function useApplyImportToExisting() {
         })
         .eq('id', input.transactionId);
       if (error) throw error;
+      // A estimativa do rotativo que recebeu o valor real deixa de ser estimativa (28/09/2026): com o
+      // "(estimado)" no nome, a taxa aprendida (`rotativo_rate_for`) continuaria ignorando a linha.
+      for (const nome of ['Juros do rotativo', 'IOF do rotativo']) {
+        const { error: e } = await supabase
+          .from('transactions')
+          .update({ description: nome })
+          .eq('id', input.transactionId)
+          .eq('description', `${nome} (estimado)`);
+        if (e) throw e;
+      }
       // Só depois de a correção passar: o item some da revisão porque o dinheiro já está no app.
       const { error: e2 } = await supabase
         .from('import_items')
