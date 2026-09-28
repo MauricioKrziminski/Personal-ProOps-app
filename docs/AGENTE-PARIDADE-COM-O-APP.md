@@ -170,6 +170,7 @@ A regra do `agent.md` é "botão novo no app = linha nova nesta tabela". Estas s
 | botão novo no app | o agente faz? | por onde |
 |---|---|---|
 | **Juros do Pix no crédito** (campo em `transaction-form`, grava compra + linha `juros` na mesma fatura) | sim, sem código novo | multi-intent: *"paguei 84,20 do DAS e 1,85 de juros do pix no crédito"* vira dois `create_expense`. `'juros'` entrou em `categories.py`, então a categoria sai igual dos dois lados. |
+| **Pix no crédito para conta própria** (transferência saindo do cartão + juro, 28/09/2026) | **ainda não** | o caminho mecânico existe (`create_transfer` com o cartão de origem + `create_expense` do juro), mas medido no Gemini real *"fiz um pix no crédito de 340 pro itaú"* virou GASTO na conta Itaú. Falta o trecho de prompt em `docs/superpowers/plans/2026-09-28-pix-no-credito-conta-propria.md`, medido antes de entrar. |
 | **Editar a série a partir de um lançamento** (linha "Repete …" no detalhe → `recurring?edit=`) | sim, já fazia | `ResourceAction` em `recurring` propaga por `update_recurring_series` (fechado na própria auditoria). O que mudou foi só o caminho no app. |
 | **Seletor de categoria com as usadas** (`categories_used()`) | não se aplica | categoria é texto livre no agente desde sempre — ele nunca esteve preso às 13 sugestões. A lacuna era só do app. |
 
