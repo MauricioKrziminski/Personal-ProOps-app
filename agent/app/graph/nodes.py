@@ -11,7 +11,7 @@ import logging
 
 from langgraph.types import interrupt
 
-from app.domain.dates import local_datetime_iso, local_iso_date
+from app.domain.dates import local_datetime_iso, local_iso_date, now_utc
 from app.graph.policy import (
     describe_for_confirmation,
     dominio_incerto,
@@ -645,6 +645,7 @@ async def resolve_node(state: AgentState) -> dict:
     if not any(getattr(a, "type", None) in resolve.TARGETS for a in acoes):
         alvos = [{} for _ in acoes]
     else:
+        await _ocorrencias_gravadas(state["workspace_id"], acoes)
         alvos = await resolve.for_actions(
             state["workspace_id"], acoes, state.get("text", ""),
             antecedente=state.get("last_write_id"),
@@ -1288,3 +1289,20 @@ async def compose(state: AgentState) -> dict:
             {"role": "assistant", "content": texto_reply},
         ],
     }
+
+
+async def _ocorrencias_gravadas(workspace_id, acoes) -> None:
+    """A recorrente que o agendador ainda não gravou só existe na regra, e "paguei o aluguel"
+    procura em `transactions`: no staging (sem cron) e no minuto antes do cron, não achava o que
+    baixar (28/09/2026). Antes de procurar, o MESMO agendador grava as séries nunca gravadas deste
+    espaço — em produção quase sempre não há nada a fazer. Falhando, o turno segue como antes.
+    """
+    from app.jobs import scheduler
+
+    if not any(resolve.TARGETS.get(getattr(a, "type", None)) in ("pendentes", "transactions")
+               for a in acoes):
+        return
+    try:
+        await scheduler.materialize_horizon(now_utc(), so_novas=True, workspace_id=workspace_id)
+    except Exception:  # noqa: BLE001
+        log.warning("não gravei as ocorrências pendentes do espaço %s", workspace_id, exc_info=True)

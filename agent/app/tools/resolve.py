@@ -163,6 +163,8 @@ def _candidato_plano(row: dict) -> dict:
         # a frase do desparcelar: a data da parcela 1 e o cartão, congelados
         "parcela1_em": str(row["parcela1_em"]) if row.get("parcela1_em") else None,
         "account_name": row.get("account_name"),
+        # "último dia de cada mês" não vale no cartão: recusado antes do SIM
+        "account_type": row.get("account_type"),
         # a conta ATUAL da compra: "foi à vista no nubank" com a compra já no Nubank
         # Cartão é descrição, não troca (`policy.conta_nova_do_plano`)
         "account_id": str(row["account_id"]) if row.get("account_id") else None,
@@ -210,7 +212,7 @@ _FONTES: dict[str, dict] = {
         "table": "installment_plans",
         "sql": f"""select p.id, p.description, p.merchant, p.total_cents, p.installments,
                          p.first_occurred_at, x.editaveis, x.travado_cents, x.travadas, x.travadas_fatura, x.ultima_travada, x.pagas, x.piso_pagas, x.parcela1_em,
-                         a.name as account_name, p.account_id
+                         a.name as account_name, a.type as account_type, p.account_id
                   from public.installment_plans p
                   {_TRAVAS_DO_PLANO}
                   left join public.accounts a
@@ -433,7 +435,7 @@ async def _com_plano(workspace_id, candidatos: list[dict]) -> list[dict]:
         """
         select t.id as tx_id, p.id as plan_id, p.description, p.merchant, p.total_cents, p.installments,
                p.first_occurred_at, x.editaveis, x.travado_cents, x.travadas, x.travadas_fatura, x.ultima_travada, x.pagas, x.piso_pagas, x.parcela1_em,
-               a.name as account_name, p.account_id
+               a.name as account_name, a.type as account_type, p.account_id
         from public.transactions t
         join public.installment_plans p on p.id = t.installment_plan_id
         """ + _TRAVAS_DO_PLANO + """

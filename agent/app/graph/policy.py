@@ -9,6 +9,10 @@ from __future__ import annotations
 
 from app.config import get_settings
 from app.domain.correcao_plano import (
+    ULTIMO_DIA,
+    ULTIMO_DIA_NO_CARTAO,
+    ULTIMO_DIA_SO_NA_COMPRA,
+    ultimo_dia_das_parcelas,
     CONTA_DO_PLANO,
     JA_A_VISTA,
     LIMITE_PARCELAS,
@@ -182,6 +186,8 @@ def _frase_correcao_plano(action: FinanceAction, target: dict, escolhido: dict) 
     if action.new_occurred_at:
         estrutura.append(f"1ª parcela em {format_date_br(action.new_occurred_at)} "
                          "(as outras seguem de mês em mês)")
+    if ultimo_dia_das_parcelas(action):
+        estrutura.append(ULTIMO_DIA)
     conta, _ = conta_nova_do_plano(action, target, escolhido)
     if conta:
         estrutura.append(f"conta → {conta['name']}")
@@ -336,6 +342,8 @@ def _frase_plano(action: FinanceAction, target: dict, escolhido: dict) -> str:
         # a RPC refaz as datas a partir da 1ª (com parcela paga fora do cartão, ela acompanha)
         partes.append(f"1ª parcela em {format_date_br(action.new_occurred_at)} "
                       "(as outras seguem de mês em mês)")
+    if ultimo_dia_das_parcelas(action):
+        partes.append(ULTIMO_DIA)
     conta, _ = conta_nova_do_plano(action, target, escolhido)
     if conta:
         partes.append(f"conta → {conta['name']}")
@@ -426,9 +434,13 @@ def erro_de_correcao(action, target: dict | None) -> str | None:
     pede_pagas = (getattr(action, "already_paid_count", None) is not None and (
         (target or {}).get("table") == "installment_plans"
         or any(c.get("table") == "installment_plans" for c in cands)))
+    # só sobre compra parcelada: fora dela a regra não é correção nenhuma (comportamento anterior)
+    ultimo = ultimo_dia_das_parcelas(action) and (
+        (target or {}).get("table") == "installment_plans"
+        or any(c.get("table") == "installment_plans" for c in cands))
     if not any([action.new_amount_cents is not None, action.new_category, action.new_occurred_at,
                 action.new_description, action.new_account, muda_parcelas, desparcela,
-                pede_desparcelar(action, target), pede_pagas]):
+                pede_desparcelar(action, target), pede_pagas, ultimo]):
         # linha AVULSA escolhida (inclusive num empate misto com uma compra): nada a desparcelar
         if (e_desparcelar(action) and (target or {}).get("status") == "found" and cands
                 and cands[0].get("table", target.get("table")) == "transactions"
@@ -443,6 +455,8 @@ def erro_de_correcao(action, target: dict | None) -> str | None:
         # 21/09/2026 as três eram recusadas com "muda no app" — inclusive quando a conta
         # dita era a que a compra já tinha ("foi à vista no nubank").
         cand = cands[0]
+        if ultimo and cand.get("account_type") == "credit_card":
+            return ULTIMO_DIA_NO_CARTAO
         conta, erro_conta = conta_nova_do_plano(action, target, cand)
         if erro_conta:
             return erro_conta
@@ -461,7 +475,7 @@ def erro_de_correcao(action, target: dict | None) -> str | None:
             if action.already_paid_count < int(cand.get("piso_pagas") or 0):
                 return pagas_na_fatura(_nome_do_plano(cand), int(cand["piso_pagas"]))
         if not (estrutura or action.new_amount_cents is not None or action.new_description
-                or action.new_category or pagas_novas):
+                or action.new_category or pagas_novas or ultimo):
             # a conta dita é a que a compra já tem, e não sobrou mais nada a mudar
             return SEM_CORRECAO
         if estrutura:
@@ -481,6 +495,9 @@ def erro_de_correcao(action, target: dict | None) -> str | None:
                 if muda_parcelas and action.installments < int(cand.get("ultima_travada") or 0):
                     return abaixo_da_paga(nome, int(cand["ultima_travada"]))
         return None
+    # UMA parcela congelada não tem "todo mês": é a compra inteira; no empate, a escolha vem antes
+    if ultimo and (target or {}).get("status") == "found" and cands and cands[0].get("installment_snapshot"):
+        return ULTIMO_DIA_SO_NA_COMPRA
     if n_plano is not None and muda_parcelas:
         return MUDAR_PARCELAS
     target = target or {}
@@ -576,7 +593,7 @@ def describe_for_confirmation(
                     and action.type == FinanceActionType.UPDATE_TRANSACTION
                     and (muda_numero_de_parcelas(action, escolhido) or action.new_occurred_at
                          or conta_nova_do_plano(action, target, escolhido)[0]
-                         or muda_pagas(action, escolhido))):
+                         or muda_pagas(action, escolhido) or ultimo_dia_das_parcelas(action))):
                 return _frase_plano(action, target, escolhido)
             if (
                 target.get("table") == "transactions"

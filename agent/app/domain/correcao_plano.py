@@ -4,6 +4,8 @@ A mesma recusa sai de dois pontos — `policy.erro_de_correcao` (antes do SIM) e
 tool (segunda trava) —, e duas cópias do texto divergiriam.
 """
 
+import re
+
 SEM_CORRECAO = ("O que você quer mudar: o valor, o nome, a categoria, a data, a conta ou o "
                 "número de parcelas? Ainda não mudei nada.")
 # Uma PARCELA solta (não a compra inteira) não troca de conta: a compra é uma só, num cartão.
@@ -151,3 +153,21 @@ def muda_numero_de_parcelas(action, cand: dict) -> bool:
     """N → M (2..72) na compra inteira. Igual ao N atual é pista de busca; 1 é desparcelar."""
     n = getattr(action, "installments", None)
     return bool(n) and n >= 2 and n != cand.get("plan_installments")
+
+
+# "Último dia de todo mês" numa compra parcelada que já existe (28/09/2026). Sem campo novo (o
+# schema está no teto): a regra de repetição que o prompt já ensina, `BYMONTHDAY=-1`, numa
+# correção. Estrutura, não sentido — quem decide que a pessoa pediu fim de mês é o modelo.
+_ULTIMO_DIA = re.compile(r"BYMONTHDAY=-1(;|$)")
+
+
+def ultimo_dia_das_parcelas(action) -> bool:
+    return (getattr(getattr(action, "type", None), "value", None) == "update_transaction"
+            and bool(_ULTIMO_DIA.search(getattr(action, "recurrence", None) or "")))
+
+
+ULTIMO_DIA = "parcelas no último dia de cada mês"
+ULTIMO_DIA_NO_CARTAO = ("No cartão a parcela segue a data da compra (é ela que decide a fatura): "
+                        "o último dia do mês não vale ali." + NADA)
+ULTIMO_DIA_SO_NA_COMPRA = ("O último dia de cada mês vale para a compra parcelada inteira. Me pede "
+                           "sobre a compra, por exemplo *passa a geladeira para o último dia de cada mês*." + NADA)

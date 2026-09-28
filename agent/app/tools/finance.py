@@ -17,6 +17,9 @@ import psycopg
 from app import db
 from app.domain import matching
 from app.domain.correcao_plano import (
+    ULTIMO_DIA,
+    ULTIMO_DIA_NO_CARTAO,
+    ultimo_dia_das_parcelas,
     CARTAO_FALTANDO,
     LINHA_SUMIU,
     NADA_EDITAVEL,
@@ -1146,6 +1149,9 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
     muda_pagas = (action.already_paid_count is not None
                   and action.already_paid_count != cands[0].get("pagas"))
     estrutura = bool(muda_n or action.new_occurred_at or conta or muda_pagas)
+    # "passa para o último dia de cada mês": depois da correção, na MESMA instrução SQL, as
+    # parcelas vão ao fim do mês delas (`private.parcelas_no_ultimo_dia`, a porta do app)
+    ultimo = ultimo_dia_das_parcelas(action)
     unidade = (ctx.target or {}).get("amount_unit")
     if action.new_amount_cents is not None and unidade not in ("total", "parcela"):
         return ToolResult(
@@ -1153,7 +1159,7 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
             "me pede a correção de novo.",
             read_only=True,
         )
-    if action.new_amount_cents is None and not estrutura:
+    if action.new_amount_cents is None and not estrutura and not ultimo:
         if not (action.new_description or action.new_category):
             raise Level1Error(
                 "❌ Numa compra parcelada dá para corrigir valor, nº de parcelas, data, conta, "
@@ -1167,7 +1173,9 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
     plano = await db.fetch_one(
         f"""
         select p.id, p.total_cents, p.installments, p.first_occurred_at, p.description,
-               p.category, p.merchant, p.account_id, x.editaveis, x.travado_cents, x.travadas, x.travadas_fatura, x.ultima_travada, x.pagas, x.piso_pagas,
+               p.category, p.merchant, p.account_id,
+               (select a.type from public.accounts a where a.id = p.account_id) as account_type,
+               x.editaveis, x.travado_cents, x.travadas, x.travadas_fatura, x.ultima_travada, x.pagas, x.piso_pagas,
                -- a data REAL da parcela 1 (editada à mão ou não): sem parcela travada a
                -- RPC recalcula TODAS as datas a partir desta. Com parcela travada a RPC
                -- exige a do plano (e não mexe em data nenhuma), daí o `case`.
@@ -1184,6 +1192,8 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
     if not plano:
         return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
     nome_atual = plano["description"] or plano["merchant"] or "a compra"
+    if ultimo and plano["account_type"] == "credit_card":
+        return ToolResult(ULTIMO_DIA_NO_CARTAO, read_only=True)
     if estrutura and int(plano["travado_cents"] or 0) > 0:
         # lido AGORA: entre a pergunta e o SIM uma fatura pode ter sido paga — a mesma régua
         # da política e da RPC (`20260926130000`)
@@ -1224,13 +1234,25 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
                  if action.new_description else plano["description"])
     categoria = guards.clean_category(action.new_category) if action.new_category else plano["category"]
     conta_id = conta["id"] if conta else plano["account_id"]
+    so_o_dia = (ultimo and action.new_amount_cents is None and not estrutura
+                and not action.new_description and not action.new_category)
     try:
-        await db.fetch_one(
-            "select public.update_installment_plan(%s, %s, %s, %s, %s, %s, %s, %s, %s) as mexidas",
-            plano["id"], total, parcelas, primeira,
-            descricao, categoria, plano["merchant"], conta_id,
-            action.already_paid_count if muda_pagas else None,
-        )
+        argumentos = (plano["id"], total, parcelas, primeira, descricao, categoria,
+                      plano["merchant"], conta_id, action.already_paid_count if muda_pagas else None)
+        if so_o_dia:
+            await db.fetch_one("select private.parcelas_no_ultimo_dia(%s, 1) as mexidas", plano["id"])
+        elif ultimo:
+            # uma instrução só: a correção e o fim do mês entram juntos ou nenhum dos dois
+            await db.fetch_one(
+                "with corrigida as (select public.update_installment_plan(%s, %s, %s, %s, %s, %s, %s, %s, %s) as mexidas) "
+                "select mexidas, private.parcelas_no_ultimo_dia(%s, 1) as no_fim from corrigida",
+                *argumentos, plano["id"],
+            )
+        else:
+            await db.fetch_one(
+                "select public.update_installment_plan(%s, %s, %s, %s, %s, %s, %s, %s, %s) as mexidas",
+                *argumentos,
+            )
     except psycopg.errors.RaiseException as err:
         # Só P0001 (o `raise exception` da RPC, escrito para a pessoa). Aqui e não no
         # registry: nem toda RPC do repo escreve a recusa em português de usuário.
@@ -1249,6 +1271,8 @@ async def _corrigir_plano(ctx: ExecContext, action: FinanceAction) -> ToolResult
         partes.append(f"conta → *{conta['name']}*")
     if muda_pagas:
         partes.append(f"parcelas pagas {int(plano['pagas'] or 0)} → {action.already_paid_count}")
+    if ultimo:
+        partes.append(ULTIMO_DIA)
     texto = f"✏️ Corrigi *{nome}*: {', '.join(partes) or 'sem mudança de valor'}"
     if action.new_amount_cents is not None and not muda_n:
         texto += f" em {parcelas}x — as já pagas ficaram como estavam"

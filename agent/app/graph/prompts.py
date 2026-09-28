@@ -186,6 +186,10 @@ Tipos:
   REPARCELAR a compra inteira também é update_transaction com o nº NOVO em installments:
   "a tv na verdade foi em 12x" -> description="tv", installments=12.
   "a primeira parcela da tv é dia 10/10" -> description="tv", new_occurred_at=2026-10-10.
+  PARCELAS NO ÚLTIMO DIA DE CADA MÊS numa compra que já existe -> update_transaction com
+  description = o nome da compra e recurrence="FREQ=MONTHLY;BYMONTHDAY=-1" (só quando a pessoa
+  disser fim/último dia do mês; um dia citado é new_occurred_at):
+  "passa as parcelas da geladeira para o último dia de cada mês" -> description="geladeira", recurrence="FREQ=MONTHLY;BYMONTHDAY=-1".
   "na verdade", "aliás", "errei", "corrigindo", "foi engano" são expressões: nunca nome de
   conta, cartão ou item.
 - delete_transaction: apagar um lançamento específico. "Apaga a TV por completo"

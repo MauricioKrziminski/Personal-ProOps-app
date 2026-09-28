@@ -1057,6 +1057,9 @@ a versão velha ao lado da nova, o vencimento 30 ao lado da linha de 04, a apaga
 `status` vem do banco: "entra como pago" com data passada nasce `cleared` — nada de "atrasado".
 
 Data de pagamento de dívida com "Este e os próximos"/"Todos" muda o dia do CONTRATO
-(`update_debt_payment_due_day`); os outros pagamentos ficam no dia em que o dinheiro saiu. Parcela
+(`update_debt_payment_due_day`) e leva os pagamentos REGISTRADOS do alcance ao dia novo, cada um no
+próprio mês (`20260928210070`, *"se ele colocou todos, os pagos têm que ir para essa data"*) — a
+mesma régua de "Todos" na recorrente e de "Todas" na parcelada. No dia dela, a prevista vem ANTES das
+gravadas e tem a mesma chave da linha gravada: tocar não a move nem a pisca. Parcela
 fora do cartão aceita "último dia de todo mês" (`*_last_day`), e a data da compra não é contrato:
 muda nos três alcances a partir da parcela de referência.

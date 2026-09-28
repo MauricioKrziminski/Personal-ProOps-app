@@ -186,7 +186,7 @@ async def _adotar_gemea(rec, dia: str) -> bool:
     return True
 
 
-async def materialize_horizon(agora, so_novas: bool = False) -> int:
+async def materialize_horizon(agora, so_novas: bool = False, workspace_id=None) -> int:
     """Cria as ocorrências que ainda faltam dentro do horizonte.
 
     ⚠️ **A query pega quem PRECISA de trabalho, e os mais atrasados primeiro.**
@@ -218,6 +218,8 @@ async def materialize_horizon(agora, so_novas: bool = False) -> int:
     # (27/09/2026, produção). As já materializadas continuam na rodada de hora em hora.
     # ponytail: série cuja primeira ocorrência cai além do horizonte segue nula e é relida a cada
     # minuto (um `limit` pequeno segura o custo); marcar "sem ocorrência" se isso aparecer.
+    # `workspace_id`: o agente pede só o espaço da conversa antes de procurar o que dar baixa
+    # (`nodes.alvos`) — "paguei o aluguel" de uma série que o cron ainda não gravou (28/09/2026).
 
     series = await db.fetch(
         """
@@ -230,12 +232,15 @@ async def materialize_horizon(agora, so_novas: bool = False) -> int:
         where r.active = true
           and (r.materialized_until is null or r.materialized_until < %s)
           and (r.end_date is null or r.end_date >= %s)
+          and (%s::uuid is null or r.workspace_id = %s::uuid)
           and (not %s or r.materialized_until is null)
         order by r.materialized_until asc nulls first
         limit %s
         """,
         horizonte,
         agora.date(),
+        workspace_id,
+        workspace_id,
         so_novas,
         MAX_NOVAS_POR_MINUTO if so_novas else MAX_SERIES_PER_RUN,
     )

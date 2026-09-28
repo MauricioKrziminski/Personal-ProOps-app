@@ -67,7 +67,20 @@ aplicadas **só no staging**; o agente não foi publicado.
 - Custo da leitura (conta `teste@`, 300 lançamentos, cache quente): `ledger_expected_lines` de um
   mês ~25 ms, a parte das recorrentes ~10 ms (a primeira chamada fria levou 710 ms).
 
+## Segunda rodada (mesmo dia)
+
+| Relato | Causa | O que mudou |
+|---|---|---|
+| Tocar no Aluguel o fazia subir para o topo do dia | A lista ordena o dia pelo `created_at` e o toque cria o lançamento AGORA; a prevista ficava no fim do dia | A prevista vem ANTES das gravadas no dia dela — o lugar que o toque lhe dá |
+| A linha sumia ~1 s no toque | Gravação quadro a quadro: a prevista e a gravada tinham chaves diferentes, a linha era remontada com a entrada animada | Mesma chave (`rec:<série>:<dia>`) antes e depois; a tocada fica "em trânsito" até a lista trazê-la |
+| "Todos" deveria levar os pagos para o dia novo | Só a data do pagamento editado mudava | `20260928210070`: os pagamentos registrados do alcance vão ao dia novo, cada um no próprio mês |
+| Agente: "paguei" em prevista e último dia em parcelada | O `mark_paid` só procura em `transactions`; parcelada fora do cartão não tinha "último dia" | Ver `docs/AGENTE-PARIDADE-COM-O-APP.md` |
+
+Conferido no simulador: a prevista de 30/10 em primeiro no dia; gravação do toque sem vão
+(todos os quadros com a linha no lugar); "Todos" na dívida com dia 20 → 20/08 e 20/09 e contrato no 20.
+
 ## Pendências
 
-- **Produção**: `20260928210000` a `20260928210060` → agente (agendador) → app, só com pedido.
-- No toque na prevista a linha some por ~1 s antes de voltar como lançamento (a leitura das previstas volta antes da lista).
+- **Produção**: `20260928210000` a `20260928210070` → agente (agendador e a gravação antes do
+  "paguei") → app, só com pedido.
+- Agente: ocorrência além do horizonte de um ano não é encontrada pelo "paguei".

@@ -196,3 +196,40 @@ async def test_gemea_ja_adotada_pelo_app_nao_trava_a_serie(monkeypatch):
     await scheduler.materialize_horizon(datetime(2026, 9, 27, 15, tzinfo=UTC), so_novas=True)
     assert escritas.count("insert") == 12, "outubro em diante nasce normalmente"
     assert escritas[-1] == "update", "a série grava materialized_until em vez de last_error"
+
+
+@pytest.mark.asyncio
+async def test_so_o_espaco_da_conversa_quando_o_agente_pede(monkeypatch):
+    """"paguei o aluguel" grava as séries NUNCA gravadas só daquele espaço (28/09/2026)."""
+    from app.jobs import scheduler
+
+    visto = {}
+
+    async def fetch(sql, *args):
+        visto["sql"], visto["args"] = sql, args
+        return []
+
+    monkeypatch.setattr(scheduler.db, "fetch", fetch)
+    await scheduler.materialize_horizon(datetime(2026, 9, 28, 12, tzinfo=UTC), so_novas=True, workspace_id="w1")
+    assert "r.workspace_id = %s::uuid" in visto["sql"]
+    assert visto["args"][2:4] == ("w1", "w1")
+    assert visto["args"][-2:] == (True, scheduler.MAX_NOVAS_POR_MINUTO)
+
+
+@pytest.mark.asyncio
+async def test_baixa_grava_as_ocorrencias_antes_de_procurar_e_falha_nao_derruba(monkeypatch):
+    from app.graph import nodes
+    from app.graph.schemas import FinanceAction, FinanceActionType
+    from app.jobs import scheduler
+
+    pedidos = []
+
+    async def materializa(agora, so_novas=False, workspace_id=None):
+        pedidos.append((so_novas, workspace_id))
+        raise RuntimeError("banco fora")
+
+    monkeypatch.setattr(scheduler, "materialize_horizon", materializa)
+    await nodes._ocorrencias_gravadas("w1", [FinanceAction(type=FinanceActionType.MARK_PAID, description="aluguel")])
+    assert pedidos == [(True, "w1")], "a falha é engolida: o turno segue como antes"
+    await nodes._ocorrencias_gravadas("w1", [FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=100)])
+    assert pedidos == [(True, "w1")], "criar gasto não procura ocorrência"
