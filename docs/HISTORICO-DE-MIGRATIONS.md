@@ -3,10 +3,15 @@
 Registro, não regra: o que está em cada banco HOJE se confere na fonte (`CLAUDE.md`, *Banco e
 fila*). Entradas movidas do `CLAUDE.md` em 26/09/2026, na ordem em que estavam lá.
 
-**Só no STAGING: `20260928230000_pix_no_credito_na_fatura`** (28/09/2026) — a transferência que
-sai do cartão (Pix no crédito para conta própria) entra na fatura e, no caixa, é entrada na
-conta. Teste: `supabase/tests/pix_no_credito.sql` (6 asserções, local e staging). Em produção
-ela sobe pelo Gabriel (`db push --project-ref`), **antes** do agente e do app que a usam.
+**Produção e staging ALINHADOS em `20260928230000_pix_no_credito_na_fatura`** — aplicada em
+produção pelo Gabriel em 28/09/2026 (`db push --project-ref`, depois de `migration list` mostrar
+só ela no `local`) e conferida na fonte: `schema_migrations` devolve `20260928230000`,
+`20260928220000`, `20260928210080`; `private.conta_na_fatura(text)` existe (o `execute` de
+`anon` é o padrão do Postgres e não alcança nada: `anon` não tem `usage` em `private`); nenhuma
+função de `public` executável por `anon`. A transferência que sai do cartão (Pix no crédito para
+conta própria) entra na fatura e, no caixa, é entrada na conta. Teste:
+`supabase/tests/pix_no_credito.sql`. Na ordem: depois dela, o acerto do dado
+(`scripts/prod-dados/2026-09-28-pix-no-credito-itau.sql`), o agente e a tag `v1.4.0`.
 
 **Produção e staging ALINHADOS em `20260928220000`** — as 31 de `20260927212119` a
 `20260928220000` aplicadas em produção pelo Gabriel em 28/09/2026 (`db push --project-ref`,
