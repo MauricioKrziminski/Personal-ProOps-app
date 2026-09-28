@@ -597,3 +597,14 @@ Spec: `docs/superpowers/specs/2026-09-24-dicas-e-guia-design.md`.
 | app | agente |
 |---|---|
 | "Entendi" das dicas, "Mostrar" do guia, "Conhecer o app" nos Primeiros passos | **não — exclusão declarada.** Não é mutação: nada vai ao banco. É ajuda sobre GESTOS da tela (arrastar, tocar no painel, deslizar o cartão), guardada no aparelho (`dicas:<userId>`). Pela conversa a pergunta equivalente ("o que dá para fazer?") já é respondida pelo nó `geral` |
+
+## Previstas na lista e "último dia" em tudo que se repete (28/09/2026)
+
+`docs/bugs/2026-09-28-previstas-na-lista-e-ultimo-dia.md`.
+
+| app | agente |
+|---|---|
+| Tocar / "Paguei" / "Editar" numa recorrente PREVISTA em Lançamentos (`materialize_recurring_occurrence`) | **lacuna conhecida, só fora do horizonte.** O `mark_paid` busca em `transactions`: em produção a ocorrência já é linha (o agendador grava um ano à frente em até um minuto), então "paguei o aluguel" funciona; sem linha (além de um ano, ou no staging, sem agendador) a busca não a encontra. Fechar exige a busca de `pendentes` olhar `ledger_expected_lines` — não feito. |
+| "Apagar" numa prevista (`skip_recurring_occurrence`) | `delete_transaction` sobre a ocorrência gravada chega ao mesmo lugar: o gatilho `ocorrencia_apagada_nao_volta` marca a data, e o agendador a respeita. Prevista sem linha: mesma lacuna acima. |
+| Data de pagamento de dívida com "Este e os próximos"/"Todos" → dia do contrato (`update_debt_payment_due_day`) | `resource_update debts due_day` (-1 = último dia) já muda o contrato; a data do pagamento em si, `update_transaction`. São dois pedidos na conversa, não um. |
+| "Último dia de todo mês" na compra parcelada fora do cartão (`*_last_day`) | **lacuna.** `update_transaction` sobre a compra muda a data com o dia fixo; "no último dia de cada mês" não tem campo. |
