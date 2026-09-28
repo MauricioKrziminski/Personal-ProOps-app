@@ -102,7 +102,14 @@ function CabecalhoDaHoje() {
   return (
     <AppHeader
       title="Hoje"
-      action={<HeaderIconButton icon="magnifyingglass" label="Buscar em tudo" onPress={() => router.push('/search')} />}
+      action={
+        <>
+          {/* O que o ProOps mandou sem a pessoa pedir (push e WhatsApp). A tela já existia, mas só
+              se chegava a ela pelo Perfil (28/09/2026, *"não deveria ter um sino para essas coisas?"*). */}
+          <HeaderIconButton icon="bell" label="Histórico de alertas" onPress={() => router.push('/profile/alerts')} />
+          <HeaderIconButton icon="magnifyingglass" label="Buscar em tudo" onPress={() => router.push('/search')} />
+        </>
+      }
     />
   );
 }
