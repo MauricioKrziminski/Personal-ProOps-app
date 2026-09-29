@@ -3137,3 +3137,33 @@ test('Arquivados (contas, cartões, metas, bens): Desarquivar à direita, Apagar
   ui.interact(() => ui.confirmations.at(-1)());
   assert.deepEqual(ui.writes.at(-1), { operation: 'excluir:goals', value: 'g1' });
 });
+
+test('Editar a conta abre no saldo ATUAL e grava a diferença no inicial (28/09/2026)', () => {
+  // O Nubank de produção: a lista mostrava 162,51 e a edição abria no inicial, 867,86.
+  const ui = screen('src/app/finance/accounts.tsx', {
+    balances: [{ account_id: 'a1', name: 'Nubank', type: 'checking', balance_cents: 16251, cleared_cents: 16251, pending_in_cents: 0, pending_out_cents: 0 }],
+    forecastAccounts: [{ id: 'a1', name: 'Nubank', type: 'checking', archived: false, initial_balance_cents: 86786 }],
+  });
+  ui.interact(() => itemLinks(ui)[0].props.actions.find((a: any) => a.label === 'Editar').onPress());
+  const campo = () => ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Saldo atual');
+  assert.ok(campo(), 'o campo se chama Saldo atual');
+  const dinheiro = () => ui.nodes().find((n: any) => n.type === 'MoneyField');
+  assert.equal(dinheiro().props.valueCents, 16251, 'abre no que a lista mostra');
+
+  // Sem mexer, o inicial não anda.
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'TaskHeader').props.action.props.onPress());
+  assert.equal(ui.writes.at(-1).value.initial_balance_cents, 86786);
+
+  // Digitando 200,00, o inicial anda 37,49 e o atual passa a ser 200,00.
+  ui.interact(() => itemLinks(ui)[0].props.actions.find((a: any) => a.label === 'Editar').onPress());
+  ui.interact(() => dinheiro().props.onChangeCents(20000));
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'TaskHeader').props.action.props.onPress());
+  assert.equal(ui.writes.at(-1).value.initial_balance_cents, 90535);
+
+  // No vermelho: o sinal vem do seletor, porque o campo de dinheiro só digita positivo.
+  ui.interact(() => itemLinks(ui)[0].props.actions.find((a: any) => a.label === 'Editar').onPress());
+  ui.interact(() => dinheiro().props.onChangeCents(5000));
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.label === 'No vermelho')).props.onChange('negativo'));
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'TaskHeader').props.action.props.onPress());
+  assert.equal(ui.writes.at(-1).value.initial_balance_cents, 86786 - 21251);
+});

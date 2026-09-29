@@ -169,6 +169,32 @@ async def test_snapshot_change_blocks_update(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_editar_saldo_da_conta_e_o_saldo_atual(monkeypatch):
+    """28/09/2026: "meu saldo no Nubank é 200" numa conta que existe é o saldo de HOJE — o
+    inicial anda pela diferença, na mesma régua da lista (confirmado; total no cartão)."""
+    async def fetch(*a):
+        return [{"id": "x", "row_version": "12", "name": "Nubank", "type": "checking"}]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    a = action("accounts", "resource_update", initial_balance_cents=20000)
+    context = ctx()
+    context.target = {"prepared": await resources.prepare(context, a)}
+    assert "saldo atual: R$ 200,00" in context.target["prepared"]["summary"]
+    chamadas = []
+
+    async def one(sql, *args):
+        chamadas.append((sql, args))
+        return {"id": "x"}
+
+    monkeypatch.setattr(resources.db, "fetch_one", one)
+    await resources.execute(context, a)
+    sql, args = chamadas[0]
+    assert "initial_balance_cents = initial_balance_cents + %s - coalesce" in sql
+    assert "_account_balances(%s)" in sql and "cleared_cents" in sql
+    assert args[:2] == (20000, context.user_id)
+
+
+@pytest.mark.asyncio
 async def test_invalid_schedule_is_not_replaced_by_now():
     a = action("reminders", title="teste", next_run_at="not-a-date")
     with pytest.raises(Level1Error):

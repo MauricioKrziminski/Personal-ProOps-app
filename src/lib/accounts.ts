@@ -107,3 +107,14 @@ export function saldoDaConta(saldo: {
     previstoTexto: cartao ? 'a vencer' : 'a receber',
   };
 }
+
+/**
+ * Editar a conta mostra o saldo ATUAL (28/09/2026, *"ao editar, depois de já ter criado, eu tenho
+ * que conseguir editar o valor atual dele, e não mais o inicial"*). O banco continua guardando o
+ * INICIAL — o saldo é derivado, nunca coluna —, então gravar anda o inicial pela diferença: o
+ * atual passa a ser o digitado e os lançamentos ficam como estão. Sem mexer no campo, o inicial
+ * não muda nem um centavo. `atualMostrado` é o de `saldoDaConta`, a régua da lista.
+ */
+export function inicialParaOSaldo(desejado: number, atualMostrado: number, inicial: number): number {
+  return inicial + (desejado - atualMostrado);
+}

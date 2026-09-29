@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { accountLabel, saldoDaConta } from './accounts.ts';
+import { accountLabel, inicialParaOSaldo, saldoDaConta } from './accounts.ts';
 
 test('o cartão diz que é cartão — foi o que custou R$ 4.000 em produção', () => {
   // As quatro contas reais de 09/09/2026, na ordem em que apareciam no seletor.
@@ -38,4 +38,15 @@ test('O saldo de UMA conta: dinheiro mostra o confirmado; cartão, o total (24/0
   assert.deepEqual(saldoDaConta(corrente), { cents: 30000, previsto: 20000, rotulo: 'Saldo', previstoTexto: 'a receber' });
   const cartao = { type: 'credit_card', balance_cents: -90000, cleared_cents: 0, pending_in_cents: 0, pending_out_cents: 60000 };
   assert.deepEqual(saldoDaConta(cartao), { cents: -90000, previsto: 60000, rotulo: 'Saldo do cartão', previstoTexto: 'a vencer' });
+});
+
+test('editar o saldo atual anda o inicial pela diferença, e sem mexer não muda nada', () => {
+  // O Nubank de produção (28/09/2026): inicial 867,86, a lista mostra 162,51.
+  assert.equal(inicialParaOSaldo(16251, 16251, 86786), 86786);
+  // A pessoa corrige para o que o banco mostra (200,00): o atual vira 200,00.
+  const inicial = inicialParaOSaldo(20000, 16251, 86786);
+  assert.equal(inicial, 90535);
+  assert.equal(inicial + (16251 - 86786), 20000, 'inicial + lançamentos = o digitado');
+  // Pode ficar negativo (conta no cheque especial).
+  assert.equal(inicialParaOSaldo(-5000, 16251, 86786), 86786 - 21251);
 });

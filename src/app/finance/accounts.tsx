@@ -47,7 +47,7 @@ import {
   type AccountBalance,
 } from '@/hooks/use-finance';
 import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
-import { saldoDaConta } from '@/lib/accounts';
+import { inicialParaOSaldo, saldoDaConta } from '@/lib/accounts';
 import { confirmDestructive } from '@/lib/item-actions';
 
 /**
@@ -84,7 +84,12 @@ interface FormState {
   id?: string;
   name: string;
   type: Account['type'];
-  initialCents: number;
+  /** O saldo no campo, SEM sinal: ATUAL na edição, e na criação o de hoje (que é o inicial). */
+  saldoCents: number;
+  /** O sinal do saldo. `MoneyField` só digita positivo; conta corrente pode estar no vermelho. */
+  negativo: boolean;
+  /** Na edição, o saldo que a lista mostrava e o inicial gravado — gravar anda o inicial pela diferença. */
+  base: { atual: number; inicial: number } | null;
   closingDay: string;
   dueDay: string;
   limitCents: number;
@@ -99,7 +104,9 @@ interface FormState {
 const FORM_VAZIO: FormState = {
   name: '',
   type: 'checking',
-  initialCents: 0,
+  saldoCents: 0,
+  negativo: false,
+  base: null,
   closingDay: '',
   dueDay: '',
   limitCents: 0,
@@ -229,11 +236,17 @@ export default function AccountsScreen() {
   };
   const abrirEdicao = (a: Account) => {
     save.reset();
+    // O campo abre no saldo que a lista mostra, não no inicial (28/09/2026): o Nubank mostrava
+    // 162,51 e a edição abria em 867,86. Sem a linha do saldo, cai no inicial com o rótulo dele.
+    const linha = balances.data?.find((b) => b.account_id === a.id);
+    const atual = linha ? saldoDaConta(linha).cents : null;
     setForm({
       id: a.id,
       name: a.name,
       type: a.type,
-      initialCents: a.initial_balance_cents,
+      saldoCents: Math.abs(atual ?? a.initial_balance_cents),
+      negativo: (atual ?? a.initial_balance_cents) < 0,
+      base: atual == null ? null : { atual, inicial: a.initial_balance_cents },
       closingDay: a.closing_day ? String(a.closing_day) : '',
       dueDay: a.due_day ? String(a.due_day) : '',
       limitCents: a.credit_limit_cents ?? 0,
@@ -251,7 +264,8 @@ export default function AccountsScreen() {
   const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
   if (params.edit && params.edit !== edicaoAberta && form === null) {
     const alvo = accounts.data?.find((a) => a.id === params.edit);
-    if (alvo) {
+    // Espera os saldos: sem eles o campo abriria no inicial, que é o número que a pessoa não vê.
+    if (alvo && !balances.isPending) {
       setEdicaoAberta(params.edit);
       volta.marcar();
       abrirEdicao(alvo);
@@ -263,6 +277,10 @@ export default function AccountsScreen() {
   const cicloOk = !ehCartao || (diaValido(form!.closingDay) && diaValido(form!.dueDay));
   const taxaOk = !ehCartao || !form!.rotativoRate.trim() || taxaValida(form!.rotativoRate);
 
+  // Só a corrente fica no vermelho; nas outras o sinal nem aparece e não pode sobrar escondido.
+  const podeNegativo = form?.type === 'checking';
+  const saldoComSinal = form ? (podeNegativo && form.negativo ? -form.saldoCents : form.saldoCents) : 0;
+
   const salvar = () => {
     if (!form || !nomeOk || !cicloOk || !taxaOk) return;
     save.mutate(
@@ -270,7 +288,9 @@ export default function AccountsScreen() {
         id: form.id,
         name: form.name.trim(),
         type: form.type,
-        initial_balance_cents: form.initialCents,
+        initial_balance_cents: form.base
+          ? inicialParaOSaldo(saldoComSinal, form.base.atual, form.base.inicial)
+          : saldoComSinal,
         closing_day: ehCartao ? Number(form.closingDay) : null,
         due_day: ehCartao ? Number(form.dueDay) : null,
         credit_limit_cents: ehCartao ? form.limitCents : null,
@@ -756,11 +776,21 @@ export default function AccountsScreen() {
                   </Field>
                 </>
               ) : (
-                <Field label="Saldo inicial">
+                <Field label={form.id && !form.base ? 'Saldo inicial' : 'Saldo atual'}>
                   <MoneyField
-                    valueCents={form.initialCents}
-                    onChangeCents={(initialCents) => setForm({ ...form, initialCents })}
+                    valueCents={form.saldoCents}
+                    onChangeCents={(saldoCents) => setForm({ ...form, saldoCents })}
                   />
+                  {podeNegativo ? (
+                    <Segmented
+                      value={form.negativo ? 'negativo' : 'positivo'}
+                      onChange={(v) => setForm({ ...form, negativo: v === 'negativo' })}
+                      options={[
+                        { value: 'positivo', label: 'Positivo' },
+                        { value: 'negativo', label: 'No vermelho' },
+                      ]}
+                    />
+                  ) : null}
                 </Field>
               )}
 
