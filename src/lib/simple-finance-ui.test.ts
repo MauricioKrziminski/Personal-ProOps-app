@@ -42,12 +42,17 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   const avisos: string[] = [];
   /** Com que limite cada lista paginada no servidor foi pedida — é como se vê o "Ver mais" pedir mais. */
   const pedidosDeLimite: [string, number | undefined][] = [];
-  const mutation = (operation: string) => ({ isPending: false, reset() {}, mutate(value: any, opts?: any) { writes.push({ operation, value }); pedidos.push({ operation, value, opts }); }, async mutateAsync(value: any) {
+  /** Quantas chamadas de cada mutação seguem no banco (`segurarMutacoes`): é o `isPending` delas. */
+  const emCurso: Record<string, number> = {};
+  const mutation = (operation: string) => ({ get isPending() { return (emCurso[operation] ?? 0) > 0; }, reset() {}, mutate(value: any, opts?: any) { writes.push({ operation, value }); pedidos.push({ operation, value, opts }); }, async mutateAsync(value: any) {
     writes.push({ operation, value });
     // `segurarMutacoes`: a promessa só resolve quando o teste chama `resolver` — é como se vê o que
     // a tela faz ANTES e DEPOIS do sucesso sem depender do callback por chamada.
     if (!options.segurarMutacoes) return `${operation}-id`;
-    return new Promise((resolver, rejeitar) => pedidos.push({ operation, value, opts: undefined, resolver, rejeitar } as any));
+    emCurso[operation] = (emCurso[operation] ?? 0) + 1;
+    const terminou = () => { emCurso[operation] -= 1; };
+    return new Promise((resolver, rejeitar) => pedidos.push({ operation, value, opts: undefined,
+      resolver: (v: unknown) => { terminou(); resolver(v); }, rejeitar: (e: unknown) => { terminou(); rejeitar(e); } } as any));
   } });
   const animation = { duration: () => animation, delay: () => animation, reduceMotion: () => animation };
   const finance = new Proxy({
@@ -270,7 +275,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name.startsWith('./') && path.startsWith('src/lib/')) return load(`src/lib/${name.slice(2)}`);
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', useWindowDimensions: () => ({ width: 384, height: 800 }), Platform: { OS: 'android', select: (o: any) => o.android ?? o.default } };
-      if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInDown: animation, FadeOut: animation, FadeIn: animation, ReduceMotion: { System: 'system' }, LinearTransition: animation, useAnimatedRef: () => ({ current: null }),
+      // `View` também no topo: sem `__esModule`, o `import Animated from` do TS lê o módulo inteiro.
+      if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, View: 'AnimatedView', FadeInDown: animation, FadeOut: animation, FadeIn: animation, ReduceMotion: { System: 'system' }, LinearTransition: animation, useAnimatedRef: () => ({ current: null }),
         // O crossfade do Lançar: com "reduzir movimento" a troca é imediata, e o teste lê a tela logo depois.
         useReducedMotion: () => true, useSharedValue: (value: unknown) => ({ value }), useAnimatedStyle: () => ({}), withTiming: (value: unknown) => value, runOnJS: (fn: unknown) => fn };
       if (name === 'expo-haptics') return { selectionAsync() {}, notificationAsync() {}, NotificationFeedbackType: { Success: 'success', Warning: 'warning' } };
@@ -3819,8 +3825,9 @@ test('FormularioDaDivida: editando com a dívida ainda não carregada, espera �
   vazio.interact((nodes: any[]) => nodes.forEach((n) => n.props?.onPress?.()));
   assert.equal(vazio.writes.length, 0, 'nenhum toque grava');
   assert.ok(vazio.nodes().some((n: any) => n.type === 'SkeletonList'), 'espera com esqueleto');
+  assert.ok(vazio.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Editar financiamento'), 'o esqueleto já diz o que é');
   const pronto = screen('src/components/finance/formulario-da-divida.tsx', { componente: 'FormularioDaDivida', debts: [carro], props });
-  assert.ok(pronto.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Editar dívida'));
+  assert.ok(pronto.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Editar financiamento'));
   assert.deepEqual(botoes(pronto), ['Salvar']);
   assert.ok(pronto.nodes().some((n: any) => n.type === 'TextField' && n.props.value === 'Carro'), 'o formulário é o da dívida');
 });
@@ -3831,6 +3838,7 @@ test('FormularioDaDivida: convertendo, Salvar entrega o financiamento ao hospede
   const ui = screen('src/components/finance/formulario-da-divida.tsx', { componente: 'FormularioDaDivida', forecastAccounts: [{ id: 'cc', name: 'Itaú', type: 'checking' }],
     props: { comum, registrarComum: () => {}, registrarEstado: () => {}, converter: (d: any) => destinos.push(d), onSalvo: () => {}, onFechar: () => {} } });
   assert.equal(ui.nodes().some((n: any) => n.props?.label === 'Salvar e criar outro'), false, 'convertendo não há "criar outro"');
+  assert.ok(ui.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Novo financiamento'));
   ui.fill('Total de parcelas', '48');
   ui.press('Salvar');
   assert.equal(ui.writes.length, 0, 'quem grava é o hospedeiro');
@@ -3986,4 +3994,93 @@ test('Lançar: convertendo um lançamento PAGO em financiamento, "Parcelas já p
   assert.match(dica(corpo({ converter: () => {}, pagamentoConvertido: true })), /já conta/);
   assert.equal(dica(corpo({ converter: () => {}, pagamentoConvertido: false })), undefined);
   assert.equal(dica(corpo({})), undefined, 'criando, sem aviso');
+});
+
+test('Lançar: converter de novo enquanto a primeira conversão está no banco não grava duas vezes, e os corpos esperam', async () => {
+  const ui = screen(lancarFile, { segurarMutacoes: true, params: { tipo: 'uma', id: 'tx-1', origem: 'transacao' } });
+  const seletor = () => ui.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'financiamento'));
+  const serie = () => ui.nodes().find((n: any) => n.type === 'FormularioDaSerie');
+  const conversoes = () => ui.writes.filter((w: any) => w.operation === 'converterRegistro').length;
+  ui.interact(() => seletor().props.onChange('recorrente'));
+  assert.equal(serie().props.salvando, false);
+  ui.interact(() => serie().props.converter({ tipo: 'recorrente', dados: {} }));
+  const primeira = ui.actions.find((a: any) => a.label === 'Manter e criar um novo');
+  ui.interact(() => primeira.onPress());
+  assert.equal(conversoes(), 1);
+  assert.equal(serie().props.salvando, true, 'o corpo trava o Salvar enquanto converte');
+  const perguntas = ui.actions.length;
+  ui.interact(() => serie().props.converter({ tipo: 'recorrente', dados: {} }));
+  assert.equal(ui.actions.length, perguntas, 'nem pergunta de novo');
+  ui.interact(() => primeira.onPress());
+  assert.equal(conversoes(), 1, 'um toque de novo na pergunta aberta também não grava');
+  (ui.pedidos.at(-1) as any).rejeitar({ code: 'P0001', message: 'Não deu.' });
+  await new Promise((r) => setTimeout(r, 0));
+  ui.interact(() => {});
+  assert.equal(serie().props.salvando, false, 'recusada, dá para tentar de novo');
+  ui.interact(() => serie().props.converter({ tipo: 'recorrente', dados: {} }));
+  assert.ok(ui.actions.length > perguntas);
+});
+
+test('Lançar: com "salvando" do hospedeiro, a série e a dívida desligam Salvar e "Salvar e criar outro"', () => {
+  const liga = (ui: any, rotulo: string) => !ui.nodes().find((n: any) => n.type === 'Button' && n.props.label === rotulo).props.disabled;
+  const base = { registrarComum: () => {}, registrarEstado: () => {}, onSalvo: () => {}, onFechar: () => {} };
+  const comumSerie = { kind: 'expense', descricao: 'Academia', valorCents: 5000, contaId: null, dataBR: '06/10/2026', categoria: null };
+  const serie = (salvando: boolean) => screen('src/components/finance/formulario-da-serie.tsx', { componente: 'FormularioDaSerie', props: { ...base, comum: comumSerie, salvando } });
+  assert.deepEqual([liga(serie(false), 'Criar'), liga(serie(false), 'Salvar e criar outro')], [true, true]);
+  assert.deepEqual([liga(serie(true), 'Criar'), liga(serie(true), 'Salvar e criar outro')], [false, false]);
+  const comumDivida = { kind: 'expense', descricao: 'Carro', valorCents: 147000, contaId: null, dataBR: '05/09/2026', categoria: null };
+  const divida = (salvando: boolean) => {
+    const ui = screen('src/components/finance/formulario-da-divida.tsx', { componente: 'FormularioDaDivida', props: { ...base, comum: comumDivida, salvando } });
+    ui.fill('Total de parcelas', '48');
+    return ui;
+  };
+  assert.deepEqual([liga(divida(false), 'Salvar'), liga(divida(false), 'Salvar e criar outro')], [true, true]);
+  assert.deepEqual([liga(divida(true), 'Salvar'), liga(divida(true), 'Salvar e criar outro')], [false, false]);
+  const lanc = readFileSync('src/components/finance/formulario-do-lancamento.tsx', 'utf8');
+  assert.match(lanc, /const saving =\s*props\.salvando \|\|/);
+});
+
+test('Lançar: os três corpos têm a MESMA moldura na tela — calha, largura, laterais e pé seguros', () => {
+  const host = readFileSync(lancarFile, 'utf8');
+  assert.match(host, /<Screen scroll=\{false\}>/, 'laterais seguras: o contêiner da pilha, pelo Screen');
+  assert.match(host, /<FormularioEmTela\.Provider value>/, 'a série e a dívida sabem que estão numa tela, não numa folha');
+  const folha = readFileSync('src/components/ui/sheet.tsx', 'utf8');
+  assert.match(folha, /export function molduraEmTela\(abaixo: number\)[\s\S]{0,400}paddingHorizontal: Space\.lg[\s\S]{0,200}paddingBottom: abaixo \+ Space\.xxl[\s\S]{0,200}maxWidth: MaxContentWidth/);
+  assert.match(folha, /if \(emTela\)[\s\S]{0,600}molduraEmTela\(insets\.bottom\)/, 'SheetScroll na tela soma o pé seguro');
+  const lanc = readFileSync('src/components/finance/formulario-do-lancamento.tsx', 'utf8');
+  assert.match(lanc, /contentContainerStyle=\{\[styles\.body, molduraEmTela\(insets\.bottom\)\]\}/, 'o lançamento usa a mesma moldura');
+  for (const f of ['formulario-da-serie.tsx', 'formulario-da-divida.tsx']) {
+    assert.match(readFileSync(`src/components/finance/${f}`, 'utf8'), /<SheetScroll contentContainerStyle=/, f);
+  }
+});
+
+test('Lançar: só o conteúdo ABAIXO do seletor esmaece; cabeçalho e seletor ficam', () => {
+  const ui = screen(lancarFile, { params: { tipo: 'recorrente' } });
+  assert.equal(ui.nodes().some((n: any) => n.type === 'AnimatedView'), false, 'o hospedeiro não embrulha o corpo');
+  const estilo = ui.nodes().find((n: any) => n.type === 'FormularioDaSerie').props.estiloDoConteudo;
+  assert.ok(estilo, 'o corpo recebe o estilo do conteúdo');
+
+  const marca = { opacity: 0.5 };
+  const topo = { type: 'Topo', props: {} };
+  const base = { registrarComum: () => {}, registrarEstado: () => {}, onSalvo: () => {}, onFechar: () => {}, topo, estiloDoConteudo: marca };
+  const debaixo = (u: any) => {
+    const caixa = u.nodes().find((n: any) => n.type === 'AnimatedView' && [n.props.style].flat().includes(marca));
+    assert.ok(caixa, 'o conteúdo mora numa caixa animada');
+    const out: any[] = [];
+    const v = (n: any) => { if (Array.isArray(n)) return n.forEach(v); if (!n?.props) return; out.push(n); v(n.props.children); };
+    v(caixa.props.children);
+    return out;
+  };
+  const serie = screen('src/components/finance/formulario-da-serie.tsx', { componente: 'FormularioDaSerie',
+    props: { ...base, comum: { kind: 'expense', descricao: '', valorCents: 0, contaId: null, dataBR: '06/10/2026', categoria: null } } });
+  const s = debaixo(serie);
+  assert.ok(s.some((n: any) => n.type?.name === 'CamposDaSerie'));
+  assert.equal(s.some((n: any) => n.type === 'TaskHeader' || n === topo), false);
+  const divida = screen('src/components/finance/formulario-da-divida.tsx', { componente: 'FormularioDaDivida',
+    props: { ...base, comum: { kind: 'expense', descricao: 'Carro', valorCents: 0, contaId: null, dataBR: '05/09/2026', categoria: null } } });
+  const d = debaixo(divida);
+  assert.ok(d.some((n: any) => n.type === 'Field' && n.props.label === 'Nome'));
+  assert.equal(d.some((n: any) => n.type === 'TaskHeader' || n === topo), false);
+  const lanc = readFileSync('src/components/finance/formulario-do-lancamento.tsx', 'utf8');
+  assert.match(lanc, /\{props\.topo\}\s*<Animated\.View style=\{\[styles\.conteudo, props\.estiloDoConteudo\]\}>/);
 });

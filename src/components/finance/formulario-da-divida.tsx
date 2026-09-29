@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import type { CorpoProps } from '@/components/finance/corpo-do-lancar';
 import { AccountPicker } from '@/components/finance/account-picker';
@@ -204,7 +205,7 @@ export function FormularioDaDivida(props: Props) {
   if (props.editandoId && !alvo && !props.estadoGuardado) {
     return (
       <>
-        <TaskHeader title="Editar dívida" onClose={props.onFechar} voltar={props.voltar} />
+        <TaskHeader title="Editar financiamento" onClose={props.onFechar} voltar={props.voltar} />
         <SheetScroll contentContainerStyle={styles.sheetBody}>
           {debts.isError ? (
             <ErrorBand message="Não deu para carregar a dívida." onRetry={() => void debts.refetch()} />
@@ -464,7 +465,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     );
   };
 
-  const salvando = save.isPending || saveScoped.isPending;
+  const salvando = props.salvando || save.isPending || saveScoped.isPending;
   const dataDoContrato = (
     <Field label={rotuloDaData} error={faltaData ? 'Escolha a data' : undefined}>
       <DatePickerField
@@ -484,7 +485,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   return (
     <>
       <TaskHeader
-        title={form.id ? 'Editar dívida' : 'Nova dívida'}
+        title={form.id ? 'Editar financiamento' : 'Novo financiamento'}
         onClose={onFechar}
         voltar={props.voltar}
         action={
@@ -492,7 +493,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
             label="Salvar"
             size="sm"
             loading={salvando}
-            disabled={!podeSalvar}
+            disabled={!podeSalvar || salvando}
             onPress={() => salvar(false)}
           />
         }
@@ -500,6 +501,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
 
       <SheetScroll contentContainerStyle={styles.sheetBody}>
         {props.topo}
+        <Animated.View style={[styles.conteudo, props.estiloDoConteudo]}>
         {/* Os pagamentos lançados são o piso das "pagas": sem eles o Salvar espera — e diz por quê. */}
         {form.id && payments.isError ? (
           <ErrorBand
@@ -713,12 +715,16 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
             onPress={() => salvar(true)}
           />
         ) : null}
+        </Animated.View>
       </SheetScroll>
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  conteudo: {
+    gap: Space.xl,
+  },
   sheetBody: {
     gap: Space.xl,
     padding: Space.lg,

@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import type { ViewStyle } from 'react-native';
+import type { AnimatedStyle } from 'react-native-reanimated';
 import type { Comum } from '@/lib/lancar';
 import type { RegistroSimulado } from '@/lib/hipotese';
 
@@ -23,4 +25,11 @@ export type CorpoProps = {
   onFechar: () => void;
   /** Aberta pelo "Aplicar" de uma hipótese: salvar a tira do rascunho. */
   deHipotese?: string;
+  /** O hospedeiro está gravando (a conversão): Salvar e "Salvar e criar outro" esperam. */
+  salvando?: boolean;
+  /**
+   * O esmaecer da troca de tipo. Vai só no conteúdo ABAIXO do `topo`: cabeçalho e seletor ficam
+   * (spec: "os comuns não se movem").
+   */
+  estiloDoConteudo?: AnimatedStyle<ViewStyle>;
 };

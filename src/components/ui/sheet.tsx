@@ -15,6 +15,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ToastOutlet } from '@/components/ui/toast';
+import { MaxContentWidth } from '@/constants/theme';
 import { classifyWindow } from '@/design/adaptive-window';
 import { abaixoDoDialogo, tabletSheetFrame } from '@/design/adaptive-sheet';
 import { Space } from '@/design/tokens';
@@ -26,6 +27,28 @@ const TabletSheetContext = createContext(false);
  * formSheet do iPad, que o próprio UIKit move.
  */
 const AbaixoDaFolha = createContext<number | null>(0);
+
+/**
+ * O corpo de formulário que nasceu para uma folha, montado numa TELA modal (`/finance/lancar`):
+ * lá não há folha para descontar o pé, e a rolagem leva a moldura da tela — a mesma do lançamento.
+ */
+export const FormularioEmTela = createContext(false);
+
+/**
+ * A moldura de formulário em tela cheia: calha, largura máxima e o pé seguro (a barra de gestos ou
+ * de tarefas). Os três corpos do formulário único usam ESTA, para trocar de tipo não mexer na tela.
+ * As laterais seguras vêm do contêiner da pilha (`Screen scroll={false}`).
+ */
+export function molduraEmTela(abaixo: number) {
+  return {
+    paddingTop: Space.md,
+    paddingHorizontal: Space.lg,
+    paddingBottom: abaixo + Space.xxl,
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+  } as const;
+}
 
 /**
  * A rolagem de uma folha com campo. É a MESMA do `Screen` (`KeyboardAwareScrollView`): com o
@@ -48,6 +71,19 @@ const AbaixoDaFolha = createContext<number | null>(0);
  */
 export function SheetScroll(props: ScrollViewProps & { children?: React.ReactNode }) {
   const abaixo = useContext(AbaixoDaFolha);
+  const emTela = useContext(FormularioEmTela);
+  const insets = useSafeAreaInsets();
+  if (emTela) {
+    return (
+      <KeyboardAwareScrollView
+        bottomOffset={Space.xxl}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        {...props}
+        contentContainerStyle={[props.contentContainerStyle, molduraEmTela(insets.bottom)]}
+      />
+    );
+  }
   if (abaixo === null) {
     // formSheet do iPad: o UIKit sobe a folha para fora do teclado (e deitado ela pode não caber).
     // Só o iOS sabe onde ela parou; o ajuste nativo mede a sobreposição de verdade e rola até o
@@ -145,6 +181,8 @@ export function Sheet({
       onRequestClose={onClose}>
       {/* O `Modal` é outra janela: gesto do gesture-handler (arrastar um card) precisa da raiz aqui dentro. */}
       <GestureHandlerRootView style={styles.raizDoGesto}>
+        {/* Uma folha aberta de dentro do formulário em tela volta a ser folha. */}
+        <FormularioEmTela.Provider value={false}>
         <AbaixoDaFolha.Provider value={abaixo}>
         {androidTablet ? (
         <View style={[styles.raizDoGesto, { backgroundColor: theme.overlay }]}>
@@ -198,6 +236,7 @@ export function Sheet({
         </View>
         )}
         </AbaixoDaFolha.Provider>
+        </FormularioEmTela.Provider>
       </GestureHandlerRootView>
     </Modal>
   );

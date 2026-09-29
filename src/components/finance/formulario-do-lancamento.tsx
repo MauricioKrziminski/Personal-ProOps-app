@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Screen } from '@/components/ui/screen';
+import { molduraEmTela } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useRascunho } from '@/hooks/use-rascunho';
 import { pendenciaDoAplicar } from '@/lib/hipotese';
@@ -483,7 +484,7 @@ export function FormularioDoLancamento(props: Props) {
   const versoesPagamentos = useDebtPaymentVersions(editing?.debt_id ?? undefined);
   const tentativaPagamento = useRef<{ key: string; id: string } | null>(null);
   const saving =
-    save.isPending || createPlan.isPending || converter.isPending || atualizarCompra.isPending || salvarPagamentoDivida.isPending ||
+    props.salvando || save.isPending || createPlan.isPending || converter.isPending || atualizarCompra.isPending || salvarPagamentoDivida.isPending ||
     salvarParcela.isPending || editarSerie.isPending || editarTodaSerie.isPending || editarUmaRecorrencia.isPending;
 
   /**
@@ -958,11 +959,12 @@ export function FormularioDoLancamento(props: Props) {
 
       <KeyboardAwareScrollView
         bottomOffset={Space.xxl}
-        contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + Space.xxl }]}
+        contentContainerStyle={[styles.body, molduraEmTela(insets.bottom)]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic">
         {props.topo}
+        <Animated.View style={[styles.conteudo, props.estiloDoConteudo]}>
         {/*
           Uma linha só, e ela É o caminho: abre a dívida DESTE pagamento, não a lista. Era um texto
           solto com um botão colado embaixo (24/09/2026).
@@ -1449,6 +1451,7 @@ export function FormularioDoLancamento(props: Props) {
         ) : null}
         </>
         )}
+        </Animated.View>
       </KeyboardAwareScrollView>
       <ToastDoModal />
     </Screen>
@@ -1546,6 +1549,7 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
   },
+  conteudo: { gap: Space.xl },
   dateBlock: { gap: Space.sm },
   chipRow: {
     flexDirection: 'row',

@@ -796,9 +796,7 @@ const SEM_SCREEN = new Set([
   // Só a FOLHA do formulário, num modal transparente por cima de quem abriu: não há tela.
   'src/app/finance/nova-recorrente.tsx',
   'src/app/finance/novo-financiamento.tsx',
-  // O formulário único e a rota antiga do lançamento: montam CORPOS (o do lançamento traz o
-  // próprio <Screen>; os da série e da dívida, `TaskHeader` + `SheetScroll`).
-  'src/app/finance/lancar.tsx',
+  // A rota antiga do lançamento só monta o CORPO, que traz o próprio <Screen>.
   'src/app/finance/transaction-form.tsx',
 ]);
 
@@ -1482,6 +1480,7 @@ test('toda tela de dados tem puxar para atualizar', () => {
     'app/paywall.tsx': 'oferta, não lista',
     'app/reminder-form.tsx': 'formulário',
     'app/finance/transaction-form.tsx': 'formulário',
+    'app/finance/lancar.tsx': 'formulário',
     'app/notes/[id].tsx': 'editor: puxar competiria com a rolagem do texto',
     'app/(tabs)/agent/index.tsx': 'compositor; o histórico tem o gesto',
     'app/finance/wallet.tsx': 'carrossel de cartões',

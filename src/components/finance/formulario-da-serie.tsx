@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import type { CorpoProps } from '@/components/finance/corpo-do-lancar';
 import { ErrorCard } from '@/components/error-card';
@@ -232,7 +233,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
     );
   };
 
-  const salvando = create.isPending || editar.isPending || editarTudo.isPending;
+  const salvando = props.salvando || create.isPending || editar.isPending || editarTudo.isPending;
 
   return (
     <>
@@ -252,22 +253,27 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
       />
       <SheetScroll contentContainerStyle={styles.corpo}>
         {props.topo}
-        <CamposDaSerie form={form} onChange={setForm} contas={accounts.data ?? []} />
-        {!editandoId && !converter ? (
-          <Button
-            variant="secondary"
-            block
-            label="Salvar e criar outro"
-            disabled={!podeSalvar || salvando}
-            onPress={() => salvar(true)}
-          />
-        ) : null}
+        <Animated.View style={[styles.conteudo, props.estiloDoConteudo]}>
+          <CamposDaSerie form={form} onChange={setForm} contas={accounts.data ?? []} />
+          {!editandoId && !converter ? (
+            <Button
+              variant="secondary"
+              block
+              label="Salvar e criar outro"
+              disabled={!podeSalvar || salvando}
+              onPress={() => salvar(true)}
+            />
+          ) : null}
+        </Animated.View>
       </SheetScroll>
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  conteudo: {
+    gap: Space.xl,
+  },
   corpo: {
     gap: Space.xl,
     padding: Space.lg,

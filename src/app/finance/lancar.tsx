@@ -1,16 +1,16 @@
 import { useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import Animated, { runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
+import { runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { FormularioDaDivida } from '@/components/finance/formulario-da-divida';
 import { FormularioDaSerie } from '@/components/finance/formulario-da-serie';
 import { FormularioDoLancamento, LancamentoEditando } from '@/components/finance/formulario-do-lancamento';
+import { Screen } from '@/components/ui/screen';
 import { Segmented } from '@/components/ui/segmented';
+import { FormularioEmTela } from '@/components/ui/sheet';
 import { ToastDoModal, useToast } from '@/components/ui/toast';
 import { Motion } from '@/design/tokens';
 import { useConverterRegistro, useTransaction } from '@/hooks/use-finance';
-import { useTheme } from '@/hooks/use-theme';
 import { isoToBR, localISODate } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
 import type { RegistroSimulado } from '@/lib/hipotese';
@@ -44,7 +44,6 @@ export default function LancarScreen() {
     Object.entries(bruto).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]),
   );
   const tipoOriginal = TIPOS_DE_LANCAMENTO.find((t) => t.value === p.tipo)?.value ?? 'uma';
-  const theme = useTheme();
   const [tipo, setTipo] = useState<TipoDeLancamento>(tipoOriginal);
   const [comum, setComum] = useState<Comum>(() => ({
     kind: p.kind === 'income' ? 'income' : 'expense',
@@ -62,6 +61,11 @@ export default function LancarScreen() {
   const lerEstado = useRef<() => unknown>(() => undefined);
   const toast = useToast();
   const converter = useConverterRegistro();
+  /**
+   * Uma conversão por vez. `isPending` só chega no render seguinte, e a pergunta aberta guarda o
+   * `onPress` de antes: o segundo toque gravaria de novo (com "Manter", um segundo registro).
+   */
+  const convertendo = useRef(false);
   const reduzir = useReducedMotion();
   const opacidade = useSharedValue(1);
   const estilo = useAnimatedStyle(() => ({ opacity: opacidade.get() }));
@@ -91,8 +95,8 @@ export default function LancarScreen() {
       setTipo(novo);
     };
     if (reduzir) return aplicar();
-    // Crossfade curto: some o corpo, troca, volta. Só opacidade — animação de LAYOUT não existe no
-    // Android (design.md §5).
+    // Crossfade curto só no conteúdo abaixo do seletor: some, troca, volta. Cabeçalho e seletor
+    // ficam. Só opacidade — animação de LAYOUT não existe no Android (design.md §5).
     // Outro toque durante a saída cancela esta: a cancelada não troca nada, quem troca é a última.
     opacidade.set(withTiming(0, { duration: Motion.duration.fast }, (terminou) => {
       if (!terminou) return;
@@ -109,17 +113,23 @@ export default function LancarScreen() {
   };
 
   const converterPara = (destino: RegistroSimulado) => {
-    if (!origem) return;
+    if (!origem || convertendo.current || converter.isPending) return;
     const acoes = opcoesDaConversao(origem).map((o) => ({
       label: o.label,
       destructive: o.destrutiva,
       onPress: () => {
-        const ir = () =>
-          converter.mutateAsync({ origem, alcance: o.alcance, destino }).then(
+        const ir = () => {
+          if (convertendo.current) return;
+          convertendo.current = true;
+          return converter.mutateAsync({ origem, alcance: o.alcance, destino }).then(
             () => router.back(),
             // A recusa do banco diz o motivo e o caminho; a tela fica aberta com o que foi digitado.
-            (e) => toast({ message: financeErrorMessage(e, 'Não deu para mudar o tipo.'), tone: 'error' }),
+            (e) => {
+              convertendo.current = false;
+              toast({ message: financeErrorMessage(e, 'Não deu para mudar o tipo.'), tone: 'error' });
+            },
           );
+        };
         if (o.destrutiva) confirmDestructive('Apagar o que já aconteceu?', 'Apagar e converter', ir, 'Os lançamentos já pagos também saem. Isso não volta.');
         else void ir();
       },
@@ -144,11 +154,14 @@ export default function LancarScreen() {
     deHipotese: doAplicar ? p.deHipotese : undefined,
     editandoId: editandoAqui,
     converter: editandoId && tipo !== tipoOriginal ? converterPara : undefined,
+    salvando: converter.isPending,
+    estiloDoConteudo: estilo,
   };
 
   return (
-    <View style={[styles.fill, { backgroundColor: theme.background }]}>
-      <Animated.View style={[styles.fill, estilo]}>
+    // `Screen` sem rolagem: o fundo e as laterais seguras no contêiner da pilha, para os três corpos.
+    <Screen scroll={false}>
+      <FormularioEmTela.Provider value>
         {tipo === 'uma' && editandoAqui ? (
           <LancamentoEditando key={`uma:${geracao}`} {...base} editandoId={editandoAqui} />
         ) : tipo === 'uma' ? (
@@ -171,11 +184,9 @@ export default function LancarScreen() {
             dadosDoAplicar={doAplicar && p.deHipotese ? { parcela: p.parcela, parcelas: p.parcelas, conta: p.conta, data: p.data } : undefined}
           />
         )}
-      </Animated.View>
+      </FormularioEmTela.Provider>
       {/* O corpo do lançamento já traz o dele; os outros dois nasceram para uma folha. */}
       {tipo !== 'uma' ? <ToastDoModal /> : null}
-    </View>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({ fill: { flex: 1 } });
