@@ -58,6 +58,7 @@ import {
   iconeDoItem,
   linhasDoDia,
   metaDoItem,
+  pendentesDaHoje,
   semanaDoDia,
   separarLembretes,
   type ItemDaAgenda,
@@ -185,6 +186,7 @@ export default function TodayScreen() {
   const lembretes = useMemo(() => separarLembretes(reminders.data ?? [], hoje), [reminders.data, hoje]);
   const linhas = linhasDoDia({ atrasados, atrasadosAbertos, limiteDoAtrasado, doDia, lembretes, agora });
   const apertados = useMemo(() => orcamentosApertados(budgets.data ?? []), [budgets.data]);
+  const paraResolver = pendentesDaHoje({ contas: bills.data ?? [], lembretes: reminders.data ?? [], hoje });
 
   /* `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch falha. */
   const emConta = useMemo(() => caixaDasContas(saldos.isError ? [] : (saldos.data ?? [])), [saldos.isError, saldos.data]);
@@ -384,6 +386,8 @@ export default function TodayScreen() {
       <BlockHeader
         title="Seu dia"
         voice="app"
+        // O MESMO número da aba Hoje (`pendentesDaHoje`): ao lado do bloco de onde ele sai.
+        count={paraResolver}
         action={{ label: 'Lembretes', accessibilityLabel: 'Ver todos os lembretes', onPress: () => router.push('/reminders') }}
       />
       {/* Cada leitura tem o seu erro (§7): contas e lembretes falham separados. */}

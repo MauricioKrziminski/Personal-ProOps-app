@@ -27,9 +27,9 @@ const TABS = [
  *
  * ## O que a deixou menos crua
  *
- * - **Badge com contagem** no Hoje: o que vence, o lembrete de hoje e o orçamento estourado. É
- *   informação, não enfeite — a mesma régua dos atalhos do painel, onde tile sem número é botão
- *   morto. Sem nada pendente o badge não aparece.
+ * - **Badge com contagem** no Hoje: o que o "Seu dia" tem para resolver (atrasado, o que vence
+ *   hoje, o lembrete de hoje) — o MESMO número ao lado do título do bloco, para dizer de onde ele
+ *   vem. Sem nada pendente o badge não aparece.
  * - **`minimizeBehavior: 'onScrollDown'`** (iOS 26): a barra encolhe ao rolar e volta ao subir.
  *   É comportamento nativo do sistema, não animação nossa.
  * - **Ícone com estado explícito** (`iconColor` default/selected): com o accent monocromático o

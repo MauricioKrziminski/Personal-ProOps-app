@@ -993,11 +993,13 @@ que "voltar" faz depois.
   `src/lib/agent-navigation.test.ts` quebra o build se divergirem — no Android o índice do slot
   vem da POSIÇÃO, então uma aba fora de ordem manda a pessoa para a tela errada enquanto o
   círculo anima para o lugar certo.
-- **Badge de aba é contagem real ou não existe.** Mesma régua dos atalhos do painel: número que
-  não muda decisão é enfeite. Hoje leva o que vence (SEM receita prevista — ela não vence) +
-  lembrete de HOJE (o que ficou de outro dia aparece na tela, com a data, e não conta) + orçamento
-  estourado, e some com zero. A régua é UMA: `pendentesDaHoje`, atrás de `usePendentesDaHoje`,
-  nas duas tab bars — elas tinham a soma copiada e contavam a receita (28/09/2026).
+- **Badge de aba é contagem real ou não existe — e tem UM lugar na tela.** O da Hoje é o que o
+  "Seu dia" tem para resolver (o atrasado, a conta que vence HOJE — receita não vence — e o
+  lembrete de hoje), e o MESMO número aparece na contagem ao lado do título "Seu dia". Some com
+  zero. A régua é UMA: `pendentesDaHoje`, nas duas tab bars e no bloco. Ele já somou conta de até
+  7 dias (metade no Seu dia, metade nos Próximos dias) e orçamento estourado (no card do
+  dinheiro): nenhuma seção mostrava aquele total, e a pergunta foi *"em qual seção esses números
+  se tratam?"* (29/09/2026). O "8" do sino é outra coisa: alerta não lido.
 - **Criar item de lista é `+` no header**, nunca botão de bloco no corpo — Contas, Cartões,
   Orçamentos, Metas, Dívidas, Recorrentes, Regras e Lembretes. O botão no corpo existe só dentro
   do `EmptyState`, onde não há lista para o `+` do header explicar.

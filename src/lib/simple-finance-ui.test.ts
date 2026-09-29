@@ -3683,3 +3683,38 @@ test('E se: só com hipótese incompleta nada é simulado e o "Onde muda" não f
   assert.equal(erro.nodes().some((n: any) => n.type === 'SkeletonList'), false);
   assert.ok(erro.nodes().some((n: any) => n.type === 'ErrorBand' || (typeof n.type === 'function' && n.type.name === 'ErrorBand')));
 });
+
+test('Aplicar recorrente e financiamento abre SÓ a folha, por cima de onde a pessoa está — sem a lista', () => {
+  // 29/09/2026, *"devo conseguir criar tudo direto ali… e não ser redirecionado para a tela deles"*.
+  const rec = screen('src/app/finance/recurring.tsx', { props: { soFormulario: true }, params: { create: '1', deHipotese: 'r', kind: 'expense', amount: '5000', start: '06/10/2026', repete: 'weekly' } });
+  assert.ok(rec.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible), 'a folha abre');
+  assert.equal(rec.nodes().some((n: any) => n.type === 'Screen'), false, 'sem a tela da lista por trás');
+  assert.equal(rec.nodes().some((n: any) => n.type === 'Search'), false);
+  const div = screen(debtsFile, { props: { soFormulario: true }, params: { create: 'financing', deHipotese: 'f', parcela: '147000', parcelas: '48', data: '31/10/2026' } });
+  assert.ok(div.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible && n.props.children));
+  assert.equal(div.nodes().some((n: any) => n.type === 'Screen'), false);
+  assert.ok(div.nodes().some((n: any) => n.type === 'MoneyField' && n.props.valueCents === 147000));
+  // e as duas rotas existem, em modal transparente, montando o modo "só a folha"
+  const layout = readFileSync('src/app/_layout.tsx', 'utf8');
+  for (const [rota, arquivo] of [['finance/nova-recorrente', 'recurring'], ['finance/novo-financiamento', 'debts']]) {
+    const i = layout.indexOf(`name="${rota}"`);
+    assert.ok(i > 0, `${rota} registrada`);
+    assert.match(layout.slice(i, i + 300), /presentation: 'transparentModal'/);
+    assert.match(readFileSync(`src/app/${rota}.tsx`, 'utf8'), new RegExp(`from '\\./${arquivo}'[\\s\\S]*soFormulario`));
+  }
+});
+
+test('Hoje: o Seu dia mostra a MESMA contagem da aba — é dele que o número fala', () => {
+  const hoje = '2026-09-08';
+  const ui = screen(hojeFile, {
+    bills: [
+      { ref_id: 'luz', kind: 'transaction', title: 'Luz', due_date: hoje, amount_cents: 1000, overdue: false },
+      { ref_id: 'agua', kind: 'transaction', title: 'Água', due_date: '2026-09-11', amount_cents: 1000, overdue: false },
+      { ref_id: 'pix', kind: 'income', title: 'Pix', due_date: hoje, amount_cents: 1000, overdue: false },
+    ],
+    reminders: [{ id: 'r1', title: 'Remédio', next_run_at: `${hoje}T15:00:00.000Z`, done: false }],
+    budgets: [{ category: 'lazer', limit_cents: 100, spent_cents: 900 }],
+  });
+  const seuDia = ui.nodes().find((n: any) => n.type === 'BlockHeader' && n.props.title === 'Seu dia');
+  assert.equal(seuDia.props.count, 2, 'a luz de hoje e o lembrete de hoje; nem a água (próximos dias), nem o Pix, nem o orçamento');
+});

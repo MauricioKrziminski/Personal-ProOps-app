@@ -1,4 +1,3 @@
-import { orcamentosApertados, type OrcamentoLinha } from './budget-tight.ts';
 import { diaCurtoBR, diaDaSemanaCurto, diasAte, isoToBR, localISODate, somaDias } from './dates.ts';
 
 /**
@@ -233,22 +232,22 @@ export function linhasDoDia<L extends LembreteDoDia>(v: {
 }
 
 /**
- * O número do badge da aba Hoje — a MESMA régua nas duas tab bars (`usePendentesDaHoje`).
+ * O número da aba Hoje — a MESMA régua nas duas tab bars (`usePendentesDaHoje`) e na contagem do
+ * "Seu dia", que é o bloco de onde ele sai: o atrasado, a conta que vence HOJE (receita não
+ * vence) e o lembrete de hoje.
  *
- * Conta a vencer (receita prevista não vence), lembrete de HOJE e orçamento estourado. As duas
- * tab bars somavam `upcoming_bills` inteiro, com a receita dentro, e o lembrete que ficou de
- * outro dia — contra a regra escrita na própria Hoje.
+ * Ele somava conta de até 7 dias (metade no Seu dia, metade nos Próximos dias) e orçamento
+ * estourado (no card do dinheiro): nenhuma seção mostrava aquele total, e a pergunta foi *"em qual
+ * seção esses números se tratam?"* (29/09/2026). Número de badge tem que ter UM lugar na tela.
  */
 export function pendentesDaHoje(v: {
-  contas: readonly Pick<ContaPrevista, 'kind'>[];
+  contas: readonly ContaPrevista[];
   lembretes: readonly Pick<LembreteDoDia, 'next_run_at'>[];
-  orcamentos: readonly OrcamentoLinha[];
   hoje: string;
 }): number {
   return (
-    v.contas.filter((c) => c.kind !== 'income').length +
-    separarLembretes(v.lembretes, v.hoje).deHoje.length +
-    orcamentosApertados(v.orcamentos).filter((o) => o.estourou).length
+    agendaDoDia(v.contas, [], v.hoje).agora.filter((i) => i.kind !== 'income').length +
+    separarLembretes(v.lembretes, v.hoje).deHoje.length
   );
 }
 

@@ -137,18 +137,23 @@ test('2+ atrasados viram UMA linha recolhida; aberta, mostra cada um com Ver mai
   assert.equal(resumoDoAtrasado([]), null);
 });
 
-test('o badge conta conta a vencer SEM receita, lembrete de HOJE e orçamento estourado', () => {
+test('o número da aba Hoje é o que o Seu dia tem para resolver: atrasado, o que vence hoje e o lembrete de hoje', () => {
+  // 29/09/2026, *"tá difícil saber por que tem esses números ali, em qual seção"*: ele somava
+  // contas de até 7 dias (metade no Seu dia, metade nos Próximos dias) e orçamento estourado (no
+  // card do dinheiro) — nenhuma seção mostrava aquele total. Agora é o do Seu dia, e só ele.
   assert.equal(
     pendentesDaHoje({
-      contas: [{ kind: 'invoice' }, { kind: 'income' }, { kind: 'transaction' }],
-      lembretes: [{ next_run_at: as(15) }, { next_run_at: as(6, 0, 3) }],
-      orcamentos: [
-        { category: 'mercado', limit_cents: 100, spent_cents: 90, committed_cents: 20 },
-        { category: 'lazer', limit_cents: 100, spent_cents: 85 },
+      contas: [
+        conta({ ref_id: 'luz', due_date: HOJE }),
+        conta({ ref_id: 'fatura', kind: 'invoice', due_date: '2026-09-10', overdue: true }),
+        conta({ ref_id: 'pix', kind: 'income', due_date: HOJE }),
+        conta({ ref_id: 'agua', due_date: '2026-09-19' }),
       ],
+      lembretes: [{ next_run_at: as(15) }, { next_run_at: as(6, 0, 3) }],
       hoje: HOJE,
     }),
-    2 + 1 + 1
+    2 + 1,
+    'luz e a fatura atrasada, mais o lembrete de hoje; a água é dos Próximos dias e a receita não vence'
   );
 });
 
