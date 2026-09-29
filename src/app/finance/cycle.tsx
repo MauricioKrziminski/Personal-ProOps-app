@@ -103,7 +103,7 @@ export default function CycleDetailScreen() {
   const comHipoteses = params.hipoteses === '1';
   const { rascunho: noAparelho } = useRascunho();
   const registros = useMemo(
-    () => (comHipoteses ? noAparelho.hipoteses.flatMap((h) => registroDaHipotese(h) ?? []) : []),
+    () => (comHipoteses ? noAparelho.hipoteses.flatMap((h, i) => registroDaHipotese(h, i) ?? []) : []),
     [comHipoteses, noAparelho.hipoteses],
   );
   const comDetalhadas = registros.length > 0;

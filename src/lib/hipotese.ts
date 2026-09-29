@@ -56,8 +56,11 @@ export function faltaNaHipotese(h: Hipotese): string | null {
  * O registro que a simulação cria — montado pelos MESMOS construtores do salvar real
  * (`lib/escrita.ts`), para a compra cair na fatura certa, o financiamento seguir o cronograma e a
  * recorrência a frequência. `null` = incompleta (fica fora da simulação).
+ *
+ * `posicao` é a da hipótese no rascunho: a dívida tem nome ÚNICO no espaço, e dois financiamentos
+ * chamados "Hipótese" faziam o segundo voltar 23505 (medido no staging, 29/09/2026).
  */
-export function registroDaHipotese(h: Hipotese): RegistroSimulado | null {
+export function registroDaHipotese(h: Hipotese, posicao: number): RegistroSimulado | null {
   if (faltaNaHipotese(h)) return null;
   switch (h.forma) {
     case 'uma':
@@ -93,7 +96,7 @@ export function registroDaHipotese(h: Hipotese): RegistroSimulado | null {
       return {
         tipo: 'financiamento',
         dados: linhaDoFinanciamento({
-          name: TITULO, kind: 'financing', calculation_mode: 'fixed_installments',
+          name: `Financiamento da hipótese ${posicao + 1}`, kind: 'financing', calculation_mode: 'fixed_installments',
           principal_cents: h.valor_cents * h.parcelas, remaining_cents: h.valor_cents * h.parcelas,
           interest_rate_monthly: 0, installments: h.parcelas, installments_paid: 0, installment_cents: h.valor_cents,
           account_id: h.conta, due_day: Number(h.data.slice(8, 10)), first_due_date: h.data,

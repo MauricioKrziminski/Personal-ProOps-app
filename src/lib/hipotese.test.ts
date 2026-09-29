@@ -41,6 +41,13 @@ test('financiamento: parcela fixa, âncora na data, dia da data', () => {
   assert.equal(r.dados.due_day, 31);
 });
 
+test('dois financiamentos no mesmo rascunho não colidem no nome (a dívida tem nome único no espaço)', () => {
+  // Medido no staging (29/09/2026): os dois se chamavam "Hipótese" e o segundo voltava 23505.
+  const f = { ...base, forma: 'financiamento' as const, valor_cents: 1000, parcelas: 3 };
+  const nomes = [registroDaHipotese(f, 0)!, registroDaHipotese({ ...f, id: 'h2' }, 1)!].map((r) => r.dados.name);
+  assert.deepEqual(nomes, ['Financiamento da hipótese 1', 'Financiamento da hipótese 2']);
+});
+
 test('o que falta: valor, conta no parcelado e no financiamento, parcelas', () => {
   assert.equal(faltaNaHipotese({ ...base, valor_cents: 0 }), 'Digite o valor');
   assert.equal(faltaNaHipotese({ ...base, forma: 'financiamento', conta: null }), 'Escolha a conta que paga');

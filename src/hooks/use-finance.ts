@@ -1090,7 +1090,7 @@ export function useSimulacao(o: {
   porConta: boolean;
   enabled: boolean;
 }) {
-  const registros = o.hipoteses.map(registroDaHipotese).filter((r): r is RegistroSimulado => r !== null);
+  const registros = o.hipoteses.map((h, i) => registroDaHipotese(h, i)).filter((r): r is RegistroSimulado => r !== null);
   const drafts = paraOBanco(o.adiantamentos);
   useRealtimeInvalidate('transactions', ['simular']);
   return useQuery({
