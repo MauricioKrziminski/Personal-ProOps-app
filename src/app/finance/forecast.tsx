@@ -37,11 +37,15 @@ import {
   useCashHistory,
   useForecastMonths,
   useForecastWithDrafts,
+  useSimulacao,
   useMonthSummary,
   useUpcomingBills,
   type Draft,
 } from '@/hooks/use-finance';
 import type { HipoteseNoCiclo } from '@/lib/rascunho-no-ciclo';
+import { registrosParaSimular, resumoDaHipotese } from '@/lib/rascunho';
+import { useRascunho } from '@/hooks/use-rascunho';
+import { useToast } from '@/components/ui/toast';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useTheme } from '@/hooks/use-theme';
@@ -211,13 +215,18 @@ export default function ForecastScreen() {
   const modo = modoDaHipotese ?? modoEscolhido;
   const [mesAberto, setMesAberto] = useState<string | null>(null);
   /**
-   * Rascunho de cenário.
-   *
-   * Mora em `useState` de propósito: sair da tela desmonta o componente e o rascunho some, que é
-   * exatamente o que o dono do produto pediu — *"ser meio que um rascunho e se eu voltar, ele
-   * some"*. Nada disso vai para o banco nem para o AsyncStorage.
+   * Rascunho de cenário — mora no APARELHO desde 29/09/2026 (spec hipóteses detalhadas: *"salvar
+   * no aparelho"*; antes, sair da tela apagava). As rápidas continuam `Draft[]`; as detalhadas são
+   * a entrada do formulário real, e a série delas vem de `simular`. O `setRascunhos` compatível
+   * mantém todo o fluxo das rápidas como era.
    */
-  const [rascunhos, setRascunhos] = useState<Draft[]>([]);
+  const toast = useToast();
+  const { rascunho, setRapidas, limpar, restaurar } = useRascunho();
+  const rascunhos = rascunho.rapidas;
+  const setRascunhos = (v: Draft[] | ((antes: Draft[]) => Draft[])) =>
+    setRapidas(typeof v === 'function' ? v : () => v);
+  const detalhadas = rascunho.detalhadas;
+  const registros = useMemo(() => registrosParaSimular(detalhadas), [detalhadas]);
   const [sheetAberto, setSheetAberto] = useState(false);
   const [novoTipo, setNovoTipo] = useState<'income' | 'expense' | 'adiantar'>('income');
   const [novoValor, setNovoValor] = useState(0);
@@ -262,7 +271,13 @@ export default function ForecastScreen() {
   const simulado = useForecastWithDrafts(dias, rascunhos, !emMes);
   const regua = useMonthRuler('projecao');
   const mensal = useForecastMonths(dias, rascunhos, emMes, regua.view);
-  const simulando = rascunhos.length > 0;
+  const comDetalhadas = registros.length > 0;
+  const simulacao = useSimulacao(dias, rascunhos, registros, emMes ? 'mes' : 'dia', regua.view, comDetalhadas);
+  const errosDaSimulacao = simulacao.data?.erros ?? [];
+  // Com hipótese detalhada, a série e o mensal vêm de `simular` (que já inclui as rápidas).
+  const serieSimulada = comDetalhadas ? simulacao.data?.forecast : simulado.data;
+  const mensalExibido = comDetalhadas ? (simulacao.data?.meses ?? mensal.data) : mensal.data;
+  const simulando = rascunhos.length > 0 || detalhadas.length > 0;
   const hipoteses = useMemo(() => agruparHipoteses(rascunhos), [rascunhos]);
 
   const pagarEm = diaDoPagamento(novoMes);
@@ -278,8 +293,8 @@ export default function ForecastScreen() {
     : novoValor > 0 && novoMes !== null;
   // `?? forecast.data` enquanto a simulação carrega: sem isso a tela PISCA vazia a cada
   // suposição somada, e o destaque salta de um número real para nada e de volta.
-  const serie = (simulando ? (simulado.data ?? forecast.data) : forecast.data) ?? [];
-  const meses: MesProjetado[] = useMemo(() => mensal.data?.meses ?? [], [mensal.data]);
+  const serie = (simulando ? (serieSimulada ?? forecast.data) : forecast.data) ?? [];
+  const meses: MesProjetado[] = useMemo(() => mensalExibido?.meses ?? [], [mensalExibido]);
 
   /**
    * A lista de meses SEM o ciclo que o horizonte cortou no meio.
@@ -307,7 +322,7 @@ export default function ForecastScreen() {
   // `hoje` é o saldo do dia 0. No mensal ele vem do payload de propósito: o primeiro MÊS fecha
   // no fim do mês corrente, e usá-lo aqui mostraria esse número com o rótulo "TENHO HOJE".
   const saldoHoje = emMes
-    ? Number(mensal.data?.hoje ?? 0)
+    ? Number(mensalExibido?.hoje ?? 0)
     : Number(serie[0]?.balance_cents ?? 0);
   const projetados = emMes
     ? [saldoHoje, ...meses.map((m) => Number(m.saldo))]
@@ -366,8 +381,8 @@ export default function ForecastScreen() {
    * dia mesmo sem nenhum lançamento, e o empty antigo era inalcançável.
    */
   const projecaoCarregando = emMes
-    ? mensal.isLoading || mensal.isPlaceholderData
-    : forecast.isLoading;
+    ? mensal.isLoading || mensal.isPlaceholderData || (comDetalhadas && simulacao.isLoading)
+    : forecast.isLoading || (comDetalhadas && simulacao.isLoading);
   const nadaParaProjetar =
     !projecaoCarregando &&
     !accounts.isLoading &&
@@ -713,13 +728,14 @@ export default function ForecastScreen() {
           </ThemedText>
           {simulando ? (
             <ThemedText type="caption" themeColor="textSecondary">
-              {hipoteses.length} {hipoteses.length === 1 ? 'hipótese' : 'hipóteses'} · nada é salvo
+              {hipoteses.length + detalhadas.length} {hipoteses.length + detalhadas.length === 1 ? 'hipótese' : 'hipóteses'} · nada é salvo
             </ThemedText>
           ) : null}
         </View>
       </View>
       {simulando ? (
-        hipoteses.map(({ chave, principal: d }) => {
+        <>
+        {hipoteses.map(({ chave, principal: d }) => {
           const texto = d.rotulo
             ? `sai ${brl(d.amount_cents)} · ${d.rotulo} · em ${isoToBR(d.start)}`
             : `${d.kind === 'income' ? 'entra' : 'sai'} ${brl(d.amount_cents)}${
@@ -749,16 +765,28 @@ export default function ForecastScreen() {
               <Icon name="chevron.right" size="sm" color="textSecondary" />
             </Pressable>
           );
-        })
+        })}
+        {detalhadas.map((h, i) => {
+          const erro = errosDaSimulacao.find((e) => e.indice === i);
+          return (
+            <View key={h.id} style={[styles.hipoteseLinha, { borderTopColor: theme.separator }]}>
+              <ThemedText type="small">{resumoDaHipotese(h, brl)}</ThemedText>
+              {erro ? (
+                <ThemedText type="caption" themeColor="danger">{`Não dá para simular: ${erro.mensagem}`}</ThemedText>
+              ) : null}
+            </View>
+          );
+        })}
+        </>
       ) : (
         <ThemedText type="small" themeColor="textSecondary">
           Simule uma entrada ou saída.
         </ThemedText>
       )}
-      {simulado.isError ? (
+      {simulado.isError || (comDetalhadas && simulacao.isError) ? (
         <ErrorBand
           message="Não deu para calcular o rascunho — os números acima são os reais."
-          onRetry={simulado.refetch}
+          onRetry={comDetalhadas ? simulacao.refetch : simulado.refetch}
         />
       ) : null}
       <View style={styles.rascunhoAcoes}>
@@ -769,7 +797,16 @@ export default function ForecastScreen() {
           onPress={abrirNova}
         />
         {simulando ? (
-          <Button label="Limpar" variant="secondary" size="sm" onPress={() => setRascunhos([])} />
+          <Button
+            label="Limpar"
+            variant="secondary"
+            size="sm"
+            onPress={() => {
+              const antes = rascunho;
+              limpar();
+              toast({ message: 'Rascunho limpo.', tone: 'success', action: { label: 'Desfazer', onPress: () => restaurar(antes) } });
+            }}
+          />
         ) : null}
       </View>
     </Card>
@@ -1213,6 +1250,7 @@ export default function ForecastScreen() {
 }
 
 const styles = StyleSheet.create({
+  hipoteseLinha: { gap: Space.xs, paddingVertical: Space.sm, borderTopWidth: StyleSheet.hairlineWidth },
   // A lista e o seu "Ver mais" a `Space.md` um do outro, como título e conteúdo.
   lista: { gap: Space.md },
   horizonteCorpo: {

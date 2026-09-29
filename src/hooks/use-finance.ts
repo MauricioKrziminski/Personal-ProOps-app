@@ -1094,6 +1094,38 @@ export function useForecastMonths(days: number, drafts: Draft[], enabled = true,
   });
 }
 
+export type ErroDaHipotese = { indice: number; mensagem: string };
+
+/**
+ * A Projeção com hipóteses DETALHADAS (spec 2026-09-28): os registros são criados de verdade no
+ * banco, lidos e desfeitos (`simular`). As rápidas vão junto, no mesmo `forecast_json`.
+ * Uma chamada por modo: no dia pede a série; no mês, o agrupado.
+ */
+export function useSimulacao(
+  days: number,
+  drafts: Draft[],
+  registros: { tipo: string; dados: unknown }[],
+  modo: 'dia' | 'mes',
+  view: CycleView | undefined,
+  enabled: boolean,
+) {
+  useRealtimeInvalidate('transactions', ['simular']);
+  return useQuery({
+    enabled: enabled && registros.length > 0,
+    placeholderData: (anterior) => anterior,
+    queryKey: ['simular', modo, String(days), JSON.stringify(paraOBanco(drafts)), JSON.stringify(registros), view ?? ''],
+    queryFn: async (): Promise<{ forecast?: ForecastDay[]; meses?: ProjecaoMensal; erros: ErroDaHipotese[] }> => {
+      const leitura = modo === 'mes'
+        ? { meses: { days, drafts: paraOBanco(drafts), view: view ?? null } }
+        : { forecast: { days, drafts: paraOBanco(drafts) } };
+      const { data, error } = await supabase.rpc('simular', { p_registros: registros as never, p_leituras: leitura as never });
+      if (error) throw error;
+      const r = data as { leituras?: { forecast?: ForecastDay[]; meses?: ProjecaoMensal }; erros?: ErroDaHipotese[] } | null;
+      return { forecast: r?.leituras?.forecast, meses: r?.leituras?.meses, erros: r?.erros ?? [] };
+    },
+  });
+}
+
 /** Faturas e lançamentos previstos que vencem no período (atrasados incluídos). */
 export function useUpcomingBills(days = 30) {
   useRealtimeInvalidate('transactions', ['upcoming-bills']);

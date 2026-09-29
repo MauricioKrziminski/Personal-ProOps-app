@@ -832,9 +832,10 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
   (`_budgets_status`) nem cronograma de dívida (`debt_schedule_for`) — reproduzir essas regras no
   cliente ou numa segunda função seria a cópia que diverge. A tela diz isso ao usuário.
 
-  **Ele vive em `useState` da Projeção e em lugar nenhum mais** — nem banco, nem
-  AsyncStorage, e `gcTime: 0` no hook para não ressuscitar do cache. Sair da tela apaga, que é o
-  contrato com o usuário. A hipótese nunca começa ANTES de hoje (a projeção começa hoje, e uma
+  **Ele mora no APARELHO, por usuário, até aplicar ou limpar** (`useRascunho`, 29/09/2026 —
+  decisão do dono do produto ao pedir hipóteses com o formulário completo: *"salvar no
+  aparelho"*; antes, sair da tela apagava). Nunca no banco. "Limpar" tem "Desfazer". A hipótese
+  nunca começa ANTES de hoje (a projeção começa hoje, e uma
   data passada entrava no saldo sem ter dia na janela para aparecer em "entra/sai").
 
   **Adiantar parcelas é a terceira forma, e ela MOVE dinheiro em vez de somar**

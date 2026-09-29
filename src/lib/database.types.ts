@@ -2883,6 +2883,10 @@ export type Database = {
         Args: { p_drafts: Json; p_from: string; p_to: string }
         Returns: Json
       }
+      simular: {
+        Args: { p_registros: Json; p_leituras: Json }
+        Returns: Json
+      }
       edit_budget: {
         Args: {
           p_category: string
