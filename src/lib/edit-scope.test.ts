@@ -24,7 +24,7 @@ for (const kind of ['occurrence', 'installment', 'payment', 'reminder'] as const
 
 test('as portas de CONTRATO não oferecem "Só esta"; a ocorrência aberta oferece (28/09/2026)', () => {
   const ler = (f: string) => readFileSync(f, 'utf8');
-  for (const tela of ['src/app/finance/debts.tsx', 'src/app/finance/installments.tsx', 'src/components/finance/formulario-da-serie.tsx'])
+  for (const tela of ['src/components/finance/formulario-da-divida.tsx', 'src/app/finance/installments.tsx', 'src/components/finance/formulario-da-serie.tsx'])
     assert.match(ler(tela), /askEditScope\([\s\S]*?\{ contrato: true \}\)/, `${tela} edita o contrato`);
   assert.doesNotMatch(ler('src/app/finance/transaction-form.tsx'), /contrato: true/, 'o lançamento é UMA ocorrência');
   // o lembrete: pela lista é a série; pela Hoje (o disparo de hoje), uma ocorrência

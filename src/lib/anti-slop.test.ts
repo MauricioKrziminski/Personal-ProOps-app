@@ -683,7 +683,7 @@ test('todo Sheet abre com TaskHeader', () => {
     for (const m of code.matchAll(/<Sheet[\s>]/g)) {
       const inicio = m.index ?? 0;
       // Um corpo do formulário único (`components/finance/formulario-*`) abre com o `TaskHeader` dele.
-      if (!/<(?:TaskHeader|FormularioDaSerie)[\s/>]/.test(code.slice(inicio, inicio + 400))) {
+      if (!/<(?:TaskHeader|FormularioDaSerie|FormularioDaDivida)[\s/>]/.test(code.slice(inicio, inicio + 400))) {
         fora.push(`${file.replace(SRC, 'src')}:${code.slice(0, inicio).split('\n').length}`);
       }
     }

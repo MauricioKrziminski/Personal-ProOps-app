@@ -320,6 +320,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       // O corpo do formulário da série (Task 4): carregado de verdade só em Recorrentes, que o hospeda
       // na folha; noutras telas ele é um nó (quem o hospeda confere as props).
       if (name === '@/components/finance/formulario-da-serie' && file.endsWith('finance/recurring.tsx')) return load('src/components/finance/formulario-da-serie.tsx');
+      // O da dívida (Task 5): de verdade só em Dívidas, pelo mesmo motivo.
+      if (name === '@/components/finance/formulario-da-divida' && file.endsWith('finance/debts.tsx')) return load('src/components/finance/formulario-da-divida.tsx');
       if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useReminders: () => ({ ...query, isSuccess: true, data: { pages: [options.reminders ?? []], pageParams: [0] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }), useToggleReminder: () => mutation('toggleReminder'), useDeleteReminder: () => mutation('deleteReminder') };
       if (name === '@/hooks/use-session') return { useSession: () => ({ session: { user: { id: 'user-1' } } }) };
       if (name === '@/hooks/use-profile') return { useProfile: () => ({ ...query, isSuccess: true, data: { display_name: 'Gabriel Almeida', phone: null } }) };
@@ -464,8 +466,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     }
     if (node.type === 'FinanceAnalysisPanes') visit(node.props.compact);
     // `CamposDaSerie` é um grupo de campos sem hook: desenhado aqui, a tela é a que a pessoa vê.
-    // O `FormularioDaSerie` tem hooks: eles rodam depois dos da tela, na mesma ordem a cada render.
-    if (typeof node.type === 'function' && ['CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie'].includes(node.type.name)) visit(node.type(node.props));
+    // Os corpos (`FormularioDaSerie`, `FormularioDaDivida`) têm hooks: eles rodam depois dos da tela, na mesma ordem a cada render.
+    if (typeof node.type === 'function' && ['CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida'].includes(node.type.name)) visit(node.type(node.props));
     // No celular o `AdaptivePanes` desenha o slot de uma coluna só (Pastas, Recorrentes…).
     if (node.type === 'AdaptivePanes') visit(node.props.singlePaneContent ?? node.props.main);
     visit(node.props.ListHeaderComponent);
@@ -3788,4 +3790,52 @@ test('FormularioDaSerie: editando com a série ainda não carregada, espera — 
   const pronto = screen('src/components/finance/formulario-da-serie.tsx', { componente: 'FormularioDaSerie', recurring: [serie], props });
   assert.ok(pronto.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Editar recorrência'));
   assert.deepEqual(botoes(pronto), ['Salvar']);
+});
+
+test('FormularioDaDivida: o comum vira Nome, Conta que paga e Valor da parcela; criar outro avisa o hospedeiro', async () => {
+  const salvos: boolean[] = [];
+  const comum = { kind: 'expense', descricao: 'Carro 2', valorCents: 147000, contaId: 'cc', dataBR: '31/10/2026', categoria: null };
+  const ui = screen('src/components/finance/formulario-da-divida.tsx', { componente: 'FormularioDaDivida', segurarMutacoes: true, forecastAccounts: [{ id: 'cc', name: 'Itaú', type: 'checking' }],
+    props: { comum, registrarComum: () => {}, onSalvo: (o: boolean) => salvos.push(o), onFechar: () => {} } });
+  assert.ok(ui.nodes().some((n: any) => n.type === 'MoneyField' && n.props.valueCents === 147000));
+  ui.fill('Total de parcelas', '48');
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'Button' && n.props.label === 'Salvar e criar outro').props.onPress());
+  assert.equal(ui.writes.at(-1).value.name, 'Carro 2');
+  (ui.pedidos.at(-1) as any).resolver('d1');
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(salvos, [true]);
+});
+
+test('FormularioDaDivida: editando com a dívida ainda não carregada, espera — nunca vira criação', () => {
+  const comum = { kind: 'expense', descricao: '', valorCents: 0, contaId: null, dataBR: '', categoria: null };
+  const props = { comum, registrarComum: () => {}, registrarEstado: () => {}, editandoId: 'd1', onSalvo: () => {}, onFechar: () => {} };
+  const botoes = (ui: any) => ui.nodes().filter((n: any) => n.type === 'Button').map((n: any) => n.props.label);
+  const vazio = screen('src/components/finance/formulario-da-divida.tsx', { componente: 'FormularioDaDivida', debts: [], props });
+  assert.equal(botoes(vazio).includes('Salvar e criar outro'), false, 'sem a dívida não há como criar');
+  vazio.interact((nodes: any[]) => nodes.forEach((n) => n.props?.onPress?.()));
+  assert.equal(vazio.writes.length, 0, 'nenhum toque grava');
+  assert.ok(vazio.nodes().some((n: any) => n.type === 'SkeletonList'), 'espera com esqueleto');
+  const pronto = screen('src/components/finance/formulario-da-divida.tsx', { componente: 'FormularioDaDivida', debts: [carro], props });
+  assert.ok(pronto.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Editar dívida'));
+  assert.deepEqual(botoes(pronto), ['Salvar']);
+  assert.ok(pronto.nodes().some((n: any) => n.type === 'TextField' && n.props.value === 'Carro'), 'o formulário é o da dívida');
+});
+
+test('FormularioDaDivida: convertendo, Salvar entrega o financiamento ao hospedeiro com as pagas SEM a linha convertida', () => {
+  const destinos: any[] = [];
+  const comum = { kind: 'expense', descricao: 'Carro', valorCents: 147000, contaId: 'cc', dataBR: '05/09/2026', categoria: null };
+  const ui = screen('src/components/finance/formulario-da-divida.tsx', { componente: 'FormularioDaDivida', forecastAccounts: [{ id: 'cc', name: 'Itaú', type: 'checking' }],
+    props: { comum, registrarComum: () => {}, registrarEstado: () => {}, converter: (d: any) => destinos.push(d), onSalvo: () => {}, onFechar: () => {} } });
+  assert.equal(ui.nodes().some((n: any) => n.props?.label === 'Salvar e criar outro'), false, 'convertendo não há "criar outro"');
+  ui.fill('Total de parcelas', '48');
+  ui.press('Salvar');
+  assert.equal(ui.writes.length, 0, 'quem grava é o hospedeiro');
+  assert.equal(destinos.length, 1);
+  const { tipo, dados } = JSON.parse(JSON.stringify(destinos[0]));
+  assert.equal(tipo, 'financiamento');
+  assert.equal(dados.installments_paid, 0, 'o banco adota a linha como 1º pagamento: não se conta aqui');
+  assert.equal(dados.first_due_date, '2026-09-05');
+  assert.equal(dados.installment_cents, 147000);
+  assert.equal(dados.account_id, 'cc');
+  assert.equal('id' in dados || 'versao' in dados, false);
 });
