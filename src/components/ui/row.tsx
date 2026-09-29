@@ -5,8 +5,11 @@ import type { SymbolViewProps } from 'expo-symbols';
 import { ThemedText } from '@/components/themed-text';
 import { BlockHeader } from '@/components/ui/block-header';
 import { Icon } from '@/components/ui/icon';
+import type { NoteColorName } from '@/constants/theme';
+import { noteInk } from '@/design/note-colors';
+import { superficieDaNota } from '@/design/note-surface';
 import { HitTarget, Radius, Space, Type } from '@/design/tokens';
-import { useTheme } from '@/hooks/use-theme';
+import { useScheme, useTheme } from '@/hooks/use-theme';
 
 type RowBadgeTone = 'warning' | 'danger' | 'success' | 'textSecondary';
 
@@ -15,6 +18,12 @@ interface RowProps {
   /** Texto, ou texto com o nome citado em `<Forte>`. Nó não entra no rótulo de acessibilidade. */
   subtitle?: ReactNode;
   icon?: SymbolViewProps['name'];
+  /**
+   * A cor da CATEGORIA (`useAparencia`): o disco do ícone ganha o fundo tingido e o glifo a tinta
+   * cheia, a mesma régua das notas coloridas (`design.md` §2b). Sem ela, o disco neutro. Linha
+   * `destructive` ignora — estado vence decoração.
+   */
+  tinta?: NoteColorName | null;
   /** Valor, badge ou qualquer coisa à direita. Chevron é automático quando há `onPress`. */
   trailing?: ReactNode;
   /**
@@ -70,6 +79,7 @@ export function Row({
   title,
   subtitle,
   icon,
+  tinta,
   trailing,
   badge,
   onPress,
@@ -82,6 +92,11 @@ export function Row({
   inlineValue = false,
 }: RowProps) {
   const theme = useTheme();
+  const scheme = useScheme();
+  const tintaCheia = tinta && !destructive ? noteInk(tinta, scheme) : null;
+  const disco = tintaCheia
+    ? superficieDaNota(tintaCheia, scheme, { surface: theme.backgroundElement, text: theme.text }).fundo
+    : null;
   const pisoDoTitulo = usePisoDoTitulo();
   const valor =
     trailing || (chevron ?? !!onPress) ? (
@@ -108,9 +123,9 @@ export function Row({
         <View
           style={[
             styles.iconChip,
-            { backgroundColor: destructive ? theme.dangerSoft : theme.backgroundElement },
+            { backgroundColor: destructive ? theme.dangerSoft : (disco ?? theme.backgroundElement) },
           ]}>
-          <Icon name={icon} size="md" color={destructive ? 'danger' : 'text'} />
+          <Icon name={icon} size="md" color={destructive ? 'danger' : 'text'} tint={tintaCheia ?? undefined} />
         </View>
       ) : null}
       {/*

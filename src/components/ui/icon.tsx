@@ -13,8 +13,13 @@ interface IconProps {
   /** Nome do SF Symbol (iOS). O equivalente Material do Android sai do mapa abaixo. */
   name: IconName;
   size?: keyof typeof IconSize | number;
-  /** Chave de cor do tema. Ícone nunca recebe hex. */
+  /** Chave de cor do tema. */
   color?: ThemeColor;
+  /**
+   * Cor de CONTEÚDO do usuário (a tinta de uma categoria, `noteInk`), que vence `color`. É a
+   * única porta para uma cor fora do tema: estado (perigo, aviso) continua vindo por `color`.
+   */
+  tint?: string;
   weight?: SymbolViewProps['weight'];
 }
 
@@ -231,7 +236,7 @@ const MATERIAL: Record<string, MaterialName> = {
  * Existe para matar dois padrões: emoji fazendo papel de ícone (proibido pela regra de design) e
  * glyph de texto (`‹` no voltar, `＋` no FAB) desenhado à mão.
  */
-export function Icon({ name, size = 'md', color = 'text', weight = 'regular' }: IconProps) {
+export function Icon({ name, size = 'md', color = 'text', tint, weight = 'regular' }: IconProps) {
   const theme = useTheme();
   /*
     ⚠️ **No Android o ícone é TEXTO, e texto cresce com a fonte do sistema** (07/09/2026).
@@ -275,7 +280,7 @@ export function Icon({ name, size = 'md', color = 'text', weight = 'regular' }: 
     <SymbolView
       name={resolved}
       size={px / escala}
-      tintColor={theme[color]}
+      tintColor={tint ?? theme[color]}
       weight={weight}
       style={{ width: px, height: px, alignItems: 'center', justifyContent: 'center' }}
     />

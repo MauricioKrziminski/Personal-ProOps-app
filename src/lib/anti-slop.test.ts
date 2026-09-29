@@ -1863,3 +1863,13 @@ test('O lançamento é um corpo do formulário único: seletor no topo, criar ou
   assert.match(f, /props\.converter\(/);
   assert.match(f, /props\.registrarComum\(/);
 });
+
+test('A tinta da categoria é cor de CONTEÚDO: sai da paleta das notas, nunca de tint/danger/warning', () => {
+  for (const f of ['components/ui/row.tsx', 'components/ui/ledger-row.tsx']) {
+    const t = readFileSync(join(SRC, f), 'utf8');
+    assert.match(t, /tinta\?: NoteColorName \| null/, f);
+    assert.match(t, /superficieDaNota\(/, f);
+    assert.match(t, /noteInk\(tinta, scheme\)/, f);
+  }
+  assert.match(readFileSync(join(SRC, 'components/notes/color-picker.tsx'), 'utf8'), /export function GradeDeCores\(/);
+});

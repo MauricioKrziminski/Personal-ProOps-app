@@ -47,11 +47,7 @@ export function ColorPicker({
   onClose: () => void;
   onPick: (color: NoteColorName | null) => void;
 }) {
-  const theme = useTheme();
-  const scheme = useScheme();
-
   const escolher = (cor: NoteColorName | null) => {
-    Haptics.selectionAsync();
     onPick(cor);
     onClose();
   };
@@ -60,28 +56,50 @@ export function ColorPicker({
     <Sheet visible={visible} onClose={onClose}>
       <TaskHeader title={title} onClose={onClose} />
       <View style={styles.corpo}>
-        <View style={styles.grade}>
-          <Amostra
-            selecionada={value === null}
-            fundo={theme.backgroundElement}
-            tinta={theme.textSecondary}
-            label="Sem cor"
-            vazia
-            onPress={() => escolher(null)}
-          />
-          {NOTE_COLOR_NAMES.map((cor) => (
-            <Amostra
-              key={cor}
-              selecionada={value === cor}
-              fundo={notePalette(cor, scheme, theme)?.surface ?? theme.backgroundElement}
-              tinta={noteInk(cor, scheme) ?? theme.textSecondary}
-              label={cor[0].toUpperCase() + cor.slice(1)}
-              onPress={() => escolher(cor)}
-            />
-          ))}
-        </View>
+        <GradeDeCores value={value} onPick={escolher} />
       </View>
     </Sheet>
+  );
+}
+
+/**
+ * A grade de "Sem cor" + as oito, INLINE — para quem já mora numa folha (a da categoria), onde
+ * abrir o `ColorPicker` seria folha dentro de folha (`Modal` dentro de `Modal` no Android).
+ */
+export function GradeDeCores({
+  value,
+  onPick,
+}: {
+  value: NoteColorName | null;
+  onPick: (color: NoteColorName | null) => void;
+}) {
+  const theme = useTheme();
+  const scheme = useScheme();
+  const escolher = (cor: NoteColorName | null) => {
+    Haptics.selectionAsync();
+    onPick(cor);
+  };
+  return (
+    <View style={styles.grade}>
+      <Amostra
+        selecionada={value === null}
+        fundo={theme.backgroundElement}
+        tinta={theme.textSecondary}
+        label="Sem cor"
+        vazia
+        onPress={() => escolher(null)}
+      />
+      {NOTE_COLOR_NAMES.map((cor) => (
+        <Amostra
+          key={cor}
+          selecionada={value === cor}
+          fundo={notePalette(cor, scheme, theme)?.surface ?? theme.backgroundElement}
+          tinta={noteInk(cor, scheme) ?? theme.textSecondary}
+          label={cor[0].toUpperCase() + cor.slice(1)}
+          onPress={() => escolher(cor)}
+        />
+      ))}
+    </View>
   );
 }
 

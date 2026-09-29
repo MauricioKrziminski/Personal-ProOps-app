@@ -3,9 +3,11 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
-import { Fonts, type ThemeColor } from '@/constants/theme';
+import { Fonts, type NoteColorName, type ThemeColor } from '@/constants/theme';
+import { noteInk } from '@/design/note-colors';
+import { superficieDaNota } from '@/design/note-surface';
 import { HitTarget, Radius, Space, tabular } from '@/design/tokens';
-import { useTheme } from '@/hooks/use-theme';
+import { useScheme, useTheme } from '@/hooks/use-theme';
 
 /** Prévia da citação (o corpo inteiro está a um toque, no detalhe) — §7. */
 const CITACAO = 90;
@@ -24,6 +26,7 @@ export function LedgerRow({
   title,
   subtitle,
   icon,
+  tinta,
   cents,
   signed,
   tone,
@@ -36,6 +39,8 @@ export function LedgerRow({
   title: string;
   subtitle?: string;
   icon: IconName;
+  /** A cor da categoria (`useAparencia`) — a mesma régua do `Row`. */
+  tinta?: NoteColorName | null;
   cents: number;
   signed: boolean;
   tone: ThemeColor | 'plain';
@@ -47,12 +52,17 @@ export function LedgerRow({
   accessibilityLabel: string;
 }) {
   const theme = useTheme();
+  const scheme = useScheme();
+  const tintaCheia = tinta ? noteInk(tinta, scheme) : null;
+  const disco = tintaCheia
+    ? superficieDaNota(tintaCheia, scheme, { surface: theme.backgroundElement, text: theme.text }).fundo
+    : null;
   const citacao = quote ? (quote.length > CITACAO ? `${quote.slice(0, CITACAO).trimEnd()}…` : quote) : null;
 
   const conteudo = (pressed: boolean) => (
     <View style={[styles.linha, { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' }]}>
-      <View style={[styles.selo, { backgroundColor: theme.backgroundElement }]}>
-        <Icon name={icon} size="md" color="text" />
+      <View style={[styles.selo, { backgroundColor: disco ?? theme.backgroundElement }]}>
+        <Icon name={icon} size="md" color="text" tint={tintaCheia ?? undefined} />
       </View>
       <View style={styles.textos}>
         <ThemedText type="default">{title}</ThemedText>
