@@ -507,3 +507,16 @@ test('toda chave de consulta financeira está em FINANCE_KEYS, ou tem motivo esc
   const orfas = Object.keys(FORA_DE_PROPOSITO).filter((k) => !usadas.has(k));
   assert.deepEqual(orfas, [], `motivo escrito para chave inexistente: ${orfas.join(', ')}`);
 });
+
+test('a simulação é marcada velha na escrita, mas NÃO recalcula ali (o rascunho ainda tem a hipótese aplicada)', async () => {
+  // 29/09/2026: ao Aplicar, a invalidação refazia `simular` com a hipótese ainda no rascunho E já
+  // gravada de verdade — o número contado duas vezes aparecia por ~2 s. Ela recalcula quando o
+  // rascunho muda (chave nova) ou a tela volta.
+  const { invalidateFinance } = await import('./query-invalidation.ts');
+  const chamadas: any[] = [];
+  const client = { invalidateQueries: async (f: any) => { chamadas.push(f); } } as any;
+  await invalidateFinance(client);
+  const sim = chamadas.find((f) => f.queryKey[0] === 'simular');
+  assert.equal(sim?.refetchType, 'none');
+  assert.equal(chamadas.find((f) => f.queryKey[0] === 'forecast')?.refetchType, undefined);
+});

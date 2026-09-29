@@ -35,8 +35,19 @@ export const FINANCE_KEYS = [
   ['proximo-passo'],
 ] as const;
 
+/**
+ * Marcadas velhas, mas SEM recalcular ali. A `simular` numa escrita vinda do "Aplicar" ainda tem
+ * a hipótese no rascunho E já gravada de verdade: refeita agora, contaria a mesma coisa duas vezes
+ * (~2 s na tela, 29/09/2026). Ela recalcula quando o rascunho muda (chave nova) ou a tela volta.
+ */
+const SEM_RECALCULAR = new Set(['simular']);
+
 export function invalidateKeys(client: QueryClient, keys: readonly (readonly string[])[]) {
-  return Promise.all(keys.map((queryKey) => client.invalidateQueries({ queryKey })));
+  return Promise.all(
+    keys.map((queryKey) =>
+      client.invalidateQueries(SEM_RECALCULAR.has(queryKey[0]) ? { queryKey, refetchType: 'none' } : { queryKey }),
+    ),
+  );
 }
 
 export function invalidateFinance(client: QueryClient) {
