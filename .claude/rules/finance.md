@@ -97,9 +97,10 @@
     próxima primeiro, com a atrasada em aberto no topo) e "Anteriores".
   - `next_run_at` é timestamp: a tela lê o dia LOCAL (`dataLocalDe`). O Fundacred de produção tem
     05/10 00:00 UTC — 04/10 em Brasília —, e o card dizia "próximo 05/10".
-  - Até o agendador rodar (1 h em produção), a projeção lê a regra só no mensal simples
-    (`recurring_projection_for`); reagendada para semanal, anual ou "a cada N meses", a série
-    some da projeção até a rodada.
+  - Até o agendador rodar (1 h em produção), a projeção lê a REGRA (`recurring_projection_for`
+    sobre `private.recurring_dates_for`, `20260927212119`): mensal (com "a cada N meses" e
+    "último dia"), semanal e anual — tudo que o `montaRRule` do app monta. Regra fora desse
+    formato (escrita pelo WhatsApp) some da projeção até a rodada.
   - **Uma tela só na ocorrência**: o formulário do lançamento de uma série abre com "Só esta |
     Esta e as próximas" no topo. "Só esta" edita a linha, com UMA data (o vencimento, fora do
     cartão). "Esta e as próximas" desenha os MESMOS campos da folha de Recorrentes
