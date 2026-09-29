@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import Animated, {
   useAnimatedProps,
   useDerivedValue,
@@ -14,18 +14,11 @@ import { type ThemeColor } from '@/constants/theme';
 import { Motion, Type, tabular, type TypeVariant } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { brlWorklet } from '@/lib/brl-worklet';
+import { valorAnimadoCabe } from '@/lib/count-up';
 import { formatBRL } from '@/lib/dates';
 
 const AnimatedInput = Animated.createAnimatedComponent(TextInput);
 
-/**
- * Acima disto o valor é desenhado por `<Money>`, sem animação.
- *
- * ⚠️ `TextInput` não tem `adjustsFontSizeToFit`, e o painel tem `overflow: 'hidden'`. A 384dp
- * com fonte 1,3× um valor de 8 dígitos seria **CORTADO** — que é pior que estourar a caixa (§7:
- * identificador não trunca). 13 glifos é `−R$ 999.999,99`.
- */
-const MAX_GLIFOS = 13;
 
 /**
  * O número grande do herói contando até o valor novo.
@@ -84,7 +77,10 @@ export function CountUpMoney({
   const animado = useAnimatedProps(() => ({ text: texto.value, defaultValue: texto.value }));
 
   const oculto = concealable && concealed;
-  const largo = formatBRL(Math.abs(cents)).length + (cents < 0 ? 1 : 0) > MAX_GLIFOS;
+  // O que não cabe (glifos × fonte do sistema) vai para o `<Money>`, que encolhe: o `TextInput`
+  // não encolhe e o painel corta (`valorAnimadoCabe`).
+  const { fontScale } = useWindowDimensions();
+  const largo = !valorAnimadoCabe(cents, fontScale);
 
   if (oculto || reduzido || largo) {
     return <Money cents={cents} variant={variant} tone={tone} concealable={concealable} />;

@@ -21,10 +21,27 @@ export function walletStageWidth(windowWidthDp: number, availableWidthDp = windo
   return Math.min(640, Math.max(0, windowWidthDp), Math.max(0, available));
 }
 
+/*
+  O que a face precisa de altura, no desenho de 340, MEDIDO no iPhone em 29/09/2026 no pior caso
+  (nome em duas linhas + "Atrasada" + fatura, limite e vencimento): 158 a 1× e ~265 a mais por
+  unidade de escala (251 a 1,35×, 431 a 2,14×, 821 a 3,57×). A raiz quadrada sozinha cortava a
+  base inteira de XXXL para cima — no accessibility-large sobrava "Fat/ura/atu/al".
+  ponytail: conta calibrada no pior caso medido, com 10% de folga; nome em três linhas a 3,5×
+  pode passar — o próximo passo seria a face medir o próprio conteúdo.
+*/
+const CONTEUDO_A_1X = 158;
+const CONTEUDO_POR_ESCALA = 265;
+const FOLGA = 1.1;
+
 /** Largura ÷ altura da face. */
 export function proporcaoDoCartao(fontScale: number): number {
   'worklet';
-  return PROPORCAO_DO_CARTAO / Math.sqrt(Math.max(1, fontScale));
+  const escala = Math.max(1, fontScale);
+  const alturaDeFabrica = LARGURA_DE_DESENHO / PROPORCAO_DO_CARTAO;
+  const conteudo = (CONTEUDO_A_1X + CONTEUDO_POR_ESCALA * (escala - 1)) * FOLGA;
+  // A raiz amacia no tamanho normal (a face não vira quadrado à toa); o conteúdo manda quando
+  // passa dela — o texto é identificador e não pode ser cortado (§7).
+  return PROPORCAO_DO_CARTAO / Math.max(Math.sqrt(escala), conteudo / alturaDeFabrica);
 }
 
 export function alturaDoCartao(largura: number, fontScale: number): number {

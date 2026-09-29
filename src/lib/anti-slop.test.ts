@@ -945,6 +945,7 @@ test('valor em texto visível passa por Money ou useBRL', () => {
     'app/finance/transaction-form.tsx': 'valor sendo digitado e a dica de parcelamento dele',
     'lib/dates.ts': 'é onde formatBRL nasce',
     'lib/brl-worklet.ts': 'deriva o separador do formatador, não mostra valor',
+    'lib/count-up.ts': 'mede quantos glifos o valor tem, não mostra valor',
     'lib/month-view.ts': 'helper puro, sem tela chamando — quando tiver, recebe o brl por parâmetro',
     'lib/widget-snapshot.ts': 'o retrato dos widgets aplica a máscara ele mesmo (`oculto`): widget não tem <Money>',
   };
@@ -1763,12 +1764,41 @@ test('Lançamento: com a fileira de parcelas escondida, o erro dela aparece na C
   assert.match(fonte, /installments: hParc\?\.installments \?\? \(daRapida\?\.kind === 'expense' \? daRapida\.parcelas : undefined\)/);
 });
 
-test('Entra e Sai ficam LADO A LADO com qualquer fonte: o valor do ladrilho encolhe, não o ladrilho que desce', () => {
-  // 29/09/2026, *"mesmo com o zoom, caberia lado a lado, não?"*: a troca para a linha inteira
-  // (`valorGrande`, fonte > 1,15) é de antes de o valor do ladrilho encolher para caber
-  // (`DinheiroEncolhe`); com ela, o par virava duas faixas largas e meio vazias.
+test('Ladrilho: lado a lado, e a linha inteira só quando MEDIR que não cabe', () => {
+  // 29/09/2026: *"pode deixar os cards entra e sai ocupando a linha toda, mas somente quando
+  // realmente for necessário"*. Nem troca por fonte (`valorGrande`, que empilhava cedo demais),
+  // nem nunca (a 2,14× "Orçament/os" e o valor a 50%): o ladrilho mede a palavra mais larga e o
+  // valor sem restrição e pede a largura mínima (`larguraMinimaDoLadrilho`).
   const tile = readFileSync(join(SRC, 'components/ui/tile.tsx'), 'utf8');
-  assert.doesNotMatch(tile, /valorGrande/);
+  assert.doesNotMatch(tile, /valorGrande|fontScale > /);
+  assert.match(tile, /larguraMinimaDoLadrilho\(/);
+  // A fileira decide por TODOS (empilhar ou repartir igual), nunca um `minWidth` por ladrilho:
+  // com ele o par saía 169 × 188 e o Yoga deixava a fileira com a altura de uma linha só.
+  assert.match(tile, /empilhaLadrilhos\(/);
+  assert.match(tile, /fileira\?\.empilhar \? LAYOUT\.wide/);
   const financas = readFileSync(join(SRC, 'app/(tabs)/finance/index.tsx'), 'utf8');
   assert.doesNotMatch(financas, /valorGrande/);
+});
+
+test('Legenda da curva do herói QUEBRA a linha em vez de partir a palavra', () => {
+  // 29/09/2026, accessibility-large: "Hoj/e" e "10/1/0" — três textos num `space-between`, todos
+  // encolhendo. O par é `flexWrap` na linha e `flexShrink: 0` nos textos (design.md §3).
+  const chart = readFileSync(join(SRC, 'components/ui/scrub-chart.tsx'), 'utf8');
+  const legenda = chart.slice(chart.indexOf('  legenda: {'), chart.indexOf('}', chart.indexOf('  legenda: {')));
+  assert.match(legenda, /flexWrap: 'wrap'/);
+  assert.match(chart, /legendaItem: \{ flexShrink: 0, maxWidth: '100%' \}/);
+  const financas = readFileSync(join(SRC, 'app/(tabs)/finance/index.tsx'), 'utf8');
+  const bloco = financas.slice(financas.indexOf('legenda={'), financas.indexOf('legenda={') + 900);
+  assert.equal((bloco.match(/<LegendaItem/g) ?? []).length, 3, 'os três textos da legenda usam o item que não encolhe');
+});
+
+test('BlockHeader: a contagem e a pílula crescem com a fonte (altura MÍNIMA, nunca fixa)', () => {
+  // 29/09/2026, accessibility-large: o "3" ao lado de "Cartões" saía cortado — caixa de 22 de
+  // altura fixa com o texto crescendo dentro.
+  const fonte = readFileSync(join(SRC, 'components/ui/block-header.tsx'), 'utf8');
+  for (const nome of ['contagem', 'pilula']) {
+    const bloco = fonte.slice(fonte.indexOf(`  ${nome}: {`), fonte.indexOf('}', fonte.indexOf(`  ${nome}: {`)));
+    assert.match(bloco, /minHeight:/, `${nome} usa minHeight`);
+    assert.doesNotMatch(bloco, /(?<!min)[Hh]eight: /, `${nome} não tem altura fixa`);
+  }
 });

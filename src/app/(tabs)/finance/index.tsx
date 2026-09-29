@@ -26,7 +26,7 @@ import { RingGauge } from '@/components/ui/ring-gauge';
 import { Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { Dica } from '@/components/ui/dica';
-import { ScrubChart } from '@/components/ui/scrub-chart';
+import { LegendaItem, ScrubChart } from '@/components/ui/scrub-chart';
 import { Skeleton, SkeletonCards, SkeletonChart, SkeletonHero, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { Tile, TileGrid, TileRow } from '@/components/ui/tile';
@@ -344,13 +344,17 @@ export default function FinanceScreen() {
                 formatValue={brl}
                 legenda={
                   <>
-                    <ThemedText type="caption" themeColor="onHeroMuted">Hoje</ThemedText>
-                    <ThemedText type="caption" themeColor={cicloRuim ? 'onHeroDanger' : 'onHeroSuccess'}>
-                      {`${brl(descricao?.cents ?? 0)} projetado`}
-                    </ThemedText>
-                    <ThemedText type="caption" themeColor="onHeroMuted">
-                      {fimDoCiclo ? isoToBR(fimDoCiclo).slice(0, 5) : ''}
-                    </ThemedText>
+                    <LegendaItem><ThemedText type="caption" themeColor="onHeroMuted">Hoje</ThemedText></LegendaItem>
+                    <LegendaItem>
+                      <ThemedText type="caption" themeColor={cicloRuim ? 'onHeroDanger' : 'onHeroSuccess'}>
+                        {`${brl(descricao?.cents ?? 0)} projetado`}
+                      </ThemedText>
+                    </LegendaItem>
+                    <LegendaItem>
+                      <ThemedText type="caption" themeColor="onHeroMuted">
+                        {fimDoCiclo ? isoToBR(fimDoCiclo).slice(0, 5) : ''}
+                      </ThemedText>
+                    </LegendaItem>
                   </>
                 }
               />

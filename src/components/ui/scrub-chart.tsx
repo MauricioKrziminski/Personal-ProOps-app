@@ -20,6 +20,11 @@ const PONTO = 10;
  * O desenho continua sendo o `Sparkline`; aqui mora só o cursor, na MESMA escala
  * (`escalaDaSerie`).
  */
+/** Um texto da legenda do `ScrubChart`: não encolhe, a linha é que quebra. */
+export function LegendaItem({ children }: { children: ReactNode }) {
+  return <View style={styles.legendaItem}>{children}</View>;
+}
+
 export function ScrubChart({
   values,
   labels,
@@ -126,10 +131,15 @@ const styles = StyleSheet.create({
   legenda: {
     minHeight: 16,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: Space.sm,
+    columnGap: Space.sm,
+    rowGap: Space.half,
   },
+  // Um item da legenda NÃO encolhe: com fonte grande, encolher partia a palavra ("Hoj/e",
+  // "10/1/0"). Quem cede é a linha (design.md §3).
+  legendaItem: { flexShrink: 0, maxWidth: '100%' },
   linha: { position: 'absolute', left: 0, top: 0, width: 2, borderRadius: Radius.pill },
   ponto: {
     position: 'absolute',

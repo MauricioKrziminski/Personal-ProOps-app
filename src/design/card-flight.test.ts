@@ -17,7 +17,7 @@ import {
   tintaDoCartao,
 } from './card-brands.ts';
 import { contrast } from './contrast.ts';
-import { PROPORCAO_DO_CARTAO, alturaDoCartao, proporcaoDoCartao } from './card-geometry.ts';
+import { LARGURA_DE_DESENHO, PROPORCAO_DO_CARTAO, alturaDoCartao, proporcaoDoCartao } from './card-geometry.ts';
 import {
   alvoDoDeslize,
   comElastico,
@@ -174,4 +174,16 @@ test('o toque acha o cartão que está debaixo do dedo, com o carrossel onde ele
   assert.equal(indiceTocado(380, largura, 4 * passo, passo, total), 4, 'nada além do último');
   assert.equal(indiceTocado(0, largura, 0, passo, total), 0, 'nada antes do primeiro');
   assert.equal(indiceTocado(195, largura, 0, passo, 0), 0);
+});
+
+test('a face comporta o conteúdo MEDIDO em cada tamanho de fonte do iPhone', () => {
+  // 29/09/2026, medido no iPhone 17 Pro (cartão da frente: nome em duas linhas + "Atrasada" +
+  // fatura, limite, vencimento), altura do conteúdo no desenho de 340. Com a raiz quadrada, de
+  // XXXL para cima a face cortava a base inteira — no accessibility-large sobrava "Fat/ura/atu/al".
+  const medido: [number, number][] = [[1, 158], [1.118, 168], [1.353, 251], [1.786, 339], [2.143, 431], [3.571, 821]];
+  for (const [escala, conteudo] of medido) {
+    assert.ok(alturaDoCartao(LARGURA_DE_DESENHO, escala) >= conteudo, `${escala}×: ${alturaDoCartao(LARGURA_DE_DESENHO, escala)} < ${conteudo}`);
+  }
+  // No tamanho normal o cartão continua com a proporção de fábrica.
+  assert.equal(proporcaoDoCartao(1), PROPORCAO_DO_CARTAO);
 });

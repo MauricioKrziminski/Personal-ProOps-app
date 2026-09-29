@@ -280,8 +280,10 @@ const styles = StyleSheet.create({
   */
   base: { gap: Space.md },
   sobreposta: { position: 'absolute', left: 0, right: 0, bottom: 0 },
-  faturaLinha: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: Space.lg },
-  fatura: { flex: 1, minWidth: 0, gap: Space.xs },
+  // Com fonte grande o "fecha dd/mm" desce para baixo do valor em vez de espremer o rótulo até
+  // uma sílaba por linha ("Fat/ura/atu/al", 29/09/2026).
+  faturaLinha: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', columnGap: Space.lg, rowGap: Space.xs },
+  fatura: { flexGrow: 1, flexShrink: 1, minWidth: '45%', gap: Space.xs },
   fecha: { flexDirection: 'row', alignItems: 'center', gap: Space.xs, paddingBottom: Space.xs },
   rodape: {
     flexDirection: 'row',
