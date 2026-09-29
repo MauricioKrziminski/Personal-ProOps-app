@@ -4207,3 +4207,9 @@ test('Seletor de categoria: chips com ícone e cor, "Nova" cria e já escolhe, "
   ui.interact(() => ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'Gerenciar categorias').props.onPress());
   assert.equal(ui.navigations.at(-1), '/finance/categories');
 });
+
+test('Categorias se alcança pelo Gerenciar, pelo Perfil e pelo menu das Finanças', () => {
+  for (const f of ['src/app/finance/manage.tsx', 'src/app/(tabs)/profile/index.tsx', 'src/app/(tabs)/finance/index.tsx']) {
+    assert.match(readFileSync(f, 'utf8'), /'\/finance\/categories'/, f);
+  }
+});

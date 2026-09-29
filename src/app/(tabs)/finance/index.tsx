@@ -372,6 +372,7 @@ export default function FinanceScreen() {
               { label: 'Projeção', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
               { label: 'Patrimônio', icon: 'building.columns', onPress: () => router.push('/finance/net-worth') },
               { label: 'Metas', icon: 'target', onPress: () => router.push('/finance/goals') },
+              { label: 'Categorias', icon: 'tag', onPress: () => router.push('/finance/categories') },
               ]);
             }}
           />

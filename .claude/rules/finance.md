@@ -167,6 +167,23 @@
   (Eram duas; a do Deno saiu com `supabase/functions/` em 09/09/2026.)
   `src/lib/categories.test.ts` falha se as duas divergirem — mexeu numa, mexe na outra. A
   tabela `categories` legada foi dropada na `0010_workspaces.sql`.
+- **Ícone e cor da categoria moram numa tabela à parte, e o registro continua com o TEXTO**
+  (`public.categories`, `20260929170000`, spec `2026-09-29-formulario-unico-e-categorias-design.md`).
+  A tabela nova tem o mesmo nome da legada e outro papel: guarda só a APARÊNCIA de um nome, por
+  espaço, e a categoria criada no app antes de ter uso. Sem FK — WhatsApp, agente e importação
+  seguem gravando o nome. `categories_used()` devolve as em uso e as criadas, com `icon`, `color`
+  e `budgets` no FIM (o APK antigo lê `category`/`uses` por nome). No app, `useAparencia`
+  (`lib/categorias.ts`) responde ícone e cor: a linha da tabela, senão o ícone adivinhado
+  (`categoryIcon`) e sem cor — `anti-slop.test.ts` barra `categoryIcon` direto numa tela.
+- **Renomear, juntar e apagar reescrevem o texto em SETE colunas, numa transação**:
+  `transactions`, `recurring_transactions`, `installment_plans`, `budgets`,
+  `categorization_rules`, `debts.payment_category` e o histórico da recorrente
+  (`private.recurring_history_versions`, por um definer: a tabela só tem policy de leitura).
+  Renomear para um nome que já existe (sem acento e sem caixa) é JUNTAR: `rename_category` recusa
+  com `CATEGORIA_EXISTE` e só junta com `p_juntar`; no mês em que as duas têm orçamento, fica o
+  da que recebe. Apagar deixa os registros sem categoria e tira os orçamentos dela. Um UPDATE só
+  de categoria não acorda o gatilho do pagamento de dívida (`update of` as colunas que ele confere)
+  nem versiona a série (`proops.renomeando_categoria`) — `supabase/tests/categorias.sql`.
 
 ## O "hoje" do banco não é o hoje do usuário
 

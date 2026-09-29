@@ -83,6 +83,7 @@ const GROUPS: { title: string; items: ManageItem[] }[] = [
     items: [
       { title: 'Importar extrato', icon: 'square.and.arrow.down', href: '/import' },
       { title: 'Regras', subtitle: 'Categoria automática por palavra', icon: 'line.3.horizontal.decrease', href: '/finance/rules' },
+      { title: 'Categorias', subtitle: 'Ícone, cor, renomear e juntar', icon: 'tag', href: '/finance/categories' },
     ],
   },
   {

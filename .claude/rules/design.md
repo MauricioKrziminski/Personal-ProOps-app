@@ -1088,6 +1088,12 @@ crédito:
 - **A contagem anti-slop não muda**: continua UM accent na tela. Cor de conteúdo não entra na
   conta pelo mesmo motivo que a foto de um comprovante não entraria.
 
+**A cor de CATEGORIA é a mesma régua** (29/09/2026): a pessoa escolhe entre as oito da nota
+(ou nenhuma) na tela Categorias, e ela pinta o disco do ícone da categoria (`Row`/`LedgerRow`
+`tinta`, `SeloDaCategoria`), o ícone do chip do seletor e a fatia da rosca de "Para onde foi".
+Estado vence decoração: linha `destructive`, chip escolhido e orçamento estourado continuam na cor
+semântica, e os anéis de orçamento apertado não mudam.
+
 > `violeta` está na paleta, e a regra "se um dia a cor voltar, que não seja roxo" continua
 > valendo — ela é sobre o ACCENT do app. Aqui é escolha do usuário sobre o cartão da nota dela.
 
