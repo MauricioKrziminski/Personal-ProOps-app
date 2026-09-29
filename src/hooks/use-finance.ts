@@ -189,7 +189,7 @@ export type RecurringTransaction = Pick<
   | 'dtstart'
   | 'end_date'
   | 'auto_confirm'
-  // O estabelecimento da série (`20260926120000`): o "Repetir lançamento" o perdia.
+  // O estabelecimento da série (`20260926120000`): o "Recorrente" do lançamento o perdia.
   | 'merchant'
   | 'edit_revision'
 > & { kind: 'expense' | 'income' };

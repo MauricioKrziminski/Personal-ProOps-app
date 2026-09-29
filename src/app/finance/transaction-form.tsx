@@ -1076,6 +1076,43 @@ function TransactionForm({
         <>
 
         {/*
+          ⚠️ **Estes botões ficam no TOPO, antes do tipo, e em evidência** (29/09/2026, pedido do
+          dono do produto: *"essas tags… têm que ficar lá em cima e de uma maneira mais evidente"*).
+          Já moraram no rodapé, como ações SOBRE o registro; lá, pílulas pequenas depois de todos
+          os campos, quase ninguém as via — e elas trocam o formulário INTEIRO, que é o controle que
+          a régua de `frontend.md` põe antes do que ele troca. Abrem só a folha, por cima.
+
+          Os rótulos são os do "Lançar" das Finanças ("Recorrente", "Financiamento"): "Repetir
+          lançamento" não cabia ao lado do outro e a fileira empilhava com larguras diferentes.
+
+          ⚠️ **"Recorrente" também no MODO EDIÇÃO**, quando o lançamento ainda não é de
+          série — é o caminho para transformar um gasto que já existe em recorrente (*"queria
+          colocar o Cabelo Marcelao como recorrente"*). Quem já tem série não vê o botão, nem o
+          PAGAMENTO DE DÍVIDA: a parcela já vem do cronograma, e uma recorrente ao lado contaria
+          duas vezes.
+        */}
+        {!editing || !(editing.recurring_id || editing.installment_plan_id || editing.debt_id) ? (
+          <View style={styles.outrosRegistros}>
+            <Button label="Recorrente" icon="arrow.triangle.2.circlepath" variant="secondary" style={styles.outroRegistro} onPress={() => {
+              const values = getValues();
+              const destino = { pathname: '/finance/nova-recorrente' as const, params: {
+                create: '1', kind: values.kind === 'income' ? 'income' : 'expense',
+                amount: String(values.amount_cents), description: values.description,
+                merchant: values.merchant?.trim() ?? '',
+                category: values.category ?? '', account: values.account_id ?? '', start: values.occurred_at,
+              } };
+              // Criando, o formulário é descartável e `replace` evita voltar para um rascunho
+              // pela metade. Editando, o lançamento continua existindo — `push` devolve para ele.
+              if (editing) router.push(destino);
+              else router.replace(destino);
+            }} />
+            {!editing ? (
+              <Button label="Financiamento" icon="building.columns" variant="secondary" style={styles.outroRegistro} onPress={() => router.push({ pathname: '/finance/novo-financiamento', params: { create: 'financing' } })} />
+            ) : null}
+          </View>
+        ) : null}
+
+        {/*
           Tipo primeiro porque ele decide QUAIS campos existem: transferência troca
           "Categoria" por "Para a conta". Controle que remonta o formulário não pode vir
           depois do que ele remonta.
@@ -1487,41 +1524,6 @@ function TransactionForm({
 
 
 
-        {/*
-          ⚠️ **Estes botões ficam no RODAPÉ, não no topo.** Eles não são campos — são ações
-          SOBRE o registro, como "Apagar lançamento" logo abaixo. No topo, o modo edição abria com
-          três blocos não-campo antes do primeiro campo, e o formulário começava por uma coisa que
-          leva para OUTRA tela. A régua de `frontend.md` é sobre campos; o que ela implica aqui é
-          que ação de ciclo de vida mora no fim, junto das outras.
-
-          ⚠️ **"Repetir lançamento" também no MODO EDIÇÃO**, quando o lançamento ainda não é de
-          série. Era só na criação, e por isso não havia caminho para transformar um gasto que já
-          existe em recorrente — foi a queixa *"queria colocar o Cabelo Marcelao como recorrente
-          mas quando vou em editar o lançamento, eu não consigo"*. Quem já tem série não vê o
-          botão: ali o caminho é editar a série, não criar uma segunda. Nem o PAGAMENTO DE DÍVIDA:
-          a parcela já vem do cronograma da dívida, e uma recorrente ao lado contaria duas vezes.
-        */}
-        {!editing || !(editing.recurring_id || editing.installment_plan_id || editing.debt_id) ? (
-          <View style={styles.errorActions}>
-            <Button label="Repetir lançamento" variant="secondary" size="sm" onPress={() => {
-              const values = getValues();
-              const destino = { pathname: '/finance/nova-recorrente' as const, params: {
-                create: '1', kind: values.kind === 'income' ? 'income' : 'expense',
-                amount: String(values.amount_cents), description: values.description,
-                merchant: values.merchant?.trim() ?? '',
-                category: values.category ?? '', account: values.account_id ?? '', start: values.occurred_at,
-              } };
-              // Criando, o formulário é descartável e `replace` evita voltar para um rascunho
-              // pela metade. Editando, o lançamento continua existindo — `push` devolve para ele.
-              if (editing) router.push(destino);
-              else router.replace(destino);
-            }} />
-            {!editing ? (
-              <Button label="Financiamento" variant="secondary" size="sm" onPress={() => router.push({ pathname: '/finance/novo-financiamento', params: { create: 'financing' } })} />
-            ) : null}
-          </View>
-        ) : null}
-
         {editing ? (
           <Button
             label="Apagar lançamento"
@@ -1574,6 +1576,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Space.md,
   },
+  outrosRegistros: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Space.sm,
+  },
+  // Os dois dividem a linha por igual; com fonte grande cada um desce e ocupa a linha inteira.
+  outroRegistro: { flexGrow: 1 },
   centered: {
     textAlign: 'center',
   },

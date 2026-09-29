@@ -112,7 +112,7 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 
 /**
  * `soFormulario`: só a folha, sem a lista por trás — é a rota `nova-recorrente`, aberta por cima de
- * onde a pessoa está (o "Aplicar" do "E se…?", o "Repetir lançamento"). *"devo conseguir criar
+ * onde a pessoa está (o "Aplicar" do "E se…?", o "Recorrente" do lançamento). *"devo conseguir criar
  * tudo direto ali"* (29/09/2026): empurrar a tela de Recorrentes era levá-la para outro lugar.
  */
 export default function RecurringScreen({ soFormulario = false }: { soFormulario?: boolean } = {}) {
@@ -133,7 +133,7 @@ export default function RecurringScreen({ soFormulario = false }: { soFormulario
   const tentativaFuturo = useRef<{ key: string; id: string } | null>(null);
   /** Qual `?edit=` já foi consumido — sem isto, fechar o sheet reabriria no render seguinte. */
   const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
-  // `?create=1` já nasce vindo de fora (é o "Repetir lançamento" e o atalho do Financeiro).
+  // `?create=1` já nasce vindo de fora (é o "Recorrente" do lançamento e o atalho do Financeiro).
   const volta = useVoltarQuandoFechar(params.create === '1');
   /** `?deHipotese=`: aberta pelo "Aplicar" do "E se…?" — criar tira aquela hipótese do rascunho. */
   const { tirar } = useRascunho();

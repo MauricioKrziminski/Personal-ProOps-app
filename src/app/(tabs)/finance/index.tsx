@@ -275,8 +275,8 @@ export default function FinanceScreen() {
   const lancar = () =>
     showItemActions('Lançar', [
       { label: 'Gasto ou receita', onPress: () => router.push({ pathname: '/finance/transaction-form', params: { month } }) },
-      { label: 'Recorrente', onPress: () => router.push({ pathname: '/finance/recurring', params: { create: '1' } }) },
-      { label: 'Financiamento', onPress: () => router.push({ pathname: '/finance/debts', params: { create: 'financing' } }) },
+      { label: 'Recorrente', onPress: () => router.push({ pathname: '/finance/nova-recorrente', params: { create: '1' } }) },
+      { label: 'Financiamento', onPress: () => router.push({ pathname: '/finance/novo-financiamento', params: { create: 'financing' } }) },
     ]);
 
   if (!pronta) {

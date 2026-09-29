@@ -1590,7 +1590,7 @@ test('Ocorrência de série: uma data só (o vencimento), e o caminho para edita
   assert.doesNotMatch(fonte, /label="Editar parcelas e datas da compra"/);
   // Linha e regra na mesma transação SQL; falha de uma não deixa a outra gravada.
   assert.match(fonte, /editarSerie\.mutate\([\s\S]*?id: editing\.id, recurringId: serie\.id, linePatch: linhas, seriesPatch: regra,[\s\S]*?expectedRevision: serie\.edit_revision, requestId: tentativaFuturoSerie\.current\.id/);
-  // "Repetir lançamento" leva o estabelecimento: a série passou a guardá-lo (`20260926120000`).
+  // "Recorrente" leva o estabelecimento: a série passou a guardá-lo (`20260926120000`).
   assert.match(fonte, /merchant: values\.merchant\?\.trim\(\) \?\? ''/);
 });
 
@@ -1831,4 +1831,25 @@ test('Projeção: o caminho "detalhado" do E se saiu por inteiro', () => {
   for (const morto of ['adicionarComo', 'aplicarTodas', 'useForecastWithDrafts', 'HipoteseDetalhada', 'detalhadas', "'Adicionar como…'"]) {
     assert.ok(!fonte.includes(morto), `forecast.tsx ainda tem ${morto}`);
   }
+});
+
+test('Lançamento: "Recorrente" e "Financiamento" ficam NO TOPO, antes do tipo, e em evidência', () => {
+  // 29/09/2026, *"essas tags… têm que ficar lá em cima e de uma maneira mais evidente"*: no
+  // rodapé, pílulas pequenas depois de todos os campos, quase ninguém as via.
+  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  // Os MESMOS rótulos do "Lançar" das Finanças (uma intenção, um rótulo); "Repetir lançamento"
+  // não cabia ao lado de "Financiamento" e a fileira empilhava com larguras diferentes.
+  const repetir = fonte.indexOf('label="Recorrente"');
+  const fin = fonte.indexOf('label="Financiamento"');
+  assert.ok(repetir > 0 && fin > 0);
+  assert.ok(repetir < fonte.indexOf('options={KINDS}') && fin < fonte.indexOf('options={KINDS}'), 'antes do tipo');
+  for (const i of [repetir, fin]) {
+    const botao = fonte.slice(i, fonte.indexOf('onPress', i));
+    assert.doesNotMatch(botao, /size="sm"/, 'tamanho normal');
+    assert.match(botao, /icon="/, 'com ícone');
+    assert.match(botao, /style=\{styles\.outroRegistro\}/, 'os dois dividem a linha por igual');
+  }
+  assert.match(fonte, /outroRegistro: \{ flexGrow: 1 \}/);
+  const estilo = fonte.slice(fonte.indexOf('outrosRegistros: {'), fonte.indexOf('}', fonte.indexOf('outrosRegistros: {')));
+  assert.match(estilo, /flexWrap: 'wrap'/, 'com fonte grande a fileira quebra, não corta');
 });
