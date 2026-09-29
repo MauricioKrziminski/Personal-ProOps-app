@@ -1,9 +1,8 @@
-import { useInvalidateFinance } from '@/hooks/use-finance';
 import { useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 import { CamposDaSerie } from '@/components/finance/serie-form';
 import { SERIE_VAZIA, serieDoRegistro, validaSerie, type SerieForm } from '@/lib/serie';
@@ -29,6 +28,7 @@ import { useToast } from '@/components/ui/toast';
 import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useAccounts,
+  useCreateRecurring,
   useDeleteRecurring,
   useRecurringTransactions,
   useSaveRecurringAll,
@@ -92,39 +92,6 @@ function useRecurringUpcoming(days = 30) {
       if (error) throw error;
       return data;
     },
-  });
-}
-
-/**
- * Criar série. Editar NÃO passa por aqui: mudar a série reescreve, na mesma transação, as
- * ocorrências `pending` já materializadas — é a RPC `update_recurring_series`.
- */
-function useCreateRecurring() {
-  const invalidate = useInvalidateFinance();
-  return useMutation({
-    mutationFn: async (input: {
-      kind: 'expense' | 'income';
-      amount_cents: number;
-      description: string | null;
-      merchant: string | null;
-      category: string | null;
-      account_id: string | null;
-      rrule: string;
-      next_run_at: string;
-      end_date: string | null;
-      auto_confirm: boolean;
-    }) => {
-      const { data: sessao, error: erroSessao } = await supabase.auth.getUser();
-      if (erroSessao || !sessao.user) throw erroSessao ?? new Error('sem sessão');
-      const { error } = await supabase.from('recurring_transactions').insert({
-        ...input,
-        // âncora da série: sem ela a hora de parede deriva a cada rodada do cron
-        dtstart: input.next_run_at,
-        user_id: sessao.user.id,
-      });
-      if (error) throw error;
-    },
-    onSuccess: invalidate,
   });
 }
 

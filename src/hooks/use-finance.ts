@@ -18,6 +18,16 @@ import { adiantaveisNoMes, type Adiantavel, type EscolhaDeAdiantamento } from '@
 import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
 import { filtroDoEstado } from '@/lib/data-da-compra';
 import type { HipoteseNoCiclo, OcorrenciaDaHipotese } from '@/lib/rascunho-no-ciclo';
+import {
+  DESCRICAO_JUROS_DO_PIX,
+  argsDaParcelada,
+  linhaDaRecorrente,
+  linhaDeJuros,
+  linhaDoFinanciamento,
+  linhasDoLancamento,
+  type EntradaParcelada,
+  type EntradaRecorrente,
+} from '@/lib/escrita';
 
 // Categorias vivem em @/lib/categories (fonte única, travada por teste contra o
 // prompt do Gemini); reexportadas aqui para não quebrar os imports das telas.
@@ -813,29 +823,10 @@ export function useSettleInvoice() {
 export function useCreateInstallmentPlan() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async (input: {
-      accountId: string;
-      totalCents: number;
-      installments: number;
-      paidInstallments: number;
-      occurredAt: string;
-      description: string | null;
-      category: string | null;
-      merchant: string | null;
-      /** Parcelas no último dia de cada mês (fora do cartão), na mesma transação da criação. */
-      lastDay?: boolean;
-    }) => {
-      const { error } = await supabase.rpc(
-        input.lastDay ? 'create_installment_plan_last_day' : 'create_installment_plan_with_history', {
-        p_account_id: input.accountId,
-        p_total_cents: input.totalCents,
-        p_installments: input.installments,
-        p_paid_installments: input.paidInstallments,
-        p_occurred_at: input.occurredAt,
-        p_description: input.description ?? undefined,
-        p_category: input.category ?? undefined,
-        p_merchant: input.merchant ?? undefined,
-      });
+    // O que vai à RPC sai de `argsDaParcelada` — a mesma função da hipótese (`simular`).
+    mutationFn: async (input: EntradaParcelada) => {
+      const { rpc, args } = argsDaParcelada(input);
+      const { error } = await supabase.rpc(rpc, args);
       if (error) throw error;
     },
     onSuccess: invalidate,
@@ -2367,6 +2358,24 @@ export function usePayoffStrategy(estrategia: 'avalanche' | 'snowball') {
   });
 }
 
+/**
+ * Criar série (movido de `recurring.tsx`, 29/09/2026: a hipótese e o "Aplicar" da Projeção usam
+ * o mesmo). Editar NÃO passa por aqui: mudar a série reescreve, na mesma transação, as
+ * ocorrências `pending` já materializadas — é a RPC `update_recurring_series`.
+ */
+export function useCreateRecurring() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (input: EntradaRecorrente) => {
+      const { error } = await supabase
+        .from('recurring_transactions')
+        .insert({ ...linhaDaRecorrente(input), user_id: await userId() } as never);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
 export function useSaveDebt() {
   const invalidate = useInvalidateFinance();
   return useMutation({
@@ -2400,7 +2409,8 @@ export function useSaveDebt() {
         if (error) throw error;
         if (!data?.length) throw Object.assign(new Error('A dívida mudou enquanto você editava.'), { code: 'VERSAO' });
       } else {
-        const { error } = await supabase.from('debts').insert({ ...resto, user_id: await userId() });
+        // O que vai ao banco sai de `linhaDoFinanciamento` — a mesma função da hipótese.
+        const { error } = await supabase.from('debts').insert({ ...linhaDoFinanciamento(resto), user_id: await userId() } as never);
         if (error) throw error;
       }
     },
@@ -2825,7 +2835,7 @@ export interface TransactionInput {
  * no mesmo ciclo, sem o app calcular nada.
  */
 /** O texto que marca a linha de juros do Pix no crédito — é por ele que a edição a acha. */
-export const DESCRICAO_JUROS_DO_PIX = 'Juros do Pix no crédito';
+export { DESCRICAO_JUROS_DO_PIX };
 
 /**
  * A linha de juros do Pix que nasceu junto com esta compra (26/09/2026: *"tudo que se cria se
@@ -2853,24 +2863,6 @@ export function useJurosDoPix(tx: Transaction | null | undefined) {
       return data;
     },
   });
-}
-
-/**
- * A linha de juros do Pix no crédito a partir da linha principal: SEMPRE uma despesa no cartão,
- * sem destino. Copiada de uma transferência (o Pix para conta própria), ela herdaria `kind` e a
- * conta de destino — e o juro viraria dinheiro movido para a conta, com o nome de juro.
- */
-function linhaDeJuros<T extends TransactionInput>(base: T, cents: number) {
-  return {
-    ...base,
-    kind: 'expense' as const,
-    counterparty_account_id: null,
-    amount_cents: cents,
-    category: 'juros',
-    description: DESCRICAO_JUROS_DO_PIX,
-    // O favorecido é da compra, não do juro: o juro é do banco.
-    merchant: null,
-  };
 }
 
 export function useSaveTransaction() {
@@ -2909,15 +2901,11 @@ export function useSaveTransaction() {
         return;
       }
       const uid = await userId();
-      const compra = { ...input, user_id: uid, source: 'app' as const };
-      const linhas = [compra];
-      // Segunda trava: juro do Pix no crédito é custo do CARTÃO — da compra ou do Pix para conta
-      // própria (28/09/2026). Numa receita ele viraria dinheiro entrando com o nome de juro.
-      if (fee_cents && fee_cents > 0 && input.kind !== 'income') {
-        linhas.push(linhaDeJuros(compra, fee_cents));
-      }
+      // As linhas saem de `linhasDoLancamento` — a mesma função da hipótese (`simular`). Ela
+      // também é a segunda trava do juro do Pix (nunca numa receita).
+      const linhas = linhasDoLancamento({ ...input, fee_cents }).map((l) => ({ ...l, user_id: uid }));
       // Um insert só: meia gravação deixaria o juro sem a compra (ou o contrário) na fatura.
-      const { error } = await supabase.from('transactions').insert(linhas);
+      const { error } = await supabase.from('transactions').insert(linhas as never);
       if (error) throw error;
     },
     onSuccess: invalidate,

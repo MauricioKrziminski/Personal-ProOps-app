@@ -1618,9 +1618,12 @@ test('Pix no crédito para conta própria: a transferência do cartão tem juro,
   const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
   assert.match(fonte, /const mostraJuros =\s*isCard && \(kind === 'expense' \|\| kind === 'transfer'\)/);
   const hook = readFileSync(join(SRC, 'hooks/use-finance.ts'), 'utf8');
+  // As linhas do lançamento moram em `escrita.ts` (29/09/2026), a mesma função da hipótese.
+  const escrita = readFileSync(join(SRC, 'lib/escrita.ts'), 'utf8');
   // copiado de uma transferência, o juro herdaria o tipo e o destino — e viraria dinheiro movido
-  assert.match(hook, /function linhaDeJuros[\s\S]{0,200}?kind: 'expense' as const,\s*counterparty_account_id: null,/);
-  assert.match(hook, /if \(fee_cents && fee_cents > 0 && input\.kind !== 'income'\) \{\s*linhas\.push\(linhaDeJuros\(/);
+  assert.match(escrita, /function linhaDeJuros[\s\S]{0,200}?kind: 'expense' as const,\s*counterparty_account_id: null,/);
+  assert.match(escrita, /if \(fee_cents && fee_cents > 0 && input\.kind !== 'income'\) \{?\s*linhas\.push\(linhaDeJuros\(/);
+  assert.match(hook, /linhasDoLancamento\(\{ \.\.\.input, fee_cents \}\)/, 'o hook grava as linhas da escrita');
   assert.match(hook, /tx\?\.invoice_id && contaNaFatura\(tx\.kind\)/, 'a edição acha o juro do Pix também');
   // a fatura soma o que a lista mostra: despesa E a transferência que sai do cartão
   for (const arquivo of ['app/finance/invoice/[id].tsx', 'components/finance/invoice-dock.tsx']) {
