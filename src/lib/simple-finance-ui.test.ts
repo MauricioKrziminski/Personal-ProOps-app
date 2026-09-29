@@ -3238,9 +3238,9 @@ test('Projeção: com hipótese detalhada no rascunho, a série vem de simular e
     { id: 'h1', tipo: 'parcelada', titulo: 'Notebook', entrada: { accountId: 'c', totalCents: 300000, installments: 10, paidInstallments: 0, occurredAt: '2026-10-01', description: 'Notebook', category: null, merchant: null } },
   ] });
   const ui = screen(forecastFile, { preferencias: { 'projecao:rascunho': rascunho }, simulacao: { forecast: [{ day: '2026-09-28', in_cents: 0, out_cents: 0, balance_cents: 100 }], erros: [{ indice: 0, mensagem: 'conta arquivada' }] } });
-  const textos = ui.nodes().map((n: any) => (Array.isArray(n.props?.children) ? n.props.children.join('') : n.props?.children)).filter((t: any) => typeof t === 'string');
-  assert.ok(textos.some((t: string) => t.includes('Notebook')), 'a hipótese detalhada aparece no rascunho');
-  assert.ok(textos.some((t: string) => t.includes('conta arquivada')), 'o erro da simulação aparece na linha');
+  const linha = ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'Notebook');
+  assert.ok(linha, 'a hipótese detalhada aparece no rascunho');
+  assert.match(linha.props.subtitle, /conta arquivada/, 'o erro da simulação aparece na linha');
 });
 
 test('Recorrente em modo hipótese: "Adicionar à hipótese" guarda a entrada e não grava', () => {
@@ -3261,4 +3261,23 @@ test('Financiamento em modo hipótese: o botão diz "Adicionar à hipótese" e o
   assert.equal(header.props.action.props.label, 'Adicionar à hipótese');
   ui.interact(() => header.props.action.props.onPress());
   assert.equal(ui.writes.length, 0);
+});
+
+test('E se: "Adicionar como…" abre o formulário real em modo hipótese; a linha arrasta Aplicar e Tirar', () => {
+  const rascunho = JSON.stringify({ versao: 1, rapidas: [], detalhadas: [
+    { id: 'h1', tipo: 'recorrente', titulo: 'Academia', entrada: { kind: 'expense', amount_cents: 5000, description: 'Academia', merchant: null, category: null, account_id: null, rrule: 'FREQ=WEEKLY;BYDAY=MO', next_run_at: '2026-10-05T12:00:00.000Z', end_date: null, auto_confirm: false } },
+  ] });
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': rascunho } });
+  ui.interact(() => ui.nodes().find((n: any) => n.props?.label === 'Adicionar como…').props.onPress());
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Lançamento', 'Compra parcelada', 'Recorrente', 'Financiamento']);
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Recorrente').onPress());
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { pathname: '/finance/recurring', params: { create: '1', hipotese: 'nova' } });
+  const card = deslizaveis(ui).find((d: any) => d.props.titulo === 'Academia');
+  assert.ok(card, 'a hipótese detalhada é uma linha que arrasta');
+  assert.deepEqual(ladosDe(card), { direita: ['Aplicar'], esquerda: ['Tirar'], mais: true, pontaDireita: 'Aplicar', pontaEsquerda: 'Tirar' });
+  // Tirar tem Desfazer
+  ui.interact(() => card.props.acoes.find((a: any) => a.label === 'Tirar').onPress());
+  assert.equal(JSON.parse(ui.preferenciasGravadas['projecao:rascunho'] || '{"detalhadas":[]}').detalhadas.length, 0);
+  ui.interact(() => ui.toasts.at(-1).action.onPress());
+  assert.equal(JSON.parse(ui.preferenciasGravadas['projecao:rascunho']).detalhadas.length, 1);
 });

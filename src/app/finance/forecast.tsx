@@ -43,7 +43,7 @@ import {
   type Draft,
 } from '@/hooks/use-finance';
 import type { HipoteseNoCiclo } from '@/lib/rascunho-no-ciclo';
-import { registrosParaSimular, resumoDaHipotese } from '@/lib/rascunho';
+import { registrosParaSimular, resumoDaHipotese, type HipoteseDetalhada } from '@/lib/rascunho';
 import { useRascunho } from '@/hooks/use-rascunho';
 import { useToast } from '@/components/ui/toast';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
@@ -221,7 +221,7 @@ export default function ForecastScreen() {
    * mantém todo o fluxo das rápidas como era.
    */
   const toast = useToast();
-  const { rascunho, setRapidas, limpar, restaurar } = useRascunho();
+  const { rascunho, setRapidas, limpar, restaurar, tirarDetalhada } = useRascunho();
   const rascunhos = rascunho.rapidas;
   const setRascunhos = (v: Draft[] | ((antes: Draft[]) => Draft[])) =>
     setRapidas(typeof v === 'function' ? v : () => v);
@@ -274,6 +274,38 @@ export default function ForecastScreen() {
   const comDetalhadas = registros.length > 0;
   const simulacao = useSimulacao(dias, rascunhos, registros, emMes ? 'mes' : 'dia', regua.view, comDetalhadas);
   const errosDaSimulacao = simulacao.data?.erros ?? [];
+
+  // As hipóteses detalhadas (spec 2026-09-28): criadas no formulário REAL em modo hipótese.
+  const adicionarComo = () =>
+    showItemActions('Adicionar como…', [
+      { label: 'Lançamento', icon: 'doc.text', onPress: () => router.push({ pathname: '/finance/transaction-form', params: { hipotese: 'nova' } }) },
+      { label: 'Compra parcelada', icon: 'creditcard', onPress: () => router.push({ pathname: '/finance/transaction-form', params: { hipotese: 'nova', parcelada: '1' } }) },
+      { label: 'Recorrente', icon: 'repeat', onPress: () => router.push({ pathname: '/finance/recurring', params: { create: '1', hipotese: 'nova' } }) },
+      { label: 'Financiamento', icon: 'banknote', onPress: () => router.push({ pathname: '/finance/debts', params: { create: 'financing', hipotese: 'nova' } }) },
+    ]);
+  const editarDetalhada = (h: HipoteseDetalhada) => {
+    if (h.tipo === 'recorrente') router.push({ pathname: '/finance/recurring', params: { create: '1', hipotese: h.id } });
+    else if (h.tipo === 'financiamento') router.push({ pathname: '/finance/debts', params: { create: 'financing', hipotese: h.id } });
+    else router.push({ pathname: '/finance/transaction-form', params: { hipotese: h.id } });
+  };
+  // Aplicar mora na Task 7 do plano (salvar pelo hook do formulário).
+  const aplicarDetalhada = (_h: HipoteseDetalhada) => {};
+  const acoesDaDetalhada = (h: HipoteseDetalhada): ItemAction[] => [
+    { label: 'Aplicar', icon: 'checkmark.circle', arrasto: 'direita', onPress: () => aplicarDetalhada(h) },
+    { label: 'Editar', icon: 'pencil', onPress: () => editarDetalhada(h) },
+    {
+      label: 'Tirar',
+      icon: 'trash',
+      destructive: true,
+      arrasto: 'esquerda',
+      desfaz: true,
+      onPress: () => {
+        const antes = rascunho;
+        tirarDetalhada(h.id);
+        toast({ message: `${h.titulo} saiu do rascunho.`, tone: 'success', action: { label: 'Desfazer', onPress: () => restaurar(antes) } });
+      },
+    },
+  ];
   // Com hipótese detalhada, a série e o mensal vêm de `simular` (que já inclui as rápidas).
   const serieSimulada = comDetalhadas ? simulacao.data?.forecast : simulado.data;
   const mensalExibido = comDetalhadas ? (simulacao.data?.meses ?? mensal.data) : mensal.data;
@@ -769,12 +801,16 @@ export default function ForecastScreen() {
         {detalhadas.map((h, i) => {
           const erro = errosDaSimulacao.find((e) => e.indice === i);
           return (
-            <View key={h.id} style={[styles.hipoteseLinha, { borderTopColor: theme.separator }]}>
-              <ThemedText type="small">{resumoDaHipotese(h, brl)}</ThemedText>
-              {erro ? (
-                <ThemedText type="caption" themeColor="danger">{`Não dá para simular: ${erro.mensagem}`}</ThemedText>
-              ) : null}
-            </View>
+            <Deslizavel key={h.id} titulo={h.titulo} acoes={acoesDaDetalhada(h)}>
+              <Row
+                title={h.titulo}
+                subtitle={erro ? `Não dá para simular: ${erro.mensagem}` : resumoDaHipotese(h, brl).replace(`${h.titulo} · `, '')}
+                destructive={Boolean(erro)}
+                onPress={() => editarDetalhada(h)}
+                onLongPress={() => showItemActions(h.titulo, acoesDaDetalhada(h))}
+                accessibilityLabel={`Hipótese: ${resumoDaHipotese(h, brl)}${erro ? `. Não dá para simular: ${erro.mensagem}` : ''}`}
+              />
+            </Deslizavel>
           );
         })}
         </>
@@ -796,6 +832,7 @@ export default function ForecastScreen() {
           size="sm"
           onPress={abrirNova}
         />
+        <Button label="Adicionar como…" variant="secondary" size="sm" onPress={adicionarComo} />
         {simulando ? (
           <Button
             label="Limpar"
