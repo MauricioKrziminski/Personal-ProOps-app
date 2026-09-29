@@ -54,12 +54,12 @@
     "Amortização + juros") lendo a LINHA (`detalheDoPagamento`), nunca o contrato.
   - **A ficha da dívida é uma TELA, `/finance/debts?id=<dívida>`** (25/09/2026): era uma folha,
     e abrir uma parcela fechava a ficha e voltar a reabria (*"para que fechar e não só voltar?"*).
-    O mesmo `debts.tsx` desenha a lista (sem `id`) e a ficha (com `id`), e as folhas de pagar e de
-    editar abrem por cima das duas. **Toda parcela da linha do tempo abre**, empilhada sobre a
-    ficha: a paga com lançamento abre o LANÇAMENTO (editar, apagar); a futura, a próxima e a só
-    contada abrem `/finance/debt-installment` (valor, vencimento, juros/amortização e saldo depois,
-    da MESMA conta da ficha). "Paguei esta parcela" ali — só na próxima, pagar é em ordem — volta
-    para a ficha já no pagamento (`lib/volta-da-parcela.ts`).
+    O mesmo `debts.tsx` desenha a lista (sem `id`) e a ficha (com `id`); a folha de pagar abre por
+    cima das duas, e editar abre o formulário único (`/finance/lancar`). **Toda parcela da linha do
+    tempo abre**, empilhada sobre a ficha: a paga com lançamento abre o LANÇAMENTO (editar, apagar);
+    a futura, a próxima e a só contada abrem `/finance/debt-installment` (valor, vencimento,
+    juros/amortização e saldo depois, da MESMA conta da ficha). "Paguei esta parcela" ali — só na
+    próxima, pagar é em ordem — volta para a ficha já no pagamento (`lib/volta-da-parcela.ts`).
   - **Excluir por completo é `public.delete_debt`**: trava a dívida, apaga os pagamentos
     (`transactions.debt_id`, com um desvio local à transação no `tg_transactions_debt_payment`) e a
     dívida. Idempotente. Apagar a dívida direto FALHA quando há pagamento: a FK `set null` dispara
@@ -103,8 +103,8 @@
     formato (escrita pelo WhatsApp) some da projeção até a rodada.
   - **Uma tela só na ocorrência**: o formulário do lançamento de uma série abre com "Só esta |
     Esta e as próximas" no topo. "Só esta" edita a linha, com UMA data (o vencimento, fora do
-    cartão). "Esta e as próximas" desenha os MESMOS campos do corpo Recorrente do
-    formulário único (`CamposDaSerie`) e grava em duas partes, nesta ordem (`mudancasDaOcorrencia`, `lib/serie.ts`):
+    cartão). "Esta e as próximas" desenha os MESMOS campos do corpo Recorrente do formulário único
+    (`CamposDaSerie`) e grava em duas partes, nesta ordem (`mudancasDaOcorrencia`, `lib/serie.ts`):
     valor, título, estabelecimento, categoria e conta desta em diante por
     `update_transaction_scoped` (ancorada nela), e só depois tipo, fim, "entra como pago" e o
     calendário por `update_recurring_series`. Tipo vale para todas as em aberto da série.
@@ -835,9 +835,9 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
   forma (uma vez | parcelado | repete | financiamento), valor, parcelas ou frequência, **conta ou
   cartão** e **dia** — a conta decide de onde a fatura e a parcela saem, e o dia em qual fatura a
   compra cai. Título, categoria e o resto vêm no formulário COMPLETO — o único, `/finance/lancar`,
-  no tipo da forma —, que o "Aplicar" abre pré-preenchido (`paramsDoAplicar`); salvar lá tira a hipótese PELO ID, pela promessa (a lista
-  pode ter mudado com o formulário aberto). Parcelado e financiamento exigem conta; "sem conta"
-  só muda a visão geral e a linha diz isso.
+  no tipo da forma —, que o "Aplicar" abre pré-preenchido (`paramsDoAplicar`); salvar lá tira a
+  hipótese PELO ID, pela promessa (a lista pode ter mudado com o formulário aberto). Parcelado e
+  financiamento exigem conta; "sem conta" só muda a visão geral e a linha diz isso.
 
   **Toda hipótese vira REGISTRO de verdade em `public.simular`** (`registroDaHipotese`, pelos
   MESMOS construtores do salvar, `src/lib/escrita.ts`): cria numa subtransação, lê e desfaz. Fatura
@@ -1014,7 +1014,9 @@ criação do `simular`: não existe uma segunda cópia da regra de criar.
 **"Tem passado" é palpite da rota, e a dúvida vale como "tem".** `passado=0` só vem de quem SABE
 (o avulso; a lista de Dívidas por `installments_paid`), e sem o parâmetro o hospedeiro assume que
 tem. Na dívida o hospedeiro confere a carregada: logo depois do "Paguei" a linha em cache ainda
-diz 0, e o "Converter" sem confirmação viraria `todas`, apagando os pagamentos.
+diz 0, e o "Converter" sem confirmação viraria `todas`, apagando os pagamentos. A conferência é
+de melhor esforço: ela lê o MESMO cache `['debts']` da lista, e só ajuda depois que a consulta
+refez. **O banco não segura `todas` numa dívida com pagamento** — a tela é a última defesa.
 
 **Origem de outro espaço recusa, em todo alcance** ("manter" inclusive): o destino nasce no espaço
 PADRÃO de quem chama, e converter ligaria uma linha do espaço A a uma série do B, em silêncio.

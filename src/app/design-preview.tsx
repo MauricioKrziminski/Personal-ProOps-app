@@ -996,9 +996,9 @@ function seedClient() {
   client.setQueryData(['reminders'], { pages: [[]], pageParams: [0] });
   client.setQueryData(['goals'], []);
   /**
-   * `Recorrentes` ganhou EDIÇÃO em 09/09/2026 e o sheet de edição é outro desenho do de
-   * criação: sem frequência e sem âncora, com um resumo no lugar. Com a lista vazia a tela
-   * cai no estado vazio e nada disso é conferível.
+   * A série semeada é o que `Recorrentes` lista e o que a aba `Editar` abre no formulário único
+   * (`?screen=lancar&tipo=recorrente&id=prev-r1`). Com a lista vazia a tela cai no estado vazio
+   * e nada disso é conferível.
    */
   client.setQueryData(['recurring'], [
     {

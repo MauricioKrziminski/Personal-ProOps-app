@@ -630,7 +630,8 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
   no formulário de lançamento: o toast disparou e nada apareceu. Ali a tela é um VC apresentado
   sobre a raiz. A correção é `<ToastDoModal/>` no fim da tela (`ui/toast.tsx`): no iOS ele desenha
   o toast, no Android não desenha nada, porque lá o modal mora no mesmo contêiner e o da raiz já
-  aparece por cima. Está no `transaction-form` e no `reminder-form`; o paywall não dispara toast.
+  aparece por cima. Está no `formulario-do-lancamento`, no hospedeiro `lancar` (para os corpos de
+  série e dívida) e no `reminder-form`; o paywall não dispara toast.
   Tela modal nova que dispare toast leva o mesmo.
 - Confirmação destrutiva é **action sheet nativo**. Ação de item é **context menu nativo**.
   `Link.Menu` do expo-router é **iOS-only** — usar só ele deixa o Android sem ação nenhuma na
@@ -807,13 +808,14 @@ que "voltar" faz depois.
 
 - **Header é do navegador — exceto nas cinco RAÍZES de aba e nas telas MODAIS.**
 
-  **As três telas `presentation: 'modal'` são `headerShown: false` desde 13/09/2026** e
+  **As telas `presentation: 'modal'` (`finance/lancar`, `reminder-form`, `paywall` e a casca
+  `finance/transaction-form`) são `headerShown: false` desde 13/09/2026** e
   desenham `TaskHeader` no conteúdo, igual aos sheets. Não é preferência:
   `react-native-screens` (`ScreenStackHeaderConfig.kt:374-382`) roda `toolbar.title = null`
   sempre que existe um subview `LEFT` customizado — e o ✕ era exatamente isso. No Android
   `transaction-form`, `reminder-form` e `paywall` renderizavam **sem título nenhum**, então "Novo
   lançamento" e "Editar lançamento" eram a mesma tela na tela. Custo aceito: o iOS perde a palavra
-  "Cancelar" e a pílula de vidro do `Stack.Toolbar` no "Salvar" nessas três.
+  "Cancelar" e a pílula de vidro do `Stack.Toolbar` no "Salvar" nelas.
   `anti-slop.test.ts` quebra o build se `headerLeft` voltar (allowlist ZERO).
 
   **Tela EMPURRADA continua com o header do navegador** e `<Stack.Title>` — **título compacto e
