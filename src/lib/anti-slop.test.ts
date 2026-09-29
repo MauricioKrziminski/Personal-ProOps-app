@@ -796,6 +796,10 @@ const SEM_SCREEN = new Set([
   // Só a FOLHA do formulário, num modal transparente por cima de quem abriu: não há tela.
   'src/app/finance/nova-recorrente.tsx',
   'src/app/finance/novo-financiamento.tsx',
+  // O formulário único e a rota antiga do lançamento: montam CORPOS (o do lançamento traz o
+  // próprio <Screen>; os da série e da dívida, `TaskHeader` + `SheetScroll`).
+  'src/app/finance/lancar.tsx',
+  'src/app/finance/transaction-form.tsx',
 ]);
 
 test('toda tela de conteúdo usa <Screen>', () => {

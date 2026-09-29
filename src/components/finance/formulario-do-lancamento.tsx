@@ -31,7 +31,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ToastDoModal, useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
-import { Motion, Space } from '@/design/tokens';
+import { Motion, Space, Type } from '@/design/tokens';
+import { ThemedText } from '@/components/themed-text';
+import { Icon } from '@/components/ui/icon';
 import {
   useAccounts,
   useConvertToInstallments,
@@ -43,8 +45,11 @@ import {
   useSaveDebtPaymentScoped,
   useSaveTransaction,
   useSaveInstallmentOccurrence,
+  useInstallmentPlan,
+  useJurosDoPix,
   useRecurringTransactions,
   useSaveRecurringOccurrenceAndSeries,
+  useTransaction,
   useSaveRecurringAll,
   useSaveRecurringOne,
   DESCRICAO_JUROS_DO_PIX,
@@ -217,7 +222,7 @@ export function FormularioDoLancamento(props: Props) {
       amount_cents: editing ? editing.amount_cents : comum.valorCents,
       category: editing ? editing.category : comum.categoria,
       description: editing ? (editing.description ?? '') : comum.descricao,
-      merchant: editing?.merchant ?? null,
+      merchant: editing ? (editing.merchant ?? null) : (comum.estabelecimento || null),
       // A conta de `?conta=`, da hipótese ou do tipo anterior: só vale se está entre as contas da pessoa.
       account_id: editing
         ? editing.account_id
@@ -249,7 +254,7 @@ export function FormularioDoLancamento(props: Props) {
   useEffect(() => {
     props.registrarComum(() => {
       const v = getValues();
-      return { kind: v.kind, descricao: v.description, valorCents: v.amount_cents, contaId: v.account_id, dataBR: v.occurred_at, categoria: v.category };
+      return { kind: v.kind, descricao: v.description, valorCents: v.amount_cents, contaId: v.account_id, dataBR: v.occurred_at, categoria: v.category, estabelecimento: v.merchant ?? undefined };
     });
     props.registrarEstado(() => getValues());
   });
@@ -363,7 +368,7 @@ export function FormularioDoLancamento(props: Props) {
     const { linhas, regra } = mudancasDaOcorrencia(form, editing, serie);
     const feito = (aviso?: string | null) => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
+      props.onFechar();
       toast({ message: aviso ?? 'Alterei esta e as próximas.', tone: 'success' });
     };
     if (Object.keys(linhas).length === 0 && Object.keys(regra).length === 0) return feito();
@@ -411,7 +416,7 @@ export function FormularioDoLancamento(props: Props) {
     }
     const { linhas, regra } = mudancasDaOcorrencia(form, editing, serie);
     if (!Object.keys(linhas).length && !Object.keys(regra).length) {
-      router.back();
+      props.onFechar();
       return;
     }
     const key = JSON.stringify([serie.id, linhas, regra, serie.edit_revision]);
@@ -428,7 +433,7 @@ export function FormularioDoLancamento(props: Props) {
       onSuccess: () => {
         tentativaTodaSerie.current = null;
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.back();
+        props.onFechar();
       },
       onError: (error) => toast({
         message: financeErrorMessage(error, 'Nada foi salvo. Confira a recorrência e tente novamente.'),
@@ -448,7 +453,7 @@ export function FormularioDoLancamento(props: Props) {
       atualizarCompra.mutate(payloadDaCompra(compra, brToISO(compra.inicio)), {
         onSuccess: () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          router.back();
+          props.onFechar();
           toast({
             message:
               compra.installments === 1
@@ -579,7 +584,7 @@ export function FormularioDoLancamento(props: Props) {
     // o app — mesma regra usada pelo WhatsApp.
     if (destino === 'criarPlano' && entradaParcelada) {
       // Pela PROMESSA: a rápida salva sai do rascunho mesmo com a tela já fechada; o que é da tela
-      // (voltar, toast), só com ela montada — `router.back()` depois de sair tiraria OUTRA tela.
+      // (voltar, toast), só com ela montada — `props.onFechar()` depois de sair tiraria OUTRA tela.
       createPlan.mutateAsync(entradaParcelada).then(
           () => {
             tirarRapida();
@@ -630,7 +635,7 @@ export function FormularioDoLancamento(props: Props) {
           {
             onSuccess: () => {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              router.back();
+              props.onFechar();
               toast({
                 message: `Parcelei em ${values.installments}x. As futuras já entram nas próximas faturas.`,
                 tone: 'success',
@@ -671,7 +676,7 @@ export function FormularioDoLancamento(props: Props) {
     // A decisão de escopo já aconteceu no Salvar; este caminho grava só a linha.
     const fechar = () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
+      props.onFechar();
     };
     if (naCompra && editing) {
       salvarParcela.mutate({
@@ -751,7 +756,7 @@ export function FormularioDoLancamento(props: Props) {
       ? (intencaoDoDia === 'ultimo' ? -1 : Number(novaData.slice(8, 10)))
       : undefined;
     if (!Object.keys(patch).length && dueDay === undefined) {
-      router.back();
+      props.onFechar();
       return;
     }
     let paymentVersions: Record<string, number>;
@@ -778,7 +783,7 @@ export function FormularioDoLancamento(props: Props) {
       onSuccess: () => {
         tentativaPagamento.current = null;
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.back();
+        props.onFechar();
       },
       onError: (error) => toast({ message: financeErrorMessage(error, 'Nada foi salvo. Confira a dívida e tente novamente.'), tone: 'error' }),
     });
@@ -788,7 +793,7 @@ export function FormularioDoLancamento(props: Props) {
     if (!editing?.installment_plan_id || !plano) return;
     if (formCompra) {
       const decisao = edicaoEscopadaDaCompra(formCompra, plano, scope, editing.installment_no ?? 1);
-      if (decisao.kind === 'no-op') return router.back();
+      if (decisao.kind === 'no-op') return props.onFechar();
       if (decisao.kind === 'structural-rejection' || decisao.kind === 'protected-rejection') {
         toast({ message: decisao.reason, tone: 'error' });
         return;
@@ -797,7 +802,7 @@ export function FormularioDoLancamento(props: Props) {
       salvarParcela.mutate({ id: editing.id, scope, patch: decisao.patch, lastDay: decisao.lastDay }, {
         onSuccess: () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          router.back();
+          props.onFechar();
         },
         onError: (error) => toast({
           message: financeErrorMessage(error, 'Nada foi salvo. Confira as parcelas e tente novamente.'),
@@ -821,11 +826,11 @@ export function FormularioDoLancamento(props: Props) {
     if (dueAt !== editing.due_at) patch.due_at = dueAt;
     if (values.auto_confirm !== editing.auto_confirm) patch.auto_confirm = values.auto_confirm;
     const lastDay = intencaoDoDia === 'ultimo' && scope !== 'one';
-    if (!Object.keys(patch).length && !lastDay) return router.back();
+    if (!Object.keys(patch).length && !lastDay) return props.onFechar();
     salvarParcela.mutate({ id: editing.id, scope, patch, lastDay }, {
       onSuccess: () => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.back();
+        props.onFechar();
       },
       onError: (error) => toast({
         message: financeErrorMessage(error, 'Nada foi salvo. Confira as parcelas e tente novamente.'),
@@ -868,7 +873,7 @@ export function FormularioDoLancamento(props: Props) {
             const dueAt = values.pending && values.due_at ? brToISO(values.due_at) : editing.due_at;
             if (dueAt !== editing.due_at) patch.due_at = dueAt;
           }
-          if (!Object.keys(patch).length) return router.back();
+          if (!Object.keys(patch).length) return props.onFechar();
           const key = JSON.stringify([editing.id, patch, editing.edit_revision]);
           if (tentativaUmaRecorrencia.current?.key !== key) {
             tentativaUmaRecorrencia.current = { key, id: newClientMessageId() };
@@ -882,7 +887,7 @@ export function FormularioDoLancamento(props: Props) {
             onSuccess: () => {
               tentativaUmaRecorrencia.current = null;
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              router.back();
+              props.onFechar();
             },
             onError: (error) => toast({ message: financeErrorMessage(error, 'Nada foi salvo. Confira a ocorrência e tente novamente.'), tone: 'error' }),
           });
@@ -926,7 +931,7 @@ export function FormularioDoLancamento(props: Props) {
       () =>
         remove.mutate(editing.id, {
           onSuccess: () => {
-            router.back();
+            props.onFechar();
             toast({ message: `Apaguei ${what}.`, tone: 'success' });
           },
           onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para apagar. Tenta de novo.'), tone: 'error' }),
@@ -1452,6 +1457,84 @@ export function FormularioDoLancamento(props: Props) {
 
 const linear = transicaoDeLayout;
 
+/**
+ * Editando um lançamento: o registro vem de `useTransaction(id)`, nunca do cache da lista — com
+ * cache frio o formulário de EDIÇÃO virava de CRIAÇÃO em silêncio e duplicava o lançamento. Por
+ * isso "é edição ou criação?" se decide ANTES de montar o corpo (os portões abaixo): enquanto a
+ * consulta não responde, não existe formulário para submeter. O corpo monta com o registro
+ * carregado (`editing`), não com o id.
+ */
+export function LancamentoEditando({ editandoId, ...props }: CorpoProps & { editandoId: string }) {
+  const query = useTransaction(editandoId);
+  // A parcela edita o valor da COMPRA: sem o plano (travadas, total) o campo não sabe o que
+  // "cada parcela" alcança. Espera junto com a linha, na mesma tela de esqueleto.
+  const planoId = query.data?.installment_plan_id;
+  const plano = useInstallmentPlan(planoId);
+  const esperandoPlano = Boolean(planoId) && plano.isPending;
+  // O juro do Pix desta compra, se houver: o campo abre com ele (26/09/2026, "tudo que se cria se
+  // edita"). Mesmo esqueleto — `useForm` só lê os valores na montagem.
+  const juros = useJurosDoPix(query.data);
+  const esperandoJuros = juros.fetchStatus === 'fetching' && juros.isPending;
+
+  if (query.isLoading || esperandoPlano || esperandoJuros) {
+    return (
+      <Screen scroll={false}>
+        <TaskHeader title="Editar lançamento" onClose={props.onFechar} />
+        <View style={[styles.body, styles.loading]}>
+          <Skeleton height={56} />
+          <Skeleton height={36} />
+          <Skeleton width="45%" height={Type.footnote.lineHeight} />
+          <Skeleton height={48} />
+          <Skeleton width="45%" height={Type.footnote.lineHeight} />
+          <Skeleton height={48} />
+        </View>
+      </Screen>
+    );
+  }
+
+  // Nunca cair em modo criação por omissão: um id que não resolve é erro, não formulário vazio.
+  // A compra da parcela também: sem ela o campo Valor não sabe o que "cada parcela" alcança.
+  if (query.isError || !query.data || (planoId && plano.isError)) {
+    const semLinha = query.isError || !query.data;
+    return (
+      <Screen scroll={false}>
+        <TaskHeader title="Lançamento" onClose={props.onFechar} />
+        <View style={styles.body}>
+          <Card>
+            <View style={styles.errorCard}>
+              <Icon name="exclamationmark.triangle" size="xl" color="danger" />
+              <ThemedText type="smallBold">
+                {semLinha ? 'Não encontrei esse lançamento' : 'Não deu para carregar a compra desta parcela'}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
+                {semLinha ? 'Ele pode ter sido apagado em outro aparelho.' : 'Pode ter sido a conexão.'}
+              </ThemedText>
+              <View style={styles.errorActions}>
+                <Button
+                  label="Tentar de novo"
+                  variant="secondary"
+                  size="sm"
+                  onPress={() => (semLinha ? query.refetch() : plano.refetch())}
+                />
+                <Button label="Voltar" size="sm" onPress={props.onFechar} />
+              </View>
+            </View>
+          </Card>
+        </View>
+      </Screen>
+    );
+  }
+
+  return (
+    <FormularioDoLancamento
+      {...props}
+      editing={query.data}
+      plano={plano.data ?? undefined}
+      jurosDoPix={juros.data ?? null}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   // Replica o padding do `Screen`, que está com `scroll={false}` para o teclado ser
   // responsabilidade do `KeyboardAwareScrollView`.
@@ -1472,5 +1555,19 @@ const styles = StyleSheet.create({
   },
   pendingCard: {
     gap: Space.lg,
+  },
+  loading: {
+    gap: Space.lg,
+  },
+  errorCard: {
+    alignItems: 'center',
+    gap: Space.md,
+  },
+  errorActions: {
+    flexDirection: 'row',
+    gap: Space.md,
+  },
+  centered: {
+    textAlign: 'center',
   },
 });

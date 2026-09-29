@@ -28,6 +28,7 @@ test('sem saber se há passado, a opção destrutiva aparece (e é confirmada)',
 
 test('"Salvar e criar outro" mantém tipo, conta e data, e limpa o resto', () => {
   assert.deepEqual(comumDepoisDeSalvar(c), { kind: 'transfer', descricao: '', valorCents: 0, contaId: 'cc', dataBR: '05/10/2026', categoria: null });
+  assert.deepEqual(comumDepoisDeSalvar({ ...c, estabelecimento: 'Padaria' }), comumDepoisDeSalvar(c), 'o estabelecimento também sai');
 });
 
 test('transferência não existe na recorrente: vira gasto', () => {

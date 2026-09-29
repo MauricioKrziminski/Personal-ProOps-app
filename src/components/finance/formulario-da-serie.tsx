@@ -90,6 +90,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
       preset: props.preset ?? SERIE_VAZIA.preset,
       amountCents: c.valorCents,
       description: c.descricao,
+      merchant: c.estabelecimento ?? '',
       category: c.categoria,
       accountId: c.contaId,
       inicio: c.dataBR,
@@ -97,7 +98,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
   });
 
   useEffect(() => {
-    registrarComum(() => ({ kind: form.kind, descricao: form.description, valorCents: form.amountCents, contaId: form.accountId, dataBR: form.inicio, categoria: form.category }));
+    registrarComum(() => ({ kind: form.kind, descricao: form.description, valorCents: form.amountCents, contaId: form.accountId, dataBR: form.inicio, categoria: form.category, estabelecimento: form.merchant }));
     registrarEstado(() => form);
   });
 

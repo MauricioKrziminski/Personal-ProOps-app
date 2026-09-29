@@ -189,6 +189,8 @@ type Props = CorpoProps & {
   dadosDoAplicar?: { parcela?: string; parcelas?: string; conta?: string; data?: string };
   /** Aberta DE DENTRO de outro formulário: o ✕ vira "Voltar". */
   voltar?: boolean;
+  /** Convertendo um lançamento PAGO: o banco o adota como um pagamento, e as pagas não o somam. */
+  pagamentoConvertido?: boolean;
 };
 
 export function FormularioDaDivida(props: Props) {
@@ -249,6 +251,9 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
       diaVencimento: data ? String(Number(data.slice(0, 2))) : '',
     };
   });
+
+  /** O lançamento convertido entra como pagamento sozinho: somá-lo às pagas o contaria duas vezes. */
+  const dicaDoConvertido = converter && props.pagamentoConvertido ? 'O lançamento convertido já conta como uma paga.' : undefined;
 
   useEffect(() => {
     registrarComum(() => ({ kind: 'expense', descricao: form.name, valorCents: form.valorCents, contaId: form.accountId, dataBR: form.ancora ? isoToBR(form.ancora) : comum.dataBR, categoria: comum.categoria }));
@@ -572,7 +577,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
           </Field>
           <Field
             label="Parcelas já pagas"
-            hint={pagamentosLancados > 0 ? `${pagamentosLancados} ${pagamentosLancados === 1 ? 'lançada' : 'lançadas'} pelo app.` : undefined}>
+            hint={pagamentosLancados > 0 ? `${pagamentosLancados} ${pagamentosLancados === 1 ? 'lançada' : 'lançadas'} pelo app.` : dicaDoConvertido}>
             <QuantityField
               value={form.installmentsPaid}
               min={pagamentosLancados}
@@ -675,7 +680,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
           `frontend.md` ("a tela se remonta debaixo do dedo"), só que para cima.
         */}
         {form.parcelas !== '' && (
-          <Field label="Parcelas já pagas">
+          <Field label="Parcelas já pagas" hint={dicaDoConvertido}>
             {/*
               ⚠️ **Sem chip "Nenhuma", e o campo nasce em `0`** (15/09/2026, a mesma régua
               do formulário de lançamento). O chip escrevia exatamente o valor que o campo

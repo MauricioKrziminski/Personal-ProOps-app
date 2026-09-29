@@ -270,7 +270,9 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name.startsWith('./') && path.startsWith('src/lib/')) return load(`src/lib/${name.slice(2)}`);
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', useWindowDimensions: () => ({ width: 384, height: 800 }), Platform: { OS: 'android', select: (o: any) => o.android ?? o.default } };
-      if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInDown: animation, FadeOut: animation, FadeIn: animation, ReduceMotion: { System: 'system' }, LinearTransition: animation, useAnimatedRef: () => ({ current: null }) };
+      if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInDown: animation, FadeOut: animation, FadeIn: animation, ReduceMotion: { System: 'system' }, LinearTransition: animation, useAnimatedRef: () => ({ current: null }),
+        // O crossfade do Lançar: com "reduzir movimento" a troca é imediata, e o teste lê a tela logo depois.
+        useReducedMotion: () => true, useSharedValue: (value: unknown) => ({ value }), useAnimatedStyle: () => ({}), withTiming: (value: unknown) => value, runOnJS: (fn: unknown) => fn };
       if (name === 'expo-haptics') return { selectionAsync() {}, notificationAsync() {}, NotificationFeedbackType: { Success: 'success', Warning: 'warning' } };
       // `back` é navegação como qualquer outra e ENTRA na lista: é o que prende o "fechar um
       // formulário que outra tela abriu devolve para ela" (`useVoltarQuandoFechar`).
@@ -489,6 +491,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     // O "Salvar" do sheet mora no slot `action` do `SheetHeader`, não em `children` — sem esta
     // linha o botão existe na tela e some daqui, que foi o que estas seis asserções viram.
     visit(node.props.action);
+    // O seletor do Lançar mora no `topo` do corpo (que aqui é um nó com nome, não a árvore dele).
+    visit(node.props.topo);
     // A barra das raízes de aba (`AppHeader`) — é nela que mora o "…" da tela.
     visit(node.props.topBar);
     // O `overlay` do `Screen` é conteúdo renderizado (a folha do "Paguei" na Hoje).
@@ -3838,4 +3842,148 @@ test('FormularioDaDivida: convertendo, Salvar entrega o financiamento ao hospede
   assert.equal(dados.installment_cents, 147000);
   assert.equal(dados.account_id, 'cc');
   assert.equal('id' in dados || 'versao' in dados, false);
+});
+
+const lancarFile = 'src/app/finance/lancar.tsx';
+
+test('Lançar: abre no tipo pedido, o seletor troca o corpo e leva os campos comuns', () => {
+  const ui = screen(lancarFile, { params: { tipo: 'recorrente' } });
+  const seletor = () => ui.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'financiamento'));
+  assert.equal(seletor().props.value, 'recorrente');
+  assert.ok(ui.nodes().some((n: any) => n.type === 'FormularioDaSerie'));
+  // o corpo registra o comum; trocar de tipo o entrega ao outro corpo
+  const serie = ui.nodes().find((n: any) => n.type === 'FormularioDaSerie');
+  ui.interact(() => serie.props.registrarComum(() => ({ kind: 'expense', descricao: 'Academia', valorCents: 5000, contaId: 'cc', dataBR: '06/10/2026', categoria: 'saude' })));
+  ui.interact(() => seletor().props.onChange('uma'));
+  const lanc = ui.nodes().find((n: any) => n.type === 'FormularioDoLancamento');
+  assert.equal(lanc.props.comum.descricao, 'Academia');
+  assert.equal(lanc.props.comum.valorCents, 5000);
+});
+
+test('Lançar: voltar a um tipo devolve TUDO que foi digitado nele, não só os campos comuns', () => {
+  const ui = screen(lancarFile, { params: { tipo: 'recorrente' } });
+  const seletor = () => ui.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'financiamento'));
+  const serie = () => ui.nodes().find((n: any) => n.type === 'FormularioDaSerie');
+  const digitado = { preset: 'weekly', description: 'Academia', amountCents: 5000 };
+  ui.interact(() => serie().props.registrarEstado(() => digitado));
+  ui.interact(() => seletor().props.onChange('uma'));
+  ui.interact(() => seletor().props.onChange('recorrente'));
+  assert.deepEqual(serie().props.estadoGuardado, digitado);
+  // "Salvar e criar outro" esvazia o guardado
+  ui.interact(() => serie().props.onSalvo(true));
+  assert.equal(serie().props.estadoGuardado, undefined);
+});
+
+test('Lançar: "Salvar e criar outro" remonta o corpo limpo, mantendo tipo, conta e data', () => {
+  const ui = screen(lancarFile, { params: { tipo: 'recorrente' } });
+  const serie = () => ui.nodes().find((n: any) => n.type === 'FormularioDaSerie');
+  ui.interact(() => serie().props.registrarComum(() => ({ kind: 'income', descricao: 'Freela', valorCents: 90000, contaId: 'cc', dataBR: '10/10/2026', categoria: 'freela' })));
+  ui.interact(() => serie().props.onSalvo(true));
+  assert.deepEqual(JSON.parse(JSON.stringify(serie().props.comum)), { kind: 'income', descricao: '', valorCents: 0, contaId: 'cc', dataBR: '10/10/2026', categoria: null });
+  assert.equal(ui.navigations.length, 0, 'não fechou');
+  ui.interact(() => serie().props.onSalvo(false));
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { back: true });
+});
+
+test('Lançar: editando e trocando o tipo, o salvar PERGUNTA o alcance e converte; voltar ao tipo original é edição comum', async () => {
+  // `passado: '0'`: a entrada SABE que a série não tem passado (sem o parâmetro, assume que tem).
+  const ui = screen(lancarFile, { segurarMutacoes: true, params: { tipo: 'recorrente', id: 'r1', origem: 'serie', passado: '0' },
+    recurring: [{ id: 'r1', kind: 'expense', amount_cents: 5000, description: 'Academia', rrule: 'FREQ=MONTHLY;BYMONTHDAY=6', next_run_at: '2026-10-06T12:00:00Z', dtstart: '2026-09-06T12:00:00Z', active: true, account_id: null, category: null, merchant: null, end_date: null, auto_confirm: false }] });
+  const seletor = () => ui.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'financiamento'));
+  // no tipo original o corpo recebe editandoId e NÃO recebe converter
+  assert.equal(ui.nodes().find((n: any) => n.type === 'FormularioDaSerie').props.editandoId, 'r1');
+  assert.equal(ui.nodes().find((n: any) => n.type === 'FormularioDaSerie').props.converter, undefined);
+  ui.interact(() => seletor().props.onChange('uma'));
+  const lanc = ui.nodes().find((n: any) => n.type === 'FormularioDoLancamento');
+  ui.interact(() => lanc.props.converter({ tipo: 'lancamento', dados: { linhas: [] } }));
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Converter', 'Manter o atual e criar um novo'], 'série sem passado');
+  ui.interact(() => ui.actions[0].onPress());
+  assert.equal(ui.writes.at(-1).operation, 'converterRegistro');
+  assert.equal(ui.writes.at(-1).value.alcance, 'todas');
+  (ui.pedidos.at(-1) as any).resolver({ ids: ['t9'] });
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { back: true });
+  // volta ao original antes de salvar: sem converter
+  const volta = screen(lancarFile, { params: { tipo: 'recorrente', id: 'r1', origem: 'serie' }, recurring: [] });
+  const s2 = () => volta.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'financiamento'));
+  volta.interact(() => s2().props.onChange('uma'));
+  volta.interact(() => s2().props.onChange('recorrente'));
+  assert.equal(volta.nodes().find((n: any) => n.type === 'FormularioDaSerie').props.converter, undefined);
+});
+
+test('Lançar: a conversão que o banco recusa mostra a frase dele e não fecha', async () => {
+  const ui = screen(lancarFile, { segurarMutacoes: true, params: { tipo: 'uma', id: 'tx-1', origem: 'transacao' } });
+  const seletor = () => ui.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'financiamento'));
+  ui.interact(() => seletor().props.onChange('recorrente'));
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'FormularioDaSerie').props.converter({ tipo: 'recorrente', dados: {} }));
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Converter').onPress());
+  (ui.pedidos.at(-1) as any).rejeitar({ code: 'P0001', message: 'Há lançamento numa fatura paga ou adiada. Desfaça o pagamento da fatura antes.' });
+  await new Promise((r) => setTimeout(r, 0));
+  assert.match(ui.toasts.at(-1).message, /fatura paga/);
+  assert.equal(ui.navigations.length, 0);
+});
+
+test('Lançar: editando um lançamento, o corpo é o que espera o registro; a opção destrutiva confirma antes', () => {
+  const ui = screen(lancarFile, { params: { tipo: 'uma', id: 'tx-1', origem: 'transacao', papel: 'ocorrencia' } });
+  const editando = ui.nodes().find((n: any) => n.type === 'LancamentoEditando');
+  assert.equal(editando.props.editandoId, 'tx-1');
+  assert.equal(editando.props.converter, undefined);
+  const seletor = () => ui.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'financiamento'));
+  ui.interact(() => seletor().props.onChange('recorrente'));
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'FormularioDaSerie').props.converter({ tipo: 'recorrente', dados: {} }));
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Só esta', 'Desta em diante', 'Todas, apagando as anteriores', 'Manter o atual e criar um novo']);
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Todas, apagando as anteriores').onPress());
+  assert.equal(ui.writes.length, 0, 'nada antes de confirmar');
+  ui.interact(() => ui.confirmations.at(-1)!());
+  assert.equal(ui.writes.at(-1).value.alcance, 'todas');
+});
+
+test('Lançar: o "Aplicar" de uma compra parcelada abre "Uma vez" com as parcelas dela; sem parcelas, à vista', () => {
+  const ui = screen(lancarFile, { params: { tipo: 'uma', deHipotese: 'h1', kind: 'expense', amount: '300000', data: '05/10/2026', parcelas: '10', conta: 'nu' } });
+  const lanc = ui.nodes().find((n: any) => n.type === 'FormularioDoLancamento');
+  assert.equal(lanc.props.parcelas, 10);
+  assert.equal(lanc.props.deHipotese, 'h1');
+  assert.deepEqual([lanc.props.comum.valorCents, lanc.props.comum.contaId, lanc.props.comum.dataBR], [300000, 'nu', '05/10/2026']);
+  const avista = screen(lancarFile, { params: { tipo: 'uma' } });
+  assert.equal(avista.nodes().find((n: any) => n.type === 'FormularioDoLancamento').props.parcelas, undefined);
+  // "Salvar e criar outro" não repete a hipótese: o próximo é um lançamento limpo
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'FormularioDoLancamento').props.onSalvo(true));
+  const outro = ui.nodes().find((n: any) => n.type === 'FormularioDoLancamento');
+  assert.equal(outro.props.parcelas, undefined);
+  assert.equal(outro.props.deHipotese, undefined);
+  assert.equal(outro.props.comum.contaId, 'nu');
+});
+
+test('Lançar: o estabelecimento viaja entre os tipos e a série nasce com ele', () => {
+  const ui = screen(lancarFile, { params: { tipo: 'uma' } });
+  const seletor = () => ui.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'financiamento'));
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'FormularioDoLancamento').props.registrarComum(() => ({ kind: 'expense', descricao: 'Pão', valorCents: 1200, contaId: null, dataBR: '06/10/2026', categoria: null, estabelecimento: 'Padaria' })));
+  ui.interact(() => seletor().props.onChange('recorrente'));
+  const comum = ui.nodes().find((n: any) => n.type === 'FormularioDaSerie').props.comum;
+  assert.equal(comum.estabelecimento, 'Padaria');
+  const serie = screen('src/components/finance/formulario-da-serie.tsx', { componente: 'FormularioDaSerie',
+    props: { comum, registrarComum: () => {}, registrarEstado: () => {}, onSalvo: () => {}, onFechar: () => {} } });
+  assert.equal(serie.nodes().find((n: any) => n.type?.name === 'CamposDaSerie').props.form.merchant, 'Padaria');
+  // o lançamento lê e devolve o estabelecimento pelo mesmo `comum`
+  const lanc = readFileSync('src/components/finance/formulario-do-lancamento.tsx', 'utf8');
+  assert.match(lanc, /merchant: editing \? \(editing\.merchant \?\? null\) : \(comum\.estabelecimento \|\| null\)/);
+  assert.match(lanc, /estabelecimento: v\.merchant \?\? undefined/);
+});
+
+test('Lançar: convertendo um lançamento PAGO em financiamento, "Parcelas já pagas" avisa que ele já conta', () => {
+  const ui = screen(lancarFile, { params: { tipo: 'uma', id: 'tx-1', origem: 'transacao' } });
+  const seletor = () => ui.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'financiamento'));
+  ui.interact(() => seletor().props.onChange('financiamento'));
+  assert.equal(ui.nodes().find((n: any) => n.type === 'FormularioDaDivida').props.pagamentoConvertido, true);
+  const emAberto = screen(lancarFile, { txStatus: 'pending', params: { tipo: 'uma', id: 'tx-1', origem: 'transacao' } });
+  emAberto.interact(() => emAberto.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'financiamento')).props.onChange('financiamento'));
+  assert.equal(emAberto.nodes().find((n: any) => n.type === 'FormularioDaDivida').props.pagamentoConvertido, false);
+
+  const comum = { kind: 'expense', descricao: 'Carro', valorCents: 147000, contaId: null, dataBR: '05/09/2026', categoria: null };
+  const corpo = (extra: any) => screen('src/components/finance/formulario-da-divida.tsx', { componente: 'FormularioDaDivida',
+    props: { comum, registrarComum: () => {}, registrarEstado: () => {}, onSalvo: () => {}, onFechar: () => {}, ...extra } });
+  const dica = (u: any) => u.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Parcelas já pagas').props.hint;
+  assert.match(dica(corpo({ converter: () => {}, pagamentoConvertido: true })), /já conta/);
+  assert.equal(dica(corpo({ converter: () => {}, pagamentoConvertido: false })), undefined);
+  assert.equal(dica(corpo({})), undefined, 'criando, sem aviso');
 });

@@ -471,6 +471,11 @@ function AppTree() {
                     name="finance/transaction-form"
                     options={modalOptions}
                   />
+                  {/* O formulário único (Uma vez | Recorrente | Financiamento): mesmo modal. */}
+                  <Stack.Screen
+                    name="finance/lancar"
+                    options={modalOptions}
+                  />
                   <Stack.Screen
                     name="reminder-form"
                     options={modalOptions}

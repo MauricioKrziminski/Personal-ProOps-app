@@ -3,16 +3,26 @@
  * as opções da pergunta de conversão — pura, para as três telas e o teste lerem a mesma coisa.
  */
 export type TipoDeLancamento = 'uma' | 'recorrente' | 'financiamento';
-export type Comum = { kind: 'expense' | 'income' | 'transfer'; descricao: string; valorCents: number; contaId: string | null; dataBR: string; categoria: string | null };
+export type Comum = {
+  kind: 'expense' | 'income' | 'transfer';
+  descricao: string;
+  valorCents: number;
+  contaId: string | null;
+  dataBR: string;
+  categoria: string | null;
+  /** Lançamento e série têm; o financiamento não. */
+  estabelecimento?: string;
+};
 export type OrigemDaConversao = { tipo: 'transacao' | 'serie' | 'plano' | 'divida'; id: string; papel: 'avulsa' | 'ocorrencia' | 'parcela' | 'pagamento' | 'registro'; temPassado: boolean };
 export type Alcance = 'so_esta' | 'desta_em_diante' | 'todas' | 'manter' | 'converter';
 export type OpcaoDaConversao = { alcance: Alcance; label: string; destrutiva?: boolean };
 
-export const TIPOS_DE_LANCAMENTO: { value: TipoDeLancamento; label: string }[] = [
+// Tupla (`as const`): o `Segmented` só aceita de 2 a 4 opções, e o tipo prova isso.
+export const TIPOS_DE_LANCAMENTO = [
   { value: 'uma', label: 'Uma vez' },
   { value: 'recorrente', label: 'Recorrente' },
   { value: 'financiamento', label: 'Financiamento' },
-];
+] as const satisfies readonly { value: TipoDeLancamento; label: string }[];
 
 export function opcoesDaConversao(o: OrigemDaConversao): OpcaoDaConversao[] {
   if (o.papel === 'avulsa') return [{ alcance: 'converter', label: 'Converter' }, { alcance: 'manter', label: 'Manter e criar um novo' }];
@@ -29,7 +39,8 @@ export function opcoesDaConversao(o: OrigemDaConversao): OpcaoDaConversao[] {
 }
 
 export function comumDepoisDeSalvar(c: Comum): Comum {
-  return { ...c, descricao: '', valorCents: 0, categoria: null };
+  const { estabelecimento: _, ...fica } = c;
+  return { ...fica, descricao: '', valorCents: 0, categoria: null };
 }
 
 export function comumParaSerie(c: Comum): Comum {
