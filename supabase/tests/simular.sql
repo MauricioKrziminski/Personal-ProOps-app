@@ -147,6 +147,10 @@ begin
   if jsonb_array_length(s->'erros') <> 1 or s->'erros'->0->>'mensagem' not like '%campo_novo%' then
     raise exception '7. campo desconhecido deveria virar erro: %', s->'erros';
   end if;
+  -- 7b. o erro traz o CÓDIGO: o app só mostra a frase do banco quando ela é nossa (P0001)
+  if s->'erros'->0->>'codigo' is null then
+    raise exception '7b. o erro deveria trazer o código: %', s->'erros';
+  end if;
 
   -- 8. fatura que JÁ existia não entra em ids (a tela marcaria as compras reais como hipótese)
   insert into public.transactions (workspace_id, user_id, account_id, kind, amount_cents, description, occurred_at, status)

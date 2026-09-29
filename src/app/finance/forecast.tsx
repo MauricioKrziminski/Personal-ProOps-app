@@ -47,7 +47,7 @@ import {
   type Draft,
 } from '@/hooks/use-finance';
 import type { HipoteseNoCiclo } from '@/lib/rascunho-no-ciclo';
-import { registrosParaSimular, resumoDaHipotese, type HipoteseDetalhada } from '@/lib/rascunho';
+import { motivoDaHipotese, registrosParaSimular, resumoDaHipotese, type HipoteseDetalhada } from '@/lib/rascunho';
 import { useRascunho } from '@/hooks/use-rascunho';
 import { useToast } from '@/components/ui/toast';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
@@ -277,11 +277,15 @@ export default function ForecastScreen() {
   const mensal = useForecastMonths(dias, rascunhos, emMes, regua.view);
   const comDetalhadas = registros.length > 0;
   const simulacao = useSimulacao(dias, rascunhos, registros, emMes ? 'mes' : 'dia', regua.view, comDetalhadas);
-  const errosDaSimulacao = simulacao.data?.erros ?? [];
+  // Da resposta ANTERIOR (placeholder) o índice pode já apontar para outra linha: sem erro até a nova.
+  const errosDaSimulacao = simulacao.isPlaceholderData ? [] : (simulacao.data?.erros ?? []);
 
   // As hipóteses detalhadas (spec 2026-09-28): criadas no formulário REAL em modo hipótese.
   const adicionarComo = () =>
-    showItemActions('Adicionar como…', [
+    // O mesmo teto de `simular` (30): passar dele derrubaria a simulação inteira.
+    detalhadas.length >= 30
+      ? toast({ message: 'O rascunho já tem 30 hipóteses detalhadas. Aplique ou tire alguma para somar outra.', tone: 'error' })
+      : showItemActions('Adicionar como…', [
       { label: 'Lançamento', icon: 'doc.text', onPress: () => router.push({ pathname: '/finance/transaction-form', params: { hipotese: 'nova' } }) },
       { label: 'Compra parcelada', icon: 'creditcard', onPress: () => router.push({ pathname: '/finance/transaction-form', params: { hipotese: 'nova', parcelada: '1' } }) },
       { label: 'Recorrente', icon: 'repeat', onPress: () => router.push({ pathname: '/finance/recurring', params: { create: '1', hipotese: 'nova' } }) },
@@ -302,6 +306,13 @@ export default function ForecastScreen() {
   const criarRecorrente = useCreateRecurring();
   const salvarFinanciamento = useSaveDebt();
   const aplicando = useRef<string | null>(null);
+  // O mesmo estado, para DESENHAR: enquanto salva, "Aplicar" e "Aplicar todas" ficam desligados
+  // (spec §8). A ref segue sendo a trava — ela vale no mesmo toque, o estado só no render seguinte.
+  const [salvando, setSalvando] = useState(false);
+  const marcarAplicando = (id: string | null) => {
+    aplicando.current = id;
+    setSalvando(id !== null);
+  };
   const gravarDetalhada = (h: HipoteseDetalhada, depois: (ok: boolean) => void) => {
     // Pela PROMESSA, nunca pelo `onSuccess` da chamada: o TanStack não chama o callback por chamada
     // de uma tela que desmontou, e sair da Projeção no meio do salvamento deixava a hipótese salva
@@ -314,12 +325,12 @@ export default function ForecastScreen() {
       : salvarFinanciamento.mutateAsync(h.entrada);
     salvando.then(
       () => {
-        aplicando.current = null;
+        marcarAplicando(null);
         tirarDetalhada(h.id);
         depois(true);
       },
       (e: unknown) => {
-        aplicando.current = null;
+        marcarAplicando(null);
         toast({ message: financeErrorMessage(e, `Não deu para aplicar ${h.titulo}.`), tone: 'error' });
         depois(false);
       },
@@ -333,7 +344,7 @@ export default function ForecastScreen() {
         icon: 'checkmark.circle',
         onPress: () => {
           if (aplicando.current) return;
-          aplicando.current = h.id;
+          marcarAplicando(h.id);
           gravarDetalhada(h, (ok) => {
             if (ok) toast({ message: `${h.titulo} foi para a conta.`, tone: 'success' });
           });
@@ -361,7 +372,7 @@ export default function ForecastScreen() {
               });
               return;
             }
-            aplicando.current = h.id;
+            marcarAplicando(h.id);
             gravarDetalhada(h, (ok) => { if (ok) proxima(feitas + 1); });
           };
           proxima(0);
@@ -384,7 +395,7 @@ export default function ForecastScreen() {
     toast({ message: 'Hipótese tirada do rascunho.', tone: 'success', action: { label: 'Desfazer', onPress: () => devolver({ rapidas: saiu, detalhadas: [] }) } });
   };
   const acoesDaDetalhada = (h: HipoteseDetalhada): ItemAction[] => [
-    { label: 'Aplicar', icon: 'checkmark.circle', arrasto: 'direita', onPress: () => aplicarDetalhada(h) },
+    { label: 'Aplicar', icon: 'checkmark.circle', arrasto: 'direita', disabled: salvando, onPress: () => aplicarDetalhada(h) },
     { label: 'Editar', icon: 'pencil', onPress: () => editarDetalhada(h) },
     {
       label: 'Tirar',
@@ -906,11 +917,11 @@ export default function ForecastScreen() {
             <Deslizavel key={h.id} titulo={h.titulo} acoes={acoesDaDetalhada(h)}>
               <Row
                 title={h.titulo}
-                subtitle={erro ? `Não dá para simular: ${erro.mensagem}` : resumoDaHipotese(h, brl).replace(`${h.titulo} · `, '')}
+                subtitle={erro ? `Não dá para aplicar: ${motivoDaHipotese(erro)}` : resumoDaHipotese(h, brl).replace(`${h.titulo} · `, '')}
                 destructive={Boolean(erro)}
                 onPress={() => editarDetalhada(h)}
                 onLongPress={() => showItemActions(h.titulo, acoesDaDetalhada(h))}
-                accessibilityLabel={`Hipótese: ${resumoDaHipotese(h, brl)}${erro ? `. Não dá para simular: ${erro.mensagem}` : ''}`}
+                accessibilityLabel={`Hipótese: ${resumoDaHipotese(h, brl)}${erro ? `. Não dá para aplicar: ${motivoDaHipotese(erro)}` : ''}`}
               />
             </Deslizavel>
           );
@@ -936,7 +947,7 @@ export default function ForecastScreen() {
         />
         <Button label="Adicionar como…" variant="secondary" size="sm" onPress={adicionarComo} />
         {detalhadas.length > 0 ? (
-          <Button label="Aplicar todas" variant="secondary" size="sm" onPress={aplicarTodas} />
+          <Button label="Aplicar todas" variant="secondary" size="sm" onPress={aplicarTodas} disabled={salvando} loading={salvando} />
         ) : null}
         {simulando ? (
           <Button

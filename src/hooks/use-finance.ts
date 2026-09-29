@@ -1095,7 +1095,7 @@ export function useForecastMonths(days: number, drafts: Draft[], enabled = true,
 }
 
 /** Erro de uma hipótese (`indice`) ou de uma leitura (`leitura`) da simulação. */
-export type ErroDaHipotese = { indice?: number; leitura?: string; mensagem: string };
+export type ErroDaHipotese = { indice?: number; leitura?: string; mensagem: string; codigo?: string };
 
 /**
  * A Projeção com hipóteses DETALHADAS (spec 2026-09-28): os registros são criados de verdade no

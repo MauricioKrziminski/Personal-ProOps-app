@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -281,10 +281,17 @@ function TransactionForm({
 }) {
   const insets = useSafeAreaInsets();
   const { rascunho, adicionarDetalhada, trocarDetalhada, setRapidas } = useRascunho();
+  /** A tela ainda está aberta? O que é dela (voltar, toast) só roda com ela montada. */
+  const [montado] = useState(() => ({ current: true }));
+  useEffect(() => () => {
+    montado.current = false;
+  }, [montado]);
   const tirarRapida = () => {
     if (daRapida) setRapidas((antes) => antes.filter((_, i) => i !== daRapida.indice));
   };
   const modoHipotese = Boolean(hipotese);
+  // Guardada uma vez, o segundo toque (antes de a tela fechar) não soma outra hipótese igual.
+  const [guardada, setGuardada] = useState(false);
   const hipoteseAberta = rascunho.detalhadas.find((h) => h.id === hipotese) ?? null;
   // Os atalhos do rodapé (recorrente, financiamento) levam o modo junto: na hipótese, o outro
   // formulário também só guarda no rascunho.
@@ -656,6 +663,8 @@ function TransactionForm({
 
     // Modo hipótese: guarda no rascunho e volta, ANTES de qualquer gravação.
     if (modoHipotese) {
+      if (guardada) return;
+      setGuardada(true);
       const h = hipoteseDoLancamento(destino, entradaLancamento, entradaParcelada);
       if (hipoteseAberta) trocarDetalhada(hipoteseAberta.id, h);
       else adicionarDetalhada(h);
@@ -667,11 +676,12 @@ function TransactionForm({
     // parcelado NOVO: quem cria as N transações (e resolve a fatura de cada uma) é o banco, não
     // o app — mesma regra usada pelo WhatsApp.
     if (destino === 'criarPlano' && entradaParcelada) {
-      createPlan.mutate(
-        entradaParcelada,
-        {
-          onSuccess: () => {
+      // Pela PROMESSA: a rápida salva sai do rascunho mesmo com a tela já fechada; o que é da tela
+      // (voltar, toast), só com ela montada — `router.back()` depois de sair tiraria OUTRA tela.
+      createPlan.mutateAsync(entradaParcelada).then(
+          () => {
             tirarRapida();
+            if (!montado.current) return;
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             router.back();
             // O `hint` do campo encurtou para caber no teto de 90 caracteres (design.md §7b), e
@@ -683,9 +693,9 @@ function TransactionForm({
               tone: 'success',
             });
           },
-          onError: (error) =>
-            toast({ message: financeErrorMessage(error, 'Não deu para parcelar. Tenta de novo.'), tone: 'error' }),
-        },
+          (error) => {
+            if (montado.current) toast({ message: financeErrorMessage(error, 'Não deu para parcelar. Tenta de novo.'), tone: 'error' });
+          },
       );
       return;
     }
@@ -784,28 +794,29 @@ function TransactionForm({
       return;
     }
     const gravar = () =>
-      save.mutate(
+      save.mutateAsync(
       {
         ...entradaLancamento,
         id: editing?.id,
         juros: editing && mostraJuros ? { id: jurosDoPix?.id ?? null, cents: values.fee_cents } : undefined,
-      },
-      {
-        onSuccess: () => {
+      }).then(
+        () => {
           tirarRapida();
+          if (!montado.current) return;
           fechar();
         },
         // Erro NUNCA fecha o modal: o que foi digitado continua na tela.
-        onError: (error) =>
+        (error) => {
+          if (!montado.current) return;
           toast({
             message:
               error && typeof error === 'object' && 'compraSalva' in error
                 ? 'Salvei a compra, mas não o juro do Pix. Tenta de novo.'
                 : financeErrorMessage(error, 'Não deu para salvar. Tenta de novo.'),
             tone: 'error',
-          }),
-      },
-    );
+          });
+        },
+      );
 
     if (correcaoDaDivida.erro) return;
     gravar();
@@ -1029,7 +1040,7 @@ function TransactionForm({
           <Button
             label={modoHipotese ? 'Adicionar à hipótese' : saving ? 'Salvando…' : 'Salvar'}
             size="sm"
-            disabled={saving || !!correcaoDaDivida.erro || (formSerie !== null && !serieOk) || (formCompra !== null && !compraOk)}
+            disabled={guardada || saving || !!correcaoDaDivida.erro || (formSerie !== null && !serieOk) || (formCompra !== null && !compraOk)}
             loading={saving}
             onPress={editing?.recurring_id || editing?.installment_plan_id || editing?.debt_id ? salvarComAlcance : onSubmit}
           />

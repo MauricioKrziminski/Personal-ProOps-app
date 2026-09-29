@@ -1713,11 +1713,13 @@ test('Lançamento em modo hipótese: "Repetir lançamento" e "Financiamento" abr
 
 test('Lançamento aberto pelo "Aplicar" de uma rápida: os dois caminhos de salvar a tiram do rascunho', () => {
   const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
-  // a compra parcelada nova e o lançamento: o `onSuccess` de cada um chama `tirarRapida()`
-  const criarPlano = fonte.slice(fonte.indexOf('createPlan.mutate('));
-  assert.match(criarPlano.slice(0, 400), /onSuccess: \(\) => \{\s*tirarRapida\(\);/);
+  // a compra parcelada nova e o lançamento: pela PROMESSA (revisão final, 29/09/2026) — o
+  // `onSuccess` por chamada não roda com a tela já fechada, e a rápida salva ficava no rascunho.
+  // O que é da TELA (voltar, toast) só com ela montada.
+  const criarPlano = fonte.slice(fonte.indexOf('createPlan.mutateAsync('));
+  assert.match(criarPlano.slice(0, 200), /\.then\(\s*\(\) => \{\s*tirarRapida\(\);\s*if \(!montado\.current\) return;/);
   const gravar = fonte.slice(fonte.indexOf('const gravar = () =>'));
-  assert.match(gravar.slice(0, 800), /onSuccess: \(\) => \{\s*tirarRapida\(\);/);
+  assert.match(gravar.slice(0, 900), /\.then\(\s*\(\) => \{\s*tirarRapida\(\);\s*if \(!montado\.current\) return;/);
 });
 
 test('Rascunho da Projeção: a fileira de ações QUEBRA a linha', () => {
@@ -1830,4 +1832,16 @@ test('Barra de abas do Android: parado, o círculo é do React; o Reanimated só
   assert.match(fonte, /const \[assentado, setAssentado\] = useState\(activeIndex\)/);
   assert.match(fonte, /andando \?/);
   assert.match(fonte, /left: PAD \+ centroParado/);
+});
+
+test('Lançamento e financiamento em modo hipótese: o segundo toque não guarda outra hipótese', () => {
+  // No lançamento o desvio mora no `handleSubmit` (a lint recusa ref ali): estado + botão desligado.
+  const lanc = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  const desvio = lanc.slice(lanc.indexOf('if (modoHipotese) {'), lanc.indexOf('if (modoHipotese) {') + 200);
+  assert.match(desvio, /if \(guardada\) return;\s*setGuardada\(true\);/);
+  assert.match(lanc, /disabled=\{guardada \|\| saving/);
+  // No financiamento o handler é comum: ref, que vale no mesmo toque.
+  const div = readFileSync(join(SRC, 'app/finance/debts.tsx'), 'utf8');
+  const desvioDiv = div.slice(div.indexOf('if (modoHipotese) {'), div.indexOf('if (modoHipotese) {') + 200);
+  assert.match(desvioDiv, /if \(guardada\.current\) return;\s*guardada\.current = true;/);
 });

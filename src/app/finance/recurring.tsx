@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
@@ -136,7 +136,14 @@ export default function RecurringScreen() {
    */
   const { rascunho, adicionarDetalhada, trocarDetalhada, setRapidas } = useRascunho();
   const modoHipotese = Boolean(params.hipotese);
+  // Guardada uma vez, o segundo toque (antes de a tela fechar) não soma outra hipótese igual.
+  const guardada = useRef(false);
   const hipoteseAberta = rascunho.detalhadas.find((h) => h.id === params.hipotese && h.tipo === 'recorrente') ?? null;
+  /** A tela ainda está aberta? O que é dela (toast, fechar) só roda com ela montada. */
+  const [montado] = useState(() => ({ current: true }));
+  useEffect(() => () => {
+    montado.current = false;
+  }, [montado]);
 
   const [form, setForm] = useState<SerieForm | null>(() => hipoteseAberta?.tipo === 'recorrente'
     ? { ...serieDoRegistro({ ...hipoteseAberta.entrada, id: '' }), id: undefined }
@@ -300,22 +307,25 @@ export default function RecurringScreen() {
       auto_confirm: form.autoConfirm,
     };
     if (modoHipotese) {
+      if (guardada.current) return;
+      guardada.current = true;
       const h = { tipo: 'recorrente' as const, entrada, titulo: entrada.description || 'Recorrente' };
       if (hipoteseAberta) trocarDetalhada(hipoteseAberta.id, h);
       else adicionarDetalhada(h);
       volta.aoFechar(() => setForm(null));
       return;
     }
-    create.mutate(
-      entrada,
-      {
-        onSuccess: () => {
-          // Aberta pelo "Aplicar" de uma hipótese rápida: ela virou real e sai do rascunho.
-          if (params.deHipotese) setRapidas((antes) => antes.filter((_, i) => i !== Number(params.deHipotese)));
-          toast({ message: 'Recorrência criada.', tone: 'success' });
-          volta.aoFechar(() => setForm(null));
-        },
-        onError: () => toast({ message: 'Não deu para criar a recorrência.', tone: 'error' }),
+    // Pela PROMESSA: aberta pelo "Aplicar" de uma rápida, ela sai do rascunho mesmo com a tela já
+    // fechada; o que é da tela (toast, fechar), só com ela montada.
+    create.mutateAsync(entrada).then(
+      () => {
+        if (params.deHipotese) setRapidas((antes) => antes.filter((_, i) => i !== Number(params.deHipotese)));
+        if (!montado.current) return;
+        toast({ message: 'Recorrência criada.', tone: 'success' });
+        volta.aoFechar(() => setForm(null));
+      },
+      () => {
+        if (montado.current) toast({ message: 'Não deu para criar a recorrência.', tone: 'error' });
       }
     );
   };

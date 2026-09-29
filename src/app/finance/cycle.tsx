@@ -25,7 +25,7 @@ import { rotaDaLinha } from '@/lib/cycle-routes';
 import { isoToBR, mesmoMes } from '@/lib/dates';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
 import { fechamentoComHipoteses, linhasDasHipoteses, type HipoteseNoCiclo } from '@/lib/rascunho-no-ciclo';
-import { registrosParaSimular, type HipoteseDetalhada } from '@/lib/rascunho';
+import { detalhadasValidas, motivoDaHipotese, registrosParaSimular, type HipoteseDetalhada } from '@/lib/rascunho';
 
 /**
  * **Por que o ciclo fechou naquele valor** — a tela que justifica o número da home.
@@ -174,7 +174,7 @@ export default function CycleDetailScreen() {
       <Fechamento ciclo={ciclo} month={month} hipoteses={hipoteses.length + detalhadas.length} />
       {errosDaSimulacao.map((e, i) => (
         <ThemedText key={i} type="small" themeColor="danger">
-          {`Não deu para simular ${e.indice !== undefined ? (detalhadas[e.indice]?.titulo ?? 'uma hipótese') : 'uma leitura'}: ${e.mensagem}`}
+          {`Não deu para simular ${e.indice !== undefined ? (detalhadas[e.indice]?.titulo ?? 'uma hipótese') : 'uma leitura'}: ${motivoDaHipotese(e)}`}
         </ThemedText>
       ))}
     </>
@@ -437,7 +437,7 @@ function lerDetalhadas(texto: string | undefined): HipoteseDetalhada[] {
   if (!texto) return [];
   try {
     const lido: unknown = JSON.parse(texto);
-    return Array.isArray(lido) ? (lido as HipoteseDetalhada[]) : [];
+    return Array.isArray(lido) ? detalhadasValidas(lido) : [];
   } catch {
     return [];
   }

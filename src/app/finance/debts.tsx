@@ -188,6 +188,8 @@ export default function DebtsScreen() {
    */
   const { rascunho, adicionarDetalhada, trocarDetalhada } = useRascunho();
   const modoHipotese = Boolean(params.hipotese);
+  // Guardada uma vez, o segundo toque (antes de a tela fechar) não soma outra hipótese igual.
+  const guardada = useRef(false);
   const hipoteseAberta = rascunho.detalhadas.find((h) => h.id === params.hipotese && h.tipo === 'financiamento') ?? null;
   const toast = useToast();
   const debts = useDebts();
@@ -486,6 +488,8 @@ export default function DebtsScreen() {
           }),
       };
     if (modoHipotese) {
+      if (guardada.current) return;
+      guardada.current = true;
       // O mesmo `target` que o salvar mandaria, sem o que só existe num registro gravado.
       const { id: _id, versao: _versao, ...entrada } = target as typeof target & { versao?: string | null };
       const h = { tipo: 'financiamento' as const, entrada, titulo: entrada.name };

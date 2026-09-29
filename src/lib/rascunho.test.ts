@@ -42,3 +42,23 @@ test('o lançamento vira hipótese de compra parcelada quando o formulário parc
   // sem título, um nome que diz o que é
   assert.equal(hipoteseDoLancamento('salvar', { ...lanc, description: '' }, null).titulo, 'Lançamento');
 });
+
+test('a recorrente diz de quanto em quanto tempo repete', () => {
+  // 29/09/2026: "Academia · recorrente · R$ 50,00" não dizia que era SEMANAL.
+  const rec = (rrule: string) => ({ id: 'r', tipo: 'recorrente' as const, titulo: 'Academia', entrada: { kind: 'expense' as const, amount_cents: 5000, description: 'Academia', merchant: null, category: null, account_id: null, rrule, next_run_at: '2026-10-06T12:00:00Z', end_date: null, auto_confirm: false } });
+  assert.equal(resumoDaHipotese(rec('FREQ=WEEKLY;BYDAY=TU'), brl), 'Academia · toda semana · R$ 50.00');
+  assert.equal(resumoDaHipotese(rec('FREQ=MONTHLY;BYMONTHDAY=5'), brl), 'Academia · todo mês · R$ 50.00');
+  assert.equal(resumoDaHipotese(rec('FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=5'), brl), 'Academia · a cada 3 meses · R$ 50.00');
+  assert.equal(resumoDaHipotese(rec('FREQ=YEARLY'), brl), 'Academia · todo ano · R$ 50.00');
+});
+
+test('item estragado no aparelho sai do rascunho; o resto continua', async () => {
+  // Revisão final, 29/09/2026: `lerRascunho` só conferia o envelope, e uma detalhada sem `entrada`
+  // (ou uma rápida `null`) derrubava a Projeção inteira.
+  const { detalhadasValidas } = await import('./rascunho.ts');
+  const boa = { id: 'h1', tipo: 'parcelada', titulo: 'Notebook', entrada: parcelada.entrada };
+  const lido = lerRascunho(JSON.stringify({ versao: 1, rapidas: [null, { kind: 'expense', amount_cents: 100, start: '2026-10-01', installments: 1 }, { kind: 'x' }], detalhadas: [boa, { id: 'h2', tipo: 'parcelada' }, { id: 'h3', tipo: 'outro', entrada: {} }, null] }));
+  assert.equal(lido.rapidas.length, 1);
+  assert.deepEqual(lido.detalhadas.map((h) => h.id), ['h1']);
+  assert.deepEqual(detalhadasValidas([boa, { tipo: 'lancamento' }, 'x']).map((h) => h.id), ['h1']);
+});

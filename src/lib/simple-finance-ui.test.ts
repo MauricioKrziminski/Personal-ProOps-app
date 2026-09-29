@@ -213,7 +213,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useTransaction: (id: string) => ({ ...query, isSuccess: true, data: (options.txs ?? [{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared', recurring_id: null, installment_plan_id: null }]).find((t: any) => t.id === id) ?? null }),
     usePayInvoice: () => mutation('payInvoice'),
     useArquivados: () => ({ ...query, isSuccess: true, data: options.arquivados ?? [] }),
-    useSimulacao: (_d: number, _dr: any[], registros: any[]) => registros.length ? { ...query, isPending: false, isSuccess: true, data: options.simulacao ?? { forecast: [], erros: [] } } : { ...query, isPending: true, data: undefined },
+    useSimulacao: (_d: number, _dr: any[], registros: any[]) => registros.length ? { ...query, isPending: false, isSuccess: true, isPlaceholderData: Boolean(options.simulacao?.placeholder), data: options.simulacao ?? { forecast: [], erros: [] } } : { ...query, isPending: true, data: undefined },
     useDesarquivar: () => mutation('desarquivar'),
     useExcluirArquivado: (tabela: string) => mutation(`excluir:${tabela}`),
     ContaComLancamentos: class extends Error {},
@@ -3255,7 +3255,7 @@ test('Projeção: com hipótese detalhada no rascunho, a série vem de simular e
   const rascunho = JSON.stringify({ versao: 1, rapidas: [], detalhadas: [
     { id: 'h1', tipo: 'parcelada', titulo: 'Notebook', entrada: { accountId: 'c', totalCents: 300000, installments: 10, paidInstallments: 0, occurredAt: '2026-10-01', description: 'Notebook', category: null, merchant: null } },
   ] });
-  const ui = screen(forecastFile, { preferencias: { 'projecao:rascunho': rascunho }, simulacao: { forecast: [{ day: '2026-09-28', in_cents: 0, out_cents: 0, balance_cents: 100 }], erros: [{ indice: 0, mensagem: 'conta arquivada' }] } });
+  const ui = screen(forecastFile, { preferencias: { 'projecao:rascunho': rascunho }, simulacao: { forecast: [{ day: '2026-09-28', in_cents: 0, out_cents: 0, balance_cents: 100 }], erros: [{ indice: 0, mensagem: 'conta arquivada', codigo: 'P0001' }] } });
   const linha = ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'Notebook');
   assert.ok(linha, 'a hipótese detalhada aparece no rascunho');
   assert.match(linha.props.subtitle, /conta arquivada/, 'o erro da simulação aparece na linha');
@@ -3347,9 +3347,10 @@ test('Aplicar a rápida abre o formulário real pré-preenchido', () => {
   });
 });
 
-test('Recorrente aberta por "Aplicar" de uma rápida: salvar tira a rápida do rascunho', () => {
+test('Recorrente aberta por "Aplicar" de uma rápida: salvar tira a rápida do rascunho', async () => {
   const rascunho = JSON.stringify({ versao: 1, rapidas: [{ kind: 'expense', amount_cents: 150000, start: '2026-10-05', installments: 1, mode: 'monthly' }], detalhadas: [] });
   const ui = screen('src/app/finance/recurring.tsx', {
+    segurarMutacoes: true,
     preferencias: { 'projecao:rascunho': rascunho },
     params: { create: '1', deHipotese: '0', kind: 'expense', amount: '150000', start: '05/10/2026', description: 'Aluguel' },
   });
@@ -3357,7 +3358,9 @@ test('Recorrente aberta por "Aplicar" de uma rápida: salvar tira a rápida do r
   ui.interact(() => header.props.action.props.onPress());
   assert.equal(ui.writes.at(-1).operation, 'createRecurring');
   assert.ok(!('projecao:rascunho' in ui.preferenciasGravadas), 'antes do sucesso o rascunho não muda');
-  ui.interact(() => ui.pedidos.at(-1).opts.onSuccess());
+  // Pela promessa: o `onSuccess` por chamada não roda com a tela já fechada (revisão final).
+  (ui.pedidos.at(-1) as any).resolver('rec-1');
+  await new Promise((r) => setTimeout(r, 0));
   assert.ok('projecao:rascunho' in ui.preferenciasGravadas, 'salvar reescreve o rascunho');
   assert.equal(JSON.parse(ui.preferenciasGravadas['projecao:rascunho'] || '{"rapidas":[]}').rapidas.length, 0);
 });
@@ -3438,4 +3441,69 @@ test('Dinheiro de DESTAQUE (money, heroMoney) encolhe sozinho: ocupa a linha e n
   assert.equal(heroi.nodes().find((n: any) => n.type === 'ThemedText').props.adjustsFontSizeToFit, true);
   const linha = screen('src/components/ui/money.tsx', { componente: 'Money', props: { cents: 3222769, variant: 'ticker' } });
   assert.equal(linha.nodes().find((n: any) => n.type === 'ThemedText').props.adjustsFontSizeToFit, false);
+});
+
+test('Hipótese que o banco recusou: a linha diz o motivo NOSSO e nunca o texto cru do Postgres', () => {
+  // Revisão final, 29/09/2026: "new row for relation debts violates check constraint…" aparecia na
+  // linha. Só a frase de `raise exception` (P0001) é para a pessoa ler — a régua de financeErrorMessage.
+  const entrada = { kind: 'expense', amount_cents: 1000, category: null, description: 'Pão', merchant: null, account_id: 'c', counterparty_account_id: null, occurred_at: '2026-10-01', status: 'pending', due_at: null, auto_confirm: false };
+  const detalhadas = [{ id: 'a', tipo: 'lancamento', titulo: 'A', entrada }, { id: 'b', tipo: 'lancamento', titulo: 'B', entrada }];
+  const ui = screen(forecastFile, {
+    forecastAccounts: [{ id: 'conta-1' }],
+    preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas }) },
+    simulacao: { forecast: [], erros: [
+      { indice: 0, mensagem: 'new row for relation "transactions" violates check constraint "x"', codigo: '23514' },
+      { indice: 1, mensagem: 'A conta foi arquivada.', codigo: 'P0001' },
+    ] },
+  });
+  const linha = (t: string) => ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === t).props.subtitle;
+  assert.equal(linha('A'), 'Não dá para aplicar: o banco recusou esta hipótese. Abra e confira os campos.');
+  assert.equal(linha('B'), 'Não dá para aplicar: A conta foi arquivada.');
+});
+
+test('E se: no teto de 30 hipóteses detalhadas, "Adicionar como…" diz o limite em vez de abrir o formulário', () => {
+  // Revisão final, 29/09/2026: a 31ª derrubava a simulação inteira com um erro genérico.
+  const entrada = { kind: 'expense', amount_cents: 100, category: null, description: 'x', merchant: null, account_id: 'c', counterparty_account_id: null, occurred_at: '2026-10-01', status: 'pending', due_at: null, auto_confirm: false };
+  const detalhadas = Array.from({ length: 30 }, (_, i) => ({ id: `h${i}`, tipo: 'lancamento', titulo: `H${i}`, entrada }));
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas }) } });
+  ui.interact(() => ui.nodes().find((n: any) => n.props?.label === 'Adicionar como…').props.onPress());
+  assert.ok(!ui.actions.some((a: any) => a.label === 'Lançamento'), 'não oferece criar a 31ª');
+  assert.match(ui.toasts.at(-1).message, /30 hipóteses/);
+});
+
+test('E se: o erro da simulação ANTERIOR não aparece enquanto a nova calcula (o índice já mudou)', () => {
+  // Revisão final, 29/09/2026: depois de um Tirar, o erro do índice 1 da resposta velha caía na
+  // linha que agora é a 1 — outra hipótese.
+  const entrada = { kind: 'expense', amount_cents: 100, category: null, description: 'x', merchant: null, account_id: 'c', counterparty_account_id: null, occurred_at: '2026-10-01', status: 'pending', due_at: null, auto_confirm: false };
+  const ui = screen(forecastFile, {
+    forecastAccounts: [{ id: 'conta-1' }],
+    preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas: [{ id: 'a', tipo: 'lancamento', titulo: 'A', entrada }] }) },
+    simulacao: { forecast: [], erros: [{ indice: 0, mensagem: 'x', codigo: 'P0001' }], placeholder: true },
+  });
+  const linha = ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'A');
+  assert.doesNotMatch(linha.props.subtitle, /Não dá para aplicar/);
+});
+
+test('E se: enquanto aplica, "Aplicar" e "Aplicar todas" ficam desligados à vista', () => {
+  // Revisão final, 29/09/2026 (spec §8: o botão fica desligado enquanto salva). Só havia a trava
+  // por ref — funcionava, mas nada na tela dizia que estava salvando.
+  const entrada = { kind: 'expense', amount_cents: 100, category: null, description: 'x', merchant: null, account_id: 'c', counterparty_account_id: null, occurred_at: '2026-10-01', status: 'pending', due_at: null, auto_confirm: false };
+  const ui = screen(forecastFile, { segurarMutacoes: true, forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas: [{ id: 'a', tipo: 'lancamento', titulo: 'A', entrada }, { id: 'b', tipo: 'lancamento', titulo: 'B', entrada }] }) } });
+  const aplicar = (t: string) => deslizaveis(ui).find((d: any) => d.props.titulo === t).props.acoes.find((a: any) => a.label === 'Aplicar');
+  ui.interact(() => aplicar('A').onPress());
+  ui.interact(() => ui.actions.filter((a: any) => a.label === 'Salvar na conta').at(-1).onPress());
+  assert.equal(aplicar('B').disabled, true, 'outra hipótese não aplica enquanto uma salva');
+  assert.equal(ui.nodes().find((n: any) => n.props?.label === 'Aplicar todas').props.disabled, true);
+});
+
+test('Modo hipótese: dois toques em "Adicionar à hipótese" guardam UMA hipótese', () => {
+  // Revisão final, 29/09/2026: entre o toque e a tela fechar, um segundo toque somava outra igual.
+  const ui = screen('src/app/finance/recurring.tsx', { params: { create: '1', hipotese: 'nova', description: 'Academia', amount: '5000' } });
+  // O MESMO handler duas vezes: o toque duplo chega antes de a tela redesenhar.
+  const toque = ui.nodes().find((n: any) => n.type === 'TaskHeader' && n.props.action).props.action.props.onPress;
+  ui.interact(() => {
+    toque();
+    toque();
+  });
+  assert.equal(JSON.parse(ui.preferenciasGravadas['projecao:rascunho']).detalhadas.length, 1);
 });
