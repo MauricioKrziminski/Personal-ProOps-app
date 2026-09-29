@@ -55,6 +55,9 @@ interface MoneyProps {
  */
 export const DinheiroEncolhe = createContext(false);
 
+/** Tamanhos de destaque: o valor é o bloco, sozinho numa linha. */
+const DESTAQUE = new Set<string>(['money', 'heroMoney']);
+
 /**
  * Dentro de um card que arrasta (`Deslizavel`) o valor não é selecionável: no Android o arrasto
  * que começa em cima do número selecionava a palavra, e o toque longo ali é o menu do card.
@@ -75,7 +78,10 @@ export function Money({
 }: MoneyProps) {
   const { concealed } = useConceal();
   const noBlocoFixo = useContext(DinheiroEncolhe);
-  const encolhe = encolhePedido ?? noBlocoFixo;
+  // O valor de DESTAQUE ocupa a linha sozinho e não tem para onde descer: não cabendo, ele encolhe
+  // ou é cortado com reticência ("+R$ 32.22…" no ciclo, 29/09/2026). O de linha (a `Row` o manda
+  // para baixo) continua sem encolher — é o caso da decisão de 24/09/2026.
+  const encolhe = encolhePedido ?? (noBlocoFixo || DESTAQUE.has(variant));
   const oculto = concealable && concealed;
   const noArrasto = useContext(DentroDeArrasto);
 

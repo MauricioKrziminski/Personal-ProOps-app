@@ -3428,3 +3428,14 @@ test('Projeção mês a mês: os dois "hoje" dizem o que são, e o rodapé nomei
   assert.match(textos, /em conta hoje R\$/);
   assert.match(textos, /A projeção vai até \d{2}\/\d{2}\/\d{4}; Dezembro de 2026 está incompleto/);
 });
+
+test('Dinheiro de DESTAQUE (money, heroMoney) encolhe sozinho: ocupa a linha e não tem para onde descer', () => {
+  // 29/09/2026, accessibility-large: o "Vou fechar em +R$ 32.22…" do ciclo — e o mesmo risco em
+  // onze telas (total da fatura, das dívidas, das metas…). O valor de linha continua sem encolher.
+  const destaque = screen('src/components/ui/money.tsx', { componente: 'Money', props: { cents: 3222769, variant: 'money' } });
+  assert.equal(destaque.nodes().find((n: any) => n.type === 'ThemedText').props.adjustsFontSizeToFit, true);
+  const heroi = screen('src/components/ui/money.tsx', { componente: 'Money', props: { cents: 3222769, variant: 'heroMoney' } });
+  assert.equal(heroi.nodes().find((n: any) => n.type === 'ThemedText').props.adjustsFontSizeToFit, true);
+  const linha = screen('src/components/ui/money.tsx', { componente: 'Money', props: { cents: 3222769, variant: 'ticker' } });
+  assert.equal(linha.nodes().find((n: any) => n.type === 'ThemedText').props.adjustsFontSizeToFit, false);
+});

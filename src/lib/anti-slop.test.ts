@@ -1742,7 +1742,10 @@ test('TaskHeader: ação longa desce de linha antes de espremer o título', () =
   const fonte = readFileSync(join(SRC, 'components/ui/task-header.tsx'), 'utf8');
   const bloco = (nome: string) => fonte.slice(fonte.indexOf(`${nome}: {`), fonte.indexOf('}', fonte.indexOf(`${nome}: {`)));
   assert.match(bloco('headRow'), /flexWrap: 'wrap'/);
-  assert.match(bloco('headText'), /minWidth: '\d+%'/);
+  // O piso do título é a palavra MAIS LARGA dele, medida: com 40% fixo "Nova recorrência" ainda
+  // partia em "recorrênci/a" (29/09/2026).
+  assert.match(fonte, /minWidth: palavraMaisLarga/);
+  assert.match(fonte, /title\.split\(/);
   assert.match(bloco('headAction'), /marginLeft: 'auto'/);
 });
 

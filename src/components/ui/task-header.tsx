@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -79,6 +80,7 @@ export function TaskHeader({
   const vidro = supportsLiquidGlass();
   const insets = useSafeAreaInsets();
   const insideTabletDialog = useTabletSheetContext();
+  const [palavraMaisLarga, setPalavraMaisLarga] = useState(0);
 
   return (
     <View
@@ -100,7 +102,24 @@ export function TaskHeader({
           {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
           <Icon name="xmark" size="sm" color="textSecondary" />
         </Pressable>
-        <View style={styles.headText}>
+        {/*
+          O piso do título é a palavra MAIS LARGA dele, medida: abaixo disso ela partiria no meio
+          ("recorrênci/a" com 40% fixo, 29/09/2026). Não cabendo ao lado do ✕ e da ação, a ação
+          desce (a linha tem `flexWrap`).
+        */}
+        <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.medidor}>
+          <View
+            style={styles.medidorColuna}
+            onLayout={(e) => {
+              const w = Math.ceil(e.nativeEvent.layout.width);
+              setPalavraMaisLarga((atual) => (atual === w ? atual : w));
+            }}>
+            {title.split(/\s+/).filter(Boolean).map((p, i) => (
+              <ThemedText key={i} type="subtitle" style={styles.semEncolher}>{p}</ThemedText>
+            ))}
+          </View>
+        </View>
+        <View style={[styles.headText, { minWidth: palavraMaisLarga }]}>
           <ThemedText type="subtitle">{title}</ThemedText>
           {subtitle ? (
             <ThemedText type="footnote" themeColor="textSecondary">
@@ -140,11 +159,11 @@ const styles = StyleSheet.create({
   */
   headText: {
     flex: 1,
-    // Piso do título: com fonte grande, uma ação longa ("Adicionar à hipótese") o espremia até
-    // uma letra por linha. Abaixo disso quem cede é a linha — a ação desce e fica à direita.
-    minWidth: '40%',
     gap: Space.half,
   },
+  medidor: { position: 'absolute', left: 0, top: 0, width: 10000, opacity: 0 },
+  medidorColuna: { position: 'absolute', left: 0, top: 0, alignItems: 'flex-start' },
+  semEncolher: { flexShrink: 0 },
   headAction: {
     marginLeft: 'auto',
   },
