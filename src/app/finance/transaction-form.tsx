@@ -23,6 +23,9 @@ import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
 import { TaskHeader } from '@/components/ui/task-header';
+import { useRascunho } from '@/hooks/use-rascunho';
+import { hipoteseDoLancamento } from '@/lib/rascunho';
+import type { EntradaLancamento, EntradaParcelada } from '@/lib/escrita';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { Segmented } from '@/components/ui/segmented';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -157,7 +160,7 @@ const schema = z
 type FormValues = z.infer<typeof schema>;
 
 export default function TransactionFormScreen() {
-  const params = useLocalSearchParams<{ id?: string; conta?: string }>();
+  const params = useLocalSearchParams<{ id?: string; conta?: string; hipotese?: string; parcelada?: string }>();
   const query = useTransaction(params.id);
   // A parcela edita o valor da COMPRA: sem o plano (travadas, total) o campo não sabe o que
   // "cada parcela" alcança. Espera junto com a linha, na mesma tela de esqueleto.
@@ -226,11 +229,13 @@ export default function TransactionFormScreen() {
     // Outro id é outro formulário: aberto por link sobre um já aberto, a tela era reaproveitada
     // e o `useForm` (que só lê os valores na montagem) seguia com o lançamento anterior.
     <TransactionForm
-      key={params.id ?? `novo:${params.conta ?? ''}`}
+      key={params.id ?? `novo:${params.conta ?? ''}:${params.hipotese ?? ''}`}
       editing={editing}
       plano={plano.data ?? undefined}
       jurosDoPix={juros.data ?? null}
       conta={editing ? undefined : params.conta}
+      hipotese={editing ? undefined : params.hipotese}
+      parcelada={params.parcelada === '1'}
     />
   );
 }
@@ -240,6 +245,8 @@ function TransactionForm({
   plano,
   jurosDoPix,
   conta,
+  hipotese,
+  parcelada,
 }: {
   editing?: Transaction;
   /** A compra desta parcela, quando `editing` é parcela e o plano carregou. */
@@ -251,8 +258,20 @@ function TransactionForm({
    * lançamento novo nasce nela. Só vale se ela está entre as contas da pessoa.
    */
   conta?: string;
+  /**
+   * `?hipotese=` (29/09/2026, spec hipóteses detalhadas): o formulário real vira hipótese do "E
+   * se…?" — `nova` cria, um id edita aquela. Não grava nada: guarda a ENTRADA no rascunho.
+   */
+  hipotese?: string;
+  /** `?parcelada=1` ("Adicionar como… Compra parcelada"): abre já em 2 parcelas. */
+  parcelada?: boolean;
 }) {
   const insets = useSafeAreaInsets();
+  const { rascunho, adicionarDetalhada, trocarDetalhada } = useRascunho();
+  const modoHipotese = Boolean(hipotese);
+  const hipoteseAberta = rascunho.detalhadas.find((h) => h.id === hipotese) ?? null;
+  const hLanc = hipoteseAberta?.tipo === 'lancamento' ? hipoteseAberta.entrada : null;
+  const hParc = hipoteseAberta?.tipo === 'parcelada' ? hipoteseAberta.entrada : null;
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const toast = useToast();
@@ -279,21 +298,22 @@ function TransactionForm({
     resolver: zodResolver(schema),
     // `editing` já chegou resolvido pelo gate — sem `useEffect`+`reset`, sem corrida.
     defaultValues: {
-      kind: editing?.kind ?? 'expense',
-      amount_cents: editing?.amount_cents ?? 0,
-      category: editing?.category ?? null,
-      description: editing?.description ?? '',
-      merchant: editing?.merchant ?? null,
-      account_id: editing?.account_id ?? (conta && accounts?.some((a) => a.id === conta) ? conta : null),
-      counterparty_account_id: editing?.counterparty_account_id ?? null,
-      installments: 1,
-      paid_installments: '0',
-      fee_cents: jurosDoPix?.amount_cents ?? 0,
-      auto_confirm: editing?.auto_confirm ?? false,
-      occurred_at: isoToBR(dataDaSerie ?? editing?.occurred_at ?? localISODate()),
-      pending: editing?.status === 'pending',
+      // A hipótese aberta para editar (`hLanc`/`hParc`) preenche como um registro preencheria.
+      kind: editing?.kind ?? hLanc?.kind ?? 'expense',
+      amount_cents: editing?.amount_cents ?? hLanc?.amount_cents ?? hParc?.totalCents ?? 0,
+      category: editing?.category ?? hLanc?.category ?? hParc?.category ?? null,
+      description: editing?.description ?? hLanc?.description ?? hParc?.description ?? '',
+      merchant: editing?.merchant ?? hLanc?.merchant ?? hParc?.merchant ?? null,
+      account_id: editing?.account_id ?? hLanc?.account_id ?? hParc?.accountId ?? (conta && accounts?.some((a) => a.id === conta) ? conta : null),
+      counterparty_account_id: editing?.counterparty_account_id ?? hLanc?.counterparty_account_id ?? null,
+      installments: hParc?.installments ?? (parcelada ? 2 : 1),
+      paid_installments: String(hParc?.paidInstallments ?? 0),
+      fee_cents: jurosDoPix?.amount_cents ?? hLanc?.fee_cents ?? 0,
+      auto_confirm: editing?.auto_confirm ?? hLanc?.auto_confirm ?? false,
+      occurred_at: isoToBR(dataDaSerie ?? editing?.occurred_at ?? hLanc?.occurred_at ?? hParc?.occurredAt ?? localISODate()),
+      pending: editing ? editing.status === 'pending' : hLanc?.status === 'pending',
       installment_occurrence: Boolean(editing?.installment_plan_id),
-      due_at: dataDaSerie ? isoToBR(dataDaSerie) : editing?.due_at ? isoToBR(editing.due_at) : null,
+      due_at: dataDaSerie ? isoToBR(dataDaSerie) : editing?.due_at ? isoToBR(editing.due_at) : hLanc?.due_at ? isoToBR(hLanc.due_at) : null,
     },
   });
 
@@ -578,11 +598,12 @@ function TransactionForm({
       ? (adiado ? values.auto_confirm : false)
       : (editing?.auto_confirm ?? false);
 
-    // parcelado NOVO: quem cria as N transações (e resolve a fatura de cada uma) é o banco, não
-    // o app — mesma regra usada pelo WhatsApp.
-    if (destino === 'criarPlano' && values.account_id) {
-      createPlan.mutate(
-        {
+    /**
+     * O que cada gravação recebe, montado UMA vez (29/09/2026): o salvar real e a hipótese do
+     * "E se…?" usam o mesmo objeto — o que foi simulado é o que se aplica.
+     */
+    const entradaParcelada: EntradaParcelada | null = values.account_id
+      ? {
           accountId: values.account_id,
           totalCents: totalDaCompraNova,
           installments: values.installments,
@@ -595,7 +616,39 @@ function TransactionForm({
           // nenhum. Ver o ⚠️ em `useCreateInstallmentPlan`.
           merchant: values.merchant?.trim() || null,
           lastDay: intencaoDoDia === 'ultimo' && !isCard,
-        },
+        }
+      : null;
+    const entradaLancamento: EntradaLancamento = {
+      kind: values.kind,
+      amount_cents: values.amount_cents,
+      category: values.kind === 'transfer' ? null : values.category,
+      description: values.description.trim(),
+      merchant: values.merchant?.trim() || null,
+      account_id: values.account_id,
+      counterparty_account_id: values.kind === 'transfer' ? values.counterparty_account_id : null,
+      occurred_at: brToISO(values.occurred_at),
+      status,
+      due_at: dueAt,
+      // Campo que não aparece não escreve (finance.md): juro só onde a pergunta existe
+      fee_cents: mostraJuros ? values.fee_cents : 0,
+      auto_confirm: autoConfirm,
+    };
+
+    // Modo hipótese: guarda no rascunho e volta, ANTES de qualquer gravação.
+    if (modoHipotese) {
+      const h = hipoteseDoLancamento(destino, entradaLancamento, entradaParcelada);
+      if (hipoteseAberta) trocarDetalhada(hipoteseAberta.id, h);
+      else adicionarDetalhada(h);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+      return;
+    }
+
+    // parcelado NOVO: quem cria as N transações (e resolve a fatura de cada uma) é o banco, não
+    // o app — mesma regra usada pelo WhatsApp.
+    if (destino === 'criarPlano' && entradaParcelada) {
+      createPlan.mutate(
+        entradaParcelada,
         {
           onSuccess: () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -712,21 +765,9 @@ function TransactionForm({
     const gravar = () =>
       save.mutate(
       {
+        ...entradaLancamento,
         id: editing?.id,
-        kind: values.kind,
-        amount_cents: values.amount_cents,
-        category: values.kind === 'transfer' ? null : values.category,
-        description: values.description.trim(),
-        merchant: values.merchant?.trim() || null,
-        account_id: values.account_id,
-        counterparty_account_id: values.kind === 'transfer' ? values.counterparty_account_id : null,
-        occurred_at: brToISO(values.occurred_at),
-        status,
-        due_at: dueAt,
-        // Campo que não aparece não escreve (finance.md): juro só onde a pergunta existe
-        fee_cents: mostraJuros ? values.fee_cents : 0,
         juros: editing && mostraJuros ? { id: jurosDoPix?.id ?? null, cents: values.fee_cents } : undefined,
-        auto_confirm: autoConfirm,
       },
       {
         onSuccess: () => {
@@ -960,11 +1001,11 @@ function TransactionForm({
   return (
     <Screen scroll={false} wide={tablet}>
       <TaskHeader
-        title={editing ? 'Editar lançamento' : 'Novo lançamento'}
+        title={modoHipotese ? (hipoteseAberta ? 'Editar hipótese' : 'Nova hipótese') : editing ? 'Editar lançamento' : 'Novo lançamento'}
         onClose={() => router.back()}
         action={
           <Button
-            label={saving ? 'Salvando…' : 'Salvar'}
+            label={modoHipotese ? 'Adicionar à hipótese' : saving ? 'Salvando…' : 'Salvar'}
             size="sm"
             disabled={saving || !!correcaoDaDivida.erro || (formSerie !== null && !serieOk) || (formCompra !== null && !compraOk)}
             loading={saving}

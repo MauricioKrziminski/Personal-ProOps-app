@@ -10,6 +10,8 @@ import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
+import { useRascunho } from '@/hooks/use-rascunho';
+import type { EntradaFinanciamento } from '@/lib/escrita';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -179,7 +181,14 @@ export default function DebtsScreen() {
   const brl = useBRL();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
-  const params = useLocalSearchParams<{ create?: string; id?: string; edit?: string }>();
+  const params = useLocalSearchParams<{ create?: string; id?: string; edit?: string; hipotese?: string }>();
+  /**
+   * `?hipotese=` (29/09/2026, spec hipóteses detalhadas): o financiamento vira hipótese do "E
+   * se…?" — `nova` cria, um id edita aquela. Não grava: guarda a ENTRADA no rascunho.
+   */
+  const { rascunho, adicionarDetalhada, trocarDetalhada } = useRascunho();
+  const modoHipotese = Boolean(params.hipotese);
+  const hipoteseAberta = rascunho.detalhadas.find((h) => h.id === params.hipotese && h.tipo === 'financiamento') ?? null;
   const toast = useToast();
   const debts = useDebts();
   const [estrategia, setEstrategia] = usePreferencia<'avalanche' | 'snowball'>('dividas:estrategia', 'avalanche', umDe(['avalanche', 'snowball']));
@@ -202,7 +211,9 @@ export default function DebtsScreen() {
   const [verArquivadas, setVerArquivadas] = useState(false);
   const pagar = usePayDebtInstallment();
 
-  const [form, setForm] = useState<FormState | null>(() => params.create === 'financing' ? { ...FORM_VAZIO, kind: 'financing' } : null);
+  const [form, setForm] = useState<FormState | null>(() =>
+    hipoteseAberta?.tipo === 'financiamento' ? formDaHipotese(hipoteseAberta.entrada)
+      : params.create === 'financing' ? { ...FORM_VAZIO, kind: 'financing' } : null);
   const [edicaoAutomatica, setEdicaoAutomatica] = useState<string | null>(null);
   // Quem chegou por `?create=financing` veio do lançamento ou do Financeiro — fechar devolve.
   const volta = useVoltarQuandoFechar(params.create === 'financing');
@@ -474,6 +485,15 @@ export default function DebtsScreen() {
             tone: 'error',
           }),
       };
+    if (modoHipotese) {
+      // O mesmo `target` que o salvar mandaria, sem o que só existe num registro gravado.
+      const { id: _id, versao: _versao, ...entrada } = target as typeof target & { versao?: string | null };
+      const h = { tipo: 'financiamento' as const, entrada, titulo: entrada.name };
+      if (hipoteseAberta) trocarDetalhada(hipoteseAberta.id, h);
+      else adicionarDetalhada(h);
+      volta.aoFechar(() => setForm(null));
+      return;
+    }
     if (!form.id || !form.original) {
       save.mutate(target, callbacks);
       return;
@@ -979,11 +999,11 @@ export default function DebtsScreen() {
       {/* Criar / editar */}
       <Sheet visible={form !== null} onClose={() => volta.aoFechar(() => setForm(null))}>
           <TaskHeader
-            title={form?.id ? 'Editar dívida' : 'Nova dívida'}
+            title={modoHipotese ? (hipoteseAberta ? 'Editar hipótese' : 'Nova hipótese') : form?.id ? 'Editar dívida' : 'Nova dívida'}
             onClose={() => volta.aoFechar(() => setForm(null))}
             action={
               <Button
-                label="Salvar"
+                label={modoHipotese ? 'Adicionar à hipótese' : 'Salvar'}
                 size="sm"
                 loading={save.isPending || saveScoped.isPending}
                 disabled={!podeSalvar}
@@ -1516,3 +1536,33 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
+
+/**
+ * O formulário a partir de uma hipótese de financiamento guardada — o mesmo mapeamento do
+ * `abrirEdicao`, sem o que só um registro gravado tem (id, versão, original).
+ */
+function formDaHipotese(e: EntradaFinanciamento): FormState {
+  const pagas = e.installments_paid ?? 0;
+  const modo = (e.calculation_mode ?? 'interest') as FormState['calculationMode'];
+  return {
+    ...FORM_VAZIO,
+    calculationMode: modo,
+    unidade: 'parcela',
+    valorCents: Number(e.installment_cents ?? 0),
+    ancora: e.first_due_date ?? null,
+    pagasOriginal: pagas,
+    name: e.name,
+    kind: e.kind as FormState['kind'],
+    remainingCents: Number(e.remaining_cents),
+    principalCents: Number(e.principal_cents),
+    taxa: e.interest_rate_monthly
+      ? formatNumberBR(Number((e.interest_rate_monthly * 100).toFixed(4)))
+      : e.kind === 'financing' ? '0' : '',
+    parcelas: e.installments ? String(modo === 'fixed_installments' ? e.installments : Math.max(e.installments - pagas, 0)) : '',
+    installmentsPaid: pagas,
+    historyConfirmed: true,
+    installmentCents: Number(e.installment_cents ?? 0),
+    accountId: e.account_id,
+    diaVencimento: e.due_day ? String(e.due_day) : '',
+  };
+}

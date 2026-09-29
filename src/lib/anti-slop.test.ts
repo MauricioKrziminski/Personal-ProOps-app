@@ -1397,7 +1397,7 @@ test('Formulário aberto por link remonta quando o registro muda (key pelo id)',
   // `key`, outro id é outro formulário.
   const lancamento = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
   // Novo lançamento aberto numa conta (`?conta=`) é outro formulário também (25/09/2026).
-  assert.match(lancamento, /<TransactionForm\s+key=\{params\.id \?\? `novo:\$\{params\.conta \?\? ''\}`\}/);
+  assert.match(lancamento, /<TransactionForm\s+key=\{params\.id \?\? `novo:\$\{params\.conta \?\? ''\}/);
   const lembrete = readFileSync(join(SRC, 'app/reminder-form.tsx'), 'utf8');
   assert.match(lembrete, /<ReminderForm\s+key=\{/);
 });
@@ -1607,7 +1607,7 @@ test('Juros do Pix no crédito também se edita: abre com o juro que nasceu junt
   // 26/09/2026, "tudo que se cria se edita": o campo só existia criando.
   const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
   assert.doesNotMatch(fonte, /const mostraJuros = [^;]*!editing &&/, 'o campo não some na edição');
-  assert.match(fonte, /fee_cents: jurosDoPix\?\.amount_cents \?\? 0/);
+  assert.match(fonte, /fee_cents: jurosDoPix\?\.amount_cents \?\?/);
   assert.match(fonte, /juros: editing && mostraJuros \? \{ id: jurosDoPix\?\.id \?\? null, cents: values\.fee_cents \}/);
   const hook = readFileSync(join(SRC, 'hooks/use-finance.ts'), 'utf8');
   assert.match(hook, /export function useJurosDoPix/);
@@ -1681,4 +1681,20 @@ test('arrasto: esquerda só tira da lista, direita nunca apaga, e apagar se cham
     }
   }
   assert.deepEqual(erros, []);
+});
+
+test('Lançamento em modo hipótese: guarda no rascunho e sai ANTES de qualquer gravação', () => {
+  // 29/09/2026 (spec hipóteses detalhadas): o formulário real vira hipótese sem escrever nada.
+  // A tela não roda no harness (react-hook-form), então a ordem é conferida no texto: o desvio
+  // da hipótese vem antes do primeiro `mutate` do salvar.
+  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  const submit = fonte.slice(fonte.indexOf('const onSubmit = handleSubmit('));
+  const desvio = submit.indexOf('if (modoHipotese) {');
+  assert.ok(desvio > 0, 'o onSubmit desvia em modo hipótese');
+  for (const escrita of ['createPlan.mutate(', 'save.mutate(', 'converter.mutate(']) {
+    const i = submit.indexOf(escrita);
+    if (i >= 0) assert.ok(desvio < i, `${escrita} vem depois do desvio da hipótese`);
+  }
+  assert.match(submit.slice(desvio, desvio + 600), /hipoteseDoLancamento\(destino, entradaLancamento, entradaParcelada\)/);
+  assert.match(fonte, /'Adicionar à hipótese'/);
 });

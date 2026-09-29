@@ -3242,3 +3242,23 @@ test('Projeção: com hipótese detalhada no rascunho, a série vem de simular e
   assert.ok(textos.some((t: string) => t.includes('Notebook')), 'a hipótese detalhada aparece no rascunho');
   assert.ok(textos.some((t: string) => t.includes('conta arquivada')), 'o erro da simulação aparece na linha');
 });
+
+test('Recorrente em modo hipótese: "Adicionar à hipótese" guarda a entrada e não grava', () => {
+  const ui = screen('src/app/finance/recurring.tsx', { params: { create: '1', hipotese: 'nova', description: 'Academia', amount: '5000' } });
+  const header = ui.nodes().find((n: any) => n.type === 'TaskHeader' && n.props.action);
+  assert.equal(header.props.action.props.label, 'Adicionar à hipótese');
+  ui.interact(() => header.props.action.props.onPress());
+  assert.equal(ui.writes.length, 0, 'modo hipótese não escreve');
+  const gravado = JSON.parse(ui.preferenciasGravadas['projecao:rascunho']);
+  assert.equal(gravado.detalhadas[0].tipo, 'recorrente');
+  assert.equal(gravado.detalhadas[0].titulo, 'Academia');
+  assert.equal(gravado.detalhadas[0].entrada.amount_cents, 5000);
+});
+
+test('Financiamento em modo hipótese: o botão diz "Adicionar à hipótese" e o salvar não grava', () => {
+  const ui = screen(debtsFile, { create: true, params: { create: 'financing', hipotese: 'nova' } });
+  const header = ui.nodes().find((n: any) => n.type === 'TaskHeader' && n.props.action);
+  assert.equal(header.props.action.props.label, 'Adicionar à hipótese');
+  ui.interact(() => header.props.action.props.onPress());
+  assert.equal(ui.writes.length, 0);
+});

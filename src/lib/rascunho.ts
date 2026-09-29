@@ -69,3 +69,19 @@ export function resumoDaHipotese(h: HipoteseDetalhada, brl: (c: number) => strin
       return `${h.titulo} · financiamento · ${brl(h.entrada.remaining_cents)}`;
   }
 }
+
+/**
+ * O que o formulário de lançamento vira em modo hipótese: a compra parcelada quando ele criaria
+ * um plano (`destinoDoSalvar` = 'criarPlano'), o lançamento no resto. A entrada é a MESMA que ele
+ * mandaria ao hook — é o que torna o "Aplicar" igual ao salvar.
+ */
+export function hipoteseDoLancamento(
+  destino: string,
+  lancamento: EntradaLancamento,
+  parcelada: EntradaParcelada | null,
+): Omit<HipoteseDetalhada, 'id'> {
+  if (destino === 'criarPlano' && parcelada) {
+    return { tipo: 'parcelada', entrada: parcelada, titulo: parcelada.description?.trim() || 'Compra parcelada' };
+  }
+  return { tipo: 'lancamento', entrada: lancamento, titulo: lancamento.description?.trim() || 'Lançamento' };
+}

@@ -33,7 +33,7 @@ test('task surfaces preserve their mutation and navigation contracts', () => {
   assert.match(recurring, /useCreateRecurring\(\)/);
   assert.match(recurring, /useSaveRecurringSeries\(\)/);
   assert.match(recurring, /useDeleteRecurring\(\)/);
-  assert.match(recurring, /label=\{form\?\.id \? 'Salvar' : 'Criar'\}/);
+  assert.match(recurring, /form\?\.id \? 'Salvar' : 'Criar'\}/);
 
   const rules = readRoute('rules');
   assert.match(rules, /useSaveRule\(\)/);

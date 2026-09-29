@@ -32,3 +32,13 @@ test('registros para simular usam as funções da escrita', () => {
 test('a linha diz título, tipo e valor', () => {
   assert.equal(resumoDaHipotese(parcelada, brl), 'Notebook · compra 10× · R$ 3000.00');
 });
+
+test('o lançamento vira hipótese de compra parcelada quando o formulário parcelaria, e de lançamento no resto', async () => {
+  const { hipoteseDoLancamento } = await import('./rascunho.ts');
+  const lanc = { kind: 'expense' as const, amount_cents: 1000, category: null, description: 'Pão', merchant: null, account_id: 'c', counterparty_account_id: null, occurred_at: '2026-10-01', status: 'cleared' as const, due_at: null, auto_confirm: false, fee_cents: 0 };
+  const parc = { accountId: 'c', totalCents: 300000, installments: 10, paidInstallments: 0, occurredAt: '2026-10-01', description: 'Notebook', category: null, merchant: null };
+  assert.deepEqual(hipoteseDoLancamento('criarPlano', lanc, parc), { tipo: 'parcelada', entrada: parc, titulo: 'Notebook' });
+  assert.deepEqual(hipoteseDoLancamento('salvar', lanc, parc), { tipo: 'lancamento', entrada: lanc, titulo: 'Pão' });
+  // sem título, um nome que diz o que é
+  assert.equal(hipoteseDoLancamento('salvar', { ...lanc, description: '' }, null).titulo, 'Lançamento');
+});
