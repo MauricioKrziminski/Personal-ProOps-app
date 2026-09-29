@@ -3,6 +3,12 @@
 Registro, não regra: o que está em cada banco HOJE se confere na fonte (`CLAUDE.md`, *Banco e
 fila*). Entradas movidas do `CLAUDE.md` em 26/09/2026, na ordem em que estavam lá.
 
+**Só no STAGING: `20260929120000_simular_hipoteses`** (29/09/2026) — `public.simular`: cria as
+hipóteses detalhadas do "E se…?" de verdade numa subtransação, roda as leituras (Projeção, meses,
+ciclo) e desfaz tudo. `security invoker`, sem `execute` para `anon`. Teste:
+`supabase/tests/simular.sql` (10 casos, incluindo banco intacto e falha no meio). Em produção sobe
+pelo Gabriel, **antes** do app que a chama.
+
 **Produção e staging ALINHADOS em `20260928237000`** — a `20260928236000` e esta aplicadas em
 produção pelo Gabriel em 28/09/2026 (`db push --project-ref`) e conferidas na fonte:
 `schema_migrations` devolve `20260928237000`, `20260928236000`, `20260928235000`; `draft_lines`
