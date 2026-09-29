@@ -6,8 +6,7 @@ import { Deslizavel } from '@/components/ui/deslizavel';
 import { Money } from '@/components/ui/money';
 import { Row } from '@/components/ui/row';
 import { useToast } from '@/components/ui/toast';
-import { categoryIcon } from '@/design/category-icons';
-import { useDebts, useMaterializeOccurrence, useSkipOccurrence } from '@/hooks/use-finance';
+import { useAparencia, useDebts, useMaterializeOccurrence, useSkipOccurrence } from '@/hooks/use-finance';
 import { formatBRL } from '@/hooks/use-items';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
@@ -135,6 +134,7 @@ export function LinhaPrevista({ line, hoje, conta, acoes, onAbrir }: {
   acoes: ItemAction[];
   onAbrir: () => void;
 }) {
+  const aparencia = useAparencia()(line.category, line.kind);
   const estado = estadoDaPrevista(line, hoje);
   const subtitulo = [origemDaPrevista(line), line.category, conta?.replace(/ /g, ' ')].filter(Boolean).join(' · ');
   return (
@@ -147,7 +147,8 @@ export function LinhaPrevista({ line, hoje, conta, acoes, onAbrir }: {
           tone: estado === 'atrasado' ? 'danger' : estado === 'não caiu' ? 'warning' : undefined,
         } : undefined}
         subtitle={subtitulo}
-        icon={categoryIcon(line.category, line.kind)}
+        icon={aparencia.icon}
+        tinta={aparencia.cor}
         accessibilityLabel={`${line.description}, ${formatBRL(line.amount_cents)}, ${line.kind === 'income' ? 'receita' : 'despesa'}, ${origemDaPrevista(line)}${estado ? `, ${estado}` : ''}`}
         onPress={onAbrir}
         onLongPress={() => showItemActions(line.description, acoes)}

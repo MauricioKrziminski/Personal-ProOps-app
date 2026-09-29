@@ -11,10 +11,9 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { categoryIcon } from '@/design/category-icons';
 import { Radius, Space, tabular } from '@/design/tokens';
 import { useEstadoDosAlertas } from '@/hooks/use-alertas-vistos';
-import { useAlertsSent } from '@/hooks/use-finance';
+import { useAlertsSent, useAparencia } from '@/hooks/use-finance';
 import { VerMais } from '@/components/ui/ver-mais';
 import { PASSO } from '@/lib/aos-poucos';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
@@ -91,6 +90,7 @@ export default function AlertsScreen() {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const theme = useTheme();
+  const aparencia = useAparencia();
   // Aos poucos: 20 do servidor, e o "Ver mais" pede mais 20.
   const [limite, setLimite] = useState(PASSO);
   const alertas = useAlertsSent(limite);
@@ -177,9 +177,10 @@ export default function AlertsScreen() {
                     // Em orçamento o `ref` É a categoria, então o ícone dela diz mais que um sino.
                     icon={
                       a.kind.startsWith('budget_')
-                        ? categoryIcon(a.ref)
+                        ? aparencia(a.ref).icon
                         : meta?.icone ?? 'bell'
                     }
+                    tinta={a.kind.startsWith('budget_') ? aparencia(a.ref).cor : null}
                     chevron={false}
                     accessibilityLabel={`${titulo}${lido ? '' : ', não lido'}, ${hora(a.created_at)}`}
                     onPress={lido ? undefined : () => marcarLido(a.id)}

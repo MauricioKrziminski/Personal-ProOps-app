@@ -1874,3 +1874,9 @@ test('A tinta da categoria é cor de CONTEÚDO: sai da paleta das notas, nunca d
   }
   assert.match(readFileSync(join(SRC, 'components/notes/color-picker.tsx'), 'utf8'), /export function GradeDeCores\(/);
 });
+
+test('Toda lista que desenha o ícone da categoria desenha a cor dela (useAparencia, não categoryIcon direto)', () => {
+  const arquivos = (readdirSync(SRC, { recursive: true }) as string[]).filter((f) => /\.tsx$/.test(f));
+  const semCor = arquivos.filter((f) => /categoryIcon\(/.test(readFileSync(join(SRC, f), 'utf8')));
+  assert.deepEqual(semCor, [], 'use useAparencia (ícone + cor) no lugar de categoryIcon');
+});

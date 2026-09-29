@@ -32,7 +32,6 @@ import { Skeleton, SkeletonCards, SkeletonChart, SkeletonHero, SkeletonList, Ske
 import { ProgressBar, Sparkline } from '@/components/ui/sparkline';
 import { Tile, TileGrid, TileRow } from '@/components/ui/tile';
 import { useToast } from '@/components/ui/toast';
-import { categoryIcon } from '@/design/category-icons';
 import { chartWidthForPane } from '@/design/adaptive-window';
 import { Radius, Space } from '@/design/tokens';
 import { umDe, usePreferencia } from '@/hooks/use-preferencia';
@@ -52,6 +51,7 @@ import {
   useMonthlyCashflow,
   useRecentTransactions,
   useTransactionsSummary,
+  useAparencia,
   type Transaction,
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
@@ -101,6 +101,7 @@ function daysToMonthEnd(): number {
 }
 
 export default function FinanceScreen() {
+  const aparencia = useAparencia();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const brl = useBRL();
@@ -536,7 +537,8 @@ export default function FinanceScreen() {
                     <LedgerRow
                       title={titulo}
                       subtitle={[tx.category, SOURCE_LABEL[tx.source]].filter(Boolean).join(' · ') || undefined}
-                      icon={categoryIcon(tx.category, tx.kind)}
+                      icon={aparencia(tx.category, tx.kind).icon}
+                      tinta={aparencia(tx.category, tx.kind).cor}
                       cents={tx.kind === 'expense' ? -tx.amount_cents : tx.amount_cents}
                       signed={tx.kind !== 'transfer'}
                       tone={tx.kind === 'income' ? 'success' : 'text'}

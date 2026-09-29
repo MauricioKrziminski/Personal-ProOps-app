@@ -6,8 +6,10 @@ import { ThemedText } from '@/components/themed-text';
 import { DonutChart, TONS_DA_ROSCA } from '@/components/ui/donut-chart';
 import { Money } from '@/components/ui/money';
 import { CHAVE_OUTRAS, fatias } from '@/design/donut-math';
+import { noteInk } from '@/design/note-colors';
 import { Radius, Space, tabular } from '@/design/tokens';
-import { useTheme } from '@/hooks/use-theme';
+import { useAparencia } from '@/hooks/use-finance';
+import { useScheme, useTheme } from '@/hooks/use-theme';
 
 export type CategoriaDoMes = {
   categoria: string;
@@ -34,7 +36,19 @@ export function SpendingDonut({
   onOpenAll: () => void;
 }) {
   const theme = useTheme();
-  const lista = useMemo(() => fatias(itens.map((i) => ({ chave: i.categoria, valor: i.total }))), [itens]);
+  const scheme = useScheme();
+  const aparencia = useAparencia();
+  // A fatia de uma categoria com cor é da cor dela (a mesma tinta do disco na lista); sem, o cinza.
+  const lista = useMemo(
+    () =>
+      fatias(
+        itens.map((i) => {
+          const cor = aparencia(i.categoria).cor;
+          return { chave: i.categoria, valor: i.total, cor: cor ? noteInk(cor, scheme) : null };
+        })
+      ),
+    [itens, aparencia, scheme]
+  );
   const total = itens.reduce((s, i) => s + i.total, 0);
   const [selecionada, setSelecionada] = useState(-1);
   const atual = selecionada >= 0 ? lista[selecionada] : null;
@@ -85,7 +99,7 @@ export function SpendingDonut({
                           : 'transparent',
                     },
                   ]}>
-                  <View style={[styles.amostra, { backgroundColor: theme[TONS_DA_ROSCA[f.tom]], borderColor: theme.separator }]} />
+                  <View style={[styles.amostra, { backgroundColor: f.cor ?? theme[TONS_DA_ROSCA[f.tom]], borderColor: theme.separator }]} />
                   <View style={styles.textos}>
                     <ThemedText type="default">{nome(f.chave)}</ThemedText>
                     {item?.comparacao ? (

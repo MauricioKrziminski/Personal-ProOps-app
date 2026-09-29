@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useBRL } from '@/components/ui/conceal';
 import { CategoryPicker } from '@/components/finance/category-picker';
+import { SeloDaCategoria } from '@/components/finance/selo-da-categoria';
 import { useMonthRuler } from '@/components/finance/month-ruler';
 import { PeriodBar } from '@/components/finance/period-bar';
 import { ThemedText } from '@/components/themed-text';
@@ -339,9 +340,12 @@ export default function BudgetsScreen() {
           <Card style={styles.linha}>
             <View style={styles.linhaTopo}>
               <View style={styles.linhaTitulo}>
+                {/* estourado, o aviso ocupa o lugar do selo: estado vence decoração (design.md §2b) */}
                 {estourou ? (
                   <Icon name="exclamationmark.triangle" size="sm" color="danger" />
-                ) : null}
+                ) : (
+                  <SeloDaCategoria categoria={b.category} />
+                )}
                 <ThemedText type="default">
                   {b.category}
                 </ThemedText>

@@ -36,3 +36,14 @@ test('o toque acha a fatia pelo ângulo e ignora o furo', () => {
   assert.equal(fatiaNoPonto(40, 88, 50, 30, 50, lista), 1);
   assert.equal(fatiaNoPonto(50, 50, 50, 30, 50, lista), -1);
 });
+
+test('a fatia com cor de categoria usa a cor, ela viaja com a categoria na ordenação, e "outras" fica no cinza', () => {
+  const f = fatias([
+    { chave: 'b', valor: 40, cor: null },
+    { chave: 'a', valor: 60, cor: '#00639C' },
+  ]);
+  assert.deepEqual(f.map((x) => [x.chave, x.cor]), [['a', '#00639C'], ['b', undefined]]);
+  const muitas = fatias(Array.from({ length: 8 }, (_, i) => ({ chave: `c${i}`, valor: 10, cor: '#111111' })));
+  assert.equal(muitas[6].chave, CHAVE_OUTRAS);
+  assert.equal(muitas[6].cor, undefined, 'outras junta várias: nenhuma cor é dela');
+});

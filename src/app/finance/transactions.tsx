@@ -4,7 +4,6 @@ import { ScrollView, SectionList, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { categoryIcon } from '@/design/category-icons';
 import { ErrorCard } from '@/components/error-card';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { MonthPicker, monthTitle, shiftMonth } from '@/components/finance/month-picker';
@@ -48,6 +47,7 @@ import {
   type Transaction,
   type TransactionKind,
   type TransactionSource,
+  useAparencia,
 } from '@/hooks/use-finance';
 import { usarDica } from '@/hooks/use-dicas';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
@@ -187,6 +187,7 @@ function toSeriesSections(items: Item[], hoje: string): DaySection[] {
 
 export default function TransactionsScreen() {
   const theme = useTheme();
+  const aparencia = useAparencia();
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const { width, windowClass } = useAdaptiveWindow();
@@ -987,7 +988,8 @@ export default function TransactionsScreen() {
                           : undefined
                       }
                       subtitle={[...badges, ...context].join(' · ')}
-                      icon={categoryIcon(tx.category, tx.kind)}
+                      icon={aparencia(tx.category, tx.kind).icon}
+                      tinta={aparencia(tx.category, tx.kind).cor}
                       accessibilityLabel={`${tx.description || tx.merchant || tx.category || 'Lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}, ${dayTitle(tx.occurred_at)}${estado ? `, ${estado}` : ''}`}
                       onLongPress={onLongPress}
                       trailing={

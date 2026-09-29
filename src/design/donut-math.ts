@@ -7,13 +7,20 @@
  */
 export const CHAVE_OUTRAS = '__outras__';
 
-export type Fatia = { chave: string; valor: number; inicio: number; fim: number; tom: number };
+/** `cor`: a cor da CATEGORIA (a tinta dela, já resolvida); sem ela, o cinza por posição (`tom`). */
+export type Fatia = { chave: string; valor: number; inicio: number; fim: number; tom: number; cor?: string };
 
-export function fatias(itens: readonly { chave: string; valor: number }[], max = 6, respiro = 0.006): Fatia[] {
+export function fatias(
+  itens: readonly { chave: string; valor: number; cor?: string | null }[],
+  max = 6,
+  respiro = 0.006
+): Fatia[] {
   const positivos = itens.filter((i) => i.valor > 0).sort((a, b) => b.valor - a.valor);
   const cabeca = positivos.slice(0, max);
   const resto = positivos.slice(max).reduce((s, i) => s + i.valor, 0);
-  const lista = resto > 0 ? [...cabeca, { chave: CHAVE_OUTRAS, valor: resto }] : cabeca;
+  // "Outras" junta várias categorias: nenhuma cor é dela, fica o cinza.
+  const lista: { chave: string; valor: number; cor?: string | null }[] =
+    resto > 0 ? [...cabeca, { chave: CHAVE_OUTRAS, valor: resto }] : cabeca;
   const total = lista.reduce((s, i) => s + i.valor, 0);
   if (total <= 0) return [];
 
@@ -27,6 +34,7 @@ export function fatias(itens: readonly { chave: string; valor: number }[], max =
       inicio: acumulado + gap / 2,
       fim: acumulado + fracao - gap / 2,
       tom: Math.min(indice, 5),
+      ...(item.cor ? { cor: item.cor } : {}),
     };
     acumulado += fracao;
     return fatia;

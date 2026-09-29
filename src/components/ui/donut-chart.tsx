@@ -65,7 +65,7 @@ export function DonutChart({
             <ArcoDaFatia
               key={fatias[i].chave}
               arco={arco}
-              cor={theme[TONS_DA_ROSCA[fatias[i].tom]]}
+              cor={fatias[i].cor ?? theme[TONS_DA_ROSCA[fatias[i].tom]]}
               espessura={espessura}
               estado={selecionada < 0 ? 'neutro' : selecionada === i ? 'ativo' : 'recuado'}
             />

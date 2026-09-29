@@ -41,6 +41,7 @@ import {
   useSettleInvoice,
   useUnrollInvoice,
   useUnsettleInvoice,
+  useAparencia,
   type Transaction,
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
@@ -118,6 +119,7 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 
 export default function InvoiceScreen() {
   const toast = useToast();
+  const aparencia = useAparencia();
   const insets = useSafeAreaInsets();
   const { id, via, acao } = useLocalSearchParams<{ id: string; via?: string; acao?: string }>();
   const { width, fontScale } = useWindowDimensions();
@@ -697,6 +699,8 @@ export default function InvoiceScreen() {
                     {({ onLongPress }) => (
                       <Row
                         title={tx.description ?? tx.merchant ?? 'Sem descrição'}
+                        icon={aparencia(tx.category, tx.kind).icon}
+                        tinta={aparencia(tx.category, tx.kind).cor}
                         // A parcela mora no dia em que cai nesta fatura; a compra é de antes
                         // ("Mostre sempre a data do lançamento", 24/09/2026).
                         subtitle={[tx.category, parcela, rotuloDaCompra(tx), prevista ? 'prevista' : null]
