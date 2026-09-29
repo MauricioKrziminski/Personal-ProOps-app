@@ -384,7 +384,6 @@ export default function FinanceScreen() {
       {serieFalhou ? null : (
         <TileRow>
           <Tile
-            valorGrande
             icon="arrow.down.left"
             label="Entra"
             // Sem o ciclo ainda, o valor é forma — o rótulo não fica sobre um vazio (25/09/2026).
@@ -394,7 +393,6 @@ export default function FinanceScreen() {
             onPress={() => abrirCiclo('entra')}
           />
           <Tile
-            valorGrande
             icon="arrow.up.right"
             label="Sai"
             value={ciclo ? <Money cents={saiu} variant="title2" /> : serie.isLoading ? <Skeleton width="60%" height={24} /> : undefined}

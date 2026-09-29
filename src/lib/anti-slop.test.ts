@@ -1762,3 +1762,13 @@ test('Lançamento: com a fileira de parcelas escondida, o erro dela aparece na C
   // Receita não parcela: a rápida de ENTRADA "em N vezes" abre à vista.
   assert.match(fonte, /installments: hParc\?\.installments \?\? \(daRapida\?\.kind === 'expense' \? daRapida\.parcelas : undefined\)/);
 });
+
+test('Entra e Sai ficam LADO A LADO com qualquer fonte: o valor do ladrilho encolhe, não o ladrilho que desce', () => {
+  // 29/09/2026, *"mesmo com o zoom, caberia lado a lado, não?"*: a troca para a linha inteira
+  // (`valorGrande`, fonte > 1,15) é de antes de o valor do ladrilho encolher para caber
+  // (`DinheiroEncolhe`); com ela, o par virava duas faixas largas e meio vazias.
+  const tile = readFileSync(join(SRC, 'components/ui/tile.tsx'), 'utf8');
+  assert.doesNotMatch(tile, /valorGrande/);
+  const financas = readFileSync(join(SRC, 'app/(tabs)/finance/index.tsx'), 'utf8');
+  assert.doesNotMatch(financas, /valorGrande/);
+});
