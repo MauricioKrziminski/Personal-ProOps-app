@@ -80,11 +80,19 @@ begin
   end if;
   if jsonb_array_length(simulado->'criados') <> 3 then raise exception '2. criados deveria ter 3'; end if;
 
-  -- 3. a série simulada é a mesma de criar de verdade (criando os 3 válidos numa subtransação)
+  -- 3. a série simulada é a mesma de criar de verdade — criando os 3 válidos pelo caminho do
+  -- APP (a RPC da compra parcelada e o insert do PostgREST), não pela função que simula: comparar
+  -- com ela mesma provaria só o desfazer (revisão final, 29/09/2026).
   begin
-    for r in select value from jsonb_array_elements(registros) with ordinality as e(value, n) where n <= 3 loop
-      perform private.criar_registro_da_hipotese(r->>'tipo', r->'dados');
-    end loop;
+    perform public.create_installment_plan_with_history(cartao, 300000, 10, hoje, 0, 'Notebook', 'eletrônicos', null);
+    insert into public.recurring_transactions
+      (user_id, kind, amount_cents, description, merchant, category, account_id, rrule, next_run_at, dtstart, end_date, auto_confirm)
+      values (auth.uid(), 'expense', 5000, 'Academia', null, 'saúde', conta, 'FREQ=WEEKLY;BYDAY=MO', (hoje + 1)::timestamptz,
+              (hoje + 1)::timestamptz, null, false);
+    insert into public.debts
+      (user_id, name, kind, calculation_mode, principal_cents, remaining_cents, interest_rate_monthly, installments,
+       installments_paid, installment_cents, account_id, due_day)
+      values (auth.uid(), 'Carro', 'financing', 'fixed_installments', 4800000, 3600000, 0, 48, 12, 100000, conta, 10);
     real := public.forecast_json(400, '[]'::jsonb);
     raise exception using errcode = 'PSIM1', message = 'desfaz o real do teste';
   exception when sqlstate 'PSIM1' then null;
