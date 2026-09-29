@@ -54,7 +54,8 @@ test('task surfaces preserve their mutation and navigation contracts', () => {
 });
 
 test('transaction form stays a bounded keyboard aware single column', () => {
-  const source = readRoute('transaction-form');
+  // o formulário mora no corpo (`FormularioDoLancamento`); a rota só espera o registro e o monta
+  const source = readRoute('transaction-form') + readFileSync('src/components/finance/formulario-do-lancamento.tsx', 'utf8');
   assert.match(source, /useAdaptiveWindow/);
   assert.match(source, /<Screen scroll=\{false\} wide=\{tablet\}/);
   assert.match(source, /KeyboardAwareScrollView/);

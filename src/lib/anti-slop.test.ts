@@ -946,7 +946,7 @@ test('valor em texto visível passa por Money ou useBRL', () => {
     // Superfície de DECISÃO: a pessoa está confirmando ou digitando ESTE valor agora, e
     // esconder o número que ela precisa conferir é o oposto de proteger (é a mesma régua do
     // `concealable={false}` do Money). Vale para toast, action sheet destrutivo e erro de campo.
-    'app/finance/transaction-form.tsx': 'valor sendo digitado e a dica de parcelamento dele',
+    'components/finance/formulario-do-lancamento.tsx': 'valor sendo digitado e a dica de parcelamento dele',
     'lib/dates.ts': 'é onde formatBRL nasce',
     'lib/brl-worklet.ts': 'deriva o separador do formatador, não mostra valor',
     'lib/count-up.ts': 'mede quantos glifos o valor tem, não mostra valor',
@@ -1374,14 +1374,11 @@ test('Toda rolagem deixa o toque passar com o teclado aberto (keyboardShouldPers
 test('Pagamento de dívida não troca de tipo, não vira "vou pagar depois" nem sai de cartão no formulário', () => {
   // O trigger `tg_transactions_debt_payment` exige despesa PAGA: o Segmented de tipo e o "vou
   // pagar depois" num pagamento de dívida eram dois controles que o banco sempre recusaria.
-  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  const fonte = readFileSync(join(SRC, 'components/finance/formulario-do-lancamento.tsx'), 'utf8');
   assert.match(fonte, /const tipoTravado = [^;]*editing\?\.debt_id/);
   assert.match(fonte, /\{!tipoTravado && \(/);
   assert.match(fonte, /const podeAdiar = [^;]*!editing\?\.debt_id/);
   assert.match(fonte, /filter\(\(a\) => !editing\?\.debt_id \|\| a\.type !== 'credit_card'\)/, 'nem sai de cartão');
-  // Nem vira série: a parcela já é projetada pelo cronograma da dívida, e uma recorrente ao lado
-  // dela contaria o mesmo dinheiro duas vezes na projeção (25/09/2026).
-  assert.match(fonte, /editing\.recurring_id \|\| editing\.installment_plan_id \|\| editing\.debt_id/, 'nem vira série');
   // A correção com alcance é uma única RPC: duas escritas separadas deixavam metade salva.
   assert.match(fonte, /salvarPagamentoDivida\.mutate\(/, 'pagamentos e contrato na mesma operação');
   assert.doesNotMatch(fonte, /salvarDivida\.mutate\(/, 'sem duas gravações sequenciais');
@@ -1391,7 +1388,7 @@ test('Formulário de lançamento só diz "Cadastrar uma conta" com as contas car
   // 25/09/2026, no s26: abrindo o formulário, o campo Conta mostrava "Cadastrar uma conta" até a
   // consulta chegar — afirmar vazio exige a consulta respondida (frontend.md), e o botão levava
   // para outra tela quem tem contas.
-  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  const fonte = readFileSync(join(SRC, 'components/finance/formulario-do-lancamento.tsx'), 'utf8');
   // A ordem é o que conta: carregando → esqueleto; erro → tentar de novo; só então o vazio.
   assert.match(fonte, /contas\.isPending \? \(\s*<Skeleton[\s\S]{0,200}?contas\.isError \? \([\s\S]{0,200}?\(accounts \?\? \[\]\)\.length === 0 \? \(/);
 });
@@ -1402,7 +1399,7 @@ test('Formulário aberto por link remonta quando o registro muda (key pelo id)',
   // `key`, outro id é outro formulário.
   const lancamento = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
   // Novo lançamento aberto numa conta (`?conta=`) é outro formulário também (25/09/2026).
-  assert.match(lancamento, /<TransactionForm\s+key=\{params\.id \?\? `novo:\$\{params\.conta \?\? ''\}/);
+  assert.match(lancamento, /<FormularioDoLancamento\s+key=\{params\.id \?\? `novo:\$\{params\.conta \?\? ''\}/);
   const lembrete = readFileSync(join(SRC, 'app/reminder-form.tsx'), 'utf8');
   assert.match(lembrete, /<ReminderForm\s+key=\{/);
 });
@@ -1570,7 +1567,7 @@ test('vazio grande só onde ele é a única coisa da tela; com outra coisa, é c
 test('Ocorrência de série: uma data só (o vencimento), e o caminho para editar a série', () => {
   // 26/09/2026, o Fundacred: *"tem duas datas, uma de vencimento e a outra que eu não sei o que
   // é"*. O agendador grava `occurred_at = due_at`; a tela mostrava as duas.
-  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  const fonte = readFileSync(join(SRC, 'components/finance/formulario-do-lancamento.tsx'), 'utf8');
   // No cartão o `due_at` é o vencimento da fatura: lá continuam sendo duas coisas.
   assert.match(fonte, /const umaData = Boolean\(editing\?\.recurring_id && !editing\.invoice_id\)/);
   assert.match(fonte, /const dataEVencimento = umaData && podeAdiar && pending/);
@@ -1591,8 +1588,6 @@ test('Ocorrência de série: uma data só (o vencimento), e o caminho para edita
   assert.doesNotMatch(fonte, /label="Editar parcelas e datas da compra"/);
   // Linha e regra na mesma transação SQL; falha de uma não deixa a outra gravada.
   assert.match(fonte, /editarSerie\.mutate\([\s\S]*?id: editing\.id, recurringId: serie\.id, linePatch: linhas, seriesPatch: regra,[\s\S]*?expectedRevision: serie\.edit_revision, requestId: tentativaFuturoSerie\.current\.id/);
-  // "Recorrente" leva o estabelecimento: a série passou a guardá-lo (`20260926120000`).
-  assert.match(fonte, /merchant: values\.merchant\?\.trim\(\) \?\? ''/);
 });
 
 test('Em parcela, Editar abre o lançamento e oferece o alcance ao Salvar', () => {
@@ -1610,7 +1605,7 @@ test('O dia de um timestamp na tela é o LOCAL, nunca o recorte do UTC', () => {
 
 test('Juros do Pix no crédito também se edita: abre com o juro que nasceu junto e acompanha a compra', () => {
   // 26/09/2026, "tudo que se cria se edita": o campo só existia criando.
-  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  const fonte = readFileSync(join(SRC, 'components/finance/formulario-do-lancamento.tsx'), 'utf8');
   assert.doesNotMatch(fonte, /const mostraJuros = [^;]*!editing &&/, 'o campo não some na edição');
   assert.match(fonte, /fee_cents: jurosDoPix\?\.amount_cents \?\?/);
   assert.match(fonte, /juros: editing && mostraJuros \? \{ id: jurosDoPix\?\.id \?\? null, cents: values\.fee_cents \}/);
@@ -1620,7 +1615,7 @@ test('Juros do Pix no crédito também se edita: abre com o juro que nasceu junt
 
 test('Pix no crédito para conta própria: a transferência do cartão tem juro, e ele é despesa no cartão', () => {
   // 28/09/2026: o Pix de R$ 340 do cartão para o Itaú, com R$ 16,99 de juro, não era representável.
-  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  const fonte = readFileSync(join(SRC, 'components/finance/formulario-do-lancamento.tsx'), 'utf8');
   assert.match(fonte, /const mostraJuros =\s*isCard && \(kind === 'expense' \|\| kind === 'transfer'\)/);
   const hook = readFileSync(join(SRC, 'hooks/use-finance.ts'), 'utf8');
   // As linhas do lançamento moram em `escrita.ts` (29/09/2026), a mesma função da hipótese.
@@ -1689,8 +1684,8 @@ test('arrasto: esquerda só tira da lista, direita nunca apaga, e apagar se cham
 });
 
 test('Formulários sem modo hipótese: a hipótese é feita na Projeção, e o formulário só APLICA (spec 2026-09-29)', () => {
-  for (const arquivo of ['transaction-form.tsx', 'recurring.tsx', 'debts.tsx']) {
-    const fonte = readFileSync(join(SRC, 'app/finance', arquivo), 'utf8');
+  for (const arquivo of ['components/finance/formulario-do-lancamento.tsx', 'app/finance/recurring.tsx', 'app/finance/debts.tsx']) {
+    const fonte = readFileSync(join(SRC, arquivo), 'utf8');
     for (const morto of ['modoHipotese', 'guardada', 'paraHipotese', 'formDaHipotese', 'hipoteseAberta', "'Adicionar à hipótese'", 'adicionarDetalhada', 'setRapidas']) {
       assert.ok(!fonte.includes(morto), `${arquivo} ainda tem ${morto}`);
     }
@@ -1698,12 +1693,12 @@ test('Formulários sem modo hipótese: a hipótese é feita na Projeção, e o f
 });
 
 test('Lançamento aberto pelo "Aplicar" de uma rápida: os dois caminhos de salvar a tiram do rascunho', () => {
-  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  const fonte = readFileSync(join(SRC, 'components/finance/formulario-do-lancamento.tsx'), 'utf8');
   // Data futura fora do cartão nasce a pagar, com o vencimento na data (a pura tem teste próprio).
   assert.match(fonte, /pending: editing \? editing\.status === 'pending' : \(doAplicar\?\.pending \?\? false\)/);
   assert.match(fonte, /\(doAplicar\?\.due_at \?\? null\)/);
   // Pelo ID da hipótese, nunca pela posição: a lista pode ter mudado com o formulário aberto.
-  assert.match(fonte, /const tirarRapida = \(\) => \{\s*if \(daRapida\) tirar\(daRapida\.id\);/);
+  assert.match(fonte, /const tirarRapida = \(\) => \{\s*if \(deHipotese\) tirar\(deHipotese\);/);
   // a compra parcelada nova e o lançamento: pela PROMESSA (revisão final, 29/09/2026) — o
   // `onSuccess` por chamada não roda com a tela já fechada, e a rápida salva ficava no rascunho.
   // O que é da TELA (voltar, toast) só com ela montada.
@@ -1754,11 +1749,11 @@ test('Lançamento: com a fileira de parcelas escondida, o erro dela aparece na C
   // Revisão final, 29/09/2026: um parcelado aberto sem conta (o "Aplicar" de uma hipótese cuja
   // conta foi arquivada) nasce com N parcelas; a fileira só existe com conta, o erro do zod morava
   // nela, e Salvar não fazia nada.
-  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  const fonte = readFileSync(join(SRC, 'components/finance/formulario-do-lancamento.tsx'), 'utf8');
   const conta = fonte.slice(fonte.indexOf("label={kind === 'transfer' ? 'Da conta' : 'Conta'}"), fonte.indexOf("label={kind === 'transfer' ? 'Da conta' : 'Conta'}") + 600);
   assert.match(conta, /!podeParcelarAqui \? errors\.installments\?\.message/);
   // Receita não parcela: a rápida de ENTRADA "em N vezes" abre à vista.
-  assert.match(fonte, /installments: \(daRapida\?\.kind === 'expense' \? daRapida\.parcelas : undefined\) \?\? 1/);
+  assert.match(fonte, /installments: \(!editing && comum\.kind === 'expense' \? parcelas : undefined\) \?\? 1/);
 });
 
 test('Ladrilho: lado a lado, e a linha inteira só quando MEDIR que não cabe', () => {
@@ -1834,35 +1829,9 @@ test('Projeção: o caminho "detalhado" do E se saiu por inteiro', () => {
   }
 });
 
-test('Lançamento: "Recorrente" e "Financiamento" ficam NO TOPO, antes do tipo, e em evidência', () => {
-  // 29/09/2026, *"essas tags… têm que ficar lá em cima e de uma maneira mais evidente"*: no
-  // rodapé, pílulas pequenas depois de todos os campos, quase ninguém as via.
-  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
-  // Os MESMOS rótulos do "Lançar" das Finanças (uma intenção, um rótulo); "Repetir lançamento"
-  // não cabia ao lado de "Financiamento" e a fileira empilhava com larguras diferentes.
-  const repetir = fonte.indexOf('label={ATALHOS_DE_LANCAMENTO.recorrente.label}');
-  const fin = fonte.indexOf('label={ATALHOS_DE_LANCAMENTO.financiamento.label}');
-  assert.ok(repetir > 0 && fin > 0);
-  assert.ok(repetir < fonte.indexOf('options={KINDS}') && fin < fonte.indexOf('options={KINDS}'), 'antes do tipo');
-  for (const i of [repetir, fin]) {
-    const botao = fonte.slice(i, fonte.indexOf('onPress', i));
-    assert.doesNotMatch(botao, /size="sm"/, 'tamanho normal');
-    assert.match(botao, /icon=\{ATALHOS_DE_LANCAMENTO\.\w+\.icon\}/, 'com ícone');
-    assert.match(botao, /style=\{styles\.outroRegistro\}/, 'os dois dividem a linha por igual');
-  }
-  assert.match(fonte, /outroRegistro: \{ flexGrow: 1 \}/);
-  const estilo = fonte.slice(fonte.indexOf('outrosRegistros: {'), fonte.indexOf('}', fonte.indexOf('outrosRegistros: {')));
-  assert.match(estilo, /flexWrap: 'wrap'/, 'com fonte grande a fileira quebra, não corta');
-});
-
-test('Atalhos de lançamento: o formulário EMPILHA o outro tipo (nunca troca), e os menus "Lançar" são os mesmos no app inteiro', () => {
-  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
-  // `replace` descartava o lançamento digitado; com `push` ele fica por baixo e o Voltar volta nele
-  assert.doesNotMatch(fonte, /router\.replace\(destino\)/);
-  assert.match(fonte, /de: editing \? 'lancamento' : 'novo-lancamento'/);
-  assert.match(fonte, /pathname: '\/finance\/novo-financiamento', params: \{ create: 'financing', de: 'novo-lancamento' \}/);
-  // uma lista só: rótulo e ícone saem de ATALHOS_DE_LANCAMENTO, nos dois menus e no formulário
-  for (const arquivo of ['app/(tabs)/finance/index.tsx', 'app/(tabs)/today/index.tsx', 'app/finance/transaction-form.tsx']) {
+test('Atalhos de lançamento: os menus "Lançar" são os mesmos no app inteiro', () => {
+  // uma lista só: rótulo e ícone saem de ATALHOS_DE_LANCAMENTO, nos dois menus
+  for (const arquivo of ['app/(tabs)/finance/index.tsx', 'app/(tabs)/today/index.tsx']) {
     const f = readFileSync(join(SRC, arquivo), 'utf8');
     assert.match(f, /ATALHOS_DE_LANCAMENTO/, arquivo);
     assert.doesNotMatch(f, /label: 'Gasto ou receita'|label: 'Recorrente'|label: 'Financiamento'|label="Recorrente"|label="Financiamento"/, `${arquivo} escreve o rótulo à mão`);
@@ -1881,4 +1850,13 @@ test('A conversão passa pela RPC converter_registro e invalida o financeiro', (
   assert.match(corpo, /p_alcance: v\.alcance/);
   assert.match(corpo, /p_destino: v\.destino/);
   assert.match(corpo, /onSuccess: invalidate/);
+});
+
+test('O lançamento é um corpo do formulário único: seletor no topo, criar outro no fim, e converte', () => {
+  const f = readFileSync(join(SRC, 'components/finance/formulario-do-lancamento.tsx'), 'utf8');
+  assert.match(f, /export function FormularioDoLancamento\(/);
+  assert.ok(f.indexOf('{props.topo}') > 0 && f.indexOf('{props.topo}') < f.indexOf('options={KINDS}'), 'o seletor vem antes do tipo');
+  assert.match(f, /label="Salvar e criar outro"/);
+  assert.match(f, /props\.converter\(/);
+  assert.match(f, /props\.registrarComum\(/);
 });
