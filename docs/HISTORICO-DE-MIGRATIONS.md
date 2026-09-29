@@ -3,13 +3,18 @@
 Registro, não regra: o que está em cada banco HOJE se confere na fonte (`CLAUDE.md`, *Banco e
 fila*). Entradas movidas do `CLAUDE.md` em 26/09/2026, na ordem em que estavam lá.
 
-**Só no STAGING: `20260928237000_pago_nunca_no_futuro`** (28/09/2026) — `paid_at` nunca passa de
+**Produção e staging ALINHADOS em `20260928237000`** — a `20260928236000` e esta aplicadas em
+produção pelo Gabriel em 28/09/2026 (`db push --project-ref`) e conferidas na fonte:
+`schema_migrations` devolve `20260928237000`, `20260928236000`, `20260928235000`; `draft_lines`
+com `execute` para `authenticated` e sem para `anon`; `set_paid_at` com o limite de hoje; zero
+lançamentos pagos no futuro fora de cartão; nenhuma função de `public` executável por `anon`.
+`20260928237000_pago_nunca_no_futuro` (28/09/2026) — `paid_at` nunca passa de
 hoje no que mexe no caixa (o cartão fica de fora). Repara o que já estava assim: no staging, um
 lançamento ("Fone", pago em 01/12); em produção, nenhum (conferido antes). Conferida no staging
 depois de aplicar: o ciclo de setembro e a Projeção em 30/09 fecham no mesmo número
 (R$ 34.657,69, diferença zero). Em produção sobe pelo Gabriel, junto com a `20260928236000`.
 
-**Só no STAGING: `20260928236000_rascunho_no_detalhe_do_ciclo`** (28/09/2026) — `draft_lines`, a
+`20260928236000_rascunho_no_detalhe_do_ciclo` (28/09/2026) — `draft_lines`, a
 leitura das hipóteses do "E se…?" dentro do detalhe do ciclo, sobre o motor que já existia
 (`private.draft_ocorrencias`). Só computa (não lê lançamento), `security invoker`, sem `execute`
 para `anon`. Em produção sobe pelo Gabriel, **antes** do app que a chama.
