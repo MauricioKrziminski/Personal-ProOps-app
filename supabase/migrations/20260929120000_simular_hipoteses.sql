@@ -15,8 +15,15 @@ declare
   cols text;
   novo uuid;
 begin
-  if p_tabela not in ('transactions', 'recurring_transactions', 'debts') then
+  if p_tabela is null or p_tabela not in ('transactions', 'recurring_transactions', 'debts') then
     raise exception 'tabela não permitida: %', p_tabela;
+  end if;
+  -- Campo fora da lista é ERRO, não silêncio: o insert real (PostgREST) recusaria, e ignorar
+  -- faria a simulação divergir do "Aplicar" sem ninguém ver. Dono e espaço nunca vêm de fora.
+  if exists (select 1 from jsonb_object_keys(p_linha) k
+             where k <> all(p_permitidas) or k in ('id', 'user_id', 'workspace_id')) then
+    raise exception 'campo fora da lista: %', (select string_agg(k, ', ') from jsonb_object_keys(p_linha) k
+      where k <> all(p_permitidas) or k in ('id', 'user_id', 'workspace_id'));
   end if;
   select string_agg(quote_ident(k), ', ') into cols
     from jsonb_object_keys(p_linha) k where k = any(p_permitidas);
@@ -31,9 +38,11 @@ $$;
 revoke execute on function private.inserir_da_hipotese(text, jsonb, text[]) from public, anon;
 grant execute on function private.inserir_da_hipotese(text, jsonb, text[]) to authenticated;
 
--- Um registro da hipótese → os ids que podem aparecer como `ref_id` nas leituras.
+-- Um registro da hipótese → `{ids, faturas}`: `ids` é o que ela CRIOU (linhas, plano, série,
+-- dívida e faturas novas) e pode aparecer como `ref_id` nas leituras; `faturas` são as que JÁ
+-- existiam e receberam a hipótese — marcá-las como hipótese marcaria as compras reais junto.
 create or replace function private.criar_registro_da_hipotese(p_tipo text, p_dados jsonb)
-returns uuid[]
+returns jsonb
 language plpgsql
 set search_path = public
 set timezone to 'America/Sao_Paulo'
@@ -45,6 +54,12 @@ declare
   plano uuid;
 begin
   if p_tipo = 'lancamento' then
+    if jsonb_typeof(p_dados->'linhas') is distinct from 'array' or jsonb_array_length(p_dados->'linhas') = 0 then
+      raise exception 'hipótese sem linhas';
+    end if;
+    if jsonb_array_length(p_dados->'linhas') > 30 then
+      raise exception 'linhas demais na hipótese (máximo 30)';
+    end if;
     for linha in select value from jsonb_array_elements(p_dados->'linhas') loop
       novo := private.inserir_da_hipotese('transactions', linha, array[
         'kind', 'amount_cents', 'category', 'description', 'merchant', 'account_id',
@@ -79,10 +94,21 @@ begin
   else
     raise exception 'tipo de hipótese desconhecido: %', p_tipo;
   end if;
-  -- As faturas em que as linhas caíram (a compra aparece no ciclo pela fatura).
-  ids := ids || array(select distinct t.invoice_id from public.transactions t
-                       where t.id = any(ids) and t.invoice_id is not null);
-  return ids;
+  -- As faturas em que as linhas caíram (a compra aparece no ciclo pela fatura). É da hipótese a
+  -- fatura em que TODAS as linhas são dela; a que tem linha real vai à parte, senão a tela
+  -- marcaria as compras reais como hipótese. (Pelo `created_at` não serve: dentro da mesma
+  -- transação todo `now()` é igual.)
+  return jsonb_build_object(
+    'ids', to_jsonb(ids || array(
+      select distinct t.invoice_id from public.transactions t
+       where t.id = any(ids) and t.invoice_id is not null
+         and not exists (select 1 from public.transactions o
+                          where o.invoice_id = t.invoice_id and not (o.id = any(ids))))),
+    'faturas', to_jsonb(array(
+      select distinct t.invoice_id from public.transactions t
+       where t.id = any(ids) and t.invoice_id is not null
+         and exists (select 1 from public.transactions o
+                      where o.invoice_id = t.invoice_id and not (o.id = any(ids))))));
 end;
 $$;
 revoke execute on function private.criar_registro_da_hipotese(text, jsonb) from public, anon;
@@ -102,38 +128,61 @@ declare
   criados jsonb := '[]'::jsonb;
   erros jsonb := '[]'::jsonb;
   l jsonb;
+  feito jsonb;
 begin
+  -- Teto: cada hipótese é uma subtransação que grava, e sem limite o custo (e o cache de
+  -- subtransações do Postgres) também não tem.
+  if jsonb_array_length(coalesce(p_registros, '[]'::jsonb)) > 30 then
+    raise exception 'hipóteses demais (máximo 30)';
+  end if;
   begin
     for r in select value from jsonb_array_elements(coalesce(p_registros, '[]'::jsonb)) loop
       -- Cada registro na sua subtransação: o que falha é desfeito sozinho e vira erro.
       begin
-        criados := criados || jsonb_build_object('indice', i,
-          'ids', to_jsonb(private.criar_registro_da_hipotese(r->>'tipo', r->'dados')));
+        feito := private.criar_registro_da_hipotese(r->>'tipo', r->'dados');
+        criados := criados || jsonb_build_object('indice', i, 'ids', feito->'ids', 'faturas', feito->'faturas');
       exception when others then
         erros := erros || jsonb_build_object('indice', i, 'mensagem', sqlerrm);
       end;
       i := i + 1;
     end loop;
 
+    -- Cada leitura na sua subtransação: uma que falhe vira erro, as outras voltam.
     l := p_leituras->'forecast';
     if l is not null then
-      leituras := leituras || jsonb_build_object('forecast',
-        public.forecast_json((l->>'days')::int, coalesce(l->'drafts', '[]'::jsonb)));
+      begin
+        leituras := leituras || jsonb_build_object('forecast',
+          public.forecast_json((l->>'days')::int, coalesce(nullif(l->'drafts', 'null'::jsonb), '[]'::jsonb)));
+      exception when others then
+        erros := erros || jsonb_build_object('leitura', 'forecast', 'mensagem', sqlerrm);
+      end;
     end if;
     l := p_leituras->'meses';
     if l is not null then
-      leituras := leituras || jsonb_build_object('meses',
-        public.month_forecast_json((l->>'days')::int, coalesce(l->'drafts', '[]'::jsonb), l->>'view'));
+      begin
+        leituras := leituras || jsonb_build_object('meses',
+          public.month_forecast_json((l->>'days')::int, coalesce(nullif(l->'drafts', 'null'::jsonb), '[]'::jsonb), l->>'view'));
+      exception when others then
+        erros := erros || jsonb_build_object('leitura', 'meses', 'mensagem', sqlerrm);
+      end;
     end if;
     l := p_leituras->'ciclo';
     if l is not null then
-      leituras := leituras || jsonb_build_object('ciclo', coalesce((select jsonb_agg(to_jsonb(c))
-        from public.cycle_series((l->>'de')::date, (l->>'ate')::date, l->>'view') c), '[]'::jsonb));
+      begin
+        leituras := leituras || jsonb_build_object('ciclo', coalesce((select jsonb_agg(to_jsonb(c))
+          from public.cycle_series((l->>'de')::date, (l->>'ate')::date, l->>'view') c), '[]'::jsonb));
+      exception when others then
+        erros := erros || jsonb_build_object('leitura', 'ciclo', 'mensagem', sqlerrm);
+      end;
     end if;
     l := p_leituras->'linhas_do_ciclo';
     if l is not null then
-      leituras := leituras || jsonb_build_object('linhas_do_ciclo', coalesce((select jsonb_agg(to_jsonb(c))
-        from public.cycle_lines((l->>'mes')::date, l->>'view') c), '[]'::jsonb));
+      begin
+        leituras := leituras || jsonb_build_object('linhas_do_ciclo', coalesce((select jsonb_agg(to_jsonb(c))
+          from public.cycle_lines((l->>'mes')::date, l->>'view') c), '[]'::jsonb));
+      exception when others then
+        erros := erros || jsonb_build_object('leitura', 'linhas_do_ciclo', 'mensagem', sqlerrm);
+      end;
     end if;
 
     -- Desfaz TUDO. As variáveis sobrevivem ao `exception`; as escritas, não.

@@ -94,6 +94,88 @@ begin
   end if;
 end $$;
 
+-- Os casos da revisão da migration (29/09/2026): série muda de verdade, nada vaza nas tabelas
+-- que os gatilhos escrevem, falha no meio de um registro, campo desconhecido, fatura que já
+-- existia não é marcada como hipótese, leituras do ciclo e teto de registros.
+do $$
+declare
+  usr uuid := '00000000-0000-0000-0000-00000000f1a1';
+  conta uuid := (select id from public.accounts where name = 'Conta' and user_id = '00000000-0000-0000-0000-00000000f1a1');
+  cartao uuid := (select id from public.accounts where name = 'Cartao' and user_id = '00000000-0000-0000-0000-00000000f1a1');
+  hoje date := (now() at time zone 'America/Sao_Paulo')::date;
+  base jsonb;
+  s jsonb;
+  real_fatura uuid;
+  n_fat bigint; n_dec bigint; n_tx bigint;
+  compra jsonb;
+begin
+  base := public.forecast_json(400, '[]'::jsonb);
+  select count(*) into n_fat from public.card_invoices;
+  select count(*) into n_dec from public.debt_declared_due_dates;
+  select count(*) into n_tx from public.transactions;
+
+  -- 5. hipótese que muda a série: a série simulada NÃO é a base, e nada ficou nas tabelas
+  compra := jsonb_build_object('tipo', 'lancamento', 'dados', jsonb_build_object('linhas', jsonb_build_array(
+    jsonb_build_object('kind', 'expense', 'amount_cents', 12345, 'description', 'Mercado', 'account_id', conta,
+      'occurred_at', hoje + 5, 'status', 'pending', 'source', 'app'))));
+  s := public.simular(jsonb_build_array(compra), jsonb_build_object('forecast', jsonb_build_object('days', 400, 'drafts', null)));
+  if s->'leituras'->'forecast' = base then raise exception '5. a hipótese não mexeu na série'; end if;
+  if (select count(*) from public.card_invoices) <> n_fat or (select count(*) from public.debt_declared_due_dates) <> n_dec
+     or (select count(*) from public.transactions) <> n_tx then
+    raise exception '5. sobrou linha em fatura, datas de dívida ou lançamento';
+  end if;
+
+  -- 6. falha no meio: a parcelada no último dia NO CARTÃO levanta depois de gravar; o lançamento
+  --    com uma linha boa e uma ruim também. Os dois voltam em erros e a série é a base.
+  s := public.simular(jsonb_build_array(
+    jsonb_build_object('tipo', 'parcelada', 'dados', jsonb_build_object(
+      'p_account_id', cartao, 'p_total_cents', 30000, 'p_installments', 3, 'p_occurred_at', hoje,
+      'p_paid_installments', 0, 'p_description', 'X', 'ultimo_dia', true)),
+    jsonb_build_object('tipo', 'lancamento', 'dados', jsonb_build_object('linhas', jsonb_build_array(
+      jsonb_build_object('kind', 'expense', 'amount_cents', 100, 'description', 'ok', 'account_id', conta, 'occurred_at', hoje + 3, 'status', 'pending', 'source', 'app'),
+      jsonb_build_object('kind', 'expense', 'amount_cents', 100, 'description', 'ruim', 'account_id', '00000000-0000-0000-0000-000000000000', 'occurred_at', hoje, 'status', 'cleared', 'source', 'app'))))),
+    jsonb_build_object('forecast', jsonb_build_object('days', 400)));
+  if jsonb_array_length(s->'erros') <> 2 or jsonb_array_length(s->'criados') <> 0 then
+    raise exception '6. esperava 2 erros e nada criado: % / %', s->'erros', s->'criados';
+  end if;
+  if s->'leituras'->'forecast' is distinct from base then raise exception '6. a falha no meio mexeu na série'; end if;
+
+  -- 7. campo fora da lista vira erro (a simulação não pode divergir do Aplicar em silêncio)
+  s := public.simular(jsonb_build_array(jsonb_build_object('tipo', 'lancamento', 'dados', jsonb_build_object('linhas', jsonb_build_array(
+    jsonb_build_object('kind', 'expense', 'amount_cents', 100, 'description', 'x', 'account_id', conta, 'occurred_at', hoje, 'source', 'app', 'campo_novo', 1))))),
+    '{}'::jsonb);
+  if jsonb_array_length(s->'erros') <> 1 or s->'erros'->0->>'mensagem' not like '%campo_novo%' then
+    raise exception '7. campo desconhecido deveria virar erro: %', s->'erros';
+  end if;
+
+  -- 8. fatura que JÁ existia não entra em ids (a tela marcaria as compras reais como hipótese)
+  insert into public.transactions (workspace_id, user_id, account_id, kind, amount_cents, description, occurred_at, status)
+    values ((select workspace_id from public.accounts where id = cartao), usr, cartao, 'expense', 5000, 'Real', hoje, 'pending')
+    returning invoice_id into real_fatura;
+  s := public.simular(jsonb_build_array(jsonb_build_object('tipo', 'lancamento', 'dados', jsonb_build_object('linhas', jsonb_build_array(
+    jsonb_build_object('kind', 'expense', 'amount_cents', 7000, 'description', 'Hipotetica', 'account_id', cartao, 'occurred_at', hoje, 'status', 'pending', 'source', 'app'))))),
+    '{}'::jsonb);
+  if (s->'criados'->0->'ids') ? real_fatura::text then raise exception '8. a fatura real foi marcada como hipótese'; end if;
+  if not ((s->'criados'->0->'faturas') ? real_fatura::text) then raise exception '8. a fatura real deveria vir em faturas'; end if;
+
+  -- 9. as leituras do mês e do ciclo voltam
+  s := public.simular(jsonb_build_array(compra), jsonb_build_object(
+    'meses', jsonb_build_object('days', 120, 'drafts', '[]'::jsonb, 'view', 'civil'),
+    'ciclo', jsonb_build_object('de', date_trunc('month', hoje)::date, 'ate', date_trunc('month', hoje)::date, 'view', 'civil'),
+    'linhas_do_ciclo', jsonb_build_object('mes', date_trunc('month', hoje)::date, 'view', 'civil')));
+  if s->'leituras'->'meses' is null or jsonb_array_length(s->'leituras'->'ciclo') <> 1 or s->'leituras'->'linhas_do_ciclo' is null then
+    raise exception '9. leituras do mês/ciclo faltando: %', s->'leituras';
+  end if;
+
+  -- 10. teto: mais de 30 hipóteses é recusado inteiro
+  begin
+    perform public.simular((select jsonb_agg(compra) from generate_series(1, 31)), '{}'::jsonb);
+    raise exception '10. deveria recusar 31 hipóteses';
+  exception when others then
+    if sqlerrm not like '%hipóteses demais%' then raise; end if;
+  end;
+end $$;
+
 reset role;
 do $$
 begin
