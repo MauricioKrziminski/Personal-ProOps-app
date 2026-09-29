@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { comumDepoisDeSalvar, comumParaSerie, hrefDoLancar, opcoesDaConversao, temPassadoDoParam, TIPOS_DE_LANCAMENTO } from './lancar.ts';
+import { comumDepoisDeSalvar, comumParaSerie, hrefDoLancar, opcoesDaConversao, hrefDoLancamento, papelDaTransacao, temPassadoDoParam, TIPOS_DE_LANCAMENTO } from './lancar.ts';
 
 const c = { kind: 'transfer' as const, descricao: 'Aluguel', valorCents: 150000, contaId: 'cc', dataBR: '05/10/2026', categoria: 'moradia' };
 
@@ -39,4 +39,11 @@ test('transferência não existe na recorrente: vira gasto', () => {
 test('o seletor tem três opções e o link carrega o tipo', () => {
   assert.deepEqual(TIPOS_DE_LANCAMENTO.map((t) => t.label), ['Uma vez', 'Recorrente', 'Financiamento']);
   assert.deepEqual(hrefDoLancar('recorrente', { id: 'r1' }), { pathname: '/finance/lancar', params: { tipo: 'recorrente', id: 'r1' } });
+});
+
+test('o papel do lançamento sai do registro: série, compra parcelada, dívida ou avulso', () => {
+  assert.deepEqual([{ recurring_id: 'r' }, { installment_plan_id: 'p' }, { debt_id: 'd' }, {}].map(papelDaTransacao), ['ocorrencia', 'parcela', 'pagamento', 'avulsa']);
+  // só o avulso SABE que não tem passado; os outros deixam o hospedeiro assumir que tem
+  assert.equal(hrefDoLancamento({ id: 't' }).params.passado, '0');
+  assert.equal('passado' in hrefDoLancamento({ id: 't', recurring_id: 'r' }).params, false);
 });

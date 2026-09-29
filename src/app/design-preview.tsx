@@ -25,7 +25,7 @@ import InvoicesScreen from './finance/invoices';
 import WalletScreen from './finance/wallet';
 import FoldersScreen from './notes/folders';
 import TransactionsScreen from './finance/transactions';
-import TransactionFormScreen from './finance/transaction-form';
+import LancarScreen from './finance/lancar';
 import FinanceScreen from './(tabs)/finance/index';
 import ForecastScreen from './finance/forecast';
 import CycleDetailScreen from './finance/cycle';
@@ -286,7 +286,7 @@ export default function DesignPreviewScreen() {
             {aba === 'Ciclo' ? <CycleDetailScreen /> : null}
             {aba === 'Relatórios' ? <ReportsScreen /> : null}
             {aba === 'Recorrentes' ? <RecurringScreen /> : null}
-            {aba === 'Editar' ? <TransactionFormScreen /> : null}
+            {aba === 'Editar' ? <LancarScreen /> : null}
             {aba === 'Detalhe' ? <TransactionDetailScreen /> : null}
             {aba === 'Lançamentos' ? <TransactionsScreen /> : null}
             {aba === 'Contas' ? <AccountsScreen /> : null}

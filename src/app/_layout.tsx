@@ -417,19 +417,6 @@ function AppTree() {
                   <Stack.Screen name="finance/debts" options={{ title: 'Dívidas' }} />
                   <Stack.Screen name="finance/debt-installment" options={{ title: 'Parcela' }} />
                   <Stack.Screen name="finance/recurring" options={{ title: 'Recorrentes' }} />
-                  {/*
-                    Só a folha do formulário, por cima de quem abriu (o "Aplicar" do "E se…?", o
-                    lançamento): modal TRANSPARENTE, sem animação própria — quem sobe é a folha.
-                    Empurrar Recorrentes ou Dívidas levava a pessoa para outra tela (29/09/2026).
-                  */}
-                  <Stack.Screen
-                    name="finance/nova-recorrente"
-                    options={{ headerShown: false, presentation: 'transparentModal', animation: 'none', contentStyle: { backgroundColor: 'transparent' } }}
-                  />
-                  <Stack.Screen
-                    name="finance/novo-financiamento"
-                    options={{ headerShown: false, presentation: 'transparentModal', animation: 'none', contentStyle: { backgroundColor: 'transparent' } }}
-                  />
                   <Stack.Screen name="finance/forecast" options={{ title: 'Projeção' }} />
                   <Stack.Screen name="finance/reports" options={{ title: 'Relatórios' }} />
                   <Stack.Screen name="finance/net-worth" options={{ title: 'Patrimônio' }} />

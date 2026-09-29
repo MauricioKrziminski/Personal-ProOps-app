@@ -31,8 +31,8 @@ test('task surfaces preserve their mutation and navigation contracts', () => {
 
   const recurring = readRoute('recurring');
   assert.match(recurring, /useDeleteRecurring\(\)/);
-  // o formulário da série é um corpo à parte (formulário único), hospedado na folha
-  assert.match(recurring, /<FormularioDaSerie/);
+  // criar e editar abrem o formulário único; o corpo da série é quem grava
+  assert.match(recurring, /router\.push\(hrefDoLancar\('recorrente'/);
   const serie = readFileSync('src/components/finance/formulario-da-serie.tsx', 'utf8');
   assert.match(serie, /useCreateRecurring\(\)/);
   assert.match(serie, /useSaveRecurringSeries\(\)/);
@@ -54,8 +54,8 @@ test('task surfaces preserve their mutation and navigation contracts', () => {
 });
 
 test('transaction form stays a bounded keyboard aware single column', () => {
-  // o formulário mora no corpo (`FormularioDoLancamento`); a rota só espera o registro e o monta
-  const source = readRoute('transaction-form') + readFileSync('src/components/finance/formulario-do-lancamento.tsx', 'utf8');
+  // o formulário mora no corpo (`FormularioDoLancamento`); o formulário único só o hospeda
+  const source = readRoute('lancar') + readFileSync('src/components/finance/formulario-do-lancamento.tsx', 'utf8');
   assert.match(source, /useAdaptiveWindow/);
   assert.match(source, /<Screen scroll=\{false\} wide=\{tablet\}/);
   assert.match(source, /KeyboardAwareScrollView/);

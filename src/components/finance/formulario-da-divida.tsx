@@ -188,8 +188,6 @@ function formDaDivida(d: Debt): FormState {
 type Props = CorpoProps & {
   /** Aberta pelo "Aplicar" de uma hipótese: parcela, parcelas, conta e data dela. */
   dadosDoAplicar?: { parcela?: string; parcelas?: string; conta?: string; data?: string };
-  /** Aberta DE DENTRO de outro formulário: o ✕ vira "Voltar". */
-  voltar?: boolean;
   /** Convertendo um lançamento PAGO: o banco o adota como um pagamento, e as pagas não o somam. */
   pagamentoConvertido?: boolean;
 };
@@ -205,7 +203,7 @@ export function FormularioDaDivida(props: Props) {
   if (props.editandoId && !alvo && !props.estadoGuardado) {
     return (
       <>
-        <TaskHeader title="Editar financiamento" onClose={props.onFechar} voltar={props.voltar} />
+        <TaskHeader title="Editar financiamento" onClose={props.onFechar} />
         <SheetScroll contentContainerStyle={styles.sheetBody}>
           {debts.isError ? (
             <ErrorBand message="Não deu para carregar a dívida." onRetry={() => void debts.refetch()} />
@@ -487,7 +485,6 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
       <TaskHeader
         title={form.id ? 'Editar financiamento' : 'Novo financiamento'}
         onClose={onFechar}
-        voltar={props.voltar}
         action={
           <Button
             label="Salvar"

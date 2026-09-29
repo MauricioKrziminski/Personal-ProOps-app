@@ -61,7 +61,6 @@ export function TaskHeader({
   onClose,
   action,
   telaCheia = false,
-  voltar = false,
 }: {
   title: string;
   /** Uma linha de estado sob o título ("de hoje até 10/12/2026"). */
@@ -76,11 +75,6 @@ export function TaskHeader({
   action?: React.ReactNode;
   /** Tela cheia sem header do navegador: soma a safe area de cima também no iOS. */
   telaCheia?: boolean;
-  /**
-   * A tarefa foi aberta DE DENTRO de outra (a recorrente pelo "Novo lançamento"): o botão volta
-   * para ela em vez de fechar tudo — quem tocou sem querer não perde o que digitou lá.
-   */
-  voltar?: boolean;
 }) {
   const theme = useTheme();
   const vidro = supportsLiquidGlass();
@@ -98,7 +92,7 @@ export function TaskHeader({
       <View style={styles.headRow}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={voltar ? 'Voltar' : 'Fechar'}
+          accessibilityLabel="Fechar"
           hitSlop={Space.sm}
           onPress={onClose}
           style={({ pressed }) => [
@@ -106,7 +100,7 @@ export function TaskHeader({
             { backgroundColor: vidro ? 'transparent' : pressed ? theme.backgroundSelected : theme.backgroundElement },
           ]}>
           {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
-          <Icon name={voltar ? 'chevron.left' : 'xmark'} size="sm" color="textSecondary" />
+          <Icon name="xmark" size="sm" color="textSecondary" />
         </Pressable>
         {/*
           O piso do título é a palavra MAIS LARGA dele, medida: abaixo disso ela partiria no meio

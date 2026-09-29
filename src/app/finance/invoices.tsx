@@ -28,6 +28,7 @@ import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { showItemActions } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
+import { hrefDoLancar } from '@/lib/lancar';
 
 /**
  * Faturas — o arquivo do cartão.
@@ -480,7 +481,7 @@ export default function InvoicesScreen() {
                 {
                   label: 'Nova compra neste cartão',
                   icon: 'plus',
-                  onPress: () => router.push({ pathname: '/finance/transaction-form', params: { conta: atual.id } }),
+                  onPress: () => router.push(hrefDoLancar('uma', { conta: atual.id })),
                 },
                 {
                   label: 'Importar fatura',

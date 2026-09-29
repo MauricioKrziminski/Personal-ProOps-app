@@ -1,6 +1,7 @@
-import DebtsScreen from './debts';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 
-/** A folha de "Nova dívida" (financiamento) por cima de onde a pessoa está — sem a lista de Dívidas. */
-export default function NovoFinanciamentoScreen() {
-  return <DebtsScreen soFormulario />;
+/** Link antigo ("Aplicar" do "E se…?", o lançamento): o formulário único abre em Financiamento. */
+export default function NovoFinanciamentoAntigo() {
+  const p = useLocalSearchParams<Record<string, string>>();
+  return <Redirect href={{ pathname: '/finance/lancar', params: { ...p, tipo: 'financiamento' } }} />;
 }

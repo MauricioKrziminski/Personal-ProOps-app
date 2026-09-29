@@ -43,6 +43,7 @@ import { dueLabel, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
 import { dataLocalDe } from '@/lib/dates';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
 
 /**
  * Lançamento (detalhe) — a tela que faltava.
@@ -393,7 +394,7 @@ export default function TransactionDetailScreen() {
               icon="repeat"
               accessibilityLabel="Editar a série recorrente que gerou este lançamento"
               onPress={() =>
-                router.push({ pathname: '/finance/recurring', params: { edit: tx.recurring_id! } })
+                router.push(hrefDoLancar('recorrente', { id: tx.recurring_id!, origem: 'serie' }))
               }
             />
           ) : null}
@@ -458,7 +459,7 @@ export default function TransactionDetailScreen() {
         actions={[
           {
             label: 'Editar',
-            onPress: () => router.push({ pathname: '/finance/transaction-form', params: { id: tx.id, month } }),
+            onPress: () => router.push(hrefDoLancamento(tx, { month })),
           },
         ]}
         menu={{
@@ -470,7 +471,7 @@ export default function TransactionDetailScreen() {
               // Numa série, parcela ou dívida, a categoria tem alcance. O formulário pergunta
               // depois da edição; o atalho de uma escrita só ignoraria essa decisão.
               ...(tx.recurring_id || tx.installment_plan_id || tx.debt_id
-                ? { onPress: () => router.push({ pathname: '/finance/transaction-form', params: { id: tx.id, month } }) }
+                ? { onPress: () => router.push(hrefDoLancamento(tx, { month })) }
                 : { actions: SUGGESTED_CATEGORIES.map((option) => ({
                     label: option,
                     selected: tx.category === option,

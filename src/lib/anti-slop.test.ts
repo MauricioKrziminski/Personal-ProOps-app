@@ -793,10 +793,9 @@ const SEM_SCREEN = new Set([
   // Conversa: lista INVERTIDA com composer fixo — o oposto de um scroll de conteúdo.
   'src/app/agent/new.tsx',
   'src/app/agent/[id].tsx',
-  // Só a FOLHA do formulário, num modal transparente por cima de quem abriu: não há tela.
+  // Links antigos do formulário: só um <Redirect> para o formulário único (`/finance/lancar`).
   'src/app/finance/nova-recorrente.tsx',
   'src/app/finance/novo-financiamento.tsx',
-  // A rota antiga do lançamento só monta o CORPO, que traz o próprio <Screen>.
   'src/app/finance/transaction-form.tsx',
 ]);
 
@@ -1397,11 +1396,12 @@ test('Formulário de lançamento só diz "Cadastrar uma conta" com as contas car
 
 test('Formulário aberto por link remonta quando o registro muda (key pelo id)', () => {
   // 25/09/2026: abrir `/finance/transaction-form?id=B` com o formulário de A aberto reaproveitava
-  // a tela — o `useForm` só lê os valores na montagem, e ela seguia com os dados de A. Com a
-  // `key`, outro id é outro formulário.
+  // a tela — o `useForm` só lê os valores na montagem, e ela seguia com os dados de A. Hoje o link
+  // antigo é um `Redirect` (troca por uma tela NOVA) e toda entrada do formulário único EMPILHA:
+  // `navigate` reaproveitaria o formulário aberto (Task 8, 29/09/2026).
   const lancamento = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
-  // Novo lançamento aberto numa conta (`?conta=`) é outro formulário também (25/09/2026).
-  assert.match(lancamento, /<FormularioDoLancamento\s+key=\{params\.id \?\? `novo:\$\{params\.conta \?\? ''\}/);
+  assert.match(lancamento, /<Redirect href=\{\{ pathname: '\/finance\/lancar'/);
+  assert.deepEqual(offenders(/router\.navigate\(hrefDoLanc/), []);
   const lembrete = readFileSync(join(SRC, 'app/reminder-form.tsx'), 'utf8');
   assert.match(lembrete, /<ReminderForm\s+key=\{/);
 });
@@ -1479,7 +1479,6 @@ test('toda tela de dados tem puxar para atualizar', () => {
     'app/catalog.tsx': 'vitrine de desenvolvimento',
     'app/paywall.tsx': 'oferta, não lista',
     'app/reminder-form.tsx': 'formulário',
-    'app/finance/transaction-form.tsx': 'formulário',
     'app/finance/lancar.tsx': 'formulário',
     'app/notes/[id].tsx': 'editor: puxar competiria com a rolagem do texto',
     'app/(tabs)/agent/index.tsx': 'compositor; o histórico tem o gesto',
@@ -1596,7 +1595,8 @@ test('Ocorrência de série: uma data só (o vencimento), e o caminho para edita
 test('Em parcela, Editar abre o lançamento e oferece o alcance ao Salvar', () => {
   for (const arquivo of ['app/(tabs)/finance/index.tsx', 'app/finance/invoice/[id].tsx', 'app/finance/[txId].tsx', 'app/finance/transactions.tsx']) {
     const fonte = readFileSync(join(SRC, arquivo), 'utf8');
-    assert.match(fonte, /pathname: '\/finance\/transaction-form'/, arquivo);
+    // o formulário único, com o papel do lançamento (a parcela pergunta o alcance ao salvar)
+    assert.match(fonte, /router\.push\(hrefDoLancamento\(tx\b/, arquivo);
   }
 });
 

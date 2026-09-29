@@ -64,6 +64,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { accountLabel, saldoDaConta } from '@/lib/accounts';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { tabletPaneWidths } from '@/design/adaptive-window';
+import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
 
 /**
  * Lançamentos — "cadê aquele lançamento, e o que entrou e saiu neste mês?".
@@ -724,10 +725,7 @@ export default function TransactionsScreen() {
   }
 
   const contaDoFiltro = contaFiltrada ? accounts.data?.find((a) => a.id === contaFiltrada) : undefined;
-  const abrirLancamento = () => router.push({
-    pathname: '/finance/transaction-form',
-    params: { month, ...(contaDoFiltro ? { conta: contaDoFiltro.id } : {}) },
-  });
+  const abrirLancamento = () => router.push(hrefDoLancar('uma', { month, ...(contaDoFiltro ? { conta: contaDoFiltro.id } : {}) }));
   const menu = (
     <HeaderActions
           actions={params.recurringId ? [] : [{ label: 'Lançar', icon: 'plus', onPress: abrirLancamento }]}
@@ -963,10 +961,7 @@ export default function TransactionsScreen() {
                       icon: 'pencil',
                       // Pendente, a direita é o "Paguei"; efetivado, é o Editar.
                       arrasto: tx.status === 'pending' ? undefined : ('direita' as const),
-                      onPress: () => router.push({
-                        pathname: '/finance/transaction-form',
-                        params: { id: tx.id, month },
-                      }),
+                      onPress: () => router.push(hrefDoLancamento(tx, { month })),
                     },
                     { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => confirmDelete(tx) },
                   ]}>

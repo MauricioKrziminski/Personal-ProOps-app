@@ -53,6 +53,7 @@ import { STATUS_DA_FATURA, contaNaFatura } from '@/lib/card-status';
 import { accountLabel } from '@/lib/accounts';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
+import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
 
 /**
  * Fatura — "o que tem nesta fatura, e como eu marco como paga?".
@@ -586,7 +587,7 @@ export default function InvoiceScreen() {
                   label: 'Nova compra',
                   icon: 'plus',
                   onPress: () =>
-                    router.push({ pathname: '/finance/transaction-form', params: { conta: fatura.account_id } }),
+                    router.push(hrefDoLancar('uma', { conta: fatura.account_id })),
                 },
               ]
             : []
@@ -689,7 +690,7 @@ export default function InvoiceScreen() {
                         label: 'Editar',
                         icon: 'pencil',
                         arrasto: 'direita',
-                        onPress: () => router.push({ pathname: '/finance/transaction-form', params: { id: tx.id } }),
+                        onPress: () => router.push(hrefDoLancamento(tx)),
                       },
                       { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => apagar(tx) },
                     ]}>

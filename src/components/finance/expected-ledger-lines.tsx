@@ -14,6 +14,7 @@ import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item
 import { estadoDaPrevista, type ExpectedLedgerLine } from '@/lib/ledger-expected';
 import { settleLabel } from '@/lib/settle-labels';
 import { aoVoltarParaDivida } from '@/lib/volta-da-parcela';
+import { hrefDoLancar } from '@/lib/lancar';
 
 function origemDaPrevista(line: ExpectedLedgerLine): string {
   if (line.origin === 'debt_estimate') return 'informada como paga';
@@ -84,7 +85,7 @@ export function useAcoesDaPrevista({ month, pagar }: { month: string; pagar: (tx
           label: 'Editar', icon: 'pencil',
           onPress: () => {
             void lancamento(line).then((id) => {
-              if (id) router.push({ pathname: '/finance/transaction-form', params: { id, month } });
+              if (id) router.push(hrefDoLancar('uma', { id, origem: 'transacao', papel: 'ocorrencia', month }));
             });
           },
         },

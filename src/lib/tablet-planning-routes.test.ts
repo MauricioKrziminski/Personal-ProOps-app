@@ -58,5 +58,5 @@ test('debts keeps payment and destructive confirmations while putting payoff str
   assert.match(source, /pagar\.mutate/);
   assert.match(source, /confirmarPagamento/);
   assert.match(source, /confirmDestructive/);
-  assert.match(source, /setForm\(null\)/);
+  assert.match(source, /setPagando\(null\)/);
 });

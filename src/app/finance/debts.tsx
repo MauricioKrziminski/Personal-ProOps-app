@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Redirect, Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
@@ -49,15 +49,15 @@ import {
   type Debt,
 } from '@/hooks/use-finance';
 import { formatBRL, localISODate } from '@/hooks/use-items';
-import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { pagamentoDaParcelaFixa } from '@/lib/confirmar-baixa';
 import { brToISO, isoToBR } from '@/lib/dates';
 import { paidInstallments, porAno, secoesDaLinha, type ItemDaLinha } from '@/lib/debt-history';
 import { lerAoVoltar } from '@/lib/volta-da-parcela';
 import { financeErrorMessage, simpleDebtValues } from '@/lib/finance-form';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
+import { hrefDoLancar } from '@/lib/lancar';
 import { AccountPicker } from '@/components/finance/account-picker';
-import { ErrorBand, FORM_VAZIO, FormularioDaDivida, taxaLabel, type FormState } from '@/components/finance/formulario-da-divida';
+import { ErrorBand, taxaLabel } from '@/components/finance/formulario-da-divida';
 import { DebtTimeline } from '@/components/finance/debt-timeline';
 import { RingGauge } from '@/components/ui/ring-gauge';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
@@ -77,22 +77,12 @@ import { transicaoDeLayout } from '@/components/motion/transicao';
  *   em 0% mesmo para quem já tinha pago metade. Agora são dois campos.
  */
 
-/**
- * `soFormulario`: só as folhas, sem a lista nem a ficha — é a rota `novo-financiamento`, aberta por
- * cima de onde a pessoa está (o "Aplicar" do "E se…?", o "Financiamento" do lançamento).
- */
-export default function DebtsScreen({ soFormulario = false }: { soFormulario?: boolean } = {}) {
+export default function DebtsScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
-  const params = useLocalSearchParams<{ create?: string; id?: string; edit?: string; deHipotese?: string; de?: string; parcela?: string; parcelas?: string; conta?: string; data?: string }>();
-  /**
-   * `?de=`: aberta DE DENTRO do lançamento ("Recorrente"/"Financiamento" no topo dele). O botão vira
-   * "Voltar" e devolve ao lançamento com o que foi digitado; salvando um lançamento NOVO (que era só
-   * o rascunho deste registro), os dois fecham juntos.
-   */
-  const deOutroFormulario = params.de === 'novo-lancamento' || params.de === 'lancamento';
+  const params = useLocalSearchParams<Record<string, string>>();
   const toast = useToast();
   const debts = useDebts();
   const [estrategia, setEstrategia] = usePreferencia<'avalanche' | 'snowball'>('dividas:estrategia', 'avalanche', umDe(['avalanche', 'snowball']));
@@ -114,26 +104,12 @@ export default function DebtsScreen({ soFormulario = false }: { soFormulario?: b
   const pagar = usePayDebtInstallment();
 
   /**
-   * A folha de criar/editar hospeda o CORPO do formulário único (`FormularioDaDivida`). Aqui mora
-   * só QUAL formulário está aberto: `editandoId` (a dívida, que o corpo lê) ou `inicial` (o estado
-   * de partida, que vence o `comum`). `?create=financing` parte do vazio em financiamento, que é o
-   * que o corpo monta sozinho; com `?deHipotese=` (spec 2026-09-29, o "Aplicar" do "E se…?") ele
-   * nasce com a parcela, as parcelas, a conta e a data da hipótese.
-   */
-  const [form, setForm] = useState<{ editandoId?: string; inicial?: FormState } | null>(() =>
-    params.create !== 'financing' ? null : {});
-  /** "Salvar e criar outro": cada formulário novo é um corpo novo (a chave muda). */
-  const [geracao, setGeracao] = useState(0);
-  const [edicaoAutomatica, setEdicaoAutomatica] = useState<string | null>(null);
-  // Quem chegou por `?create=financing` veio do lançamento ou do Financeiro — fechar devolve.
-  const volta = useVoltarQuandoFechar(params.create === 'financing');
-  /**
    * A FICHA da dívida é uma TELA — `/finance/debts?id=<dívida>` —, não uma folha (25/09/2026). Era
    * um `Sheet`: abrir uma parcela fechava a ficha e voltar a reabria (*"para que fechar e não só
    * voltar?"*). Como tela, a parcela e o lançamento empilham por cima e "voltar" só volta, e quem
    * chega de fora (o pagamento no lançamento, a prestação no ciclo) cai direto nela. O mesmo
-   * componente desenha as duas — sem `id` a lista, com `id` a ficha —, e as folhas de pagar e de
-   * editar servem às duas.
+   * componente desenha as duas — sem `id` a lista, com `id` a ficha —, e a folha de pagar serve às
+   * duas; editar abre o formulário único.
    */
   const fichaId = params.id;
   const [pagandoId, setPagandoId] = useState<string | null>(null);
@@ -189,13 +165,10 @@ export default function DebtsScreen({ soFormulario = false }: { soFormulario?: b
   const jaPagas = useAosPoucos(secoes.pagas, detalhe?.id ?? '');
   const pagadoras = (accounts.data ?? []).filter((a) => a.type !== 'credit_card');
 
-  const abrirNova = () => setForm({ inicial: { ...FORM_VAZIO } });
-  const abrirEdicao = (d: Debt) => setForm({ editandoId: d.id });
-
-  if (params.edit === '1' && detalhe && edicaoAutomatica !== detalhe.id) {
-    setEdicaoAutomatica(detalhe.id);
-    abrirEdicao(detalhe);
-  }
+  // Criar e editar abrem o formulário único. A dívida sabe se tem passado: as parcelas já pagas.
+  const abrirNova = () => router.push(hrefDoLancar('financiamento'));
+  const abrirEdicao = (d: Debt) =>
+    router.push(hrefDoLancar('financiamento', { id: d.id, origem: 'divida', passado: d.installments_paid > 0 ? '1' : '0' }));
 
   const abrirPagamento = (d: Debt) => {
     setPagoCents(Number((detalhe?.id === d.id ? schedule.data?.[0]?.payment_cents : null) ?? d.installment_cents ?? 0));
@@ -257,7 +230,7 @@ export default function DebtsScreen({ soFormulario = false }: { soFormulario?: b
               message: <>Parcela de <Forte>{pagando.name}</Forte> registrada.{mudaContrato ? ` As próximas passam a ${formatBRL(pagoCents)}.` : ''}</>,
               tone: 'success',
             });
-            volta.aoFechar(() => setPagando(null));
+            setPagando(null);
           },
           // o sheet FICA aberto: fechar num erro faz o usuário registrar o pagamento de novo
           onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para registrar o pagamento.'), tone: 'error' }),
@@ -592,15 +565,14 @@ export default function DebtsScreen({ soFormulario = false }: { soFormulario?: b
     />
   );
 
-  const fecharFormulario = () => volta.aoFechar(() => setForm(null));
-  // As folhas de pagar e de editar: por cima da lista E da ficha.
+  // A folha de pagar: por cima da lista E da ficha.
   const folhas = (
     <>
       {/* Pagar parcela — sheet com a conta explicada ANTES de confirmar. */}
-      <Sheet visible={pagando !== null} onClose={() => volta.aoFechar(() => setPagando(null))}>
+      <Sheet visible={pagando !== null} onClose={() => setPagando(null)}>
           <TaskHeader
             title={pagando ? `Pagar ${pagando.name}` : 'Pagar'}
-            onClose={() => volta.aoFechar(() => setPagando(null))}
+            onClose={() => setPagando(null)}
           />
 
           {pagando ? (
@@ -685,29 +657,6 @@ export default function DebtsScreen({ soFormulario = false }: { soFormulario?: b
               />
             </SheetScroll>
           ) : null}
-      </Sheet>
-
-      {/* Criar / editar: o corpo do formulário único, com o que a folha sempre montou. */}
-      <Sheet visible={form !== null} onClose={fecharFormulario}>
-        {form ? (
-          <FormularioDaDivida
-            key={form.editandoId ?? `nova-${geracao}`}
-            comum={{ kind: 'expense', descricao: '', valorCents: 0, contaId: null, dataBR: '', categoria: null }}
-            estadoGuardado={form.inicial}
-            editandoId={form.editandoId}
-            dadosDoAplicar={params.deHipotese ? params : undefined}
-            registrarComum={() => {}}
-            registrarEstado={() => {}}
-            deHipotese={params.deHipotese}
-            voltar={deOutroFormulario}
-            onFechar={fecharFormulario}
-            onSalvo={(criarOutro) => {
-              if (!criarOutro) return volta.aoSalvar(() => setForm(null), params.de === 'novo-lancamento');
-              setForm({ inicial: { ...FORM_VAZIO } });
-              setGeracao((g) => g + 1);
-            }}
-          />
-        ) : null}
       </Sheet>
     </>
   );
@@ -831,7 +780,16 @@ export default function DebtsScreen({ soFormulario = false }: { soFormulario?: b
     </>
   );
 
-  if (soFormulario) return <View style={styles.soFolha}>{folhas}</View>;
+  /*
+    Link antigo (`?create=financing` do "Aplicar" de um APK anterior, `?id=&edit=1`): o formulário
+    agora é o único, e esta tela não fica por baixo — fechar devolve para quem abriu. O link não diz
+    se a dívida tem passado: o hospedeiro assume que sim.
+  */
+  if (params.edit === '1' && fichaId) return <Redirect href={hrefDoLancar('financiamento', { id: fichaId, origem: 'divida' })} />;
+  if (params.create === 'financing') {
+    const { create: _c, de: _d, ...resto } = params;
+    return <Redirect href={hrefDoLancar('financiamento', resto)} />;
+  }
 
   if (fichaId) {
     return (
@@ -893,7 +851,6 @@ export default function DebtsScreen({ soFormulario = false }: { soFormulario?: b
 }
 
 const styles = StyleSheet.create({
-  soFolha: { flex: 1 },
   paneBody: {
     gap: Space.xl,
     minWidth: 0,

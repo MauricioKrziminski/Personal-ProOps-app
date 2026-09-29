@@ -47,6 +47,7 @@ import { nextPendingInstallment } from '@/lib/installment-progress';
 import { accountLabel } from '@/lib/accounts';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { transicaoDeLayout } from '@/components/motion/transicao';
+import { hrefDoLancar } from '@/lib/lancar';
 
 /**
  * Parceladas — "o que eu já comprometi nos próximos meses, e quanto falta para acabar?".
@@ -654,7 +655,7 @@ export default function InstallmentsScreen() {
           icon="creditcard"
           title="Nenhuma compra parcelada"
           hint={'Quando você lançar uma compra em 10x,\nela aparece aqui com quanto falta.'}
-          action={{ label: 'Lançar compra', onPress: () => router.push('/finance/transaction-form') }}
+          action={{ label: 'Lançar compra', onPress: () => router.push(hrefDoLancar('uma')) }}
         />
       ) : null}
     </>
@@ -679,7 +680,7 @@ export default function InstallmentsScreen() {
       {/* O parcelamento nasce da COMPRA: o "+" abre o lançamento, onde se escolhe em quantas vezes
           (25/09/2026 — antes esta tela não criava nada, e quem estava nela tinha que sair). */}
       <HeaderActions
-        actions={[{ label: 'Nova compra', icon: 'plus', onPress: () => router.push('/finance/transaction-form') }]}
+        actions={[{ label: 'Nova compra', icon: 'plus', onPress: () => router.push(hrefDoLancar('uma')) }]}
       />
 
       {tablet ? tabletBody : compactBody}

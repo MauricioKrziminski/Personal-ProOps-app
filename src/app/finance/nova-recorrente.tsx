@@ -1,6 +1,7 @@
-import RecurringScreen from './recurring';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 
-/** A folha de "Nova recorrência" por cima de onde a pessoa está — sem a lista de Recorrentes. */
-export default function NovaRecorrenteScreen() {
-  return <RecurringScreen soFormulario />;
+/** Link antigo ("Aplicar" do "E se…?", o lançamento): o formulário único abre em Recorrente. */
+export default function NovaRecorrenteAntiga() {
+  const p = useLocalSearchParams<Record<string, string>>();
+  return <Redirect href={{ pathname: '/finance/lancar', params: { ...p, tipo: 'recorrente' } }} />;
 }

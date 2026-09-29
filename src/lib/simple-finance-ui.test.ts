@@ -282,7 +282,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === 'expo-haptics') return { selectionAsync() {}, notificationAsync() {}, NotificationFeedbackType: { Success: 'success', Warning: 'warning' } };
       // `back` é navegação como qualquer outra e ENTRA na lista: é o que prende o "fechar um
       // formulário que outra tela abriu devolve para ela" (`useVoltarQuandoFechar`).
-      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => options.params ?? ({ ...(file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), ...(options.create !== false ? { create: 'financing' } : {}) }), useFocusEffect: () => {}, useIsFocused: () => true, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }), dismiss: (n?: number) => navigations.push({ dismiss: n ?? 1 }), canDismiss: () => !options.primeiraDaPilha, canGoBack: () => !options.primeiraDaPilha } };
+      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, Redirect: 'Redirect', useLocalSearchParams: () => options.params ?? (file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), useFocusEffect: () => {}, useIsFocused: () => true, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }), dismiss: (n?: number) => navigations.push({ dismiss: n ?? 1 }), canDismiss: () => !options.primeiraDaPilha, canGoBack: () => !options.primeiraDaPilha } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
       if (name === '@/lib/supabase' && file.endsWith('finance/recurring.tsx')) return { supabase: {
@@ -530,6 +530,17 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   };
 }
 const debtsFile = 'src/app/finance/debts.tsx';
+/**
+ * O formulário da dívida é o corpo do formulário único (Task 8: a folha de Dívidas saiu). Criando, ele
+ * nasce do `comum` vazio que o hospedeiro passa; editando, com `editandoId`.
+ */
+const formDivida = (opts: Parameters<typeof screen>[1] = {}, props: Record<string, unknown> = {}) =>
+  screen('src/components/finance/formulario-da-divida.tsx', { componente: 'FormularioDaDivida', ...opts, props: {
+    comum: { kind: 'expense', descricao: '', valorCents: 0, contaId: null, dataBR: '', categoria: null },
+    registrarComum: () => {}, registrarEstado: () => {}, onSalvo: () => {}, onFechar: () => {}, ...props,
+  } });
+/** Editando a primeira dívida da lista. */
+const editarDivida = (opts: Parameters<typeof screen>[1] & { debts: any[] }) => formDivida(opts, { editandoId: opts.debts[0].id });
 const forecastFile = 'src/app/finance/forecast.tsx';
 
 /** O rascunho gravado no aparelho (vazio grava ''). */
@@ -704,7 +715,7 @@ test('E se: Ver resultado depois de Somar não duplica a hipótese já adicionad
 });
 
 test('new financing: Nome and Conta first, the name is required and the typed one is saved', () => {
-  const ui = screen(debtsFile);
+  const ui = formDivida();
   // 23/09/2026: "Nome e conta" era uma linha recolhida no FIM, e o nome caía em "Financiamento 2".
   assert.deepEqual(ui.nodes().filter((n) => n.type === 'Field').map((n) => n.props.label), ['Nome', 'Conta que paga', 'Tipo', 'Cobrança', 'Valor', 'Total de parcelas', 'Parcelas já pagas', 'Primeira parcela']);
   assert.equal(ui.nodes().some((n) => n.type === 'Row' && n.props.title === 'Nome e conta'), false);
@@ -736,7 +747,7 @@ test('new financing: Nome and Conta first, the name is required and the typed on
 });
 
 test('"Total a pagar" divides by the count and saves the contract that the check accepts', () => {
-  const ui = screen(debtsFile);
+  const ui = formDivida();
   ui.fill('Nome', 'Carro');
   ui.interact((nodes) => nodes.find((n) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'total')).props.onChange('total'));
   ui.fill('Valor', 7000000);
@@ -748,7 +759,7 @@ test('"Total a pagar" divides by the count and saves the contract that the check
 });
 
 test('paid history moves the anchor: the date asked is the NEXT one, and the first is derived', () => {
-  const ui = screen(debtsFile);
+  const ui = formDivida();
   ui.fill('Nome', 'Carro');
   ui.fill('Valor', 147000);
   ui.fill('Total de parcelas', '48');
@@ -762,7 +773,7 @@ test('paid history moves the anchor: the date asked is the NEXT one, and the fir
 });
 
 test('history above the contract total settles on the total instead of blocking (22/09/2026)', () => {
-  const ui = screen(debtsFile);
+  const ui = formDivida();
   ui.fill('Nome', 'Carro');
   ui.fill('Valor', 147000);
   ui.fill('Total de parcelas', '48');
@@ -780,14 +791,23 @@ const carro = {
   first_due_date: '2026-02-05',
   edit_revision: 0, updated_at: 'v1',
 };
-const editar = (ui: any) => {
-  ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onLongPress());
-  ui.interact(() => ui.actions.find((a: any) => a.label === 'Editar').onPress());
-};
+
+test('Dívidas: Editar e "Nova dívida" abrem o formulário único, e a dívida diz se tem passado', () => {
+  const ui = screen(debtsFile, { debts: [carro, { ...carro, id: 'd2', name: 'Moto', installments_paid: 0 }] });
+  const editarA = (i: number) => {
+    ui.interact((nodes: any[]) => nodes.filter((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress)[i].props.onLongPress());
+    ui.interact(() => ui.actions.findLast((a: any) => a.label === 'Editar').onPress());
+    return copia(ui.navigations.at(-1));
+  };
+  assert.deepEqual(editarA(0), { pathname: '/finance/lancar', params: { tipo: 'financiamento', id: 'd1', origem: 'divida', passado: '1' } });
+  assert.deepEqual(editarA(1).params.passado, '0', 'nenhuma parcela paga: sem passado');
+  ui.press('Nova dívida');
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/lancar', params: { tipo: 'financiamento' } });
+  assert.equal(ui.nodes().some((n: any) => n.type === 'FormularioDaDivida' || n.type?.name === 'FormularioDaDivida'), false, 'a folha de formulário saiu');
+});
 
 test('editing the paid count keeps the contract calendar: the next date follows the anchor', () => {
-  const ui = screen(debtsFile, { create: false, debts: [carro] });
-  editar(ui);
+  const ui = editarDivida({ debts: [carro] });
   ui.fill('Parcelas já pagas', '10');
   const data = ui.nodes().find((n) => n.type === 'Field' && n.props.label === 'Próxima parcela (a 11ª)');
   assert.ok(data, 'o rótulo segue as pagas');
@@ -803,9 +823,8 @@ test('editing the paid count keeps the contract calendar: the next date follows 
 });
 
 test('na ficha da dívida o Salvar pergunta só próximas ou todas: não há "esta" (28/09/2026)', () => {
-  const ui = screen(debtsFile, { create: false, debts: [carro],
+  const ui = editarDivida({ debts: [carro],
     debtSchedule: [{ installment_no: 9, due_date: '2026-10-05', payment_cents: 147000 }] });
-  editar(ui);
   ui.fill('Valor', 150000);
   ui.press('Salvar');
   assert.equal(ui.writes.length, 0);
@@ -820,9 +839,8 @@ test('na ficha da dívida o Salvar pergunta só próximas ou todas: não há "es
 });
 
 test('last-day choice from debt editor carries the due-day rule to future installments', () => {
-  const ui = screen(debtsFile, { create: false, debts: [carro],
+  const ui = editarDivida({ debts: [carro],
     debtSchedule: [{ installment_no: 9, due_date: '2026-10-05', payment_cents: 147000 }] });
-  editar(ui);
   ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'DatePickerField').props.onSelectLastDay('31/10/2026'));
   ui.press('Salvar');
   ui.interact(() => ui.actions.find((a: any) => a.label === 'Esta e próximas').onPress());
@@ -832,16 +850,15 @@ test('last-day choice from debt editor carries the due-day rule to future instal
 });
 
 test('unchanged debt Save closes without asking and without writing', () => {
-  const ui = screen(debtsFile, { create: false, debts: [carro],
+  const ui = editarDivida({ debts: [carro],
     debtSchedule: [{ installment_no: 9, due_date: '2026-10-05', payment_cents: 147000 }] });
-  editar(ui);
   ui.press('Salvar');
   assert.ok(!ui.actions.some((a: any) => a.label === 'Todas'), 'nada mudou: nada a perguntar');
   assert.equal(ui.writes.length, 0);
 });
 
 test('long press on an active debt offers the full set, including delete for good', () => {
-  const ui = screen(debtsFile, { create: false, debts: [carro] });
+  const ui = screen(debtsFile, { debts: [carro] });
   ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onLongPress());
   assert.deepEqual(ui.actions.map((a: any) => a.label), ['Pagar parcela', 'Ver as parcelas', 'Editar', 'Arquivar', 'Apagar por completo']);
 });
@@ -880,8 +897,7 @@ test('"Desfazer"/Desarquivar de uma dívida que já não existe não diz que ela
 });
 
 test('salvar a edição manda a versão que foi aberta, e a dívida que mudou no meio vira aviso', () => {
-  const ui = screen(debtsFile, { create: false, debts: [{ ...carro, updated_at: '2026-09-24T10:00:00.123456+00:00' }] });
-  editar(ui);
+  const ui = editarDivida({ debts: [{ ...carro, updated_at: '2026-09-24T10:00:00.123456+00:00' }] });
   ui.fill('Nome', 'Carro novo');
   ui.press('Salvar');
   assert.equal(ui.writes.length, 0);
@@ -893,7 +909,7 @@ test('salvar a edição manda a versão que foi aberta, e a dívida que mudou no
 });
 
 test('without archived debts there is no empty "Arquivadas" row', () => {
-  const ui = screen(debtsFile, { create: false, debts: [carro] });
+  const ui = screen(debtsFile, { debts: [carro] });
   assert.equal(ui.nodes().some((n) => n.type === 'Row' && String(n.props.title).startsWith('Arquivadas')), false);
 });
 
@@ -968,12 +984,10 @@ test('por onde começar: dívida com juros ZERO diz "sem juros", como a linha de
 test('editing the paid count of an OLD debt keeps the date its schedule shows (final review, 23/09/2026)', () => {
   // A dívida antiga não tem âncora: deduzir uma de `schedule[0]` − pagas levaria a data meses para
   // a frente quando a pessoa corrige as pagas (5 → 9), e parcelas sumiriam da projeção.
-  const ui = screen(debtsFile, {
-    create: false,
+  const ui = editarDivida({
     debts: [{ ...carro, first_due_date: null, installments_paid: 5, remaining_cents: 147000 * 43 }],
     debtSchedule: [{ installment_no: 6, due_date: '2026-10-05', payment_cents: 147000, interest_cents: null, principal_cents: null, balance_cents: 0 }],
   });
-  editar(ui);
   ui.fill('Parcelas já pagas', '9');
   const campo = ui.nodes().find((n) => n.type === 'DatePickerField');
   assert.equal(campo.props.value, '05/10/2026', 'a data mostrada é a do cronograma, não uma deduzida');
@@ -983,8 +997,7 @@ test('editing the paid count of an OLD debt keeps the date its schedule shows (f
 });
 
 test('editar com os pagamentos sem carregar diz por que o Salvar não liga, e tenta de novo', () => {
-  const ui = screen(debtsFile, { create: false, debts: [{ ...carro }], paymentsError: true });
-  editar(ui);
+  const ui = editarDivida({ debts: [{ ...carro }], paymentsError: true });
   assert.equal(ui.button('Salvar').props.disabled, true);
   const faixa = ui.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'ErrorBand' && /pagamentos/.test(n.props.message));
   assert.ok(faixa, 'a faixa de erro aparece no formulário');
@@ -994,12 +1007,9 @@ test('editar com os pagamentos sem carregar diz por que o Salvar não liga, e te
 
 test('as pagas não descem abaixo da maior parcela já paga pelo app (não só da contagem)', () => {
   // Um "Paguei" lançado como a 5ª: dizer 4 pagas deixaria a 5ª paga aparecendo como futura.
-  const ui = screen(debtsFile, {
-    create: false,
-    debts: [{ ...carro, installments_paid: 5, remaining_cents: 147000 * 43 }],
+  const ui = editarDivida({ debts: [{ ...carro, installments_paid: 5, remaining_cents: 147000 * 43 }],
     debtPayments: [{ debt_payment_no: 5, occurred_at: '2026-09-05', amount_cents: 147000 }],
   });
-  editar(ui);
   ui.fill('Parcelas já pagas', '4');
   ui.press('Salvar');
   assert.equal(ui.writes.length, 0, 'o piso conserva o valor original e Save não escreve');
@@ -1008,23 +1018,20 @@ test('as pagas não descem abaixo da maior parcela já paga pelo app (não só d
 test('diminuir as pagas de uma dívida com âncora nunca mostra uma próxima parcela no passado', () => {
   // Contrato com 1ª em 05/02/2026 e 9 pagas: a 10ª é 05/11. Corrigir para 5 levaria a 6ª a 05/07,
   // que já passou — o cronograma a mostra na próxima ocorrência do dia 5 a partir de hoje (08/09).
-  const ui = screen(debtsFile, { create: false, debts: [{ ...carro, first_due_date: '2026-02-05', installments_paid: 9, remaining_cents: 147000 * 39 }] });
-  editar(ui);
+  const ui = editarDivida({ debts: [{ ...carro, first_due_date: '2026-02-05', installments_paid: 9, remaining_cents: 147000 * 39 }] });
   ui.fill('Parcelas já pagas', '5');
   const campo = ui.nodes().find((n) => n.type === 'DatePickerField');
   assert.equal(campo.props.value, '05/10/2026');
 });
 
 test('tocar no dia 28 de fevereiro escolhe dia fixo, e a ação explícita preserva fim do mês', () => {
-  const ui = screen(debtsFile, { create: false, debts: [{ ...carro, due_day: 31, first_due_date: '2026-01-31', installments_paid: 1, remaining_cents: 147000 * 47 }] });
-  editar(ui);
+  const ui = editarDivida({ debts: [{ ...carro, due_day: 31, first_due_date: '2026-01-31', installments_paid: 1, remaining_cents: 147000 * 47 }] });
   ui.fill('Próxima parcela (a 2ª)', '28/02/2026');
   ui.press('Salvar');
   ui.interact(() => ui.actions.find((a: any) => a.label === 'Esta e próximas').onPress());
   assert.equal(ui.writes[0].value.patch.due_day, 28, 'tocar 28 é escolher 28 fixo');
 
-  const ultimo = screen(debtsFile, { create: false, debts: [{ ...carro, due_day: 31, first_due_date: '2026-01-31', installments_paid: 1, remaining_cents: 147000 * 47 }] });
-  editar(ultimo);
+  const ultimo = editarDivida({ debts: [{ ...carro, due_day: 31, first_due_date: '2026-01-31', installments_paid: 1, remaining_cents: 147000 * 47 }] });
   ultimo.interact((nodes: any[]) => nodes.find((n) => n.type === 'DatePickerField').props.onSelectLastDay('28/02/2026'));
   ultimo.press('Salvar');
   ultimo.interact(() => ultimo.actions.find((a: any) => a.label === 'Esta e próximas').onPress());
@@ -1032,8 +1039,7 @@ test('tocar no dia 28 de fevereiro escolhe dia fixo, e a ação explícita prese
 });
 
 test('editing an OLD debt without its schedule loaded never invents an anchor', () => {
-  const ui = screen(debtsFile, { create: false, debts: [{ ...carro, first_due_date: null }] });
-  editar(ui);
+  const ui = editarDivida({ debts: [{ ...carro, first_due_date: null }] });
   ui.fill('Nome', 'Carro novo');
   ui.press('Salvar');
   ui.interact(() => ui.actions.find((a: any) => a.label === 'Todas').onPress());
@@ -1043,7 +1049,7 @@ test('editing an OLD debt without its schedule loaded never invents an anchor', 
 });
 
 test('detailed mode still exposes the financial inputs', () => {
-  const ui = screen(debtsFile);
+  const ui = formDivida();
   ui.interact((nodes) => nodes.find((n) => n.type === 'Segmented').props.onChange('amortized'));
   const labels = ui.nodes().filter((n) => n.type === 'Field').map((n) => n.props.label);
   for (const label of ['Nome', 'Quanto você deve hoje', 'Valor original', 'Juros por mês']) assert.ok(labels.includes(label), label);
@@ -1053,10 +1059,10 @@ test('detailed mode still exposes the financial inputs', () => {
 test('a debt without installments has no cadence, so it never demands a due day', () => {
   // "Devo 500 pro João": exigir dia de vencimento aqui travaria o cadastro por
   // um dado que o contrato não tem. A trava vale só para contrato com parcelas.
-  // `create: 'financing'` no deep link nasce como financiamento, que exige parcelas.
-  const ui = screen(debtsFile, { create: false });
-  ui.interact((nodes) => nodes.find((n) => n.type === 'EmptyState').props.action.onPress());
+  // O formulário único nasce em financiamento, que exige parcelas: "Devo 500 pro João" é empréstimo.
+  const ui = formDivida();
   ui.interact((nodes) => nodes.find((n) => n.type === 'Segmented').props.onChange('amortized'));
+  ui.interact((nodes) => nodes.find((n) => n.type === 'SelectField' && n.props.options.some((o: any) => o.id === 'loan')).props.onChange('loan'));
   ui.fill('Nome', 'João');
   ui.fill('Quanto você deve hoje', 50000);
   ui.fill('Juros por mês', '0');
@@ -1065,22 +1071,26 @@ test('a debt without installments has no cadence, so it never demands a due day'
   assert.equal(ui.writes[0].value.remaining_cents, 50000);
 });
 
-test('fechar um formulário que OUTRA tela abriu devolve para aquela tela', () => {
-  // A queixa (15/09/2026): *"cliquei em editar a compra inteira e quando eu clico em voltar,
-  // ao invés de voltar para a tela onde eu estava, ele me leva para a tela de Parceladas"*.
-  // Chegar num formulário de sheet vindo de fora é um `push` na tela da LISTA com parâmetro;
-  // fechar o sheet tem que fechar também a tela que só existia para hospedá-lo.
-  const ui = screen(debtsFile);
-  const cabecalhos = ui.nodes().filter((n) => n.type === 'TaskHeader');
-  assert.equal(cabecalhos.length, 1, 'só o sheet do formulário está aberto');
-  ui.interact(() => cabecalhos[0].props.onClose());
-  assert.deepEqual(ui.navigations, [{ back: true }]);
+test('link antigo de Dívidas e Recorrentes (`?create=`, `?edit=`) abre o formulário único no lugar da lista', () => {
+  // A lista não fica por baixo: fechar o formulário devolve para quem abriu o link (15/09/2026,
+  // *"ao invés de voltar para a tela onde eu estava, ele me leva para a tela de Parceladas"*).
+  const redirect = (file: string, params: Record<string, string>) =>
+    copia(screen(file, { params, debts: [carro] }).nodes().find((n: any) => n.type === 'Redirect')?.props.href);
+  assert.deepEqual(redirect(debtsFile, { create: 'financing', de: 'novo-lancamento', deHipotese: 'f', parcela: '147000' }),
+    { pathname: '/finance/lancar', params: { tipo: 'financiamento', deHipotese: 'f', parcela: '147000' } });
+  assert.deepEqual(redirect(debtsFile, { id: 'd1', edit: '1' }), { pathname: '/finance/lancar', params: { tipo: 'financiamento', id: 'd1', origem: 'divida' } });
+  assert.deepEqual(redirect('src/app/finance/recurring.tsx', { create: '1', kind: 'income', amount: '5000' }),
+    { pathname: '/finance/lancar', params: { tipo: 'recorrente', kind: 'income', amount: '5000' } });
+  // a série não sabe se tem passado: sem `passado`, o hospedeiro assume que tem
+  assert.deepEqual(redirect('src/app/finance/recurring.tsx', { edit: 'rec-1' }), { pathname: '/finance/lancar', params: { tipo: 'recorrente', id: 'rec-1', origem: 'serie' } });
+  // a ficha sem `edit` continua a ficha
+  assert.equal(screen(debtsFile, { params: { id: 'd1' }, debts: [carro] }).nodes().some((n: any) => n.type === 'Redirect'), false);
 });
 
 test('aberto por link, como a primeira tela da pilha, fechar o formulário fica na lista', () => {
   // Deep link (notificação) abre a lista já com o sheet: não há tela atrás, e o `back` virava
   // "The action 'GO_BACK' was not handled" (visto no s26 em 26/09/2026).
-  const ui = screen(debtsFile, { primeiraDaPilha: true });
+  const ui = screen('src/app/finance/accounts.tsx', { params: { create: '1' }, primeiraDaPilha: true });
   ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'TaskHeader').props.onClose());
   assert.deepEqual(ui.navigations, []);
 });
@@ -1088,8 +1098,8 @@ test('aberto por link, como a primeira tela da pilha, fechar o formulário fica 
 test('e quem abriu o formulário PELA PRÓPRIA tela continua nela', () => {
   // O espelho do caso acima, e o que quebra se alguém marcar "veio de fora" sem condição:
   // fechar levaria a pessoa para fora de uma lista que ela abriu de propósito.
-  const ui = screen(debtsFile, { create: false });
-  ui.interact((nodes) => nodes.find((n) => n.type === 'EmptyState').props.action.onPress());
+  const ui = screen('src/app/finance/accounts.tsx', { params: {} });
+  ui.press('Nova conta');
   ui.interact((nodes) => nodes.find((n) => n.type === 'TaskHeader').props.onClose());
   assert.deepEqual(ui.navigations, []);
 });
@@ -1107,9 +1117,7 @@ test('na ficha da dívida, pagar e fechar a folha fica na ficha — nada de volt
 });
 
 test('editing a legacy amortized financing preserves its mode and remaining-term semantics', () => {
-  const ui = screen(debtsFile, { create: false, debts: [{ id: 'old-debt', name: 'Carro', kind: 'financing', calculation_mode: 'amortized', principal_cents: 7056000, remaining_cents: 5880000, installments: 48, installments_paid: 8, installment_cents: 147000, interest_rate_monthly: 0.0199, account_id: null, due_day: 10 }] });
-  ui.interact((nodes) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onLongPress());
-  ui.interact(() => ui.actions.find((a) => a.label === 'Editar')!.onPress());
+  const ui = editarDivida({ debts: [{ id: 'old-debt', name: 'Carro', kind: 'financing', calculation_mode: 'amortized', principal_cents: 7056000, remaining_cents: 5880000, installments: 48, installments_paid: 8, installment_cents: 147000, interest_rate_monthly: 0.0199, account_id: null, due_day: 10 }] });
   assert.ok(ui.nodes().some((n) => n.type === 'Field' && n.props.label === 'Juros por mês'));
   // O modo também se edita (26/09/2026) — e abre no modo que a dívida tem.
   const modo = ui.nodes().find((n) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'amortized'));
@@ -2425,7 +2433,7 @@ test('Lançamentos: a linha diz a data da COMPRA, nunca o vencimento da fatura (
   const parcela = ui.nodes().find((n: any) => n.type === 'ItemLink' && n.props.title === 'wardogs (1/2)');
   ui.interact(() => parcela.props.actions.find((a: any) => a.label === 'Editar').onPress());
   assert.deepEqual(copia(ui.navigations.at(-1)), {
-    pathname: '/finance/transaction-form', params: { id: 'w1', month: '2026-09' },
+    pathname: '/finance/lancar', params: { tipo: 'uma', id: 'w1', origem: 'transacao', papel: 'parcela', month: '2026-09' },
   }, 'Editar a parcela abre a linha, cujo Salvar pergunta o alcance');
   assert.match(legenda('wardogs (2/2)'), /compra em 14\/09/);
   assert.doesNotMatch(legenda('wardogs (1/2)'), /compra em/, 'a parcela 1 já está no dia da compra');
@@ -2631,7 +2639,7 @@ test('Lançamento de parcela de dívida: embaixo do total, a parcela + o encargo
   assert.ok(!menu.actions.some((a: any) => a.label === 'Duplicar'), 'sem Duplicar no pagamento de dívida');
   ui.interact(() => menu.actions.find((a: any) => a.label === 'Mudar categoria').onPress());
   assert.deepEqual(copia(ui.navigations.at(-1)), {
-    pathname: '/finance/transaction-form', params: { id: 'pg-1', month: '2026-09' },
+    pathname: '/finance/lancar', params: { tipo: 'uma', id: 'pg-1', origem: 'transacao', papel: 'pagamento', month: '2026-09' },
   }, 'a categoria de um pagamento parcelado passa pela escolha de alcance');
 });
 
@@ -2937,7 +2945,8 @@ test('Fatura: "+" cria compra NESTE cartão; o "…" edita o cartão e leva às 
   assert.ok(acao('Editar cartão') && acao('Ver todas as faturas'), menu.map((a: any) => a.label).join(', '));
   ui.interact(() => mais.onPress());
   const nova = copia(ui.navigations.at(-1));
-  assert.equal(nova.pathname, '/finance/transaction-form');
+  assert.equal(nova.pathname, '/finance/lancar');
+  assert.equal(nova.params.tipo, 'uma');
   assert.ok(nova.params.conta, 'a compra nasce no cartão da fatura');
   ui.interact(() => acao('Ver todas as faturas').onPress());
   assert.equal(copia(ui.navigations.at(-1)).params.account, nova.params.conta, 'as faturas DESTE cartão');
@@ -2956,7 +2965,7 @@ test('Lançamentos de uma conta: o "…" edita a conta, e Lançar e Importar já
   assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/import', params: { conta: 'c1' } });
   ui.interact(() => header.props.actions.find((a: any) => a.label === 'Lançar').onPress());
   assert.deepEqual(copia(ui.navigations.at(-1)), {
-    pathname: '/finance/transaction-form', params: { month: '2026-09', conta: 'c1' },
+    pathname: '/finance/lancar', params: { tipo: 'uma', month: '2026-09', conta: 'c1' },
   });
 });
 
@@ -2970,7 +2979,11 @@ test('Hoje: "Lançar" cria lançamento, lembrete ou nota ali mesmo', () => {
   assert.deepEqual(ui.actions.map((a: any) => a.label), ['Gasto ou receita', 'Recorrente', 'Financiamento', 'Lembrete', 'Nota']);
   assert.ok(ui.actions.every((a: any) => a.icon));
   ui.interact(() => ui.actions.find((a: any) => a.label === 'Recorrente').onPress());
-  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { pathname: '/finance/nova-recorrente', params: { create: '1' } }, 'só a folha, por cima da Hoje');
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { pathname: '/finance/lancar', params: { tipo: 'recorrente' } }, 'o formulário único, por cima da Hoje');
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Financiamento').onPress());
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { pathname: '/finance/lancar', params: { tipo: 'financiamento' } });
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Gasto ou receita').onPress());
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { pathname: '/finance/lancar', params: { tipo: 'uma' } });
 });
 
 /** Organizar pastas não cria (25/09/2026): renomear abre a MESMA folha de "Nova pasta". */
@@ -3020,14 +3033,21 @@ test('Série: editar tem os campos da criação, e só o calendário mexido vai 
     rrule: 'FREQ=MONTHLY;BYMONTHDAY=4', dtstart: '2026-09-01T12:00:00Z', next_run_at: proxima.toISOString(),
     active: true, account_id: null, category: 'estudo', end_date: null, auto_confirm: false, edit_revision: 4,
   };
-  const abrir = () => screen('src/app/finance/recurring.tsx', { recurring: [serie], params: { edit: 'rec-1' } });
+  // Editar abre o formulário único (Task 8); o corpo da série é quem edita.
+  const abrir = () => screen('src/components/finance/formulario-da-serie.tsx', { componente: 'FormularioDaSerie', recurring: [serie], props: {
+    comum: { kind: 'expense', descricao: '', valorCents: 0, contaId: null, dataBR: br(hoje), categoria: null },
+    editandoId: 'rec-1', registrarComum: () => {}, registrarEstado: () => {}, onSalvo: () => {}, onFechar: () => {},
+  } });
   const salvar = (ui: any) => ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'TaskHeader').props.action.props.onPress());
   const campo = (ui: any, label: string) => ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === label);
 
   const peloMenu = screen('src/app/finance/recurring.tsx', { recurring: [serie], params: {} });
   peloMenu.interact(() => deslizaveis(peloMenu)[0].props.acoes.find((a: any) => a.label === 'Editar').onPress());
   assert.equal(peloMenu.actions.length, 0, 'Editar abre o formulário sem pedir o escopo');
-  assert.ok(peloMenu.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible));
+  // a lista não sabe se a série tem passado: sem `passado`, o hospedeiro assume que tem
+  assert.deepEqual(copia(peloMenu.navigations.at(-1)), { pathname: '/finance/lancar', params: { tipo: 'recorrente', id: 'rec-1', origem: 'serie' } });
+  peloMenu.press('Nova recorrência');
+  assert.deepEqual(copia(peloMenu.navigations.at(-1)), { pathname: '/finance/lancar', params: { tipo: 'recorrente' } });
 
   const ui = abrir();
   for (const label of ['Tipo', 'Título', 'Estabelecimento', 'Repete', 'A cada quantos meses', 'Próximo vencimento', 'Termina em']) {
@@ -3084,14 +3104,6 @@ test('Série: editar tem os campos da criação, e só o calendário mexido vai 
   assert.deepEqual(uiSemEsta.actions.slice(-2).map((a: any) => a.label), ['Esta e próximas', 'Todas']);
   assert.ok(!uiSemEsta.actions.some((a: any) => a.label === 'Só esta parcela'));
 
-  const filtrada = abrir();
-  filtrada.interact((nodes: any[]) => nodes.find((n) => n.type === 'Search').props.onChangeText('não aparece'));
-  filtrada.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(125000));
-  salvar(filtrada);
-  filtrada.interact(() => filtrada.actions.at(-1).onPress());
-  assert.equal(filtrada.pedidos.at(-1).operation, 'saveRecurringAll', 'a busca da lista não apaga a versão da série editada');
-  assert.deepEqual(copia(filtrada.pedidos.at(-1).value.seriesPatch), { amount_cents: 125000 });
-
   // Vencimento no passado não salva, e diz por quê.
   const ui3 = abrir();
   const ontem = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 1);
@@ -3102,7 +3114,7 @@ test('Série: editar tem os campos da criação, e só o calendário mexido vai 
 
 test('Dívida de parcela fixa também tem "Tipo" (e grava o escolhido)', () => {
   // 26/09/2026: o campo só existia no modo "com juros"; a parcela fixa não trocava de tipo nunca.
-  const ui = screen('src/app/finance/debts.tsx', { params: { create: 'financing' } });
+  const ui = formDivida();
   const tipo = ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Tipo');
   assert.ok(tipo, '"Tipo" no modo parcela fixa');
   assert.ok(ui.nodes().some((n: any) => n.type === 'Segmented' && n.props.value === 'fixed_installments'), 'é o modo parcela fixa');
@@ -3335,15 +3347,17 @@ test('Rascunho da versão 1: a parcelada sem conta não aplica (o formulário fi
   // e a v1 de um valor só vira hipótese completa, sem conta
   const simples = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [{ kind: 'income', amount_cents: 5000, start: '2026-10-01', installments: 1, mode: 'total', grupo: 'g' }], detalhadas: [] }) } });
   simples.interact(() => aplicar(deslizaveis(simples)[0]).onPress());
-  assert.deepEqual(JSON.parse(JSON.stringify(simples.navigations.at(-1))), { pathname: '/finance/transaction-form', params: { deHipotese: 'g', kind: 'income', amount: '5000', data: '01/10/2026', parcelas: '1' } });
+  assert.deepEqual(JSON.parse(JSON.stringify(simples.navigations.at(-1))), { pathname: '/finance/lancar', params: { tipo: 'uma', deHipotese: 'g', kind: 'income', amount: '5000', data: '01/10/2026', parcelas: '1' } });
 });
 
 test('Recorrente aberta pelo Aplicar: conta e frequência chegam, e salvar tira a hipótese PELO ID', async () => {
   const rascunho = JSON.stringify({ versao: 2, adiantamentos: [], hipoteses: [
     { id: 'x', kind: 'expense', forma: 'uma', valor_cents: 1, parcelas: 1, repete: 'monthly', conta: null, data: '2026-10-01' },
     { id: 'r', kind: 'expense', forma: 'repete', valor_cents: 5000, parcelas: 1, repete: 'weekly', conta: 'cc', data: '2026-10-06' } ] });
-  const ui = screen('src/app/finance/recurring.tsx', { segurarMutacoes: true, preferencias: { 'projecao:rascunho': rascunho },
-    params: { create: '1', deHipotese: 'r', kind: 'expense', amount: '5000', start: '06/10/2026', account: 'cc', repete: 'weekly', description: 'Academia' } });
+  // O que o formulário único entrega ao corpo da série vindo do "Aplicar" (o hospedeiro tem teste próprio).
+  const ui = screen('src/components/finance/formulario-da-serie.tsx', { componente: 'FormularioDaSerie', segurarMutacoes: true, preferencias: { 'projecao:rascunho': rascunho },
+    props: { comum: { kind: 'expense', descricao: 'Academia', valorCents: 5000, contaId: 'cc', dataBR: '06/10/2026', categoria: null }, preset: 'weekly', deHipotese: 'r',
+      registrarComum: () => {}, registrarEstado: () => {}, onSalvo: () => {}, onFechar: () => {} } });
   const header = ui.nodes().find((n: any) => n.type === 'TaskHeader' && n.props.action);
   assert.equal(header.props.action.props.label, 'Criar', 'o formulário é o real');
   ui.interact(() => header.props.action.props.onPress());
@@ -3360,8 +3374,11 @@ test('Recorrente aberta pelo Aplicar: conta e frequência chegam, e salvar tira 
 test('Financiamento aberto pelo Aplicar: parcela, parcelas, conta e a próxima parcela preenchidas; salvar tira a hipótese', async () => {
   const rascunho = JSON.stringify({ versao: 2, adiantamentos: [], hipoteses: [
     { id: 'f', kind: 'expense', forma: 'financiamento', valor_cents: 147000, parcelas: 48, repete: 'monthly', conta: 'cc', data: '2026-10-31' } ] });
-  const ui = screen(debtsFile, { create: true, segurarMutacoes: true, preferencias: { 'projecao:rascunho': rascunho },
-    params: { create: 'financing', deHipotese: 'f', parcela: '147000', parcelas: '48', conta: 'cc', data: '31/10/2026' } });
+  // O que o formulário único entrega ao corpo da dívida vindo do "Aplicar" (o hospedeiro tem teste próprio).
+  const ui = formDivida({ segurarMutacoes: true, preferencias: { 'projecao:rascunho': rascunho } }, {
+    comum: { kind: 'expense', descricao: '', valorCents: 0, contaId: 'cc', dataBR: '31/10/2026', categoria: null },
+    deHipotese: 'f', dadosDoAplicar: { parcela: '147000', parcelas: '48', conta: 'cc', data: '31/10/2026' },
+  });
   assert.ok(ui.nodes().some((n: any) => n.type === 'MoneyField' && n.props.valueCents === 147000), 'a parcela vem da hipótese');
   const campo = (label: string) => ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === label);
   assert.ok(campo('Total de parcelas'));
@@ -3571,7 +3588,7 @@ test('E se: a linha da hipótese aplica pelo formulário com tudo e tira PELO ID
   const ui = screen(forecastFile, { forecastAccounts: [{ id: 'nu', name: 'Nubank Cartão', type: 'credit_card' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 2, hipoteses, adiantamentos: [] }) } });
   const linha = (t: RegExp) => deslizaveis(ui).find((d: any) => t.test(d.props.titulo));
   ui.interact(() => linha(/10×/).props.acoes.find((a: any) => a.label === 'Aplicar').onPress());
-  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { pathname: '/finance/transaction-form', params: { deHipotese: 'a', kind: 'expense', amount: '300000', data: '05/10/2026', parcelas: '10', conta: 'nu' } });
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { pathname: '/finance/lancar', params: { tipo: 'uma', deHipotese: 'a', kind: 'expense', amount: '300000', data: '05/10/2026', parcelas: '10', conta: 'nu' } });
   ui.interact(() => linha(/sem conta/).props.acoes.find((a: any) => a.label === 'Tirar').onPress());
   assert.deepEqual(JSON.parse(ui.preferenciasGravadas['projecao:rascunho']).hipoteses.map((h: any) => h.id), ['a']);
   // o Desfazer devolve a que saiu
@@ -3706,24 +3723,21 @@ test('E se: só com hipótese incompleta nada é simulado e o "Onde muda" não f
   assert.ok(erro.nodes().some((n: any) => n.type === 'ErrorBand' || (typeof n.type === 'function' && n.type.name === 'ErrorBand')));
 });
 
-test('Aplicar recorrente e financiamento abre SÓ a folha, por cima de onde a pessoa está — sem a lista', () => {
-  // 29/09/2026, *"devo conseguir criar tudo direto ali… e não ser redirecionado para a tela deles"*.
-  const rec = screen('src/app/finance/recurring.tsx', { props: { soFormulario: true }, params: { create: '1', deHipotese: 'r', kind: 'expense', amount: '5000', start: '06/10/2026', repete: 'weekly' } });
-  assert.ok(rec.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible), 'a folha abre');
-  assert.equal(rec.nodes().some((n: any) => n.type === 'Screen'), false, 'sem a tela da lista por trás');
-  assert.equal(rec.nodes().some((n: any) => n.type === 'Search'), false);
-  const div = screen(debtsFile, { props: { soFormulario: true }, params: { create: 'financing', deHipotese: 'f', parcela: '147000', parcelas: '48', data: '31/10/2026' } });
-  assert.ok(div.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible && n.props.children));
-  assert.equal(div.nodes().some((n: any) => n.type === 'Screen'), false);
-  assert.ok(div.nodes().some((n: any) => n.type === 'MoneyField' && n.props.valueCents === 147000));
-  // e as duas rotas existem, em modal transparente, montando o modo "só a folha"
+test('Aplicar recorrente e financiamento abre o formulário único no tipo certo, com a hipótese nos corpos', () => {
+  // 29/09/2026, *"devo conseguir criar tudo direto ali… e não ser redirecionado para a tela deles"*:
+  // o formulário único é um modal por cima de quem abriu, sem lista por trás.
+  const rec = screen(lancarFile, { params: { tipo: 'recorrente', deHipotese: 'r', kind: 'expense', amount: '5000', start: '06/10/2026', account: 'cc', repete: 'weekly' } });
+  const serie = rec.nodes().find((n: any) => n.type === 'FormularioDaSerie');
+  assert.equal(serie.props.preset, 'weekly');
+  assert.equal(serie.props.deHipotese, 'r');
+  assert.deepEqual(copia([serie.props.comum.valorCents, serie.props.comum.contaId, serie.props.comum.dataBR]), [5000, 'cc', '06/10/2026']);
+  const div = screen(lancarFile, { params: { tipo: 'financiamento', deHipotese: 'f', parcela: '147000', parcelas: '48', conta: 'cc', data: '31/10/2026' } });
+  const divida = div.nodes().find((n: any) => n.type === 'FormularioDaDivida');
+  assert.equal(divida.props.deHipotese, 'f');
+  assert.deepEqual(copia(divida.props.dadosDoAplicar), { parcela: '147000', parcelas: '48', conta: 'cc', data: '31/10/2026' });
+  // as rotas "só a folha" saíram do registro: os arquivos são cascas que redirecionam
   const layout = readFileSync('src/app/_layout.tsx', 'utf8');
-  for (const [rota, arquivo] of [['finance/nova-recorrente', 'recurring'], ['finance/novo-financiamento', 'debts']]) {
-    const i = layout.indexOf(`name="${rota}"`);
-    assert.ok(i > 0, `${rota} registrada`);
-    assert.match(layout.slice(i, i + 300), /presentation: 'transparentModal'/);
-    assert.match(readFileSync(`src/app/${rota}.tsx`, 'utf8'), new RegExp(`from '\\./${arquivo}'[\\s\\S]*soFormulario`));
-  }
+  assert.equal(/name="finance\/(nova-recorrente|novo-financiamento)"/.test(layout), false);
 });
 
 test('Hoje: o Seu dia mostra a MESMA contagem da aba — é dele que o número fala', () => {
@@ -3739,36 +3753,6 @@ test('Hoje: o Seu dia mostra a MESMA contagem da aba — é dele que o número f
   });
   const seuDia = ui.nodes().find((n: any) => n.type === 'BlockHeader' && n.props.title === 'Seu dia');
   assert.equal(seuDia.props.count, 2, 'a luz de hoje e o lembrete de hoje; nem a água (próximos dias), nem o Pix, nem o orçamento');
-});
-
-test('Recorrente e financiamento abertos DO lançamento: "Voltar" devolve ao lançamento; salvar um lançamento novo fecha os dois', async () => {
-  // 29/09/2026, *"o botão desse novo modal tem que ser de voltar… às vezes ele clicou sem querer,
-  // preencheu as informações e agora tem que fechar o modal de recorrente e perder tudo"*.
-  const rec = screen('src/app/finance/recurring.tsx', { props: { soFormulario: true }, segurarMutacoes: true,
-    params: { create: '1', de: 'novo-lancamento', kind: 'expense', amount: '5000', start: '06/10/2026', description: 'Academia' } });
-  const cab = () => rec.nodes().find((n: any) => n.type === 'TaskHeader');
-  assert.equal(cab().props.voltar, true, 'o cabeçalho diz Voltar, não Fechar');
-  rec.interact(() => cab().props.onClose());
-  assert.deepEqual(JSON.parse(JSON.stringify(rec.navigations)), [{ back: true }], 'volta UMA tela: o lançamento, com o que foi digitado');
-  const rec2 = screen('src/app/finance/recurring.tsx', { props: { soFormulario: true }, segurarMutacoes: true,
-    params: { create: '1', de: 'novo-lancamento', kind: 'expense', amount: '5000', start: '06/10/2026', description: 'Academia' } });
-  rec2.interact(() => rec2.nodes().find((n: any) => n.type === 'TaskHeader').props.action.props.onPress());
-  (rec2.pedidos.at(-1) as any).resolver('rec-1');
-  await new Promise((r) => setTimeout(r, 0));
-  assert.deepEqual(JSON.parse(JSON.stringify(rec2.navigations.at(-1))), { dismiss: 2 }, 'o lançamento era o rascunho dela: fecham os dois');
-  // editando um lançamento que já existe, salvar volta para ele
-  const edit = screen('src/app/finance/recurring.tsx', { props: { soFormulario: true }, segurarMutacoes: true,
-    params: { create: '1', de: 'lancamento', kind: 'expense', amount: '5000', start: '06/10/2026', description: 'Academia' } });
-  edit.interact(() => edit.nodes().find((n: any) => n.type === 'TaskHeader').props.action.props.onPress());
-  (edit.pedidos.at(-1) as any).resolver('rec-1');
-  await new Promise((r) => setTimeout(r, 0));
-  assert.deepEqual(JSON.parse(JSON.stringify(edit.navigations.at(-1))), { back: true });
-  // financiamento: o mesmo Voltar
-  const fin = screen(debtsFile, { props: { soFormulario: true }, params: { create: 'financing', de: 'novo-lancamento' } });
-  assert.equal(fin.nodes().find((n: any) => n.type === 'TaskHeader').props.voltar, true);
-  // aberto de fora de um formulário (o Aplicar, o menu Lançar), continua o ✕
-  const solto = screen(debtsFile, { props: { soFormulario: true }, params: { create: 'financing' } });
-  assert.ok(!solto.nodes().find((n: any) => n.type === 'TaskHeader').props.voltar);
 });
 
 test('FormularioDaSerie: cria, e "Salvar e criar outro" avisa o hospedeiro sem fechar', async () => {
@@ -4083,4 +4067,33 @@ test('Lançar: só o conteúdo ABAIXO do seletor esmaece; cabeçalho e seletor f
   assert.equal(d.some((n: any) => n.type === 'TaskHeader' || n === topo), false);
   const lanc = readFileSync('src/components/finance/formulario-do-lancamento.tsx', 'utf8');
   assert.match(lanc, /\{props\.topo\}\s*<Animated\.View style=\{\[styles\.conteudo, props\.estiloDoConteudo\]\}>/);
+});
+
+test('Toda entrada de criar/editar lançamento, recorrente e dívida abre o formulário único', () => {
+  const arquivos = (readdirSync('src', { recursive: true }) as string[]).filter((f) => /\.(ts|tsx)$/.test(f) && !f.includes('.test.'));
+  const fora: string[] = [];
+  for (const f of arquivos) {
+    const t = readFileSync(`src/${f}`, 'utf8');
+    if (/pathname: '\/finance\/(transaction-form|nova-recorrente|novo-financiamento)'/.test(t)) fora.push(f);
+    if (/pathname: '\/finance\/(recurring|debts)', params: \{ (create|edit)/.test(t)) fora.push(f);
+  }
+  assert.deepEqual(fora, []);
+});
+
+test('Links antigos continuam abrindo o formulário certo', () => {
+  for (const [arquivo, tipo] of [['transaction-form', 'uma'], ['nova-recorrente', 'recorrente'], ['novo-financiamento', 'financiamento']] as const) {
+    const ui = screen(`src/app/finance/${arquivo}.tsx`, { params: { id: 'x1' } });
+    const r = ui.nodes().find((n: any) => n.type === 'Redirect');
+    assert.equal(r.props.href.pathname, '/finance/lancar', arquivo);
+    assert.equal(r.props.href.params.tipo, tipo, arquivo);
+    assert.equal(r.props.href.params.id, 'x1', 'os parâmetros viajam');
+  }
+});
+
+test('Lançar: link sem `papel` (o antigo, a Projeção) usa o do próprio lançamento na conversão', () => {
+  const ocorrencia = { id: 'o1', kind: 'expense', amount_cents: 5000, occurred_at: '2026-10-06', description: 'Academia', category: null, account_id: null, status: 'pending', recurring_id: 'r1', installment_plan_id: null };
+  const ui = screen(lancarFile, { params: { tipo: 'uma', id: 'o1', origem: 'transacao' }, txs: [ocorrencia] });
+  ui.interact((nodes) => nodes.find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'financiamento')).props.onChange('recorrente'));
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'FormularioDaSerie').props.converter({ tipo: 'recorrente', dados: {} }));
+  assert.equal(ui.actions[0].label, 'Só esta', 'é uma ocorrência de série, não um avulso');
 });

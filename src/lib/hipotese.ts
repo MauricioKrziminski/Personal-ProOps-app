@@ -1,5 +1,6 @@
 import { brToISO, isValidBRDate, isoToBR, localISODate } from './dates.ts';
 import { argsDaParcelada, linhaDaRecorrente, linhaDoFinanciamento, linhasDoLancamento } from './escrita.ts';
+import { hrefDoLancar } from './lancar.ts';
 import { montaRRule } from './serie.ts';
 
 export type Forma = 'uma' | 'parcelado' | 'repete' | 'financiamento';
@@ -133,27 +134,15 @@ export function resumoDaHipotese(h: Hipotese, brl: (c: number) => string, nomeDa
  * Para onde o "Aplicar" leva: o formulário COMPLETO do registro, pré-preenchido com tudo que a
  * hipótese tem. `deHipotese` é o id — salvar lá tira ESTA hipótese, mesmo que a lista tenha mudado.
  */
-export function paramsDoAplicar(h: Hipotese):
-  | { pathname: '/finance/transaction-form'; params: Record<string, string> }
-  | { pathname: '/finance/nova-recorrente'; params: Record<string, string> }
-  | { pathname: '/finance/novo-financiamento'; params: Record<string, string> } {
+export function paramsDoAplicar(h: Hipotese): ReturnType<typeof hrefDoLancar> {
   const data = isoToBR(dataDaHipotese(h));
   if (h.forma === 'repete') {
-    return {
-      pathname: '/finance/nova-recorrente',
-      params: { create: '1', deHipotese: h.id, kind: h.kind, amount: String(h.valor_cents), start: data, ...(h.conta ? { account: h.conta } : {}), repete: h.repete },
-    };
+    return hrefDoLancar('recorrente', { deHipotese: h.id, kind: h.kind, amount: String(h.valor_cents), start: data, ...(h.conta ? { account: h.conta } : {}), repete: h.repete });
   }
   if (h.forma === 'financiamento') {
-    return {
-      pathname: '/finance/novo-financiamento',
-      params: { create: 'financing', deHipotese: h.id, parcela: String(h.valor_cents), parcelas: String(h.parcelas), ...(h.conta ? { conta: h.conta } : {}), data },
-    };
+    return hrefDoLancar('financiamento', { deHipotese: h.id, parcela: String(h.valor_cents), parcelas: String(h.parcelas), ...(h.conta ? { conta: h.conta } : {}), data });
   }
-  return {
-    pathname: '/finance/transaction-form',
-    params: { deHipotese: h.id, kind: h.kind, amount: String(h.valor_cents), data, parcelas: String(h.forma === 'parcelado' ? h.parcelas : 1), ...(h.conta ? { conta: h.conta } : {}) },
-  };
+  return hrefDoLancar('uma', { deHipotese: h.id, kind: h.kind, amount: String(h.valor_cents), data, parcelas: String(h.forma === 'parcelado' ? h.parcelas : 1), ...(h.conta ? { conta: h.conta } : {}) });
 }
 
 /**

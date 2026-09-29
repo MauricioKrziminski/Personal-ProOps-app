@@ -74,6 +74,7 @@ import {
 import { AdiantarCampos } from '@/components/finance/anticipation-fields';
 import { settleLabel } from '@/lib/settle-labels';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
+import { hrefDoLancar } from '@/lib/lancar';
 
 /**
  * Projeção — "posso gastar isso?".
@@ -493,7 +494,7 @@ export default function ForecastScreen() {
               label: 'Editar',
               icon: 'pencil',
               onPress: () =>
-                router.push({ pathname: '/finance/transaction-form', params: { id: b.ref_id } }),
+                router.push(hrefDoLancar('uma', { id: b.ref_id, origem: 'transacao' })),
             },
           ];
 

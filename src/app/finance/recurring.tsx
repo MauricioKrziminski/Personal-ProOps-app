@@ -1,14 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Redirect, Stack, router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
-import { FormularioDaSerie } from '@/components/finance/formulario-da-serie';
-import { SERIE_VAZIA, serieDoRegistro, type SerieForm } from '@/lib/serie';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
-import { Sheet } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -33,12 +30,12 @@ import {
 } from '@/hooks/use-finance';
 import { useRealtimeInvalidate } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
-import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useDebounced } from '@/hooks/use-debounced';
 import { semAcento } from '@/lib/text';
-import { dataLocalDe, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
+import { dataLocalDe, isoToBR, localISODate } from '@/lib/dates';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
+import { hrefDoLancar } from '@/lib/lancar';
 import { describeRRule } from '@/lib/rrule-text';
 import { supabase } from '@/lib/supabase';
 import { transicaoDeLayout } from '@/components/motion/transicao';
@@ -100,13 +97,8 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
   );
 }
 
-/**
- * `soFormulario`: só a folha, sem a lista por trás — é a rota `nova-recorrente`, aberta por cima de
- * onde a pessoa está (o "Aplicar" do "E se…?", o "Recorrente" do lançamento). *"devo conseguir criar
- * tudo direto ali"* (29/09/2026): empurrar a tela de Recorrentes era levá-la para outro lugar.
- */
-export default function RecurringScreen({ soFormulario = false }: { soFormulario?: boolean } = {}) {
-  const params = useLocalSearchParams<{ create?: string; edit?: string; kind?: string; amount?: string; description?: string; merchant?: string; category?: string; account?: string; start?: string; deHipotese?: string; de?: string; repete?: string }>();
+export default function RecurringScreen() {
+  const params = useLocalSearchParams<Record<string, string>>();
   const theme = useTheme();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
@@ -115,29 +107,6 @@ export default function RecurringScreen({ soFormulario = false }: { soFormulario
   const proximos = useRecurringUpcoming(30);
   const toggle = useToggleRecurring();
   const remove = useDeleteRecurring();
-  /** Qual `?edit=` já foi consumido — sem isto, fechar o sheet reabriria no render seguinte. */
-  const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
-  // `?create=1` já nasce vindo de fora (é o "Recorrente" do lançamento e o atalho do Financeiro).
-  const volta = useVoltarQuandoFechar(params.create === '1');
-  /**
-   * `?de=`: aberta DE DENTRO do lançamento ("Recorrente"/"Financiamento" no topo dele). O botão vira
-   * "Voltar" e devolve ao lançamento com o que foi digitado; salvando um lançamento NOVO (que era só
-   * o rascunho deste registro), os dois fecham juntos.
-   */
-  const deOutroFormulario = params.de === 'novo-lancamento' || params.de === 'lancamento';
-
-  const [form, setForm] = useState<SerieForm | null>(() => params.create === '1' ? {
-    ...SERIE_VAZIA, kind: params.kind === 'income' ? 'income' : 'expense',
-    // a frequência da hipótese (o "Aplicar"); fora dela, o padrão
-    preset: params.repete === 'weekly' || params.repete === 'yearly' ? params.repete : SERIE_VAZIA.preset,
-    amountCents: Number(params.amount) > 0 ? Number(params.amount) : 0,
-    description: params.description ?? '', merchant: params.merchant ?? '', category: params.category || null,
-    accountId: params.account || null,
-    inicio: params.start && isValidBRDate(params.start) ? params.start : isoToBR(localISODate()),
-  } : null);
-  /** "Salvar e criar outro": a folha nasce de novo, vazia, sem fechar. */
-  const [geracao, setGeracao] = useState(0);
-
   // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
   // falha, e sem este corte a lista seguia afirmando números embaixo da faixa que acabou
   // de dizer que não conseguiu carregar. Zerar aqui cobre lista, contadores e destaque de
@@ -179,25 +148,9 @@ export default function RecurringScreen({ soFormulario = false }: { soFormulario
     .filter((t) => t.kind === 'income')
     .reduce((s, t) => s + Number(t.amount_cents), 0);
 
-  const abrirEdicao = (r: RecurringTransaction) => setForm(serieDoRegistro(r));
-
-  /**
-   * `?edit=<id>` abre a edição direto, como `?create=1` já abria a criação — dá destino
-   * para link de fora e é o que torna o sheet conferível sem toque (a vitrine monta por URL).
-   *
-   * Ajuste de estado NO RENDER, não em efeito: a série chega DEPOIS do primeiro render (a
-   * query ainda carregava), então o inicializador do `useState` não a alcança; e `setState`
-   * dentro de `useEffect` é o que o React Compiler recusa, por encadear renders. Este é o
-   * padrão documentado de "ajustar estado quando a entrada muda", com guarda de idempotência.
-   */
-  if (params.edit && params.edit !== edicaoAberta && form === null) {
-    const alvo = lista.find((r) => r.id === params.edit);
-    if (alvo) {
-      setEdicaoAberta(params.edit);
-      setForm(serieDoRegistro(alvo));
-      volta.marcar();
-    }
-  }
+  // Criar e editar abrem o formulário único; a série não diz se tem passado, e o hospedeiro assume que sim.
+  const abrirNova = () => router.push(hrefDoLancar('recorrente'));
+  const abrirEdicao = (r: RecurringTransaction) => router.push(hrefDoLancar('recorrente', { id: r.id, origem: 'serie' }));
 
   const alternar = (r: RecurringTransaction) =>
     toggle.mutate(
@@ -416,7 +369,7 @@ export default function RecurringScreen({ soFormulario = false }: { soFormulario
           title="Nada ativo se repetindo"
           action={{
             label: 'Nova recorrência',
-            onPress: () => setForm({ ...SERIE_VAZIA, inicio: isoToBR(localISODate()) }),
+            onPress: abrirNova,
           }}
           compacto
         />
@@ -428,7 +381,7 @@ export default function RecurringScreen({ soFormulario = false }: { soFormulario
           hint={'Manda no WhatsApp: *todo dia 5 pago 1200 de aluguel*\n— ou toca em + para cadastrar aqui.'}
           action={{
             label: 'Nova recorrência',
-            onPress: () => setForm({ ...SERIE_VAZIA, inicio: isoToBR(localISODate()) }),
+            onPress: abrirNova,
           }}
         />
       ) : null}
@@ -448,36 +401,15 @@ export default function RecurringScreen({ soFormulario = false }: { soFormulario
     />
   );
 
-  const fechar = () => volta.aoFechar(() => setForm(null));
   /*
-    O formulário é o CORPO do formulário único (`FormularioDaSerie`). Esta folha lhe passa o estado
-    inicial que ela sempre montou (dos parâmetros, com estabelecimento e a data conferida, ou da
-    série aberta) como `estadoGuardado`, que vence o `comum` — o que se grava não muda.
+    Link antigo (`?edit=<série>`, `?create=1` do "Aplicar" de um APK anterior): o formulário agora é
+    o único, e a lista não fica por baixo — fechar devolve para quem abriu.
   */
-  const folhaDoFormulario = (
-    <Sheet visible={form !== null} onClose={fechar}>
-      {form ? (
-        <FormularioDaSerie
-          key={form.id ?? `nova-${geracao}`}
-          comum={{ kind: form.kind, descricao: form.description, valorCents: form.amountCents, contaId: form.accountId, dataBR: form.inicio, categoria: form.category }}
-          estadoGuardado={form}
-          editandoId={form.id}
-          registrarComum={() => {}}
-          registrarEstado={() => {}}
-          deHipotese={params.deHipotese}
-          voltar={deOutroFormulario}
-          onFechar={fechar}
-          onSalvo={(criarOutro) => {
-            if (!criarOutro) return volta.aoSalvar(() => setForm(null), params.de === 'novo-lancamento');
-            setForm({ ...SERIE_VAZIA, inicio: isoToBR(localISODate()) });
-            setGeracao((g) => g + 1);
-          }}
-        />
-      ) : null}
-    </Sheet>
-  );
-
-  if (soFormulario) return <View style={styles.soFolha}>{folhaDoFormulario}</View>;
+  if (params.edit) return <Redirect href={hrefDoLancar('recorrente', { id: params.edit, origem: 'serie' })} />;
+  if (params.create === '1') {
+    const { create: _c, de: _d, ...resto } = params;
+    return <Redirect href={hrefDoLancar('recorrente', resto)} />;
+  }
 
   return (
     <Screen
@@ -503,7 +435,7 @@ export default function RecurringScreen({ soFormulario = false }: { soFormulario
           {
             label: 'Nova recorrência',
             icon: 'plus',
-            onPress: () => setForm({ ...SERIE_VAZIA, inicio: isoToBR(localISODate()) }),
+            onPress: abrirNova,
           },
         ]}
       />
@@ -512,13 +444,11 @@ export default function RecurringScreen({ soFormulario = false }: { soFormulario
 
       {tablet ? tabletBody : compactBody}
 
-      {folhaDoFormulario}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  soFolha: { flex: 1 },
   paneBody: {
     gap: Space.xl,
     minWidth: 0,

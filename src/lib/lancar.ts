@@ -54,3 +54,17 @@ export function hrefDoLancar(tipo: TipoDeLancamento, extra: Record<string, strin
 export function temPassadoDoParam(v: string | undefined): boolean {
   return v !== '0';
 }
+
+/** O que o lançamento é dentro do registro que o gerou — é o que decide as opções da conversão. */
+export function papelDaTransacao(tx: { recurring_id?: string | null; installment_plan_id?: string | null; debt_id?: string | null }): OrigemDaConversao['papel'] {
+  return tx.recurring_id ? 'ocorrencia' : tx.installment_plan_id ? 'parcela' : tx.debt_id ? 'pagamento' : 'avulsa';
+}
+
+/** Editar um lançamento que se tem à mão: o avulso não tem passado, os outros o hospedeiro pergunta. */
+export function hrefDoLancamento(
+  tx: { id: string; recurring_id?: string | null; installment_plan_id?: string | null; debt_id?: string | null },
+  extra: Record<string, string> = {},
+) {
+  const papel = papelDaTransacao(tx);
+  return hrefDoLancar('uma', { id: tx.id, origem: 'transacao', papel, ...(papel === 'avulsa' ? { passado: '0' } : {}), ...extra });
+}

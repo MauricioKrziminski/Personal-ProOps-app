@@ -63,6 +63,7 @@ import { describeCycle, describeRealizado } from '@/lib/cycle-label';
 import { isoToBR, mesmoMes } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
 
 /**
  * Financeiro — "como o meu ciclo fecha", na estrutura de conversa organizada (spec 2026-09-17).
@@ -275,9 +276,9 @@ export default function FinanceScreen() {
 
   const lancar = () =>
     showItemActions('Lançar', [
-      { ...ATALHOS_DE_LANCAMENTO.lancamento, onPress: () => router.push({ pathname: '/finance/transaction-form', params: { month } }) },
-      { ...ATALHOS_DE_LANCAMENTO.recorrente, onPress: () => router.push({ pathname: '/finance/nova-recorrente', params: { create: '1' } }) },
-      { ...ATALHOS_DE_LANCAMENTO.financiamento, onPress: () => router.push({ pathname: '/finance/novo-financiamento', params: { create: 'financing' } }) },
+      { ...ATALHOS_DE_LANCAMENTO.lancamento, onPress: () => router.push(hrefDoLancar('uma', { month })) },
+      { ...ATALHOS_DE_LANCAMENTO.recorrente, onPress: () => router.push(hrefDoLancar('recorrente')) },
+      { ...ATALHOS_DE_LANCAMENTO.financiamento, onPress: () => router.push(hrefDoLancar('financiamento')) },
     ]);
 
   if (!pronta) {
@@ -527,7 +528,7 @@ export default function FinanceScreen() {
                       label: 'Editar',
                       icon: 'pencil',
                       arrasto: 'direita',
-                      onPress: () => router.push({ pathname: '/finance/transaction-form', params: { id: tx.id, month } }),
+                      onPress: () => router.push(hrefDoLancamento(tx, { month })),
                     },
                     { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => confirmDelete(tx) },
                   ]}>

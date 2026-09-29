@@ -11,6 +11,8 @@
  */
 import type { Href } from 'expo-router';
 
+import { hrefDoLancar } from './lancar.ts';
+
 export type ProximoId = 'importar' | 'projecao' | 'lembrete' | 'parcelada' | 'nota';
 
 export type Proximo = {
@@ -56,7 +58,7 @@ export function proximoPasso(
       titulo: 'Compra parcelada se organiza sozinha',
       acao: 'Lançar compra',
       icon: 'creditcard.and.123',
-      href: '/finance/transaction-form',
+      href: hrefDoLancar('uma'),
     },
     {
       id: 'nota',

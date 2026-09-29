@@ -4,9 +4,9 @@ import { router } from 'expo-router';
 /**
  * Formulário que OUTRA TELA abriu tem que devolver para aquela tela quando fecha.
  *
- * ⚠️ **Três telas do app têm formulário dentro de um `Sheet`, e chegar neles de fora é um
- * `push` na tela da LISTA com um parâmetro** (`/finance/recurring?edit=`,
- * `/finance/installments?edit=`, `/finance/debts?create=financing`). Fechando o sheet, a lista
+ * ⚠️ **Duas telas do app têm formulário dentro de um `Sheet`, e chegar neles de fora é um
+ * `push` na tela da LISTA com um parâmetro** (`/finance/installments?edit=`,
+ * `/finance/accounts?create=1`). Fechando o sheet, a lista
  * fica — e a pessoa é largada numa tela que ela nunca pediu. A queixa foi literal (15/09/2026):
  * *"cliquei em editar a compra inteira e quando eu clico em voltar, ao invés de voltar para a
  * tela onde eu estava, ele me leva para a tela de Parceladas"*.
@@ -40,18 +40,5 @@ export function useVoltarQuandoFechar(inicial = false) {
     /** Chame ao CONSUMIR o parâmetro que abriu o formulário. */
     marcar: () => setVeioDeFora(true),
     aoFechar,
-    /**
-     * Use no sucesso do salvar. `fecharAOrigem`: a tela de baixo era só o rascunho DESTE registro
-     * (o "Novo lançamento" que virou recorrente) — salvo, as duas saem juntas.
-     */
-    aoSalvar: (fechar: () => void, fecharAOrigem: boolean) => {
-      if (fecharAOrigem && router.canDismiss()) {
-        fechar();
-        setVeioDeFora(false);
-        router.dismiss(2);
-        return;
-      }
-      aoFechar(fechar);
-    },
   };
 }

@@ -38,8 +38,6 @@ import { SERIE_VAZIA, serieDoRegistro, validaSerie, type SerieForm } from '@/lib
  */
 type Props = CorpoProps & {
   preset?: SerieForm['preset'];
-  /** Aberta DE DENTRO de outro formulário: o ✕ vira "Voltar". */
-  voltar?: boolean;
 };
 
 export function FormularioDaSerie(props: Props) {
@@ -53,7 +51,7 @@ export function FormularioDaSerie(props: Props) {
   if (props.editandoId && !alvo && !props.estadoGuardado) {
     return (
       <>
-        <TaskHeader title="Editar recorrência" onClose={props.onFechar} voltar={props.voltar} />
+        <TaskHeader title="Editar recorrência" onClose={props.onFechar} />
         <SheetScroll contentContainerStyle={styles.corpo}>
           {series.isError ? <ErrorCard onRetry={() => void series.refetch()} /> : <SkeletonList linhas={4} />}
         </SheetScroll>
@@ -240,7 +238,6 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
       <TaskHeader
         title={form.id ? 'Editar recorrência' : 'Nova recorrência'}
         onClose={onFechar}
-        voltar={props.voltar}
         action={
           <Button
             label={form.id || converter ? 'Salvar' : 'Criar'}

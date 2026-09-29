@@ -65,6 +65,7 @@ import {
   type ItemDaAgenda,
 } from '@/lib/today-sections';
 import { painelDoDia } from '@/lib/today-spend';
+import { hrefDoLancar } from '@/lib/lancar';
 
 /**
  * A Hoje — "o dia" (spec `2026-09-28-hoje-o-dia-design.md`).
@@ -517,9 +518,9 @@ export default function TodayScreen() {
             onPress={() =>
               showItemActions('Lançar', [
                 // Os MESMOS tipos de lançamento das Finanças (`ATALHOS_DE_LANCAMENTO`), e o que é da Hoje.
-                { ...ATALHOS_DE_LANCAMENTO.lancamento, onPress: () => router.push('/finance/transaction-form') },
-                { ...ATALHOS_DE_LANCAMENTO.recorrente, onPress: () => router.push({ pathname: '/finance/nova-recorrente', params: { create: '1' } }) },
-                { ...ATALHOS_DE_LANCAMENTO.financiamento, onPress: () => router.push({ pathname: '/finance/novo-financiamento', params: { create: 'financing' } }) },
+                { ...ATALHOS_DE_LANCAMENTO.lancamento, onPress: () => router.push(hrefDoLancar('uma')) },
+                { ...ATALHOS_DE_LANCAMENTO.recorrente, onPress: () => router.push(hrefDoLancar('recorrente')) },
+                { ...ATALHOS_DE_LANCAMENTO.financiamento, onPress: () => router.push(hrefDoLancar('financiamento')) },
                 { label: 'Lembrete', icon: 'bell', onPress: () => router.push('/reminder-form') },
                 { label: 'Nota', icon: 'note.text', onPress: () => router.push('/notes/new') },
               ])

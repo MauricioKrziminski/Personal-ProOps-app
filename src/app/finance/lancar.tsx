@@ -19,6 +19,7 @@ import {
   comumDepoisDeSalvar,
   comumParaSerie,
   opcoesDaConversao,
+  papelDaTransacao,
   temPassadoDoParam,
   TIPOS_DE_LANCAMENTO,
   type Comum,
@@ -72,16 +73,18 @@ export default function LancarScreen() {
 
   const editandoId = p.id;
   const tipoDaOrigem = (p.origem as OrigemDaConversao['tipo'] | undefined) ?? ORIGEM_DO_TIPO[tipoOriginal];
+  // Lançamento PAGO virando financiamento: o banco o adota como um pagamento (o corpo avisa).
+  const transacao = useTransaction(editandoId && tipoDaOrigem === 'transacao' ? editandoId : undefined);
   const origem: OrigemDaConversao | null = editandoId
     ? {
         tipo: tipoDaOrigem,
         id: editandoId,
-        papel: (p.papel as OrigemDaConversao['papel'] | undefined) ?? (tipoDaOrigem === 'transacao' ? 'avulsa' : 'registro'),
+        // Quem abriu sem dizer o papel (link antigo, a Projeção): o do próprio registro, quando chega.
+        papel: (p.papel as OrigemDaConversao['papel'] | undefined)
+          ?? (tipoDaOrigem !== 'transacao' ? 'registro' : transacao.data ? papelDaTransacao(transacao.data) : 'avulsa'),
         temPassado: temPassadoDoParam(p.passado),
       }
     : null;
-  // Lançamento PAGO virando financiamento: o banco o adota como um pagamento (o corpo avisa).
-  const transacao = useTransaction(origem?.tipo === 'transacao' ? editandoId : undefined);
   // O "Aplicar" do "E se…?" vale para o primeiro corpo; o "criar outro" começa limpo.
   const doAplicar = geracao === 0;
 
