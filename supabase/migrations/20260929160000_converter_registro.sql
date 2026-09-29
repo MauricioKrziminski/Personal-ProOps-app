@@ -31,6 +31,7 @@ declare
   v_dia date;
   v_importados uuid[];
   v_restam int;
+  v_ws uuid;
   v_dados jsonb := p_destino->'dados';
   v_destino text := p_destino->>'tipo';
 begin
@@ -41,6 +42,7 @@ begin
   if v_tipo = 'transacao' then
     select * into v_tx from public.transactions where id = v_id for update;
     if v_tx.id is null then raise exception 'Esse lançamento não existe mais.'; end if;
+    v_ws := v_tx.workspace_id;
     v_serie := v_tx.recurring_id;
     v_plano := v_tx.installment_plan_id;
     v_divida := v_tx.debt_id;
@@ -48,17 +50,25 @@ begin
     -- compra já aconteceu na data dela (a régua de `update_recurring_series`).
     v_ancora := case when v_tx.invoice_id is null then coalesce(v_tx.due_at, v_tx.occurred_at) else v_tx.occurred_at end;
   elsif v_tipo = 'serie' then
-    select id, (next_run_at at time zone 'America/Sao_Paulo')::date into v_serie, v_ancora
+    select id, (next_run_at at time zone 'America/Sao_Paulo')::date, workspace_id into v_serie, v_ancora, v_ws
       from public.recurring_transactions where id = v_id for update;
     if v_serie is null then raise exception 'Essa recorrência não existe mais.'; end if;
   elsif v_tipo = 'plano' then
-    select id into v_plano from public.installment_plans where id = v_id for update;
+    select id, workspace_id into v_plano, v_ws from public.installment_plans where id = v_id for update;
     if v_plano is null then raise exception 'Essa compra não existe mais.'; end if;
   elsif v_tipo = 'divida' then
-    select id into v_divida from public.debts where id = v_id for update;
+    select id, workspace_id into v_divida, v_ws from public.debts where id = v_id for update;
     if v_divida is null then raise exception 'Essa dívida não existe mais.'; end if;
   else
     raise exception 'Origem desconhecida: %', v_tipo;
+  end if;
+
+  -- O destino nasce no espaço PADRÃO de quem chama (`criar_registro_da_hipotese` usa o default da
+  -- coluna). Com a origem em outro espaço, a conversão ligaria uma linha do espaço A a uma série do
+  -- B, ou levaria a continuação de uma série compartilhada para o espaço pessoal — em silêncio.
+  -- Até a criação receber o espaço, recusa em todo alcance, "manter" inclusive.
+  if v_ws is distinct from public.my_default_workspace() then
+    raise exception 'Esse registro é de outro espaço. Mude o tipo dele a partir do espaço dele.';
   end if;
 
   -- MANTER: nada muda na origem

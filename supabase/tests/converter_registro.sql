@@ -57,6 +57,30 @@ begin
     values (ws, usr, 'expense', 900, 'S4', c, hoje - 2, 'pending', 'recurring', s),
            (ws, usr, 'expense', 900, 'S4', c, hoje + 5, 'pending', 'recurring', s);
 
+  -- W2: espaço de OUTRA pessoa em que o usuário é membro (não é o padrão dele), com uma série S13
+  -- e um lançamento T13
+  declare
+    dono uuid := '00000000-0000-0000-0000-00000000f1d2';
+    w2 uuid;
+    a2 uuid;
+    s13 uuid;
+  begin
+    insert into auth.users (id, email) values (dono, 'teste-converter-dono@example.invalid') on conflict (id) do nothing;
+    insert into public.profiles (id) values (dono) on conflict (id) do nothing;
+    insert into public.workspaces (name, owner_id) values ('teste converter W2', dono) returning id into w2;
+    insert into public.workspace_members (workspace_id, user_id, role) values (w2, dono, 'owner'), (w2, usr, 'member');
+    insert into public.accounts (workspace_id, user_id, name, type, initial_balance_cents)
+      values (w2, dono, 'A2', 'checking', 100000) returning id into a2;
+    insert into public.recurring_transactions (workspace_id, user_id, kind, amount_cents, description, account_id,
+      rrule, next_run_at, dtstart, auto_confirm)
+    values (w2, dono, 'expense', 900, 'S13', a2, 'FREQ=MONTHLY;BYMONTHDAY=' || extract(day from hoje + 5)::int,
+      ((hoje + 5)::text || 'T12:00:00Z')::timestamptz, ((hoje - 30)::text || 'T12:00:00Z')::timestamptz, false)
+    returning id into s13;
+    insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, account_id, occurred_at, status, source, recurring_id)
+      values (w2, dono, 'expense', 900, 'S13', a2, hoje + 5, 'pending', 'recurring', s13),
+             (w2, dono, 'expense', 900, 'T13', a2, hoje - 1, 'cleared', 'app', null);
+  end;
+
   -- compra P no cartão em 3x, a primeira paga; P7b em 4x com duas pagas
   perform public.create_installment_plan_with_history(c, 30000, 3, hoje - 60, 1, 'P', null, null);
   perform public.create_installment_plan_with_history(c, 40000, 4, hoje - 60, 2, 'P7b', null, null);
@@ -281,6 +305,35 @@ begin
       raise exception 'a futura ficou';
     end if;
   exception when others then raise exception '12. %', sqlerrm;
+  end;
+
+  -- 13. origem em OUTRO espaço (o usuário é membro, mas o destino nasceria no espaço padrão dele):
+  --     recusa em todo alcance, e nada muda — nem a origem, nem o destino nasce
+  antes := (select count(*) from public.transactions);
+  antes_p9 := (select count(*) from public.recurring_transactions);
+  declare
+    s13 uuid := (select id from public.recurring_transactions where description = 'S13');
+    t13 uuid := (select id from public.transactions where description = 'T13');
+    caso record;
+  begin
+    if s13 is null or t13 is null then raise exception '13. a montagem não é visível ao membro'; end if;
+    for caso in
+      select * from (values ('serie', s13, 'manter'), ('serie', s13, 'todas'), ('serie', s13, 'desta_em_diante'),
+                            ('transacao', t13, 'converter')) v(tipo, id, alcance)
+    loop
+      begin
+        r := public.converter_registro(jsonb_build_object('tipo', caso.tipo, 'id', caso.id), caso.alcance,
+               jsonb_build_object('tipo', 'recorrente', 'dados', recorrente));
+        raise exception 'deveria recusar';
+      exception when others then
+        if sqlerrm not like '%outro espaço%' then raise exception '13. % %: recusa errada: %', caso.tipo, caso.alcance, sqlerrm; end if;
+      end;
+    end loop;
+    if (select count(*) from public.transactions) <> antes
+       or (select count(*) from public.recurring_transactions) <> antes_p9
+       or (select recurring_id from public.transactions where id = t13) is not null then
+      raise exception '13. a recusa mudou alguma coisa';
+    end if;
   end;
 end $$;
 

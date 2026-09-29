@@ -24,7 +24,7 @@ saiu IDÊNTICA nos 3.651 dias e no mês a mês, antes e depois) e o horizonte po
 `public.converter_registro(p_origem, p_alcance, p_destino)`: muda o tipo de um registro que
 existe numa transação só (encerra a origem pelo alcance e cria o destino por
 `private.criar_registro_da_hipotese`). `security invoker`, sem `execute` para `anon`. Teste:
-`supabase/tests/converter_registro.sql` (11 casos). Depende da `20260929120000` (a função de
+`supabase/tests/converter_registro.sql` (14 casos: 1–13 e 7b). Depende da `20260929120000` (a função de
 criação); em produção sobe **antes** do app que a chama.
 
 **Produção e staging ALINHADOS em `20260928237000`** — a `20260928236000` e esta aplicadas em
