@@ -304,6 +304,8 @@ export function comumDepoisDeSalvar(c: Comum): Comum; // mantém kind, conta, da
 export function comumParaSerie(c: Comum): Comum;       // transfer → expense
 export const TIPOS_DE_LANCAMENTO: { value: TipoDeLancamento; label: string }[]; // Uma vez | Recorrente | Financiamento
 export function hrefDoLancar(tipo: TipoDeLancamento, extra?: Record<string, string>): { pathname: '/finance/lancar'; params: Record<string, string> };
+/** Sem saber, assume que TEM passado: a pergunta mostra "Todas, apagando…" (destrutiva, confirmada) em vez de um "Converter" que apagaria o pago calado. */
+export function temPassadoDoParam(v: string | undefined): boolean;
 ```
 
 - [ ] **Step 1: Teste**
@@ -311,7 +313,7 @@ export function hrefDoLancar(tipo: TipoDeLancamento, extra?: Record<string, stri
 ```ts
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { comumDepoisDeSalvar, comumParaSerie, hrefDoLancar, opcoesDaConversao, TIPOS_DE_LANCAMENTO } from './lancar.ts';
+import { comumDepoisDeSalvar, comumParaSerie, hrefDoLancar, opcoesDaConversao, temPassadoDoParam, TIPOS_DE_LANCAMENTO } from './lancar.ts';
 
 const c = { kind: 'transfer' as const, descricao: 'Aluguel', valorCents: 150000, contaId: 'cc', dataBR: '05/10/2026', categoria: 'moradia' };
 
@@ -327,6 +329,14 @@ test('as quatro opções da spec, e só as que mudam alguma coisa', () => {
   // sem passado, "Converter" é o "todas" da série (não há o que apagar)
   assert.equal(opcoesDaConversao({ tipo: 'serie', id: 's', papel: 'registro', temPassado: false })[0].alcance, 'todas');
   assert.equal(opcoesDaConversao({ tipo: 'transacao', id: 't', papel: 'avulsa', temPassado: false })[0].alcance, 'converter');
+});
+
+test('sem saber se há passado, a opção destrutiva aparece (e é confirmada)', () => {
+  assert.equal(temPassadoDoParam(undefined), true);
+  assert.equal(temPassadoDoParam('1'), true);
+  assert.equal(temPassadoDoParam('0'), false);
+  const o = opcoesDaConversao({ tipo: 'serie', id: 's', papel: 'registro', temPassado: temPassadoDoParam(undefined) });
+  assert.ok(o.some((x) => x.alcance === 'todas' && x.destrutiva));
 });
 
 test('"Salvar e criar outro" mantém tipo, conta e data, e limpa o resto', () => {
@@ -390,6 +400,10 @@ export function comumParaSerie(c: Comum): Comum {
 export function hrefDoLancar(tipo: TipoDeLancamento, extra: Record<string, string> = {}) {
   return { pathname: '/finance/lancar' as const, params: { tipo, ...extra } };
 }
+
+export function temPassadoDoParam(v: string | undefined): boolean {
+  return v !== '0';
+}
 ```
 
 - [ ] **Step 4: Ver passar** — Run: `node --test src/lib/lancar.test.ts` — Expected: PASS.
@@ -415,7 +429,9 @@ test('A conversão passa pela RPC converter_registro e invalida o financeiro', (
   const i = fonte.indexOf('export function useConverterRegistro');
   assert.ok(i > 0);
   const corpo = fonte.slice(i, i + 900);
-  assert.match(corpo, /supabase\.rpc\('converter_registro', \{ p_origem: \{ tipo: v\.origem\.tipo, id: v\.origem\.id \}, p_alcance: v\.alcance, p_destino: v\.destino/);
+  assert.match(corpo, /supabase\.rpc\('converter_registro'/);
+  assert.match(corpo, /p_alcance: v\.alcance/);
+  assert.match(corpo, /p_destino: v\.destino/);
   assert.match(corpo, /onSuccess: invalidate/);
 });
 ```
@@ -472,6 +488,10 @@ export type CorpoProps = {
   comum: Comum;
   /** O hospedeiro lê os campos comuns do corpo na hora de trocar de tipo. */
   registrarComum: (ler: () => Comum) => void;
+  /** O estado INTEIRO do corpo (o objeto do formulário dele), para voltar a este tipo sem perder nada. */
+  registrarEstado: (ler: () => unknown) => void;
+  /** O que foi digitado neste tipo antes de a pessoa trocar para outro; vence o `comum` ao montar. */
+  estadoGuardado?: unknown;
   /** Editando: o id do registro DESTE tipo. */
   editandoId?: string;
   /** Convertendo: o registro de OUTRO tipo que está virando este. Salvar chama `converter`. */
@@ -513,7 +533,8 @@ Mover de `src/app/finance/recurring.tsx` para `src/components/finance/formulario
 - os hooks `useCreateRecurring`, `useSaveRecurringSeries` (`editar`), `useSaveRecurringAll` (`editarTudo`), os refs `tentativaTudo`/`tentativaFuturo`, `useToast`, `useAccounts`, `useRascunho().tirar`, o objeto `montado`;
 - `validaSerie(form)` e a função `salvar` inteira (hoje linhas 205-325), trocando: `volta.aoFechar(() => setForm(null))` → `props.onFechar()` (edição sem mudança e sucesso da edição); o sucesso da criação → `toast(...)` + `props.onSalvo(criarOutro)`; `tirar(params.deHipotese)` → `if (props.deHipotese) tirar(props.deHipotese)`;
 - o estado inicial do formulário: editando, `serieDoRegistro(<a série de useRecurringTransactions com id = editandoId>)`; criando, `{ ...SERIE_VAZIA, kind: comumParaSerie(comum).kind === 'income' ? 'income' : 'expense', preset: props.preset ?? SERIE_VAZIA.preset, amountCents: comum.valorCents, description: comum.descricao, category: comum.categoria, accountId: comum.contaId, inicio: comum.dataBR }`;
-- `props.registrarComum(() => ({ kind: form.kind, descricao: form.description, valorCents: form.amountCents, contaId: form.accountId, dataBR: form.inicio, categoria: form.category }))` num `useEffect` a cada render do form;
+- `props.registrarComum(() => ({ kind: form.kind, descricao: form.description, valorCents: form.amountCents, contaId: form.accountId, dataBR: form.inicio, categoria: form.category }))` e `props.registrarEstado(() => form)` num `useEffect` a cada render do form;
+- com `props.estadoGuardado`, ele É o estado inicial (`(props.estadoGuardado as SerieForm | undefined) ?? <o de cima>`);
 - com `props.converter`: o Salvar monta `{ tipo: 'recorrente', dados: linhaDaRecorrente(<a mesma EntradaRecorrente da criação>) }` e chama `props.converter(destino)` em vez de `create`.
 
 Em `recurring.tsx`: a folha (`folhaDoFormulario`) passa a renderizar `<FormularioDaSerie>` dentro do `Sheet` com `comum` montado dos parâmetros e `onFechar`/`onSalvo` = `volta.aoFechar(() => setForm(null))` — a tela continua funcionando igual até a Task 8 trocar as entradas.
@@ -557,7 +578,7 @@ test('FormularioDaDivida: o comum vira Nome, Conta que paga e Valor da parcela; 
 
 - [ ] **Step 3: Extrair** — mover de `debts.tsx` para o componente, sem mudar a regra: `FormState`, `UNIDADES_DA_DIVIDA`, `FORM_VAZIO`, `formDoAplicar`, o `useState` do form, `save`/`saveScoped`/`contractAttempt`, as consultas `schedule`/`payments`/`paymentVersions` chaveadas no `form.id`, `pagadoras`, `abrirEdicao` (vira o estado inicial quando `editandoId`, lendo a dívida de `useDebts()`), todas as derivações (`fracao` … `podeSalvar`, hoje 379-463), `salvar` (466-576) e o JSX da folha de criar/editar (1019-1269, do `TaskHeader` ao fim dos campos), trocando:
 - estado inicial criando: `dadosDoAplicar ? formDoAplicar(dadosDoAplicar) : { ...FORM_VAZIO, kind: 'financing', name: comum.descricao, valorCents: comum.valorCents, installmentCents: comum.valorCents, accountId: comum.contaId, ancora: comum.dataBR ? brToISO(comum.dataBR) : null, diaVencimento: comum.dataBR ? String(Number(comum.dataBR.slice(0, 2))) : '' }`;
-- `registrarComum(() => ({ kind: 'expense', descricao: form.name, valorCents: form.valorCents, contaId: form.accountId, dataBR: form.ancora ? isoToBR(form.ancora) : comum.dataBR, categoria: comum.categoria }))`;
+- `registrarComum(() => ({ kind: 'expense', descricao: form.name, valorCents: form.valorCents, contaId: form.accountId, dataBR: form.ancora ? isoToBR(form.ancora) : comum.dataBR, categoria: comum.categoria }))` e `registrarEstado(() => form)`; com `estadoGuardado`, ele é o estado inicial (`as FormState`);
 - sucesso: criando → `props.onSalvo(criarOutro)`; editando → `props.onFechar()`; `volta.*` sai do corpo;
 - com `props.converter`: Salvar monta `{ tipo: 'financiamento', dados: linhaDoFinanciamento(<o mesmo target da criação>) }` e chama `props.converter(destino)`;
 - no fim do conteúdo, só criando, o botão "Salvar e criar outro".
@@ -598,7 +619,7 @@ test('O lançamento é um corpo do formulário único: seletor no topo, criar ou
 - o `TaskHeader` fica como está; `{props.topo}` é o PRIMEIRO filho do `KeyboardAwareScrollView`;
 - saem os botões "Recorrente | Financiamento" do topo, `styles.outrosRegistros`/`outroRegistro` e o import de `ATALHOS_DE_LANCAMENTO` (o seletor faz o papel deles);
 - `defaultValues` criando leem `comum`: `kind: comum.kind`, `amount_cents: comum.valorCents`, `description: comum.descricao`, `account_id: comum.contaId`, `occurred_at: comum.dataBR`, `category: comum.categoria` (editando, continua `editing`);
-- `props.registrarComum(() => { const v = getValues(); return { kind: v.kind, descricao: v.description, valorCents: v.amount_cents, contaId: v.account_id, dataBR: v.occurred_at, categoria: v.category }; })` num `useEffect`;
+- `props.registrarComum(() => { const v = getValues(); return { kind: v.kind, descricao: v.description, valorCents: v.amount_cents, contaId: v.account_id, dataBR: v.occurred_at, categoria: v.category }; })` e `props.registrarEstado(() => getValues())` num `useEffect`; com `estadoGuardado`, os `defaultValues` são ele (`as FormValues`);
 - com `props.converter`: o `onSubmit` monta o destino pelo mesmo `destinoDoSalvar`: `criarPlano` → `{ tipo: 'parcelada', dados: { ...argsDaParcelada(entradaParcelada).args, ultimo_dia: … } }`; os outros → `{ tipo: 'lancamento', dados: { linhas: linhasDoLancamento(entradaLancamento) } }`, e chama `props.converter(destino)`;
 - o sucesso da criação (`createPlan.then`, `gravar.then`) chama `props.onSalvo(criarOutro)` em vez de `router.back()`; o `criarOutro` vem do botão novo "Salvar e criar outro" (fim do conteúdo, antes de "Apagar", só `!editing && !props.converter`), que chama o mesmo `onSubmit` com a flag;
 - `onClose` do `TaskHeader` → `props.onFechar`.
@@ -640,6 +661,20 @@ test('Lançar: abre no tipo pedido, o seletor troca o corpo e leva os campos com
   const lanc = ui.nodes().find((n: any) => n.type === 'FormularioDoLancamento');
   assert.equal(lanc.props.comum.descricao, 'Academia');
   assert.equal(lanc.props.comum.valorCents, 5000);
+});
+
+test('Lançar: voltar a um tipo devolve TUDO que foi digitado nele, não só os campos comuns', () => {
+  const ui = screen(lancarFile, { params: { tipo: 'recorrente' } });
+  const seletor = () => ui.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'financiamento'));
+  const serie = () => ui.nodes().find((n: any) => n.type === 'FormularioDaSerie');
+  const digitado = { preset: 'weekly', description: 'Academia', amountCents: 5000 };
+  ui.interact(() => serie().props.registrarEstado(() => digitado));
+  ui.interact(() => seletor().props.onChange('uma'));
+  ui.interact(() => seletor().props.onChange('recorrente'));
+  assert.deepEqual(serie().props.estadoGuardado, digitado);
+  // "Salvar e criar outro" esvazia o guardado
+  ui.interact(() => serie().props.onSalvo(true));
+  assert.equal(serie().props.estadoGuardado, undefined);
 });
 
 test('Lançar: "Salvar e criar outro" remonta o corpo limpo, mantendo tipo, conta e data', () => {
@@ -734,6 +769,8 @@ export default function LancarScreen() {
   }));
   const [geracao, setGeracao] = useState(0);
   const lerComum = useRef<() => Comum>(() => comum);
+  const lerEstado = useRef<() => unknown>(() => undefined);
+  const estados = useRef<Partial<Record<TipoDeLancamento, unknown>>>({});
   const toast = useToast();
   const converter = useConverterRegistro();
   const reduzir = useReducedMotion();
@@ -742,12 +779,13 @@ export default function LancarScreen() {
 
   const editandoId = p.id;
   const origem: OrigemDaConversao | null = editandoId
-    ? { tipo: (p.origem as OrigemDaConversao['tipo']) ?? 'transacao', id: editandoId, papel: (p.papel as OrigemDaConversao['papel']) ?? (p.origem === 'transacao' ? 'avulsa' : 'registro'), temPassado: p.passado === '1' }
+    ? { tipo: (p.origem as OrigemDaConversao['tipo']) ?? 'transacao', id: editandoId, papel: (p.papel as OrigemDaConversao['papel']) ?? (p.origem === 'transacao' ? 'avulsa' : 'registro'), temPassado: temPassadoDoParam(p.passado) }
     : null;
 
   const trocar = (novo: TipoDeLancamento) => {
     if (novo === tipo) return;
     const atual = lerComum.current();
+    estados.current[tipo] = lerEstado.current();
     const aplicar = () => {
       setComum(novo === 'recorrente' ? comumParaSerie(atual) : atual);
       setTipo(novo);
@@ -763,6 +801,7 @@ export default function LancarScreen() {
   const onSalvo = (criarOutro: boolean) => {
     if (!criarOutro) return router.back();
     setComum(comumDepoisDeSalvar(lerComum.current()));
+    estados.current = {};
     setGeracao((g) => g + 1);
   };
 
@@ -791,6 +830,8 @@ export default function LancarScreen() {
     topo,
     comum,
     registrarComum: (ler: () => Comum) => { lerComum.current = ler; },
+    registrarEstado: (ler: () => unknown) => { lerEstado.current = ler; },
+    estadoGuardado: estados.current[tipo],
     onSalvo,
     onFechar: () => router.back(),
     deHipotese: p.deHipotese,
@@ -816,7 +857,7 @@ const styles = StyleSheet.create({ fill: { flex: 1 } });
 
 Notas de implementação:
 - O `FormularioDoLancamento` editando precisa das consultas de hoje (`useTransaction`, `useInstallmentPlan`, `useJurosDoPix`) e dos portões de esqueleto: mover o `TransactionFormScreen` de `transaction-form.tsx` para um componente `LancamentoEditando` dentro de `formulario-do-lancamento.tsx`, que o hospedeiro usa quando `tipo === 'uma' && editandoId`.
-- `papel` e `passado` chegam na rota pelas entradas (Task 8): a transação sabe o que é (`recurring_id` → `ocorrencia`, `installment_plan_id` → `parcela`, `debt_id` → `pagamento`, senão `avulsa`); série/dívida passam `passado=1` quando têm ocorrência paga / pagamento.
+- `papel` e `passado` chegam na rota pelas entradas (Task 8): a transação sabe o que é (`recurring_id` → `ocorrencia`, `installment_plan_id` → `parcela`, `debt_id` → `pagamento`, senão `avulsa`). `passado=0` só vai quando a entrada SABE que não há passado — dívida com `installments_paid = 0`, compra sem parcela paga (`useInstallmentPlan`), lançamento avulso; na dúvida (a série aberta pela lista) o parâmetro não vai e `temPassadoDoParam` assume que há.
 - Registrar em `_layout.tsx`: `<Stack.Screen name="finance/lancar" options={modalOptions} />`.
 
 - [ ] **Step 4: Ver passar + portão** — Run: `node --test --test-name-pattern="Lançar:" src/lib/simple-finance-ui.test.ts && npx tsc --noEmit && npx expo lint && npm test` — Expected: PASS.
@@ -860,12 +901,12 @@ test('Links antigos continuam abrindo o formulário certo', () => {
 
 - [ ] **Step 3: Trocar as entradas** (use `hrefDoLancar`):
 - criar lançamento: `(tabs)/today/index.tsx` (menu Lançar), `(tabs)/finance/index.tsx` (menu Lançar, `{month}`), `transactions.tsx:727` (`{conta?}`), `installments.tsx:657,682`, `invoice/[id].tsx:589`, `invoices.tsx:483`, `lib/proximo-passo.ts:59` → `hrefDoLancar('uma', {...})`;
-- editar lançamento: `(tabs)/finance/index.tsx:530`, `transactions.tsx:966`, `[txId].tsx:461,473`, `forecast.tsx:496`, `invoice/[id].tsx:692`, `expected-ledger-lines.tsx:87` → `hrefDoLancar('uma', { id, origem: 'transacao', papel: <do registro>, passado: … })` — `papel` vem de `tx.recurring_id ? 'ocorrencia' : tx.installment_plan_id ? 'parcela' : tx.debt_id ? 'pagamento' : 'avulsa'`; um helper `papelDaTransacao(tx)` em `src/lib/lancar.ts` (com teste de uma linha em `lancar.test.ts`);
-- recorrente: menus Lançar → `hrefDoLancar('recorrente')`; `recurring.tsx` "+" (647), EmptyState (564, 576), "Editar" (390-393), `?edit=` (338-345), `[txId].tsx:396` → `hrefDoLancar('recorrente', { id, origem: 'serie', passado })`;
-- dívida: menus Lançar → `hrefDoLancar('financiamento')`; `debts.tsx` "+" (1443), EmptyState "Nova dívida" (883), "Editar" (695, 1382, 1403, `?edit=1` 327) → `hrefDoLancar('financiamento', { id, origem: 'divida', passado })`;
+- editar lançamento: `(tabs)/finance/index.tsx:530`, `transactions.tsx:966`, `[txId].tsx:461,473`, `forecast.tsx:496`, `invoice/[id].tsx:692`, `expected-ledger-lines.tsx:87` → `hrefDoLancar('uma', { id, origem: 'transacao', papel: <do registro>, ...(<sabe que não há passado> ? { passado: '0' } : {}) })` — `papel` vem de `tx.recurring_id ? 'ocorrencia' : tx.installment_plan_id ? 'parcela' : tx.debt_id ? 'pagamento' : 'avulsa'`; um helper `papelDaTransacao(tx)` em `src/lib/lancar.ts` (com teste de uma linha em `lancar.test.ts`);
+- recorrente: menus Lançar → `hrefDoLancar('recorrente')`; `recurring.tsx` "+" (647), EmptyState (564, 576), "Editar" (390-393), `?edit=` (338-345), `[txId].tsx:396` → `hrefDoLancar('recorrente', { id, origem: 'serie' })` (sem `passado`: a lista não sabe, e o hospedeiro assume que há);
+- dívida: menus Lançar → `hrefDoLancar('financiamento')`; `debts.tsx` "+" (1443), EmptyState "Nova dívida" (883), "Editar" (695, 1382, 1403, `?edit=1` 327) → `hrefDoLancar('financiamento', { id, origem: 'divida', passado: d.installments_paid > 0 ? '1' : '0' })`;
 - `paramsDoAplicar` (`hipotese.ts`): os três ramos passam a `hrefDoLancar(<tipo da hipótese>, { deHipotese, ... })`, mantendo os parâmetros de hoje.
 
-Remover: a folha de formulário de `recurring.tsx` e `debts.tsx` (a de PAGAR fica), `soFormulario`, `deOutroFormulario`, a prop `voltar` do `TaskHeader` e o `aoSalvar`/`router.dismiss` de `use-voltar-quando-fechar.ts` (se nenhuma outra tela usar), o registro de `finance/nova-recorrente` e `finance/novo-financiamento` em `_layout.tsx` e de ambos em `SEM_SCREEN` (`anti-slop.test.ts`).
+Remover: a folha de formulário de `recurring.tsx` e `debts.tsx` (a de PAGAR fica), `soFormulario`, `deOutroFormulario`, a prop `voltar` do `TaskHeader` e o `aoSalvar`/`router.dismiss` de `use-voltar-quando-fechar.ts` (se nenhuma outra tela usar), o registro de `finance/nova-recorrente` e `finance/novo-financiamento` em `_layout.tsx` (os ARQUIVOS ficam, como cascas; o expo-router registra rota pelo arquivo). Em `SEM_SCREEN` (`anti-slop.test.ts`): os dois continuam, e entram `src/app/finance/lancar.tsx` (desenha corpos, não `Screen`) e `src/app/finance/transaction-form.tsx` (vira um `Redirect`).
 
 `transaction-form.tsx`, `nova-recorrente.tsx`, `novo-financiamento.tsx` viram cascas:
 

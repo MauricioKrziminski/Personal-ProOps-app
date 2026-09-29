@@ -8,7 +8,7 @@
 
 **Tech Stack:** Supabase Postgres (plpgsql, `extensions.unaccent`), Expo SDK 57 + expo-router, TanStack Query, `node --test` com o harness de `simple-finance-ui.test.ts`.
 
-**Spec:** `docs/superpowers/specs/2026-09-29-formulario-unico-e-categorias-design.md` (Partes 3 e 4). Independente do plano A (`2026-09-29-formulario-unico.md`); os dois se tocam só no `CategoryPicker`, que o A usa sem mudar.
+**Spec:** `docs/superpowers/specs/2026-09-29-formulario-unico-e-categorias-design.md` (Partes 3 e 4). Independente do plano A (`2026-09-29-formulario-unico.md`); os dois se tocam no `CategoryPicker` (o A usa sem mudar) e em `src/app/finance/[txId].tsx` (o A troca os links de editar, o B a folha "Mudar categoria"). **Ordem: o A primeiro**, e o B parte da `main` com o A dentro.
 
 ## Global Constraints
 
@@ -90,6 +90,9 @@ begin
      or exists (select 1 from public.installment_plans where category = 'roupa')
      or exists (select 1 from public.categorization_rules where category = 'roupa')
      or exists (select 1 from public.debts where payment_category = 'roupa') then raise exception '4. sobrou roupa'; end if;
+  -- o histórico da recorrente (só policy de leitura: o update tem que ir pelo definer)
+  if exists (select 1 from private.recurring_history_versions where category = 'roupa') then raise exception '4. histórico'; end if;
+  if not exists (select 1 from private.recurring_history_versions where category = 'roupas') then raise exception '4. a recorrente não tem versão para conferir'; end if;
   if (select amount_cents from public.budgets where category = 'roupas' and month = date '2026-10-01') <> 50000 then raise exception '4. orçamento de outubro'; end if;
   if (select amount_cents from public.budgets where category = 'roupas' and month is null) <> 30000 then raise exception '4. o padrão veio junto'; end if;
 
@@ -175,6 +178,19 @@ begin
   on conflict (workspace_id, name) do update set icon = excluded.icon, color = excluded.color;
 end $$;
 
+-- O histórico de versões da recorrente só tem policy de LEITURA: um `update` sob o papel do
+-- usuário afetaria ZERO linhas, sem erro, e a ocorrência prevista voltaria com o nome antigo.
+-- Definer, e o escopo sai DE DENTRO (`my_workspace_ids()` lê o `auth.uid()` de quem chamou):
+-- receber a lista de espaços por parâmetro deixaria qualquer um escrever no espaço de outro.
+create function private.renomear_no_historico(p_de text, p_para text)
+returns void language sql security definer set search_path = public
+as $$
+  update private.recurring_history_versions set category = p_para
+   where workspace_id in (select private.my_workspace_ids()) and category = p_de;
+$$;
+revoke execute on function private.renomear_no_historico(text, text) from public, anon;
+grant execute on function private.renomear_no_historico(text, text) to authenticated;
+
 create function public.rename_category(p_from text, p_to text, p_juntar boolean default false)
 returns jsonb language plpgsql security invoker set search_path = public
 as $$
@@ -212,7 +228,7 @@ begin
   update public.budgets set category = v_to where workspace_id = any(v_ws) and category = v_from;
   update public.categorization_rules set category = v_to where workspace_id = any(v_ws) and category = v_from;
   update public.debts set payment_category = v_to where workspace_id = any(v_ws) and payment_category = v_from;
-  update private.recurring_history_versions set category = v_to where workspace_id = any(v_ws) and category = v_from;
+  perform private.renomear_no_historico(v_from, v_to);
 
   -- a aparência vai junto; juntando, fica a da que recebe (se ela tiver)
   if exists (select 1 from public.categories where workspace_id = any(v_ws) and name = v_to) then
@@ -239,7 +255,7 @@ begin
   update public.installment_plans set category = null where workspace_id = any(v_ws) and category = v;
   update public.categorization_rules set category = null where workspace_id = any(v_ws) and category = v;
   update public.debts set payment_category = null where workspace_id = any(v_ws) and payment_category = v;
-  update private.recurring_history_versions set category = null where workspace_id = any(v_ws) and category = v;
+  perform private.renomear_no_historico(v, null);
   delete from public.categories where workspace_id = any(v_ws) and name = v;
   return jsonb_build_object('lancamentos', v_tx, 'orcamentos', v_orc);
 end $$;
@@ -255,7 +271,6 @@ grant execute on function public.delete_category(text) to authenticated;
 ```
 
 Notas:
-- `private.recurring_history_versions` tem só policy de LEITURA: se o `update` dela falhar como `authenticated`, trocar essas duas linhas por uma função `private.renomear_no_historico(ws uuid[], de text, para text)` `security definer` chamada daqui (e anotar no ledger).
 - `debts.payment_category` e o histórico de recorrentes não estão na lista da spec; entram porque, fora deles, o pagamento da dívida e a ocorrência prevista voltariam com o nome antigo.
 - Array de `anon_sem_execute.sql`: `'delete_category'`, `'rename_category'`, `'save_category'` nas posições alfabéticas.
 
@@ -311,7 +326,8 @@ test('a linha da tabela manda; sem ela, o ícone adivinhado pelo nome e sem cor'
 
 test('todo ícone da grade existe no Android (MATERIAL)', () => {
   const fonte = readFileSync('src/components/ui/icon.tsx', 'utf8');
-  for (const i of ICONES_DE_CATEGORIA) assert.match(fonte, new RegExp(`'${i.replace(/\./g, '\\.')}':`), i);
+  // as chaves do MATERIAL vêm com aspas quando têm ponto ('bitcoinsign.circle') e sem quando não têm (airplane)
+  for (const i of ICONES_DE_CATEGORIA) assert.match(fonte, new RegExp(`(^|\\s)'?${i.replace(/\./g, '\\.')}'?:`, 'm'), i);
   assert.ok(ICONES_DE_CATEGORIA.length >= 24 && ICONES_DE_CATEGORIA.length <= 36);
   assert.equal(new Set(ICONES_DE_CATEGORIA).size, ICONES_DE_CATEGORIA.length);
 });
