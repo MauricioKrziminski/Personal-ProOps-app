@@ -9,6 +9,10 @@ ciclo) e desfaz tudo. `security invoker`, sem `execute` para `anon`. Teste:
 `supabase/tests/simular.sql` (10 casos, incluindo banco intacto e falha no meio). Em produção sobe
 pelo Gabriel, **antes** do app que a chama.
 
+**Só no STAGING: `20260929130000_simular_codigo_do_erro`** (29/09/2026) — a mesma `simular`, com
+`codigo` (SQLSTATE) em cada erro, para o app mostrar só a frase nossa (P0001) e nunca o texto cru
+do Postgres. Sobe no MESMO `db push` da anterior.
+
 **Produção e staging ALINHADOS em `20260928237000`** — a `20260928236000` e esta aplicadas em
 produção pelo Gabriel em 28/09/2026 (`db push --project-ref`) e conferidas na fonte:
 `schema_migrations` devolve `20260928237000`, `20260928236000`, `20260928235000`; `draft_lines`
