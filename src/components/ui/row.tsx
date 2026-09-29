@@ -1,5 +1,5 @@
 import { Children, Fragment, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View, type AccessibilityState } from 'react-native';
+import { Pressable, StyleSheet, View, useWindowDimensions, type AccessibilityState } from 'react-native';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
@@ -82,6 +82,7 @@ export function Row({
   inlineValue = false,
 }: RowProps) {
   const theme = useTheme();
+  const pisoDoTitulo = usePisoDoTitulo();
   const valor =
     trailing || (chevron ?? !!onPress) ? (
       <View style={styles.trailing}>
@@ -119,10 +120,10 @@ export function Row({
         cresce (`minHeight`, não `height`, e sem `overflow: 'hidden'` no grupo do texto).
         Ver `design.md` §7.
       */}
-      <View style={styles.labels}>
+      <View style={[styles.labels, pisoDoTitulo]}>
         {inlineValue ? (
           <View style={styles.tituloComValor}>
-            <ThemedText type="default" themeColor={destructive ? 'danger' : 'text'} style={styles.tituloDoExtrato}>
+            <ThemedText type="default" themeColor={destructive ? 'danger' : 'text'} style={[styles.tituloDoExtrato, pisoDoTitulo]}>
               {title}
             </ThemedText>
             {valor}
@@ -234,6 +235,19 @@ export function Section({
   );
 }
 
+/** O piso do título antes de o valor descer de linha — ver `row` abaixo. */
+const MIN_TITULO = 134;
+
+/**
+ * O piso do título de toda linha de duas colunas (`Row`, a linha de extrato e o "Seu dia"), no
+ * tamanho de fonte em que ela está sendo desenhada. Uma função, três lugares: um número copiado
+ * em cada um divergia (era o `anti-slop.test.ts` que os mantinha iguais à mão).
+ */
+export function usePisoDoTitulo() {
+  const { fontScale } = useWindowDimensions();
+  return { minWidth: MIN_TITULO * Math.max(1, fontScale) };
+}
+
 const styles = StyleSheet.create({
   /*
     ⚠️ `flexWrap`: o valor à direita desce para a linha de baixo quando o título não caberia.
@@ -256,9 +270,10 @@ const styles = StyleSheet.create({
     inteiro quebra à toa. Não é escolha de gosto — é o ponto onde os dois defeitos se tocam, e
     trocar o número exige repetir a medição (plantar um título de 15 letras e olhar a 384dp).
 
-    Não precisa de `fontScale`: com fonte grande o VALOR cresce e o espaço do título encolhe
-    sozinho, então a válvula dispara na hora certa. Medido a 1,3× — a linha quebra, a palavra
-    fica inteira.
+    **E o piso cresce com a fonte** (28/09/2026). A 1,3× bastava o valor crescer e o título
+    encolher; no tamanho de acessibilidade do iPhone uma palavra só passa dos 134 e partia no meio
+    ("Orçament / o", no histórico de alertas) com o valor ainda ao lado. `134 × fontScale` é a
+    mesma palavra de 15 letras medida no tamanho em que ela está sendo desenhada.
   */
   row: {
     flexDirection: 'row',
@@ -272,7 +287,6 @@ const styles = StyleSheet.create({
   labels: {
     flexGrow: 1,
     flexShrink: 1,
-    minWidth: 134,
     gap: 2,
   },
   // A pílula fica ao lado do subtítulo quando cabe e sobe para a própria linha quando não.
@@ -302,7 +316,7 @@ const styles = StyleSheet.create({
   // `flexBasis: 0` + `flexGrow`: o título ocupa a sobra e empurra o valor para a borda. O piso é
   // o MESMO do título da `Row` (134, medido para "Estacionamentoo"): com 96, "Financiamento"
   // partia ao meio a 384dp × 1,3. Abaixo dele o valor desce para baixo do título.
-  tituloDoExtrato: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 134 },
+  tituloDoExtrato: { flexGrow: 1, flexShrink: 1, flexBasis: 0 },
   trailing: {
     flexDirection: 'row',
     alignItems: 'center',

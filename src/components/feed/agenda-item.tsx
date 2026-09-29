@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { useBRL } from '@/components/ui/conceal';
 import { Money } from '@/components/ui/money';
+import { usePisoDoTitulo } from '@/components/ui/row';
 import type { ThemeColor } from '@/constants/theme';
 import { Motion, Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -51,6 +52,7 @@ export interface AgendaItemProps {
  */
 export function AgendaItem({ title, meta, metaTone, cents, valueTone, icon, cartao, action, onPress }: AgendaItemProps) {
   const theme = useTheme();
+  const pisoDoTitulo = usePisoDoTitulo();
   const brl = useBRL();
 
   const corpo = (pressed: boolean) => (
@@ -67,7 +69,7 @@ export function AgendaItem({ title, meta, metaTone, cents, valueTone, icon, cart
       <View style={styles.textos}>
         {/* Título e valor na mesma linha; o título quebra entre palavras e, abaixo do piso, o valor desce (§3). */}
         <View style={styles.topo}>
-          <ThemedText type="default" style={styles.titulo}>
+          <ThemedText type="default" style={[styles.titulo, pisoDoTitulo]}>
             {title}
           </ThemedText>
           <View style={styles.direita}>
@@ -131,6 +133,7 @@ export function LinhaDoAtrasado({
   onAlternar: () => void;
 }) {
   const theme = useTheme();
+  const pisoDoTitulo = usePisoDoTitulo();
   const brl = useBRL();
   const temConta = resumo.contas > 0;
   const titulo = temConta
@@ -162,7 +165,7 @@ export function LinhaDoAtrasado({
           </View>
           <View style={styles.textos}>
             <View style={styles.topo}>
-              <ThemedText type="headline" style={styles.titulo}>
+              <ThemedText type="headline" style={[styles.titulo, pisoDoTitulo]}>
                 {titulo}
               </ThemedText>
               <View style={[styles.direita, styles.valorComSeta]}>
@@ -208,7 +211,7 @@ const styles = StyleSheet.create({
   // A receita do título de extrato da `Row` (piso 134, medido): o título quebra ENTRE palavras ao
   // lado do valor, e o valor só desce abaixo do piso. Com `flexShrink: 0` o valor descia sempre
   // que o título não cabia numa linha — "3 contas atrasadas" num iPhone de 393pt (28/09/2026).
-  titulo: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 134 },
+  titulo: { flexGrow: 1, flexShrink: 1, flexBasis: 0 },
   // `marginLeft: auto` mantém o valor e a ação encostados à direita mesmo quando descem de linha.
   direita: { marginLeft: 'auto' },
   base: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: Space.md, rowGap: Space.sm, minHeight: 20 },

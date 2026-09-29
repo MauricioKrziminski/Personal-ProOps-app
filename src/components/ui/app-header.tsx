@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
+import { Contador } from '@/components/ui/contador';
 import { Icon } from '@/components/ui/icon';
 import { Mark } from '@/components/ui/mark';
 import { Fonts } from '@/constants/theme';
@@ -172,13 +173,13 @@ export function HeaderIconButton({
   icon,
   label,
   onPress,
-  ponto = false,
+  contagem = 0,
 }: {
   icon: React.ComponentProps<typeof Icon>['name'];
   label: string;
   onPress: () => void;
-  /** Tem coisa nova do outro lado (o sino com alerta não visto). Geometria fixa, como o selo da aba. */
-  ponto?: boolean;
+  /** Quantos esperam do outro lado (o sino: alertas não lidos). O MESMO selo da aba (`Contador`). */
+  contagem?: number;
 }) {
   const theme = useTheme();
   const vidro = supportsLiquidGlass();
@@ -186,13 +187,13 @@ export function HeaderIconButton({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={ponto ? `${label}, tem novidade` : label}
+      accessibilityLabel={contagem ? `${label}, ${contagem} ${contagem === 1 ? 'não lido' : 'não lidos'}` : label}
       hitSlop={Space.sm}
       onPress={onPress}
       style={[styles.tile, { backgroundColor: vidro ? 'transparent' : theme.backgroundElement }]}>
       {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
       <Icon name={icon} size="md" color="text" />
-      {ponto ? <View style={[styles.ponto, { backgroundColor: theme.danger, borderColor: theme.background }]} /> : null}
+      <Contador valor={contagem} borda={theme.background} style={styles.contador} />
     </Pressable>
   );
 }
@@ -237,13 +238,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ponto: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    width: 10,
-    height: 10,
-    borderRadius: Radius.pill,
-    borderWidth: 2,
-  },
+  /** No canto de cima, avançando um pouco para fora do botão, como o selo da aba no ícone. */
+  contador: { top: -6, right: -6 },
 });

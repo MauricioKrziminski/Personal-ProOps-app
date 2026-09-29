@@ -228,7 +228,6 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       // A preferência gravada vale como `useState` dentro de uma visita; o disco tem teste próprio
       // (`use-preferencia.test.ts`).
       if (name === '@/hooks/use-preferencia') return { umDe: () => () => true, usePreferencia: (_nome: string, padrao: unknown) => react.useState(padrao) };
-      if (name === '@/hooks/use-alertas-vistos') return { useAlertasVistos: () => react.useState(''), useTemAlertaNovo: () => false };
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', useWindowDimensions: () => ({ width: 384, height: 800 }), Platform: { OS: 'android', select: (o: any) => o.android ?? o.default } };
       if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInDown: animation, FadeOut: animation, FadeIn: animation, ReduceMotion: { System: 'system' }, LinearTransition: animation, useAnimatedRef: () => ({ current: null }) };
@@ -270,6 +269,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@/hooks/use-tela-pronta') return { useTelaPronta: (...consultas: any[]) => { gates.push(consultas); return true; } };
       // Carregado DE VERDADE: ele é a regra que se quer testar, não um arredor da tela.
       if (name === '@/hooks/use-voltar-quando-fechar') return load('src/hooks/use-voltar-quando-fechar.ts');
+      if (name === '@/hooks/use-alertas-vistos') return load('src/hooks/use-alertas-vistos.ts');
       // O "Paguei" que confirma o valor (25/09/2026): carregado DE VERDADE, é a regra em teste.
       if (name === '@/components/finance/confirmar-baixa') return load('src/components/finance/confirmar-baixa.tsx');
       if (name === '@/lib/confirmar-baixa') return load('src/lib/confirmar-baixa.ts');
@@ -3166,4 +3166,35 @@ test('Editar a conta abre no saldo ATUAL e grava a diferença no inicial (28/09/
   ui.interact(() => ui.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.label === 'No vermelho')).props.onChange('negativo'));
   ui.interact(() => ui.nodes().find((n: any) => n.type === 'TaskHeader').props.action.props.onPress());
   assert.equal(ui.writes.at(-1).value.initial_balance_cents, 86786 - 21251);
+});
+
+test('Histórico de alertas: não lido até a pessoa marcar; Lida à direita, Limpar à esquerda, e o menu faz todas', () => {
+  // 28/09/2026: "o sino tem que ter os números, limpar todas as notificações e marcar como lida"
+  const alertas = [
+    { id: 'a1', workspace_id: 'w', kind: 'negative_forecast', ref: 'r', sent_on: '2026-09-28', channel: 'whatsapp', created_at: '2026-09-28T15:00:00Z' },
+    { id: 'a2', workspace_id: 'w', kind: 'negative_forecast', ref: 'r', sent_on: '2026-09-27', channel: 'whatsapp', created_at: '2026-09-27T15:00:00Z' },
+  ];
+  const ui = screen('src/app/profile/alerts.tsx', { alerts: alertas });
+  const cards = () => deslizaveis(ui);
+  assert.equal(cards().length, 2, 'abrir a tela não marca nem some nada');
+  assert.deepEqual(ladosDe(cards()[0]), { direita: ['Marcar como lida'], esquerda: ['Limpar'], mais: false, pontaDireita: 'Marcar como lida', pontaEsquerda: 'Limpar' });
+
+  // lida: some o "Lida" do arrasto, o card fica
+  ui.interact(() => cards()[0].props.acoes.find((a: any) => a.label === 'Marcar como lida').onPress());
+  assert.deepEqual(ladosDe(cards()[0]).direita, []);
+  assert.equal(cards().length, 2);
+
+  // limpar uma: some da lista, e o "Desfazer" traz de volta
+  ui.interact(() => cards()[1].props.acoes.find((a: any) => a.label === 'Limpar').onPress());
+  assert.equal(cards().length, 1);
+  ui.interact(() => ui.toasts.at(-1).action.onPress());
+  assert.equal(cards().length, 2);
+
+  // o menu do cabeçalho: marcar todas, e limpar todas
+  const menu = () => ui.nodes().find((n: any) => n.type === 'HeaderActions').props.menu.actions;
+  ui.interact(() => menu().find((a: any) => a.label === 'Marcar todas como lidas').onPress());
+  assert.ok(cards().every((c: any) => ladosDe(c).direita.length === 0), 'todas lidas');
+  ui.interact(() => menu().find((a: any) => a.label === 'Limpar todas').onPress());
+  assert.equal(cards().length, 0);
+  assert.ok(ui.nodes().some((n: any) => n.type === 'EmptyState'));
 });

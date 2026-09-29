@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { alertChannelLabel, alertaMaisNovo, combineAlertDeliveries, temAlertaNovo } from './alert-history.ts';
+import { alertChannelLabel, alertaLido, alertaMaisNovo, alertaVisivel, combineAlertDeliveries, naoLidos } from './alert-history.ts';
 
 const base = {
   id: 'push-id',
@@ -45,12 +45,23 @@ test('mantém uma entrega antiga sem canal reconhecido', () => {
   assert.equal(alertChannelLabel(result?.channels ?? []), null);
 });
 
-test('a bolinha do sino: acende com alerta mais novo que o visto, e só com ele', () => {
-  assert.equal(temAlertaNovo(null, ''), false, 'sem alerta nenhum');
-  assert.equal(temAlertaNovo('2026-09-28T12:00:00+00:00', ''), true, 'nunca abriu o histórico');
-  assert.equal(temAlertaNovo('2026-09-28T12:00:00+00:00', '2026-09-28T12:00:00+00:00'), false);
-  assert.equal(temAlertaNovo('2026-09-28T12:00:00+00:00', '2026-09-28T09:00:00-03:00'), false, 'mesmo instante, outro fuso');
-  assert.equal(temAlertaNovo('2026-09-29T12:00:00+00:00', '2026-09-28T12:00:00+00:00'), true);
+test('o número do sino: visíveis e não lidos, com marco e lista nos dois lados', () => {
+  const a1 = { id: 'a1', created_at: '2026-09-26T12:00:00+00:00' };
+  const a2 = { id: 'a2', created_at: '2026-09-27T12:00:00+00:00' };
+  const a3 = { id: 'a3', created_at: '2026-09-28T12:00:00+00:00' };
+  const nada = { vistoAte: '', lidos: [], limpoAte: '', limpos: [] };
+  assert.equal(naoLidos([a1, a2, a3], nada), 3, 'nunca leu nada');
+  // "marcar todas como lidas" anda o marco — o mesmo instante em outro fuso também conta
+  assert.equal(naoLidos([a1, a2, a3], { ...nada, vistoAte: '2026-09-28T09:00:00-03:00' }), 0);
+  // "marcar como lida" uma: entra na lista
+  assert.equal(alertaLido(a2, { ...nada, lidos: ['a2'] }), true);
+  assert.equal(naoLidos([a1, a2, a3], { ...nada, lidos: ['a2'] }), 2);
+  // limpar uma some da lista E do número, mesmo sem ter lido
+  assert.equal(alertaVisivel(a3, { ...nada, limpos: ['a3'] }), false);
+  assert.equal(naoLidos([a1, a2, a3], { ...nada, limpos: ['a3'] }), 2);
+  // "limpar todas" anda o marco: o que chegar DEPOIS volta a contar
+  const a4 = { id: 'a4', created_at: '2026-09-29T12:00:00+00:00' };
+  assert.equal(naoLidos([a1, a2, a3, a4], { ...nada, limpoAte: a3.created_at }), 1);
 });
 
 test('abrir o histórico marca o mais novo da lista, fora de ordem ou não', () => {

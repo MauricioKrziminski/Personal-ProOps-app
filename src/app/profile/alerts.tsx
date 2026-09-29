@@ -1,16 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Stack } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { ErrorCard } from '@/components/error-card';
 import { ThemedText } from '@/components/themed-text';
+import { Deslizavel } from '@/components/ui/deslizavel';
 import { EmptyState } from '@/components/ui/empty-state';
+import { HeaderActions } from '@/components/ui/header-actions';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/toast';
 import { categoryIcon } from '@/design/category-icons';
 import { Radius, Space, tabular } from '@/design/tokens';
-import { useAlertasVistos } from '@/hooks/use-alertas-vistos';
+import { useEstadoDosAlertas } from '@/hooks/use-alertas-vistos';
 import { useAlertsSent } from '@/hooks/use-finance';
 import { VerMais } from '@/components/ui/ver-mais';
 import { PASSO } from '@/lib/aos-poucos';
@@ -19,11 +22,14 @@ import { formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 import {
   alertChannelLabel,
+  alertaLido,
   alertaMaisNovo,
-  temAlertaNovo,
+  alertaVisivel,
   combineAlertDeliveries,
+  naoLidos,
   type AlertHistoryItem,
 } from '@/lib/alert-history';
+import { showItemActions, type ItemAction } from '@/lib/item-actions';
 import type { SymbolViewProps } from 'expo-symbols';
 
 /**
@@ -88,19 +94,61 @@ export default function AlertsScreen() {
   // Aos poucos: 20 do servidor, e o "Ver mais" pede mais 20.
   const [limite, setLimite] = useState(PASSO);
   const alertas = useAlertsSent(limite);
-  const dias = porDia(combineAlertDeliveries(alertas.data ?? []));
-  // Abrir o histórico é ver: o mais novo mostrado apaga a bolinha do sino da Hoje.
-  const [vistoAte, marcarVisto] = useAlertasVistos();
+  const toast = useToast();
+  // Ler e limpar são da pessoa (28/09/2026): abrir a tela não marca nada sozinho.
+  const { estado, restaurar, marcarLido, marcarTodosLidos, limpar, limparTodos } = useEstadoDosAlertas();
+  const todos = combineAlertDeliveries(alertas.data ?? []);
+  const visiveis = todos.filter((a) => alertaVisivel(a, estado));
+  const dias = porDia(visiveis);
   const maisNovo = alertaMaisNovo(alertas.data ?? []);
-  useEffect(() => {
-    if (maisNovo && temAlertaNovo(maisNovo, vistoAte)) marcarVisto(maisNovo);
-  }, [maisNovo, vistoAte, marcarVisto]);
+  const pendentes = naoLidos(todos, estado);
+
+  const comDesfazer = (mensagem: string, fazer: () => void) => {
+    const antes = estado;
+    fazer();
+    toast({ message: mensagem, tone: 'success', action: { label: 'Desfazer', onPress: () => restaurar(antes) } });
+  };
+
+  const acoesDoAlerta = (a: AlertHistoryItem, titulo: string): ItemAction[] => [
+    ...(alertaLido(a, estado)
+      ? []
+      : [{ label: 'Marcar como lida', curto: 'Lida', icon: 'checkmark.circle' as const, arrasto: 'direita' as const, onPress: () => marcarLido(a.id) }]),
+    {
+      label: 'Limpar',
+      icon: 'trash',
+      destructive: true,
+      arrasto: 'esquerda',
+      desfaz: true,
+      onPress: () => comDesfazer(`${titulo} saiu do histórico.`, () => limpar(a.id)),
+    },
+  ];
 
   return (
     <Screen grouped wide={tablet} onRefresh={() => Promise.all([alertas.refetch()])}>
       <Stack.Screen options={{ title: 'Histórico de alertas' }} />
+      {maisNovo && visiveis.length > 0 ? (
+        <HeaderActions
+          actions={[]}
+          menu={{
+            title: 'Alertas',
+            actions: [
+              ...(pendentes > 0
+                ? [{ label: 'Marcar todas como lidas', icon: 'checkmark.circle' as const, onPress: () => marcarTodosLidos(maisNovo) }]
+                : []),
+              {
+                label: 'Limpar todas',
+                icon: 'trash',
+                destructive: true,
+                onPress: () => comDesfazer('Histórico limpo.', () => limparTodos(maisNovo)),
+              },
+            ],
+          }}
+        />
+      ) : null}
 
-      <View style={tablet ? styles.tabletReading : null} testID="alerts-tablet-workspace">
+      {/* O `gap` é o mesmo do `Screen`: embrulhados aqui, os dias não herdavam o espaço dele e o
+          título de cada dia encostava no card de cima (28/09/2026). */}
+      <View style={[styles.coluna, tablet ? styles.tabletReading : null]} testID="alerts-tablet-workspace">
         {alertas.isLoading ? (
           <Section>
             <SkeletonRow />
@@ -111,7 +159,7 @@ export default function AlertsScreen() {
           <ErrorCard onRetry={() => alertas.refetch()} />
         ) : dias.length === 0 ? (
           <EmptyState
-            title="Nenhum alerta ainda"
+            title="Nenhum alerta"
             hint="Os avisos importantes aparecem aqui"
           />
         ) : (
@@ -119,10 +167,12 @@ export default function AlertsScreen() {
             <Section key={dia} title={formatDateBR(dia)}>
               {doDia.map((a) => {
                 const meta = ALERTA[a.kind];
+                const titulo = meta?.titulo ?? a.kind;
+                const lido = alertaLido(a, estado);
                 return (
+                  <Deslizavel key={a.id} titulo={titulo} acoes={acoesDoAlerta(a, titulo)}>
                   <Row
-                    key={a.id}
-                    title={meta?.titulo ?? a.kind}
+                    title={titulo}
                     subtitle={detalhe(a)}
                     // Em orçamento o `ref` É a categoria, então o ícone dela diz mais que um sino.
                     icon={
@@ -131,17 +181,24 @@ export default function AlertsScreen() {
                         : meta?.icone ?? 'bell'
                     }
                     chevron={false}
+                    accessibilityLabel={`${titulo}${lido ? '' : ', não lido'}, ${hora(a.created_at)}`}
+                    onPress={lido ? undefined : () => marcarLido(a.id)}
+                    onLongPress={() => showItemActions(titulo, acoesDoAlerta(a, titulo))}
                     trailing={
-                      <View style={[styles.pill, { backgroundColor: theme.backgroundElement }]}>
-                        <ThemedText
-                          type="code"
-                          themeColor={meta?.tom ?? 'textSecondary'}
-                          style={tabular}>
-                          {hora(a.created_at)}
-                        </ThemedText>
+                      <View style={styles.fim}>
+                        {lido ? null : <View style={[styles.naoLido, { backgroundColor: theme.danger }]} />}
+                        <View style={[styles.pill, { backgroundColor: theme.backgroundElement }]}>
+                          <ThemedText
+                            type="code"
+                            themeColor={lido ? 'textSecondary' : (meta?.tom ?? 'textSecondary')}
+                            style={tabular}>
+                            {hora(a.created_at)}
+                          </ThemedText>
+                        </View>
                       </View>
                     }
                   />
+                  </Deslizavel>
                 );
               })}
             </Section>
@@ -168,6 +225,10 @@ function hora(iso: string | null | undefined): string {
 }
 
 const styles = StyleSheet.create({
+  coluna: { gap: Space.xl },
+  fim: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
+  /** O alerta não lido: a mesma cor do contador do sino. */
+  naoLido: { width: 8, height: 8, borderRadius: Radius.pill },
   pill: {
     paddingHorizontal: Space.sm,
     paddingVertical: Space.half,

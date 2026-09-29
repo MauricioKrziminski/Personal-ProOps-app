@@ -1205,15 +1205,15 @@ test('frase com dinheiro não é montada em peças numa linha que quebra', () =>
  * defeito que o design.md §3 proíbe. Abaixo do piso, o valor desce para baixo do título.
  */
 test('o título da linha de extrato tem o mesmo piso de largura do título da Row', () => {
+  // Uma régua só, e ela cresce com a fonte (`usePisoDoTitulo`, 28/09/2026): as três linhas de
+  // duas colunas — `Row`, a linha de extrato e as do Seu dia — aplicam a MESMA função.
   const row = readFileSync(join(SRC, 'components/ui/row.tsx'), 'utf8');
-  const piso = row.match(/\n  labels: \{[^}]*minWidth: (\d+)/)?.[1];
-  const extrato = row.match(/tituloDoExtrato: \{[^}]*minWidth: (\d+)/)?.[1];
-  // As linhas do Seu dia (compromisso e atrasado) seguem a mesma régua (28/09/2026).
   const agenda = readFileSync(join(SRC, 'components/feed/agenda-item.tsx'), 'utf8');
-  const doDia = agenda.match(/\n  titulo: \{[^}]*minWidth: (\d+)/)?.[1];
-  assert.ok(piso && extrato && doDia, 'os três estilos existem');
-  assert.equal(Number(extrato), Number(piso));
-  assert.equal(Number(doDia), Number(piso));
+  assert.match(row, /style=\{\[styles\.labels, pisoDoTitulo\]\}/);
+  assert.match(row, /style=\{\[styles\.tituloDoExtrato, pisoDoTitulo\]\}/);
+  assert.equal((agenda.match(/\[styles\.titulo, pisoDoTitulo\]/g) ?? []).length, 2, 'as duas linhas do Seu dia');
+  // e nenhum piso copiado à mão sobrou
+  assert.doesNotMatch(row + agenda, /minWidth: 134/);
 });
 
 test('card que arrasta tem press-in: o filho do Deslizavel é PressableScale ou desenha o pressionado', () => {
@@ -1522,7 +1522,7 @@ const VAZIO_GRANDE_PERMITIDO: Record<string, string[]> = {
   'app/notes/archived.tsx': ['Não deu para carregar o arquivo', 'Nada arquivado'], // tablet: outro painel
   'app/notes/folder/[id].tsx': ['Pasta não encontrada', 'A pasta'], // só os chips de tag (filtro) acima
   'app/notes/trash.tsx': ['Lixeira vazia'], // só a legenda de 30 dias acima
-  'app/profile/alerts.tsx': ['Nenhum alerta ainda'],
+  'app/profile/alerts.tsx': ['Nenhum alerta'],
   'app/reminders.tsx': ['Nenhum lembrete ainda'],
   'app/search.tsx': ['Procurando o quê?', 'Nada encontrado para'], // só os chips de escopo acima
   'components/agent/conversation-screen.tsx': ['Não consegui carregar essa conversa'],

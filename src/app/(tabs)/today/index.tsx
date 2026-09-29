@@ -26,7 +26,7 @@ import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { VerMais } from '@/components/ui/ver-mais';
 import { Motion, Radius, Space } from '@/design/tokens';
-import { useTemAlertaNovo } from '@/hooks/use-alertas-vistos';
+import { useAlertasNaoLidos } from '@/hooks/use-alertas-vistos';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useAgora } from '@/hooks/use-agora';
 import { useBoolPref } from '@/hooks/use-bool-pref';
@@ -100,7 +100,7 @@ function Bloco({ children }: { children: React.ReactNode }) {
  * procura em lançamentos, notas e lembretes de uma vez.
  */
 function CabecalhoDaHoje() {
-  const alertaNovo = useTemAlertaNovo();
+  const naoLidos = useAlertasNaoLidos();
   return (
     <AppHeader
       title="Hoje"
@@ -111,7 +111,7 @@ function CabecalhoDaHoje() {
           <HeaderIconButton
             icon="bell"
             label="Histórico de alertas"
-            ponto={alertaNovo}
+            contagem={naoLidos}
             onPress={() => router.push('/profile/alerts')}
           />
           <HeaderIconButton icon="magnifyingglass" label="Buscar em tudo" onPress={() => router.push('/search')} />

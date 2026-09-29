@@ -65,20 +65,41 @@ export function alertChannelLabel(channels: string[]): string | null {
 }
 
 /**
- * Tem alerta que a pessoa ainda não viu? É a bolinha do sino da Hoje (28/09/2026).
+ * O que a pessoa já leu e o que ela limpou do histórico (28/09/2026, *"o sino tem que ter os
+ * números, limpar todas as notificações e marcar como lida"*). Gravado por usuário, no aparelho.
  *
- * `vistoAte` é o `created_at` do alerta mais novo que o histórico já mostrou (vazio = nunca abriu).
- * Compara por INSTANTE, não por texto: o mesmo momento pode vir escrito com fuso diferente.
+ * Um MARCO + uma lista curta, nos dois: "todas lidas/limpas" anda o marco (o `created_at` do mais
+ * novo) e zera a lista; "esta" entra na lista. Assim a lista não cresce sem fim.
  */
-export function temAlertaNovo(maisRecente: string | null | undefined, vistoAte: string): boolean {
-  if (!maisRecente) return false;
-  const novo = Date.parse(maisRecente);
-  if (Number.isNaN(novo)) return false;
-  const visto = vistoAte ? Date.parse(vistoAte) : Number.NaN;
-  return Number.isNaN(visto) || novo > visto;
+export interface EstadoDosAlertas {
+  vistoAte: string;
+  lidos: readonly string[];
+  limpoAte: string;
+  limpos: readonly string[];
 }
 
-/** O `created_at` mais novo de uma lista — o que abrir o histórico marca como visto. */
+type AlertaComData = { id: string; created_at: string };
+
+/** Compara por INSTANTE, não por texto: o mesmo momento pode vir escrito com fuso diferente. */
+function ateOMarco(criado: string, marco: string): boolean {
+  const c = Date.parse(criado);
+  const m = marco ? Date.parse(marco) : Number.NaN;
+  return !Number.isNaN(c) && !Number.isNaN(m) && c <= m;
+}
+
+export function alertaLido(a: AlertaComData, e: EstadoDosAlertas): boolean {
+  return ateOMarco(a.created_at, e.vistoAte) || e.lidos.includes(a.id);
+}
+
+export function alertaVisivel(a: AlertaComData, e: EstadoDosAlertas): boolean {
+  return !ateOMarco(a.created_at, e.limpoAte) && !e.limpos.includes(a.id);
+}
+
+/** O número do sino: os visíveis que ainda não foram lidos. */
+export function naoLidos(itens: readonly AlertaComData[], e: EstadoDosAlertas): number {
+  return itens.filter((a) => alertaVisivel(a, e) && !alertaLido(a, e)).length;
+}
+
 export function alertaMaisNovo(rows: readonly { created_at: string }[]): string | null {
   let maior: string | null = null;
   for (const r of rows) {

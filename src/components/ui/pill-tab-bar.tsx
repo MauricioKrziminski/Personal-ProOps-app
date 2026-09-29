@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react';
 import * as Haptics from 'expo-haptics';
-import { Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   interpolateColor,
   useAnimatedStyle,
@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { progressoDeEntrada, useRelogioDeEntrada } from '@/components/motion/entrada';
-import { ThemedText } from '@/components/themed-text';
+import { Contador } from '@/components/ui/contador';
 import { Icon } from '@/components/ui/icon';
 import { centroDoSlot, distanciaDaAba, escalaDoRotulo, folgaDaMola, larguraDoAlvo, posicaoDesenhada } from '@/design/tab-pill';
 import { Elevation, Motion, Radius, Space, Type } from '@/design/tokens';
@@ -213,7 +213,7 @@ export function PillTabBar({
         <View pointerEvents="none" style={styles.fileiraDeBadges}>
           {tabs.map((tab) => (
             <View key={tab.name} style={[styles.slotEscuro, { width: slot }]}>
-              <Badge valor={tab.badge} />
+              <Contador valor={tab.badge} borda={theme.heroSurface} style={styles.badge} />
             </View>
           ))}
         </View>
@@ -274,29 +274,6 @@ function Rotulo({
   );
 }
 
-/**
- * O contador da aba — "9+" no máximo.
- *
- * ⚠️ **A fonte NÃO escala aqui**, pelo mesmo motivo do `Icon`: o badge mora numa caixa de
- * geometria fixa, e a 1,3× o "9+" quebrava em duas linhas dentro de um oval alto. O texto é pedido
- * em `px / fontScale` e o RN multiplica de volta; `flexShrink: 0` impede o "+" de descer.
- */
-function Badge({ valor }: { valor: number | undefined }) {
-  const theme = useTheme();
-  const { fontScale } = useWindowDimensions();
-  if (!valor) return null;
-  const escala = Platform.OS === 'android' ? Math.max(fontScale, 1) : 1;
-  return (
-    <View style={[styles.badge, { backgroundColor: theme.danger, borderColor: theme.heroSurface }]}>
-      <ThemedText
-        type="meta"
-        themeColor="onTint"
-        style={[styles.badgeTexto, { fontSize: Type.meta.fontSize / escala, lineHeight: Type.meta.lineHeight / escala }]}>
-        {valor > 9 ? '9+' : String(valor)}
-      </ThemedText>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   /** O fim da subida, escrito pelo React (ver `useRelogioDeEntrada`). */
@@ -342,22 +319,7 @@ const styles = StyleSheet.create({
     height: DIAMETRO,
     flexDirection: 'row',
   },
-  badge: {
-    position: 'absolute',
-    top: 0,
-    left: '50%',
-    marginLeft: 4,
-    flexDirection: 'row',
-    // Geometria FIXA: com a altura da linha escalando e a largura não, a 1,15× o selo saía oval, e
-    // o lado sem a borda escura visível lia como cortado (28/09/2026). Um dígito = círculo.
-    height: 20,
-    minWidth: 20,
-    borderRadius: Radius.pill,
-    borderWidth: 2,
-    paddingHorizontal: Space.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeTexto: { flexShrink: 0 },
+  /** Onde o contador pousa: no canto do ícone da aba. A forma é do `Contador`. */
+  badge: { top: 0, left: '50%', marginLeft: 4 },
   rotulo: { textAlign: 'center' },
 });
