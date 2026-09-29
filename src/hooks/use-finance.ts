@@ -1,3 +1,8 @@
+import { useCallback } from 'react';
+
+import type { IconName } from '@/components/ui/icon';
+import type { NoteColorName } from '@/constants/theme';
+import { aparenciaDaCategoria, nomeDaCategoria, type Categoria } from '@/lib/categorias';
 import { contaNaFatura } from '@/lib/card-status';
 import { invalidateFinance, invalidateKeys } from '@/lib/query-invalidation';
 import type { Natureza } from '@/lib/import-preview';
@@ -528,21 +533,106 @@ const RECURRING_COLUMNS =
   'id, kind, amount_cents, currency, category, description, merchant, account_id, rrule, next_run_at, active, run_attempts, last_error, created_at, dtstart, end_date, auto_confirm, edit_revision';
 
 /**
- * As categorias que o usuário realmente usa, mais usada primeiro.
+ * As categorias do espaço, mais usada primeiro: as que os lançamentos usam e as criadas no app,
+ * com ícone, cor e quantos orçamentos cada uma tem.
  *
  * Categoria é texto livre (`finance.md`): quem lança pelo WhatsApp cria categoria nova, e o
- * seletor do app só conhecia as 13 sugestões. Ver `categories_used()` na `20260909100000`.
+ * seletor do app só conhecia as 13 sugestões. Ver `categories_used()` na `20260909100000`; a
+ * aparência veio na `20260929170000`.
  */
 export function useCategoriesUsed() {
   useRealtimeInvalidate('transactions', ['categories-used']);
+  useRealtimeInvalidate('categories', ['categories-used']);
   return useQuery({
     queryKey: ['categories-used'],
-    queryFn: async (): Promise<{ category: string; uses: number }[]> => {
+    queryFn: async (): Promise<Categoria[]> => {
       const { data, error } = await supabase.rpc('categories_used');
       if (error) throw error;
-      return (data ?? []).map((r) => ({ category: r.category, uses: Number(r.uses) }));
+      return (data ?? []).map((r) => ({
+        category: r.category,
+        uses: Number(r.uses),
+        // o APK novo contra um banco sem a 20260929170000 recebe só category e uses
+        icon: (r.icon ?? null) as IconName | null,
+        color: (r.color ?? null) as NoteColorName | null,
+        budgets: Number(r.budgets ?? 0),
+      }));
     },
     staleTime: 60_000,
+  });
+}
+
+/** "Que ícone e que cor este nome tem" — a tabela primeiro, o ícone adivinhado pelo nome depois. */
+export function useAparencia() {
+  const { data } = useCategoriesUsed();
+  const categorias = data ?? SEM_CATEGORIAS;
+  return useCallback(
+    (nome: string | null | undefined, kind?: string | null) => aparenciaDaCategoria(nome, categorias, kind),
+    [categorias]
+  );
+}
+const SEM_CATEGORIAS: Categoria[] = [];
+
+/** Recusa do `rename_category` quando o nome novo já é outra categoria: a tela pergunta se junta. */
+export type CategoriaExiste = Error & { code: 'CATEGORIA_EXISTE'; existente: string };
+
+/**
+ * Cria ou edita uma categoria. Renomeando (`renomearDe` diferente de `name`), primeiro reescreve o
+ * nome em todo registro (`rename_category`) e só depois grava a aparência no nome novo.
+ */
+export function useSalvarCategoria() {
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (input: {
+      name: string;
+      icon: IconName | null;
+      color: NoteColorName | null;
+      renomearDe?: string | null;
+      juntar?: boolean;
+    }) => {
+      const name = nomeDaCategoria(input.name);
+      if (input.renomearDe && input.renomearDe !== name) {
+        const { data, error } = await supabase.rpc('rename_category', {
+          p_from: input.renomearDe,
+          p_to: name,
+          p_juntar: input.juntar ?? false,
+        });
+        if (error) {
+          const m = /CATEGORIA_EXISTE: (.+)$/.exec(error.message ?? '');
+          if (m) throw Object.assign(new Error(error.message), { code: 'CATEGORIA_EXISTE' as const, existente: m[1].trim() });
+          throw error;
+        }
+        const juntou = (data as { juntou?: boolean } | null)?.juntou;
+        if (juntou) return; // juntando, fica a aparência da que recebe
+      }
+      const { error } = await supabase.rpc('save_category', {
+        p_name: name,
+        p_icon: input.icon as string,
+        p_color: input.color as string,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['categories-used'] });
+      invalidate();
+    },
+  });
+}
+
+/** Apaga a categoria: os registros ficam sem categoria e os orçamentos dela saem. */
+export function useApagarCategoria() {
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (nome: string) => {
+      const { data, error } = await supabase.rpc('delete_category', { p_name: nome });
+      if (error) throw error;
+      return data as { lancamentos: number; orcamentos: number };
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['categories-used'] });
+      invalidate();
+    },
   });
 }
 

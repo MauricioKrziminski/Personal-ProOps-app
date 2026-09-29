@@ -207,6 +207,22 @@ const MATERIAL: Record<string, MaterialName> = {
    */
   'archivebox.fill': 'archive',
   'tray.full': 'inbox',
+  /** A grade de ícones da folha de categoria (`ICONES_DE_CATEGORIA`, `lib/categorias.ts`). */
+  'cup.and.saucer': 'local_cafe',
+  fuelpump: 'local_gas_station',
+  bus: 'directions_bus',
+  bolt: 'bolt',
+  drop: 'water_drop',
+  wifi: 'wifi',
+  'cross.case': 'medical_services',
+  tshirt: 'apparel',
+  bag: 'shopping_bag',
+  gamecontroller: 'sports_esports',
+  film: 'movie',
+  'music.note': 'music_note',
+  pawprint: 'pets',
+  'figure.run': 'directions_run',
+  'wrench.and.screwdriver': 'handyman',
 };
 
 /**
