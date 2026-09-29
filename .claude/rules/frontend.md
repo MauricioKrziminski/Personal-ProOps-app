@@ -287,33 +287,46 @@ vocabulário comum das duas plataformas.
 **Sintoma de que a regra foi violada:** `Platform.OS` dentro de `src/app/`. Se apareceu ali e não
 é regra de negócio, o lugar certo é um primitivo em `src/components/ui/`.
 
-### Formulário que OUTRA tela abriu devolve para ela ao fechar
+### Criar e editar um registro financeiro é UM formulário: `/finance/lancar` (29/09/2026)
 
-**E quando quem abre quer só o formulário, a lista nem aparece** (29/09/2026, *"devo conseguir
-criar tudo direto ali… e não ser redirecionado para a tela deles"*). O "Aplicar" do "E se…?" e os
-botões "Repetir lançamento" e "Financiamento" do lançamento abrem `/finance/nova-recorrente` e
-`/finance/novo-financiamento`: modal TRANSPARENTE que monta a tela de Recorrentes/Dívidas com
-`soFormulario` — só a folha, por cima de quem abriu. O formulário é o MESMO componente (nada
-copiado); fechar ou salvar volta para quem abriu, sem ter passado pela lista.
+*"devo conseguir criar tudo direto ali… e não ser redirecionado para a tela deles"* e *"às vezes
+ele clicou sem querer, preencheu as informações e agora tem que fechar o modal de recorrente e
+perder tudo"*. Eram três formulários em três telas (o lançamento, a folha de Recorrentes, a de
+Dívidas), costurados por `?de=`, "Voltar" e `dismiss(2)`. Hoje é uma tela modal só, com
+`Segmented` **Uma vez | Recorrente | Financiamento** no topo (spec
+`2026-09-29-formulario-unico-e-categorias-design.md`):
 
-**Aberta DE DENTRO de outro formulário, a folha EMPILHA e o botão é "Voltar"** (`?de=`,
-`TaskHeader voltar`; 29/09/2026, *"às vezes ele clicou sem querer, preencheu as informações e
-agora tem que fechar o modal de recorrente e perder tudo"*). O lançamento abre a recorrente com
-`push`, nunca `replace`: ele fica por baixo com o que foi digitado, e o "‹" (ou o voltar do
-Android) devolve a ele. Salvando a partir de um lançamento NOVO — que era só o rascunho do
-registro —, as duas saem juntas (`useVoltarQuandoFechar().aoSalvar`, `router.dismiss(2)`).
+- **Três corpos, um contrato.** `components/finance/formulario-do-lancamento.tsx`,
+  `formulario-da-serie.tsx` e `formulario-da-divida.tsx` recebem `CorpoProps`
+  (`corpo-do-lancar.ts`). O hospedeiro (`app/finance/lancar.tsx`) desenha o seletor, lê os campos
+  comuns (`Comum`, `lib/lancar.ts`: tipo, título, valor, conta, data, categoria, estabelecimento) e
+  os entrega ao corpo seguinte. Os campos continuam os da criação (`CamposDaSerie`,
+  `CamposDaCompra`) — nada copiado.
+- **Trocar de tipo não perde nada.** O estado INTEIRO de cada corpo fica guardado por tipo
+  (`registrarEstado`/`estadoGuardado`): voltar a Recorrente devolve a frequência e o fim, não só
+  o comum. A troca é um crossfade curto só no conteúdo abaixo do seletor (sem movimento com
+  Reduzir Movimento); o toque durante a saída vale só o último.
+- **"Salvar e criar outro"** remonta o corpo limpo e mantém tipo, conta e data
+  (`comumDepoisDeSalvar`) — lançar três contas seguidas sem reabrir nada.
+- **Editar abre no tipo do registro.** Trocar o tipo e salvar PERGUNTA o alcance e converte
+  (`opcoesDaConversao`, `converter_registro`; a régua mora em `finance.md` → *Mudar o tipo de um
+  registro*); voltar ao tipo original antes de salvar é edição comum.
+- **Os atalhos de tipo são UMA lista** (`ATALHOS_DE_LANCAMENTO`, rótulo e ícone): os menus
+  "Lançar" da Hoje e das Finanças, e cada um abre `hrefDoLancar(tipo)`. Escritos à mão por tela, a
+  Hoje ficou sem Recorrente e Financiamento enquanto as Finanças tinham os dois.
+- **As rotas antigas são cascas `<Redirect>`** para o formulário único, no tipo certo:
+  `transaction-form`, `nova-recorrente`, `novo-financiamento`, `recurring?edit=`/`?create=1` e
+  `debts?create=financing`/`?id=&edit=1` — APK em campo, notificação e link antigo continuam
+  chegando. Rota nova de criar ou editar esses três tipos não nasce: é `hrefDoLancar`.
 
-**Os atalhos de tipo de lançamento são UMA lista** (`ATALHOS_DE_LANCAMENTO`, rótulo e ícone):
-os menus "Lançar" da Hoje e das Finanças e o topo do "Novo lançamento". Escritos à mão por tela,
-a Hoje ficou sem Recorrente e Financiamento enquanto as Finanças tinham os dois.
+### Formulário num `Sheet` que OUTRA tela abriu devolve para ela ao fechar
 
-**Quatro telas hospedam formulário num `Sheet`, e chegar neles de fora é um `push` na tela da
-LISTA com um parâmetro** — `/finance/recurring?edit=`, `/finance/installments?edit=`,
-`/finance/debts?create=financing` e `/finance/accounts?create=1|cartao` (todo "Cadastrar conta",
-"Cadastrar cartão" e "Novo cartão" de outra tela, 25/09/2026: antes caíam na lista). Fechando o sheet, a lista ficava: a pessoa era largada numa
-tela que ela nunca pediu. A queixa foi literal (15/09/2026): *"cliquei em editar a compra
-inteira e quando eu clico em voltar, ao invés de voltar para a tela onde eu estava, ele me leva
-para a tela de Parceladas"*.
+**Duas telas ainda hospedam formulário num `Sheet`, e chegar neles de fora é um `push` na tela
+da LISTA com um parâmetro** — `/finance/installments?edit=` e `/finance/accounts?create=1|cartao`
+(todo "Cadastrar conta", "Cadastrar cartão" e "Novo cartão" de outra tela, 25/09/2026: antes caíam
+na lista). Fechando o sheet, a lista ficava: a pessoa era largada numa tela que ela nunca pediu.
+A queixa foi literal (15/09/2026): *"cliquei em editar a compra inteira e quando eu clico em
+voltar, ao invés de voltar para a tela onde eu estava, ele me leva para a tela de Parceladas"*.
 
 O `push` está certo — é como a pilha sabe voltar. O que faltava era **fechar o formulário fechar
 também a tela que só existia para hospedá-lo**: `useVoltarQuandoFechar`

@@ -610,3 +610,11 @@ Spec: `docs/superpowers/specs/2026-09-24-dicas-e-guia-design.md`.
 | "Apagar" numa prevista (`skip_recurring_occurrence`) | `delete_transaction` sobre a ocorrência (gravada pelo passo acima) chega ao mesmo lugar: o gatilho `ocorrencia_apagada_nao_volta` marca a data, e o agendador a respeita. |
 | Data de pagamento de dívida com "Este e os próximos"/"Todos" → dia do contrato e pagamentos do alcance (`update_debt_payment_due_day`) | `resource_update debts due_day` (-1 = último dia) muda o contrato; a data de um pagamento, `update_transaction`. São dois pedidos na conversa, não um. |
 | "Último dia de todo mês" na compra parcelada fora do cartão (`*_last_day`) | Correção da compra: `update_transaction` com `recurrence="FREQ=MONTHLY;BYMONTHDAY=-1"` (sem campo novo — o schema está no teto). A política recusa no cartão antes do SIM e a frase diz "parcelas no último dia de cada mês"; a tool grava `update_installment_plan` + `private.parcelas_no_ultimo_dia` numa instrução só. CRIAR parcelada pelo agente continua só no cartão, onde o último dia não vale. Sonda: `scripts/probe_parcelas_no_ultimo_dia.py`. |
+
+## Mudar o tipo de um registro (29/09/2026)
+
+Spec: `docs/superpowers/specs/2026-09-29-formulario-unico-e-categorias-design.md` (o formulário único, `/finance/lancar`).
+
+| app | agente |
+|---|---|
+| Editar um registro, trocar Uma vez \| Recorrente \| Financiamento e salvar: Converter / Só esta / Desta em diante / Todas, apagando as anteriores / Manter e criar um novo (`converter_registro`) | **não — só no app, por decisão.** O agente não converte: pela conversa o mesmo resultado sai em dois pedidos que ele já faz (criar o registro novo; apagar ou editar o antigo), cada um com o SIM dele. Juntar os dois numa ação exigiria campo novo em `FinanceAction`, que está no teto de 252, e a opção "Todas" apaga o que já foi pago — caminho destrutivo que a tela confirma à parte |

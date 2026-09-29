@@ -103,8 +103,8 @@
     formato (escrita pelo WhatsApp) some da projeção até a rodada.
   - **Uma tela só na ocorrência**: o formulário do lançamento de uma série abre com "Só esta |
     Esta e as próximas" no topo. "Só esta" edita a linha, com UMA data (o vencimento, fora do
-    cartão). "Esta e as próximas" desenha os MESMOS campos da folha de Recorrentes
-    (`CamposDaSerie`) e grava em duas partes, nesta ordem (`mudancasDaOcorrencia`, `lib/serie.ts`):
+    cartão). "Esta e as próximas" desenha os MESMOS campos do corpo Recorrente do
+    formulário único (`CamposDaSerie`) e grava em duas partes, nesta ordem (`mudancasDaOcorrencia`, `lib/serie.ts`):
     valor, título, estabelecimento, categoria e conta desta em diante por
     `update_transaction_scoped` (ancorada nela), e só depois tipo, fim, "entra como pago" e o
     calendário por `update_recurring_series`. Tipo vale para todas as em aberto da série.
@@ -834,8 +834,8 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
   que não só manter um [botão]?… quando ele aplicar aparece o forms completo"*). A folha pede tipo,
   forma (uma vez | parcelado | repete | financiamento), valor, parcelas ou frequência, **conta ou
   cartão** e **dia** — a conta decide de onde a fatura e a parcela saem, e o dia em qual fatura a
-  compra cai. Título, categoria e o resto vêm no formulário COMPLETO, que o "Aplicar" abre
-  pré-preenchido (`paramsDoAplicar`); salvar lá tira a hipótese PELO ID, pela promessa (a lista
+  compra cai. Título, categoria e o resto vêm no formulário COMPLETO — o único, `/finance/lancar`,
+  no tipo da forma —, que o "Aplicar" abre pré-preenchido (`paramsDoAplicar`); salvar lá tira a hipótese PELO ID, pela promessa (a lista
   pode ter mudado com o formulário aberto). Parcelado e financiamento exigem conta; "sem conta"
   só muda a visão geral e a linha diz isso.
 
@@ -975,6 +975,51 @@ fica tem motivo lógico escrito na frase. O que isso mudou no domínio:
   `resource_update goals` com os campos do aporte.
 - **Parcelas já pagas pelo agente**: `update_transaction` com `already_paid_count` sobre a compra,
   pelo 9º argumento de `update_installment_plan` (para mais ou para menos).
+
+## Mudar o tipo de um registro (`converter_registro`, 29/09/2026)
+
+No formulário único (`frontend.md` → `/finance/lancar`), editar um registro e trocar o seletor
+(Uma vez | Recorrente | Financiamento) e salvar CONVERTE: `public.converter_registro(origem,
+alcance, destino)` encerra a origem pelo alcance e cria o destino **numa transação só** — qualquer
+recusa desfaz tudo, e a tela fica aberta com o que foi digitado. O destino é o MESMO `{tipo,
+dados}` de `registroDaHipotese` e nasce por `private.criar_registro_da_hipotese`, o caminho de
+criação do `simular`: não existe uma segunda cópia da regra de criar.
+
+**As opções dependem do que foi aberto** (`opcoesDaConversao`, `lib/lancar.ts`, com teste):
+
+| origem | pergunta |
+|---|---|
+| lançamento avulso | **Converter** (`converter`) · Manter e criar um novo |
+| série, compra ou dívida SEM passado | [Só esta] · **Converter** (`todas`) · Manter o atual e criar um novo |
+| série, compra ou dívida COM passado | [Só esta] · Desta em diante · **Todas, apagando as anteriores** (confirma antes) · Manter o atual e criar um novo |
+
+"Só esta" aparece só quando o que se abriu é uma ocorrência de recorrente.
+
+- **`converter` é SÓ do avulso**: a própria linha vira o destino, com o MESMO id (lançamento,
+  parcelada por `convert_transaction_to_installments`, 1ª ocorrência da série no dia do `dtstart`,
+  ou 1º pagamento do financiamento se já estava paga). Sem passado, "Todas" e "Desta em diante"
+  dão o mesmo resultado, e a tela escreve **"Converter"** mas manda `todas` — o banco recusa
+  `desta_em_diante`/`todas` num avulso e `converter` numa série.
+- **Só esta**: a ocorrência sai da série (a data fica pulada por `skip_recurring_occurrence`, e o
+  agendador não a recria) e é convertida no lugar.
+- **Desta em diante**: o passado fica como histórico. A série termina na véspera da âncora e as em
+  aberto dali em diante saem; a compra perde as parcelas não travadas (sobrando uma, ela vira
+  lançamento); a dívida é arquivada com os pagamentos. **A âncora é a próxima data em aberto**:
+  aberta pela série, o `next_run_at` — a ocorrência ATRASADA antes dela fica como conta em aberto;
+  aberta por uma ocorrência, a data dela (o vencimento fora do cartão, a data da compra nele).
+- **Todas**: a origem some INTEIRA, pago incluído (dívida por `delete_debt`) — por isso confirma.
+  Linha numa fatura paga, adiada ou paga em parte recusa com a frase e o caminho.
+- **Manter**: nada muda na origem; só nasce o destino.
+
+**"Tem passado" é palpite da rota, e a dúvida vale como "tem".** `passado=0` só vem de quem SABE
+(o avulso; a lista de Dívidas por `installments_paid`), e sem o parâmetro o hospedeiro assume que
+tem. Na dívida o hospedeiro confere a carregada: logo depois do "Paguei" a linha em cache ainda
+diz 0, e o "Converter" sem confirmação viraria `todas`, apagando os pagamentos.
+
+**Origem de outro espaço recusa, em todo alcance** ("manter" inclusive): o destino nasce no espaço
+PADRÃO de quem chama, e converter ligaria uma linha do espaço A a uma série do B, em silêncio.
+`supabase/tests/converter_registro.sql` prende os alcances e as recusas. O agente não converte
+(`docs/AGENTE-PARIDADE-COM-O-APP.md`).
 
 ## Rotativo — a fatura vencida que vai para a próxima
 
