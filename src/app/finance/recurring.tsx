@@ -116,7 +116,7 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
  * tudo direto ali"* (29/09/2026): empurrar a tela de Recorrentes era levá-la para outro lugar.
  */
 export default function RecurringScreen({ soFormulario = false }: { soFormulario?: boolean } = {}) {
-  const params = useLocalSearchParams<{ create?: string; edit?: string; kind?: string; amount?: string; description?: string; merchant?: string; category?: string; account?: string; start?: string; deHipotese?: string; repete?: string }>();
+  const params = useLocalSearchParams<{ create?: string; edit?: string; kind?: string; amount?: string; description?: string; merchant?: string; category?: string; account?: string; start?: string; deHipotese?: string; de?: string; repete?: string }>();
   const theme = useTheme();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
@@ -135,6 +135,12 @@ export default function RecurringScreen({ soFormulario = false }: { soFormulario
   const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
   // `?create=1` já nasce vindo de fora (é o "Recorrente" do lançamento e o atalho do Financeiro).
   const volta = useVoltarQuandoFechar(params.create === '1');
+  /**
+   * `?de=`: aberta DE DENTRO do lançamento ("Recorrente"/"Financiamento" no topo dele). O botão vira
+   * "Voltar" e devolve ao lançamento com o que foi digitado; salvando um lançamento NOVO (que era só
+   * o rascunho deste registro), os dois fecham juntos.
+   */
+  const deOutroFormulario = params.de === 'novo-lancamento' || params.de === 'lancamento';
   /** `?deHipotese=`: aberta pelo "Aplicar" do "E se…?" — criar tira aquela hipótese do rascunho. */
   const { tirar } = useRascunho();
   /** A tela ainda está aberta? O que é dela (toast, fechar) só roda com ela montada. */
@@ -310,7 +316,7 @@ export default function RecurringScreen({ soFormulario = false }: { soFormulario
         if (params.deHipotese) tirar(params.deHipotese);
         if (!montado.current) return;
         toast({ message: 'Recorrência criada.', tone: 'success' });
-        volta.aoFechar(() => setForm(null));
+        volta.aoSalvar(() => setForm(null), params.de === 'novo-lancamento');
       },
       () => {
         if (montado.current) toast({ message: 'Não deu para criar a recorrência.', tone: 'error' });
@@ -592,6 +598,7 @@ export default function RecurringScreen({ soFormulario = false }: { soFormulario
       <TaskHeader
         title={form?.id ? 'Editar recorrência' : 'Nova recorrência'}
         onClose={() => volta.aoFechar(() => setForm(null))}
+        voltar={deOutroFormulario}
         action={
           <Button
             label={form?.id ? 'Salvar' : 'Criar'}

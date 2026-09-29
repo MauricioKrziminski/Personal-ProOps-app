@@ -184,7 +184,13 @@ export default function DebtsScreen({ soFormulario = false }: { soFormulario?: b
   const brl = useBRL();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
-  const params = useLocalSearchParams<{ create?: string; id?: string; edit?: string; deHipotese?: string; parcela?: string; parcelas?: string; conta?: string; data?: string }>();
+  const params = useLocalSearchParams<{ create?: string; id?: string; edit?: string; deHipotese?: string; de?: string; parcela?: string; parcelas?: string; conta?: string; data?: string }>();
+  /**
+   * `?de=`: aberta DE DENTRO do lançamento ("Recorrente"/"Financiamento" no topo dele). O botão vira
+   * "Voltar" e devolve ao lançamento com o que foi digitado; salvando um lançamento NOVO (que era só
+   * o rascunho deste registro), os dois fecham juntos.
+   */
+  const deOutroFormulario = params.de === 'novo-lancamento' || params.de === 'lancamento';
   /**
    * `?deHipotese=` (spec 2026-09-29): aberto pelo "Aplicar" do "E se…?", o financiamento nasce com
    * a parcela, as parcelas, a conta e a data da hipótese; salvar a tira do rascunho pelo id.
@@ -481,7 +487,7 @@ export default function DebtsScreen({ soFormulario = false }: { soFormulario?: b
     const callbacks = {
         onSuccess: () => {
           toast({ message: form.id ? 'Dívida atualizada.' : 'Dívida cadastrada.', tone: 'success' });
-          volta.aoFechar(() => setForm(null));
+          volta.aoSalvar(() => setForm(null), !form.id && params.de === 'novo-lancamento');
         },
         onError: (error: Error) =>
           toast({
@@ -1014,6 +1020,7 @@ export default function DebtsScreen({ soFormulario = false }: { soFormulario?: b
           <TaskHeader
             title={form?.id ? 'Editar dívida' : 'Nova dívida'}
             onClose={() => volta.aoFechar(() => setForm(null))}
+            voltar={deOutroFormulario}
             action={
               <Button
                 label="Salvar"

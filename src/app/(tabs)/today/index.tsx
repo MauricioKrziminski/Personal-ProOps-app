@@ -22,6 +22,7 @@ import { useBRL } from '@/components/ui/conceal';
 import { Dica } from '@/components/ui/dica';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ExtendedFab } from '@/components/ui/extended-fab';
+import { ATALHOS_DE_LANCAMENTO } from '@/lib/atalhos-de-lancamento';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { VerMais } from '@/components/ui/ver-mais';
@@ -515,9 +516,12 @@ export default function TodayScreen() {
             icon="plus"
             onPress={() =>
               showItemActions('Lançar', [
-                { label: 'Gasto ou receita', onPress: () => router.push('/finance/transaction-form') },
-                { label: 'Lembrete', onPress: () => router.push('/reminder-form') },
-                { label: 'Nota', onPress: () => router.push('/notes/new') },
+                // Os MESMOS tipos de lançamento das Finanças (`ATALHOS_DE_LANCAMENTO`), e o que é da Hoje.
+                { ...ATALHOS_DE_LANCAMENTO.lancamento, onPress: () => router.push('/finance/transaction-form') },
+                { ...ATALHOS_DE_LANCAMENTO.recorrente, onPress: () => router.push({ pathname: '/finance/nova-recorrente', params: { create: '1' } }) },
+                { ...ATALHOS_DE_LANCAMENTO.financiamento, onPress: () => router.push({ pathname: '/finance/novo-financiamento', params: { create: 'financing' } }) },
+                { label: 'Lembrete', icon: 'bell', onPress: () => router.push('/reminder-form') },
+                { label: 'Nota', icon: 'note.text', onPress: () => router.push('/notes/new') },
               ])
             }
           />

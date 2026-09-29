@@ -273,7 +273,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === 'expo-haptics') return { selectionAsync() {}, notificationAsync() {}, NotificationFeedbackType: { Success: 'success', Warning: 'warning' } };
       // `back` é navegação como qualquer outra e ENTRA na lista: é o que prende o "fechar um
       // formulário que outra tela abriu devolve para ela" (`useVoltarQuandoFechar`).
-      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => options.params ?? ({ ...(file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), ...(options.create !== false ? { create: 'financing' } : {}) }), useFocusEffect: () => {}, useIsFocused: () => true, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }), canGoBack: () => !options.primeiraDaPilha } };
+      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => options.params ?? ({ ...(file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), ...(options.create !== false ? { create: 'financing' } : {}) }), useFocusEffect: () => {}, useIsFocused: () => true, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }), dismiss: (n?: number) => navigations.push({ dismiss: n ?? 1 }), canDismiss: () => !options.primeiraDaPilha, canGoBack: () => !options.primeiraDaPilha } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
       if (name === '@/lib/supabase' && file.endsWith('finance/recurring.tsx')) return { supabase: {
@@ -345,7 +345,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/components/ui/glass-backdrop') return { GlassBackdrop: 'GlassBackdrop', supportsLiquidGlass: () => false };
       if (name === '@/hooks/use-note-sort') return { SORT_LABEL: {}, useNoteSort: () => ['manual', () => {}] };
@@ -2948,7 +2948,12 @@ test('Hoje: "Lançar" cria lançamento, lembrete ou nota ali mesmo', () => {
   const fab = ui.nodes().find((n: any) => n.type === 'ExtendedFab' && n.props.label === 'Lançar');
   assert.ok(fab, 'a Hoje tem o Lançar');
   ui.interact(() => fab.props.onPress());
-  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Gasto ou receita', 'Lembrete', 'Nota']);
+  // Os MESMOS tipos de lançamento das Finanças (29/09/2026, "padronize no app inteiro"), cada um
+  // com o seu ícone, e o que é da Hoje: lembrete e nota.
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Gasto ou receita', 'Recorrente', 'Financiamento', 'Lembrete', 'Nota']);
+  assert.ok(ui.actions.every((a: any) => a.icon));
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Recorrente').onPress());
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { pathname: '/finance/nova-recorrente', params: { create: '1' } }, 'só a folha, por cima da Hoje');
 });
 
 /** Organizar pastas não cria (25/09/2026): renomear abre a MESMA folha de "Nova pasta". */
@@ -3717,4 +3722,34 @@ test('Hoje: o Seu dia mostra a MESMA contagem da aba — é dele que o número f
   });
   const seuDia = ui.nodes().find((n: any) => n.type === 'BlockHeader' && n.props.title === 'Seu dia');
   assert.equal(seuDia.props.count, 2, 'a luz de hoje e o lembrete de hoje; nem a água (próximos dias), nem o Pix, nem o orçamento');
+});
+
+test('Recorrente e financiamento abertos DO lançamento: "Voltar" devolve ao lançamento; salvar um lançamento novo fecha os dois', async () => {
+  // 29/09/2026, *"o botão desse novo modal tem que ser de voltar… às vezes ele clicou sem querer,
+  // preencheu as informações e agora tem que fechar o modal de recorrente e perder tudo"*.
+  const rec = screen('src/app/finance/recurring.tsx', { props: { soFormulario: true }, segurarMutacoes: true,
+    params: { create: '1', de: 'novo-lancamento', kind: 'expense', amount: '5000', start: '06/10/2026', description: 'Academia' } });
+  const cab = () => rec.nodes().find((n: any) => n.type === 'TaskHeader');
+  assert.equal(cab().props.voltar, true, 'o cabeçalho diz Voltar, não Fechar');
+  rec.interact(() => cab().props.onClose());
+  assert.deepEqual(JSON.parse(JSON.stringify(rec.navigations)), [{ back: true }], 'volta UMA tela: o lançamento, com o que foi digitado');
+  const rec2 = screen('src/app/finance/recurring.tsx', { props: { soFormulario: true }, segurarMutacoes: true,
+    params: { create: '1', de: 'novo-lancamento', kind: 'expense', amount: '5000', start: '06/10/2026', description: 'Academia' } });
+  rec2.interact(() => rec2.nodes().find((n: any) => n.type === 'TaskHeader').props.action.props.onPress());
+  (rec2.pedidos.at(-1) as any).resolver('rec-1');
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(JSON.parse(JSON.stringify(rec2.navigations.at(-1))), { dismiss: 2 }, 'o lançamento era o rascunho dela: fecham os dois');
+  // editando um lançamento que já existe, salvar volta para ele
+  const edit = screen('src/app/finance/recurring.tsx', { props: { soFormulario: true }, segurarMutacoes: true,
+    params: { create: '1', de: 'lancamento', kind: 'expense', amount: '5000', start: '06/10/2026', description: 'Academia' } });
+  edit.interact(() => edit.nodes().find((n: any) => n.type === 'TaskHeader').props.action.props.onPress());
+  (edit.pedidos.at(-1) as any).resolver('rec-1');
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(JSON.parse(JSON.stringify(edit.navigations.at(-1))), { back: true });
+  // financiamento: o mesmo Voltar
+  const fin = screen(debtsFile, { props: { soFormulario: true }, params: { create: 'financing', de: 'novo-lancamento' } });
+  assert.equal(fin.nodes().find((n: any) => n.type === 'TaskHeader').props.voltar, true);
+  // aberto de fora de um formulário (o Aplicar, o menu Lançar), continua o ✕
+  const solto = screen(debtsFile, { props: { soFormulario: true }, params: { create: 'financing' } });
+  assert.ok(!solto.nodes().find((n: any) => n.type === 'TaskHeader').props.voltar);
 });

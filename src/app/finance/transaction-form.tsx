@@ -25,6 +25,7 @@ import { Screen } from '@/components/ui/screen';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useRascunho } from '@/hooks/use-rascunho';
 import { pendenciaDoAplicar } from '@/lib/hipotese';
+import { ATALHOS_DE_LANCAMENTO } from '@/lib/atalhos-de-lancamento';
 import type { EntradaLancamento, EntradaParcelada } from '@/lib/escrita';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { Segmented } from '@/components/ui/segmented';
@@ -1093,21 +1094,21 @@ function TransactionForm({
         */}
         {!editing || !(editing.recurring_id || editing.installment_plan_id || editing.debt_id) ? (
           <View style={styles.outrosRegistros}>
-            <Button label="Recorrente" icon="arrow.triangle.2.circlepath" variant="secondary" style={styles.outroRegistro} onPress={() => {
+            <Button label={ATALHOS_DE_LANCAMENTO.recorrente.label} icon={ATALHOS_DE_LANCAMENTO.recorrente.icon} variant="secondary" style={styles.outroRegistro} onPress={() => {
               const values = getValues();
-              const destino = { pathname: '/finance/nova-recorrente' as const, params: {
-                create: '1', kind: values.kind === 'income' ? 'income' : 'expense',
+              router.push({ pathname: '/finance/nova-recorrente', params: {
+                create: '1', de: editing ? 'lancamento' : 'novo-lancamento', kind: values.kind === 'income' ? 'income' : 'expense',
                 amount: String(values.amount_cents), description: values.description,
                 merchant: values.merchant?.trim() ?? '',
                 category: values.category ?? '', account: values.account_id ?? '', start: values.occurred_at,
-              } };
-              // Criando, o formulário é descartável e `replace` evita voltar para um rascunho
-              // pela metade. Editando, o lançamento continua existindo — `push` devolve para ele.
-              if (editing) router.push(destino);
-              else router.replace(destino);
+              } });
+              // `push`, nunca `replace`: o lançamento fica POR BAIXO com o que foi digitado, e o
+              // "Voltar" da recorrente devolve a ele (29/09/2026, *"às vezes ele clicou sem
+              // querer… e agora tem que fechar o modal de recorrente e perder tudo"*). Salvando a
+              // recorrente de um lançamento NOVO, os dois fecham juntos (`aoSalvar`).
             }} />
             {!editing ? (
-              <Button label="Financiamento" icon="building.columns" variant="secondary" style={styles.outroRegistro} onPress={() => router.push({ pathname: '/finance/novo-financiamento', params: { create: 'financing' } })} />
+              <Button label={ATALHOS_DE_LANCAMENTO.financiamento.label} icon={ATALHOS_DE_LANCAMENTO.financiamento.icon} variant="secondary" style={styles.outroRegistro} onPress={() => router.push({ pathname: '/finance/novo-financiamento', params: { create: 'financing', de: 'novo-lancamento' } })} />
             ) : null}
           </View>
         ) : null}

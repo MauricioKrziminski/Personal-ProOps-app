@@ -18,6 +18,7 @@ import { useBRL } from '@/components/ui/conceal';
 import { CountUpMoney } from '@/components/ui/count-up-money';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ExtendedFab } from '@/components/ui/extended-fab';
+import { ATALHOS_DE_LANCAMENTO } from '@/lib/atalhos-de-lancamento';
 import { HeroPanel } from '@/components/ui/hero-panel';
 import { ItemLink } from '@/components/ui/item-link';
 import { LedgerRow } from '@/components/ui/ledger-row';
@@ -274,9 +275,9 @@ export default function FinanceScreen() {
 
   const lancar = () =>
     showItemActions('Lançar', [
-      { label: 'Gasto ou receita', onPress: () => router.push({ pathname: '/finance/transaction-form', params: { month } }) },
-      { label: 'Recorrente', onPress: () => router.push({ pathname: '/finance/nova-recorrente', params: { create: '1' } }) },
-      { label: 'Financiamento', onPress: () => router.push({ pathname: '/finance/novo-financiamento', params: { create: 'financing' } }) },
+      { ...ATALHOS_DE_LANCAMENTO.lancamento, onPress: () => router.push({ pathname: '/finance/transaction-form', params: { month } }) },
+      { ...ATALHOS_DE_LANCAMENTO.recorrente, onPress: () => router.push({ pathname: '/finance/nova-recorrente', params: { create: '1' } }) },
+      { ...ATALHOS_DE_LANCAMENTO.financiamento, onPress: () => router.push({ pathname: '/finance/novo-financiamento', params: { create: 'financing' } }) },
     ]);
 
   if (!pronta) {

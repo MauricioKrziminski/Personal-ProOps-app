@@ -1839,17 +1839,34 @@ test('Lançamento: "Recorrente" e "Financiamento" ficam NO TOPO, antes do tipo, 
   const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
   // Os MESMOS rótulos do "Lançar" das Finanças (uma intenção, um rótulo); "Repetir lançamento"
   // não cabia ao lado de "Financiamento" e a fileira empilhava com larguras diferentes.
-  const repetir = fonte.indexOf('label="Recorrente"');
-  const fin = fonte.indexOf('label="Financiamento"');
+  const repetir = fonte.indexOf('label={ATALHOS_DE_LANCAMENTO.recorrente.label}');
+  const fin = fonte.indexOf('label={ATALHOS_DE_LANCAMENTO.financiamento.label}');
   assert.ok(repetir > 0 && fin > 0);
   assert.ok(repetir < fonte.indexOf('options={KINDS}') && fin < fonte.indexOf('options={KINDS}'), 'antes do tipo');
   for (const i of [repetir, fin]) {
     const botao = fonte.slice(i, fonte.indexOf('onPress', i));
     assert.doesNotMatch(botao, /size="sm"/, 'tamanho normal');
-    assert.match(botao, /icon="/, 'com ícone');
+    assert.match(botao, /icon=\{ATALHOS_DE_LANCAMENTO\.\w+\.icon\}/, 'com ícone');
     assert.match(botao, /style=\{styles\.outroRegistro\}/, 'os dois dividem a linha por igual');
   }
   assert.match(fonte, /outroRegistro: \{ flexGrow: 1 \}/);
   const estilo = fonte.slice(fonte.indexOf('outrosRegistros: {'), fonte.indexOf('}', fonte.indexOf('outrosRegistros: {')));
   assert.match(estilo, /flexWrap: 'wrap'/, 'com fonte grande a fileira quebra, não corta');
+});
+
+test('Atalhos de lançamento: o formulário EMPILHA o outro tipo (nunca troca), e os menus "Lançar" são os mesmos no app inteiro', () => {
+  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  // `replace` descartava o lançamento digitado; com `push` ele fica por baixo e o Voltar volta nele
+  assert.doesNotMatch(fonte, /router\.replace\(destino\)/);
+  assert.match(fonte, /de: editing \? 'lancamento' : 'novo-lancamento'/);
+  assert.match(fonte, /pathname: '\/finance\/novo-financiamento', params: \{ create: 'financing', de: 'novo-lancamento' \}/);
+  // uma lista só: rótulo e ícone saem de ATALHOS_DE_LANCAMENTO, nos dois menus e no formulário
+  for (const arquivo of ['app/(tabs)/finance/index.tsx', 'app/(tabs)/today/index.tsx', 'app/finance/transaction-form.tsx']) {
+    const f = readFileSync(join(SRC, arquivo), 'utf8');
+    assert.match(f, /ATALHOS_DE_LANCAMENTO/, arquivo);
+    assert.doesNotMatch(f, /label: 'Gasto ou receita'|label: 'Recorrente'|label: 'Financiamento'|label="Recorrente"|label="Financiamento"/, `${arquivo} escreve o rótulo à mão`);
+  }
+  // a Hoje oferece os MESMOS tipos de lançamento que as Finanças
+  const hoje = readFileSync(join(SRC, 'app/(tabs)/today/index.tsx'), 'utf8');
+  for (const k of ['lancamento', 'recorrente', 'financiamento']) assert.match(hoje, new RegExp(`ATALHOS_DE_LANCAMENTO\\.${k}`));
 });

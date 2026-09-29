@@ -296,6 +296,17 @@ botões "Repetir lançamento" e "Financiamento" do lançamento abrem `/finance/n
 `soFormulario` — só a folha, por cima de quem abriu. O formulário é o MESMO componente (nada
 copiado); fechar ou salvar volta para quem abriu, sem ter passado pela lista.
 
+**Aberta DE DENTRO de outro formulário, a folha EMPILHA e o botão é "Voltar"** (`?de=`,
+`TaskHeader voltar`; 29/09/2026, *"às vezes ele clicou sem querer, preencheu as informações e
+agora tem que fechar o modal de recorrente e perder tudo"*). O lançamento abre a recorrente com
+`push`, nunca `replace`: ele fica por baixo com o que foi digitado, e o "‹" (ou o voltar do
+Android) devolve a ele. Salvando a partir de um lançamento NOVO — que era só o rascunho do
+registro —, as duas saem juntas (`useVoltarQuandoFechar().aoSalvar`, `router.dismiss(2)`).
+
+**Os atalhos de tipo de lançamento são UMA lista** (`ATALHOS_DE_LANCAMENTO`, rótulo e ícone):
+os menus "Lançar" da Hoje e das Finanças e o topo do "Novo lançamento". Escritos à mão por tela,
+a Hoje ficou sem Recorrente e Financiamento enquanto as Finanças tinham os dois.
+
 **Quatro telas hospedam formulário num `Sheet`, e chegar neles de fora é um `push` na tela da
 LISTA com um parâmetro** — `/finance/recurring?edit=`, `/finance/installments?edit=`,
 `/finance/debts?create=financing` e `/finance/accounts?create=1|cartao` (todo "Cadastrar conta",

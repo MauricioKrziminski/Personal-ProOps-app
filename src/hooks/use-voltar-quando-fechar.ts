@@ -26,18 +26,32 @@ import { router } from 'expo-router';
  */
 export function useVoltarQuandoFechar(inicial = false) {
   const [veioDeFora, setVeioDeFora] = useState(inicial);
+  /** Use no lugar do `setForm(null)`: fecha e, se outra tela abriu, volta para ela. */
+  const aoFechar = (fechar: () => void) => {
+    fechar();
+    if (veioDeFora) {
+      setVeioDeFora(false);
+      // Aberto por link (notificação, deep link) a tela É a primeira da pilha: não há para onde
+      // voltar, e o `back` virava "GO_BACK was not handled". Aí a lista fica, que é o destino certo.
+      if (router.canGoBack()) router.back();
+    }
+  };
   return {
     /** Chame ao CONSUMIR o parâmetro que abriu o formulário. */
     marcar: () => setVeioDeFora(true),
-    /** Use no lugar do `setForm(null)`: fecha e, se outra tela abriu, volta para ela. */
-    aoFechar: (fechar: () => void) => {
-      fechar();
-      if (veioDeFora) {
+    aoFechar,
+    /**
+     * Use no sucesso do salvar. `fecharAOrigem`: a tela de baixo era só o rascunho DESTE registro
+     * (o "Novo lançamento" que virou recorrente) — salvo, as duas saem juntas.
+     */
+    aoSalvar: (fechar: () => void, fecharAOrigem: boolean) => {
+      if (fecharAOrigem && router.canDismiss()) {
+        fechar();
         setVeioDeFora(false);
-        // Aberto por link (notificação, deep link) a tela É a primeira da pilha: não há para onde
-        // voltar, e o `back` virava "GO_BACK was not handled". Aí a lista fica, que é o destino certo.
-        if (router.canGoBack()) router.back();
+        router.dismiss(2);
+        return;
       }
+      aoFechar(fechar);
     },
   };
 }
