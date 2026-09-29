@@ -465,7 +465,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     if (node.type === 'FinanceAnalysisPanes') visit(node.props.compact);
     // `CamposDaSerie` é um grupo de campos sem hook: desenhado aqui, a tela é a que a pessoa vê.
     // O `FormularioDaSerie` tem hooks: eles rodam depois dos da tela, na mesma ordem a cada render.
-    if (typeof node.type === 'function' && ['CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie'].includes(node.type.name)) visit(node.type(node.props));
+    if (typeof node.type === 'function' && ['CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie'].includes(node.type.name)) visit(node.type(node.props));
     // No celular o `AdaptivePanes` desenha o slot de uma coluna só (Pastas, Recorrentes…).
     if (node.type === 'AdaptivePanes') visit(node.props.singlePaneContent ?? node.props.main);
     visit(node.props.ListHeaderComponent);
@@ -3773,4 +3773,19 @@ test('FormularioDaSerie: cria, e "Salvar e criar outro" avisa o hospedeiro sem f
   const edit = screen('src/components/finance/formulario-da-serie.tsx', { componente: 'FormularioDaSerie', recurring: [{ id: 'r1', kind: 'expense', amount_cents: 5000, description: 'Academia', rrule: 'FREQ=MONTHLY;BYMONTHDAY=6', next_run_at: '2026-10-06T12:00:00Z', dtstart: '2026-10-06T12:00:00Z', active: true, account_id: null, category: null, merchant: null, end_date: null, auto_confirm: false }],
     props: { comum, registrarComum: () => {}, editandoId: 'r1', onSalvo: () => {}, onFechar: () => {} } });
   assert.equal(edit.nodes().some((n: any) => n.props?.label === 'Salvar e criar outro'), false);
+});
+
+test('FormularioDaSerie: editando com a série ainda não carregada, espera — nunca vira criação', () => {
+  const comum = { kind: 'expense', descricao: 'Academia', valorCents: 5000, contaId: 'cc', dataBR: '06/10/2026', categoria: null };
+  const props = { comum, registrarComum: () => {}, registrarEstado: () => {}, editandoId: 'r1', onSalvo: () => {}, onFechar: () => {} };
+  const botoes = (ui: any) => ui.nodes().filter((n: any) => n.type === 'Button').map((n: any) => n.props.label);
+  const vazio = screen('src/components/finance/formulario-da-serie.tsx', { componente: 'FormularioDaSerie', recurring: [], props });
+  assert.equal(botoes(vazio).some((l: string) => l === 'Criar' || l === 'Salvar e criar outro'), false, 'sem a série não há como criar');
+  vazio.interact((nodes: any[]) => nodes.forEach((n) => n.props?.onPress?.()));
+  assert.equal(vazio.writes.length, 0, 'nenhum toque grava');
+  assert.ok(vazio.nodes().some((n: any) => n.type === 'SkeletonList'), 'espera com esqueleto');
+  const serie = { id: 'r1', kind: 'expense', amount_cents: 5000, description: 'Academia', rrule: 'FREQ=MONTHLY;BYMONTHDAY=6', next_run_at: '2026-10-06T12:00:00Z', dtstart: '2026-10-06T12:00:00Z', active: true, account_id: null, category: null, merchant: null, end_date: null, auto_confirm: false };
+  const pronto = screen('src/components/finance/formulario-da-serie.tsx', { componente: 'FormularioDaSerie', recurring: [serie], props });
+  assert.ok(pronto.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Editar recorrência'));
+  assert.deepEqual(botoes(pronto), ['Salvar']);
 });

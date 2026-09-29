@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import type { CorpoProps } from '@/components/finance/corpo-do-lancar';
+import { ErrorCard } from '@/components/error-card';
 import { CamposDaSerie } from '@/components/finance/serie-form';
 import { Button } from '@/components/ui/button';
 import { SheetScroll } from '@/components/ui/sheet';
+import { SkeletonList } from '@/components/ui/skeleton';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useToast } from '@/components/ui/toast';
 import { Space } from '@/design/tokens';
@@ -14,6 +16,7 @@ import {
   useRecurringTransactions,
   useSaveRecurringAll,
   useSaveRecurringSeries,
+  type RecurringTransaction,
 } from '@/hooks/use-finance';
 import { useRascunho } from '@/hooks/use-rascunho';
 import { newClientMessageId } from '@/lib/agent-chat';
@@ -32,12 +35,35 @@ import { SERIE_VAZIA, serieDoRegistro, validaSerie, type SerieForm } from '@/lib
  * A rolagem é `SheetScroll`: dentro de uma folha ela desconta o que fica abaixo dela; fora (a tela
  * modal), é o `KeyboardAwareScrollView` comum — o mesmo corpo serve aos dois.
  */
-export function FormularioDaSerie(props: CorpoProps & {
+type Props = CorpoProps & {
   preset?: SerieForm['preset'];
   /** Aberta DE DENTRO de outro formulário: o ✕ vira "Voltar". */
   voltar?: boolean;
-}) {
-  const { comum, editandoId, converter, deHipotese, onSalvo, onFechar, registrarComum, registrarEstado } = props;
+};
+
+export function FormularioDaSerie(props: Props) {
+  const series = useRecurringTransactions();
+  const alvo = props.editandoId ? (series.data ?? []).find((r) => r.id === props.editandoId) : undefined;
+  /*
+    Editando sem a série carregada, o estado inicial cairia na CRIAÇÃO — e o `useState` não relê:
+    "Criar" gravaria uma série duplicada. Espera (ou diz que falhou); com a série, o formulário monta
+    com ela, pela chave.
+  */
+  if (props.editandoId && !alvo && !props.estadoGuardado) {
+    return (
+      <>
+        <TaskHeader title="Editar recorrência" onClose={props.onFechar} voltar={props.voltar} />
+        <SheetScroll contentContainerStyle={styles.corpo}>
+          {series.isError ? <ErrorCard onRetry={() => void series.refetch()} /> : <SkeletonList linhas={4} />}
+        </SheetScroll>
+      </>
+    );
+  }
+  return <CorpoDaSerie key={alvo?.id ?? 'novo'} {...props} alvo={alvo} />;
+}
+
+function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
+  const { comum, editandoId, converter, deHipotese, onSalvo, onFechar, registrarComum, registrarEstado, alvo } = props;
   const toast = useToast();
   const series = useRecurringTransactions();
   const accounts = useAccounts();
@@ -56,7 +82,6 @@ export function FormularioDaSerie(props: CorpoProps & {
 
   const [form, setForm] = useState<SerieForm>(() => {
     if (props.estadoGuardado) return props.estadoGuardado as SerieForm;
-    const alvo = editandoId ? (series.data ?? []).find((r) => r.id === editandoId) : undefined;
     if (alvo) return serieDoRegistro(alvo);
     const c = comumParaSerie(comum);
     return {
@@ -171,6 +196,8 @@ export function FormularioDaSerie(props: CorpoProps & {
       }, 'Todas também corrige as ocorrências já passadas.', { contrato: true });
       return;
     }
+    // Editando, o formulário SEMPRE tem o id: sem ele, nunca cai na criação (seria uma duplicata).
+    if (editandoId) return;
     if (!podeSalvar || !inicioDate || !rrulePrevia) return;
     const entrada: EntradaRecorrente = {
       kind: form.kind,
