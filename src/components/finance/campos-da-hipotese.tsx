@@ -6,20 +6,22 @@ import { Field, MoneyField } from '@/components/ui/field';
 import { Note } from '@/components/ui/note';
 import { QuantityField } from '@/components/ui/quantity-field';
 import { Segmented } from '@/components/ui/segmented';
+import { SelectField, type SelectOption } from '@/components/ui/select-field';
 import { Space } from '@/design/tokens';
 import { localISODate } from '@/lib/dates';
 import type { Forma, Hipotese, Repete } from '@/lib/hipotese';
 
+/**
+ * A forma é `SelectField`, não `Segmented`: com quatro opções "Financiamento" não cabe num quarto
+ * da largura e saía "Financiame…" no iPhone já na fonte padrão (29/09/2026).
+ */
 const FORMAS_SAI = [
-  { value: 'uma', label: 'Uma vez' },
-  { value: 'parcelado', label: 'Parcelado' },
-  { value: 'repete', label: 'Repete' },
-  { value: 'financiamento', label: 'Financiamento' },
-] as const satisfies readonly { value: Forma; label: string }[];
-const FORMAS_ENTRA = [
-  { value: 'uma', label: 'Uma vez' },
-  { value: 'repete', label: 'Repete' },
-] as const satisfies readonly { value: Forma; label: string }[];
+  { id: 'uma', label: 'Uma vez', icon: 'calendar' },
+  { id: 'parcelado', label: 'Parcelado', icon: 'list.number' },
+  { id: 'repete', label: 'Repete', icon: 'arrow.triangle.2.circlepath' },
+  { id: 'financiamento', label: 'Financiamento', icon: 'building.columns' },
+] as const satisfies readonly (SelectOption & { id: Forma })[];
+const FORMAS_ENTRA = FORMAS_SAI.filter((f) => f.id === 'uma' || f.id === 'repete');
 const REPETE = [
   { value: 'weekly', label: 'Toda semana' },
   { value: 'monthly', label: 'Todo mês' },
@@ -60,12 +62,20 @@ export function CamposDaHipotese({
           value={h.kind}
           onChange={(kind) =>
             // A forma que o outro lado não tem volta a "Uma vez" — nunca uma receita "parcelada".
-            set({ kind, forma: (kind === 'income' ? (FORMAS_ENTRA as readonly { value: Forma }[]) : FORMAS_SAI).some((f) => f.value === h.forma) ? h.forma : 'uma' })}
+            set({ kind, forma: (kind === 'income' ? FORMAS_ENTRA : FORMAS_SAI).some((f) => f.id === h.forma) ? h.forma : 'uma' })}
         />
       </Field>
 
       <Field label="Como">
-        <Segmented<Forma> options={formas} value={h.forma} onChange={(forma) => set({ forma, conta: forma === 'financiamento' && contas.find((c) => c.id === h.conta)?.type === 'credit_card' ? null : h.conta })} />
+        <SelectField
+          options={formas}
+          value={h.forma}
+          placeholder="Escolher"
+          onChange={(id) => {
+            const forma = (id ?? 'uma') as Forma;
+            set({ forma, conta: forma === 'financiamento' && contas.find((c) => c.id === h.conta)?.type === 'credit_card' ? null : h.conta });
+          }}
+        />
       </Field>
 
       <Field label={h.forma === 'parcelado' ? 'Valor total' : h.forma === 'financiamento' ? 'Valor da parcela' : h.forma === 'repete' ? 'Valor de cada vez' : 'Valor'}>

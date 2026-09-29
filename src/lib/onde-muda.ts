@@ -79,3 +79,28 @@ export function ondeMuda(
   });
   return [...contas, ...cartoes];
 }
+
+/**
+ * A frase do limite do cartão, a mesma na linha do "Onde muda" e no detalhe. Cartão que JÁ estava
+ * acima do limite diz isso com o antes → depois: "passa do limite em R$ 11.460" num cartão que já
+ * devia R$ 8.460 além dele culpava a hipótese (visto no staging, 29/09/2026).
+ */
+export function fraseDoLimite(m: MudancaNoCartao, brl: (c: number) => string): string | null {
+  if (m.semLimite) return 'Sem limite cadastrado';
+  if (m.passaDoLimiteEm === null) return null;
+  if (m.livreAntes !== null && m.livreAntes < 0) return `Já estava acima do limite: ${brl(-m.livreAntes)} → ${brl(m.passaDoLimiteEm)}`;
+  return `Passa do limite em ${brl(m.passaDoLimiteEm)}`;
+}
+
+/**
+ * A frase do dia negativo da conta, a mesma na linha e no detalhe (`data` formata o ISO). Conta que
+ * JÁ ficava negativa diz isso: "fica negativa em 28/02" numa conta que já ficava em 2030 soava como
+ * se a hipótese a tivesse levado ao vermelho sozinha (visto no staging, 29/09/2026).
+ */
+export function fraseDoNegativo(m: MudancaNaConta, data: (iso: string) => string): string | null {
+  const antes = m.antes?.negativa_em ?? null;
+  if (m.ficaNegativaEm && antes) return `Fica negativa mais cedo: em ${data(m.ficaNegativaEm)} (era ${data(antes)})`;
+  if (m.ficaNegativaEm) return `Fica negativa em ${data(m.ficaNegativaEm)}`;
+  if (m.depois.negativa_em) return `Já ficava negativa em ${data(m.depois.negativa_em)}`;
+  return null;
+}

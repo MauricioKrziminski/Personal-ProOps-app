@@ -13,13 +13,15 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { SkeletonList } from '@/components/ui/skeleton';
+import { VerMais } from '@/components/ui/ver-mais';
 import { Space, tabular } from '@/design/tokens';
 import { useAccounts, useHorizonteReal, useSimulacao } from '@/hooks/use-finance';
+import { useAosPoucos } from '@/hooks/use-aos-poucos';
 import { useRascunho } from '@/hooks/use-rascunho';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { isoToBR, localISODate, somaDias } from '@/lib/dates';
 import { resumoDaHipotese } from '@/lib/hipotese';
-import { ondeMuda } from '@/lib/onde-muda';
+import { fraseDoLimite, fraseDoNegativo, ondeMuda } from '@/lib/onde-muda';
 
 /**
  * O detalhe de UMA conta ou cartão com as hipóteses do "E se…?" (spec 2026-09-29, §5): antes →
@@ -43,6 +45,12 @@ export default function HipoteseScreen() {
   });
   const horizonte = useHorizonteReal(dias, temRascunho);
   const pronta = useTelaPronta(accounts, simulacao, horizonte.contas, horizonte.cartoes);
+  const mudanca = ondeMuda(
+    { contas: horizonte.contas.data ?? [], cartoes: horizonte.cartoes.data ?? [] },
+    { contas: simulacao.data?.contas ?? [], cartoes: simulacao.data?.cartoes ?? [] },
+  ).find((m) => m.account_id === params.conta);
+  // Uma compra em 72× muda 72 faturas: 20 por vez (frontend.md, "aos poucos").
+  const faturas = useAosPoucos(mudanca?.tipo === 'cartao' ? mudanca.faturas : [], params.conta ?? '');
 
   const conta = accounts.data?.find((a) => a.id === params.conta);
   const cabecalho = <Stack.Screen options={{ title: conta?.name ?? 'Detalhe da hipótese' }} />;
@@ -91,10 +99,6 @@ export default function HipoteseScreen() {
     );
   }
 
-  const mudanca = ondeMuda(
-    { contas: horizonte.contas.data ?? [], cartoes: horizonte.cartoes.data ?? [] },
-    { contas: simulacao.data?.contas ?? [], cartoes: simulacao.data?.cartoes ?? [] },
-  ).find((m) => m.account_id === id);
   const fim = isoToBR(somaDias(localISODate(), dias));
 
   return (
@@ -107,15 +111,15 @@ export default function HipoteseScreen() {
             <HeroLabel>Com as hipóteses</HeroLabel>
             <AntesDepois rotulo="Hoje" antes={contaAntes?.saldo_hoje ?? 0} depois={contaDepois.saldo_hoje} />
             <AntesDepois
-              rotulo={`Menor saldo · ${isoToBR(contaDepois.dia_do_menor).slice(0, 5)}`}
+              rotulo={`Menor saldo · ${isoToBR(contaDepois.dia_do_menor)}`}
               antes={contaAntes?.menor ?? 0}
               depois={contaDepois.menor}
             />
             <AntesDepois rotulo={`No fim · ${fim}`} antes={contaAntes?.saldo_fim ?? 0} depois={contaDepois.saldo_fim} />
           </Card>
-          {contaDepois.negativa_em ? (
-            <Note icon="exclamationmark.triangle.fill" tone="danger">
-              {`Fica negativa em ${isoToBR(contaDepois.negativa_em)}`}
+          {mudanca?.tipo === 'conta' && fraseDoNegativo(mudanca, isoToBR) ? (
+            <Note icon="exclamationmark.triangle.fill" tone={mudanca.ficaNegativaEm ? 'danger' : 'warning'}>
+              {fraseDoNegativo(mudanca, isoToBR)}
             </Note>
           ) : null}
         </>
@@ -143,12 +147,12 @@ export default function HipoteseScreen() {
           )}
           {mudanca?.tipo === 'cartao' && mudanca.passaDoLimiteEm !== null ? (
             <Note icon="exclamationmark.triangle.fill" tone="danger">
-              {`Passa do limite em ${brl(mudanca.passaDoLimiteEm)}`}
+              {fraseDoLimite(mudanca, brl)}
             </Note>
           ) : null}
-          {mudanca?.tipo === 'cartao' && mudanca.faturas.length > 0 ? (
+          {faturas.visiveis.length > 0 ? (
             <Section title="Faturas">
-              {mudanca.faturas.map((f) => (
+              {faturas.visiveis.map((f) => (
                 <Row
                   key={f.vencimento}
                   title={`Vence ${isoToBR(f.vencimento)}`}
@@ -157,6 +161,7 @@ export default function HipoteseScreen() {
               ))}
             </Section>
           ) : null}
+          <VerMais restantes={faturas.restantes} onPress={faturas.verMais} />
         </>
       ) : null}
 

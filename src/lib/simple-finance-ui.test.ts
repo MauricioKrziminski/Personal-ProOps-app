@@ -3483,15 +3483,23 @@ test('Folha da hipótese: Sai oferece as quatro formas; Entra só "Uma vez" e "R
   const contas = [{ id: 'cc', name: 'Itaú', type: 'checking' }, { id: 'nu', name: 'Nubank Cartão', type: 'credit_card', closing_day: 3 }];
   const props = (valor: any) => ({ valor, onChange: (n: any) => { atual = n; }, contas, max: '2036-10-05' });
   const ui = screen('src/components/finance/campos-da-hipotese.tsx', { componente: 'CamposDaHipotese', props: props(h) });
-  const segs = () => ui.nodes().filter((n: any) => n.type === 'Segmented');
   const rotulos = (n: any) => JSON.parse(JSON.stringify(n.props.options.map((o: any) => o.label)));
-  assert.deepEqual(rotulos(segs()[1]), ['Uma vez', 'Parcelado', 'Repete', 'Financiamento']);
+  // A forma é um SelectField, nunca Segmented: "Financiamento" num quarto da largura saía
+  // "Financiame…" no iPhone já na fonte padrão (29/09/2026). Cada opção tem o seu glifo.
+  const como = (u: any) => u.nodes().find((n: any) => n.type === 'SelectField');
+  assert.deepEqual(rotulos(como(ui)), ['Uma vez', 'Parcelado', 'Repete', 'Financiamento']);
+  assert.ok(como(ui).props.options.every((o: any) => o.icon));
+  assert.equal(ui.nodes().filter((n: any) => n.type === 'Segmented').length, 1, 'só o Tipo é Segmented');
   // trocar para Entra com uma forma que Entra não tem volta a "Uma vez"
   const parcelado = screen('src/components/finance/campos-da-hipotese.tsx', { componente: 'CamposDaHipotese', props: props({ ...h, forma: 'parcelado' }) });
   parcelado.interact(() => parcelado.nodes().filter((n: any) => n.type === 'Segmented')[0].props.onChange('income'));
   assert.deepEqual(JSON.parse(JSON.stringify([atual.kind, atual.forma])), ['income', 'uma']);
   const entra = screen('src/components/finance/campos-da-hipotese.tsx', { componente: 'CamposDaHipotese', props: props({ ...h, kind: 'income' }) });
-  assert.deepEqual(rotulos(entra.nodes().filter((n: any) => n.type === 'Segmented')[1]), ['Uma vez', 'Repete']);
+  assert.deepEqual(rotulos(como(entra)), ['Uma vez', 'Repete']);
+  // escolher financiamento com um cartão escolhido tira o cartão (cartão não paga financiamento)
+  const noCartao = screen('src/components/finance/campos-da-hipotese.tsx', { componente: 'CamposDaHipotese', props: props({ ...h, conta: 'nu' }) });
+  noCartao.interact(() => como(noCartao).props.onChange('financiamento'));
+  assert.deepEqual(JSON.parse(JSON.stringify([atual.forma, atual.conta])), ['financiamento', null]);
   const fin = screen('src/components/finance/campos-da-hipotese.tsx', { componente: 'CamposDaHipotese', props: props({ ...h, forma: 'financiamento' }) });
   const picker = fin.nodes().find((n: any) => n.type === 'AccountPicker');
   assert.deepEqual(JSON.parse(JSON.stringify(picker.props.accounts.map((a: any) => a.id))), ['cc']);
@@ -3626,7 +3634,7 @@ test('Detalhe da hipótese — conta: hoje, menor (e o dia) e fim, antes → dep
   // os três pares, antes → depois
   const pares = ui.nodes().filter((n: any) => typeof n.type === 'function' && n.type.name === 'AntesDepois').map((n: any) => [n.props.rotulo, n.props.antes, n.props.depois]);
   assert.deepEqual(JSON.parse(JSON.stringify(pares.map((p: any) => [p[1], p[2]]))), [[100000, 100000], [40000, -10000], [40000, -10000]]);
-  assert.match(pares[1][0], /Menor saldo · 12\/11/);
+  assert.equal(pares[1][0], 'Menor saldo · 12/11/2026', 'com o ano: o horizonte vai a 10 anos');
   // quem lê a simulação é o hook de sempre, com o detalhe por conta e a janela da Projeção
   const o = ui.simulacoes.at(-1);
   assert.equal(o.porConta, true);
@@ -3648,6 +3656,11 @@ test('Detalhe da hipótese — cartão sem limite: diz e oferece cadastrar; com 
   const estoura = screen(hipoteseFile, { ...base, horizonte: { contas: [], cartoes: [k(100000, 20000, [])] }, simulacao: { contas: [], cartoes: [k(100000, -30000, fatura)], erros: [] } });
   assert.match(textoDa(estoura), /Passa do limite em R\$ 300\.00/);
   assert.doesNotMatch(textoDa(estoura), /Cadastrar o limite/);
+  // 72× são 72 faturas: 20 por vez, com "Ver mais" (frontend.md, "aos poucos")
+  const muitas = Array.from({ length: 25 }, (_, i) => ({ invoice_id: `f${i}`, vencimento: `20${27 + Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, '0')}-10`, total: 1000, aberto: 1000 }));
+  const longa = screen(hipoteseFile, { ...base, horizonte: { contas: [], cartoes: [k(100000, 20000, [])] }, simulacao: { contas: [], cartoes: [k(100000, -5000, muitas)], erros: [] } });
+  assert.equal(longa.nodes().filter((n: any) => n.type === 'Row' && /^Vence /.test(n.props.title)).length, 20);
+  assert.equal(longa.nodes().find((n: any) => n.type === 'VerMais').props.restantes, 5);
 });
 
 test('Detalhe da hipótese — conta que não existe mais, rascunho vazio e erro da leitura', () => {

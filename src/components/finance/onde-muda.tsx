@@ -4,7 +4,7 @@ import { useBRL } from '@/components/ui/conceal';
 import { Row, Section } from '@/components/ui/row';
 import { Space } from '@/design/tokens';
 import { isoToBR } from '@/lib/dates';
-import type { MudancaNaConta, MudancaNoCartao } from '@/lib/onde-muda';
+import { fraseDoLimite, fraseDoNegativo, type MudancaNaConta, type MudancaNoCartao } from '@/lib/onde-muda';
 
 const ddmm = (iso: string) => isoToBR(iso).slice(0, 5);
 
@@ -26,14 +26,15 @@ export function OndeMuda({
   const linha = (m: MudancaNaConta | MudancaNoCartao) => {
     if (m.tipo === 'conta') {
       const partes = [`No fim: ${brl(m.antes?.saldo_fim ?? 0)} → ${brl(m.depois.saldo_fim)}`];
-      if (m.ficaNegativaEm) partes.push(`Fica negativa em ${ddmm(m.ficaNegativaEm)}`);
+      const negativo = fraseDoNegativo(m, isoToBR);
+      if (negativo) partes.push(negativo);
       return { subtitle: partes.join(' · '), alerta: m.ficaNegativaEm !== null };
     }
     const partes: string[] = [];
     const primeira = m.faturas[0];
     if (primeira) partes.push(`Fatura de ${ddmm(primeira.vencimento)}: ${brl(primeira.antes)} → ${brl(primeira.depois)}`);
-    if (m.semLimite) partes.push('Sem limite cadastrado');
-    else if (m.passaDoLimiteEm !== null) partes.push(`Passa do limite em ${brl(m.passaDoLimiteEm)}`);
+    const limite = fraseDoLimite(m, brl);
+    if (limite) partes.push(limite);
     else if (m.livreAntes !== m.livreDepois && m.livreDepois !== null) partes.push(`Limite livre: ${brl(m.livreAntes ?? 0)} → ${brl(m.livreDepois)}`);
     return { subtitle: partes.join(' · '), alerta: m.passaDoLimiteEm !== null };
   };
