@@ -115,12 +115,9 @@ begin
   exception when others then
     if sqlerrm not like '%fatura%' then raise; end if;
   end;
-  begin
-    perform public.update_installment_occurrence(anchor, '{"amount_cents":11000}'::jsonb);
-    raise exception 'protected invoice accepted amount change';
-  exception when others then
-    if sqlerrm not like '%fatura%' then raise; end if;
-  end;
+  -- The amount moves (20260928235000); the invoice follows through the trigger.
+  perform public.update_installment_occurrence(anchor, '{"amount_cents":11000}'::jsonb);
+  assert (select amount_cents from public.transactions where id = anchor) = 11000;
   begin
     perform public.update_installment_occurrence(anchor,
       jsonb_build_object('occurred_at', current_date + 1));
@@ -145,7 +142,8 @@ begin
     if sqlerrm not like '%fatura%' then raise; end if;
   end;
   assert (select occurred_at from public.transactions where id = anchor) = current_date + 30;
-  assert (select total_cents from public.installment_plans where id = p) = 20000;
+  -- 20000 + the corrected first installment (10000 → 11000)
+  assert (select total_cents from public.installment_plans where id = p) = 21000;
 end $$;
 
 -- Simulate a plan-write failure after the line update. PL/pgSQL's caught subtransaction

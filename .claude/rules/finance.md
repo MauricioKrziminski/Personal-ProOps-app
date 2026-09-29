@@ -681,7 +681,18 @@ PRIMEIRA parcela, onde este repo põe na ÚLTIMA); o Mobills edita com escopo; o
 desabilita o número de parcelas depois do primeiro pagamento**; o Oracle Financials só atualiza
 parcela com saldo em aberto. Daí as três regras:
 
-1. **Parcela travada não se move** — nem valor, nem data, nem conta, nem existência.
+1. **Parcela travada não se move** — nem data, nem conta, nem existência. **O VALOR muda**
+   (`20260928235000`, *"mesmo que tenha sido paga, ele tem que mudar e alterar todos os lugares
+   que esse valor é influenciado"*): corrigir quanto uma parcela custou não a tira da fatura. Quem
+   mantém a fatura honesta é o gatilho `valor_corrigido_na_fatura`, em `transactions` — fatura
+   PAGA: o total anda e o pagamento fica (é o que saiu da conta, confirmado no "Paguei"); ADIADA:
+   o saldo levado à seguinte anda a mesma diferença (e a cascata é a recursão do gatilho); PAGA EM
+   PARTE: o que falta anda, zerado ela vira paga, negativo recusa; paga por transferência e com o
+   total acima do pago, REABRE com a diferença (a marcada como paga à mão segue paga). Vale para
+   o valor da parcela ("Só esta"/"Esta e as próximas"/"Todas", `update_installment_scope`), da
+   ocorrência de recorrente, da compra à vista e para o agente. O `update_installment_plan` ("Editar a
+   compra" sem incluir as já pagas) continua repartindo o total só entre as em aberto.
+   `supabase/tests/valor_em_fatura_fechada.sql`.
 2. **Com parcela paga, o NÚMERO de parcelas muda** (as pagas ficam; o que falta do total se
    reparte entre as em aberto, nunca abaixo da última paga) e **as parcelas já pagas também**
    (`p_paid_installments`, `20260926130000`: aumentar dá baixa nas primeiras e quita a fatura

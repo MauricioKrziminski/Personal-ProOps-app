@@ -3,6 +3,14 @@
 Registro, não regra: o que está em cada banco HOJE se confere na fonte (`CLAUDE.md`, *Banco e
 fila*). Entradas movidas do `CLAUDE.md` em 26/09/2026, na ordem em que estavam lá.
 
+**Só no STAGING: `20260928235000_valor_muda_em_fatura_fechada`** (28/09/2026) — o VALOR de uma
+parcela, ocorrência ou compra muda mesmo numa fatura paga, adiada ou paga em parte, e o gatilho
+`valor_corrigido_na_fatura` mantém a fatura honesta (paga: o pagamento fica, e reabre se o total
+passar do que foi pago por transferência; adiada: o saldo levado anda junto; paga em parte: fecha
+no zero, recusa abaixo). Conferida no staging depois de aplicar: gatilho ativo, as três RPCs sem a
+trava de valor, `anon` sem execute. Teste: `supabase/tests/valor_em_fatura_fechada.sql`. Em
+produção sobe pelo Gabriel, **antes** do agente e do app que a usam.
+
 **Produção e staging ALINHADOS em `20260928230000_pix_no_credito_na_fatura`** — aplicada em
 produção pelo Gabriel em 28/09/2026 (`db push --project-ref`, depois de `migration list` mostrar
 só ela no `local`) e conferida na fonte: `schema_migrations` devolve `20260928230000`,

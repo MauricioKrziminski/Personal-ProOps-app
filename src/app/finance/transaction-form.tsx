@@ -1112,11 +1112,12 @@ function TransactionForm({
               <Field
                 label="Valor"
                 error={errors.amount_cents?.message ?? correcaoDaDivida.erro ?? undefined}
-                hint={parcelaNaFatura ? 'Paga na fatura do cartão: o valor desta parcela não muda' : undefined}>
+                // O valor muda mesmo com a parcela paga na fatura (28/09/2026): o banco mantém a
+                // fatura honesta (`valor_corrigido_na_fatura`). Só a data fica presa a ela.
+              >
                 <MoneyField
                   valueCents={field.value}
                   onChangeCents={field.onChange}
-                  readOnly={parcelaNaFatura}
                   invalid={!!errors.amount_cents || !!correcaoDaDivida.erro}
                 />
               </Field>

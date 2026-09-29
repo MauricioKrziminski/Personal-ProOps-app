@@ -464,7 +464,9 @@ class TestEdicaoPlano:
         assert "p.workspace_id = u.workspace_id" in update[0][0]
         assert LINHA in update[0][1] and WS in update[0][1]
         assert "workspace_id = %s" in update[0][0]
-        assert "parcela_travada" in update[0][0]
+        # O valor muda mesmo com a parcela numa fatura fechada (`20260928235000`): quem
+        # mantém a fatura honesta é o gatilho do banco, não uma trava aqui.
+        assert "parcela_travada" not in update[0][0]
         assert not any("cleared" in c[0] for c in chamadas)
         assert not r.read_only
 

@@ -140,25 +140,28 @@ begin
   assert (select total_cents from public.installment_plans where id = p) = 8000;
 end $$;
 
--- Financial edits touching a paid, rolled, or partly paid card invoice are rejected atomically.
+-- A paid, rolled, or partly paid card invoice accepts a corrected AMOUNT (20260928235000, the
+-- invoice follows through `valor_corrigido_na_fatura`), but its date stays put.
 do $$
 declare
   p uuid := '00000000-0000-0000-0000-00000000d8e2';
   n integer;
   anchor uuid;
 begin
+  select id into anchor from public.transactions where installment_plan_id = p and installment_no = 1;
+  perform public.update_installment_scope(anchor, 'all', '{"amount_cents":11000}'::jsonb);
+  assert (select array_agg(amount_cents order by installment_no) from public.transactions
+          where installment_plan_id = p) = array[11000,11000,11000]::bigint[];
+  assert (select total_cents from public.installment_plans where id = p) = 33000;
   for n in 1..3 loop
     select id into anchor from public.transactions where installment_plan_id = p and installment_no = n;
     begin
-      perform public.update_installment_scope(anchor, 'future', '{"amount_cents":11000}'::jsonb);
-      raise exception 'protected card installment % changed', n;
+      perform public.update_installment_scope(anchor, 'one', '{"occurred_at":"2026-01-20"}'::jsonb);
+      raise exception 'protected card installment % moved date', n;
     exception when others then
       if sqlerrm not like '%fatura%' then raise; end if;
     end;
   end loop;
-  assert (select array_agg(amount_cents order by installment_no) from public.transactions
-          where installment_plan_id = p) = array[10000,10000,10000]::bigint[];
-  assert (select total_cents from public.installment_plans where id = p) = 30000;
 end $$;
 
 -- RLS: other workspace cannot reach this plan through the RPC.

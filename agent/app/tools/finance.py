@@ -1056,10 +1056,10 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     if frozen_account and frozen_account["id"] is not None:
         account_guard = " and exists (select 1 from public.accounts a where a.id = %s and a.workspace_id = %s and not a.archived)"
         args.extend([frozen_account["id"], ctx.workspace_id])
-    # Parcela travada não se move (valor, data, conta) — a régua do banco, a mesma de
-    # `update_installment_plan`. Mexer nela deixa a fatura paga/parcial sem fechar.
+    # Parcela travada não se move (data, conta) — a régua do banco. O VALOR muda desde a
+    # `20260928235000`: o gatilho `valor_corrigido_na_fatura` mantém a fatura honesta.
     trava = ""
-    if parcela_do_snapshot and patch.keys() & {"amount_cents", "occurred_at", "account_id"}:
+    if parcela_do_snapshot and patch.keys() & {"occurred_at", "account_id"}:
         trava = " and not private.parcela_travada(status, invoice_id)"
     # Linha de compra parcelada: o total do plano acompanha, na MESMA operação (a
     # soma é "as outras linhas + o valor novo", porque um CTE não enxerga o update do

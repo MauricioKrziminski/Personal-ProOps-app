@@ -128,12 +128,17 @@ begin
   assert (select invoice_id from public.transactions where id=card_line_id)=legacy_invoice_id;
   assert (select due_at from public.transactions where id=card_line_id)=invoice_due;
   select edit_revision into rev from public.transactions where id=card_line_id;
+  -- The amount moves (20260928235000); the date of a line in a paid invoice does not.
+  assert public.update_recurring_one(card_line_id,
+    '{"amount_cents":1200}'::jsonb,rev,gen_random_uuid())=1;
+  assert (select amount_cents from public.transactions where id=card_line_id)=1200;
+  select edit_revision into rev from public.transactions where id=card_line_id;
   begin
     perform public.update_recurring_one(card_line_id,
-      '{"amount_cents":1200}'::jsonb,rev,gen_random_uuid());
-    raise exception 'protected invoice amount accepted';
+      jsonb_build_object('occurred_at', current_date - 400),rev,gen_random_uuid());
+    raise exception 'protected invoice date accepted';
   exception when others then
-    if sqlerrm='protected invoice amount accepted' then raise; end if;
+    if sqlerrm='protected invoice date accepted' then raise; end if;
     assert sqlerrm like '%fatura paga%', sqlerrm;
   end;
 end $$;
