@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[] } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -84,6 +84,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       : { ...query, isPending: false, isSuccess: true, data: { plan: options.plan ?? 'pro' } },
     useMonthLines: () => ({ ...query, data: options.monthLines ?? [] }),
     useCycleLines: () => ({ ...query, data: options.cycleLines ?? [] }),
+    useDraftLines: (hipoteses: any[]) => hipoteses.length ? { ...query, isPending: false, isSuccess: true, data: options.draftLines ?? { antes: 0, linhas: [] } } : { ...query, isPending: true, data: undefined },
     // A tela do ciclo mostra o esqueleto enquanto não tem a série — sem este dublê ela nunca
     // chega a renderizar linha nenhuma, e o teste passaria a medir o esqueleto.
     // `cycleSeriesPending`: a série de OUTRO mês chegando (a troca de mês, com o portão já aberto).
@@ -306,7 +307,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/serie' || name === '@/lib/compra') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/components/ui/glass-backdrop') return { GlassBackdrop: 'GlassBackdrop', supportsLiquidGlass: () => false };
       if (name === '@/hooks/use-note-sort') return { SORT_LABEL: {}, useNoteSort: () => ['manual', () => {}] };
@@ -3197,4 +3198,28 @@ test('Histórico de alertas: não lido até a pessoa marcar; Lida à direita, Li
   ui.interact(() => menu().find((a: any) => a.label === 'Limpar todas').onPress());
   assert.equal(cards().length, 0);
   assert.ok(ui.nodes().some((n: any) => n.type === 'EmptyState'));
+});
+
+test('Ciclo aberto pela Projeção com rascunho: as hipóteses entram na lista e no fechamento, sem salvar', () => {
+  // 28/09/2026: "tem que mostrar com aqueles valores da projeção de hipótese (sem salvar)… como se fosse real"
+  const rascunho = JSON.stringify([
+    { kind: 'income', amount_cents: 67500, start: '2026-09-28', installments: 1 },
+    { kind: 'expense', amount_cents: 300000, start: '2026-09-28', installments: 3 },
+  ]);
+  const ui = screen('src/app/finance/cycle.tsx', {
+    params: { month: '2026-10', view: 'cycle', rascunho },
+    cycleRow: { mes: '2026-10-01', ini: '2026-09-11', fim: '2026-10-10', estado: 'aberto', comecei_com: 100000, entrou: 500000, saiu: 400000, resultado: 200000, caixa_no_fim: 200000, faltou_pagar: 0, confere: true },
+    draftLines: { antes: 0, linhas: [
+      { i: 0, day: '2026-09-28', kind: 'income', cents: 67500 },
+      { i: 1, day: '2026-09-28', kind: 'expense', cents: 100000 },
+    ] },
+  });
+  assert.ok(ui.nodes().some((n: any) => n.type === 'SectionHead' && /^Hipóteses do rascunho/.test(n.props.title)), 'o grupo das hipóteses');
+  const fechamento = ui.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'Fechamento');
+  assert.equal(fechamento.props.hipoteses, 2, 'o painel diz que o rascunho está dentro');
+  const c = fechamento.props.ciclo;
+  assert.equal(Number(c.entrou), 567500);
+  assert.equal(Number(c.saiu), 500000);
+  assert.equal(Number(c.caixa_no_fim), 167500, 'comecei + entrou − saiu, com as hipóteses');
+  assert.equal(ui.writes.length, 0, 'nada é salvo');
 });

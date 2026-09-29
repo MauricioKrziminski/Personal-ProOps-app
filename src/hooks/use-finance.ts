@@ -17,6 +17,7 @@ import { ACCOUNT_TYPES } from '@/lib/accounts';
 import { adiantaveisNoMes, type Adiantavel, type EscolhaDeAdiantamento } from '@/lib/anticipation';
 import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
 import { filtroDoEstado } from '@/lib/data-da-compra';
+import type { HipoteseNoCiclo, OcorrenciaDaHipotese } from '@/lib/rascunho-no-ciclo';
 
 // Categorias vivem em @/lib/categories (fonte única, travada por teste contra o
 // prompt do Gemini); reexportadas aqui para não quebrar os imports das telas.
@@ -2259,6 +2260,26 @@ export function useSpendable(view?: CycleView) {
       const { data, error } = await supabase.rpc('spendable', { p_view: view ?? undefined });
       if (error) throw error;
       return (data as Spendable[])[0];
+    },
+  });
+}
+
+/**
+ * As ocorrências das hipóteses do rascunho dentro de um ciclo (`draft_lines`, sobre o motor da
+ * Projeção). Nada é salvo: o rascunho chega pela rota e vive só enquanto a tela está aberta.
+ */
+export function useDraftLines(hipoteses: readonly HipoteseNoCiclo[], de: string | undefined, ate: string | undefined) {
+  const drafts = hipoteses.map(({ rotulo: _rotulo, ...d }) => d);
+  return useQuery({
+    queryKey: ['draft-lines', JSON.stringify(drafts), de ?? '', ate ?? ''],
+    enabled: drafts.length > 0 && Boolean(de) && Boolean(ate),
+    // Como o rascunho da Projeção: não sobrevive a sair da tela.
+    gcTime: 0,
+    queryFn: async (): Promise<{ antes: number; linhas: OcorrenciaDaHipotese[] }> => {
+      const { data, error } = await supabase.rpc('draft_lines', { p_drafts: drafts, p_from: de!, p_to: ate! });
+      if (error) throw error;
+      const r = data as { antes?: number; linhas?: OcorrenciaDaHipotese[] } | null;
+      return { antes: Number(r?.antes ?? 0), linhas: r?.linhas ?? [] };
     },
   });
 }

@@ -2879,6 +2879,10 @@ export type Database = {
         }
         Returns: number
       }
+      draft_lines: {
+        Args: { p_drafts: Json; p_from: string; p_to: string }
+        Returns: Json
+      }
       edit_budget: {
         Args: {
           p_category: string

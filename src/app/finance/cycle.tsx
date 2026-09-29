@@ -19,11 +19,12 @@ import { Radius, Space } from '@/design/tokens';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { VerMais } from '@/components/ui/ver-mais';
 import { useAosPoucos, useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
-import { type CycleLine, type CycleRow, type CycleView, useCycleLines, useCycleMonth, useCycleSeries, useInvoice } from '@/hooks/use-finance';
+import { type CycleLine, type CycleRow, type CycleView, useCycleLines, useCycleMonth, useCycleSeries, useDraftLines, useInvoice } from '@/hooks/use-finance';
 import { describeCycle } from '@/lib/cycle-label';
 import { rotaDaLinha } from '@/lib/cycle-routes';
 import { isoToBR, mesmoMes } from '@/lib/dates';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
+import { fechamentoComHipoteses, linhasDasHipoteses, type HipoteseNoCiclo } from '@/lib/rascunho-no-ciclo';
 
 /**
  * **Por que o ciclo fechou naquele valor** — a tela que justifica o número da home.
@@ -78,7 +79,7 @@ export default function CycleDetailScreen() {
   const brl = useBRL();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
-  const params = useLocalSearchParams<{ month?: string; view?: string; tipo?: string }>();
+  const params = useLocalSearchParams<{ month?: string; view?: string; tipo?: string; rascunho?: string }>();
   const view = (params.view === 'civil' ? 'civil' : 'cycle') as CycleView;
   /*
     ⚠️ **Sem `month` no link, cai no ciclo CORRENTE — não em string vazia.**
@@ -93,7 +94,15 @@ export default function CycleDetailScreen() {
 
   const serie = useCycleSeries(month, month, view);
   const linhas = useCycleLines(month, view);
-  const ciclo = serie.data?.find((c) => mesmoMes(c.mes, month)) ?? null;
+  const cicloReal = serie.data?.find((c) => mesmoMes(c.mes, month)) ?? null;
+  // As hipóteses da Projeção, quando se chega por ela com um rascunho (28/09/2026): entram na lista
+  // e no fechamento como se fossem reais, e nada é salvo.
+  const hipoteses = useMemo(() => lerRascunho(params.rascunho), [params.rascunho]);
+  const rascunho = useDraftLines(hipoteses, cicloReal?.ini, cicloReal?.fim);
+  const comRascunho = hipoteses.length > 0;
+  const ciclo = cicloReal && rascunho.data
+    ? fechamentoComHipoteses(cicloReal, rascunho.data.antes, rascunho.data.linhas)
+    : cicloReal;
 
   /**
    * Quantas linhas cada grupo mostra (24/09/2026): um ciclo tem 30 a 150 movimentos, e desenhar
@@ -102,27 +111,31 @@ export default function CycleDetailScreen() {
   const janelas = useJanelasPorGrupo(`${month}|${view}|${lado}`);
 
   const grupos = useMemo(() => {
-    const todas = linhas.data ?? [];
+    const todas = [
+      ...(linhas.data ?? []),
+      ...(linhasDasHipoteses(rascunho.data?.linhas ?? [], hipoteses) as unknown as CycleLine[]),
+    ];
     const doLado = todas.filter((l) =>
       lado === 'tudo' ? true : lado === 'entra' ? Number(l.in_cents) > 0 : Number(l.in_cents) === 0
     );
     return agrupar(doLado, brl);
-  }, [linhas.data, lado, brl]);
+  }, [linhas.data, rascunho.data, hipoteses, lado, brl]);
 
-  if (serie.isError || linhas.isError) {
+  if (serie.isError || linhas.isError || (comRascunho && rascunho.isError)) {
     return (
       <Screen>
         <ErrorCard
           onRetry={() => {
             void serie.refetch();
             void linhas.refetch();
+            if (comRascunho) void rascunho.refetch();
           }}
         />
       </Screen>
     );
   }
 
-  if (serie.isPending || !ciclo) {
+  if (serie.isPending || !ciclo || (comRascunho && rascunho.isPending)) {
     return (
       <Screen>
         <Skeleton height={220} radius={Radius.md} />
@@ -130,7 +143,7 @@ export default function CycleDetailScreen() {
     );
   }
 
-  const fechamento = <Fechamento ciclo={ciclo} month={month} />;
+  const fechamento = <Fechamento ciclo={ciclo} month={month} hipoteses={hipoteses.length} />;
   const filtro = (
     <Segmented
       options={[
@@ -173,7 +186,7 @@ export default function CycleDetailScreen() {
       escreve o próprio padding é a que diverge.
     */
     // Puxar para atualizar, como as outras telas de dados (25/09/2026): era a única sem.
-    <Screen wide={tablet} onRefresh={() => Promise.all([serie.refetch(), linhas.refetch()])}>
+    <Screen wide={tablet} onRefresh={() => Promise.all([serie.refetch(), linhas.refetch(), ...(comRascunho ? [rascunho.refetch()] : [])])}>
       {tablet ? (
         <FinanceAnalysisPanes primary={fechamento} support={<>{filtro}{movimentos}</>} compact={compact} />
       ) : compact}
@@ -188,7 +201,7 @@ export default function CycleDetailScreen() {
  * `comecei + entrou − saiu` dá o caixa que de fato ficou, e a dívida é uma linha à parte. Somar
  * as duas seria o abatimento automático que o dono do produto recusou.
  */
-function Fechamento({ ciclo, month }: { ciclo: CycleRow; month: string }) {
+function Fechamento({ ciclo, month, hipoteses }: { ciclo: CycleRow; month: string; hipoteses: number }) {
   const nome = monthTitle(month).replace(/ de \d{4}$/, '').toLowerCase();
   const d = describeCycle(ciclo, nome);
   const faltou = Number(ciclo.faltou_pagar ?? 0);
@@ -200,6 +213,11 @@ function Fechamento({ ciclo, month }: { ciclo: CycleRow; month: string }) {
       <ThemedText type="caption" themeColor="textSecondary">
         {`${isoToBR(ciclo.ini)} a ${isoToBR(ciclo.fim)} · ciclo ${ciclo.estado}`}
       </ThemedText>
+      {hipoteses > 0 ? (
+        <ThemedText type="caption" themeColor="warning">
+          {`Com ${hipoteses === 1 ? 'a hipótese' : `as ${hipoteses} hipóteses`} do rascunho · nada é salvo`}
+        </ThemedText>
+      ) : null}
 
       <View style={styles.conta}>
         <Conta rotulo="Comecei com" cents={Number(ciclo.comecei_com)} />
@@ -307,6 +325,7 @@ function Linha({ linha }: { linha: CycleLine }) {
  */
 function agrupar(linhas: CycleLine[], brl: (cents: number) => string) {
   const balde = (l: CycleLine) => {
+    if (l.origin === 'hipotese') return 'Hipóteses do rascunho';
     if (Number(l.in_cents) > 0) return 'Entradas';
     if (l.origin === 'invoice' || l.origin === 'invoice_payment') return 'Faturas de cartão';
     if (l.origin === 'debt_schedule') return 'Parcelas de financiamento';
@@ -314,6 +333,8 @@ function agrupar(linhas: CycleLine[], brl: (cents: number) => string) {
     return 'Boletos, pix e gastos';
   };
   const ordem = [
+    // Primeiro: é o que a pessoa veio ver ao abrir o ciclo pela Projeção com um rascunho.
+    'Hipóteses do rascunho',
     'Faturas de cartão',
     'Boletos, pix e gastos',
     'Parcelas de financiamento',
@@ -364,3 +385,14 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
 });
+
+/** O rascunho que a Projeção manda pela rota. Inválido vira nenhum — a tela abre com o real. */
+function lerRascunho(texto: string | undefined): HipoteseNoCiclo[] {
+  if (!texto) return [];
+  try {
+    const lido: unknown = JSON.parse(texto);
+    return Array.isArray(lido) ? (lido as HipoteseNoCiclo[]) : [];
+  } catch {
+    return [];
+  }
+}

@@ -41,6 +41,7 @@ import {
   useUpcomingBills,
   type Draft,
 } from '@/hooks/use-finance';
+import type { HipoteseNoCiclo } from '@/lib/rascunho-no-ciclo';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useTheme } from '@/hooks/use-theme';
@@ -957,7 +958,14 @@ export default function ForecastScreen() {
                     onPress={() =>
                       router.push({
                         pathname: '/finance/cycle',
-                        params: { month: m.mes, view: regua.view, tipo: 'sai' },
+                        params: {
+                          month: m.mes,
+                          view: regua.view,
+                          tipo: 'sai',
+                          // Com rascunho, o ciclo abre COM as hipóteses (28/09/2026), como a linha
+                          // acima já soma. Pela rota, e nada é salvo.
+                          ...(rascunhos.length > 0 ? { rascunho: JSON.stringify(paraOCiclo(rascunhos)) } : {}),
+                        },
                       })
                     }
                   />
@@ -1323,3 +1331,19 @@ const styles = StyleSheet.create({
     gap: Space.half,
   },
 });
+
+/**
+ * O rascunho como o ciclo o recebe: o draft do motor e o nome da hipótese. As parcelas que um
+ * adiantamento cancela levam o nome dele (só o draft do pagamento tem `rotulo`).
+ */
+function paraOCiclo(rascunhos: Draft[]): HipoteseNoCiclo[] {
+  const doGrupo = new Map(rascunhos.filter((d) => d.grupo && d.rotulo).map((d) => [d.grupo!, d.rotulo!]));
+  return rascunhos.map((d) => ({
+    kind: d.kind,
+    amount_cents: d.amount_cents,
+    start: d.start,
+    installments: d.installments,
+    mode: d.mode,
+    rotulo: d.rotulo ?? (d.grupo ? doGrupo.get(d.grupo) : undefined),
+  }));
+}
