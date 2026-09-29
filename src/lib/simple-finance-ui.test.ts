@@ -3408,3 +3408,23 @@ test('Desfazer o "Tirar" devolve SÓ o que saiu — não traz de volta o que sai
   ui.interact(() => desfazerA.onPress());
   assert.deepEqual(JSON.parse(ui.preferenciasGravadas['projecao:rascunho']).detalhadas.map((h: any) => h.id), ['a']);
 });
+
+test('Projeção mês a mês: os dois "hoje" dizem o que são, e o rodapé nomeia o fim real do horizonte', () => {
+  // 29/09/2026, *"setembro não seria o mês atual? A conta tá correta?"*: a conta estava, a tela
+  // não dizia. "tenho hoje" (depois do que vence hoje, atrasados inclusive) e "hoje você tem" (o
+  // que está na conta) tinham números diferentes; e "Projeção até 01/12" era o começo do mês que
+  // a lista esconde, não o fim dos 90 dias.
+  const meses = [
+    { mes: '2026-09-01', de: '2026-09-01', ate: '2026-09-30', entra: 0, sai: 1049730, saldo: 3465769, parcial: true, primeiroNegativo: null },
+    { mes: '2026-10-01', de: '2026-10-01', ate: '2026-10-31', entra: 0, sai: 372500, saldo: 3093269, parcial: false, primeiroNegativo: null },
+    { mes: '2026-11-01', de: '2026-11-01', ate: '2026-11-30', entra: 0, sai: 308000, saldo: 2785269, parcial: false, primeiroNegativo: null },
+    { mes: '2026-12-01', de: '2026-12-01', ate: '2026-12-31', entra: 0, sai: 308000, saldo: 2477269, parcial: true, primeiroNegativo: null },
+  ];
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], forecastMonths: meses });
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'mes')).props.onChange('mes'));
+  const textos = JSON.stringify(ui.nodes().map((n: any) => [n.props?.children, n.props?.subtitle]));
+  assert.match(textos, /no fim de hoje/);
+  assert.doesNotMatch(textos, /tenho hoje|hoje você tem/);
+  assert.match(textos, /em conta hoje R\$/);
+  assert.match(textos, /A projeção vai até \d{2}\/\d{2}\/\d{4}; Dezembro de 2026 está incompleto/);
+});

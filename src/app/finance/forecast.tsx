@@ -110,7 +110,7 @@ import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
  * "entra/sai" é o que ainda vai acontecer, não o ciclo inteiro. Escrito com as mesmas palavras
  * das outras linhas, um ciclo que já recebeu o salário no dia 20 aparece como
  * `Setembro · entra R$ 0,00`, e a leitura óbvia é *"o app perdeu meu salário"*. Ele não perdeu:
- * o salário já está DENTRO do "hoje você tem".
+ * o salário já está DENTRO do "em conta hoje".
  *
  * A última linha tem o problema espelhado — ela é parcial porque o HORIZONTE corta ali, não
  * porque falta acontecer.
@@ -127,7 +127,7 @@ function legendaDoMes(
 
   if (primeiro && m.parcial) {
     return (
-      `${janela} · hoje você tem ${brl(veioDe(m))}` +
+      `${janela} · em conta hoje ${brl(veioDe(m))}` +
       ` · ainda entra ${brl(m.entra)} · ainda sai ${brl(m.sai)}${vermelho}`
     );
   }
@@ -818,7 +818,9 @@ export default function ForecastScreen() {
             </View>
             <View style={styles.heroSplit}>
               <View style={styles.heroParte}>
-                <HeroLabel>tenho hoje</HeroLabel>
+                {/* O saldo no FIM de hoje: já sem o que vence hoje, atrasados inclusive. "Tenho hoje" dizia
+                    outro número que o "em conta hoje" do mês logo abaixo (29/09/2026). */}
+                <HeroLabel>no fim de hoje</HeroLabel>
                 <Money cents={hoje} variant="title2" tone={hoje < 0 ? 'danger' : 'text'} />
               </View>
               <View style={styles.heroParte}>
@@ -1153,7 +1155,9 @@ export default function ForecastScreen() {
           ))}
           {cicloCortado && jMeses.restantes === 0 ? (
             <ThemedText type="footnote" themeColor="textSecondary" style={styles.corte}>
-              {`Projeção até ${isoToBR(cicloCortado.de)}. Aumente o horizonte.`}
+              {/* O fim REAL do horizonte, e o mês que a lista esconde por estar incompleto. Era
+                  "Projeção até <início do mês cortado>", que parecia o fim da projeção. */}
+              {`A projeção vai até ${isoToBR(somaDias(localISODate(), dias - 1))}; ${monthTitle(cicloCortado.mes)} está incompleto. Aumente o horizonte para ver o mês inteiro.`}
             </ThemedText>
           ) : null}
         </Section>
