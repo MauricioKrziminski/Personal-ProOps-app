@@ -93,7 +93,9 @@ export default function LancarScreen() {
     if (reduzir) return aplicar();
     // Crossfade curto: some o corpo, troca, volta. Só opacidade — animação de LAYOUT não existe no
     // Android (design.md §5).
-    opacidade.set(withTiming(0, { duration: Motion.duration.fast }, () => {
+    // Outro toque durante a saída cancela esta: a cancelada não troca nada, quem troca é a última.
+    opacidade.set(withTiming(0, { duration: Motion.duration.fast }, (terminou) => {
+      if (!terminou) return;
       runOnJS(aplicar)();
       opacidade.set(withTiming(1, { duration: Motion.duration.base }));
     }));
