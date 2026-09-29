@@ -856,9 +856,10 @@ export default function ForecastScreen() {
       {simulando ? (
         <>
         {hipoteses.map(({ chave, principal: d, indices }) => {
-          // "Aplicar" só para a rápida solta: o adiantamento (grupo) não aplica nesta versão (spec §6).
+          // "Aplicar" só para a rápida solta: o adiantamento não aplica nesta versão (spec §6). Quem
+          // marca o adiantamento é o `rotulo` — `grupo` toda rápida tem.
           const acoesDaRapida: ItemAction[] = [
-            ...(d.grupo ? [] : [{ label: 'Aplicar', icon: 'checkmark.circle' as const, arrasto: 'direita' as const, onPress: () => aplicarRapida(indices[0], d) }]),
+            ...(d.rotulo ? [] : [{ label: 'Aplicar', icon: 'checkmark.circle' as const, arrasto: 'direita' as const, onPress: () => aplicarRapida(indices[0], d) }]),
             { label: 'Editar', icon: 'pencil', onPress: () => abrirEdicao(chave, d) },
             { label: 'Tirar', icon: 'trash', destructive: true, arrasto: 'esquerda', desfaz: true, onPress: () => tirarRapida(indices) },
           ];
@@ -1412,7 +1413,9 @@ const styles = StyleSheet.create({
   },
   heroSplit: {
     flexDirection: 'row',
-    gap: Space.xl,
+    flexWrap: 'wrap',
+    columnGap: Space.xl,
+    rowGap: Space.md,
   },
   heroParte: {
     gap: Space.xs,
@@ -1452,9 +1455,11 @@ const styles = StyleSheet.create({
   },
   rascunhoAcoes: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Space.sm,
+    columnGap: Space.sm,
+    // Quebrando, as fileiras de botões são linhas irmãs do card: `Space.md` (design.md §2).
+    rowGap: Space.md,
   },
   sheetCorpo: {
     gap: Space.md,

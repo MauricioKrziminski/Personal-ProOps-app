@@ -1699,6 +1699,17 @@ test('Lançamento em modo hipótese: guarda no rascunho e sai ANTES de qualquer 
   assert.match(fonte, /'Adicionar à hipótese'/);
 });
 
+test('Lançamento em modo hipótese: "Repetir lançamento" e "Financiamento" abrem os outros formulários TAMBÉM como hipótese', () => {
+  // 29/09/2026, visto no emulador: em "Nova hipótese" os dois botões do rodapé levavam ao
+  // formulário REAL, e quem estava montando uma hipótese salvava na conta sem saber.
+  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  const repetir = fonte.slice(fonte.indexOf('label="Repetir lançamento"'), fonte.indexOf('label="Financiamento"'));
+  assert.match(repetir, /\.\.\.paraHipotese/, 'Repetir leva o modo hipótese');
+  const fin = fonte.slice(fonte.indexOf('label="Financiamento"'), fonte.indexOf('label="Financiamento"') + 300);
+  assert.match(fin, /\.\.\.paraHipotese/, 'Financiamento leva o modo hipótese');
+  assert.match(fonte, /const paraHipotese = modoHipotese \? \{ hipotese: 'nova' \} : \{\}/);
+});
+
 test('Lançamento aberto pelo "Aplicar" de uma rápida: os dois caminhos de salvar a tiram do rascunho', () => {
   const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
   // a compra parcelada nova e o lançamento: o `onSuccess` de cada um chama `tirarRapida()`
@@ -1706,4 +1717,38 @@ test('Lançamento aberto pelo "Aplicar" de uma rápida: os dois caminhos de salv
   assert.match(criarPlano.slice(0, 400), /onSuccess: \(\) => \{\s*tirarRapida\(\);/);
   const gravar = fonte.slice(fonte.indexOf('const gravar = () =>'));
   assert.match(gravar.slice(0, 800), /onSuccess: \(\) => \{\s*tirarRapida\(\);/);
+});
+
+test('Rascunho da Projeção: a fileira de ações QUEBRA a linha', () => {
+  // 29/09/2026, visto no emulador: com "Adicionar outra hipótese", "Adicionar como…" e "Aplicar
+  // todas" a fileira passava da borda do card e cortava o último botão ao meio.
+  const fonte = readFileSync(join(SRC, 'app/finance/forecast.tsx'), 'utf8');
+  const estilo = fonte.slice(fonte.indexOf('rascunhoAcoes: {'), fonte.indexOf('}', fonte.indexOf('rascunhoAcoes: {')));
+  assert.match(estilo, /flexWrap: 'wrap'/);
+});
+
+test('Projeção: "tenho hoje" e "em N dias" QUEBRAM a linha com fonte grande', () => {
+  // 29/09/2026, iPhone em accessibility-large: o segundo valor passava da borda do card
+  // ("R$ 19" cortado). Dinheiro não encolhe (design.md §3); quem cede é a linha.
+  const fonte = readFileSync(join(SRC, 'app/finance/forecast.tsx'), 'utf8');
+  const estilo = fonte.slice(fonte.indexOf('heroSplit: {'), fonte.indexOf('}', fonte.indexOf('heroSplit: {')));
+  assert.match(estilo, /flexWrap: 'wrap'/);
+});
+
+test('TaskHeader: ação longa desce de linha antes de espremer o título', () => {
+  // 29/09/2026, iPhone em accessibility-large: "Adicionar à hipótese" deixou o título "Nova
+  // hipótese" com UMA letra por linha. Quem cede é a linha (flexWrap), e o título tem piso.
+  const fonte = readFileSync(join(SRC, 'components/ui/task-header.tsx'), 'utf8');
+  const bloco = (nome: string) => fonte.slice(fonte.indexOf(`${nome}: {`), fonte.indexOf('}', fonte.indexOf(`${nome}: {`)));
+  assert.match(bloco('headRow'), /flexWrap: 'wrap'/);
+  assert.match(bloco('headText'), /minWidth: '\d+%'/);
+  assert.match(bloco('headAction'), /marginLeft: 'auto'/);
+});
+
+test('MoneyField: a caixa dos dígitos cresce com a fonte do sistema', () => {
+  // 29/09/2026, iPhone em accessibility-large: "0,00" cortado embaixo em TODO formulário. A caixa
+  // tinha a altura da linha em 1×, com `overflow: hidden`, e o texto dentro dela crescia.
+  const fonte = readFileSync(join(SRC, 'components/ui/field.tsx'), 'utf8');
+  assert.match(fonte, /height: Type\.money\.lineHeight \* fontScale/, 'a caixa acompanha o texto');
+  assert.match(fonte, /const altura = Type\.money\.lineHeight \* fontScale/, 'o dígito rola a altura real');
 });

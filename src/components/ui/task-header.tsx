@@ -108,7 +108,7 @@ export function TaskHeader({
             </ThemedText>
           ) : null}
         </View>
-        {action}
+        {action ? <View style={styles.headAction}>{action}</View> : null}
       </View>
     </View>
   );
@@ -130,6 +130,7 @@ const styles = StyleSheet.create({
   },
   headRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: Space.md,
   },
@@ -139,7 +140,13 @@ const styles = StyleSheet.create({
   */
   headText: {
     flex: 1,
+    // Piso do título: com fonte grande, uma ação longa ("Adicionar à hipótese") o espremia até
+    // uma letra por linha. Abaixo disso quem cede é a linha — a ação desce e fica à direita.
+    minWidth: '40%',
     gap: Space.half,
+  },
+  headAction: {
+    marginLeft: 'auto',
   },
   /*
     32 de geometria com `hitSlop` de 8 fecha os 44pt de alvo (design.md §11) sem o disco pesar

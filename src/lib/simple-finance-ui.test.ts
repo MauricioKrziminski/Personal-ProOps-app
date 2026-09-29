@@ -239,7 +239,13 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       // (`use-preferencia.test.ts`).
       if (name === '@/hooks/use-preferencia') return { umDe: () => () => true, usePreferencia: (nome: string, padrao: unknown) => {
         const [v, setV] = react.useState(options.preferencias?.[nome] ?? padrao);
-        return [v, (x: unknown) => { preferenciasGravadas[nome] = x; setV(x); }];
+        // Por função, parte do GRAVADO (como o hook de verdade), não do valor deste render.
+        return [v, (x: unknown) => {
+          const antes = nome in preferenciasGravadas ? preferenciasGravadas[nome] : (options.preferencias?.[nome] ?? padrao);
+          const novo = typeof x === 'function' ? (x as (a: unknown) => unknown)(antes) : x;
+          preferenciasGravadas[nome] = novo;
+          setV(novo);
+        }];
       } };
       if (name === '@/hooks/use-rascunho') return load('src/hooks/use-rascunho.ts');
       // Import relativo dentro de `src/lib` (o `rascunho.ts` importa `./escrita.ts`): o módulo de verdade.
@@ -3313,8 +3319,15 @@ test('Aplicar duas vezes seguidas grava uma vez só', () => {
 });
 
 test('Aplicar a rápida abre o formulário real pré-preenchido', () => {
-  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [{ kind: 'expense', amount_cents: 300000, start: '2026-10-01', installments: 6, mode: 'total' }], detalhadas: [] }) } });
-  const card = deslizaveis(ui).find((d: any) => d.props.acoes.some((a: any) => a.label === 'Aplicar'));
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [
+    // Como o sheet grava de verdade: toda rápida tem `grupo`; só o adiantamento tem `rotulo`
+    // (29/09/2026, visto no emulador: o "Aplicar" sumia de todas as rápidas).
+    { kind: 'expense', amount_cents: 300000, start: '2026-10-01', installments: 6, mode: 'total', grupo: 'h1' },
+    { kind: 'expense', amount_cents: 50000, start: '2026-10-01', installments: 1, mode: 'cancel', grupo: 'h2', rotulo: 'adianta a tv' },
+  ], detalhadas: [] }) } });
+  const comAplicar = deslizaveis(ui).filter((d: any) => d.props.acoes.some((a: any) => a.label === 'Aplicar'));
+  assert.equal(comAplicar.length, 1, 'a rápida solta aplica; o adiantamento não');
+  const card = comAplicar[0];
   ui.interact(() => card.props.acoes.find((a: any) => a.label === 'Aplicar').onPress());
   assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), {
     pathname: '/finance/transaction-form',

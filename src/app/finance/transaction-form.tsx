@@ -286,6 +286,9 @@ function TransactionForm({
   };
   const modoHipotese = Boolean(hipotese);
   const hipoteseAberta = rascunho.detalhadas.find((h) => h.id === hipotese) ?? null;
+  // Os atalhos do rodapé (recorrente, financiamento) levam o modo junto: na hipótese, o outro
+  // formulário também só guarda no rascunho.
+  const paraHipotese = modoHipotese ? { hipotese: 'nova' } : {};
   const hLanc = hipoteseAberta?.tipo === 'lancamento' ? hipoteseAberta.entrada : null;
   const hParc = hipoteseAberta?.tipo === 'parcelada' ? hipoteseAberta.entrada : null;
   const { windowClass } = useAdaptiveWindow();
@@ -1514,12 +1517,12 @@ function TransactionForm({
           botão: ali o caminho é editar a série, não criar uma segunda. Nem o PAGAMENTO DE DÍVIDA:
           a parcela já vem do cronograma da dívida, e uma recorrente ao lado contaria duas vezes.
         */}
-        {!editing || !(editing.recurring_id || editing.installment_plan_id || editing.debt_id) ? (
+        {!hipoteseAberta && (!editing || !(editing.recurring_id || editing.installment_plan_id || editing.debt_id)) ? (
           <View style={styles.errorActions}>
             <Button label="Repetir lançamento" variant="secondary" size="sm" onPress={() => {
               const values = getValues();
               const destino = { pathname: '/finance/recurring' as const, params: {
-                create: '1', kind: values.kind === 'income' ? 'income' : 'expense',
+                ...paraHipotese, create: '1', kind: values.kind === 'income' ? 'income' : 'expense',
                 amount: String(values.amount_cents), description: values.description,
                 merchant: values.merchant?.trim() ?? '',
                 category: values.category ?? '', account: values.account_id ?? '', start: values.occurred_at,
@@ -1530,7 +1533,7 @@ function TransactionForm({
               else router.replace(destino);
             }} />
             {!editing ? (
-              <Button label="Financiamento" variant="secondary" size="sm" onPress={() => router.push({ pathname: '/finance/debts', params: { create: 'financing' } })} />
+              <Button label="Financiamento" variant="secondary" size="sm" onPress={() => router.push({ pathname: '/finance/debts', params: { ...paraHipotese, create: 'financing' } })} />
             ) : null}
           </View>
         ) : null}

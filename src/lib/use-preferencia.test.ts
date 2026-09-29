@@ -99,3 +99,45 @@ test('valor gravado que a tela não aceita mais, ou disco corrompido, cai no pad
   await esperar();
   assert.equal(quebrado.api.usePreferencia('regua:lancamentos', 'civil', quebrado.api.umDe(REGUA))[0], 'civil');
 });
+
+test('mudar por FUNÇÃO lê o valor gravado na hora: duas mudanças do mesmo render valem as duas', async () => {
+  // 29/09/2026, visto no emulador: "Aplicar todas" tirava as hipóteses do rascunho com funções
+  // criadas no MESMO render; cada uma partia do valor daquele render e a segunda desfazia a
+  // primeira — uma hipótese já salva na conta continuava no rascunho, pronta para duplicar.
+  const disco = new Map<string, string>();
+  const a = carregar(disco);
+  a.api.carregarPreferencias('u1');
+  await esperar();
+  const ehTexto = (v: unknown): v is string => typeof v === 'string';
+  const [, mudar] = a.api.usePreferencia('lista', 'a,b,c', ehTexto);
+  mudar((antes: string) => antes.split(',').filter((x) => x !== 'a').join(','));
+  mudar((antes: string) => antes.split(',').filter((x) => x !== 'b').join(','));
+  assert.equal(a.api.usePreferencia('lista', 'a,b,c', ehTexto)[0], 'c');
+});
+
+test('useRascunho: tirar duas hipóteses com as funções do MESMO render tira as duas', async () => {
+  const disco = new Map<string, string>();
+  const a = carregar(disco);
+  a.api.carregarPreferencias('u1');
+  await esperar();
+  const mod = { exports: {} as any };
+  runInNewContext(transpilar('../hooks/use-rascunho.ts'), {
+    module: mod,
+    exports: mod.exports,
+    require: (nome: string) => {
+      if (nome === '@/hooks/use-preferencia') return a.api;
+      if (nome === '@/lib/rascunho')
+        return {
+          lerRascunho: (t: string) => (t ? JSON.parse(t) : { versao: 1, rapidas: [], detalhadas: [] }),
+          gravarRascunho: (r: any) => JSON.stringify(r),
+        };
+      throw new Error(`módulo inesperado: ${nome}`);
+    },
+  });
+  const inicio = mod.exports.useRascunho();
+  inicio.restaurar({ versao: 1, rapidas: [], detalhadas: [{ id: 'x' }, { id: 'y' }, { id: 'z' }] });
+  const mesmoRender = mod.exports.useRascunho();
+  mesmoRender.tirarDetalhada('x');
+  mesmoRender.tirarDetalhada('y');
+  assert.deepEqual(mod.exports.useRascunho().rascunho.detalhadas.map((h: any) => h.id), ['z']);
+});

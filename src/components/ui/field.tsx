@@ -4,6 +4,7 @@ import {
   StyleSheet,
   TextInput,
   View,
+  useWindowDimensions,
   type StyleProp,
   type TextInputProps,
   type TextStyle,
@@ -339,7 +340,9 @@ function Digito({ ch, cor, animar }: { ch: string; cor: string; animar: boolean 
     t.set(withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) }));
   }, [atual, antigo, reduzido, t]);
 
-  const altura = Type.money.lineHeight;
+  // O texto cresce com a fonte do sistema; a rolagem anda a altura que ele tem de verdade.
+  const { fontScale } = useWindowDimensions();
+  const altura = Type.money.lineHeight * fontScale;
   const entra = useAnimatedStyle(() => ({
     opacity: t.get(),
     transform: [{ translateY: (1 - t.get()) * direcao.value * altura * ROLA }],
@@ -429,13 +432,15 @@ export function MoneyField({
   const cursor = useAnimatedStyle(() => ({ opacity: piscar.get() }));
 
   const cor = readOnly ? theme.textSecondary : theme.text;
+  const { fontScale } = useWindowDimensions();
 
   return moldura(
     <View style={styles.valor}>
       <ThemedText themeColor="textSecondary" style={[Type.title2, styles.moeda]}>
         R$
       </ThemedText>
-      <View style={styles.digitos} pointerEvents="none">
+      {/* A altura da caixa acompanha a fonte do sistema: em 1× ela cortava o "0,00" com fonte grande. */}
+      <View style={[styles.digitos, { height: Type.money.lineHeight * fontScale }]} pointerEvents="none">
         {caracteres.map((c, i) => {
           const posicao = caracteres.length - 1 - i;
           return <Digito key={posicao} ch={c} cor={cor} animar={posicao >= iniciais} />;
@@ -522,7 +527,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    height: Type.money.lineHeight,
     overflow: 'hidden',
   },
   digito: { flexShrink: 0 },

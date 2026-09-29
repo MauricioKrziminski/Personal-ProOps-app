@@ -11,19 +11,22 @@ const ehTexto = (v: string | number): v is string => typeof v === 'string';
 export function useRascunho() {
   const [texto, setTexto] = usePreferencia<string>('projecao:rascunho', '', ehTexto);
   const rascunho = lerRascunho(texto);
-  const gravar = (r: Rascunho) => setTexto(gravarRascunho(r));
+  // Toda mudança parte do GRAVADO na hora, nunca do `rascunho` deste render: o "Aplicar todas"
+  // tira uma hipótese por salvamento, todas com funções do mesmo render, e partindo do render a
+  // segunda desfazia a primeira (a hipótese já salva na conta ficava no rascunho).
+  const mudar = (f: (r: Rascunho) => Rascunho) => setTexto((antes) => gravarRascunho(f(lerRascunho(antes))));
   return {
     rascunho,
-    setRapidas: (f: (antes: Draft[]) => Draft[]) => gravar({ ...rascunho, rapidas: f(rascunho.rapidas) }),
+    setRapidas: (f: (antes: Draft[]) => Draft[]) => mudar((r) => ({ ...r, rapidas: f(r.rapidas) })),
     adicionarDetalhada: (h: Omit<HipoteseDetalhada, 'id'>) => {
       const id = `h${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-      gravar({ ...rascunho, detalhadas: [...rascunho.detalhadas, { ...h, id } as HipoteseDetalhada] });
+      mudar((r) => ({ ...r, detalhadas: [...r.detalhadas, { ...h, id } as HipoteseDetalhada] }));
       return id;
     },
     trocarDetalhada: (id: string, h: Omit<HipoteseDetalhada, 'id'>) =>
-      gravar({ ...rascunho, detalhadas: rascunho.detalhadas.map((d) => (d.id === id ? ({ ...h, id } as HipoteseDetalhada) : d)) }),
-    tirarDetalhada: (id: string) => gravar({ ...rascunho, detalhadas: rascunho.detalhadas.filter((d) => d.id !== id) }),
+      mudar((r) => ({ ...r, detalhadas: r.detalhadas.map((d) => (d.id === id ? ({ ...h, id } as HipoteseDetalhada) : d)) })),
+    tirarDetalhada: (id: string) => mudar((r) => ({ ...r, detalhadas: r.detalhadas.filter((d) => d.id !== id) })),
     limpar: () => setTexto(''),
-    restaurar: (r: Rascunho) => gravar(r),
+    restaurar: (r: Rascunho) => setTexto(gravarRascunho(r)),
   };
 }

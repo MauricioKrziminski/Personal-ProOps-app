@@ -100,7 +100,7 @@ export function usePreferencia<T extends Valor>(
   nome: string,
   padrao: T,
   aceita: (v: Valor) => v is T,
-): [T, (v: T) => void] {
+): [T, (v: T | ((antes: T) => T)) => void] {
   const userId = useSession().session?.user.id;
   const assinarUsuario = useCallback(
     (ouvinte: () => void) => {
@@ -111,7 +111,16 @@ export function usePreferencia<T extends Valor>(
   );
   const bruto = useSyncExternalStore(assinarUsuario, () => ler(userId, nome));
   const valor = bruto !== undefined && aceita(bruto) ? bruto : padrao;
-  const mudar = useCallback((v: T) => escrever(userId, nome, v), [userId, nome]);
+  // Por função, o valor de partida é o GRAVADO na hora da chamada, não o do render: duas mudanças
+  // seguidas de funções do mesmo render (uma fila de salvamentos) valem as duas.
+  const mudar = useCallback(
+    (v: T | ((antes: T) => T)) => {
+      if (typeof v !== 'function') return escrever(userId, nome, v);
+      const agora = ler(userId, nome);
+      escrever(userId, nome, v(agora !== undefined && aceita(agora) ? agora : padrao));
+    },
+    [userId, nome, aceita, padrao],
+  );
   return [valor, mudar];
 }
 
