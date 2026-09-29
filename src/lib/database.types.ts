@@ -598,6 +598,54 @@ export type Database = {
           },
         ]
       }
+      categories: {
+        Row: {
+          color: string | null
+          created_at: string
+          icon: string | null
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+          workspace_id?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "categories_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categorization_rules: {
         Row: {
           account_id: string | null
@@ -2714,7 +2762,10 @@ export type Database = {
       categories_used: {
         Args: never
         Returns: {
+          budgets: number
           category: string
+          color: string
+          icon: string
           uses: number
         }[]
       }
@@ -2873,6 +2924,7 @@ export type Database = {
           principal_cents: number
         }[]
       }
+      delete_category: { Args: { p_name: string }; Returns: Json }
       delete_debt: { Args: { p_debt_id: string }; Returns: number }
       edit_goal_contribution: {
         Args: {
@@ -3165,6 +3217,10 @@ export type Database = {
           status: string
         }[]
       }
+      rename_category: {
+        Args: { p_from: string; p_juntar?: boolean; p_to: string }
+        Returns: Json
+      }
       roll_invoice: {
         Args: {
           p_invoice_id: string
@@ -3195,6 +3251,10 @@ export type Database = {
           p_rollover?: boolean
         }
         Returns: string
+      }
+      save_category: {
+        Args: { p_color: string; p_icon: string; p_name: string }
+        Returns: undefined
       }
       settle_invoice: {
         Args: { p_invoice_id: string; p_paid_at?: string }

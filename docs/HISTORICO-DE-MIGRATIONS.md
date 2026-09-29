@@ -27,6 +27,20 @@ existe numa transação só (encerra a origem pelo alcance e cria o destino por
 `supabase/tests/converter_registro.sql` (14 casos: 1–13 e 7b). Depende da `20260929120000` (a função de
 criação); em produção sobe **antes** do app que a chama.
 
+**AINDA EM NENHUM BANCO REMOTO: `20260929170000_categorias`** (29/09/2026, testada só no
+Postgres LOCAL: a sessão que a escreveu não tinha acesso ao staging) — a tabela `categories`
+(ícone e cor de um nome, por espaço; RLS `workspace rows`, na publicação do Realtime),
+`categories_used` com `icon`, `color` e `budgets` no FIM (o APK antigo lê `category`/`uses` por
+nome) e `save_category`, `rename_category` (juntar com `p_juntar`, recusa `CATEGORIA_EXISTE`) e
+`delete_category`, que reescrevem o nome nas sete colunas. `security invoker`, sem `execute` para
+`anon`. Mexe em dois gatilhos para um UPDATE só de categoria não acordá-los: `sync_debt_payment`
+passa a `update of` as colunas que confere (antes, um pagamento com a conta pagadora arquivada
+derrubava o rename inteiro) e `private.track_recurring_history` sai cedo com
+`proops.renomeando_categoria` ligado (antes, versionava o rename e trocava uma versão futura de
+calendário por outra com a âncora antiga). Teste: `supabase/tests/categorias.sql` (os dois
+defeitos conferidos com o gatilho antigo: o teste falha). **Próximo passo: `db push` no staging**; em
+produção sobe **antes** do app que a chama.
+
 **Produção e staging ALINHADOS em `20260928237000`** — a `20260928236000` e esta aplicadas em
 produção pelo Gabriel em 28/09/2026 (`db push --project-ref`) e conferidas na fonte:
 `schema_migrations` devolve `20260928237000`, `20260928236000`, `20260928235000`; `draft_lines`
