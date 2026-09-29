@@ -111,7 +111,7 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 export default function RecurringScreen() {
-  const params = useLocalSearchParams<{ create?: string; edit?: string; kind?: string; amount?: string; description?: string; merchant?: string; category?: string; account?: string; start?: string; hipotese?: string }>();
+  const params = useLocalSearchParams<{ create?: string; edit?: string; kind?: string; amount?: string; description?: string; merchant?: string; category?: string; account?: string; start?: string; hipotese?: string; deHipotese?: string }>();
   const theme = useTheme();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
@@ -134,7 +134,7 @@ export default function RecurringScreen() {
    * `?hipotese=` (29/09/2026, spec hipóteses detalhadas): a série vira hipótese do "E se…?" —
    * `nova` cria, um id edita aquela. Não grava: guarda a ENTRADA no rascunho.
    */
-  const { rascunho, adicionarDetalhada, trocarDetalhada } = useRascunho();
+  const { rascunho, adicionarDetalhada, trocarDetalhada, setRapidas } = useRascunho();
   const modoHipotese = Boolean(params.hipotese);
   const hipoteseAberta = rascunho.detalhadas.find((h) => h.id === params.hipotese && h.tipo === 'recorrente') ?? null;
 
@@ -310,6 +310,8 @@ export default function RecurringScreen() {
       entrada,
       {
         onSuccess: () => {
+          // Aberta pelo "Aplicar" de uma hipótese rápida: ela virou real e sai do rascunho.
+          if (params.deHipotese) setRapidas((antes) => antes.filter((_, i) => i !== Number(params.deHipotese)));
           toast({ message: 'Recorrência criada.', tone: 'success' });
           volta.aoFechar(() => setForm(null));
         },

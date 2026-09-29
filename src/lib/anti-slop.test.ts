@@ -1698,3 +1698,12 @@ test('Lançamento em modo hipótese: guarda no rascunho e sai ANTES de qualquer 
   assert.match(submit.slice(desvio, desvio + 600), /hipoteseDoLancamento\(destino, entradaLancamento, entradaParcelada\)/);
   assert.match(fonte, /'Adicionar à hipótese'/);
 });
+
+test('Lançamento aberto pelo "Aplicar" de uma rápida: os dois caminhos de salvar a tiram do rascunho', () => {
+  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  // a compra parcelada nova e o lançamento: o `onSuccess` de cada um chama `tirarRapida()`
+  const criarPlano = fonte.slice(fonte.indexOf('createPlan.mutate('));
+  assert.match(criarPlano.slice(0, 400), /onSuccess: \(\) => \{\s*tirarRapida\(\);/);
+  const gravar = fonte.slice(fonte.indexOf('const gravar = () =>'));
+  assert.match(gravar.slice(0, 800), /onSuccess: \(\) => \{\s*tirarRapida\(\);/);
+});

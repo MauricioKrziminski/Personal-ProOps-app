@@ -197,6 +197,9 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useMarkPaid: () => mutation('markPaid'),
     useConfirmPaymentScoped: () => mutation('confirmPaymentScoped'),
     useSaveTransactionScoped: () => mutation('saveScoped'),
+    useSaveTransaction: () => mutation('saveTransaction'),
+    useCreateInstallmentPlan: () => mutation('createInstallmentPlan'),
+    useCreateRecurring: () => mutation('createRecurring'),
     useSaveRecurringSeries: () => mutation('saveRecurringSeries'),
     useSaveRecurringAll: () => mutation('saveRecurringAll'),
     useSaveRecurringOne: () => mutation('saveRecurringOne'),
@@ -218,7 +221,9 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useState(initial: any) { const index = cursor++; if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial; return [state[index], (value: any) => { state[index] = typeof value === 'function' ? value(state[index]) : value; if (renderizando) deNovo = true; }]; },
     useMemo: (fn: () => unknown) => fn(),
     useCallback: (fn: unknown) => fn,
-    useRef: (v: unknown) => ({ current: v }),
+    // Persistente entre renders, como no React: um `ref` que zera a cada render esconde o guarda
+    // de toque duplo do "Aplicar" (29/09/2026).
+    useRef: (v: unknown) => { const index = cursor++; if (!(index in state)) state[index] = { current: v }; return state[index]; },
     useEffect: () => {},
     memo: (componente: unknown) => componente,
     createContext: (valor: unknown) => ({ valor, Provider: 'Provider' }),
@@ -3280,4 +3285,53 @@ test('E se: "Adicionar como…" abre o formulário real em modo hipótese; a lin
   assert.equal(JSON.parse(ui.preferenciasGravadas['projecao:rascunho'] || '{"detalhadas":[]}').detalhadas.length, 0);
   ui.interact(() => ui.toasts.at(-1).action.onPress());
   assert.equal(JSON.parse(ui.preferenciasGravadas['projecao:rascunho']).detalhadas.length, 1);
+});
+
+test('Aplicar a detalhada grava pelo mesmo hook do formulário e só então sai do rascunho', () => {
+  const entrada = { accountId: 'c', totalCents: 300000, installments: 10, paidInstallments: 0, occurredAt: '2026-10-01', description: 'Notebook', category: null, merchant: null };
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas: [{ id: 'h1', tipo: 'parcelada', titulo: 'Notebook', entrada }] }) } });
+  const card = deslizaveis(ui).find((d: any) => d.props.titulo === 'Notebook');
+  ui.interact(() => card.props.acoes.find((a: any) => a.label === 'Aplicar').onPress());
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Salvar na conta').onPress());
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.writes.at(-1))), { operation: 'createInstallmentPlan', value: entrada });
+  assert.ok(!ui.preferenciasGravadas['projecao:rascunho'], 'antes do sucesso a hipótese continua no rascunho');
+  ui.interact(() => ui.pedidos.at(-1).opts.onSuccess());
+  assert.equal(JSON.parse(ui.preferenciasGravadas['projecao:rascunho'] || '{"detalhadas":[]}').detalhadas.length, 0);
+});
+
+test('Aplicar duas vezes seguidas grava uma vez só', () => {
+  const entrada = { kind: 'expense', amount_cents: 1000, category: null, description: 'Pão', merchant: null, account_id: 'c', counterparty_account_id: null, occurred_at: '2026-10-01', status: 'cleared', due_at: null, auto_confirm: false };
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas: [{ id: 'h1', tipo: 'lancamento', titulo: 'Pão', entrada }] }) } });
+  const aplicar = () => deslizaveis(ui).find((d: any) => d.props.titulo === 'Pão').props.acoes.find((a: any) => a.label === 'Aplicar').onPress();
+  ui.interact(aplicar);
+  ui.interact(() => ui.actions.filter((a: any) => a.label === 'Salvar na conta').at(-1).onPress());
+  ui.interact(aplicar);
+  const confirmar = ui.actions.filter((a: any) => a.label === 'Salvar na conta').at(-1);
+  ui.interact(() => confirmar.onPress());
+  assert.equal(ui.writes.filter((w: any) => w.operation === 'saveTransaction').length, 1);
+});
+
+test('Aplicar a rápida abre o formulário real pré-preenchido', () => {
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [{ kind: 'expense', amount_cents: 300000, start: '2026-10-01', installments: 6, mode: 'total' }], detalhadas: [] }) } });
+  const card = deslizaveis(ui).find((d: any) => d.props.acoes.some((a: any) => a.label === 'Aplicar'));
+  ui.interact(() => card.props.acoes.find((a: any) => a.label === 'Aplicar').onPress());
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), {
+    pathname: '/finance/transaction-form',
+    params: { deHipotese: '0', kind: 'expense', amount: '300000', data: '01/10/2026', parcelas: '6' },
+  });
+});
+
+test('Recorrente aberta por "Aplicar" de uma rápida: salvar tira a rápida do rascunho', () => {
+  const rascunho = JSON.stringify({ versao: 1, rapidas: [{ kind: 'expense', amount_cents: 150000, start: '2026-10-05', installments: 1, mode: 'monthly' }], detalhadas: [] });
+  const ui = screen('src/app/finance/recurring.tsx', {
+    preferencias: { 'projecao:rascunho': rascunho },
+    params: { create: '1', deHipotese: '0', kind: 'expense', amount: '150000', start: '05/10/2026', description: 'Aluguel' },
+  });
+  const header = ui.nodes().find((n: any) => n.type === 'TaskHeader' && n.props.action);
+  ui.interact(() => header.props.action.props.onPress());
+  assert.equal(ui.writes.at(-1).operation, 'createRecurring');
+  assert.ok(!('projecao:rascunho' in ui.preferenciasGravadas), 'antes do sucesso o rascunho não muda');
+  ui.interact(() => ui.pedidos.at(-1).opts.onSuccess());
+  assert.ok('projecao:rascunho' in ui.preferenciasGravadas, 'salvar reescreve o rascunho');
+  assert.equal(JSON.parse(ui.preferenciasGravadas['projecao:rascunho'] || '{"rapidas":[]}').rapidas.length, 0);
 });

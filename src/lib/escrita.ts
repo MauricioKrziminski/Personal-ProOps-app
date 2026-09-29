@@ -5,7 +5,7 @@
  * byte, o que é aplicado. `user_id` fica de fora — o hook põe o da sessão, e `simular` põe
  * `auth.uid()` no banco.
  */
-import type { TransactionInput } from '@/hooks/use-finance';
+import type { Debt, TransactionInput } from '@/hooks/use-finance';
 
 export const DESCRICAO_JUROS_DO_PIX = 'Juros do Pix no crédito';
 
@@ -35,8 +35,8 @@ export type EntradaRecorrente = {
 };
 export type EntradaFinanciamento = {
   name: string;
-  kind: 'financing' | 'loan' | 'other' | string;
-  calculation_mode?: 'fixed_installments' | 'interest' | string;
+  kind: Debt['kind'];
+  calculation_mode?: Debt['calculation_mode'];
   principal_cents: number;
   remaining_cents: number;
   interest_rate_monthly: number;

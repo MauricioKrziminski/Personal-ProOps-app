@@ -160,7 +160,7 @@ const schema = z
 type FormValues = z.infer<typeof schema>;
 
 export default function TransactionFormScreen() {
-  const params = useLocalSearchParams<{ id?: string; conta?: string; hipotese?: string; parcelada?: string }>();
+  const params = useLocalSearchParams<{ id?: string; conta?: string; hipotese?: string; parcelada?: string; deHipotese?: string; kind?: string; amount?: string; data?: string; parcelas?: string }>();
   const query = useTransaction(params.id);
   // A parcela edita o valor da COMPRA: sem o plano (travadas, total) o campo não sabe o que
   // "cada parcela" alcança. Espera junto com a linha, na mesma tela de esqueleto.
@@ -229,13 +229,20 @@ export default function TransactionFormScreen() {
     // Outro id é outro formulário: aberto por link sobre um já aberto, a tela era reaproveitada
     // e o `useForm` (que só lê os valores na montagem) seguia com o lançamento anterior.
     <TransactionForm
-      key={params.id ?? `novo:${params.conta ?? ''}:${params.hipotese ?? ''}`}
+      key={params.id ?? `novo:${params.conta ?? ''}:${params.hipotese ?? ''}:${params.deHipotese ?? ''}`}
       editing={editing}
       plano={plano.data ?? undefined}
       jurosDoPix={juros.data ?? null}
       conta={editing ? undefined : params.conta}
       hipotese={editing ? undefined : params.hipotese}
       parcelada={params.parcelada === '1'}
+      daRapida={editing || params.deHipotese === undefined ? undefined : {
+        indice: Number(params.deHipotese),
+        kind: params.kind === 'income' ? 'income' : 'expense',
+        amount: Number(params.amount) || 0,
+        data: params.data,
+        parcelas: Math.max(1, Number(params.parcelas) || 1),
+      }}
     />
   );
 }
@@ -247,6 +254,7 @@ function TransactionForm({
   conta,
   hipotese,
   parcelada,
+  daRapida,
 }: {
   editing?: Transaction;
   /** A compra desta parcela, quando `editing` é parcela e o plano carregou. */
@@ -265,9 +273,17 @@ function TransactionForm({
   hipotese?: string;
   /** `?parcelada=1` ("Adicionar como… Compra parcelada"): abre já em 2 parcelas. */
   parcelada?: boolean;
+  /**
+   * Aberto pelo "Aplicar" de uma hipótese RÁPIDA: o formulário nasce com o tipo, o valor (o total,
+   * com parcelas), a data e as parcelas dela; salvar a tira do rascunho.
+   */
+  daRapida?: { indice: number; kind: 'income' | 'expense'; amount: number; data?: string; parcelas: number };
 }) {
   const insets = useSafeAreaInsets();
-  const { rascunho, adicionarDetalhada, trocarDetalhada } = useRascunho();
+  const { rascunho, adicionarDetalhada, trocarDetalhada, setRapidas } = useRascunho();
+  const tirarRapida = () => {
+    if (daRapida) setRapidas((antes) => antes.filter((_, i) => i !== daRapida.indice));
+  };
   const modoHipotese = Boolean(hipotese);
   const hipoteseAberta = rascunho.detalhadas.find((h) => h.id === hipotese) ?? null;
   const hLanc = hipoteseAberta?.tipo === 'lancamento' ? hipoteseAberta.entrada : null;
@@ -299,18 +315,18 @@ function TransactionForm({
     // `editing` já chegou resolvido pelo gate — sem `useEffect`+`reset`, sem corrida.
     defaultValues: {
       // A hipótese aberta para editar (`hLanc`/`hParc`) preenche como um registro preencheria.
-      kind: editing?.kind ?? hLanc?.kind ?? 'expense',
-      amount_cents: editing?.amount_cents ?? hLanc?.amount_cents ?? hParc?.totalCents ?? 0,
+      kind: editing?.kind ?? hLanc?.kind ?? daRapida?.kind ?? 'expense',
+      amount_cents: editing?.amount_cents ?? hLanc?.amount_cents ?? hParc?.totalCents ?? daRapida?.amount ?? 0,
       category: editing?.category ?? hLanc?.category ?? hParc?.category ?? null,
       description: editing?.description ?? hLanc?.description ?? hParc?.description ?? '',
       merchant: editing?.merchant ?? hLanc?.merchant ?? hParc?.merchant ?? null,
       account_id: editing?.account_id ?? hLanc?.account_id ?? hParc?.accountId ?? (conta && accounts?.some((a) => a.id === conta) ? conta : null),
       counterparty_account_id: editing?.counterparty_account_id ?? hLanc?.counterparty_account_id ?? null,
-      installments: hParc?.installments ?? (parcelada ? 2 : 1),
+      installments: hParc?.installments ?? daRapida?.parcelas ?? (parcelada ? 2 : 1),
       paid_installments: String(hParc?.paidInstallments ?? 0),
       fee_cents: jurosDoPix?.amount_cents ?? hLanc?.fee_cents ?? 0,
       auto_confirm: editing?.auto_confirm ?? hLanc?.auto_confirm ?? false,
-      occurred_at: isoToBR(dataDaSerie ?? editing?.occurred_at ?? hLanc?.occurred_at ?? hParc?.occurredAt ?? localISODate()),
+      occurred_at: daRapida?.data ?? isoToBR(dataDaSerie ?? editing?.occurred_at ?? hLanc?.occurred_at ?? hParc?.occurredAt ?? localISODate()),
       pending: editing ? editing.status === 'pending' : hLanc?.status === 'pending',
       installment_occurrence: Boolean(editing?.installment_plan_id),
       due_at: dataDaSerie ? isoToBR(dataDaSerie) : editing?.due_at ? isoToBR(editing.due_at) : hLanc?.due_at ? isoToBR(hLanc.due_at) : null,
@@ -651,6 +667,7 @@ function TransactionForm({
         entradaParcelada,
         {
           onSuccess: () => {
+            tirarRapida();
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             router.back();
             // O `hint` do campo encurtou para caber no teto de 90 caracteres (design.md §7b), e
@@ -771,6 +788,7 @@ function TransactionForm({
       },
       {
         onSuccess: () => {
+          tirarRapida();
           fechar();
         },
         // Erro NUNCA fecha o modal: o que foi digitado continua na tela.

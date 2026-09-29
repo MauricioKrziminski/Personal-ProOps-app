@@ -38,6 +38,10 @@ import {
   useForecastMonths,
   useForecastWithDrafts,
   useSimulacao,
+  useSaveTransaction,
+  useCreateInstallmentPlan,
+  useCreateRecurring,
+  useSaveDebt,
   useMonthSummary,
   useUpcomingBills,
   type Draft,
@@ -71,7 +75,7 @@ import {
 } from '@/lib/anticipation';
 import { AdiantarCampos } from '@/components/finance/anticipation-fields';
 import { QuantityField } from '@/components/ui/quantity-field';
-import { faixaDeParcelas } from '@/lib/finance-form';
+import { faixaDeParcelas, financeErrorMessage } from '@/lib/finance-form';
 import { settleLabel } from '@/lib/settle-labels';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
 
@@ -288,8 +292,92 @@ export default function ForecastScreen() {
     else if (h.tipo === 'financiamento') router.push({ pathname: '/finance/debts', params: { create: 'financing', hipotese: h.id } });
     else router.push({ pathname: '/finance/transaction-form', params: { hipotese: h.id } });
   };
-  // Aplicar mora na Task 7 do plano (salvar pelo hook do formulário).
-  const aplicarDetalhada = (_h: HipoteseDetalhada) => {};
+  /**
+   * Aplicar (spec 2026-09-28, seção 5): a detalhada salva pelo MESMO hook do formulário, com a
+   * entrada guardada — e só sai do rascunho no sucesso. O `ref` segura o toque duplo: entre o
+   * primeiro toque e o render seguinte, o estado ainda não mudou.
+   */
+  const salvarLancamento = useSaveTransaction();
+  const criarParcelada = useCreateInstallmentPlan();
+  const criarRecorrente = useCreateRecurring();
+  const salvarFinanciamento = useSaveDebt();
+  const aplicando = useRef<string | null>(null);
+  const gravarDetalhada = (h: HipoteseDetalhada, depois: (ok: boolean) => void) => {
+    const fim = {
+      onSuccess: () => {
+        aplicando.current = null;
+        tirarDetalhada(h.id);
+        depois(true);
+      },
+      onError: (e: unknown) => {
+        aplicando.current = null;
+        toast({ message: financeErrorMessage(e, `Não deu para aplicar ${h.titulo}.`), tone: 'error' });
+        depois(false);
+      },
+    };
+    if (h.tipo === 'lancamento') salvarLancamento.mutate(h.entrada, fim);
+    else if (h.tipo === 'parcelada') criarParcelada.mutate(h.entrada, fim);
+    else if (h.tipo === 'recorrente') criarRecorrente.mutate(h.entrada, fim);
+    else salvarFinanciamento.mutate(h.entrada, fim);
+  };
+  const aplicarDetalhada = (h: HipoteseDetalhada) => {
+    if (aplicando.current) return;
+    showItemActions(`Salvar ${h.titulo} na conta?`, [
+      {
+        label: 'Salvar na conta',
+        icon: 'checkmark.circle',
+        onPress: () => {
+          if (aplicando.current) return;
+          aplicando.current = h.id;
+          gravarDetalhada(h, (ok) => {
+            if (ok) toast({ message: `${h.titulo} foi para a conta.`, tone: 'success' });
+          });
+        },
+      },
+    ], resumoDaHipotese(h, brl));
+  };
+  /** "Aplicar todas": em sequência — a próxima só depois da anterior; para no primeiro erro. */
+  const aplicarTodas = () => {
+    if (aplicando.current || detalhadas.length === 0) return;
+    const fila = [...detalhadas];
+    showItemActions(`Salvar ${fila.length === 1 ? 'a hipótese detalhada' : `as ${fila.length} hipóteses detalhadas`} na conta?`, [
+      {
+        label: 'Salvar na conta',
+        icon: 'checkmark.circle',
+        onPress: () => {
+          const proxima = (feitas: number) => {
+            const h = fila.shift();
+            if (!h) {
+              toast({
+                message: rascunhos.length
+                  ? `Salvei ${feitas}. As rápidas precisam do formulário para virar lançamento.`
+                  : `Salvei ${feitas} na conta.`,
+                tone: 'success',
+              });
+              return;
+            }
+            aplicando.current = h.id;
+            gravarDetalhada(h, (ok) => { if (ok) proxima(feitas + 1); });
+          };
+          proxima(0);
+        },
+      },
+    ]);
+  };
+  /** A rápida vira o formulário completo, pré-preenchido; salvar lá tira ela do rascunho. */
+  const aplicarRapida = (indice: number, d: Draft) => {
+    const data = isoToBR(d.start);
+    if (d.mode === 'monthly') {
+      router.push({ pathname: '/finance/recurring', params: { create: '1', deHipotese: String(indice), kind: d.kind, amount: String(d.amount_cents), start: data } });
+      return;
+    }
+    router.push({ pathname: '/finance/transaction-form', params: { deHipotese: String(indice), kind: d.kind, amount: String(d.amount_cents), data, parcelas: String(d.installments) } });
+  };
+  const tirarRapida = (indices: number[]) => {
+    const antes = rascunho;
+    setRascunhos((lista) => lista.filter((_, i) => !indices.includes(i)));
+    toast({ message: 'Hipótese tirada do rascunho.', tone: 'success', action: { label: 'Desfazer', onPress: () => restaurar(antes) } });
+  };
   const acoesDaDetalhada = (h: HipoteseDetalhada): ItemAction[] => [
     { label: 'Aplicar', icon: 'checkmark.circle', arrasto: 'direita', onPress: () => aplicarDetalhada(h) },
     { label: 'Editar', icon: 'pencil', onPress: () => editarDetalhada(h) },
@@ -767,17 +855,23 @@ export default function ForecastScreen() {
       </View>
       {simulando ? (
         <>
-        {hipoteses.map(({ chave, principal: d }) => {
+        {hipoteses.map(({ chave, principal: d, indices }) => {
+          // "Aplicar" só para a rápida solta: o adiantamento (grupo) não aplica nesta versão (spec §6).
+          const acoesDaRapida: ItemAction[] = [
+            ...(d.grupo ? [] : [{ label: 'Aplicar', icon: 'checkmark.circle' as const, arrasto: 'direita' as const, onPress: () => aplicarRapida(indices[0], d) }]),
+            { label: 'Editar', icon: 'pencil', onPress: () => abrirEdicao(chave, d) },
+            { label: 'Tirar', icon: 'trash', destructive: true, arrasto: 'esquerda', desfaz: true, onPress: () => tirarRapida(indices) },
+          ];
           const texto = d.rotulo
             ? `sai ${brl(d.amount_cents)} · ${d.rotulo} · em ${isoToBR(d.start)}`
             : `${d.kind === 'income' ? 'entra' : 'sai'} ${brl(d.amount_cents)}${
                 d.mode === 'monthly' ? ' todo mês' : d.installments > 1 ? ` em ${d.installments}x` : ''
               } · a partir de ${isoToBR(d.start)}`;
           return (
-            // A linha É o botão de editar: um botão por linha ("Tirar") poluía o card, e tirar
-            // mora no sheet de edição, ao lado do que se está desistindo.
+            // A linha É o botão de editar; o arrasto aplica (direita) e tira (esquerda), como as
+            // hipóteses detalhadas logo abaixo.
+            <Deslizavel key={chave} titulo={texto} acoes={acoesDaRapida}>
             <Pressable
-              key={chave}
               accessibilityRole="button"
               accessibilityLabel={`Editar hipótese: ${texto}`}
               onPress={() => abrirEdicao(chave, d)}
@@ -796,6 +890,7 @@ export default function ForecastScreen() {
               </ThemedText>
               <Icon name="chevron.right" size="sm" color="textSecondary" />
             </Pressable>
+            </Deslizavel>
           );
         })}
         {detalhadas.map((h, i) => {
@@ -833,6 +928,9 @@ export default function ForecastScreen() {
           onPress={abrirNova}
         />
         <Button label="Adicionar como…" variant="secondary" size="sm" onPress={adicionarComo} />
+        {detalhadas.length > 0 ? (
+          <Button label="Aplicar todas" variant="secondary" size="sm" onPress={aplicarTodas} />
+        ) : null}
         {simulando ? (
           <Button
             label="Limpar"
