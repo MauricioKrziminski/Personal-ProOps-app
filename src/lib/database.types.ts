@@ -2887,6 +2887,14 @@ export type Database = {
         Args: { p_registros: Json; p_leituras: Json }
         Returns: Json
       }
+      accounts_horizon: {
+        Args: { days?: number }
+        Returns: Json
+      }
+      cards_horizon: {
+        Args: { days?: number }
+        Returns: Json
+      }
       edit_budget: {
         Args: {
           p_category: string

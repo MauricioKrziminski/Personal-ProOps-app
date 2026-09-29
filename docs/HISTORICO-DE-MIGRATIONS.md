@@ -13,6 +13,13 @@ pelo Gabriel, **antes** do app que a chama.
 `codigo` (SQLSTATE) em cada erro, para o app mostrar só a frase nossa (P0001) e nunca o texto cru
 do Postgres. Sobe no MESMO `db push` da anterior.
 
+**Só no STAGING: `20260929140000_caixa_por_conta` e `20260929150000_horizonte_por_conta`**
+(29/09/2026) — o caixa e os eventos da projeção passam a dizer a conta (`caixa_das_contas`,
+`eventos_de_caixa`; `cash_total` e as duas `cash_flow_forecast` leem deles — a projeção do `dev@`
+saiu IDÊNTICA nos 3.651 dias e no mês a mês, antes e depois) e o horizonte por conta e cartão
+(`accounts_horizon`, `cards_horizon`, leituras `contas`/`cartoes` do `simular`). Sobem no MESMO
+`db push` das duas `simular`, antes do app.
+
 **Produção e staging ALINHADOS em `20260928237000`** — a `20260928236000` e esta aplicadas em
 produção pelo Gabriel em 28/09/2026 (`db push --project-ref`) e conferidas na fonte:
 `schema_migrations` devolve `20260928237000`, `20260928236000`, `20260928235000`; `draft_lines`
