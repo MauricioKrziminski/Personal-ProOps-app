@@ -6,7 +6,7 @@ import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClie
 import type { ProjecaoMensal } from '@/lib/forecast-months';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
-import { dataLocalDe, localISODate, monthBounds, primeiroDiaDoMes } from '@/lib/dates';
+import { dataLocalDe, localISODate, mesmoMes, monthBounds, primeiroDiaDoMes } from '@/lib/dates';
 import { avisoDeDeslize } from '@/lib/serie';
 import type { Consulta } from '@/lib/tela-pronta';
 import type { DebtDeclaredEstimateRow, DebtPaymentRow } from '@/lib/debt-history';
@@ -1094,7 +1094,8 @@ export function useForecastMonths(days: number, drafts: Draft[], enabled = true,
   });
 }
 
-export type ErroDaHipotese = { indice: number; mensagem: string };
+/** Erro de uma hipótese (`indice`) ou de uma leitura (`leitura`) da simulação. */
+export type ErroDaHipotese = { indice?: number; leitura?: string; mensagem: string };
 
 /**
  * A Projeção com hipóteses DETALHADAS (spec 2026-09-28): os registros são criados de verdade no
@@ -2303,6 +2304,40 @@ export function useDraftLines(hipoteses: readonly HipoteseNoCiclo[], de: string 
       if (error) throw error;
       const r = data as { antes?: number; linhas?: OcorrenciaDaHipotese[] } | null;
       return { antes: Number(r?.antes ?? 0), linhas: r?.linhas ?? [] };
+    },
+  });
+}
+
+/**
+ * O ciclo COM as hipóteses detalhadas (spec 2026-09-28, seção 7): o fechamento e as linhas vêm de
+ * `simular` — os registros são criados de verdade, lidos e desfeitos. `idsHipotese` são os
+ * `ref_id` que a hipótese CRIOU (a linha vai ao grupo dela); `faturasComHipotese` são faturas que
+ * já existiam e receberam a hipótese (continuam no grupo delas, marcadas).
+ */
+export function useCicloSimulado(registros: { tipo: string; dados: unknown }[], month: string, view?: CycleView) {
+  return useQuery({
+    enabled: registros.length > 0 && Boolean(month),
+    gcTime: 0,
+    queryKey: ['simular', 'ciclo', month, view ?? '', JSON.stringify(registros)],
+    queryFn: async () => {
+      const mes = primeiroDiaDoMes(month);
+      const { data, error } = await supabase.rpc('simular', {
+        p_registros: registros as never,
+        p_leituras: { ciclo: { de: mes, ate: mes, view: view ?? null }, linhas_do_ciclo: { mes, view: view ?? null } } as never,
+      });
+      if (error) throw error;
+      const r = data as {
+        leituras?: { ciclo?: CycleRow[]; linhas_do_ciclo?: CycleLine[] };
+        criados?: { ids?: string[]; faturas?: string[] }[];
+        erros?: ErroDaHipotese[];
+      } | null;
+      return {
+        ciclo: r?.leituras?.ciclo?.find((c) => mesmoMes(c.mes, month)) ?? null,
+        linhas: r?.leituras?.linhas_do_ciclo ?? [],
+        idsHipotese: (r?.criados ?? []).flatMap((c) => c.ids ?? []),
+        faturasComHipotese: (r?.criados ?? []).flatMap((c) => c.faturas ?? []),
+        erros: r?.erros ?? [],
+      };
     },
   });
 }

@@ -198,6 +198,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useConfirmPaymentScoped: () => mutation('confirmPaymentScoped'),
     useSaveTransactionScoped: () => mutation('saveScoped'),
     useSaveTransaction: () => mutation('saveTransaction'),
+    useCicloSimulado: (registros: any[]) => registros.length ? { ...query, isPending: false, isSuccess: true, data: options.cicloSimulado } : { ...query, isPending: true, data: undefined },
     useCreateInstallmentPlan: () => mutation('createInstallmentPlan'),
     useCreateRecurring: () => mutation('createRecurring'),
     useSaveRecurringSeries: () => mutation('saveRecurringSeries'),
@@ -3334,4 +3335,24 @@ test('Recorrente aberta por "Aplicar" de uma rápida: salvar tira a rápida do r
   ui.interact(() => ui.pedidos.at(-1).opts.onSuccess());
   assert.ok('projecao:rascunho' in ui.preferenciasGravadas, 'salvar reescreve o rascunho');
   assert.equal(JSON.parse(ui.preferenciasGravadas['projecao:rascunho'] || '{"rapidas":[]}').rapidas.length, 0);
+});
+
+test('Ciclo pela Projeção com hipótese detalhada: lê por simular e marca a linha que veio dela', () => {
+  const detalhadas = JSON.stringify([{ id: 'h1', tipo: 'recorrente', titulo: 'Academia', entrada: { kind: 'expense', amount_cents: 5000, description: 'Academia', merchant: null, category: null, account_id: null, rrule: 'FREQ=WEEKLY;BYDAY=MO', next_run_at: '2026-10-05T12:00:00.000Z', end_date: null, auto_confirm: false } }]);
+  const ui = screen('src/app/finance/cycle.tsx', {
+    params: { month: '2026-10', view: 'cycle', detalhadas },
+    cicloSimulado: {
+      ciclo: { mes: '2026-10-01', ini: '2026-09-11', fim: '2026-10-10', estado: 'aberto', comecei_com: 0, entrou: 0, saiu: 5000, resultado: -5000, caixa_no_fim: -5000, faltou_pagar: 0, confere: true },
+      linhas: [
+        { day: '2026-10-05', in_cents: 0, out_cents: 5000, title: 'Academia', origin: 'recurring_projection', ref_id: 'r1', method_label: null, realizado: false, atrasada: false },
+        { day: '2026-10-10', in_cents: 0, out_cents: 90000, title: 'Fatura Nubank', origin: 'invoice', ref_id: 'f1', method_label: 'Nubank', realizado: false, atrasada: false },
+      ],
+      idsHipotese: ['r1'], faturasComHipotese: ['f1'], erros: [],
+    },
+  });
+  const heads = ui.nodes().filter((n: any) => n.type === 'SectionHead').map((n: any) => n.props.title);
+  assert.ok(heads.some((t: string) => /^Hipóteses do rascunho/.test(t)), 'a linha da hipótese vai ao grupo próprio');
+  // a fatura que já existia continua no grupo dela, dizendo que inclui a hipótese
+  const fatura = ui.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'Linha' && n.props.linha.ref_id === 'f1');
+  assert.match(fatura.props.linha.method_label, /inclui hipótese/);
 });

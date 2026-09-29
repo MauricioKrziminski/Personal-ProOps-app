@@ -914,7 +914,7 @@ export default function ForecastScreen() {
           Simule uma entrada ou saída.
         </ThemedText>
       )}
-      {simulado.isError || (comDetalhadas && simulacao.isError) ? (
+      {simulado.isError || (comDetalhadas && (simulacao.isError || errosDaSimulacao.some((e) => e.leitura))) ? (
         <ErrorBand
           message="Não deu para calcular o rascunho — os números acima são os reais."
           onRetry={comDetalhadas ? simulacao.refetch : simulado.refetch}
@@ -1137,6 +1137,7 @@ export default function ForecastScreen() {
                           // Com rascunho, o ciclo abre COM as hipóteses (28/09/2026), como a linha
                           // acima já soma. Pela rota, e nada é salvo.
                           ...(rascunhos.length > 0 ? { rascunho: JSON.stringify(paraOCiclo(rascunhos)) } : {}),
+                          ...(detalhadas.length > 0 ? { detalhadas: JSON.stringify(detalhadas) } : {}),
                         },
                       })
                     }

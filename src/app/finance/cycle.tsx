@@ -19,12 +19,13 @@ import { Radius, Space } from '@/design/tokens';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { VerMais } from '@/components/ui/ver-mais';
 import { useAosPoucos, useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
-import { type CycleLine, type CycleRow, type CycleView, useCycleLines, useCycleMonth, useCycleSeries, useDraftLines, useInvoice } from '@/hooks/use-finance';
+import { type CycleLine, type CycleRow, type CycleView, useCicloSimulado, useCycleLines, useCycleMonth, useCycleSeries, useDraftLines, useInvoice } from '@/hooks/use-finance';
 import { describeCycle } from '@/lib/cycle-label';
 import { rotaDaLinha } from '@/lib/cycle-routes';
 import { isoToBR, mesmoMes } from '@/lib/dates';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
 import { fechamentoComHipoteses, linhasDasHipoteses, type HipoteseNoCiclo } from '@/lib/rascunho-no-ciclo';
+import { registrosParaSimular, type HipoteseDetalhada } from '@/lib/rascunho';
 
 /**
  * **Por que o ciclo fechou naquele valor** — a tela que justifica o número da home.
@@ -79,7 +80,7 @@ export default function CycleDetailScreen() {
   const brl = useBRL();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
-  const params = useLocalSearchParams<{ month?: string; view?: string; tipo?: string; rascunho?: string }>();
+  const params = useLocalSearchParams<{ month?: string; view?: string; tipo?: string; rascunho?: string; detalhadas?: string }>();
   const view = (params.view === 'civil' ? 'civil' : 'cycle') as CycleView;
   /*
     ⚠️ **Sem `month` no link, cai no ciclo CORRENTE — não em string vazia.**
@@ -94,7 +95,16 @@ export default function CycleDetailScreen() {
 
   const serie = useCycleSeries(month, month, view);
   const linhas = useCycleLines(month, view);
-  const cicloReal = serie.data?.find((c) => mesmoMes(c.mes, month)) ?? null;
+  // Hipóteses DETALHADAS (29/09/2026): o fechamento e as linhas vêm de `simular` — os registros
+  // criados de verdade, lidos e desfeitos. As rápidas somam por cima, como antes.
+  const detalhadas = useMemo(() => lerDetalhadas(params.detalhadas), [params.detalhadas]);
+  const registros = useMemo(() => registrosParaSimular(detalhadas), [detalhadas]);
+  const comDetalhadas = registros.length > 0;
+  const simulado = useCicloSimulado(registros, month, view);
+  const cicloReal = comDetalhadas
+    ? (simulado.data?.ciclo ?? null)
+    : (serie.data?.find((c) => mesmoMes(c.mes, month)) ?? null);
+  const linhasBase = comDetalhadas ? simulado.data?.linhas : linhas.data;
   // As hipóteses da Projeção, quando se chega por ela com um rascunho (28/09/2026): entram na lista
   // e no fechamento como se fossem reais, e nada é salvo.
   const hipoteses = useMemo(() => lerRascunho(params.rascunho), [params.rascunho]);
@@ -111,17 +121,28 @@ export default function CycleDetailScreen() {
   const janelas = useJanelasPorGrupo(`${month}|${view}|${lado}`);
 
   const grupos = useMemo(() => {
+    const criados = new Set(simulado.data?.idsHipotese ?? []);
+    const faturasCom = new Set(simulado.data?.faturasComHipotese ?? []);
+    // A linha que a hipótese CRIOU vira linha de hipótese (grupo próprio, sem destino — o registro
+    // não existe); a fatura que já existia continua no grupo dela, dizendo que inclui a hipótese.
+    const base = (linhasBase ?? []).map((l) =>
+      criados.has(l.ref_id)
+        ? { ...l, origin: 'hipotese', method_label: 'hipótese' }
+        : faturasCom.has(l.ref_id)
+          ? { ...l, method_label: [l.method_label, 'inclui hipótese'].filter(Boolean).join(' · ') }
+          : l,
+    );
     const todas = [
-      ...(linhas.data ?? []),
+      ...base,
       ...(linhasDasHipoteses(rascunho.data?.linhas ?? [], hipoteses) as unknown as CycleLine[]),
     ];
     const doLado = todas.filter((l) =>
       lado === 'tudo' ? true : lado === 'entra' ? Number(l.in_cents) > 0 : Number(l.in_cents) === 0
     );
     return agrupar(doLado, brl);
-  }, [linhas.data, rascunho.data, hipoteses, lado, brl]);
+  }, [linhasBase, simulado.data, rascunho.data, hipoteses, lado, brl]);
 
-  if (serie.isError || linhas.isError || (comRascunho && rascunho.isError)) {
+  if (serie.isError || linhas.isError || (comRascunho && rascunho.isError) || (comDetalhadas && simulado.isError)) {
     return (
       <Screen>
         <ErrorCard
@@ -129,13 +150,14 @@ export default function CycleDetailScreen() {
             void serie.refetch();
             void linhas.refetch();
             if (comRascunho) void rascunho.refetch();
+            if (comDetalhadas) void simulado.refetch();
           }}
         />
       </Screen>
     );
   }
 
-  if (serie.isPending || !ciclo || (comRascunho && rascunho.isPending)) {
+  if (serie.isPending || !ciclo || (comRascunho && rascunho.isPending) || (comDetalhadas && simulado.isPending)) {
     return (
       <Screen>
         <Skeleton height={220} radius={Radius.md} />
@@ -143,7 +165,17 @@ export default function CycleDetailScreen() {
     );
   }
 
-  const fechamento = <Fechamento ciclo={ciclo} month={month} hipoteses={hipoteses.length} />;
+  const errosDaSimulacao = simulado.data?.erros ?? [];
+  const fechamento = (
+    <>
+      <Fechamento ciclo={ciclo} month={month} hipoteses={hipoteses.length + detalhadas.length} />
+      {errosDaSimulacao.map((e, i) => (
+        <ThemedText key={i} type="small" themeColor="danger">
+          {`Não deu para simular ${e.indice !== undefined ? (detalhadas[e.indice]?.titulo ?? 'uma hipótese') : 'uma leitura'}: ${e.mensagem}`}
+        </ThemedText>
+      ))}
+    </>
+  );
   const filtro = (
     <Segmented
       options={[
@@ -392,6 +424,17 @@ function lerRascunho(texto: string | undefined): HipoteseNoCiclo[] {
   try {
     const lido: unknown = JSON.parse(texto);
     return Array.isArray(lido) ? (lido as HipoteseNoCiclo[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** As hipóteses detalhadas que a Projeção manda pela rota. Inválido vira nenhuma. */
+function lerDetalhadas(texto: string | undefined): HipoteseDetalhada[] {
+  if (!texto) return [];
+  try {
+    const lido: unknown = JSON.parse(texto);
+    return Array.isArray(lido) ? (lido as HipoteseDetalhada[]) : [];
   } catch {
     return [];
   }
