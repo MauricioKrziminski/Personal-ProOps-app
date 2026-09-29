@@ -69,6 +69,10 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useCardSummary: () => ({ ...query, isSuccess: true, data: options.cards ?? [] }),
     useCardInvoices: () => ({ ...query, isSuccess: true, data: options.faturas ?? [] }),
     useCategoriesUsed: () => ({ ...query, isSuccess: true, data: options.categoriasUsadas ?? [] }),
+    // A aparência sai da régua de verdade (`lib/categorias.ts`) sobre as categorias do teste.
+    useAparencia: () => (nome: string | null, kind?: string | null) => load('src/lib/categorias.ts').aparenciaDaCategoria(nome, options.categoriasUsadas ?? [], kind),
+    useSalvarCategoria: () => mutation('salvarCategoria'),
+    useApagarCategoria: () => mutation('apagarCategoria'),
     useImportItems: () => ({ ...query, isSuccess: true, data: options.importItems ?? [] }),
     useImportBatch: () => ({ ...query, isSuccess: true, data: options.importBatch ?? { status: 'open', account_id: 'conta-1', accounts: { type: 'checking' } } }),
     useImportUnmatched: () => ({ ...query, isSuccess: true, data: options.unmatched ?? [] }),
@@ -359,7 +363,9 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/categorias') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      // o `categorias.ts` importa o mapa de ícones por caminho relativo (roda no `node --test` puro)
+      if (name === '../design/category-icons.ts') return { categoryIcon: () => 'circle' };
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/components/ui/glass-backdrop') return { GlassBackdrop: 'GlassBackdrop', supportsLiquidGlass: () => false };
       if (name === '@/hooks/use-note-sort') return { SORT_LABEL: {}, useNoteSort: () => ['manual', () => {}] };
@@ -4110,4 +4116,72 @@ test('Lançar: link sem `papel` (o antigo, a Projeção) usa o do próprio lanç
   ui.interact((nodes) => nodes.find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'financiamento')).props.onChange('recorrente'));
   ui.interact(() => ui.nodes().find((n: any) => n.type === 'FormularioDaSerie').props.converter({ tipo: 'recorrente', dados: {} }));
   assert.equal(ui.actions[0].label, 'Só esta', 'é uma ocorrência de série, não um avulso');
+});
+
+// ── Categorias personalizáveis (29/09/2026) ─────────────────────────────────────────────────────
+const categoriasFile = 'src/app/finance/categories.tsx';
+const CATS = [
+  { category: 'mercado', uses: 9, icon: 'cart', color: 'musgo', budgets: 1 },
+  { category: 'roupa', uses: 2, icon: null, color: null, budgets: 1 },
+  { category: 'roupas', uses: 1, icon: null, color: null, budgets: 1 },
+];
+
+test('Categorias: lista com o uso e a cor, cria pelo "+" e edita tocando', () => {
+  const ui = screen(categoriasFile, { categoriasUsadas: CATS });
+  const linha = ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'mercado');
+  assert.equal(linha.props.subtitle, '9 lançamentos');
+  assert.equal(linha.props.icon, 'cart');
+  assert.equal(linha.props.tinta, 'musgo');
+  assert.equal(ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'roupas').props.subtitle, '1 lançamento');
+  const folha = () => ui.nodes().find((n: any) => n.type === 'CategoriaSheet');
+  assert.equal(folha().props.visible, false);
+  ui.interact(() => linha.props.onPress());
+  assert.equal(folha().props.visible, true);
+  assert.equal(folha().props.categoria.category, 'mercado');
+  ui.interact(() => folha().props.onClose());
+  ui.press('Nova categoria');
+  assert.equal(folha().props.visible, true);
+  assert.equal(folha().props.categoria, null, 'o "+" abre a folha vazia');
+});
+
+test('Categorias: apagar diz quantos lançamentos ficam sem categoria e quantos orçamentos saem', () => {
+  const ui = screen(categoriasFile, { categoriasUsadas: CATS });
+  const d = ui.nodes().find((n: any) => n.type === 'Deslizavel' && n.props.titulo === 'mercado');
+  ui.interact(() => d.props.acoes.find((a: any) => a.destructive).onPress());
+  assert.equal(ui.avisos.at(-1), '9 lançamentos ficam sem categoria e 1 orçamento sai.');
+  assert.equal(ui.writes.length, 0, 'nada sai antes de confirmar');
+  ui.interact(() => ui.confirmations.at(-1)!());
+  assert.equal(ui.writes.at(-1)?.operation, 'apagarCategoria');
+  assert.equal(ui.writes.at(-1)?.value, 'mercado');
+});
+
+test('Folha de categoria: renomear para um nome que existe pergunta antes de juntar, e só junta com o sim', async () => {
+  const salvas: string[] = [];
+  const ui = screen('src/components/finance/categoria-sheet.tsx', { componente: 'CategoriaSheet', categoriasUsadas: CATS, segurarMutacoes: true,
+    props: { visible: true, categoria: CATS[1], onClose: () => {}, onSalva: (n: string) => salvas.push(n) } });
+  ui.fill('Nome', 'Roupas');
+  ui.press('Salvar');
+  assert.deepEqual({ ...ui.writes.at(-1)?.value }, { name: 'roupas', icon: 'circle', color: null, renomearDe: 'roupa' });
+  (ui.pedidos.at(-1) as any).rejeitar(Object.assign(new Error('CATEGORIA_EXISTE: roupas'), { code: 'CATEGORIA_EXISTE', existente: 'roupas' }));
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(ui.avisos.at(-1), 'Tudo que está em roupa passa para roupas. No mês em que as duas têm orçamento, fica o de roupas.');
+  assert.equal(ui.writes.length, 1, 'não junta sem a resposta');
+  ui.interact(() => ui.confirmations.at(-1)!());
+  assert.equal(ui.writes.at(-1)?.value.juntar, true);
+  assert.equal(ui.writes.at(-1)?.value.renomearDe, 'roupa');
+  (ui.pedidos.at(-1) as any).resolver();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(salvas, ['roupas'], 'o seletor recebe o nome que ficou');
+});
+
+test('Folha de categoria: sem nome não salva; criando um nome que já existe, avisa que muda a aparência dela', () => {
+  const ui = screen('src/components/finance/categoria-sheet.tsx', { componente: 'CategoriaSheet', categoriasUsadas: CATS,
+    props: { visible: true, categoria: null, onClose: () => {}, onSalva: () => {} } });
+  assert.equal(ui.button('Salvar').props.disabled, true);
+  ui.fill('Nome', 'Mércado ');
+  assert.ok(ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Nome').props.hint, 'avisa que a categoria já existe');
+  ui.press('Salvar');
+  // grava na que EXISTE: com o nome digitado, nasceria uma segunda aparência para a mesma categoria
+  assert.equal(ui.writes.at(-1)?.operation, 'salvarCategoria');
+  assert.deepEqual({ ...ui.writes.at(-1)?.value }, { name: 'mercado', icon: 'tag', color: null, renomearDe: null });
 });

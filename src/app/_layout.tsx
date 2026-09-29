@@ -421,6 +421,7 @@ function AppTree() {
                   <Stack.Screen name="finance/reports" options={{ title: 'Relatórios' }} />
                   <Stack.Screen name="finance/net-worth" options={{ title: 'Patrimônio' }} />
                   <Stack.Screen name="finance/rules" options={{ title: 'Regras' }} />
+                  <Stack.Screen name="finance/categories" options={{ title: 'Categorias' }} />
                   <Stack.Screen name="finance/manage" options={{ title: 'Gerenciar' }} />
                   <Stack.Screen name="finance/plan" options={{ title: 'Plano' }} />
 
