@@ -448,12 +448,13 @@ function AppTree() {
                     ⚠️ **`headerShown: false` — o cabeçalho é o `TaskHeader`, no conteúdo.**
                     `react-native-screens` (`ScreenStackHeaderConfig.kt:374-382`) roda
                     `toolbar.title = null` sempre que existe um subview LEFT customizado, e o ✕
-                    era exatamente isso: no Android estas três telas renderizavam SEM TÍTULO —
+                    era exatamente isso: no Android as telas modais renderizavam SEM TÍTULO —
                     "Novo lançamento" e "Editar lançamento" eram a mesma tela na tela. O
                     `modalOptions` que morava aqui também era o único pedaço de chrome do app sem
                     um token de espaço (um `<Pressable hitSlop={12}>` cru), que era a queixa
                     literal do dono do produto sobre o título colado no botão de fechar.
                   */}
+                  {/* Casca `<Redirect>` para o formulário único (link antigo); o mesmo modal na transição. */}
                   <Stack.Screen
                     name="finance/transaction-form"
                     options={modalOptions}

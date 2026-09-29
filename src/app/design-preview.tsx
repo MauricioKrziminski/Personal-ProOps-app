@@ -63,17 +63,19 @@ import TodayScreen from './(tabs)/today/index';
  * `/design-preview?id=prev-i1`.
  */
 /**
- * `Recorrentes` entra porque a tela ganhou EDIÇÃO em 09/09/2026, e o sheet de edição é outro
- * desenho do de criação (sem frequência, sem âncora, com um resumo no lugar).
+ * `Recorrentes` entra pela LISTA. Criar e editar uma série não moram mais nela: `?edit=` e
+ * `?create=1` redirecionam para o formulário único (`/finance/lancar`), e na vitrine o redirect
+ * sairia dela — não use esses parâmetros aqui.
  *
- * `Editar` monta o formulário sobre uma PARCELA (`?id=prev-p1`): é a única forma de chegar na
- * pergunta "Aplicar em quais?", que só aparece ao salvar e só quando a linha pertence a uma série.
- * A parcela precisa de `due_at` — o zod do formulário exige vencimento em lançamento previsto.
+ * `Editar` monta o formulário único (`LancarScreen`), que lê os parâmetros da própria URL. Sobre uma
+ * PARCELA (`?id=prev-p1`) é a única forma de chegar na pergunta "Aplicar em quais?", que só aparece
+ * ao salvar e só quando a linha pertence a uma série. A parcela precisa de `due_at` — o zod do
+ * formulário exige vencimento em lançamento previsto.
  *
- * ⚠️ **Sheet se confere por URL + `cliclick`, não por `osascript`.** `xcrun simctl` não tem tap; o clique por
- * System Events exige acesso assistivo que o osascript aqui não tem; e o `idb` não está
- * instalado. Por isso a tela abre a edição por `?edit=<id>`, do mesmo jeito que já abria a
- * criação por `?create=1`: `appproops:///design-preview?edit=prev-r1`.
+ * ⚠️ **Formulário se confere por URL + `cliclick`, não por `osascript`.** `xcrun simctl` não tem tap; o clique por
+ * System Events exige acesso assistivo que o osascript aqui não tem. Por isso a edição abre pela
+ * URL: `appproops:///design-preview?screen=lancar&tipo=recorrente&id=prev-r1` (a série semeada) ou
+ * `?screen=lancar&id=prev-p1` (a parcela).
  *
  * Para tocar: `cliclick c:X,Y` (instalado), com `open -a Simulator` ANTES DE CADA clique — sem
  * refocar, o segundo clique não chega no app. A conversão sai da geometria da janela:

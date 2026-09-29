@@ -3903,6 +3903,20 @@ test('Lançar: editando e trocando o tipo, o salvar PERGUNTA o alcance e convert
   assert.equal(volta.nodes().find((n: any) => n.type === 'FormularioDaSerie').props.converter, undefined);
 });
 
+test('Lançar: a dívida CARREGADA com parcela paga tem passado, mesmo com `passado=0` na rota', () => {
+  // Logo depois do "Paguei", a linha da lista ainda pode dizer 0: a rota é palpite, a dívida é a
+  // verdade. Sem isso, "Converter" (sem confirmação) vira `todas` e apaga os pagamentos.
+  const ui = screen(lancarFile, { params: { tipo: 'financiamento', id: 'd1', origem: 'divida', passado: '0' },
+    debts: [{ id: 'd1', name: 'Carro', kind: 'financing', calculation_mode: 'fixed_installments', installments: 48, installments_paid: 2, installment_cents: 147000, remaining_cents: 6762000, principal_cents: 7056000, interest_rate_monthly: 0, account_id: null, due_day: 10, archived: false, first_due_date: null }] });
+  const seletor = () => ui.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'financiamento'));
+  ui.interact(() => seletor().props.onChange('recorrente'));
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'FormularioDaSerie').props.converter({ tipo: 'recorrente', dados: {} }));
+  const labels = ui.actions.map((a: any) => a.label);
+  assert.ok(labels.includes('Todas, apagando as anteriores'), labels.join(' | '));
+  assert.equal(labels.includes('Converter'), false);
+  assert.equal(ui.actions.find((a: any) => a.label === 'Todas, apagando as anteriores').destructive, true);
+});
+
 test('Lançar: a conversão que o banco recusa mostra a frase dele e não fecha', async () => {
   const ui = screen(lancarFile, { segurarMutacoes: true, params: { tipo: 'uma', id: 'tx-1', origem: 'transacao' } });
   const seletor = () => ui.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'financiamento'));

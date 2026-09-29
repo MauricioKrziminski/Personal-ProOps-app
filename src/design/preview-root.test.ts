@@ -25,6 +25,7 @@ test('QA can open the real invoice route without exposing pushed-route chrome', 
   assert.equal(previewScreenFromParam('folders'), 'Pastas');
   assert.equal(previewScreenFromParam('wallet'), 'Carteira');
   assert.equal(previewScreenFromParam('invoices'), 'Faturas');
+  assert.equal(previewScreenFromParam('lancar'), 'Editar');
   assert.equal(previewScreenFromParam('notes'), 'Notas');
   assert.equal(previewScreenFromParam('unknown'), null);
 });

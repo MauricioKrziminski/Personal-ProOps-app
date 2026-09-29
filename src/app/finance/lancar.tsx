@@ -10,7 +10,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { FormularioEmTela } from '@/components/ui/sheet';
 import { ToastDoModal, useToast } from '@/components/ui/toast';
 import { Motion } from '@/design/tokens';
-import { useConverterRegistro, useTransaction } from '@/hooks/use-finance';
+import { useConverterRegistro, useDebts, useTransaction } from '@/hooks/use-finance';
 import { isoToBR, localISODate } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
 import type { RegistroSimulado } from '@/lib/hipotese';
@@ -75,6 +75,10 @@ export default function LancarScreen() {
   const tipoDaOrigem = (p.origem as OrigemDaConversao['tipo'] | undefined) ?? ORIGEM_DO_TIPO[tipoOriginal];
   // Lançamento PAGO virando financiamento: o banco o adota como um pagamento (o corpo avisa).
   const transacao = useTransaction(editandoId && tipoDaOrigem === 'transacao' ? editandoId : undefined);
+  // `passado` na rota é palpite: logo depois do "Paguei" a linha da lista ainda pode dizer 0, e
+  // "Converter" (sem confirmação) vira `todas`, que apaga os pagamentos. A dívida carregada decide.
+  const dividas = useDebts();
+  const divida = editandoId && tipoDaOrigem === 'divida' ? dividas.data?.find((d) => d.id === editandoId) : undefined;
   const origem: OrigemDaConversao | null = editandoId
     ? {
         tipo: tipoDaOrigem,
@@ -82,7 +86,7 @@ export default function LancarScreen() {
         // Quem abriu sem dizer o papel (link antigo, a Projeção): o do próprio registro, quando chega.
         papel: (p.papel as OrigemDaConversao['papel'] | undefined)
           ?? (tipoDaOrigem !== 'transacao' ? 'registro' : transacao.data ? papelDaTransacao(transacao.data) : 'avulsa'),
-        temPassado: temPassadoDoParam(p.passado),
+        temPassado: temPassadoDoParam(p.passado) || (divida?.installments_paid ?? 0) > 0,
       }
     : null;
   // O "Aplicar" do "E se…?" vale para o primeiro corpo; o "criar outro" começa limpo.

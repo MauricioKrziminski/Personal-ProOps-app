@@ -3,7 +3,7 @@
  * componentizada… ter todos os campos de quando eu crio ao editar"*). As regras, puras e com
  * teste, moram em `lib/serie.ts`.
  *
- * Duas telas desenham isto: a folha de Recorrentes (criar e editar a série) e o formulário do
+ * Dois corpos do formulário único desenham isto: o Recorrente (criar e editar a série) e o do
  * lançamento, quando uma ocorrência é editada em "Esta e as próximas". Duas cópias dos campos
  * divergiriam — foi assim que a edição ficou sem Repete, sem vencimento e sem Tipo.
  */
