@@ -43,6 +43,7 @@ import { confirmDestructive } from '@/lib/item-actions';
 import { ondaDaTroca } from '@/lib/session-gate';
 import { appUpdateAction, appUpdateSubtitle, type AppUpdateState } from '@/lib/app-update';
 import { supabase, supabaseUrl } from '@/lib/supabase';
+import { telefoneLegivel } from '@/lib/phone-br';
 
 const APP_UPDATE_ICON: Partial<
   Record<AppUpdateState['status'], Parameters<typeof Icon>[0]['name']>
@@ -84,7 +85,8 @@ export default function ProfileScreen() {
    * Ele mora na SESSÃO, não em `profiles`: só entra ali por Phone OTP, que é verificado por
    * construção. Conta criada por e-mail não tem nenhum, e o cartão precisa dizer isso.
    */
-  const phone = session?.user?.phone ? `+${session.user.phone}` : null;
+  // Por partes (`+55 (35) 99874-4200`): cru, o número era uma palavra só e partia nos dígitos.
+  const phone = session?.user?.phone ? telefoneLegivel(session.user.phone) : null;
   /*
     Quem entrou por Phone OTP não tem e-mail, e quem entrou por e-mail pode não ter telefone. A
     linha da Conta muda de rótulo conforme isso: "Cadastrar" quando falta, "Trocar" quando já

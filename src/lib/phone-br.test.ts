@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
   displayPhoneBR,
   formatPhoneBR,
+  telefoneLegivel,
   isValidPhoneBR,
   phoneDigits,
   toE164BR,
@@ -49,4 +50,11 @@ test('E.164 e exibição saem da mesma normalização', () => {
   assert.equal(toE164BR('(11) 99999-8888'), '+5511999998888');
   assert.equal(toE164BR('+55 11 99999-8888'), '+5511999998888');
   assert.equal(displayPhoneBR('11999998888'), '+55 (11) 99999-8888');
+});
+
+test('telefoneLegivel escreve o número brasileiro por partes, que quebram entre si (nunca "+553599874/4200")', () => {
+  assert.equal(telefoneLegivel('5535998744200'), '+55 (35) 99874-4200');
+  assert.equal(telefoneLegivel('551133334444'), '+55 (11) 3333-4444');
+  // Fora do Brasil não se inventa máscara: o número vai como veio.
+  assert.equal(telefoneLegivel('14155550123'), '+14155550123');
 });

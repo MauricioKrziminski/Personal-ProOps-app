@@ -79,3 +79,14 @@ export function displayPhoneBR(input: string): string {
   const d = phoneDigits(input);
   return d ? `+${DDI} ${formatPhoneBR(d)}` : input;
 }
+
+/**
+ * O telefone gravado (E.164 sem "+", como o Supabase devolve) para LER: `+55 (35) 99874-4200`.
+ * Cru, `+5535998744200` era uma palavra só, e com fonte grande partia no meio dos dígitos
+ * (29/09/2026). Fora do Brasil não se inventa máscara.
+ */
+export function telefoneLegivel(e164: string): string {
+  const d = e164.replace(/\D/g, '');
+  if (d.startsWith(DDI) && (d.length === 12 || d.length === 13)) return `+${DDI} ${formatPhoneBR(d.slice(2))}`;
+  return `+${d}`;
+}

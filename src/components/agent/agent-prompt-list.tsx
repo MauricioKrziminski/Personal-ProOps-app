@@ -47,9 +47,16 @@ export const AgentPromptList = memo(function AgentPromptList({ onSelect }: Props
 const styles = StyleSheet.create({
   root: { gap: Space.md },
   list: { width: '100%', maxWidth: 450, flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm },
+  /*
+    A largura é a do TEXTO, com piso de 40% (no máximo dois por linha) e crescendo para fechar a
+    linha. Com `width: '48%'` fixo, a fonte grande partia a palavra ("Lembret/e", 29/09/2026);
+    agora o que não cabe na metade desce e ocupa a linha dele.
+  */
   prompt: {
-    width: '48%',
-    minWidth: 0,
+    flexGrow: 1,
+    flexBasis: 'auto',
+    minWidth: '40%',
+    maxWidth: '100%',
     minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',

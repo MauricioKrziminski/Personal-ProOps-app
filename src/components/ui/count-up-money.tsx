@@ -83,7 +83,8 @@ export function CountUpMoney({
   const largo = !valorAnimadoCabe(cents, fontScale);
 
   if (oculto || reduzido || largo) {
-    return <Money cents={cents} variant={variant} tone={tone} concealable={concealable} />;
+    // Não coube no `TextInput` (que não encolhe): o `<Money>` encolhe, senão cortava com reticência.
+    return <Money cents={cents} variant={variant} tone={tone} concealable={concealable} encolhe />;
   }
 
   return (

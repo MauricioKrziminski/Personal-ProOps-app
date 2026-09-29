@@ -1802,3 +1802,19 @@ test('BlockHeader: a contagem e a pílula crescem com a fonte (altura MÍNIMA, n
     assert.doesNotMatch(bloco, /(?<!min)[Hh]eight: /, `${nome} não tem altura fixa`);
   }
 });
+
+test('CountUpMoney: quando o valor animado não cabe, o <Money> que o substitui ENCOLHE (nunca reticência)', () => {
+  // 29/09/2026, Hoje em accessibility-large: "Dá para gastar por dia R$ 2.929,…". Fora de bloco
+  // fixo o <Money> não encolhe e, numa linha só, cortava com reticência — valor é identificador.
+  const fonte = readFileSync(join(SRC, 'components/ui/count-up-money.tsx'), 'utf8');
+  assert.match(fonte, /<Money cents=\{cents\} variant=\{variant\} tone=\{tone\} concealable=\{concealable\} encolhe \/>/);
+});
+
+test('Atalhos do Agente: o botão tem a largura do texto (nunca "Lembret/e"), no máximo dois por linha', () => {
+  // 29/09/2026, accessibility-large: `width: '48%'` fixo obrigava a palavra a partir.
+  const fonte = readFileSync(join(SRC, 'components/agent/agent-prompt-list.tsx'), 'utf8');
+  const bloco = fonte.slice(fonte.indexOf('  prompt: {'), fonte.indexOf('}', fonte.indexOf('  prompt: {')));
+  assert.doesNotMatch(bloco, /(?<!min|max)[Ww]idth: '48%'/);
+  assert.match(bloco, /flexBasis: 'auto'/);
+  assert.match(bloco, /minWidth: '40%'/);
+});
