@@ -682,7 +682,8 @@ test('todo Sheet abre com TaskHeader', () => {
     // `<Sheet` seguido de espaço ou `>`: `\b` casaria `<SheetHeader` e o guarda ficaria verde só.
     for (const m of code.matchAll(/<Sheet[\s>]/g)) {
       const inicio = m.index ?? 0;
-      if (!/<TaskHeader[\s/>]/.test(code.slice(inicio, inicio + 400))) {
+      // Um corpo do formulário único (`components/finance/formulario-*`) abre com o `TaskHeader` dele.
+      if (!/<(?:TaskHeader|FormularioDaSerie)[\s/>]/.test(code.slice(inicio, inicio + 400))) {
         fora.push(`${file.replace(SRC, 'src')}:${code.slice(0, inicio).split('\n').length}`);
       }
     }

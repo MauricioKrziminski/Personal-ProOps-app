@@ -30,10 +30,13 @@ test('task surfaces preserve their mutation and navigation contracts', () => {
   assert.match(installments, /confirmDestructive/);
 
   const recurring = readRoute('recurring');
-  assert.match(recurring, /useCreateRecurring\(\)/);
-  assert.match(recurring, /useSaveRecurringSeries\(\)/);
   assert.match(recurring, /useDeleteRecurring\(\)/);
-  assert.match(recurring, /form\?\.id \? 'Salvar' : 'Criar'\}/);
+  // o formulário da série é um corpo à parte (formulário único), hospedado na folha
+  assert.match(recurring, /<FormularioDaSerie/);
+  const serie = readFileSync('src/components/finance/formulario-da-serie.tsx', 'utf8');
+  assert.match(serie, /useCreateRecurring\(\)/);
+  assert.match(serie, /useSaveRecurringSeries\(\)/);
+  assert.match(serie, /form\.id \|\| converter \? 'Salvar' : 'Criar'/);
 
   const rules = readRoute('rules');
   assert.match(rules, /useSaveRule\(\)/);

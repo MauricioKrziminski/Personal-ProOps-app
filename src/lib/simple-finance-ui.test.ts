@@ -317,6 +317,9 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       if (name === '@/components/finance/serie-form') return load('src/components/finance/serie-form.tsx');
       // E os da compra (26/09/2026): a folha de Parceladas e o "A compra toda" do lançamento.
       if (name === '@/components/finance/compra-form') return load('src/components/finance/compra-form.tsx');
+      // O corpo do formulário da série (Task 4): carregado de verdade só em Recorrentes, que o hospeda
+      // na folha; noutras telas ele é um nó (quem o hospeda confere as props).
+      if (name === '@/components/finance/formulario-da-serie' && file.endsWith('finance/recurring.tsx')) return load('src/components/finance/formulario-da-serie.tsx');
       if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useReminders: () => ({ ...query, isSuccess: true, data: { pages: [options.reminders ?? []], pageParams: [0] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }), useToggleReminder: () => mutation('toggleReminder'), useDeleteReminder: () => mutation('deleteReminder') };
       if (name === '@/hooks/use-session') return { useSession: () => ({ session: { user: { id: 'user-1' } } }) };
       if (name === '@/hooks/use-profile') return { useProfile: () => ({ ...query, isSuccess: true, data: { display_name: 'Gabriel Almeida', phone: null } }) };
@@ -346,7 +349,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/components/ui/glass-backdrop') return { GlassBackdrop: 'GlassBackdrop', supportsLiquidGlass: () => false };
       if (name === '@/hooks/use-note-sort') return { SORT_LABEL: {}, useNoteSort: () => ['manual', () => {}] };
@@ -461,7 +464,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     }
     if (node.type === 'FinanceAnalysisPanes') visit(node.props.compact);
     // `CamposDaSerie` é um grupo de campos sem hook: desenhado aqui, a tela é a que a pessoa vê.
-    if (typeof node.type === 'function' && (node.type.name === 'CamposDaSerie' || node.type.name === 'CamposDaCompra')) visit(node.type(node.props));
+    // O `FormularioDaSerie` tem hooks: eles rodam depois dos da tela, na mesma ordem a cada render.
+    if (typeof node.type === 'function' && ['CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie'].includes(node.type.name)) visit(node.type(node.props));
     // No celular o `AdaptivePanes` desenha o slot de uma coluna só (Pastas, Recorrentes…).
     if (node.type === 'AdaptivePanes') visit(node.props.singlePaneContent ?? node.props.main);
     visit(node.props.ListHeaderComponent);
@@ -3753,4 +3757,20 @@ test('Recorrente e financiamento abertos DO lançamento: "Voltar" devolve ao lan
   // aberto de fora de um formulário (o Aplicar, o menu Lançar), continua o ✕
   const solto = screen(debtsFile, { props: { soFormulario: true }, params: { create: 'financing' } });
   assert.ok(!solto.nodes().find((n: any) => n.type === 'TaskHeader').props.voltar);
+});
+
+test('FormularioDaSerie: cria, e "Salvar e criar outro" avisa o hospedeiro sem fechar', async () => {
+  const salvos: boolean[] = [];
+  const comum = { kind: 'expense', descricao: 'Academia', valorCents: 5000, contaId: 'cc', dataBR: '06/10/2026', categoria: null };
+  const ui = screen('src/components/finance/formulario-da-serie.tsx', { componente: 'FormularioDaSerie', segurarMutacoes: true,
+    props: { comum, registrarComum: () => {}, onSalvo: (outro: boolean) => salvos.push(outro), onFechar: () => {} } });
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'Button' && n.props.label === 'Salvar e criar outro').props.onPress());
+  assert.equal(ui.writes.at(-1).operation, 'createRecurring');
+  (ui.pedidos.at(-1) as any).resolver('rec-1');
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(salvos, [true]);
+  // editando não há "criar outro"
+  const edit = screen('src/components/finance/formulario-da-serie.tsx', { componente: 'FormularioDaSerie', recurring: [{ id: 'r1', kind: 'expense', amount_cents: 5000, description: 'Academia', rrule: 'FREQ=MONTHLY;BYMONTHDAY=6', next_run_at: '2026-10-06T12:00:00Z', dtstart: '2026-10-06T12:00:00Z', active: true, account_id: null, category: null, merchant: null, end_date: null, auto_confirm: false }],
+    props: { comum, registrarComum: () => {}, editandoId: 'r1', onSalvo: () => {}, onFechar: () => {} } });
+  assert.equal(edit.nodes().some((n: any) => n.props?.label === 'Salvar e criar outro'), false);
 });

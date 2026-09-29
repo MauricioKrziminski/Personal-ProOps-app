@@ -1,17 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
-import { CamposDaSerie } from '@/components/finance/serie-form';
-import { useRascunho } from '@/hooks/use-rascunho';
-import type { EntradaRecorrente } from '@/lib/escrita';
-import { SERIE_VAZIA, serieDoRegistro, validaSerie, type SerieForm } from '@/lib/serie';
+import { FormularioDaSerie } from '@/components/finance/formulario-da-serie';
+import { SERIE_VAZIA, serieDoRegistro, type SerieForm } from '@/lib/serie';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
-import { Sheet, SheetScroll } from '@/components/ui/sheet';
-import { TaskHeader } from '@/components/ui/task-header';
+import { Sheet } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -29,12 +26,8 @@ import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
-  useAccounts,
-  useCreateRecurring,
   useDeleteRecurring,
   useRecurringTransactions,
-  useSaveRecurringAll,
-  useSaveRecurringSeries,
   useToggleRecurring,
   type RecurringTransaction,
 } from '@/hooks/use-finance';
@@ -44,13 +37,10 @@ import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useDebounced } from '@/hooks/use-debounced';
 import { semAcento } from '@/lib/text';
-import { brToISO, dataLocalDe, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
+import { dataLocalDe, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
-import { financeErrorMessage } from '@/lib/finance-form';
 import { describeRRule } from '@/lib/rrule-text';
 import { supabase } from '@/lib/supabase';
-import { askEditScope } from '@/lib/edit-scope';
-import { newClientMessageId } from '@/lib/agent-chat';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 
 /**
@@ -123,14 +113,8 @@ export default function RecurringScreen({ soFormulario = false }: { soFormulario
   const toast = useToast();
   const series = useRecurringTransactions();
   const proximos = useRecurringUpcoming(30);
-  const accounts = useAccounts();
   const toggle = useToggleRecurring();
   const remove = useDeleteRecurring();
-  const create = useCreateRecurring();
-  const editar = useSaveRecurringSeries();
-  const editarTudo = useSaveRecurringAll();
-  const tentativaTudo = useRef<{ key: string; id: string } | null>(null);
-  const tentativaFuturo = useRef<{ key: string; id: string } | null>(null);
   /** Qual `?edit=` já foi consumido — sem isto, fechar o sheet reabriria no render seguinte. */
   const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
   // `?create=1` já nasce vindo de fora (é o "Recorrente" do lançamento e o atalho do Financeiro).
@@ -141,13 +125,6 @@ export default function RecurringScreen({ soFormulario = false }: { soFormulario
    * o rascunho deste registro), os dois fecham juntos.
    */
   const deOutroFormulario = params.de === 'novo-lancamento' || params.de === 'lancamento';
-  /** `?deHipotese=`: aberta pelo "Aplicar" do "E se…?" — criar tira aquela hipótese do rascunho. */
-  const { tirar } = useRascunho();
-  /** A tela ainda está aberta? O que é dela (toast, fechar) só roda com ela montada. */
-  const [montado] = useState(() => ({ current: true }));
-  useEffect(() => () => {
-    montado.current = false;
-  }, [montado]);
 
   const [form, setForm] = useState<SerieForm | null>(() => params.create === '1' ? {
     ...SERIE_VAZIA, kind: params.kind === 'income' ? 'income' : 'expense',
@@ -158,6 +135,8 @@ export default function RecurringScreen({ soFormulario = false }: { soFormulario
     accountId: params.account || null,
     inicio: params.start && isValidBRDate(params.start) ? params.start : isoToBR(localISODate()),
   } : null);
+  /** "Salvar e criar outro": a folha nasce de novo, vazia, sem fechar. */
+  const [geracao, setGeracao] = useState(0);
 
   // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
   // falha, e sem este corte a lista seguia afirmando números embaixo da faixa que acabou
@@ -199,130 +178,6 @@ export default function RecurringScreen({ soFormulario = false }: { soFormulario
   const entra = (proximos.data ?? [])
     .filter((t) => t.kind === 'income')
     .reduce((s, t) => s + Number(t.amount_cents), 0);
-
-  const { inicioDate, agendaNoPassado, podeSalvar, rrulePrevia } = validaSerie(form);
-
-  const salvar = () => {
-    if (!form) return;
-    if (form.id) {
-      /**
-       * Só o que MUDOU. `update_recurring_series` propaga toda chave presente para as
-       * ocorrências futuras: mandar o objeto inteiro faria "corrigi só o valor do
-       * aluguel" reescrever a categoria e o nome de ocorrências que alguém ajustou à
-       * mão. É a mesma regra do `patchDaSerie` do formulário de lançamento.
-       */
-      const antes = todas.find((r) => r.id === form.id);
-      const patch: Parameters<typeof editar.mutate>[0]['patch'] = {};
-      if (!antes || form.amountCents !== Number(antes.amount_cents)) patch.amount_cents = form.amountCents;
-      if (!antes || form.category !== antes.category) patch.category = form.category;
-      const desc = form.description.trim();
-      if (!antes || desc !== antes.description) patch.description = desc;
-      if (!antes || form.accountId !== antes.account_id) patch.account_id = form.accountId;
-      if (!antes || form.autoConfirm !== antes.auto_confirm) patch.auto_confirm = form.autoConfirm;
-      const fim = form.fim ? brToISO(form.fim) : null;
-      if (!antes || fim !== antes.end_date) patch.end_date = fim;
-      const merchant = form.merchant.trim() || null;
-      if (!antes || merchant !== (antes.merchant ?? null)) patch.merchant = merchant;
-      if (!antes || form.kind !== antes.kind) patch.kind = form.kind;
-      if (form.agendaMudou) {
-        if (!inicioDate || !rrulePrevia || agendaNoPassado) return;
-        patch.rrule = rrulePrevia;
-        patch.next_run_at = inicioDate.toISOString();
-      }
-      const linePatch: Parameters<typeof editarTudo.mutate>[0]['linePatch'] = {};
-      if (patch.amount_cents !== undefined) linePatch.amount_cents = patch.amount_cents;
-      if (patch.category !== undefined) linePatch.category = patch.category;
-      if (patch.description !== undefined) linePatch.description = patch.description;
-      if (patch.merchant !== undefined) linePatch.merchant = patch.merchant;
-      if (patch.account_id !== undefined) linePatch.account_id = patch.account_id;
-
-      /*
-        Aqui a pessoa edita a SÉRIE, não uma ocorrência (28/09/2026): "Das próximas em diante" ou
-        "Todas". O "Só esta" mexia na próxima ocorrência gravada, que ninguém abriu — uma
-        ocorrência se edita pelo lançamento dela, em Lançamentos ou em "Ver ocorrências".
-      */
-      if (Object.keys(patch).length === 0) {
-        // nada mudou: nada a perguntar
-        volta.aoFechar(() => setForm(null));
-        return;
-      }
-      askEditScope('occurrence', async (scope) => {
-        if (scope === 'all') {
-          if (!antes || antes.edit_revision == null) {
-            toast({ message: 'A recorrência mudou. Abra a edição novamente antes de salvar.', tone: 'error' });
-            return;
-          }
-          const key = JSON.stringify([form.id, patch, antes.edit_revision]);
-          if (tentativaTudo.current?.key !== key) tentativaTudo.current = { key, id: newClientMessageId() };
-          editarTudo.mutate({
-            recurringId: form.id!,
-            linePatch,
-            seriesPatch: patch,
-            expectedRevision: Number(antes.edit_revision),
-            requestId: tentativaTudo.current.id,
-          }, {
-            onSuccess: () => {
-              tentativaTudo.current = null;
-              toast({ message: 'Série e ocorrências gravadas alteradas.', tone: 'success' });
-              volta.aoFechar(() => setForm(null));
-            },
-            onError: (saveError) => toast({ message: financeErrorMessage(saveError, 'Não deu para alterar todas as ocorrências.'), tone: 'error' }),
-          });
-          return;
-        }
-        if (!antes || antes.edit_revision == null) {
-          toast({ message: 'A recorrência mudou. Abra a edição novamente antes de salvar.', tone: 'error' });
-          return;
-        }
-        const key = JSON.stringify([form.id, patch, antes.edit_revision]);
-        if (tentativaFuturo.current?.key !== key) tentativaFuturo.current = { key, id: newClientMessageId() };
-        editar.mutate({
-          id: form.id!, patch,
-          expectedRevision: Number(antes.edit_revision),
-          requestId: tentativaFuturo.current.id,
-        }, {
-          onSuccess: ({ quantas, aviso }) => {
-            tentativaFuturo.current = null;
-            toast({
-              message: aviso ?? (quantas > 0
-                ? `Série alterada e ${quantas} ${quantas === 1 ? 'ocorrência futura' : 'ocorrências futuras'} junto.`
-                : 'Série alterada.'),
-              tone: 'success',
-            });
-            volta.aoFechar(() => setForm(null));
-          },
-          onError: (saveError) => toast({ message: financeErrorMessage(saveError, 'Não deu para alterar a série.'), tone: 'error' }),
-        });
-      }, 'Todas também corrige as ocorrências já passadas.', { contrato: true });
-      return;
-    }
-    if (!podeSalvar || !inicioDate || !rrulePrevia) return;
-    const entrada: EntradaRecorrente = {
-      kind: form.kind,
-      amount_cents: form.amountCents,
-      description: form.description.trim(),
-      merchant: form.merchant.trim() || null,
-      category: form.category,
-      account_id: form.accountId,
-      rrule: rrulePrevia,
-      next_run_at: inicioDate.toISOString(),
-      end_date: form.fim ? brToISO(form.fim) : null,
-      auto_confirm: form.autoConfirm,
-    };
-    // Pela PROMESSA: aberta pelo "Aplicar" de uma hipótese, ela sai do rascunho mesmo com a tela já
-    // fechada; o que é da tela (toast, fechar), só com ela montada.
-    create.mutateAsync(entrada).then(
-      () => {
-        if (params.deHipotese) tirar(params.deHipotese);
-        if (!montado.current) return;
-        toast({ message: 'Recorrência criada.', tone: 'success' });
-        volta.aoSalvar(() => setForm(null), params.de === 'novo-lancamento');
-      },
-      () => {
-        if (montado.current) toast({ message: 'Não deu para criar a recorrência.', tone: 'error' });
-      }
-    );
-  };
 
   const abrirEdicao = (r: RecurringTransaction) => setForm(serieDoRegistro(r));
 
@@ -593,27 +448,31 @@ export default function RecurringScreen({ soFormulario = false }: { soFormulario
     />
   );
 
+  const fechar = () => volta.aoFechar(() => setForm(null));
+  /*
+    O formulário é o CORPO do formulário único (`FormularioDaSerie`). Esta folha lhe passa o estado
+    inicial que ela sempre montou (dos parâmetros, com estabelecimento e a data conferida, ou da
+    série aberta) como `estadoGuardado`, que vence o `comum` — o que se grava não muda.
+  */
   const folhaDoFormulario = (
-    <Sheet visible={form !== null} onClose={() => volta.aoFechar(() => setForm(null))}>
-      <TaskHeader
-        title={form?.id ? 'Editar recorrência' : 'Nova recorrência'}
-        onClose={() => volta.aoFechar(() => setForm(null))}
-        voltar={deOutroFormulario}
-        action={
-          <Button
-            label={form?.id ? 'Salvar' : 'Criar'}
-            size="sm"
-            loading={create.isPending || editar.isPending || editarTudo.isPending}
-            disabled={!podeSalvar || create.isPending || editar.isPending || editarTudo.isPending}
-            onPress={salvar}
-          />
-        }
-      />
-
+    <Sheet visible={form !== null} onClose={fechar}>
       {form ? (
-        <SheetScroll contentContainerStyle={styles.sheetBody}>
-          <CamposDaSerie form={form} onChange={setForm} contas={accounts.data ?? []} />
-        </SheetScroll>
+        <FormularioDaSerie
+          key={form.id ?? `nova-${geracao}`}
+          comum={{ kind: form.kind, descricao: form.description, valorCents: form.amountCents, contaId: form.accountId, dataBR: form.inicio, categoria: form.category }}
+          estadoGuardado={form}
+          editandoId={form.id}
+          registrarComum={() => {}}
+          registrarEstado={() => {}}
+          deHipotese={params.deHipotese}
+          voltar={deOutroFormulario}
+          onFechar={fechar}
+          onSalvo={(criarOutro) => {
+            if (!criarOutro) return volta.aoSalvar(() => setForm(null), params.de === 'novo-lancamento');
+            setForm({ ...SERIE_VAZIA, inicio: isoToBR(localISODate()) });
+            setGeracao((g) => g + 1);
+          }}
+        />
       ) : null}
     </Sheet>
   );
@@ -720,11 +579,6 @@ const styles = StyleSheet.create({
   },
   bandText: {
     textAlign: 'center',
-  },
-  sheetBody: {
-    gap: Space.xl,
-    padding: Space.lg,
-    paddingBottom: Space.xxxl,
   },
   chips: {
     flexDirection: 'row',
