@@ -871,6 +871,17 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
   depois, e para. Aberto (`occurred_at <= current_date`) mandaria o mesmo aviso todo dia, e no
   WhatsApp fora da janela de 24h isso é template PAGO.
 
+## Nada foi pago num dia que ainda não chegou (`20260928237000`)
+
+**No que mexe no caixa** (conta, dinheiro, sem conta), `paid_at` nunca passa de HOJE (o do
+Brasil): o gatilho `set_paid_at` põe hoje no lugar de uma data futura, sem erro — "paguei" um
+lançamento futuro é pagar adiantado. Achado por R$ 250 de diferença entre a Projeção (que parte do
+saldo, e o saldo conta todo `cleared`) e o detalhe do ciclo (que põe o realizado no dia do
+pagamento): um "Fone" de dezembro marcado como pago em 01/12. **A linha de cartão fica de fora**:
+ali `paid_at` é a marca de que a fatura se liquidou, e desfazer pagamento/adiamento casa por ela
+(uma fatura adiada antes de vencer tem as linhas "pagas" no vencimento, no futuro).
+`supabase/tests/pago_nunca_no_futuro.sql`.
+
 ## "Paguei" confirma o valor (25/09/2026)
 
 Dar baixa abre uma folha curta (`useConfirmarBaixa`, `components/finance/confirmar-baixa.tsx`):

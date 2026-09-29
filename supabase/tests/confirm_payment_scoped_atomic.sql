@@ -93,9 +93,10 @@ declare
   changed bigint;
 begin
   select id into anchor from public.transactions where installment_plan_id = p and installment_no = 3;
-  changed := public.confirm_payment_scoped(anchor, current_date + 1, 15000, 'future');
+  -- Yesterday, not tomorrow: a payment date never lies in the future (20260928237000).
+  changed := public.confirm_payment_scoped(anchor, current_date - 1, 15000, 'future');
   assert changed = 2, 'future scope must correct anchor and next pending installment';
-  assert (select status = 'cleared' and amount_cents = 15000 and paid_at = current_date + 1
+  assert (select status = 'cleared' and amount_cents = 15000 and paid_at = current_date - 1
           from public.transactions where id = anchor);
   assert (select amount_cents from public.transactions where installment_plan_id = p and installment_no = 1) = 10000;
   assert (select status = 'pending' and amount_cents = 15000
