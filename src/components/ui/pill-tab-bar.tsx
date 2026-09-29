@@ -1,8 +1,9 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   interpolateColor,
+  runOnJS,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
@@ -114,16 +115,34 @@ export function PillTabBar({
   const escalaDoTexto = escalaDoRotulo(slot, fontScale);
 
   const progresso = useSharedValue(activeIndex);
+  /*
+    Parado, o círculo é do REACT; o Reanimated só desenha durante a troca (29/09/2026). Aberto por
+    link direto em Finanças, um re-render (a entrada da barra assentando) devolveu ao transform o
+    valor da montagem: o círculo ficou em "Hoje" com o rótulo de Finanças aceso. É a armadilha do
+    `Segmented` (design.md §5), com o mesmo remédio. `indo` é para onde a mola vai (o toque sai
+    antes de a rota mudar); `assentado`, onde ela parou.
+  */
+  const [assentado, setAssentado] = useState(activeIndex);
+  // O toque anima antes de a rota mudar: o alvo é o tocado enquanto a rota ainda é a de antes.
+  // Derivado no render (sem `setState` no efeito): link de fora muda a rota e o alvo segue ela.
+  const [tocado, setTocado] = useState<{ de: number; para: number } | null>(null);
+  const indo = tocado && tocado.de === activeIndex ? tocado.para : activeIndex;
+  const andando = indo !== assentado;
   const animarPara = useCallback(
     (destino: number) => {
-      'worklet';
-      progresso.set(withSpring(destino, Motion.spring.tab));
+      progresso.set(
+        withSpring(destino, Motion.spring.tab, (fim) => {
+          'worklet';
+          if (fim) runOnJS(setAssentado)(destino);
+        })
+      );
     },
     [progresso]
   );
   useEffect(() => {
     animarPara(activeIndex);
   }, [activeIndex, animarPara]);
+  const centroParado = centroDoSlot(posicaoDesenhada(assentado, tabs.length, folga), slot) - DIAMETRO / 2;
 
   const posicao = useDerivedValue(() => posicaoDesenhada(progresso.get(), tabs.length, folga));
   const esquerda = useDerivedValue(() => centroDoSlot(posicao.get(), slot) - DIAMETRO / 2);
@@ -131,10 +150,16 @@ export function PillTabBar({
   const circulo = useAnimatedStyle(() => ({ transform: [{ translateX: esquerda.get() }] }));
   const contraCirculo = useAnimatedStyle(() => ({ transform: [{ translateX: -esquerda.get() }] }));
 
+  const icones = tabs.map((tab) => (
+    <View key={tab.name} style={[styles.slotEscuro, { width: slot }]}>
+      <Icon name={tab.icon} size="md" color="heroSurface" />
+    </View>
+  ));
+
   // A entrada: a barra sobe toda vez que o app fica visível (abertura, conta, desbloqueio) —
   // o mesmo relógio da cascata das raízes. Coberta, ela desce por baixo da camada.
   const descida = BAR_H + insets.bottom + Space.lg;
-  const { relogio, assentado } = useRelogioDeEntrada(ATRASO_DA_BARRA_MS, DURACAO_DA_BARRA_MS);
+  const { relogio, assentado: entrou } = useRelogioDeEntrada(ATRASO_DA_BARRA_MS, DURACAO_DA_BARRA_MS);
   const entrada = useAnimatedStyle(() => ({
     transform: [{ translateY: (1 - progressoDeEntrada(relogio.get())) * descida }],
   }));
@@ -146,7 +171,7 @@ export function PillTabBar({
         styles.raiz,
         // Centrada na área SEGURA: deitado, o recorte da câmera é inset de um dos lados.
         { paddingBottom: insets.bottom + Space.sm, paddingLeft: insets.left, paddingRight: insets.right },
-        assentado ? styles.noLugar : entrada,
+        entrou ? styles.noLugar : entrada,
       ]}>
       <View
         style={[
@@ -173,6 +198,7 @@ export function PillTabBar({
                     Haptics.selectionAsync();
                     // A mola primeiro, a navegação depois: invertido, o `navigate` ocupa a JS
                     // thread antes de a animação existir.
+                    setTocado({ de: activeIndex, para: i });
                     animarPara(i);
                     onSelect(i);
                   }}
@@ -197,17 +223,21 @@ export function PillTabBar({
         </View>
 
         {/* O círculo, com a fileira de ícones escuros recortada dentro dele. */}
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.circulo, { backgroundColor: theme.onHero }, circulo]}>
-          <Animated.View style={[styles.fileiraEscura, { width: interna }, contraCirculo]}>
-            {tabs.map((tab) => (
-              <View key={tab.name} style={[styles.slotEscuro, { width: slot }]}>
-                <Icon name={tab.icon} size="md" color="heroSurface" />
-              </View>
-            ))}
+        {andando ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.circulo, { backgroundColor: theme.onHero }, circulo]}>
+            <Animated.View style={[styles.fileiraEscura, { width: interna }, contraCirculo]}>
+              {icones}
+            </Animated.View>
           </Animated.View>
-        </Animated.View>
+        ) : (
+          <View
+            pointerEvents="none"
+            style={[styles.circulo, { backgroundColor: theme.onHero, left: PAD + centroParado }]}>
+            <View style={[styles.fileiraEscura, { width: interna, left: -centroParado }]}>{icones}</View>
+          </View>
+        )}
 
         {/* Os contadores, por cima de tudo e parados no lugar do ícone. */}
         <View pointerEvents="none" style={styles.fileiraDeBadges}>

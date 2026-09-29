@@ -1821,3 +1821,13 @@ test('Atalhos do Agente: o botão tem a largura do texto (nunca "Lembret/e"), no
   assert.match(bloco, /flexBasis: 'auto'/);
   assert.match(bloco, /minWidth: '40%'/);
 });
+
+test('Barra de abas do Android: parado, o círculo é do React; o Reanimated só desenha durante a troca', () => {
+  // 29/09/2026, emulador a 384dp × 1,3: aberto por link direto em Finanças, o círculo ficou em
+  // "Hoje" com o rótulo de Finanças aceso. Um re-render (a entrada da barra assentando) devolveu
+  // ao transform o valor da montagem — a mesma armadilha do `Segmented` (design.md §5).
+  const fonte = readFileSync(join(SRC, 'components/ui/pill-tab-bar.tsx'), 'utf8');
+  assert.match(fonte, /const \[assentado, setAssentado\] = useState\(activeIndex\)/);
+  assert.match(fonte, /andando \?/);
+  assert.match(fonte, /left: PAD \+ centroParado/);
+});

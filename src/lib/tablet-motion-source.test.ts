@@ -6,7 +6,7 @@ test('the Android pill enters on app reveal and moves the selected icon with its
   const pill = readFileSync('src/components/ui/pill-tab-bar.tsx', 'utf8');
   assert.match(pill, /useRelogioDeEntrada\(/, 'pill must share the root entrance clock');
   assert.match(pill, /progressoDeEntrada\(relogio\.get\(\)\)/);
-  assert.match(pill, /withSpring\(destino, Motion\.spring\.tab\)/, 'selection moves from the tap');
+  assert.match(pill, /withSpring\(destino, Motion\.spring\.tab[,)]/, 'selection moves from the tap');
   assert.match(pill, /overflow:\s*'hidden'/, 'selected surface clips the dark icon');
   assert.match(pill, /translateX:\s*-esquerda\.get\(\)/, 'icon row counter-translates');
 });
