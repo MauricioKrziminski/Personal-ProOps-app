@@ -829,19 +829,35 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
   responde entrada E saída, e o veredito sai da própria série simulada (`primeiroNegativo` sobre
   `serie`), não de uma segunda RPC.
 
-  **O rascunho move o CAIXA, e só.** Não remonta fatura (`set_invoice`), orçamento
-  (`_budgets_status`) nem cronograma de dívida (`debt_schedule_for`) — reproduzir essas regras no
-  cliente ou numa segunda função seria a cópia que diverge. A tela diz isso ao usuário.
+  **Uma hipótese só, rápida, com o que o detalhe precisa** (spec
+  `2026-09-29-e-se-hipotese-unica-e-detalhe-por-conta-design.md`, pedido do dono do produto: *"por
+  que não só manter um [botão]?… quando ele aplicar aparece o forms completo"*). A folha pede tipo,
+  forma (uma vez | parcelado | repete | financiamento), valor, parcelas ou frequência, **conta ou
+  cartão** e **dia** — a conta decide de onde a fatura e a parcela saem, e o dia em qual fatura a
+  compra cai. Título, categoria e o resto vêm no formulário COMPLETO, que o "Aplicar" abre
+  pré-preenchido (`paramsDoAplicar`); salvar lá tira a hipótese PELO ID, pela promessa (a lista
+  pode ter mudado com o formulário aberto). Parcelado e financiamento exigem conta; "sem conta"
+  só muda a visão geral e a linha diz isso.
 
-  **Hipótese detalhada** (`public.simular`, `20260929120000`): o formulário REAL (lançamento,
-  compra parcelada, recorrente, financiamento) em modo hipótese guarda a entrada do hook
-  (`src/lib/escrita.ts`) no rascunho, e `simular` cria de verdade numa subtransação, lê a
-  Projeção e o ciclo e desfaz tudo — fatura, cronograma e recorrência saem das regras de
-  verdade, e o simulado É o aplicado (medido no staging: aplicar não moveu um centavo). "Aplicar"
-  entrega a mesma entrada ao hook que salva. Custo: ~0,4 s com 10 hipóteses e 10 anos. **Toda
-  mudança do rascunho parte do GRAVADO na hora** (`usePreferencia` por função): o "Aplicar
-  todas" tira uma hipótese por salvamento com funções do mesmo render, e partindo do render a
-  segunda desfazia a primeira — a hipótese já salva na conta voltava ao rascunho.
+  **Toda hipótese vira REGISTRO de verdade em `public.simular`** (`registroDaHipotese`, pelos
+  MESMOS construtores do salvar, `src/lib/escrita.ts`): cria numa subtransação, lê e desfaz. Fatura
+  (`set_invoice`), cronograma de dívida e recorrência saem das regras reais — conferido no staging
+  em 29/09/2026 criando cada forma de verdade: `accounts_horizon`/`cards_horizon` deram o MESMO
+  JSON que a simulação, nas seis formas. Só o adiantamento continua `Draft` de cancelamento.
+  Financiamento simulado se chama "Financiamento da hipótese N": `debts` tem nome ÚNICO no espaço,
+  e dois chamados "Hipótese" faziam o segundo voltar 23505. Custo medido: ~0,5 s com 10 hipóteses
+  em 10 anos, com o detalhe por conta.
+
+  **"Onde muda" e o detalhe leem UMA fonte** (`20260929140000`/`150000`): `private.caixa_das_contas`
+  e `private.eventos_de_caixa` (com `account_id`) — a soma das contas É o `cash_total`, e as duas
+  `cash_flow_forecast` leem os mesmos eventos (a projeção do staging deu idêntica em 3.651 dias).
+  O "antes" é `accounts_horizon`/`cards_horizon`; o "depois", as leituras `contas`/`cartoes` do
+  `simular` — a mesma função privada dos dois lados. A tela `/finance/hipotese?conta=&dias=` recebe
+  a janela da Projeção (a hipótese pode tê-la esticado só naquela visita). **Aviso que já existia
+  diz que já existia** (`fraseDoLimite`, `fraseDoNegativo`): "passa do limite em R$ 11.460" num
+  cartão que já devia R$ 8.460 além dele culpava a hipótese; "fica negativa mais cedo: em 28/02/2027
+  (era 22/07/2030)". Cartão sem limite nunca "passa": diz "Sem limite cadastrado" e leva ao
+  cadastro. **Toda mudança do rascunho parte do GRAVADO na hora** (`usePreferencia` por função).
 
   **Ele mora no APARELHO, por usuário, até aplicar ou limpar** (`useRascunho`, 29/09/2026 —
   decisão do dono do produto ao pedir hipóteses com o formulário completo: *"salvar no
