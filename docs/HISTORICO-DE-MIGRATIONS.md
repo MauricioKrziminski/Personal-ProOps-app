@@ -3,6 +3,11 @@
 Registro, não regra: o que está em cada banco HOJE se confere na fonte (`CLAUDE.md`, *Banco e
 fila*). Entradas movidas do `CLAUDE.md` em 26/09/2026, na ordem em que estavam lá.
 
+**Só no STAGING: `20260928236000_rascunho_no_detalhe_do_ciclo`** (28/09/2026) — `draft_lines`, a
+leitura das hipóteses do "E se…?" dentro do detalhe do ciclo, sobre o motor que já existia
+(`private.draft_ocorrencias`). Só computa (não lê lançamento), `security invoker`, sem `execute`
+para `anon`. Em produção sobe pelo Gabriel, **antes** do app que a chama.
+
 **Produção e staging ALINHADOS em `20260928235000_valor_muda_em_fatura_fechada`** — aplicada
 em produção pelo Gabriel em 28/09/2026 (`db push --project-ref`) e conferida na fonte:
 `schema_migrations` devolve `20260928235000`, `20260928230000`, `20260928220000`; o gatilho
