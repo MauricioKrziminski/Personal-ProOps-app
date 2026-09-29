@@ -792,6 +792,9 @@ const SEM_SCREEN = new Set([
   // Conversa: lista INVERTIDA com composer fixo — o oposto de um scroll de conteúdo.
   'src/app/agent/new.tsx',
   'src/app/agent/[id].tsx',
+  // Só a FOLHA do formulário, num modal transparente por cima de quem abriu: não há tela.
+  'src/app/finance/nova-recorrente.tsx',
+  'src/app/finance/novo-financiamento.tsx',
 ]);
 
 test('toda tela de conteúdo usa <Screen>', () => {

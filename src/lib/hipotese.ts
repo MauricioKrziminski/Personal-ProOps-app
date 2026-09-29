@@ -135,18 +135,18 @@ export function resumoDaHipotese(h: Hipotese, brl: (c: number) => string, nomeDa
  */
 export function paramsDoAplicar(h: Hipotese):
   | { pathname: '/finance/transaction-form'; params: Record<string, string> }
-  | { pathname: '/finance/recurring'; params: Record<string, string> }
-  | { pathname: '/finance/debts'; params: Record<string, string> } {
+  | { pathname: '/finance/nova-recorrente'; params: Record<string, string> }
+  | { pathname: '/finance/novo-financiamento'; params: Record<string, string> } {
   const data = isoToBR(dataDaHipotese(h));
   if (h.forma === 'repete') {
     return {
-      pathname: '/finance/recurring',
+      pathname: '/finance/nova-recorrente',
       params: { create: '1', deHipotese: h.id, kind: h.kind, amount: String(h.valor_cents), start: data, ...(h.conta ? { account: h.conta } : {}), repete: h.repete },
     };
   }
   if (h.forma === 'financiamento') {
     return {
-      pathname: '/finance/debts',
+      pathname: '/finance/novo-financiamento',
       params: { create: 'financing', deHipotese: h.id, parcela: String(h.valor_cents), parcelas: String(h.parcelas), ...(h.conta ? { conta: h.conta } : {}), data },
     };
   }

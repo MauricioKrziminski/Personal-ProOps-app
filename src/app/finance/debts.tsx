@@ -175,7 +175,11 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
   );
 }
 
-export default function DebtsScreen() {
+/**
+ * `soFormulario`: só as folhas, sem a lista nem a ficha — é a rota `novo-financiamento`, aberta por
+ * cima de onde a pessoa está (o "Aplicar" do "E se…?", o "Financiamento" do lançamento).
+ */
+export default function DebtsScreen({ soFormulario = false }: { soFormulario?: boolean } = {}) {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
   const { windowClass } = useAdaptiveWindow();
@@ -1378,6 +1382,8 @@ export default function DebtsScreen() {
     </>
   );
 
+  if (soFormulario) return <View style={styles.soFolha}>{folhas}</View>;
+
   if (fichaId) {
     return (
       <Screen
@@ -1438,6 +1444,7 @@ export default function DebtsScreen() {
 }
 
 const styles = StyleSheet.create({
+  soFolha: { flex: 1 },
   paneBody: {
     gap: Space.xl,
     minWidth: 0,

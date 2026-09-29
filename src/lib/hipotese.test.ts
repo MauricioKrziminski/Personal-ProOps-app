@@ -67,8 +67,8 @@ test('a linha diz forma, conta e data', () => {
 test('aplicar abre o formulário certo, com tudo', () => {
   assert.deepEqual(paramsDoAplicar(base), { pathname: '/finance/transaction-form', params: { deHipotese: 'h1', kind: 'expense', amount: '10000', data: '05/10/2026', parcelas: '1', conta: 'c1' } });
   assert.equal(paramsDoAplicar({ ...base, forma: 'parcelado', parcelas: 10 }).params.parcelas, '10');
-  assert.deepEqual(paramsDoAplicar({ ...base, forma: 'repete', repete: 'weekly' }), { pathname: '/finance/recurring', params: { create: '1', deHipotese: 'h1', kind: 'expense', amount: '10000', start: '05/10/2026', account: 'c1', repete: 'weekly' } });
-  assert.deepEqual(paramsDoAplicar({ ...base, forma: 'financiamento', parcelas: 48 }), { pathname: '/finance/debts', params: { create: 'financing', deHipotese: 'h1', parcela: '10000', parcelas: '48', conta: 'c1', data: '05/10/2026' } });
+  assert.deepEqual(paramsDoAplicar({ ...base, forma: 'repete', repete: 'weekly' }), { pathname: '/finance/nova-recorrente', params: { create: '1', deHipotese: 'h1', kind: 'expense', amount: '10000', start: '05/10/2026', account: 'c1', repete: 'weekly' } });
+  assert.deepEqual(paramsDoAplicar({ ...base, forma: 'financiamento', parcelas: 48 }), { pathname: '/finance/novo-financiamento', params: { create: 'financing', deHipotese: 'h1', parcela: '10000', parcelas: '48', conta: 'c1', data: '05/10/2026' } });
   assert.deepEqual(paramsDoAplicar({ ...base, conta: null }).params, { deHipotese: 'h1', kind: 'expense', amount: '10000', data: '05/10/2026', parcelas: '1' });
 });
 

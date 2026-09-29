@@ -110,7 +110,12 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
   );
 }
 
-export default function RecurringScreen() {
+/**
+ * `soFormulario`: só a folha, sem a lista por trás — é a rota `nova-recorrente`, aberta por cima de
+ * onde a pessoa está (o "Aplicar" do "E se…?", o "Repetir lançamento"). *"devo conseguir criar
+ * tudo direto ali"* (29/09/2026): empurrar a tela de Recorrentes era levá-la para outro lugar.
+ */
+export default function RecurringScreen({ soFormulario = false }: { soFormulario?: boolean } = {}) {
   const params = useLocalSearchParams<{ create?: string; edit?: string; kind?: string; amount?: string; description?: string; merchant?: string; category?: string; account?: string; start?: string; deHipotese?: string; repete?: string }>();
   const theme = useTheme();
   const { windowClass } = useAdaptiveWindow();
@@ -582,6 +587,32 @@ export default function RecurringScreen() {
     />
   );
 
+  const folhaDoFormulario = (
+    <Sheet visible={form !== null} onClose={() => volta.aoFechar(() => setForm(null))}>
+      <TaskHeader
+        title={form?.id ? 'Editar recorrência' : 'Nova recorrência'}
+        onClose={() => volta.aoFechar(() => setForm(null))}
+        action={
+          <Button
+            label={form?.id ? 'Salvar' : 'Criar'}
+            size="sm"
+            loading={create.isPending || editar.isPending || editarTudo.isPending}
+            disabled={!podeSalvar || create.isPending || editar.isPending || editarTudo.isPending}
+            onPress={salvar}
+          />
+        }
+      />
+
+      {form ? (
+        <SheetScroll contentContainerStyle={styles.sheetBody}>
+          <CamposDaSerie form={form} onChange={setForm} contas={accounts.data ?? []} />
+        </SheetScroll>
+      ) : null}
+    </Sheet>
+  );
+
+  if (soFormulario) return <View style={styles.soFolha}>{folhaDoFormulario}</View>;
+
   return (
     <Screen
       grouped
@@ -615,33 +646,13 @@ export default function RecurringScreen() {
 
       {tablet ? tabletBody : compactBody}
 
-      <Sheet visible={form !== null} onClose={() => volta.aoFechar(() => setForm(null))}>
-
-          <TaskHeader
-            title={form?.id ? 'Editar recorrência' : 'Nova recorrência'}
-            onClose={() => volta.aoFechar(() => setForm(null))}
-            action={
-              <Button
-                label={form?.id ? 'Salvar' : 'Criar'}
-                size="sm"
-                loading={create.isPending || editar.isPending || editarTudo.isPending}
-                disabled={!podeSalvar || create.isPending || editar.isPending || editarTudo.isPending}
-                onPress={salvar}
-              />
-            }
-          />
-
-          {form ? (
-            <SheetScroll contentContainerStyle={styles.sheetBody}>
-              <CamposDaSerie form={form} onChange={setForm} contas={accounts.data ?? []} />
-            </SheetScroll>
-          ) : null}
-      </Sheet>
+      {folhaDoFormulario}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  soFolha: { flex: 1 },
   paneBody: {
     gap: Space.xl,
     minWidth: 0,

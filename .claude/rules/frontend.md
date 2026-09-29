@@ -289,6 +289,13 @@ vocabulário comum das duas plataformas.
 
 ### Formulário que OUTRA tela abriu devolve para ela ao fechar
 
+**E quando quem abre quer só o formulário, a lista nem aparece** (29/09/2026, *"devo conseguir
+criar tudo direto ali… e não ser redirecionado para a tela deles"*). O "Aplicar" do "E se…?" e os
+botões "Repetir lançamento" e "Financiamento" do lançamento abrem `/finance/nova-recorrente` e
+`/finance/novo-financiamento`: modal TRANSPARENTE que monta a tela de Recorrentes/Dívidas com
+`soFormulario` — só a folha, por cima de quem abriu. O formulário é o MESMO componente (nada
+copiado); fechar ou salvar volta para quem abriu, sem ter passado pela lista.
+
 **Quatro telas hospedam formulário num `Sheet`, e chegar neles de fora é um `push` na tela da
 LISTA com um parâmetro** — `/finance/recurring?edit=`, `/finance/installments?edit=`,
 `/finance/debts?create=financing` e `/finance/accounts?create=1|cartao` (todo "Cadastrar conta",

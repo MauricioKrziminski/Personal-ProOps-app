@@ -1505,7 +1505,7 @@ function TransactionForm({
           <View style={styles.errorActions}>
             <Button label="Repetir lançamento" variant="secondary" size="sm" onPress={() => {
               const values = getValues();
-              const destino = { pathname: '/finance/recurring' as const, params: {
+              const destino = { pathname: '/finance/nova-recorrente' as const, params: {
                 create: '1', kind: values.kind === 'income' ? 'income' : 'expense',
                 amount: String(values.amount_cents), description: values.description,
                 merchant: values.merchant?.trim() ?? '',
@@ -1517,7 +1517,7 @@ function TransactionForm({
               else router.replace(destino);
             }} />
             {!editing ? (
-              <Button label="Financiamento" variant="secondary" size="sm" onPress={() => router.push({ pathname: '/finance/debts', params: { create: 'financing' } })} />
+              <Button label="Financiamento" variant="secondary" size="sm" onPress={() => router.push({ pathname: '/finance/novo-financiamento', params: { create: 'financing' } })} />
             ) : null}
           </View>
         ) : null}
