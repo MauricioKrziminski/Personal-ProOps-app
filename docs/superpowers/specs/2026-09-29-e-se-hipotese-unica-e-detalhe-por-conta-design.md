@@ -104,11 +104,14 @@ Duas leituras novas, cada uma com porta pública (o "antes", sem hipótese) e le
 - **`private.contas_no_horizonte(ws, fim)`** → por conta NÃO cartão: `saldo_hoje`, `menor`,
   `dia_do_menor`, `saldo_fim`, `negativa_em` (primeiro dia < 0 ou null). Soma o saldo realizado de
   cada conta com os eventos de caixa de hoje até `fim`.
-  **Os eventos de caixa passam a dizer a conta**: `private.cash_events` ganha `account_id` (última
-  coluna): a conta do lançamento; na fatura, a `payment_account_id` do cartão (null quando não há);
-  no pagamento de fatura, a conta que pagou; no Pix no crédito, a conta que recebeu. É a MESMA
-  fonte de `cash_flow_forecast` — por isso "a soma das contas + sem conta" tem que dar a visão
-  geral, e o teste confere isso.
+  **A projeção passa a ter UMA lista de eventos, com a conta** (corrigido no plano, 29/09/2026:
+  a projeção diária não usa o `cash_events` do ciclo — tem a própria lista). Ela vira
+  `private.eventos_de_caixa(ws, ate)` com `account_id`: o lançamento na conta dele; a fatura na
+  `payment_account_id` do cartão (null quando não há); a parcela da dívida na conta da dívida; a
+  recorrente projetada na conta da série; a transferência pendente entre contas (não cartão) nos
+  dois lados (soma zero). `cash_flow_forecast` e `_cash_flow_forecast` passam a ler dela, e o saldo
+  inicial vira `private.caixa_das_contas(ws, dia)`, com `cash_total` = a soma dela. Uma fonte só:
+  a soma das contas + "sem conta" É a visão geral, e o teste confere dia a dia.
 - **`private.cartoes_no_horizonte(ws, fim)`** → por cartão: `limite` (null = sem limite),
   `livre` (a mesma conta do `card_summary`), `faturas` (JSON: vencimento, total pela régua
   `conta_na_fatura`, status) das faturas não pagas até `fim`.
