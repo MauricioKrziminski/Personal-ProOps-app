@@ -115,7 +115,7 @@ test('mudar por FUNÇÃO lê o valor gravado na hora: duas mudanças do mesmo re
   assert.equal(a.api.usePreferencia('lista', 'a,b,c', ehTexto)[0], 'c');
 });
 
-test('useRascunho: tirar duas hipóteses com as funções do MESMO render tira as duas', async () => {
+test('useRascunho v2: adicionar, trocar e tirar partem do GRAVADO (duas mudanças do mesmo render valem as duas)', async () => {
   const disco = new Map<string, string>();
   const a = carregar(disco);
   a.api.carregarPreferencias('u1');
@@ -128,16 +128,21 @@ test('useRascunho: tirar duas hipóteses com as funções do MESMO render tira a
       if (nome === '@/hooks/use-preferencia') return a.api;
       if (nome === '@/lib/rascunho')
         return {
-          lerRascunho: (t: string) => (t ? JSON.parse(t) : { versao: 1, rapidas: [], detalhadas: [] }),
+          lerRascunho: (t: string) => (t ? JSON.parse(t) : { versao: 2, hipoteses: [], adiantamentos: [] }),
           gravarRascunho: (r: any) => JSON.stringify(r),
         };
       throw new Error(`módulo inesperado: ${nome}`);
     },
   });
-  const inicio = mod.exports.useRascunho();
-  inicio.restaurar({ versao: 1, rapidas: [], detalhadas: [{ id: 'x' }, { id: 'y' }, { id: 'z' }] });
-  const mesmoRender = mod.exports.useRascunho();
-  mesmoRender.tirarDetalhada('x');
-  mesmoRender.tirarDetalhada('y');
-  assert.deepEqual(mod.exports.useRascunho().rascunho.detalhadas.map((h: any) => h.id), ['z']);
+  const h = (id: string, valor: number) => ({ id, kind: 'expense', forma: 'uma', valor_cents: valor, parcelas: 1, repete: 'monthly', conta: null, data: '2026-10-01' });
+  const r0 = mod.exports.useRascunho();
+  r0.adicionar(h('a', 1));
+  r0.adicionar(h('b', 2));
+  const r1 = mod.exports.useRascunho();
+  r1.tirar('a');
+  r1.trocar(h('b', 3));
+  assert.deepEqual(mod.exports.useRascunho().rascunho.hipoteses.map((x: any) => [x.id, x.valor_cents]), [['b', 3]]);
+  // o Desfazer devolve só o que saiu, sem duplicar o que ainda está lá
+  mod.exports.useRascunho().devolver({ hipoteses: [h('a', 1), h('b', 9)], adiantamentos: [] });
+  assert.deepEqual(mod.exports.useRascunho().rascunho.hipoteses.map((x: any) => [x.id, x.valor_cents]), [['b', 3], ['a', 1]]);
 });

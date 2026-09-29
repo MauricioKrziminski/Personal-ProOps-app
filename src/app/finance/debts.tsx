@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -11,7 +11,6 @@ import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useRascunho } from '@/hooks/use-rascunho';
-import type { EntradaFinanciamento } from '@/lib/escrita';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -57,7 +56,7 @@ import {
 import { formatBRL, localISODate } from '@/hooks/use-items';
 import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { pagamentoDaParcelaFixa } from '@/lib/confirmar-baixa';
-import { brToISO, formatNumberBR, isoToBR } from '@/lib/dates';
+import { brToISO, formatNumberBR, isValidBRDate, isoToBR } from '@/lib/dates';
 import { paidInstallments, porAno, secoesDaLinha, type ItemDaLinha } from '@/lib/debt-history';
 import { lerAoVoltar } from '@/lib/volta-da-parcela';
 import {
@@ -181,16 +180,17 @@ export default function DebtsScreen() {
   const brl = useBRL();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
-  const params = useLocalSearchParams<{ create?: string; id?: string; edit?: string; hipotese?: string }>();
+  const params = useLocalSearchParams<{ create?: string; id?: string; edit?: string; deHipotese?: string; parcela?: string; parcelas?: string; conta?: string; data?: string }>();
   /**
-   * `?hipotese=` (29/09/2026, spec hipóteses detalhadas): o financiamento vira hipótese do "E
-   * se…?" — `nova` cria, um id edita aquela. Não grava: guarda a ENTRADA no rascunho.
+   * `?deHipotese=` (spec 2026-09-29): aberto pelo "Aplicar" do "E se…?", o financiamento nasce com
+   * a parcela, as parcelas, a conta e a data da hipótese; salvar a tira do rascunho pelo id.
    */
-  const { rascunho, adicionarDetalhada, trocarDetalhada } = useRascunho();
-  const modoHipotese = Boolean(params.hipotese);
-  // Guardada uma vez, o segundo toque (antes de a tela fechar) não soma outra hipótese igual.
-  const guardada = useRef(false);
-  const hipoteseAberta = rascunho.detalhadas.find((h) => h.id === params.hipotese && h.tipo === 'financiamento') ?? null;
+  const { tirar } = useRascunho();
+  /** A tela ainda está aberta? O que é dela (toast, fechar) só roda com ela montada. */
+  const [montado] = useState(() => ({ current: true }));
+  useEffect(() => () => {
+    montado.current = false;
+  }, [montado]);
   const toast = useToast();
   const debts = useDebts();
   const [estrategia, setEstrategia] = usePreferencia<'avalanche' | 'snowball'>('dividas:estrategia', 'avalanche', umDe(['avalanche', 'snowball']));
@@ -214,8 +214,9 @@ export default function DebtsScreen() {
   const pagar = usePayDebtInstallment();
 
   const [form, setForm] = useState<FormState | null>(() =>
-    hipoteseAberta?.tipo === 'financiamento' ? formDaHipotese(hipoteseAberta.entrada)
-      : params.create === 'financing' ? { ...FORM_VAZIO, kind: 'financing' } : null);
+    params.create !== 'financing' ? null
+      : params.deHipotese ? formDoAplicar(params)
+        : { ...FORM_VAZIO, kind: 'financing' });
   const [edicaoAutomatica, setEdicaoAutomatica] = useState<string | null>(null);
   // Quem chegou por `?create=financing` veio do lançamento ou do Financeiro — fechar devolve.
   const volta = useVoltarQuandoFechar(params.create === 'financing');
@@ -487,15 +488,19 @@ export default function DebtsScreen() {
             tone: 'error',
           }),
       };
-    if (modoHipotese) {
-      if (guardada.current) return;
-      guardada.current = true;
-      // O mesmo `target` que o salvar mandaria, sem o que só existe num registro gravado.
-      const { id: _id, versao: _versao, ...entrada } = target as typeof target & { versao?: string | null };
-      const h = { tipo: 'financiamento' as const, entrada, titulo: entrada.name };
-      if (hipoteseAberta) trocarDetalhada(hipoteseAberta.id, h);
-      else adicionarDetalhada(h);
-      volta.aoFechar(() => setForm(null));
+    const deHipotese = !form.id ? params.deHipotese : undefined;
+    if (deHipotese) {
+      // Pela PROMESSA: a hipótese sai do rascunho mesmo com a tela já fechada; o que é da tela
+      // (toast, fechar), só com ela montada.
+      save.mutateAsync(target).then(
+        () => {
+          tirar(deHipotese);
+          if (montado.current) callbacks.onSuccess();
+        },
+        (error: Error) => {
+          if (montado.current) callbacks.onError(error);
+        },
+      );
       return;
     }
     if (!form.id || !form.original) {
@@ -1003,11 +1008,11 @@ export default function DebtsScreen() {
       {/* Criar / editar */}
       <Sheet visible={form !== null} onClose={() => volta.aoFechar(() => setForm(null))}>
           <TaskHeader
-            title={modoHipotese ? (hipoteseAberta ? 'Editar hipótese' : 'Nova hipótese') : form?.id ? 'Editar dívida' : 'Nova dívida'}
+            title={form?.id ? 'Editar dívida' : 'Nova dívida'}
             onClose={() => volta.aoFechar(() => setForm(null))}
             action={
               <Button
-                label={modoHipotese ? 'Adicionar à hipótese' : 'Salvar'}
+                label="Salvar"
                 size="sm"
                 loading={save.isPending || saveScoped.isPending}
                 disabled={!podeSalvar}
@@ -1542,31 +1547,21 @@ const styles = StyleSheet.create({
 });
 
 /**
- * O formulário a partir de uma hipótese de financiamento guardada — o mesmo mapeamento do
- * `abrirEdicao`, sem o que só um registro gravado tem (id, versão, original).
+ * O financiamento a partir da hipótese do "E se…?" (`paramsDoAplicar`): parcela fixa, sem juros
+ * digitados, a próxima parcela na data da hipótese. O nome é o que falta — a pessoa dá aqui.
  */
-function formDaHipotese(e: EntradaFinanciamento): FormState {
-  const pagas = e.installments_paid ?? 0;
-  const modo = (e.calculation_mode ?? 'interest') as FormState['calculationMode'];
+function formDoAplicar(p: { parcela?: string; parcelas?: string; conta?: string; data?: string }): FormState {
+  const parcela = Math.max(0, Number(p.parcela) || 0);
+  const data = p.data && isValidBRDate(p.data) ? p.data : null;
   return {
     ...FORM_VAZIO,
-    calculationMode: modo,
+    kind: 'financing',
     unidade: 'parcela',
-    valorCents: Number(e.installment_cents ?? 0),
-    ancora: e.first_due_date ?? null,
-    pagasOriginal: pagas,
-    name: e.name,
-    kind: e.kind as FormState['kind'],
-    remainingCents: Number(e.remaining_cents),
-    principalCents: Number(e.principal_cents),
-    taxa: e.interest_rate_monthly
-      ? formatNumberBR(Number((e.interest_rate_monthly * 100).toFixed(4)))
-      : e.kind === 'financing' ? '0' : '',
-    parcelas: e.installments ? String(modo === 'fixed_installments' ? e.installments : Math.max(e.installments - pagas, 0)) : '',
-    installmentsPaid: pagas,
-    historyConfirmed: true,
-    installmentCents: Number(e.installment_cents ?? 0),
-    accountId: e.account_id,
-    diaVencimento: e.due_day ? String(e.due_day) : '',
+    valorCents: parcela,
+    installmentCents: parcela,
+    parcelas: p.parcelas ?? '',
+    accountId: p.conta ?? null,
+    diaVencimento: data ? String(Number(data.slice(0, 2))) : '',
+    ancora: data ? brToISO(data) : null,
   };
 }

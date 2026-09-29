@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/finance/chip';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Field, MoneyField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
@@ -36,24 +35,23 @@ import {
   useCashFlowForecast,
   useCashHistory,
   useForecastMonths,
-  useForecastWithDrafts,
+  useHorizonteReal,
   useSimulacao,
-  useSaveTransaction,
-  useCreateInstallmentPlan,
-  useCreateRecurring,
-  useSaveDebt,
   useMonthSummary,
   useUpcomingBills,
   type Draft,
 } from '@/hooks/use-finance';
-import type { HipoteseNoCiclo } from '@/lib/rascunho-no-ciclo';
-import { motivoDaHipotese, registrosParaSimular, resumoDaHipotese, type HipoteseDetalhada } from '@/lib/rascunho';
+import { motivoDaHipotese } from '@/lib/rascunho';
+import { faltaNaHipotese, novaHipotese, paramsDoAplicar, resumoDaHipotese, type Hipotese } from '@/lib/hipotese';
+import { ondeMuda } from '@/lib/onde-muda';
+import { CamposDaHipotese } from '@/components/finance/campos-da-hipotese';
+import { OndeMuda } from '@/components/finance/onde-muda';
+import { Note } from '@/components/ui/note';
 import { useRascunho } from '@/hooks/use-rascunho';
 import { useToast } from '@/components/ui/toast';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
-import { useTheme } from '@/hooks/use-theme';
-import { MonthPicker, currentMonth, monthTitle } from '@/components/finance/month-picker';
+import { currentMonth, monthTitle } from '@/components/finance/month-picker';
 import { mesDoCorte, veioDe, type MesProjetado } from '@/lib/forecast-months';
 import {
   diasAte,
@@ -74,8 +72,6 @@ import {
   type Quais,
 } from '@/lib/anticipation';
 import { AdiantarCampos } from '@/components/finance/anticipation-fields';
-import { QuantityField } from '@/components/ui/quantity-field';
-import { faixaDeParcelas, financeErrorMessage } from '@/lib/finance-form';
 import { settleLabel } from '@/lib/settle-labels';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
 
@@ -181,7 +177,6 @@ const ehHorizonte = (v: string | number): v is number => typeof v === 'number' &
 export default function ForecastScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
-  const theme = useTheme();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
 
@@ -219,24 +214,21 @@ export default function ForecastScreen() {
   const modo = modoDaHipotese ?? modoEscolhido;
   const [mesAberto, setMesAberto] = useState<string | null>(null);
   /**
-   * Rascunho de cenário — mora no APARELHO desde 29/09/2026 (spec hipóteses detalhadas: *"salvar
-   * no aparelho"*; antes, sair da tela apagava). As rápidas continuam `Draft[]`; as detalhadas são
-   * a entrada do formulário real, e a série delas vem de `simular`. O `setRascunhos` compatível
-   * mantém todo o fluxo das rápidas como era.
+   * Rascunho de cenário — mora no APARELHO (`useRascunho`). Uma hipótese só, rápida de fazer; o
+   * formulário completo aparece ao aplicar (spec 2026-09-29).
    */
   const toast = useToast();
-  const { rascunho, setRapidas, limpar, devolver, tirarDetalhada } = useRascunho();
-  const rascunhos = rascunho.rapidas;
-  const setRascunhos = (v: Draft[] | ((antes: Draft[]) => Draft[])) =>
-    setRapidas(typeof v === 'function' ? v : () => v);
-  const detalhadas = rascunho.detalhadas;
-  const registros = useMemo(() => registrosParaSimular(detalhadas), [detalhadas]);
+  const { rascunho, adicionar, trocar, tirar, setAdiantamentos, limpar, devolver } = useRascunho();
+  /** As hipóteses (spec 2026-09-29): com conta, forma e data, viram registro na simulação. */
+  const hipoteses = rascunho.hipoteses;
+  /** Os adiantamentos continuam `Draft` de cancelamento, pelas leituras de caixa. */
+  const adiantamentos = rascunho.adiantamentos;
   const [sheetAberto, setSheetAberto] = useState(false);
-  const [novoTipo, setNovoTipo] = useState<'income' | 'expense' | 'adiantar'>('income');
-  const [novoValor, setNovoValor] = useState(0);
-  const [novoMes, setNovoMes] = useState<string | null>(null);
-  const [novoParcelas, setNovoParcelas] = useState(1);
-  const [novoModo, setNovoModo] = useState<'total' | 'monthly'>('total');
+  /** O que a folha monta: uma hipótese de entrada ou saída, ou um adiantamento de parcelas. */
+  const [tipoDaFolha, setTipoDaFolha] = useState<'hipotese' | 'adiantar'>('hipotese');
+  const [hipotese, setHipotese] = useState<Hipotese>(() => novaHipotese(localISODate()));
+  /** O mês do pagamento do adiantamento. */
+  const [mesAdiantar, setMesAdiantar] = useState<string | null>(null);
   /*
     Adiantar parcelas (spec 2026-09-21): QUAL item, QUANTAS parcelas, as últimas ou as
     próximas, e o valor a pagar — `null` segue a sugestão do banco (valor presente no
@@ -247,10 +239,9 @@ export default function ForecastScreen() {
   const [adiantarQuais, setAdiantarQuais] = useState<Quais>('ultimas');
   const [adiantarValor, setAdiantarValor] = useState<number | null>(null);
   /**
-   * O `grupo` da hipótese aberta para edição; `null` = o sheet cria uma nova.
-   * Editar é refazer a hipótese com o formulário preenchido e TROCAR os drafts dela no mesmo
-   * lugar da lista (`substituirGrupo`) — um adiantamento tem 1 + N drafts, e mexer draft a draft
-   * deixaria parcela cancelada sem o pagamento, ou o contrário.
+   * O que está aberto para edição: o `id` da hipótese, ou o `grupo` do adiantamento; `null` = a
+   * folha cria. Editar um adiantamento TROCA os drafts dele no mesmo lugar (`substituirGrupo`) — um
+   * adiantamento tem 1 + N drafts, e mexer draft a draft deixaria parcela cancelada sem o pagamento.
    */
   const [editando, setEditando] = useState<string | null>(null);
 
@@ -269,163 +260,67 @@ export default function ForecastScreen() {
   // "Paguei" confirma o valor numa folha curta antes da baixa (25/09/2026).
   const baixa = useConfirmarBaixa();
 
-  // ⚠️ A troca do rascunho acontece AQUI, num lugar só, nos DOIS caminhos: o mensal recebe as
-  // mesmas hipóteses e passa pela mesma `forecast_json` por dentro. Assim a tabela e a curva
-  // não têm como discordar por caminho.
-  const simulado = useForecastWithDrafts(dias, rascunhos, !emMes);
+  // ⚠️ Com rascunho, a série vem de UMA chamada a `simular` (spec 2026-09-29): as hipóteses viram
+  // registros de verdade e os adiantamentos vão como `drafts`, nos DOIS modos. A projeção real
+  // segue sem drafts — curva e tabela não têm como discordar por caminho.
   const regua = useMonthRuler('projecao');
-  const mensal = useForecastMonths(dias, rascunhos, emMes, regua.view);
-  const comDetalhadas = registros.length > 0;
-  const simulacao = useSimulacao(dias, rascunhos, registros, emMes ? 'mes' : 'dia', regua.view, comDetalhadas);
+  const mensal = useForecastMonths(dias, [], emMes, regua.view);
+  const simulando = hipoteses.length > 0 || adiantamentos.length > 0;
+  const simulacao = useSimulacao({
+    dias, modo: emMes ? 'mes' : 'dia', view: regua.view, hipoteses, adiantamentos,
+    porConta: hipoteses.length > 0, enabled: simulando,
+  });
+  // O "antes" do Onde muda: o horizonte real por conta e por cartão.
+  const horizonte = useHorizonteReal(dias, hipoteses.length > 0);
   // Da resposta ANTERIOR (placeholder) o índice pode já apontar para outra linha: sem erro até a nova.
   const errosDaSimulacao = simulacao.isPlaceholderData ? [] : (simulacao.data?.erros ?? []);
+  /** As que vão à simulação — o índice do erro é o índice aqui. */
+  const completas = hipoteses.filter((h) => !faltaNaHipotese(h));
+  const nomeDaConta = (id: string) => accounts.data?.find((a) => a.id === id)?.name ?? null;
 
-  // As hipóteses detalhadas (spec 2026-09-28): criadas no formulário REAL em modo hipótese.
-  const adicionarComo = () =>
-    // O mesmo teto de `simular` (30): passar dele derrubaria a simulação inteira.
-    detalhadas.length >= 30
-      ? toast({ message: 'O rascunho já tem 30 hipóteses detalhadas. Aplique ou tire alguma para somar outra.', tone: 'error' })
-      : showItemActions('Adicionar como…', [
-      { label: 'Lançamento', icon: 'doc.text', onPress: () => router.push({ pathname: '/finance/transaction-form', params: { hipotese: 'nova' } }) },
-      { label: 'Compra parcelada', icon: 'creditcard', onPress: () => router.push({ pathname: '/finance/transaction-form', params: { hipotese: 'nova', parcelada: '1' } }) },
-      { label: 'Recorrente', icon: 'repeat', onPress: () => router.push({ pathname: '/finance/recurring', params: { create: '1', hipotese: 'nova' } }) },
-      { label: 'Financiamento', icon: 'banknote', onPress: () => router.push({ pathname: '/finance/debts', params: { create: 'financing', hipotese: 'nova' } }) },
-    ]);
-  const editarDetalhada = (h: HipoteseDetalhada) => {
-    if (h.tipo === 'recorrente') router.push({ pathname: '/finance/recurring', params: { create: '1', hipotese: h.id } });
-    else if (h.tipo === 'financiamento') router.push({ pathname: '/finance/debts', params: { create: 'financing', hipotese: h.id } });
-    else router.push({ pathname: '/finance/transaction-form', params: { hipotese: h.id } });
+  /** Aplicar = o formulário COMPLETO do registro, pré-preenchido; salvar lá tira a hipótese pelo id. */
+  const aplicarHipotese = (h: Hipotese) => router.push(paramsDoAplicar(h));
+  const tirarHipotese = (h: Hipotese) => {
+    tirar(h.id);
+    toast({ message: 'Hipótese tirada do rascunho.', tone: 'success', action: { label: 'Desfazer', onPress: () => devolver({ hipoteses: [h], adiantamentos: [] }) } });
   };
+  const tirarAdiantamento = (grupo: string) => {
+    const saiu = adiantamentos.filter((d) => d.grupo === grupo);
+    setAdiantamentos((lista) => lista.filter((d) => d.grupo !== grupo));
+    toast({ message: 'Hipótese tirada do rascunho.', tone: 'success', action: { label: 'Desfazer', onPress: () => devolver({ hipoteses: [], adiantamentos: saiu }) } });
+  };
+  const serieSimulada = simulacao.data?.forecast;
+  const mensalExibido = simulando ? (simulacao.data?.meses ?? mensal.data) : mensal.data;
+  const gruposDeAdiantar = useMemo(() => agruparHipoteses(adiantamentos), [adiantamentos]);
   /**
-   * Aplicar (spec 2026-09-28, seção 5): a detalhada salva pelo MESMO hook do formulário, com a
-   * entrada guardada — e só sai do rascunho no sucesso. O `ref` segura o toque duplo: entre o
-   * primeiro toque e o render seguinte, o estado ainda não mudou.
+   * "Onde muda" (spec 2026-09-29, §4): antes (real) × depois (simulado). Só com as quatro leituras
+   * na mão e a simulação ATUAL — com a anterior, o "depois" seria de outro rascunho.
    */
-  const salvarLancamento = useSaveTransaction();
-  const criarParcelada = useCreateInstallmentPlan();
-  const criarRecorrente = useCreateRecurring();
-  const salvarFinanciamento = useSaveDebt();
-  const aplicando = useRef<string | null>(null);
-  // O mesmo estado, para DESENHAR: enquanto salva, "Aplicar" e "Aplicar todas" ficam desligados
-  // (spec §8). A ref segue sendo a trava — ela vale no mesmo toque, o estado só no render seguinte.
-  const [salvando, setSalvando] = useState(false);
-  const marcarAplicando = (id: string | null) => {
-    aplicando.current = id;
-    setSalvando(id !== null);
-  };
-  const gravarDetalhada = (h: HipoteseDetalhada, depois: (ok: boolean) => void) => {
-    // Pela PROMESSA, nunca pelo `onSuccess` da chamada: o TanStack não chama o callback por chamada
-    // de uma tela que desmontou, e sair da Projeção no meio do salvamento deixava a hipótese salva
-    // no rascunho — contada duas vezes e pronta para duplicar. O rascunho mora fora da tela, então
-    // tirar depois de desmontar ainda grava.
-    const salvando: Promise<unknown> =
-      h.tipo === 'lancamento' ? salvarLancamento.mutateAsync(h.entrada)
-      : h.tipo === 'parcelada' ? criarParcelada.mutateAsync(h.entrada)
-      : h.tipo === 'recorrente' ? criarRecorrente.mutateAsync(h.entrada)
-      : salvarFinanciamento.mutateAsync(h.entrada);
-    salvando.then(
-      () => {
-        marcarAplicando(null);
-        tirarDetalhada(h.id);
-        depois(true);
-      },
-      (e: unknown) => {
-        marcarAplicando(null);
-        toast({ message: financeErrorMessage(e, `Não deu para aplicar ${h.titulo}.`), tone: 'error' });
-        depois(false);
-      },
-    );
-  };
-  const aplicarDetalhada = (h: HipoteseDetalhada) => {
-    if (aplicando.current) return;
-    showItemActions(`Salvar ${h.titulo} na conta?`, [
-      {
-        label: 'Salvar na conta',
-        icon: 'checkmark.circle',
-        onPress: () => {
-          if (aplicando.current) return;
-          marcarAplicando(h.id);
-          gravarDetalhada(h, (ok) => {
-            if (ok) toast({ message: `${h.titulo} foi para a conta.`, tone: 'success' });
-          });
-        },
-      },
-    ], resumoDaHipotese(h, brl));
-  };
-  /** "Aplicar todas": em sequência — a próxima só depois da anterior; para no primeiro erro. */
-  const aplicarTodas = () => {
-    if (aplicando.current || detalhadas.length === 0) return;
-    const fila = [...detalhadas];
-    showItemActions(`Salvar ${fila.length === 1 ? 'a hipótese detalhada' : `as ${fila.length} hipóteses detalhadas`} na conta?`, [
-      {
-        label: 'Salvar na conta',
-        icon: 'checkmark.circle',
-        onPress: () => {
-          const proxima = (feitas: number) => {
-            const h = fila.shift();
-            if (!h) {
-              toast({
-                message: rascunhos.length
-                  ? `Salvei ${feitas}. As rápidas precisam do formulário para virar lançamento.`
-                  : `Salvei ${feitas} na conta.`,
-                tone: 'success',
-              });
-              return;
-            }
-            marcarAplicando(h.id);
-            gravarDetalhada(h, (ok) => { if (ok) proxima(feitas + 1); });
-          };
-          proxima(0);
-        },
-      },
-    ]);
-  };
-  /** A rápida vira o formulário completo, pré-preenchido; salvar lá tira ela do rascunho. */
-  const aplicarRapida = (indice: number, d: Draft) => {
-    const data = isoToBR(d.start);
-    if (d.mode === 'monthly') {
-      router.push({ pathname: '/finance/recurring', params: { create: '1', deHipotese: String(indice), kind: d.kind, amount: String(d.amount_cents), start: data } });
-      return;
-    }
-    router.push({ pathname: '/finance/transaction-form', params: { deHipotese: String(indice), kind: d.kind, amount: String(d.amount_cents), data, parcelas: String(d.installments) } });
-  };
-  const tirarRapida = (indices: number[]) => {
-    const saiu = rascunhos.filter((_, i) => indices.includes(i));
-    setRascunhos((lista) => lista.filter((_, i) => !indices.includes(i)));
-    toast({ message: 'Hipótese tirada do rascunho.', tone: 'success', action: { label: 'Desfazer', onPress: () => devolver({ rapidas: saiu, detalhadas: [] }) } });
-  };
-  const acoesDaDetalhada = (h: HipoteseDetalhada): ItemAction[] => [
-    { label: 'Aplicar', icon: 'checkmark.circle', arrasto: 'direita', disabled: salvando, onPress: () => aplicarDetalhada(h) },
-    { label: 'Editar', icon: 'pencil', onPress: () => editarDetalhada(h) },
-    {
-      label: 'Tirar',
-      icon: 'trash',
-      destructive: true,
-      arrasto: 'esquerda',
-      desfaz: true,
-      onPress: () => {
-        tirarDetalhada(h.id);
-        toast({ message: `${h.titulo} saiu do rascunho.`, tone: 'success', action: { label: 'Desfazer', onPress: () => devolver({ rapidas: [], detalhadas: [h] }) } });
-      },
-    },
-  ];
-  // Com hipótese detalhada, a série e o mensal vêm de `simular` (que já inclui as rápidas).
-  const serieSimulada = comDetalhadas ? simulacao.data?.forecast : simulado.data;
-  const mensalExibido = comDetalhadas ? (simulacao.data?.meses ?? mensal.data) : mensal.data;
-  const simulando = rascunhos.length > 0 || detalhadas.length > 0;
-  const hipoteses = useMemo(() => agruparHipoteses(rascunhos), [rascunhos]);
+  const contasAntes = horizonte.contas.data;
+  const cartoesAntes = horizonte.cartoes.data;
+  const contasDepois = simulacao.data?.contas;
+  const cartoesDepois = simulacao.data?.cartoes;
+  const mudancas = useMemo(
+    () =>
+      contasAntes && cartoesAntes && contasDepois && cartoesDepois && !simulacao.isPlaceholderData
+        ? ondeMuda({ contas: contasAntes, cartoes: cartoesAntes }, { contas: contasDepois, cartoes: cartoesDepois })
+        : null,
+    [contasAntes, cartoesAntes, contasDepois, cartoesDepois, simulacao.isPlaceholderData],
+  );
 
-  const pagarEm = diaDoPagamento(novoMes);
-  const adiantaveis = useAnticipationCandidates(pagarEm, sheetAberto && novoTipo === 'adiantar');
+  const pagarEm = diaDoPagamento(mesAdiantar);
+  const adiantaveis = useAnticipationCandidates(pagarEm, sheetAberto && tipoDaFolha === 'adiantar');
   const itemAdiantar = adiantaveis.data?.find((i) => i.ref_id === adiantarId) ?? null;
   // A quantidade ASSENTA no que ainda vence depois do pagamento (`quantasQueCabem`): trocar o
   // mês para mais tarde diminui o número na tela, em vez de travar a hipótese com um erro.
   const qtdAdiantar = quantasQueCabem(itemAdiantar, adiantarQtd);
   const parcelasAdiantar = itemAdiantar ? escolherParcelas(itemAdiantar, qtdAdiantar, adiantarQuais) : [];
   const valorAdiantar = adiantarValor ?? valorSugerido(parcelasAdiantar);
-  const podeAplicar = novoTipo === 'adiantar'
+  /** O que falta na hipótese da folha, em uma frase — o botão desligado diz por quê. */
+  const faltaNaFolha = tipoDaFolha === 'hipotese' ? faltaNaHipotese(hipotese) : null;
+  const podeAplicar = tipoDaFolha === 'adiantar'
     ? parcelasAdiantar.length > 0 && valorAdiantar > 0
-    : novoValor > 0 && novoMes !== null;
+    : faltaNaFolha === null;
   // `?? forecast.data` enquanto a simulação carrega: sem isso a tela PISCA vazia a cada
   // suposição somada, e o destaque salta de um número real para nada e de volta.
   const serie = (simulando ? (serieSimulada ?? forecast.data) : forecast.data) ?? [];
@@ -516,8 +411,8 @@ export default function ForecastScreen() {
    * dia mesmo sem nenhum lançamento, e o empty antigo era inalcançável.
    */
   const projecaoCarregando = emMes
-    ? mensal.isLoading || mensal.isPlaceholderData || (comDetalhadas && simulacao.isLoading)
-    : forecast.isLoading || (comDetalhadas && simulacao.isLoading);
+    ? mensal.isLoading || mensal.isPlaceholderData || (simulando && simulacao.isLoading)
+    : forecast.isLoading || (simulando && simulacao.isLoading);
   const nadaParaProjetar =
     !projecaoCarregando &&
     !accounts.isLoading &&
@@ -646,116 +541,108 @@ export default function ForecastScreen() {
     );
   };
 
-  /** Grava a hipótese: nova vai para o fim; editada troca a antiga no mesmo lugar. */
-  const gravar = (novos: Draft[]) =>
-    setRascunhos((anteriores) =>
-      editando ? substituirGrupo(anteriores, editando, novos) : [...anteriores, ...novos]);
+  /** Amplia a janela até o último dia que a hipótese toca — senão ela não aparece no resultado. */
+  const ampliarAte = (ultimo: string) => {
+    const precisa = diasAte(ultimo);
+    const maior = HORIZONTES.find((h) => h.dias >= precisa) ?? HORIZONTES[HORIZONTES.length - 1];
+    if (maior.dias > dias) setDiasDaHipotese(maior.dias);
+  };
+  const fecharFolha = () => {
+    setSheetAberto(false);
+    setEditando(null);
+  };
 
-  /** Adicionar mais uma prepara outra hipótese; ver resultado inclui a atual e encerra a montagem. */
+  /** "Adicionar mais uma" prepara outra; "Ver resultado" inclui a atual e encerra a montagem. */
   const aplicarSuposicao = (verResultado: boolean) => {
-    // ⚠️ Não só o relógio: `h${Date.now()}` dava o MESMO grupo a duas hipóteses criadas no mesmo
-    // milissegundo, e elas viravam uma linha só (e "Tirar" levava as duas). Era a intermitência
-    // de `simple-finance-ui.test.ts` ("esperava 2 hipóteses, veio 1"), anterior a 22/09/2026.
-    const grupo = editando ?? `h${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     // editar sempre fecha: "Salvar" é o único caminho da edição
     const fecha = verResultado || editando !== null;
-    if (novoTipo === 'adiantar') {
+    if (tipoDaFolha === 'adiantar') {
+      // ⚠️ Não só o relógio: `h${Date.now()}` dava o MESMO grupo a dois adiantamentos criados no
+      // mesmo milissegundo, e eles viravam uma linha só (e "Tirar" levava os dois).
+      const grupo = editando ?? `h${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       if (!itemAdiantar || !podeAplicar) {
-        if (verResultado && rascunhos.length > 0) {
+        if (verResultado && simulando) {
           setSheetAberto(false);
           setModoDaHipotese('mes');
         }
         return;
       }
-      gravar(draftsDoAdiantamento(itemAdiantar, parcelasAdiantar, valorAdiantar, pagarEm, grupo,
-        { quantas: qtdAdiantar, quais: adiantarQuais }));
+      const novos = draftsDoAdiantamento(itemAdiantar, parcelasAdiantar, valorAdiantar, pagarEm, grupo,
+        { quantas: qtdAdiantar, quais: adiantarQuais });
+      setAdiantamentos((antes) => (editando ? substituirGrupo(antes, editando, novos) : [...antes, ...novos]));
       // O ganho de adiantar "as últimas" está no FIM do contrato: a janela vai até a última
       // parcela tirada, senão a projeção mostraria só o custo.
-      const precisa = diasAte(ultimoDia(parcelasAdiantar, pagarEm));
-      const maior = HORIZONTES.find((h) => h.dias >= precisa) ?? HORIZONTES[HORIZONTES.length - 1];
-      if (maior.dias > dias) setDiasDaHipotese(maior.dias);
+      ampliarAte(ultimoDia(parcelasAdiantar, pagarEm));
       Haptics.selectionAsync();
       setAdiantarId(null);
       setAdiantarValor(null);
       if (fecha) {
-        setSheetAberto(false);
-        setEditando(null);
+        fecharFolha();
         setModoDaHipotese('mes');
       }
       return;
     }
-    if (novoValor <= 0 || novoMes === null) {
-      if (verResultado && rascunhos.length > 0) {
+    if (faltaNaHipotese(hipotese)) {
+      if (verResultado && simulando) {
         setSheetAberto(false);
         setModoDaHipotese('mes');
       }
       return;
     }
-    const primeiroDia = `${novoMes}-01`;
-    // A projeção começa hoje: uma hipótese no mês atual não pode entrar no passado.
-    const inicio = primeiroDia < localISODate() ? localISODate() : primeiroDia;
-    const hipotese: Draft = {
-      kind: novoTipo,
-      amount_cents: novoValor,
-      start: inicio,
-      installments: novoModo === 'monthly' ? 1 : novoParcelas,
-      mode: novoModo,
-      grupo,
-    };
-    gravar([hipotese]);
-
-    // Uma hipótese num mês distante precisa ampliar a janela para aparecer no resultado.
-    const alvo = new Date(Number(novoMes.slice(0, 4)), Number(novoMes.slice(5, 7)), 0);
-    const precisa = Math.ceil((alvo.getTime() - Date.now()) / 86400000);
-    const maior = HORIZONTES.find((h) => h.dias >= precisa) ?? HORIZONTES[HORIZONTES.length - 1];
-    if (maior.dias > dias) setDiasDaHipotese(maior.dias);
-
+    if (editando) trocar(hipotese);
+    else adicionar(hipotese);
+    // Parcelado e financiamento andam mês a mês: a janela vai até a última parcela.
+    const longa = hipotese.forma === 'parcelado' || hipotese.forma === 'financiamento';
+    ampliarAte(longa ? somaDias(hipotese.data, 31 * hipotese.parcelas) : hipotese.data);
     Haptics.selectionAsync();
-    setNovoValor(0);
+    // A próxima começa do lado e da conta desta: "mais uma" costuma ser parecida.
+    setHipotese({ ...novaHipotese(localISODate()), kind: hipotese.kind, conta: hipotese.conta });
     if (fecha) {
-      setSheetAberto(false);
-      setEditando(null);
+      fecharFolha();
       setModoDaHipotese('mes');
     }
   };
 
   const abrirNova = () => {
+    // O teto de `simular` (30): passar dele derrubaria a simulação inteira.
+    if (hipoteses.length >= 30) {
+      toast({ message: 'O rascunho já tem 30 hipóteses. Aplique ou tire alguma para somar outra.', tone: 'error' });
+      return;
+    }
     setEditando(null);
-    setNovoTipo('income');
-    setNovoValor(0);
-    setNovoMes(currentMonth());
-    setNovoParcelas(1);
-    setNovoModo('total');
+    setTipoDaFolha('hipotese');
+    setHipotese(novaHipotese(localISODate()));
+    setMesAdiantar(currentMonth());
     setAdiantarId(null);
     setAdiantarValor(null);
     setSheetAberto(true);
   };
 
-  /** Abre o sheet com a hipótese do jeito que ela foi feita. */
-  const abrirEdicao = (grupo: string, d: Draft) => {
+  /** Abre a folha com a hipótese do jeito que ela foi feita. */
+  const editarHipotese = (h: Hipotese) => {
+    setEditando(h.id);
+    setTipoDaFolha('hipotese');
+    setHipotese(h);
+    setSheetAberto(true);
+  };
+  const editarAdiantamento = (grupo: string, d: Draft) => {
+    if (!d.adiantar) return;
     setEditando(grupo);
-    setNovoMes(d.start.slice(0, 7));
-    if (d.adiantar) {
-      setNovoTipo('adiantar');
-      setAdiantarId(d.adiantar.ref_id);
-      setAdiantarQtd(d.adiantar.quantas);
-      setAdiantarQuais(d.adiantar.quais);
-      // o valor que a pessoa aprovou — escolher outra coisa volta à sugestão
-      setAdiantarValor(d.amount_cents);
-    } else {
-      setNovoTipo(d.kind);
-      setNovoValor(d.amount_cents);
-      setNovoModo(d.mode === 'monthly' ? 'monthly' : 'total');
-      setNovoParcelas(d.installments);
-    }
+    setTipoDaFolha('adiantar');
+    setMesAdiantar(d.start.slice(0, 7));
+    setAdiantarId(d.adiantar.ref_id);
+    setAdiantarQtd(d.adiantar.quantas);
+    setAdiantarQuais(d.adiantar.quais);
+    // o valor que a pessoa aprovou — escolher outra coisa volta à sugestão
+    setAdiantarValor(d.amount_cents);
     setSheetAberto(true);
   };
 
   const tirarEditando = () => {
     if (!editando) return;
-    setRascunhos((r) => r.filter((d) => d.grupo !== editando));
-    setEditando(null);
-    setSheetAberto(false);
+    if (tipoDaFolha === 'adiantar') setAdiantamentos((r) => r.filter((d) => d.grupo !== editando));
+    else tirar(editando);
+    fecharFolha();
   };
 
   /*
@@ -865,90 +752,86 @@ export default function ForecastScreen() {
           </ThemedText>
           {simulando ? (
             <ThemedText type="caption" themeColor="textSecondary">
-              {hipoteses.length + detalhadas.length} {hipoteses.length + detalhadas.length === 1 ? 'hipótese' : 'hipóteses'} · nada é salvo
+              {hipoteses.length + gruposDeAdiantar.length} {hipoteses.length + gruposDeAdiantar.length === 1 ? 'hipótese' : 'hipóteses'} · nada é salvo
             </ThemedText>
           ) : null}
         </View>
       </View>
       {simulando ? (
         <>
-        {hipoteses.map(({ chave, principal: d, indices }) => {
-          // "Aplicar" só para a rápida solta: o adiantamento não aplica nesta versão (spec §6). Quem
-          // marca o adiantamento é o `rotulo` — `grupo` toda rápida tem.
-          const acoesDaRapida: ItemAction[] = [
-            ...(d.rotulo ? [] : [{ label: 'Aplicar', icon: 'checkmark.circle' as const, arrasto: 'direita' as const, onPress: () => aplicarRapida(indices[0], d) }]),
-            { label: 'Editar', icon: 'pencil', onPress: () => abrirEdicao(chave, d) },
-            { label: 'Tirar', icon: 'trash', destructive: true, arrasto: 'esquerda', desfaz: true, onPress: () => tirarRapida(indices) },
+        {hipoteses.map((h) => {
+          const falta = faltaNaHipotese(h);
+          const erro = falta ? undefined : errosDaSimulacao.find((e) => e.indice === completas.indexOf(h));
+          const titulo = resumoDaHipotese(h, brl, nomeDaConta);
+          // Incompleta (a v1 parcelada sem conta) não aplica: o formulário ficaria sem a conta.
+          const aviso = falta ?? (erro ? `Não dá para aplicar: ${motivoDaHipotese(erro)}` : undefined);
+          const acoes: ItemAction[] = [
+            { label: 'Aplicar', icon: 'checkmark.circle', arrasto: 'direita', disabled: falta !== null, onPress: () => aplicarHipotese(h) },
+            { label: 'Editar', icon: 'pencil', onPress: () => editarHipotese(h) },
+            { label: 'Tirar', icon: 'trash', destructive: true, arrasto: 'esquerda', desfaz: true, onPress: () => tirarHipotese(h) },
           ];
-          const texto = d.rotulo
-            ? `sai ${brl(d.amount_cents)} · ${d.rotulo} · em ${isoToBR(d.start)}`
-            : `${d.kind === 'income' ? 'entra' : 'sai'} ${brl(d.amount_cents)}${
-                d.mode === 'monthly' ? ' todo mês' : d.installments > 1 ? ` em ${d.installments}x` : ''
-              } · a partir de ${isoToBR(d.start)}`;
           return (
-            // A linha É o botão de editar; o arrasto aplica (direita) e tira (esquerda), como as
-            // hipóteses detalhadas logo abaixo.
-            <Deslizavel key={chave} titulo={texto} acoes={acoesDaRapida}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Editar hipótese: ${texto}`}
-              onPress={() => abrirEdicao(chave, d)}
-              style={({ pressed }) => [
-                styles.rascunhoLinha,
-                {
-                  borderTopColor: theme.separator,
-                  backgroundColor: pressed ? theme.backgroundSelected : 'transparent',
-                },
-              ]}>
-              <ThemedText
-                type="small"
-                themeColor="textSecondary"
-                style={[tabular, styles.rascunhoDescricao]}>
-                {texto}
-              </ThemedText>
-              <Icon name="chevron.right" size="sm" color="textSecondary" />
-            </Pressable>
-            </Deslizavel>
-          );
-        })}
-        {detalhadas.map((h, i) => {
-          const erro = errosDaSimulacao.find((e) => e.indice === i);
-          return (
-            <Deslizavel key={h.id} titulo={h.titulo} acoes={acoesDaDetalhada(h)}>
+            // Tocar edita; o arrasto aplica (direita) e tira (esquerda).
+            <Deslizavel key={h.id} titulo={titulo} acoes={acoes}>
               <Row
-                title={h.titulo}
-                subtitle={erro ? `Não dá para aplicar: ${motivoDaHipotese(erro)}` : resumoDaHipotese(h, brl).replace(`${h.titulo} · `, '')}
-                destructive={Boolean(erro)}
-                onPress={() => editarDetalhada(h)}
-                onLongPress={() => showItemActions(h.titulo, acoesDaDetalhada(h))}
-                accessibilityLabel={`Hipótese: ${resumoDaHipotese(h, brl)}${erro ? `. Não dá para aplicar: ${motivoDaHipotese(erro)}` : ''}`}
+                title={titulo}
+                subtitle={aviso}
+                destructive={Boolean(aviso)}
+                onPress={() => editarHipotese(h)}
+                onLongPress={() => showItemActions(titulo, acoes)}
+                accessibilityLabel={`Hipótese: ${titulo}${aviso ? `. ${aviso}` : ''}`}
               />
             </Deslizavel>
           );
         })}
+        {gruposDeAdiantar.map(({ chave, principal: d }) => {
+          // O adiantamento não aplica nesta versão (spec 2026-09-28, §6).
+          const titulo = `Sai ${brl(d.amount_cents)} · ${d.rotulo ?? 'adiantamento'} · em ${isoToBR(d.start)}`;
+          const acoes: ItemAction[] = [
+            { label: 'Editar', icon: 'pencil', onPress: () => editarAdiantamento(chave, d) },
+            { label: 'Tirar', icon: 'trash', destructive: true, arrasto: 'esquerda', desfaz: true, onPress: () => tirarAdiantamento(chave) },
+          ];
+          return (
+            <Deslizavel key={chave} titulo={titulo} acoes={acoes}>
+              <Row
+                title={titulo}
+                onPress={() => editarAdiantamento(chave, d)}
+                onLongPress={() => showItemActions(titulo, acoes)}
+                accessibilityLabel={`Hipótese: ${titulo}`}
+              />
+            </Deslizavel>
+          );
+        })}
+        {hipoteses.length > 0 ? (
+          mudancas ? (
+            <OndeMuda mudancas={mudancas} onAbrir={(conta) => router.push({ pathname: '/finance/hipotese', params: { conta, dias: String(dias) } })} />
+          ) : simulacao.isError || horizonte.contas.isError || horizonte.cartoes.isError ? null : (
+            <SkeletonList linhas={2} />
+          )
+        ) : null}
         </>
       ) : (
         <ThemedText type="small" themeColor="textSecondary">
           Simule uma entrada ou saída.
         </ThemedText>
       )}
-      {simulado.isError || (comDetalhadas && (simulacao.isError || errosDaSimulacao.some((e) => e.leitura))) ? (
+      {simulacao.isError || errosDaSimulacao.some((e) => e.leitura) || horizonte.contas.isError || horizonte.cartoes.isError ? (
         <ErrorBand
           message="Não deu para calcular o rascunho — os números acima são os reais."
-          onRetry={comDetalhadas ? simulacao.refetch : simulado.refetch}
+          onRetry={() => {
+            void simulacao.refetch();
+            void horizonte.contas.refetch();
+            void horizonte.cartoes.refetch();
+          }}
         />
       ) : null}
       <View style={styles.rascunhoAcoes}>
         <Button
-          label={simulando ? 'Adicionar outra hipótese' : 'Supor um lançamento'}
+          label="Nova hipótese"
           variant={simulando ? 'secondary' : 'primary'}
           size="sm"
           onPress={abrirNova}
         />
-        <Button label="Adicionar como…" variant="secondary" size="sm" onPress={adicionarComo} />
-        {detalhadas.length > 0 ? (
-          <Button label="Aplicar todas" variant="secondary" size="sm" onPress={aplicarTodas} disabled={salvando} loading={salvando} />
-        ) : null}
         {simulando ? (
           <Button
             label="Limpar"
@@ -1152,10 +1035,9 @@ export default function ForecastScreen() {
                           month: m.mes,
                           view: regua.view,
                           tipo: 'sai',
-                          // Com rascunho, o ciclo abre COM as hipóteses (28/09/2026), como a linha
-                          // acima já soma. Pela rota, e nada é salvo.
-                          ...(rascunhos.length > 0 ? { rascunho: JSON.stringify(paraOCiclo(rascunhos)) } : {}),
-                          ...(detalhadas.length > 0 ? { detalhadas: JSON.stringify(detalhadas) } : {}),
+                          // Com rascunho, o ciclo abre COM as hipóteses, como a linha acima já soma.
+                          // Ele as lê do aparelho (o rascunho mora lá), e nada é salvo.
+                          ...(simulando ? { hipoteses: '1' } : {}),
                         },
                       })
                     }
@@ -1266,11 +1148,11 @@ export default function ForecastScreen() {
           </Card>
         ) : null}
       </View>
-      {/* Ambas as ações existem desde a primeira hipótese; adicionar mais uma mantém o formulário aberto. */}
-      <Sheet visible={sheetAberto} onClose={() => { setSheetAberto(false); setEditando(null); }}>
+      {/* "Adicionar mais uma" mantém a folha aberta; "Ver resultado" inclui a atual e fecha. */}
+      <Sheet visible={sheetAberto} onClose={fecharFolha}>
         <TaskHeader
           title={editando ? 'Editar hipótese' : 'Nova hipótese'}
-          onClose={() => { setSheetAberto(false); setEditando(null); }}
+          onClose={fecharFolha}
           action={
             <Button
               label={editando ? 'Salvar' : 'Ver resultado'}
@@ -1282,19 +1164,19 @@ export default function ForecastScreen() {
         />
 
         <SheetScroll contentContainerStyle={styles.sheetCorpo}>
-          <Field label="Tipo">
+          {/* Editando, o tipo é o da linha aberta: trocar viraria outra hipótese no lugar dela. */}
+          {editando ? null : (
             <Segmented
               options={[
-                { value: 'income', label: 'Entra' },
-                { value: 'expense', label: 'Sai' },
-                { value: 'adiantar', label: 'Adiantar' },
+                { value: 'hipotese', label: 'Entrada ou saída' },
+                { value: 'adiantar', label: 'Adiantar parcelas' },
               ]}
-              value={novoTipo}
-              onChange={(v) => setNovoTipo(v)}
+              value={tipoDaFolha}
+              onChange={(v) => setTipoDaFolha(v)}
             />
-          </Field>
+          )}
 
-          {novoTipo === 'adiantar' ? (
+          {tipoDaFolha === 'adiantar' ? (
             <AdiantarCampos
               consulta={adiantaveis}
               item={itemAdiantar}
@@ -1315,9 +1197,9 @@ export default function ForecastScreen() {
                 setAdiantarQuais(q);
                 setAdiantarValor(null);
               }}
-              mes={novoMes}
+              mes={mesAdiantar}
               onMes={(m) => {
-                setNovoMes(m);
+                setMesAdiantar(m);
                 setAdiantarValor(null);
               }}
               parcelas={parcelasAdiantar}
@@ -1325,57 +1207,15 @@ export default function ForecastScreen() {
               onValor={setAdiantarValor}
             />
           ) : (
-          <>
-
-          {/*
-            ⚠️ Vem ANTES do valor e das parcelas de propósito (`frontend.md`): é o controle que
-            muda o SIGNIFICADO do valor e quais campos existem abaixo. Depois deles, a tela se
-            remontaria debaixo do dedo.
-          */}
-          <Field label="Frequência">
-            <Segmented
-              options={[
-                { value: 'total', label: 'Uma vez' },
-                { value: 'monthly', label: 'Todo mês' },
-              ]}
-              value={novoModo}
-              onChange={(v) => setNovoModo(v)}
+            <CamposDaHipotese
+              valor={hipotese}
+              onChange={setHipotese}
+              contas={accounts.data ?? []}
+              max={somaDias(localISODate(), 3650)}
             />
-          </Field>
-
-          <Field label={novoModo === 'monthly' ? 'Valor por mês' : 'Valor'}>
-            <MoneyField valueCents={novoValor} onChangeCents={setNovoValor} autoFocus />
-          </Field>
-
-          {/*
-            ⚠️ `MonthPicker`, não `SelectField`.
-            
-            O seletor listava os meses DA JANELA aberta — com o horizonte em 90 dias, quatro
-            opções, e supor uma receita em 2028 era impossível mesmo com a projeção sabendo
-            chegar lá. E uma lista de 36 meses aberta no lugar comeria a tela inteira.
-            
-            `MonthPicker` já existe para exatamente isto: setas de mês, escolha de ano, uma
-            linha só. É o mesmo controle de "Entradas e saídas", então o gesto já é conhecido.
-          */}
-          <Field label="Mês">
-            <MonthPicker month={novoMes ?? currentMonth()} onChange={setNovoMes} />
-          </Field>
-
-          {/* Parcelar só faz sentido em "uma vez": "todo mês" já é a repetição. */}
-          {novoModo === 'total' ? (
-            <Field label="Em quantas vezes">
-              {/* O mesmo campo aberto do lançamento (`faixaDeParcelas`): lista fixa não deixava 5x. */}
-              <QuantityField
-                value={novoParcelas}
-                min={faixaDeParcelas(0).min}
-                max={faixaDeParcelas(0).max}
-                accessibilityLabel="Em quantas vezes"
-                onChange={setNovoParcelas}
-              />
-            </Field>
-          ) : null}
-          </>
           )}
+
+          {faltaNaFolha ? <Note icon="info.circle">{faltaNaFolha}</Note> : null}
 
           {editando ? (
             <Button
@@ -1406,7 +1246,6 @@ export default function ForecastScreen() {
 }
 
 const styles = StyleSheet.create({
-  hipoteseLinha: { gap: Space.xs, paddingVertical: Space.sm, borderTopWidth: StyleSheet.hairlineWidth },
   // A lista e o seu "Ver mais" a `Space.md` um do outro, como título e conteúdo.
   lista: { gap: Space.md },
   horizonteCorpo: {
@@ -1529,19 +1368,3 @@ const styles = StyleSheet.create({
     gap: Space.half,
   },
 });
-
-/**
- * O rascunho como o ciclo o recebe: o draft do motor e o nome da hipótese. As parcelas que um
- * adiantamento cancela levam o nome dele (só o draft do pagamento tem `rotulo`).
- */
-function paraOCiclo(rascunhos: Draft[]): HipoteseNoCiclo[] {
-  const doGrupo = new Map(rascunhos.filter((d) => d.grupo && d.rotulo).map((d) => [d.grupo!, d.rotulo!]));
-  return rascunhos.map((d) => ({
-    kind: d.kind,
-    amount_cents: d.amount_cents,
-    start: d.start,
-    installments: d.installments,
-    mode: d.mode,
-    rotulo: d.rotulo ?? (d.grupo ? doGrupo.get(d.grupo) : undefined),
-  }));
-}

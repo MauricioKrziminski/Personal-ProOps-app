@@ -35,7 +35,7 @@ test('forecast presents the measured curve beside its scenario while preserving 
   assert.match(source, /<FinanceAnalysisPanes/);
   assert.match(source, /<Screen wide=\{tablet\}/);
   assert.match(source, /useCashFlowForecast\(dias, !emMes\)/);
-  assert.match(source, /useForecastWithDrafts\(dias, rascunhos, !emMes\)/);
+  assert.match(source, /useSimulacao\(\{/);
   assert.match(source, /setHorizonteAberto\(true\)/);
   assert.match(source, /MeasuredSparkline/);
 });

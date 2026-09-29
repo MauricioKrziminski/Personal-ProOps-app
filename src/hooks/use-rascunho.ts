@@ -1,43 +1,37 @@
 import { usePreferencia } from '@/hooks/use-preferencia';
 import type { Draft } from '@/hooks/use-finance';
-import { gravarRascunho, lerRascunho, type HipoteseDetalhada, type Rascunho } from '@/lib/rascunho';
+import type { Hipotese } from '@/lib/hipotese';
+import { gravarRascunho, lerRascunho, type Rascunho } from '@/lib/rascunho';
 
 const ehTexto = (v: string | number): v is string => typeof v === 'string';
 
 /**
  * O rascunho do "E se…?" no aparelho, por usuário (28/09/2026: *"salvar no aparelho"*). A
- * Projeção e os formulários em modo hipótese leem e escrevem o MESMO estado.
+ * Projeção, o ciclo, o detalhe da hipótese e os formulários do "Aplicar" leem e escrevem o MESMO
+ * estado.
+ *
+ * Toda mudança parte do GRAVADO na hora, nunca do `rascunho` deste render: duas mudanças com
+ * funções do mesmo render (tirar e trocar, ou o salvar de um formulário que ficou aberto) valem as
+ * duas.
  */
 export function useRascunho() {
   const [texto, setTexto] = usePreferencia<string>('projecao:rascunho', '', ehTexto);
   const rascunho = lerRascunho(texto);
-  // Toda mudança parte do GRAVADO na hora, nunca do `rascunho` deste render: o "Aplicar todas"
-  // tira uma hipótese por salvamento, todas com funções do mesmo render, e partindo do render a
-  // segunda desfazia a primeira (a hipótese já salva na conta ficava no rascunho).
   const mudar = (f: (r: Rascunho) => Rascunho) => setTexto((antes) => gravarRascunho(f(lerRascunho(antes))));
   return {
     rascunho,
-    setRapidas: (f: (antes: Draft[]) => Draft[]) => mudar((r) => ({ ...r, rapidas: f(r.rapidas) })),
-    adicionarDetalhada: (h: Omit<HipoteseDetalhada, 'id'>) => {
-      const id = `h${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-      mudar((r) => ({ ...r, detalhadas: [...r.detalhadas, { ...h, id } as HipoteseDetalhada] }));
-      return id;
-    },
-    trocarDetalhada: (id: string, h: Omit<HipoteseDetalhada, 'id'>) =>
-      mudar((r) => ({ ...r, detalhadas: r.detalhadas.map((d) => (d.id === id ? ({ ...h, id } as HipoteseDetalhada) : d)) })),
-    tirarDetalhada: (id: string) => mudar((r) => ({ ...r, detalhadas: r.detalhadas.filter((d) => d.id !== id) })),
+    adicionar: (h: Hipotese) => mudar((r) => ({ ...r, hipoteses: [...r.hipoteses, h] })),
+    trocar: (h: Hipotese) => mudar((r) => ({ ...r, hipoteses: r.hipoteses.map((x) => (x.id === h.id ? h : x)) })),
+    /** Pelo id: a hipótese certa sai mesmo que a lista tenha mudado com o formulário aberto. */
+    tirar: (id: string) => mudar((r) => ({ ...r, hipoteses: r.hipoteses.filter((x) => x.id !== id) })),
+    setAdiantamentos: (f: (antes: Draft[]) => Draft[]) => mudar((r) => ({ ...r, adiantamentos: f(r.adiantamentos) })),
     limpar: () => setTexto(''),
-    /**
-     * O "Desfazer" de Tirar/Limpar: devolve SÓ o que saiu, somado ao rascunho de AGORA. Regravar a
-     * cópia inteira de antes trazia de volta o que saiu depois — uma hipótese já aplicada, contada
-     * duas vezes e pronta para duplicar.
-     */
-    devolver: (saiu: Pick<Rascunho, 'rapidas' | 'detalhadas'>) =>
+    /** O "Desfazer": devolve SÓ o que saiu, somado ao rascunho de agora. */
+    devolver: (saiu: Pick<Rascunho, 'hipoteses' | 'adiantamentos'>) =>
       mudar((r) => ({
         ...r,
-        rapidas: [...r.rapidas, ...saiu.rapidas],
-        detalhadas: [...r.detalhadas, ...saiu.detalhadas.filter((h) => !r.detalhadas.some((d) => d.id === h.id))],
+        hipoteses: [...r.hipoteses, ...saiu.hipoteses.filter((h) => !r.hipoteses.some((x) => x.id === h.id))],
+        adiantamentos: [...r.adiantamentos, ...saiu.adiantamentos],
       })),
-    restaurar: (r: Rascunho) => setTexto(gravarRascunho(r)),
   };
 }

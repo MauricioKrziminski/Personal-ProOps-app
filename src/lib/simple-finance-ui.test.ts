@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -28,6 +28,8 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   const refetches: string[] = [];
   const rulerViews: string[] = [];
   let forecastDrafts: any[] = [];
+  /** Cada chamada de `useSimulacao`, com o que ela recebeu. */
+  const simulacoes: any[] = [];
   /** O que cada chamada do portão da tela recebeu — o dublê dele abre sempre, então é por aqui que se confere a COMPOSIÇÃO. */
   const gates: any[][] = [];
   const query = { data: [], isLoading: false, isError: false, isRefetching: false, refetch: async () => {} };
@@ -137,10 +139,6 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useCashHistory: () => ({ ...query, data: [] }),
     useAnticipationCandidates: (pagarEm: string) => ({ ...query, isSuccess: true,
       data: typeof options.anticipation === 'function' ? options.anticipation(pagarEm) : options.anticipation ?? [] }),
-    useForecastWithDrafts: (_days: number, drafts: any[]) => {
-      forecastDrafts = drafts;
-      return { ...query, data: [{ day: '2026-09-18', balance_cents: 10000, in_cents: 0, out_cents: 0 }] };
-    },
     useForecastMonths: () => ({ ...query, data: { hoje: 10000, meses: options.forecastMonths ?? [] }, isPlaceholderData: false }),
     // O mês é uma STRING (`2026-09`); sem este dublê o Proxy devolvia um objeto-consulta.
     useCycleMonth: () => '2026-09',
@@ -213,7 +211,20 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useTransaction: (id: string) => ({ ...query, isSuccess: true, data: (options.txs ?? [{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared', recurring_id: null, installment_plan_id: null }]).find((t: any) => t.id === id) ?? null }),
     usePayInvoice: () => mutation('payInvoice'),
     useArquivados: () => ({ ...query, isSuccess: true, data: options.arquivados ?? [] }),
-    useSimulacao: (_d: number, _dr: any[], registros: any[]) => registros.length ? { ...query, isPending: false, isSuccess: true, isPlaceholderData: Boolean(options.simulacao?.placeholder), data: options.simulacao ?? { forecast: [], erros: [] } } : { ...query, isPending: true, data: undefined },
+    // O que a Projeção mandou simular: os adiantamentos (drafts de caixa) e as hipóteses.
+    useSimulacao: (o: any) => {
+      forecastDrafts = o.adiantamentos;
+      simulacoes.push(o);
+      const ativo = o.enabled && (o.hipoteses.length > 0 || o.adiantamentos.length > 0);
+      return ativo
+        ? { ...query, isPending: false, isSuccess: true, isPlaceholderData: Boolean(options.simulacao?.placeholder),
+            data: options.simulacao ?? { forecast: [{ day: '2026-09-18', balance_cents: 10000, in_cents: 0, out_cents: 0 }], erros: [] } }
+        : { ...query, isPending: true, data: undefined };
+    },
+    useHorizonteReal: () => ({
+      contas: { ...query, isPending: false, isSuccess: true, data: options.horizonte?.contas ?? [] },
+      cartoes: { ...query, isPending: false, isSuccess: true, data: options.horizonte?.cartoes ?? [] },
+    }),
     useDesarquivar: () => mutation('desarquivar'),
     useExcluirArquivado: (tabela: string) => mutation(`excluir:${tabela}`),
     ContaComLancamentos: class extends Error {},
@@ -334,7 +345,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
       if (name === '@/components/ui/glass-backdrop') return { GlassBackdrop: 'GlassBackdrop', supportsLiquidGlass: () => false };
       if (name === '@/hooks/use-note-sort') return { SORT_LABEL: {}, useNoteSort: () => ['manual', () => {}] };
@@ -493,6 +504,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   return {
     writes, pedidos, toasts, preferenciasGravadas, pedidosDeLimite, avisos, confirmations, actions, navigations, refetches, gates, rulerViews,
     drafts: () => forecastDrafts,
+    simulacoes,
     nodes: () => nodes,
     button(label: string) { const node = nodes.find((n) => n.type === 'Button' && n.props.label === label); assert.ok(node, `visible button: ${label}`); return node; },
     press(label: string) { const node = this.button(label); assert.ok(!node.props.disabled, `${label} must be enabled`); node.props.onPress(); render(); },
@@ -503,16 +515,27 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
 const debtsFile = 'src/app/finance/debts.tsx';
 const forecastFile = 'src/app/finance/forecast.tsx';
 
+/** O rascunho gravado no aparelho (vazio grava ''). */
+const gravado = (ui: any) => {
+  const t = ui.preferenciasGravadas['projecao:rascunho'];
+  return t ? JSON.parse(t) : { hipoteses: [], adiantamentos: [] };
+};
+/** Preenche a hipótese da folha pelos campos (o componente é um nó no harness). */
+const preenche = (ui: any, mudanca: Record<string, unknown>) => {
+  const campos = ui.nodes().find((n: any) => n.type === 'CamposDaHipotese');
+  assert.ok(campos, 'a folha mostra os campos da hipótese');
+  ui.interact(() => campos.props.onChange({ ...campos.props.valor, ...mudanca }));
+};
+
 test('E se: Ver resultado funciona na primeira hipótese, com Adicionar mais uma disponível em paralelo', () => {
   const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }] });
-  ui.press('Supor um lançamento');
-  ui.fill('Valor', 25000);
+  ui.press('Nova hipótese');
+  preenche(ui, { valor_cents: 25000 });
   assert.equal(ui.button('Adicionar mais uma').props.disabled, false);
   ui.press('Ver resultado');
 
-  assert.equal(ui.drafts().length, 1);
-  assert.equal(ui.drafts()[0].kind, 'income');
-  assert.equal(ui.drafts()[0].amount_cents, 25000);
+  const [h] = gravado(ui).hipoteses;
+  assert.deepEqual([h.kind, h.forma, h.valor_cents], ['expense', 'uma', 25000]);
   assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText' && n.props.children === 'Rascunho'));
   assert.equal(ui.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible), false);
   assert.deepEqual(ui.writes, []);
@@ -520,19 +543,22 @@ test('E se: Ver resultado funciona na primeira hipótese, com Adicionar mais uma
 
 test('E se: Adicionar mais uma prepara várias hipóteses sem fechar; Ver resultado inclui a última', () => {
   const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }] });
-  ui.press('Supor um lançamento');
-  ui.fill('Valor', 25000);
+  ui.press('Nova hipótese');
+  preenche(ui, { valor_cents: 25000 });
   ui.press('Adicionar mais uma');
   assert.ok(ui.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible));
   assert.equal(ui.button('Adicionar mais uma').props.disabled, true);
   assert.equal(ui.button('Ver resultado').props.disabled, false);
-  ui.fill('Valor', 10000);
+  // a folha diz o que falta na hipótese nova
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Note' && n.props.children === 'Digite o valor'));
+  preenche(ui, { valor_cents: 10000 });
   ui.press('Adicionar mais uma');
-  assert.deepEqual(Array.from(ui.drafts(), (d: any) => d.amount_cents), [25000, 10000]);
+  assert.deepEqual(gravado(ui).hipoteses.map((h: any) => h.valor_cents), [25000, 10000]);
 
-  ui.fill('Valor', 5000);
+  preenche(ui, { valor_cents: 5000 });
   ui.press('Ver resultado');
-  assert.deepEqual(Array.from(ui.drafts(), (d: any) => d.amount_cents), [25000, 10000, 5000]);
+  assert.deepEqual(gravado(ui).hipoteses.map((h: any) => h.valor_cents), [25000, 10000, 5000]);
+  assert.equal(new Set(gravado(ui).hipoteses.map((h: any) => h.id)).size, 3, 'cada uma com o seu id');
   assert.equal(ui.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible), false);
   assert.deepEqual(ui.writes, []);
 });
@@ -547,7 +573,8 @@ test('E se: adiantar vira UMA hipótese — o pagamento e um cancelamento por pa
     ],
   };
   const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], anticipation: [carro] });
-  ui.press('Supor um lançamento');
+  const linhas = () => ui.nodes().filter((n: any) => n.type === 'Row' && String(n.props.accessibilityLabel).startsWith('Hipótese:'));
+  ui.press('Nova hipótese');
   const tipo = () => ui.nodes().find((n: any) => n.type === 'Segmented'
     && n.props.options.some((o: any) => o.value === 'adiantar'));
   ui.interact(() => tipo().props.onChange('adiantar'));
@@ -568,13 +595,12 @@ test('E se: adiantar vira UMA hipótese — o pagamento e um cancelamento por pa
   ]);
   assert.equal(drafts[0].mode, 'total');
   assert.equal(drafts[0].amount_cents, 157000);
-  assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText'
-    && String(n.props.children).includes('adianta 2 parcelas de Carro')), 'a lista mostra uma linha');
+  assert.equal(linhas().length, 1, 'a lista mostra uma linha');
+  assert.ok(linhas()[0].props.title.includes('adianta 2 parcelas de Carro'));
   assert.deepEqual(ui.writes, []);
 
   // Tocar na linha EDITA: o sheet volta com a escolha feita e o valor aprovado
-  const linha = () => ui.nodes().find((n: any) => n.type === 'Pressable'
-    && String(n.props.accessibilityLabel).startsWith('Editar hipótese'));
+  const linha = () => linhas()[0];
   assert.equal(ui.nodes().some((n: any) => n.type === 'Button' && n.props.label === 'Tirar'), false,
     'o card não tem um botão por linha');
   ui.interact(() => linha().props.onPress());
@@ -590,8 +616,7 @@ test('E se: adiantar vira UMA hipótese — o pagamento e um cancelamento por pa
   ui.press('Salvar');
   assert.equal(ui.drafts().length, 4, 'um pagamento e três cancelamentos, a hipótese antiga saiu');
   assert.equal(ui.drafts().filter((d: any) => d.mode === 'total').length, 1);
-  assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText'
-    && String(n.props.children).includes('adianta 3 parcelas de Carro')));
+  assert.ok(linha().props.title.includes('adianta 3 parcelas de Carro'));
 
   // "Tirar hipótese" mora no sheet de edição e leva o grupo inteiro
   ui.interact(() => linha().props.onPress());
@@ -612,7 +637,7 @@ test('E se: trocar o mês do pagamento para depois das parcelas escolhidas DIMIN
   const tv = (pagarEm: string) => [{ source: 'plan', ref_id: 'p1', title: 'TV', account_name: null,
     total_n: 8, taxa: null, events: eventos.filter((e) => e.day > pagarEm) }];
   const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], anticipation: tv });
-  ui.press('Supor um lançamento');
+  ui.press('Nova hipótese');
   ui.interact((nodes) => nodes.find((n: any) => n.type === 'Segmented'
     && n.props.options.some((o: any) => o.value === 'adiantar')).props.onChange('adiantar'));
   const campos = () => ui.nodes().find((n: any) => n.type === 'AdiantarCampos');
@@ -628,37 +653,36 @@ test('E se: trocar o mês do pagamento para depois das parcelas escolhidas DIMIN
   assert.equal(ui.drafts().filter((d: any) => d.mode === 'cancel').length, 2);
 });
 
-test('E se: editar uma entrada troca o valor e as parcelas no mesmo lugar da lista', () => {
-  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }] });
-  ui.press('Supor um lançamento');
-  ui.fill('Valor', 25000);
+test('E se: editar uma entrada troca o valor e a forma no mesmo lugar da lista', () => {
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1', name: 'Itaú', type: 'checking' }] });
+  ui.press('Nova hipótese');
+  preenche(ui, { valor_cents: 25000 });
   ui.press('Adicionar mais uma');
-  ui.fill('Valor', 10000);
+  preenche(ui, { valor_cents: 10000 });
   ui.press('Ver resultado');
-  const linhas = () => ui.nodes().filter((n: any) => n.type === 'Pressable'
-    && String(n.props.accessibilityLabel).startsWith('Editar hipótese'));
+  const linhas = () => ui.nodes().filter((n: any) => n.type === 'Row' && String(n.props.accessibilityLabel).startsWith('Hipótese:'));
   assert.equal(linhas().length, 2);
 
   ui.interact(() => linhas()[0].props.onPress());
+  assert.ok(ui.nodes().some((n: any) => n.type === 'TaskHeader' && n.props.title === 'Editar hipótese'));
+  // editando, o tipo da folha é o da linha: nada de trocar para adiantar
+  assert.equal(ui.nodes().some((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'adiantar')), false);
   assert.equal(ui.button('Salvar').props.disabled, false);
-  ui.fill('Valor', 30000);
-  ui.interact((nodes) => nodes.find((n: any) => n.type === 'QuantityField'
-    && n.props.accessibilityLabel === 'Em quantas vezes').props.onChange(3));
+  preenche(ui, { valor_cents: 30000, forma: 'parcelado', parcelas: 3, conta: 'conta-1' });
   ui.press('Salvar');
 
-  assert.deepEqual(JSON.parse(JSON.stringify(ui.drafts().map((d: any) => [d.amount_cents, d.installments]))),
-    [[30000, 3], [10000, 1]]);
+  assert.deepEqual(gravado(ui).hipoteses.map((h: any) => [h.valor_cents, h.forma, h.parcelas]), [[30000, 'parcelado', 3], [10000, 'uma', 2]]);
   assert.equal(ui.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible), false);
   assert.deepEqual(ui.writes, []);
 });
 
 test('E se: Ver resultado depois de Somar não duplica a hipótese já adicionada', () => {
   const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }] });
-  ui.press('Supor um lançamento');
-  ui.fill('Valor', 25000);
+  ui.press('Nova hipótese');
+  preenche(ui, { valor_cents: 25000 });
   ui.press('Adicionar mais uma');
   ui.press('Ver resultado');
-  assert.equal(ui.drafts().length, 1);
+  assert.equal(gravado(ui).hipoteses.length, 1);
   assert.equal(ui.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible), false);
 });
 
@@ -2743,6 +2767,8 @@ test('Cadastrar conta ou cartão, de qualquer tela, abre o formulário já no ti
     const linhas = readFileSync(f, 'utf8').split('\n');
     linhas.forEach((l, i) => {
       if (!l.includes("'/finance/accounts'")) return;
+      // `edit:` já abre o formulário daquela conta (o "Cadastrar o limite" do detalhe da hipótese)
+      if (/params: \{ edit: /.test(l)) return;
       if (/Cadastr|Novo cartão/.test(linhas.slice(Math.max(0, i - 6), i + 1).join('\n'))) soltos.push(`${f}:${i + 1}`);
     });
   }
@@ -3227,148 +3253,117 @@ test('Histórico de alertas: não lido até a pessoa marcar; Lida à direita, Li
   assert.ok(ui.nodes().some((n: any) => n.type === 'EmptyState'));
 });
 
-test('Ciclo aberto pela Projeção com rascunho: as hipóteses entram na lista e no fechamento, sem salvar', () => {
+test('Ciclo aberto pela Projeção com um adiantamento: o pagamento e a parcela que deixa de sair entram na lista, sem salvar', () => {
   // 28/09/2026: "tem que mostrar com aqueles valores da projeção de hipótese (sem salvar)… como se fosse real"
-  const rascunho = JSON.stringify([
-    { kind: 'income', amount_cents: 67500, start: '2026-09-28', installments: 1 },
-    { kind: 'expense', amount_cents: 300000, start: '2026-09-28', installments: 3 },
-  ]);
+  const rascunho = JSON.stringify({ versao: 2, hipoteses: [], adiantamentos: [
+    { kind: 'expense', amount_cents: 157000, start: '2026-09-28', installments: 1, mode: 'total', grupo: 'g', rotulo: 'adianta 2 parcelas de Carro' },
+    { kind: 'expense', amount_cents: 124500, start: '2026-10-05', installments: 1, mode: 'cancel', grupo: 'g' },
+  ] });
   const ui = screen('src/app/finance/cycle.tsx', {
-    params: { month: '2026-10', view: 'cycle', rascunho },
+    params: { month: '2026-10', view: 'cycle', hipoteses: '1' },
+    preferencias: { 'projecao:rascunho': rascunho },
     cycleRow: { mes: '2026-10-01', ini: '2026-09-11', fim: '2026-10-10', estado: 'aberto', comecei_com: 100000, entrou: 500000, saiu: 400000, resultado: 200000, caixa_no_fim: 200000, faltou_pagar: 0, confere: true },
     draftLines: { antes: 0, linhas: [
-      { i: 0, day: '2026-09-28', kind: 'income', cents: 67500 },
-      { i: 1, day: '2026-09-28', kind: 'expense', cents: 100000 },
+      { i: 0, day: '2026-09-28', kind: 'expense', cents: 157000 },
+      { i: 1, day: '2026-10-05', kind: 'expense', cents: -124500 },
     ] },
   });
   assert.ok(ui.nodes().some((n: any) => n.type === 'SectionHead' && /^Hipóteses do rascunho/.test(n.props.title)), 'o grupo das hipóteses');
+  const titulos = ui.nodes().filter((n: any) => typeof n.type === 'function' && n.type.name === 'Linha').map((n: any) => n.props.linha.title);
+  assert.ok(titulos.includes('Adianta 2 parcelas de Carro'));
+  assert.ok(titulos.includes('Parcela adiantada'));
   const fechamento = ui.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'Fechamento');
-  assert.equal(fechamento.props.hipoteses, 2, 'o painel diz que o rascunho está dentro');
-  const c = fechamento.props.ciclo;
-  assert.equal(Number(c.entrou), 567500);
-  assert.equal(Number(c.saiu), 500000);
-  assert.equal(Number(c.caixa_no_fim), 167500, 'comecei + entrou − saiu, com as hipóteses');
+  assert.equal(fechamento.props.hipoteses, 1, 'um adiantamento é UMA hipótese');
   assert.equal(ui.writes.length, 0, 'nada é salvo');
 });
 
-test('Projeção: com hipótese detalhada no rascunho, a série vem de simular e o erro aparece na linha', () => {
-  const rascunho = JSON.stringify({ versao: 1, rapidas: [], detalhadas: [
-    { id: 'h1', tipo: 'parcelada', titulo: 'Notebook', entrada: { accountId: 'c', totalCents: 300000, installments: 10, paidInstallments: 0, occurredAt: '2026-10-01', description: 'Notebook', category: null, merchant: null } },
-  ] });
-  const ui = screen(forecastFile, { preferencias: { 'projecao:rascunho': rascunho }, simulacao: { forecast: [{ day: '2026-09-28', in_cents: 0, out_cents: 0, balance_cents: 100 }], erros: [{ indice: 0, mensagem: 'conta arquivada', codigo: 'P0001' }] } });
-  const linha = ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'Notebook');
-  assert.ok(linha, 'a hipótese detalhada aparece no rascunho');
-  assert.match(linha.props.subtitle, /conta arquivada/, 'o erro da simulação aparece na linha');
-});
-
-test('Recorrente em modo hipótese: "Adicionar à hipótese" guarda a entrada e não grava', () => {
-  const ui = screen('src/app/finance/recurring.tsx', { params: { create: '1', hipotese: 'nova', description: 'Academia', amount: '5000' } });
-  const header = ui.nodes().find((n: any) => n.type === 'TaskHeader' && n.props.action);
-  assert.equal(header.props.action.props.label, 'Adicionar à hipótese');
-  ui.interact(() => header.props.action.props.onPress());
-  assert.equal(ui.writes.length, 0, 'modo hipótese não escreve');
-  const gravado = JSON.parse(ui.preferenciasGravadas['projecao:rascunho']);
-  assert.equal(gravado.detalhadas[0].tipo, 'recorrente');
-  assert.equal(gravado.detalhadas[0].titulo, 'Academia');
-  assert.equal(gravado.detalhadas[0].entrada.amount_cents, 5000);
-});
-
-test('Financiamento em modo hipótese: o botão diz "Adicionar à hipótese" e o salvar não grava', () => {
-  const ui = screen(debtsFile, { create: true, params: { create: 'financing', hipotese: 'nova' } });
-  const header = ui.nodes().find((n: any) => n.type === 'TaskHeader' && n.props.action);
-  assert.equal(header.props.action.props.label, 'Adicionar à hipótese');
-  ui.interact(() => header.props.action.props.onPress());
-  assert.equal(ui.writes.length, 0);
-});
-
-test('E se: "Adicionar como…" abre o formulário real em modo hipótese; a linha arrasta Aplicar e Tirar', () => {
-  const rascunho = JSON.stringify({ versao: 1, rapidas: [], detalhadas: [
-    { id: 'h1', tipo: 'recorrente', titulo: 'Academia', entrada: { kind: 'expense', amount_cents: 5000, description: 'Academia', merchant: null, category: null, account_id: null, rrule: 'FREQ=WEEKLY;BYDAY=MO', next_run_at: '2026-10-05T12:00:00.000Z', end_date: null, auto_confirm: false } },
-  ] });
-  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': rascunho } });
-  ui.interact(() => ui.nodes().find((n: any) => n.props?.label === 'Adicionar como…').props.onPress());
-  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Lançamento', 'Compra parcelada', 'Recorrente', 'Financiamento']);
-  ui.interact(() => ui.actions.find((a: any) => a.label === 'Recorrente').onPress());
-  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { pathname: '/finance/recurring', params: { create: '1', hipotese: 'nova' } });
-  const card = deslizaveis(ui).find((d: any) => d.props.titulo === 'Academia');
-  assert.ok(card, 'a hipótese detalhada é uma linha que arrasta');
-  assert.deepEqual(ladosDe(card), { direita: ['Aplicar'], esquerda: ['Tirar'], mais: true, pontaDireita: 'Aplicar', pontaEsquerda: 'Tirar' });
-  // Tirar tem Desfazer
-  ui.interact(() => card.props.acoes.find((a: any) => a.label === 'Tirar').onPress());
-  assert.equal(JSON.parse(ui.preferenciasGravadas['projecao:rascunho'] || '{"detalhadas":[]}').detalhadas.length, 0);
-  ui.interact(() => ui.toasts.at(-1).action.onPress());
-  assert.equal(JSON.parse(ui.preferenciasGravadas['projecao:rascunho']).detalhadas.length, 1);
-});
-
-test('Aplicar a detalhada grava pelo mesmo hook do formulário e só então sai do rascunho', async () => {
-  const entrada = { accountId: 'c', totalCents: 300000, installments: 10, paidInstallments: 0, occurredAt: '2026-10-01', description: 'Notebook', category: null, merchant: null };
-  const ui = screen(forecastFile, { segurarMutacoes: true, forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas: [{ id: 'h1', tipo: 'parcelada', titulo: 'Notebook', entrada }] }) } });
-  const card = deslizaveis(ui).find((d: any) => d.props.titulo === 'Notebook');
-  ui.interact(() => card.props.acoes.find((a: any) => a.label === 'Aplicar').onPress());
-  ui.interact(() => ui.actions.find((a: any) => a.label === 'Salvar na conta').onPress());
-  assert.deepEqual(JSON.parse(JSON.stringify(ui.writes.at(-1))), { operation: 'createInstallmentPlan', value: entrada });
-  assert.ok(!ui.preferenciasGravadas['projecao:rascunho'], 'antes do sucesso a hipótese continua no rascunho');
-  // Pela PROMESSA, não pelo `onSuccess` da chamada: o TanStack não chama o callback por chamada de
-  // uma tela que já desmontou, e sair da Projeção no meio do salvamento deixava a hipótese salva
-  // no rascunho — contada duas vezes e pronta para duplicar (revisão final, 29/09/2026).
-  const pedido: any = ui.pedidos.at(-1);
-  assert.equal(pedido.opts, undefined, 'a tela usa mutateAsync, sem callback por chamada');
-  pedido.resolver('plano-1');
-  await new Promise((r) => setTimeout(r, 0));
-  assert.equal(JSON.parse(ui.preferenciasGravadas['projecao:rascunho'] || '{"detalhadas":[]}').detalhadas.length, 0);
-});
-
-test('Aplicar duas vezes seguidas grava uma vez só', () => {
-  const entrada = { kind: 'expense', amount_cents: 1000, category: null, description: 'Pão', merchant: null, account_id: 'c', counterparty_account_id: null, occurred_at: '2026-10-01', status: 'cleared', due_at: null, auto_confirm: false };
-  const ui = screen(forecastFile, { segurarMutacoes: true, forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas: [{ id: 'h1', tipo: 'lancamento', titulo: 'Pão', entrada }] }) } });
-  const aplicar = () => deslizaveis(ui).find((d: any) => d.props.titulo === 'Pão').props.acoes.find((a: any) => a.label === 'Aplicar').onPress();
-  ui.interact(aplicar);
-  ui.interact(() => ui.actions.filter((a: any) => a.label === 'Salvar na conta').at(-1).onPress());
-  ui.interact(aplicar);
-  const confirmar = ui.actions.filter((a: any) => a.label === 'Salvar na conta').at(-1);
-  ui.interact(() => confirmar.onPress());
-  assert.equal(ui.writes.filter((w: any) => w.operation === 'saveTransaction').length, 1);
-});
-
-test('Aplicar a rápida abre o formulário real pré-preenchido', () => {
-  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [
-    // Como o sheet grava de verdade: toda rápida tem `grupo`; só o adiantamento tem `rotulo`
-    // (29/09/2026, visto no emulador: o "Aplicar" sumia de todas as rápidas).
-    { kind: 'expense', amount_cents: 300000, start: '2026-10-01', installments: 6, mode: 'total', grupo: 'h1' },
-    { kind: 'expense', amount_cents: 50000, start: '2026-10-01', installments: 1, mode: 'cancel', grupo: 'h2', rotulo: 'adianta a tv' },
-  ], detalhadas: [] }) } });
-  const comAplicar = deslizaveis(ui).filter((d: any) => d.props.acoes.some((a: any) => a.label === 'Aplicar'));
-  assert.equal(comAplicar.length, 1, 'a rápida solta aplica; o adiantamento não');
-  const card = comAplicar[0];
-  ui.interact(() => card.props.acoes.find((a: any) => a.label === 'Aplicar').onPress());
-  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), {
-    pathname: '/finance/transaction-form',
-    params: { deHipotese: '0', kind: 'expense', amount: '300000', data: '01/10/2026', parcelas: '6' },
-  });
-});
-
-test('Recorrente aberta por "Aplicar" de uma rápida: salvar tira a rápida do rascunho', async () => {
-  const rascunho = JSON.stringify({ versao: 1, rapidas: [{ kind: 'expense', amount_cents: 150000, start: '2026-10-05', installments: 1, mode: 'monthly' }], detalhadas: [] });
-  const ui = screen('src/app/finance/recurring.tsx', {
-    segurarMutacoes: true,
+test('Ciclo aberto de outro lugar não usa o rascunho do aparelho', () => {
+  const rascunho = JSON.stringify({ versao: 2, adiantamentos: [], hipoteses: [
+    { id: 'h', kind: 'expense', forma: 'uma', valor_cents: 5000, parcelas: 1, repete: 'monthly', conta: null, data: '2026-10-01' }] });
+  const ui = screen('src/app/finance/cycle.tsx', {
+    params: { month: '2026-10', view: 'cycle' },
     preferencias: { 'projecao:rascunho': rascunho },
-    params: { create: '1', deHipotese: '0', kind: 'expense', amount: '150000', start: '05/10/2026', description: 'Aluguel' },
+    cycleRow: { mes: '2026-10-01', ini: '2026-09-11', fim: '2026-10-10', estado: 'aberto', comecei_com: 100000, entrou: 500000, saiu: 400000, resultado: 200000, caixa_no_fim: 200000, faltou_pagar: 0, confere: true },
   });
+  const fechamento = ui.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'Fechamento');
+  assert.equal(fechamento.props.hipoteses, 0);
+  assert.equal(Number(fechamento.props.ciclo.saiu), 400000, 'o ciclo real');
+});
+
+test('Projeção: com hipótese no rascunho, o erro da simulação aparece na linha; ela arrasta Aplicar e Tirar', () => {
+  const hipoteses = [{ id: 'h1', kind: 'expense', forma: 'parcelado', valor_cents: 300000, parcelas: 10, repete: 'monthly', conta: 'c', data: '2026-10-01' }];
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'c', name: 'Nubank', type: 'credit_card' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 2, hipoteses: hipoteses, adiantamentos: [] }) }, simulacao: { forecast: [{ day: '2026-09-28', in_cents: 0, out_cents: 0, balance_cents: 100 }], erros: [{ indice: 0, mensagem: 'conta arquivada', codigo: 'P0001' }] } });
+  const linha = ui.nodes().find((n: any) => n.type === 'Row' && String(n.props.accessibilityLabel).startsWith('Hipótese:'));
+  assert.equal(linha.props.title, 'Sai R$ 3000.00 em 10× · Nubank · a partir de 01/10/2026');
+  assert.match(linha.props.subtitle, /conta arquivada/, 'o erro da simulação aparece na linha');
+  const card = deslizaveis(ui)[0];
+  assert.deepEqual(ladosDe(card), { direita: ['Aplicar'], esquerda: ['Tirar'], mais: true, pontaDireita: 'Aplicar', pontaEsquerda: 'Tirar' });
+});
+
+test('Rascunho da versão 1: a parcelada sem conta não aplica (o formulário ficaria sem a conta); o adiantamento nunca aplica', () => {
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [
+    { kind: 'expense', amount_cents: 300000, start: '2026-10-01', installments: 6, mode: 'total', grupo: 'h1' },
+    { kind: 'expense', amount_cents: 50000, start: '2026-10-01', installments: 1, mode: 'total', grupo: 'h2', rotulo: 'adianta a tv' },
+    { kind: 'expense', amount_cents: 20000, start: '2026-11-10', installments: 1, mode: 'cancel', grupo: 'h2' },
+  ], detalhadas: [] }) } });
+  const aplicar = (d: any) => d.props.acoes.find((a: any) => a.label === 'Aplicar');
+  const [parcelada, adiantamento] = deslizaveis(ui);
+  assert.equal(aplicar(parcelada).disabled, true);
+  assert.equal(aplicar(adiantamento), undefined);
+  // e a v1 de um valor só vira hipótese completa, sem conta
+  const simples = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [{ kind: 'income', amount_cents: 5000, start: '2026-10-01', installments: 1, mode: 'total', grupo: 'g' }], detalhadas: [] }) } });
+  simples.interact(() => aplicar(deslizaveis(simples)[0]).onPress());
+  assert.deepEqual(JSON.parse(JSON.stringify(simples.navigations.at(-1))), { pathname: '/finance/transaction-form', params: { deHipotese: 'g', kind: 'income', amount: '5000', data: '01/10/2026', parcelas: '1' } });
+});
+
+test('Recorrente aberta pelo Aplicar: conta e frequência chegam, e salvar tira a hipótese PELO ID', async () => {
+  const rascunho = JSON.stringify({ versao: 2, adiantamentos: [], hipoteses: [
+    { id: 'x', kind: 'expense', forma: 'uma', valor_cents: 1, parcelas: 1, repete: 'monthly', conta: null, data: '2026-10-01' },
+    { id: 'r', kind: 'expense', forma: 'repete', valor_cents: 5000, parcelas: 1, repete: 'weekly', conta: 'cc', data: '2026-10-06' } ] });
+  const ui = screen('src/app/finance/recurring.tsx', { segurarMutacoes: true, preferencias: { 'projecao:rascunho': rascunho },
+    params: { create: '1', deHipotese: 'r', kind: 'expense', amount: '5000', start: '06/10/2026', account: 'cc', repete: 'weekly', description: 'Academia' } });
   const header = ui.nodes().find((n: any) => n.type === 'TaskHeader' && n.props.action);
+  assert.equal(header.props.action.props.label, 'Criar', 'o formulário é o real');
   ui.interact(() => header.props.action.props.onPress());
   assert.equal(ui.writes.at(-1).operation, 'createRecurring');
+  assert.equal(ui.writes.at(-1).value.account_id, 'cc');
+  assert.match(ui.writes.at(-1).value.rrule, /^FREQ=WEEKLY/);
   assert.ok(!('projecao:rascunho' in ui.preferenciasGravadas), 'antes do sucesso o rascunho não muda');
   // Pela promessa: o `onSuccess` por chamada não roda com a tela já fechada (revisão final).
   (ui.pedidos.at(-1) as any).resolver('rec-1');
   await new Promise((r) => setTimeout(r, 0));
-  assert.ok('projecao:rascunho' in ui.preferenciasGravadas, 'salvar reescreve o rascunho');
-  assert.equal(JSON.parse(ui.preferenciasGravadas['projecao:rascunho'] || '{"rapidas":[]}').rapidas.length, 0);
+  assert.deepEqual(JSON.parse(ui.preferenciasGravadas['projecao:rascunho']).hipoteses.map((h: any) => h.id), ['x']);
 });
 
-test('Ciclo pela Projeção com hipótese detalhada: lê por simular e marca a linha que veio dela', () => {
-  const detalhadas = JSON.stringify([{ id: 'h1', tipo: 'recorrente', titulo: 'Academia', entrada: { kind: 'expense', amount_cents: 5000, description: 'Academia', merchant: null, category: null, account_id: null, rrule: 'FREQ=WEEKLY;BYDAY=MO', next_run_at: '2026-10-05T12:00:00.000Z', end_date: null, auto_confirm: false } }]);
+test('Financiamento aberto pelo Aplicar: parcela, parcelas, conta e a próxima parcela preenchidas; salvar tira a hipótese', async () => {
+  const rascunho = JSON.stringify({ versao: 2, adiantamentos: [], hipoteses: [
+    { id: 'f', kind: 'expense', forma: 'financiamento', valor_cents: 147000, parcelas: 48, repete: 'monthly', conta: 'cc', data: '2026-10-31' } ] });
+  const ui = screen(debtsFile, { create: true, segurarMutacoes: true, preferencias: { 'projecao:rascunho': rascunho },
+    params: { create: 'financing', deHipotese: 'f', parcela: '147000', parcelas: '48', conta: 'cc', data: '31/10/2026' } });
+  assert.ok(ui.nodes().some((n: any) => n.type === 'MoneyField' && n.props.valueCents === 147000), 'a parcela vem da hipótese');
+  const campo = (label: string) => ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === label);
+  assert.ok(campo('Total de parcelas'));
+  // o nome é o que falta: o formulário pede, e com ele o Salvar liga
+  assert.equal(ui.button('Salvar').props.disabled, true);
+  ui.fill('Nome', 'Carro');
+  ui.press('Salvar');
+  const escrita = ui.writes.at(-1);
+  assert.equal(escrita.value.installment_cents, 147000);
+  assert.equal(escrita.value.installments, 48);
+  assert.equal(escrita.value.account_id, 'cc');
+  assert.equal(escrita.value.first_due_date, '2026-10-31');
+  assert.ok(!('projecao:rascunho' in ui.preferenciasGravadas), 'antes do sucesso o rascunho não muda');
+  (ui.pedidos.at(-1) as any).resolver('divida-1');
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(ui.preferenciasGravadas['projecao:rascunho'], '', 'a única hipótese saiu');
+});
+
+test('Ciclo pela Projeção com hipótese: lê por simular e marca a linha que veio dela', () => {
+  const rascunho = JSON.stringify({ versao: 2, adiantamentos: [], hipoteses: [
+    { id: 'h1', kind: 'expense', forma: 'repete', valor_cents: 5000, parcelas: 1, repete: 'weekly', conta: 'nu', data: '2026-10-05' }] });
   const ui = screen('src/app/finance/cycle.tsx', {
-    params: { month: '2026-10', view: 'cycle', detalhadas },
+    params: { month: '2026-10', view: 'cycle', hipoteses: '1' },
+    preferencias: { 'projecao:rascunho': rascunho },
     cicloSimulado: {
       ciclo: { mes: '2026-10-01', ini: '2026-09-11', fim: '2026-10-10', estado: 'aberto', comecei_com: 0, entrou: 0, saiu: 5000, resultado: -5000, caixa_no_fim: -5000, faltou_pagar: 0, confere: true },
       linhas: [
@@ -3385,12 +3380,14 @@ test('Ciclo pela Projeção com hipótese detalhada: lê por simular e marca a l
   assert.match(fatura.props.linha.method_label, /inclui hipótese/);
 });
 
-test('Ciclo com hipótese detalhada: leitura que falhou DENTRO do simular mostra o erro, não esqueleto para sempre', () => {
+test('Ciclo com hipótese: leitura que falhou DENTRO do simular mostra o erro, não esqueleto para sempre', () => {
   // Revisão final, 29/09/2026: a leitura do ciclo que falha volta em `erros` (a RPC responde 200),
   // `ciclo` chega nulo e a tela ficava no esqueleto, sem card de erro — a regra do portão.
-  const detalhadas = JSON.stringify([{ id: 'h1', tipo: 'lancamento', titulo: 'Pão', entrada: { kind: 'expense', amount_cents: 1000, category: null, description: 'Pão', merchant: null, account_id: null, counterparty_account_id: null, occurred_at: '2026-10-01', status: 'pending', due_at: null, auto_confirm: false } }]);
+  const rascunho = JSON.stringify({ versao: 2, adiantamentos: [], hipoteses: [
+    { id: 'h1', kind: 'expense', forma: 'uma', valor_cents: 1000, parcelas: 1, repete: 'monthly', conta: null, data: '2026-10-01' }] });
   const ui = screen('src/app/finance/cycle.tsx', {
-    params: { month: '2026-10', view: 'cycle', detalhadas },
+    params: { month: '2026-10', view: 'cycle', hipoteses: '1' },
+    preferencias: { 'projecao:rascunho': rascunho },
     cicloSimulado: { ciclo: null, linhas: null, idsHipotese: [], faturasComHipotese: [], erros: [{ leitura: 'ciclo', mensagem: 'canceling statement due to statement timeout' }] },
   });
   assert.ok(ui.nodes().some((n: any) => n.type === 'ErrorCard'), 'a falha aparece com "Tentar de novo"');
@@ -3399,17 +3396,14 @@ test('Ciclo com hipótese detalhada: leitura que falhou DENTRO do simular mostra
 test('Desfazer o "Tirar" devolve SÓ o que saiu — não traz de volta o que saiu depois (já aplicado)', () => {
   // Revisão final, 29/09/2026: o Desfazer regravava a cópia INTEIRA de antes; tirar A, aplicar B
   // e tocar no Desfazer de A punha B de volta — contado duas vezes e pronto para duplicar.
-  const lanc = (d: string) => ({ kind: 'expense', amount_cents: 1000, category: null, description: d, merchant: null, account_id: null, counterparty_account_id: null, occurred_at: '2026-10-01', status: 'pending', due_at: null, auto_confirm: false });
-  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas: [
-    { id: 'a', tipo: 'lancamento', titulo: 'A', entrada: lanc('A') },
-    { id: 'b', tipo: 'lancamento', titulo: 'B', entrada: lanc('B') },
-  ] }) } });
-  const tirar = (t: string) => ui.interact(() => deslizaveis(ui).find((d: any) => d.props.titulo === t).props.acoes.find((a: any) => a.label === 'Tirar').onPress());
-  tirar('A');
+  const h = (id: string, valor: number) => ({ id, kind: 'expense', forma: 'uma', valor_cents: valor, parcelas: 1, repete: 'monthly', conta: null, data: '2026-10-01' });
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 2, hipoteses: [h('a', 1000), h('b', 2000)], adiantamentos: [] }) } });
+  const tirar = (t: RegExp) => ui.interact(() => deslizaveis(ui).find((d: any) => t.test(d.props.titulo)).props.acoes.find((a: any) => a.label === 'Tirar').onPress());
+  tirar(/10\.00/);
   const desfazerA = ui.toasts.at(-1).action;
-  tirar('B'); // o mesmo efeito, no rascunho, de B ter ido para a conta
+  tirar(/20\.00/); // o mesmo efeito, no rascunho, de B ter sido aplicada
   ui.interact(() => desfazerA.onPress());
-  assert.deepEqual(JSON.parse(ui.preferenciasGravadas['projecao:rascunho']).detalhadas.map((h: any) => h.id), ['a']);
+  assert.deepEqual(JSON.parse(ui.preferenciasGravadas['projecao:rascunho']).hipoteses.map((x: any) => x.id), ['a']);
 });
 
 test('Projeção mês a mês: os dois "hoje" dizem o que são, e o rodapé nomeia o fim real do horizonte', () => {
@@ -3446,64 +3440,220 @@ test('Dinheiro de DESTAQUE (money, heroMoney) encolhe sozinho: ocupa a linha e n
 test('Hipótese que o banco recusou: a linha diz o motivo NOSSO e nunca o texto cru do Postgres', () => {
   // Revisão final, 29/09/2026: "new row for relation debts violates check constraint…" aparecia na
   // linha. Só a frase de `raise exception` (P0001) é para a pessoa ler — a régua de financeErrorMessage.
-  const entrada = { kind: 'expense', amount_cents: 1000, category: null, description: 'Pão', merchant: null, account_id: 'c', counterparty_account_id: null, occurred_at: '2026-10-01', status: 'pending', due_at: null, auto_confirm: false };
-  const detalhadas = [{ id: 'a', tipo: 'lancamento', titulo: 'A', entrada }, { id: 'b', tipo: 'lancamento', titulo: 'B', entrada }];
+  const h = (id: string, valor: number) => ({ id, kind: 'expense', forma: 'uma', valor_cents: valor, parcelas: 1, repete: 'monthly', conta: null, data: '2026-10-01' });
+  // a incompleta do meio fica fora da simulação: o índice do erro é o das COMPLETAS
+  const hipoteses = [h('a', 1000), h('x', 0), h('b', 2000)];
   const ui = screen(forecastFile, {
     forecastAccounts: [{ id: 'conta-1' }],
-    preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas }) },
+    preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 2, hipoteses: hipoteses, adiantamentos: [] }) },
     simulacao: { forecast: [], erros: [
       { indice: 0, mensagem: 'new row for relation "transactions" violates check constraint "x"', codigo: '23514' },
       { indice: 1, mensagem: 'A conta foi arquivada.', codigo: 'P0001' },
     ] },
   });
-  const linha = (t: string) => ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === t).props.subtitle;
-  assert.equal(linha('A'), 'Não dá para aplicar: o banco recusou esta hipótese. Abra e confira os campos.');
-  assert.equal(linha('B'), 'Não dá para aplicar: A conta foi arquivada.');
+  const linhas = ui.nodes().filter((n: any) => n.type === 'Row' && String(n.props.accessibilityLabel).startsWith('Hipótese:')).map((n: any) => n.props.subtitle);
+  assert.deepEqual(linhas, ['Não dá para aplicar: o banco recusou esta hipótese. Abra e confira os campos.', 'Digite o valor', 'Não dá para aplicar: A conta foi arquivada.']);
 });
 
-test('E se: no teto de 30 hipóteses detalhadas, "Adicionar como…" diz o limite em vez de abrir o formulário', () => {
+test('E se: no teto de 30 hipóteses, "Nova hipótese" diz o limite em vez de abrir a folha', () => {
   // Revisão final, 29/09/2026: a 31ª derrubava a simulação inteira com um erro genérico.
-  const entrada = { kind: 'expense', amount_cents: 100, category: null, description: 'x', merchant: null, account_id: 'c', counterparty_account_id: null, occurred_at: '2026-10-01', status: 'pending', due_at: null, auto_confirm: false };
-  const detalhadas = Array.from({ length: 30 }, (_, i) => ({ id: `h${i}`, tipo: 'lancamento', titulo: `H${i}`, entrada }));
-  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas }) } });
-  ui.interact(() => ui.nodes().find((n: any) => n.props?.label === 'Adicionar como…').props.onPress());
-  assert.ok(!ui.actions.some((a: any) => a.label === 'Lançamento'), 'não oferece criar a 31ª');
+  const hipoteses = Array.from({ length: 30 }, (_, i) => ({ id: `h${i}`, kind: 'expense', forma: 'uma', valor_cents: 100, parcelas: 1, repete: 'monthly', conta: null, data: '2026-10-01' }));
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 2, hipoteses: hipoteses, adiantamentos: [] }) } });
+  ui.press('Nova hipótese');
+  assert.equal(ui.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible), false);
   assert.match(ui.toasts.at(-1).message, /30 hipóteses/);
 });
 
 test('E se: o erro da simulação ANTERIOR não aparece enquanto a nova calcula (o índice já mudou)', () => {
   // Revisão final, 29/09/2026: depois de um Tirar, o erro do índice 1 da resposta velha caía na
   // linha que agora é a 1 — outra hipótese.
-  const entrada = { kind: 'expense', amount_cents: 100, category: null, description: 'x', merchant: null, account_id: 'c', counterparty_account_id: null, occurred_at: '2026-10-01', status: 'pending', due_at: null, auto_confirm: false };
+  const hipoteses = [{ id: 'a', kind: 'expense', forma: 'uma', valor_cents: 100, parcelas: 1, repete: 'monthly', conta: null, data: '2026-10-01' }];
   const ui = screen(forecastFile, {
     forecastAccounts: [{ id: 'conta-1' }],
-    preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas: [{ id: 'a', tipo: 'lancamento', titulo: 'A', entrada }] }) },
+    preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 2, hipoteses: hipoteses, adiantamentos: [] }) },
     simulacao: { forecast: [], erros: [{ indice: 0, mensagem: 'x', codigo: 'P0001' }], placeholder: true },
   });
-  const linha = ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'A');
-  assert.doesNotMatch(linha.props.subtitle, /Não dá para aplicar/);
+  const linha = ui.nodes().find((n: any) => n.type === 'Row' && String(n.props.accessibilityLabel).startsWith('Hipótese:'));
+  assert.equal(linha.props.subtitle, undefined);
 });
 
-test('E se: enquanto aplica, "Aplicar" e "Aplicar todas" ficam desligados à vista', () => {
-  // Revisão final, 29/09/2026 (spec §8: o botão fica desligado enquanto salva). Só havia a trava
-  // por ref — funcionava, mas nada na tela dizia que estava salvando.
-  const entrada = { kind: 'expense', amount_cents: 100, category: null, description: 'x', merchant: null, account_id: 'c', counterparty_account_id: null, occurred_at: '2026-10-01', status: 'pending', due_at: null, auto_confirm: false };
-  const ui = screen(forecastFile, { segurarMutacoes: true, forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas: [{ id: 'a', tipo: 'lancamento', titulo: 'A', entrada }, { id: 'b', tipo: 'lancamento', titulo: 'B', entrada }] }) } });
-  const aplicar = (t: string) => deslizaveis(ui).find((d: any) => d.props.titulo === t).props.acoes.find((a: any) => a.label === 'Aplicar');
-  ui.interact(() => aplicar('A').onPress());
-  ui.interact(() => ui.actions.filter((a: any) => a.label === 'Salvar na conta').at(-1).onPress());
-  assert.equal(aplicar('B').disabled, true, 'outra hipótese não aplica enquanto uma salva');
-  assert.equal(ui.nodes().find((n: any) => n.props?.label === 'Aplicar todas').props.disabled, true);
+test('Folha da hipótese: Sai oferece as quatro formas; Entra só "Uma vez" e "Repete"; financiamento sem cartão', () => {
+  const h = { id: 'h1', kind: 'expense', forma: 'uma', valor_cents: 0, parcelas: 2, repete: 'monthly', conta: null, data: '2026-10-05' };
+  let atual: any = h;
+  const contas = [{ id: 'cc', name: 'Itaú', type: 'checking' }, { id: 'nu', name: 'Nubank Cartão', type: 'credit_card', closing_day: 3 }];
+  const props = (valor: any) => ({ valor, onChange: (n: any) => { atual = n; }, contas, max: '2036-10-05' });
+  const ui = screen('src/components/finance/campos-da-hipotese.tsx', { componente: 'CamposDaHipotese', props: props(h) });
+  const segs = () => ui.nodes().filter((n: any) => n.type === 'Segmented');
+  const rotulos = (n: any) => JSON.parse(JSON.stringify(n.props.options.map((o: any) => o.label)));
+  assert.deepEqual(rotulos(segs()[1]), ['Uma vez', 'Parcelado', 'Repete', 'Financiamento']);
+  // trocar para Entra com uma forma que Entra não tem volta a "Uma vez"
+  const parcelado = screen('src/components/finance/campos-da-hipotese.tsx', { componente: 'CamposDaHipotese', props: props({ ...h, forma: 'parcelado' }) });
+  parcelado.interact(() => parcelado.nodes().filter((n: any) => n.type === 'Segmented')[0].props.onChange('income'));
+  assert.deepEqual(JSON.parse(JSON.stringify([atual.kind, atual.forma])), ['income', 'uma']);
+  const entra = screen('src/components/finance/campos-da-hipotese.tsx', { componente: 'CamposDaHipotese', props: props({ ...h, kind: 'income' }) });
+  assert.deepEqual(rotulos(entra.nodes().filter((n: any) => n.type === 'Segmented')[1]), ['Uma vez', 'Repete']);
+  const fin = screen('src/components/finance/campos-da-hipotese.tsx', { componente: 'CamposDaHipotese', props: props({ ...h, forma: 'financiamento' }) });
+  const picker = fin.nodes().find((n: any) => n.type === 'AccountPicker');
+  assert.deepEqual(JSON.parse(JSON.stringify(picker.props.accounts.map((a: any) => a.id))), ['cc']);
+  assert.equal(picker.props.emptyLabel, undefined, 'financiamento exige a conta');
+  const cal = fin.nodes().find((n: any) => n.type === 'Calendar');
+  assert.equal(cal.props.max, '2036-10-05');
+  assert.ok(cal.props.min, 'o calendário não deixa escolher antes de hoje');
+  // uma vez aceita "Sem conta" e diz o que isso significa
+  const semConta = screen('src/components/finance/campos-da-hipotese.tsx', { componente: 'CamposDaHipotese', props: props(h) });
+  assert.equal(semConta.nodes().find((n: any) => n.type === 'AccountPicker').props.emptyLabel, 'Sem conta');
+  assert.ok(semConta.nodes().some((n: any) => n.type === 'Note'));
 });
 
-test('Modo hipótese: dois toques em "Adicionar à hipótese" guardam UMA hipótese', () => {
-  // Revisão final, 29/09/2026: entre o toque e a tela fechar, um segundo toque somava outra igual.
-  const ui = screen('src/app/finance/recurring.tsx', { params: { create: '1', hipotese: 'nova', description: 'Academia', amount: '5000' } });
-  // O MESMO handler duas vezes: o toque duplo chega antes de a tela redesenhar.
-  const toque = ui.nodes().find((n: any) => n.type === 'TaskHeader' && n.props.action).props.action.props.onPress;
-  ui.interact(() => {
-    toque();
-    toque();
+test('Onde muda: conta negativa, cartão acima do limite e cartão sem limite, cada um com a frase', () => {
+  const conta = (fim: number) => ({ account_id: 'cc', nome: 'Itaú', tipo: 'checking', saldo_hoje: 0, menor: fim, dia_do_menor: '2026-11-12', saldo_fim: fim, negativa_em: null });
+  const mudancas = [
+    { tipo: 'conta', account_id: 'cc', nome: 'Itaú', antes: conta(420000), depois: conta(-10000), ficaNegativaEm: '2026-11-12' },
+    { tipo: 'cartao', account_id: 'nu', nome: 'Nubank Cartão', semLimite: false, livreAntes: 20000, livreDepois: -10000, passaDoLimiteEm: 10000, faturas: [{ vencimento: '2026-11-10', antes: 135000, depois: 165000 }] },
+    { tipo: 'cartao', account_id: 'd', nome: 'Cartão D', semLimite: true, livreAntes: null, livreDepois: null, passaDoLimiteEm: null, faturas: [{ vencimento: '2026-11-10', antes: 0, depois: 5000 }] },
+  ];
+  const abertos: string[] = [];
+  const ui = screen('src/components/finance/onde-muda.tsx', { componente: 'OndeMuda', props: { mudancas, onAbrir: (id: string) => abertos.push(id) } });
+  const linhas = ui.nodes().filter((n: any) => n.type === 'Row');
+  assert.deepEqual(linhas.map((l: any) => l.props.title), ['Itaú', 'Nubank Cartão', 'Cartão D']);
+  assert.match(linhas[0].props.subtitle, /No fim: R\$ 4200\.00 → R\$ -100\.00 · Fica negativa em 12\/11/);
+  assert.match(linhas[1].props.subtitle, /Fatura de 10\/11: R\$ 1350\.00 → R\$ 1650\.00 · Passa do limite em R\$ 100\.00/);
+  assert.match(linhas[2].props.subtitle, /Sem limite cadastrado/);
+  assert.equal(linhas[0].props.destructive, true);
+  assert.equal(linhas[2].props.destructive, false);
+  ui.interact(() => linhas[1].props.onPress());
+  assert.deepEqual(abertos, ['nu']);
+  assert.equal(screen('src/components/finance/onde-muda.tsx', { componente: 'OndeMuda', props: { mudancas: [], onAbrir: () => {} } }).nodes().length, 0);
+});
+
+test('E se: UM botão "Nova hipótese"; nada de "Adicionar como…" nem "Aplicar todas"', () => {
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }] });
+  const botoes = ui.nodes().filter((n: any) => n.type === 'Button').map((n: any) => n.props.label);
+  assert.ok(botoes.includes('Nova hipótese'));
+  assert.ok(!botoes.includes('Adicionar como…') && !botoes.includes('Aplicar todas') && !botoes.includes('Supor um lançamento'));
+});
+
+test('E se: a linha da hipótese aplica pelo formulário com tudo e tira PELO ID', () => {
+  const hipoteses = [
+    { id: 'a', kind: 'expense', forma: 'parcelado', valor_cents: 300000, parcelas: 10, repete: 'monthly', conta: 'nu', data: '2026-10-05' },
+    { id: 'b', kind: 'expense', forma: 'uma', valor_cents: 1000, parcelas: 1, repete: 'monthly', conta: null, data: '2026-10-06' },
+  ];
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'nu', name: 'Nubank Cartão', type: 'credit_card' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 2, hipoteses, adiantamentos: [] }) } });
+  const linha = (t: RegExp) => deslizaveis(ui).find((d: any) => t.test(d.props.titulo));
+  ui.interact(() => linha(/10×/).props.acoes.find((a: any) => a.label === 'Aplicar').onPress());
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { pathname: '/finance/transaction-form', params: { deHipotese: 'a', kind: 'expense', amount: '300000', data: '05/10/2026', parcelas: '10', conta: 'nu' } });
+  ui.interact(() => linha(/sem conta/).props.acoes.find((a: any) => a.label === 'Tirar').onPress());
+  assert.deepEqual(JSON.parse(ui.preferenciasGravadas['projecao:rascunho']).hipoteses.map((h: any) => h.id), ['a']);
+  // o Desfazer devolve a que saiu
+  ui.interact(() => ui.toasts.at(-1).action.onPress());
+  assert.deepEqual(JSON.parse(ui.preferenciasGravadas['projecao:rascunho']).hipoteses.map((h: any) => h.id), ['a', 'b']);
+});
+
+test('E se: as hipóteses completas vão à simulação com o detalhe por conta; a incompleta não', () => {
+  const hipoteses = [
+    { id: 'a', kind: 'expense', forma: 'uma', valor_cents: 1000, parcelas: 1, repete: 'monthly', conta: 'cc', data: '2026-10-05' },
+    { id: 'b', kind: 'expense', forma: 'parcelado', valor_cents: 900, parcelas: 3, repete: 'monthly', conta: null, data: '2026-10-05' },
+  ];
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'cc', name: 'Itaú', type: 'checking' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 2, hipoteses, adiantamentos: [] }) } });
+  const o = ui.simulacoes.at(-1);
+  assert.equal(o.porConta, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(o.hipoteses.map((h: any) => h.id))), ['a', 'b'], 'o hook recebe todas e descarta a incompleta');
+  const incompleta = ui.nodes().find((n: any) => n.type === 'Row' && /Escolha a conta/.test(n.props.subtitle ?? ''));
+  assert.ok(incompleta, 'a linha incompleta diz o que falta');
+});
+
+test('E se: com hipótese, "Onde muda" aparece com as contas que mudam e leva ao detalhe', () => {
+  const hipoteses = [{ id: 'a', kind: 'expense', forma: 'uma', valor_cents: 50000, parcelas: 1, repete: 'monthly', conta: 'cc', data: '2026-10-05' }];
+  const conta = (fim: number, neg: string | null) => ({ account_id: 'cc', nome: 'Itaú', tipo: 'checking', saldo_hoje: 100, menor: fim, dia_do_menor: '2026-10-05', saldo_fim: fim, negativa_em: neg });
+  const ui = screen(forecastFile, {
+    forecastAccounts: [{ id: 'cc', name: 'Itaú', type: 'checking' }],
+    preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 2, hipoteses, adiantamentos: [] }) },
+    horizonte: { contas: [conta(40000, null)], cartoes: [] },
+    simulacao: { forecast: [], contas: [conta(-10000, '2026-10-05')], cartoes: [], erros: [] },
   });
-  assert.equal(JSON.parse(ui.preferenciasGravadas['projecao:rascunho']).detalhadas.length, 1);
+  const bloco = ui.nodes().find((n: any) => n.type === 'OndeMuda');
+  assert.equal(bloco.props.mudancas.length, 1);
+  ui.interact(() => bloco.props.onAbrir('cc'));
+  // o horizonte vai junto: o detalhe mostra a MESMA janela que a Projeção (esticada pela hipótese)
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { pathname: '/finance/hipotese', params: { conta: 'cc', dias: '90' } });
+});
+
+test('E se: rascunho da versão 1 no aparelho continua abrindo; a parcelada sem conta pede a conta', () => {
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'cc' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, detalhadas: [], rapidas: [{ kind: 'expense', amount_cents: 900, start: '2026-10-02', installments: 3, mode: 'total', grupo: 'g2' }] }) } });
+  assert.ok(ui.nodes().find((n: any) => n.type === 'Row' && /Escolha a conta/.test(n.props.subtitle ?? '')));
+});
+
+test('E se: a folha cria a hipótese com conta, forma e data, e "Ver resultado" só com ela completa', () => {
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'cc', name: 'Itaú', type: 'checking' }] });
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'Button' && n.props.label === 'Nova hipótese').props.onPress());
+  const campos = () => ui.nodes().find((n: any) => n.type === 'CamposDaHipotese');
+  const ver = () => ui.nodes().find((n: any) => n.type === 'TaskHeader').props.action;
+  assert.equal(ver().props.disabled, true, 'sem valor, não dá');
+  ui.interact(() => campos().props.onChange({ ...campos().props.valor, valor_cents: 25000, forma: 'parcelado', parcelas: 5, conta: 'cc', data: '2026-11-03' }));
+  assert.equal(ver().props.disabled, false);
+  ui.interact(() => ver().props.onPress());
+  const gravado = JSON.parse(ui.preferenciasGravadas['projecao:rascunho']);
+  assert.deepEqual([gravado.hipoteses[0].forma, gravado.hipoteses[0].conta, gravado.hipoteses[0].data, gravado.hipoteses[0].parcelas], ['parcelado', 'cc', '2026-11-03', 5]);
+});
+
+test('E se: "Ver o ciclo" leva as hipóteses pelo aparelho, não pela rota', () => {
+  const hipoteses = [{ id: 'a', kind: 'expense', forma: 'uma', valor_cents: 1000, parcelas: 1, repete: 'monthly', conta: 'cc', data: '2026-10-05' }];
+  const meses = [{ mes: '2026-10-01', de: '2026-10-01', ate: '2026-10-31', entra: 0, sai: 1000, saldo: 9000, parcial: false, primeiroNegativo: null }];
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'cc' }], forecastMonths: meses, simulacao: { meses: { hoje: 10000, meses }, erros: [] }, preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 2, hipoteses, adiantamentos: [] }) } });
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'mes'))?.props.onChange('mes'));
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'Row' && /Outubro/.test(n.props.title ?? '')).props.onPress());
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'Button' && n.props.label === 'Ver o ciclo').props.onPress());
+  const nav = JSON.parse(JSON.stringify(ui.navigations.at(-1)));
+  assert.equal(nav.params.hipoteses, '1');
+  assert.equal(nav.params.rascunho, undefined);
+  assert.equal(nav.params.detalhadas, undefined);
+});
+
+const hipoteseFile = 'src/app/finance/hipotese.tsx';
+const textoDa = (ui: any) => JSON.stringify(ui.nodes().map((n: any) => [n.props?.children, n.props?.title, n.props?.subtitle, n.props?.label]));
+
+test('Detalhe da hipótese — conta: hoje, menor (e o dia) e fim, antes → depois; e as hipóteses dela', () => {
+  const c = (hoje: number, menor: number, fim: number, neg: string | null) => ({ account_id: 'cc', nome: 'Itaú', tipo: 'checking', saldo_hoje: hoje, menor, dia_do_menor: '2026-11-12', saldo_fim: fim, negativa_em: neg });
+  const ui = screen(hipoteseFile, { params: { conta: 'cc', dias: '90' }, forecastAccounts: [{ id: 'cc', name: 'Itaú', type: 'checking' }],
+    preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 2, adiantamentos: [], hipoteses: [
+      { id: 'a', kind: 'expense', forma: 'uma', valor_cents: 50000, parcelas: 1, repete: 'monthly', conta: 'cc', data: '2026-11-12' },
+      { id: 'b', kind: 'expense', forma: 'uma', valor_cents: 7000, parcelas: 1, repete: 'monthly', conta: 'outra', data: '2026-11-12' }] }) },
+    horizonte: { contas: [c(100000, 40000, 40000, null)], cartoes: [] }, simulacao: { contas: [c(100000, -10000, -10000, '2026-11-12')], cartoes: [], erros: [] } });
+  const t = textoDa(ui);
+  assert.match(t, /Fica negativa em 12\/11\/2026/);
+  assert.match(t, /Sai R\$ 500\.00 · Itaú · em 12\/11\/2026/);
+  assert.doesNotMatch(t, /R\$ 70\.00/, 'só as hipóteses DESTA conta');
+  // os três pares, antes → depois
+  const pares = ui.nodes().filter((n: any) => typeof n.type === 'function' && n.type.name === 'AntesDepois').map((n: any) => [n.props.rotulo, n.props.antes, n.props.depois]);
+  assert.deepEqual(JSON.parse(JSON.stringify(pares.map((p: any) => [p[1], p[2]]))), [[100000, 100000], [40000, -10000], [40000, -10000]]);
+  assert.match(pares[1][0], /Menor saldo · 12\/11/);
+  // quem lê a simulação é o hook de sempre, com o detalhe por conta e a janela da Projeção
+  const o = ui.simulacoes.at(-1);
+  assert.equal(o.porConta, true);
+  assert.equal(o.dias, 90);
+});
+
+test('Detalhe da hipótese — cartão sem limite: diz e oferece cadastrar; com limite estourado: quanto', () => {
+  const k = (limite: number | null, livre: number | null, faturas: any[]) => ({ account_id: 'nu', nome: 'Nubank Cartão', limite, livre, faturas });
+  const base = { params: { conta: 'nu' }, forecastAccounts: [{ id: 'nu', name: 'Nubank Cartão', type: 'credit_card' }],
+    preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 2, adiantamentos: [], hipoteses: [{ id: 'a', kind: 'expense', forma: 'uma', valor_cents: 50000, parcelas: 1, repete: 'monthly', conta: 'nu', data: '2026-10-05' }] }) } };
+  const fatura = [{ invoice_id: 'f', vencimento: '2026-11-10', total: 50000, aberto: 50000 }];
+  const sem = screen(hipoteseFile, { ...base, horizonte: { contas: [], cartoes: [k(null, null, [])] }, simulacao: { contas: [], cartoes: [k(null, null, fatura)], erros: [] } });
+  assert.match(textoDa(sem), /Sem limite cadastrado/);
+  sem.press('Cadastrar o limite');
+  assert.deepEqual(JSON.parse(JSON.stringify(sem.navigations.at(-1))), { pathname: '/finance/accounts', params: { edit: 'nu' } });
+  // a fatura que muda: vence quando, antes → depois
+  const linha = sem.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'Vence 10/11/2026');
+  assert.ok(linha, 'a fatura que muda');
+  const estoura = screen(hipoteseFile, { ...base, horizonte: { contas: [], cartoes: [k(100000, 20000, [])] }, simulacao: { contas: [], cartoes: [k(100000, -30000, fatura)], erros: [] } });
+  assert.match(textoDa(estoura), /Passa do limite em R\$ 300\.00/);
+  assert.doesNotMatch(textoDa(estoura), /Cadastrar o limite/);
+});
+
+test('Detalhe da hipótese — conta que não existe mais, rascunho vazio e erro da leitura', () => {
+  const nada = screen(hipoteseFile, { params: { conta: 'sumiu' }, forecastAccounts: [], horizonte: { contas: [], cartoes: [] }, simulacao: { contas: [], cartoes: [], erros: [] } });
+  assert.ok(nada.nodes().some((n: any) => n.type === 'EmptyState' && n.props.compacto));
+  const rascunho = JSON.stringify({ versao: 2, adiantamentos: [], hipoteses: [{ id: 'a', kind: 'expense', forma: 'uma', valor_cents: 1, parcelas: 1, repete: 'monthly', conta: 'cc', data: '2026-10-05' }] });
+  const erro = screen(hipoteseFile, { params: { conta: 'cc' }, forecastAccounts: [{ id: 'cc', name: 'Itaú', type: 'checking' }], preferencias: { 'projecao:rascunho': rascunho }, horizonte: { contas: [], cartoes: [] }, simulacao: { contas: null, cartoes: [], erros: [{ leitura: 'contas', mensagem: 'x', codigo: 'XX000' }] } });
+  assert.ok(erro.nodes().some((n: any) => n.type === 'ErrorCard'));
 });

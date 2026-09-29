@@ -373,6 +373,7 @@ function AppTree() {
                   */}
                   <Stack.Screen name="finance/transactions" options={{ title: 'Lançamentos' }} />
                   <Stack.Screen name="finance/cycle" options={{ title: 'Detalhe do ciclo' }} />
+                  <Stack.Screen name="finance/hipotese" options={{ title: 'Detalhe da hipótese' }} />
                   <Stack.Screen name="finance/[txId]" options={{ title: 'Lançamento' }} />
                   <Stack.Screen name="finance/accounts" options={{ title: 'Contas' }} />
                   <Stack.Screen name="finance/cards" options={{ title: 'Cartões' }} />

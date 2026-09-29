@@ -1684,35 +1684,19 @@ test('arrasto: esquerda só tira da lista, direita nunca apaga, e apagar se cham
   assert.deepEqual(erros, []);
 });
 
-test('Lançamento em modo hipótese: guarda no rascunho e sai ANTES de qualquer gravação', () => {
-  // 29/09/2026 (spec hipóteses detalhadas): o formulário real vira hipótese sem escrever nada.
-  // A tela não roda no harness (react-hook-form), então a ordem é conferida no texto: o desvio
-  // da hipótese vem antes do primeiro `mutate` do salvar.
-  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
-  const submit = fonte.slice(fonte.indexOf('const onSubmit = handleSubmit('));
-  const desvio = submit.indexOf('if (modoHipotese) {');
-  assert.ok(desvio > 0, 'o onSubmit desvia em modo hipótese');
-  for (const escrita of ['createPlan.mutate(', 'save.mutate(', 'converter.mutate(']) {
-    const i = submit.indexOf(escrita);
-    if (i >= 0) assert.ok(desvio < i, `${escrita} vem depois do desvio da hipótese`);
+test('Formulários sem modo hipótese: a hipótese é feita na Projeção, e o formulário só APLICA (spec 2026-09-29)', () => {
+  for (const arquivo of ['transaction-form.tsx', 'recurring.tsx', 'debts.tsx']) {
+    const fonte = readFileSync(join(SRC, 'app/finance', arquivo), 'utf8');
+    for (const morto of ['modoHipotese', 'guardada', 'paraHipotese', 'formDaHipotese', 'hipoteseAberta', "'Adicionar à hipótese'", 'adicionarDetalhada', 'setRapidas']) {
+      assert.ok(!fonte.includes(morto), `${arquivo} ainda tem ${morto}`);
+    }
   }
-  assert.match(submit.slice(desvio, desvio + 600), /hipoteseDoLancamento\(destino, entradaLancamento, entradaParcelada\)/);
-  assert.match(fonte, /'Adicionar à hipótese'/);
-});
-
-test('Lançamento em modo hipótese: "Repetir lançamento" e "Financiamento" abrem os outros formulários TAMBÉM como hipótese', () => {
-  // 29/09/2026, visto no emulador: em "Nova hipótese" os dois botões do rodapé levavam ao
-  // formulário REAL, e quem estava montando uma hipótese salvava na conta sem saber.
-  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
-  const repetir = fonte.slice(fonte.indexOf('label="Repetir lançamento"'), fonte.indexOf('label="Financiamento"'));
-  assert.match(repetir, /\.\.\.paraHipotese/, 'Repetir leva o modo hipótese');
-  const fin = fonte.slice(fonte.indexOf('label="Financiamento"'), fonte.indexOf('label="Financiamento"') + 300);
-  assert.match(fin, /\.\.\.paraHipotese/, 'Financiamento leva o modo hipótese');
-  assert.match(fonte, /const paraHipotese = modoHipotese \? \{ hipotese: 'nova' \} : \{\}/);
 });
 
 test('Lançamento aberto pelo "Aplicar" de uma rápida: os dois caminhos de salvar a tiram do rascunho', () => {
   const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  // Pelo ID da hipótese, nunca pela posição: a lista pode ter mudado com o formulário aberto.
+  assert.match(fonte, /const tirarRapida = \(\) => \{\s*if \(daRapida\) tirar\(daRapida\.id\);/);
   // a compra parcelada nova e o lançamento: pela PROMESSA (revisão final, 29/09/2026) — o
   // `onSuccess` por chamada não roda com a tela já fechada, e a rápida salva ficava no rascunho.
   // O que é da TELA (voltar, toast) só com ela montada.
@@ -1760,13 +1744,14 @@ test('MoneyField: a caixa dos dígitos cresce com a fonte do sistema', () => {
 });
 
 test('Lançamento: com a fileira de parcelas escondida, o erro dela aparece na Conta — Salvar nunca fica mudo', () => {
-  // Revisão final, 29/09/2026: "Adicionar como… → Compra parcelada" nasce com 2 parcelas e sem
-  // conta; a fileira só existe com conta, o erro do zod morava nela, e Salvar não fazia nada.
+  // Revisão final, 29/09/2026: um parcelado aberto sem conta (o "Aplicar" de uma hipótese cuja
+  // conta foi arquivada) nasce com N parcelas; a fileira só existe com conta, o erro do zod morava
+  // nela, e Salvar não fazia nada.
   const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
   const conta = fonte.slice(fonte.indexOf("label={kind === 'transfer' ? 'Da conta' : 'Conta'}"), fonte.indexOf("label={kind === 'transfer' ? 'Da conta' : 'Conta'}") + 600);
   assert.match(conta, /!podeParcelarAqui \? errors\.installments\?\.message/);
   // Receita não parcela: a rápida de ENTRADA "em N vezes" abre à vista.
-  assert.match(fonte, /installments: hParc\?\.installments \?\? \(daRapida\?\.kind === 'expense' \? daRapida\.parcelas : undefined\)/);
+  assert.match(fonte, /installments: \(daRapida\?\.kind === 'expense' \? daRapida\.parcelas : undefined\) \?\? 1/);
 });
 
 test('Ladrilho: lado a lado, e a linha inteira só quando MEDIR que não cabe', () => {
@@ -1834,14 +1819,10 @@ test('Barra de abas do Android: parado, o círculo é do React; o Reanimated só
   assert.match(fonte, /left: PAD \+ centroParado/);
 });
 
-test('Lançamento e financiamento em modo hipótese: o segundo toque não guarda outra hipótese', () => {
-  // No lançamento o desvio mora no `handleSubmit` (a lint recusa ref ali): estado + botão desligado.
-  const lanc = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
-  const desvio = lanc.slice(lanc.indexOf('if (modoHipotese) {'), lanc.indexOf('if (modoHipotese) {') + 200);
-  assert.match(desvio, /if \(guardada\) return;\s*setGuardada\(true\);/);
-  assert.match(lanc, /disabled=\{guardada \|\| saving/);
-  // No financiamento o handler é comum: ref, que vale no mesmo toque.
-  const div = readFileSync(join(SRC, 'app/finance/debts.tsx'), 'utf8');
-  const desvioDiv = div.slice(div.indexOf('if (modoHipotese) {'), div.indexOf('if (modoHipotese) {') + 200);
-  assert.match(desvioDiv, /if \(guardada\.current\) return;\s*guardada\.current = true;/);
+test('Projeção: o caminho "detalhado" do E se saiu por inteiro', () => {
+  // 29/09/2026 (spec "E se…? — uma hipótese só"): um botão, uma folha; o formulário completo só no Aplicar.
+  const fonte = readFileSync(join(SRC, 'app/finance/forecast.tsx'), 'utf8');
+  for (const morto of ['adicionarComo', 'aplicarTodas', 'useForecastWithDrafts', 'HipoteseDetalhada', 'detalhadas', "'Adicionar como…'"]) {
+    assert.ok(!fonte.includes(morto), `forecast.tsx ainda tem ${morto}`);
+  }
 });

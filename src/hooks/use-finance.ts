@@ -18,6 +18,8 @@ import { adiantaveisNoMes, type Adiantavel, type EscolhaDeAdiantamento } from '@
 import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
 import { filtroDoEstado } from '@/lib/data-da-compra';
 import type { HipoteseNoCiclo, OcorrenciaDaHipotese } from '@/lib/rascunho-no-ciclo';
+import { registroDaHipotese, type Hipotese, type RegistroSimulado } from '@/lib/hipotese';
+import type { CartaoNoHorizonte, ContaNoHorizonte } from '@/lib/onde-muda';
 import {
   DESCRICAO_JUROS_DO_PIX,
   argsDaParcelada,
@@ -1035,32 +1037,6 @@ export function useAnticipationCandidates(pagarEm: string, enabled = true) {
   });
 }
 
-/**
- * A projeção com hipóteses aplicadas — o Rascunho.
- *
- * ⚠️ **A conta mora no BANCO** (`private.draft_effect`), no MESMO motor que o "Posso comprar
- * isso?" usa desde `20260910170000`. Somar aqui seria a segunda cópia de uma aritmética de
- * dinheiro, e as duas telas passariam a poder discordar.
- *
- * Com a lista vazia o hook desliga: quem não está simulando não paga uma RPC a mais, e a tela
- * cai na projeção real (`useCashFlowForecast`).
- */
-export function useForecastWithDrafts(days: number, drafts: Draft[], enabled = true) {
-  useRealtimeInvalidate('transactions', ['forecast-drafts']);
-  return useQuery({
-    enabled: enabled && drafts.length > 0,
-    // O rascunho é efêmero de propósito: sai da tela, some. `gcTime: 0` impede que ele
-    // ressuscite do cache quando o usuário voltar — que é justamente o que ele pediu que NÃO
-    // acontecesse ("se eu voltar, ele some").
-    gcTime: 0,
-    queryKey: ['forecast-drafts', String(days), JSON.stringify(paraOBanco(drafts))],
-    queryFn: async (): Promise<ForecastDay[]> => {
-      const { data, error } = await supabase.rpc('forecast_json', { days, drafts: paraOBanco(drafts) });
-      if (error) throw error;
-      return (data ?? []) as unknown as ForecastDay[];
-    },
-  });
-}
 
 /**
  * A projeção **agrupada por mês**, somada no banco.
@@ -1098,33 +1074,78 @@ export function useForecastMonths(days: number, drafts: Draft[], enabled = true,
 export type ErroDaHipotese = { indice?: number; leitura?: string; mensagem: string; codigo?: string };
 
 /**
- * A Projeção com hipóteses DETALHADAS (spec 2026-09-28): os registros são criados de verdade no
- * banco, lidos e desfeitos (`simular`). As rápidas vão junto, no mesmo `forecast_json`.
- * Uma chamada por modo: no dia pede a série; no mês, o agrupado.
+ * A simulação do "E se…?" (spec 2026-09-29): as hipóteses viram registros de verdade dentro de
+ * `simular`, as leituras correm e tudo é desfeito. Os adiantamentos seguem como `drafts` das
+ * leituras de caixa. Com `porConta`, vêm junto o horizonte por conta e por cartão — o "depois"
+ * do Onde muda. Uma chamada só por tela: criar e desfazer duas vezes seria pagar a escrita duas.
+ *
+ * `erros[].indice` aponta para as hipóteses COMPLETAS, na ordem — as incompletas não vão.
  */
-export function useSimulacao(
-  days: number,
-  drafts: Draft[],
-  registros: { tipo: string; dados: unknown }[],
-  modo: 'dia' | 'mes',
-  view: CycleView | undefined,
-  enabled: boolean,
-) {
+export function useSimulacao(o: {
+  dias: number;
+  modo: 'dia' | 'mes';
+  view: CycleView | undefined;
+  hipoteses: Hipotese[];
+  adiantamentos: Draft[];
+  porConta: boolean;
+  enabled: boolean;
+}) {
+  const registros = o.hipoteses.map(registroDaHipotese).filter((r): r is RegistroSimulado => r !== null);
+  const drafts = paraOBanco(o.adiantamentos);
   useRealtimeInvalidate('transactions', ['simular']);
   return useQuery({
-    enabled: enabled && registros.length > 0,
+    enabled: o.enabled && (registros.length > 0 || drafts.length > 0),
     placeholderData: (anterior) => anterior,
-    queryKey: ['simular', modo, String(days), JSON.stringify(paraOBanco(drafts)), JSON.stringify(registros), view ?? ''],
-    queryFn: async (): Promise<{ forecast?: ForecastDay[]; meses?: ProjecaoMensal; erros: ErroDaHipotese[] }> => {
-      const leitura = modo === 'mes'
-        ? { meses: { days, drafts: paraOBanco(drafts), view: view ?? null } }
-        : { forecast: { days, drafts: paraOBanco(drafts) } };
+    queryKey: ['simular', o.modo, String(o.dias), JSON.stringify(drafts), JSON.stringify(registros), o.view ?? '', o.porConta],
+    queryFn: async (): Promise<{
+      forecast?: ForecastDay[];
+      meses?: ProjecaoMensal;
+      contas?: ContaNoHorizonte[];
+      cartoes?: CartaoNoHorizonte[];
+      erros: ErroDaHipotese[];
+    }> => {
+      const leitura: Record<string, unknown> = o.modo === 'mes'
+        ? { meses: { days: o.dias, drafts, view: o.view ?? null } }
+        : { forecast: { days: o.dias, drafts } };
+      if (o.porConta) Object.assign(leitura, { contas: { days: o.dias }, cartoes: { days: o.dias } });
       const { data, error } = await supabase.rpc('simular', { p_registros: registros as never, p_leituras: leitura as never });
       if (error) throw error;
-      const r = data as { leituras?: { forecast?: ForecastDay[]; meses?: ProjecaoMensal }; erros?: ErroDaHipotese[] } | null;
-      return { forecast: r?.leituras?.forecast, meses: r?.leituras?.meses, erros: r?.erros ?? [] };
+      const r = data as { leituras?: Record<string, unknown>; erros?: ErroDaHipotese[] } | null;
+      const l = r?.leituras ?? {};
+      return {
+        forecast: l.forecast as ForecastDay[] | undefined,
+        meses: l.meses as ProjecaoMensal | undefined,
+        contas: l.contas as ContaNoHorizonte[] | undefined,
+        cartoes: l.cartoes as CartaoNoHorizonte[] | undefined,
+        erros: r?.erros ?? [],
+      };
     },
   });
+}
+
+/** O "antes" do Onde muda: o horizonte por conta e por cartão, sem hipótese. */
+export function useHorizonteReal(dias: number, enabled: boolean) {
+  useRealtimeInvalidate('transactions', ['accounts-horizon']);
+  useRealtimeInvalidate('transactions', ['cards-horizon']);
+  const contas = useQuery({
+    enabled,
+    queryKey: ['accounts-horizon', String(dias)],
+    queryFn: async (): Promise<ContaNoHorizonte[]> => {
+      const { data, error } = await supabase.rpc('accounts_horizon', { days: dias });
+      if (error) throw error;
+      return (data ?? []) as unknown as ContaNoHorizonte[];
+    },
+  });
+  const cartoes = useQuery({
+    enabled,
+    queryKey: ['cards-horizon', String(dias)],
+    queryFn: async (): Promise<CartaoNoHorizonte[]> => {
+      const { data, error } = await supabase.rpc('cards_horizon', { days: dias });
+      if (error) throw error;
+      return (data ?? []) as unknown as CartaoNoHorizonte[];
+    },
+  });
+  return { contas, cartoes };
 }
 
 /** Faturas e lançamentos previstos que vencem no período (atrasados incluídos). */
@@ -2171,7 +2192,6 @@ const REGUA_MUDOU = [
   ['cycle-lines'],
   ['cycle-range'],
   ['forecast'],
-  ['forecast-drafts'],
   ['forecast-months'],
   ['monthly-cashflow'],
   ['month-summary'],
@@ -2314,7 +2334,7 @@ export function useDraftLines(hipoteses: readonly HipoteseNoCiclo[], de: string 
  * `ref_id` que a hipótese CRIOU (a linha vai ao grupo dela); `faturasComHipotese` são faturas que
  * já existiam e receberam a hipótese (continuam no grupo delas, marcadas).
  */
-export function useCicloSimulado(registros: { tipo: string; dados: unknown }[], month: string, view?: CycleView) {
+export function useCicloSimulado(registros: RegistroSimulado[], month: string, view?: CycleView) {
   return useQuery({
     enabled: registros.length > 0 && Boolean(month),
     gcTime: 0,

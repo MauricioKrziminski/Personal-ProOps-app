@@ -24,7 +24,6 @@ import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useRascunho } from '@/hooks/use-rascunho';
-import { hipoteseDoLancamento } from '@/lib/rascunho';
 import type { EntradaLancamento, EntradaParcelada } from '@/lib/escrita';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { Segmented } from '@/components/ui/segmented';
@@ -160,7 +159,7 @@ const schema = z
 type FormValues = z.infer<typeof schema>;
 
 export default function TransactionFormScreen() {
-  const params = useLocalSearchParams<{ id?: string; conta?: string; hipotese?: string; parcelada?: string; deHipotese?: string; kind?: string; amount?: string; data?: string; parcelas?: string }>();
+  const params = useLocalSearchParams<{ id?: string; conta?: string; deHipotese?: string; kind?: string; amount?: string; data?: string; parcelas?: string }>();
   const query = useTransaction(params.id);
   // A parcela edita o valor da COMPRA: sem o plano (travadas, total) o campo não sabe o que
   // "cada parcela" alcança. Espera junto com a linha, na mesma tela de esqueleto.
@@ -229,15 +228,13 @@ export default function TransactionFormScreen() {
     // Outro id é outro formulário: aberto por link sobre um já aberto, a tela era reaproveitada
     // e o `useForm` (que só lê os valores na montagem) seguia com o lançamento anterior.
     <TransactionForm
-      key={params.id ?? `novo:${params.conta ?? ''}:${params.hipotese ?? ''}:${params.deHipotese ?? ''}`}
+      key={params.id ?? `novo:${params.conta ?? ''}:${params.deHipotese ?? ''}`}
       editing={editing}
       plano={plano.data ?? undefined}
       jurosDoPix={juros.data ?? null}
       conta={editing ? undefined : params.conta}
-      hipotese={editing ? undefined : params.hipotese}
-      parcelada={params.parcelada === '1'}
       daRapida={editing || params.deHipotese === undefined ? undefined : {
-        indice: Number(params.deHipotese),
+        id: params.deHipotese,
         kind: params.kind === 'income' ? 'income' : 'expense',
         amount: Number(params.amount) || 0,
         data: params.data,
@@ -252,8 +249,6 @@ function TransactionForm({
   plano,
   jurosDoPix,
   conta,
-  hipotese,
-  parcelada,
   daRapida,
 }: {
   editing?: Transaction;
@@ -267,37 +262,22 @@ function TransactionForm({
    */
   conta?: string;
   /**
-   * `?hipotese=` (29/09/2026, spec hipóteses detalhadas): o formulário real vira hipótese do "E
-   * se…?" — `nova` cria, um id edita aquela. Não grava nada: guarda a ENTRADA no rascunho.
+   * Aberto pelo "Aplicar" de uma hipótese do "E se…?" (spec 2026-09-29): o formulário nasce com o
+   * tipo, o valor (o total, com parcelas), a data, as parcelas e a conta dela; salvar a tira do
+   * rascunho PELO ID — a lista pode ter mudado com o formulário aberto.
    */
-  hipotese?: string;
-  /** `?parcelada=1` ("Adicionar como… Compra parcelada"): abre já em 2 parcelas. */
-  parcelada?: boolean;
-  /**
-   * Aberto pelo "Aplicar" de uma hipótese RÁPIDA: o formulário nasce com o tipo, o valor (o total,
-   * com parcelas), a data e as parcelas dela; salvar a tira do rascunho.
-   */
-  daRapida?: { indice: number; kind: 'income' | 'expense'; amount: number; data?: string; parcelas: number };
+  daRapida?: { id: string; kind: 'income' | 'expense'; amount: number; data?: string; parcelas: number };
 }) {
   const insets = useSafeAreaInsets();
-  const { rascunho, adicionarDetalhada, trocarDetalhada, setRapidas } = useRascunho();
+  const { tirar } = useRascunho();
   /** A tela ainda está aberta? O que é dela (voltar, toast) só roda com ela montada. */
   const [montado] = useState(() => ({ current: true }));
   useEffect(() => () => {
     montado.current = false;
   }, [montado]);
   const tirarRapida = () => {
-    if (daRapida) setRapidas((antes) => antes.filter((_, i) => i !== daRapida.indice));
+    if (daRapida) tirar(daRapida.id);
   };
-  const modoHipotese = Boolean(hipotese);
-  // Guardada uma vez, o segundo toque (antes de a tela fechar) não soma outra hipótese igual.
-  const [guardada, setGuardada] = useState(false);
-  const hipoteseAberta = rascunho.detalhadas.find((h) => h.id === hipotese) ?? null;
-  // Os atalhos do rodapé (recorrente, financiamento) levam o modo junto: na hipótese, o outro
-  // formulário também só guarda no rascunho.
-  const paraHipotese = modoHipotese ? { hipotese: 'nova' } : {};
-  const hLanc = hipoteseAberta?.tipo === 'lancamento' ? hipoteseAberta.entrada : null;
-  const hParc = hipoteseAberta?.tipo === 'parcelada' ? hipoteseAberta.entrada : null;
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const toast = useToast();
@@ -324,23 +304,23 @@ function TransactionForm({
     resolver: zodResolver(schema),
     // `editing` já chegou resolvido pelo gate — sem `useEffect`+`reset`, sem corrida.
     defaultValues: {
-      // A hipótese aberta para editar (`hLanc`/`hParc`) preenche como um registro preencheria.
-      kind: editing?.kind ?? hLanc?.kind ?? daRapida?.kind ?? 'expense',
-      amount_cents: editing?.amount_cents ?? hLanc?.amount_cents ?? hParc?.totalCents ?? daRapida?.amount ?? 0,
-      category: editing?.category ?? hLanc?.category ?? hParc?.category ?? null,
-      description: editing?.description ?? hLanc?.description ?? hParc?.description ?? '',
-      merchant: editing?.merchant ?? hLanc?.merchant ?? hParc?.merchant ?? null,
-      account_id: editing?.account_id ?? hLanc?.account_id ?? hParc?.accountId ?? (conta && accounts?.some((a) => a.id === conta) ? conta : null),
-      counterparty_account_id: editing?.counterparty_account_id ?? hLanc?.counterparty_account_id ?? null,
-      // Receita não parcela: a rápida de entrada "em N vezes" abre à vista, com o total.
-      installments: hParc?.installments ?? (daRapida?.kind === 'expense' ? daRapida.parcelas : undefined) ?? (parcelada ? 2 : 1),
-      paid_installments: String(hParc?.paidInstallments ?? 0),
-      fee_cents: jurosDoPix?.amount_cents ?? hLanc?.fee_cents ?? 0,
-      auto_confirm: editing?.auto_confirm ?? hLanc?.auto_confirm ?? false,
-      occurred_at: daRapida?.data ?? isoToBR(dataDaSerie ?? editing?.occurred_at ?? hLanc?.occurred_at ?? hParc?.occurredAt ?? localISODate()),
-      pending: editing ? editing.status === 'pending' : hLanc?.status === 'pending',
+      kind: editing?.kind ?? daRapida?.kind ?? 'expense',
+      amount_cents: editing?.amount_cents ?? daRapida?.amount ?? 0,
+      category: editing?.category ?? null,
+      description: editing?.description ?? '',
+      merchant: editing?.merchant ?? null,
+      // `?conta=` e a conta da hipótese: só valem se ela está entre as contas da pessoa.
+      account_id: editing?.account_id ?? (conta && accounts?.some((a) => a.id === conta) ? conta : null),
+      counterparty_account_id: editing?.counterparty_account_id ?? null,
+      // Receita não parcela: a hipótese de entrada abre à vista, com o total.
+      installments: (daRapida?.kind === 'expense' ? daRapida.parcelas : undefined) ?? 1,
+      paid_installments: '0',
+      fee_cents: jurosDoPix?.amount_cents ?? 0,
+      auto_confirm: editing?.auto_confirm ?? false,
+      occurred_at: daRapida?.data ?? isoToBR(dataDaSerie ?? editing?.occurred_at ?? localISODate()),
+      pending: editing ? editing.status === 'pending' : false,
       installment_occurrence: Boolean(editing?.installment_plan_id),
-      due_at: dataDaSerie ? isoToBR(dataDaSerie) : editing?.due_at ? isoToBR(editing.due_at) : hLanc?.due_at ? isoToBR(hLanc.due_at) : null,
+      due_at: dataDaSerie ? isoToBR(dataDaSerie) : editing?.due_at ? isoToBR(editing.due_at) : null,
     },
   });
 
@@ -625,10 +605,7 @@ function TransactionForm({
       ? (adiado ? values.auto_confirm : false)
       : (editing?.auto_confirm ?? false);
 
-    /**
-     * O que cada gravação recebe, montado UMA vez (29/09/2026): o salvar real e a hipótese do
-     * "E se…?" usam o mesmo objeto — o que foi simulado é o que se aplica.
-     */
+    /** O que cada gravação recebe, montado UMA vez. */
     const entradaParcelada: EntradaParcelada | null = values.account_id
       ? {
           accountId: values.account_id,
@@ -660,18 +637,6 @@ function TransactionForm({
       fee_cents: mostraJuros ? values.fee_cents : 0,
       auto_confirm: autoConfirm,
     };
-
-    // Modo hipótese: guarda no rascunho e volta, ANTES de qualquer gravação.
-    if (modoHipotese) {
-      if (guardada) return;
-      setGuardada(true);
-      const h = hipoteseDoLancamento(destino, entradaLancamento, entradaParcelada);
-      if (hipoteseAberta) trocarDetalhada(hipoteseAberta.id, h);
-      else adicionarDetalhada(h);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.back();
-      return;
-    }
 
     // parcelado NOVO: quem cria as N transações (e resolve a fatura de cada uma) é o banco, não
     // o app — mesma regra usada pelo WhatsApp.
@@ -1034,13 +999,13 @@ function TransactionForm({
   return (
     <Screen scroll={false} wide={tablet}>
       <TaskHeader
-        title={modoHipotese ? (hipoteseAberta ? 'Editar hipótese' : 'Nova hipótese') : editing ? 'Editar lançamento' : 'Novo lançamento'}
+        title={editing ? 'Editar lançamento' : 'Novo lançamento'}
         onClose={() => router.back()}
         action={
           <Button
-            label={modoHipotese ? 'Adicionar à hipótese' : saving ? 'Salvando…' : 'Salvar'}
+            label={saving ? 'Salvando…' : 'Salvar'}
             size="sm"
-            disabled={guardada || saving || !!correcaoDaDivida.erro || (formSerie !== null && !serieOk) || (formCompra !== null && !compraOk)}
+            disabled={saving || !!correcaoDaDivida.erro || (formSerie !== null && !serieOk) || (formCompra !== null && !compraOk)}
             loading={saving}
             onPress={editing?.recurring_id || editing?.installment_plan_id || editing?.debt_id ? salvarComAlcance : onSubmit}
           />
@@ -1531,12 +1496,12 @@ function TransactionForm({
           botão: ali o caminho é editar a série, não criar uma segunda. Nem o PAGAMENTO DE DÍVIDA:
           a parcela já vem do cronograma da dívida, e uma recorrente ao lado contaria duas vezes.
         */}
-        {!hipoteseAberta && (!editing || !(editing.recurring_id || editing.installment_plan_id || editing.debt_id)) ? (
+        {!editing || !(editing.recurring_id || editing.installment_plan_id || editing.debt_id) ? (
           <View style={styles.errorActions}>
             <Button label="Repetir lançamento" variant="secondary" size="sm" onPress={() => {
               const values = getValues();
               const destino = { pathname: '/finance/recurring' as const, params: {
-                ...paraHipotese, create: '1', kind: values.kind === 'income' ? 'income' : 'expense',
+                create: '1', kind: values.kind === 'income' ? 'income' : 'expense',
                 amount: String(values.amount_cents), description: values.description,
                 merchant: values.merchant?.trim() ?? '',
                 category: values.category ?? '', account: values.account_id ?? '', start: values.occurred_at,
@@ -1547,7 +1512,7 @@ function TransactionForm({
               else router.replace(destino);
             }} />
             {!editing ? (
-              <Button label="Financiamento" variant="secondary" size="sm" onPress={() => router.push({ pathname: '/finance/debts', params: { ...paraHipotese, create: 'financing' } })} />
+              <Button label="Financiamento" variant="secondary" size="sm" onPress={() => router.push({ pathname: '/finance/debts', params: { create: 'financing' } })} />
             ) : null}
           </View>
         ) : null}

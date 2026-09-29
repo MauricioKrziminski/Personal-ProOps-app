@@ -19,13 +19,15 @@ import { Radius, Space } from '@/design/tokens';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { VerMais } from '@/components/ui/ver-mais';
 import { useAosPoucos, useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
-import { type CycleLine, type CycleRow, type CycleView, useCicloSimulado, useCycleLines, useCycleMonth, useCycleSeries, useDraftLines, useInvoice } from '@/hooks/use-finance';
+import { type CycleLine, type CycleRow, type CycleView, type Draft, useCicloSimulado, useCycleLines, useCycleMonth, useCycleSeries, useDraftLines, useInvoice } from '@/hooks/use-finance';
 import { describeCycle } from '@/lib/cycle-label';
 import { rotaDaLinha } from '@/lib/cycle-routes';
 import { isoToBR, mesmoMes } from '@/lib/dates';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
 import { fechamentoComHipoteses, linhasDasHipoteses, type HipoteseNoCiclo } from '@/lib/rascunho-no-ciclo';
-import { detalhadasValidas, motivoDaHipotese, registrosParaSimular, type HipoteseDetalhada } from '@/lib/rascunho';
+import { motivoDaHipotese } from '@/lib/rascunho';
+import { registroDaHipotese } from '@/lib/hipotese';
+import { useRascunho } from '@/hooks/use-rascunho';
 
 /**
  * **Por que o ciclo fechou naquele valor** — a tela que justifica o número da home.
@@ -80,7 +82,7 @@ export default function CycleDetailScreen() {
   const brl = useBRL();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
-  const params = useLocalSearchParams<{ month?: string; view?: string; tipo?: string; rascunho?: string; detalhadas?: string }>();
+  const params = useLocalSearchParams<{ month?: string; view?: string; tipo?: string; hipoteses?: string }>();
   const view = (params.view === 'civil' ? 'civil' : 'cycle') as CycleView;
   /*
     ⚠️ **Sem `month` no link, cai no ciclo CORRENTE — não em string vazia.**
@@ -95,10 +97,15 @@ export default function CycleDetailScreen() {
 
   const serie = useCycleSeries(month, month, view);
   const linhas = useCycleLines(month, view);
-  // Hipóteses DETALHADAS (29/09/2026): o fechamento e as linhas vêm de `simular` — os registros
-  // criados de verdade, lidos e desfeitos. As rápidas somam por cima, como antes.
-  const detalhadas = useMemo(() => lerDetalhadas(params.detalhadas), [params.detalhadas]);
-  const registros = useMemo(() => registrosParaSimular(detalhadas), [detalhadas]);
+  // Aberto pela Projeção com rascunho (`?hipoteses=1`), o ciclo lê as hipóteses do APARELHO (spec
+  // 2026-09-29): as hipóteses viram registros em `simular` — criados, lidos e desfeitos — e os
+  // adiantamentos somam por cima, pelo motor da Projeção. De outro lugar, o ciclo é o real.
+  const comHipoteses = params.hipoteses === '1';
+  const { rascunho: noAparelho } = useRascunho();
+  const registros = useMemo(
+    () => (comHipoteses ? noAparelho.hipoteses.flatMap((h) => registroDaHipotese(h) ?? []) : []),
+    [comHipoteses, noAparelho.hipoteses],
+  );
   const comDetalhadas = registros.length > 0;
   const simulado = useCicloSimulado(registros, month, view);
   const cicloReal = comDetalhadas
@@ -107,7 +114,9 @@ export default function CycleDetailScreen() {
   const linhasBase = comDetalhadas ? simulado.data?.linhas : linhas.data;
   // As hipóteses da Projeção, quando se chega por ela com um rascunho (28/09/2026): entram na lista
   // e no fechamento como se fossem reais, e nada é salvo.
-  const hipoteses = useMemo(() => lerRascunho(params.rascunho), [params.rascunho]);
+  const adiantamentos = comHipoteses ? noAparelho.adiantamentos : SEM_ADIANTAMENTOS;
+  const hipoteses = useMemo(() => paraOCiclo(adiantamentos), [adiantamentos]);
+  const gruposDeAdiantar = new Set(adiantamentos.map((d) => d.grupo)).size;
   const rascunho = useDraftLines(hipoteses, cicloReal?.ini, cicloReal?.fim);
   const comRascunho = hipoteses.length > 0;
   const ciclo = cicloReal && rascunho.data
@@ -171,10 +180,10 @@ export default function CycleDetailScreen() {
   const errosDaSimulacao = simulado.data?.erros ?? [];
   const fechamento = (
     <>
-      <Fechamento ciclo={ciclo} month={month} hipoteses={hipoteses.length + detalhadas.length} />
+      <Fechamento ciclo={ciclo} month={month} hipoteses={registros.length + gruposDeAdiantar} />
       {errosDaSimulacao.map((e, i) => (
         <ThemedText key={i} type="small" themeColor="danger">
-          {`Não deu para simular ${e.indice !== undefined ? (detalhadas[e.indice]?.titulo ?? 'uma hipótese') : 'uma leitura'}: ${motivoDaHipotese(e)}`}
+          {`Não deu para simular ${e.indice !== undefined ? `a ${e.indice + 1}ª hipótese` : 'uma leitura'}: ${motivoDaHipotese(e)}`}
         </ThemedText>
       ))}
     </>
@@ -421,24 +430,20 @@ const styles = StyleSheet.create({
   },
 });
 
-/** O rascunho que a Projeção manda pela rota. Inválido vira nenhum — a tela abre com o real. */
-function lerRascunho(texto: string | undefined): HipoteseNoCiclo[] {
-  if (!texto) return [];
-  try {
-    const lido: unknown = JSON.parse(texto);
-    return Array.isArray(lido) ? (lido as HipoteseNoCiclo[]) : [];
-  } catch {
-    return [];
-  }
-}
+const SEM_ADIANTAMENTOS: Draft[] = [];
 
-/** As hipóteses detalhadas que a Projeção manda pela rota. Inválido vira nenhuma. */
-function lerDetalhadas(texto: string | undefined): HipoteseDetalhada[] {
-  if (!texto) return [];
-  try {
-    const lido: unknown = JSON.parse(texto);
-    return Array.isArray(lido) ? detalhadasValidas(lido) : [];
-  } catch {
-    return [];
-  }
+/**
+ * Os adiantamentos como o ciclo os recebe: o draft do motor e o nome. As parcelas que um
+ * adiantamento cancela levam o nome dele (só o draft do pagamento tem `rotulo`).
+ */
+function paraOCiclo(drafts: readonly Draft[]): HipoteseNoCiclo[] {
+  const doGrupo = new Map(drafts.filter((d) => d.grupo && d.rotulo).map((d) => [d.grupo!, d.rotulo!]));
+  return drafts.map((d) => ({
+    kind: d.kind,
+    amount_cents: d.amount_cents,
+    start: d.start,
+    installments: d.installments,
+    mode: d.mode,
+    rotulo: d.rotulo ?? (d.grupo ? doGrupo.get(d.grupo) : undefined),
+  }));
 }

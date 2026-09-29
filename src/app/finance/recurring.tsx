@@ -111,7 +111,7 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 export default function RecurringScreen() {
-  const params = useLocalSearchParams<{ create?: string; edit?: string; kind?: string; amount?: string; description?: string; merchant?: string; category?: string; account?: string; start?: string; hipotese?: string; deHipotese?: string }>();
+  const params = useLocalSearchParams<{ create?: string; edit?: string; kind?: string; amount?: string; description?: string; merchant?: string; category?: string; account?: string; start?: string; deHipotese?: string; repete?: string }>();
   const theme = useTheme();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
@@ -130,25 +130,18 @@ export default function RecurringScreen() {
   const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
   // `?create=1` já nasce vindo de fora (é o "Repetir lançamento" e o atalho do Financeiro).
   const volta = useVoltarQuandoFechar(params.create === '1');
-  /**
-   * `?hipotese=` (29/09/2026, spec hipóteses detalhadas): a série vira hipótese do "E se…?" —
-   * `nova` cria, um id edita aquela. Não grava: guarda a ENTRADA no rascunho.
-   */
-  const { rascunho, adicionarDetalhada, trocarDetalhada, setRapidas } = useRascunho();
-  const modoHipotese = Boolean(params.hipotese);
-  // Guardada uma vez, o segundo toque (antes de a tela fechar) não soma outra hipótese igual.
-  const guardada = useRef(false);
-  const hipoteseAberta = rascunho.detalhadas.find((h) => h.id === params.hipotese && h.tipo === 'recorrente') ?? null;
+  /** `?deHipotese=`: aberta pelo "Aplicar" do "E se…?" — criar tira aquela hipótese do rascunho. */
+  const { tirar } = useRascunho();
   /** A tela ainda está aberta? O que é dela (toast, fechar) só roda com ela montada. */
   const [montado] = useState(() => ({ current: true }));
   useEffect(() => () => {
     montado.current = false;
   }, [montado]);
 
-  const [form, setForm] = useState<SerieForm | null>(() => hipoteseAberta?.tipo === 'recorrente'
-    ? { ...serieDoRegistro({ ...hipoteseAberta.entrada, id: '' }), id: undefined }
-    : params.create === '1' ? {
+  const [form, setForm] = useState<SerieForm | null>(() => params.create === '1' ? {
     ...SERIE_VAZIA, kind: params.kind === 'income' ? 'income' : 'expense',
+    // a frequência da hipótese (o "Aplicar"); fora dela, o padrão
+    preset: params.repete === 'weekly' || params.repete === 'yearly' ? params.repete : SERIE_VAZIA.preset,
     amountCents: Number(params.amount) > 0 ? Number(params.amount) : 0,
     description: params.description ?? '', merchant: params.merchant ?? '', category: params.category || null,
     accountId: params.account || null,
@@ -293,7 +286,6 @@ export default function RecurringScreen() {
       return;
     }
     if (!podeSalvar || !inicioDate || !rrulePrevia) return;
-    // Montada UMA vez: o salvar real e a hipótese do "E se…?" recebem o mesmo objeto.
     const entrada: EntradaRecorrente = {
       kind: form.kind,
       amount_cents: form.amountCents,
@@ -306,20 +298,11 @@ export default function RecurringScreen() {
       end_date: form.fim ? brToISO(form.fim) : null,
       auto_confirm: form.autoConfirm,
     };
-    if (modoHipotese) {
-      if (guardada.current) return;
-      guardada.current = true;
-      const h = { tipo: 'recorrente' as const, entrada, titulo: entrada.description || 'Recorrente' };
-      if (hipoteseAberta) trocarDetalhada(hipoteseAberta.id, h);
-      else adicionarDetalhada(h);
-      volta.aoFechar(() => setForm(null));
-      return;
-    }
-    // Pela PROMESSA: aberta pelo "Aplicar" de uma rápida, ela sai do rascunho mesmo com a tela já
+    // Pela PROMESSA: aberta pelo "Aplicar" de uma hipótese, ela sai do rascunho mesmo com a tela já
     // fechada; o que é da tela (toast, fechar), só com ela montada.
     create.mutateAsync(entrada).then(
       () => {
-        if (params.deHipotese) setRapidas((antes) => antes.filter((_, i) => i !== Number(params.deHipotese)));
+        if (params.deHipotese) tirar(params.deHipotese);
         if (!montado.current) return;
         toast({ message: 'Recorrência criada.', tone: 'success' });
         volta.aoFechar(() => setForm(null));
@@ -635,11 +618,11 @@ export default function RecurringScreen() {
       <Sheet visible={form !== null} onClose={() => volta.aoFechar(() => setForm(null))}>
 
           <TaskHeader
-            title={modoHipotese ? (hipoteseAberta ? 'Editar hipótese' : 'Nova hipótese') : form?.id ? 'Editar recorrência' : 'Nova recorrência'}
+            title={form?.id ? 'Editar recorrência' : 'Nova recorrência'}
             onClose={() => volta.aoFechar(() => setForm(null))}
             action={
               <Button
-                label={modoHipotese ? 'Adicionar à hipótese' : form?.id ? 'Salvar' : 'Criar'}
+                label={form?.id ? 'Salvar' : 'Criar'}
                 size="sm"
                 loading={create.isPending || editar.isPending || editarTudo.isPending}
                 disabled={!podeSalvar || create.isPending || editar.isPending || editarTudo.isPending}
