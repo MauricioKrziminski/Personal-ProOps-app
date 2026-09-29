@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { faltaNaHipotese, paramsDoAplicar, registroDaHipotese, resumoDaHipotese, type Hipotese } from './hipotese.ts';
+import { dataDaHipotese, faltaNaHipotese, pendenciaDoAplicar, paramsDoAplicar, registroDaHipotese, resumoDaHipotese, type Hipotese } from './hipotese.ts';
+import { isoToBR, localISODate } from './dates.ts';
 
 const base: Hipotese = { id: 'h1', kind: 'expense', forma: 'uma', valor_cents: 10000, parcelas: 2, repete: 'monthly', conta: 'c1', data: '2026-10-05' };
 const brl = (c: number) => `R$ ${(c / 100).toFixed(2)}`;
@@ -69,4 +70,27 @@ test('aplicar abre o formulário certo, com tudo', () => {
   assert.deepEqual(paramsDoAplicar({ ...base, forma: 'repete', repete: 'weekly' }), { pathname: '/finance/recurring', params: { create: '1', deHipotese: 'h1', kind: 'expense', amount: '10000', start: '05/10/2026', account: 'c1', repete: 'weekly' } });
   assert.deepEqual(paramsDoAplicar({ ...base, forma: 'financiamento', parcelas: 48 }), { pathname: '/finance/debts', params: { create: 'financing', deHipotese: 'h1', parcela: '10000', parcelas: '48', conta: 'c1', data: '05/10/2026' } });
   assert.deepEqual(paramsDoAplicar({ ...base, conta: null }).params, { deHipotese: 'h1', kind: 'expense', amount: '10000', data: '05/10/2026', parcelas: '1' });
+});
+
+test('hipótese com data que já passou vale a partir de HOJE: na simulação, na linha e no Aplicar (revisão final)', () => {
+  // O rascunho mora no aparelho: "Entra R$ 2.000 em 29/09" ainda está lá em 03/10. Com a data
+  // crua, a receita atrasada saía da projeção e a parcela caía numa fatura já fechada, em silêncio.
+  const hoje = localISODate();
+  const velha = { ...base, data: '2020-01-01' };
+  assert.equal(((registroDaHipotese(velha, 0)!.dados.linhas as any[])[0]).occurred_at, hoje);
+  assert.equal(registroDaHipotese({ ...velha, forma: 'parcelado', parcelas: 3 }, 0)!.dados.p_occurred_at, hoje);
+  assert.equal(paramsDoAplicar(velha).params.data, isoToBR(hoje));
+  assert.match(resumoDaHipotese(velha, brl, nome), new RegExp(isoToBR(hoje)));
+  assert.equal(dataDaHipotese(velha), hoje);
+  assert.equal(dataDaHipotese({ ...base, data: '2099-01-01' }), '2099-01-01');
+});
+
+test('Aplicar de uma data futura fora do cartão nasce A PAGAR, como foi simulado (revisão final)', () => {
+  // "Sai R$ 800 em 20/10, conta corrente" → Aplicar → Salvar gravava PAGO, e o saldo mexia hoje.
+  assert.deepEqual(pendenciaDoAplicar('20/10/2026', 'checking', '2026-09-29'), { pending: true, due_at: '20/10/2026' });
+  assert.deepEqual(pendenciaDoAplicar('20/10/2026', null, '2026-09-29'), { pending: true, due_at: '20/10/2026' }, 'sem conta também');
+  // no cartão quem decide é a fatura; hoje e no passado é o lançamento comum
+  assert.deepEqual(pendenciaDoAplicar('20/10/2026', 'credit_card', '2026-09-29'), { pending: false, due_at: null });
+  assert.deepEqual(pendenciaDoAplicar('29/09/2026', 'checking', '2026-09-29'), { pending: false, due_at: null });
+  assert.deepEqual(pendenciaDoAplicar(undefined, 'checking', '2026-09-29'), { pending: false, due_at: null });
 });

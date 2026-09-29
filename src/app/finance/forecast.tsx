@@ -42,7 +42,7 @@ import {
   type Draft,
 } from '@/hooks/use-finance';
 import { motivoDaHipotese } from '@/lib/rascunho';
-import { faltaNaHipotese, novaHipotese, paramsDoAplicar, resumoDaHipotese, type Hipotese } from '@/lib/hipotese';
+import { dataDaHipotese, faltaNaHipotese, novaHipotese, paramsDoAplicar, resumoDaHipotese, type Hipotese } from '@/lib/hipotese';
 import { ondeMuda } from '@/lib/onde-muda';
 import { CamposDaHipotese } from '@/components/finance/campos-da-hipotese';
 import { OndeMuda } from '@/components/finance/onde-muda';
@@ -266,14 +266,19 @@ export default function ForecastScreen() {
   const regua = useMonthRuler('projecao');
   const mensal = useForecastMonths(dias, [], emMes, regua.view);
   const simulando = hipoteses.length > 0 || adiantamentos.length > 0;
+  const temCompletas = hipoteses.some((h) => !faltaNaHipotese(h));
   const simulacao = useSimulacao({
     dias, modo: emMes ? 'mes' : 'dia', view: regua.view, hipoteses, adiantamentos,
-    porConta: hipoteses.length > 0, enabled: simulando,
+    // Só a hipótese COMPLETA vai à simulação: com só incompletas, ligada ela ficaria pendente
+    // para sempre (a consulta desligada fica `isPending`) e o "Onde muda" em esqueleto.
+    porConta: temCompletas, enabled: temCompletas || adiantamentos.length > 0,
   });
   // O "antes" do Onde muda: o horizonte real por conta e por cartão.
-  const horizonte = useHorizonteReal(dias, hipoteses.length > 0);
+  const horizonte = useHorizonteReal(dias, temCompletas);
   // Da resposta ANTERIOR (placeholder) o índice pode já apontar para outra linha: sem erro até a nova.
   const errosDaSimulacao = simulacao.isPlaceholderData ? [] : (simulacao.data?.erros ?? []);
+  /** A leitura por conta que falha DENTRO do `simular` (a RPC responde 200) é erro, não espera. */
+  const leituraPorContaFalhou = errosDaSimulacao.some((e) => e.leitura === 'contas' || e.leitura === 'cartoes');
   /** As que vão à simulação — o índice do erro é o índice aqui. */
   const completas = hipoteses.filter((h) => !faltaNaHipotese(h));
   const nomeDaConta = (id: string) => accounts.data?.find((a) => a.id === id)?.name ?? null;
@@ -622,7 +627,8 @@ export default function ForecastScreen() {
   const editarHipotese = (h: Hipotese) => {
     setEditando(h.id);
     setTipoDaFolha('hipotese');
-    setHipotese(h);
+    // a data que já passou abre em hoje: o calendário não deixa escolher antes disso
+    setHipotese({ ...h, data: dataDaHipotese(h) });
     setSheetAberto(true);
   };
   const editarAdiantamento = (grupo: string, d: Draft) => {
@@ -802,7 +808,7 @@ export default function ForecastScreen() {
             </Deslizavel>
           );
         })}
-        {hipoteses.length > 0 ? (
+        {temCompletas && !leituraPorContaFalhou ? (
           mudancas ? (
             <OndeMuda mudancas={mudancas} onAbrir={(conta) => router.push({ pathname: '/finance/hipotese', params: { conta, dias: String(dias) } })} />
           ) : simulacao.isError || horizonte.contas.isError || horizonte.cartoes.isError ? null : (

@@ -24,6 +24,7 @@ import { Icon } from '@/components/ui/icon';
 import { Screen } from '@/components/ui/screen';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useRascunho } from '@/hooks/use-rascunho';
+import { pendenciaDoAplicar } from '@/lib/hipotese';
 import type { EntradaLancamento, EntradaParcelada } from '@/lib/escrita';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { Segmented } from '@/components/ui/segmented';
@@ -300,6 +301,10 @@ function TransactionForm({
   const umaData = Boolean(editing?.recurring_id && !editing.invoice_id);
   const dataDaSerie = umaData && editing?.status === 'pending' ? (editing.due_at ?? editing.occurred_at) : null;
 
+  // Aberto pelo "Aplicar": data futura fora do cartão nasce a pagar, como foi simulada.
+  const doAplicar = !editing && daRapida
+    ? pendenciaDoAplicar(daRapida.data, accounts?.find((a) => a.id === conta)?.type, localISODate())
+    : null;
   const { control, handleSubmit, setValue, getValues, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),
     // `editing` já chegou resolvido pelo gate — sem `useEffect`+`reset`, sem corrida.
@@ -318,9 +323,9 @@ function TransactionForm({
       fee_cents: jurosDoPix?.amount_cents ?? 0,
       auto_confirm: editing?.auto_confirm ?? false,
       occurred_at: daRapida?.data ?? isoToBR(dataDaSerie ?? editing?.occurred_at ?? localISODate()),
-      pending: editing ? editing.status === 'pending' : false,
+      pending: editing ? editing.status === 'pending' : (doAplicar?.pending ?? false),
       installment_occurrence: Boolean(editing?.installment_plan_id),
-      due_at: dataDaSerie ? isoToBR(dataDaSerie) : editing?.due_at ? isoToBR(editing.due_at) : null,
+      due_at: dataDaSerie ? isoToBR(dataDaSerie) : editing?.due_at ? isoToBR(editing.due_at) : (doAplicar?.due_at ?? null),
     },
   });
 

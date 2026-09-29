@@ -1,4 +1,4 @@
-import { isoToBR } from './dates.ts';
+import { brToISO, isValidBRDate, isoToBR, localISODate } from './dates.ts';
 import { argsDaParcelada, linhaDaRecorrente, linhaDoFinanciamento, linhasDoLancamento } from './escrita.ts';
 import { montaRRule } from './serie.ts';
 
@@ -42,6 +42,17 @@ export function novaHipotese(hoje: string): Hipotese {
   };
 }
 
+/**
+ * O dia em que a hipótese vale: o dela, ou HOJE quando ele já passou. O rascunho mora no aparelho
+ * e fica lá dias; com a data crua, a receita "atrasada" saía da projeção e a parcela caía numa
+ * fatura já fechada, sem aviso (revisão final, 29/09/2026). A simulação, a linha e o Aplicar leem
+ * daqui — os três dizem o mesmo dia.
+ */
+export function dataDaHipotese(h: Hipotese): string {
+  const hoje = localISODate();
+  return h.data < hoje ? hoje : h.data;
+}
+
 /** O que falta para a hipótese entrar na simulação, em uma frase — ou `null` quando está pronta. */
 export function faltaNaHipotese(h: Hipotese): string | null {
   if (!(h.valor_cents > 0)) return 'Digite o valor';
@@ -60,8 +71,9 @@ export function faltaNaHipotese(h: Hipotese): string | null {
  * `posicao` é a da hipótese no rascunho: a dívida tem nome ÚNICO no espaço, e dois financiamentos
  * chamados "Hipótese" faziam o segundo voltar 23505 (medido no staging, 29/09/2026).
  */
-export function registroDaHipotese(h: Hipotese, posicao: number): RegistroSimulado | null {
-  if (faltaNaHipotese(h)) return null;
+export function registroDaHipotese(hipotese: Hipotese, posicao: number): RegistroSimulado | null {
+  if (faltaNaHipotese(hipotese)) return null;
+  const h = { ...hipotese, data: dataDaHipotese(hipotese) };
   switch (h.forma) {
     case 'uma':
       return {
@@ -110,7 +122,7 @@ const REPETE: Record<Repete, string> = { weekly: 'toda semana', monthly: 'todo m
 /** A linha da hipótese: lado, valor e forma · onde · quando. */
 export function resumoDaHipotese(h: Hipotese, brl: (c: number) => string, nomeDaConta: (id: string) => string | null): string {
   const onde = h.conta ? (nomeDaConta(h.conta) ?? 'conta que não existe mais') : 'sem conta (só a visão geral)';
-  const quando = isoToBR(h.data);
+  const quando = isoToBR(dataDaHipotese(h));
   if (h.forma === 'financiamento') return `Financiamento de ${h.parcelas}× ${brl(h.valor_cents)} · ${onde} · 1ª em ${quando}`;
   const lado = h.kind === 'income' ? 'Entra' : 'Sai';
   const como = h.forma === 'parcelado' ? ` em ${h.parcelas}×` : h.forma === 'repete' ? ` ${REPETE[h.repete]}` : '';
@@ -125,7 +137,7 @@ export function paramsDoAplicar(h: Hipotese):
   | { pathname: '/finance/transaction-form'; params: Record<string, string> }
   | { pathname: '/finance/recurring'; params: Record<string, string> }
   | { pathname: '/finance/debts'; params: Record<string, string> } {
-  const data = isoToBR(h.data);
+  const data = isoToBR(dataDaHipotese(h));
   if (h.forma === 'repete') {
     return {
       pathname: '/finance/recurring',
@@ -142,4 +154,18 @@ export function paramsDoAplicar(h: Hipotese):
     pathname: '/finance/transaction-form',
     params: { deHipotese: h.id, kind: h.kind, amount: String(h.valor_cents), data, parcelas: String(h.forma === 'parcelado' ? h.parcelas : 1), ...(h.conta ? { conta: h.conta } : {}) },
   };
+}
+
+/**
+ * O status com que o formulário do "Aplicar" nasce: data futura fora do cartão é "a pagar", com o
+ * vencimento na data — como a simulação a tratou. Nascendo paga, o saldo mexia HOJE e o aplicado
+ * deixava de ser o simulado (revisão final, 29/09/2026). No cartão quem decide é a fatura.
+ */
+export function pendenciaDoAplicar(
+  dataBR: string | undefined,
+  tipoDaConta: string | null | undefined,
+  hoje: string,
+): { pending: boolean; due_at: string | null } {
+  const futura = !!dataBR && isValidBRDate(dataBR) && brToISO(dataBR) > hoje;
+  return futura && tipoDaConta !== 'credit_card' ? { pending: true, due_at: dataBR } : { pending: false, due_at: null };
 }

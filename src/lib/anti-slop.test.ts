@@ -1695,6 +1695,9 @@ test('Formulários sem modo hipótese: a hipótese é feita na Projeção, e o f
 
 test('Lançamento aberto pelo "Aplicar" de uma rápida: os dois caminhos de salvar a tiram do rascunho', () => {
   const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  // Data futura fora do cartão nasce a pagar, com o vencimento na data (a pura tem teste próprio).
+  assert.match(fonte, /pending: editing \? editing\.status === 'pending' : \(doAplicar\?\.pending \?\? false\)/);
+  assert.match(fonte, /\(doAplicar\?\.due_at \?\? null\)/);
   // Pelo ID da hipótese, nunca pela posição: a lista pode ter mudado com o formulário aberto.
   assert.match(fonte, /const tirarRapida = \(\) => \{\s*if \(daRapida\) tirar\(daRapida\.id\);/);
   // a compra parcelada nova e o lançamento: pela PROMESSA (revisão final, 29/09/2026) — o

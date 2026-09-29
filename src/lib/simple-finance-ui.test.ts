@@ -3670,3 +3670,16 @@ test('Detalhe da hipótese — conta que não existe mais, rascunho vazio e erro
   const erro = screen(hipoteseFile, { params: { conta: 'cc' }, forecastAccounts: [{ id: 'cc', name: 'Itaú', type: 'checking' }], preferencias: { 'projecao:rascunho': rascunho }, horizonte: { contas: [], cartoes: [] }, simulacao: { contas: null, cartoes: [], erros: [{ leitura: 'contas', mensagem: 'x', codigo: 'XX000' }] } });
   assert.ok(erro.nodes().some((n: any) => n.type === 'ErrorCard'));
 });
+
+test('E se: só com hipótese incompleta nada é simulado e o "Onde muda" não fica em esqueleto (revisão final)', () => {
+  // A parcelada da v1 sem conta fica fora da simulação: a consulta desligada fica `isPending`
+  // para sempre, e o bloco desenhava esqueleto eterno (frontend.md, consulta desligada).
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'cc' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [{ kind: 'expense', amount_cents: 900, start: '2026-10-02', installments: 3, mode: 'total', grupo: 'g' }], detalhadas: [] }) } });
+  assert.equal(ui.simulacoes.at(-1).enabled, false);
+  assert.equal(ui.nodes().some((n: any) => n.type === 'SkeletonList'), false);
+  // e a leitura que falha DENTRO do simular vira faixa de erro, não esqueleto ao lado dela
+  const hipoteses = [{ id: 'a', kind: 'expense', forma: 'uma', valor_cents: 1000, parcelas: 1, repete: 'monthly', conta: 'cc', data: '2026-10-05' }];
+  const erro = screen(forecastFile, { forecastAccounts: [{ id: 'cc' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 2, hipoteses, adiantamentos: [] }) }, simulacao: { forecast: [], contas: null, cartoes: null, erros: [{ leitura: 'contas', mensagem: 'x', codigo: 'XX000' }] } });
+  assert.equal(erro.nodes().some((n: any) => n.type === 'SkeletonList'), false);
+  assert.ok(erro.nodes().some((n: any) => n.type === 'ErrorBand' || (typeof n.type === 'function' && n.type.name === 'ErrorBand')));
+});
