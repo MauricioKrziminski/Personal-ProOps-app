@@ -1870,3 +1870,14 @@ test('Atalhos de lançamento: o formulário EMPILHA o outro tipo (nunca troca), 
   const hoje = readFileSync(join(SRC, 'app/(tabs)/today/index.tsx'), 'utf8');
   for (const k of ['lancamento', 'recorrente', 'financiamento']) assert.match(hoje, new RegExp(`ATALHOS_DE_LANCAMENTO\\.${k}`));
 });
+
+test('A conversão passa pela RPC converter_registro e invalida o financeiro', () => {
+  const fonte = readFileSync(join(SRC, 'hooks/use-finance.ts'), 'utf8');
+  const i = fonte.indexOf('export function useConverterRegistro');
+  assert.ok(i > 0);
+  const corpo = fonte.slice(i, i + 900);
+  assert.match(corpo, /supabase\.rpc\('converter_registro'/);
+  assert.match(corpo, /p_alcance: v\.alcance/);
+  assert.match(corpo, /p_destino: v\.destino/);
+  assert.match(corpo, /onSuccess: invalidate/);
+});

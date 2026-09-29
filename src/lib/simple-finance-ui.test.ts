@@ -210,6 +210,7 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
     useSaveRecurringOne: () => mutation('saveRecurringOne'),
     useTransaction: (id: string) => ({ ...query, isSuccess: true, data: (options.txs ?? [{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared', recurring_id: null, installment_plan_id: null }]).find((t: any) => t.id === id) ?? null }),
     usePayInvoice: () => mutation('payInvoice'),
+    useConverterRegistro: () => mutation('converterRegistro'),
     useArquivados: () => ({ ...query, isSuccess: true, data: options.arquivados ?? [] }),
     // O que a Projeção mandou simular: os adiantamentos (drafts de caixa) e as hipóteses.
     useSimulacao: (o: any) => {

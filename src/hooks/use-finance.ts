@@ -20,6 +20,7 @@ import { filtroDoEstado } from '@/lib/data-da-compra';
 import type { HipoteseNoCiclo, OcorrenciaDaHipotese } from '@/lib/rascunho-no-ciclo';
 import { registroDaHipotese, type Hipotese, type RegistroSimulado } from '@/lib/hipotese';
 import type { CartaoNoHorizonte, ContaNoHorizonte } from '@/lib/onde-muda';
+import type { Alcance, OrigemDaConversao } from '@/lib/lancar';
 import {
   DESCRICAO_JUROS_DO_PIX,
   argsDaParcelada,
@@ -1120,6 +1121,22 @@ export function useSimulacao(o: {
         erros: r?.erros ?? [],
       };
     },
+  });
+}
+
+/**
+ * Mudar o tipo de um registro que existe (spec 2026-09-29, Parte 2): a origem encerra pelo alcance e
+ * o destino nasce, numa transação só no banco — nunca dois passos pelo app.
+ */
+export function useConverterRegistro() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (v: { origem: OrigemDaConversao; alcance: Alcance; destino: RegistroSimulado }) => {
+      const { data, error } = await supabase.rpc('converter_registro', { p_origem: { tipo: v.origem.tipo, id: v.origem.id }, p_alcance: v.alcance, p_destino: v.destino as never });
+      if (error) throw error;
+      return data as { ids: string[] };
+    },
+    onSuccess: invalidate,
   });
 }
 
