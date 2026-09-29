@@ -27,6 +27,17 @@ export function useRascunho() {
       mudar((r) => ({ ...r, detalhadas: r.detalhadas.map((d) => (d.id === id ? ({ ...h, id } as HipoteseDetalhada) : d)) })),
     tirarDetalhada: (id: string) => mudar((r) => ({ ...r, detalhadas: r.detalhadas.filter((d) => d.id !== id) })),
     limpar: () => setTexto(''),
+    /**
+     * O "Desfazer" de Tirar/Limpar: devolve SÓ o que saiu, somado ao rascunho de AGORA. Regravar a
+     * cópia inteira de antes trazia de volta o que saiu depois — uma hipótese já aplicada, contada
+     * duas vezes e pronta para duplicar.
+     */
+    devolver: (saiu: Pick<Rascunho, 'rapidas' | 'detalhadas'>) =>
+      mudar((r) => ({
+        ...r,
+        rapidas: [...r.rapidas, ...saiu.rapidas],
+        detalhadas: [...r.detalhadas, ...saiu.detalhadas.filter((h) => !r.detalhadas.some((d) => d.id === h.id))],
+      })),
     restaurar: (r: Rascunho) => setTexto(gravarRascunho(r)),
   };
 }

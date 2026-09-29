@@ -142,7 +142,10 @@ export default function CycleDetailScreen() {
     return agrupar(doLado, brl);
   }, [linhasBase, simulado.data, rascunho.data, hipoteses, lado, brl]);
 
-  if (serie.isError || linhas.isError || (comRascunho && rascunho.isError) || (comDetalhadas && simulado.isError)) {
+  // A leitura que falha DENTRO do `simular` volta em `erros` (a RPC responde 200): com o ciclo ou
+  // as linhas nulos, é erro — senão a tela ficava no esqueleto para sempre.
+  const leituraSimuladaFalhou = comDetalhadas && simulado.isSuccess && (!simulado.data?.ciclo || !simulado.data?.linhas);
+  if (serie.isError || linhas.isError || (comRascunho && rascunho.isError) || (comDetalhadas && simulado.isError) || leituraSimuladaFalhou) {
     return (
       <Screen>
         <ErrorCard

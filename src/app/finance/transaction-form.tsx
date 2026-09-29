@@ -325,7 +325,8 @@ function TransactionForm({
       merchant: editing?.merchant ?? hLanc?.merchant ?? hParc?.merchant ?? null,
       account_id: editing?.account_id ?? hLanc?.account_id ?? hParc?.accountId ?? (conta && accounts?.some((a) => a.id === conta) ? conta : null),
       counterparty_account_id: editing?.counterparty_account_id ?? hLanc?.counterparty_account_id ?? null,
-      installments: hParc?.installments ?? daRapida?.parcelas ?? (parcelada ? 2 : 1),
+      // Receita não parcela: a rápida de entrada "em N vezes" abre à vista, com o total.
+      installments: hParc?.installments ?? (daRapida?.kind === 'expense' ? daRapida.parcelas : undefined) ?? (parcelada ? 2 : 1),
       paid_installments: String(hParc?.paidInstallments ?? 0),
       fee_cents: jurosDoPix?.amount_cents ?? hLanc?.fee_cents ?? 0,
       auto_confirm: editing?.auto_confirm ?? hLanc?.auto_confirm ?? false,
@@ -1210,7 +1211,9 @@ function TransactionForm({
           render={({ field }) => (
             <Field
               label={kind === 'transfer' ? 'Da conta' : 'Conta'}
-              error={contas.isError ? 'Não deu para carregar as contas.' : undefined}>
+              // Sem a fileira de parcelas (sem conta ou fora de gasto), o erro dela mora aqui:
+              // senão o Salvar recusava sem dizer por quê.
+              error={contas.isError ? 'Não deu para carregar as contas.' : !podeParcelarAqui ? errors.installments?.message : undefined}>
               {/* Afirmar "não tem conta" exige a consulta respondida: carregando, era o
                   "Cadastrar uma conta" que aparecia para quem tem contas. */}
               {contas.isPending ? (

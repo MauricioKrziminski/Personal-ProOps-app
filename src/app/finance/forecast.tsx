@@ -225,7 +225,7 @@ export default function ForecastScreen() {
    * mantém todo o fluxo das rápidas como era.
    */
   const toast = useToast();
-  const { rascunho, setRapidas, limpar, restaurar, tirarDetalhada } = useRascunho();
+  const { rascunho, setRapidas, limpar, devolver, tirarDetalhada } = useRascunho();
   const rascunhos = rascunho.rapidas;
   const setRascunhos = (v: Draft[] | ((antes: Draft[]) => Draft[])) =>
     setRapidas(typeof v === 'function' ? v : () => v);
@@ -303,22 +303,27 @@ export default function ForecastScreen() {
   const salvarFinanciamento = useSaveDebt();
   const aplicando = useRef<string | null>(null);
   const gravarDetalhada = (h: HipoteseDetalhada, depois: (ok: boolean) => void) => {
-    const fim = {
-      onSuccess: () => {
+    // Pela PROMESSA, nunca pelo `onSuccess` da chamada: o TanStack não chama o callback por chamada
+    // de uma tela que desmontou, e sair da Projeção no meio do salvamento deixava a hipótese salva
+    // no rascunho — contada duas vezes e pronta para duplicar. O rascunho mora fora da tela, então
+    // tirar depois de desmontar ainda grava.
+    const salvando: Promise<unknown> =
+      h.tipo === 'lancamento' ? salvarLancamento.mutateAsync(h.entrada)
+      : h.tipo === 'parcelada' ? criarParcelada.mutateAsync(h.entrada)
+      : h.tipo === 'recorrente' ? criarRecorrente.mutateAsync(h.entrada)
+      : salvarFinanciamento.mutateAsync(h.entrada);
+    salvando.then(
+      () => {
         aplicando.current = null;
         tirarDetalhada(h.id);
         depois(true);
       },
-      onError: (e: unknown) => {
+      (e: unknown) => {
         aplicando.current = null;
         toast({ message: financeErrorMessage(e, `Não deu para aplicar ${h.titulo}.`), tone: 'error' });
         depois(false);
       },
-    };
-    if (h.tipo === 'lancamento') salvarLancamento.mutate(h.entrada, fim);
-    else if (h.tipo === 'parcelada') criarParcelada.mutate(h.entrada, fim);
-    else if (h.tipo === 'recorrente') criarRecorrente.mutate(h.entrada, fim);
-    else salvarFinanciamento.mutate(h.entrada, fim);
+    );
   };
   const aplicarDetalhada = (h: HipoteseDetalhada) => {
     if (aplicando.current) return;
@@ -374,9 +379,9 @@ export default function ForecastScreen() {
     router.push({ pathname: '/finance/transaction-form', params: { deHipotese: String(indice), kind: d.kind, amount: String(d.amount_cents), data, parcelas: String(d.installments) } });
   };
   const tirarRapida = (indices: number[]) => {
-    const antes = rascunho;
+    const saiu = rascunhos.filter((_, i) => indices.includes(i));
     setRascunhos((lista) => lista.filter((_, i) => !indices.includes(i)));
-    toast({ message: 'Hipótese tirada do rascunho.', tone: 'success', action: { label: 'Desfazer', onPress: () => restaurar(antes) } });
+    toast({ message: 'Hipótese tirada do rascunho.', tone: 'success', action: { label: 'Desfazer', onPress: () => devolver({ rapidas: saiu, detalhadas: [] }) } });
   };
   const acoesDaDetalhada = (h: HipoteseDetalhada): ItemAction[] => [
     { label: 'Aplicar', icon: 'checkmark.circle', arrasto: 'direita', onPress: () => aplicarDetalhada(h) },
@@ -388,9 +393,8 @@ export default function ForecastScreen() {
       arrasto: 'esquerda',
       desfaz: true,
       onPress: () => {
-        const antes = rascunho;
         tirarDetalhada(h.id);
-        toast({ message: `${h.titulo} saiu do rascunho.`, tone: 'success', action: { label: 'Desfazer', onPress: () => restaurar(antes) } });
+        toast({ message: `${h.titulo} saiu do rascunho.`, tone: 'success', action: { label: 'Desfazer', onPress: () => devolver({ rapidas: [], detalhadas: [h] }) } });
       },
     },
   ];
@@ -940,7 +944,7 @@ export default function ForecastScreen() {
             onPress={() => {
               const antes = rascunho;
               limpar();
-              toast({ message: 'Rascunho limpo.', tone: 'success', action: { label: 'Desfazer', onPress: () => restaurar(antes) } });
+              toast({ message: 'Rascunho limpo.', tone: 'success', action: { label: 'Desfazer', onPress: () => devolver(antes) } });
             }}
           />
         ) : null}

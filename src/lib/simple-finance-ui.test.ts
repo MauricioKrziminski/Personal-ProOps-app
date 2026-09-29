@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any } = {}) {
+function screen(file: string, options: { tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean } = {}) {
   const state: any[] = [];
   let cursor = 0;
   let nodes: any[] = [];
@@ -40,7 +40,13 @@ function screen(file: string, options: { tablet?: boolean; debts?: any[]; archiv
   const avisos: string[] = [];
   /** Com que limite cada lista paginada no servidor foi pedida — é como se vê o "Ver mais" pedir mais. */
   const pedidosDeLimite: [string, number | undefined][] = [];
-  const mutation = (operation: string) => ({ isPending: false, reset() {}, mutate(value: any, opts?: any) { writes.push({ operation, value }); pedidos.push({ operation, value, opts }); }, async mutateAsync(value: any) { writes.push({ operation, value }); return `${operation}-id`; } });
+  const mutation = (operation: string) => ({ isPending: false, reset() {}, mutate(value: any, opts?: any) { writes.push({ operation, value }); pedidos.push({ operation, value, opts }); }, async mutateAsync(value: any) {
+    writes.push({ operation, value });
+    // `segurarMutacoes`: a promessa só resolve quando o teste chama `resolver` — é como se vê o que
+    // a tela faz ANTES e DEPOIS do sucesso sem depender do callback por chamada.
+    if (!options.segurarMutacoes) return `${operation}-id`;
+    return new Promise((resolver, rejeitar) => pedidos.push({ operation, value, opts: undefined, resolver, rejeitar } as any));
+  } });
   const animation = { duration: () => animation, delay: () => animation, reduceMotion: () => animation };
   const finance = new Proxy({
     DEBT_KINDS: [{ value: 'financing', label: 'Financiamento' }, { value: 'loan', label: 'Empréstimo' }],
@@ -3294,21 +3300,27 @@ test('E se: "Adicionar como…" abre o formulário real em modo hipótese; a lin
   assert.equal(JSON.parse(ui.preferenciasGravadas['projecao:rascunho']).detalhadas.length, 1);
 });
 
-test('Aplicar a detalhada grava pelo mesmo hook do formulário e só então sai do rascunho', () => {
+test('Aplicar a detalhada grava pelo mesmo hook do formulário e só então sai do rascunho', async () => {
   const entrada = { accountId: 'c', totalCents: 300000, installments: 10, paidInstallments: 0, occurredAt: '2026-10-01', description: 'Notebook', category: null, merchant: null };
-  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas: [{ id: 'h1', tipo: 'parcelada', titulo: 'Notebook', entrada }] }) } });
+  const ui = screen(forecastFile, { segurarMutacoes: true, forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas: [{ id: 'h1', tipo: 'parcelada', titulo: 'Notebook', entrada }] }) } });
   const card = deslizaveis(ui).find((d: any) => d.props.titulo === 'Notebook');
   ui.interact(() => card.props.acoes.find((a: any) => a.label === 'Aplicar').onPress());
   ui.interact(() => ui.actions.find((a: any) => a.label === 'Salvar na conta').onPress());
   assert.deepEqual(JSON.parse(JSON.stringify(ui.writes.at(-1))), { operation: 'createInstallmentPlan', value: entrada });
   assert.ok(!ui.preferenciasGravadas['projecao:rascunho'], 'antes do sucesso a hipótese continua no rascunho');
-  ui.interact(() => ui.pedidos.at(-1).opts.onSuccess());
+  // Pela PROMESSA, não pelo `onSuccess` da chamada: o TanStack não chama o callback por chamada de
+  // uma tela que já desmontou, e sair da Projeção no meio do salvamento deixava a hipótese salva
+  // no rascunho — contada duas vezes e pronta para duplicar (revisão final, 29/09/2026).
+  const pedido: any = ui.pedidos.at(-1);
+  assert.equal(pedido.opts, undefined, 'a tela usa mutateAsync, sem callback por chamada');
+  pedido.resolver('plano-1');
+  await new Promise((r) => setTimeout(r, 0));
   assert.equal(JSON.parse(ui.preferenciasGravadas['projecao:rascunho'] || '{"detalhadas":[]}').detalhadas.length, 0);
 });
 
 test('Aplicar duas vezes seguidas grava uma vez só', () => {
   const entrada = { kind: 'expense', amount_cents: 1000, category: null, description: 'Pão', merchant: null, account_id: 'c', counterparty_account_id: null, occurred_at: '2026-10-01', status: 'cleared', due_at: null, auto_confirm: false };
-  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas: [{ id: 'h1', tipo: 'lancamento', titulo: 'Pão', entrada }] }) } });
+  const ui = screen(forecastFile, { segurarMutacoes: true, forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas: [{ id: 'h1', tipo: 'lancamento', titulo: 'Pão', entrada }] }) } });
   const aplicar = () => deslizaveis(ui).find((d: any) => d.props.titulo === 'Pão').props.acoes.find((a: any) => a.label === 'Aplicar').onPress();
   ui.interact(aplicar);
   ui.interact(() => ui.actions.filter((a: any) => a.label === 'Salvar na conta').at(-1).onPress());
@@ -3368,4 +3380,31 @@ test('Ciclo pela Projeção com hipótese detalhada: lê por simular e marca a l
   // a fatura que já existia continua no grupo dela, dizendo que inclui a hipótese
   const fatura = ui.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'Linha' && n.props.linha.ref_id === 'f1');
   assert.match(fatura.props.linha.method_label, /inclui hipótese/);
+});
+
+test('Ciclo com hipótese detalhada: leitura que falhou DENTRO do simular mostra o erro, não esqueleto para sempre', () => {
+  // Revisão final, 29/09/2026: a leitura do ciclo que falha volta em `erros` (a RPC responde 200),
+  // `ciclo` chega nulo e a tela ficava no esqueleto, sem card de erro — a regra do portão.
+  const detalhadas = JSON.stringify([{ id: 'h1', tipo: 'lancamento', titulo: 'Pão', entrada: { kind: 'expense', amount_cents: 1000, category: null, description: 'Pão', merchant: null, account_id: null, counterparty_account_id: null, occurred_at: '2026-10-01', status: 'pending', due_at: null, auto_confirm: false } }]);
+  const ui = screen('src/app/finance/cycle.tsx', {
+    params: { month: '2026-10', view: 'cycle', detalhadas },
+    cicloSimulado: { ciclo: null, linhas: null, idsHipotese: [], faturasComHipotese: [], erros: [{ leitura: 'ciclo', mensagem: 'canceling statement due to statement timeout' }] },
+  });
+  assert.ok(ui.nodes().some((n: any) => n.type === 'ErrorCard'), 'a falha aparece com "Tentar de novo"');
+});
+
+test('Desfazer o "Tirar" devolve SÓ o que saiu — não traz de volta o que saiu depois (já aplicado)', () => {
+  // Revisão final, 29/09/2026: o Desfazer regravava a cópia INTEIRA de antes; tirar A, aplicar B
+  // e tocar no Desfazer de A punha B de volta — contado duas vezes e pronto para duplicar.
+  const lanc = (d: string) => ({ kind: 'expense', amount_cents: 1000, category: null, description: d, merchant: null, account_id: null, counterparty_account_id: null, occurred_at: '2026-10-01', status: 'pending', due_at: null, auto_confirm: false });
+  const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [], detalhadas: [
+    { id: 'a', tipo: 'lancamento', titulo: 'A', entrada: lanc('A') },
+    { id: 'b', tipo: 'lancamento', titulo: 'B', entrada: lanc('B') },
+  ] }) } });
+  const tirar = (t: string) => ui.interact(() => deslizaveis(ui).find((d: any) => d.props.titulo === t).props.acoes.find((a: any) => a.label === 'Tirar').onPress());
+  tirar('A');
+  const desfazerA = ui.toasts.at(-1).action;
+  tirar('B'); // o mesmo efeito, no rascunho, de B ter ido para a conta
+  ui.interact(() => desfazerA.onPress());
+  assert.deepEqual(JSON.parse(ui.preferenciasGravadas['projecao:rascunho']).detalhadas.map((h: any) => h.id), ['a']);
 });

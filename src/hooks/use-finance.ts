@@ -2333,7 +2333,8 @@ export function useCicloSimulado(registros: { tipo: string; dados: unknown }[], 
       } | null;
       return {
         ciclo: r?.leituras?.ciclo?.find((c) => mesmoMes(c.mes, month)) ?? null,
-        linhas: r?.leituras?.linhas_do_ciclo ?? [],
+        // `null` = a leitura falhou dentro do `simular` (não é "sem linhas"): a tela mostra o erro.
+        linhas: r?.leituras?.linhas_do_ciclo ?? null,
         idsHipotese: (r?.criados ?? []).flatMap((c) => c.ids ?? []),
         faturasComHipotese: (r?.criados ?? []).flatMap((c) => c.faturas ?? []),
         erros: r?.erros ?? [],

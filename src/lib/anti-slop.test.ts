@@ -1752,3 +1752,13 @@ test('MoneyField: a caixa dos dígitos cresce com a fonte do sistema', () => {
   assert.match(fonte, /height: Type\.money\.lineHeight \* fontScale/, 'a caixa acompanha o texto');
   assert.match(fonte, /const altura = Type\.money\.lineHeight \* fontScale/, 'o dígito rola a altura real');
 });
+
+test('Lançamento: com a fileira de parcelas escondida, o erro dela aparece na Conta — Salvar nunca fica mudo', () => {
+  // Revisão final, 29/09/2026: "Adicionar como… → Compra parcelada" nasce com 2 parcelas e sem
+  // conta; a fileira só existe com conta, o erro do zod morava nela, e Salvar não fazia nada.
+  const fonte = readFileSync(join(SRC, 'app/finance/transaction-form.tsx'), 'utf8');
+  const conta = fonte.slice(fonte.indexOf("label={kind === 'transfer' ? 'Da conta' : 'Conta'}"), fonte.indexOf("label={kind === 'transfer' ? 'Da conta' : 'Conta'}") + 600);
+  assert.match(conta, /!podeParcelarAqui \? errors\.installments\?\.message/);
+  // Receita não parcela: a rápida de ENTRADA "em N vezes" abre à vista.
+  assert.match(fonte, /installments: hParc\?\.installments \?\? \(daRapida\?\.kind === 'expense' \? daRapida\.parcelas : undefined\)/);
+});
