@@ -2778,6 +2778,10 @@ export type Database = {
         }
         Returns: string
       }
+      converter_registro: {
+        Args: { p_alcance: string; p_destino: Json; p_origem: Json }
+        Returns: Json
+      }
       create_installment_plan: {
         Args: {
           p_account_id: string

@@ -20,6 +20,13 @@ saiu IDÊNTICA nos 3.651 dias e no mês a mês, antes e depois) e o horizonte po
 (`accounts_horizon`, `cards_horizon`, leituras `contas`/`cartoes` do `simular`). Sobem no MESMO
 `db push` das duas `simular`, antes do app.
 
+**Só no STAGING: `20260929160000_converter_registro`** (staging 29/09/2026; produção pendente) —
+`public.converter_registro(p_origem, p_alcance, p_destino)`: muda o tipo de um registro que
+existe numa transação só (encerra a origem pelo alcance e cria o destino por
+`private.criar_registro_da_hipotese`). `security invoker`, sem `execute` para `anon`. Teste:
+`supabase/tests/converter_registro.sql` (11 casos). Depende da `20260929120000` (a função de
+criação); em produção sobe **antes** do app que a chama.
+
 **Produção e staging ALINHADOS em `20260928237000`** — a `20260928236000` e esta aplicadas em
 produção pelo Gabriel em 28/09/2026 (`db push --project-ref`) e conferidas na fonte:
 `schema_migrations` devolve `20260928237000`, `20260928236000`, `20260928235000`; `draft_lines`

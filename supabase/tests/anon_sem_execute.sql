@@ -24,7 +24,7 @@ begin
   from unnest(array[
     'accept_pending_invites','account_balances','accounts_horizon','agent_activity','annual_by_category','annual_summary',
     'anticipation_candidates','approve_import_items','budgets_status','cancel_subscription','card_summary','cards_horizon',
-    'categories_used','convert_transaction_to_installments','create_installment_plan_last_day','create_installment_plan_with_history',
+    'categories_used','convert_transaction_to_installments','converter_registro','create_installment_plan_last_day','create_installment_plan_with_history',
     'cycle_lines','cycle_now','cycle_range','cycle_series','daily_spending','debt_schedule','delete_debt','financial_health',
     'finish_import_batch','forecast_json','goal_deposit','import_unmatched','month_breakdown',
     'materialize_recurring_occurrence','month_forecast_json','month_lines','month_summary','monthly_cashflow','my_default_workspace',
