@@ -323,6 +323,7 @@ que é o lado que não pode cair: aprovar o que não devia apaga dado do usuári
 | escolher **QUANDO** começa | **não** — cravava `current_date` | `query_from` |
 | **EMPILHAR** hipóteses | **não** — array de um elemento | as ações irmãs do plano somam numa resposta só (`ExecContext.siblings`) |
 | ver a **série** | **não** — só veredito + pior dia | veredito no 1º dia negativo + saldo no fim |
+| **hipótese detalhada** (formulário completo) e **Aplicar** (29/09/2026) | não | **só no app, por decisão**: o agente segue com a hipótese rápida (`simulate_scenario`); criar de verdade ele já faz pelos caminhos de sempre |
 
 ## O número podia discordar, e discordava por construção
 

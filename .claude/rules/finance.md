@@ -832,6 +832,16 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
   (`_budgets_status`) nem cronograma de dívida (`debt_schedule_for`) — reproduzir essas regras no
   cliente ou numa segunda função seria a cópia que diverge. A tela diz isso ao usuário.
 
+  **Hipótese detalhada** (`public.simular`, `20260929120000`): o formulário REAL (lançamento,
+  compra parcelada, recorrente, financiamento) em modo hipótese guarda a entrada do hook
+  (`src/lib/escrita.ts`) no rascunho, e `simular` cria de verdade numa subtransação, lê a
+  Projeção e o ciclo e desfaz tudo — fatura, cronograma e recorrência saem das regras de
+  verdade, e o simulado É o aplicado (medido no staging: aplicar não moveu um centavo). "Aplicar"
+  entrega a mesma entrada ao hook que salva. Custo: ~0,4 s com 10 hipóteses e 10 anos. **Toda
+  mudança do rascunho parte do GRAVADO na hora** (`usePreferencia` por função): o "Aplicar
+  todas" tira uma hipótese por salvamento com funções do mesmo render, e partindo do render a
+  segunda desfazia a primeira — a hipótese já salva na conta voltava ao rascunho.
+
   **Ele mora no APARELHO, por usuário, até aplicar ou limpar** (`useRascunho`, 29/09/2026 —
   decisão do dono do produto ao pedir hipóteses com o formulário completo: *"salvar no
   aparelho"*; antes, sair da tela apagava). Nunca no banco. "Limpar" tem "Desfazer". A hipótese
