@@ -25,6 +25,8 @@ import {
   DEBT_KINDS,
   SUGGESTED_CATEGORIES,
   useAccounts,
+  useAparencia,
+  useCategoriesUsed,
   useDeleteTransaction,
   useInvoice,
   useDeleteInstallmentPlan,
@@ -37,6 +39,7 @@ import {
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { detalheDoPagamento } from '@/lib/confirmar-baixa';
+import { foldCategory, mergeCategories } from '@/lib/categories-merge';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive } from '@/lib/item-actions';
 import { dueLabel, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
@@ -83,6 +86,9 @@ function longDate(iso: string): string {
   });
 }
 
+/** Um menu nativo, não uma lista: as mais usadas; o resto é o formulário (a busca do seletor). */
+const CATEGORIAS_NO_MENU = 10;
+
 export default function TransactionDetailScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
@@ -101,6 +107,10 @@ export default function TransactionDetailScreen() {
   const tx = list.data;
 
   const accounts = useAccounts();
+  // As categorias do USUÁRIO, por uso, no submenu "Mudar categoria" — as 13 sugestões sozinhas
+  // escondiam as que ele usa ("roupa", "eletrônicos") justamente onde ele ia trocá-las.
+  const categoriasUsadas = useCategoriesUsed();
+  const aparencia = useAparencia();
   const invoice = useInvoice(tx?.invoice_id ?? undefined);
   // A compra DESTA parcela, pelo id — procurá-la na lista de todas era carregar todas para achar uma.
   const plans = useInstallmentPlan(tx?.installment_plan_id);
@@ -440,6 +450,22 @@ export default function TransactionDetailScreen() {
     />
   );
 
+  const acoesDeCategoria = [
+    ...mergeCategories(categoriasUsadas.data ?? [], SUGGESTED_CATEGORIES, tx.category)
+      .slice(0, CATEGORIAS_NO_MENU)
+      .map((option) => {
+        const icone = aparencia(option.label).icon;
+        return {
+          label: option.label,
+          // o menu nativo só aceita o NOME do SF Symbol (toda a grade é nome)
+          icon: typeof icone === 'string' ? icone : undefined,
+          selected: !!tx.category && foldCategory(tx.category) === foldCategory(option.label),
+          onPress: () => patch({ category: option.label }),
+        };
+      }),
+    { label: 'Gerenciar categorias', icon: 'slider.horizontal.3' as const, onPress: () => router.push('/finance/categories') },
+  ];
+
   return (
     <Screen
       grouped
@@ -472,11 +498,7 @@ export default function TransactionDetailScreen() {
               // depois da edição; o atalho de uma escrita só ignoraria essa decisão.
               ...(tx.recurring_id || tx.installment_plan_id || tx.debt_id
                 ? { onPress: () => router.push(hrefDoLancamento(tx, { month })) }
-                : { actions: SUGGESTED_CATEGORIES.map((option) => ({
-                    label: option,
-                    selected: tx.category === option,
-                    onPress: () => patch({ category: option }),
-                  })) }),
+                : { actions: acoesDeCategoria }),
             },
             // Pagamento de dívida não duplica: a cópia seria um gasto solto, sem baixar a dívida.
             // A próxima parcela se paga no "Paguei" de Dívidas. O de FATURA também: a cópia seria

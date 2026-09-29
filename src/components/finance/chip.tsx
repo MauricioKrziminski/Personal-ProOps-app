@@ -3,8 +3,11 @@ import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
+import { Icon, type IconName } from '@/components/ui/icon';
+import type { NoteColorName } from '@/constants/theme';
+import { noteInk } from '@/design/note-colors';
 import { Radius, Space } from '@/design/tokens';
-import { useTheme } from '@/hooks/use-theme';
+import { useScheme, useTheme } from '@/hooks/use-theme';
 
 interface ChipProps {
   label: string;
@@ -18,11 +21,20 @@ interface ChipProps {
    * o tipo que o sistema usa para dado.
    */
   count?: number;
+  /** Ícone antes do rótulo (a categoria, no seletor). */
+  icon?: IconName;
+  /**
+   * A cor da categoria (conteúdo do usuário, `design.md` §2b): pinta só o ÍCONE do chip não
+   * escolhido. O escolhido continua na tinta do app — estado vence decoração.
+   */
+  tinta?: NoteColorName | null;
 }
 
 /** Chip de seleção (categorias, filtros, tipos de conta). */
-export function Chip({ label, selected, onPress, count }: ChipProps) {
+export function Chip({ label, selected, onPress, count, icon, tinta }: ChipProps) {
   const theme = useTheme();
+  const scheme = useScheme();
+  const tintaCheia = tinta && !selected ? noteInk(tinta, scheme) : null;
   const vidro = supportsLiquidGlass();
   return (
     <Pressable
@@ -50,6 +62,9 @@ export function Chip({ label, selected, onPress, count }: ChipProps) {
       ) : null}
       {/* `flexShrink: 0`: o chip já não encolhe (Pressable), então parado nada muda; dentro de um
           contêiner com `entering` o rótulo encolhido na medida não se remede (design.md §3). */}
+      {icon ? (
+        <Icon name={icon} size="sm" color={selected ? 'onTint' : 'textSecondary'} tint={tintaCheia ?? undefined} />
+      ) : null}
       <ThemedText type="smallBold" themeColor={selected ? 'onTint' : 'text'} style={styles.rotulo}>
         {label}
       </ThemedText>

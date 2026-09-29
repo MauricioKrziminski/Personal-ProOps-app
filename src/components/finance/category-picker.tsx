@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { router } from 'expo-router';
 
+import { CategoriaSheet } from '@/components/finance/categoria-sheet';
 import { Chip } from '@/components/finance/chip';
 import { ThemedText } from '@/components/themed-text';
+import { Icon } from '@/components/ui/icon';
 import { Row } from '@/components/ui/row';
 import { SearchField } from '@/components/ui/search-field';
 import { Sheet, SheetScroll } from '@/components/ui/sheet';
@@ -10,7 +13,7 @@ import { TaskHeader } from '@/components/ui/task-header';
 import { VerMais } from '@/components/ui/ver-mais';
 import { useAosPoucos } from '@/hooks/use-aos-poucos';
 import { Space } from '@/design/tokens';
-import { useCategoriesUsed } from '@/hooks/use-finance';
+import { useAparencia, useCategoriesUsed } from '@/hooks/use-finance';
 import { SUGGESTED_CATEGORIES } from '@/lib/categories';
 import { filterCategories, foldCategory, mergeCategories } from '@/lib/categories-merge';
 
@@ -48,7 +51,10 @@ export function CategoryPicker({
   onChange: (category: string | null) => void;
 }) {
   const usadas = useCategoriesUsed();
+  const aparencia = useAparencia();
   const [aberto, setAberto] = useState(false);
+  // A folha de criar (nome, ícone e cor): a categoria criada já volta escolhida.
+  const [criando, setCriando] = useState(false);
   const [busca, setBusca] = useState('');
 
   const opcoes = mergeCategories(usadas.data ?? [], SUGGESTED_CATEGORIES, value);
@@ -80,14 +86,24 @@ export function CategoryPicker({
           <Chip
             key={o.label}
             label={o.label}
+            icon={aparencia(o.label).icon}
+            tinta={aparencia(o.label).cor}
             selected={!!value && foldCategory(o.label) === foldCategory(value)}
             onPress={() => escolher(value && foldCategory(o.label) === foldCategory(value) ? null : o.label)}
           />
         ))}
+        <Chip label="Nova" icon="plus" selected={false} onPress={() => setCriando(true)} />
         {opcoes.length > chips.length ? (
           <Chip label="Todas…" selected={false} onPress={() => setAberto(true)} />
         ) : null}
       </View>
+
+      <CategoriaSheet
+        visible={criando}
+        categoria={null}
+        onClose={() => setCriando(false)}
+        onSalva={(nome) => onChange(nome)}
+      />
 
       <Sheet visible={aberto} onClose={() => setAberto(false)}>
         {/* Sem `action`: este sheet fecha por escolher uma categoria ou pelo ✕, não por Salvar. */}
@@ -121,14 +137,28 @@ export function CategoryPicker({
               key={o.label}
               title={o.label}
               subtitle={o.uses > 0 ? `${o.uses} ${o.uses === 1 ? 'lançamento' : 'lançamentos'}` : 'sugestão'}
-              icon={
-                value && foldCategory(o.label) === foldCategory(value) ? 'checkmark' : 'tag'
+              icon={aparencia(o.label).icon}
+              tinta={aparencia(o.label).cor}
+              trailing={
+                value && foldCategory(o.label) === foldCategory(value) ? (
+                  <Icon name="checkmark" size="sm" color="text" />
+                ) : undefined
               }
+              accessibilityState={{ selected: !!value && foldCategory(o.label) === foldCategory(value) }}
               chevron={false}
               onPress={() => escolher(o.label)}
             />
           ))}
           <VerMais restantes={visiveis.restantes} onPress={visiveis.verMais} />
+          <Row
+            icon="slider.horizontal.3"
+            title="Gerenciar categorias"
+            subtitle="Ícone, cor, renomear e juntar"
+            onPress={() => {
+              setAberto(false);
+              router.push('/finance/categories');
+            }}
+          />
           {filtradas.length === 0 && !podeCriar ? (
             <ThemedText type="small" themeColor="textSecondary">
               Nada com esse nome. Digite mais para criar uma categoria.

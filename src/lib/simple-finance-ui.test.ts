@@ -2231,7 +2231,8 @@ test('Categoria: a folha de "Todas…" mostra aos poucos, e a busca recomeça', 
   const usadas = Array.from({ length: 30 }, (_, i) => ({ category: `categoria ${String(i).padStart(2, '0')}`, uses: 30 - i }));
   const ui = screen('src/components/finance/category-picker.tsx', { componente: 'CategoryPicker', props: { value: null, onChange: () => {} }, categoriasUsadas: usadas });
   ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Chip' && n.props.label === 'Todas…').props.onPress());
-  const opcoes = () => ui.nodes().filter((n: any) => n.type === 'Row' && n.props.icon === 'tag');
+  // pelo nome: o ícone agora é o da categoria (`useAparencia`), não um `tag` fixo
+  const opcoes = () => ui.nodes().filter((n: any) => n.type === 'Row' && String(n.props.title).startsWith('categoria '));
   assert.equal(opcoes().length, 20);
   const mais = ui.nodes().find((n: any) => n.type === 'VerMais');
   assert.ok(mais.props.restantes > 0);
@@ -4184,4 +4185,25 @@ test('Folha de categoria: sem nome não salva; criando um nome que já existe, a
   // grava na que EXISTE: com o nome digitado, nasceria uma segunda aparência para a mesma categoria
   assert.equal(ui.writes.at(-1)?.operation, 'salvarCategoria');
   assert.deepEqual({ ...ui.writes.at(-1)?.value }, { name: 'mercado', icon: 'tag', color: null, renomearDe: null });
+});
+
+test('Seletor de categoria: chips com ícone e cor, "Nova" cria e já escolhe, "Gerenciar categorias" leva à tela', () => {
+  const escolhidas: (string | null)[] = [];
+  const ui = screen('src/components/finance/category-picker.tsx', { componente: 'CategoryPicker', categoriasUsadas: CATS,
+    props: { value: null, onChange: (c: string | null) => escolhidas.push(c) } });
+  const chip = ui.nodes().find((n: any) => n.type === 'Chip' && n.props.label === 'mercado');
+  assert.equal(chip.props.icon, 'cart');
+  assert.equal(chip.props.tinta, 'musgo');
+  const folha = () => ui.nodes().find((n: any) => n.type === 'CategoriaSheet');
+  assert.equal(folha().props.visible, false);
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'Chip' && n.props.label === 'Nova').props.onPress());
+  assert.equal(folha().props.visible, true);
+  assert.equal(folha().props.categoria, null);
+  ui.interact(() => folha().props.onSalva('viagem'));
+  assert.deepEqual(escolhidas, ['viagem'], 'a categoria criada já volta escolhida');
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'Chip' && n.props.label === 'Todas…').props.onPress());
+  const linha = ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'mercado');
+  assert.equal(linha.props.tinta, 'musgo', 'a lista inteira também mostra a cor');
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'Gerenciar categorias').props.onPress());
+  assert.equal(ui.navigations.at(-1), '/finance/categories');
 });
