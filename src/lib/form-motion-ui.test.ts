@@ -109,10 +109,10 @@ function montar(file: string, name: string, initial: any, config = { reduzir: fa
     const code = ts.transpileModule(readFileSync(path, 'utf8'), {
       compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 },
     }).outputText;
-    runInNewContext(code, { module, exports: module.exports, require: (id: string) => {
+    runInNewContext(code, { performance, module, exports: module.exports, require: (id: string) => {
       if (id === 'react') return react;
       if (id === 'react/jsx-runtime') return require(id);
-      if (id === 'react-native') return { Pressable: 'Pressable', View: 'View', TextInput: 'TextInput', Platform: { OS: 'android' }, StyleSheet: { create: (s: any) => s, flatten, hairlineWidth: 1 } };
+      if (id === 'react-native') return { Pressable: 'Pressable', View: 'View', TextInput: 'TextInput', useWindowDimensions: () => ({ width: 402, fontScale: 1 }), Platform: { OS: 'android' }, StyleSheet: { create: (s: any) => s, flatten, hairlineWidth: 1 } };
       if (id === 'react-native-reanimated') return reanimated;
       if (id === 'expo-haptics') return { selectionAsync() {} };
       if (id === '@/components/motion/presenca') return load('src/components/motion/presenca.tsx');
@@ -128,6 +128,9 @@ function montar(file: string, name: string, initial: any, config = { reduzir: fa
       if (id === '@/components/ui/field') return { TextField: 'TextField' };
       if (id === '@/components/finance/calendar') return { Calendar: 'Calendar' };
       if (id === '@/lib/dates') return load('src/lib/dates.ts');
+      if (id === './dates.ts') return load('src/lib/dates.ts');
+      if (id === '@/lib/lancar') return load('src/lib/lancar.ts');
+      if (id === '@/lib/atalhos-de-lancamento') return load('src/lib/atalhos-de-lancamento.ts');
       throw new Error(`Unexpected module ${id}`);
     } });
     return module.exports;
@@ -803,4 +806,104 @@ test('Presenca lazy first appearance honors reduced motion and an inactive paren
   inactive.render({ visivel: false, children: null });
   const pending = inactive.close(); inactive.unmount(); pending.done?.(true);
   assert.equal(inactive.writesAfterUnmount(), 0);
+});
+
+test('prepared compact presence measures while hidden and first open reuses its native motion', () => {
+  const props = { visivel: false, preparar: true, children: 'options' };
+  const ui = montar(helper, 'Presenca', props);
+  assert.ok(incoming(ui), 'compact options exist before the first interaction');
+  assert.equal(ui.style(outgoing(ui)).height, 0);
+  assert.equal(ui.style(incoming(ui)).opacity, 0);
+  assert.equal(outgoing(ui).props.accessibilityElementsHidden, true);
+  assert.equal(outgoing(ui).props.importantForAccessibility, 'no-hide-descendants');
+  assert.equal(ui.find((n) => n.type === 'Provider').props.value, false);
+  const installed = ui.sharedValues.length;
+  ui.layout(incoming(ui), 120);
+  ui.render({ ...props, visivel: true });
+  assert.equal(ui.sharedValues.length, installed, 'opening installs no new shared values');
+  const opening = ui.transition(); assertMorphSpring(opening);
+  opening.shared.value = .25;
+  assert.equal(ui.style(ui.find((n) => n.props?.pointerEvents === 'auto')).height, 30);
+  ui.finish(opening);
+  ui.render(props); ui.finish(ui.close());
+  assert.equal(ui.style(outgoing(ui)).height, 0);
+  assert.equal(content(ui), 'options');
+  ui.render({ ...props, children: 'updated options' });
+  ui.layout(incoming(ui), 180);
+  ui.render({ ...props, children: 'updated options', visivel: true });
+  ui.transition().shared.value = .5;
+  assert.equal(ui.style(ui.find((n) => n.props?.pointerEvents === 'auto')).height, 90);
+  assert.equal(ui.sharedValues.length, installed, 'reopening uses the updated measurement');
+});
+
+test('prepared presence waits for measurement on an immediate first tap and accepts an empty list', () => {
+  const props = { visivel: false, preparar: true, children: null };
+  const ui = montar(helper, 'Presenca', props);
+  ui.render({ ...props, visivel: true });
+  assert.equal(ui.animations.length, 0, 'no opening progress is lost before native layout');
+  ui.layout(incoming(ui), 0);
+  assertMorphSpring(ui.transition());
+  ui.finish(ui.transition());
+  assert.equal(ui.style(ui.find((n) => n.props?.pointerEvents === 'auto')).height, 'auto');
+});
+
+test('SelectField first opening and reopening install no new native motion for its options', () => {
+  const props = { value: 'a', placeholder: 'Choose', options: [
+    { id: 'a', label: 'A', icon: 'circle' }, { id: 'b', label: 'B', icon: 'circle' }, { id: 'c', label: 'C', icon: 'circle' },
+  ], onChange() {} };
+  const ui = montar('src/components/ui/select-field.tsx', 'SelectField', props);
+  const header = () => ui.find((n) => n.type === 'PressableScale' && n.props.accessibilityState.expanded !== undefined);
+  const installed = ui.sharedValues.length;
+  header().props.onPress(); ui.render();
+  assert.equal(ui.sharedValues.length, installed, 'the first tap must not initialize the option animations');
+  header().props.onPress(); ui.render(); ui.finish(ui.close());
+  header().props.onPress(); ui.render();
+  assert.equal(ui.sharedValues.length, installed, 'closing must retain prepared compact options');
+});
+
+test('prepared presence remains hidden with reduced motion and ignores native layout after unmount', () => {
+  const props = { visivel: false, preparar: true, children: 'options' };
+  const ui = montar(helper, 'Presenca', props, { reduzir: true, ativo: true });
+  assert.equal(ui.style(outgoing(ui)).height, 0);
+  assert.equal(ui.style(incoming(ui)).opacity, 0);
+  ui.render({ ...props, visivel: true });
+  assert.equal(ui.animations.length, 0);
+  assert.equal(ui.style(incoming(ui)).opacity, 1);
+  ui.render(props);
+  assert.equal(ui.style(outgoing(ui)).height, 0);
+  const measure = incoming(ui).props.onLayout;
+  const previous = ui.sharedValues.map((value) => value.get());
+  ui.unmount(); measure({ nativeEvent: { layout: { width: 300, height: 999 } } });
+  assert.deepEqual(ui.sharedValues.map((value) => value.get()), previous);
+  assert.equal(ui.writesAfterUnmount(), 0);
+});
+
+test('FormatoDoLancamento prepares first opening and cannot select while hidden or inactive', () => {
+  const calls: string[] = [];
+  const props = { value: 'uma', onChange: (value: string) => calls.push(value) };
+  const config = { reduzir: false, ativo: true };
+  const ui = montar('src/components/finance/formato-do-lancamento.tsx', 'FormatoDoLancamento', props, config);
+  const header = () => ui.find((n) => n.props?.accessibilityState?.expanded !== undefined);
+  const option = () => ui.find((n) => n.props?.accessibilityLabel === 'Recorrente, Um valor que se repete');
+  option().props.onPress(); assert.deepEqual(calls, []);
+  ui.layout(incoming(ui), 240);
+  const installed = ui.sharedValues.length;
+  header().props.onPress(); ui.render();
+  assert.equal(ui.sharedValues.length, installed);
+  const choose = option().props.onPress;
+  choose(); choose(); assert.deepEqual(calls, ['recorrente']);
+  ui.render({ ...props, value: 'recorrente' }); ui.finish(ui.close());
+  assert.equal(ui.style(outgoing(ui)).height, 0);
+  config.ativo = false; ui.render({ ...props, value: 'recorrente' });
+  header().props.onPress(); option().props.onPress();
+  assert.equal(header().props.accessibilityState.expanded, false);
+  assert.deepEqual(calls, ['recorrente']);
+});
+
+test('SelectField keeps the icon column spacing for alternatives without an icon', () => {
+  const ui = montar('src/components/ui/select-field.tsx', 'SelectField', {
+    value: 'a', placeholder: 'Choose', options: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], onChange() {},
+  });
+  const option = ui.find((n) => n.type === 'PressableScale' && n.props.accessibilityLabel === 'B');
+  assert.equal(option.props.children.props.children.filter(Boolean).length, 3, 'icon spacer, labels and indicator retain the three original columns');
 });

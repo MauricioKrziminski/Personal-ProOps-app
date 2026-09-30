@@ -114,6 +114,16 @@ export function SelectField({
     const aceso = marcada && !o?.neutral;
     const confirmada = confirmacao !== null && confirmacao.id === o?.id && marcada;
     const mostrarCheck = marcada && (aberto || confirmada);
+    const icone = ladrilho(o?.icon ?? (cabecalho ? 'circle' : undefined), aceso);
+    const textos = <>
+      <ThemedText type={marcada ? 'headline' : 'default'} themeColor={o ? 'text' : 'textSecondary'} style={styles.textoInteiro}>
+        {o?.label ?? placeholder}
+      </ThemedText>
+      {o?.meta ? <ThemedText type="caption" themeColor="textSecondary" style={styles.textoInteiro}>{o.meta}</ThemedText> : null}
+    </>;
+    const indicador = mostrarCheck ? (
+      <View style={[styles.marca, { backgroundColor: theme.tintFill }]}><Icon name="checkmark" size="xs" color="onTint" /></View>
+    ) : cabecalho ? <Icon name="chevron.down" size="sm" color="textSecondary" /> : null;
     return (
       <PressableScale scaleTo={1}
         onPress={cabecalho ? aberto ? () => escolher(value) : alternar : () => escolher(o!.id)}
@@ -123,20 +133,10 @@ export function SelectField({
         accessibilityLabel={o ? o.meta ? `${o.label}, ${o.meta}` : o.label : placeholder}
         accessibilityHint={aberto ? 'Toque para escolher e fechar' : 'Toque para escolher'}>
         {({ pressed }) => <LinhaRealcada pressionada={pressed} confirmar={confirmada}>
-          <MudancaSuave valor={`${o?.icon}:${aceso}`}>
-            {ladrilho(o?.icon ?? (cabecalho ? 'circle' : undefined), aceso)}
-          </MudancaSuave>
-          <MudancaSuave valor={o?.id} style={styles.textos}>
-            <ThemedText type={marcada ? 'headline' : 'default'} themeColor={o ? 'text' : 'textSecondary'} style={styles.textoInteiro}>
-              {o?.label ?? placeholder}
-            </ThemedText>
-            {o?.meta ? <ThemedText type="caption" themeColor="textSecondary" style={styles.textoInteiro}>{o.meta}</ThemedText> : null}
-          </MudancaSuave>
-          <MudancaSuave valor={mostrarCheck} style={styles.indicador}>
-            {mostrarCheck ? (
-              <View style={[styles.marca, { backgroundColor: theme.tintFill }]}><Icon name="checkmark" size="xs" color="onTint" /></View>
-            ) : cabecalho ? <Icon name="chevron.down" size="sm" color="textSecondary" /> : null}
-          </MudancaSuave>
+          {/* Só o cabeçalho troca conteúdo; alternativas estáveis não precisam de três morphs. */}
+          {cabecalho ? <MudancaSuave valor={`${o?.icon}:${aceso}`}>{icone}</MudancaSuave> : <View>{icone}</View>}
+          {cabecalho ? <MudancaSuave valor={o?.id} style={styles.textos}>{textos}</MudancaSuave> : <View style={styles.textos}>{textos}</View>}
+          {cabecalho ? <MudancaSuave valor={mostrarCheck} style={styles.indicador}>{indicador}</MudancaSuave> : <View style={styles.indicador}>{indicador}</View>}
         </LinhaRealcada>}
       </PressableScale>
     );
@@ -149,7 +149,7 @@ export function SelectField({
       {vidro ? <GlassBackdrop fallbackColor={theme.surface} radius={Radius.md} /> : null}
       {/* A linha escolhida permanece na mesma posição e vira a primeira opção. Nunca duplica. */}
       {linha(escolhida, true)}
-      <Presenca visivel={aberto} onSaidaConcluida={() => setConfirmacao(null)}>
+      <Presenca visivel={aberto} preparar onSaidaConcluida={() => setConfirmacao(null)}>
         {options.filter((o) => o.id !== value).map((o, i, restantes) => (
           <Fragment key={o.id ?? '__nenhum__'}>
             {o.group && o.group !== restantes[i - 1]?.group ? (

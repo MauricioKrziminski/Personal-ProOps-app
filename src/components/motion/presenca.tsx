@@ -12,7 +12,7 @@ export function usePresencaAtiva() {
 }
 
 /** A mola parte do progresso atual; espaço e conteúdo acompanham o mesmo percurso. */
-export function usePresenca(visivel: boolean, animarEntradaNaMontagem = false) {
+export function usePresenca(visivel: boolean, animarEntradaNaMontagem = false, pronto = true) {
   const reduzir = useReducedMotion();
   const [estado, setEstado] = useState({ visivel, presente: visivel, assentado: !animarEntradaNaMontagem });
   if (estado.visivel !== visivel || (reduzir && !visivel && estado.presente)) {
@@ -30,7 +30,7 @@ export function usePresenca(visivel: boolean, animarEntradaNaMontagem = false) {
     };
     if (reduzir || (visivel && estado.assentado)) {
       progresso.set(Number(visivel));
-    } else if (presente) {
+    } else if (presente && (!visivel || pronto)) {
       progresso.set(withSpring(Number(visivel), {
         ...Motion.spring.morph,
         reduceMotion: ReduceMotion.System,
@@ -41,7 +41,7 @@ export function usePresenca(visivel: boolean, animarEntradaNaMontagem = false) {
     return () => {
       versao.current += 1;
     };
-  }, [visivel, presente, reduzir, progresso, estado.assentado]);
+  }, [visivel, presente, reduzir, progresso, estado.assentado, pronto]);
   useLayoutEffect(() => () => cancelAnimation(progresso), [progresso]);
 
   return { presente, estilo, reduzir, progresso, assentado: reduzir || estado.assentado };
@@ -51,23 +51,31 @@ type PropsDePresenca = {
   visivel: boolean;
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
+  /** Listas curtas já medem e instalam seu movimento antes do primeiro toque. */
+  preparar?: boolean;
   /** Confirma o recolhimento real, sem timer nem atraso na ação do usuário. */
   onSaidaConcluida?: () => void;
 };
 
-/** Blocos que nunca apareceram não instalam shared values, estilos ou efeitos nativos. */
+/** Blocos comuns são preguiçosos; seletores podem preparar sua pequena lista oculta. */
 export function Presenca(props: PropsDePresenca) {
-  const [entrada, setEntrada] = useState({ montada: props.visivel, animar: !props.visivel });
-  if (props.visivel && !entrada.montada) setEntrada({ ...entrada, montada: true });
+  const [entrada, setEntrada] = useState({ montada: props.visivel || !!props.preparar, animar: !props.visivel });
+  if ((props.visivel || props.preparar) && !entrada.montada) setEntrada({ ...entrada, montada: true });
   if (!entrada.montada) return null;
   return <PresencaAnimada {...props} animarEntradaNaMontagem={entrada.animar} />;
 }
 
-function PresencaAnimada({ visivel, children, style, onSaidaConcluida, animarEntradaNaMontagem }: PropsDePresenca & {
+function PresencaAnimada({ visivel, children, style, preparar, onSaidaConcluida, animarEntradaNaMontagem }: PropsDePresenca & {
   animarEntradaNaMontagem: boolean;
 }) {
   const paiAtivo = usePresencaAtiva();
-  const { presente, estilo, reduzir, progresso, assentado } = usePresenca(visivel, animarEntradaNaMontagem);
+  const [medido, setMedido] = useState(false);
+  const vivo = useRef(true);
+  useLayoutEffect(() => {
+    vivo.current = true;
+    return () => { vivo.current = false; };
+  }, []);
+  const { presente, estilo, reduzir, progresso, assentado } = usePresenca(visivel, animarEntradaNaMontagem, !preparar || medido);
   const estevePresente = useRef(presente);
   useLayoutEffect(() => {
     const saiu = estevePresente.current && !presente;
@@ -75,31 +83,37 @@ function PresencaAnimada({ visivel, children, style, onSaidaConcluida, animarEnt
     if (saiu && !visivel) onSaidaConcluida?.();
   }, [presente, visivel, onSaidaConcluida]);
   const [ultimoConteudo, setUltimoConteudo] = useState(children);
-  if (visivel && children !== ultimoConteudo) setUltimoConteudo(children);
+  if ((visivel || !presente) && children !== ultimoConteudo) setUltimoConteudo(children);
   const altura = useSharedValue(0);
   const envelope = useAnimatedStyle(() => ({
     // Fabric precisa receber o retorno ao layout natural explicitamente após a altura animada.
-    height: assentado || reduzir ? 'auto' : altura.get() * Math.max(0, progresso.get()),
+    height: !presente ? 0 : assentado || reduzir ? 'auto' : altura.get() * Math.max(0, progresso.get()),
   }));
-  if (!presente) return null;
+  if (!presente && !preparar) return null;
   const ativa = paiAtivo && visivel;
+  const natural = presente && (assentado || reduzir);
   const medir = (event: LayoutChangeEvent) => {
+    if (!vivo.current) return;
     const nova = event.nativeEvent.layout.height;
-    if (nova > 0) altura.set(nova);
+    if (Number.isFinite(nova) && (nova > 0 || (preparar && nova === 0))) {
+      altura.set(nova);
+      if (preparar) setMedido(true);
+    }
   };
   return (
     <PresencaAtiva.Provider value={ativa}>
       <Animated.View
         collapsable={false}
-        style={[assentado || reduzir ? styles.natural : styles.recorte, !assentado && !reduzir ? envelope : undefined]}
+        style={[natural ? styles.natural : styles.recorte, natural ? undefined : envelope]}
         pointerEvents={ativa ? 'auto' : 'none'}
         accessibilityElementsHidden={!ativa}
         importantForAccessibility={ativa ? 'auto' : 'no-hide-descendants'}>
         <Animated.View
           collapsable={false}
           onLayout={medir}
-          style={[styles.conteudoDePresenca, style, assentado || reduzir ? styles.parado : estilo]}>
-          {visivel ? children : ultimoConteudo}
+          style={[styles.conteudoDePresenca, preparar && !natural ? styles.medicao : undefined, style,
+            !presente ? { opacity: 0 } : natural ? styles.parado : estilo]}>
+          {visivel || !presente ? children : ultimoConteudo}
         </Animated.View>
       </Animated.View>
     </PresencaAtiva.Provider>

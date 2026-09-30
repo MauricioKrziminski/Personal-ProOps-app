@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import Animated, { ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { PressableScale } from '@/components/motion/pressable-scale';
-import { Presenca } from '@/components/motion/presenca';
+import { Presenca, usePresencaAtiva } from '@/components/motion/presenca';
 import { ThemedText } from '@/components/themed-text';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { Elevation, Motion, Radius, Space, Type } from '@/design/tokens';
@@ -25,6 +25,7 @@ export function FormatoDoLancamento({ value, onChange }: {
 }) {
   const theme = useTheme();
   const scheme = useScheme();
+  const ativo = usePresencaAtiva();
   const reduzir = useReducedMotion();
   const { width, fontScale } = useWindowDimensions();
   const [aberto, setAberto] = useState(false);
@@ -51,11 +52,12 @@ export function FormatoDoLancamento({ value, onChange }: {
   );
 
   const alternar = () => {
+    if (!ativo) return;
     escolhendo.current = false;
     setAberto((a) => !a);
   };
   const escolher = (tipo: TipoDeLancamento) => {
-    if (!aberto || escolhendo.current) return;
+    if (!ativo || !aberto || escolhendo.current) return;
     escolhendo.current = true;
     setAberto(false);
     if (tipo !== value) {
@@ -70,10 +72,11 @@ export function FormatoDoLancamento({ value, onChange }: {
         haptic="selection"
         scaleTo={reduzir ? 1 : Motion.pressScale}
         onPress={alternar}
+        disabled={!ativo}
         accessibilityRole="button"
         accessibilityLabel={`Formato do lançamento, ${atual.label}`}
         accessibilityHint={aberto ? 'Toque para fechar as alternativas' : 'Toque para escolher Uma vez, Recorrente ou Financiamento'}
-        accessibilityState={{ expanded: aberto }}
+        accessibilityState={{ expanded: aberto, disabled: !ativo }}
         style={styles.destaque}>
         <View style={styles.linhaDoDestaque}>
           <View style={[styles.circulo, { backgroundColor: theme.tintFill }]}>
@@ -87,7 +90,7 @@ export function FormatoDoLancamento({ value, onChange }: {
         {amplo ? textos : null}
       </PressableScale>
 
-      <Presenca visivel={aberto} style={styles.respiroDasAlternativas}>
+      <Presenca visivel={aberto} preparar style={styles.respiroDasAlternativas}>
         <View
           accessibilityRole="radiogroup"
           accessibilityLabel="Formato do lançamento"
@@ -105,10 +108,11 @@ export function FormatoDoLancamento({ value, onChange }: {
                 <PressableScale
                   scaleTo={reduzir ? 1 : Motion.pressScale}
                   onPress={() => escolher(tipo.value)}
+                  disabled={!ativo || !aberto}
                   accessibilityRole="radio"
                   accessibilityLabel={`${tipo.label}, ${opcao.descricao}`}
                   accessibilityHint={selecionada ? 'Toque para manter este formato e fechar' : 'Toque para mudar o formato, mantendo os campos preenchidos'}
-                  accessibilityState={{ selected: selecionada }}>
+                  accessibilityState={{ selected: selecionada, disabled: !ativo || !aberto }}>
                     <View style={styles.linhaDaOpcao}>
                       <Icon name={opcao.icon} color={selecionada ? 'text' : 'textSecondary'} size="md" />
                       <View style={styles.textos}>
