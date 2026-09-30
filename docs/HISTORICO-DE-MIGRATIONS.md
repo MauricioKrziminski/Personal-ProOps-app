@@ -3,6 +3,18 @@
 Registro, não regra: o que está em cada banco HOJE se confere na fonte (`CLAUDE.md`, *Banco e
 fila*). Entradas movidas do `CLAUDE.md` em 26/09/2026, na ordem em que estavam lá.
 
+**Produção e staging ALINHADOS em `20260930163000`** — promoção explicitamente autorizada pelo
+Gabriel em 30/09/2026. Dry run de produção mostrou exatamente as nove migrações
+`20260929120000`, `20260929130000`, `20260929140000`, `20260929150000`, `20260929160000`,
+`20260929170000`, `20260930133521`, `20260930160000` e `20260930163000`. Aplicadas pelo CLI com
+`--project-ref kwriuifcwyvdrxtspjiz --skip-vault`, sem seed e sem trocar o link local de staging.
+Categorias foi aplicada e testada primeiro no staging. Conferência posterior em leitura:
+as nove versões presentes nos dois bancos; 13 definições de função idênticas; RLS e Realtime de
+`categories` ativos; CRUD para `authenticated`; RPCs da release sem execute para `anon`.
+Advisors de segurança de produção: nenhum erro. As matrizes de conversão/edição (106 casos),
+projeções, pagamento de dívida e recusa de anônimo passaram no staging com categorias presente,
+sempre com rollback. Registro anterior das pendências abaixo preservado como histórico.
+
 **Só no STAGING: `20260929120000_simular_hipoteses`** (29/09/2026) — `public.simular`: cria as
 hipóteses detalhadas do "E se…?" de verdade numa subtransação, roda as leituras (Projeção, meses,
 ciclo) e desfaz tudo. `security invoker`, sem `execute` para `anon`. Teste:
