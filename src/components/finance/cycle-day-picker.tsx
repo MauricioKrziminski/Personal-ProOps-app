@@ -1,9 +1,12 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { ThemedText } from '@/components/themed-text';
+import { useCoresSuaves, useOpacidadeSuave } from '@/components/motion/cores-suaves';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
-import { Radius, Space, tabular } from '@/design/tokens';
+import { Radius, Space, tabular, Type } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -61,9 +64,6 @@ export function CycleDayPicker({
   value: number | null;
   onChange: (dia: number | null) => void;
 }) {
-  const theme = useTheme();
-  const vidro = supportsLiquidGlass();
-
   return (
     <>
       <View style={styles.grade}>
@@ -85,29 +85,8 @@ export function CycleDayPicker({
                     Haptics.selectionAsync();
                     onChange(ultimo ? null : dia);
                   }}
-                  style={[
-                    styles.dia,
-                    {
-                      backgroundColor: escolhido
-                        ? vidro
-                          ? 'transparent'
-                          : theme.tintFill
-                        : theme.surface,
-                      borderColor: escolhido ? theme.tintFill : theme.cardBorder,
-                    },
-                  ]}>
-                  {vidro && escolhido ? (
-                    <GlassBackdrop
-                      fallbackColor={theme.tintFill}
-                      radius={Radius.sm}
-                      tintColor={theme.glassActionTint}
-                    />
-                  ) : null}
-                  <ThemedText
-                    type="default"
-                    style={[tabular, escolhido ? { color: theme.onTint } : undefined]}>
-                    {dia}
-                  </ThemedText>
+                  style={styles.vazio}>
+                  <DiaDoCiclo dia={dia} escolhido={escolhido} />
                 </Pressable>
               );
             })}
@@ -123,6 +102,32 @@ export function CycleDayPicker({
             : `do dia ${value + 1} de um mês ao dia ${value} do seguinte`}
       </ThemedText>
     </>
+  );
+}
+
+function DiaDoCiclo({ dia, escolhido }: { dia: number; escolhido: boolean }) {
+  const theme = useTheme();
+  const vidro = supportsLiquidGlass();
+  const { fontScale } = useWindowDimensions();
+  const [vidroMontado, setVidroMontado] = useState(vidro && escolhido);
+  if (vidro && escolhido && !vidroMontado) setVidroMontado(true);
+  const superficie = useCoresSuaves({
+    backgroundColor: escolhido ? theme.tintFill : theme.surface,
+    borderColor: escolhido ? theme.tintFill : theme.cardBorder,
+  });
+  const texto = useCoresSuaves({ color: escolhido ? theme.onTint : theme.text });
+  const vidroVisivel = useOpacidadeSuave(escolhido ? 1 : 0);
+  return (
+    <Animated.View style={[styles.dia, superficie]}>
+      {vidroMontado ? (
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, vidroVisivel]}>
+          <GlassBackdrop fallbackColor={theme.tintFill} radius={Radius.sm} tintColor={theme.glassActionTint} />
+        </Animated.View>
+      ) : null}
+      <Animated.Text key={fontScale} android_hyphenationFrequency="none" style={[Type.body, tabular, styles.numero, texto]}>
+        {dia}
+      </Animated.Text>
+    </Animated.View>
   );
 }
 
@@ -154,6 +159,7 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
   },
   vazio: { flex: 1 },
+  numero: { flexShrink: 0 },
   previa: {
     marginTop: Space.sm,
   },

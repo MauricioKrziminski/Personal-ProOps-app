@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import * as Haptics from 'expo-haptics';
 import { z } from 'zod';
@@ -28,11 +27,12 @@ import { pendenciaDoAplicar } from '@/lib/hipotese';
 import { argsDaParcelada, linhasDoLancamento, type EntradaLancamento, type EntradaParcelada } from '@/lib/escrita';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { Segmented } from '@/components/ui/segmented';
+import { SelectField, type SelectOption } from '@/components/ui/select-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ToastDoModal, useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
-import { Motion, Space, Type } from '@/design/tokens';
+import { Space, Type } from '@/design/tokens';
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
 import {
@@ -81,7 +81,7 @@ import {
 import { confirmDestructive } from '@/lib/item-actions';
 import { correcaoDoPagamento } from '@/lib/confirmar-baixa';
 import { AccountPicker } from '@/components/finance/account-picker';
-import { transicaoDeLayout } from '@/components/motion/transicao';
+import { Presenca } from '@/components/motion/presenca';
 import { debtPaymentPatch, selectedDebtPaymentVersions, type DebtPaymentScope } from '@/lib/debt-payment-scope';
 import { newClientMessageId } from '@/lib/agent-chat';
 import { askEditScope } from '@/lib/edit-scope';
@@ -96,10 +96,10 @@ import { askEditScope } from '@/lib/edit-scope';
  */
 
 const KINDS = [
-  { value: 'expense', label: 'Gasto' },
-  { value: 'income', label: 'Receita' },
-  { value: 'transfer', label: 'Transferência' },
-] as const satisfies readonly { value: TransactionKind; label: string }[];
+  { id: 'expense', label: 'Gasto', icon: 'arrow.up.right' },
+  { id: 'income', label: 'Receita', icon: 'arrow.down.left' },
+  { id: 'transfer', label: 'Transferência', icon: 'arrow.left.arrow.right' },
+] as const satisfies readonly (SelectOption & { id: TransactionKind })[];
 
 const schema = z
   .object({
@@ -322,7 +322,7 @@ export function FormularioDoLancamento(props: Props) {
    * (26/09/2026, `convert_transaction_to_installments` com as já pagas) — o mesmo campo.
    */
   const podeInformarHistorico = podeParcelarAqui;
-  /** Achado B: esconde o Segmented de tipo numa linha de série — ver o ⚠️ no Controller de `kind`. */
+  /** Achado B: esconde a escolha de tipo numa linha de série — ver o ⚠️ no Controller de `kind`. */
   const naSerieEditada = Boolean(editing?.installment_plan_id || editing?.recurring_id);
   /** Pagamento de dívida também: o trigger da dívida exige despesa PAGA, e recusaria a troca. */
   const tipoTravado = naSerieEditada || Boolean(editing?.debt_id);
@@ -964,7 +964,7 @@ export function FormularioDoLancamento(props: Props) {
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic">
         {props.topo}
-        <Animated.View style={[styles.conteudo, props.estiloDoConteudo]}>
+        <View style={styles.conteudo}>
         {/*
           Uma linha só, e ela É o caminho: abre a dívida DESTE pagamento, não a lista. Era um texto
           solto com um botão colado embaixo (24/09/2026).
@@ -1010,6 +1010,7 @@ export function FormularioDoLancamento(props: Props) {
           </Note>
         ) : null}
 
+        <View style={styles.conteudo}>
         {formSerie ? (
           <CamposDaSerie form={formSerie} onChange={setFormSerie} contas={accounts ?? []} rotuloDaData="Vence em" />
         ) : formCompra ? (
@@ -1022,7 +1023,7 @@ export function FormularioDoLancamento(props: Props) {
           "Categoria" por "Para a conta". Controle que remonta o formulário não pode vir
           depois do que ele remonta.
 
-          ⚠️ **Linha de série ou parcela não troca de tipo.** Com o Segmented na tela, dava
+          ⚠️ **Linha de série ou parcela não troca de tipo.** Com a escolha na tela, dava
           para virar uma parcela de cartão em receita, e a fatura ficava com uma linha que
           soma para o outro lado. O tipo gravado continua sendo `editing.kind`, que é o que
           o `defaultValues` já traz.
@@ -1032,22 +1033,27 @@ export function FormularioDoLancamento(props: Props) {
             control={control}
             name="kind"
             render={({ field }) => (
-              <Segmented
-                options={KINDS}
-                value={field.value}
-                onChange={(next) => {
-                  field.onChange(next);
-                  // A fileira de parcelas só existe em gasto (`podeParcelarAqui`).
-                  if (next !== 'expense') resetParcelasSeEscondeu();
-                  // Transferência não tem "vou pagar depois" (`podeAdiar`): mesma reação da troca
-                  // para cartão. Sem ela o zod seguia exigindo o vencimento de um campo que sumiu,
-                  // e o "Salvar" não fazia nada, com o erro escondido (22/09/2026).
-                  if (next === 'transfer') {
-                    setValue('pending', false);
-                    setValue('due_at', null);
-                  }
-                }}
-              />
+              <Field label="Tipo">
+                <SelectField
+                  options={KINDS}
+                  value={field.value}
+                  placeholder="Escolher o tipo"
+                  onChange={(next) => {
+                    if (next === field.value) return;
+                    if (next !== 'expense' && next !== 'income' && next !== 'transfer') return;
+                    field.onChange(next);
+                    // A fileira de parcelas só existe em gasto (`podeParcelarAqui`).
+                    if (next !== 'expense') resetParcelasSeEscondeu();
+                    // Transferência não tem "vou pagar depois" (`podeAdiar`): mesma reação da troca
+                    // para cartão. Sem ela o zod seguia exigindo o vencimento de um campo que sumiu,
+                    // e o "Salvar" não fazia nada, com o erro escondido (22/09/2026).
+                    if (next === 'transfer') {
+                      setValue('pending', false);
+                      setValue('due_at', null);
+                    }
+                  }}
+                />
+              </Field>
             )}
           />
         )}
@@ -1069,7 +1075,7 @@ export function FormularioDoLancamento(props: Props) {
                 onChangeText={field.onChange}
                 placeholder="Ex.: Fone de ouvido"
                 accessibilityLabel="Título"
-                autoFocus={!editing}
+                autoFocus={!editing && props.focarAoAbrir !== false}
                 invalid={!!errors.description}
               />
             </Field>
@@ -1111,8 +1117,7 @@ export function FormularioDoLancamento(props: Props) {
           />
 
 
-        {kind !== 'transfer' && (
-          <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
+        <Presenca visivel={kind !== 'transfer'}>
             <Controller
               control={control}
               name="category"
@@ -1122,8 +1127,7 @@ export function FormularioDoLancamento(props: Props) {
                 </Field>
               )}
             />
-          </Animated.View>
-        )}
+          </Presenca>
 
         {/* Numa parcela a conta é da COMPRA: muda em "A compra toda" (uma parcela sozinha noutro
             cartão não existe). */}
@@ -1177,8 +1181,7 @@ export function FormularioDoLancamento(props: Props) {
 
         {/* Sem conta nenhuma, o "Cadastrar uma conta" de cima responde pelas duas: o destino seria
             uma lista vazia. */}
-        {kind === 'transfer' && !(contas.isSuccess && (accounts ?? []).length === 0) && (
-          <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
+        <Presenca visivel={kind === 'transfer' && !(contas.isSuccess && (accounts ?? []).length === 0)}>
             <Controller
               control={control}
               name="counterparty_account_id"
@@ -1193,11 +1196,9 @@ export function FormularioDoLancamento(props: Props) {
                 </Field>
               )}
             />
-          </Animated.View>
-        )}
+          </Presenca>
 
-        {podeParcelarAqui && (
-          <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
+        <Presenca visivel={podeParcelarAqui}>
             <Controller
               control={control}
               name="installments"
@@ -1224,15 +1225,13 @@ export function FormularioDoLancamento(props: Props) {
                 </Field>
               )}
             />
-          </Animated.View>
-        )}
+          </Presenca>
 
         {/*
           O que o número do Valor É. Mora DEPOIS das parcelas porque só existe com 2× ou mais:
           acima delas, aparecer empurraria o "+" para baixo do dedo no meio do toque.
         */}
-        {podeParcelarAqui && installmentCount > 1 && (
-          <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
+        <Presenca visivel={podeParcelarAqui && installmentCount > 1}>
             <Field
               label="O valor acima é"
               hint={
@@ -1244,10 +1243,9 @@ export function FormularioDoLancamento(props: Props) {
               }>
               <Segmented options={UNIDADES_DO_VALOR} value={unidade} onChange={setUnidade} />
             </Field>
-          </Animated.View>
-        )}
+          </Presenca>
 
-        {podeInformarHistorico && installmentCount > 1 && (
+        <Presenca visivel={podeInformarHistorico && installmentCount > 1}>
           <Controller control={control} name="paid_installments" render={({ field }) => (
             <Field label="Parcelas já pagas" error={errors.paid_installments?.message}>
               {/*
@@ -1259,7 +1257,7 @@ export function FormularioDoLancamento(props: Props) {
                 placeholder="0" accessibilityLabel="Parcelas iniciais já pagas" />
             </Field>
           )} />
-        )}
+        </Presenca>
 
         {/*
           **Pix no crédito** (Nubank e afins): o boleto pede um valor, o cartão cobra outro.
@@ -1270,8 +1268,7 @@ export function FormularioDoLancamento(props: Props) {
           pergunta faz sentido (gasto em cartão, à vista). Editando, ele abre com o juro que nasceu
           junto (`useJurosDoPix`), e mudar, zerar ou somar depois vale.
         */}
-        {mostraJuros && (
-          <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
+        <Presenca visivel={mostraJuros}>
             <Controller
               control={control}
               name="fee_cents"
@@ -1287,8 +1284,7 @@ export function FormularioDoLancamento(props: Props) {
                 </Field>
               )}
             />
-          </Animated.View>
-        )}
+          </Presenca>
 
 
         <Controller
@@ -1355,8 +1351,7 @@ export function FormularioDoLancamento(props: Props) {
         />
 
         {/* Conta a pagar: o gasto entra na projeção pelo vencimento, não pela data de hoje. */}
-        {podeAdiar && (
-          <Animated.View entering={FadeIn.duration(Motion.duration.base)} layout={linear}>
+        <Presenca visivel={podeAdiar}>
             <Card>
               <View style={styles.pendingCard}>
                 <Controller
@@ -1382,8 +1377,7 @@ export function FormularioDoLancamento(props: Props) {
                     />
                   )}
                 />
-                {pending ? (
-                  <Animated.View entering={FadeIn.duration(Motion.duration.base)} style={styles.pendingCard}>
+                <Presenca visivel={pending} style={styles.pendingCard}>
                     {umaData ? null : (
                     <Controller
                       control={control}
@@ -1420,12 +1414,10 @@ export function FormularioDoLancamento(props: Props) {
                         <SwitchRow label={autoConfirmLabel(kind)} value={field.value} onValueChange={field.onChange} />
                       )}
                     />
-                  </Animated.View>
-                ) : null}
+                  </Presenca>
               </View>
             </Card>
-          </Animated.View>
-        )}
+          </Presenca>
 
 
 
@@ -1451,14 +1443,14 @@ export function FormularioDoLancamento(props: Props) {
         ) : null}
         </>
         )}
-        </Animated.View>
+        </View>
+        </View>
       </KeyboardAwareScrollView>
       <ToastDoModal />
     </Screen>
   );
 }
 
-const linear = transicaoDeLayout;
 
 /**
  * Editando um lançamento: o registro vem de `useTransaction(id)`, nunca do cache da lista — com

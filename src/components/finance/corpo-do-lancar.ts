@@ -1,6 +1,4 @@
 import type { ReactNode } from 'react';
-import type { ViewStyle } from 'react-native';
-import type { AnimatedStyle } from 'react-native-reanimated';
 import type { Comum } from '@/lib/lancar';
 import type { RegistroSimulado } from '@/lib/hipotese';
 
@@ -8,6 +6,8 @@ import type { RegistroSimulado } from '@/lib/hipotese';
 export type CorpoProps = {
   /** O seletor de tipo, desenhado pelo hospedeiro no TOPO da rolagem do corpo. */
   topo?: ReactNode;
+  /** Foco automático só na abertura; mudar formato não abre novamente o teclado. */
+  focarAoAbrir?: boolean;
   /** Os campos comuns ao montar (vindos do tipo anterior, ou dos parâmetros). */
   comum: Comum;
   /** O hospedeiro lê os campos comuns do corpo na hora de trocar de tipo. */
@@ -27,9 +27,5 @@ export type CorpoProps = {
   deHipotese?: string;
   /** O hospedeiro está gravando (a conversão): Salvar e "Salvar e criar outro" esperam. */
   salvando?: boolean;
-  /**
-   * O esmaecer da troca de tipo. Vai só no conteúdo ABAIXO do `topo`: cabeçalho e seletor ficam
-   * (spec: "os comuns não se movem").
-   */
-  estiloDoConteudo?: AnimatedStyle<ViewStyle>;
+
 };

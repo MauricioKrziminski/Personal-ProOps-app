@@ -1,12 +1,15 @@
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { MudancaSuave, usePresencaAtiva } from '@/components/motion/presenca';
+import { useCoresSuaves, useOpacidadeSuave } from '@/components/motion/cores-suaves';
 import { monthTitle, shiftMonth } from '@/components/finance/month-picker';
 import { Icon } from '@/components/ui/icon';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
-import { HitTarget, Radius, Space, tabular } from '@/design/tokens';
+import { HitTarget, Radius, Space, tabular, Type } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { isoToBR, localISODate, monthGrid } from '@/lib/dates';
 
@@ -69,6 +72,7 @@ interface Props {
  */
 export function Calendar({ value, onChange, onMonthChange, min, max }: Props) {
   const theme = useTheme();
+  const ativo = usePresencaAtiva();
   const vidro = supportsLiquidGlass();
   const hoje = localISODate();
   const [mes, setMes] = useState(() => (value ?? hoje).slice(0, 7));
@@ -93,6 +97,7 @@ export function Calendar({ value, onChange, onMonthChange, min, max }: Props) {
         disabled={bloqueado}
         hitSlop={Space.sm}
         onPress={() => {
+          if (!ativo || bloqueado) return;
           Haptics.selectionAsync();
           setMes(alvo);
           onMonthChange?.(alvo);
@@ -114,12 +119,15 @@ export function Calendar({ value, onChange, onMonthChange, min, max }: Props) {
     <View style={styles.wrap}>
       <View style={styles.cabecalho}>
         {passo(-1)}
-        <ThemedText type="smallBold" accessibilityRole="header" style={styles.mes}>
+        <MudancaSuave valor={mes} style={styles.mes}>
+        <ThemedText type="smallBold" accessibilityRole="header" style={styles.mesTexto}>
           {monthTitle(mes)}
         </ThemedText>
+        </MudancaSuave>
         {passo(1)}
       </View>
 
+      <MudancaSuave valor={mes} style={styles.grade}>
       <View style={styles.linha}>
         {SEMANA.map((dia) => (
           <View key={dia} style={styles.inicialDaSemana}>
@@ -146,46 +154,49 @@ export function Calendar({ value, onChange, onMonthChange, min, max }: Props) {
               accessibilityLabel={isoToBR(iso)}
               disabled={bloqueado}
               onPress={() => {
+                if (!ativo || bloqueado) return;
                 Haptics.selectionAsync();
                 onChange(iso);
               }}
               style={styles.celula}>
               {({ pressed }) => (
-                <View
-                  style={[
-                    styles.dia,
-                    marcado
-                      ? { backgroundColor: vidro ? 'transparent' : theme.tintFill }
-                      : pressed
-                        ? { backgroundColor: theme.backgroundSelected }
-                        : null,
-                    /*
-                      HOJE leva um anel, não preenchimento: preenchido ele competiria com o dia
-                      escolhido — dois discos cheios na mesma grade e nenhum dizendo qual é a
-                      resposta.
-                    */
-                    iso === hoje && !marcado
-                      ? { borderWidth: StyleSheet.hairlineWidth, borderColor: theme.tint }
-                      : null,
-                    bloqueado ? styles.bloqueado : null,
-                  ]}>
-                  {marcado && vidro ? (
-                    <GlassBackdrop fallbackColor={theme.tintFill} radius={Radius.pill} tintColor={theme.glassActionTint} />
-                  ) : null}
-                  <ThemedText
-                    type="ticker"
-                    themeColor={marcado ? 'onTint' : iso === hoje ? 'tint' : 'text'}
-                    style={tabular}>
-                    {Number(iso.slice(8))}
-                  </ThemedText>
-                </View>
+                <DiaDoCalendario iso={iso} hoje={iso === hoje} marcado={marcado} bloqueado={bloqueado} pressed={pressed} vidro={vidro} />
               )}
             </Pressable>
           );
         })}
       </View>
       ))}
+      </MudancaSuave>
     </View>
+  );
+}
+
+function DiaDoCalendario({ iso, hoje, marcado, bloqueado, pressed, vidro }: {
+  iso: string; hoje: boolean; marcado: boolean; bloqueado: boolean; pressed: boolean; vidro: boolean;
+}) {
+  const theme = useTheme();
+  const { fontScale } = useWindowDimensions();
+  const [vidroMontado, setVidroMontado] = useState(vidro && marcado);
+  if (vidro && marcado && !vidroMontado) setVidroMontado(true);
+  const superficie = useCoresSuaves({
+    backgroundColor: marcado ? theme.tintFill : pressed ? theme.backgroundSelected : 'transparent',
+    // Hoje conserva seu anel; ele cede à seleção sem trocar de largura no meio do toque.
+    borderColor: hoje && !marcado ? theme.tint : 'transparent',
+  });
+  const texto = useCoresSuaves({ color: marcado ? theme.onTint : hoje ? theme.tint : theme.text });
+  const vidroVisivel = useOpacidadeSuave(marcado ? 1 : 0);
+  return (
+    <Animated.View style={[styles.dia, superficie, bloqueado ? styles.bloqueado : null]}>
+      {vidroMontado ? (
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, vidroVisivel]}>
+          <GlassBackdrop fallbackColor={theme.tintFill} radius={Radius.pill} tintColor={theme.glassActionTint} />
+        </Animated.View>
+      ) : null}
+      <Animated.Text key={fontScale} android_hyphenationFrequency="none" style={[Type.ticker, tabular, styles.numero, texto]}>
+        {Number(iso.slice(8))}
+      </Animated.Text>
+    </Animated.View>
   );
 }
 
@@ -213,8 +224,12 @@ const styles = StyleSheet.create({
   },
   mes: {
     flex: 1,
-    textAlign: 'center',
   },
+  mesTexto: {
+    textAlign: 'center',
+    flexShrink: 0,
+  },
+  grade: { gap: Space.sm },
   linha: {
     flexDirection: 'row',
   },
@@ -244,9 +259,11 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderRadius: Radius.pill,
     borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  numero: { flexShrink: 0 },
   bloqueado: {
     opacity: 0.3,
   },

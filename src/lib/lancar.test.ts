@@ -1,8 +1,34 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { comumDepoisDeSalvar, comumParaSerie, hrefDoLancar, opcoesDaConversao, hrefDoLancamento, papelDaTransacao, temPassadoDoParam, TIPOS_DE_LANCAMENTO } from './lancar.ts';
+import { comumDepoisDeSalvar, comumParaSerie, hrefDoLancar, hrefDoResultadoDaConversao, opcoesDaConversao, hrefDoLancamento, papelDaTransacao, temPassadoDoParam, TIPOS_DE_LANCAMENTO } from './lancar.ts';
 
 const c = { kind: 'transfer' as const, descricao: 'Aluguel', valorCents: 150000, contaId: 'cc', dataBR: '05/10/2026', categoria: 'moradia' };
+
+test('a conversão abre o registro devolvido pelo banco, inclusive financiamento sem transação', () => {
+  assert.deepEqual(hrefDoResultadoDaConversao({ tipo: 'financiamento', dados: {} }, { ids: ['debt'] }),
+    { pathname: '/finance/debts', params: { id: 'debt' } });
+  assert.deepEqual(hrefDoResultadoDaConversao({ tipo: 'lancamento', dados: {} }, { ids: ['tx', 'juros', 'fatura'] }),
+    { pathname: '/finance/[txId]', params: { txId: 'tx' } });
+  assert.deepEqual(hrefDoResultadoDaConversao({ tipo: 'parcelada', dados: {} }, { ids: ['plan', 'tx1', 'tx2', 'fatura'] }),
+    { pathname: '/finance/[txId]', params: { txId: 'tx1' } }, 'o ID do plano não é uma transação');
+});
+
+test('a série convertida abre suas ocorrências no mês local do início escolhido', () => {
+  const anterior = process.env.TZ;
+  try {
+    process.env.TZ = 'America/Sao_Paulo';
+    assert.deepEqual(hrefDoResultadoDaConversao({ tipo: 'recorrente', dados: { dtstart: '2026-11-01T02:00:00Z', next_run_at: '2026-12-01T03:00:00Z' } }, { ids: ['serie'] }),
+      { pathname: '/finance/transactions', params: { recurringId: 'serie', month: '2026-10' } });
+  } finally {
+    if (anterior === undefined) delete process.env.TZ; else process.env.TZ = anterior;
+  }
+});
+
+test('sem ID de resultado a conversão abre a lista válida, nunca a origem removida', () => {
+  assert.deepEqual(hrefDoResultadoDaConversao({ tipo: 'financiamento', dados: {} }, { ids: [] }), { pathname: '/finance/debts', params: {} });
+  assert.deepEqual(hrefDoResultadoDaConversao({ tipo: 'recorrente', dados: {} }, { ids: [] }), { pathname: '/finance/recurring', params: {} });
+  assert.deepEqual(hrefDoResultadoDaConversao({ tipo: 'lancamento', dados: {} }, { ids: [] }), { pathname: '/finance/transactions', params: {} });
+});
 
 test('as quatro opções da spec, e só as que mudam alguma coisa', () => {
   const rotulos = (o: Parameters<typeof opcoesDaConversao>[0]) => opcoesDaConversao(o).map((x) => x.label);

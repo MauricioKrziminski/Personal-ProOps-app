@@ -48,9 +48,12 @@ begin
   values (intocada, w, u, 'expense', 3000, 'Streaming', 'FREQ=MONTHLY;BYMONTHDAY=12',
           private.add_months(base, 1) + 11, private.add_months(base, 1) + 11);
   -- a gêmea: lançada à mão no dia, antes de a série existir
+  -- A âncora também é o dia 3: base - 28 pode cair no dia 4, depois da
+  -- ocorrência que o teste pede. Uma data anterior ao dtstart não é prevista.
   insert into public.recurring_transactions
     (id, workspace_id, user_id, kind, amount_cents, description, rrule, dtstart, next_run_at)
-  values (gemeas, w, u, 'expense', 8000, 'Água', 'FREQ=MONTHLY;BYMONTHDAY=3', base - 28, base - 28);
+  values (gemeas, w, u, 'expense', 8000, 'Água', 'FREQ=MONTHLY;BYMONTHDAY=3',
+          private.day_in_month(base - 28, 3), private.day_in_month(base - 28, 3));
   insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, source, status)
   values (w, u, 'expense', 8000, 'agua', private.day_in_month(base - 28, 3), 'app', 'cleared')
   returning id into solta;

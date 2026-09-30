@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import type { SymbolViewProps } from 'expo-symbols';
+import { Presenca, TrocaSuave } from '@/components/motion/presenca';
 
 import { SecaoDeArquivados } from '@/components/ui/secao-de-arquivados';
 import { useBRL } from '@/components/ui/conceal';
@@ -653,6 +654,7 @@ export default function AccountsScreen() {
                 />
               </Field>
 
+              <TrocaSuave estado={form.type === 'credit_card' ? 'cartao' : 'conta'} style={styles.camposDoTipo}>
               {form.type === 'credit_card' ? (
                 <>
                   {/*
@@ -781,7 +783,7 @@ export default function AccountsScreen() {
                     valueCents={form.saldoCents}
                     onChangeCents={(saldoCents) => setForm({ ...form, saldoCents })}
                   />
-                  {podeNegativo ? (
+                  <Presenca visivel={podeNegativo}>
                     <Segmented
                       value={form.negativo ? 'negativo' : 'positivo'}
                       onChange={(v) => setForm({ ...form, negativo: v === 'negativo' })}
@@ -790,9 +792,10 @@ export default function AccountsScreen() {
                         { value: 'negativo', label: 'No vermelho' },
                       ]}
                     />
-                  ) : null}
+                  </Presenca>
                 </Field>
               )}
+              </TrocaSuave>
 
               {save.isError ? (
                 <ThemedText type="small" themeColor="danger" style={styles.bandText}>
@@ -833,6 +836,7 @@ const styles = StyleSheet.create({
     padding: Space.lg,
     paddingBottom: Space.xxxl,
   },
+  camposDoTipo: { gap: Space.xl },
   diaRow: {
     flexDirection: 'row',
     gap: Space.lg,

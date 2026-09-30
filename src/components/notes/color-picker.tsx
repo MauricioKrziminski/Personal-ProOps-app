@@ -1,14 +1,14 @@
-import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
-import { ThemedText } from '@/components/themed-text';
+import { useCoresSuaves, useOpacidadeSuave } from '@/components/motion/cores-suaves';
 import { Icon } from '@/components/ui/icon';
 import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { NOTE_COLOR_NAMES, type NoteColorName } from '@/constants/theme';
 import { noteInk, notePalette } from '@/design/note-colors';
-import { HitTarget, Motion, Radius, Space } from '@/design/tokens';
+import { HitTarget, Radius, Space, Type } from '@/design/tokens';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 
 /**
@@ -119,6 +119,11 @@ function Amostra({
   onPress: () => void;
 }) {
   const theme = useTheme();
+  const { fontScale } = useWindowDimensions();
+  const anel = useCoresSuaves({ backgroundColor: fundo, borderColor: selecionada ? tinta : theme.cardBorder });
+  const texto = useCoresSuaves({ color: selecionada ? theme.text : theme.textSecondary });
+  const disco = useOpacidadeSuave(selecionada ? 0 : 1);
+  const check = useOpacidadeSuave(selecionada ? 1 : 0);
   return (
     <Pressable
       accessibilityRole="button"
@@ -128,36 +133,31 @@ function Amostra({
       style={styles.alvo}>
       {({ pressed }) => (
         <>
-        <View
+        <Animated.View
           style={[
             styles.anel,
-            {
-              backgroundColor: fundo,
-              borderColor: selecionada ? tinta : theme.cardBorder,
-              opacity: pressed ? 0.6 : 1,
-            },
+            anel,
+            { opacity: pressed ? 0.6 : 1 },
           ]}>
-          {selecionada ? (
-            <Animated.View entering={FadeIn.duration(Motion.duration.fast)}>
-              <Icon name="checkmark" size="md" color="text" />
-            </Animated.View>
-          ) : (
-            <View
+            <Animated.View
               style={[
                 styles.disco,
+                disco,
                 // "Sem cor" mostra o contorno vazio: um disco cinza leria como uma nona cor.
                 vazia
                   ? { borderWidth: StyleSheet.hairlineWidth, borderColor: tinta }
                   : { backgroundColor: tinta },
               ]}
             />
-          )}
-        </View>
+            <Animated.View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[StyleSheet.absoluteFill, styles.check, check]}>
+              <Icon name="checkmark" size="md" color="text" />
+            </Animated.View>
+        </Animated.View>
         {/* Sem `textTransform: 'capitalize'`: ele sobe a inicial de CADA palavra e escrevia
             "Sem Cor". A maiúscula vem de quem monta o rótulo. */}
-        <ThemedText type="caption" themeColor={selecionada ? 'text' : 'textSecondary'}>
+        <Animated.Text key={fontScale} android_hyphenationFrequency="none" style={[Type.caption, styles.rotulo, texto]}>
           {label}
-        </ThemedText>
+        </Animated.Text>
         </>
       )}
     </Pressable>
@@ -180,4 +180,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   disco: { width: 20, height: 20, borderRadius: Radius.pill },
+  check: { alignItems: 'center', justifyContent: 'center' },
+  rotulo: { flexShrink: 0 },
 });

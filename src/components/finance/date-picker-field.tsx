@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { Calendar } from '@/components/finance/calendar';
 import { ThemedText } from '@/components/themed-text';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Icon } from '@/components/ui/icon';
-import { Elevation, Radius, Space } from '@/design/tokens';
+import { Elevation, Motion, Radius, Space } from '@/design/tokens';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import { brToISO, isValidBRDate, isoToBR, localISODate, monthBounds } from '@/lib/dates';
-import { transicaoDeLayout } from '@/components/motion/transicao';
+import { useCoresSuaves } from '@/components/motion/cores-suaves';
+import { MudancaSuave, Presenca, usePresencaAtiva } from '@/components/motion/presenca';
 
 interface Props {
   /** Data em dd/mm/aaaa, o formato do formulário. `null` = vazia. */
@@ -61,11 +62,23 @@ export function DatePickerField({
 }: Props) {
   const theme = useTheme();
   const scheme = useScheme();
+  const ativo = usePresencaAtiva();
+  const borda = useCoresSuaves({ borderColor: invalid ? theme.danger : theme.cardBorder });
   const [aberto, setAberto] = useState(false);
+  const [abertura, setAbertura] = useState(0);
+  const escolhendo = useRef(false);
+  const calendarioAberto = useRef(false);
+  const aberturaAtual = useRef(0);
+  const giro = useSharedValue(0);
+  const estiloDoChevron = useAnimatedStyle(() => ({ transform: [{ rotate: `${giro.get()}deg` }] }));
+  useLayoutEffect(() => {
+    calendarioAberto.current = aberto && ativo;
+    giro.set(withSpring(aberto ? 180 : 0, { ...Motion.spring.morph, reduceMotion: ReduceMotion.System }));
+  }, [aberto, ativo, giro]);
   // O mês que a grade está MOSTRANDO: navegando até junho, "último dia" é 30/06, não o fim do
   // mês da data gravada (28/09/2026, *"se eu estou em junho no calendário…"*).
   const [mesVisivel, setMesVisivel] = useState<string | null>(null);
-  const vidro = supportsLiquidGlass() && !aberto;
+  const vidro = supportsLiquidGlass();
 
   const iso = value && isValidBRDate(value) ? brToISO(value) : null;
   const mesDoValor = iso?.slice(0, 7) ?? localISODate().slice(0, 7);
@@ -80,28 +93,38 @@ export function DatePickerField({
   const marcado = lastDaySelected && iso === fimDoMesISO;
 
   const alternarUltimoDia = () => {
+    if (!ativo || (calendarioAberto.current && escolhendo.current)) return;
+    escolhendo.current = calendarioAberto.current;
+    calendarioAberto.current = false;
     if (marcado) onChange(fimDoMes);
     else onSelectLastDay?.(fimDoMes);
     setAberto(false);
   };
 
   return (
-    <Animated.View layout={transicaoDeLayout}>
-      <View
+    <View>
+      <Animated.View
         style={[
           styles.moldura,
+          borda,
           {
             backgroundColor: vidro ? 'transparent' : theme.surface,
-            borderColor: invalid ? theme.danger : theme.cardBorder,
             boxShadow: Elevation[scheme].raised,
           },
         ]}>
         {vidro ? <GlassBackdrop fallbackColor={theme.surface} radius={Radius.sm} /> : null}
         <Pressable
           onPress={() => {
+            if (!ativo) return;
             Haptics.selectionAsync();
-            setMesVisivel(null);
-            setAberto((a) => !a);
+            escolhendo.current = false;
+            if (!calendarioAberto.current) {
+              setMesVisivel(null);
+              aberturaAtual.current += 1;
+              setAbertura(aberturaAtual.current);
+            }
+            calendarioAberto.current = !calendarioAberto.current;
+            setAberto(calendarioAberto.current);
           }}
           accessibilityRole="button"
           accessibilityState={{ expanded: aberto }}
@@ -114,32 +137,41 @@ export function DatePickerField({
                 { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
               ]}>
               <Icon name="calendar" size="sm" color="textSecondary" />
+              <MudancaSuave valor={value} style={styles.valor}>
               <ThemedText
                 type="default"
                 themeColor={value ? 'text' : 'textSecondary'}
-                style={styles.valor}>
+                style={styles.textoInteiro}>
                 {value || placeholder}
               </ThemedText>
-              <Icon name={aberto ? 'chevron.up' : 'chevron.down'} size="sm" color="textSecondary" />
+              </MudancaSuave>
+              <Animated.View style={estiloDoChevron}>
+                <Icon name="chevron.down" size="sm" color="textSecondary" />
+              </Animated.View>
             </View>
           )}
         </Pressable>
 
-        {aberto ? (
-          <View style={[styles.calendario, { borderTopColor: theme.cardBorder }]}>
+        <Presenca visivel={aberto} style={[styles.calendario, { borderTopColor: theme.cardBorder }]}>
             <Calendar
+              key={abertura}
               value={iso}
-              onMonthChange={setMesVisivel}
+              onMonthChange={(mes) => {
+                if (calendarioAberto.current && ativo && aberturaAtual.current === abertura) setMesVisivel(mes);
+              }}
               onChange={(escolhido) => {
+                if (!calendarioAberto.current || !ativo || escolhendo.current || aberturaAtual.current !== abertura) return;
+                escolhendo.current = true;
+                calendarioAberto.current = false;
                 onChange(isoToBR(escolhido));
                 setAberto(false);
               }}
               min={min}
               max={max}
             />
-          </View>
-        ) : null}
-        {onSelectLastDay ? (
+        </Presenca>
+        <Presenca visivel={Boolean(onSelectLastDay)}>
+          <MudancaSuave valor={`${marcado}:${fimDoMes}`}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Último dia de todo mês"
@@ -162,9 +194,10 @@ export function DatePickerField({
               {marcado ? `Selecionado · ${fimDoMes}` : `Usar ${fimDoMes}`}
             </ThemedText>
           </Pressable>
-        ) : null}
-      </View>
-    </Animated.View>
+          </MudancaSuave>
+        </Presenca>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -173,6 +206,7 @@ const styles = StyleSheet.create({
   linha: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, padding: Space.md, minHeight: 48 },
   /* O valor empurra o chevron para a direita e cede antes dele quando a fonte cresce. */
   valor: { flex: 1 },
+  textoInteiro: { flexShrink: 0 },
   calendario: { borderTopWidth: 1, padding: Space.sm },
   ultimoDia: {
     minHeight: 48,

@@ -1,8 +1,11 @@
-import { Switch } from 'react-native';
+import { StyleSheet, Switch, View } from 'react-native';
 import { router } from 'expo-router';
 
+import { Presenca } from '@/components/motion/presenca';
 import { Row, Section } from '@/components/ui/row';
 import { useToast } from '@/components/ui/toast';
+import { Space } from '@/design/tokens';
+import { useTheme } from '@/hooks/use-theme';
 import {
   pushBlockerMessage,
   useAlertPreferences,
@@ -57,6 +60,7 @@ export function AlertPreferencesSection({
   hasVerifiedPhone,
   showHistory = true,
 }: AlertPreferencesSectionProps) {
+  const theme = useTheme();
   const toast = useToast();
   const push = usePushStatus(userId);
   const register = useRegisterPush(userId);
@@ -101,6 +105,7 @@ export function AlertPreferencesSection({
 
   return (
     <Section heading="block" title="Notificações">
+      <View>
       <Row
         title="Avisos financeiros no celular"
         subtitle={pushSubtitle({
@@ -127,6 +132,7 @@ export function AlertPreferencesSection({
           />
         }
       />
+      <View style={[styles.separador, { backgroundColor: theme.separator }]} />
       <Row
         title="Avisos financeiros no WhatsApp"
         subtitle={whatsappSubtitle({
@@ -148,11 +154,19 @@ export function AlertPreferencesSection({
           />
         }
       />
-      {showHistory ? <Row
+      <Presenca visivel={showHistory}>
+      <View style={[styles.separador, { backgroundColor: theme.separator }]} />
+      <Row
         title="Histórico de alertas"
         icon="clock.arrow.circlepath"
         onPress={() => router.push('/profile/alerts')}
-      /> : null}
+      />
+      </Presenca>
+      </View>
     </Section>
   );
 }
+
+const styles = StyleSheet.create({
+  separador: { height: StyleSheet.hairlineWidth, marginLeft: Space.lg },
+});

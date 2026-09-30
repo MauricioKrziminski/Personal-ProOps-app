@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { GradeDeCores } from '@/components/notes/color-picker';
+import { useCoresSuaves } from '@/components/motion/cores-suaves';
+import { TrocaSuave } from '@/components/motion/presenca';
 import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
 import { Forte } from '@/components/ui/forte';
@@ -12,7 +15,7 @@ import { TaskHeader } from '@/components/ui/task-header';
 import { useToast } from '@/components/ui/toast';
 import type { NoteColorName } from '@/constants/theme';
 import { noteInk } from '@/design/note-colors';
-import { HitTarget, Radius, Space } from '@/design/tokens';
+import { HitTarget, IconSize, Radius, Space } from '@/design/tokens';
 import { useCategoriesUsed, useSalvarCategoria } from '@/hooks/use-finance';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import { foldCategory } from '@/lib/categories-merge';
@@ -160,42 +163,47 @@ function GradeDeIcones({
   cor: NoteColorName | null;
   onPick: (icon: IconName) => void;
 }) {
-  const theme = useTheme();
-  const scheme = useScheme();
-  const tinta = cor ? noteInk(cor, scheme) : null;
   return (
     <View style={styles.grade}>
-      {ICONES_DE_CATEGORIA.map((i) => {
-        const selecionado = i === valor;
-        return (
-          <Pressable
-            key={String(i)}
-            accessibilityRole="button"
-            accessibilityLabel={ROTULO_DO_ICONE[String(i)] ?? String(i)}
-            accessibilityState={{ selected: selecionado }}
-            onPress={() => {
-              Haptics.selectionAsync();
-              onPick(i);
-            }}
-            style={({ pressed }) => [
-              styles.icone,
-              {
-                backgroundColor: theme.backgroundElement,
-                borderColor: selecionado ? theme.text : 'transparent',
-                opacity: pressed ? 0.6 : 1,
-              },
-            ]}>
-            <Icon name={i} size="md" color="text" tint={selecionado && tinta ? tinta : undefined} />
-          </Pressable>
-        );
-      })}
+      {ICONES_DE_CATEGORIA.map((i) => (
+        <AmostraDoIcone key={String(i)} icon={i} selecionado={i === valor} cor={cor} onPick={onPick} />
+      ))}
     </View>
+  );
+}
+
+function AmostraDoIcone({ icon, selecionado, cor, onPick }: {
+  icon: IconName; selecionado: boolean; cor: NoteColorName | null; onPick: (icon: IconName) => void;
+}) {
+  const theme = useTheme();
+  const scheme = useScheme();
+  const tinta = selecionado && cor ? noteInk(cor, scheme) ?? undefined : undefined;
+  const superficie = useCoresSuaves({
+    backgroundColor: theme.backgroundElement,
+    borderColor: selecionado ? theme.text : 'transparent',
+  });
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={ROTULO_DO_ICONE[String(icon)] ?? String(icon)}
+      accessibilityState={{ selected: selecionado }}
+      onPress={() => { Haptics.selectionAsync(); onPick(icon); }}
+      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+      <Animated.View style={[styles.icone, superficie]}>
+        <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.glifo}>
+          <TrocaSuave estado={`${String(icon)}:${tinta ?? theme.text}`} style={styles.glifo}>
+            <Icon name={icon} size="md" color="text" tint={tinta} />
+          </TrocaSuave>
+        </View>
+      </Animated.View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   corpo: { gap: Space.xl, padding: Space.lg, paddingBottom: Space.xxl },
   grade: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm },
+  glifo: { width: IconSize.md, height: IconSize.md, alignItems: 'center', justifyContent: 'center' },
   icone: {
     width: HitTarget,
     height: HitTarget,

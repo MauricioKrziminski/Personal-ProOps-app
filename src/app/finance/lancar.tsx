@@ -1,15 +1,14 @@
-import { useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
+import { TrocaSuave } from '@/components/motion/presenca';
 
 import { FormularioDaDivida } from '@/components/finance/formulario-da-divida';
+import { FormatoDoLancamento } from '@/components/finance/formato-do-lancamento';
 import { FormularioDaSerie } from '@/components/finance/formulario-da-serie';
 import { FormularioDoLancamento, LancamentoEditando } from '@/components/finance/formulario-do-lancamento';
 import { Screen } from '@/components/ui/screen';
-import { Segmented } from '@/components/ui/segmented';
 import { FormularioEmTela } from '@/components/ui/sheet';
 import { ToastDoModal, useToast } from '@/components/ui/toast';
-import { Motion } from '@/design/tokens';
 import { useConverterRegistro, useDebts, useTransaction } from '@/hooks/use-finance';
 import { isoToBR, localISODate } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
@@ -18,6 +17,7 @@ import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import {
   comumDepoisDeSalvar,
   comumParaSerie,
+  hrefDoResultadoDaConversao,
   opcoesDaConversao,
   papelDaTransacao,
   temPassadoDoParam,
@@ -67,9 +67,14 @@ export default function LancarScreen() {
    * `onPress` de antes: o segundo toque gravaria de novo (com "Manter", um segundo registro).
    */
   const convertendo = useRef(false);
-  const reduzir = useReducedMotion();
-  const opacidade = useSharedValue(1);
-  const estilo = useAnimatedStyle(() => ({ opacity: opacidade.get() }));
+  const montado = useRef(true);
+  const tipoAtivo = useRef(tipo);
+  useLayoutEffect(() => { tipoAtivo.current = tipo; }, [tipo]);
+  const [focarAoAbrir, setFocarAoAbrir] = useState(true);
+  useEffect(() => {
+    montado.current = true;
+    return () => { montado.current = false; };
+  }, []);
 
   const editandoId = p.id;
   const tipoDaOrigem = (p.origem as OrigemDaConversao['tipo'] | undefined) ?? ORIGEM_DO_TIPO[tipoOriginal];
@@ -93,29 +98,20 @@ export default function LancarScreen() {
   const doAplicar = geracao === 0;
 
   const trocar = (novo: TipoDeLancamento) => {
-    if (novo === tipo) return;
+    if (!montado.current || novo === tipo) return;
     const atual = lerComum.current();
     const guardado = lerEstado.current();
-    const aplicar = () => {
-      setEstados((e) => ({ ...e, [tipo]: guardado }));
-      setComum(novo === 'recorrente' ? comumParaSerie(atual) : atual);
-      setTipo(novo);
-    };
-    if (reduzir) return aplicar();
-    // Crossfade curto só no conteúdo abaixo do seletor: some, troca, volta. Cabeçalho e seletor
-    // ficam. Só opacidade — animação de LAYOUT não existe no Android (design.md §5).
-    // Outro toque durante a saída cancela esta: a cancelada não troca nada, quem troca é a última.
-    opacidade.set(withTiming(0, { duration: Motion.duration.fast }, (terminou) => {
-      if (!terminou) return;
-      runOnJS(aplicar)();
-      opacidade.set(withTiming(1, { duration: Motion.duration.base }));
-    }));
+    setEstados((e) => ({ ...e, [tipo]: guardado }));
+    setComum(novo === 'recorrente' ? comumParaSerie(atual) : atual);
+    setFocarAoAbrir(false);
+    setTipo(novo);
   };
 
   const onSalvo = (criarOutro: boolean) => {
     if (!criarOutro) return router.back();
     setComum(comumDepoisDeSalvar(lerComum.current()));
     setEstados({});
+    setFocarAoAbrir(true);
     setGeracao((g) => g + 1);
   };
 
@@ -129,7 +125,12 @@ export default function LancarScreen() {
           if (convertendo.current) return;
           convertendo.current = true;
           return converter.mutateAsync({ origem, alcance: o.alcance, destino }).then(
-            () => router.back(),
+            (resultado) => {
+              // A conversão pode apagar a ocorrência, a série ou a ficha aberta por baixo.
+              // Voltar (ou só substituir o modal) deixaria esse detalhe morto na pilha.
+              router.dismissAll();
+              router.push(hrefDoResultadoDaConversao(destino, resultado));
+            },
             // A recusa do banco diz o motivo e o caminho; a tela fica aberta com o que foi digitado.
             (e) => {
               convertendo.current = false;
@@ -147,13 +148,13 @@ export default function LancarScreen() {
   /** Editando: só no tipo do registro. Em outro tipo, o corpo cria — e o salvar converte. */
   const editandoAqui = tipo === tipoOriginal ? editandoId : undefined;
   const base = {
-    topo: <Segmented<TipoDeLancamento> options={TIPOS_DE_LANCAMENTO} value={tipo} onChange={trocar} />,
+    topo: <FormatoDoLancamento value={tipo} onChange={trocar} />,
     comum,
     registrarComum: (ler: () => Comum) => {
-      lerComum.current = ler;
+      if (tipoAtivo.current === tipo) lerComum.current = ler;
     },
     registrarEstado: (ler: () => unknown) => {
-      lerEstado.current = ler;
+      if (tipoAtivo.current === tipo) lerEstado.current = ler;
     },
     estadoGuardado: estados[tipo],
     onSalvo,
@@ -162,13 +163,14 @@ export default function LancarScreen() {
     editandoId: editandoAqui,
     converter: editandoId && tipo !== tipoOriginal ? converterPara : undefined,
     salvando: converter.isPending,
-    estiloDoConteudo: estilo,
+    focarAoAbrir,
   };
 
   return (
     // `Screen` sem rolagem: o fundo e as laterais seguras no contêiner da pilha, para os três corpos.
     <Screen scroll={false}>
       <FormularioEmTela.Provider value>
+        <TrocaSuave estado={`${tipo}:${geracao}`} preencher>
         {tipo === 'uma' && editandoAqui ? (
           <LancamentoEditando key={`uma:${geracao}`} {...base} editandoId={editandoAqui} />
         ) : tipo === 'uma' ? (
@@ -191,6 +193,7 @@ export default function LancarScreen() {
             dadosDoAplicar={doAplicar && p.deHipotese ? { parcela: p.parcela, parcelas: p.parcelas, conta: p.conta, data: p.data } : undefined}
           />
         )}
+        </TrocaSuave>
       </FormularioEmTela.Provider>
       {/* O corpo do lançamento já traz o dele; os outros dois nasceram para uma folha. */}
       {tipo !== 'uma' ? <ToastDoModal /> : null}

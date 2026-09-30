@@ -293,7 +293,7 @@ vocabulário comum das duas plataformas.
 ele clicou sem querer, preencheu as informações e agora tem que fechar o modal de recorrente e
 perder tudo"*. Eram três formulários em três telas (o lançamento, a folha de Recorrentes, a de
 Dívidas), costurados por `?de=`, "Voltar" e `dismiss(2)`. Hoje é uma tela modal só, com
-`Segmented` **Uma vez | Recorrente | Financiamento** no topo (spec
+`FormatoDoLancamento` no topo: escolha atual em destaque e alternativas **Uma vez | Recorrente | Financiamento** abertas no lugar (spec
 `2026-09-29-formulario-unico-e-categorias-design.md`):
 
 - **Três corpos, um contrato.** `components/finance/formulario-do-lancamento.tsx`,

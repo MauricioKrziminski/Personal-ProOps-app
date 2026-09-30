@@ -1,4 +1,4 @@
-import { createContext, forwardRef, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, forwardRef, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Platform,
   StyleSheet,
@@ -25,6 +25,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { MudancaSuave, Presenca, usePresencaAtiva } from '@/components/motion/presenca';
 import { ComNegrito } from '@/components/ui/forte';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Fonts } from '@/constants/theme';
@@ -73,27 +74,31 @@ export function Field({ label, error, hint, children }: FieldProps) {
   return (
     <FocoDoCampo.Provider value={foco}>
       <View style={styles.field}>
+        <View style={styles.baseDoCampo}>
         {/* O label é IDENTIFICADOR do campo, e por isso vai na cor cheia. */}
+        <MudancaSuave valor={typeof label === 'string' ? label : undefined}>
         <ThemedText type="footnote" style={styles.rotulo}>
           {label}
         </ThemedText>
+        </MudancaSuave>
         {children}
+        </View>
         {/*
           O erro NÃO apaga o hint. Eles se excluíam por um ternário, e a explicação sumia
           exatamente quando mais importa. Mesma geometria (footnote) nos dois, então a altura não
           pula na validação. Quando o erro É a dica ("Pelo menos 8 caracteres"), só o erro fica —
           a mesma frase duas vezes, uma vermelha e outra cinza, é ruído.
         */}
-        {error ? (
+        <Presenca visivel={Boolean(error)} style={styles.respiroDaMensagem}>
           <ThemedText type="footnote" themeColor="danger">
             {typeof error === 'string' ? <ComNegrito texto={error} /> : error}
           </ThemedText>
-        ) : null}
-        {hint && hint !== error ? (
+        </Presenca>
+        <Presenca visivel={Boolean(hint && hint !== error)} style={styles.respiroDaMensagem}>
           <ThemedText type="footnote" themeColor="textSecondary">
             {typeof hint === 'string' ? <ComNegrito texto={hint} /> : hint}
           </ThemedText>
-        ) : null}
+        </Presenca>
       </View>
     </FocoDoCampo.Provider>
   );
@@ -146,28 +151,22 @@ function useCaixa(invalid: boolean | undefined) {
   const doField = useContext(FocoDoCampo);
   const proprio = useSharedValue(0);
   const foco = doField ?? proprio;
-  const tremor = useSharedValue(0);
+  const erro = useSharedValue(Number(Boolean(invalid)));
   const antes = useRef(invalid);
-
-  useEffect(() => {
-    if (invalid && !antes.current && !reduzido) {
-      tremor.set(
-        withSequence(
-          withTiming(-6, { duration: 50 }),
-          withTiming(6, { duration: 70 }),
-          withTiming(-4, { duration: 60 }),
-          withTiming(0, { duration: 60 })
-        )
-      );
+  useLayoutEffect(() => {
+    if (antes.current !== invalid || reduzido) {
+      erro.set(reduzido ? Number(Boolean(invalid)) : withTiming(Number(Boolean(invalid)), {
+        duration: Motion.duration.morph, easing: Motion.easing.inOut,
+      }));
     }
     antes.current = invalid;
-  }, [invalid, reduzido, tremor]);
+    return () => cancelAnimation(erro);
+  }, [invalid, reduzido, erro]);
 
   const estiloCaixa = useAnimatedStyle(() => ({
-    borderColor: invalid
-      ? theme.danger
-      : interpolateColor(foco.get(), [0, 1], [theme.separator, theme.tint]),
-    transform: [{ translateX: tremor.get() }],
+    borderColor: interpolateColor(erro.get(), [0, 1], [
+      interpolateColor(foco.get(), [0, 1], [theme.separator, theme.tint]), theme.danger,
+    ]),
   }));
 
   const focar = () =>
@@ -203,6 +202,7 @@ function useCaixa(invalid: boolean | undefined) {
 export const TextField = forwardRef<TextInput, TextInputProps & { invalid?: boolean }>(
   function TextField({ invalid, style, onFocus, onBlur, placeholder, ...rest }, ref) {
     const theme = useTheme();
+    const ativo = usePresencaAtiva();
     const { focar, desfocar, moldura } = useCaixa(invalid);
     const { caixa, input } = repartir(style);
     /*
@@ -242,16 +242,18 @@ export const TextField = forwardRef<TextInput, TextInputProps & { invalid?: bool
         selectionColor={theme.tint}
         onFocus={(e) => {
           focar();
-          onFocus?.(e);
+          if (ativo) onFocus?.(e);
         }}
         onBlur={(e) => {
           desfocar();
-          onBlur?.(e);
+          if (ativo) onBlur?.(e);
         }}
         style={[styles.input, { color: theme.text }, input]}
         placeholder={Platform.OS === 'ios' ? marcador : placeholder}
         {...rest}
         {...soltaOArrasto}
+        editable={ativo && rest.editable !== false}
+        onChangeText={ativo ? rest.onChangeText : undefined}
       />,
       caixa
     );
@@ -396,6 +398,7 @@ export function MoneyField({
   accessibilityLabel = 'Valor em reais',
 }: MoneyFieldProps) {
   const theme = useTheme();
+  const ativo = usePresencaAtiva();
   const reduzido = useReducedMotion();
   const { focar, desfocar, moldura } = useCaixa(invalid);
   const [focado, setFocado] = useState(false);
@@ -453,6 +456,7 @@ export function MoneyField({
         value={reais}
         selection={{ start: reais.length, end: reais.length }}
         onChangeText={(text) => {
+          if (!ativo) return;
           const novo = Number(text.replace(/\D/g, '').slice(0, 11) || 0);
           // Grava a direção ANTES do render que troca os dígitos: é ela que as animações leem.
           direcao.value = novo >= valueCents ? 1 : -1;
@@ -468,7 +472,7 @@ export function MoneyField({
         }}
         keyboardType="number-pad"
         autoFocus={autoFocus}
-        editable={!readOnly}
+        editable={ativo && !readOnly}
         caretHidden
         contextMenuHidden
         accessibilityLabel={accessibilityLabel}
@@ -480,9 +484,10 @@ export function MoneyField({
 }
 
 const styles = StyleSheet.create({
-  field: {
-    gap: Space.sm,
-  },
+  field: {},
+  baseDoCampo: { gap: Space.sm },
+  // O respiro faz parte da altura que anima; `gap` no pai saltaria antes/depois da presença.
+  respiroDaMensagem: { paddingTop: Space.sm },
   rotulo: { fontFamily: Fonts.medium },
   /*
     ⚠️ A borda da caixa é de 1dp, não `hairlineWidth` (15/09/2026). `hairlineWidth` é 1 pixel

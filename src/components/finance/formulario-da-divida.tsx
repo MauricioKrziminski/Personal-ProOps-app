@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated from 'react-native-reanimated';
 
 import type { CorpoProps } from '@/components/finance/corpo-do-lancar';
+import { Presenca, TrocaSuave } from '@/components/motion/presenca';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { ThemedText } from '@/components/themed-text';
@@ -498,7 +498,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
 
       <SheetScroll contentContainerStyle={styles.sheetBody}>
         {props.topo}
-        <Animated.View style={[styles.conteudo, props.estiloDoConteudo]}>
+        <View style={styles.conteudo}>
         {/* Os pagamentos lançados são o piso das "pagas": sem eles o Salvar espera — e diz por quê. */}
         {form.id && payments.isError ? (
           <ErrorBand
@@ -516,7 +516,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
             value={form.name}
             onChangeText={(name) => setForm({ ...form, name })}
             placeholder="Ex.: Carro"
-            autoFocus={!form.id}
+            autoFocus={!form.id && props.focarAoAbrir !== false}
             invalid={faltaNome}
           />
         </Field>
@@ -541,12 +541,21 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
         {/* Também na edição (26/09/2026, *"o modo da dívida ele deve poder alterar também"*): a
             parcela, o que falta e as pagas atravessam, e "parcelas" troca de sentido. */}
         <Field label="Cobrança">
-          <Segmented
-            options={[{ value: 'fixed_installments', label: 'Parcela fixa' }, { value: 'amortized', label: 'Com juros ao mês' }]}
+          <SelectField
+            options={[
+              { id: 'fixed_installments', label: 'Parcela fixa', icon: 'banknote' },
+              { id: 'amortized', label: 'Com juros ao mês', icon: 'chart.line.uptrend.xyaxis' },
+            ]}
             value={form.calculationMode}
-            onChange={(calculationMode) => setForm({ ...form, ...camposNoOutroModo(form, calculationMode) })}
+            placeholder="Escolher a cobrança"
+            onChange={(calculationMode) => {
+              if (calculationMode === form.calculationMode) return;
+              if (calculationMode !== 'fixed_installments' && calculationMode !== 'amortized') return;
+              setForm({ ...form, ...camposNoOutroModo(form, calculationMode) });
+            }}
           />
         </Field>
+        <TrocaSuave estado={form.calculationMode} style={styles.conteudo}>
         {form.calculationMode === 'fixed_installments' ? <>
           <Field label="Valor">
             <Segmented options={UNIDADES_DA_DIVIDA} value={form.unidade} onChange={mudarUnidade} />
@@ -587,7 +596,8 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
           </Field>
           {dataDoContrato}
           {/* O contrato que VAI ser gravado: com "Total a pagar" a parcela arredonda. */}
-          {simpleValues && <Card style={styles.resumo}>
+          <Presenca visivel={Boolean(simpleValues)}>
+          {simpleValues ? <Card style={styles.resumo}>
             <ThemedText type="small" style={tabular}>{`${simpleValues.installments}× de ${brl(parcelaCents)} = ${brl(simpleValues.principal_cents)}`}</ThemedText>
             {form.installmentsPaid > 0 ? (
               <ThemedText type="small" themeColor="textSecondary" style={tabular}>
@@ -595,7 +605,8 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
                 <Money cents={simpleValues.remaining_cents} variant="headline" />
               </ThemedText>
             ) : null}
-          </Card>}
+          </Card> : null}
+          </Presenca>
         </> : <>
 
         <Field label="Quanto você deve hoje">
@@ -639,23 +650,23 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
 
         {/* Prévia ao vivo: errar por um fator de 100 aqui não dá erro nenhum, só um total
             de juros absurdo que ninguém confere. */}
-        {fracao > 0 && form.remainingCents > 0 ? (
+        <Presenca visivel={fracao > 0 && form.remainingCents > 0}>
           <ThemedText type="small" themeColor="textSecondary">
             {taxaLabel(fracao)} dá{' '}
             <Money cents={Math.round(form.remainingCents * fracao)} variant="subhead" tone="danger" />{' '}
             de juros no primeiro mês sobre{' '}
             <Money cents={form.remainingCents} variant="subhead" tone="textSecondary" />
           </ThemedText>
-        ) : null}
+        </Presenca>
 
-        {fracao > 0.2 ? (
+        <Presenca visivel={fracao > 0.2}>
           <View style={styles.aviso}>
             <Icon name="exclamationmark.triangle" size="sm" color="warning" />
             <ThemedText type="small" themeColor="textSecondary" style={styles.avisoTexto}>
               Taxa alta: confira se é ao mês
             </ThemedText>
           </View>
-        ) : null}
+        </Presenca>
 
         <Field label="Valor da parcela" hint="Em branco, sai dos juros e das parcelas">
           <MoneyField valueCents={form.installmentCents} onChangeCents={(installmentCents) => setForm({ ...form, installmentCents })} />
@@ -670,7 +681,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
             keyboardType="number-pad"
           />
         </Field>
-        {form.parcelas !== '' ? dataDoContrato : null}
+        <Presenca visivel={form.parcelas !== ''}>{dataDoContrato}</Presenca>
         {/*
           ⚠️ **Vem DEPOIS de "Parcelas que faltam", porque é esse campo que o cria.**
           Ele renderizava ACIMA, gated em `form.parcelas !== ''` — então digitar o número
@@ -678,7 +689,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
           inteiro para baixo no meio da digitação. É a mesma frase da régua de
           `frontend.md` ("a tela se remonta debaixo do dedo"), só que para cima.
         */}
-        {form.parcelas !== '' && (
+        <Presenca visivel={form.parcelas !== ''}>
           <Field label="Parcelas já pagas" hint={dicaDoConvertido}>
             {/*
               ⚠️ **Sem chip "Nenhuma", e o campo nasce em `0`** (15/09/2026, a mesma régua
@@ -696,13 +707,14 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
               accessibilityLabel="Parcelas do financiamento já pagas"
             />
           </Field>
-        )}
-        {form.parcelas !== '' && form.historyConfirmed && (
+        </Presenca>
+        <Presenca visivel={form.parcelas !== '' && form.historyConfirmed}>
           <ThemedText type="small" themeColor="textSecondary">
             {`${Number(form.parcelas) + form.installmentsPaid} parcelas no total`}
           </ThemedText>
-        )}
+        </Presenca>
         </>}
+        </TrocaSuave>
         {!editandoId && !converter ? (
           <Button
             variant="secondary"
@@ -712,7 +724,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
             onPress={() => salvar(true)}
           />
         ) : null}
-        </Animated.View>
+        </View>
       </SheetScroll>
     </>
   );

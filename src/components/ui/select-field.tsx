@@ -1,6 +1,6 @@
-import { Fragment, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { StyleSheet, View } from 'react-native';
+import Animated, { cancelAnimation, interpolateColor, ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { Icon, type IconName } from '@/components/ui/icon';
@@ -8,7 +8,8 @@ import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdr
 import { ThemedText } from '@/components/themed-text';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import { Elevation, Motion, Radius, Space, Type } from '@/design/tokens';
-import { transicaoDeLayout } from '@/components/motion/transicao';
+import { PressableScale } from '@/components/motion/pressable-scale';
+import { MudancaSuave, Presenca, usePresencaAtiva } from '@/components/motion/presenca';
 
 export type SelectOption = {
   /** `null` é a opção "nenhum" — ela existe se você a incluir na lista. */
@@ -66,17 +67,26 @@ export function SelectField({
 }) {
   const theme = useTheme();
   const scheme = useScheme();
+  const ativo = usePresencaAtiva();
   const [aberto, setAberto] = useState(false);
-  const vidro = supportsLiquidGlass() && !aberto;
+  const [confirmacao, setConfirmacao] = useState<{ id: string | null } | null>(null);
+  const escolhendo = useRef(false);
+  const vidro = supportsLiquidGlass();
 
   const escolhida = options.find((o) => o.id === value);
 
   function alternar() {
+    if (!ativo) return;
+    escolhendo.current = false;
+    setConfirmacao(null);
     Haptics.selectionAsync();
     setAberto((a) => !a);
   }
 
   function escolher(id: string | null) {
+    if (!ativo || !aberto || escolhendo.current) return;
+    escolhendo.current = true;
+    setConfirmacao(id !== value ? { id } : null);
     if (id !== value) Haptics.selectionAsync();
     onChange(id);
     setAberto(false);
@@ -99,118 +109,82 @@ export function SelectField({
       </View>
     ) : null;
 
-  return (
-    <Animated.View layout={transicaoDeLayout}>
-      <View
-        style={[
-          styles.moldura,
-          {
-            backgroundColor: vidro ? 'transparent' : theme.surface,
-            borderColor: theme.cardBorder,
-            boxShadow: vidro ? undefined : Elevation[scheme].raised,
-          },
-        ]}>
-        {vidro ? <GlassBackdrop fallbackColor={theme.surface} radius={Radius.md} /> : null}
-        {/* --- o valor, que é o estado normal do campo ---
-             Ele SOME enquanto a lista está aberta. Mantê-lo visível duplicava a
-             opção escolhida: o valor em cima e a mesma linha marcada logo abaixo,
-             uma colada na outra — com "Não informar" (que é o padrão e a primeira
-             opção) isso lia como defeito, não como campo. Fechar é escolher, e a
-             linha marcada mostra o que fechar sem mudar nada. */}
-        {!aberto ? (
-        <Pressable
-          onPress={alternar}
-          accessibilityRole="button"
-          accessibilityState={{ expanded: aberto }}
-          accessibilityLabel={escolhida ? escolhida.label : placeholder}
-          accessibilityHint="Toque para escolher">
-          {({ pressed }) => (
-            <View
-              style={[
-                styles.linha,
-                { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
-              ]}>
-              {ladrilho(escolhida?.icon ?? 'circle', false)}
-              <View style={styles.textos}>
-                <ThemedText themeColor={escolhida ? 'text' : 'textSecondary'}>
-                  {escolhida ? escolhida.label : placeholder}
-                </ThemedText>
-                {escolhida?.meta ? (
-                  <ThemedText type="caption" themeColor="textSecondary">
-                    {escolhida.meta}
-                  </ThemedText>
-                ) : null}
-              </View>
-              <Icon name="chevron.down" size="sm" color="textSecondary" />
-            </View>
-          )}
-        </Pressable>
-        ) : null}
+  const linha = (o: SelectOption | undefined, cabecalho = false) => {
+    const marcada = o?.id === value;
+    const aceso = marcada && !o?.neutral;
+    const confirmada = confirmacao !== null && confirmacao.id === o?.id && marcada;
+    const mostrarCheck = marcada && (aberto || confirmada);
+    return (
+      <PressableScale scaleTo={1}
+        onPress={cabecalho ? aberto ? () => escolher(value) : alternar : () => escolher(o!.id)}
+        disabled={!ativo}
+        accessibilityRole={aberto ? 'radio' : 'button'}
+        accessibilityState={{ selected: aberto && marcada, expanded: cabecalho ? aberto : undefined, disabled: !ativo }}
+        accessibilityLabel={o ? o.meta ? `${o.label}, ${o.meta}` : o.label : placeholder}
+        accessibilityHint={aberto ? 'Toque para escolher e fechar' : 'Toque para escolher'}>
+        {({ pressed }) => <LinhaRealcada pressionada={pressed} confirmar={confirmada}>
+          <MudancaSuave valor={`${o?.icon}:${aceso}`}>
+            {ladrilho(o?.icon ?? (cabecalho ? 'circle' : undefined), aceso)}
+          </MudancaSuave>
+          <MudancaSuave valor={o?.id} style={styles.textos}>
+            <ThemedText type={marcada ? 'headline' : 'default'} themeColor={o ? 'text' : 'textSecondary'} style={styles.textoInteiro}>
+              {o?.label ?? placeholder}
+            </ThemedText>
+            {o?.meta ? <ThemedText type="caption" themeColor="textSecondary" style={styles.textoInteiro}>{o.meta}</ThemedText> : null}
+          </MudancaSuave>
+          <MudancaSuave valor={mostrarCheck} style={styles.indicador}>
+            {mostrarCheck ? (
+              <View style={[styles.marca, { backgroundColor: theme.tintFill }]}><Icon name="checkmark" size="xs" color="onTint" /></View>
+            ) : cabecalho ? <Icon name="chevron.down" size="sm" color="textSecondary" /> : null}
+          </MudancaSuave>
+        </LinhaRealcada>}
+      </PressableScale>
+    );
+  };
 
-        {/* --- a lista, só enquanto ele está escolhendo --- */}
-        {aberto ? (
-          <Animated.View
-            entering={FadeIn.duration(Motion.duration.fast)}
-            accessibilityRole="radiogroup">
-            {options.map((o, i) => {
-              const marcada = o.id === value;
-              const aceso = marcada && !o.neutral;
-              const grupoNovo = o.group && o.group !== options[i - 1]?.group;
-              return (
-                <Fragment key={o.id ?? '__nenhum__'}>
-                  {grupoNovo ? (
-                    <View style={styles.cabecalho}>
-                      <ThemedText type="caption" themeColor="textSecondary" style={styles.etiqueta}>
-                        {o.group}
-                      </ThemedText>
-                    </View>
-                  ) : i > 0 ? (
-                    <View style={[styles.divisor, { backgroundColor: theme.separator }]} />
-                  ) : null}
-                  <Pressable
-                    onPress={() => escolher(o.id)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: marcada }}
-                    accessibilityLabel={o.meta ? `${o.label}, ${o.meta}` : o.label}>
-                    {({ pressed }) => (
-                      <View
-                        style={[
-                          styles.linha,
-                          {
-                            backgroundColor: marcada
-                              ? theme.accentSoft
-                              : pressed
-                                ? theme.backgroundSelected
-                                : 'transparent',
-                          },
-                        ]}>
-                        {ladrilho(o.icon, aceso)}
-                        <View style={styles.textos}>
-                          <ThemedText>{o.label}</ThemedText>
-                          {o.meta ? (
-                            <ThemedText type="caption" themeColor="textSecondary">
-                              {o.meta}
-                            </ThemedText>
-                          ) : null}
-                        </View>
-                        {/* Só a escolhida desenha algo: um círculo vazio em cada
-                            linha é ruído, a ausência já diz "não é esta". */}
-                        {marcada ? (
-                          <View style={[styles.marca, { backgroundColor: theme.tintFill }]}>
-                            <Icon name="checkmark" size="xs" color="onTint" />
-                          </View>
-                        ) : null}
-                      </View>
-                    )}
-                  </Pressable>
-                </Fragment>
-              );
-            })}
-          </Animated.View>
-        ) : null}
-      </View>
-    </Animated.View>
+  return (
+    <View style={[styles.moldura, { backgroundColor: vidro ? 'transparent' : theme.surface,
+      borderColor: theme.cardBorder, boxShadow: vidro ? undefined : Elevation[scheme].raised }]}
+      accessibilityRole={aberto ? 'radiogroup' : undefined}>
+      {vidro ? <GlassBackdrop fallbackColor={theme.surface} radius={Radius.md} /> : null}
+      {/* A linha escolhida permanece na mesma posição e vira a primeira opção. Nunca duplica. */}
+      {linha(escolhida, true)}
+      <Presenca visivel={aberto} onSaidaConcluida={() => setConfirmacao(null)}>
+        {options.filter((o) => o.id !== value).map((o, i, restantes) => (
+          <Fragment key={o.id ?? '__nenhum__'}>
+            {o.group && o.group !== restantes[i - 1]?.group ? (
+              <View style={styles.cabecalho}><ThemedText type="caption" themeColor="textSecondary" style={styles.etiqueta}>{o.group}</ThemedText></View>
+            ) : <View style={[styles.divisor, { backgroundColor: theme.separator }]} />}
+            {linha(o)}
+          </Fragment>
+        ))}
+      </Presenca>
+    </View>
   );
+}
+
+function LinhaRealcada({ pressionada, confirmar, children }: {
+  pressionada: boolean; confirmar: boolean; children: ReactNode;
+}) {
+  const theme = useTheme();
+  const reduzir = useReducedMotion();
+  const realce = useSharedValue(0);
+  useLayoutEffect(() => {
+    const config = { easing: Motion.easing.out, reduceMotion: ReduceMotion.System };
+    if (reduzir) realce.set(Number(pressionada));
+    else if (confirmar) {
+      // O flash termina em 180ms; não espera a mola da lista assentar para remover o cinza.
+      realce.set(withSequence(
+        withTiming(1, { ...config, duration: Motion.duration.fast / 2 }),
+        withTiming(0, { ...config, duration: Motion.duration.fast }),
+      ));
+    } else realce.set(withTiming(Number(pressionada), { ...config, duration: Motion.duration.fast }));
+    return () => cancelAnimation(realce);
+  }, [pressionada, confirmar, reduzir, realce]);
+  const cores = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(realce.get(), [0, 1], ['transparent', theme.backgroundSelected]),
+  }));
+  return <Animated.View style={[styles.linha, cores]}>{children}</Animated.View>;
 }
 
 const styles = StyleSheet.create({
@@ -238,7 +212,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  textos: { flex: 1, gap: Space.half },
+  // O bloco acompanha o centro do ladrilho, mesmo com título e descrição ou fonte ampliada.
+  textos: { flex: 1, minHeight: 36, justifyContent: 'center', gap: Space.half },
+  textoInteiro: { flexShrink: 0, includeFontPadding: false, textAlignVertical: 'center' },
+  // Seta e check usam a mesma coluna; a largura menor da seta não pode recortar o círculo.
+  indicador: {
+    width: 24,
+    height: 36,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   marca: {
     width: 22,
     height: 22,

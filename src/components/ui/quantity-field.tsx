@@ -1,11 +1,15 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { TextField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { HitTarget, Radius, Space, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
+import { PressableScale } from '@/components/motion/pressable-scale';
+import { useOpacidadeSuave } from '@/components/motion/cores-suaves';
+import { usePresencaAtiva } from '@/components/motion/presenca';
 
 /**
  * Quantidade ABERTA: digita qualquer número, e − / + para o ajuste fino. Nunca atalhos fixos
@@ -36,14 +40,16 @@ export function QuantityField({
   accessibilityLabel?: string;
 }) {
   const theme = useTheme();
+  const ativo = usePresencaAtiva();
   // Só DURANTE a digitação o campo mostra o texto cru: apagar para digitar outro número não pode
   // virar o mínimo no meio do caminho. Fora dela, mostra o número que valeu.
   const [digitando, setDigitando] = useState<string | null>(null);
   const assentado = Math.max(min, Math.min(value, max));
   useEffect(() => {
-    if (assentado !== value) onChange(assentado);
-  }, [assentado, value, onChange]);
+    if (ativo && assentado !== value) onChange(assentado);
+  }, [ativo, assentado, value, onChange]);
   const muda = (n: number) => {
+    if (!ativo) return;
     const certo = Math.max(min, Math.min(n, max));
     if (certo !== value) Haptics.selectionAsync();
     // − / + com o campo ainda em foco: sem largar o texto digitado, o campo continuava mostrando
@@ -51,26 +57,29 @@ export function QuantityField({
     setDigitando(null);
     onChange(certo);
   };
+  const menos = useOpacidadeSuave(assentado <= min ? 0.4 : 1);
+  const mais = useOpacidadeSuave(assentado >= max ? 0.4 : 1);
   const botao = (icone: 'minus' | 'plus', rotulo: string, alvo: number, desligado: boolean) => (
-    <Pressable
+    <PressableScale scaleTo={0.97}
       accessibilityRole="button"
       accessibilityLabel={rotulo}
-      accessibilityState={{ disabled: desligado }}
-      disabled={desligado}
+      accessibilityState={{ disabled: desligado || !ativo }}
+      disabled={desligado || !ativo}
       onPress={() => muda(alvo)}
-      style={({ pressed }) => [
-        styles.passo,
-        { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement, opacity: desligado ? 0.4 : 1 },
-      ]}>
-      <Icon name={icone} size="sm" color="text" />
-    </Pressable>
+      style={styles.passo}>
+      <Animated.View style={[styles.passo, { backgroundColor: theme.backgroundElement }, icone === 'minus' ? menos : mais]}>
+        <Icon name={icone} size="sm" color="text" />
+      </Animated.View>
+    </PressableScale>
   );
   return (
     <View style={styles.linha}>
       {botao('minus', 'Um a menos', assentado - 1, assentado <= min)}
+      <View style={styles.numero}>
       <TextField
         value={digitando ?? String(assentado)}
         onChangeText={(t) => {
+          if (!ativo) return;
           const digitos = t.replace(/\D/g, '').slice(0, String(max).length);
           setDigitando(digitos);
           const n = Number(digitos);
@@ -81,8 +90,9 @@ export function QuantityField({
         selectTextOnFocus
         accessibilityLabel={accessibilityLabel}
         invalid={invalid}
-        style={[styles.numero, tabular]}
+        style={[styles.texto, tabular]}
       />
+      </View>
       {botao('plus', 'Um a mais', assentado + 1, assentado >= max)}
     </View>
   );
@@ -97,5 +107,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  numero: { flex: 1, textAlign: 'center' },
+  numero: { flex: 1 },
+  texto: { textAlign: 'center' },
 });

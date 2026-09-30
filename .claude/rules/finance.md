@@ -104,10 +104,15 @@
   - **Uma tela só na ocorrência**: o formulário do lançamento de uma série abre com "Só esta |
     Esta e as próximas" no topo. "Só esta" edita a linha, com UMA data (o vencimento, fora do
     cartão). "Esta e as próximas" desenha os MESMOS campos do corpo Recorrente do formulário único
-    (`CamposDaSerie`) e grava em duas partes, nesta ordem (`mudancasDaOcorrencia`, `lib/serie.ts`):
-    valor, título, estabelecimento, categoria e conta desta em diante por
-    `update_transaction_scoped` (ancorada nela), e só depois tipo, fim, "entra como pago" e o
-    calendário por `update_recurring_series`. Tipo vale para todas as em aberto da série.
+    (`CamposDaSerie`). `mudancasDaOcorrencia` separa campos da linha e regra; a RPC
+    `update_recurring_future` grava ambos atomicamente, com revisão e chave de repetição.
+    Na pendente futura, o helper captura o vencimento ORIGINAL (compra no cartão) antes de
+    alterar conta ou campos: a linha SELECIONADA conserva seu id ao mudar de data, pendências
+    anteriores ficam e só as seguintes são regeneradas. Adiar para outro mês também encerra
+    as estimativas da regra antiga a partir dessa âncora original, sem recriá-las no intervalo
+    até o novo início (`20260930160000`, `20260930163000`). Pela ocorrência paga/atrasada,
+    permanece o calendário das próximas em aberto; edição direta da série mantém a régua de
+    período descrita acima.
 
   **A janela é de um ano porque uma janela curta faz a projeção MENTIR** — não "acabar". A
   parcela é linha real e continua aparecendo; a receita recorrente além da janela, não: com 90

@@ -13,6 +13,8 @@ declare
   nova_data date := current_date + 5;
   nova_regra text := format('FREQ=MONTHLY;BYMONTHDAY=%s', extract(day from current_date + 5)::int);
 begin
+  -- Match the authenticated app caller for the protected history writer.
+  perform set_config('request.jwt.claim.sub',u::text,true);
   insert into auth.users (id, email) values (u, 'atomic-recurring@example.invalid')
     on conflict (id) do nothing;
   insert into public.profiles (id) values (u) on conflict (id) do nothing;

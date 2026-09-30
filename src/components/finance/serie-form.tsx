@@ -8,13 +8,14 @@
  * divergiriam — foi assim que a edição ficou sem Repete, sem vencimento e sem Tipo.
  */
 import { CategoryPicker } from '@/components/finance/category-picker';
+import { MudancaSuave, Presenca } from '@/components/motion/presenca';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { QuantityField } from '@/components/ui/quantity-field';
-import { Segmented } from '@/components/ui/segmented';
+import { SelectField } from '@/components/ui/select-field';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { brToISO, localISODate } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
@@ -43,13 +44,19 @@ export function CamposDaSerie({
       <Field label="Tipo">
         {/* A série grava `kind` e as futuras em aberto vão junto. O padrão do "entra como pago"
             só acompanha numa série nova. */}
-        <Segmented
+        <SelectField
           options={[
-            { value: 'expense', label: 'Gasto' },
-            { value: 'income', label: 'Receita' },
+            { id: 'expense', label: 'Gasto', icon: 'arrow.up.right' },
+            { id: 'income', label: 'Receita', icon: 'arrow.down.left' },
           ]}
           value={form.kind}
-          onChange={(kind) => onChange(editando ? { ...form, kind } : { ...form, kind, autoConfirm: kind !== 'income' })}
+          placeholder="Escolher o tipo"
+          onChange={(id) => {
+            if (id === form.kind) return;
+            if (id !== 'expense' && id !== 'income') return;
+            const kind = id;
+            onChange(editando ? { ...form, kind } : { ...form, kind, autoConfirm: kind !== 'income' });
+          }}
         />
       </Field>
 
@@ -89,12 +96,12 @@ export function CamposDaSerie({
         />
       </Field>
 
-      {form.regraPropria ? (
-        // Regra que o app não sabe desenhar: por extenso, e trocar é um toque consciente — a
-        // regra da IA não volta. O vencimento só muda junto com ela.
+      <Presenca visivel={Boolean(form.regraPropria)}>
+        {/* Regra que o app não sabe desenhar: por extenso, e trocar é um toque consciente — a
+            regra da IA não volta. O vencimento só muda junto com ela. */}
         <Field label="Repete" hint={`Próximo vencimento ${form.inicio}`}>
           <ThemedText type="small" themeColor="textSecondary">
-            {describeRRule(form.regraPropria)}
+            {describeRRule(form.regraPropria ?? null)}
           </ThemedText>
           <Button
             label="Substituir"
@@ -110,25 +117,27 @@ export function CamposDaSerie({
             }
           />
         </Field>
-      ) : null}
+      </Presenca>
 
-      {form.regraPropria ? null : (
+      <Presenca visivel={!form.regraPropria}>
       <Field label="Repete">
-        <Segmented
-          // Rótulos de UMA palavra: a 384dp × 1,3 "Toda semana" quebrava em duas linhas dentro da
-          // célula e as três ficavam de alturas diferentes (§1 do design).
+        <SelectField
           options={[
-            { value: 'monthly', label: 'Mensal' },
-            { value: 'weekly', label: 'Semanal' },
-            { value: 'yearly', label: 'Anual' },
+            { id: 'monthly', label: 'Mensal', icon: 'calendar' },
+            { id: 'weekly', label: 'Semanal', icon: 'calendar' },
+            { id: 'yearly', label: 'Anual', icon: 'calendar' },
           ]}
           value={form.preset}
-          onChange={(preset) => mudaAgenda({ preset })}
+          placeholder="Escolher a repetição"
+          onChange={(preset) => {
+            if (preset === form.preset) return;
+            if (preset === 'monthly' || preset === 'weekly' || preset === 'yearly') mudaAgenda({ preset });
+          }}
         />
       </Field>
-      )}
+      </Presenca>
 
-      {form.preset === 'monthly' && !form.regraPropria ? (
+      <Presenca visivel={form.preset === 'monthly' && !form.regraPropria}>
         <Field label="A cada quantos meses">
           {/* Campo de quantidade (`QuantityField`): "0" não existe, então não há erro a mostrar. */}
           <QuantityField
@@ -138,9 +147,9 @@ export function CamposDaSerie({
             onChange={(n) => mudaAgenda({ intervalo: String(n) })}
           />
         </Field>
-      ) : null}
+      </Presenca>
 
-      {form.regraPropria ? null : (
+      <Presenca visivel={!form.regraPropria}>
       <Field
         // Editando, a data é o próximo vencimento; o calendário tem uma ação própria de fim do mês.
         label={editando ? rotuloDaData : 'Começa em'}
@@ -160,15 +169,17 @@ export function CamposDaSerie({
           min={editando ? localISODate() : undefined}
           invalid={(Boolean(form.inicio) && !inicioOk) || agendaNoPassado}
         />
-        {form.preset === 'monthly' && inicioDate ? (
+        <Presenca visivel={form.preset === 'monthly' && Boolean(inicioDate)}>
+          <MudancaSuave valor={form.ultimoDia ? 'ultimo' : form.inicio}>
           <ThemedText type="small" themeColor="textSecondary">
             {form.ultimoDia
               ? 'Repete no último dia de todo mês.'
-              : `Repete todo dia ${inicioDate.getDate()}${inicioDate.getDate() > 28 ? '; nos meses curtos, no último dia disponível.' : '.'}`}
+              : inicioDate ? `Repete todo dia ${inicioDate.getDate()}${inicioDate.getDate() > 28 ? '; nos meses curtos, no último dia disponível.' : '.'}` : ''}
           </ThemedText>
-        ) : null}
+          </MudancaSuave>
+        </Presenca>
       </Field>
-      )}
+      </Presenca>
 
       {/*
         ⚠️ O placeholder era uma DATA PLAUSÍVEL (`31/12/2026`) e o campo lia como preenchido — *"como

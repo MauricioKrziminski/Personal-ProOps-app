@@ -2,6 +2,7 @@ import { View, StyleSheet } from 'react-native';
 
 import { AccountPicker, type PickableAccount } from '@/components/finance/account-picker';
 import { Calendar } from '@/components/finance/calendar';
+import { Presenca } from '@/components/motion/presenca';
 import { Field, MoneyField } from '@/components/ui/field';
 import { Note } from '@/components/ui/note';
 import { QuantityField } from '@/components/ui/quantity-field';
@@ -82,7 +83,7 @@ export function CamposDaHipotese({
         <MoneyField valueCents={h.valor_cents} onChangeCents={(valor_cents) => set({ valor_cents })} />
       </Field>
 
-      {h.forma === 'parcelado' || h.forma === 'financiamento' ? (
+      <Presenca visivel={h.forma === 'parcelado' || h.forma === 'financiamento'}>
         <Field label="Parcelas">
           <QuantityField
             value={h.parcelas}
@@ -92,13 +93,13 @@ export function CamposDaHipotese({
             onChange={(parcelas) => set({ parcelas })}
           />
         </Field>
-      ) : null}
+      </Presenca>
 
-      {h.forma === 'repete' ? (
+      <Presenca visivel={h.forma === 'repete'}>
         <Field label="Repete">
           <Segmented options={REPETE} value={h.repete} onChange={(repete) => set({ repete })} />
         </Field>
-      ) : null}
+      </Presenca>
 
       <Field label={h.forma === 'financiamento' ? 'Conta que paga' : 'Conta ou cartão'}>
         <AccountPicker
@@ -108,9 +109,9 @@ export function CamposDaHipotese({
           emptyLabel={contaObrigatoria ? undefined : 'Sem conta'}
         />
       </Field>
-      {h.conta === null && !contaObrigatoria ? (
+      <Presenca visivel={h.conta === null && !contaObrigatoria}>
         <Note icon="info.circle">Sem conta, a hipótese só muda a visão geral.</Note>
-      ) : null}
+      </Presenca>
 
       <Field label={h.forma === 'financiamento' ? 'Primeira parcela' : h.forma === 'uma' ? 'Data' : 'A partir de'}>
         <Calendar value={h.data} onChange={(data) => set({ data })} min={localISODate()} max={max} />

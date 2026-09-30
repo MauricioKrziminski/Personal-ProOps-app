@@ -2,6 +2,7 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { StyleSheet, View } from 'react-native';
 
 import { MonthPicker, currentMonth } from '@/components/finance/month-picker';
+import { Presenca } from '@/components/motion/presenca';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { useBRL } from '@/components/ui/conceal';
@@ -97,7 +98,7 @@ export function AdiantarCampos(p: Props) {
         )}
       </Field>
 
-      {p.item && !recorrente ? (
+      <Presenca visivel={Boolean(p.item && !recorrente)}>
         <Field label="Quais parcelas">
           <Segmented
             options={[
@@ -108,20 +109,21 @@ export function AdiantarCampos(p: Props) {
             onChange={p.onQuais}
           />
         </Field>
-      ) : null}
+      </Presenca>
 
-      {p.item ? (
+      <Presenca visivel={Boolean(p.item)}>
         <Field
           label={recorrente ? 'Quantos meses' : 'Quantas parcelas'}
           hint={recorrente ? undefined : `De ${total} ${total === 1 ? 'parcela' : 'parcelas'} a vencer.`}>
           <QuantityField value={p.quantas} max={total} onChange={p.onQuantas} />
         </Field>
-      ) : null}
+      </Presenca>
 
       <Field label="Pagar em">
         <MonthPicker month={p.mes ?? currentMonth()} onChange={p.onMes} />
       </Field>
 
+      <Presenca visivel={Boolean(p.item && p.parcelas.length > 0)} style={styles.resultado}>
       {p.item && p.parcelas.length > 0 ? (
         <>
           <Field
@@ -136,10 +138,12 @@ export function AdiantarCampos(p: Props) {
           </Note>
         </>
       ) : null}
+      </Presenca>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   erro: { gap: Space.md, alignItems: 'flex-start' },
+  resultado: { gap: Space.md },
 });

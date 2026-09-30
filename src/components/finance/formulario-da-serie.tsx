@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet } from 'react-native';
-import Animated from 'react-native-reanimated';
+import { StyleSheet, View } from 'react-native';
 
 import type { CorpoProps } from '@/components/finance/corpo-do-lancar';
 import { ErrorCard } from '@/components/error-card';
 import { CamposDaSerie } from '@/components/finance/serie-form';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { SheetScroll } from '@/components/ui/sheet';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { TaskHeader } from '@/components/ui/task-header';
@@ -26,6 +26,7 @@ import { askEditScope } from '@/lib/edit-scope';
 import { linhaDaRecorrente, type EntradaRecorrente } from '@/lib/escrita';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { comumParaSerie } from '@/lib/lancar';
+import { estadoDaRecorrencia } from '@/lib/recurring-state';
 import { SERIE_VAZIA, serieDoRegistro, validaSerie, type SerieForm } from '@/lib/serie';
 
 /**
@@ -43,6 +44,24 @@ type Props = CorpoProps & {
 export function FormularioDaSerie(props: Props) {
   const series = useRecurringTransactions();
   const alvo = props.editandoId ? (series.data ?? []).find((r) => r.id === props.editandoId) : undefined;
+  // Links antigos podem chegar à origem mantida pela conversão: ela é histórico,
+  // e não deve voltar a oferecer o formulário de uma recorrência em andamento.
+  if (alvo && estadoDaRecorrencia(alvo) === 'encerrada') {
+    return (
+      <>
+        <TaskHeader title="Recorrência encerrada" onClose={props.onFechar} />
+        <SheetScroll contentContainerStyle={styles.corpo}>
+          <EmptyState
+            icon="repeat"
+            title="Esta recorrência já terminou"
+            hint="O histórico permanece em Lançamentos. Um registro criado pela conversão se edita por ele."
+            action={{ label: 'Voltar', onPress: props.onFechar }}
+            compacto
+          />
+        </SheetScroll>
+      </>
+    );
+  }
   /*
     Editando sem a série carregada, o estado inicial cairia na CRIAÇÃO — e o `useState` não relê:
     "Criar" gravaria uma série duplicada. Espera (ou diz que falhou); com a série, o formulário monta
@@ -250,7 +269,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
       />
       <SheetScroll contentContainerStyle={styles.corpo}>
         {props.topo}
-        <Animated.View style={[styles.conteudo, props.estiloDoConteudo]}>
+        <View style={styles.conteudo}>
           <CamposDaSerie form={form} onChange={setForm} contas={accounts.data ?? []} />
           {!editandoId && !converter ? (
             <Button
@@ -261,7 +280,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
               onPress={() => salvar(true)}
             />
           ) : null}
-        </Animated.View>
+        </View>
       </SheetScroll>
     </>
   );

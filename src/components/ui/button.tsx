@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import {
   Dimensions,
   StyleSheet,
@@ -9,16 +9,18 @@ import {
 } from 'react-native';
 import Animated, {
   interpolate,
+  ReduceMotion,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
 import { DotsLoader } from '@/components/motion/dots-loader';
 import { useCortina } from '@/components/motion/session-curtain';
 import { PressableScale } from '@/components/motion/pressable-scale';
+import { MudancaSuave, usePresenca, usePresencaAtiva } from '@/components/motion/presenca';
+import { useCoresSuaves, useOpacidadeSuave } from '@/components/motion/cores-suaves';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Icon } from '@/components/ui/icon';
 import { ThemedText } from '@/components/themed-text';
@@ -100,10 +102,12 @@ export function Button({
   const cortina = useCortina();
   const caixa = useRef<View>(null);
   const reduzido = useReducedMotion();
+  const ativo = usePresencaAtiva();
   // A própria cortina comunica a troca de sessão. O botão só mostra loader quando a ação
   // explicitamente pede isso; assim ele não faz um segundo movimento enquanto a onda cobre a tela.
   const loadingVisual = loading;
-  const inert = disabled || loading;
+  const { presente: loaderPresente } = usePresenca(Boolean(loadingVisual));
+  const inert = disabled || loading || !ativo;
   const altura = HEIGHT[size];
   const off = disabled && !loadingVisual;
   /**
@@ -127,7 +131,7 @@ export function Button({
         : 'text';
   // O material é decidido uma vez para todas as variantes. A cor comunica a ação; o
   // GlassView nativo fornece a superfície no iOS 26+.
-  const vidro = supportsLiquidGlass() && !disabled;
+  const vidro = supportsLiquidGlass();
   const cor = vidro ? 'transparent' : off ? theme.backgroundElement : fill[variant];
   const glassTint =
     variant === 'primary'
@@ -140,13 +144,13 @@ export function Button({
 
   /** 0 = botão, 1 = cápsula carregando. */
   const morph = useSharedValue(loadingVisual ? 1 : 0);
-  useEffect(() => {
-    morph.set(
-      loadingVisual
-        ? withSpring(1, Motion.spring.encaixe)
-        : withTiming(0, { duration: Motion.duration.base, easing: Motion.easing.out })
-    );
+  useLayoutEffect(() => {
+    morph.set(withTiming(Number(Boolean(loadingVisual)), {
+      duration: Motion.duration.morph, easing: Motion.easing.inOut, reduceMotion: ReduceMotion.System,
+    }));
   }, [loadingVisual, morph]);
+  const superficie = useCoresSuaves({ backgroundColor: cor });
+  const desligado = useOpacidadeSuave(off ? 1 : 0);
 
   // A cápsula de carregamento é uma composição opaca. No iOS o vidro permanece estável
   // enquanto o conteúdo troca pelo indicador de progresso.
@@ -172,11 +176,11 @@ export function Button({
     return { transform: [{ scaleX: Math.max(0, (meio - 2 * r) / meio) }] };
   });
   const conteudo = useAnimatedStyle(() => ({
-    opacity: interpolate(morph.get(), [0, 0.35], [1, 0], 'clamp'),
+    opacity: 1 - morph.get(),
     transform: [{ scale: interpolate(morph.get(), [0, 1], [1, 0.94]) }],
   }));
   const pontos = useAnimatedStyle(() => ({
-    opacity: interpolate(morph.get(), [0.45, 1], [0, 1], 'clamp'),
+    opacity: morph.get(),
     transform: [{ scale: interpolate(morph.get(), [0, 1], [0.6, 1]) }],
   }));
 
@@ -184,7 +188,7 @@ export function Button({
   const tampa = { width: altura, height: altura, borderRadius: altura / 2, backgroundColor: cor };
 
   return (
-    <View ref={caixa} style={[block ? styles.block : styles.hug, style]}>
+    <Animated.View ref={caixa} style={[block ? styles.block : styles.hug, style]}>
       <PressableScale
         accessibilityRole="button"
         accessibilityLabel={label}
@@ -194,6 +198,7 @@ export function Button({
         haptic="light"
         scaleTo={0.97}
         onPress={() => {
+          if (inert) return;
           if (origemDaCortina) {
             caixa.current?.measureInWindow((x, y, w, h) => {
               const tela = Dimensions.get('window');
@@ -214,14 +219,16 @@ export function Button({
             effectStyle={variant === 'ghost' ? 'clear' : 'regular'}
           />
         ) : null}
+        {vidro ? <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill,
+          { backgroundColor: theme.backgroundElement, borderRadius: altura / 2 }, desligado]} /> : null}
         {variant !== 'ghost' && !vidro ? (
           <>
             <Animated.View
               pointerEvents="none"
-              style={[styles.peca, { left: altura / 2, right: altura / 2, height: altura, backgroundColor: cor }, miolo]}
+              style={[styles.peca, { left: altura / 2, right: altura / 2, height: altura, backgroundColor: cor }, miolo, superficie]}
             />
-            <Animated.View pointerEvents="none" style={[styles.peca, { left: 0 }, tampa, tampaEsquerda]} />
-            <Animated.View pointerEvents="none" style={[styles.peca, { right: 0 }, tampa, tampaDireita]} />
+            <Animated.View pointerEvents="none" style={[styles.peca, { left: 0 }, tampa, tampaEsquerda, superficie]} />
+            <Animated.View pointerEvents="none" style={[styles.peca, { right: 0 }, tampa, tampaDireita, superficie]} />
           </>
         ) : null}
 
@@ -231,6 +238,7 @@ export function Button({
             { height: altura, paddingHorizontal: size === 'sm' ? Space.lg : Space.xl },
             conteudo,
           ]}>
+          <MudancaSuave valor={`${labelColor}:${label}`} style={styles.conteudo}>
           {/* No `sm` o ícone acompanha o rótulo: 20px ao lado de um texto de 12 pesa demais. */}
           {icon ? <Icon name={icon} size={size === 'sm' ? 'sm' : 'md'} color={labelColor} /> : null}
           <ThemedText
@@ -239,15 +247,16 @@ export function Button({
             style={styles.semEncolher}>
             {label}
           </ThemedText>
+          </MudancaSuave>
         </Animated.View>
 
-        {loadingVisual ? (
+        {loaderPresente ? (
           <Animated.View pointerEvents="none" style={[styles.pontos, { height: altura }, pontos]}>
             <DotsLoader size={size === 'sm' ? 5 : 7} color={labelColor} />
           </Animated.View>
         ) : null}
       </PressableScale>
-    </View>
+    </Animated.View>
   );
 }
 

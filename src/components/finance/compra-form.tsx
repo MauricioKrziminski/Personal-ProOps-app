@@ -10,6 +10,7 @@
 import { AccountPicker } from '@/components/finance/account-picker';
 import { CategoryPicker } from '@/components/finance/category-picker';
 import { DatePickerField } from '@/components/finance/date-picker-field';
+import { Presenca } from '@/components/motion/presenca';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { QuantityField } from '@/components/ui/quantity-field';
 import { Segmented } from '@/components/ui/segmented';
@@ -133,7 +134,7 @@ export function CamposDaCompra({
 
       {/* Como na criação (26/09/2026): as primeiras N ficam pagas. A paga junto com uma fatura de
           verdade é o piso — para reabri-la, desfaz-se o pagamento da fatura. */}
-      {form.installments > 1 ? (
+      <Presenca visivel={form.installments > 1}>
         <Field
           label="Parcelas já pagas"
           hint={form.pisoPagas > 0 ? `${form.pisoPagas} paga${form.pisoPagas === 1 ? '' : 's'} com a fatura do cartão` : undefined}>
@@ -145,7 +146,7 @@ export function CamposDaCompra({
             onChange={(pagas) => onChange({ ...form, pagas })}
           />
         </Field>
-      ) : null}
+      </Presenca>
     </>
   );
 }

@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Row } from '@/components/ui/row';
 import { EmptyState } from '@/components/ui/empty-state';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Icon } from '@/components/ui/icon';
@@ -15,6 +16,7 @@ import { Money } from '@/components/ui/money';
 import { Screen } from '@/components/ui/screen';
 import { Deslizavel } from '@/components/ui/deslizavel';
 import { PressableScale } from '@/components/motion/pressable-scale';
+import { Presenca } from '@/components/motion/presenca';
 import { VerMais } from '@/components/ui/ver-mais';
 import { useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
@@ -37,6 +39,7 @@ import { dataLocalDe, isoToBR, localISODate } from '@/lib/dates';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { hrefDoLancar } from '@/lib/lancar';
 import { describeRRule } from '@/lib/rrule-text';
+import { estadoDaRecorrencia } from '@/lib/recurring-state';
 import { supabase } from '@/lib/supabase';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 
@@ -132,14 +135,19 @@ export default function RecurringScreen() {
     );
   }, [todas, termo]);
 
-  const comErro = lista.filter((r) => r.last_error);
-  const ativas = lista.filter((r) => r.active && !r.last_error);
-  const pausadas = lista.filter((r) => !r.active && !r.last_error);
+  const hoje = localISODate();
+  const encerrada = (r: RecurringTransaction) => estadoDaRecorrencia(r, hoje) === 'encerrada';
+  const encerradas = lista.filter(encerrada).sort((a, b) => (b.end_date ?? '').localeCompare(a.end_date ?? ''));
+  const comErro = lista.filter((r) => !encerrada(r) && r.last_error);
+  const ativas = lista.filter((r) => estadoDaRecorrencia(r, hoje) === 'ativa' && !r.last_error);
+  const pausadas = lista.filter((r) => estadoDaRecorrencia(r, hoje) === 'pausada' && !r.last_error);
+  const [verEncerradas, setVerEncerradas] = useState(false);
   // Aos poucos (24/09/2026): é a lista que mais cresce. Uma busca nova recomeça as seções.
   const janelas = useJanelasPorGrupo(termo);
   const jErro = janelas.janelaDe('erro', comErro);
   const jAtivas = janelas.janelaDe('ativas', ativas);
   const jPausadas = janelas.janelaDe('pausadas', pausadas);
+  const jEncerradas = janelas.janelaDe('encerradas', encerradas);
 
   const sai = (proximos.data ?? [])
     .filter((t) => t.kind === 'expense')
@@ -179,29 +187,36 @@ export default function RecurringScreen() {
       // O trigger `recurring_drop_future` (20260909090000) leva junto as ocorrências futuras
       // ainda em aberto. O que fica é histórico e conta atrasada — nenhum dos dois some
       // porque a série parou de existir.
-      'As ocorrências futuras saem da projeção junto. O histórico e o que está atrasado ficam. Para só parar de gerar, pause a série.'
+      encerrada(r)
+        ? 'O histórico e o que está atrasado ficam.'
+        : 'As ocorrências futuras saem da projeção junto. O histórico e o que está atrasado ficam. Para só parar de gerar, pause a série.'
     );
 
   /** O menu da série, UMA lista para o toque (curto e longo) e o arrasto. */
-  const acoesDaSerie = (r: RecurringTransaction): ItemAction[] => [
+  const acoesDaSerie = (r: RecurringTransaction): ItemAction[] => {
+    const acoesDeEdicao: ItemAction[] = encerrada(r) ? [] : [
+      {
+        // Até 09/09/2026 esta tela só sabia criar, pausar e apagar: corrigir o valor
+        // do aluguel exigia apagar a série e refazer, perdendo o histórico.
+        label: 'Editar',
+        icon: 'pencil',
+        onPress: () => abrirEdicao(r),
+      },
+      { label: r.active ? 'Pausar' : 'Retomar', icon: r.active ? 'pause' : 'play', arrasto: 'direita', desfaz: true, onPress: () => alternar(r) },
+    ];
+    return [
       {
         label: 'Ver ocorrências',
         onPress: () =>
           router.push({
             pathname: '/finance/transactions',
-            params: { recurringId: r.id, month: dataLocalDe(r.next_run_at).slice(0, 7) },
+            params: { recurringId: r.id, month: (encerrada(r) && r.end_date ? r.end_date : dataLocalDe(r.next_run_at)).slice(0, 7) },
           }),
       },
-      {
-        // Até 09/09/2026 esta tela só sabia criar, pausar e apagar: corrigir o valor
-        // do aluguel exigia apagar a série e refazer, perdendo o histórico.
-        label: 'Editar',
-        icon: 'pencil' as const,
-        onPress: () => abrirEdicao(r),
-      },
-      { label: r.active ? 'Pausar' : 'Retomar', icon: r.active ? 'pause' : 'play', arrasto: 'direita', desfaz: true, onPress: () => alternar(r) },
+      ...acoesDeEdicao,
       { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => apagar(r) },
     ];
+  };
   const acoes = (r: RecurringTransaction) => showItemActions(r.description ?? 'Recorrência', acoesDaSerie(r));
 
   const cartaoSerie = (r: RecurringTransaction, index: number) => {
@@ -359,6 +374,37 @@ export default function RecurringScreen() {
           <SectionHead title="Pausadas" />
           {jPausadas.visiveis.map(cartaoSerie)}
           <VerMais restantes={jPausadas.restantes} onPress={() => janelas.verMais('pausadas')} />
+        </View>
+      ) : null}
+
+      {encerradas.length > 0 ? (
+        <View style={styles.secao}>
+          <Row
+            icon="archivebox"
+            title={`Encerradas · ${encerradas.length}`}
+            chevron={false}
+            trailing={<Icon name={verEncerradas ? 'chevron.up' : 'chevron.down'} size="sm" color="textSecondary" />}
+            onPress={() => setVerEncerradas((v) => !v)}
+            accessibilityState={{ expanded: verEncerradas }}
+          />
+          <Presenca visivel={verEncerradas} style={styles.secao}>
+            {jEncerradas.visiveis.map((r) => (
+              <Deslizavel key={r.id} titulo={r.description ?? 'Recorrência'} acoes={acoesDaSerie(r)} forma="card">
+                <Card style={styles.serie}>
+                  <Row
+                    title={r.description ?? 'sem descrição'}
+                    subtitle={`Encerrada em ${isoToBR(r.end_date!)}`}
+                    trailing={<Money cents={Number(r.amount_cents)} variant="ticker" tone="textSecondary" />}
+                    chevron={false}
+                    onPress={() => acoes(r)}
+                    onLongPress={() => acoes(r)}
+                    accessibilityLabel={`${r.description ?? 'recorrência'}, encerrada em ${isoToBR(r.end_date!)}. Ver ocorrências ou apagar.`}
+                  />
+                </Card>
+              </Deslizavel>
+            ))}
+            <VerMais restantes={jEncerradas.restantes} onPress={() => janelas.verMais('encerradas')} />
+          </Presenca>
         </View>
       ) : null}
 

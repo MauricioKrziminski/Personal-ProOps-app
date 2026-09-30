@@ -2,6 +2,9 @@
  * A régua do formulário único (spec 2026-09-29): os tipos, os campos comuns que viajam entre eles e
  * as opções da pergunta de conversão — pura, para as três telas e o teste lerem a mesma coisa.
  */
+import { dataLocalDe } from './dates.ts';
+import type { RegistroSimulado } from './hipotese.ts';
+
 export type TipoDeLancamento = 'uma' | 'recorrente' | 'financiamento';
 export type Comum = {
   kind: 'expense' | 'income' | 'transfer';
@@ -49,6 +52,33 @@ export function comumParaSerie(c: Comum): Comum {
 
 export function hrefDoLancar(tipo: TipoDeLancamento, extra: Record<string, string> = {}) {
   return { pathname: '/finance/lancar' as const, params: { tipo, ...extra } };
+}
+
+/** IDs da RPC: entidade primeiro; na parcelada, plano seguido pelos lançamentos. */
+export function hrefDoResultadoDaConversao(destino: RegistroSimulado, resultado: { ids: string[] }) {
+  const id = resultado.ids?.[0];
+  switch (destino.tipo) {
+    case 'financiamento':
+      return { pathname: '/finance/debts' as const, params: id ? { id } : {} };
+    case 'recorrente': {
+      const inicio = destino.dados.dtstart ?? destino.dados.next_run_at;
+      const month = typeof inicio === 'string' && !Number.isNaN(new Date(inicio).getTime())
+        ? dataLocalDe(inicio).slice(0, 7) : undefined;
+      return id
+        ? { pathname: '/finance/transactions' as const, params: { recurringId: id, ...(month ? { month } : {}) } }
+        : { pathname: '/finance/recurring' as const, params: {} };
+    }
+    case 'parcelada': {
+      const txId = resultado.ids?.[1];
+      return txId
+        ? { pathname: '/finance/[txId]' as const, params: { txId } }
+        : { pathname: '/finance/installments' as const, params: id ? { edit: id } : {} };
+    }
+    case 'lancamento':
+      return id
+        ? { pathname: '/finance/[txId]' as const, params: { txId: id } }
+        : { pathname: '/finance/transactions' as const, params: {} };
+  }
 }
 
 export function temPassadoDoParam(v: string | undefined): boolean {

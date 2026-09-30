@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { Presenca } from '@/components/motion/presenca';
 
 import { useBRL } from '@/components/ui/conceal';
 import { Button } from '@/components/ui/button';
@@ -522,11 +523,7 @@ export default function InstallmentsScreen() {
         </Pressable>
         </Deslizavel>
 
-        {expandido ? (
-          <Animated.View
-            layout={transicaoDeLayout}
-            entering={FadeInDown.duration(Motion.duration.base)}
-            style={styles.parcelas}>
+        <Presenca visivel={expandido} style={styles.parcelas}>
             {aSeguir.length > 0 ? (
               <ThemedText type="meta" themeColor="textSecondary" style={styles.subtituloParcelas}>
                 A seguir
@@ -541,8 +538,7 @@ export default function InstallmentsScreen() {
             ) : null}
             {jPagas.visiveis.map(linhaDaParcela)}
             <VerMais restantes={jPagas.restantes} onPress={() => janelas.verMais(`${plano.id}:pagas`)} />
-          </Animated.View>
-        ) : null}
+        </Presenca>
       </Animated.View>
     );
   };

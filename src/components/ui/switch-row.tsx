@@ -1,6 +1,7 @@
 import { StyleSheet, Switch, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { MudancaSuave, usePresencaAtiva } from '@/components/motion/presenca';
 import { Space } from '@/design/tokens';
 
 /**
@@ -22,12 +23,15 @@ export function SwitchRow({
   onValueChange: (value: boolean) => void;
   disabled?: boolean;
 }) {
+  const ativo = usePresencaAtiva();
   return (
     <View style={styles.linha}>
-      <ThemedText type="default" style={styles.texto}>
+      <MudancaSuave valor={label} style={styles.texto}>
+      <ThemedText type="default">
         {label}
       </ThemedText>
-      <Switch value={value} onValueChange={onValueChange} disabled={disabled} accessibilityLabel={label} />
+      </MudancaSuave>
+      <Switch value={value} onValueChange={onValueChange} disabled={disabled || !ativo} accessibilityLabel={label} />
     </View>
   );
 }

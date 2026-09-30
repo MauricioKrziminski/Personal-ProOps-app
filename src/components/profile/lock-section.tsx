@@ -12,6 +12,7 @@
 
 import { StyleSheet, View } from 'react-native';
 
+import { Presenca } from '@/components/motion/presenca';
 import { ThemedText } from '@/components/themed-text';
 import { Note } from '@/components/ui/note';
 import { Section } from '@/components/ui/row';
@@ -19,6 +20,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { useToast } from '@/components/ui/toast';
 import { Space } from '@/design/tokens';
 import { useLock } from '@/hooks/use-lock';
+import { useTheme } from '@/hooks/use-theme';
 import type { LockDelay, LockMode } from '@/lib/lock-policy';
 
 const MODOS = [
@@ -33,6 +35,7 @@ const ESPERAS = [
 ] as const;
 
 export function LockSection() {
+  const theme = useTheme();
   const { mode, delaySeconds, disponivel, comoAutentica, configurar, definirEspera } = useLock();
   const toast = useToast();
 
@@ -54,15 +57,16 @@ export function LockSection() {
 
   return (
     <Section heading="block" title="Bloqueio">
+      <View>
       <View style={styles.linha}>
         <View style={styles.texto}>
           <ThemedText type="default">Pedir para desbloquear ao abrir</ThemedText>
           {/* Desligado não ganha palavra: o segmentado ao lado já diz "Não". */}
-          {!disponivel || mode !== 'off' ? (
+          <Presenca visivel={!disponivel || mode !== 'off'}>
             <ThemedText type="footnote" themeColor="textSecondary">
               {disponivel ? comoAutentica : 'indisponível'}
             </ThemedText>
-          ) : null}
+          </Presenca>
         </View>
         {/*
           Sem bloqueio de tela no celular o controle nem aparece: ligado, ele trancaria o app num
@@ -76,14 +80,18 @@ export function LockSection() {
       </View>
 
       {!disponivel ? (
+        <>
+        <View style={[styles.separador, { backgroundColor: theme.separator }]} />
         <View style={styles.aviso}>
           <Note icon="exclamationmark.triangle">
             Ative o bloqueio de tela do celular
           </Note>
         </View>
+        </>
       ) : null}
 
-      {disponivel && mode !== 'off' ? (
+      <Presenca visivel={disponivel && mode !== 'off'}>
+        <View style={[styles.separador, { backgroundColor: theme.separator }]} />
         <View style={styles.linha}>
           <View style={styles.texto}>
             <ThemedText type="default">Depois de sair do app</ThemedText>
@@ -96,12 +104,14 @@ export function LockSection() {
             />
           </View>
         </View>
-      ) : null}
+      </Presenca>
+      </View>
     </Section>
   );
 }
 
 const styles = StyleSheet.create({
+  separador: { height: StyleSheet.hairlineWidth, marginLeft: Space.lg },
   /*
     Copiado do `temaRow` do Perfil, e cada propriedade tem motivo — a primeira versão daqui usava
     `flex: 1` no texto e o rótulo ERA ESPREMIDO ATÉ SUMIR, deixando o segmentado sozinho numa

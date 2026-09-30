@@ -83,6 +83,8 @@ export const Motion = {
   duration: {
     /** press feedback, troca de filtro */
     fast: 120,
+    /** Transformar um controle ou reorganizar campos, sem fases de espera. */
+    morph: 180,
     /** padrão: reposicionar, aparecer, sumir */
     base: 200,
     /** entrada de tela, gráfico redesenhando */
@@ -97,6 +99,8 @@ export const Motion = {
   },
   /** Configs de `withSpring`. Sheet tem um quique de gesto; settle assenta sem oscilar. */
   spring: {
+    /** Percurso como o berço Android, com quique discreto para campos e seletores. */
+    morph: { stiffness: 360, damping: 26, mass: 1 },
     sheet: { duration: 300, dampingRatio: 0.8 },
     settle: { duration: 400, dampingRatio: 1 },
     /**

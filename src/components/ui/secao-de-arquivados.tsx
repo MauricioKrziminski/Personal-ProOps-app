@@ -1,11 +1,15 @@
 import { useState, type ReactNode } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { ErrorCard } from '@/components/error-card';
+import { Presenca } from '@/components/motion/presenca';
 import { Forte } from '@/components/ui/forte';
 import { Deslizavel } from '@/components/ui/deslizavel';
 import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
 import { useToast } from '@/components/ui/toast';
+import { Space } from '@/design/tokens';
+import { useTheme } from '@/hooks/use-theme';
 import {
   ContaComLancamentos,
   useArquivados,
@@ -41,6 +45,7 @@ interface Props {
  * É o desenho que as dívidas já tinham. Some sem nada arquivado; com erro, diz que falhou.
  */
 export function SecaoDeArquivados({ tabela, titulo, filtro, subtitulo, trailing }: Props) {
+  const theme = useTheme();
   const toast = useToast();
   const consulta = useArquivados(tabela);
   const desarquivar = useDesarquivar(tabela);
@@ -90,6 +95,7 @@ export function SecaoDeArquivados({ tabela, titulo, filtro, subtitulo, trailing 
 
   return (
     <Section>
+      <View>
       <Row
         icon="archivebox"
         title={`${titulo} · ${itens.length}`}
@@ -98,9 +104,11 @@ export function SecaoDeArquivados({ tabela, titulo, filtro, subtitulo, trailing 
         onPress={() => setAberta((v) => !v)}
         accessibilityState={{ expanded: aberta }}
       />
-      {aberta
-        ? itens.map((item) => (
-            <Deslizavel key={item.id} titulo={item.name} acoes={acoes(item)}>
+      <Presenca visivel={aberta}>
+        {itens.map((item) => (
+          <View key={item.id}>
+            <View style={[styles.separador, { backgroundColor: theme.separator }]} />
+            <Deslizavel titulo={item.name} acoes={acoes(item)}>
               <Row
                 title={item.name}
                 subtitle={subtitulo(item)}
@@ -111,8 +119,14 @@ export function SecaoDeArquivados({ tabela, titulo, filtro, subtitulo, trailing 
                 accessibilityLabel={`${item.name}, ${subtitulo(item)}. Toque para desarquivar.`}
               />
             </Deslizavel>
-          ))
-        : null}
+          </View>
+        ))}
+      </Presenca>
+      </View>
     </Section>
   );
 }
+
+const styles = StyleSheet.create({
+  separador: { height: StyleSheet.hairlineWidth, marginLeft: Space.lg },
+});
