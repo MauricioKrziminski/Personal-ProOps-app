@@ -22,6 +22,7 @@ import Animated, {
   Easing,
   FadeIn,
   FadeOut,
+  cancelAnimation,
   runOnJS,
   useAnimatedStyle,
   useReducedMotion,
@@ -105,7 +106,8 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
 
   useEffect(() => {
     if (!saindo) {
-      progresso.set(withTiming(0, { duration: Motion.duration.base }));
+      cancelAnimation(progresso);
+      progresso.set(0);
       return;
     }
     /*
@@ -117,15 +119,21 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
       return;
     }
     const duracao = reduzido ? Motion.duration.base : Motion.curtain.duration;
+    let vigente = true;
+    const concluir = () => { if (vigente) onSaiu(); };
     progresso.set(
       withTiming(1, { duration: duracao, easing: Easing.linear }, (fim) => {
         'worklet';
-        if (fim) runOnJS(onSaiu)();
+        if (fim) runOnJS(concluir)();
       })
     );
     // Se o callback da animação não vier, a trava sai do mesmo jeito: modal preso é pior que corte.
-    const teto = setTimeout(onSaiu, duracao + 400);
-    return () => clearTimeout(teto);
+    const teto = setTimeout(concluir, duracao + 400);
+    return () => {
+      vigente = false;
+      clearTimeout(teto);
+      cancelAnimation(progresso);
+    };
   }, [saindo, cortinaSaindo, reduzido, progresso, onSaiu]);
 
   const conteudo = useAnimatedStyle(() => {
@@ -144,6 +152,8 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
           paddingTop: insets.top + Space.xl,
           // `Math.max`, não soma: com navegação por gestos o inset do Android volta 0.
           paddingBottom: Math.max(insets.bottom, Space.xxl),
+          // Proteção imediata no render de relock, antes de o efeito cancelar a onda antiga.
+          backgroundColor: saindo ? 'transparent' : theme.curtain,
         },
       ]}>
       {reduzido ? (

@@ -1,0 +1,8 @@
+{
+  "trial": "later-1300",
+  "requested_delay_after_enter_s": 1.3,
+  "actual_home_after_enter_command_s": 2.053,
+  "return_after_home_s": 3.683,
+  "kind": "later",
+  "system_prompt_on_return": true
+}

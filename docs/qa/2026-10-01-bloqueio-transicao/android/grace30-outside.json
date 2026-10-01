@@ -1,0 +1,7 @@
+{
+  "trial": "grace30-outside",
+  "time_between_home_command_and_launch_s": 32.054,
+  "system_prompt": true,
+  "expected_prompt": true,
+  "passed": true
+}

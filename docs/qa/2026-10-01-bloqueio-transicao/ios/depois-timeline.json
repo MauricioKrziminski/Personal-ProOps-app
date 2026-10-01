@@ -1,0 +1,77 @@
+{
+  "phase": "fixed",
+  "events": [
+    {
+      "action": "ordinary departure",
+      "at": 1790831765.865321,
+      "completed": 1790831766.012552
+    },
+    {
+      "action": "first return starts authentication",
+      "at": 1790831767.2197702,
+      "completed": 1790831767.5157719
+    },
+    {
+      "action": "pending-auth AX",
+      "at": 1790831768.1197171,
+      "completed": 1790831768.316619
+    },
+    {
+      "action": "pending-auth PNG",
+      "at": 1790831768.316874,
+      "completed": 1790831768.447225
+    },
+    {
+      "action": "interrupt pending authentication",
+      "at": 1790831768.447309,
+      "completed": 1790831768.5526679
+    },
+    {
+      "action": "home AX",
+      "at": 1790831768.552674,
+      "completed": 1790831768.668772
+    },
+    {
+      "action": "home PNG",
+      "at": 1790831768.669069,
+      "completed": 1790831768.789547
+    },
+    {
+      "action": "return after old success",
+      "at": 1790831772.2997088,
+      "completed": 1790831772.597308
+    },
+    {
+      "action": "returned AX",
+      "at": 1790831772.95196,
+      "completed": 1790831773.094284
+    },
+    {
+      "action": "returned PNG",
+      "at": 1790831773.094551,
+      "completed": 1790831773.217098
+    },
+    {
+      "action": "settled AX",
+      "at": 1790831777.0191739,
+      "completed": 1790831777.2729862
+    },
+    {
+      "action": "settled PNG",
+      "at": 1790831777.273213,
+      "completed": 1790831777.3909671
+    }
+  ],
+  "returned": {
+    "label": "returned",
+    "locked": true,
+    "confirming": true,
+    "home": false
+  },
+  "settled": {
+    "label": "settled",
+    "locked": false,
+    "confirming": false,
+    "home": true
+  }
+}

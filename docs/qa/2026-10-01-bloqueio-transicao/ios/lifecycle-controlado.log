@@ -1,0 +1,27 @@
+ LOG  [QA LOCK] prompt start 1790831473987
+ LOG  [QA LOCK] success 1790831477197
+ LOG  [QA LOCK] state inactive 1790831518505
+ LOG  [QA LOCK] state background 1790831519145
+ LOG  [QA LOCK] state active 1790831523621
+ LOG  [QA LOCK] prompt start 1790831523621
+ LOG  [QA LOCK] success 1790831526132
+ LOG  [QA LOCK] state inactive 1790831577577
+ LOG  [QA LOCK] state background 1790831578207
+ LOG  [QA LOCK] state active 1790831579028
+ LOG  [QA LOCK] prompt start 1790831579029
+ LOG  [QA LOCK] state inactive 1790831580149
+ LOG  [QA LOCK] state background 1790831580682
+ LOG  [QA LOCK] success 1790831581669
+ LOG  [QA LOCK] state active 1790831584052
+ LOG  [QA LOCK] prompt start 1790831652750
+ LOG  [QA LOCK] success 1790831655659
+ LOG  [QA LOCK] state inactive 1790831766325
+ LOG  [QA LOCK] state background 1790831766952
+ LOG  [QA LOCK] state active 1790831767736
+ LOG  [QA LOCK] prompt start 1790831767737
+ LOG  [QA LOCK] state inactive 1790831768893
+ LOG  [QA LOCK] state background 1790831769467
+ LOG  [QA LOCK] success 1790831772578
+ LOG  [QA LOCK] state active 1790831772830
+ LOG  [QA LOCK] prompt start 1790831772830
+ LOG  [QA LOCK] success 1790831775332

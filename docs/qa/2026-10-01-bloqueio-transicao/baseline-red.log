@@ -1,0 +1,480 @@
+(node:46628) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/proops-lock-baseline/src/lib/form-motion-ui.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/proops-lock-baseline/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Presenca shrinks space and opacity on the same spring, preserving an inactive outgoing snapshot (35.090375ms)
+✔ Presenca ignores completion after unmount and reduced motion closes without waiting (15.750416ms)
+✔ Nested presence inherits its inactive parent provider (6.504041ms)
+✔ Presenca reports an actual exit once and ignores a canceled exit after reopening (11.457709ms)
+✔ TrocaSuave mounts both layers immediately and starts progress only after incoming native layout (5.352583ms)
+✔ TrocaSuave retains its measured width during absolute-layer swaps and explicitly restores natural dimensions (6.171666ms)
+✔ Resting presence publishes natural height and swaps retain static geometry after stale shared-value writes (9.218791ms)
+✔ a settled label swap releases its frame before larger text measures again (4.565084ms)
+✔ TrocaSuave retargets midflight from its current progress while retaining the original outgoing layer (5.705833ms)
+✔ Spring overshoot keeps opacity bounded and height nonnegative while allowing a small spatial bounce (8.397375ms)
+✔ TrocaSuave rejects stale completion after another mode, return to original, and unmount (4.080333ms)
+✔ TrocaSuave ignores a stale incoming layout when a newer mode is waiting for its own measurement (5.295875ms)
+✔ TrocaSuave returning A to B to A creates a new incoming lifetime and waits for its new native layout (4.219416ms)
+✔ TrocaSuave ignores captured native measurement callbacks after unmount (3.973833ms)
+✔ TrocaSuave provider disables outgoing native input callbacks while the incoming input stays editable (19.325208ms)
+✔ TrocaSuave reduced motion interrupts pending work and full-screen mode preserves its frame (4.244833ms)
+✔ SelectField delivers selection synchronously once, keeps one chosen row, and can reopen while closing (10.44225ms)
+✔ SelectField confirms a different option during collapse without delaying its callback (9.581958ms)
+✔ DatePicker delivers one date synchronously, preserves limits and can reopen during collapse (14.739833ms)
+✔ DatePicker outgoing calendar cannot select again while the collapsed month-end control remains active (10.0835ms)
+✔ DatePicker reopening during collapse gives the calendar a new lifetime and keeps month-end aligned with its current month (12.514791ms)
+✔ QuantityField snapshot never clamps or edits financial state; typing and steps stay synchronous (8.39725ms)
+✔ TextField outgoing snapshot suppresses editing and contract-clamping blur (14.255125ms)
+✔ MudancaSuave crossfades discrete content and reduced motion restores the latest label immediately (3.25375ms)
+✔ Presenca lazily mounts native motion once and first appearance springs through measured space (3.277375ms)
+✔ Presenca explicitly restores natural resting geometry after opening, closing and reopening (3.240708ms)
+✔ Presenca lazy first appearance honors reduced motion and an inactive parent (5.770333ms)
+✔ prepared compact presence measures while hidden and first open reuses its native motion (5.124833ms)
+✔ prepared presence waits for measurement on an immediate first tap and accepts an empty list (5.634542ms)
+✔ SelectField first opening and reopening install no new native motion for its options (6.807709ms)
+✔ prepared presence remains hidden with reduced motion and ignores native layout after unmount (2.896667ms)
+✔ FormatoDoLancamento prepares first opening and cannot select while hidden or inactive (12.2065ms)
+✔ SelectField keeps the icon column spacing for alternatives without an icon (7.639125ms)
+✔ TextField keeps a full line visible when the font changes, retaining normal geometry and typing (11.632125ms)
+✔ TextField respects the caller font cap, disabled scaling and multiline geometry (9.892917ms)
+✔ Field keeps its visible label gap through accessory and native text height changes (9.950584ms)
+✖ LockOverlay immediately covers an interrupted reveal and ignores its queued animation (full motion) (6.88275ms)
+✖ LockOverlay immediately covers an interrupted reveal and ignores its queued animation (reduced motion) (2.923625ms)
+✖ LockOverlay rejects stale fallback timers after an interrupted reveal and callbacks after unmount (2.788625ms)
+✔ LockOverlay fallback completes only its current reveal when a native completion is missing (2.475875ms)
+(node:46629) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/proops-lock-baseline/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ leaving during the successful prompt return invalidates that visit and asks again (35.597666ms)
+✖ the real departure before the prompt active event cannot be consumed as system UI (8.987959ms)
+✖ iOS legitimate prompt success before active opens once (6.111208ms)
+✔ iOS legitimate prompt success after active opens once (7.302166ms)
+✖ Android system credential background with success before active is a legitimate return (5.93675ms)
+✔ Android system credential background with success after active is a legitimate return (5.823291ms)
+✔ Android biometric dialog that never pauses the app opens without waiting for a nonexistent active event (7.787542ms)
+✖ iOS actual background before a late success refuses the old result and retries on return (5.065958ms)
+✖ an iOS result delivered after the real return cannot unlock the new visit or clear its retry guard (4.845542ms)
+✔ user_cancel keeps the app locked and a manual retry can open (4.720625ms)
+✔ system_cancel keeps the app locked and a manual retry can open (9.3535ms)
+✔ authentication_failed keeps the app locked and a manual retry can open (4.453209ms)
+✔ reentrant requests share one native operation and cannot prematurely open (4.23025ms)
+✔ completed unlock respects 0s grace at the threshold (3.937625ms)
+✖ leaving after native success before active invalidates the attempt even with 0s grace (5.815ms)
+✔ completed unlock respects 30s grace before the threshold (3.973083ms)
+✔ completed unlock respects 30s grace at the threshold (4.081333ms)
+✖ leaving after native success before active invalidates the attempt even with 30s grace (4.949ms)
+✔ completed unlock respects 60s grace before the threshold (3.697ms)
+✔ completed unlock respects 60s grace at the threshold (3.556459ms)
+✖ leaving after native success before active invalidates the attempt even with 60s grace (3.477875ms)
+✖ a thrown native error releases the in-flight guard so a retry can authenticate (3.651458ms)
+✔ ios external system UI returning after operation completion stays unlocked (3.966417ms)
+✔ ios external system UI returning before operation completion stays unlocked (3.575083ms)
+✔ ios nested system UI retains the exemption until the last operation returns (4.283542ms)
+✔ android external system UI returning after operation completion stays unlocked (3.965834ms)
+✔ android external system UI returning before operation completion stays unlocked (9.237875ms)
+✔ android nested system UI retains the exemption until the last operation returns (3.58225ms)
+✖ logout settles a successful authentication waiting for active as refused (3.627542ms)
+✖ account swap settles a successful authentication waiting for active as refused (4.267958ms)
+✖ a late native success after an account swap cannot release the returned account (3.938542ms)
+✖ a native result arriving after logout is refused without relying on a background event (3.643167ms)
+✖ a native result arriving after an account swap is refused without relying on a background event (3.740417ms)
+✖ unmount settles successful authentication waiting for active without a later lifecycle event (7.594542ms)
+✖ native success arriving after unmount is refused and a fresh provider remains protected (10.940625ms)
+✔ a genuine departure immediately after success and active asks again even while the visual reveal can still be running (3.324417ms)
+ℹ tests 76
+ℹ suites 0
+ℹ pass 56
+ℹ fail 20
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 552.756625
+
+✖ failing tests:
+
+test at src/lib/form-motion-ui.test.ts:997:3
+✖ LockOverlay immediately covers an interrupted reveal and ignores its queued animation (full motion) (6.88275ms)
+  AssertionError [ERR_ASSERTION]: protection is opaque on the relock render, before animation effects
+  + actual - expected
+  
+  + undefined
+  - '#0B0B0C'
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/form-motion-ui.test.ts:1009:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: '#0B0B0C',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/form-motion-ui.test.ts:997:3
+✖ LockOverlay immediately covers an interrupted reveal and ignores its queued animation (reduced motion) (2.923625ms)
+  AssertionError [ERR_ASSERTION]: protection is opaque on the relock render, before animation effects
+  + actual - expected
+  
+  + undefined
+  - '#0B0B0C'
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/form-motion-ui.test.ts:1009:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: '#0B0B0C',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/form-motion-ui.test.ts:1021:1
+✖ LockOverlay rejects stale fallback timers after an interrupted reveal and callbacks after unmount (2.788625ms)
+  AssertionError [ERR_ASSERTION]: an already queued old timeout cannot remove the latest curtain
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/form-motion-ui.test.ts:1029:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at src/lib/lock-lifecycle.test.ts:155:1
+✖ leaving during the successful prompt return invalidates that visit and asks again (35.597666ms)
+  AssertionError [ERR_ASSERTION]: success before active must keep content protected
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts:161:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/lock-lifecycle.test.ts:170:1
+✖ the real departure before the prompt active event cannot be consumed as system UI (8.987959ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts:179:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/lock-lifecycle.test.ts:185:3
+✖ iOS legitimate prompt success before active opens once (6.111208ms)
+  AssertionError [ERR_ASSERTION]: native success alone must not expose inactive content
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts:192:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/lock-lifecycle.test.ts:208:3
+✖ Android system credential background with success before active is a legitimate return (5.93675ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts:216:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/lock-lifecycle.test.ts:239:1
+✖ iOS actual background before a late success refuses the old result and retries on return (5.065958ms)
+  AssertionError [ERR_ASSERTION]: a backgrounded visit cannot accept the result
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts:246:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/lock-lifecycle.test.ts:254:1
+✖ an iOS result delivered after the real return cannot unlock the new visit or clear its retry guard (4.845542ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'aberto'
+  - 'trancado'
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts:263:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'aberto',
+    expected: 'trancado',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/lock-lifecycle.test.ts:341:3
+✖ leaving after native success before active invalidates the attempt even with 0s grace (5.815ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts:350:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/lock-lifecycle.test.ts:341:3
+✖ leaving after native success before active invalidates the attempt even with 30s grace (4.949ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts:350:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/lock-lifecycle.test.ts:341:3
+✖ leaving after native success before active invalidates the attempt even with 60s grace (3.477875ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts:350:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/lock-lifecycle.test.ts:356:1
+✖ a thrown native error releases the in-flight guard so a retry can authenticate (3.651458ms)
+  AssertionError [ERR_ASSERTION]: an exception cannot leave a permanent busy prompt
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts:366:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'autenticando',
+    expected: 'autenticando',
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/lock-lifecycle.test.ts:436:3
+✖ logout settles a successful authentication waiting for active as refused (3.627542ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'aberto'
+  - 'pending'
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts:442:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'aberto',
+    expected: 'pending',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/lock-lifecycle.test.ts:436:3
+✖ account swap settles a successful authentication waiting for active as refused (4.267958ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'aberto'
+  - 'pending'
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts:442:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'aberto',
+    expected: 'pending',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/lock-lifecycle.test.ts:459:1
+✖ a late native success after an account swap cannot release the returned account (3.938542ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'aberto'
+  - 'trancado'
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts:468:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'aberto',
+    expected: 'trancado',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/lock-lifecycle.test.ts:474:3
+✖ a native result arriving after logout is refused without relying on a background event (3.643167ms)
+  AssertionError [ERR_ASSERTION]: the old native result cannot authenticate a changed session
+  + actual - expected
+  
+  + 'aberto'
+  - 'trancado'
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts:482:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'aberto',
+    expected: 'trancado',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/lock-lifecycle.test.ts:474:3
+✖ a native result arriving after an account swap is refused without relying on a background event (3.740417ms)
+  AssertionError [ERR_ASSERTION]: the old native result cannot authenticate a changed session
+  + actual - expected
+  
+  + 'aberto'
+  - 'trancado'
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts:482:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'aberto',
+    expected: 'trancado',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/lock-lifecycle.test.ts:493:1
+✖ unmount settles successful authentication waiting for active without a later lifecycle event (7.594542ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'aberto'
+  - 'pending'
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts:499:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'aberto',
+    expected: 'pending',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/lock-lifecycle.test.ts:508:1
+✖ native success arriving after unmount is refused and a fresh provider remains protected (10.940625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'aberto'
+  - 'trancado'
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-lock-baseline/src/lib/lock-lifecycle.test.ts:518:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'aberto',
+    expected: 'trancado',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

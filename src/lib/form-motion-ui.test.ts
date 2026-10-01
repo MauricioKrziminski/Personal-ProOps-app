@@ -9,7 +9,7 @@ const require = createRequire(import.meta.url);
 
 // Commit effects after stable renders; neither springs nor native layout finish automatically.
 // Component-local hooks and provider context exercise the real nested presence lifetimes.
-function montar(file: string, name: string, initial: any, config: { reduzir: boolean; ativo: boolean; fontScale?: number } = { reduzir: false, ativo: true }) {
+function montar(file: string, name: string, initial: any, config: { reduzir: boolean; ativo: boolean; fontScale?: number; lock?: any } = { reduzir: false, ativo: true }) {
   type Instance = { slots: any[]; cursor: number; mounted: boolean; restart: boolean };
   type Animation = { shared: any; done?: (ok: boolean) => void; target: number; from: number; kind: 'spring' | 'timing'; settings: any; canceled: boolean };
   const instances = new Map<string, Instance>();
@@ -26,6 +26,7 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
   let effects: { instance: Instance; index: number; fn: () => any; deps: any[] }[] = [];
   let postUnmountWrites = 0;
   let animatedStyles = 0;
+  const timers: { fn: () => void; canceled: boolean }[] = [];
   function flatten(style: any): any {
     if (!style) return {};
     if (Array.isArray(style)) return Object.assign({}, ...style.map(flatten));
@@ -53,6 +54,13 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (!(index in current.slots)) current.slots[index] = { current: value };
       return current.slots[index];
     },
+    useMemo: (fn: () => any, deps: any[]) => {
+      const index = current.cursor++;
+      const previous = current.slots[index];
+      if (!previous || deps.some((dep, i) => !Object.is(dep, previous.deps[i]))) current.slots[index] = { deps, value: fn() };
+      return current.slots[index].value;
+    },
+    useCallback: (fn: any, deps: any[]) => react.useMemo(() => fn, deps),
     useEffect: (fn: () => any, deps: any[]) => effect(fn, deps),
     useLayoutEffect: (fn: () => any, deps: any[]) => effect(fn, deps),
   };
@@ -66,6 +74,9 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
   const reanimated = {
     __esModule: true,
     default: { View: 'Animated.View' },
+    Easing: { linear: 'linear' },
+    FadeIn: { duration: () => ({}), delay: () => ({ duration: () => ({}) }) },
+    FadeOut: { duration: () => ({}) },
     ReduceMotion: { System: 'system' },
     useReducedMotion: () => config.reduzir,
     useAnimatedStyle: (fn: () => any) => { animatedStyles++; return { __worklet: fn }; },
@@ -92,13 +103,14 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
     withTiming: (target: number, settings: any, done?: (ok: boolean) => void) => ({ timing: true, target, done, settings }),
     // Native color pulses have no completion callback; control-lifetime assertions finish separately.
     withSequence: (...steps: any[]) => steps.at(-1),
+    withRepeat: (animation: any) => animation,
     withSpring: (target: number, settings: any, done?: (ok: boolean) => void) => ({ spring: true, target, done, settings }),
     cancelAnimation: (shared: any) => { if (shared.animation) shared.animation.canceled = true; },
     runOnJS: (fn: any) => fn,
     interpolateColor: (_t: number, _range: any, colors: any[]) => colors[0],
   };
   const tokens = {
-    Motion: { duration: { fast: 120, base: 200, morph: 180 }, easing: { out: 'out', inOut: 'inOut' }, spring: { morph: { stiffness: 360, damping: 26, mass: 1 } } },
+    Motion: { duration: { fast: 120, base: 200, morph: 180 }, curtain: { duration: 1150 }, easing: { out: 'out', inOut: 'inOut' }, spring: { morph: { stiffness: 360, damping: 26, mass: 1 } } },
     Radius: { sm: 8, md: 12, pill: 100 }, Space: { sm: 8, md: 12, lg: 16, half: 2, xs: 4 },
     Elevation: { light: { raised: [] } }, Type: { meta: {}, body: { fontSize: 16, lineHeight: 23 }, money: {} }, HitTarget: 44, tabular: {},
   };
@@ -109,7 +121,10 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
     const code = ts.transpileModule(readFileSync(path, 'utf8'), {
       compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 },
     }).outputText;
-    runInNewContext(code, { performance, module, exports: module.exports, require: (id: string) => {
+    runInNewContext(code, { performance, module, exports: module.exports,
+      setTimeout: (fn: () => void) => { const timer = { fn, canceled: false }; timers.push(timer); return timer; },
+      clearTimeout: (timer: typeof timers[number]) => { timer.canceled = true; },
+      require: (id: string) => {
       if (id === 'react') return react;
       if (id === 'react/jsx-runtime') return require(id);
       if (id === 'react-native') return { Pressable: 'Pressable', View: 'View', TextInput: 'TextInput', useWindowDimensions: () => ({ width: 402, fontScale: config.fontScale ?? 1 }), Platform: { OS: 'android' }, StyleSheet: { create: (s: any) => s, flatten, hairlineWidth: 1 } };
@@ -119,7 +134,12 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === '@/components/motion/cores-suaves') return { useCoresSuaves: () => ({}), useOpacidadeSuave: () => ({}) };
       if (id === '@/components/motion/pressable-scale') return { PressableScale: 'PressableScale' };
       if (id === '@/design/tokens') return tokens;
-      if (id === '@/hooks/use-theme') return { useTheme: () => ({}), useScheme: () => 'light' };
+      if (id === '@/hooks/use-theme') return { useTheme: () => ({ curtain: '#0B0B0C' }), useScheme: () => 'light' };
+      if (id === '@/hooks/use-lock') return { useLock: () => config.lock };
+      if (id === '@/components/motion/session-curtain') return { useCortinaSaindo: () => config.ativo };
+      if (id === '@/components/motion/wave-curtain') return { WaveCurtain: 'WaveCurtain' };
+      if (id === '@/components/ui/mark') return { Mark: 'Mark' };
+      if (id === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) };
       if (id === '@/components/ui/glass-backdrop') return { GlassBackdrop: 'GlassBackdrop', supportsLiquidGlass: () => false };
       if (id === '@/components/themed-text') return { ThemedText: 'ThemedText' };
       if (id === '@/components/ui/icon') return { Icon: 'Icon' };
@@ -198,7 +218,7 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
   }
   render();
   return {
-    render, nodes, animations, sharedValues, config,
+    render, nodes, animations, sharedValues, config, timers,
     element: (path: string, component: string, componentProps: any) => ({ type: load(path)[component], props: componentProps }),
     find: (predicate: (node: any) => boolean) => nodes().find(predicate),
     style: (node: any) => flatten(node.props.style),
@@ -971,4 +991,53 @@ test('Field keeps its visible label gap through accessory and native text height
   assert.equal(ui.style(body()).gap, 16, 'removing the action retains the requested gap');
   ui.render({ label: 'Date', children: 'Input' });
   assert.equal(ui.style(body()).gap, 8, 'ordinary fields retain the existing spacing');
+});
+
+for (const reduzir of [false, true]) {
+  test(`LockOverlay immediately covers an interrupted reveal and ignores its queued animation (${reduzir ? 'reduced' : 'full'} motion)`, () => {
+    const lock = { locked: true, velado: false, estado: 'trancado', comoAutentica: 'a senha do celular', autenticar: async () => 'aberto' };
+    const ui = montar('src/components/ui/lock-overlay.tsx', 'LockOverlay', {}, { reduzir, ativo: true, lock });
+    lock.locked = false;
+    ui.render();
+    const old = ui.transition();
+    old.shared.value = 0.6;
+    lock.locked = true;
+    ui.render();
+    const cover = ui.find((n) => n.props?.accessibilityViewIsModal === true);
+    assert.ok(cover, 'the returned visit is protected and intercepts input');
+    assert.equal(cover.props.pointerEvents, 'auto');
+    assert.equal(ui.style(cover).backgroundColor, '#0B0B0C', 'protection is opaque on the relock render, before animation effects');
+    assert.equal(old.shared.get(), 0, 'relocking does not animate exposed content back under the curtain');
+    lock.locked = false;
+    ui.render();
+    const current = ui.transition();
+    ui.finish(old);
+    assert.ok(ui.find((n) => n.props?.accessibilityViewIsModal === false), 'a queued callback cannot unmount a newer reveal');
+    ui.finish(current);
+    assert.equal(ui.nodes().length, 0, 'the valid reveal still completes');
+  });
+}
+
+test('LockOverlay rejects stale fallback timers after an interrupted reveal and callbacks after unmount', () => {
+  const lock = { locked: true, velado: false, estado: 'trancado', comoAutentica: 'a senha do celular', autenticar: async () => 'aberto' };
+  const ui = montar('src/components/ui/lock-overlay.tsx', 'LockOverlay', {}, { reduzir: false, ativo: true, lock });
+  lock.locked = false; ui.render();
+  const stale = ui.timers.at(-1)!;
+  lock.locked = true; ui.render();
+  lock.locked = false; ui.render();
+  stale.fn(); ui.render();
+  assert.ok(ui.find((n) => n.type === 'WaveCurtain'), 'an already queued old timeout cannot remove the latest curtain');
+  const animation = ui.transition();
+  const timer = ui.timers.at(-1)!;
+  ui.unmount();
+  animation.done?.(true); timer.fn();
+  assert.equal(ui.writesAfterUnmount(), 0);
+});
+
+test('LockOverlay fallback completes only its current reveal when a native completion is missing', () => {
+  const lock = { locked: true, velado: false, estado: 'trancado', comoAutentica: 'a senha do celular', autenticar: async () => 'aberto' };
+  const ui = montar('src/components/ui/lock-overlay.tsx', 'LockOverlay', {}, { reduzir: false, ativo: true, lock });
+  lock.locked = false; ui.render();
+  ui.timers.at(-1)!.fn(); ui.render();
+  assert.equal(ui.nodes().length, 0);
 });

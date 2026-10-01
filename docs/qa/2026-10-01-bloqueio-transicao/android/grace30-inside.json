@@ -1,0 +1,7 @@
+{
+  "trial": "grace30-inside",
+  "time_between_home_command_and_launch_s": 3.055,
+  "system_prompt": false,
+  "expected_prompt": false,
+  "passed": true
+}

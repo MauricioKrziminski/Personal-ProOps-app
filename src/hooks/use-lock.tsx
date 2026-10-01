@@ -123,6 +123,12 @@ interface LockContexto {
 
 const Ctx = createContext<LockContexto | null>(null);
 
+interface TentativaDeAbertura {
+  cancelada: boolean;
+  autenticada: boolean;
+  aoVoltar?: (permitir: boolean) => void;
+}
+
 /**
  * O nome que o usuário reconhece, não o da API.
  *
@@ -166,13 +172,17 @@ export function LockProvider({ children }: { children: ReactNode }) {
   */
   const { session, loading: sessaoCarregando } = useSession();
   const temSessao = !!session;
-  const sessaoAgora = sessaoCarregando ? undefined : temSessao;
+  const sessaoAgora = sessaoCarregando ? undefined : session?.user.id ?? null;
   const [sessaoAntes, setSessaoAntes] = useState(sessaoAgora);
   if (sessaoAntes !== sessaoAgora) {
     setSessaoAntes(sessaoAgora);
     if (sessaoAntes !== undefined && sessaoAgora !== undefined) {
-      setLocked(false);
-      setVelado(false);
+      if (sessaoAntes === null || sessaoAgora === null) {
+        setLocked(false);
+        setVelado(false);
+      }
+      // Uma troca direta de conta também descarta o estado ocupado da tentativa anterior,
+      // preservando a cobertura que já existia até a conta atual autenticar.
       setEstado('trancado');
     }
   }
@@ -241,6 +251,26 @@ export function LockProvider({ children }: { children: ReactNode }) {
     se sobrepor, e um `false` escrito pelo primeiro a terminar destravaria a guarda do outro.
   */
   const aberturas = useRef(0);
+  const tentativaAtual = useRef<TentativaDeAbertura | null>(null);
+  const pedirNaVolta = useRef(false);
+  const sessaoDaTentativa = useRef(session?.user.id);
+  const vivo = useRef(true);
+
+  const invalidarTentativa = useCallback(() => {
+    const tentativa = tentativaAtual.current;
+    if (tentativa) {
+      tentativa.cancelada = true;
+      tentativa.aoVoltar?.(false);
+    }
+    pedirNaVolta.current = false;
+  }, []);
+
+  useEffect(() => {
+    if (sessaoDaTentativa.current !== session?.user.id) {
+      sessaoDaTentativa.current = session?.user.id;
+      invalidarTentativa();
+    }
+  }, [session?.user.id, invalidarTentativa]);
 
   const abrirUiDoSistema = useCallback(() => {
     aberturas.current += 1;
@@ -256,11 +286,15 @@ export function LockProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
+    vivo.current = true;
     const sub = AppState.addEventListener('change', (s) => {
       if (s === 'active') {
+        const tentativa = tentativaAtual.current;
+        if (tentativa?.autenticada && !tentativa.cancelada) tentativa.aoVoltar?.(true);
         // Trancar de novo ZERA o estado: sem isso a cortina reabre mostrando o "não deu certo"
         // da sessão passada, que é informação velha na primeira coisa que a pessoa vê.
-        if (deveTrancar(vigia.current, Date.now())) {
+        if ((pedirNaVolta.current && vigia.current.mode === 'on' && vigia.current.temSessao)
+          || deveTrancar(vigia.current, Date.now())) {
           setLocked(true);
           setEstado('trancado');
           /*
@@ -283,19 +317,40 @@ export function LockProvider({ children }: { children: ReactNode }) {
         setVelado(false);
       } else if (s === 'background' || s === 'inactive') {
         vigia.current.backgroundedAt = Date.now();
+        const tentativa = tentativaAtual.current;
+        // No iOS o prompt só deixa o app inactive. Background é uma saída real.
+        // No Android a tela de credencial também usa background; depois do resultado,
+        // porém, uma nova saída já não pertence ao prompt que acabou de autenticar.
+        if (s === 'background' && tentativa && (Platform.OS === 'ios' || tentativa.autenticada)) {
+          tentativa.cancelada = true;
+          tentativa.aoVoltar?.(false);
+          vigia.current.systemUiOpen = false;
+          pedirNaVolta.current = vigia.current.mode === 'on' && vigia.current.temSessao;
+          if (pedirNaVolta.current) setLocked(true);
+          setEstado('trancado');
+        }
         // Só `background`: no iOS `inactive` é também a central de controle e o próprio Face ID.
         if (s === 'background' && deveVelarAoSair(vigia.current)) setVelado(true);
       }
     });
-    return () => sub.remove();
-  }, []);
+    return () => {
+      vivo.current = false;
+      invalidarTentativa();
+      sub.remove();
+    };
+  }, [invalidarTentativa]);
 
   const configurar = useCallback(async (novo: LockMode) => {
     await AsyncStorage.setItem(CHAVE_MODO, novo);
     setMode(novo);
     vigia.current.mode = novo;
-    if (novo === 'off') setLocked(false);
-  }, []);
+    if (novo === 'off') {
+      invalidarTentativa();
+      setLocked(false);
+      setVelado(false);
+      setEstado('trancado');
+    }
+  }, [invalidarTentativa]);
 
   const definirEspera = useCallback(async (d: LockDelay) => {
     await AsyncStorage.setItem(CHAVE_ESPERA, String(d));
@@ -313,8 +368,15 @@ export function LockProvider({ children }: { children: ReactNode }) {
   const emVoo = useRef(false);
 
   const autenticar = useCallback(async () => {
-    if (emVoo.current) return 'trancado' as const;
+    if (!vivo.current || emVoo.current) return 'trancado' as const;
+    if (AppState.currentState !== 'active') {
+      pedirNaVolta.current = true;
+      return 'trancado' as const;
+    }
     emVoo.current = true;
+    pedirNaVolta.current = false;
+    const tentativa: TentativaDeAbertura = { cancelada: false, autenticada: false };
+    tentativaAtual.current = tentativa;
     setEstado('autenticando');
     // O prompt tira o app do primeiro plano — sem a bandeira, voltar dele trancaria de novo por
     // cima do overlay que já estava aberto.
@@ -333,15 +395,33 @@ export function LockProvider({ children }: { children: ReactNode }) {
           })
         : { success: false as const };
       const saida = aposAutenticar(r);
-      if (saida === 'aberto') setLocked(false);
+      if (tentativa.cancelada) return 'trancado' as const;
+      if (saida === 'aberto') {
+        tentativa.autenticada = true;
+        // Sucesso nativo pode chegar antes do active, inclusive mais de um segundo antes.
+        // Só o retorno dessa mesma visita permite revelar; sair de novo invalida a espera.
+        if (AppState.currentState !== 'active') {
+          const permitir = await new Promise<boolean>((resolve) => { tentativa.aoVoltar = resolve; });
+          if (!permitir || tentativa.cancelada || AppState.currentState !== 'active') return 'trancado' as const;
+        }
+        setLocked(false);
+      }
       // Falhou FICA falhado: o botão passa a dizer "Tentar de novo" e a cortina diz o porquê.
       // Voltar sozinho para `trancado` apagaria a única pista de que a tentativa aconteceu.
       setEstado(saida === 'aberto' ? 'trancado' : 'falhou');
       return saida;
+    } catch {
+      if (!tentativa.cancelada) setEstado('falhou');
+      return 'trancado' as const;
     } finally {
+      if (tentativaAtual.current === tentativa) tentativaAtual.current = null;
       emVoo.current = false;
       // Quem baixa a bandeira é o `active` do fechamento, não um prazo — ver `bandeiraCaiAoTerminar`.
       fecharUiDoSistema();
+      // O active pode ter chegado com a tentativa antiga ainda em voo. O retry só começa
+      // depois que ela termina, preservando a guarda que impede dois prompts simultâneos.
+      if (vivo.current && pedirNaVolta.current && AppState.currentState === 'active'
+        && vigia.current.mode === 'on' && vigia.current.temSessao) pedirRef.current();
     }
   }, [abrirUiDoSistema, fecharUiDoSistema]);
 
