@@ -145,7 +145,11 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === '@/components/ui/icon') return { Icon: 'Icon' };
       if (id === '@/components/ui/forte') return { ComNegrito: 'ComNegrito' };
       if (id === '@/constants/theme') return { Fonts: {} };
-      if (id === '@/components/ui/field') return { TextField: 'TextField' };
+      if (id === '@/components/ui/field') return { TextField: 'TextField', Field: 'Field', MoneyField: 'MoneyField' };
+      if (id === '@/components/finance/account-picker') return { AccountPicker: 'AccountPicker' };
+      if (id === '@/components/finance/date-picker-field') return { DatePickerField: 'DatePickerField' };
+      if (id === '@/components/ui/switch-row') return { SwitchRow: 'SwitchRow' };
+      if (id === '@/lib/down-payment') return load('src/lib/down-payment.ts');
       if (id === '@/components/finance/calendar') return { Calendar: 'Calendar' };
       if (id === '@/lib/dates') return load('src/lib/dates.ts');
       if (id === './dates.ts') return load('src/lib/dates.ts');
@@ -234,7 +238,8 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
 
 const helper = 'src/components/motion/presenca.tsx';
 const outgoing = (ui: ReturnType<typeof montar>) => ui.find((n) => n.type === 'Animated.View' && n.props.pointerEvents === 'none');
-const incoming = (ui: ReturnType<typeof montar>) => ui.find((n) => n.type === 'Animated.View' && n.props.onLayout);
+const incoming = (ui: ReturnType<typeof montar>) => ui.find((n) => n.type === 'Animated.View' && n.props.onLayout)
+  ?? ui.find((n) => n.type === 'Animated.View' && n.props.pointerEvents !== undefined)?.props.children;
 const content = (ui: ReturnType<typeof montar>) => incoming(ui)?.props.children;
 function assertMorphSpring(animation: ReturnType<typeof montar>['animations'][number]) {
   assert.equal(animation.kind, 'spring');
@@ -669,6 +674,164 @@ test('DatePicker delivers one date synchronously, preserves limits and can reope
   assert.deepEqual(dates, ['20/09/2026', '22/09/2026']);
 });
 
+test('SelectField keeps the outgoing snapshot and reactivates collapsed without clearing its value', () => {
+  const props = { options: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], value: 'a', placeholder: 'Choose', onChange: () => assert.fail('hiding must not change the account') };
+  const ui = montar('src/components/ui/select-field.tsx', 'SelectField', props);
+  const header = () => ui.find(n => n.type === 'PressableScale' && n.props.accessibilityState.expanded !== undefined);
+  header().props.onPress(); ui.render();
+  ui.config.ativo = false; ui.render();
+  assert.equal(header().props.accessibilityState.expanded, true, 'outgoing visual state is frozen');
+  assert.equal(header().props.disabled, true);
+  ui.config.ativo = true; ui.render();
+  assert.equal(header().props.accessibilityState.expanded, false, 'a hidden form must not revive an expanded picker');
+  assert.equal(header().props.accessibilityLabel, 'A');
+});
+
+test('SelectField rejects captured choices while hidden and after reopening a different interaction', () => {
+  const selected: string[] = [];
+  const props = { options: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], value: 'a', placeholder: 'Choose', onChange: (v: string) => selected.push(v) };
+  const ui = montar('src/components/ui/select-field.tsx', 'SelectField', props);
+  const toggle = () => { ui.find(n => n.type === 'PressableScale' && n.props.accessibilityState.expanded !== undefined).props.onPress(); ui.render(); };
+  toggle();
+  const stale = ui.find(n => n.type === 'PressableScale' && n.props.accessibilityLabel === 'B').props.onPress;
+  ui.config.ativo = false; ui.render(); stale();
+  assert.deepEqual(selected, [], 'queued input cannot edit an inactive financial draft');
+  ui.config.ativo = true; ui.render(); toggle(); stale();
+  assert.deepEqual(selected, [], 'a previous interaction cannot select in the new picker');
+  const current = ui.find(n => n.type === 'PressableScale' && n.props.accessibilityLabel === 'B').props.onPress;
+  current(); current();
+  assert.deepEqual(selected, ['b'], 'the active choice stays synchronous and emits exactly once');
+});
+
+test('SelectField discards native handlers queued before unmount', () => {
+  const selected: string[] = [];
+  const ui = montar('src/components/ui/select-field.tsx', 'SelectField', {
+    options: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], value: 'a', placeholder: 'Choose', onChange: (v: string) => selected.push(v),
+  });
+  ui.find(n => n.props?.accessibilityState?.expanded === false).props.onPress(); ui.render();
+  const choose = ui.find(n => n.type === 'PressableScale' && n.props.accessibilityLabel === 'B').props.onPress;
+  const header = ui.find(n => n.props?.accessibilityState?.expanded === true).props.onPress;
+  ui.unmount(); choose(); header();
+  assert.deepEqual(selected, []);
+  assert.equal(ui.writesAfterUnmount(), 0);
+});
+
+test('SelectField rejects a collapsed header queued before hiding even after reactivation', () => {
+  const ui = montar('src/components/ui/select-field.tsx', 'SelectField', {
+    options: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }], value: 'a', placeholder: 'Choose', onChange: () => assert.fail('header must not select'),
+  });
+  const header = () => ui.find(n => n.props?.accessibilityState?.expanded !== undefined);
+  const stale = header().props.onPress;
+  ui.config.ativo = false; ui.render(); stale(); ui.render();
+  assert.equal(header().props.accessibilityState.expanded, false);
+  ui.config.ativo = true; ui.render(); stale(); ui.render();
+  assert.equal(header().props.accessibilityState.expanded, false, 'queued old header cannot reopen a new visit');
+  header().props.onPress(); ui.render();
+  assert.equal(header().props.accessibilityState.expanded, true, 'current header still opens synchronously');
+});
+
+test('DatePicker rejects a collapsed header queued before hiding even after reactivation', () => {
+  const ui = montar('src/components/finance/date-picker-field.tsx', 'DatePickerField', {
+    value: '15/09/2026', accessibilityLabel: 'Date', onChange: () => assert.fail('header must not change date'),
+  });
+  const header = () => ui.find(n => n.props?.accessibilityLabel === 'Date');
+  const stale = header().props.onPress;
+  ui.config.ativo = false; ui.render(); stale(); ui.render();
+  assert.equal(header().props.accessibilityState.expanded, false);
+  ui.config.ativo = true; ui.render(); stale(); ui.render();
+  assert.equal(header().props.accessibilityState.expanded, false, 'queued old header cannot reopen a new visit');
+  header().props.onPress(); ui.render();
+  assert.equal(header().props.accessibilityState.expanded, true, 'current header still opens synchronously');
+});
+
+test('DatePicker rejects a collapsed month-end choice queued before reactivation with unchanged value', () => {
+  const dates: string[] = [];
+  const ui = montar('src/components/finance/date-picker-field.tsx', 'DatePickerField', {
+    value: '15/09/2026', accessibilityLabel: 'Date', onChange: (d: string) => dates.push(d), onSelectLastDay: (d: string) => dates.push(d),
+  });
+  const monthEnd = () => ui.nodes().findLast(n => n.props?.accessibilityLabel === 'Último dia de todo mês').props.onPress;
+  const stale = monthEnd();
+  ui.config.ativo = false; ui.render(); stale();
+  assert.deepEqual(dates, []);
+  ui.config.ativo = true; ui.render(); stale();
+  assert.deepEqual(dates, [], 'unchanged value must not revive an old collapsed month-end handler');
+  monthEnd()(); monthEnd()();
+  assert.deepEqual(dates, ['30/09/2026'], 'current collapsed choice emits synchronously once');
+});
+
+test('DatePicker discards calendar, header and month-end handlers queued before unmount', () => {
+  const dates: string[] = [];
+  const ui = montar('src/components/finance/date-picker-field.tsx', 'DatePickerField', {
+    value: '15/09/2026', accessibilityLabel: 'Date', onChange: (d: string) => dates.push(d), onSelectLastDay: (d: string) => dates.push(d),
+  });
+  ui.find(n => n.props?.accessibilityLabel === 'Date').props.onPress(); ui.render();
+  const calendar = ui.find(n => n.type === 'Calendar');
+  const header = ui.find(n => n.props?.accessibilityLabel === 'Date').props.onPress;
+  const lastDay = ui.find(n => n.props?.accessibilityLabel === 'Último dia de todo mês').props.onPress;
+  ui.unmount(); calendar.props.onChange('2026-09-20'); header(); lastDay();
+  assert.deepEqual(dates, []);
+  assert.equal(ui.writesAfterUnmount(), 0);
+});
+
+test('DatePicker rejects an old month-end choice after reactivation or navigating another month', () => {
+  const dates: string[] = [];
+  const props = { value: '15/09/2026', accessibilityLabel: 'Date', onChange: (d: string) => dates.push(d), onSelectLastDay: (d: string) => dates.push(d) };
+  const ui = montar('src/components/finance/date-picker-field.tsx', 'DatePickerField', props);
+  const open = () => { ui.find(n => n.props?.accessibilityLabel === 'Date').props.onPress(); ui.render(); };
+  const monthEnd = () => ui.nodes().findLast(n => n.props?.accessibilityLabel === 'Último dia de todo mês').props.onPress;
+  open(); const oldVisit = monthEnd();
+  ui.config.ativo = false; ui.render(); ui.config.ativo = true; ui.render(); open();
+  oldVisit(); ui.render();
+  assert.deepEqual(dates, [], 'last-day handler from a previous visit must be inert');
+  const oldMonth = monthEnd();
+  ui.find(n => n.type === 'Calendar').props.onMonthChange('2026-06'); ui.render();
+  oldMonth(); ui.render();
+  assert.deepEqual(dates, [], 'a September callback must not select in the June calendar');
+  assert.equal(ui.find(n => n.props?.accessibilityLabel === 'Date').props.accessibilityState.expanded, true);
+  monthEnd()(); monthEnd()();
+  assert.deepEqual(dates, ['30/06/2026'], 'current choice emits once before rerender');
+});
+
+test('DatePicker month-end choice is single emission and a newly committed selection can toggle its intent', () => {
+  const dates: string[] = [];
+  const props = { value: '15/09/2026', accessibilityLabel: 'Date', onChange: (d: string) => dates.push(`day:${d}`), onSelectLastDay: (d: string) => dates.push(`last:${d}`) };
+  const ui = montar('src/components/finance/date-picker-field.tsx', 'DatePickerField', props);
+  const monthEnd = () => ui.nodes().findLast(n => n.props?.accessibilityLabel === 'Último dia de todo mês').props.onPress;
+  const stale = monthEnd(); stale(); stale();
+  assert.deepEqual(dates, ['last:30/09/2026']);
+  ui.render({ ...props, value: '30/09/2026', lastDaySelected: true });
+  stale(); assert.deepEqual(dates, ['last:30/09/2026'], 'queued old intent cannot toggle the committed selection');
+  monthEnd()(); monthEnd()();
+  assert.deepEqual(dates, ['last:30/09/2026', 'day:30/09/2026']);
+  ui.render({ ...props, value: '30/09/2026', lastDaySelected: false });
+  monthEnd()();
+  assert.deepEqual(dates, ['last:30/09/2026', 'day:30/09/2026', 'last:30/09/2026']);
+});
+
+test('DatePicker preserves an outgoing calendar but reactivates collapsed and invalidates its old session', () => {
+  const dates: string[] = [];
+  const props = { value: '15/09/2026', accessibilityLabel: 'Date', onChange: (d: string) => dates.push(d), onSelectLastDay: () => {} };
+  const ui = montar('src/components/finance/date-picker-field.tsx', 'DatePickerField', props);
+  const header = () => ui.find(n => n.props?.accessibilityLabel === 'Date');
+  header().props.onPress(); ui.render();
+  const stale = ui.find(n => n.type === 'Calendar');
+  stale.props.onMonthChange('2026-06'); ui.render();
+  ui.config.ativo = false; ui.render();
+  assert.equal(header().props.accessibilityState.expanded, true, 'outgoing content must not collapse during its exit');
+  ui.config.ativo = true; ui.render();
+  assert.equal(header().props.accessibilityState.expanded, false);
+  stale.props.onChange('2026-06-18');
+  assert.deepEqual(dates, []);
+  header().props.onPress(); ui.render();
+  const current = ui.find(n => n.type === 'Calendar' && n.key !== stale.key);
+  assert.ok(current, 'a new opening has a new calendar lifetime');
+  stale.props.onChange('2026-06-19'); stale.props.onMonthChange('2026-06'); ui.render();
+  assert.deepEqual(dates, []);
+  assert.equal(ui.nodes().findLast(n => n.type === 'ThemedText' && n.props.type === 'caption').props.children, 'Usar 30/09/2026');
+  current.props.onChange('2026-09-20');
+  assert.deepEqual(dates, ['20/09/2026']);
+});
+
 test('DatePicker outgoing calendar cannot select again while the collapsed month-end control remains active', () => {
   const dates: string[] = [];
   const monthEnds: string[] = [];
@@ -1040,4 +1203,113 @@ test('LockOverlay fallback completes only its current reveal when a native compl
   lock.locked = false; ui.render();
   ui.timers.at(-1)!.fn(); ui.render();
   assert.equal(ui.nodes().length, 0);
+});
+
+const entradaFile = 'src/components/finance/down-payment-fields.tsx';
+function entradaUI(showToggle = true, reduzir = false) {
+  let props: any = { enabled: !showToggle, showToggle,
+    value: { amountCents: 0, dateBR: '01/09/2026', accountId: null }, accounts: [],
+    onEnabled: (enabled: boolean) => { props = { ...props, enabled }; ui.render(props); },
+    onChange: (value: any) => { props = { ...props, value }; ui.render(props); } };
+  const ui = montar(entradaFile, 'DownPaymentFields', props, { reduzir, ativo: true });
+  return { ui, change: (extra: any) => { props = { ...props, ...extra }; ui.render(props); } };
+}
+const campoEntrada = (ui: ReturnType<typeof montar>, label: string) => ui.find(n => n.type === 'Field' && n.props.label === label);
+
+test('entrada começa sem erro nem foco, valida ao sair do valor e limpa o erro após corrigir', () => {
+  const { ui } = entradaUI();
+  ui.find(n => n.type === 'SwitchRow').props.onValueChange(true);
+  assert.equal(campoEntrada(ui, 'Entrada').props.error, undefined);
+  assert.equal(campoEntrada(ui, 'Conta da entrada').props.error, undefined);
+  let money = ui.find(n => n.type === 'MoneyField');
+  assert.equal(Boolean(money.props.invalid), false);
+  assert.equal(Boolean(money.props.autoFocus), false);
+  money.props.onBlur(); ui.render();
+  assert.ok(campoEntrada(ui, 'Entrada').props.error);
+  assert.equal(campoEntrada(ui, 'Conta da entrada').props.error, undefined);
+  money = ui.find(n => n.type === 'MoneyField');
+  money.props.onChangeCents(20000); ui.render();
+  assert.equal(campoEntrada(ui, 'Entrada').props.error, undefined);
+  assert.equal(Boolean(ui.find(n => n.type === 'MoneyField').props.invalid), false);
+});
+
+test('entrada fica inteira e utilizável no primeiro render, sem esperar medição ou animação', () => {
+  const { ui } = entradaUI();
+  const installed = ui.sharedValues.length;
+  ui.find(n => n.type === 'SwitchRow').props.onValueChange(true);
+  assert.equal(ui.sharedValues.length, installed, 'o toque não monta novos worklets');
+  const envelope = ui.find(n => n.props?.pointerEvents === 'auto');
+  const semQuadroAnimado = (style: any): any => Array.isArray(style)
+    ? Object.assign({}, ...style.map(semQuadroAnimado)) : style?.__worklet ? {} : style ?? {};
+  assert.equal(semQuadroAnimado(envelope.props.style).height, 'auto', 'a altura não espera o mapper da UI');
+  assert.equal(semQuadroAnimado(incoming(ui).props.style).opacity, 1, 'a visibilidade não espera o mapper da UI');
+  assert.equal(ui.style(envelope).height, 'auto', 'o campo completo não depende do progresso da expansão');
+  assert.equal(envelope.props.accessibilityElementsHidden, false);
+  assert.equal(ui.style(incoming(ui)).opacity, 1, 'o campo é legível antes de qualquer quadro da animação');
+  ui.find(n => n.type === 'MoneyField').props.onChangeCents(5000);
+  assert.equal(ui.find(n => n.type === 'MoneyField').props.valueCents, 5000);
+  ui.find(n => n.type === 'MoneyField').props.onBlur(); ui.render();
+  assert.equal(campoEntrada(ui, 'Entrada').props.error, undefined);
+});
+
+for (const reduzir of [false, true]) test(`entrada oculta imediatamente e reabre inteira durante reversões (${reduzir ? 'reduced' : 'full'} motion)`, () => {
+  const { ui } = entradaUI(true, reduzir);
+  ui.find(n => n.type === 'SwitchRow').props.onValueChange(true);
+  const opening = ui.animations.at(-1);
+  if (!reduzir) {
+    assert.equal(opening?.kind, 'timing');
+    assert.equal(opening.settings.duration, 120);
+  }
+  if (opening) opening.shared.value = .5;
+  ui.find(n => n.type === 'MoneyField').props.onBlur(); ui.render();
+  assert.ok(campoEntrada(ui, 'Entrada').props.error);
+  ui.find(n => n.type === 'SwitchRow').props.onValueChange(false);
+  if (opening) assert.equal(opening.canceled, true, 'a reversão cancela o movimento anterior');
+  assert.equal(ui.style(outgoing(ui)).height, 0);
+  assert.equal(ui.style(incoming(ui)).opacity, 0);
+  assert.equal(outgoing(ui).props.accessibilityElementsHidden, true);
+  ui.find(n => n.type === 'SwitchRow').props.onValueChange(true);
+  if (opening) ui.finish(opening);
+  assert.equal(ui.style(ui.find(n => n.props?.pointerEvents === 'auto')).height, 'auto');
+  assert.equal(ui.style(incoming(ui)).opacity, 1);
+  assert.equal(campoEntrada(ui, 'Entrada').props.error, undefined);
+  assert.equal(Boolean(ui.find(n => n.type === 'MoneyField').props.autoFocus), false);
+  ui.unmount();
+  opening?.done?.(true);
+  assert.equal(ui.writesAfterUnmount(), 0);
+});
+
+test('adicionar entrada a contrato existente também nasce sem validação prematura', () => {
+  const { ui } = entradaUI(false);
+  assert.equal(campoEntrada(ui, 'Entrada').props.error, undefined);
+  assert.equal(campoEntrada(ui, 'Conta da entrada').props.error, undefined);
+});
+
+test('entrada já preenchida explica um limite do total mesmo depois de reiniciar a revisão', () => {
+  const { ui, change } = entradaUI();
+  const value = { amountCents: 10000, dateBR: '01/09/2026', accountId: 'conta' };
+  change({ enabled: true, value });
+  ui.find(n => n.type === 'MoneyField').props.onBlur(); ui.render();
+  change({ enabled: false }); change({ enabled: true });
+  assert.equal(campoEntrada(ui, 'Entrada').props.error, undefined);
+  change({ error: 'A entrada precisa ser menor que o total da compra' });
+  assert.equal(campoEntrada(ui, 'Entrada').props.error, 'A entrada precisa ser menor que o total da compra');
+  assert.equal(Boolean(ui.find(n => n.type === 'MoneyField').props.invalid), true);
+  change({ error: undefined });
+  assert.equal(campoEntrada(ui, 'Entrada').props.error, undefined);
+  assert.equal(Boolean(ui.find(n => n.type === 'MoneyField').props.invalid), false);
+});
+
+test('erros de conta e data não pintam a borda do valor; limite da compra aparece após revisar o valor', () => {
+  const { ui, change } = entradaUI(false);
+  const value = { amountCents: 20000, dateBR: '01/09/2026', accountId: null };
+  change({ value, error: 'Escolha a conta da entrada' });
+  ui.find(n => n.type === 'MoneyField').props.onBlur(); ui.render();
+  assert.equal(campoEntrada(ui, 'Entrada').props.error, undefined);
+  assert.equal(Boolean(ui.find(n => n.type === 'MoneyField').props.invalid), false);
+  change({ value: { ...value, accountId: 'conta', dateBR: 'inválida' }, error: 'Informe a data da entrada' });
+  assert.equal(campoEntrada(ui, 'Entrada').props.error, undefined);
+  change({ value: { ...value, accountId: 'conta' }, error: 'A entrada precisa ser menor que o total da compra' });
+  assert.ok(campoEntrada(ui, 'Entrada').props.error);
+  assert.equal(Boolean(ui.find(n => n.type === 'MoneyField').props.invalid), true);
 });

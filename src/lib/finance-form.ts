@@ -26,6 +26,10 @@ export function validRecurringRange(start: string, end: string, interval: string
 
 /** Show intentional database domain errors, while keeping infrastructure failures generic. */
 export function financeErrorMessage(error: unknown, fallback: string): string {
+  if (error && typeof error === 'object' && 'code' in error && error.code === '23505' &&
+      'message' in error && typeof error.message === 'string' && error.message.includes('debts_workspace_id_name_key')) {
+    return 'Já existe uma dívida ativa com esse nome. Escolha outro nome ou arquive a anterior.';
+  }
   if (error && typeof error === 'object' && 'code' in error && error.code === 'P0001' && 'message' in error && typeof error.message === 'string') return error.message;
   return fallback;
 }
@@ -274,11 +278,11 @@ export interface CamposDoModo {
  * a pessoa já tem atravessa — a parcela, o que falta, as pagas —, e "parcelas" troca de sentido:
  * 48 no total com 10 pagas vira 38 que faltam, e volta a 48.
  */
-export function camposNoOutroModo(f: CamposDoModo, modo: CamposDoModo['calculationMode']): Partial<CamposDoModo> {
+export function camposNoOutroModo(f: CamposDoModo, modo: CamposDoModo['calculationMode'], entradaCents = 0): Partial<CamposDoModo> {
   if (modo === f.calculationMode) return {};
   const n = /^\d+$/.test(f.parcelas) ? Number(f.parcelas) : null;
   if (modo === 'amortized') {
-    const parcela = f.unidade === 'total' && n ? parcelaDoTotalDoContrato(f.valorCents, n) : f.valorCents;
+    const parcela = f.unidade === 'total' && n ? parcelaDoTotalDoContrato(f.valorCents - entradaCents, n) : f.valorCents;
     const faltam = n !== null ? Math.max(n - f.installmentsPaid, 0) : null;
     return {
       calculationMode: 'amortized',

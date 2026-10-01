@@ -316,6 +316,8 @@ interface MoneyFieldProps {
   /** Valor em centavos. Nunca float. */
   valueCents: number;
   onChangeCents: (cents: number) => void;
+  /** Validação do formulário só depois de a pessoa sair do campo. */
+  onBlur?: () => void;
   autoFocus?: boolean;
   invalid?: boolean;
   /** Só leitura: o valor existe mas não é mais editável (compra com tudo pago). */
@@ -409,6 +411,7 @@ function Digito({ ch, cor, animar }: { ch: string; cor: string; animar: boolean 
 export function MoneyField({
   valueCents,
   onChangeCents,
+  onBlur,
   autoFocus,
   invalid,
   readOnly,
@@ -486,11 +489,15 @@ export function MoneyField({
         onBlur={() => {
           setFocado(false);
           desfocar();
+          if (ativo) onBlur?.();
         }}
         keyboardType="number-pad"
         autoFocus={autoFocus}
         editable={ativo && !readOnly}
-        caretHidden
+        // No iOS caretHidden zera a geometria usada pelo KeyboardAwareScrollView.
+        // O cursor desenhado acima continua visível; o nativo conserva só a medida.
+        caretHidden={Platform.OS !== 'ios'}
+        selectionColor={Platform.OS === 'ios' ? 'transparent' : undefined}
         contextMenuHidden
         accessibilityLabel={accessibilityLabel}
         // Na cor da própria caixa: o Android ignora `color: 'transparent'` num input.

@@ -9,7 +9,8 @@ import { FormularioDoLancamento, LancamentoEditando } from '@/components/finance
 import { Screen } from '@/components/ui/screen';
 import { FormularioEmTela } from '@/components/ui/sheet';
 import { ToastDoModal, useToast } from '@/components/ui/toast';
-import { useConverterRegistro, useDebts, useTransaction } from '@/hooks/use-finance';
+import { useConverterRegistro, useDebts, useInstallmentPlan, useTransaction } from '@/hooks/use-finance';
+import { usePurchaseDownPayment } from '@/hooks/use-down-payment';
 import { isoToBR, localISODate } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
 import type { RegistroSimulado } from '@/lib/hipotese';
@@ -84,6 +85,19 @@ export default function LancarScreen() {
   // "Converter" (sem confirmação) vira `todas`, que apaga os pagamentos. A dívida carregada decide.
   const dividas = useDebts();
   const divida = editandoId && tipoDaOrigem === 'divida' ? dividas.data?.find((d) => d.id === editandoId) : undefined;
+  // A entrada já é um pagamento histórico, mesmo antes da primeira prestação.
+  const parentId = tipoDaOrigem === 'divida' || tipoDaOrigem === 'plano' ? editandoId
+    : tipoDaOrigem === 'transacao' ? transacao.data?.installment_plan_id ?? undefined : undefined;
+  const planoId = tipoDaOrigem === 'divida' ? undefined : parentId;
+  const plano = useInstallmentPlan(planoId);
+  const entrada = usePurchaseDownPayment(tipoDaOrigem === 'divida' ? 'financiamento' : 'parcelada', parentId);
+  const consultasDaOrigem = editandoId ? [
+    ...(tipoDaOrigem === 'transacao' ? [transacao] : []),
+    ...(tipoDaOrigem === 'divida' ? [dividas] : []),
+    ...(planoId ? [plano] : []),
+    ...(parentId ? [entrada] : []),
+  ] : [];
+  const conferindoHistorico = consultasDaOrigem.some((q) => q.isPending);
   const origem: OrigemDaConversao | null = editandoId
     ? {
         tipo: tipoDaOrigem,
@@ -91,7 +105,8 @@ export default function LancarScreen() {
         // Quem abriu sem dizer o papel (link antigo, a Projeção): o do próprio registro, quando chega.
         papel: (p.papel as OrigemDaConversao['papel'] | undefined)
           ?? (tipoDaOrigem !== 'transacao' ? 'registro' : transacao.data ? papelDaTransacao(transacao.data) : 'avulsa'),
-        temPassado: temPassadoDoParam(p.passado) || (divida?.installments_paid ?? 0) > 0,
+        temPassado: temPassadoDoParam(p.passado) || (divida?.installments_paid ?? 0) > 0
+          || (plano.data?.locked ?? 0) > 0 || Boolean(entrada.data),
       }
     : null;
   // O "Aplicar" do "E se…?" vale para o primeiro corpo; o "criar outro" começa limpo.
@@ -117,6 +132,14 @@ export default function LancarScreen() {
 
   const converterPara = (destino: RegistroSimulado) => {
     if (!origem || convertendo.current || converter.isPending) return;
+    if (consultasDaOrigem.some((q) => !q.isSuccess)) {
+      const falhas = consultasDaOrigem.filter((q) => q.isError);
+      if (falhas.length) {
+        toast({ message: 'Não deu para conferir o histórico. Tente salvar novamente após a consulta.', tone: 'error' });
+        falhas.forEach((q) => { void q.refetch(); });
+      }
+      return;
+    }
     const acoes = opcoesDaConversao(origem).map((o) => ({
       label: o.label,
       destructive: o.destrutiva,
@@ -138,7 +161,7 @@ export default function LancarScreen() {
             },
           );
         };
-        if (o.destrutiva) confirmDestructive('Apagar o que já aconteceu?', 'Apagar e converter', ir, 'Os lançamentos já pagos também saem. Isso não volta.');
+        if (o.destrutiva) confirmDestructive('Apagar o que já aconteceu?', 'Apagar e converter', ir, 'Os lançamentos já pagos, incluindo a entrada, também saem. Isso não volta.');
         else void ir();
       },
     }));
@@ -163,7 +186,7 @@ export default function LancarScreen() {
     deHipotese: doAplicar ? p.deHipotese : undefined,
     editandoId: editandoAqui,
     converter: editandoId && tipo !== tipoOriginal ? converterPara : undefined,
-    salvando: converter.isPending,
+    salvando: converter.isPending || (tipo !== tipoOriginal && conferindoHistorico),
     focarAoAbrir,
   };
 

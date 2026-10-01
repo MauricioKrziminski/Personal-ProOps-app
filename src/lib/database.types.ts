@@ -2925,10 +2925,20 @@ export type Database = {
         }
         Returns: string
       }
-      converter_registro: {
-        Args: { p_alcance: string; p_destino: Json; p_origem: Json }
-        Returns: Json
-      }
+      converter_registro:
+        | {
+            Args: { p_alcance: string; p_destino: Json; p_origem: Json }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_alcance: string
+              p_destino: Json
+              p_origem: Json
+              p_request_id: string
+            }
+            Returns: Json
+          }
       create_installment_plan: {
         Args: {
           p_account_id: string
@@ -3031,6 +3041,10 @@ export type Database = {
       }
       delete_category: { Args: { p_name: string }; Returns: Json }
       delete_debt: { Args: { p_debt_id: string }; Returns: number }
+      delete_installment_purchase: {
+        Args: { p_plan_id: string }
+        Returns: number
+      }
       draft_lines: {
         Args: { p_drafts: Json; p_from: string; p_to: string }
         Returns: Json

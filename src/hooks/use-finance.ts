@@ -1019,6 +1019,7 @@ export function useUpdateInstallmentPlan() {
  */
 export function useConvertToInstallments() {
   const invalidate = useInvalidateFinance();
+  const attempt = useRef<{ key: string; id: string } | null>(null);
   return useMutation({
     mutationFn: async (input: {
       transactionId: string;
@@ -1034,7 +1035,7 @@ export function useConvertToInstallments() {
       downPayment?: DownPaymentInput;
     }) => {
       if (input.downPayment) {
-        const { error } = await supabase.rpc('converter_registro', {
+        const payload = {
           p_origem: { tipo: 'transacao', id: input.transactionId }, p_alcance: 'converter',
           p_destino: { tipo: 'parcelada', dados: {
             p_account_id: input.accountId, p_total_cents: input.totalCents,
@@ -1042,7 +1043,10 @@ export function useConvertToInstallments() {
             p_paid_installments: input.paidInstallments ?? 0, p_description: input.description,
             p_category: input.category, p_merchant: input.merchant, down_payment: input.downPayment,
           } },
-        });
+        };
+        const key = JSON.stringify(payload);
+        if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
+        const { error } = await supabase.rpc('converter_registro', { ...payload, p_request_id: attempt.current.id });
         if (error) throw error;
         return;
       }
@@ -1257,9 +1261,13 @@ export function useSimulacao(o: {
  */
 export function useConverterRegistro() {
   const invalidate = useInvalidateFinance();
+  const attempt = useRef<{ key: string; id: string } | null>(null);
   return useMutation({
     mutationFn: async (v: { origem: OrigemDaConversao; alcance: Alcance; destino: RegistroSimulado }) => {
-      const { data, error } = await supabase.rpc('converter_registro', { p_origem: { tipo: v.origem.tipo, id: v.origem.id }, p_alcance: v.alcance, p_destino: v.destino as never });
+      const payload = { p_origem: { tipo: v.origem.tipo, id: v.origem.id }, p_alcance: v.alcance, p_destino: v.destino as never };
+      const key = JSON.stringify(payload);
+      if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
+      const { data, error } = await supabase.rpc('converter_registro', { ...payload, p_request_id: attempt.current.id });
       if (error) throw error;
       return data as { ids: string[] };
     },
@@ -3158,9 +3166,7 @@ export function useDeleteTransaction() {
 /**
  * Apaga a compra parcelada INTEIRA.
  *
- * Um `delete` só: `transactions.installment_plan_id` tem `on delete cascade`,
- * então as N parcelas caem junto. Antes disso, cancelar uma compra em 12x
- * significava apagar doze lançamentos um por um, navegando doze meses.
+ * Uma RPC apaga entrada e plano na mesma transação, inclusive quando já não há parcelas.
  *
  * Não tem "Desfazer": o cascade não volta. Por isso quem chama precisa
  * confirmar nomeando o estrago (`confirmDestructive`).
@@ -3169,7 +3175,7 @@ export function useDeleteInstallmentPlan() {
   const invalidate = useInvalidateFinance();
   return useMutation({
     mutationFn: async (planId: string) => {
-      const { error } = await supabase.from('installment_plans').delete().eq('id', planId);
+      const { error } = await supabase.rpc('delete_installment_purchase', { p_plan_id: planId });
       if (error) throw error;
     },
     onSuccess: invalidate,

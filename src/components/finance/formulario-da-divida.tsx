@@ -277,7 +277,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   const entrada = form.downPayment ?? { amountCents: 0, dateBR: isoToBR(localISODate()), accountId: form.accountId };
   const valorDasParcelas = form.valorCents - (entradaAtiva && form.unidade === 'total' ? entrada.amountCents : 0);
   const erroEntrada = entradaAtiva
-    ? downPaymentError(entrada, localISODate()) ?? (form.calculationMode === 'fixed_installments' && valorDasParcelas < totalDeParcelas
+    ? downPaymentError(entrada, localISODate()) ?? (form.calculationMode === 'fixed_installments' && form.unidade === 'total' && valorDasParcelas < totalDeParcelas
       ? 'A entrada precisa ser menor que o total da compra' : undefined)
     : undefined;
   /** A parcela do contrato fixo, venha o valor digitado como parcela ou como total a pagar. */
@@ -394,7 +394,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     if (form.id && form.original) {
       const original = form.original;
       const patch: Record<string, string | number | null> = {};
-      const fields = ['name','kind','principal_cents','remaining_cents','interest_rate_monthly',
+      const fields = ['name','kind','calculation_mode','principal_cents','remaining_cents','interest_rate_monthly',
         'installments','installments_paid','installment_cents','account_id','due_day','first_due_date'] as const;
       for (const field of fields) {
         const wanted = target[field as keyof typeof target];
@@ -406,10 +406,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
         delete patch.principal_cents;
         delete patch.remaining_cents;
       }
-      if (form.calculationMode !== original.calculation_mode) {
-        toast({ message: 'O modo de cálculo não pode ser alterado. Cadastre outro contrato.', tone: 'error' });
-        return;
-      }
+      const mudouModo = form.calculationMode !== original.calculation_mode;
       /*
         Na ficha a pessoa edita o CONTRATO, não uma parcela: "Das próximas parcelas em diante" ou
         "Todas" (28/09/2026). "Só esta" mexia na próxima parcela, que ninguém escolheu, e nome, conta
@@ -443,7 +440,9 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
       };
       const mexeNoPassado = Number(original.installments_paid ?? 0) > 0 &&
         ['installment_cents', 'due_day', 'first_due_date', 'account_id', 'name'].some((k) => k in patch);
-      if (!mexeNoPassado) {
+      // Trocar o modo com pagamentos reais conserva os fatos anteriores. "Todas" exigiria
+      // recalcular esse histórico e é recusado pelo contrato; ofereça apenas o alcance válido.
+      if (!mexeNoPassado || (mudouModo && payments.data?.length)) {
         salvarNo('future');
         return;
       }
@@ -567,7 +566,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
             onChange={(calculationMode) => {
               if (calculationMode === form.calculationMode) return;
               if (calculationMode !== 'fixed_installments' && calculationMode !== 'amortized') return;
-              setForm({ ...form, ...camposNoOutroModo(form, calculationMode) });
+              setForm({ ...form, ...camposNoOutroModo(form, calculationMode, entradaAtiva ? entrada.amountCents : 0) });
             }}
           />
         </Field>

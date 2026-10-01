@@ -38,6 +38,85 @@ function loadHooks(client: QueryClient, entry = 'src/hooks/use-finance.ts', depe
   return load(entry);
 }
 
+test('conversion retries after a committed response is lost reuse the request and result', async () => {
+  const client = new QueryClient();
+  const committed = new Map<string, { ids: string[] }>();
+  const calls: any[] = [];
+  let sequence = 0;
+  let responseLost = true;
+  const mutation = loadHooks(client, 'src/hooks/use-finance.ts', {
+    '@/lib/agent-chat': { newClientMessageId: () => `request-${++sequence}` },
+    '@/lib/supabase': { supabase: { rpc: async (name: string, args: any) => {
+      assert.equal(name, 'converter_registro'); calls.push(args);
+      const key = args.p_request_id ?? `unkeyed-${calls.length}`;
+      if (!committed.has(key)) committed.set(key, { ids: [`record-${committed.size + 1}`] });
+      if (responseLost) { responseLost = false; return { error: new Error('response lost after commit') }; }
+      return { data: committed.get(key), error: null };
+    } } },
+  }).useConverterRegistro();
+  const intent = { origem: { tipo: 'financiamento', id: 'debt-1' }, alcance: 'todas',
+    destino: { tipo: 'recorrente', dados: { amount_cents: 100, down_payment: { amount_cents: 200, account_id: 'account-1', occurred_at: '2026-10-01' } } } };
+  try {
+    await assert.rejects(mutation.mutationFn(intent), /response lost/);
+    const recovered = await mutation.mutationFn(intent);
+    assert.deepEqual(JSON.parse(JSON.stringify(recovered)), { ids: ['record-1'] });
+    assert.equal(committed.size, 1, 'retry cannot create a second destination');
+    assert.equal(typeof calls[0].p_request_id, 'string');
+    assert.equal(calls[0].p_request_id, calls[1].p_request_id);
+    assert.equal(sequence, 1);
+  } finally { client.clear(); }
+});
+
+test('conversion shares concurrent identical intent but changes request for a new scope or entry', async () => {
+  const client = new QueryClient();
+  const calls: any[] = [];
+  let sequence = 0;
+  const mutation = loadHooks(client, 'src/hooks/use-finance.ts', {
+    '@/lib/agent-chat': { newClientMessageId: () => `request-${++sequence}` },
+    '@/lib/supabase': { supabase: { rpc: async (_name: string, args: any) => { calls.push(args); return { data: { ids: ['created'] }, error: null }; } } },
+  }).useConverterRegistro();
+  const intent = { origem: { tipo: 'financiamento', id: 'debt-1' }, alcance: 'desta_em_diante',
+    destino: { tipo: 'parcelada', dados: { down_payment: { amount_cents: 200 } } } };
+  try {
+    await Promise.all([mutation.mutationFn(intent), mutation.mutationFn(intent)]);
+    await mutation.mutationFn({ ...intent, alcance: 'manter' });
+    await mutation.mutationFn({ ...intent, destino: { ...intent.destino, dados: { down_payment: { amount_cents: 300 } } } });
+    assert.equal(typeof calls[0].p_request_id, 'string');
+    assert.equal(calls[0].p_request_id, calls[1].p_request_id);
+    assert.notEqual(calls[0].p_request_id, calls[2].p_request_id);
+    assert.notEqual(calls[2].p_request_id, calls[3].p_request_id);
+    assert.equal(sequence, 3);
+  } finally { client.clear(); }
+});
+
+test('converting a transaction to installments with an entry also keys response-loss retries', async () => {
+  const client = new QueryClient();
+  const calls: any[] = [];
+  let sequence = 0;
+  const mutation = loadHooks(client, 'src/hooks/use-finance.ts', {
+    '@/lib/agent-chat': { newClientMessageId: () => `request-${++sequence}` },
+    '@/lib/supabase': { supabase: { rpc: async (name: string, args: any) => {
+      calls.push({ name, args });
+      return calls.length === 1 ? { error: new Error('lost') } : { data: { ids: ['plan-1'] }, error: null };
+    } } },
+  }).useConvertToInstallments();
+  const input = { transactionId: 'transaction-1', totalCents: 10000, installments: 5, firstOccurredAt: '2026-10-01',
+    description: 'Compra', category: null, merchant: null, accountId: 'account-1',
+    downPayment: { amount_cents: 1000, account_id: 'account-2', occurred_at: '2026-10-01' } };
+  try {
+    await assert.rejects(mutation.mutationFn(input), /lost/);
+    await mutation.mutationFn(input);
+    assert.equal(calls[0].name, 'converter_registro');
+    assert.equal(typeof calls[0].args.p_request_id, 'string');
+    assert.equal(calls[0].args.p_request_id, calls[1].args.p_request_id);
+    assert.equal(sequence, 1);
+    await mutation.mutationFn({ ...input, downPayment: { ...input.downPayment, amount_cents: 1500 } });
+    assert.notEqual(calls[1].args.p_request_id, calls[2].args.p_request_id);
+    await mutation.mutationFn({ ...input, downPayment: undefined });
+    assert.equal(calls[3].name, 'convert_transaction_to_installments');
+  } finally { client.clear(); }
+});
+
 test('settling a historical invoice refreshes history without realtime and invalidates inactive installment/report caches', async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   const historyKey = ['card-invoices', 'card-1', '60'];
@@ -519,4 +598,22 @@ test('a simulação é marcada velha na escrita, mas NÃO recalcula ali (o rascu
   const sim = chamadas.find((f) => f.queryKey[0] === 'simular');
   assert.equal(sim?.refetchType, 'none');
   assert.equal(chamadas.find((f) => f.queryKey[0] === 'forecast')?.refetchType, undefined);
+});
+
+test('excluir compra chama exclusão atômica de entrada e plano; erro do banco é propagado', async () => {
+  const client = new QueryClient();
+  const calls: any[] = [];
+  const refusal = { message: 'Fatura paga' };
+  let fail = false;
+  try {
+    const hooks = loadHooks(client, 'src/hooks/use-finance.ts', {
+      '@/lib/supabase': { supabase: { rpc: async (name: string, args: any) => {
+        calls.push({ name, args }); return { data: fail ? null : 1, error: fail ? refusal : null };
+      } } },
+    });
+    await hooks.useDeleteInstallmentPlan().mutationFn('plano-1');
+    assert.deepEqual(calls.map(c => [c.name, c.args.p_plan_id]), [['delete_installment_purchase', 'plano-1']]);
+    fail = true;
+    await assert.rejects(hooks.useDeleteInstallmentPlan().mutationFn('plano-1'), error => error === refusal);
+  } finally { client.clear(); }
 });

@@ -68,28 +68,51 @@ export function SelectField({
   const theme = useTheme();
   const scheme = useScheme();
   const ativo = usePresencaAtiva();
-  const [aberto, setAberto] = useState(false);
+  const [escolha, setEscolha] = useState({ aberto: false, abertura: 0 });
+  const { aberto, abertura } = escolha;
   const [confirmacao, setConfirmacao] = useState<{ id: string | null } | null>(null);
+  const [presenca, setPresenca] = useState({ ativa: ativo, fechamento: 0, visita: 0 });
   const escolhendo = useRef(false);
+  const abertoAtual = useRef(false);
+  const ativoAtual = useRef(ativo);
+  const aberturaAtual = useRef(0);
+  const visitaAtual = useRef(0);
   const vidro = supportsLiquidGlass();
+
+  // Conserve o bloco que sai; ao voltar, preserve o valor e descarte só a UI de escolha.
+  if (presenca.ativa !== ativo) {
+    setPresenca({ ativa: ativo, fechamento: presenca.fechamento + Number(ativo && aberto), visita: presenca.visita + Number(ativo) });
+    if (ativo) { setEscolha({ ...escolha, aberto: false }); setConfirmacao(null); }
+  }
+  useLayoutEffect(() => {
+    ativoAtual.current = ativo;
+    abertoAtual.current = ativo && aberto;
+    visitaAtual.current = presenca.visita;
+    return () => { ativoAtual.current = false; abertoAtual.current = false; };
+  }, [ativo, aberto, presenca.visita]);
 
   const escolhida = options.find((o) => o.id === value);
 
   function alternar() {
-    if (!ativo) return;
+    if (!ativoAtual.current || visitaAtual.current !== presenca.visita || aberturaAtual.current !== abertura) return;
     escolhendo.current = false;
     setConfirmacao(null);
     Haptics.selectionAsync();
-    setAberto((a) => !a);
+    if (!abertoAtual.current) {
+      aberturaAtual.current += 1;
+    }
+    abertoAtual.current = !abertoAtual.current;
+    setEscolha({ aberto: abertoAtual.current, abertura: aberturaAtual.current });
   }
 
   function escolher(id: string | null) {
-    if (!ativo || !aberto || escolhendo.current) return;
+    if (!ativoAtual.current || visitaAtual.current !== presenca.visita || !abertoAtual.current || escolhendo.current || aberturaAtual.current !== abertura) return;
     escolhendo.current = true;
+    abertoAtual.current = false;
     setConfirmacao(id !== value ? { id } : null);
     if (id !== value) Haptics.selectionAsync();
     onChange(id);
-    setAberto(false);
+    setEscolha({ ...escolha, aberto: false });
   }
 
   const ladrilho = (icone: IconName | undefined, aceso: boolean) =>
@@ -149,7 +172,7 @@ export function SelectField({
       {vidro ? <GlassBackdrop fallbackColor={theme.surface} radius={Radius.md} /> : null}
       {/* A linha escolhida permanece na mesma posição e vira a primeira opção. Nunca duplica. */}
       {linha(escolhida, true)}
-      <Presenca visivel={aberto} preparar onSaidaConcluida={() => setConfirmacao(null)}>
+      <Presenca key={presenca.fechamento} visivel={aberto} preparar onSaidaConcluida={() => setConfirmacao(null)}>
         {options.filter((o) => o.id !== value).map((o, i, restantes) => (
           <Fragment key={o.id ?? '__nenhum__'}>
             {o.group && o.group !== restantes[i - 1]?.group ? (

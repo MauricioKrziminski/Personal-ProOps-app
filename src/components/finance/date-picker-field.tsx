@@ -28,6 +28,32 @@ interface Props {
   max?: string;
 }
 
+/** Preserva a imagem de saída e reinicia só a interface ao reativar o campo. */
+function useEstadoDoCalendario(ativo: boolean) {
+  const [aberto, setAberto] = useState(false);
+  const [mesVisivel, setMesVisivel] = useState<string | null>(null);
+  const [presenca, setPresenca] = useState({ ativa: ativo, fechamento: 0, visita: 0 });
+  if (presenca.ativa !== ativo) {
+    setPresenca({ ativa: ativo, fechamento: presenca.fechamento + Number(ativo && aberto), visita: presenca.visita + Number(ativo) });
+    if (ativo) { setAberto(false); setMesVisivel(null); }
+  }
+  return { aberto, setAberto, mesVisivel, setMesVisivel, fechamento: presenca.fechamento, visita: presenca.visita };
+}
+
+function estadoDoUltimoDia(iso: string | null, mesVisivel: string | null, aberto: boolean,
+  lastDaySelected: boolean, min?: string, max?: string) {
+  const mesDoValor = iso?.slice(0, 7) ?? localISODate().slice(0, 7);
+  const mesPedido = (aberto && mesVisivel) || mesDoValor;
+  // Séries antigas podem ter o mês do valor antes do primeiro mês permitido.
+  const mesDoBotao = min && monthBounds(mesPedido).to < min ? min.slice(0, 7) : mesPedido;
+  const fimDoMesISO = monthBounds(mesDoBotao).to;
+  return {
+    fimDoMes: isoToBR(fimDoMesISO),
+    foraDoLimite: Boolean((min && fimDoMesISO < min) || (max && fimDoMesISO > max)),
+    marcado: lastDaySelected && iso === fimDoMesISO,
+  };
+}
+
 /**
  * **Escolher uma data num formulário** — o valor colapsado, o calendário no lugar.
  *
@@ -64,37 +90,39 @@ export function DatePickerField({
   const scheme = useScheme();
   const ativo = usePresencaAtiva();
   const borda = useCoresSuaves({ borderColor: invalid ? theme.danger : theme.cardBorder });
-  const [aberto, setAberto] = useState(false);
+  const { aberto, setAberto, mesVisivel, setMesVisivel, fechamento, visita } = useEstadoDoCalendario(ativo);
   const [abertura, setAbertura] = useState(0);
   const escolhendo = useRef(false);
   const calendarioAberto = useRef(false);
+  const ativoAtual = useRef(ativo);
   const aberturaAtual = useRef(0);
+  const visitaAtual = useRef(0);
   const giro = useSharedValue(0);
   const estiloDoChevron = useAnimatedStyle(() => ({ transform: [{ rotate: `${giro.get()}deg` }] }));
   useLayoutEffect(() => {
+    ativoAtual.current = ativo;
     calendarioAberto.current = aberto && ativo;
+    visitaAtual.current = visita;
     giro.set(withSpring(aberto ? 180 : 0, { ...Motion.spring.morph, reduceMotion: ReduceMotion.System }));
-  }, [aberto, ativo, giro]);
+    return () => { ativoAtual.current = false; calendarioAberto.current = false; };
+  }, [aberto, ativo, giro, visita]);
   // O mês que a grade está MOSTRANDO: navegando até junho, "último dia" é 30/06, não o fim do
   // mês da data gravada (28/09/2026, *"se eu estou em junho no calendário…"*).
-  const [mesVisivel, setMesVisivel] = useState<string | null>(null);
   const vidro = supportsLiquidGlass();
 
   const iso = value && isValidBRDate(value) ? brToISO(value) : null;
-  const mesDoValor = iso?.slice(0, 7) ?? localISODate().slice(0, 7);
-  const mesPedido = (aberto && mesVisivel) || mesDoValor;
-  // O mês do valor antes do mínimo (o vencimento velho de uma série que o agendador não andou)
-  // desligava o botão: vale o primeiro mês permitido.
-  const mesDoBotao = min && monthBounds(mesPedido).to < min ? min.slice(0, 7) : mesPedido;
-  const fimDoMesISO = monthBounds(mesDoBotao).to;
-  const fimDoMes = isoToBR(fimDoMesISO);
-  const fimDoMesForaDoLimite = Boolean((min && fimDoMesISO < min) || (max && fimDoMesISO > max));
-  // Marcado só quando a intenção gravada É este fim de mês; em outro mês o toque escolhe o dele.
-  const marcado = lastDaySelected && iso === fimDoMesISO;
+  const { fimDoMes, foraDoLimite: fimDoMesForaDoLimite, marcado } = estadoDoUltimoDia(iso, mesVisivel, aberto, lastDaySelected, min, max);
+  const intencao = `${visita}:${abertura}:${value}:${marcado}:${fimDoMes}:${min}:${max}`;
+  const intencaoAtual = useRef(intencao);
+  const ultimoDiaEscolhido = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    intencaoAtual.current = intencao;
+  }, [intencao]);
 
   const alternarUltimoDia = () => {
-    if (!ativo || (calendarioAberto.current && escolhendo.current)) return;
-    escolhendo.current = calendarioAberto.current;
+    if (!ativoAtual.current || aberturaAtual.current !== abertura || intencaoAtual.current !== intencao || ultimoDiaEscolhido.current === intencao || fimDoMesForaDoLimite) return;
+    ultimoDiaEscolhido.current = intencao;
+    escolhendo.current = true;
     calendarioAberto.current = false;
     if (marcado) onChange(fimDoMes);
     else onSelectLastDay?.(fimDoMes);
@@ -115,7 +143,7 @@ export function DatePickerField({
         {vidro ? <GlassBackdrop fallbackColor={theme.surface} radius={Radius.sm} /> : null}
         <Pressable
           onPress={() => {
-            if (!ativo) return;
+            if (!ativoAtual.current || visitaAtual.current !== visita || aberturaAtual.current !== abertura) return;
             Haptics.selectionAsync();
             escolhendo.current = false;
             if (!calendarioAberto.current) {
@@ -153,15 +181,15 @@ export function DatePickerField({
           )}
         </Pressable>
 
-        <Presenca visivel={aberto} style={[styles.calendario, { borderTopColor: theme.cardBorder }]}>
+        <Presenca key={fechamento} visivel={aberto} style={[styles.calendario, { borderTopColor: theme.cardBorder }]}>
             <Calendar
               key={abertura}
               value={iso}
               onMonthChange={(mes) => {
-                if (calendarioAberto.current && ativo && aberturaAtual.current === abertura) setMesVisivel(mes);
+                if (calendarioAberto.current && ativoAtual.current && visitaAtual.current === visita && aberturaAtual.current === abertura) setMesVisivel(mes);
               }}
               onChange={(escolhido) => {
-                if (!calendarioAberto.current || !ativo || escolhendo.current || aberturaAtual.current !== abertura) return;
+                if (!calendarioAberto.current || !ativoAtual.current || visitaAtual.current !== visita || escolhendo.current || aberturaAtual.current !== abertura) return;
                 escolhendo.current = true;
                 calendarioAberto.current = false;
                 onChange(isoToBR(escolhido));

@@ -4,8 +4,14 @@ import {
   debtTerm, validRecurringRange, simpleDebtValues, destinoDoSalvar, podeParcelar, temContrato, faixaDeParcelas,
   totalDigitado, totalPorParcela, parcelaDoTotal, valorExibido, digitarValor, nomeDaCompra, type Contrato,
   ancoraDoContrato, parcelaDoTotalDoContrato, proximaDoContrato, proximaNoCronograma, vencimentoDaDividaEscolhido,
-  vencimentoPendenteValido,
+  vencimentoPendenteValido, financeErrorMessage,
 } from './finance-form.ts';
+test('nome repetido de contrato ativo explica como salvar sem expor o erro SQL', () => {
+  assert.equal(financeErrorMessage({ code: '23505', message: 'duplicate key value violates unique constraint "debts_workspace_id_name_key"' }, 'Falhou'),
+    'Já existe uma dívida ativa com esse nome. Escolha outro nome ou arquive a anterior.');
+  assert.equal(financeErrorMessage({ code: '23505', message: 'duplicate key value violates unique constraint "accounts_ws_name_key"' }, 'Falhou'), 'Falhou');
+  assert.equal(financeErrorMessage({ code: 'P0001', message: 'Escolha uma conta ativa' }, 'Falhou'), 'Escolha uma conta ativa');
+});
 test('parcela pendente usa seu cronograma sem exigir um segundo vencimento', () => {
   assert.equal(vencimentoPendenteValido(true, true, null), true);
   assert.equal(vencimentoPendenteValido(true, false, null), false);
@@ -262,4 +268,19 @@ test('A dívida troca de modo sem perder o que já tem: "parcelas" troca de sent
   const peloTotal = camposNoOutroModo({ ...fixa, unidade: 'total', valorCents: 147000 * 48 }, 'amortized');
   assert.equal(peloTotal.installmentCents, 147000);
   assert.deepEqual(camposNoOutroModo(fixa, 'fixed_installments'), {});
+});
+
+
+test('trocar cobrança usa apenas o valor financiado e mantém entrada separada na ida e volta', async () => {
+  const { camposNoOutroModo } = await import('./finance-form.ts');
+  const fixa = { calculationMode: 'fixed_installments' as const, parcelas: '5', installmentsPaid: 0,
+    unidade: 'total' as const, valorCents: 120000, remainingCents: 100000, principalCents: 100000, installmentCents: 20000 };
+  const juros = { ...fixa, ...camposNoOutroModo(fixa, 'amortized', 20000) };
+  assert.deepEqual([juros.principalCents, juros.remainingCents, juros.installmentCents], [100000, 100000, 20000]);
+  const volta = { ...juros, ...camposNoOutroModo(juros, 'fixed_installments', 20000) };
+  assert.deepEqual([volta.unidade, volta.valorCents, volta.parcelas], ['parcela', 20000, '5']);
+  const cada = camposNoOutroModo({ ...fixa, unidade: 'parcela', valorCents: 20000 }, 'amortized', 20000);
+  assert.deepEqual([cada.principalCents, cada.remainingCents, cada.installmentCents], [100000, 100000, 20000]);
+  const sem = camposNoOutroModo(fixa, 'amortized', 0);
+  assert.deepEqual([sem.principalCents, sem.remainingCents, sem.installmentCents], [120000, 120000, 24000]);
 });

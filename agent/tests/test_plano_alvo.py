@@ -72,13 +72,13 @@ def sql(monkeypatch):
 
 class TestApagarCompraInteira:
     @pytest.mark.asyncio
-    async def test_apaga_o_PLANO_e_deixa_o_cascade_trabalhar(self, sql):
+    async def test_apaga_a_COMPRA_completa_pela_rpc_com_workspace(self, sql):
         r = await finance.delete_transaction(
             _ctx("installment_plans"),
             FinanceAction(type=FinanceActionType.DELETE_TRANSACTION),
         )
         query, args = sql[0]
-        assert query.startswith("delete from public.installment_plans")
+        assert query.startswith("select public.delete_installment_purchase(id) from public.installment_plans")
         # escopo de workspace no where, como toda mutação do projeto
         assert "workspace_id = %s" in query
         assert args == ("plano-1", WS)

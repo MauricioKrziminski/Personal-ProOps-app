@@ -1,6 +1,6 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { cancelAnimation, ReduceMotion, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { cancelAnimation, ReduceMotion, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
 import { Motion, Space } from '@/design/tokens';
 
@@ -53,6 +53,8 @@ type PropsDePresenca = {
   style?: StyleProp<ViewStyle>;
   /** Listas curtas já medem e instalam seu movimento antes do primeiro toque. */
   preparar?: boolean;
+  /** Campos interativos aparecem inteiros no render da ação; só o deslocamento é animado. */
+  imediata?: boolean;
   /** Confirma o recolhimento real, sem timer nem atraso na ação do usuário. */
   onSaidaConcluida?: () => void;
 };
@@ -62,7 +64,45 @@ export function Presenca(props: PropsDePresenca) {
   const [entrada, setEntrada] = useState({ montada: props.visivel || !!props.preparar, animar: !props.visivel });
   if ((props.visivel || props.preparar) && !entrada.montada) setEntrada({ ...entrada, montada: true });
   if (!entrada.montada) return null;
+  if (props.imediata) return <PresencaImediata {...props} animarEntradaNaMontagem={entrada.animar} />;
   return <PresencaAnimada {...props} animarEntradaNaMontagem={entrada.animar} />;
+}
+
+/** O estado define geometria e visibilidade; a animação não participa da disponibilidade. */
+function PresencaImediata({ visivel, children, style, preparar, onSaidaConcluida, animarEntradaNaMontagem }: PropsDePresenca & {
+  animarEntradaNaMontagem: boolean;
+}) {
+  const paiAtivo = usePresencaAtiva();
+  const reduzir = useReducedMotion();
+  const deslocamento = useSharedValue(visivel && !animarEntradaNaMontagem ? 0 : Space.xs);
+  const movimento = useAnimatedStyle(() => ({ transform: [{ translateY: reduzir ? 0 : deslocamento.get() }] }));
+  useLayoutEffect(() => {
+    deslocamento.set(visivel ? reduzir ? 0 : withTiming(0, {
+      duration: Motion.duration.fast, easing: Motion.easing.out, reduceMotion: ReduceMotion.System,
+    }) : Space.xs);
+    return () => cancelAnimation(deslocamento);
+  }, [visivel, reduzir, deslocamento]);
+  const esteveVisivel = useRef(visivel);
+  useLayoutEffect(() => {
+    const saiu = esteveVisivel.current && !visivel;
+    esteveVisivel.current = visivel;
+    if (saiu) onSaidaConcluida?.();
+  }, [visivel, onSaidaConcluida]);
+  if (!visivel && !preparar) return null;
+  const ativa = paiAtivo && visivel;
+  return (
+    <PresencaAtiva.Provider value={ativa}>
+      <Animated.View collapsable={false}
+        style={[visivel ? styles.natural : styles.recorte, { height: visivel ? 'auto' : 0 }]}
+        pointerEvents={ativa ? 'auto' : 'none'} accessibilityElementsHidden={!ativa}
+        importantForAccessibility={ativa ? 'auto' : 'no-hide-descendants'}>
+        <Animated.View collapsable={false}
+          style={[styles.conteudoDePresenca, !visivel ? styles.medicao : undefined, style, { opacity: Number(visivel) }, movimento]}>
+          {children}
+        </Animated.View>
+      </Animated.View>
+    </PresencaAtiva.Provider>
+  );
 }
 
 function PresencaAnimada({ visivel, children, style, preparar, onSaidaConcluida, animarEntradaNaMontagem }: PropsDePresenca & {

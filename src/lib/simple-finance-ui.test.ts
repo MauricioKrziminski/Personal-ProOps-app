@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any } = {}) {
+function screen(file: string, options: { debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any } = {}) {
   const state: any[] = [];
   const timers = new Map<number, () => void>();
   let timerId = 0;
@@ -76,7 +76,7 @@ function screen(file: string, options: { fontScale?: number; datasReais?: boolea
     ],
     INCOME_CATEGORIES: [],
     ASSET_CLASSES: [{ value: 'investment', label: 'Investimento', icon: 'chart.line.uptrend.xyaxis' }],
-    useDebts: () => ({ ...query, data: options.debts ?? [] }),
+    useDebts: () => ({ ...query, data: options.debts ?? [], isPending: Boolean(options.debtsPending), isSuccess: !options.debtsPending && !options.debtsError, isError: Boolean(options.debtsError), refetch: async () => { refetches.push('debts'); } }),
     useCardSummary: () => ({ ...query, isSuccess: true, data: options.cards ?? [] }),
     useCardInvoices: () => ({ ...query, isSuccess: true, data: options.faturas ?? [] }),
     useCategoriesUsed: () => ({ ...query, isSuccess: true, data: options.categoriasUsadas ?? [] }),
@@ -98,7 +98,7 @@ function screen(file: string, options: { fontScale?: number; datasReais?: boolea
     useAlertsSent: (limite?: number) => { pedidosDeLimite.push(['alerts', limite]); return { ...query, isSuccess: true, data: options.alerts ?? [] }; },
     useInstallmentPlans: () => ({ ...query, isSuccess: true, data: options.plans ?? [] }),
     useUpdateInstallmentPlan: () => mutation('updateInstallmentPlan'),
-    useInstallmentPlan: (id?: string) => ({ ...query, isSuccess: true, data: (options.plans ?? []).find((p: any) => p.id === id) ?? null }),
+    useInstallmentPlan: (id?: string) => ({ ...query, isPending: Boolean(options.plansPending), isSuccess: !options.plansPending && !options.plansError, isError: Boolean(options.plansError), refetch: async () => { refetches.push('plan'); }, data: (options.plans ?? []).find((p: any) => p.id === id) ?? null }),
     useGoalContributions: () => ({ ...query, isSuccess: true, data: options.contributions ?? [] }),
     useEditGoalContribution: () => mutation('editGoalContribution'),
     useGoalDeposit: () => mutation('goalDeposit'),
@@ -241,7 +241,7 @@ function screen(file: string, options: { fontScale?: number; datasReais?: boolea
     useSaveRecurringSeries: () => mutation('saveRecurringSeries'),
     useSaveRecurringAll: () => mutation('saveRecurringAll'),
     useSaveRecurringOne: () => mutation('saveRecurringOne'),
-    useTransaction: (id: string) => ({ ...query, isSuccess: true, data: (options.txs ?? [{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared', recurring_id: null, installment_plan_id: null }]).find((t: any) => t.id === id) ?? null }),
+    useTransaction: (id: string) => ({ ...query, isPending: Boolean(options.txPending), isSuccess: !options.txPending && !options.txError, isError: Boolean(options.txError), refetch: async () => { refetches.push('transaction'); }, data: (options.txs ?? [{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared', recurring_id: null, installment_plan_id: null }]).find((t: any) => t.id === id) ?? null }),
     usePayInvoice: () => mutation('payInvoice'),
     useConverterRegistro: () => mutation('converterRegistro'),
     useArquivados: () => ({ ...query, isSuccess: true, data: options.arquivados ?? [] }),
@@ -373,6 +373,7 @@ function screen(file: string, options: { fontScale?: number; datasReais?: boolea
       // O "Paguei" que confirma o valor (25/09/2026): carregado DE VERDADE, é a regra em teste.
       if (name === '@/components/finance/confirmar-baixa') return load('src/components/finance/confirmar-baixa.tsx');
       if (name === '@/lib/confirmar-baixa') return load('src/lib/confirmar-baixa.ts');
+      if (name === '@/lib/down-payment') return load('src/lib/down-payment.ts');
       // Os campos da série (26/09/2026): a folha de Recorrentes e o "Esta e as próximas" do lançamento.
       if (name === '@/components/finance/serie-form') return load('src/components/finance/serie-form.tsx');
       // E os da compra (26/09/2026): a folha de Parceladas e o "A compra toda" do lançamento.
@@ -382,6 +383,7 @@ function screen(file: string, options: { fontScale?: number; datasReais?: boolea
       if (name === '@/components/finance/formulario-da-serie' && file.endsWith('finance/recurring.tsx')) return load('src/components/finance/formulario-da-serie.tsx');
       // O da dívida (Task 5): de verdade só em Dívidas, pelo mesmo motivo.
       if (name === '@/components/finance/formulario-da-divida' && file.endsWith('finance/debts.tsx')) return load('src/components/finance/formulario-da-divida.tsx');
+      if (name === '@/hooks/use-down-payment') return { usePurchaseDownPayment: (_type: string, parentId?: string) => ({ ...query, isPending: Boolean(parentId && options.downPaymentPending), isSuccess: !options.downPaymentPending && !options.downPaymentError, isError: Boolean(options.downPaymentError), data: parentId ? options.downPayment ?? null : undefined, refetch: async () => { refetches.push('down-payment'); } }) };
       if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: options.datasReais ? load('src/lib/dates.ts').formatDateBR : () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useReminders: () => ({ ...query, isSuccess: true, data: { pages: [options.reminders ?? []], pageParams: [0] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }), useToggleReminder: () => mutation('toggleReminder'), useDeleteReminder: () => mutation('deleteReminder') };
       if (name === '@/hooks/use-session') return { useSession: () => ({ session: { user: { id: 'user-1' } } }) };
       if (name === '@/hooks/use-profile') return { useProfile: () => ({ ...query, isSuccess: true, data: { display_name: 'Gabriel Almeida', phone: null } }) };
@@ -825,6 +827,55 @@ test('"Total a pagar" divides by the count and saves the contract that the check
   assert.equal(ui.writes[0].value.principal_cents, 145833 * 48, 'grava parcela × N, nunca o digitado');
 });
 
+test('financiamento com entrada aceita 12 parcelas de um centavo sem comparar parcela com entrada', () => {
+  const ui = formDivida();
+  ui.fill('Nome', 'Compra pequena');
+  ui.fill('Valor', 1);
+  ui.fill('Total de parcelas', '12');
+  ui.fill('Primeira parcela', '05/12/2026');
+  ui.interact((nodes) => nodes.find((n) => n.type === 'DownPaymentFields').props.onEnabled(true));
+  ui.interact((nodes) => nodes.find((n) => n.type === 'DownPaymentFields').props.onChange({
+    amountCents: 100, dateBR: '01/09/2026', accountId: 'conta-1',
+  }));
+  ui.press('Salvar');
+  assert.equal(ui.writes.length, 1);
+  assert.equal(ui.writes[0].value.installment_cents, 1);
+  assert.equal(ui.writes[0].value.installments, 12);
+  assert.equal(ui.writes[0].value.principal_cents, 12);
+  assert.equal(ui.writes[0].value.remaining_cents, 12);
+  assert.deepEqual(copia(ui.writes[0].value.down_payment), {
+    amount_cents: 100, occurred_at: '2026-09-01', account_id: 'conta-1',
+  });
+});
+
+test('financiamento com entrada conserva o piso de um centavo por parcela e rejeita valores inválidos', () => {
+  for (const fixture of [
+    { unidade: 'total', valor: 99, parcelas: '12', podeSalvar: false },
+    { unidade: 'total', valor: 100, parcelas: '12', podeSalvar: false },
+    { unidade: 'total', valor: 111, parcelas: '12', podeSalvar: false },
+    { unidade: 'total', valor: 112, parcelas: '12', podeSalvar: true },
+    { unidade: 'parcela', valor: 0, parcelas: '12', podeSalvar: false },
+    { unidade: 'parcela', valor: 1, parcelas: '0', podeSalvar: false },
+    { unidade: 'parcela', valor: 1, parcelas: 'inválida', podeSalvar: false },
+  ]) {
+    const ui = formDivida();
+    ui.fill('Nome', 'Compra pequena');
+    ui.interact((nodes) => nodes.find((n) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'total')).props.onChange(fixture.unidade));
+    ui.fill('Valor', fixture.valor);
+    ui.fill('Total de parcelas', fixture.parcelas);
+    ui.fill('Primeira parcela', '05/12/2026');
+    ui.interact((nodes) => nodes.find((n) => n.type === 'DownPaymentFields').props.onEnabled(true));
+    ui.interact((nodes) => nodes.find((n) => n.type === 'DownPaymentFields').props.onChange({
+      amountCents: 100, dateBR: '01/09/2026', accountId: 'conta-1',
+    }));
+    assert.equal(!ui.button('Salvar').props.disabled, fixture.podeSalvar, JSON.stringify(fixture));
+    if (fixture.podeSalvar) ui.press('Salvar');
+    else ui.interact(() => ui.button('Salvar').props.onPress());
+    assert.equal(ui.writes.length, Number(fixture.podeSalvar), 'o handler também protege os dados inválidos');
+    if (fixture.podeSalvar) assert.equal(ui.writes[0].value.principal_cents, 12);
+  }
+});
+
 test('paid history moves the anchor: the date asked is the NEXT one, and the first is derived', () => {
   const ui = formDivida();
   ui.fill('Nome', 'Carro');
@@ -1192,6 +1243,37 @@ test('editing a legacy amortized financing preserves its mode and remaining-term
   ui.interact(() => modo.props.onChange('amortized'));
   ui.press('Salvar');
   assert.equal(ui.writes.length, 0, 'sem mudar campos, o contrato existente fica intacto');
+});
+
+test('trocar cobrança de financiamento existente salva o modo e conserva o prazo restante', () => {
+  for (const from of ['fixed_installments', 'amortized']) {
+    const to = from === 'amortized' ? 'fixed_installments' : 'amortized';
+    const ui = editarDivida({ debts: [{ ...carro, calculation_mode: from, interest_rate_monthly: 0 }] });
+    ui.interact((nodes) => nodes.find((n) => n.type === 'SelectField' && n.props.options.some((o: any) => o.id === 'amortized')).props.onChange(to));
+    ui.press('Salvar');
+    assert.equal(ui.writes.length, 1, `${from} → ${to} grava o contrato existente`);
+    assert.equal(ui.writes[0].operation, 'saveDebtContractScoped');
+    assert.equal(ui.writes[0].value.debtId, carro.id);
+    assert.equal(ui.writes[0].value.scope, 'future');
+    assert.equal(ui.writes[0].value.patch.calculation_mode, to);
+    assert.equal(ui.writes[0].value.anchorNo, 9);
+    assert.equal(ui.toasts.some((t: any) => t.tone === 'error'), false);
+  }
+});
+
+test('trocar cobrança e valor com pagamento registrado não oferece reescrever o passado', () => {
+  const ui = editarDivida({ debts: [{ ...carro, calculation_mode: 'amortized', interest_rate_monthly: 0 }],
+    debtPayments: [{ id: 'p1', debt_payment_no: 8, edit_revision: 2, amount_cents: 147000 }] });
+  ui.interact((nodes) => nodes.find((n) => n.type === 'SelectField' && n.props.options.some((o: any) => o.id === 'amortized')).props.onChange('fixed_installments'));
+  ui.fill('Valor', 150000);
+  ui.press('Salvar');
+  assert.equal(ui.actions.some((a: any) => a.label === 'Todas'), false);
+  assert.equal(ui.writes.length, 1);
+  assert.equal(ui.writes[0].value.scope, 'future');
+  assert.equal(ui.writes[0].value.patch.calculation_mode, 'fixed_installments');
+  assert.equal(ui.writes[0].value.patch.installment_cents, 150000);
+  assert.equal('principal_cents' in ui.writes[0].value.patch, false, 'banco deriva parcela × prazo');
+  assert.deepEqual(copia(ui.writes[0].value.paymentVersions), { p1: 2 });
 });
 
 test('visible invoice settlement confirms then marks paid without issuing an account payment', () => {
@@ -4938,4 +5020,64 @@ test('Dívidas: busca, conta e primeiro vencimento filtram arquivos e abrem resu
   applyListFilters(ui, { from: '2026-10-01' });
   assert.doesNotMatch(filterScreenText(ui), /Carro arquivado|Carro sem âncora/);
   assert.match(filterScreenText(ui), /Nenhuma dívida encontrada/);
+});
+
+
+test('Lançar: entrada paga é passado mesmo com zero prestações e rota passado=0', () => {
+  for (const origem of ['divida', 'plano', 'transacao']) {
+    const ui = screen(lancarFile, { params: { tipo: origem === 'divida' ? 'financiamento' : 'uma', id: 'origem', origem, passado: '0' },
+      downPayment: { id: 'entrada', amount_cents: 20000, occurred_at: '2026-09-01', account_id: 'cc', status: 'cleared', description: 'Entrada' },
+      txs: [{ id: 'origem', installment_plan_id: origem === 'transacao' ? 'plano' : null, status: 'pending' }], plans: [{ id: origem === 'plano' ? 'origem' : 'plano', paid: 0, locked: 0 }],
+      debts: [{ id: 'origem', installments_paid: 0 }] });
+    ui.interact(() => ui.nodes().find(n => n.type === 'FormatoDoLancamento').props.onChange('recorrente'));
+    ui.interact(() => ui.nodes().find(n => n.type === 'FormularioDaSerie').props.converter({ tipo: 'recorrente', dados: {} }));
+    assert.equal(ui.actions.some(a => a.label === 'Converter'), false, origem);
+    ui.interact(() => ui.actions.find(a => a.label === 'Todas, apagando as anteriores')!.onPress());
+    assert.equal(ui.writes.length, 0, 'aguarda confirmação destrutiva');
+    assert.equal(ui.confirmations.length, 1);
+    assert.match(ui.avisos[0], /entrada/i);
+  }
+});
+
+test('Lançar: consulta da entrada pendente ou com erro não permite converter sem conhecer o histórico', () => {
+  for (const state of [{ downPaymentPending: true }, { downPaymentError: true }]) {
+    const ui = screen(lancarFile, { ...state, params: { tipo: 'financiamento', id: 'd1', origem: 'divida', passado: '0' }, debts: [{ id: 'd1', installments_paid: 0 }] });
+    ui.interact(() => ui.nodes().find(n => n.type === 'FormatoDoLancamento').props.onChange('recorrente'));
+    const body = ui.nodes().find(n => n.type === 'FormularioDaSerie');
+    ui.interact(() => body.props.converter({ tipo: 'recorrente', dados: {} }));
+    assert.equal(ui.actions.length, 0);
+    assert.equal(ui.writes.length, 0);
+    if (state.downPaymentPending) assert.equal(body.props.salvando, true);
+    else { assert.equal(ui.toasts.length, 1); assert.deepEqual(ui.refetches, ['down-payment']); }
+  }
+});
+
+
+test('Lançar: dívida/transação/plano ainda pendentes ou com erro não autorizam apagar histórico', () => {
+  for (const [origem, flag, consulta] of [
+    ['divida', 'debtsPending', 'debts'], ['divida', 'debtsError', 'debts'],
+    ['transacao', 'txPending', 'transaction'], ['transacao', 'txError', 'transaction'],
+    ['plano', 'plansPending', 'plan'], ['plano', 'plansError', 'plan'],
+  ]) {
+    const ui = screen(lancarFile, { [flag]: true, params: { tipo: origem === 'divida' ? 'financiamento' : 'uma', id: 'origem', origem, passado: '0' }, debts: [{ id: 'origem', installments_paid: 0 }], txs: [{ id: 'origem', status: 'cleared' }], plans: [{ id: 'origem', locked: 0 }] });
+    ui.interact(() => ui.nodes().find(n => n.type === 'FormatoDoLancamento').props.onChange('recorrente'));
+    const body = ui.nodes().find(n => n.type === 'FormularioDaSerie');
+    ui.interact(() => body.props.converter({ tipo: 'recorrente', dados: {} }));
+    assert.equal(ui.actions.length, 0, flag);
+    assert.equal(ui.writes.length, 0);
+    if (flag.endsWith('Pending')) assert.equal(body.props.salvando, true);
+    else { assert.equal(ui.toasts.length, 1); assert.ok(ui.refetches.includes(consulta)); }
+  }
+});
+
+test('Lançar: parcela histórica carregada supera passado=0 mesmo sem entrada', () => {
+  for (const origem of ['plano', 'transacao']) {
+    const ui = screen(lancarFile, { params: { tipo: 'uma', id: 'origem', origem, passado: '0', papel: origem === 'plano' ? 'registro' : 'parcela' }, plans: [{ id: origem === 'plano' ? 'origem' : 'plano', paid: 1, locked: 1 }], txs: [{ id: 'origem', installment_plan_id: 'plano' }] });
+    ui.interact(() => ui.nodes().find(n => n.type === 'FormatoDoLancamento').props.onChange('recorrente'));
+    ui.interact(() => ui.nodes().find(n => n.type === 'FormularioDaSerie').props.converter({ tipo: 'recorrente', dados: {} }));
+    assert.equal(ui.actions.some(a => a.label === 'Converter'), false);
+    ui.interact(() => ui.actions.find(a => a.label === 'Todas, apagando as anteriores')!.onPress());
+    assert.equal(ui.writes.length, 0);
+    assert.equal(ui.confirmations.length, 1);
+  }
 });

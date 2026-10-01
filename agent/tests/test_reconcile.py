@@ -251,7 +251,9 @@ def test_pix_no_credito_com_duas_bases_possiveis_nao_escolhe():
 
 
 def test_o_texto_do_juro_e_o_mesmo_do_app():
-    app = (Path(__file__).resolve().parents[2] / "src/hooks/use-finance.ts").read_text()
+    # Os hooks importam a descrição da escrita compartilhada; a declaração saiu
+    # de use-finance.ts quando o app unificou os caminhos de lançamento.
+    app = (Path(__file__).resolve().parents[2] / "src/lib/escrita.ts").read_text()
     assert f"DESCRICAO_JUROS_DO_PIX = '{JUROS_DO_PIX}'" in app
 
 

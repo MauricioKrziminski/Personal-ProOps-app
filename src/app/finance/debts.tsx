@@ -327,7 +327,7 @@ export default function DebtsScreen() {
             ? { message: <><Forte>{d.name}</Forte> voltou para a lista.</>, tone: 'success' as const }
             : { message: <><Forte>{d.name}</Forte> não existe mais.</>, tone: 'error' as const },
         ),
-      onError: () => toast({ message: <>Não deu para desarquivar <Forte>{d.name}</Forte>.</>, tone: 'error' }),
+      onError: (error) => toast({ message: financeErrorMessage(error, '') || <>Não deu para desarquivar <Forte>{d.name}</Forte>.</>, tone: 'error' }),
     });
 
   /**

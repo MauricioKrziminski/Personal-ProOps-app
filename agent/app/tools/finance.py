@@ -1477,10 +1477,9 @@ def _alvo_e_plano(ctx: ExecContext) -> bool:
 async def _apagar_plano(ctx: ExecContext) -> ToolResult:
     """Apaga a compra parcelada inteira.
 
-    Um `delete` só: `transactions.installment_plan_id` tem `on delete cascade`
-    (0013:142), então as N parcelas caem junto. Contar antes é o que permite dizer
-    quantas foram — e apagar uma de cada vez deixaria o plano órfão mentindo
-    `installments = 10` com 9 parcelas vivas, que era o estado anterior.
+    A RPC remove entrada e contrato na mesma transação, inclusive no plano vazio.
+    A seleção pelo workspace continua na própria chamada porque o agente usa a pool
+    administrativa; o candidato confirmado nunca autoriza outro workspace.
     """
     cands = (ctx.target or {}).get("candidates") or []
     if not cands:
@@ -1499,7 +1498,7 @@ async def _apagar_plano(ctx: ExecContext) -> ToolResult:
     if not plano:
         return ToolResult("🤷 Essa compra parcelada não está mais aqui.", read_only=True)
     await db.execute(
-        "delete from public.installment_plans where id = %s and workspace_id = %s",
+        "select public.delete_installment_purchase(id) from public.installment_plans where id = %s and workspace_id = %s",
         plano["id"], ctx.workspace_id,
     )
     nome = plano["description"] or "compra parcelada"
