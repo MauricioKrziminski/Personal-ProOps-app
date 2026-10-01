@@ -1,0 +1,178 @@
+[
+  [
+    {
+      "command": [
+        "ui",
+        "text",
+        "864209"
+      ],
+      "startedAt": 1790834393.7175071,
+      "finishedAt": 1790834393.812841
+    },
+    {
+      "command": [
+        "ui",
+        "tap",
+        "350",
+        "773"
+      ],
+      "startedAt": 1790834393.8128488,
+      "finishedAt": 1790834393.91859
+    },
+    {
+      "command": [
+        "screenshot",
+        "qa-temp/proops-v1.6.2-ios-native-wave.png"
+      ],
+      "startedAt": 1790834394.577982,
+      "finishedAt": 1790834394.725674
+    },
+    {
+      "command": [
+        "ui",
+        "button",
+        "HOME"
+      ],
+      "startedAt": 1790834394.7256808,
+      "finishedAt": 1790834394.8381178,
+      "secondsAfterCredentialConfirm": 0.807086706161499
+    },
+    {
+      "command": [
+        "launch",
+        "-f",
+        "com.proops.personal.dev"
+      ],
+      "startedAt": 1790834396.048243,
+      "finishedAt": 1790834396.344324
+    },
+    {
+      "command": [
+        "screenshot",
+        "qa-temp/proops-v1.6.2-ios-native-interrupted-return.png"
+      ],
+      "startedAt": 1790834397.8535528,
+      "finishedAt": 1790834397.971443
+    },
+    {
+      "command": [
+        "ui",
+        "describe-all"
+      ],
+      "startedAt": 1790834397.9714482,
+      "finishedAt": 1790834398.082508
+    }
+  ],
+  [
+    {
+      "command": [
+        "ui",
+        "text",
+        "864209"
+      ],
+      "startedAt": 1790834560.821355,
+      "finishedAt": 1790834560.9162612
+    },
+    {
+      "command": [
+        "ui",
+        "tap",
+        "350",
+        "773"
+      ],
+      "startedAt": 1790834560.916268,
+      "finishedAt": 1790834561.0200698
+    },
+    {
+      "command": [
+        "screenshot",
+        "qa-temp/proops-v1.6.2-ios-native-wave-middle.png"
+      ],
+      "startedAt": 1790834562.028262,
+      "finishedAt": 1790834562.20507
+    },
+    {
+      "command": [
+        "ui",
+        "button",
+        "HOME"
+      ],
+      "startedAt": 1790834562.205077,
+      "finishedAt": 1790834562.34741,
+      "secondsAfterCredentialConfirm": 1.184999942779541
+    },
+    {
+      "command": [
+        "launch",
+        "-f",
+        "com.proops.personal.dev"
+      ],
+      "startedAt": 1790834563.5575402,
+      "finishedAt": 1790834563.852284
+    },
+    {
+      "command": [
+        "screenshot",
+        "qa-temp/proops-v1.6.2-ios-native-wave-middle-return.png"
+      ],
+      "startedAt": 1790834565.3555222,
+      "finishedAt": 1790834565.50399
+    }
+  ],
+  [
+    {
+      "command": [
+        "ui",
+        "text",
+        "864209"
+      ],
+      "startedAt": 1790834456.388374,
+      "finishedAt": 1790834456.481502
+    },
+    {
+      "command": [
+        "ui",
+        "tap",
+        "350",
+        "773"
+      ],
+      "startedAt": 1790834456.4815092,
+      "finishedAt": 1790834456.588184
+    },
+    {
+      "command": [
+        "screenshot",
+        "qa-temp/proops-v1.6.2-ios-native-wave-later.png"
+      ],
+      "startedAt": 1790834458.038442,
+      "finishedAt": 1790834458.191146
+    },
+    {
+      "command": [
+        "ui",
+        "button",
+        "HOME"
+      ],
+      "startedAt": 1790834458.1911502,
+      "finishedAt": 1790834458.288481,
+      "secondsAfterCredentialConfirm": 1.6029503345489502
+    },
+    {
+      "command": [
+        "launch",
+        "-f",
+        "com.proops.personal.dev"
+      ],
+      "startedAt": 1790834459.4986691,
+      "finishedAt": 1790834459.792415
+    },
+    {
+      "command": [
+        "screenshot",
+        "qa-temp/proops-v1.6.2-ios-native-wave-return.png"
+      ],
+      "startedAt": 1790834461.302546,
+      "finishedAt": 1790834461.448482
+    }
+  ]
+]

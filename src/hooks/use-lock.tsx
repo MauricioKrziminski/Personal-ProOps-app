@@ -124,6 +124,7 @@ interface LockContexto {
 const Ctx = createContext<LockContexto | null>(null);
 
 interface TentativaDeAbertura {
+  userId: string | undefined;
   cancelada: boolean;
   autenticada: boolean;
   aoVoltar?: (permitir: boolean) => void;
@@ -253,7 +254,6 @@ export function LockProvider({ children }: { children: ReactNode }) {
   const aberturas = useRef(0);
   const tentativaAtual = useRef<TentativaDeAbertura | null>(null);
   const pedirNaVolta = useRef(false);
-  const sessaoDaTentativa = useRef(session?.user.id);
   const vivo = useRef(true);
 
   const invalidarTentativa = useCallback(() => {
@@ -266,8 +266,10 @@ export function LockProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (sessaoDaTentativa.current !== session?.user.id) {
-      sessaoDaTentativa.current = session?.user.id;
+    const tentativa = tentativaAtual.current;
+    // O efeito filho pode iniciar a senha para a sessão restaurada antes deste efeito pai.
+    // Só um pedido pertencente a OUTRA conta é antigo; a hidratação não cancela o pedido novo.
+    if (tentativa && tentativa.userId !== session?.user.id) {
       invalidarTentativa();
     }
   }, [session?.user.id, invalidarTentativa]);
@@ -375,7 +377,11 @@ export function LockProvider({ children }: { children: ReactNode }) {
     }
     emVoo.current = true;
     pedirNaVolta.current = false;
-    const tentativa: TentativaDeAbertura = { cancelada: false, autenticada: false };
+    const tentativa: TentativaDeAbertura = {
+      userId: session?.user.id,
+      cancelada: false,
+      autenticada: false,
+    };
     tentativaAtual.current = tentativa;
     setEstado('autenticando');
     // O prompt tira o app do primeiro plano — sem a bandeira, voltar dele trancaria de novo por
@@ -423,7 +429,7 @@ export function LockProvider({ children }: { children: ReactNode }) {
       if (vivo.current && pedirNaVolta.current && AppState.currentState === 'active'
         && vigia.current.mode === 'on' && vigia.current.temSessao) pedirRef.current();
     }
-  }, [abrirUiDoSistema, fecharUiDoSistema]);
+  }, [abrirUiDoSistema, fecharUiDoSistema, session?.user.id]);
 
   useEffect(() => {
     pedirRef.current = () => void autenticar();

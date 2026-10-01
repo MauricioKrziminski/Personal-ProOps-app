@@ -9,7 +9,11 @@ type AuthResult = { success: boolean; error?: string };
 type Slot = any;
 
 /** Real LockProvider; native results and lifecycle events remain pending until the test delivers them. */
-function mountLock(platform: 'ios' | 'android' = 'ios', delay: 0 | 30 | 60 = 0) {
+function mountLock(
+  platform: 'ios' | 'android' = 'ios',
+  delay: 0 | 30 | 60 = 0,
+  options: { restoringSession?: boolean; autoAuthenticateChild?: boolean } = {},
+) {
   let now = 1_000;
   let cursor = 0;
   let dirty = true;
@@ -17,10 +21,14 @@ function mountLock(platform: 'ios' | 'android' = 'ios', delay: 0 | 30 | 60 = 0) 
   let mounted = true;
   let value: any;
   const slots: Slot[] = [];
-  const effects: { index: number; fn: () => any; deps: any[] }[] = [];
+  const childSlots: Slot[] = [];
+  let currentSlots = slots;
+  let childAttempt: Promise<string> | undefined;
+  const effects: { owner: Slot[]; index: number; fn: () => any; deps: any[] }[] = [];
   const listeners = new Set<(state: AppStatus) => void>();
   const auth: { resolve: (value: AuthResult) => void; reject: (error: Error) => void }[] = [];
-  let session: { user: { id: string } } | null = { user: { id: 'test-user' } };
+  let session: { user: { id: string } } | null = options.restoringSession ? null : { user: { id: 'test-user' } };
+  let sessionLoading = !!options.restoringSession;
   const appState = {
     currentState: 'active' as AppStatus,
     addEventListener(_name: string, fn: (state: AppStatus) => void) {
@@ -29,33 +37,38 @@ function mountLock(platform: 'ios' | 'android' = 'ios', delay: 0 | 30 | 60 = 0) 
     },
   };
   const react = {
-    createContext: (initial: any) => ({ value: initial, Provider: 'Provider' }),
+    createContext: (initial: any) => {
+      const context = { value: initial, Provider: {} as any };
+      context.Provider = { context };
+      return context;
+    },
     useContext: (context: any) => context.value,
     useState(initial: any) {
       const index = cursor++;
-      if (!(index in slots)) slots[index] = typeof initial === 'function' ? initial() : initial;
-      return [slots[index], (next: any) => {
+      const owner = currentSlots;
+      if (!(index in owner)) owner[index] = typeof initial === 'function' ? initial() : initial;
+      return [owner[index], (next: any) => {
         if (!mounted) return;
-        const result = typeof next === 'function' ? next(slots[index]) : next;
-        if (!Object.is(slots[index], result)) { slots[index] = result; dirty = true; }
+        const result = typeof next === 'function' ? next(owner[index]) : next;
+        if (!Object.is(owner[index], result)) { owner[index] = result; dirty = true; }
       }];
     },
     useRef(initial: any) {
       const index = cursor++;
-      return slots[index] ?? (slots[index] = { current: initial });
+      return currentSlots[index] ?? (currentSlots[index] = { current: initial });
     },
     useEffect(fn: () => any, deps: any[]) {
       const index = cursor++;
-      const previous = slots[index];
+      const previous = currentSlots[index];
       if (!previous || deps.length !== previous.deps.length || deps.some((dep, i) => !Object.is(dep, previous.deps[i])))
-        effects.push({ index, fn, deps });
+        effects.push({ owner: currentSlots, index, fn, deps });
     },
     useMemo(fn: () => any, deps: any[]) {
       const index = cursor++;
-      const previous = slots[index];
+      const previous = currentSlots[index];
       if (!previous || deps.length !== previous.deps.length || deps.some((dep, i) => !Object.is(dep, previous.deps[i])))
-        slots[index] = { deps, value: fn() };
-      return slots[index].value;
+        currentSlots[index] = { deps, value: fn() };
+      return currentSlots[index].value;
     },
     useCallback(fn: (...args: any[]) => any, deps: any[]) { return react.useMemo(() => fn, deps); },
   };
@@ -82,11 +95,15 @@ function mountLock(platform: 'ios' | 'android' = 'ios', delay: 0 | 30 | 60 = 0) 
       authenticateAsync: () => new Promise<AuthResult>((resolve, reject) => auth.push({ resolve, reject })),
       cancelAuthenticate: async () => {},
     };
-    if (name === '@/hooks/use-session') return { useSession: () => ({ session, loading: false }) };
+    if (name === '@/hooks/use-session') return { useSession: () => ({ session, loading: sessionLoading }) };
     if (name === '../../modules/proops-privacidade') return { protegerAoSair() {} };
     if (name === '@/lib/lock-policy') return policy;
     throw new Error(`Unexpected dependency ${name}`);
   });
+  function AutoAuthenticateChild() {
+    const { autenticar } = provider.useLock();
+    react.useEffect(() => { childAttempt = autenticar(); }, [autenticar]);
+  }
   function render() {
     if (!mounted) return;
     if (rendering) throw new Error('Nested render');
@@ -96,13 +113,26 @@ function mountLock(platform: 'ios' | 'android' = 'ios', delay: 0 | 30 | 60 = 0) 
         if (count === 50) throw new Error('LockProvider did not reach a stable render');
         dirty = false;
         cursor = 0;
+        currentSlots = slots;
         effects.length = 0;
-        value = provider.LockProvider({ children: null }).props.value;
+        const tree = provider.LockProvider({ children: null });
+        value = tree.props.value;
         // A render-phase state update discards effects from that render, as React does.
         if (dirty) continue;
-        for (const { index, fn, deps } of effects.splice(0)) {
-          slots[index]?.cleanup?.();
-          slots[index] = { deps, cleanup: fn() };
+        const parentEffects = effects.splice(0);
+        tree.type.context.value = value;
+        if (options.autoAuthenticateChild && value.locked && !value.carregando) {
+          currentSlots = childSlots;
+          cursor = 0;
+          AutoAuthenticateChild();
+        } else {
+          for (const slot of childSlots) slot?.cleanup?.();
+          childSlots.length = 0;
+        }
+        // React commits child passive effects before its parent's passive effects.
+        for (const { owner, index, fn, deps } of [...effects.splice(0), ...parentEffects]) {
+          owner[index]?.cleanup?.();
+          owner[index] = { deps, cleanup: fn() };
         }
       }
     } finally { rendering = false; }
@@ -115,13 +145,14 @@ function mountLock(platform: 'ios' | 'android' = 'ios', delay: 0 | 30 | 60 = 0) 
   return {
     get value() { return value; },
     get calls() { return auth.length; },
+    get childAttempt() { return childAttempt; },
     flush,
     emit(state: AppStatus) { appState.currentState = state; for (const fn of [...listeners]) fn(state); render(); },
     advance(milliseconds: number) { now += milliseconds; },
-    setSession(id: string | null) { session = id ? { user: { id } } : null; dirty = true; render(); },
+    setSession(id: string | null) { session = id ? { user: { id } } : null; sessionLoading = false; dirty = true; render(); },
     unmount() {
       mounted = false;
-      for (const slot of slots) if (typeof slot?.cleanup === 'function') slot.cleanup();
+      for (const slot of [...childSlots, ...slots]) if (typeof slot?.cleanup === 'function') slot.cleanup();
     },
     start() { const pending = value.autenticar(); render(); return pending; },
     async result(index: number, result: AuthResult) { assert.ok(auth[index], `Missing native call ${index}`); auth[index].resolve(result); await flush(); },
@@ -151,6 +182,27 @@ async function unlock(app: ReturnType<typeof mountLock>) {
   assert.equal(await pending, 'aberto');
   assert.equal(app.value.locked, false);
 }
+
+test('restored session child auto-authentication survives the parent hydration effect and opens on success plus active', async () => {
+  const app = mountLock('ios', 0, { restoringSession: true, autoAuthenticateChild: true });
+  await app.flush();
+  assert.equal(app.value.carregando, true, 'session restoration still protects startup');
+  assert.equal(app.calls, 0, 'the overlay cannot authenticate before the account is restored');
+  app.setSession('restored-user');
+  assert.equal(app.calls, 1, 'the mounted child starts the restored account authentication');
+  assert.equal(app.value.locked, true);
+  assert.equal(app.value.estado, 'autenticando');
+  const pending = observe(app.childAttempt!);
+  app.emit('inactive');
+  await app.result(0, { success: true });
+  assert.equal(app.value.locked, true, 'success alone must keep inactive content covered');
+  app.emit('active');
+  await app.flush();
+  assert.equal(app.value.locked, false, 'hydration must not invalidate authentication already started for this account');
+  assert.equal(app.value.estado, 'trancado', 'a completed prompt cannot leave Confirmando stuck');
+  assert.equal(pending.value, 'aberto');
+  assert.equal(app.calls, 1, 'normal restored-session authentication opens without a retry loop');
+});
 
 test('leaving during the successful prompt return invalidates that visit and asks again', async () => {
   const app = mountLock();

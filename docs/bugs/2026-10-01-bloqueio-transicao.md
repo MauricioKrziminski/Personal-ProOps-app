@@ -39,4 +39,25 @@ biometria Android sem pausa, resultados tardios, cancelamento, retry, reentrânc
 lifetime, UI externa aninhada, carência 0/30/60 e callbacks de cortina já enfileirados.
 
 [Reprodução, evidências e limites do QA](../qa/2026-10-01-bloqueio-transicao/README.md).
-A distribuição será registrada no documento da release v1.6.1 depois de conferida.
+A distribuição final será registrada no documento da release v1.6.2 depois de conferida.
+
+## Corrida adicional na restauração da sessão
+
+Na última checagem nativa do iOS, depois da publicação da v1.6.1, uma abertura fria deixou a
+cortina em “Confirmando…” mesmo depois de o sistema aceitar a credencial. O diagnóstico
+pontual, sem substituir a API nativa, mostrou que a tentativa já estava cancelada antes de
+receber o resultado: o efeito do `LockOverlay` iniciou o pedido para a conta restaurada antes
+que o efeito de identidade do `LockProvider` processasse a hidratação da sessão. Esse efeito
+comparava a conta atual com o valor inicial ainda vazio e invalidava o pedido recém-criado.
+
+O retorno nativo chegou ao JavaScript e o `active` chegou em seguida; a hipótese de falta de
+evento ou de Promise nativa não entregue foi descartada nessa reprodução. Os eventos estão em
+[hidratacao-antes.json](../qa/2026-10-01-bloqueio-transicao/ios/hidratacao-antes.json).
+A v1.6.1 publicada será preservada; esta correção segue em uma nova versão.
+
+A identidade agora pertence à tentativa no instante em que ela começa, e não ao último efeito
+de sessão executado. O efeito cancela somente uma tentativa pertencente a outra conta.
+O callback de autenticação recebe a identidade atual; uma hidratação com efeito filho antes
+do pai continua válida. O teste adicional falhou antes da correção e passou depois; os 81
+casos focados e os 1.410 da suíte completa passam. A abertura fria e a saída durante a onda
+foram validadas também com a API nativa real do simulador iOS, sem adaptador de sucesso.

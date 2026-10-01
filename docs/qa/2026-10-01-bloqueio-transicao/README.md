@@ -49,3 +49,37 @@ TypeScript, lint e suíte completa são registrados na release depois do último
 houve escrita financeira, migration nem alteração do agente. O PIN é sintético do AVD isolado.
 Bloqueio Android restaurado a Não/Na hora; preferência do simulador iOS preservada. Servidores
 Metro usados no ensaio e configuração temporária são restaurados após o QA.
+
+## Checagem nativa final do iOS e restauração da sessão
+
+Depois da publicação da v1.6.1, uma abertura fria com a API nativa real do iOS ficou em
+“Confirmando…”. O [diagnóstico da hidratação](ios/hidratacao-antes.json) separa duas execuções:
+a primeira mostra o resultado nativo entregue ao JS como sucesso, com a tentativa cancelada,
+e a chegada posterior de `active`; a segunda registra o pedido filho iniciado para a conta
+restaurada e o efeito pai cancelando-o na mesma montagem. A árvore de acessibilidade da
+execução anterior, sem instrumentação, confirma o botão ocupado e o app bloqueado.
+
+O teste de regressão reproduz a ordem de efeitos filho → pai durante a hidratação, executando
+o provider real. Antes da correção: 40 testes passaram e apenas esse falhou; depois, os
+[81 testes focados](focused-green-v1.6.2.log) passaram. A tentativa passa a guardar a conta para
+a qual nasceu: a sessão restaurada não cancela seu próprio pedido, e trocar a conta continua
+recusando o resultado antigo. Nenhuma API nativa foi substituída nessa checagem final.
+
+Com o código corrigido da v1.6.2, no app de desenvolvimento `com.proops.personal.dev` do
+simulador iPhone 17 Pro/iOS 26.5, conectado ao staging:
+
+- A abertura fria restaurou a sessão, pediu a credencial nativa e chegou à Hoje sem ficar em
+  “Confirmando…”: [desbloqueio normal](ios/nativo-desbloqueio-normal.png).
+- Sair com Home e voltar pediu a senha novamente.
+- Três saídas após confirmar a credencial, em aproximadamente 0,807, 1,185 e 1,603 segundos,
+  voltaram ao prompt. A captura do caso intermediário comprova a
+  [onda ainda revelando o app](ios/nativo-onda-interrompida.png), seguida da
+  [nova exigência de senha](ios/nativo-volta-pede-senha.png).
+  [Sequências e tempos](ios/nativo-interrupcoes.json).
+
+As credenciais foram sintéticas do simulador. Isso verifica a integração nativa, o lifecycle
+e a cortina; não prova Face ID ou a validade da senha no iPhone físico. A tela de credencial
+simulada não ofereceu cancelamento com Escape; cancelamento e senha errada continuam cobertos
+pelos testes de comportamento e pelo QA Android anterior. Não houve nova rodada completa no
+Android após o ajuste de identidade da tentativa. Os diagnósticos temporários foram retirados
+antes da compilação, sem alterações nas dependências nativas.

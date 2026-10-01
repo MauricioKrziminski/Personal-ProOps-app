@@ -1,0 +1,115 @@
+{
+  "coldLaunchIdentityTrace": [
+    {
+      "evento": "listener-montou",
+      "dados": {
+        "cache": "active"
+      },
+      "momento": 1790834077302
+    },
+    {
+      "evento": "inicio",
+      "dados": {
+        "cache": "active",
+        "vivo": true,
+        "emVoo": false
+      },
+      "momento": 1790834077402
+    },
+    {
+      "evento": "sessao-trocou",
+      "dados": {
+        "anteriorPresente": false,
+        "atualPresente": true
+      },
+      "momento": 1790834077406
+    },
+    {
+      "evento": "invalidar",
+      "dados": {
+        "cache": "active"
+      },
+      "momento": 1790834077406
+    },
+    {
+      "evento": "appstate",
+      "dados": {
+        "s": "inactive",
+        "cache": "inactive",
+        "autenticada": false,
+        "cancelada": true
+      },
+      "momento": 1790834078077
+    }
+  ],
+  "nativeCredentialPreviousColdLaunch": [
+    {
+      "evento": "resultado-js",
+      "dados": {
+        "resultado": {
+          "warning": null,
+          "error": null,
+          "success": true
+        },
+        "cache": "inactive",
+        "cancelada": true
+      },
+      "momento": 1790834030933
+    },
+    {
+      "evento": "finally",
+      "dados": {
+        "cache": "inactive",
+        "cancelada": true,
+        "pedirNaVolta": false
+      },
+      "momento": 1790834030933
+    },
+    {
+      "evento": "appstate",
+      "dados": {
+        "s": "active",
+        "cache": "active"
+      },
+      "momento": 1790834031474
+    }
+  ],
+  "originalUninstrumentedScreen": [
+    {
+      "AXLabel": "Confirmando",
+      "AXValue": "busy",
+      "enabled": false,
+      "type": "Button",
+      "frame": {
+        "x": 144.99999618530273,
+        "width": 112,
+        "y": 308.6666564941406,
+        "height": 112
+      }
+    },
+    {
+      "AXLabel": "App bloqueado",
+      "AXValue": null,
+      "enabled": true,
+      "type": "StaticText",
+      "frame": {
+        "y": 444.6666564941406,
+        "width": 214.66668701171875,
+        "x": 93.66666412353516,
+        "height": 38
+      }
+    },
+    {
+      "AXLabel": "Confirmando\u2026",
+      "AXValue": null,
+      "enabled": true,
+      "type": "StaticText",
+      "frame": {
+        "y": 486.6666564941406,
+        "x": 152.66666412353516,
+        "width": 96.66665649414062,
+        "height": 19
+      }
+    }
+  ]
+}
