@@ -1,0 +1,10 @@
+PASS contextual labels: notes
+PASS contextual labels: reminders
+PASS contextual labels: import-history
+PASS contextual labels: finance/debts
+PASS contextual labels: finance/installments
+PASS contextual labels: finance/recurring
+PASS contextual labels: notes/archived
+PASS contextual labels: notes/trash
+PASS contextual labels: transactions (ios-fluxo.log)
+PASS contextual labels: folder (ios-pasta-folha-ax.json)

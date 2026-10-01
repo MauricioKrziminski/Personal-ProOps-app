@@ -1,0 +1,48 @@
+(node:96124) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/form-motion-ui.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Presenca shrinks space and opacity on the same spring, preserving an inactive outgoing snapshot (39.265667ms)
+✔ Presenca ignores completion after unmount and reduced motion closes without waiting (15.1705ms)
+✔ Nested presence inherits its inactive parent provider (6.851542ms)
+✔ Presenca reports an actual exit once and ignores a canceled exit after reopening (10.900042ms)
+✔ TrocaSuave mounts both layers immediately and starts progress only after incoming native layout (7.6185ms)
+✔ TrocaSuave retains its measured width during absolute-layer swaps and explicitly restores natural dimensions (4.556291ms)
+✔ Resting presence publishes natural height and swaps retain static geometry after stale shared-value writes (9.641541ms)
+✔ a settled label swap releases its frame before larger text measures again (5.085792ms)
+✔ TrocaSuave retargets midflight from its current progress while retaining the original outgoing layer (4.648459ms)
+✔ Spring overshoot keeps opacity bounded and height nonnegative while allowing a small spatial bounce (8.468083ms)
+✔ TrocaSuave rejects stale completion after another mode, return to original, and unmount (5.064084ms)
+✔ TrocaSuave ignores a stale incoming layout when a newer mode is waiting for its own measurement (3.727959ms)
+✔ TrocaSuave returning A to B to A creates a new incoming lifetime and waits for its new native layout (3.362583ms)
+✔ TrocaSuave ignores captured native measurement callbacks after unmount (3.76625ms)
+✔ TrocaSuave provider disables outgoing native input callbacks while the incoming input stays editable (23.020916ms)
+✔ TrocaSuave reduced motion interrupts pending work and full-screen mode preserves its frame (4.2845ms)
+✔ SelectField delivers selection synchronously once, keeps one chosen row, and can reopen while closing (10.173166ms)
+✔ SelectField confirms a different option during collapse without delaying its callback (9.99725ms)
+✔ DatePicker delivers one date synchronously, preserves limits and can reopen during collapse (14.859125ms)
+✔ DatePicker outgoing calendar cannot select again while the collapsed month-end control remains active (10.775792ms)
+✔ DatePicker reopening during collapse gives the calendar a new lifetime and keeps month-end aligned with its current month (11.394875ms)
+✔ QuantityField snapshot never clamps or edits financial state; typing and steps stay synchronous (8.113375ms)
+✔ TextField outgoing snapshot suppresses editing and contract-clamping blur (10.711333ms)
+✔ MudancaSuave crossfades discrete content and reduced motion restores the latest label immediately (3.332584ms)
+✔ Presenca lazily mounts native motion once and first appearance springs through measured space (3.454834ms)
+✔ Presenca explicitly restores natural resting geometry after opening, closing and reopening (3.32375ms)
+✔ Presenca lazy first appearance honors reduced motion and an inactive parent (6.579958ms)
+✔ prepared compact presence measures while hidden and first open reuses its native motion (6.222666ms)
+✔ prepared presence waits for measurement on an immediate first tap and accepts an empty list (3.329584ms)
+✔ SelectField first opening and reopening install no new native motion for its options (6.662917ms)
+✔ prepared presence remains hidden with reduced motion and ignores native layout after unmount (3.193ms)
+✔ FormatoDoLancamento prepares first opening and cannot select while hidden or inactive (16.482416ms)
+✔ SelectField keeps the icon column spacing for alternatives without an icon (7.283709ms)
+✔ TextField keeps a full line visible when the font changes, retaining normal geometry and typing (10.970625ms)
+✔ TextField respects the caller font cap, disabled scaling and multiline geometry (10.251875ms)
+✔ Field keeps its visible label gap through accessory and native text height changes (13.121625ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 36
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 585.960459

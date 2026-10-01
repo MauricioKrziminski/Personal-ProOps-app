@@ -1,0 +1,106 @@
+[
+  {
+    "enabled": true,
+    "AXFrame": "{{16, 321}, {322, 18}}",
+    "title": null,
+    "subrole": null,
+    "help": null,
+    "custom_actions": [],
+    "AXValue": null,
+    "AXLabel": "Lançamento a partir de",
+    "pid": 92690,
+    "role": "AXStaticText",
+    "role_description": "text",
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "content_required": false,
+    "AXUniqueId": null,
+    "frame": {
+      "y": 321,
+      "width": 322,
+      "x": 16,
+      "height": 18
+    },
+    "type": "StaticText"
+  },
+  {
+    "role_description": "button",
+    "type": "Button",
+    "help": "Toque para escolher no calendário",
+    "AXLabel": "Lançamento a partir de",
+    "frame": {
+      "y": 357,
+      "x": 17,
+      "width": 368,
+      "height": 48
+    },
+    "custom_actions": [],
+    "subrole": null,
+    "enabled": true,
+    "AXUniqueId": null,
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "title": null,
+    "role": "AXButton",
+    "AXValue": "Escolher data",
+    "content_required": false,
+    "AXFrame": "{{17, 357}, {368, 48}}",
+    "pid": 92690
+  },
+  {
+    "help": null,
+    "title": null,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "role_description": "text",
+    "AXLabel": "Lançamento até",
+    "AXUniqueId": null,
+    "AXValue": null,
+    "subrole": null,
+    "AXFrame": "{{16, 422}, {370, 18}}",
+    "content_required": false,
+    "role": "AXStaticText",
+    "enabled": true,
+    "type": "StaticText",
+    "custom_actions": [],
+    "pid": 92690,
+    "frame": {
+      "width": 370,
+      "height": 18,
+      "y": 422,
+      "x": 16
+    }
+  },
+  {
+    "role": "AXButton",
+    "title": null,
+    "custom_actions": [],
+    "enabled": true,
+    "pid": 92690,
+    "AXLabel": "Lançamento até",
+    "subrole": null,
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "content_required": false,
+    "help": "Toque para escolher no calendário",
+    "AXFrame": "{{17, 449}, {368, 48}}",
+    "AXValue": "Escolher data",
+    "type": "Button",
+    "frame": {
+      "width": 368,
+      "y": 449,
+      "x": 17,
+      "height": 48
+    },
+    "AXUniqueId": null,
+    "role_description": "button"
+  }
+]

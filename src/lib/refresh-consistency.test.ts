@@ -24,7 +24,7 @@ function loadHooks(client: QueryClient, entry = 'src/hooks/use-finance.ts', depe
     runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
       if (name in dependencies) return dependencies[name];
       if (name === '@tanstack/react-query') return { ...require(name), useQueryClient: () => client, useMutation: (options: unknown) => options };
-      if (name === 'react') return { useCallback: (fn: unknown) => fn };
+      if (name === 'react') return { useCallback: (fn: unknown) => fn, useRef: (value: unknown) => ({ current: value }) };
       if (name === '@/lib/agent-api') return {};
       if (name === '@/lib/supabase') return { supabase: { rpc: async () => ({ error: null }) } };
       if (name.startsWith('@/lib/') && existsSync(`src/lib/${name.slice(6)}.ts`)) return load(`src/lib/${name.slice(6)}.ts`);

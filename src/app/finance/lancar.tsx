@@ -148,7 +148,8 @@ export default function LancarScreen() {
   /** Editando: só no tipo do registro. Em outro tipo, o corpo cria — e o salvar converte. */
   const editandoAqui = tipo === tipoOriginal ? editandoId : undefined;
   const base = {
-    topo: <FormatoDoLancamento value={tipo} onChange={trocar} />,
+    topo: <FormatoDoLancamento value={tipo} onChange={trocar}
+      disabled={Boolean(transacao.data?.down_payment_debt_id || transacao.data?.down_payment_plan_id)} />,
     comum,
     registrarComum: (ler: () => Comum) => {
       if (tipoAtivo.current === tipo) lerComum.current = ler;

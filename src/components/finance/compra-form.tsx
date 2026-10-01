@@ -10,6 +10,7 @@
 import { AccountPicker } from '@/components/finance/account-picker';
 import { CategoryPicker } from '@/components/finance/category-picker';
 import { DatePickerField } from '@/components/finance/date-picker-field';
+import { PurchaseDownPayment } from '@/components/finance/purchase-down-payment';
 import { Presenca } from '@/components/motion/presenca';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { QuantityField } from '@/components/ui/quantity-field';
@@ -41,6 +42,7 @@ export function CamposDaCompra({
 
   return (
     <>
+      <PurchaseDownPayment type="parcelada" parentId={form.id} installmentsCents={form.totalCents} />
       <Field label="Título" error={tituloOk ? undefined : 'Escreva um título para esta compra'}>
         <TextField
           value={form.description}
@@ -68,7 +70,7 @@ export function CamposDaCompra({
             ? `${form.installments}x · o alcance define quais parcelas recebem este valor`
             : travado
               ? `${formatBRL(form.travadoCents)} já pago · o alcance define o novo total`
-              : undefined
+              : 'Total das parcelas; a entrada aparece separadamente acima'
         }>
         {/* Sempre na tela: sumir no "À vista" subiria o formulário embaixo do "−". */}
         <Segmented options={UNIDADES_DO_VALOR} value={form.unidade} onChange={(unidade) => onChange({ ...form, unidade })} />

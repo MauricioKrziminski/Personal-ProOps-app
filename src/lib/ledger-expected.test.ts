@@ -76,3 +76,10 @@ test('tocar na prevista não abre buraco na lista nem a mostra duas vezes', () =
   // sem toque em andamento, a leitura manda
   assert.deepEqual(previstasNaTela([recurrence], [], []), [recurrence]);
 });
+
+test('previsões respeitam valor mínimo/máximo inclusivos e combinados com conta', () => {
+  assert.deepEqual(filterExpectedLines([recurrence, debt], { minCents: 5590, maxCents: 5590 }), [recurrence, debt]);
+  assert.deepEqual(filterExpectedLines([recurrence, debt], { minCents: 5591 }), []);
+  assert.deepEqual(filterExpectedLines([recurrence, debt], { maxCents: 5589 }), []);
+  assert.deepEqual(filterExpectedLines([recurrence, debt], { minCents: 0, maxCents: 5590, accountId: null }), [recurrence]);
+});

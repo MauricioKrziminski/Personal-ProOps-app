@@ -119,7 +119,7 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
   ];
 
   return (
-    <ItemLink href={`/notes/${note.id}`} title={titulo} actions={menu} forma="card">
+    <ItemLink href={`/notes/${note.id}`} title={titulo} accessibilityLabel={label} actions={menu} forma="card">
       {({ onLongPress }) => (
         <Pressable
           accessibilityRole="button"

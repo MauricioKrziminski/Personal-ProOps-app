@@ -104,7 +104,7 @@ function PresencaAnimada({ visivel, children, style, preparar, onSaidaConcluida,
     <PresencaAtiva.Provider value={ativa}>
       <Animated.View
         collapsable={false}
-        style={[natural ? styles.natural : styles.recorte, natural ? undefined : envelope]}
+        style={[natural ? styles.natural : styles.recorte, envelope]}
         pointerEvents={ativa ? 'auto' : 'none'}
         accessibilityElementsHidden={!ativa}
         importantForAccessibility={ativa ? 'auto' : 'no-hide-descendants'}>
@@ -208,7 +208,7 @@ export function TrocaSuave({ estado, children, style, preencher = false, desloca
 
   return (
     <Animated.View collapsable={false} style={[preencher ? styles.preencher : trocando ? styles.recorte : styles.natural,
-      !preencher && style ? { flex: StyleSheet.flatten(style)?.flex } : undefined, trocando ? envelope : undefined]}>
+      !preencher && style ? { flex: StyleSheet.flatten(style)?.flex } : undefined, envelope]}>
       {[
         camadas.anterior && !reduzir ? (
           <PresencaAtiva.Provider key={`${camadas.anterior.estado}:${camadas.anterior.chave}`} value={false}>

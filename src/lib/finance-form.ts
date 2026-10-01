@@ -69,6 +69,8 @@ type ComContrato = {
   recurring_id?: string | null;
   debt_id?: string | null;
   rollover_of_invoice_id?: string | null;
+  down_payment_debt_id?: string | null;
+  down_payment_plan_id?: string | null;
 };
 
 /**
@@ -84,7 +86,8 @@ type ComContrato = {
  */
 export function temContrato(editing?: ComContrato | null): boolean {
   return Boolean(
-    editing?.installment_plan_id || editing?.recurring_id || editing?.debt_id || editing?.rollover_of_invoice_id,
+    editing?.installment_plan_id || editing?.recurring_id || editing?.debt_id || editing?.rollover_of_invoice_id ||
+    editing?.down_payment_debt_id || editing?.down_payment_plan_id,
   );
 }
 

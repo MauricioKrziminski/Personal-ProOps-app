@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
@@ -7,6 +7,9 @@ import * as Haptics from 'expo-haptics';
 import { ThemedText } from '@/components/themed-text';
 import { confirmarApagarPasta, symbol } from '@/components/notes/note-actions';
 import { EmptyState } from '@/components/ui/empty-state';
+import { FilterBar } from '@/components/ui/filter-bar';
+import { ListFilters } from '@/components/ui/list-filters';
+import { listFiltersActive, type ListFiltersValue } from '@/lib/list-filters';
 import { VerMais } from '@/components/ui/ver-mais';
 import { Icon } from '@/components/ui/icon';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
@@ -55,7 +58,10 @@ export default function ArchivedScreen() {
   const tablet = windowClass !== 'compact';
   const toast = useToast();
 
-  const notas = useNotesList({ archived: true, sort: 'recentes' });
+  const [filters, setFilters] = useState<ListFiltersValue>({});
+  const [filtering, setFiltering] = useState(false);
+  const filtered = listFiltersActive(filters);
+  const notas = useNotesList({ archived: true, sort: 'recentes', q: filters.q, from: filters.from, to: filters.to });
   const pastas = useArchivedFolders();
 
   const updateNote = useUpdateNote();
@@ -143,6 +149,11 @@ export default function ArchivedScreen() {
 
   const archiveList = (
     <>
+      <FilterBar value={filters} dateLabel="Atualização" defaultLabel="Notas arquivadas" onPress={() => setFiltering(true)} />
+      {filtered && !notas.isError && !notas.isLoading && listaNotas.length === 0 ? (
+        <EmptyState compacto icon="magnifyingglass" title="Nenhuma nota com esses filtros"
+          action={{ label: 'Limpar filtros', onPress: () => setFilters({}) }} />
+      ) : null}
       {notas.isError || pastas.isError ? (
         <EmptyState
           icon="exclamationmark.triangle"
@@ -162,7 +173,7 @@ export default function ArchivedScreen() {
           <SkeletonRow />
           <SkeletonRow />
         </Section>
-      ) : vazia ? (
+      ) : vazia && !filtered ? (
         <EmptyState
           icon="archivebox"
           title="Nada arquivado"
@@ -277,6 +288,8 @@ export default function ArchivedScreen() {
           singlePaneContent={archiveList}
         />
       ) : archiveList}
+      <ListFilters visible={filtering} value={filters} onClose={() => setFiltering(false)} onApply={setFilters}
+        dateLabels={{ from: 'Atualização a partir de', to: 'Atualização até' }} />
     </Screen>
   );
 }

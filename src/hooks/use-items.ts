@@ -3,6 +3,8 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClie
 import { useEffect } from 'react';
 
 import { localISODate } from '@/lib/dates';
+import { timestampDateBounds } from '@/lib/list-filters';
+import { toIlikeTerm } from '@/lib/search';
 import { supabase } from '@/lib/supabase';
 
 // Helpers puros vivem em @/lib/dates (testáveis fora do RN); reexportados aqui
@@ -79,21 +81,37 @@ export function useRealtimeInvalidate(table: string, queryKey: string[]) {
  */
 const REMINDERS_PAGE = 20;
 
-export function useReminders() {
+export interface ReminderFilters {
+  q?: string;
+  active?: boolean;
+  channel?: Reminder['channel'];
+  from?: string;
+  to?: string;
+}
+
+export function useReminders(filters: ReminderFilters = {}) {
   useRealtimeInvalidate('reminders', ['reminders']);
+  const filtered = Object.values(filters).some((value) => value !== undefined && value !== '');
   return useInfiniteQuery({
-    queryKey: ['reminders'],
+    queryKey: filtered ? ['reminders', filters] : ['reminders'],
     initialPageParam: 0,
     queryFn: async ({ pageParam }): Promise<Reminder[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('reminders')
         .select('id, title, recurrence, next_run_at, channel, active, skip_run_at, parent_reminder_id, original_run_at')
         .or('parent_reminder_id.is.null,active.eq.true')
         // pausados também vêm: sem eles não haveria como retomar pelo app
         .order('active', { ascending: false })
         .order('next_run_at')
-        .order('id')
-        .range(pageParam, pageParam + REMINDERS_PAGE - 1);
+        .order('id');
+      const bounds = timestampDateBounds(filters);
+      if (bounds.from) query = query.gte('next_run_at', bounds.from);
+      if (bounds.before) query = query.lt('next_run_at', bounds.before);
+      if (filters.active !== undefined) query = query.eq('active', filters.active);
+      if (filters.channel) query = query.eq('channel', filters.channel);
+      const term = toIlikeTerm(filters.q ?? '');
+      if (term) query = query.ilike('title', `%${term}%`);
+      const { data, error } = await query.range(pageParam, pageParam + REMINDERS_PAGE - 1);
       if (error) throw error;
       return data as Reminder[];
     },

@@ -9,7 +9,7 @@ const require = createRequire(import.meta.url);
 
 // Commit effects after stable renders; neither springs nor native layout finish automatically.
 // Component-local hooks and provider context exercise the real nested presence lifetimes.
-function montar(file: string, name: string, initial: any, config = { reduzir: false, ativo: true }) {
+function montar(file: string, name: string, initial: any, config: { reduzir: boolean; ativo: boolean; fontScale?: number } = { reduzir: false, ativo: true }) {
   type Instance = { slots: any[]; cursor: number; mounted: boolean; restart: boolean };
   type Animation = { shared: any; done?: (ok: boolean) => void; target: number; from: number; kind: 'spring' | 'timing'; settings: any; canceled: boolean };
   const instances = new Map<string, Instance>();
@@ -100,7 +100,7 @@ function montar(file: string, name: string, initial: any, config = { reduzir: fa
   const tokens = {
     Motion: { duration: { fast: 120, base: 200, morph: 180 }, easing: { out: 'out', inOut: 'inOut' }, spring: { morph: { stiffness: 360, damping: 26, mass: 1 } } },
     Radius: { sm: 8, md: 12, pill: 100 }, Space: { sm: 8, md: 12, lg: 16, half: 2, xs: 4 },
-    Elevation: { light: { raised: [] } }, Type: { meta: {}, body: {}, money: {} }, HitTarget: 44, tabular: {},
+    Elevation: { light: { raised: [] } }, Type: { meta: {}, body: { fontSize: 16, lineHeight: 23 }, money: {} }, HitTarget: 44, tabular: {},
   };
   function load(path: string): any {
     if (modules.has(path)) return modules.get(path);
@@ -112,7 +112,7 @@ function montar(file: string, name: string, initial: any, config = { reduzir: fa
     runInNewContext(code, { performance, module, exports: module.exports, require: (id: string) => {
       if (id === 'react') return react;
       if (id === 'react/jsx-runtime') return require(id);
-      if (id === 'react-native') return { Pressable: 'Pressable', View: 'View', TextInput: 'TextInput', useWindowDimensions: () => ({ width: 402, fontScale: 1 }), Platform: { OS: 'android' }, StyleSheet: { create: (s: any) => s, flatten, hairlineWidth: 1 } };
+      if (id === 'react-native') return { Pressable: 'Pressable', View: 'View', TextInput: 'TextInput', useWindowDimensions: () => ({ width: 402, fontScale: config.fontScale ?? 1 }), Platform: { OS: 'android' }, StyleSheet: { create: (s: any) => s, flatten, hairlineWidth: 1 } };
       if (id === 'react-native-reanimated') return reanimated;
       if (id === 'expo-haptics') return { selectionAsync() {} };
       if (id === '@/components/motion/presenca') return load('src/components/motion/presenca.tsx');
@@ -331,7 +331,7 @@ test('TrocaSuave retains its measured width during absolute-layer swaps and expl
   assert.equal(ui.style(incoming(ui)).position, 'relative');
 });
 
-test('Resting presence and swaps detach animated styles and retain static native geometry after stale shared-value writes', () => {
+test('Resting presence publishes natural height and swaps retain static geometry after stale shared-value writes', () => {
   const hasWorklet = (style: any): boolean => Array.isArray(style)
     ? style.some(hasWorklet) : Boolean(style?.__worklet);
   const presence = montar(helper, 'Presenca', { visivel: false, children: 'fields' });
@@ -347,7 +347,8 @@ test('Resting presence and swaps detach animated styles and retain static native
   assert.equal(presence.style(frame).width, 'auto');
   assert.equal(presence.style(incoming(presence)).opacity, 1);
   assert.equal(presence.style(incoming(presence)).transform[0].translateY, 0);
-  assert.ok(presence.nodes().filter((n) => n.type === 'Animated.View').every((n) => !hasWorklet(n.props.style)), 'resting presence has no attached animation binder');
+  assert.ok(hasWorklet(frame.props.style), 'resting presence explicitly releases animated height through the same binder');
+  assert.ok(!hasWorklet(incoming(presence).props.style), 'resting content detaches its opacity animation');
 
   const swap = montar(helper, 'TrocaSuave', { estado: 'a', children: 'A' });
   swap.layout(incoming(swap), 80);
@@ -364,8 +365,24 @@ test('Resting presence and swaps detach animated styles and retain static native
   assert.equal(swap.style(incoming(swap)).opacity, 1);
   assert.equal(swap.style(incoming(swap)).transform[0].translateY, 0);
   assert.equal(swap.style(incoming(swap)).position, 'relative');
-  assert.ok(swap.nodes().filter((n) => n.type === 'Animated.View').every((n) => !hasWorklet(n.props.style)), 'resting swap has no attached animation binder');
+  assert.ok(hasWorklet(swap.nodes()[0].props.style), 'resting swap releases its measured geometry through the same native binder');
+  assert.ok(!hasWorklet(incoming(swap).props.style), 'resting incoming content detaches its opacity animation');
   assert.ok(swap.nodes().filter((n) => n.type === 'Animated.View').every((n) => n.props.collapsable === false));
+});
+
+test('a settled label swap releases its frame before larger text measures again', () => {
+  const ui = montar(helper, 'MudancaSuave', { valor: 'default', children: 'All items' });
+  ui.layout(incoming(ui), 19, 266);
+  ui.render({ valor: 'active', children: 'State: paused · Channel: WhatsApp' });
+  ui.layout(incoming(ui), 19, 252);
+  ui.finish(ui.transition());
+  const frame = ui.nodes()[0];
+  assert.ok(frame.props.style.some((style: any) => style?.__worklet), 'removing an animated style would retain its last native width and height');
+  ui.layout(incoming(ui), 228, 370);
+  assert.equal(ui.style(ui.nodes()[0]).height, 'auto');
+  assert.equal(ui.style(ui.nodes()[0]).width, 'auto');
+  assert.equal(outgoing(ui), undefined);
+  assert.equal(content(ui), 'State: paused · Channel: WhatsApp');
 });
 
 test('TrocaSuave retargets midflight from its current progress while retaining the original outgoing layer', () => {
@@ -906,4 +923,52 @@ test('SelectField keeps the icon column spacing for alternatives without an icon
   });
   const option = ui.find((n) => n.type === 'PressableScale' && n.props.accessibilityLabel === 'B');
   assert.equal(option.props.children.props.children.filter(Boolean).length, 3, 'icon spacer, labels and indicator retain the three original columns');
+});
+
+test('TextField keeps a full line visible when the font changes, retaining normal geometry and typing', () => {
+  const config = { reduzir: false, ativo: true, fontScale: 1 };
+  const typed: string[] = [];
+  const ui = montar('src/components/ui/field.tsx', 'TextField', { value: 'QA', onChangeText: (s: string) => typed.push(s) }, config);
+  const input = () => ui.find((n) => n.type === 'TextInput');
+  const normal = ui.style(input()).height;
+  config.fontScale = 3.12; ui.render();
+  const large = ui.style(input());
+  assert.ok(large.height >= large.lineHeight * config.fontScale + 4, 'scaled glyph line must fit inside the native input');
+  assert.ok(large.height > normal);
+  input().props.onChangeText('QA2');
+  assert.deepEqual(typed, ['QA2']);
+  config.fontScale = 1; ui.render();
+  assert.equal(ui.style(input()).height, normal);
+});
+
+test('TextField respects the caller font cap, disabled scaling and multiline geometry', () => {
+  const config = { reduzir: false, ativo: true, fontScale: 3.12 };
+  const ui = montar('src/components/ui/field.tsx', 'TextField', { value: 'QA', allowFontScaling: false }, config);
+  const input = () => ui.find((n) => n.type === 'TextInput');
+  assert.equal(ui.style(input()).height, 50);
+  ui.render({ allowFontScaling: true, maxFontSizeMultiplier: 1.5 });
+  assert.equal(ui.style(input()).height, 50);
+  ui.render({ maxFontSizeMultiplier: 0 });
+  assert.ok(ui.style(input()).height >= 23 * config.fontScale + 4);
+  ui.render({ multiline: true, style: { height: 120, lineHeight: 30 } });
+  assert.equal(ui.style(input()).height, 120);
+});
+
+test('Field keeps its visible label gap through accessory and native text height changes', () => {
+  const props = { label: 'Date', labelAccessory: 'Reset', labelGap: 16, children: 'Input' };
+  const ui = montar('src/components/ui/field.tsx', 'Field', props);
+  const text = () => ui.find((n) => n.type === 'ThemedText' && n.props.children === 'Date');
+  const row = () => ui.find((n) => n.type === 'View' && n.props.onLayout);
+  const body = () => ui.find((n) => n.type === 'View' && n.props.children?.includes?.('Input'));
+  const visibleGap = (textHeight: number, rowHeight: number) =>
+    (rowHeight - textHeight) / 2 + ui.style(body()).gap;
+  for (const [textHeight, rowHeight] of [[18, 36], [30, 36], [60, 60], [128, 128], [18, 36]]) {
+    ui.layout(text(), textHeight);
+    ui.layout(row(), rowHeight);
+    assert.equal(visibleGap(textHeight, rowHeight), 16, 'a taller action cannot add a second label-to-input gap');
+  }
+  ui.render({ ...props, labelAccessory: undefined });
+  assert.equal(ui.style(body()).gap, 16, 'removing the action retains the requested gap');
+  ui.render({ label: 'Date', children: 'Input' });
+  assert.equal(ui.style(body()).gap, 8, 'ordinary fields retain the existing spacing');
 });

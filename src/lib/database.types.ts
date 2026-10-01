@@ -713,6 +713,32 @@ export type Database = {
           },
         ]
       }
+      debt_declared_due_dates: {
+        Row: {
+          debt_id: string
+          due_date: string
+          installment_no: number
+        }
+        Insert: {
+          debt_id: string
+          due_date: string
+          installment_no: number
+        }
+        Update: {
+          debt_id?: string
+          due_date?: string
+          installment_no?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debt_declared_due_dates_debt_id_fkey"
+            columns: ["debt_id"]
+            isOneToOne: false
+            referencedRelation: "debts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       debt_declared_estimates: {
         Row: {
           amount_cents: number
@@ -739,25 +765,28 @@ export type Database = {
           },
         ]
       }
-      debt_declared_due_dates: {
+      debt_installment_edits: {
         Row: {
+          amount_cents: number | null
           debt_id: string
-          due_date: string
+          due_date: string | null
           installment_no: number
         }
         Insert: {
+          amount_cents?: number | null
           debt_id: string
-          due_date: string
+          due_date?: string | null
           installment_no: number
         }
         Update: {
+          amount_cents?: number | null
           debt_id?: string
-          due_date?: string
+          due_date?: string | null
           installment_no?: number
         }
         Relationships: [
           {
-            foreignKeyName: "debt_declared_due_dates_debt_id_fkey"
+            foreignKeyName: "debt_installment_edits_debt_id_fkey"
             columns: ["debt_id"]
             isOneToOne: false
             referencedRelation: "debts"
@@ -1846,15 +1875,19 @@ export type Database = {
           active: boolean
           channel: string
           created_at: string
+          delivered_channels: string[] | null
+          delivered_title: string | null
           id: string
           last_error: string | null
           next_run_at: string
           note_id: string | null
+          occurrence_outcome: string | null
           original_run_at: string | null
           parent_reminder_id: string | null
-          skip_run_at: string | null
+          processed_at: string | null
           recurrence: string | null
           send_attempts: number
+          skip_run_at: string | null
           source: string
           timezone: string
           title: string
@@ -1866,15 +1899,19 @@ export type Database = {
           active?: boolean
           channel?: string
           created_at?: string
+          delivered_channels?: string[] | null
+          delivered_title?: string | null
           id?: string
           last_error?: string | null
           next_run_at: string
           note_id?: string | null
+          occurrence_outcome?: string | null
           original_run_at?: string | null
           parent_reminder_id?: string | null
-          skip_run_at?: string | null
+          processed_at?: string | null
           recurrence?: string | null
           send_attempts?: number
+          skip_run_at?: string | null
           source?: string
           timezone?: string
           title: string
@@ -1886,15 +1923,19 @@ export type Database = {
           active?: boolean
           channel?: string
           created_at?: string
+          delivered_channels?: string[] | null
+          delivered_title?: string | null
           id?: string
           last_error?: string | null
           next_run_at?: string
           note_id?: string | null
+          occurrence_outcome?: string | null
           original_run_at?: string | null
           parent_reminder_id?: string | null
-          skip_run_at?: string | null
+          processed_at?: string | null
           recurrence?: string | null
           send_attempts?: number
+          skip_run_at?: string | null
           source?: string
           timezone?: string
           title?: string
@@ -1909,6 +1950,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "notes"
             referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "reminders_parent_reminder_id_fkey"
+            columns: ["parent_reminder_id"]
+            isOneToOne: false
+            referencedRelation: "reminders"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "reminders_user_id_fkey"
@@ -1995,6 +2043,8 @@ export type Database = {
           debt_payment_no: number | null
           debt_principal_cents: number | null
           description: string | null
+          down_payment_debt_id: string | null
+          down_payment_plan_id: string | null
           due_at: string | null
           edit_revision: number
           id: string
@@ -2005,8 +2055,8 @@ export type Database = {
           merchant: string | null
           occurred_at: string
           paid_at: string | null
-          recurring_id: string | null
           pays_invoice_id: string | null
+          recurring_id: string | null
           rollover_of_invoice_id: string | null
           source: string
           status: string
@@ -2029,6 +2079,8 @@ export type Database = {
           debt_payment_no?: number | null
           debt_principal_cents?: number | null
           description?: string | null
+          down_payment_debt_id?: string | null
+          down_payment_plan_id?: string | null
           due_at?: string | null
           edit_revision?: number
           id?: string
@@ -2039,8 +2091,8 @@ export type Database = {
           merchant?: string | null
           occurred_at?: string
           paid_at?: string | null
-          recurring_id?: string | null
           pays_invoice_id?: string | null
+          recurring_id?: string | null
           rollover_of_invoice_id?: string | null
           source?: string
           status?: string
@@ -2063,6 +2115,8 @@ export type Database = {
           debt_payment_no?: number | null
           debt_principal_cents?: number | null
           description?: string | null
+          down_payment_debt_id?: string | null
+          down_payment_plan_id?: string | null
           due_at?: string | null
           edit_revision?: number
           id?: string
@@ -2073,8 +2127,8 @@ export type Database = {
           merchant?: string | null
           occurred_at?: string
           paid_at?: string | null
-          recurring_id?: string | null
           pays_invoice_id?: string | null
+          recurring_id?: string | null
           rollover_of_invoice_id?: string | null
           source?: string
           status?: string
@@ -2105,6 +2159,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "transactions_down_payment_debt_id_fkey"
+            columns: ["down_payment_debt_id"]
+            isOneToOne: false
+            referencedRelation: "debts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_down_payment_plan_id_fkey"
+            columns: ["down_payment_plan_id"]
+            isOneToOne: false
+            referencedRelation: "installment_plans"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "transactions_installment_plan_id_fkey"
             columns: ["installment_plan_id"]
             isOneToOne: false
@@ -2114,6 +2182,13 @@ export type Database = {
           {
             foreignKeyName: "transactions_invoice_id_fkey"
             columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "card_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_pays_invoice_id_fkey"
+            columns: ["pays_invoice_id"]
             isOneToOne: false
             referencedRelation: "card_invoices"
             referencedColumns: ["id"]
@@ -2508,6 +2583,7 @@ export type Database = {
           out_cents: number
         }[]
       }
+      _liquidar_faturas_vencidas: { Args: never; Returns: number }
       _match_rule: {
         Args: { texto: string; ws_id: string }
         Returns: {
@@ -2669,6 +2745,16 @@ export type Database = {
           type: string
         }[]
       }
+      accounts_horizon: { Args: { days?: number }; Returns: Json }
+      add_purchase_down_payment: {
+        Args: {
+          p_entrada: Json
+          p_parent_id: string
+          p_request_id: string
+          p_tipo: string
+        }
+        Returns: string
+      }
       affordability: {
         Args: { amount_cents: number; installments?: number }
         Returns: {
@@ -2749,6 +2835,7 @@ export type Database = {
           unpaid_total_cents: number
         }[]
       }
+      cards_horizon: { Args: { days?: number }; Returns: Json }
       cash_at: { Args: { as_of?: string }; Returns: number }
       cash_flow_forecast: {
         Args: { days?: number }
@@ -2815,6 +2902,15 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      confirm_payment_scoped: {
+        Args: {
+          p_amount_cents: number
+          p_paid_at: string
+          p_scope: string
+          p_transaction_id: string
+        }
+        Returns: number
+      }
       convert_transaction_to_installments: {
         Args: {
           p_account_id?: string
@@ -2871,6 +2967,15 @@ export type Database = {
         }
         Returns: string
       }
+      create_purchase: {
+        Args: {
+          p_dados: Json
+          p_entrada?: Json
+          p_request_id?: string
+          p_tipo: string
+        }
+        Returns: Json
+      }
       cycle_lines: {
         Args: { p_month: string; p_view?: string }
         Returns: {
@@ -2926,29 +3031,8 @@ export type Database = {
       }
       delete_category: { Args: { p_name: string }; Returns: Json }
       delete_debt: { Args: { p_debt_id: string }; Returns: number }
-      edit_goal_contribution: {
-        Args: {
-          p_amount_cents: number
-          p_contribution_id: string
-          p_note?: string
-          p_occurred_at: string
-        }
-        Returns: number
-      }
       draft_lines: {
         Args: { p_drafts: Json; p_from: string; p_to: string }
-        Returns: Json
-      }
-      simular: {
-        Args: { p_registros: Json; p_leituras: Json }
-        Returns: Json
-      }
-      accounts_horizon: {
-        Args: { days?: number }
-        Returns: Json
-      }
-      cards_horizon: {
-        Args: { days?: number }
         Returns: Json
       }
       edit_budget: {
@@ -2961,6 +3045,29 @@ export type Database = {
           p_rollover?: boolean
         }
         Returns: string
+      }
+      edit_goal_contribution: {
+        Args: {
+          p_amount_cents: number
+          p_contribution_id: string
+          p_note?: string
+          p_occurred_at: string
+        }
+        Returns: number
+      }
+      expected_recurring_occurrences: {
+        Args: { p_from: string; p_recurring_id?: string; p_to: string }
+        Returns: {
+          account_id: string
+          amount_cents: number
+          category: string
+          description: string
+          due_date: string
+          id: string
+          inferred_start: boolean
+          kind: string
+          recurring_id: string
+        }[]
       }
       expenses_monthly: {
         Args: { months_back?: number }
@@ -2975,20 +3082,6 @@ export type Database = {
           category: string
           expense_count: number
           total_cents: number
-        }[]
-      }
-      expected_recurring_occurrences: {
-        Args: { p_from: string; p_to: string; p_recurring_id?: string | null }
-        Returns: {
-          id: string
-          recurring_id: string
-          due_date: string
-          amount_cents: number
-          kind: string
-          description: string
-          category: string
-          account_id: string | null
-          inferred_start: boolean
         }[]
       }
       expire_draft_actions: { Args: never; Returns: number }
@@ -3009,6 +3102,20 @@ export type Database = {
       finish_import_batch: {
         Args: { p_batch_id: string; p_item_ids: string[] }
         Returns: number
+      }
+      finish_reminder_occurrence: {
+        Args: {
+          p_delivered_channels?: string[]
+          p_delivered_title?: string
+          p_error: string
+          p_expected_recurrence: string
+          p_expected_run_at: string
+          p_id: string
+          p_next_run_at: string
+          p_outcome: string
+          p_recurrence: string
+        }
+        Returns: boolean
       }
       forecast_json: { Args: { days: number; drafts?: Json }; Returns: Json }
       forecast_with_drafts: {
@@ -3043,19 +3150,19 @@ export type Database = {
         }[]
       }
       ledger_expected_lines: {
-        Args: { p_from: string; p_to: string; p_recurring_id?: string | null }
+        Args: { p_from: string; p_recurring_id?: string; p_to: string }
         Returns: {
+          account_id: string
+          amount_cents: number
+          category: string
+          description: string
+          due_date: string
+          inferred_start: boolean
+          installment_no: number
+          installments_total: number
+          kind: string
           origin: string
           ref_id: string
-          due_date: string
-          amount_cents: number
-          kind: string
-          description: string
-          category: string
-          account_id: string | null
-          installment_no: number | null
-          installments_total: number | null
-          inferred_start: boolean
           status: string
         }[]
       }
@@ -3230,19 +3337,6 @@ export type Database = {
         Returns: Json
       }
       routes_to_python: { Args: { p_phone: string }; Returns: boolean }
-      save_reminder_scoped: {
-        Args: {
-          p_id: string
-          p_expected_run_at: string
-          p_scope: string
-          p_title: string
-          p_recurrence: string | null
-          p_next_run_at: string
-          p_channel: string
-          p_timezone: string
-        }
-        Returns: undefined
-      }
       save_budget: {
         Args: {
           p_category: string
@@ -3256,21 +3350,41 @@ export type Database = {
         Args: { p_color: string; p_icon: string; p_name: string }
         Returns: undefined
       }
+      save_reminder_child_scoped: {
+        Args: {
+          p_channel: string
+          p_child_id: string
+          p_expected_child_run_at: string
+          p_next_run_at: string
+          p_parent_id: string
+          p_recurrence: string | null
+          p_scope: string
+          p_timezone: string
+          p_title: string
+        }
+        Returns: undefined
+      }
+      save_reminder_scoped: {
+        Args: {
+          p_channel: string
+          p_expected_run_at: string
+          p_id: string
+          p_next_run_at: string
+          p_recurrence: string | null
+          p_scope: string
+          p_timezone: string
+          p_title: string
+        }
+        Returns: undefined
+      }
       settle_invoice: {
         Args: { p_invoice_id: string; p_paid_at?: string }
         Returns: string
       }
+      simular: { Args: { p_leituras: Json; p_registros: Json }; Returns: Json }
       skip_recurring_occurrence: {
         Args: { p_date: string; p_recurring_id: string }
         Returns: undefined
-      }
-      unroll_invoice: {
-        Args: { p_invoice_id: string }
-        Returns: string
-      }
-      unsettle_invoice: {
-        Args: { p_invoice_id: string }
-        Returns: string
       }
       spendable: {
         Args: { p_view?: string }
@@ -3302,6 +3416,8 @@ export type Database = {
           tx_count: number
         }[]
       }
+      unroll_invoice: { Args: { p_invoice_id: string }; Returns: string }
+      unsettle_invoice: { Args: { p_invoice_id: string }; Returns: string }
       upcoming_bills: {
         Args: { days?: number }
         Returns: {
@@ -3317,6 +3433,18 @@ export type Database = {
         Args: { p_as_of?: string; p_asset_id: string; p_value_cents: number }
         Returns: number
       }
+      update_debt_contract_scoped: {
+        Args: {
+          p_anchor_no: number
+          p_debt_id: string
+          p_expected_payment_versions: Json
+          p_expected_revision: number
+          p_patch: Json
+          p_request_id: string
+          p_scope: string
+        }
+        Returns: Json
+      }
       update_debt_payment_due_day: {
         Args: {
           p_anchor_id: string
@@ -3330,6 +3458,22 @@ export type Database = {
           p_scope: string
         }
         Returns: Json
+      }
+      update_debt_payment_scoped: {
+        Args: {
+          p_anchor_id: string
+          p_expected_anchor_revision: number
+          p_expected_debt_revision: number
+          p_expected_payment_versions: Json
+          p_patch: Json
+          p_request_id: string
+          p_scope: string
+        }
+        Returns: Json
+      }
+      update_installment_occurrence: {
+        Args: { p_patch: Json; p_transaction_id: string }
+        Returns: number
       }
       update_installment_plan: {
         Args: {
@@ -3345,12 +3489,8 @@ export type Database = {
         }
         Returns: number
       }
-      update_installment_occurrence: {
-        Args: { p_transaction_id: string; p_patch: Json }
-        Returns: number
-      }
       update_installment_scope: {
-        Args: { p_transaction_id: string; p_scope: string; p_patch: Json }
+        Args: { p_patch: Json; p_scope: string; p_transaction_id: string }
         Returns: number
       }
       update_installment_scope_last_day: {
@@ -3359,97 +3499,50 @@ export type Database = {
       }
       update_recurring_all: {
         Args: {
-          p_recurring_id: string
+          p_expected_revision: number
           p_line_patch: Json
-          p_series_patch: Json
-          p_expected_revision: number
-          p_request_id: string
-        }
-        Returns: number
-      }
-      update_debt_contract_scoped: {
-        Args: {
-          p_debt_id: string
-          p_anchor_no: number
-          p_scope: string
-          p_patch: Json
-          p_expected_revision: number
-          p_expected_payment_versions: Json
-          p_request_id: string
-        }
-        Returns: Json
-      }
-      save_reminder_child_scoped: {
-        Args: {
-          p_child_id: string
-          p_parent_id: string
-          p_expected_child_run_at: string
-          p_scope: string
-          p_title: string
-          p_recurrence: string | null
-          p_next_run_at: string
-          p_channel: string
-          p_timezone: string
-        }
-        Returns: undefined
-      }
-      update_recurring_series: {
-        Args: { p_patch: Json; p_propagate?: boolean; p_recurring_id: string }
-        Returns: number
-      }
-      update_recurring_occurrence_and_series: {
-        Args: {
-          p_transaction_id: string
           p_recurring_id: string
-          p_line_patch: Json
-          p_series_patch: Json
-        }
-        Returns: number
-      }
-      update_recurring_one: {
-        Args: {
-          p_transaction_id: string
-          p_patch: Json
-          p_expected_revision: number
           p_request_id: string
+          p_series_patch: Json
         }
         Returns: number
       }
       update_recurring_future: {
         Args: {
-          p_transaction_id: string | null
-          p_recurring_id: string
-          p_line_patch: Json
-          p_series_patch: Json
           p_expected_revision: number
+          p_line_patch: Json
+          p_recurring_id: string
           p_request_id: string
+          p_series_patch: Json
+          p_transaction_id: string | null
         }
+        Returns: number
+      }
+      update_recurring_occurrence_and_series: {
+        Args: {
+          p_line_patch: Json
+          p_recurring_id: string
+          p_series_patch: Json
+          p_transaction_id: string
+        }
+        Returns: number
+      }
+      update_recurring_one: {
+        Args: {
+          p_expected_revision: number
+          p_patch: Json
+          p_request_id: string
+          p_transaction_id: string
+        }
+        Returns: number
+      }
+      update_recurring_series: {
+        Args: { p_patch: Json; p_propagate?: boolean; p_recurring_id: string }
         Returns: number
       }
       update_transaction_scoped: {
         Args: { p_patch: Json; p_scope: string; p_transaction_id: string }
         Returns: number
-      }
-      confirm_payment_scoped: {
-        Args: {
-          p_transaction_id: string
-          p_paid_at: string
-          p_amount_cents: number
-          p_scope: string
-        }
-        Returns: number
-      }
-      update_debt_payment_scoped: {
-        Args: {
-          p_anchor_id: string
-          p_scope: string
-          p_patch: Json
-          p_expected_debt_revision: number
-          p_expected_anchor_revision: number
-          p_expected_payment_versions: Json
-          p_request_id: string
-        }
-        Returns: Json
       }
       year_end_balances: {
         Args: { p_year: number }
@@ -3587,9 +3680,7 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
+  graphql_public: { Enums: {} },
   public: {
     Enums: {},
   },

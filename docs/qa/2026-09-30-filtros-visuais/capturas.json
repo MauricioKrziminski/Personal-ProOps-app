@@ -1,0 +1,57 @@
+[
+  {
+    "file": "antes.png",
+    "bytes": 467043,
+    "sha256": "9e512dc411b30042fcf969c21cbfade661c4385ae648dbf69363912a5fa490b7"
+  },
+  {
+    "file": "datas-icone.png",
+    "bytes": 303498,
+    "sha256": "8e31e6f6ec696f7d594490564bd6ab7e1190ccb031c5a60a15f0563339e3363e"
+  },
+  {
+    "file": "depois.png",
+    "bytes": 350712,
+    "sha256": "a3c01cf1a61bd744f65bdc1511f5583745865d43de998ed9f2e8c5c2df6df730"
+  },
+  {
+    "file": "escuro.png",
+    "bytes": 321384,
+    "sha256": "ea096b086b8dc2f673533e8c50deb12d42c2498bfeb1884ee734a83309070713"
+  },
+  {
+    "file": "fonte-grande-antes.png",
+    "bytes": 324335,
+    "sha256": "a00fea6fbf23ef9aeb730840ed8a12b0460f84b457306294475d1a9553be8725"
+  },
+  {
+    "file": "fonte-grande-depois.png",
+    "bytes": 313562,
+    "sha256": "029cdee454303a1800d7777a3f64a4d8225b4afa650d3b2c5745454fff88a643"
+  },
+  {
+    "file": "multiplos.png",
+    "bytes": 353450,
+    "sha256": "45160f297c34af07aea3608bd0ee83c67fac69c8c1c67037a3b00eb7bc79ea4b"
+  },
+  {
+    "file": "padrao.png",
+    "bytes": 360625,
+    "sha256": "a314006ebee0e56a019d5124e5c30fab90f3ff4ab0b9916f23004402212fd2d0"
+  },
+  {
+    "file": "reset-aplicado.png",
+    "bytes": 467345,
+    "sha256": "98c548c578db3b91bf1f6d76f0766d681396958ee516feeae15a557b59966086"
+  },
+  {
+    "file": "sem-resultados.png",
+    "bytes": 255188,
+    "sha256": "e07717625d9b7b9ddb295258b4a9348c839065bd6b5b263fd120c419c4e48c44"
+  },
+  {
+    "file": "transicoes.mp4",
+    "bytes": 3293124,
+    "sha256": "4e7101465922c9dde86f06988fce5719ac0e53855ef68720c3b3ed795b2031c5"
+  }
+]

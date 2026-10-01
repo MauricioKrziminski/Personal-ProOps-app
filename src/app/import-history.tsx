@@ -6,6 +6,9 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { monthTitle } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
+import { FilterBar } from '@/components/ui/filter-bar';
+import { ListFilters, type FilterSelect } from '@/components/ui/list-filters';
+import { listFiltersActive, type ListFiltersValue } from '@/lib/list-filters';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
@@ -26,7 +29,7 @@ import { VerMais } from '@/components/ui/ver-mais';
 import { PASSO } from '@/lib/aos-poucos';
 import { formatDateBR } from '@/hooks/use-items';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
-import { accountLabel } from '@/lib/accounts';
+import { accountLabel, accountSelectOptions } from '@/lib/accounts';
 import { dataLocalDe } from '@/lib/dates';
 import { transicaoDeLayout, transicaoDeLayoutRapida } from '@/components/motion/transicao';
 
@@ -66,8 +69,16 @@ export default function ImportHistoryScreen() {
   const toast = useToast();
   // Aos poucos: 20 do servidor, e o "Ver mais" pede mais 20.
   const [limite, setLimite] = useState(PASSO);
-  const batches = useImportBatches(limite);
-  const accounts = useAccounts();
+  const [filters, setFilters] = useState<ListFiltersValue>({});
+  const [filtersVisible, setFiltersVisible] = useState(false);
+  const filtered = listFiltersActive(filters);
+  const batches = useImportBatches(limite, filters);
+  const accounts = useAccounts(undefined, true);
+  const filterSelects: readonly FilterSelect[] = [
+    { key: 'source', label: 'Formato', options: [{ id: 'ofx', label: 'OFX' }, { id: 'csv', label: 'CSV' }] },
+    { key: 'accountId', label: 'Conta ou cartão', options: accountSelectOptions(accounts.data ?? [], 'Sem conta', 'none') },
+  ];
+  const applyFilters = (value: ListFiltersValue) => { setFilters(value); setLimite(PASSO); };
   const plano = usePlanStatus();
   const apagar = useDeleteImportBatch();
 
@@ -136,6 +147,10 @@ export default function ImportHistoryScreen() {
       <HeaderActions
         actions={[{ label: 'Nova importação', icon: 'plus', onPress: () => router.push('/import') }]}
       />
+      <FilterBar value={filters} selects={filterSelects} dateLabel="Importação"
+        defaultLabel="Todas as importações" onPress={() => setFiltersVisible(true)} />
+      <ListFilters visible={filtersVisible} value={filters} onClose={() => setFiltersVisible(false)} onApply={applyFilters}
+        dateLabels={{ from: 'Importação a partir de', to: 'Importação até' }} selects={filterSelects} />
 
       {batches.isLoading ? (
         <Section>
@@ -231,7 +246,11 @@ export default function ImportHistoryScreen() {
       ) : null}
 
       {/* Esconder a funcionalidade não vende plano; explicar vende. */}
-      {!batches.isLoading && !batches.isError && lista.length === 0 && bloqueadoNoPlano ? (
+      {!batches.isLoading && !batches.isError && lista.length === 0 && filtered ? (
+        <EmptyState compacto icon="line.3.horizontal.decrease" title="Nenhuma importação com esses filtros"
+          action={{ label: 'Limpar filtros', onPress: () => applyFilters({}) }} />
+      ) : null}
+      {!batches.isLoading && !batches.isError && lista.length === 0 && !filtered && bloqueadoNoPlano ? (
         <EmptyState
           icon="lock"
           title="Importação é do Pro"
@@ -243,7 +262,7 @@ export default function ImportHistoryScreen() {
         />
       ) : null}
 
-      {!batches.isLoading && !batches.isError && lista.length === 0 && !bloqueadoNoPlano ? (
+      {!batches.isLoading && !batches.isError && lista.length === 0 && !filtered && !bloqueadoNoPlano ? (
         <EmptyState
           icon="tray"
           title="Nenhuma importação ainda"

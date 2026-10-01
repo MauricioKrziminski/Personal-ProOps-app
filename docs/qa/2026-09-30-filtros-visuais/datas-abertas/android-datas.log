@@ -1,0 +1,33 @@
+ERROR: null root node returned by UiTestAutomationBridge.
+PASS final-only.
+ERROR: null root node returned by UiTestAutomationBridge.
+PASS reversed dates blocked with inline explanation; cancel keeps applied upper bound.
+ERROR: null root node returned by UiTestAutomationBridge.
+ERROR: null root node returned by UiTestAutomationBridge.
+Traceback (most recent call last):
+  File "<stdin>", line 10, in <module>
+  File "/private/tmp/proops_open_dates_android.py", line 53, in clear
+    def clear(count):filters(count);tap('Limpar filtros');tap('Aplicar');time.sleep(1.2);summary('Todos os lançamentos')
+                                                                                         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/proops_open_dates_android.py", line 50, in summary
+    if has(s,True):return
+       ~~~^^^^^^^^
+  File "/private/tmp/proops_open_dates_android.py", line 34, in has
+    def has(s,partial=False):return any(s in label(n) if partial else s==label(n) for n in rows())
+                                                                                           ~~~~^^
+  File "/private/tmp/proops_open_dates_android.py", line 6, in rows
+    output=adb('shell','uiautomator','dump','/data/local/tmp/proops-qa.xml')
+  File "/private/tmp/proops_open_dates_android.py", line 3, in adb
+    def adb(*args):return subprocess.check_output([ADB,'-s','emulator-5554',*map(str,args)])
+                          ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 473, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+               **kwargs).stdout
+               ^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 557, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 1208, in communicate
+    stdout = self.stdout.read()
+KeyboardInterrupt

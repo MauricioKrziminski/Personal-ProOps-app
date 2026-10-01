@@ -1,0 +1,3 @@
+PASS final original color hook: stable native screenshot after settling, no temporary diagnostic code.
+ERROR: null root node returned by UiTestAutomationBridge.
+PASS final filters/font1/night no restored; Sistema unchanged.

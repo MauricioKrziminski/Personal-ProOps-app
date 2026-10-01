@@ -9,6 +9,7 @@ import {
 import type { NoteColorName } from '@/constants/theme';
 import { useRealtimeInvalidate } from '@/hooks/use-items';
 import { normalizeFolderName, toTsQuery } from '@/lib/search';
+import { timestampDateBounds } from '@/lib/list-filters';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -106,6 +107,9 @@ export function folderTree(folders: NoteFolder[]): (NoteFolder & { depth: number
 export type NoteSort = 'manual' | 'recentes' | 'criadas' | 'titulo';
 
 export interface NoteFilters {
+  /** Intervalo de dias no calendário exibido por atualização, inclusive nas duas pontas. */
+  from?: string;
+  to?: string;
   folderId?: string | null;
   tag?: string | null;
   q?: string;
@@ -138,28 +142,33 @@ export function useNotesList(filters: NoteFilters = {}) {
     queryFn: async ({ pageParam }) => {
       let query = supabase.from('notes').select(NOTE_COLUMNS);
 
-      // Fixada primeiro SEMPRE, inclusive no modo manual: com `position` à frente de `pinned`
-      // uma nota fixada de slot 2 cairia atrás de uma solta de slot 1 e a seção FIXADAS se
-      // intercalaria com o resto da lista.
-      query = query.order('pinned', { ascending: false });
-      switch (filters.sort ?? 'manual') {
-        case 'criadas':
-          query = query.order('created_at', { ascending: false });
-          break;
-        case 'titulo':
-          query = query.order('content', { ascending: true });
-          break;
-        case 'recentes':
-          query = query.order('updated_at', { ascending: false });
-          break;
-        default:
-          // `nullsFirst: false` é o que faz "nunca arrastada" ir para o fim — antes do primeiro
-          // arrasto tudo é null e a ordem é a de sempre, por recência.
-          query = query
-            .order('position', { ascending: true, nullsFirst: false })
-            .order('updated_at', { ascending: false });
+      if (filters.trash) {
+        query = query.order('deleted_at', { ascending: false }).order('id', { ascending: false });
+      } else {
+        // Fixada primeiro SEMPRE, inclusive no modo manual: com `position` à frente de `pinned`
+        // uma nota fixada de slot 2 cairia atrás de uma solta de slot 1 e a seção FIXADAS se
+        // intercalaria com o resto da lista.
+        query = query.order('pinned', { ascending: false });
+        switch (filters.sort ?? 'manual') {
+          case 'criadas':
+            query = query.order('created_at', { ascending: false });
+            break;
+          case 'titulo':
+            query = query.order('content', { ascending: true });
+            break;
+          case 'recentes':
+            query = query.order('updated_at', { ascending: false });
+            break;
+          default:
+            // `nullsFirst: false` é o que faz "nunca arrastada" ir para o fim — antes do primeiro
+            // arrasto tudo é null e a ordem é a de sempre, por recência.
+            query = query
+              .order('position', { ascending: true, nullsFirst: false })
+              .order('updated_at', { ascending: false });
+        }
+        // Desempate estável evita duplicar/pular notas com timestamps ou títulos iguais.
+        query = query.order('id');
       }
-      query = query.range(pageParam, pageParam + PAGE - 1);
 
       query = filters.trash
         ? query.not('deleted_at', 'is', null)
@@ -182,6 +191,11 @@ export function useNotesList(filters: NoteFilters = {}) {
 
       const term = filters.q ? toTsQuery(filters.q) : '';
       if (term) query = query.textSearch('search_tsv', term, { config: 'pt_unaccent' });
+
+      const bounds = timestampDateBounds(filters);
+      if (bounds.from) query = query.gte('updated_at', bounds.from);
+      if (bounds.before) query = query.lt('updated_at', bounds.before);
+      query = query.range(pageParam, pageParam + PAGE - 1);
 
       const { data, error } = await query;
       if (error) throw error;

@@ -5,6 +5,9 @@ import type { CorpoProps } from '@/components/finance/corpo-do-lancar';
 import { Presenca, TrocaSuave } from '@/components/motion/presenca';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { DatePickerField } from '@/components/finance/date-picker-field';
+import { DownPaymentFields } from '@/components/finance/down-payment-fields';
+import { PurchaseDownPayment } from '@/components/finance/purchase-down-payment';
+import { downPaymentError, downPaymentInput, type DownPaymentForm } from '@/lib/down-payment';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -94,6 +97,8 @@ export interface FormState {
   ancora: string | null;
   /** As pagas de quando o formulário abriu: é com elas que o cronograma do banco foi feito. */
   pagasOriginal: number;
+  downPaymentEnabled?: boolean;
+  downPayment?: DownPaymentForm;
 }
 
 /**
@@ -222,7 +227,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
   const toast = useToast();
-  const accounts = useAccounts();
+  const accounts = useAccounts(alvo?.account_id);
   const save = useSaveDebt();
   const saveScoped = useSaveDebtContractScoped();
   const contractAttempt = useRef<{ key: string; id: string } | null>(null);
@@ -268,9 +273,16 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
 
   const fracao = parseTaxa(form.taxa);
   const totalDeParcelas = /^\d+$/.test(form.parcelas) ? Number(form.parcelas) : 0;
+  const entradaAtiva = !form.id && Boolean(form.downPaymentEnabled);
+  const entrada = form.downPayment ?? { amountCents: 0, dateBR: isoToBR(localISODate()), accountId: form.accountId };
+  const valorDasParcelas = form.valorCents - (entradaAtiva && form.unidade === 'total' ? entrada.amountCents : 0);
+  const erroEntrada = entradaAtiva
+    ? downPaymentError(entrada, localISODate()) ?? (form.calculationMode === 'fixed_installments' && valorDasParcelas < totalDeParcelas
+      ? 'A entrada precisa ser menor que o total da compra' : undefined)
+    : undefined;
   /** A parcela do contrato fixo, venha o valor digitado como parcela ou como total a pagar. */
   const parcelaCents = form.unidade === 'total'
-    ? parcelaDoTotalDoContrato(form.valorCents, totalDeParcelas)
+    ? parcelaDoTotalDoContrato(valorDasParcelas, totalDeParcelas)
     : form.valorCents;
   let simpleValues: ReturnType<typeof simpleDebtValues> | null = null;
   if (form.calculationMode === 'fixed_installments') {
@@ -323,7 +335,8 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     if (unidade === form.unidade) return;
     // Trocar a unidade sem digitar não move dinheiro: o número muda de régua, o contrato fica.
     const valorCents =
-      unidade === 'total' ? form.valorCents * totalDeParcelas : parcelaDoTotalDoContrato(form.valorCents, totalDeParcelas);
+      unidade === 'total' ? form.valorCents * totalDeParcelas + (entradaAtiva ? entrada.amountCents : 0)
+        : parcelaDoTotalDoContrato(valorDasParcelas, totalDeParcelas);
     setForm({ ...form, unidade, valorCents: totalDeParcelas > 0 ? valorCents : form.valorCents });
   };
   const nomeOk = form.name.trim().length >= 2;
@@ -346,7 +359,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     (!form.parcelas || Number(form.parcelas) > 0) &&
     (form.kind !== 'financing' || (form.taxa.trim() !== '' && !!form.parcelas)) &&
     Number.isFinite(Number(form.taxa.replace(',', '.'))) && Number(form.taxa.replace(',', '.')) >= 0;
-  const podeSalvar = Boolean(nomeOk && validDueDay && (!form.id || payments.isSuccess) && (form.calculationMode === 'fixed_installments' ? simpleValues : advancedValid));
+  const podeSalvar = Boolean(nomeOk && !erroEntrada && validDueDay && (!form.id || payments.isSuccess) && (form.calculationMode === 'fixed_installments' ? simpleValues : advancedValid));
 
   const salvar = (criarOutro: boolean) => {
     if (!podeSalvar) return;
@@ -368,6 +381,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
         // Só com âncora conhecida: sem ela o cronograma segue o jeito antigo, sem data inventada.
         ...(ancoraEfetiva ? { first_due_date: ancoraEfetiva } : {}),
         ...(form.id ? { versao: form.versao ?? null } : {}),
+        ...(entradaAtiva ? { down_payment: downPaymentInput(entrada, localISODate()) } : {}),
       };
     const aoFalhar = (error: Error) =>
       toast({
@@ -498,6 +512,8 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
 
       <SheetScroll contentContainerStyle={styles.sheetBody}>
         {props.topo}
+        {form.id ? <PurchaseDownPayment type="financiamento" parentId={form.id}
+          installmentsCents={form.calculationMode === 'fixed_installments' ? simpleValues?.principal_cents : undefined} /> : null}
         <View style={styles.conteudo}>
         {/* Os pagamentos lançados são o piso das "pagas": sem eles o Salvar espera — e diz por quê. */}
         {form.id && payments.isError ? (
@@ -555,9 +571,13 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
             }}
           />
         </Field>
+        {!form.id ? <DownPaymentFields enabled={Boolean(form.downPaymentEnabled)}
+          onEnabled={(downPaymentEnabled) => setForm({ ...form, downPaymentEnabled })}
+          value={entrada} onChange={(downPayment) => setForm({ ...form, downPayment })}
+          accounts={accounts.data ?? []} error={erroEntrada} /> : null}
         <TrocaSuave estado={form.calculationMode} style={styles.conteudo}>
         {form.calculationMode === 'fixed_installments' ? <>
-          <Field label="Valor">
+          <Field label="Valor" hint={form.id ? 'Valor das parcelas; a entrada aparece separadamente acima' : entradaAtiva && form.unidade === 'total' ? 'Inclui a entrada; só o restante será parcelado' : undefined}>
             <Segmented options={UNIDADES_DA_DIVIDA} value={form.unidade} onChange={mudarUnidade} />
             <MoneyField
               valueCents={form.valorCents}
@@ -599,6 +619,9 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
           <Presenca visivel={Boolean(simpleValues)}>
           {simpleValues ? <Card style={styles.resumo}>
             <ThemedText type="small" style={tabular}>{`${simpleValues.installments}× de ${brl(parcelaCents)} = ${brl(simpleValues.principal_cents)}`}</ThemedText>
+            {entradaAtiva ? <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+              {`Entrada ${brl(entrada.amountCents)} · total ${brl(simpleValues.principal_cents + entrada.amountCents)}`}
+            </ThemedText> : null}
             {form.installmentsPaid > 0 ? (
               <ThemedText type="small" themeColor="textSecondary" style={tabular}>
                 {`Falta pagar (${simpleValues.installments - form.installmentsPaid} parcelas) `}

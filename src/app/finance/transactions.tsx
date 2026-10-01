@@ -15,18 +15,19 @@ import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { ItemLink } from '@/components/ui/item-link';
 import { Search } from '@/components/ui/search';
+import { ListFilters } from '@/components/ui/list-filters';
+import { listFilterCount, type ListFiltersValue } from '@/lib/list-filters';
+import { MudancaSuave } from '@/components/motion/presenca';
 import { PeriodSummaryCard } from '@/components/finance/period-summary-card';
 import { Button } from '@/components/ui/button';
-import { Chip } from '@/components/finance/chip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Card } from '@/components/ui/card';
 import { Dica } from '@/components/ui/dica';
-import { useBRL } from '@/components/ui/conceal';
+import { useBRL, useConceal } from '@/components/ui/conceal';
 import { Money } from '@/components/ui/money';
 import { Row } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { fecharDeslizavelAberto } from '@/components/ui/deslizavel';
-import { Segmented } from '@/components/ui/segmented';
 import { Skeleton, SkeletonChart, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
@@ -35,6 +36,7 @@ import {
   NO_ACCOUNT,
   useAccountBalances,
   useAccounts,
+  useCategoriesUsed,
   useDeleteTransaction,
   useRecentTransactions,
   useRecurringTransactions,
@@ -61,7 +63,7 @@ import { filterExpectedLines, mesclarPrevistas, previstasNaTela, type ItemDoExtr
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
 import { useDebounced } from '@/hooks/use-debounced';
 import { useTheme } from '@/hooks/use-theme';
-import { accountLabel, saldoDaConta } from '@/lib/accounts';
+import { accountLabel, accountSelectOptions, saldoDaConta } from '@/lib/accounts';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { tabletPaneWidths } from '@/design/adaptive-window';
 import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
@@ -87,7 +89,7 @@ const KIND_OPTIONS = [
   { value: 'all', label: 'Tudo' },
   { value: 'expense', label: 'Gastos' },
   { value: 'income', label: 'Receitas' },
-  { value: 'transfer', label: 'Transf.' },
+  { value: 'transfer', label: 'Transferências' },
 ] as const satisfies readonly { value: TransactionKind | 'all'; label: string }[];
 
 /**
@@ -137,24 +139,25 @@ const chaveDoItem = ({ tx, prevista }: Item) =>
       ? `rec:${prevista!.ref_id}:${prevista!.due_date}`
       : `${prevista!.origin}:${prevista!.ref_id}:${prevista!.due_date}`;
 
-/** `2026-08-23` → `sáb, 23 de agosto`. */
-function dayTitle(iso: string): string {
+/** No mês/ciclo o ano já está na régua; intervalos livres precisam identificá-lo em cada dia. */
+function dayTitle(iso: string, includeYear = false): string {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('pt-BR', {
     weekday: 'short',
     day: '2-digit',
-    month: 'long',
+    month: includeYear ? '2-digit' : 'long',
+    ...(includeYear ? { year: 'numeric' as const } : {}),
   });
 }
 
-function toSections(items: Item[]): DaySection[] {
+function toSections(items: Item[], includeYear = false): DaySection[] {
   const sections: DaySection[] = [];
   let currentDay = '';
   for (const item of items) {
     const dia = dataDoItem(item);
     if (dia !== currentDay) {
       currentDay = dia;
-      sections.push({ title: dayTitle(dia), net: 0, data: [] });
+      sections.push({ title: dayTitle(dia, includeYear), net: 0, data: [] });
     }
     const section = sections[sections.length - 1];
     section.data.push(item);
@@ -172,14 +175,14 @@ function toSections(items: Item[]): DaySection[] {
  * futuro para o passado, então "A seguir" chega inteiro na primeira página e "Anteriores" cresce
  * com a rolagem.
  */
-function toSeriesSections(items: Item[], hoje: string): DaySection[] {
+function toSeriesSections(items: Item[], hoje: string, includeYear = false): DaySection[] {
   // A atrasada em aberto (fora do cartão) é o que falta pagar: vai para o topo de "A seguir".
   // A prevista passada também falta — menos a estimada, que não prova que existiu.
   const falta = ({ tx, prevista }: Item) => tx
     ? tx.occurred_at >= hoje || (tx.status === 'pending' && !tx.invoice_id)
     : prevista!.due_date >= hoje || !prevista!.inferred_start;
-  const aSeguir = toSections(items.filter(falta).reverse());
-  const anteriores = toSections(items.filter((item) => !falta(item)));
+  const aSeguir = toSections(items.filter(falta).reverse(), includeYear);
+  const anteriores = toSections(items.filter((item) => !falta(item)), includeYear);
   if (aSeguir[0]) aSeguir[0].grupo = 'A seguir';
   if (anteriores[0]) anteriores[0].grupo = 'Anteriores';
   return [...aSeguir, ...anteriores];
@@ -226,6 +229,10 @@ export default function TransactionsScreen() {
   const [source, setSource] = useState<TransactionSource | undefined>(undefined);
   const [search, setSearch] = useState('');
   const [puxando, setPuxando] = useState(false);
+  const [filtersVisible, setFiltersVisible] = useState(false);
+  const [customDates, setCustomDates] = useState<{ from?: string; to?: string }>({});
+  const [minCents, setMinCents] = useState<number>();
+  const [maxCents, setMaxCents] = useState<number>();
   // Busca-enquanto-digita sem uma requisição por tecla — agora ela vai ao banco.
   const term = useDebounced(search.trim(), 250);
   // Congelado na montagem: todas as linhas da lista são julgadas pelo MESMO "hoje". Lido por
@@ -272,7 +279,18 @@ export default function TransactionsScreen() {
   const mesCorrente = useCycleMonth(view);
   const month = mesEscolhido ?? mesCorrente;
   const setMonth = setMesEscolhido;
-  const range = useMonthRange(month, view);
+  const monthRange = useMonthRange(month, view);
+  const customPeriod = Boolean(customDates.from || customDates.to);
+  const openPeriod = customPeriod && !(customDates.from && customDates.to);
+  const range = customPeriod ? { ...monthRange, from: customDates.from, to: customDates.to,
+    pronto: true, isError: false, isPending: false, fetchStatus: 'idle' as const } : monthRange;
+  const periodLabel = customDates.from && customDates.to
+    ? `${formatDateBR(customDates.from)} a ${formatDateBR(customDates.to)}`
+    : customDates.from ? `A partir de ${formatDateBR(customDates.from)}`
+      : customDates.to ? `Até ${formatDateBR(customDates.to)}` : monthTitle(month);
+  const periodDescription = openPeriod ? periodLabel.charAt(0).toLowerCase() + periodLabel.slice(1)
+    : customPeriod ? `de ${periodLabel}` : `em ${periodLabel}`;
+  const forecastsEnabled = range.pronto && !openPeriod;
   const list = useTransactions({
     /*
       ⚠️ **As MESMAS bordas do resumo, não `month`.** O hook recortava o mês civil por conta
@@ -289,9 +307,11 @@ export default function TransactionsScreen() {
     status: status === 'all' ? undefined : status,
     source,
     q: term,
+    minCents, maxCents,
   });
-  const expected = useExpectedLedgerLines(range.from, range.to, range.pronto, params.recurringId);
-  const summary = useTransactionsSummary(range.from, range.to, range.pronto);
+  const expected = useExpectedLedgerLines(range.from, range.to, forecastsEnabled, params.recurringId);
+  // O card global fica oculto em períodos personalizados; nenhuma RPC de total é necessária.
+  const summary = useTransactionsSummary(range.from, range.to, range.pronto && !customPeriod);
   /*
     ⚠️ **O card do topo soma a LISTA, e o ciclo virou o link do rodapé.** Ele já foi o contrário
     — lia `cycle_series` para bater com a home — e aí parou de bater com a lista logo abaixo
@@ -321,7 +341,8 @@ export default function TransactionsScreen() {
   // `toSections` agrupa em varredura linear, então o dia que atravessa a fronteira de duas
   // páginas continua sendo uma seção só depois do `flat()`.
   const rows = useMemo(() => list.data?.pages.flat() ?? [], [list.data]);
-  const expectedLines = useMemo(() => filterExpectedLines(expected.data ?? [], {
+  // Queries desligadas podem conservar cache e erro. O modo aberto exclui também esses dados.
+  const expectedLines = useMemo(() => openPeriod ? [] : filterExpectedLines(expected.data ?? [], {
     kind: kind === 'all' ? undefined : kind,
     status: status === 'all' ? undefined : status,
     category,
@@ -329,10 +350,18 @@ export default function TransactionsScreen() {
     source,
     recurringId: params.recurringId,
     q: term,
-  }), [expected.data, kind, status, category, accountId, source, params.recurringId, term]);
+    minCents, maxCents,
+  }), [openPeriod, expected.data, kind, status, category, accountId, source, params.recurringId, term, minCents, maxCents]);
+  // Trocar de filtro durante a gravação não pode trazer uma ocorrência de outro recorte.
+  const transitoFiltrado = useMemo(() => openPeriod ? [] : filterExpectedLines(previstas.emTransito.filter(p =>
+    (!range.from || p.due_date >= range.from) && (!range.to || p.due_date <= range.to)), {
+      kind: kind === 'all' ? undefined : kind, status: status === 'all' ? undefined : status,
+      category, accountId: accountId === undefined ? undefined : accountId === NO_ACCOUNT ? null : accountId,
+      source, recurringId: params.recurringId, q: term, minCents, maxCents,
+    }), [openPeriod, previstas.emTransito, range.from, range.to, kind, status, category, accountId, source, params.recurringId, term, minCents, maxCents]);
   const previstasVisiveis = useMemo(
-    () => previstasNaTela(expectedLines, previstas.emTransito, rows),
-    [expectedLines, previstas.emTransito, rows]
+    () => previstasNaTela(expectedLines, transitoFiltrado, rows),
+    [expectedLines, transitoFiltrado, rows]
   );
   const totais = useMemo(() => {
     let entrou = 0;
@@ -365,10 +394,12 @@ export default function TransactionsScreen() {
     return { entrou, saiu, entrouPrevisto, saiuPrevisto, linhas };
   }, [summary.data, previstasVisiveis]);
 
-  const accounts = useAccounts();
+  const accounts = useAccounts(undefined, true);
+  const categories = useCategoriesUsed();
   const saldos = useAccountBalances();
   // O saldo respeita o "esconder valores" (`useBRL`), como na tela Contas.
   const brl = useBRL();
+  const { concealed } = useConceal();
   // Um item basta para separar "nunca teve nada" de "este mês não teve nada".
   const anyEver = useRecentTransactions(1);
   const remove = useDeleteTransaction();
@@ -392,10 +423,12 @@ export default function TransactionsScreen() {
     "Tentar de novo". Como consulta, ele libera quando falha, e a falha aparece no card e na
     lista. `regua.cycle` entra porque é ele que dá NOME ao mês. Ver `tela-pronta.ts`.
   */
-  const pronta = useTelaPronta(summary, serieCiclo, accounts, anyEver, list, expected, regua.cycle, range);
+  const pronta = useTelaPronta(accounts, anyEver, list,
+    ...(openPeriod ? [] : [expected]),
+    ...(customPeriod ? [] : [summary, serieCiclo, regua.cycle, range]));
 
   /** O ciclo corrente não veio: o mês exibido seria o palpite civil, com o nome errado. */
-  const cicloFalhou = regua.cycle.isError && !regua.cycle.data;
+  const cicloFalhou = !customPeriod && regua.cycle.isError && !regua.cycle.data;
   /** Sem período utilizável: nem o resumo nem a lista têm como responder. */
   const periodoFalhou = cicloFalhou || range.isError;
   /**
@@ -407,7 +440,9 @@ export default function TransactionsScreen() {
     Promise.all([
       ...(cicloFalhou ? [regua.cycle.refetch()] : []),
       ...(range.isError ? [range.refetch()] : []),
-      ...(range.pronto ? [summary.refetch(), list.refetch(), expected.refetch()] : []),
+      ...(range.pronto ? [list.refetch()] : []),
+      ...(range.pronto && !customPeriod ? [summary.refetch()] : []),
+      ...(forecastsEnabled ? [expected.refetch()] : []),
     ]);
 
   // Falhou a leitura dos lançamentos: a lista mostra o erro, nunca uma lista só de previstas.
@@ -416,8 +451,8 @@ export default function TransactionsScreen() {
     [rows, previstasVisiveis, list.hasNextPage, list.isError]
   );
   const sections = useMemo(
-    () => (params.recurringId ? toSeriesSections(itens, hoje) : toSections(itens)),
-    [itens, params.recurringId, hoje]
+    () => (params.recurringId ? toSeriesSections(itens, hoje, customPeriod) : toSections(itens, customPeriod)),
+    [itens, params.recurringId, hoje, customPeriod]
   );
 
   /** Id da conta filtrada; `undefined` na lista global e também em "Sem conta". */
@@ -457,13 +492,31 @@ export default function TransactionsScreen() {
         ? 'Sem conta'
         : (accountName.get(accountId) ?? 'Extrato');
 
-  const hasFilters =
-    kind !== 'all' ||
-    status !== 'all' ||
-    Boolean(category) ||
-    accountId !== undefined ||
-    source !== undefined ||
-    search.trim() !== '';
+  // A mesma fonte governa a folha, a contagem e o resumo: não há filtros paralelos.
+  const filterValue: ListFiltersValue = {
+    q: search, ...customDates, minCents, maxCents, selections: {
+      kind: kind === 'all' ? '' : kind, status: status === 'all' ? '' : status,
+      category: category ?? '', accountId: accountId ?? '', source: source ?? '',
+    },
+  };
+  const filterCount = listFilterCount(filterValue);
+  const hasFilters = filterCount > 0;
+  const valueSummary = minCents !== undefined && maxCents !== undefined
+    ? `${brl(minCents)} a ${brl(maxCents)}`
+    : minCents !== undefined ? `A partir de ${brl(minCents)}`
+      : maxCents !== undefined ? `Até ${brl(maxCents)}` : undefined;
+  const filterDetails = [
+    tituloDaConta,
+    kind !== 'all' ? KIND_OPTIONS.find(o => o.value === kind)?.label : undefined,
+    status !== 'all' ? STATUS_OPTIONS.find(o => o.value === status)?.label : undefined,
+    category,
+    source ? SOURCE_FILTER.find(o => o.value === source)?.label : undefined,
+    valueSummary, search.trim() ? `Busca: ${search.trim()}` : undefined,
+  ].filter(Boolean);
+  const fullFilterSummary = filterDetails.join(' · ');
+  // Resumir critérios é diferente de cortar rótulos: nomes completos continuam quebrando linha.
+  const filterSummary = [...filterDetails.slice(0, 2),
+    ...(filterDetails.length > 2 ? [`mais ${filterDetails.length - 2}`] : [])].join(' · ');
 
   /**
    * A lista está mostrando MENOS que o período inteiro?
@@ -494,6 +547,16 @@ export default function TransactionsScreen() {
     setAccountId(undefined);
     setSource(undefined);
     setSearch('');
+    setCustomDates({}); setMinCents(undefined); setMaxCents(undefined);
+  };
+  const applyFilters = (value: ListFiltersValue) => {
+    setSearch(value.q ?? ''); setCustomDates({ from: value.from, to: value.to });
+    setMinCents(value.minCents); setMaxCents(value.maxCents);
+    setKind((value.selections?.kind || 'all') as typeof kind);
+    setStatus((value.selections?.status || 'all') as typeof status);
+    setCategory(value.selections?.category || undefined);
+    setAccountId(value.selections?.accountId || undefined);
+    setSource((value.selections?.source || undefined) as typeof source);
   };
 
   const pay = (tx: Transaction) => baixa.abrir(tx.id);
@@ -537,9 +600,35 @@ export default function TransactionsScreen() {
           da tela Contas (`saldoDaConta`). */}
       {saldoDaContaFiltrada}
 
-      {params.recurringId
+      {customPeriod ? null : params.recurringId
         ? <MonthPicker month={month} onChange={setMonth} />
         : <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} />}
+      <View style={styles.filterOverview}>
+        <View style={styles.filterRow}>
+          <View style={styles.filterText}>
+            {/* Ocultar valores remonta o texto: dinheiro aberto não permanece na camada de saída. */}
+            <MudancaSuave key={String(concealed)} valor={customPeriod ? periodLabel : filterSummary}>
+              <ThemedText type={customPeriod ? 'smallBold' : 'small'}
+                themeColor={customPeriod ? 'text' : 'textSecondary'}
+                accessibilityLabel={customPeriod ? `Período: ${periodLabel}` : fullFilterSummary || 'Todos os lançamentos'}>
+                {customPeriod ? periodLabel : filterSummary || 'Todos os lançamentos'}
+              </ThemedText>
+            </MudancaSuave>
+          </View>
+          <Button label={filterCount ? `Filtros · ${filterCount}` : 'Filtros'}
+            icon="line.3.horizontal.decrease" variant={hasFilters ? 'primary' : 'secondary'} size="sm"
+            onPress={() => setFiltersVisible(true)} />
+        </View>
+        {customPeriod && filterSummary ? <MudancaSuave key={String(concealed)} valor={filterSummary}>
+          <ThemedText type="small" themeColor="textSecondary" accessibilityLabel={fullFilterSummary}>
+            {filterSummary}
+          </ThemedText>
+        </MudancaSuave> : null}
+      </View>
+
+      {openPeriod ? <ThemedText type="footnote" themeColor="textSecondary">
+        Lançamentos registrados. Escolha as duas datas para incluir previsões.
+      </ThemedText> : null}
 
       {/*
         ⚠️ **Com filtro ativo o card SOME.** Ele soma o período inteiro; a lista filtrada soma
@@ -595,61 +684,8 @@ export default function TransactionsScreen() {
         />
       )}
 
-      {/*
-        **Um `Segmented` e uma fileira de chips, não dois `Segmented`.**
-
-        Os dois filtros vinham empilhados, do mesmo tamanho e com a mesma forma — duas lajes
-        idênticas em que nada dizia qual mandava em quê. É o mesmo defeito dos dois campos de
-        texto que a aba Notas tinha, e a correção é a mesma: dar forma diferente a papéis
-        diferentes.
-
-        `kind` é o filtro PRIMÁRIO (é o que muda a resposta da tela: gastei ou recebi) e fica no
-        segmentado, que é o controle de escolha única do sistema. `status` é um recorte
-        secundário sobre o resultado, e recorte secundário é chip — a mesma gramática dos filtros
-        de pasta e tag em Notas. De quebra, a fileira de chips ocupa metade da altura.
-      */}
-      <View style={styles.filters}>
-        <Segmented options={KIND_OPTIONS} value={kind} onChange={setKind} />
-        <View style={styles.statusChips}>
-          {STATUS_OPTIONS.map((o) => (
-            <Chip
-              key={o.value}
-              label={o.label}
-              selected={status === o.value}
-              onPress={() => setStatus(o.value)}
-            />
-          ))}
-        </View>
-        {category ? (
-          <Button
-            label={`categoria: ${category}`}
-            icon="xmark"
-            size="sm"
-            variant="secondary"
-            onPress={() => setCategory(undefined)}
-          />
-        ) : null}
-        {tituloDaConta ? (
-          <Button
-            label={`conta: ${tituloDaConta}`}
-            icon="xmark"
-            size="sm"
-            variant="secondary"
-            onPress={() => setAccountId(undefined)}
-          />
-        ) : null}
-        {source ? (
-          <Button
-            label={`origem: ${SOURCE_FILTER.find((o) => o.value === source)?.label ?? source}`}
-            icon="xmark"
-            size="sm"
-            variant="secondary"
-            onPress={() => setSource(undefined)}
-          />
-        ) : null}
-      </View>
       {/* As previstas moram na lista, no dia delas; a falha da leitura delas aparece aqui. */}
-      {expected.isError ? <ErrorCard onRetry={expected.refetch} /> : null}
+      {forecastsEnabled && expected.isError ? <ErrorCard onRetry={expected.refetch} /> : null}
       {/* Aponta para a primeira linha: só com linhas, e só onde a lista vem logo abaixo. */}
       {sections.length > 0 && !wideWorkspace ? <Dica id="lista-arrasto" tela="lancamentos" bico="baixo" /> : null}
     </View>
@@ -672,7 +708,7 @@ export default function TransactionsScreen() {
     </View>
   // The expected-query error already appears in the header. A successful
   // projection must never conceal a failed read of recorded transactions.
-  ) : expected.isError ? null : params.recurringId && !hasFilters ? (
+  ) : forecastsEnabled && expected.isError ? null : params.recurringId && !hasFilters ? (
     // Série recém-criada ou com o calendário refeito: o agendador gera as ocorrências em até um
     // minuto, e a lista se atualiza sozinha quando elas chegam.
     <EmptyState compacto icon="repeat" title="Esta recorrente ainda não tem ocorrências" />
@@ -681,8 +717,8 @@ export default function TransactionsScreen() {
       icon="line.3.horizontal.decrease"
       title={
         search.trim()
-          ? <>Nenhum lançamento com <Forte>{search.trim()}</Forte> em {monthTitle(month)}</>
-          : `Nenhum lançamento com esse filtro em ${monthTitle(month)}`
+          ? <>Nenhum lançamento com <Forte>{search.trim()}</Forte> {periodDescription}</>
+          : `Nenhum lançamento com esse filtro ${periodDescription}`
       }
       action={{ label: 'Limpar filtros', onPress: clearFilters }}
     />
@@ -731,41 +767,6 @@ export default function TransactionsScreen() {
     <HeaderActions
           actions={params.recurringId ? [] : [{ label: 'Lançar', icon: 'plus', onPress: abrirLancamento }]}
           menu={{ title: 'Mais opções', actions: [
-            // Submenu, não uma fileira de chips: com oito contas cadastradas o corpo da tela
-            // viraria filtro. É o mesmo desenho do "mudar de pasta" das notas.
-            {
-              label: 'Conta',
-              icon: 'wallet.bifold',
-              actions: [
-                {
-                  label: 'Todas',
-                  selected: accountId === undefined,
-                  onPress: () => setAccountId(undefined),
-                },
-                ...(accounts.data ?? []).map((a) => ({
-                  label: accountLabel(a),
-                  selected: accountId === a.id,
-                  onPress: () => setAccountId(a.id),
-                })),
-                {
-                  label: 'Sem conta',
-                  selected: accountId === NO_ACCOUNT,
-                  onPress: () => setAccountId(NO_ACCOUNT),
-                },
-              ],
-            },
-            {
-              label: 'Origem',
-              icon: 'arrow.triangle.branch',
-              actions: [
-                { label: 'Todas', selected: source === undefined, onPress: () => setSource(undefined) },
-                ...SOURCE_FILTER.map((o) => ({
-                  label: o.label,
-                  selected: source === o.value,
-                  onPress: () => setSource(o.value),
-                })),
-              ],
-            },
             // Olhando UMA conta, ela se edita daqui, e o extrato importado já vai para ela (25/09/2026).
             ...(contaDoFiltro
               ? [
@@ -833,7 +834,9 @@ export default function TransactionsScreen() {
                 style={styles.dayTitle}>
                 {section.title}
               </ThemedText>
-              <Money cents={section.net} variant="footnote" tone="textSecondary" signed />
+              <View style={styles.dayNet}>
+                <Money cents={section.net} variant="footnote" tone="textSecondary" signed />
+              </View>
             </View>
             </View>
           )}
@@ -990,7 +993,7 @@ export default function TransactionsScreen() {
                       subtitle={[...badges, ...context].join(' · ')}
                       icon={aparencia(tx.category, tx.kind).icon}
                       tinta={aparencia(tx.category, tx.kind).cor}
-                      accessibilityLabel={`${tx.description || tx.merchant || tx.category || 'Lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}, ${dayTitle(tx.occurred_at)}${estado ? `, ${estado}` : ''}`}
+                      accessibilityLabel={`${tx.description || tx.merchant || tx.category || 'Lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}, ${dayTitle(tx.occurred_at, customPeriod)}${estado ? `, ${estado}` : ''}`}
                       onLongPress={onLongPress}
                       trailing={
                         <Money
@@ -1045,6 +1048,16 @@ export default function TransactionsScreen() {
         options={{ title: nomeDaSerie ?? tituloDaConta ?? 'Lançamentos' }}
       />
       {menu}
+      <ListFilters visible={filtersVisible} onClose={() => setFiltersVisible(false)} onApply={applyFilters}
+        value={filterValue} showValues dateLabels={{ from: 'Lançamento a partir de', to: 'Lançamento até' }}
+        resetDatesLabel={view === 'cycle' ? 'Voltar ao ciclo' : 'Voltar ao mês'}
+        selects={[
+          { key: 'kind', label: 'Tipo', options: KIND_OPTIONS.filter(o => o.value !== 'all').map(o => ({ id: o.value, label: o.label })) },
+          { key: 'status', label: 'Situação', options: STATUS_OPTIONS.filter(o => o.value !== 'all').map(o => ({ id: o.value, label: o.label })) },
+          { key: 'category', label: 'Categoria', options: (categories.data ?? []).map(c => ({ id: c.category, label: c.category })) },
+          { key: 'accountId', label: 'Conta ou cartão', options: accountSelectOptions(accounts.data ?? [], 'Sem conta', 'none') },
+          { key: 'source', label: 'Origem', options: SOURCE_FILTER.map(o => ({ id: o.value, label: o.label })) },
+        ]} />
       {wideWorkspace ? (
         <View style={styles.wideCanvas}>
           <AdaptivePanes
@@ -1065,6 +1078,9 @@ export default function TransactionsScreen() {
 }
 
 const styles = StyleSheet.create({
+  filterOverview: { gap: Space.sm },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Space.md },
+  filterText: { flexGrow: 1, flexShrink: 1, flexBasis: 180, minWidth: 180 },
   listHost: {
     flex: 1,
   },
@@ -1104,14 +1120,9 @@ const styles = StyleSheet.create({
   },
   // Sem uso: o esqueleto virou um bloco único com a altura do card.
 
-  filters: {
-    gap: Space.sm,
-  },
-  // `flexWrap` porque os rótulos passaram a ser frases ("Ainda vai acontecer"): cabem numa
-  // linha a 384dp e descem para a segunda com fonte grande, em vez de sair pela borda.
-  statusChips: { flexDirection: 'row', gap: Space.sm, flexWrap: 'wrap' },
   dayHeader: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Space.md,
@@ -1122,7 +1133,11 @@ const styles = StyleSheet.create({
   },
   dayTitle: {
     letterSpacing: 0.2,
+    // Data inteira precisa de espaço útil; o total ocupa a próxima linha em fonte ampliada.
+    minWidth: 180,
+    flexGrow: 1,
   },
+  dayNet: { marginLeft: 'auto' },
   grupoDaSerie: { paddingTop: Space.lg },
   rowHost: {
     overflow: 'hidden',

@@ -129,6 +129,7 @@ export function DatePickerField({
           accessibilityRole="button"
           accessibilityState={{ expanded: aberto }}
           accessibilityLabel={accessibilityLabel}
+          accessibilityValue={{ text: value || placeholder }}
           accessibilityHint="Toque para escolher no calendário">
           {({ pressed }) => (
             <View

@@ -1,0 +1,23 @@
+{
+  "src/components/ui/list-filters.tsx": "cc8e049643ae8fd54a32691fbd39ac873ad51a78b25c535c8be1f1d69f4f3fc0",
+  "src/components/ui/field.tsx": "6b9ccdae029daa24062db5cc4fa48c5f858cfdfb89d018b9db6d2d4c24eeb551",
+  "src/lib/list-filters.ts": "cc85fffaf91b80516d6ac99b51822651fadc36b0396c1d02d26d93aefc255483",
+  "src/hooks/use-finance.ts": "f4c302a5d734faf93b4a4d9e55fcc9963c7be00fecf9619741f4f81b2dc9dc53",
+  "src/app/finance/transactions.tsx": "f9784b901fefcfc8add7c2273fddfc1af56d636522b424e4774040aea8904f63",
+  "src/app/(tabs)/notes/index.tsx": "3399e3607a9fe4e60735b7cdaad0e2099dd2820e0b80ce1c1dbe39ec1e138eb6",
+  "src/app/finance/debts.tsx": "07858dbf23b35dafff2e7e3af174e3f9fcb9693307e9af7799ac75e416395c54",
+  "src/app/finance/installments.tsx": "910724cd8cd3c631f9321f43a3d0338e511bbb218caadaf5e1c78ea25f3cacd7",
+  "src/app/finance/recurring.tsx": "0c50dfab1cbb1bcc6aef97c74088dffae38e39d3c726dff85f66158c0dd76ca7",
+  "src/app/import-history.tsx": "99175ad4665955abce5f656ad35839a562d47d28dd26bfcf092f0c2294518b4f",
+  "src/app/notes/archived.tsx": "1cbb8b7aeb530d85b5bc403affa4e62922f6fb762b157194c9f7ae026abaff49",
+  "src/app/notes/folder/[id].tsx": "13bdd1f72320e3bc0068234b6e31b1a157d48f3b71b77e05f280cbcb897e33ce",
+  "src/app/notes/trash.tsx": "3e3949ec7afd05f3759fdb81bdbad80586162d86ce1f3487da80917fe0d029b2",
+  "src/app/reminders.tsx": "260fcff5f9028bf02ebe25c5a63af539ec15e87971b6265f15b1c6fd06b3f073",
+  "src/lib/finance-query-filters.test.ts": "1f3c12c5a7cfa3f5cf457d6ce5cedaaaf857430c16945b3baebec9cf7b69aef0",
+  "src/lib/list-filters-ui.test.ts": "5da27d868b34e07871f6e044504f63aeb94005ececcf8e809043e64a71522a76",
+  "src/lib/list-filters.test.ts": "ee2db2fd8e89a06d1f624420a66fa051a1c935c660292cb3bb72c416e3673431",
+  "src/lib/simple-finance-ui.test.ts": "e9ddff22140c0e0d08bf7b8ebadc68306686c6d37902e3497c728ac871b3da72",
+  "src/lib/anti-slop.test.ts": "58f4fbeb5a58d9a834e646fc609dfa80e31d09f77964e6bfde2510fcf1e467d7",
+  "src/lib/form-motion-ui.test.ts": "9c8888c78ea30a1a5c32498921bf168f783eac04126c1d0f5cf7b36bce7d9af7",
+  "src/components/ui/row.tsx": "1004559cf4cacffbbcfd400d20b45cce43a6859b3a6f618ff2c16f0f88574385"
+}

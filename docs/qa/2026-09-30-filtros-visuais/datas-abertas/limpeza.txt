@@ -1,0 +1,5 @@
+PASS final source iPhone cleanup: saved theme light/Claro, font large; transactions and notes default filters; original 2 active/3 archived notes; no temporary folder. No personal profile/notes snapshot persisted.
+PASS final original color hook: stable native screenshot after settling, no temporary diagnostic code.
+ERROR: null root node returned by UiTestAutomationBridge.
+PASS final filters/font1/night no restored; Sistema unchanged.
+PASS owned emulator-5554: AVD s26 confirmed; adb emu kill exit0; read-only/no-snapshot-save instance ended.

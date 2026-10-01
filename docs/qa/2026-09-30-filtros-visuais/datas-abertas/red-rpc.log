@@ -1,0 +1,50 @@
+(node:12733) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/finance-query-filters.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ transactions combinam valor inclusivo, conta recebida e busca no servidor em todas as paginas (149.592792ms)
+✔ transactions maximo zero e sem conta nao viram ausencia de filtro; limpar recorte retira limites (77.273375ms)
+✔ transactions com uma borda mantêm o outro lado aberto em todas as páginas (131.6815ms)
+✖ previsões e resumo sem ambas as bordas não enviam RPC inválida, inclusive via refetch manual (60.662583ms)
+✔ previsoes de janela longa repartem todos os dias em blocos disjuntos de ate 62 dias (60.7805ms)
+✔ previsoes com mais de 1000 linhas buscam paginas seguintes sem perda nem duplicacao (59.931709ms)
+✔ falha apos um lote de previsoes rejeita periodo completo e nao devolve resultado parcial (58.347ms)
+✔ cancelamento de previsoes chega ao fetch e rejeita consulta inteira (68.876417ms)
+✔ accounts paginam alem de 1000 e incluem apenas arquivada selecionada quando nao pedidas todas (58.118125ms)
+✔ accounts distinguem lista ativa, conta selecionada e todas arquivadas na consulta/cache (56.119042ms)
+✔ importacoes combinam datas locais, arquivo, conta e origem antes de limitar historico (57.104542ms)
+✔ importacoes com sem conta, OFX e datas abertas aplicam so as bordas escolhidas (55.832917ms)
+✔ importacoes conservam placeholder ao ver mais somente se o recorte anterior e igual (55.328333ms)
+✔ erro remoto de importacao rejeita consulta; retry preserva recorte completo (56.655917ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 13
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1225.533916
+
+✖ failing tests:
+
+test at src/lib/finance-query-filters.test.ts:139:1
+✖ previsões e resumo sem ambas as bordas não enviam RPC inválida, inclusive via refetch manual (60.662583ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/finance-query-filters.test.ts:143:14)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

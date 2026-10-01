@@ -1,5 +1,5 @@
 import { Stack, router } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -11,6 +11,9 @@ import { ThemedText } from '@/components/themed-text';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
+import { FilterBar } from '@/components/ui/filter-bar';
+import { ListFilters } from '@/components/ui/list-filters';
+import { listFiltersActive, type ListFiltersValue } from '@/lib/list-filters';
 import { VerMais } from '@/components/ui/ver-mais';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -63,21 +66,26 @@ function notesLabel(count: number): string {
 /** Uma prévia de linha, não a nota: duas a três linhas na largura de um celular (medido no s26). */
 const PREVIA = 70;
 
+function TrashEmptyState({ filtered, onClear }: { filtered: boolean; onClear: () => void }) {
+  return <EmptyState icon="trash"
+    title={filtered ? 'Nenhuma nota com esses filtros' : 'Lixeira vazia'}
+    hint={filtered ? undefined : 'Nada apagado nos últimos 30 dias.'}
+    action={filtered ? { label: 'Limpar filtros', onPress: onClear } : undefined} />;
+}
+
 export default function TrashScreen() {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const toast = useToast();
-  const list = useNotesList({ trash: true });
+  const [filters, setFilters] = useState<ListFiltersValue>({});
+  const [filtering, setFiltering] = useState(false);
+  const filtered = listFiltersActive(filters);
+  const list = useNotesList({ trash: true, q: filters.q, from: filters.from, to: filters.to });
   const restore = useRestoreNote();
   const purge = usePurgeNote();
 
-  // A query ordena por `pinned, updated_at` (é a mesma da lista); aqui o que importa é o que acabou
-  // de ser apagado. Ordenar no cliente é ordenar só o que já foi paginado — a lixeira é pequena por
-  // definição, e lixeira grande é sintoma, não caso de uso.
-  const notes = useMemo(() => {
-    const all = (list.data?.pages ?? []).flat();
-    return [...all].sort((a, b) => (b.deleted_at ?? '').localeCompare(a.deleted_at ?? ''));
-  }, [list.data]);
+  // A ordem por exclusão vem do servidor antes da paginação e permanece entre páginas.
+  const notes = useMemo(() => (list.data?.pages ?? []).flat(), [list.data]);
 
   const onRestore = (note: Note) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -134,6 +142,7 @@ export default function TrashScreen() {
 
   const trashBody = (
     <>
+      <FilterBar value={filters} dateLabel="Atualização" defaultLabel="Notas na lixeira" onPress={() => setFiltering(true)} />
       {/* Antes da lista: a pessoa precisa saber o prazo ANTES de decidir se corre. */}
       <ThemedText type="small" themeColor="textSecondary">
         Apagadas de vez após 30 dias
@@ -160,11 +169,7 @@ export default function TrashScreen() {
           <SkeletonRow />
         </Section>
       ) : notes.length === 0 ? (
-        <EmptyState
-          icon="trash"
-          title="Lixeira vazia"
-          hint="Nada apagado nos últimos 30 dias."
-        />
+        <TrashEmptyState filtered={filtered} onClear={() => setFilters({})} />
       ) : (
         <Section>
           {notes.map((note, index) => (
@@ -245,6 +250,8 @@ export default function TrashScreen() {
           singlePaneContent={trashBody}
         />
       ) : trashBody}
+      <ListFilters visible={filtering} value={filters} onClose={() => setFiltering(false)} onApply={setFilters}
+        dateLabels={{ from: 'Atualização a partir de', to: 'Atualização até' }} />
     </Screen>
   );
 }

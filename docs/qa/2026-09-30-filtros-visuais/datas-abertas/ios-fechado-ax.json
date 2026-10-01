@@ -1,0 +1,973 @@
+[
+  {
+    "help": null,
+    "title": null,
+    "traits": [
+      "None"
+    ],
+    "role_description": "application",
+    "AXLabel": "ProOps",
+    "AXUniqueId": null,
+    "AXValue": null,
+    "subrole": null,
+    "AXFrame": "{{0, 0}, {402, 874}}",
+    "content_required": false,
+    "role": "AXApplication",
+    "enabled": true,
+    "type": "Application",
+    "custom_actions": [],
+    "pid": 19929,
+    "frame": {
+      "width": 402,
+      "x": 0,
+      "height": 874,
+      "y": 0
+    }
+  },
+  {
+    "role": "AXGroup",
+    "title": null,
+    "custom_actions": [],
+    "enabled": true,
+    "pid": 19929,
+    "AXLabel": null,
+    "subrole": null,
+    "traits": [
+      "Scrollable"
+    ],
+    "content_required": false,
+    "help": null,
+    "AXFrame": "{{0, 62}, {402, 114}}",
+    "AXValue": null,
+    "type": "Group",
+    "frame": {
+      "width": 402,
+      "height": 114,
+      "y": 62,
+      "x": 0
+    },
+    "AXUniqueId": "Lançamentos",
+    "role_description": "Nav bar"
+  },
+  {
+    "AXLabel": "Filtros · 1",
+    "AXFrame": "{{281.66665649414062, 188}, {104.33334350585938, 36}}",
+    "content_required": false,
+    "subrole": null,
+    "help": null,
+    "type": "Button",
+    "frame": {
+      "height": 36,
+      "x": 281.6666564941406,
+      "y": 188,
+      "width": 104.33334350585938
+    },
+    "title": null,
+    "AXUniqueId": null,
+    "role_description": "button",
+    "enabled": true,
+    "pid": 19929,
+    "role": "AXButton",
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "AXValue": null,
+    "custom_actions": []
+  },
+  {
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "AXFrame": "{{16, 196.66666698455811}, {253.66665649414062, 18.999998092651367}}",
+    "custom_actions": [],
+    "title": null,
+    "role": "AXStaticText",
+    "type": "StaticText",
+    "frame": {
+      "y": 196.6666669845581,
+      "x": 16,
+      "width": 253.66665649414062,
+      "height": 18.999998092651367
+    },
+    "content_required": false,
+    "help": null,
+    "AXUniqueId": null,
+    "role_description": "text",
+    "AXValue": null,
+    "enabled": true,
+    "AXLabel": "Período: 01/09/2026 a 30/09/2026",
+    "subrole": null,
+    "pid": 19929
+  },
+  {
+    "enabled": true,
+    "AXFrame": "{{16, 256}, {146.66667175292969, 19}}",
+    "subrole": null,
+    "custom_actions": [],
+    "content_required": false,
+    "traits": [
+      "Header",
+      "Scrollable",
+      "StaticText"
+    ],
+    "frame": {
+      "width": 146.6666717529297,
+      "x": 16,
+      "y": 256,
+      "height": 19
+    },
+    "AXUniqueId": null,
+    "help": null,
+    "role": "AXHeading",
+    "AXValue": null,
+    "AXLabel": "qua., 30 de setembro",
+    "pid": 19929,
+    "role_description": "heading",
+    "title": null,
+    "type": "Heading"
+  },
+  {
+    "role_description": "text",
+    "help": null,
+    "role": "AXStaticText",
+    "AXValue": null,
+    "type": "StaticText",
+    "frame": {
+      "x": 305,
+      "height": 18,
+      "width": 81,
+      "y": 256.3333339691162
+    },
+    "AXLabel": "−R$ 3.233,34",
+    "AXFrame": "{{305, 256.33333396911621}, {81, 18}}",
+    "AXUniqueId": null,
+    "custom_actions": [],
+    "content_required": false,
+    "subrole": null,
+    "title": null,
+    "enabled": true,
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "pid": 19929
+  },
+  {
+    "enabled": true,
+    "AXLabel": "Parcela Carro, R$ 1.166,67, despesa, qua., 30 de setembro",
+    "subrole": null,
+    "pid": 19929,
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "title": null,
+    "role": "AXLink",
+    "frame": {
+      "height": 67,
+      "y": 287,
+      "width": 370,
+      "x": 16
+    },
+    "AXUniqueId": null,
+    "traits": [
+      "Scrollable",
+      "Link"
+    ],
+    "AXValue": null,
+    "role_description": "link",
+    "help": null,
+    "AXFrame": "{{16, 287}, {370, 67}}",
+    "content_required": false,
+    "type": "Link"
+  },
+  {
+    "role": "AXButton",
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "pid": 19929,
+    "traits": [
+      "Scrollable",
+      "Link"
+    ],
+    "subrole": null,
+    "frame": {
+      "y": 354.3333282470703,
+      "x": 16,
+      "width": 370,
+      "height": 67
+    },
+    "title": null,
+    "type": "Button",
+    "AXLabel": "Parcela Carro, R$ 1.166,67, despesa, qua., 30 de setembro",
+    "role_description": "button",
+    "help": null,
+    "AXValue": null,
+    "content_required": false,
+    "AXUniqueId": null,
+    "AXFrame": "{{16, 354.33332824707031}, {370, 67}}",
+    "enabled": true
+  },
+  {
+    "AXFrame": "{{16, 421.66667175292969}, {370, 66.999984741210938}}",
+    "role": "AXLink",
+    "content_required": false,
+    "AXLabel": "pc gamer (6/8), R$ 900,00, despesa, qua., 30 de setembro",
+    "frame": {
+      "x": 16,
+      "height": 66.99998474121094,
+      "width": 370,
+      "y": 421.6666717529297
+    },
+    "help": null,
+    "subrole": null,
+    "title": null,
+    "AXUniqueId": null,
+    "enabled": true,
+    "pid": 19929,
+    "AXValue": null,
+    "type": "Link",
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "role_description": "link",
+    "traits": [
+      "Scrollable",
+      "Link"
+    ]
+  },
+  {
+    "help": null,
+    "frame": {
+      "width": 152.3333282470703,
+      "y": 504.6666564941406,
+      "x": 16,
+      "height": 19
+    },
+    "AXValue": null,
+    "type": "Heading",
+    "role_description": "heading",
+    "AXUniqueId": null,
+    "custom_actions": [],
+    "role": "AXHeading",
+    "subrole": null,
+    "AXLabel": "dom., 20 de setembro",
+    "enabled": true,
+    "AXFrame": "{{16, 504.66665649414062}, {152.33332824707031, 19}}",
+    "content_required": false,
+    "pid": 19929,
+    "title": null,
+    "traits": [
+      "Header",
+      "Scrollable",
+      "StaticText"
+    ]
+  },
+  {
+    "enabled": true,
+    "AXFrame": "{{316.66665649414062, 504.99999046325684}, {69.333343505859375, 18}}",
+    "content_required": false,
+    "type": "StaticText",
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "frame": {
+      "width": 69.33334350585938,
+      "height": 18,
+      "y": 504.99999046325684,
+      "x": 316.6666564941406
+    },
+    "help": null,
+    "subrole": null,
+    "pid": 19929,
+    "role_description": "text",
+    "AXLabel": "−R$ 550,00",
+    "custom_actions": [],
+    "AXUniqueId": null,
+    "title": null,
+    "role": "AXStaticText",
+    "AXValue": null
+  },
+  {
+    "AXUniqueId": null,
+    "help": null,
+    "AXLabel": "Aluguel, R$ 550,00, despesa, recorrente",
+    "frame": {
+      "width": 370,
+      "x": 16,
+      "height": 67,
+      "y": 535.6666564941406
+    },
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "role": "AXLink",
+    "AXFrame": "{{16, 535.66665649414062}, {370, 67}}",
+    "title": null,
+    "custom_actions": [],
+    "enabled": true,
+    "type": "Link",
+    "content_required": false,
+    "subrole": null,
+    "pid": 19929,
+    "role_description": "link",
+    "AXValue": null
+  },
+  {
+    "role_description": "heading",
+    "AXUniqueId": null,
+    "help": null,
+    "frame": {
+      "y": 618.6666564941406,
+      "x": 16,
+      "width": 135.3333282470703,
+      "height": 19
+    },
+    "AXValue": null,
+    "type": "Heading",
+    "subrole": null,
+    "enabled": true,
+    "custom_actions": [],
+    "title": null,
+    "pid": 19929,
+    "AXLabel": "sex., 11 de setembro",
+    "traits": [
+      "Header",
+      "Scrollable",
+      "StaticText"
+    ],
+    "content_required": false,
+    "role": "AXHeading",
+    "AXFrame": "{{16, 618.66665649414062}, {135.33332824707031, 19}}"
+  },
+  {
+    "help": null,
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "AXFrame": "{{316.66665649414062, 618.99999046325684}, {69.333343505859375, 18}}",
+    "frame": {
+      "width": 69.33334350585938,
+      "y": 618.9999904632568,
+      "height": 18,
+      "x": 316.6666564941406
+    },
+    "subrole": null,
+    "custom_actions": [],
+    "AXUniqueId": null,
+    "role": "AXStaticText",
+    "AXLabel": "−R$ 443,00",
+    "title": null,
+    "AXValue": null,
+    "pid": 19929,
+    "type": "StaticText",
+    "content_required": false,
+    "enabled": true,
+    "role_description": "text"
+  },
+  {
+    "AXLabel": "Ferramentas, R$ 443,00, despesa, sex., 11 de setembro",
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "help": null,
+    "pid": 19929,
+    "content_required": false,
+    "role_description": "link",
+    "type": "Link",
+    "title": null,
+    "AXValue": null,
+    "enabled": true,
+    "AXUniqueId": null,
+    "frame": {
+      "width": 370,
+      "x": 16,
+      "y": 649.6666564941406,
+      "height": 67.00003051757812
+    },
+    "subrole": null,
+    "traits": [
+      "Scrollable",
+      "Link"
+    ],
+    "AXFrame": "{{16, 649.66665649414062}, {370, 67.000030517578125}}",
+    "role": "AXLink"
+  },
+  {
+    "pid": 19929,
+    "help": null,
+    "AXFrame": "{{16, 732.66668701171875}, {138.33332824707031, 19}}",
+    "AXLabel": "qui., 10 de setembro",
+    "enabled": true,
+    "subrole": null,
+    "frame": {
+      "width": 138.3333282470703,
+      "height": 19,
+      "y": 732.6666870117188,
+      "x": 16
+    },
+    "title": null,
+    "traits": [
+      "Header",
+      "Scrollable",
+      "StaticText"
+    ],
+    "custom_actions": [],
+    "content_required": false,
+    "role_description": "heading",
+    "AXValue": null,
+    "type": "Heading",
+    "AXUniqueId": null,
+    "role": "AXHeading"
+  },
+  {
+    "enabled": true,
+    "AXFrame": "{{316.66665649414062, 733.00002098083496}, {69.333343505859375, 18}}",
+    "title": null,
+    "subrole": null,
+    "help": null,
+    "custom_actions": [],
+    "AXValue": null,
+    "AXLabel": "−R$ 550,00",
+    "pid": 19929,
+    "role": "AXStaticText",
+    "role_description": "text",
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "content_required": false,
+    "AXUniqueId": null,
+    "frame": {
+      "x": 316.6666564941406,
+      "y": 733.000020980835,
+      "width": 69.33334350585938,
+      "height": 18
+    },
+    "type": "StaticText"
+  },
+  {
+    "role_description": "button",
+    "type": "Button",
+    "help": null,
+    "AXLabel": "Parcela Compra Casa, R$ 550,00, despesa, informada como paga",
+    "frame": {
+      "height": 67,
+      "y": 763.6666870117188,
+      "x": 16,
+      "width": 370
+    },
+    "custom_actions": [],
+    "subrole": null,
+    "enabled": true,
+    "AXUniqueId": null,
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "title": null,
+    "role": "AXButton",
+    "AXValue": null,
+    "content_required": false,
+    "AXFrame": "{{16, 763.66668701171875}, {370, 67}}",
+    "pid": 19929
+  },
+  {
+    "AXUniqueId": null,
+    "subrole": null,
+    "AXValue": null,
+    "AXFrame": "{{16, 846.66668701171875}, {139.33332824707031, 19}}",
+    "enabled": true,
+    "type": "Heading",
+    "content_required": false,
+    "role_description": "heading",
+    "help": null,
+    "frame": {
+      "y": 846.6666870117188,
+      "x": 16,
+      "width": 139.3333282470703,
+      "height": 19
+    },
+    "title": null,
+    "AXLabel": "ter., 08 de setembro",
+    "custom_actions": [],
+    "pid": 19929,
+    "traits": [
+      "Header",
+      "Scrollable",
+      "StaticText"
+    ],
+    "role": "AXHeading"
+  },
+  {
+    "type": "StaticText",
+    "custom_actions": [],
+    "help": null,
+    "subrole": null,
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "pid": 19929,
+    "role_description": "text",
+    "AXUniqueId": null,
+    "role": "AXStaticText",
+    "title": null,
+    "AXLabel": "−R$ 859,30",
+    "frame": {
+      "width": 69.33334350585938,
+      "height": 18,
+      "y": 847.000020980835,
+      "x": 316.6666564941406
+    },
+    "AXValue": null,
+    "AXFrame": "{{316.66665649414062, 847.00002098083496}, {69.333343505859375, 18}}",
+    "enabled": true,
+    "content_required": false
+  },
+  {
+    "type": "Link",
+    "title": null,
+    "AXFrame": "{{16, 877.66668701171875}, {370, 67}}",
+    "traits": [
+      "Scrollable",
+      "Link"
+    ],
+    "enabled": true,
+    "frame": {
+      "x": 16,
+      "height": 67,
+      "y": 877.6666870117188,
+      "width": 370
+    },
+    "AXValue": null,
+    "subrole": null,
+    "help": null,
+    "content_required": false,
+    "pid": 19929,
+    "role": "AXLink",
+    "AXUniqueId": null,
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "role_description": "link",
+    "AXLabel": "Hotel Serra, R$ 645,00, despesa, ter., 08 de setembro"
+  },
+  {
+    "AXUniqueId": null,
+    "title": null,
+    "AXLabel": "Energia, R$ 214,30, despesa, ter., 08 de setembro, atrasado",
+    "AXFrame": "{{16, 945}, {370, 67}}",
+    "pid": 19929,
+    "subrole": null,
+    "AXValue": null,
+    "type": "Link",
+    "frame": {
+      "y": 945,
+      "height": 67,
+      "x": 16,
+      "width": 370
+    },
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "role": "AXLink",
+    "traits": [
+      "Scrollable",
+      "Link"
+    ],
+    "content_required": false,
+    "help": null,
+    "role_description": "link",
+    "enabled": true
+  },
+  {
+    "type": "Heading",
+    "AXValue": null,
+    "role": "AXHeading",
+    "AXUniqueId": null,
+    "AXFrame": "{{16, 1028}, {144, 19}}",
+    "subrole": null,
+    "AXLabel": "sex., 04 de setembro",
+    "title": null,
+    "custom_actions": [],
+    "role_description": "heading",
+    "pid": 19929,
+    "frame": {
+      "y": 1028,
+      "width": 144,
+      "height": 19,
+      "x": 16
+    },
+    "traits": [
+      "Header",
+      "Scrollable",
+      "StaticText"
+    ],
+    "help": null,
+    "enabled": true,
+    "content_required": false
+  },
+  {
+    "AXValue": null,
+    "frame": {
+      "width": 69.33334350585938,
+      "y": 1028.3333339691162,
+      "height": 18,
+      "x": 316.6666564941406
+    },
+    "custom_actions": [],
+    "pid": 19929,
+    "content_required": false,
+    "title": null,
+    "help": null,
+    "enabled": true,
+    "AXLabel": "−R$ 980,00",
+    "AXUniqueId": null,
+    "type": "StaticText",
+    "role": "AXStaticText",
+    "AXFrame": "{{316.66665649414062, 1028.3333339691162}, {69.333343505859375, 18}}",
+    "subrole": null,
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "role_description": "text"
+  },
+  {
+    "role_description": "link",
+    "enabled": true,
+    "role": "AXLink",
+    "AXUniqueId": null,
+    "AXValue": null,
+    "pid": 19929,
+    "type": "Link",
+    "AXLabel": "Marcenaria, R$ 980,00, despesa, sex., 04 de setembro",
+    "traits": [
+      "Scrollable",
+      "Link"
+    ],
+    "help": null,
+    "title": null,
+    "frame": {
+      "x": 16,
+      "width": 370,
+      "y": 1059,
+      "height": 67
+    },
+    "content_required": false,
+    "AXFrame": "{{16, 1059}, {370, 67}}",
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "subrole": null
+  },
+  {
+    "help": null,
+    "pid": 19929,
+    "enabled": true,
+    "AXFrame": "{{16, 1142}, {146.66667175292969, 19}}",
+    "subrole": null,
+    "AXLabel": "qua., 02 de setembro",
+    "role_description": "heading",
+    "role": "AXHeading",
+    "title": null,
+    "AXUniqueId": null,
+    "content_required": false,
+    "frame": {
+      "width": 146.6666717529297,
+      "height": 19,
+      "x": 16,
+      "y": 1142
+    },
+    "traits": [
+      "Header",
+      "Scrollable",
+      "StaticText"
+    ],
+    "type": "Heading",
+    "custom_actions": [],
+    "AXValue": null
+  },
+  {
+    "enabled": true,
+    "role_description": "text",
+    "role": "AXStaticText",
+    "title": null,
+    "frame": {
+      "width": 81,
+      "y": 1142.3333339691162,
+      "x": 305,
+      "height": 18
+    },
+    "AXValue": null,
+    "AXUniqueId": null,
+    "help": null,
+    "type": "StaticText",
+    "content_required": false,
+    "AXFrame": "{{305, 1142.3333339691162}, {81, 18}}",
+    "pid": 19929,
+    "subrole": null,
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "AXLabel": "−R$ 1.580,00",
+    "custom_actions": []
+  },
+  {
+    "enabled": true,
+    "role_description": "link",
+    "AXValue": null,
+    "AXLabel": "Passagem aérea, R$ 1.280,00, despesa, qua., 02 de setembro",
+    "content_required": false,
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "traits": [
+      "Scrollable",
+      "Link"
+    ],
+    "role": "AXLink",
+    "help": null,
+    "frame": {
+      "y": 1173,
+      "width": 370,
+      "x": 16,
+      "height": 67
+    },
+    "subrole": null,
+    "AXUniqueId": null,
+    "type": "Link",
+    "pid": 19929,
+    "AXFrame": "{{16, 1173}, {370, 67}}",
+    "title": null
+  },
+  {
+    "enabled": true,
+    "title": null,
+    "AXLabel": "tv (1/10), R$ 300,00, despesa, qua., 02 de setembro",
+    "role_description": "link",
+    "frame": {
+      "y": 1240.3333740234375,
+      "width": 370,
+      "x": 16,
+      "height": 67
+    },
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "content_required": false,
+    "subrole": null,
+    "pid": 19929,
+    "role": "AXLink",
+    "type": "Link",
+    "AXFrame": "{{16, 1240.3333740234375}, {370, 67}}",
+    "AXValue": null,
+    "traits": [
+      "Scrollable",
+      "Link"
+    ],
+    "AXUniqueId": null,
+    "help": null
+  },
+  {
+    "role": "AXHeading",
+    "AXLabel": "ter., 01 de setembro",
+    "frame": {
+      "y": 1323.3333740234375,
+      "x": 16,
+      "height": 19,
+      "width": 136
+    },
+    "custom_actions": [],
+    "help": null,
+    "role_description": "heading",
+    "content_required": false,
+    "AXUniqueId": null,
+    "title": null,
+    "type": "Heading",
+    "AXValue": null,
+    "subrole": null,
+    "pid": 19929,
+    "traits": [
+      "Header",
+      "Scrollable",
+      "StaticText"
+    ],
+    "AXFrame": "{{16, 1323.3333740234375}, {136, 19}}",
+    "enabled": true
+  },
+  {
+    "subrole": null,
+    "role": "AXStaticText",
+    "pid": 19929,
+    "AXFrame": "{{297.33334350585938, 1323.6667079925537}, {88.666656494140625, 18}}",
+    "frame": {
+      "width": 88.66665649414062,
+      "x": 297.3333435058594,
+      "y": 1323.6667079925537,
+      "height": 18
+    },
+    "AXLabel": "+R$ 16.970,00",
+    "AXValue": null,
+    "help": null,
+    "title": null,
+    "custom_actions": [],
+    "enabled": true,
+    "AXUniqueId": null,
+    "content_required": false,
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "type": "StaticText",
+    "role_description": "text"
+  },
+  {
+    "frame": {
+      "height": 67,
+      "width": 370,
+      "x": 16,
+      "y": 1354.3333740234375
+    },
+    "content_required": false,
+    "AXUniqueId": null,
+    "help": null,
+    "subrole": null,
+    "role_description": "link",
+    "enabled": true,
+    "AXValue": null,
+    "role": "AXLink",
+    "traits": [
+      "Scrollable",
+      "Link"
+    ],
+    "AXFrame": "{{16, 1354.3333740234375}, {370, 67}}",
+    "pid": 19929,
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "type": "Link",
+    "title": null,
+    "AXLabel": "Aluguel, R$ 1.800,00, despesa, ter., 01 de setembro, atrasado"
+  },
+  {
+    "help": null,
+    "type": "Link",
+    "subrole": null,
+    "role_description": "link",
+    "content_required": false,
+    "AXUniqueId": null,
+    "AXFrame": "{{16, 1421.6666259765625}, {370, 67}}",
+    "frame": {
+      "y": 1421.6666259765625,
+      "width": 370,
+      "x": 16,
+      "height": 67
+    },
+    "pid": 19929,
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "title": null,
+    "role": "AXLink",
+    "enabled": true,
+    "traits": [
+      "Scrollable",
+      "Link"
+    ],
+    "AXLabel": "geladeira (5/8), R$ 450,00, despesa, ter., 01 de setembro",
+    "AXValue": null
+  },
+  {
+    "title": null,
+    "AXLabel": "salário, R$ 20.000,00, receita, ter., 01 de setembro",
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "help": null,
+    "frame": {
+      "y": 1489,
+      "width": 370,
+      "x": 16,
+      "height": 67
+    },
+    "AXUniqueId": null,
+    "AXValue": null,
+    "type": "Link",
+    "pid": 19929,
+    "traits": [
+      "Scrollable",
+      "Link"
+    ],
+    "subrole": null,
+    "role_description": "link",
+    "role": "AXLink",
+    "enabled": true,
+    "AXFrame": "{{16, 1489}, {370, 67}}",
+    "content_required": false
+  },
+  {
+    "role_description": "link",
+    "type": "Link",
+    "pid": 19929,
+    "AXValue": null,
+    "title": null,
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "AXLabel": "macbook (1/12), R$ 780,00, despesa, ter., 01 de setembro",
+    "frame": {
+      "width": 370,
+      "x": 16,
+      "y": 1556.3333740234375,
+      "height": 67
+    },
+    "AXFrame": "{{16, 1556.3333740234375}, {370, 67}}",
+    "role": "AXLink",
+    "AXUniqueId": null,
+    "enabled": true,
+    "traits": [
+      "Scrollable",
+      "Link"
+    ],
+    "help": null,
+    "subrole": null,
+    "content_required": false
+  }
+]

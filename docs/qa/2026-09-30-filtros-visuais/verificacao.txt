@@ -1,0 +1,10 @@
+2026-09-30 — branch gabriel/entrada-filtros
+com.proops.personal.dev — iPhone 17 Pro — iOS 26.5
+npm test: 1338 / 1338, fail 0, skipped 0, exit 0
+tsc --noEmit: exit 0
+expo lint: exit 0
+git diff --check: exit 0
+React Doctor: errorCount 0, warningCount 18
+Button: 12/12 regressões direcionadas
+ListFilters: 17/17 integração dirigida, inclusive reset icon e cancelamento
+Native: mesmo cartão/período; múltiplos critérios; limpeza cancelada; datas resetadas somente no draft; cancelar restaura; busca sem resultados; limpeza geral; tema escuro e restauração Claro; fonte máxima Aplicar height73.33; fonte original large restaurada

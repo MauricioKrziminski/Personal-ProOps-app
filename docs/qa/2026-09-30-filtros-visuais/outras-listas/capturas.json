@@ -1,0 +1,603 @@
+{
+  "date": "2026-09-30",
+  "branch": "gabriel/entrada-filtros",
+  "head": "49468625323401e6cac6e9c378c291da129a59ed",
+  "worktree": "local changes, not committed",
+  "native_app": "com.proops.personal.dev",
+  "gates": {
+    "tests": 1348,
+    "passed": 1348,
+    "failed": 0,
+    "tsc_exit": 0,
+    "lint_exit": 0,
+    "diff_check_exit": 0,
+    "react_doctor_errors": 0,
+    "react_doctor_warnings": 19
+  },
+  "native_devices": [
+    "iPhone 17 Pro / iOS26.5",
+    "s26 / Android16"
+  ],
+  "tablet": "integration harness only; no native iPad",
+  "artifacts": [
+    {
+      "file": "README.md",
+      "bytes": 11411,
+      "sha256": "39c7a2920a66c72d5b4bc928c226d267c4afadabcc5ab28a067fcc58a1b0d175"
+    },
+    {
+      "file": "android-archived-ativo.png",
+      "bytes": 83960,
+      "sha256": "a05c1989fab9ed4a570e0ca5c8970eb32114c0e30d57b7017ccbf016e5bf5825",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-archived-ativo.xml",
+      "bytes": 18474,
+      "sha256": "1dc77c3af06281d0a4d3c62264ddd3d3e522a1a78758fb838a383603d138c676"
+    },
+    {
+      "file": "android-checks.txt",
+      "bytes": 1003,
+      "sha256": "6942cabeb4dfd1b0c51fc5f17fb7b2cad6f3395e64bda648a52c9f8913f3ad11"
+    },
+    {
+      "file": "android-datas-icone.png",
+      "bytes": 136598,
+      "sha256": "1c6c39fb5279987c77196a7d8fffc4bc8de3b9736e24fed4dec3b89e2fc49ae1",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-datas-icone.xml",
+      "bytes": 33679,
+      "sha256": "4958441f0395d2d2d4a46797956eb457664dbf8f74e544f90795b40ac1195d69"
+    },
+    {
+      "file": "android-debts-ativo.png",
+      "bytes": 221606,
+      "sha256": "70338a4b39596553f1d9fb675c57daa822effb46c864a2f830c682e48dcbce60",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-dev-aviso-intermediario.png",
+      "bytes": 98148,
+      "sha256": "6a388f903a06c9297327522bd3d5b40aeba1717f0b875140da3b8f6a590cefb2",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-folder-ativo.png",
+      "bytes": 84295,
+      "sha256": "01b1faca52867865dc254c22d80b376bc0c2285d063bd9cea8e2c31d68af08b1",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-folder-ativo.xml",
+      "bytes": 19209,
+      "sha256": "f9692a15114ea6f8632725ec9a0b4caeb51ee2a98f0a49f4e3fc6ad53df0d7d2"
+    },
+    {
+      "file": "android-fonte2-folha.png",
+      "bytes": 205501,
+      "sha256": "fdf9841a45002b361be54e58bda93c84ff80903773ce5bfe3a5a2a86a1098839",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-fonte2-folha.xml",
+      "bytes": 33690,
+      "sha256": "fd1ddddec209e7a6d134c6939eac3722d5ed258b7eed76fa4b194e35b53b6eba"
+    },
+    {
+      "file": "android-fonte2.png",
+      "bytes": 186466,
+      "sha256": "ce68b878cbe8ba79d7abfedb7f04c0a19d1507accda691aabc139ecf70142acf",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-fonte2.xml",
+      "bytes": 17986,
+      "sha256": "b94cc47da958262ea63e7a380393f5c1ec466cc3930dc1a09acf800a32e659b5"
+    },
+    {
+      "file": "android-import-ativo.png",
+      "bytes": 80749,
+      "sha256": "4e83c663cd1dd277a569de014ef023470b75475df046e26c57ece9bb12e4544c",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-installments-ativo.png",
+      "bytes": 108841,
+      "sha256": "106393de52e22e23158311d458a96de50c6ba137d7459ac3b68c02ac6e6b3eab",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-installments-ativo.xml",
+      "bytes": 22175,
+      "sha256": "eb71d6be1549cfe110772f5f6eda3cd4e3fc1202b6be7c2f8cd559171f71ecd4"
+    },
+    {
+      "file": "android-multiplos-claro.png",
+      "bytes": 112913,
+      "sha256": "5a195350a5a272d27131d8d894a3084b8b465f5cc8f09d325664db113e2e779d",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-multiplos-claro.xml",
+      "bytes": 17985,
+      "sha256": "fcd8fadcdacf0b44162d4c022238a79888dfc825fa3688f76592cd81bd6e06bf"
+    },
+    {
+      "file": "android-multiplos-escuro.png",
+      "bytes": 113554,
+      "sha256": "a1bd9ea452c4a9bb61e4621696e37f7d7412626702d752aca7ba55911e5f4d06",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-multiplos-escuro.xml",
+      "bytes": 17985,
+      "sha256": "fcd8fadcdacf0b44162d4c022238a79888dfc825fa3688f76592cd81bd6e06bf"
+    },
+    {
+      "file": "android-notes-busca-tag.png",
+      "bytes": 210746,
+      "sha256": "23e1dff549c80d2574b286793fec53b86d3a872a624a3c997f8655abe4f410b7",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-notes-busca-tag.xml",
+      "bytes": 36947,
+      "sha256": "65206468fdbb8a80c3643c7b0706ab5962921b5ac812168d4885a534e6ae3322"
+    },
+    {
+      "file": "android-notes-folha.png",
+      "bytes": 103191,
+      "sha256": "220dc1d5c5582abf724d5bf731813938f5693cc1d0854b3e245290ca4cc75eef",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-notes-folha.xml",
+      "bytes": 25341,
+      "sha256": "cf2e531446ead033a61c405fdb7120e72978a46c4be1b72054a9f7a3e543ae7f"
+    },
+    {
+      "file": "android-notes-limpo.png",
+      "bytes": 213072,
+      "sha256": "11b265a828780dbf313b2befec9afb75a6f24ecc128f3d406a31d3fd2851f9dd",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-notes-limpo.xml",
+      "bytes": 52778,
+      "sha256": "94b456e329b1fd76adf476e71c5411e2e9408e76ef9a584e47d45fc358a37440"
+    },
+    {
+      "file": "android-recurring-ativo.png",
+      "bytes": 102745,
+      "sha256": "bf52a23ee9287017c79f96875f2e298e48a735b7b440067a353753d9752d4262",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-recurring-ativo.xml",
+      "bytes": 20727,
+      "sha256": "d2bae7cef3303588a3d9b9678d9d4a4028f926dce6eef126dd3558fba3f92a76"
+    },
+    {
+      "file": "android-relatorio.md",
+      "bytes": 3408,
+      "sha256": "46085180fefd145725cf402e97a1dd34c7a986d59121c40e7daf8c9c7a193d04"
+    },
+    {
+      "file": "android-reminders-ativo.png",
+      "bytes": 92587,
+      "sha256": "f5ee037ca049c68d02a7e13ec70140874c76746e1c82e32bef63f13ab773b5d5",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-restaurado.png",
+      "bytes": 123185,
+      "sha256": "0f317aaec922a720568e02c247c2b4c25968246d71f6040c4cbd997d2358c24a",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-transactions-ativo.png",
+      "bytes": 99397,
+      "sha256": "e0c33a7ba3246f8156406514de91c852e5cd60054e089dbfa797f26088531a23",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-transactions-ativo.xml",
+      "bytes": 25400,
+      "sha256": "2b04f85515cbe127c9182d1b8b3d0f5e8e750a759399e0809eb52647e83721df"
+    },
+    {
+      "file": "android-transicoes.mp4",
+      "bytes": 1857980,
+      "sha256": "5e45c49224417e7adefcb8e71063df3e17071843a3679c2c325453365b1d420a"
+    },
+    {
+      "file": "android-trash-ativo.png",
+      "bytes": 88388,
+      "sha256": "dd45bb7586226f225b30851243719446cf5a86187c662273221ea48565156602",
+      "width": 1344,
+      "height": 2992
+    },
+    {
+      "file": "android-trash-ativo.xml",
+      "bytes": 16726,
+      "sha256": "c95de29e9358c67589c49e25c9f531523df88e28a6b7e91dcd69c44217ffb3d3"
+    },
+    {
+      "file": "cleanup.json",
+      "bytes": 293,
+      "sha256": "3c673e59c7d6a41f9c2e1178b2698a539c5051d1e42f68d050a24c1135a687d5"
+    },
+    {
+      "file": "doctor.txt",
+      "bytes": 3519,
+      "sha256": "62c9158dd926ea99468dc86f016177c420da088c8fe61ca20ded62449699f495"
+    },
+    {
+      "file": "iphone-apos-limpeza.png",
+      "bytes": 473273,
+      "sha256": "c2de69315ec97daf13854eb1353264497d9b3e427c0dbe6985ee946124c4809f",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-archived-active-after.png",
+      "bytes": 168374,
+      "sha256": "b180335fce957a12183af23015c1b0adda9245dc5fc3e768a0b6499139eeedb1",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-archived-before.png",
+      "bytes": 197248,
+      "sha256": "40f10709c8868a5976ab29bf674822683799a48014563abe14d6215ef2920343",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-archived-default-after.png",
+      "bytes": 204495,
+      "sha256": "92ba4848bf62f02a8b89aeb1cf1b25e7d48e52bec099aed6cf88f047767a9011",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-debts-active-after.png",
+      "bytes": 291572,
+      "sha256": "bb7a95c7f763dead30acad571f128c8f57e45c611dd8a57609284b23b2594b88",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-debts-before.png",
+      "bytes": 289298,
+      "sha256": "f2208b26332bde9229c2c20b7586f971c7453c574fcc157558b7fcddcf28a598",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-debts-default-after.png",
+      "bytes": 294723,
+      "sha256": "9b99eaee696adf84b3ed0e87645a80b4d9e9eaa0816de5ca23989583a5b7770f",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-escuro.png",
+      "bytes": 145307,
+      "sha256": "c8ceaab62b62852ac318229c87892a0f23d92b3d4bf6b08518598c47937b244d",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-folder-active-after.png",
+      "bytes": 173585,
+      "sha256": "5195701456fa24d3a0cb29576e9f220f8451e8ecab51c3255bc914412690992f",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-folder-before.png",
+      "bytes": 179950,
+      "sha256": "7333629f34ac6a0913820f915d05547d6ba067f2cfcbe2cb8638026312d8ce37",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-folder-default-after.png",
+      "bytes": 183634,
+      "sha256": "97c746f8ba92384d5c8a3b8f78e2b1661691c2f581d3c911c1276734a60995ad",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-fonte-maxima-antes.png",
+      "bytes": 248044,
+      "sha256": "4b9e11769f8f04fa40c7b03a43e9628a312a8f821c1679fa3d313e58c0e67873",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-fonte-maxima-depois.png",
+      "bytes": 251745,
+      "sha256": "8ce99e44c2e7df2b56ff7e3b9d6507adf95db21b777d5a06f6dc57a8f9d552dc",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-imports-active-after.png",
+      "bytes": 177489,
+      "sha256": "f08051d37ccd3ea7f9fc7a0fcd5793a37298ad6f6bd87351d9cb19f4dfc5a5a1",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-imports-before.png",
+      "bytes": 209005,
+      "sha256": "f1c50d2c045e3969aaa221ef294afc6f95b727c762852f7b46f6d0b4cc392bb6",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-imports-default-after.png",
+      "bytes": 190616,
+      "sha256": "2de355c0a109b1326d15fa6e08359eece167cbd6f93238015e69b1f34e361abf",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-installments-active-after.png",
+      "bytes": 177200,
+      "sha256": "4c34c11d53af830891b7267e0023336c81d1cf37f43778e0cd71dfc4dcb3f73d",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-installments-before.png",
+      "bytes": 284558,
+      "sha256": "8c5b48aad12611190132af378559e93ebb4c851145166d6083891562b1c42da1",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-installments-default-after.png",
+      "bytes": 288810,
+      "sha256": "0a9b610dc0b0f26a14d332e62586aa29cd49bf229e30dae231b8c69fce805afe",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-notes-active-after.png",
+      "bytes": 302757,
+      "sha256": "1d7c87088c6e444a577e466c02d98e5ea4ecbf980649f37d62c031c61b8dce87",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-notes-before.png",
+      "bytes": 511554,
+      "sha256": "645f183f33307b83719d22700781ae55641859080dd7ae7c74c14b82ae3484c3",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-notes-date-tag.png",
+      "bytes": 293470,
+      "sha256": "9737ba34acb95bace0140246fff73cefeefed927221db1f629487feb9ed7ed90",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-notes-default-after.png",
+      "bytes": 535833,
+      "sha256": "a3e041de2c216e9b5b878dd641176aa381df4fd3d5600fb94609524bc636d548",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-notes-reset-draft.png",
+      "bytes": 233955,
+      "sha256": "56ee0e36de24cf12d0d310b2c70cd607899e17e66999f2b9a1588820cb6405a8",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-parceladas-oculto.png",
+      "bytes": 181742,
+      "sha256": "5a4359828d62b8c078cd7fc4c2dec7566eb2446c86c8402c63cf7d303f665804",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-parceladas-zero.png",
+      "bytes": 184632,
+      "sha256": "77e3949bb2c0c014756c31488998cb9831479388933b2cd7732846a43ce070eb",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-recurring-active-after.png",
+      "bytes": 200475,
+      "sha256": "53d0423cdfdc8547ec84ff2f1c473c1b3ffb483a243720496a8f04ace054d87e",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-recurring-before.png",
+      "bytes": 235766,
+      "sha256": "e24ff3258e166db7ee4a24d8688bb882c42e13eba16b4aaa8f089171278a97d4",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-recurring-default-after.png",
+      "bytes": 243688,
+      "sha256": "deefdffbd78dd1a409356a8d742112c330bc30591660e7f55ec346909b41a1ee",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-reminders-active-after.png",
+      "bytes": 176187,
+      "sha256": "dbea56074535e9d808e86be76994a88bcd170880236e1ea8eac7ebb03e4d3a01",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-reminders-before.png",
+      "bytes": 275400,
+      "sha256": "953784364a5f63d5a80bfbe069f697da575a975976bd46e87ee2f6ec79965384",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-reminders-default-after.png",
+      "bytes": 215920,
+      "sha256": "2c6b2d25100cb2d26cb1ec359536497098ea4671c9c971492976543da25b0da8",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-tags-apos-limpeza.png",
+      "bytes": 233285,
+      "sha256": "a2a41146bd26e79e9b8ed67b7cad7637df933144f31a85391e531681ef8d0375",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-transicoes.mp4",
+      "bytes": 4273009,
+      "sha256": "ddc0b881e14c2426f7e9344e40d5bd3262d7ab4be5d8d58bb6178dcf45f36044"
+    },
+    {
+      "file": "iphone-trash-active-after.png",
+      "bytes": 189996,
+      "sha256": "4dcee0848b9de21568b52c3423754d99f8901e91306f7c210ca412f3d5fa4961",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-trash-before.png",
+      "bytes": 162434,
+      "sha256": "8e3a722b2e6f2efe334803f713bf22f0157a4517a8e9c7243c08d3aea264def6",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "iphone-trash-default-after.png",
+      "bytes": 166554,
+      "sha256": "b1024367d2441edb5874260423efe5cb49799563674e1ed18d63841b19565b5f",
+      "width": 1206,
+      "height": 2622
+    },
+    {
+      "file": "lint.txt",
+      "bytes": 115,
+      "sha256": "f8c74e3855fd434de998c44a6e5bb6c4748517ed9ff4fc7b70ba8a53e261d339"
+    },
+    {
+      "file": "tests.txt",
+      "bytes": 183618,
+      "sha256": "75d01f13494e4e396c54fdb0462681a1219b06905510ea609ef0abef9c65f761"
+    },
+    {
+      "file": "tsc.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "source_fingerprints": [
+    {
+      "file": "src/components/ui/filter-bar.tsx",
+      "sha256": "2b8c01880db2f653d399c8804a269997ff4d1da729f799f3bfa73beec6bd2996"
+    },
+    {
+      "file": "src/lib/list-filters.ts",
+      "sha256": "ce021e70ad27525b28d2c7277d7108fcf3153312f3771b6030f09bff5cc7681f"
+    },
+    {
+      "file": "src/components/ui/list-filters.tsx",
+      "sha256": "94490d2a145405ef2bf7a55e234fc986c5993366bd35b81269f547b986c2bf9c"
+    },
+    {
+      "file": "src/components/motion/presenca.tsx",
+      "sha256": "9a71b4e1794b894fdf2e0d190d4bbfe5a7398dd83ef870dad73e4c642e3cc519"
+    },
+    {
+      "file": "src/components/ui/button.tsx",
+      "sha256": "1b491d3a5ab389bf87501a73fdda529240c1c773f159fa9dcac29c5129e687b9"
+    },
+    {
+      "file": "src/app/reminders.tsx",
+      "sha256": "3edfdf41b456f623578404516f35d9e4282571b1825960a6d65f69fde7ae0853"
+    },
+    {
+      "file": "src/app/import-history.tsx",
+      "sha256": "f498d6ce8231969e594097e1506459c0c166845b397218f4324ee53b9a824bd9"
+    },
+    {
+      "file": "src/app/finance/debts.tsx",
+      "sha256": "97c1e400a08ba64b110afc03ccc567dba99f116cd539296dd6d3196b1cc5cbfe"
+    },
+    {
+      "file": "src/app/finance/installments.tsx",
+      "sha256": "034752d1d1a50c794a674b9445703b6028d695801ab9d0b165f72859c8891f03"
+    },
+    {
+      "file": "src/app/finance/recurring.tsx",
+      "sha256": "0acb26fa638407fcbc0c003c541fd6d05974919ca69669fbe2d17a38159376e7"
+    },
+    {
+      "file": "src/app/(tabs)/notes/index.tsx",
+      "sha256": "162f27c824e9e8e77e3d7a689812e16ccb0c5a01e3479585a9d97f4c3a73b916"
+    },
+    {
+      "file": "src/app/notes/archived.tsx",
+      "sha256": "9f069f42bb3e13ea2a998352c2eb13f361a3521bef5adb044199a067281c2881"
+    },
+    {
+      "file": "src/app/notes/trash.tsx",
+      "sha256": "1a50d98a408ee721aca40de4a91d84b94495c1812e9eede1eadf5e7559643bc3"
+    },
+    {
+      "file": "src/app/notes/folder/[id].tsx",
+      "sha256": "fd9d108d9f6094a54ef8c17f6b71493bc94726a9695a677f11b9501e4f11a5ce"
+    },
+    {
+      "file": "src/app/finance/transactions.tsx",
+      "sha256": "5e8c2ad3876ab4c8c18375139502800159143bd9cdaa2f59366dcdea4c1993b8"
+    },
+    {
+      "file": "src/lib/list-filters.test.ts",
+      "sha256": "ac4e664cc80108fe9df1c025858b5c6cd581a33fbc52f2e58feab299d2dec0a4"
+    },
+    {
+      "file": "src/lib/simple-finance-ui.test.ts",
+      "sha256": "857f4bab23a1f7bec734f2d78b6983c70d45fe5324ae08ff08e8803d087157ad"
+    },
+    {
+      "file": "src/lib/form-motion-ui.test.ts",
+      "sha256": "164cfec658ff72c5974c7859b7505a6b473da78b5280a6414df7604e10680b8c"
+    }
+  ]
+}

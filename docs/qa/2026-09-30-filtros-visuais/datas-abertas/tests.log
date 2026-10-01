@@ -1,0 +1,1864 @@
+
+> app-proops@1.0.0 test
+> node --test
+
+✔ registra o modulo Android local usado pelo instalador de APK (0.870792ms)
+✔ expoe a consulta da permissao especial e a URI segura do FileProvider (1.237208ms)
+✔ registra o módulo de privacidade nas duas plataformas (0.897791ms)
+✔ iOS cobre só no segundo plano de verdade, nunca no inactive do Face ID (0.308459ms)
+✔ Android desliga a foto dos recentes e reaplica numa atividade recriada (0.21775ms)
+✔ produção e staging não levam x86: 67 MB que nenhum celular usa (0.392875ms)
+✔ development mantém as quatro — o emulador da máquina pode ser x86_64 (0.05075ms)
+✔ sem a propriedade no template, o plugin acrescenta em vez de sumir (0.045834ms)
+✔ aplicar duas vezes não duplica a propriedade (0.041459ms)
+✔ o tema aponta fundo da janela, fundo da tarefa e acento para as cores do app (41.656333ms)
+✔ aplicar duas vezes não duplica item (0.21425ms)
+✔ as cores são as do tema claro e do escuro do app (3.126667ms)
+✔ declara uma única permissão e um FileProvider privado para os APKs (5.453542ms)
+✔ gera de forma idempotente um caminho restrito ao cache de atualizações (37.106542ms)
+✔ o tema do app aponta o estilo de texto para o que quebra pelo avanço (26.374833ms)
+✔ o estilo desliga a caixa de tinta e herda o TextView do AppCompat (0.194ms)
+✔ o item existente do tema continua lá (0.1465ms)
+✔ aplicar duas vezes não duplica estilo nem item (0.161875ms)
+✔ força o work-runtime-ktx na 2.8.1, uma vez só (prebuild roda de novo) (0.632083ms)
+✔ gera apenas os campos do contrato e normaliza o sha256 (13.596708ms)
+✔ recusa versionCode que não pode representar uma versão Android válida (0.365208ms)
+✔ recusa versão sem semver, download fora de HTTPS e hash inválido (0.230125ms)
+✔ limita as notas para manter o manifesto muito abaixo do teto lido pelo app (0.096417ms)
+✔ extrai o APK de um único build concluído (2.6845ms)
+✔ aceita a chave legada buildUrl e um objeto sem envelope de lista (0.161916ms)
+✔ recusa saída ambígua, build incompleto e artefato inseguro (0.389542ms)
+✔ real APK xmltree resolves runtime resource and literal JSON channel (1.950333ms)
+✔ local receipt records actual APK evidence and CI provenance without EAS metadata (1.275334ms)
+✔ APK applicationId mismatch blocks local attestation (0.266959ms)
+✔ APK appVersion mismatch blocks local attestation (0.173333ms)
+✔ APK runtimeVersion mismatch blocks local attestation (0.140792ms)
+✔ APK updatesUrl mismatch blocks local attestation (0.135375ms)
+✔ APK channel mismatch blocks local attestation (0.895791ms)
+✔ APK updatesEnabled mismatch blocks local attestation (0.146583ms)
+✔ missing runtime resource, ambiguous resource and absent metadata fail closed (0.360125ms)
+✔ missing or mismatched CI provenance and checksum fail closed (0.531625ms)
+✔ local APK receipt permits compatible OTA and blocks divergent native fingerprint (3.572459ms)
+✔ receipt identity comes from checked-in production profile and resolved Expo config (1.334375ms)
+✔ profile channel drift fails closed (0.922625ms)
+✔ profile environment drift fails closed (0.151542ms)
+✔ profile env drift fails closed (0.135834ms)
+✔ profile env drift fails closed (0.33725ms)
+✔ profile android drift fails closed (0.122875ms)
+✔ profile extends drift fails closed (0.110666ms)
+✔ wrong update project and Android runtime overrides fail closed (0.194291ms)
+✔ finished build evidence binds source, runtime, channel and verified APK checksum (0.173583ms)
+✔ EAS status mismatch cannot attest receipt (0.18825ms)
+✔ EAS runtime mismatch cannot attest receipt (0.107083ms)
+✔ EAS updateChannel mismatch cannot attest receipt (0.096167ms)
+✔ EAS gitCommitHash mismatch cannot attest receipt (0.090291ms)
+✔ EAS appIdentifier mismatch cannot attest receipt (0.166708ms)
+✔ EAS app mismatch cannot attest receipt (0.668125ms)
+✔ missing EAS metadata is rejected rather than inferred from source (0.163042ms)
+✔ compatible JS update reaches publication once without rebuilding (1.113917ms)
+✔ incompatible fingerprint never publishes (1.029791ms)
+✔ incompatible runtimeVersion never publishes (0.118875ms)
+✔ incompatible environment never publishes (0.085084ms)
+✔ incompatible channel never publishes (0.076875ms)
+✔ incompatible applicationId never publishes (0.073125ms)
+✔ incompatible publicEnvironmentHash never publishes (0.073542ms)
+✔ incompatible fingerprintVersion never publishes (0.061833ms)
+✔ missing receipt, wrong source or tag fail closed (0.175625ms)
+✔ changed native source package.json blocks even an unchanged fingerprint (0.317292ms)
+✔ changed native source package-lock.json blocks even an unchanged fingerprint (0.211ms)
+✔ changed native source app.json blocks even an unchanged fingerprint (0.094125ms)
+✔ changed native source app.config.js blocks even an unchanged fingerprint (0.067084ms)
+✔ changed native source eas.json blocks even an unchanged fingerprint (0.071292ms)
+✔ changed native source plugins/with-native.js blocks even an unchanged fingerprint (0.092875ms)
+✔ changed native source modules/example/index.ts blocks even an unchanged fingerprint (0.060834ms)
+✔ changed native source android/app/src/Main.kt blocks even an unchanged fingerprint (0.034625ms)
+✔ changed native source .fingerprintignore blocks even an unchanged fingerprint (0.029291ms)
+✔ changed native source fingerprint.config.js blocks even an unchanged fingerprint (0.0305ms)
+✔ JS and documentation changes preserve the publication path (0.041208ms)
+✔ unattested source receipt never authorizes publication (0.048541ms)
+✔ extrai pacote e versões da saída real do aapt2 (1.166ms)
+✔ tolera atributos extras e ordem diferente (0.071083ms)
+✔ recusa saída sem a linha package ou sem campo obrigatório (0.164459ms)
+✔ recusa atributos duplicados em vez de escolher silenciosamente (0.045334ms)
+✔ normaliza impressões com ou sem separadores (3.713583ms)
+✔ extrai somente o certificado dos signers do APK (3.706042ms)
+✔ aceita exatamente o signer esperado e recusa chave diferente ou múltipla (8.136625ms)
+(node:95740) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/components/finance/date-picker-field.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ month-end control stays visible while the calendar is collapsed and toggles to fixed month-end (76.087125ms)
+✔ month-end control is omitted when the date field has no monthly action (109.416875ms)
+✔ month-end control follows the month shown in the open calendar, not the saved date (21.971917ms)
+✔ month-end control jumps to the first allowed month when the saved date is before the minimum (27.661ms)
+✔ selecting a day closes the calendar, blocks stale calendar callbacks, and leaves month-end available (12.980708ms)
+✔ reopening remounts the calendar for the saved month and rejects callbacks from the previous opening (19.384208ms)
+(node:95741) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/adaptive-auth.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ tablet authentication keeps the form and actions in one centered task (0.477167ms)
+(node:95742) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/adaptive-sheet.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ tablet sheets use a bounded task surface in both orientations (1.113292ms)
+✔ o diálogo do tablet cabe DENTRO da área segura (barra de tarefas, status, recortes) (0.164375ms)
+✔ o vão sob o diálogo é o que o teclado cobre fora dele (0.115125ms)
+✔ toda folha com campo tem UM mecanismo de teclado: a rolagem (0.343083ms)
+✔ shared sheets use native iPad form presentation and Android tablet dialog semantics (0.309792ms)
+✔ a sheet cannot remain presented over a different route (2.151208ms)
+(node:95743) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/adaptive-window.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ classifies the available window width at both breakpoints (1.377208ms)
+✔ returns to the compact composition after a window shrinks (0.127708ms)
+✔ rejects invalid window widths instead of choosing a tablet layout (0.084875ms)
+✔ keeps a single readable pane when both pane minimums cannot fit (0.117833ms)
+✔ uses two bounded panes only when both minimums fit (0.117708ms)
+✔ normalizes invalid container measurements (0.073708ms)
+✔ keeps compact roots at their existing width and pill clearance (0.083791ms)
+✔ keeps bottom pill clearance on medium and expanded Android roots (0.080708ms)
+✔ does not invent an Android pill inset for pushed routes or iPad (0.08125ms)
+✔ Today uses measured content width to decide its editorial split (0.130917ms)
+✔ Finance chart fits inside the measured hero panel at phone and tablet widths (0.103042ms)
+✔ library and reading panes only split when both reading minimums fit (0.133583ms)
+✔ an invoice card skeleton uses the bounded reading column, not the full tablet window (0.077792ms)
+✔ o pé da rolagem soma a área segura no iOS: a última linha não fica sob a barra de abas (0.057334ms)
+(node:95744) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/card-flight.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ o quadro de uma caixa em pé usa a ALTURA como lado longo e gira 90° (0.61375ms)
+✔ o voo começa na origem, termina no pouso e só levanta no meio (0.122042ms)
+✔ o quique da mola não traz o arco de volta (0.042708ms)
+✔ a caixa arrastada desce e encolhe em volta do centro (0.051333ms)
+✔ o índice arredonda e fica preso nas pontas (0.058125ms)
+✔ item no centro é identidade; vizinho em repouso é plano, menor e apagado (0.07525ms)
+✔ a proporção cai com a fonte e nunca passa a do cartão de verdade (0.050584ms)
+✔ a tinta da face segue o contraste: clara no roxo, escura no amarelo (1.426625ms)
+✔ todo emissor tem texto principal e secundário legíveis (≥ 4,5:1) em todo o metal (5.03775ms)
+✔ os tokens da face usam a mesma opacidade e o mesmo brilho que a conta de contraste (0.406916ms)
+✔ o deslize anda no máximo um cartão e respeita a intenção do dedo (0.0715ms)
+✔ além das pontas o carrossel cede um terço do dedo (0.040667ms)
+✔ o toque acha o cartão que está debaixo do dedo, com o carrossel onde ele está (0.056541ms)
+✔ a face comporta o conteúdo MEDIDO em cada tamanho de fonte do iPhone (0.047167ms)
+(node:95745) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/contrast.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ contraste da paleta light (0.742416ms)
+✔ contraste da paleta dark (0.637584ms)
+✔ os dois temas declaram os mesmos papéis de cor (0.374042ms)
+✔ contrast() confere com a referência WCAG (0.117042ms)
+(node:95746) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/donut-math.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ as fatias seguem a ordem do maior e cobrem a volta com respiro (1.356042ms)
+✔ acima de seis, o resto vira "outras" no último tom (0.173ms)
+✔ uma fatia só fecha a volta (0.107959ms)
+✔ zero e negativo não entram (0.122167ms)
+✔ o toque acha a fatia pelo ângulo e ignora o furo (0.187375ms)
+✔ a fatia com cor de categoria usa a cor, ela viaja com a categoria na ordenação, e "outras" fica no cinza (0.14975ms)
+(node:95747) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/note-face.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ negrito sobe o peso, itálico escolhe a face inclinada (0.366042ms)
+✔ negrito dentro de um título (600) sobe para 700 — senão não faz nada visível (0.049916ms)
+✔ mono ganha da combinação inteira (0.040666ms)
+✔ riscado é decoração, não família (0.040709ms)
+(node:95760) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/note-surface.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ light: as oito cores pintam o cartão e o texto continua legível (0.819958ms)
+✔ dark: as oito cores pintam o cartão e o texto continua legível (0.16ms)
+(node:95761) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/preview-account-balances.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ preview account balances satisfy the same cash contract as production (0.851417ms)
+(node:95762) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/preview-finance-analysis.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ analysis QA seeds exact hook keys and internally consistent money (8.661667ms)
+(node:95763) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/preview-finance-cache.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ preview seeds the period queries Finance actually requests (3.01025ms)
+(node:95764) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/preview-root.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ QA deep links select only the five tab roots (0.668917ms)
+✔ QA can open the real invoice route without exposing pushed-route chrome (0.1535ms)
+(node:95765) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/reorder-math.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a posição soma as alturas medidas mais o respiro (0.396ms)
+✔ altura ainda não medida conta zero e não estoura (0.047ms)
+✔ o slot sai do CENTRO do item arrastado, não do topo (2.739ms)
+✔ arrastar para fora das pontas gruda na primeira e na última (0.114083ms)
+✔ a grade é aritmética exata: índice vira linha e coluna (0.361709ms)
+✔ na grade o slot é o ladrilho mais próximo, preso dentro dos dados (0.051666ms)
+✔ só o irmão ENTRE a origem e o destino anda, e anda UM slot (0.049417ms)
+✔ sem arrasto em curso ninguém se mexe (0.045833ms)
+✔ o item arrastado acaba exatamente no slot que o leque abriu (0.138125ms)
+✔ no meio da tela o auto-scroll fica parado (4.288125ms)
+✔ perto do topo ele sobe, e mais rápido quanto mais perto (0.135541ms)
+✔ o pé da faixa desconta a DOCK — senão o dedo nunca alcança (0.063083ms)
+(node:95766) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/sparkline-geometry.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a escala põe as pontas no respiro e o maior valor mais alto (0.986958ms)
+✔ série plana não divide por zero (0.142ms)
+✔ menos de dois pontos ou largura zero não têm escala (0.137792ms)
+✔ o índice do dedo prende nas pontas (0.147208ms)
+✔ o rótulo fica dentro da largura (0.122208ms)
+(node:95767) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/tab-pill.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a folga deixa o círculo encostar no respiro da pílula, nunca passar dele (0.723083ms)
+✔ dentro da faixa a posição da mola passa intacta (1.194667ms)
+✔ slot pequeno demais não dá folga negativa (0.067375ms)
+✔ a distância da aba satura em um slot (0.055875ms)
+✔ o alvo ocupa o slot no celular, mas não a faixa vazia entre ícones no tablet (0.049959ms)
+✔ rótulos vizinhos nunca ficam a menos do vão mínimo, em nenhuma largura de celular (0.088083ms)
+✔ com espaço sobrando, o rótulo segue a fonte do sistema até 1,15× (0.040334ms)
+(node:95768) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/tablet-accounts.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ accounts keeps the ledger primary and decision support secondary on tablets (0.528125ms)
+✔ accounts tablet support does not duplicate ledger sections (0.119375ms)
+(node:95769) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/tablet-cards.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ cards keeps compact reading order and composes a measured tablet decision workspace (0.458416ms)
+(node:95770) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/tablet-transactions.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ transaction workspace keeps the native ledger below the safe two-pane width (0.581375ms)
+✔ transactions uses a virtualized ledger beside contextual controls only in wide windows (1.481792ms)
+(node:95771) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/tile-math.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ tamanho normal: Entra e Sai cabem lado a lado (0.352375ms)
+✔ valor que precisaria encolher mais que o limite pede a linha inteira (0.050958ms)
+✔ palavra que não cabe na metade pede a linha inteira (nunca "Orçament/os") (0.038625ms)
+✔ a fileira empilha TODOS quando o maior mínimo não cabe na metade — e só então (0.05175ms)
+(node:95772) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/wallet-stage.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ the wallet keeps phone geometry and bounds the tablet carousel (0.621459ms)
+✔ the measured stage is centered and a resize follows the current card (0.313959ms)
+(node:95773) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/design/wave-math.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ cobrir: em 1 não há nada na tela, em 0 a tela inteira está coberta (0.401042ms)
+✔ revelar: em 0 a tela inteira está coberta, em 1 não há nada (0.056208ms)
+✔ as duas fases andam para CIMA: a borda sobe enquanto a cobertura cresce e enquanto some (0.080209ms)
+✔ a curva é mais funda no meio do caminho do que nas pontas (0.132416ms)
+✔ o círculo cobre a tela inteira a partir de qualquer origem (0.281416ms)
+✔ a curva de tempo vai de 0 a 1 sem sair do intervalo (0.08175ms)
+✔ a capa para com a linha de base em 17% da altura (0.158708ms)
+✔ a altura da capa é o ponto mais baixo da borda (o fundo da barriga) (0.335917ms)
+(node:95774) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/abas.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ A rota (tabs) tem o título da aba ativa — é o que o "voltar" do iOS lê (0.311542ms)
+✔ As duas tab bars leem o rótulo da mesma lista (0.193667ms)
+(node:95775) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/account-cash.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ o total é a soma EXATA das linhas mostradas (0.387584ms)
+✔ cartão e investimento ficam de fora — não são caixa (0.310833ms)
+✔ o lançamento SEM conta entra como linha, e por isso o total continua fechando (0.058208ms)
+✔ o que ainda vai cair não entra no total — ele vira aReceber (0.041958ms)
+✔ conta zerada e sem nada a receber não vira linha (0.05475ms)
+(node:95776) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/accounts.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ o cartão diz que é cartão — foi o que custou R$ 4.000 em produção (0.576958ms)
+✔ nome que já diz o tipo não repete (0.784542ms)
+✔ os outros tipos também aparecem — a regra não é só sobre cartão (0.110875ms)
+✔ sem conta e tipo desconhecido não quebram a tela (0.098583ms)
+✔ O saldo de UMA conta: dinheiro mostra o confirmado; cartão, o total (24/09/2026) (0.358375ms)
+✔ editar o saldo atual anda o inicial pela diferença, e sem mexer não muda nada (0.05075ms)
+✔ filtros e formulários distinguem cartão, conta histórica e ausência com o mesmo seletor (0.129541ms)
+(node:95779) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/agent-chat.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ newClientMessageId monta um UUID v4 a partir dos 16 bytes recebidos (0.681083ms)
+✔ os bits de versão e variant são aplicados mesmo com bytes todos 0xff (0.091334ms)
+✔ bytes diferentes geram ids diferentes (0.05725ms)
+✔ só os 16 bytes entram: a mesma semente devolve o mesmo id (0.047041ms)
+✔ defaultRandomBytes prefere o CSPRNG quando ele existe (0.062125ms)
+✔ sem CSPRNG cai no fallback e ainda preenche os 16 bytes (3.835375ms)
+✔ o retry reaproveita o UUID já guardado na mensagem falha (0.091708ms)
+✔ mensagem vazia ou só com espaço não envia (0.100667ms)
+✔ mensagem no limite envia e acima não (0.081209ms)
+✔ o limite conta o texto TRIMADO, que é o que o servidor recebe (0.109833ms)
+✔ título vazio ou acima de 80 não salva (0.102667ms)
+✔ páginas de conversas concatenam sem duplicar id (0.625292ms)
+✔ a conversa repetida fica com a versão MAIS NOVA (0.08575ms)
+✔ página antiga entra ANTES sem mudar a ordem (0.146042ms)
+✔ sequence repetido não duplica (0.070584ms)
+✔ mensagem local sem sequence sobrevive à chegada da página (0.061625ms)
+✔ isNearChatEnd distingue 80px do fim (0.062208ms)
+✔ gravação com apenas ruído de fundo não é enviada ao transcritor (0.080708ms)
+✔ 402 abre paywall e não oferece nova tentativa (0.063958ms)
+✔ 409 mantém o composer bloqueado e é retentável (0.042209ms)
+✔ 429 é retentável sem paywall (0.039ms)
+✔ falha de rede é retentável (0.039792ms)
+✔ 422 e 404 não são retentáveis: repetir dá o mesmo erro (0.044292ms)
+✔ 500 é retentável (0.04ms)
+✔ pergunta já resolvida desabilita TODOS os controles (0.057584ms)
+✔ payload sem pending_id não tem controle para habilitar (0.03525ms)
+✔ turno em andamento também desabilita (0.046083ms)
+✔ 200 não renova nada (0.144792ms)
+✔ 401 renova UMA vez e repete com o token novo (0.071333ms)
+✔ 401 no retry encerra a sessão e NÃO tenta uma terceira vez (0.094959ms)
+✔ refresh que falha encerra a sessão sem tentar de novo (0.071292ms)
+✔ erro que não é 401 passa direto, sem renovar (0.126084ms)
+✔ composer bloqueia vazio, acima do limite e turno ativo, mas deixa corrigir proposta aberta (0.144ms)
+✔ a conversa criada vira a rota do id, não uma tela nova (0.050667ms)
+✔ confirmação simples vira approve e reject (0.133625ms)
+✔ candidatos viram choose com o id que o servidor congelou (0.0685ms)
+✔ lista longa vira linhas com descrição (0.044166ms)
+✔ opção de OUTRA pergunta é descartada (0.055ms)
+✔ payload sem pendente não rende botão nenhum (0.029709ms)
+✔ a lista de cartões do rascunho vira botões (0.0745ms)
+✔ o sufixo do rascunho não é interpretado na tela (0.049958ms)
+✔ botão de OUTRO rascunho é descartado (0.035833ms)
+✔ um payload não empresta o id do outro (0.025042ms)
+✔ pergunta de rascunho respondida deixa os controles inertes (0.030708ms)
+✔ resolvido e expirado deixam os controles inertes (0.034333ms)
+✔ o negrito do WhatsApp vira trecho, não asterisco na tela (0.097667ms)
+✔ asterisco solto continua sendo asterisco (0.044625ms)
+✔ o par não atravessa quebra de linha (0.020083ms)
+✔ o preview da lista sai sem a marcação (0.0265ms)
+✔ abrirConversaNova navega no mesmo toque, mesmo com o envio nunca resolvendo (0.078875ms)
+✔ a semente tem o formato do useInfiniteQuery e a mensagem local sem sequence (1.087209ms)
+✔ histórico: cache vazio busca; só a mensagem local não busca; com servidor busca (0.068792ms)
+✔ aplicarTurno troca a local pela do servidor sem duplicar e sem apagar resposta do agente (0.108291ms)
+✔ aplicarTurno encaixa na página MAIS NOVA (a primeira), não na mais antiga (0.039417ms)
+✔ marcarTurnoLocal muda só a mensagem daquele turno (0.056833ms)
+✔ retry: sem nada do servidor recria com o mesmo id; depois, envia (0.025042ms)
+✔ falha do turno: 404 sai sem retry, 422 sem retry, rede com texto de rede (1.492709ms)
+✔ título provisório segue a regra do servidor: 1ª linha não vazia, colapsada, 48 (0.236208ms)
+✔ duplo toque no mesmo quadro abre UMA conversa só (0.1995ms)
+✔ trava do toque libera no próximo quadro mesmo se o envio lançar (0.202959ms)
+✔ compositor trava enquanto a conversa não existe no servidor (0.074542ms)
+✔ marcarTurnoLocal renova o created_at quando o patch traz um (0.031125ms)
+✔ not_configured não vira "sem conexão" com retry (0.046833ms)
+✔ marcarTurnoLocal reabre também a mensagem que o servidor já gravou (0.029709ms)
+(node:95780) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/agent-navigation.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ components/app-tabs.tsx tem os cinco destinos na ordem canônica (2.903458ms)
+✔ components/app-tabs.tsx declara cada destino uma vez só (0.525042ms)
+✔ components/app-tabs.android.tsx tem os cinco destinos na ordem canônica (0.553833ms)
+✔ components/app-tabs.android.tsx declara cada destino uma vez só (0.835542ms)
+✔ components/app-tabs.web.tsx tem os cinco destinos na ordem canônica (0.239416ms)
+✔ components/app-tabs.web.tsx declara cada destino uma vez só (0.259959ms)
+✔ o Android navega para os cinco hrefs, na mesma ordem (0.230584ms)
+✔ a pílula inferior do Android recebe a seleção da rota em qualquer largura (0.466541ms)
+✔ a vitrine visual monta as cinco raízes (0.422167ms)
+✔ a vitrine Android mostra a mesma pílula inferior das raízes (0.352458ms)
+✔ a aba do agente usa os SF Symbols que estão no mapa do Icon (0.33775ms)
+✔ a lista lateral da aba do Agente EMPURRA a conversa (com replace ela sumia com as abas) (0.310042ms)
+(node:95781) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/agent-sql-columns.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ todo insert do agente escreve em coluna que existe (20.820708ms)
+(node:95782) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/ai-channel-contract.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ o serviço Python exige o canal e grava as duas colunas (0.687875ms)
+(node:95783) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/alert-history.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ combina o mesmo alerta entregue por push e WhatsApp (0.829917ms)
+✔ não combina alertas de workspaces diferentes (0.129625ms)
+✔ mantém uma entrega antiga sem canal reconhecido (0.097209ms)
+✔ o número do sino: visíveis e não lidos, com marco e lista nos dois lados (0.188292ms)
+✔ abrir o histórico marca o mais novo da lista, fora de ordem ou não (0.098167ms)
+(node:95784) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/alert-preferences-contract.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ desligar aviso financeiro não apaga a capacidade de push (0.488458ms)
+(node:95786) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/anti-slop.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ nenhuma cor hardcoded fora de constants/theme.ts (68.112292ms)
+✔ nenhum fontSize solto fora de design/tokens.ts (20.044417ms)
+✔ nenhum fontWeight solto — peso é FAMÍLIA, não número (49.734125ms)
+✔ nenhuma face do tipo antigo sobrou (46.830416ms)
+✔ campo de ação como FUNDO é tintFill, nunca tint (19.503625ms)
+✔ rgba/hsl literais também não passam (18.947542ms)
+✔ nenhum onAuthStateChange fora de hooks/use-session.tsx (32.009666ms)
+✔ nenhum rótulo truncado — texto quebra, layout cede (76.7165ms)
+✔ nenhum Canvas do Skia fora de ui/skia-canvas.tsx (16.654584ms)
+✔ SkiaCanvas lê PixelRatio no carregamento do módulo, não a cada render (0.260917ms)
+✔ nenhuma chamada a Edge Function no app (13.930292ms)
+✔ nenhuma leitura do app usa RPC de projeção linha-por-dia (98.963917ms)
+✔ hint de Field cabe em duas linhas (20.025ms)
+✔ botão ghost só como par do primário (71.81225ms)
+✔ placeholder de busca cabe em uma linha (23.40125ms)
+✔ nenhuma tela compõe variante de texto com spread de Type (4.42ms)
+✔ nenhum glifo de texto fazendo papel de ícone (24.461542ms)
+✔ nenhuma tela desenha o próprio campo de texto (19.385209ms)
+✔ nenhuma tela monta lista de conta à mão (25.731125ms)
+✔ nenhuma tela declara HeaderActions e HeaderMenu juntos (4.052375ms)
+✔ useRecentTransactions só lista o que já aconteceu (0.312625ms)
+✔ mês de ciclo nunca vem de currentMonth() (25.340375ms)
+✔ todo Sheet abre com TaskHeader (103.28025ms)
+✔ nenhuma tela monta headerLeft (73.089583ms)
+✔ nenhuma tela desenha o próprio botão de fechar (18.944417ms)
+✔ Segmented não passa de 4 opções (14.803417ms)
+✔ toda tela de conteúdo usa <Screen> (2.685958ms)
+✔ createAnimatedComponent(Pressable) só com estilo estático (13.389209ms)
+✔ o resumo e a lista de lançamentos leem a mesma janela (17.362458ms)
+✔ o portão de carregamento só aceita consulta, nunca booleano (11.677209ms)
+✔ valor em texto visível passa por Money ou useBRL (121.144625ms)
+✔ toda face de Fonts está carregada no _layout raiz (0.460291ms)
+✔ a paleta de nota e o CHECK do banco dizem a mesma coisa (1.224416ms)
+✔ header translúcido na raiz, nenhum título grande, nenhuma tela opaca por cima (33.88ms)
+✔ nenhuma tela decide "previsto" pelo status (16.567583ms)
+✔ LinearTransition só mora em components/motion/transicao.ts (16.494333ms)
+✔ título de seção fica a Space.md do conteúdo, no Section e em volta de todo SectionHead e BlockHeader (22.804417ms)
+✔ Switch de formulário só pelo SwitchRow (16.475625ms)
+✔ frase com dinheiro não é montada em peças numa linha que quebra (104.84075ms)
+✔ o título da linha de extrato tem o mesmo piso de largura do título da Row (0.167458ms)
+✔ card que arrasta tem press-in: o filho do Deslizavel é PressableScale ou desenha o pressionado (2.4865ms)
+✔ Placeholder é exemplo ("Ex.: …") ou instrução, nunca dado que parece preenchido (80.48875ms)
+✔ Busca nativa do iOS não esconde a barra de navegação (o "(tabs)" de 24/09/2026) (0.088375ms)
+✔ Botão do painel do arrasto é Tap simultâneo ao observador do dedo (iOS não recebia o toque) (0.166334ms)
+✔ O item levantado no reordenar tem o raio do card: a sombra não desenha um quadrado (0.107458ms)
+✔ Nenhum « » em texto do app: o termo vai em negrito ou a frase se reescreve (26.66975ms)
+✔ O input invisível do Valor não prende o arrasto: não alinha o texto à direita (0.118584ms)
+✔ Campo centralizado ou à direita não prende o arrasto no Android (TextField) (0.065291ms)
+✔ O toast sobe acima do teclado: erro de formulário não some atrás dele (0.04175ms)
+✔ Toda rolagem deixa o toque passar com o teclado aberto (keyboardShouldPersistTaps, nunca o padrão never) (14.106292ms)
+✔ Pagamento de dívida não troca de tipo, não vira "vou pagar depois" nem sai de cartão no formulário (0.286916ms)
+✔ Formulário de lançamento só diz "Cadastrar uma conta" com as contas carregadas e vazias (0.155583ms)
+✔ Formulário aberto por link remonta quando o registro muda (key pelo id) (22.351125ms)
+✔ o nome que ficava entre « » vai em <Forte>, não solto na frase (54.216458ms)
+✔ a cascata do Screen não embrulha o que não ocupa lugar na tela (0.189417ms)
+✔ nome citado nem exemplo vão entre aspas: negrito onde o app desenha, frase nomeada no diálogo nativo (49.364125ms)
+✔ o conteúdo que substitui o esqueleto nasce no lugar, sem voltar ao invisível (0.210084ms)
+✔ as conversas do Agente são buscadas ao entrar na conta, com as MESMAS opções da aba (0.097625ms)
+✔ toda tela de dados tem puxar para atualizar (3.175209ms)
+✔ nenhum horário vira dia por slice (é o dia do UTC) (41.453458ms)
+✔ vazio grande só onde ele é a única coisa da tela; com outra coisa, é compacto (15.721625ms)
+✔ Ocorrência de série: uma data só (o vencimento), e o caminho para editar a série (0.683625ms)
+✔ Em parcela, Editar abre o lançamento e oferece o alcance ao Salvar (0.229083ms)
+✔ O dia de um timestamp na tela é o LOCAL, nunca o recorte do UTC (24.101666ms)
+✔ Juros do Pix no crédito também se edita: abre com o juro que nasceu junto e acompanha a compra (0.388625ms)
+✔ Pix no crédito para conta própria: a transferência do cartão tem juro, e ele é despesa no cartão (0.46525ms)
+✔ Folha com rolagem usa SheetScroll, e o conteúdo dela não soma a área segura (10.145542ms)
+✔ arrasto: esquerda só tira da lista, direita nunca apaga, e apagar se chama "Apagar" (13.65675ms)
+✔ Formulários sem modo hipótese: a hipótese é feita na Projeção, e o formulário só APLICA (spec 2026-09-29) (0.597625ms)
+✔ Lançamento aberto pelo "Aplicar" de uma rápida: os dois caminhos de salvar a tiram do rascunho (0.239417ms)
+✔ Rascunho da Projeção: a fileira de ações QUEBRA a linha (0.124584ms)
+✔ Projeção: "tenho hoje" e "em N dias" QUEBRAM a linha com fonte grande (0.115417ms)
+✔ TaskHeader: ação longa desce de linha antes de espremer o título (0.074625ms)
+✔ MoneyField: a caixa dos dígitos cresce com a fonte do sistema (0.052375ms)
+✔ Lançamento: com a fileira de parcelas escondida, o erro dela aparece na Conta — Salvar nunca fica mudo (0.077583ms)
+✔ Ladrilho: lado a lado, e a linha inteira só quando MEDIR que não cabe (0.106625ms)
+✔ Legenda da curva do herói QUEBRA a linha em vez de partir a palavra (0.087833ms)
+✔ BlockHeader: a contagem e a pílula crescem com a fonte (altura MÍNIMA, nunca fixa) (0.081ms)
+✔ CountUpMoney: quando o valor animado não cabe, o <Money> que o substitui ENCOLHE (nunca reticência) (0.035209ms)
+✔ Atalhos do Agente: o botão tem a largura do texto (nunca "Lembret/e"), no máximo dois por linha (0.065584ms)
+✔ Barra de abas do Android: parado, o círculo é do React; o Reanimated só desenha durante a troca (0.051125ms)
+✔ Projeção: o caminho "detalhado" do E se saiu por inteiro (0.163583ms)
+✔ Atalhos de lançamento: os menus "Lançar" são os mesmos no app inteiro (0.182042ms)
+✔ A conversão passa pela RPC converter_registro e invalida o financeiro (0.143875ms)
+✔ O lançamento é um corpo do formulário único: seletor no topo, criar outro no fim, e converte (0.133291ms)
+✔ A tinta da categoria é cor de CONTEÚDO: sai da paleta das notas, nunca de tint/danger/warning (0.360667ms)
+✔ Toda lista que desenha o ícone da categoria desenha a cor dela (useAparencia, não categoryIcon direto) (7.166333ms)
+(node:95787) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/anticipation.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ as últimas pegam do fim; as próximas, do começo (0.622208ms)
+✔ pedir mais do que existe devolve todas; zero não devolve nada (0.174292ms)
+✔ recorrente não tem fim: "as últimas" vira as próximas (0.101ms)
+✔ o valor sugerido é a soma dos valores presentes, em centavos inteiros (0.118209ms)
+✔ a hipótese é um pagamento e um cancelamento por parcela, no dia de cada uma (0.213208ms)
+✔ sem parcela ou sem valor, não há hipótese (0.079041ms)
+✔ o horizonte precisa ir até a última parcela tirada (0.081459ms)
+✔ a lista mostra um adiantamento como UMA hipótese, e tirar leva o grupo inteiro (0.156ms)
+✔ editar troca a hipótese no mesmo lugar da lista, e grupo sumido entra no fim (0.185667ms)
+✔ a escolha do adiantamento viaja no draft do pagamento, para a edição voltar a ela (0.211375ms)
+✔ 8 parcelas escolhidas em setembro assentam no que cabe em dezembro, sem erro (0.150625ms)
+✔ cada mês à frente tira UMA parcela, e ir e voltar dá sempre o mesmo número (0.228792ms)
+(node:95788) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/aos-poucos.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ mostra o primeiro passo e conta o que falta (0.347666ms)
+✔ o último passo mostra só o que sobra (0.064458ms)
+✔ lista curta não tem "ver mais" (0.043292ms)
+(node:95801) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/app-update.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ o atualizador de APK pertence apenas ao pacote Android de produção (0.655084ms)
+✔ parseia o contrato, ignora campos novos e normaliza o sha256 (1.001292ms)
+✔ notas são opcionais para manter compatibilidade com manifestos antigos (0.165959ms)
+✔ recusa HTML explicitamente antes de tentar baixar qualquer APK (0.312208ms)
+✔ recusa campos obrigatórios inválidos (0.189625ms)
+✔ limita o corpo durante a leitura, não só depois do download (2.799542ms)
+✔ só versionCode estritamente maior é atualização (0.06275ms)
+✔ progresso é inteiro, limitado e ausente sem tamanho total (0.054167ms)
+✔ grava e calcula o SHA-256 no mesmo laço, emitindo só percentuais novos (0.4725ms)
+✔ apaga o APK parcial quando o hash não confere (0.179084ms)
+✔ a interface mostra as notas e só oferece a próxima etapa válida (0.313584ms)
+(node:95802) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/arrasto.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ cada ação vai para o lado marcado, na ordem declarada (1.421959ms)
+✔ "Mais" aparece quando sobra ação sem lado, e "fora" não conta (0.145875ms)
+✔ submenu sem lado conta para o "Mais" (é assim que "Mover para" chega) (0.096ms)
+✔ ação desligada ou sem onPress não entra no arrasto nem no "Mais" (0.109916ms)
+✔ até o fim aciona a opção da BORDA, qualquer que seja (24/09/2026) (0.149916ms)
+✔ a ponta é a do painel DESENHADO: só "Mais" à esquerda, "Mais" é a ponta (0.167291ms)
+✔ pouco arrastado: cada botão na largura natural, saindo de baixo do card em degraus (0.159916ms)
+✔ aberto: os botões encostam um no outro, cada um na largura natural (0.087334ms)
+✔ passando do painel, os botões esticam por igual e o conteúdo fica no meio de cada um (0.103375ms)
+✔ até o fim, a ponta cobre o painel até o card, com o conteúdo colado na borda dele (0.150917ms)
+✔ fechado, nada entra sob o card; um botão só é colado e ponta ao mesmo tempo (0.098833ms)
+✔ temArrasto: só quando há algo para mostrar (0.101ms)
+✔ arrastar até o fim só vale depois do painel inteiro, e só onde há ponta (0.069709ms)
+✔ um aberto por vez: abrir outro fecha o anterior, e o toque em outro só fecha (0.100875ms)
+✔ card que saiu da tela não engole o primeiro toque da próxima (0.090708ms)
+✔ até o fim olha o LADO: arrastar à esquerda nunca dispara a ação da direita (0.073458ms)
+✔ a ponta da esquerda é o botão da BORDA (o último), não o primeiro (0.120458ms)
+✔ o botão cresce com a fonte até 1,6× — acima disso o rótulo de uma palavra ainda cabe (0.061ms)
+✔ o ponto de abrir é meio botão, e de um lado só (0.046917ms)
+✔ "até o fim" que a mola desligou há instantes ainda vale; de propósito, não (0.029583ms)
+✔ ao soltar, vale o deslocamento REAL do soltar — o quadro pode não ter visto o fim (0.052208ms)
+✔ no soltar, o deslocamento é o do dedo mais a posição em que o card já estava (0.037792ms)
+✔ até o fim cabe no card: a folga encolhe até meio botão para ficar em 85% da largura (0.050417ms)
+✔ soltar do lado oposto ao painel aberto nunca executa; do mesmo lado, continua valendo (0.02875ms)
+✔ o painel entra por baixo do canto do card: a sobra é do botão colado nele, e da ponta até o fim (0.046542ms)
+✔ fechado, nada aparece no canto do card: a sobra cresce com o que o card revelou (0.018458ms)
+✔ o toque vira arrasto quando o dedo anda para o LADO — e aí o card não abre o item (0.033792ms)
+✔ o card aberto sabe que está aberto: o toque nele só fecha (0.032375ms)
+(node:95803) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/auth-errors.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ sem erro, sem mensagem (0.942625ms)
+✔ código errado e código expirado são frases diferentes (0.088625ms)
+✔ rate limit devolve os segundos que a API informou (0.084667ms)
+✔ número inválido fala de DDD, não de token (0.045834ms)
+✔ queda de rede tem saída própria (0.045375ms)
+✔ erro imprevisto nunca vaza inglês (0.0475ms)
+✔ e-mail e senha errados não dizem qual dos dois (0.037167ms)
+✔ cadastro por e-mail: confirmado, repetido e senha fraca têm frases próprias (0.047083ms)
+✔ telefone já vinculado orienta entrar pela conta existente (0.043625ms)
+✔ senha igual à antiga não vira "senha fraca" (0.06775ms)
+✔ senha fraca diz o MOTIVO que o servidor deu (0.065417ms)
+✔ teto de tempo do cliente e rede caída falam de conexão (0.036167ms)
+(node:95804) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/billing.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ o agente Python usa exatamente os mesmos produtos do app (1.276667ms)
+✔ produto desconhecido nunca vira plano pago (0.128125ms)
+✔ cada produto mapeia para o plano certo (0.073542ms)
+✔ ids são únicos e existe mensal e anual para cada plano (0.115167ms)
+(node:95805) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/brl-worklet.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ brlWorklet é byte a byte igual a moneySign + formatBRL (191.07225ms)
+✔ o separador vem do Intl, não de um espaço cravado (0.102875ms)
+(node:95806) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/budget-tight.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ o aviso conta o comprometido, o número mostrado é só o gasto (0.974625ms)
+✔ abaixo do limiar não entra; sem limite não entra (0.654792ms)
+✔ gasto mais comprometido acima do limite marca estouro, com números em string (0.11575ms)
+(node:95807) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/button-intrinsic-ui.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Button opaco sm: altura natural acomoda fonte grande e várias linhas (162.787417ms)
+✔ Button opaco md: altura natural acomoda fonte grande e várias linhas (83.80775ms)
+✔ Button opaco lg: altura natural acomoda fonte grande e várias linhas (38.136958ms)
+✔ Button vidro sm: altura natural acomoda fonte grande e várias linhas (40.39975ms)
+✔ Button vidro md: altura natural acomoda fonte grande e várias linhas (21.759125ms)
+✔ Button vidro lg: altura natural acomoda fonte grande e várias linhas (54.102375ms)
+✔ Button: cápsula e centro do loader usam a altura atual ao crescer durante carregamento (31.241708ms)
+✔ Button opaco: texto com muitas linhas mantém as tampas dentro de uma caixa mais alta que larga (16.749333ms)
+✔ Button opaco: label maior reflow imediato sem camada absoluta ou largura antiga (83.150833ms)
+✔ Button vidro: label maior reflow imediato sem camada absoluta ou largura antiga (23.958584ms)
+✔ Button preserva acessibilidade, bloqueio da acao, loader e largura externa durante carregamento (80.445458ms)
+✔ Button conserva block, feedback e presenca inativa ao trocar rotulo (17.562833ms)
+(node:95808) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/calendar-intrinsic-ui.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Calendar opaco: 5→6→5 semanas reflow antes do spring, mantendo cabeçalho e seleção de 31/08 (333.9335ms)
+✔ Calendar vidro: 5→6→5 semanas reflow antes do spring, mantendo cabeçalho e seleção de 31/08 (118.804833ms)
+✔ Calendar ajusta quatro semanas de fevereiro para cinco de março e volta sem envelope antigo (71.9725ms)
+✔ Calendar preserva limites inclusivos, estilo selecionado e bloqueio de presença inativa (153.773042ms)
+✔ DatePicker + Calendar + Presenca reais opaco: abertura libera altura animada antes de 5→6→5 semanas (67.517875ms)
+✔ DatePicker + Calendar + Presenca reais vidro: abertura libera altura animada antes de 5→6→5 semanas (87.497833ms)
+✔ DatePicker real conserva limites e rejeita callbacks da abertura anterior ao reabrir durante saída (120.175ms)
+(node:95809) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/card-status.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ prazo lê a data pura, sem a hora de agora (0.382208ms)
+✔ estado sai das datas: atrasada vence antes de fechada (0.074084ms)
+✔ outras faturas: o que o limite usa fora da corrente e das atrasadas (0.082542ms)
+✔ pilha: o escolhido vai para a frente e o resto fica na ordem original (0.653958ms)
+(node:95810) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/categorias.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a linha da tabela manda; sem ela, o ícone adivinhado pelo nome e sem cor (1.104917ms)
+✔ o nome gravado é minúsculo e sem espaço nas pontas (o CHECK do banco) (0.083125ms)
+✔ todo ícone da grade existe no Android (MATERIAL) e tem nome para o leitor de tela (1.373292ms)
+(node:95811) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/categories-merge.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ o que o usuário usa aparece — era o defeito (9.22275ms)
+✔ acento e caixa não viram duas entradas (0.591542ms)
+✔ a contagem é a soma das duas grafias (0.072917ms)
+✔ a grafia da SUGESTÃO ganha da contagem — o erro de digitação não vira o chip principal (0.049959ms)
+✔ sem sugestão para arbitrar, vence a mais usada (0.04725ms)
+✔ empate vai para a forma acentuada (0.048416ms)
+✔ sugestão nunca usada continua oferecida, mas atrás (0.046333ms)
+✔ a categoria do lançamento aberto não some da lista (0.042ms)
+✔ busca ignora acento — quem digita "saude" acha "saúde" (0.082542ms)
+(node:95816) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/categories.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ o agente Python usa exatamente as mesmas categorias do app (0.708917ms)
+✔ categorias são curtas, minúsculas e sem duplicata (0.077792ms)
+✔ categorias de receita fazem parte da lista (0.044291ms)
+(node:95817) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/chip-motion-ui.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Chip fallback colors follow one spring, retaining constant icon/material props and safe overshoot (123.434333ms)
+✔ Chip glass colors follow one spring, retaining constant icon/material props and safe overshoot (13.102958ms)
+✔ Chip preserves full keyed labels, selection/disabled semantics and one synchronous haptic/callback (42.501125ms)
+(node:95818) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/com-teto.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ promessa que nunca termina vira rejeição depois do teto (12.712417ms)
+✔ promessa que resolve a tempo devolve o valor (1.916792ms)
+✔ rejeição própria passa inteira — o teto não a mascara (0.175375ms)
+✔ o timer morre quando a promessa resolve antes (0.267834ms)
+(node:95819) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/compra.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Com parcela paga o número muda, só não fica abaixo da última paga nem vira à vista (1.624792ms)
+✔ Data e conta mudam fora do cartão; com parcela paga na fatura, não (0.088709ms)
+✔ As já pagas vão do piso (paga com a fatura) ao número de parcelas (0.076833ms)
+✔ O total mínimo permite corrigir também as parcelas já pagas quando Todas for escolhido (0.137792ms)
+✔ O salvar só manda as pagas quando elas mudaram (0.071291ms)
+✔ Cada parcela digitada segue o número novo; as pagas não mudam de valor (0.049208ms)
+✔ Ao escolher a compra toda no Salvar, o rascunho da parcela chega inteiro à revisão (0.272125ms)
+✔ O total escolhido para esta ou futuras parcelas chega como total do plano, sem transformar em valor mensal (0.070792ms)
+✔ Cada parcela aplica o valor digitado em cada linha do alcance, inclusive as pagas em Todas (0.079667ms)
+✔ Quantidade é contrato: escopos limitados explicam a impossibilidade (0.078833ms)
+✔ Com 3 pagas a data muda nos três alcances, a partir da parcela de referência (0.110459ms)
+✔ Último dia de todo mês: regra no alcance, data própria em Só esta (0.109334ms)
+✔ Todas inclui parcela paga fora do cartão; fatura protegida continua bloqueada (0.052166ms)
+(node:95820) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/confirmar-baixa.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ mesmo valor: só dá baixa, sem corrigir nada (1.463459ms)
+✔ outro valor: corrige só este lançamento (0.224666ms)
+✔ outro valor numa série com "nas próximas": corrige este e os próximos (0.086792ms)
+✔ "nas próximas" sem série não existe: vale só este (0.083958ms)
+✔ valor zero ou negativo não dá baixa (0.250833ms)
+✔ parcela fixa: a mais é encargo, a menos é desconto, igual não tem diferença (0.122167ms)
+✔ parcela fixa: da metade até menos do dobro; fora disso diz por quê (0.15775ms)
+✔ pagamento de parcela fixa: valor novo dentro do limite pergunta se vale para as próximas (0.110791ms)
+✔ pagamento de parcela fixa: fora do limite diz por quê, e vale em pagamento ANTIGO também (0.092292ms)
+✔ dívida com juros: pagamento antigo pode mudar, mas o valor deve passar dos juros (0.13175ms)
+✔ pagamento sem o histórico da dívida não muda de valor por aqui (0.119166ms)
+✔ parcela fixa paga a mais: parcela + encargo (0.110416ms)
+✔ parcela fixa paga a menos: parcela − desconto (0.071875ms)
+✔ com juros: o que abate o saldo + os juros do mês (0.051625ms)
+✔ sem diferença, sem histórico ou fora de dívida: nada embaixo do total (0.053ms)
+(node:95821) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/count-up.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ o valor animado só fica com o TextInput quando cabe na fonte do sistema (11.528417ms)
+(node:95822) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/cycle-label.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ ciclo fechado devendo lidera com a DÍVIDA, e o caixa vai para o rodapé (3.367917ms)
+✔ fatura ADIADA continua sendo "faltou pagar" (0.151875ms)
+✔ ciclo fechado sem dívida lidera com o caixa (0.09325ms)
+✔ ciclo aberto e previsto falam no futuro e usam o resultado (0.089542ms)
+✔ os campos chegam como string do PostgREST e continuam somando (0.110333ms)
+✔ a sub-linha escreve a LENTE — "na conta" / "da conta", nunca só "já saiu" (0.507083ms)
+✔ zero realizado num ciclo ABERTO diz "nada ainda" — é informação, não ausência (0.1745ms)
+✔ realizado == total some: repetir o <Money> ao lado é eco (§1) (0.340125ms)
+✔ ciclo PREVISTO fica sem subtítulo (0.237083ms)
+✔ sem série (primeiro frame) não inventa sub-linha (0.088709ms)
+✔ o valor passa pelo brl recebido — é o useBRL, que obedece ao esconder saldo (0.058416ms)
+(node:95837) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/cycle-routes.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a parcela do cronograma abre A DÍVIDA CERTA, com o id (0.62425ms)
+✔ fatura abre a FATURA; o pagamento dela abre o LANÇAMENTO (0.065708ms)
+✔ o que é projetado da regra não tem destino (0.039583ms)
+(node:95838) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/data-da-compra.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ A data da compra de uma parcela é a da parcela 1, não a do mês em que ela cai (0.426792ms)
+✔ Compra de outro ano leva o ano junto (0.053583ms)
+✔ "Concluído" é o que já aconteceu — a mesma régua da pílula (0.382791ms)
+(node:95865) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/dates.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ localISODate formata a data local com zero à esquerda (1.350958ms)
+✔ localISODate não desloca o dia como toISOString faria (0.100791ms)
+✔ monthBounds cobre o mês inteiro, inclusive fevereiro (0.569542ms)
+✔ formatDateBR devolve dd/mm/yyyy — a MESMA grafia de `isoToBR` (3.762417ms)
+✔ formatBRL trabalha em centavos inteiros (19.18975ms)
+✔ conversão entre ISO e dd/mm/aaaa (0.164917ms)
+✔ validação de data recusa dia que não existe (0.1945ms)
+✔ validação de hora em 24h (0.118042ms)
+✔ localDateTime monta o instante no fuso do aparelho (0.210083ms)
+✔ data pura não anda um dia para trás em fuso negativo (7.158083ms)
+✔ timestamptz continua sendo lido no fuso local (0.605542ms)
+✔ data: `formatDateBR` e `isoToBR` escrevem a MESMA data igual (0.1575ms)
+✔ relativeBR: os degraus que a lista de notas mostra (0.310041ms)
+✔ greetingBR vira nas fronteiras da manhã, da tarde e da noite (0.079791ms)
+✔ negativo sempre leva o sinal; `signed` decide só o + do positivo (0.059208ms)
+✔ diasAte e somaDias são a mesma régua nos dois sentidos (0.321ms)
+✔ maskBRDate põe as barras e deixa apagar (0.193625ms)
+✔ monthGrid põe cada dia na coluna do dia da semana (0.565417ms)
+✔ ehUltimoDiaDoMes reconhece o fim de cada mês (0.575916ms)
+✔ primeiroDiaDoMes aceita YYYY-MM e YYYY-MM-DD — o deep link manda o segundo (0.058ms)
+✔ mesmoMes casa qualquer dia do mês — o `startsWith` só acertava o dia 01 (0.038ms)
+✔ diaCurtoBR escreve o dia da semana e o mês abreviados (0.144ms)
+✔ rotuloDoDia usa palavra perto de hoje e a data curta longe (0.223209ms)
+✔ horaBR não inventa hora (0.100333ms)
+✔ emQuantoTempo fala em minutos até uma hora e em horas depois (0.096542ms)
+✔ fimQueSegueOInicio: o fim anda junto só quando o início passaria dele (0.066792ms)
+✔ horaComoData e timeBR fecham ida e volta; hora inválida não mexe no relógio (0.407833ms)
+✔ dataLocalDe: o dia de um timestamp é o do RELÓGIO da pessoa, não o do UTC (1.160584ms)
+(node:95878) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/debt-history.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a cadência anda para trás sem estourar o fim do mês (2.671083ms)
+✔ "estou na nona parcela" devolve as oito anteriores, numeradas 1 a 8 (0.789333ms)
+✔ pagamento registrado ganha a data e o valor REAIS, não a cadência (0.169792ms)
+✔ estimativa declarada usa o valor salvo para seu número, mas o pagamento real prevalece (0.278042ms)
+✔ vencimento histórico salvo permanece estável quando a próxima parcela muda (0.2425ms)
+✔ data real do pagamento prevalece sobre a estimativa histórica salva (0.213959ms)
+✔ nada pago, nada para trás (0.120166ms)
+✔ quitada não tem próxima parcela e ainda assim mostra o histórico (0.165042ms)
+✔ linha do tempo agrupa por ano e marca paga, estimada, próxima e futura (0.225542ms)
+✔ pagamento lançado com número acima das pagas aparece como PAGO, uma vez só, e a próxima é a seguinte (0.147917ms)
+✔ a linha do tempo se divide em "a seguir" (a próxima primeiro) e "já pagas" (a mais recente primeiro) (0.128375ms)
+✔ o pagamento lançado leva o id do lançamento até a linha do tempo — é por ele que a parcela paga abre (0.062834ms)
+(node:95879) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/debt-payment-scope.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ o patch de pagamento só contém campos alterados e mantém null explícito (1.137958ms)
+✔ as versões seguem exatamente o escopo escolhido, inclusive o histórico em Todos (0.262709ms)
+(node:95880) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/dicas.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a dica da vez é a primeira do catálogo daquela tela que está na tela e não foi encerrada (1.091875ms)
+✔ dica de algo que não está na tela não trava a próxima (sem cartão, vem a do gráfico) (0.120084ms)
+✔ uma por visita: dispensou uma, a tela fica quieta até a próxima abertura do app (0.575458ms)
+✔ a dica das listas é UMA: usada nas Notas, não aparece em Lançamentos (0.082292ms)
+✔ "Mostrar" do guia reacende a dica, mesmo encerrada e com a tela quieta (0.12275ms)
+✔ o catálogo: frase curta, uma tela pelo menos, ids únicos (0.127166ms)
+✔ o guia tem porta para TODA dica, e o "Mostrar" dela leva à tela onde ela mora (0.14975ms)
+✔ menos texto: título curto e uma linha de explicação, no guia inteiro (0.09ms)
+✔ todo gesto escondido tem dica: painel, gráfico, pilha, Carteira, contas, arrasto, ordem e pastas, fatura (0.116667ms)
+✔ o passo "O que dá para fazer" do onboarding: seis linhas curtas, e foto e áudio só pelo WhatsApp (0.223709ms)
+✔ nenhuma dica deixa uma palavra sozinha na linha do iPhone (0.155166ms)
+(node:95881) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/down-payment.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ entrada sai do total antes de dividir o restante, sem contar uma parcela (10.861542ms)
+✔ entrada não altera os centavos das prestações ou o resto da última parcela (0.128375ms)
+✔ entrada inválida nunca vira payload de pagamento (1.624583ms)
+✔ entrada já vinculada não vira uma segunda compra parcelada ao editar (0.213375ms)
+(node:95882) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/edit-scope.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ occurrence: Salvar oferece exatamente um, futuras e todas (0.71775ms)
+✔ installment: Salvar oferece exatamente um, futuras e todas (0.056ms)
+✔ payment: Salvar oferece exatamente um, futuras e todas (0.039333ms)
+✔ reminder: Salvar oferece exatamente um, futuras e todas (0.040291ms)
+✔ occurrence: editando o contrato não há "Só esta" — próximas e todas (0.127208ms)
+✔ installment: editando o contrato não há "Só esta" — próximas e todas (0.134833ms)
+✔ payment: editando o contrato não há "Só esta" — próximas e todas (0.462042ms)
+✔ reminder: editando o contrato não há "Só esta" — próximas e todas (0.044083ms)
+✔ as portas de CONTRATO não oferecem "Só esta"; a ocorrência aberta oferece (28/09/2026) (0.510708ms)
+(node:95883) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/environment.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ produção não mostra rótulo; qualquer outro ambiente mostra (0.83025ms)
+✔ ref desconhecido se identifica em vez de se passar por produção (0.111334ms)
+✔ o ref é lido sem depender de caixa nem do sufixo do domínio (0.075875ms)
+✔ login de teste só aparece em runtime dev fora de produção (0.197625ms)
+(node:95884) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/escrita.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ lançamento: uma linha, com source app; juros do Pix vira a segunda linha no cartão (0.64275ms)
+✔ parcelada: a RPC muda com o último dia; os argumentos são os da RPC (0.085834ms)
+✔ recorrente: a âncora é o próximo vencimento (0.173875ms)
+✔ financiamento: a linha é a entrada, sem id nem versão (0.105333ms)
+(node:95885) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/fala.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Android: trechos finais se juntam e o parcial vem por cima, sem repetir (92.746042ms)
+✔ iPhone: o parcial que cresce é substituído, e o final único fecha igual (11.33975ms)
+✔ sem o módulo nativo a biblioteca nem é carregada, e a escuta ao vivo fica indisponível (15.583208ms)
+(node:95886) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/finance-form.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ parcela pendente usa seu cronograma sem exigir um segundo vencimento (1.847ms)
+✔ remaining installments are added to already paid, never subtracted twice (0.257292ms)
+✔ data escolhida na dívida é dia fixo; fim do mês exige ação própria (0.934125ms)
+✔ recurrence end and interval reject invalid schedules (0.101833ms)
+✔ debt term rejects fabricated negative or fractional paid history (0.095417ms)
+✔ retrospective purchase asks paid history and preserves explicit zero (0.392417ms)
+✔ simple financing needs only installment value and total count, keeping embedded interest unspecified (0.127208ms)
+✔ simple financing subtracts explicitly paid installments once (0.067292ms)
+✔ simple financing rejects fractional counts, absent amounts, excess history and unsafe sums (0.169ms)
+✔ parcelar vale também EDITANDO um lançamento simples (0.185125ms)
+✔ o que já tem outro contrato não se parcela por aqui (0.092ms)
+✔ saldo adiado de fatura não se parcela por aqui (0.07375ms)
+✔ parcelar continua exigindo gasto e conta (0.048708ms)
+✔ criar com 1x salva; criar com 2x cria o plano (0.056583ms)
+✔ editar um simples com 2x CONVERTE — não cria um segundo lançamento (0.04475ms)
+✔ editar sem mexer em parcelas continua sendo só o update (0.046292ms)
+✔ editar uma parcela nunca converte, nem com o campo forçado (0.055292ms)
+✔ sem conta não há para onde parcelar (0.044833ms)
+✔ o número de parcelas é faixa aberta de 1 a 72 quando nada foi pago (0.050875ms)
+✔ com parcela paga, "À vista" sai da faixa (0.0405ms)
+✔ criando em N×, "parcela" multiplica e "total" fica como digitado (0.061ms)
+✔ numa compra que já existe, "cada parcela" vale para as em aberto e a travada fica (0.071959ms)
+✔ trocar a unidade sem digitar não muda a compra — nem por um centavo (0.054625ms)
+✔ digitar em "parcela" guarda o que foi digitado e recalcula o total (0.06475ms)
+✔ com tudo pago, "cada parcela" não alcança nenhuma (0.037708ms)
+✔ o nome da compra é o da parcela sem o "(k/N)" (0.121125ms)
+✔ uma parcela salva só ela — a compra toda se edita no topo do formulário (26/09/2026) (0.050375ms)
+✔ total a pagar vira parcela arredondada; o total gravado é parcela × N (0.049958ms)
+✔ âncora e próxima parcela fazem ida e volta, inclusive no dia 31 (0.100541ms)
+✔ a próxima parcela que o formulário mostra é a do cronograma: nunca no passado (0.097042ms)
+✔ A dívida troca de modo sem perder o que já tem: "parcelas" troca de sentido (0.214625ms)
+(node:95887) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/finance-query-filters.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ transactions combinam valor inclusivo, conta recebida e busca no servidor em todas as paginas (647.026833ms)
+✔ transactions maximo zero e sem conta nao viram ausencia de filtro; limpar recorte retira limites (313.684208ms)
+✔ transactions com uma borda mantêm o outro lado aberto em todas as páginas (573.197667ms)
+✔ previsões e resumo sem ambas as bordas não enviam RPC inválida, inclusive via refetch manual (338.618208ms)
+✔ previsoes de janela longa repartem todos os dias em blocos disjuntos de ate 62 dias (228.353ms)
+✔ previsoes com mais de 1000 linhas buscam paginas seguintes sem perda nem duplicacao (271.433125ms)
+✔ falha apos um lote de previsoes rejeita periodo completo e nao devolve resultado parcial (259.57125ms)
+✔ cancelamento de previsoes chega ao fetch e rejeita consulta inteira (208.389458ms)
+✔ accounts paginam alem de 1000 e incluem apenas arquivada selecionada quando nao pedidas todas (131.489084ms)
+✔ accounts distinguem lista ativa, conta selecionada e todas arquivadas na consulta/cache (112.740584ms)
+✔ importacoes combinam datas locais, arquivo, conta e origem antes de limitar historico (113.251042ms)
+✔ importacoes com sem conta, OFX e datas abertas aplicam so as bordas escolhidas (102.995375ms)
+✔ importacoes conservam placeholder ao ver mais somente se o recorte anterior e igual (106.617084ms)
+✔ erro remoto de importacao rejeita consulta; retry preserva recorte completo (128.341625ms)
+(node:95888) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/forecast-months.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ o corte é o mês da cobertura, e só quando há mês além dele (0.363875ms)
+✔ sem meses não há corte (0.050083ms)
+✔ veioDe encadeia: o começo de um mês é a sobra do anterior (0.06375ms)
+(node:95889) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/forgot-password-ui.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ código e senha rodam no cliente descartável; a sessão só vai ao principal depois da troca (173.858875ms)
+✔ a recusa do servidor aparece no campo da senha e some ao digitar (45.713542ms)
+✔ senha trocada mas entrega falhou: diz isso, revoga a recuperação e leva ao login (27.62875ms)
+✔ Cancelar no passo da senha revoga a sessão de recuperação e sai (40.967542ms)
+(node:95890) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/form-motion-ui.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Presenca shrinks space and opacity on the same spring, preserving an inactive outgoing snapshot (117.803833ms)
+✔ Presenca ignores completion after unmount and reduced motion closes without waiting (75.549791ms)
+✔ Nested presence inherits its inactive parent provider (22.000916ms)
+✔ Presenca reports an actual exit once and ignores a canceled exit after reopening (30.958208ms)
+✔ TrocaSuave mounts both layers immediately and starts progress only after incoming native layout (37.308ms)
+✔ TrocaSuave retains its measured width during absolute-layer swaps and explicitly restores natural dimensions (15.005833ms)
+✔ Resting presence publishes natural height and swaps retain static geometry after stale shared-value writes (11.157166ms)
+✔ a settled label swap releases its frame before larger text measures again (5.336ms)
+✔ TrocaSuave retargets midflight from its current progress while retaining the original outgoing layer (6.540834ms)
+✔ Spring overshoot keeps opacity bounded and height nonnegative while allowing a small spatial bounce (90.466459ms)
+✔ TrocaSuave rejects stale completion after another mode, return to original, and unmount (28.481125ms)
+✔ TrocaSuave ignores a stale incoming layout when a newer mode is waiting for its own measurement (11.624125ms)
+✔ TrocaSuave returning A to B to A creates a new incoming lifetime and waits for its new native layout (10.127625ms)
+✔ TrocaSuave ignores captured native measurement callbacks after unmount (13.165667ms)
+✔ TrocaSuave provider disables outgoing native input callbacks while the incoming input stays editable (72.094125ms)
+✔ TrocaSuave reduced motion interrupts pending work and full-screen mode preserves its frame (6.015ms)
+✔ SelectField delivers selection synchronously once, keeps one chosen row, and can reopen while closing (23.42575ms)
+✔ SelectField confirms a different option during collapse without delaying its callback (18.806291ms)
+✔ DatePicker delivers one date synchronously, preserves limits and can reopen during collapse (123.373958ms)
+✔ DatePicker outgoing calendar cannot select again while the collapsed month-end control remains active (50.566625ms)
+✔ DatePicker reopening during collapse gives the calendar a new lifetime and keeps month-end aligned with its current month (39.069458ms)
+✔ QuantityField snapshot never clamps or edits financial state; typing and steps stay synchronous (21.912541ms)
+✔ TextField outgoing snapshot suppresses editing and contract-clamping blur (84.214125ms)
+✔ MudancaSuave crossfades discrete content and reduced motion restores the latest label immediately (11.299458ms)
+✔ Presenca lazily mounts native motion once and first appearance springs through measured space (9.617083ms)
+✔ Presenca explicitly restores natural resting geometry after opening, closing and reopening (14.526667ms)
+✔ Presenca lazy first appearance honors reduced motion and an inactive parent (60.4775ms)
+✔ prepared compact presence measures while hidden and first open reuses its native motion (12.328ms)
+✔ prepared presence waits for measurement on an immediate first tap and accepts an empty list (8.664916ms)
+✔ SelectField first opening and reopening install no new native motion for its options (42.750833ms)
+✔ prepared presence remains hidden with reduced motion and ignores native layout after unmount (14.145916ms)
+✔ FormatoDoLancamento prepares first opening and cannot select while hidden or inactive (61.093125ms)
+✔ SelectField keeps the icon column spacing for alternatives without an icon (50.271125ms)
+✔ TextField keeps a full line visible when the font changes, retaining normal geometry and typing (72.041625ms)
+✔ TextField respects the caller font cap, disabled scaling and multiline geometry (31.854375ms)
+(node:95891) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/glass-backdrop.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ vidro com tinta leva a cor sólida por baixo: o conteúdo continua legível se o vidro não pintar (125.34575ms)
+✔ vidro sem tinta continua só vidro — o controle comum refrata o que está atrás (27.334792ms)
+(node:95892) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/hipotese.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ uma vez vira lançamento pendente com o título Hipótese (1.283334ms)
+✔ parcelado vira a compra parcelada com 0 pagas; sem conta é incompleto (0.189ms)
+✔ repete vira recorrente com a regra do app (0.208292ms)
+✔ financiamento: parcela fixa, âncora na data, dia da data (0.126167ms)
+✔ dois financiamentos no mesmo rascunho não colidem no nome (a dívida tem nome único no espaço) (0.1315ms)
+✔ o que falta: valor, conta no parcelado e no financiamento, parcelas (0.076583ms)
+✔ a linha diz forma, conta e data (0.143708ms)
+✔ aplicar abre o formulário certo, com tudo (0.208166ms)
+✔ hipótese com data que já passou vale a partir de HOJE: na simulação, na linha e no Aplicar (revisão final) (0.190167ms)
+✔ Aplicar de uma data futura fora do cartão nasce A PAGAR, como foi simulado (revisão final) (0.2925ms)
+(node:95893) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/icon-map.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Icon: todo SF Symbol usado no app está no mapa SF → Material (34.917125ms)
+(node:95906) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/import-preview.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ só o que é NOVO e é gasto/receita de verdade nasce marcado (1.300042ms)
+✔ crédito na fatura nunca entra sozinho como receita — mesmo sem a IA ter respondido (0.129375ms)
+✔ transferência entre contas e aplicação ficam de fora por padrão, com o motivo (0.677375ms)
+✔ a frase do parcelado diz o que vai ser criado (0.369083ms)
+✔ o motivo do "já está no app" mostra com o quê (0.147667ms)
+✔ o total é o que está MARCADO, e conta as compras parceladas que nascem (0.198625ms)
+(node:95907) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/installment-progress.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ next installment follows pending numbers, not the count already paid (3.217792ms)
+(node:95908) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/item-actions.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Android sem mensagem: a pergunta vai no corpo, sem vão vazio embaixo do título (110.156833ms)
+✔ Android com mensagem: título e mensagem como sempre (38.316ms)
+✔ iOS continua com o título na folha de ações (33.890125ms)
+(node:95909) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/item-link-accessibility.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ cartão iOS expõe rótulo e ativação fora do contêiner nativo do preview, preservando menu e arrasto (326.356667ms)
+✔ ações AX preservam submenus e impedem executar ações desabilitadas (16.071333ms)
+✔ ItemLink preserva rótulo rico do filho e só executa render prop uma vez (18.205458ms)
+✔ rótulo explícito do ItemLink prevalece sobre o título e rótulo do filho (8.020875ms)
+(node:95910) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/lancar.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a conversão abre o registro devolvido pelo banco, inclusive financiamento sem transação (0.873416ms)
+✔ a série convertida abre suas ocorrências no mês local do início escolhido (1.0985ms)
+✔ sem ID de resultado a conversão abre a lista válida, nunca a origem removida (0.08525ms)
+✔ as quatro opções da spec, e só as que mudam alguma coisa (0.137917ms)
+✔ sem saber se há passado, a opção destrutiva aparece (e é confirmada) (0.0825ms)
+✔ "Salvar e criar outro" mantém tipo, conta e data, e limpa o resto (0.063084ms)
+✔ transferência não existe na recorrente: vira gasto (0.046875ms)
+✔ o seletor tem três opções e o link carrega o tipo (0.060792ms)
+✔ o papel do lançamento sai do registro: série, compra parcelada, dívida ou avulso (0.093625ms)
+(node:95911) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/ledger-expected.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ previsões respeitam filtros da lista, sem se passarem por lançamentos concluídos (0.719709ms)
+✔ Ver ocorrências limita previsões à série selecionada (0.469708ms)
+✔ previsões de origens diferentes aparecem em ordem de vencimento (7.879834ms)
+✔ previstas entram no dia delas, entre os lançamentos, sem passar da página carregada (0.290458ms)
+✔ pílula da prevista segue a data, e a estimada nunca se passa por conta a pagar (0.135125ms)
+✔ tocar na prevista não abre buraco na lista nem a mostra duas vezes (0.163708ms)
+✔ previsões respeitam valor mínimo/máximo inclusivos e combinados com conta (0.10725ms)
+(node:95912) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/list-filters-ui.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ busca preserva nomes e termos digitados sem autocorreção do teclado (269.272333ms)
+✔ significado da data fica no rótulo de cada input, sem título de seção duplicado (67.520708ms)
+✔ digitar modifica somente draft; Aplicar publica um payload e fecha depois (65.434834ms)
+✔ Sheet: fechar/voltar cancela e reabrir remonta draft do valor publicado (31.301917ms)
+✔ TaskHeader: fechar/voltar cancela e reabrir remonta draft do valor publicado (31.417459ms)
+✔ Limpar zera busca, datas, valores e selecoes mas somente Aplicar publica a limpeza (33.212584ms)
+✔ Voltar ao mês remove somente o intervalo e exige Aplicar; cancelar preserva o recorte publicado (17.762417ms)
+✔ ícone único limpa datas em listas com bordas independentes sem alterar seleções (111.860875ms)
+✔ apenas uma data é aplicável e publica somente a borda escolhida (117.272125ms)
+✔ erro de intervalo aparece junto à data final e desaparece ao corrigir a ordem (21.568792ms)
+✔ data impossivel: erro inline desabilita Aplicar e o handler tambem recusa (29.005583ms)
+✔ ordem das datas: erro inline desabilita Aplicar e o handler tambem recusa (21.822292ms)
+✔ minimo acima do maximo: erro inline desabilita Aplicar e o handler tambem recusa (29.297792ms)
+✔ valor negativo: erro inline desabilita Aplicar e o handler tambem recusa (20.876417ms)
+✔ centavos fracionarios: erro inline desabilita Aplicar e o handler tambem recusa (21.054375ms)
+✔ data invalida digitada atualiza validacao sem publicar o draft (10.790791ms)
+✔ minimo/maximo zero e intervalo do mesmo dia sao validos e publicados (63.171542ms)
+✔ selecao null remove so a chave escolhida e preserva objeto original/conjunto de opcoes (38.256792ms)
+✔ cabecalho fica presente e SheetScroll e o ultimo filho da folha (49.596459ms)
+(node:95913) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/list-filters.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ resumo descreve datas e valores como intervalos e resolve seleções pelos mesmos rótulos da folha (1.247291ms)
+✔ resumo cobre bordas únicas, mesmo dia, zero, privacidade e opção que deixou de estar disponível (0.295917ms)
+✔ contagem agrupa período e faixa de valor, reconhece zero e ignora critérios vazios (0.099792ms)
+✔ período inclusivo aceita mesmo dia e rejeita datas invertidas ou inexistentes (0.918959ms)
+✔ limites de dinheiro são centavos inteiros, inclusivos, e zero é um filtro (0.123041ms)
+✔ divide previsões extensas sem perder bordas, inclusive virada de ano e fevereiro bissexto (0.934583ms)
+✔ timestamps usam o dia BRT inteiro, final exclusivo na virada do ano (4.897541ms)
+(node:95914) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/list-query-filters.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ lixeira ordena pela exclusão no servidor antes de paginar, sem misturar fixação da lista ativa (352.194125ms)
+✔ lembretes sem filtros conservam a chave de cache da vitrine e do retrato inicial (68.155584ms)
+✔ lembretes combinam título, canal e estado antes da paginação e incluem o último instante do dia BRT (97.730958ms)
+✔ notas mantêm pasta/tag/busca/ordem no intervalo de atualização antes das páginas seguintes (90.067625ms)
+✔ notes: datas abertas, fevereiro bissexto e limpeza não reutilizam o recorte anterior (119.578333ms)
+✔ notes: erro remoto é propagado e retry conserva filtros (48.835375ms)
+✔ reminders: datas abertas, fevereiro bissexto e limpeza não reutilizam o recorte anterior (100.404333ms)
+✔ reminders: erro remoto é propagado e retry conserva filtros (43.873417ms)
+(node:95915) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/lock-policy.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ trava desligada nunca tranca (0.712541ms)
+✔ sem ter saído do app não tranca (0.097917ms)
+✔ espera 0 tranca na hora — e `0` é falsy, que é onde isto quebra (0.132708ms)
+✔ espera de 30s só tranca depois dos 30s (0.080084ms)
+✔ UI do sistema aberta (arquivo, câmera, o próprio prompt) não tranca (0.071875ms)
+✔ ligada, o app abre trancado (0.069292ms)
+✔ só sucesso abre — desistir ou falhar mantém trancado (0.071125ms)
+✔ celular sem bloqueio de tela não pode oferecer a trava (0.073666ms)
+✔ a bandeira NÃO cai ao terminar quando o app saiu do primeiro plano (0.093917ms)
+✔ a bandeira cai na hora quando o app nunca saiu do primeiro plano (0.11975ms)
+✔ operação ainda em voo segura a bandeira dos dois lados (0.074417ms)
+✔ sem conta aberta não tranca — a porta é o login (0.056792ms)
+✔ sair do app com a trava ligada cobre na hora — menos para a UI do sistema e sem conta (0.06875ms)
+(node:95916) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/month-view.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ os quatro blocos têm título e a ordem é a da planilha (0.623416ms)
+✔ o subtítulo monta o que existe e não deixa separador solto (0.089417ms)
+✔ o percentual sai de pontos-base inteiros, inclusive nos extremos (0.044292ms)
+✔ o corte por natureza traduz a chave crua do SQL; os outros usam o rótulo (0.040958ms)
+✔ passado, presente e futuro pedem verbos diferentes para o mesmo caixa (0.054542ms)
+✔ o aviso do horizonte fala mesmo quando nada foi gerado (0.071833ms)
+✔ parcela declarada sem lançamento: singular e plural (0.05175ms)
+✔ a diferença entre resultado e caixa é explicada, e some quando não existe (29.694084ms)
+✔ o herói mostra caixa quando ele existe e resultado quando não existe (0.148375ms)
+(node:95917) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/note-blocks.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ classifica os sete tipos de bloco (0.720041ms)
+✔ a marcação não vaza para o texto (0.062ms)
+✔ divisória não é confundida com item de lista (0.048667ms)
+✔ a primeira linha vira título — mas só se for parágrafo (0.104375ms)
+✔ linha em branco não vira bloco, mas o índice continua o da linha original (0.047208ms)
+✔ toggle marca e desmarca preservando o recuo (0.054791ms)
+✔ toggle em linha que não é item não muda nada (0.040625ms)
+✔ converter bloco preserva o texto (0.0495ms)
+✔ reaplicar o mesmo tipo devolve o bloco a parágrafo (0.042667ms)
+✔ converter para divisória e sair dela não inventa texto (0.069584ms)
+✔ lineAt encontra a linha do cursor (0.051917ms)
+✔ progresso conta só os itens marcáveis (0.345667ms)
+✔ separarTitulo: parágrafo e "# título" viram título; lista não (0.127792ms)
+✔ juntarTitulo desfaz separarTitulo — nada pula de campo ao reabrir (0.134458ms)
+✔ juntarTitulo nunca deixa quebra de linha entrar no título (0.071791ms)
+✔ Enter depois de um item abre o próximo do mesmo tipo (0.1965ms)
+✔ Enter no meio da nota, no meio de um item, ou com autocorretor junto (0.063167ms)
+✔ Enter num item vazio sai da lista (0.044583ms)
+✔ fora de lista, colando várias linhas ou digitando letra, nada muda (0.044958ms)
+(node:95919) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/note-inline.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ as quatro marcas (0.845417ms)
+✔ texto sem marcação sai inteiro, num span só (0.071625ms)
+✔ marca no meio da frase (0.056916ms)
+✔ aninha, e a ordem das marcas segue a de abertura (0.065708ms)
+✔ duas marcas iguais na mesma linha não se confundem (0.053375ms)
+✔ snake_case fica intocado — o `_` vem depois de letra e não abre (0.084625ms)
+✔ multiplicação não vira negrito (0.038667ms)
+✔ delimitador solto é texto (0.039042ms)
+✔ mono é literal: nada é interpretado lá dentro (0.053125ms)
+✔ `*negrito*` no começo da linha não vira item de lista (0.302292ms)
+✔ `* leite` continua sendo item de lista, e o texto dele não tem marcação (0.052708ms)
+✔ `***` continua divisória e `___` também (0.041583ms)
+✔ marksAt aponta a marca sob o cursor, não a primeira igual da linha (0.056791ms)
+✔ seleção vazia insere o par e deixa o cursor no meio (0.079875ms)
+✔ envolve a seleção e devolve a seleção nova sobre o mesmo texto (0.037ms)
+✔ já envolvido, desfaz — virar negrito não é caminho de mão única (0.0305ms)
+✔ o espaço das pontas fica FORA do delimitador (0.03375ms)
+✔ seleção só de espaço não escreve nada (0.028542ms)
+✔ o que toggleMark escreve, parseInline lê de volta (0.066167ms)
+(node:95920) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/notes-autosave.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ autosave: texto novo em nota existente grava (0.639291ms)
+✔ autosave: nada mudou não vira requisição (0.093542ms)
+✔ autosave: antes da hidratação nunca grava (a nota ainda está carregando) (0.070417ms)
+✔ autosave: remontagem com estado zerado NÃO esvazia a nota — é o bug de 28/08 (0.0715ms)
+✔ autosave: apagar o texto de propósito também não grava — apagar é a Lixeira (0.074292ms)
+✔ autosave: nota em branco nunca é inserida (0.067459ms)
+✔ autosave: nota que já estava vazia pode receber texto e continuar vazia sem gravar (0.075208ms)
+✔ autosave: nota na lixeira não recebe mais nada (0.061959ms)
+(node:95921) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/notifications.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ abrir o app por uma notificação leva ao destino e LIMPA a resposta (101.315042ms)
+✔ a abertura seguinte não repete a notificação antiga (35.217583ms)
+✔ tocar com o app aberto também limpa — senão a próxima abertura voltaria para lá (17.536417ms)
+(node:95934) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/onboarding.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ only an explicit persisted completion skips initial preferences (0.323417ms)
+✔ completion belongs to the current account, not the device (0.293375ms)
+(node:95935) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/onde-muda.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ conta que muda aparece; conta igual e "sem conta" não (0.926708ms)
+✔ fica negativa: quando passa a ficar, ou fica MAIS CEDO (0.224042ms)
+✔ conta que só existe no depois (recebe a primeira movimentação) aparece com antes nulo (0.084708ms)
+✔ cartão: faturas antes → depois pelo vencimento, fatura nova conta do zero (0.263167ms)
+✔ passa do limite: quanto; sem limite: nunca "passa", diz que não tem (0.140417ms)
+✔ cartão que não muda não aparece; conta do tipo cartão no horizonte de contas não aparece (0.102875ms)
+✔ contas antes dos cartões, na ordem em que vieram (0.126625ms)
+✔ a frase do limite: passa agora, já estava acima (visto no staging, 29/09/2026) ou sem limite (0.225792ms)
+✔ a frase do negativo: nova, mais cedo (visto no staging, 29/09/2026) ou a mesma de antes (0.162292ms)
+(node:95936) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/phone-br.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ máscara progressiva acompanha a digitação (0.758917ms)
+✔ fixo de 10 dígitos quebra o hífen num lugar diferente do celular (0.072083ms)
+✔ DDI só é removido quando sobra número demais para ser nacional (0.201042ms)
+✔ lixo e excesso não passam (0.142292ms)
+✔ validade cobre o que o botão precisa saber (0.093875ms)
+✔ E.164 e exibição saem da mesma normalização (0.202667ms)
+✔ telefoneLegivel escreve o número brasileiro por partes, que quebram entre si (nunca "+553599874/4200") (0.116417ms)
+(node:95937) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/phone-link.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ aceita o mesmo usuário e telefone mesmo com formatos diferentes (0.415791ms)
+✔ recusa resposta do OTP que aponta para outro usuário (0.056125ms)
+✔ recusa usuário sem telefone ou com outro número (0.049042ms)
+(node:95938) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/proximo-passo.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a ordem: importar, projeção, lembrete, parcelada, nota (1.354833ms)
+✔ importar leva à importação com o cartão já escolhido (0.150958ms)
+✔ sem cartão não oferece importar a fatura nem compra parcelada (0.145917ms)
+✔ o que já foi feito não volta, e sem passo aplicável é null (0.113584ms)
+(node:95939) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/purchase-write.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ useCreateInstallmentPlan: mesmo payload conserva a tentativa entre renders; outra montagem recebe chave propria (355.844375ms)
+✔ useCreateInstallmentPlan: payload diferente recebe nova tentativa sem modificar o input (131.033083ms)
+✔ useCreateInstallmentPlan: erro da RPC e falha de transporte preservam chave no retry (118.570084ms)
+✔ useSaveDebt: mesmo payload conserva a tentativa entre renders; outra montagem recebe chave propria (154.769083ms)
+✔ useSaveDebt: payload diferente recebe nova tentativa sem modificar o input (123.235583ms)
+✔ useSaveDebt: erro da RPC e falha de transporte preservam chave no retry (100.572708ms)
+✔ useAddPurchaseDownPayment: mesmo payload conserva a tentativa entre renders; outra montagem recebe chave propria (50.442708ms)
+✔ useAddPurchaseDownPayment: payload diferente recebe nova tentativa sem modificar o input (2.37425ms)
+✔ useAddPurchaseDownPayment: erro da RPC e falha de transporte preservam chave no retry (8.994917ms)
+✔ useCreateInstallmentPlan: a chave tambem acompanha o valor/contrato quando a outra parte fica igual (67.128916ms)
+✔ useSaveDebt: a chave tambem acompanha o valor/contrato quando a outra parte fica igual (103.263875ms)
+✔ useAddPurchaseDownPayment: a chave tambem acompanha o valor/contrato quando a outra parte fica igual (4.980042ms)
+✔ compra com entrada transmite somente contrato remanescente e os tres campos independentes da entrada (69.140083ms)
+✔ compra sem entrada conserva conta, historico, estabelecimento e ultimo dia (62.402458ms)
+✔ financiamento com/sem entrada conserva o contrato e nao cria debt_id/installment_plan_id na entrada (47.693291ms)
+✔ anexar entrada usa o parent escolhido e devolve o id da despesa sem editar o contrato (2.200916ms)
+✔ editar divida preserva id e versao na consulta; nao cria parent nem grava entrada no contrato (57.754792ms)
+✔ divida alterada por outra escrita recusa update vazio e nao cria parent como fallback (44.124375ms)
+(node:95940) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/push-routes.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ o fechamento abre O CICLO QUE FECHOU, não o corrente (0.705625ms)
+✔ `ref` que não é mês é IGNORADO — a rota abre sem parâmetro (0.117916ms)
+✔ `ref` nunca escolhe PARA ONDE se navega — só o `target` faz isso (0.049166ms)
+✔ alvo fora da allowlist não navega (0.06525ms)
+✔ `toString` não devolve uma FUNÇÃO para o router (0.054ms)
+✔ data ausente, vazio ou de tipo errado não navega (0.04725ms)
+✔ os alvos que o servidor produz hoje todos resolvem (0.182792ms)
+(node:95941) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/push-targets-contract.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ os alvos de push do servidor e do app são exatamente os mesmos (0.849125ms)
+✔ todo alvo que `target_for` devolve está na allowlist do app (0.150833ms)
+✔ o fechamento de ciclo tem alvo próprio, e ele é `cycle` (0.093416ms)
+✔ o `ref` só vira parâmetro de rota depois de passar por regex de mês (0.0485ms)
+(node:95942) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/rascunho-no-ciclo.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ cada ocorrência vira uma linha com nome, e a parcela adiantada lê como dinheiro que fica (0.648458ms)
+✔ o fechamento soma o efeito de antes no "comecei" e o de dentro em entrou/saiu (0.090709ms)
+(node:95943) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/rascunho.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ versão 2 volta como foi gravada; vazio grava texto vazio (0.673375ms)
+✔ formato estranho ou corrompido não quebra: vira vazio (0.071958ms)
+✔ item estragado da versão 2 sai; o resto continua (0.07ms)
+✔ rascunho da versão 1 vira a versão 2 (0.128791ms)
+✔ o motivo: a frase NOSSA passa, o texto cru do Postgres não (0.060458ms)
+(node:95944) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/reabrir-ao-voltar.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a folha só reabre depois de a tela ter saído do foco e voltado (5.2045ms)
+(node:95945) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/recurring-state.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ conversão encerra pelo corte antes da próxima mesmo com active preservado (0.581792ms)
+✔ fim anterior a hoje encerra mesmo com next_run_at desatualizado (0.130667ms)
+✔ fim hoje é inclusivo quando a próxima ainda cabe (0.090042ms)
+✔ virada UTC não antecipa o fim no Brasil (0.082375ms)
+✔ fim futuro com próxima válida mantém estado ativo ou pausado (0.086167ms)
+✔ sem fim segue o estado persistido (0.081959ms)
+✔ encerrada prevalece sobre pausa e erro antigo (0.088542ms)
+✔ data pura da próxima mantém o dia local e timestamp inválido não inventa encerramento (0.093625ms)
+(node:95946) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/refresh-consistency.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ settling a historical invoice refreshes history without realtime and invalidates inactive installment/report caches (687.99025ms)
+✔ financial mutation remains pending until active reads finish (339.810917ms)
+✔ completed agent turn invalidates writable domains without relying on realtime (16.899541ms)
+✔ every ledger mutation invalidates historical derived reads and search (170.542708ms)
+✔ import create/approve/discard/update refresh batch history without waiting for realtime (158.680709ms)
+✔ agent processing response preserves domain caches until completion (15.7045ms)
+✔ criar conversa: onMutate volta a local para processing; onError marca failed, invalida a lista e abre o paywall (11.797584ms)
+✔ realtime account change refreshes balances/forecast derived reads once per table (101.374875ms)
+✔ native resume reloads fresh active data, skips disabled reads and does not fetch on initial active event (3.282625ms)
+✔ native resume cancels an old inflight read before fetching current data (5.4725ms)
+✔ realtime remount does not reuse a channel whose asynchronous removal is still pending (55.439584ms)
+✔ 48 realtime row events coalesce and an event during refetch still gets a final fresh read (107.986916ms)
+✔ Today routes an overdue invoice to invoice payment instead of writing its ID into transactions (20.100333ms)
+✔ Today opens the pay confirmation for the standalone transaction and exposes pull to refresh (15.663167ms)
+✔ mark paid rejects a zero-row write instead of reporting success (148.784542ms)
+✔ toda chave de consulta financeira está em FINANCE_KEYS, ou tem motivo escrito (1.124958ms)
+✔ a simulação é marcada velha na escrita, mas NÃO recalcula ali (o rascunho ainda tem a hipótese aplicada) (2.422042ms)
+(node:95947) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/rrule-text.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ frequências simples (10.789334ms)
+✔ dia do mês — a regra que a IA mais gera (0.229875ms)
+✔ dias da semana (0.136334ms)
+✔ intervalo maior que 1 (0.067917ms)
+✔ aceita o prefixo RRULE: e ordem/caixa variadas (0.065416ms)
+✔ o que não dá para interpretar volta cru, sem inventar (0.150625ms)
+✔ último dia do mês não vira "todo dia -1" (3.963042ms)
+(node:95960) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/runtime-config.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ configuração do app config vence o fallback injetado pelo Metro (0.56175ms)
+✔ fallback continua funcionando quando o app config ainda não tem a chave (0.063917ms)
+(node:95961) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/search.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ tsquery: prefixo só no último termo (é o que faz buscar enquanto digita) (1.554334ms)
+✔ tsquery: entrada vazia ou só pontuação vira string vazia, não query inválida (0.114125ms)
+✔ tsquery: pontuação separa termos e não vaza para o operador (0.072875ms)
+✔ tsquery: acento e maiúscula são preservados em minúscula (unaccent resolve no banco) (0.064959ms)
+✔ tsquery: número entra como termo (0.087875ms)
+✔ título é a primeira linha não vazia (0.813458ms)
+✔ prévia não repete o título (0.129834ms)
+✔ prévia e título não vazam a marcação de NENHUM bloco (0.108583ms)
+✔ prévia não vaza a marcação do checklist (aparecia `- [x] leite - [ ] pão`) (0.094375ms)
+✔ título de nota que começa com checklist mostra o texto, não a marcação (0.133708ms)
+✔ o strip come a MARCAÇÃO, nunca o hífen que é texto (0.394458ms)
+✔ prévia não repete a #tag, que já aparece na faixa de metadados (0.228375ms)
+✔ prévia preserva # colado em palavra e cerquilha solta (não é tag) (0.73775ms)
+✔ nome de pasta respeita o check do banco: lower, trim e 40 chars (0.085459ms)
+✔ ilike: metacaractere do PostgREST vira espaço (`compra (mercado)` quebrava a query) (0.45575ms)
+✔ ilike: acento, número e hífen sobrevivem (0.555667ms)
+✔ ilike: só pontuação vira string vazia (0.253667ms)
+✔ tag: acrescenta no fim e não duplica (nem trocando a caixa) (1.349125ms)
+✔ tag: entrada suja vira tag válida, e o que o banco não reconhece é recusado (0.063292ms)
+✔ tag: remover não deixa espaço duplo nem quebra o resto do texto (0.392584ms)
+✔ tag: `#tag` colada em palavra não é tag (mesma regra do banco) (1.297ms)
+✔ prévia e título não vazam a marcação INLINE (`*negrito*`, `_itálico_`) (0.144916ms)
+✔ o que não é marcação casada continua na tela (0.048625ms)
+✔ notePreview com limite corta numa palavra inteira e marca o corte — a lista não vira a nota inteira (0.105666ms)
+(node:95962) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/serie.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Esta e as próximas: valor e vencimento mudados — o valor vai pelas linhas, o calendário pela regra (1.866583ms)
+✔ Esta e as próximas sem mexer em nada não grava nada — nem o calendário vindo do WhatsApp (0.277583ms)
+✔ Tipo, fim e "entra como pago" são da série; título e estabelecimento, das linhas (0.143791ms)
+✔ A data do formulário é o vencimento da linha fora do cartão, e a compra no cartão (0.118667ms)
+✔ A série no formulário: o próximo é o dia LOCAL, e a repetição sai da regra (0.585709ms)
+✔ regra que o app não desenha fica própria: o formulário não a reescreve (0.333584ms)
+✔ 30/09 continua dia 30 fixo sem a ação explícita de último dia (0.170333ms)
+✔ calendário escolhe dia fixo até no dia 31; ação própria escolhe fim do mês (0.154375ms)
+✔ Esta e as próximas numa ocorrência PAGA parte do próximo vencimento, não da data dela (0.753375ms)
+✔ A data que o banco deslizou vira aviso; a mesma data, nada (48.234917ms)
+(node:95963) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/session-gate.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a primeira sessão resolvida é a abertura, não uma troca (0.404375ms)
+✔ mesmo usuário (refresh de token, metadados do onboarding) passa direto (0.055041ms)
+✔ entrar, sair e trocar de conta passam pela cortina (0.04125ms)
+✔ sair cobre descendo e revela subindo até a capa do login (0.323042ms)
+✔ troca direta de conta pode usar o botão; sem origem, desce do topo (0.058917ms)
+✔ a tela antiga permanece visível enquanto a cortina chega; a nova só entra na revelação (0.626042ms)
+✔ a origem lembrada vence depois de um tempo (0.167667ms)
+✔ a abertura espera o teto curto, e o longo enquanto a trava pede a senha (0.091917ms)
+✔ a marca fica um mínimo na tela, e não mais que isso (0.19275ms)
+(node:95964) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/settle-labels.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ receita se recebe, despesa se paga (2.822875ms)
+✔ kind ausente cai no rótulo de despesa, não em texto vazio (0.127542ms)
+✔ caixaLabels: receita CAI, despesa SAI (0.665209ms)
+✔ receita não vence — ela é esperada (0.138333ms)
+✔ no cartão a data é da fatura, e o rótulo diz isso (0.211625ms)
+✔ fatura sem data ainda diz que é do cartão (1.347417ms)
+✔ fora do cartão nada mudou (0.463333ms)
+✔ nenhuma tela escreve "Paguei" à mão (11.259625ms)
+✔ compra de cartão que já aconteceu não é previsto, mesmo pendente (0.104334ms)
+✔ compra de cartão com data à frente continua previsto (0.085042ms)
+✔ conta a pagar que venceu é ATRASADA, não prevista (0.046375ms)
+✔ conta que vence hoje ainda é prevista — vencer hoje não é atrasar (0.041041ms)
+✔ sem vencimento, quem decide é a data do lançamento (0.030917ms)
+✔ receita que passou da data NÃO CAIU — ela não atrasa (0.02775ms)
+✔ parcela de plano SEM cartão e com data passada lê atrasada (0.024042ms)
+✔ lançamento efetivado não tem estado nenhum (0.026166ms)
+✔ fora do cartão quem manda é o vencimento, mesmo com a data do lançamento à frente (0.031166ms)
+(node:95965) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/setup-steps.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ usuário novo tem os quatro passos abertos, e o último é conhecer o app (0.735291ms)
+✔ telefone em branco não conta como WhatsApp ligado (4.480667ms)
+✔ abrir o guia marca "Conhecer o app" (0.094041ms)
+✔ com tudo feito o progresso é completo (0.060625ms)
+(node:95966) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/simple-finance-ui.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ E se: Ver resultado funciona na primeira hipótese, com Adicionar mais uma disponível em paralelo (588.070875ms)
+✔ E se: Adicionar mais uma prepara várias hipóteses sem fechar; Ver resultado inclui a última (175.367084ms)
+✔ E se: adiantar vira UMA hipótese — o pagamento e um cancelamento por parcela, no dia de cada uma (156.7455ms)
+✔ E se: trocar o mês do pagamento para depois das parcelas escolhidas DIMINUI a quantidade sozinho (170.283834ms)
+✔ E se: editar uma entrada troca o valor e a forma no mesmo lugar da lista (166.442667ms)
+✔ E se: Ver resultado depois de Somar não duplica a hipótese já adicionada (123.864542ms)
+✔ new financing: Nome and Conta first, the name is required and the typed one is saved (53.180958ms)
+✔ "Total a pagar" divides by the count and saves the contract that the check accepts (52.148583ms)
+✔ paid history moves the anchor: the date asked is the NEXT one, and the first is derived (42.705667ms)
+✔ history above the contract total settles on the total instead of blocking (22/09/2026) (39.522041ms)
+✔ Dívidas: Editar e "Nova dívida" abrem o formulário único, e a dívida diz se tem passado (102.107625ms)
+✔ editing the paid count keeps the contract calendar: the next date follows the anchor (40.280083ms)
+✔ na ficha da dívida o Salvar pergunta só próximas ou todas: não há "esta" (28/09/2026) (42.3375ms)
+✔ last-day choice from debt editor carries the due-day rule to future installments (38.094333ms)
+✔ unchanged debt Save closes without asking and without writing (53.950083ms)
+✔ long press on an active debt offers the full set, including delete for good (93.362834ms)
+✔ archived debts have a place to come back from (91.844834ms)
+✔ "Desfazer"/Desarquivar de uma dívida que já não existe não diz que ela voltou (96.71375ms)
+✔ salvar a edição manda a versão que foi aberta, e a dívida que mudou no meio vira aviso (38.069375ms)
+✔ without archived debts there is no empty "Arquivadas" row (95.52675ms)
+✔ delete for good asks with the consequence first, then deletes (114.047875ms)
+✔ a ficha da dívida é uma tela: Editar no topo e o resto no "…", com as ações do toque longo (207.507792ms)
+✔ detalhe da dívida: "A seguir" começa na próxima, 20 por vez, e "Já pagas" vem da mais recente (107.060583ms)
+✔ detalhe da dívida: juros de R$ 0,00 não viram linha vermelha; juros de verdade continuam (220.955ms)
+✔ por onde começar: dívida com juros ZERO diz "sem juros", como a linha dela (110.452708ms)
+✔ editing the paid count of an OLD debt keeps the date its schedule shows (final review, 23/09/2026) (45.157791ms)
+✔ editar com os pagamentos sem carregar diz por que o Salvar não liga, e tenta de novo (42.696375ms)
+✔ as pagas não descem abaixo da maior parcela já paga pelo app (não só da contagem) (42.6645ms)
+✔ diminuir as pagas de uma dívida com âncora nunca mostra uma próxima parcela no passado (41.778792ms)
+✔ tocar no dia 28 de fevereiro escolhe dia fixo, e a ação explícita preserva fim do mês (81.623625ms)
+✔ editing an OLD debt without its schedule loaded never invents an anchor (42.782125ms)
+✔ detailed mode still exposes the financial inputs (41.277208ms)
+✔ a debt without installments has no cadence, so it never demands a due day (37.306042ms)
+✔ link antigo de Dívidas e Recorrentes (`?create=`, `?edit=`) abre o formulário único no lugar da lista (368.460083ms)
+✔ aberto por link, como a primeira tela da pilha, fechar o formulário fica na lista (26.399791ms)
+✔ e quem abriu o formulário PELA PRÓPRIA tela continua nela (23.409625ms)
+✔ na ficha da dívida, pagar e fechar a folha fica na ficha — nada de voltar sozinho (135.783959ms)
+✔ editing a legacy amortized financing preserves its mode and remaining-term semantics (39.23675ms)
+✔ visible invoice settlement confirms then marks paid without issuing an account payment (50.519292ms)
+✔ the docked card carries the invoice summary and the explaining lines (46.519292ms)
+✔ Fatura: tudo que se faz com ela se desfaz — pagamento, quitar à mão e adiar (137.608875ms)
+✔ a paid invoice does not expose settlement or payment buttons (55.032167ms)
+✔ an asset with a valid name but no value cannot be saved (21.648ms)
+✔ Lançamentos abre julho pelo mês civil para incluir um vencimento de 31/07 em julho (195.489ms)
+✔ Lançamentos mantém Lançar no header sem cobrir a recorrência calculada (72.239333ms)
+✔ Lançamentos com as bordas do período falhando mostra o erro, não um esqueleto eterno (75.241792ms)
+✔ o "Tentar de novo" do período refaz as BORDAS, não o resumo buscado com o palpite (72.042542ms)
+✔ Lançamentos com o período resolvido desenha o resumo, sem erro (83.8335ms)
+✔ Lançamentos: a prevista mora na lista, no dia dela, e o toque a abre (28/09/2026) (75.802959ms)
+✔ Lançamentos mostra a falha na leitura dos registros reais, mesmo com previstas (74.884917ms)
+✔ Lançamentos mostra só uma falha quando a consulta das previsões falha (75.974583ms)
+✔ Orçamentos com as bordas falhando avisa em "Sem limite", em vez de sumir com a seção (20.274667ms)
+✔ Orçamentos com o período resolvido não mostra falha nenhuma (21.053959ms)
+✔ Financeiro com as bordas falhando mostra o erro no herói, não um esqueleto eterno (40.769042ms)
+✔ o "Tentar de novo" do herói refaz as bordas e nunca o resumo sem elas (36.406083ms)
+✔ trocando de mês, com as bordas ainda chegando, o herói espera em vez de desenhar zero (45.360125ms)
+✔ Financeiro segura a primeira pintura enquanto as bordas do mês ANTERIOR chegam (74.74275ms)
+✔ Financeiro com o período resolvido não mostra falha nem esqueleto no herói (36.249917ms)
+✔ Hoje: o atrasado aparece no Seu dia e o botão dá baixa no lançamento certo, depois de confirmar o valor (69.492042ms)
+✔ Hoje: "Recebi" pergunta quanto ENTROU; numa série, outro valor pode valer para as próximas (58.618667ms)
+✔ Hoje: fatura atrasada leva para a fatura, nunca dá baixa de lançamento (63.453167ms)
+✔ Hoje: compra que vai cair no cartão aparece nos próximos dias e abre a fatura (66.070792ms)
+✔ Hoje: usuário novo vê os Primeiros passos (54.248083ms)
+✔ Hoje: com os passos todos feitos o card não aparece (59.697959ms)
+✔ Hoje: o Próximo passo espera os Primeiros passos acabarem (56.027791ms)
+✔ Hoje: com os Primeiros passos feitos aparece o Próximo passo, e ele leva ao lugar (59.409041ms)
+✔ Hoje: falha nas contas mostra o erro no Seu dia, e o "Tentar de novo" refaz as contas (57.019875ms)
+✔ Hoje: dia sem nada diz "Nada para hoje" num vazio COMPACTO — o resto da tela continua embaixo (124.871125ms)
+✔ Hoje: os blocos vão DIRETO para a cascata — um Fragment vazio era um vão de 24dp (56.145333ms)
+✔ Hoje: cada leitura do card do dinheiro que falha aparece, e o "Tentar de novo" refaz só ela (68.7635ms)
+✔ Hoje: sem o ciclo e sem próxima entrada, o card não inventa "1 dia" (58.377375ms)
+✔ Hoje: sem as contas, os próximos dias dizem que falharam em vez de mostrar só o cartão (60.757625ms)
+✔ Hoje: o que pede atenção mora no Seu dia e no card do dinheiro, cada um com o seu destino (56.973792ms)
+✔ Hoje: lembrete que ficou de outro dia diz a data dele; o de hoje tem o AGORA antes (54.765875ms)
+✔ Hoje: o dinheiro vem por dia, com o livre total na legenda, e tocar abre o menu de sempre (117.460042ms)
+✔ Hoje: falha no dinheiro do dia diz que falhou, e o "Tentar de novo" refaz só ele (53.403208ms)
+✔ Hoje: as notas fixadas aparecem; sem fixada, as últimas; e tocar abre a nota (310.351667ms)
+✔ Hoje: "Em conta" soma exatamente as linhas que mostra, e cartão fica de fora (51.925125ms)
+✔ Hoje: tocar numa conta abre o extrato DELA (63.484458ms)
+✔ Hoje: falha nos saldos diz que falhou e refaz só os saldos (52.628292ms)
+✔ Hoje: sem conta nenhuma a linha "Em conta" não afirma R$ 0,00 (48.385333ms)
+✔ Hoje: a semana vem no topo — três dias para trás pela régua do "saiu hoje", hoje no meio (53.073167ms)
+✔ Hoje: a semana sem o gasto — ou sem os próximos dias — diz que falhou, e refaz só o que falhou (106.699ms)
+✔ Hoje: sem "por dia" a semana não desenha régua (54.937ms)
+✔ Financeiro: os atalhos do mosaico levam aos mesmos destinos de antes (32.8835ms)
+✔ Financeiro: Entra e Sai abrem o ciclo filtrado pelo lado (32.924375ms)
+✔ Financeiro: o FAB continua oferecendo as três formas de lançar (32.113334ms)
+✔ Hoje tablet reuses its real blocks and retains their destinations (49.8305ms)
+✔ Financeiro tablet keeps the cycle, analysis and all management actions (31.1415ms)
+✔ Cartões: "Importar fatura" se alcança com o DEDO (toque longo), não só pelo leitor de tela (11.732291ms)
+✔ Importar: no Free o aviso do Pro É a etapa — sem conta, sem arquivo, "Ver planos" leva ao paywall (13.542209ms)
+✔ Importar: enquanto o plano carrega, esqueleto — o botão não nasce ligado para o aviso entrar depois (16.234542ms)
+✔ Importar: ?conta= de uma conta da pessoa já nasce escolhida e o arquivo está liberado (12.737375ms)
+✔ Importar: ?conta= que não é da pessoa é ignorado — nada pré-escolhido, o arquivo espera a conta (23.645ms)
+✔ Lembretes: arrastar à direita pausa (até o fim, com Desfazer), à esquerda apaga (16.334667ms)
+✔ Lançamentos: pendente arrasta Paguei à direita; efetivado arrasta Editar; Apagar à esquerda (129.855291ms)
+✔ Paguei confirma valor e baixa numa única escrita, inclusive com correção (112.436042ms)
+✔ Financeiro: o último lançamento arrasta Editar e Apagar (Ver detalhe é o toque) (27.815916ms)
+✔ Fatura: a compra arrasta Editar e Apagar (32.879417ms)
+✔ Contas: a conta arrasta Editar e Arquivar (Ver extrato é o toque) (14.390459ms)
+✔ Projeção: a conta prevista arrasta Paguei à direita; Editar mora no Mais (a esquerda só tira da lista) (79.23ms)
+✔ Regras: a regra arrasta Editar e Apagar (5.222959ms)
+✔ Dívidas: arrasta Pagar parcela à direita; Arquivar à esquerda vai até o fim (tem Desfazer) (69.833333ms)
+✔ Cartões: fatura aberta arrasta Importar fatura à direita e Arquivar à esquerda (8.584666ms)
+✔ Cartões: "Paguei" abre a fatura já no pagamento, não só a fatura (8.40725ms)
+✔ Recorrentes: arrasta Pausar (até o fim, com Desfazer) e Apagar; o resto no Mais (33.862875ms)
+✔ Metas: arrasta Guardar à direita e Arquivar à esquerda (17.486583ms)
+✔ Nota: arrasta Fixar à direita e Arquivar à esquerda (os dois até o fim); o resto no Mais (12.969083ms)
+✔ Nota colorida: o cartão INTEIRO é da cor, e sem cor própria herda a da pasta (41.929792ms)
+✔ Pasta: arrasta Fixar à direita e Arquivar à esquerda (os dois até o fim); o resto no Mais (12.88925ms)
+✔ Lixeira: Restaurar à direita, Apagar de vez à esquerda (Ver conteúdo é o toque) (16.57825ms)
+✔ Arquivadas das notas: Desarquivar à direita, apagar à esquerda (20.990917ms)
+✔ Conversa: arrasta Renomear à direita e Apagar à esquerda (2.518791ms)
+✔ Importação: arrasta só Apagar registro à esquerda (retomar é o toque) (21.393917ms)
+✔ Orçamento: arrasta Editar limite à direita; o resto no Mais (15.675333ms)
+✔ Aporte: no extrato da meta arrasta Apagar à esquerda, e ele confirma antes de mover dinheiro (17.921917ms)
+✔ Parcelada: arrasta Editar a compra à direita e Apagar a compra inteira à esquerda; o resto no Mais (78.772417ms)
+✔ Lançamentos: o valor da linha não encolhe a fonte (57.736667ms)
+✔ Paywall: no plano que a pessoa já tem, o botão não oferece dias grátis (5.024209ms)
+✔ Ciclo: dentro de cada grupo, do mais recente para o mais antigo, e 20 por vez com "Ver mais" (50.471833ms)
+✔ Importar: a prévia desenha cada grupo aos poucos, e "Marcar todos" continua valendo para o grupo inteiro (14.049041ms)
+✔ Importar: a linha se edita antes de importar — título, tipo e categoria (11.217458ms)
+✔ Importar: "Está no app e não veio no arquivo" vem do mais recente para o mais antigo, aos poucos (13.46575ms)
+✔ Projeção: "Atrasado" e os meses aparecem aos poucos, com "Ver mais" (152.104542ms)
+✔ Recorrentes: cada seção aparece aos poucos, com "Ver mais" (32.116083ms)
+✔ Metas: o extrato vem aos poucos, e o total do mês continua sendo o do mês inteiro (20.713209ms)
+✔ Parcelada aberta: "A seguir" a partir da próxima, e "Pagas" da mais recente para a mais antiga (73.649209ms)
+✔ Regras: a lista vem aos poucos, com "Ver mais" (4.956791ms)
+✔ Categoria: a folha de "Todas…" mostra aos poucos, e a busca recomeça (206.731625ms)
+✔ Lembretes: vêm do servidor em páginas; "Ver mais" busca a próxima (16.087833ms)
+✔ Alertas e importações: o servidor manda 20; "Ver mais" pede mais 20 (29.706209ms)
+✔ Notas arquivadas: com mais no servidor, "Ver mais" busca a próxima página (21.748ms)
+✔ Arquivadas: segurar a pasta apaga (com confirmação), segurar a nota manda à lixeira (20.183125ms)
+✔ Hoje: muito atrasado vira UMA linha que abre no lugar, aos poucos, com "Ver mais" (38.591416ms)
+✔ Busca: em "Tudo" cada tipo mostra 5 e "Ver mais" abre o tipo; dentro dele, "Ver mais" pede mais 20 (12.255625ms)
+✔ Contas: dentro de cada seção, a conta mais recente primeiro (13.113792ms)
+✔ Faturas: fatura FUTURA sem compra nenhuma não aparece em "Próximas faturas" (16.900167ms)
+✔ Dinheiro não encolhe por padrão; encolhe só onde o bloco tem geometria fixa (24/09/2026) (14.236542ms)
+✔ Importações: apagar o registro diz o que fica no financeiro sem "Os 0 lançamentos" (60.659375ms)
+✔ Orçamentos: "Sem limite definido" mostra 5 e o resto vem pelo "Ver mais" (era corte calado) (12.619459ms)
+✔ Últimos lançamentos: a linha recebe o toque do Link do iOS (24/09/2026) (1.721584ms)
+✔ Todo filho de ItemLink repassa o onPress que o Link do iOS injeta (0.496875ms)
+✔ Row: fonte máxima e painel estreito conservam título e valor dentro da largura medida (9.123875ms)
+✔ Lançamentos: a linha diz a data da COMPRA, nunca o vencimento da fatura (24/09/2026) (72.226834ms)
+✔ Lista principal vazia com seção secundária: a secundária em cima e o vazio COMPACTO embaixo (206.684709ms)
+✔ Hoje: a dica do painel mora no card do dinheiro, e tocar no valor a encerra (46.385875ms)
+✔ Hoje: sem conta na tela, a dica das contas não é montada (43.423417ms)
+✔ Lançamentos: a dica do arrasto aponta para a primeira linha, e some com a lista vazia (102.524583ms)
+✔ Guia: "Mostrar" de um gesto acende a dica e leva à tela dela (2.631ms)
+✔ Guia: item sem dica só leva à tela, sem acender nada (2.230959ms)
+✔ Notas: a dica do arrasto aparece com notas na tela, e some com a lista vazia (48.402167ms)
+✔ Notas: o arquivado tem porta no fim da aba, com a contagem, e ela some sem nada arquivado (46.448042ms)
+✔ Card: os filhos têm respiro entre si — o texto e o botão não colam (design.md §2) (0.8465ms)
+✔ Dívidas: parcela fixa paga com outro valor conta uma parcela e diz o encargo; fora do limite o botão espera (70.120125ms)
+✔ Dívidas: "Usar este valor nas próximas" muda o contrato ANTES de pagar, e a parcela sai inteira no valor novo (68.041792ms)
+✔ a prestação da agenda abre A dívida dela, na Hoje e na Projeção — não a lista (116.595541ms)
+✔ Lançamento de parcela de dívida: embaixo do total, a parcela + o encargo; e o vínculo com a dívida (158.616792ms)
+✔ Agente: as conversas recentes não desenham texto nem esqueleto enquanto carregam (13.213208ms)
+✔ Financeiro: carregando o período, o rótulo do herói é forma — "Atualizando período" saiu (53.069375ms)
+✔ Financeiro: com a série do mês chegando, Entra e Sai não deixam o rótulo sobre um vazio (55.922375ms)
+✔ Orçamentos: com os limites chegando, nem o rótulo do destaque nem "Sem limite definido" (25.764042ms)
+✔ Busca: na primeira busca, só o esqueleto até as três responderem — nada de seção pela metade (22.506583ms)
+✔ Financeiro: a série do mês falhando mostra o erro no herói e refaz a série — nunca "R$ 0,00" (26.786917ms)
+✔ Orçamentos: o resumo chegando não segura a tela — só "Sem limite definido" espera ele (14.185625ms)
+✔ Notas: "Nova pasta" no "…" abre a folha ali mesmo, com e sem pastas, e o cabeçalho não leva botão (51.168167ms)
+✔ Nova pasta: cria com o nome normalizado, recusa nome repetido e, dentro de uma pasta, cria subpasta (39.830792ms)
+✔ Contas: ?create=1 abre "Nova conta" direto, e fechar ou salvar devolve para quem abriu (38.660125ms)
+✔ Cadastrar conta ou cartão, de qualquer tela, abre o formulário já no tipo certo (24.1985ms)
+✔ Parcelada sem conta: editar o nome salva sem exigir conta; com conta, a conta continua obrigatória (140.924709ms)
+✔ Orçamentos: a categoria do limite é o seletor de categorias, com as do usuário e a que já veio (12.988125ms)
+✔ Apagar lançamento: a recusa do banco aparece com a frase dele, a falha de rede segue genérica (87.757792ms)
+✔ Dívida: tocar numa parcela paga abre o lançamento; numa futura, a tela da parcela (63.181416ms)
+✔ Parcela da dívida: a próxima mostra valor e vencimento, e "Paguei esta parcela" volta para pagar (14.799792ms)
+✔ Parcela antiga apenas declarada conserva seu valor no detalhe após editar parcelas futuras (5.994666ms)
+✔ Contas: ?edit=<id> abre a edição daquela conta, com o título do tipo, e fechar devolve (14.617541ms)
+✔ Carteira: o cartão escolhido se edita e um novo se cria ali mesmo (0.162167ms)
+✔ Fatura: "+" cria compra NESTE cartão; o "…" edita o cartão e leva às faturas dele (29.677667ms)
+✔ Lançamentos de uma conta: o "…" edita a conta, e Lançar e Importar já vão para ela (50.615833ms)
+✔ Hoje: "Lançar" cria lançamento, lembrete ou nota ali mesmo (40.594917ms)
+✔ Organizar pastas: sem criar; Renomear abre a folha da pasta, que salva sem mexer na pasta-mãe (20.197708ms)
+✔ Pasta: o "…" renomeia na folha da pasta e move sem ir a Organizar pastas (25.049875ms)
+✔ Série: editar tem os campos da criação, e só o calendário mexido vai com regra e vencimento (366.81525ms)
+✔ Dívida de parcela fixa também tem "Tipo" (e grava o escolhido) (27.554208ms)
+✔ Organizar pastas: "Sem pasta" abre as notas soltas (a aba Notas) (9.894666ms)
+✔ Editar a compra: as já pagas se editam, o número muda com parcela paga, e data e conta só prendem pela fatura (144.138959ms)
+✔ Dívidas: o "Paguei" tem a data do pagamento, e ela vai para o banco (66.550875ms)
+✔ Orçamento: editar muda AQUELE limite — a categoria também, pela chave de quando abriu (13.72525ms)
+✔ Conta: com lançamentos, o tipo só troca na mesma família; editando o cartão, os dias refazem as faturas abertas (13.7505ms)
+✔ Dívida arquivada: Desarquivar à direita, Apagar por completo à esquerda (66.857833ms)
+✔ Arquivados (contas, cartões, metas, bens): Desarquivar à direita, Apagar à esquerda, e apagar confirma (2.069875ms)
+✔ Editar a conta abre no saldo ATUAL e grava a diferença no inicial (28/09/2026) (13.523042ms)
+✔ Histórico de alertas: não lido até a pessoa marcar; Lida à direita, Limpar à esquerda, e o menu faz todas (10.817416ms)
+✔ Ciclo aberto pela Projeção com um adiantamento: o pagamento e a parcela que deixa de sair entram na lista, sem salvar (46.11125ms)
+✔ Ciclo aberto de outro lugar não usa o rascunho do aparelho (54.318459ms)
+✔ Projeção: com hipótese no rascunho, o erro da simulação aparece na linha; ela arrasta Aplicar e Tirar (70.138458ms)
+✔ Rascunho da versão 1: a parcelada sem conta não aplica (o formulário ficaria sem a conta); o adiantamento nunca aplica (145.154959ms)
+✔ Recorrente aberta pelo Aplicar: conta e frequência chegam, e salvar tira a hipótese PELO ID (57.278417ms)
+✔ Financiamento aberto pelo Aplicar: parcela, parcelas, conta e a próxima parcela preenchidas; salvar tira a hipótese (25.435ms)
+✔ Ciclo pela Projeção com hipótese: lê por simular e marca a linha que veio dela (50.577667ms)
+✔ Ciclo com hipótese: leitura que falhou DENTRO do simular mostra o erro, não esqueleto para sempre (49.363041ms)
+✔ Desfazer o "Tirar" devolve SÓ o que saiu — não traz de volta o que saiu depois (já aplicado) (71.381208ms)
+✔ Projeção mês a mês: os dois "hoje" dizem o que são, e o rodapé nomeia o fim real do horizonte (70.048791ms)
+✔ Dinheiro de DESTAQUE (money, heroMoney) encolhe sozinho: ocupa a linha e não tem para onde descer (18.272667ms)
+✔ Hipótese que o banco recusou: a linha diz o motivo NOSSO e nunca o texto cru do Postgres (73.646958ms)
+✔ E se: no teto de 30 hipóteses, "Nova hipótese" diz o limite em vez de abrir a folha (75.506292ms)
+✔ E se: o erro da simulação ANTERIOR não aparece enquanto a nova calcula (o índice já mudou) (71.353208ms)
+✔ Folha da hipótese: Sai oferece as quatro formas; Entra só "Uma vez" e "Repete"; financiamento sem cartão (25.963541ms)
+✔ Onde muda: conta negativa, cartão acima do limite e cartão sem limite, cada um com a frase (8.9965ms)
+✔ E se: UM botão "Nova hipótese"; nada de "Adicionar como…" nem "Aplicar todas" (69.0855ms)
+✔ E se: a linha da hipótese aplica pelo formulário com tudo e tira PELO ID (68.993625ms)
+✔ E se: as hipóteses completas vão à simulação com o detalhe por conta; a incompleta não (73.716833ms)
+✔ E se: com hipótese, "Onde muda" aparece com as contas que mudam e leva ao detalhe (87.602334ms)
+✔ E se: rascunho da versão 1 no aparelho continua abrindo; a parcelada sem conta pede a conta (69.794709ms)
+✔ E se: a folha cria a hipótese com conta, forma e data, e "Ver resultado" só com ela completa (69.79225ms)
+✔ E se: "Ver o ciclo" leva as hipóteses pelo aparelho, não pela rota (73.087041ms)
+✔ Detalhe da hipótese — conta: hoje, menor (e o dia) e fim, antes → depois; e as hipóteses dela (34.917667ms)
+✔ Detalhe da hipótese — cartão sem limite: diz e oferece cadastrar; com limite estourado: quanto (104.214167ms)
+✔ Detalhe da hipótese — conta que não existe mais, rascunho vazio e erro da leitura (70.073166ms)
+✔ E se: só com hipótese incompleta nada é simulado e o "Onde muda" não fica em esqueleto (revisão final) (143.477875ms)
+✔ Aplicar recorrente e financiamento abre o formulário único no tipo certo, com a hipótese nos corpos (30.669875ms)
+✔ Hoje: o Seu dia mostra a MESMA contagem da aba — é dele que o número fala (44.007625ms)
+✔ FormularioDaSerie: cria, e "Salvar e criar outro" avisa o hospedeiro sem fechar (112.509041ms)
+✔ FormularioDaSerie: editando com a série ainda não carregada, espera — nunca vira criação (102.272667ms)
+✔ FormularioDaDivida: o comum vira Nome, Conta que paga e Valor da parcela; criar outro avisa o hospedeiro (28.419666ms)
+✔ FormularioDaDivida: editando com a dívida ainda não carregada, espera — nunca vira criação (52.443417ms)
+✔ FormularioDaDivida: convertendo, Salvar entrega o financiamento ao hospedeiro com as pagas SEM a linha convertida (26.312416ms)
+✔ Formato do lançamento: abre as três escolhas acessíveis e devolve a escolha ao recolher o menu (6.148833ms)
+✔ Formato do lançamento: a opção escolhida e o controle fecham sem solicitar mudança (21.548542ms)
+✔ Formato do lançamento: cada alternativa devolve seu tipo ao hospedeiro (20.544916ms)
+✔ Formato do lançamento: a escolha muda imediatamente uma vez, sem aguardar o menu (12.401875ms)
+✔ Formato do lançamento: pode reabrir logo após escolher e mudar novamente, sem escolhas duplicadas (8.559958ms)
+✔ Campos da série: Tipo mantém o padrão de confirmação da criação e o escolhido na edição (38.007041ms)
+✔ Campos da série: Repete preserva campos e marca apenas a agenda que foi alterada (16.765583ms)
+✔ Campos da série: fechar Tipo pela opção atual preserva a confirmação escolhida na criação (37.038ms)
+✔ Campos da série: fechar Repete pela frequência atual não refaz a agenda na edição (55.52275ms)
+✔ Lançar: abre no tipo pedido, o seletor troca o corpo e leva os campos comuns (16.079334ms)
+✔ Lançar: voltar a um tipo devolve TUDO que foi digitado nele, não só os campos comuns (16.007542ms)
+✔ Lançar: "Salvar e criar outro" remonta o corpo limpo, mantendo tipo, conta e data (14.234625ms)
+✔ Lançar: editando e trocando o tipo, o salvar PERGUNTA o alcance e converte; voltar ao tipo original é edição comum (32.491875ms)
+✔ Lançar: converter Só esta em financiamento abre a nova ficha e remove o detalhe antigo da pilha (15.070917ms)
+✔ Lançar: cada alcance bem-sucedido abre a série de resultado, inclusive Manter (69.965583ms)
+✔ Lançar: parcelada convertida abre um lançamento do resultado, e não o ID do plano (14.029458ms)
+✔ Lançar: a dívida CARREGADA com parcela paga tem passado, mesmo com `passado=0` na rota (15.7495ms)
+✔ Lançar: a conversão que o banco recusa mostra a frase dele e não fecha (15.356625ms)
+✔ Lançar: editando um lançamento, o corpo é o que espera o registro; a opção destrutiva confirma antes (14.266208ms)
+✔ Lançar: o "Aplicar" de uma compra parcelada abre "Uma vez" com as parcelas dela; sem parcelas, à vista (29.185417ms)
+✔ Lançar: o estabelecimento viaja entre os tipos e a série nasce com ele (67.97325ms)
+✔ Lançar: convertendo um lançamento PAGO em financiamento, "Parcelas já pagas" avisa que ele já conta (113.613834ms)
+✔ Lançar: converter de novo enquanto a primeira conversão está no banco não grava duas vezes, e os corpos esperam (14.772541ms)
+✔ Lançar: com "salvando" do hospedeiro, a série e a dívida desligam Salvar e "Salvar e criar outro" (335.555333ms)
+✔ Lançar: os três corpos têm a MESMA moldura na tela — calha, largura, laterais e pé seguros (0.375709ms)
+✔ Lançar: os formatos entram completos numa moldura comum sem fade independente do formulário (49.289792ms)
+✔ Toda entrada de criar/editar lançamento, recorrente e dívida abre o formulário único (11.084959ms)
+✔ Links antigos continuam abrindo o formulário certo (2.112083ms)
+✔ Lançar: link sem `papel` (o antigo, a Projeção) usa o do próprio lançamento na conversão (16.679292ms)
+✔ Categorias: lista com o uso e a cor, cria pelo "+" e edita tocando (11.106792ms)
+✔ Categorias: apagar diz quantos lançamentos ficam sem categoria e quantos orçamentos saem (12.174208ms)
+✔ Folha de categoria: renomear para um nome que existe pergunta antes de juntar, e só junta com o sim (13.250417ms)
+✔ Folha de categoria: sem nome não salva; criando um nome que já existe, avisa que muda a aparência dela (16.044541ms)
+✔ Seletor de categoria: chips com ícone e cor, "Nova" cria e já escolhe, "Gerenciar categorias" leva à tela (405.888042ms)
+✔ Categorias se alcança pelo Gerenciar, pelo Perfil e pelo menu das Finanças (0.188917ms)
+✔ Formato do lançamento: fechar pelo controle conserva o tipo e não espera uma barreira do corpo (6.405375ms)
+✔ Formato do lançamento: reduzir movimento mantém o callback imediato e uma opção por tipo (6.424958ms)
+✔ Lançar: formato muda no toque, preserva os campos comuns e evita refocar ao montar o corpo seguinte (30.997292ms)
+✔ Lançar: leitores do corpo que saiu não sobrescrevem o rascunho ativo durante o crossfade (13.895709ms)
+✔ Lançar: escolher o tipo atual não relê nem remonta, e callback após desmontagem não troca o corpo (14.668292ms)
+✔ Recorrente encerrada não anuncia próxima cobrança, nem oferece editar ou retomar (29.928542ms)
+✔ Link antigo da recorrência encerrada mostra histórico, sem montar edição ou oferecer conversão (53.133667ms)
+✔ Notas arquivadas: resumo único conserva busca/data e a limpeza restaura o contexto (40.636708ms)
+✔ Notas lixeira: resumo único conserva busca/data e a limpeza restaura o contexto (32.931ms)
+✔ Notas pasta: resumo único conserva busca/data e a limpeza restaura o contexto (43.767333ms)
+✔ Notas: abrir filtros antes do debounce conserva busca atual; aplicar/limpar cancela termos antigos (48.33975ms)
+✔ Barra compacta revela todos os critérios ao leitor de tela, conserva nomes e esconde dinheiro (9.148375ms)
+✔ Lembretes: critérios têm uma entrada única e resumo; limpar no vazio continua sendo contextual (26.519625ms)
+✔ Importações: barra compacta conserva formato/conta e aplicar reinicia a paginação (20.5645ms)
+✔ Lançamentos: um único editor conserva todos os critérios e resume o recorte sem repetir controles (101.027166ms)
+✔ Lançamentos: resumo financeiro e rótulo acessível respeitam ocultação de valores (50.565458ms)
+✔ Ocorrências usam o mês civil para retornar de um período personalizado (51.439875ms)
+✔ Lançamentos: data inicial sozinha consulta intervalo aberto (celular) (57.2895ms)
+✔ Lançamentos: data final sozinha consulta intervalo aberto (celular) (54.86175ms)
+✔ Lançamentos: data inicial sozinha consulta intervalo aberto (tablet) (53.408209ms)
+✔ Lançamentos: data final sozinha consulta intervalo aberto (tablet) (52.89675ms)
+✔ Lançamentos: intervalo aberto ignora previsões em cache e em trânsito; duas datas restauram cálculo (101.863083ms)
+✔ Lançamentos: período personalizado distingue anos nos dias e rótulos acessíveis (extrato) (163.521667ms)
+✔ Lançamentos: período personalizado distingue anos nos dias e rótulos acessíveis (ocorrências) (161.328291ms)
+✔ Lançamentos: consulta aberta não aguarda mês, ciclo ou resumo de outra janela (130.473ms)
+✔ Lançamentos: erro antigo de previsão não esconde vazio aberto nem cria retry; refresh consulta só registros (235.573041ms)
+✔ Parceladas: filtrar quitadas expande resultados e oculta o resumo global; limpar restaura (74.883541ms)
+✔ Parceladas: busca e intervalo mostram compra terminada sem exigir expansão manual (76.220333ms)
+✔ Recorrentes: encerrada e pausada têm resultados sem vazio de ativas nem resumo global (29.988125ms)
+✔ Dívidas: busca, conta e primeiro vencimento filtram arquivos e abrem resultados; data nula não casa (67.069916ms)
+(node:95967) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/tablet-chart-source.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ measured sparkline waits for its own card width and updates after resize (90.671042ms)
+✔ finance chart and invoice face do not derive their width from the whole tablet window (0.688917ms)
+(node:95968) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/tablet-finance-routes.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ cycle detail keeps one financial source while composing a tablet decision pane (0.810208ms)
+✔ annual report puts year-end evidence beside the categories without changing export or year selection (0.258792ms)
+✔ net worth keeps the trend beside the account and asset evidence (0.226917ms)
+✔ forecast presents the measured curve beside its scenario while preserving model and horizon actions (0.787084ms)
+(node:95969) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/tablet-finance-task-routes.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ task list routes keep compact content and expose measured tablet workspaces (1.174542ms)
+✔ task surfaces preserve their mutation and navigation contracts (0.883083ms)
+✔ transaction form stays a bounded keyboard aware single column (0.370291ms)
+(node:95970) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/tablet-motion-source.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ the Android pill enters on app reveal and moves the selected icon with its circle (0.60575ms)
+✔ preview tab taps update params in place so the pill does not remount mid-flight (0.135ms)
+✔ a stalled cover snaps closed before the shown session is replaced (0.726417ms)
+✔ logout covers downward and reveals upward, with the session changed while hidden (0.496125ms)
+✔ the session curtain does not duplicate or animate the auth brand (0.577ms)
+✔ logout starts covering before signOut and reuses that cover in the session gate (0.322208ms)
+✔ auth cap recomputes its matching curve after a tablet resize and the form stays readable (0.351ms)
+(node:95971) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/tablet-notes-deep-routes.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ notes recovery routes use the measured tablet workspace and keep a compact fallback (0.556833ms)
+✔ notes deep editor and folder stay readable when a tablet window is wide (3.167542ms)
+(node:95972) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/tablet-notes-routes.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ folder organizer is the whole tree, and renaming opens the same sheet as creating (0.5245ms)
+(node:95973) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/tablet-planning-routes.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ budgets keeps the compact reading order and exposes category context in a measured tablet split (0.942292ms)
+✔ goals keeps contribution and archive actions while placing the aggregate beside the goal list on tablets (0.337ms)
+✔ debts keeps payment and destructive confirmations while putting payoff strategy beside the debt list on tablets (0.732458ms)
+(node:95974) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/tablet-wallet-invoices.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ wallet keeps the real flight routes while opting into a measured tablet workspace (0.670292ms)
+✔ invoice history uses a bounded tablet list and truthful selected invoice context (0.324833ms)
+(node:95975) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/tela-pronta.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ sem consulta nenhuma a tela está pronta (0.448959ms)
+✔ uma buscando segura a tela inteira (0.060541ms)
+✔ todas prontas abrem o portão (0.042167ms)
+✔ query DESLIGADA não pode prender a tela no skeleton para sempre (0.040833ms)
+✔ sem rede a tela abre e mostra o estado dela, não um skeleton eterno (0.050292ms)
+✔ refetch de fundo NÃO traz o skeleton de volta (0.040083ms)
+✔ consulta que FALHOU libera a tela para ela mostrar o erro, não um skeleton eterno (0.039541ms)
+(node:95976) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/themed-text.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ o texto é medido de novo quando a escala da fonte do sistema muda (129.115667ms)
+(node:95977) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/today-sections.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Agora tem o atrasado, o que vence hoje e o que chega hoje; atrasado primeiro (0.906833ms)
+✔ Próximos dias agrupa por dia, respeita a janela e nunca repete o que está em Agora (40.838834ms)
+✔ compra no cartão de hoje não vira pendência (0.095666ms)
+✔ o texto e o tom de cada item dizem o que aconteceu (1.128041ms)
+✔ lembrete de outro dia não é "de hoje" — o "Para hoje" listava 03/09 em 28/09 (1.666625ms)
+✔ o AGORA fica entre o lembrete que passou e o que vem, e o que vem é o próximo (0.307834ms)
+✔ com todos os lembretes já passados o AGORA vai para o fim; sem lembrete não há AGORA (0.164875ms)
+✔ 2+ atrasados viram UMA linha recolhida; aberta, mostra cada um com Ver mais; 1 só não vira resumo (0.2625ms)
+✔ o número da aba Hoje é o que o Seu dia tem para resolver: atrasado, o que vence hoje e o lembrete de hoje (0.172208ms)
+✔ "por dia" é UMA conta: o card da Hoje e o widget dividem igual (0.282625ms)
+✔ a semana tem hoje no meio: o que saiu para trás, o previsto para a frente (0.441459ms)
+✔ semana sem nada ainda tem teto (nunca divide por zero) e sem "por dia" não tem régua (0.204209ms)
+✔ a frase do dia diz quando, quanto e o estado — "dentro" não se escreve, a entrada vai à parte (0.256292ms)
+✔ um dia enorme não esmaga a régua: o teto para em 3× o "por dia" (0.1165ms)
+(node:95990) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/use-dicas.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ usar antes de o disco responder não se perde, nem apaga o que já estava encerrado (81.592166ms)
+✔ sem nada gravado e sem mudança pendente, ler não grava nada (32.005042ms)
+(node:95991) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/use-folder-menu.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ segurar a pasta oferece Apagar, e apagar confirma antes (67.550209ms)
+✔ segurar a pasta também renomeia e move — sem ir a Organizar pastas (25/09/2026) (21.404625ms)
+(node:95992) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/use-preferencia.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a régua escolhida volta no próximo processo, e cada tela tem a sua (100.407666ms)
+✔ o toque antes de o disco responder vale, e não apaga o que já estava gravado (11.450958ms)
+✔ outra conta no mesmo aparelho não herda a escolha (6.938417ms)
+✔ valor gravado que a tela não aceita mais, ou disco corrompido, cai no padrão (13.678875ms)
+✔ mudar por FUNÇÃO lê o valor gravado na hora: duas mudanças do mesmo render valem as duas (7.6445ms)
+✔ useRascunho v2: adicionar, trocar e tirar partem do GRAVADO (duas mudanças do mesmo render valem as duas) (13.256792ms)
+(node:95993) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/widget-snapshot.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ o livre é caixa menos o que vence antes da próxima entrada — o número da Hoje (9.453333ms)
+✔ o atrasado é UM resumo; a lista é só o que vai vencer, com o selo de data (0.247083ms)
+✔ a lista tem teto e conta o que sobrou (0.29975ms)
+✔ o veredito é o da Hoje: atrasado ganha de tudo (18.815666ms)
+✔ esconder saldo vale no widget: nenhum valor sai no retrato (0.580667ms)
+✔ saiu da conta: o widget para de mostrar o dinheiro (0.095167ms)
+✔ veredito sem obrigação: por dia só a partir de R$ 1,00 (0.073459ms)
+✔ o que vai para o widget do iOS não leva null em nível nenhum (0.369958ms)
+ℹ tests 1364
+ℹ suites 0
+ℹ pass 1364
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 23971.266333

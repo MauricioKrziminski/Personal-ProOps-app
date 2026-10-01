@@ -50,6 +50,10 @@ interface FieldProps {
    * erro vai em `<Forte>` ("Renomear **Mercado**"), nunca entre « ».
    */
   label: React.ReactNode;
+  /** Ação contextual ao lado do rótulo, fora do texto e do alvo do input. */
+  labelAccessory?: React.ReactNode;
+  /** Espaço visível entre o texto do rótulo e o input, mesmo com uma ação mais alta. */
+  labelGap?: number;
   /** Texto nosso pode marcar o nome de um botão ou exemplo com `*assim*`; dado vai em `<Forte>`. */
   error?: React.ReactNode;
   hint?: React.ReactNode;
@@ -68,19 +72,26 @@ interface FieldProps {
  * que é o campo" de "explicação sobre o campo". A distinção anda em DOIS eixos, porque um só não
  * sobrevive a 1,3×: **peso** (500 → 400) e **cor** (`text` → `textSecondary`).
  */
-export function Field({ label, error, hint, children }: FieldProps) {
+export function Field({ label, labelAccessory, labelGap = Space.sm, error, hint, children }: FieldProps) {
   const foco = useSharedValue(0);
+  const [alturaDoRotulo, setAlturaDoRotulo] = useState(0);
+  const [alturaDaLinha, setAlturaDaLinha] = useState(0);
+  // A ação pode ser maior que o texto. Seu espaço abaixo do texto já faz parte do gap visual.
+  const respiroDaLinha = labelAccessory ? Math.max(0, (alturaDaLinha - alturaDoRotulo) / 2) : 0;
+  const rotulo = (
+    <MudancaSuave valor={typeof label === 'string' ? label : undefined} style={labelAccessory ? styles.textoDoRotulo : undefined}>
+      <ThemedText type="footnote" style={styles.rotulo}
+        onLayout={labelAccessory ? (event) => setAlturaDoRotulo(event.nativeEvent.layout.height) : undefined}>{label}</ThemedText>
+    </MudancaSuave>
+  );
 
   return (
     <FocoDoCampo.Provider value={foco}>
       <View style={styles.field}>
-        <View style={styles.baseDoCampo}>
+        <View style={[styles.baseDoCampo, { gap: Math.max(0, labelGap - respiroDaLinha) }]}>
         {/* O label é IDENTIFICADOR do campo, e por isso vai na cor cheia. */}
-        <MudancaSuave valor={typeof label === 'string' ? label : undefined}>
-        <ThemedText type="footnote" style={styles.rotulo}>
-          {label}
-        </ThemedText>
-        </MudancaSuave>
+        {labelAccessory ? <View style={styles.linhaDoRotulo}
+          onLayout={(event) => setAlturaDaLinha(event.nativeEvent.layout.height)}>{rotulo}{labelAccessory}</View> : rotulo}
         {children}
         </View>
         {/*
@@ -205,6 +216,12 @@ export const TextField = forwardRef<TextInput, TextInputProps & { invalid?: bool
     const ativo = usePresencaAtiva();
     const { focar, desfocar, moldura } = useCaixa(invalid);
     const { caixa, input } = repartir(style);
+    const { fontScale } = useWindowDimensions();
+    const escala = rest.allowFontScaling === false ? 1
+      : rest.maxFontSizeMultiplier && rest.maxFontSizeMultiplier > 0
+        ? Math.min(fontScale, rest.maxFontSizeMultiplier) : fontScale;
+    // A linha nativa cresce com Dynamic Type. A altura fixa cortava placeholder e valor.
+    const altura = Math.max(HitTarget + 6, Math.ceil((input.lineHeight ?? Type.body.lineHeight) * escala + Space.xs));
     /*
       ⚠️ **No Android, campo de UMA linha alinhado ao centro ou à direita prende o arrasto**
       (25/09/2026). O `EditText` segura o gesto que começa nele enquanto ele PODE ROLAR, e o de
@@ -248,7 +265,7 @@ export const TextField = forwardRef<TextInput, TextInputProps & { invalid?: bool
           desfocar();
           if (ativo) onBlur?.(e);
         }}
-        style={[styles.input, { color: theme.text }, input]}
+        style={[styles.input, { color: theme.text, height: altura, minHeight: altura }, input]}
         placeholder={Platform.OS === 'ios' ? marcador : placeholder}
         {...rest}
         {...soltaOArrasto}
@@ -485,7 +502,10 @@ export function MoneyField({
 
 const styles = StyleSheet.create({
   field: {},
-  baseDoCampo: { gap: Space.sm },
+  baseDoCampo: {},
+  linhaDoRotulo: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
+  // A camada interna da troca suave ocupa a altura da ação; centralize o texto nela também.
+  textoDoRotulo: { flex: 1, justifyContent: 'center' },
   // O respiro faz parte da altura que anima; `gap` no pai saltaria antes/depois da presença.
   respiroDaMensagem: { paddingTop: Space.sm },
   rotulo: { fontFamily: Fonts.medium },

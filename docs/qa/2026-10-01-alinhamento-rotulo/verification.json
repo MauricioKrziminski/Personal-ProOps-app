@@ -1,0 +1,30 @@
+{
+  "branch": "gabriel/entrada-filtros",
+  "app": "com.proops.personal.dev",
+  "device": "iPhone 17 Pro / iOS 26.5",
+  "checks": {
+    "npm test": {
+      "exit": 0,
+      "passed": 1364,
+      "failed": 0,
+      "skipped": 0
+    },
+    "npx tsc --noEmit": {
+      "exit": 0
+    },
+    "npx expo lint": {
+      "exit": 0
+    },
+    "git diff --check": {
+      "exit": 0
+    }
+  },
+  "cleanup": {
+    "font": "large",
+    "screen": "Notes",
+    "activeLinks": 2,
+    "archivedNotes": 3,
+    "filters": 0
+  },
+  "nativeAndroidRunThisAdjustment": false
+}

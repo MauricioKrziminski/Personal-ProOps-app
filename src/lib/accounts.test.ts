@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { accountLabel, inicialParaOSaldo, saldoDaConta } from './accounts.ts';
+import { accountSelectOptions, accountLabel, inicialParaOSaldo, saldoDaConta } from './accounts.ts';
 
 test('o cartão diz que é cartão — foi o que custou R$ 4.000 em produção', () => {
   // As quatro contas reais de 09/09/2026, na ordem em que apareciam no seletor.
@@ -49,4 +49,20 @@ test('editar o saldo atual anda o inicial pela diferença, e sem mexer não muda
   assert.equal(inicial + (16251 - 86786), 20000, 'inicial + lançamentos = o digitado');
   // Pode ficar negativo (conta no cheque especial).
   assert.equal(inicialParaOSaldo(-5000, 16251, 86786), 86786 - 21251);
+});
+
+
+test('filtros e formulários distinguem cartão, conta histórica e ausência com o mesmo seletor', () => {
+  const options = accountSelectOptions([
+    { id: 'card', name: 'Nubank', type: 'credit_card', closing_day: 10 },
+    { id: 'bank', name: 'Nubank', type: 'checking', archived: true },
+  ], 'Sem conta', 'none');
+  assert.deepEqual(options.map(o => o.id), ['none', 'bank', 'card']);
+  assert.equal(options[0].neutral, true);
+  assert.equal(options[1].meta, 'Corrente · arquivada');
+  assert.equal(options[1].group, 'CONTAS');
+  assert.equal(options[2].meta, 'Cartão · fecha dia 10');
+  assert.equal(options[2].group, 'CARTÕES');
+  assert.equal(options[2].icon, 'creditcard');
+  assert.equal(accountSelectOptions([{ id: 'cash', name: 'Carteira', type: 'cash' }])[0].group, undefined);
 });

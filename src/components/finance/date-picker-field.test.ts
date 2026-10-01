@@ -131,7 +131,11 @@ test('month-end control stays visible while the calendar is collapsed and toggle
 
 test('month-end control is omitted when the date field has no monthly action', () => {
   const render = datePicker({ value: '01/10/2026', onChange() {}, accessibilityLabel: 'Data' });
-  assert.equal(find(render(), (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Último dia de todo mês'), undefined);
+  const tree = render();
+  assert.equal(find(tree, (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Último dia de todo mês'), undefined);
+  assert.equal(find(tree, (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Data').props.accessibilityValue?.text, '01/10/2026');
+  const empty = datePicker({ value: null, onChange() {}, accessibilityLabel: 'Data', placeholder: 'Sem data' })();
+  assert.equal(find(empty, (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Data').props.accessibilityValue?.text, 'Sem data');
 });
 
 test('month-end control follows the month shown in the open calendar, not the saved date', () => {
@@ -189,6 +193,7 @@ test('selecting a day closes the calendar, blocks stale calendar callbacks, and 
   assert.deepEqual(fixedDateChanges, ['18/09/2026'], 'closing is guarded synchronously before another render');
   tree = render();
   assert.equal(find(tree, (node) => node.type === 'Calendar'), undefined);
+  assert.equal(find(tree, (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Vencimento').props.accessibilityValue?.text, '18/09/2026', 'o leitor deve anunciar a data que acabou de ser escolhida');
   const monthEnd = find(tree, (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Último dia de todo mês');
   monthEnd.props.onPress();
   assert.deepEqual(lastDayChanges, ['30/09/2026'], 'the previous day selection must not disable the collapsed month-end control');

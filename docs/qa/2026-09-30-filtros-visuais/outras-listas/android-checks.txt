@@ -1,0 +1,27 @@
+recurring aplicar PASS
+recurring cancelar limpeza PASS
+recurring aplicar limpeza PASS
+transactions aplicar PASS
+transactions cancelar limpeza PASS
+transactions aplicar limpeza PASS
+archived aplicar PASS
+archived cancelar limpeza PASS
+archived aplicar limpeza PASS
+trash aplicar PASS
+trash cancelar limpeza PASS
+trash aplicar limpeza PASS
+home busca fixa + tag folha PASS
+home cancelar limpeza preserva busca/tag PASS
+home limpeza total + grade pastas preservada PASS
+home pasta qaclean aberta sem mutação PASS
+folder aplicar PASS
+folder cancelar limpeza PASS
+folder aplicar limpeza PASS
+reminders-final reset único de datas PASS
+reminders-final 4 critérios / resumo2+mais2 / AX completo PASS
+reminders-final escuro PASS
+reminders-font2 reset único de datas PASS
+reminders-font2 4 critérios / resumo2+mais2 / AX completo PASS
+reminders-font2 fonte2 critérios aplicados PASS candidata inspeção visual
+reminders-font2 fonte2 abrir/fechar controles PASS
+reminders-font2 fonte2 aplicar limpeza PASS

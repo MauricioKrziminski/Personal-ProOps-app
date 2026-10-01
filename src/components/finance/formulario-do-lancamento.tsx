@@ -16,6 +16,8 @@ import { Row, Section } from '@/components/ui/row';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { CamposDaSerie } from '@/components/finance/serie-form';
 import { CamposDaCompra } from '@/components/finance/compra-form';
+import { DownPaymentFields } from '@/components/finance/down-payment-fields';
+import { downPaymentError, downPaymentInput, purchaseAmounts } from '@/lib/down-payment';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
@@ -117,6 +119,11 @@ const schema = z
     /** `transactions.auto_confirm` — entra sozinho na data em vez de esperar baixa. */
     auto_confirm: z.boolean(),
     paid_installments: z.string(),
+    down_payment_enabled: z.boolean(),
+    down_payment_cents: z.number().int().nonnegative(),
+    down_payment_date: z.string(),
+    down_payment_account: z.string().nullable(),
+    value_unit: z.enum(['total', 'parcela']),
     occurred_at: z.string().refine(isValidBRDate, 'Data em dd/mm/aaaa'),
     /** "Isso ainda vai acontecer" — vira `status='pending'`, a base da projeção de caixa. */
     pending: z.boolean(),
@@ -190,7 +197,7 @@ export function FormularioDoLancamento(props: Props) {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const toast = useToast();
-  const contas = useAccounts();
+  const contas = useAccounts(editing?.account_id);
   const accounts = contas.data;
 
   const save = useSaveTransaction();
@@ -232,6 +239,11 @@ export function FormularioDoLancamento(props: Props) {
       // Receita não parcela: a hipótese de entrada abre à vista, com o total.
       installments: (!editing && comum.kind === 'expense' ? parcelas : undefined) ?? 1,
       paid_installments: '0',
+      down_payment_enabled: false,
+      down_payment_cents: 0,
+      down_payment_date: isoToBR(localISODate()),
+      down_payment_account: comum.contaId ?? null,
+      value_unit: 'total',
       fee_cents: jurosDoPix?.amount_cents ?? 0,
       auto_confirm: editing?.auto_confirm ?? false,
       occurred_at: editing ? isoToBR(dataDaSerie ?? editing.occurred_at) : comum.dataBR,
@@ -293,7 +305,8 @@ export function FormularioDoLancamento(props: Props) {
    * A, com outra cara. Parcelar já diz quando cada parcela acontece.
    */
   // Pagamento de dívida é sempre PAGO (trigger da dívida): adiar seria recusado pelo banco.
-  const podeAdiar = kind !== 'transfer' && !isCard && installmentCount <= 1 && !editing?.debt_id;
+  const podeAdiar = kind !== 'transfer' && !isCard && installmentCount <= 1 &&
+    !editing?.debt_id && !editing?.down_payment_debt_id && !editing?.down_payment_plan_id;
   // O campo "Data" É o vencimento: rótulo "Vence em" e sem o atalho "Ontem" (vencimento não é compra).
   const dataEVencimento = umaData && podeAdiar && pending;
   /* Ao salvar uma parcela, a pessoa escolhe entre a linha e a compra inteira. A compra inteira
@@ -306,7 +319,12 @@ export function FormularioDoLancamento(props: Props) {
    */
   const parcelaNaFatura = Boolean(naCompra && editing?.invoice_id && plano?.locked_ids.includes(editing.id));
   /** Criando/convertendo em N×: a unidade REINTERPRETA o número digitado ("250 é cada parcela"). */
-  const [unidade, setUnidade] = useState<UnidadeDoValor>('total');
+  const unidade = useWatch({ control, name: 'value_unit' });
+  const setUnidade = (value: UnidadeDoValor) => setValue('value_unit', value);
+  const entradaLigada = useWatch({ control, name: 'down_payment_enabled' });
+  const entradaCents = useWatch({ control, name: 'down_payment_cents' });
+  const entradaData = useWatch({ control, name: 'down_payment_date' });
+  const entradaConta = useWatch({ control, name: 'down_payment_account' });
   const [formCompra, setFormCompra] = useState<CompraForm | null>(null);
   const atualizarCompra = useUpdateInstallmentPlan();
   const compraOk = validaCompra(formCompra).podeSalvar;
@@ -322,10 +340,17 @@ export function FormularioDoLancamento(props: Props) {
    * (26/09/2026, `convert_transaction_to_installments` com as já pagas) — o mesmo campo.
    */
   const podeInformarHistorico = podeParcelarAqui;
+  const entradaVisivel = podeParcelarAqui && installmentCount > 1;
+  const erroEntrada = entradaVisivel && entradaLigada
+    ? downPaymentError({ amountCents: entradaCents, dateBR: entradaData, accountId: entradaConta }, localISODate())
+      ?? (unidade === 'total' && amountCents - entradaCents < installmentCount
+        ? 'A entrada precisa ser menor que o total da compra' : undefined)
+    : undefined;
+  const restanteCents = unidade === 'total' ? amountCents - (entradaVisivel && entradaLigada ? entradaCents : 0) : amountCents * installmentCount;
   /** Achado B: esconde a escolha de tipo numa linha de série — ver o ⚠️ no Controller de `kind`. */
   const naSerieEditada = Boolean(editing?.installment_plan_id || editing?.recurring_id);
   /** Pagamento de dívida também: o trigger da dívida exige despesa PAGA, e recusaria a troca. */
-  const tipoTravado = naSerieEditada || Boolean(editing?.debt_id);
+  const tipoTravado = naSerieEditada || Boolean(editing?.debt_id || editing?.down_payment_debt_id || editing?.down_payment_plan_id);
 
   /**
    * ⚠️ **A fileira de parcelas sumir não pode deixar `installments` inválido para trás.**
@@ -499,6 +524,10 @@ export function FormularioDoLancamento(props: Props) {
 
   /** `criarOutro`: o "Salvar e criar outro" — o hospedeiro recebe no `onSalvo` e remonta limpo. */
   const onSubmit = (criarOutro = false) => handleSubmit((values) => {
+    if ((editing?.down_payment_debt_id || editing?.down_payment_plan_id) && brToISO(values.occurred_at) > localISODate()) {
+      toast({ message: 'A entrada paga não pode ter data futura', tone: 'error' });
+      return;
+    }
     /**
      * UMA escrita, e qual delas é decisão pura (`destinoDoSalvar`, com teste). As três são
      * exclusivas de propósito: duas escritas para uma intenção é a compra duplicada na fatura.
@@ -508,7 +537,19 @@ export function FormularioDoLancamento(props: Props) {
       account_id: values.account_id,
     });
     // O que o número digitado vale como TOTAL — criando e convertendo, a unidade o reinterpreta.
-    const totalDaCompraNova = totalDigitado(values.amount_cents, unidade, values.installments);
+    const temEntrada = podeParcelarAqui && values.installments > 1 && values.down_payment_enabled;
+    let totalDaCompraNova = totalDigitado(values.amount_cents, unidade, values.installments);
+    let downPayment: ReturnType<typeof downPaymentInput> | undefined;
+    if (temEntrada) {
+      try {
+        downPayment = downPaymentInput({ amountCents: values.down_payment_cents,
+          dateBR: values.down_payment_date, accountId: values.down_payment_account }, localISODate());
+        totalDaCompraNova = purchaseAmounts(values.amount_cents, unidade, values.installments, values.down_payment_cents).financedCents;
+      } catch (error) {
+        toast({ message: (error as Error).message, tone: 'error' });
+        return;
+      }
+    }
     // Reforço do `podeAdiar`: trocar para cartão depois de marcar "vou pagar depois" não
     // pode vazar um `pending` que a UI já escondeu.
     const adiado = podeAdiar && values.pending;
@@ -548,6 +589,7 @@ export function FormularioDoLancamento(props: Props) {
           // nenhum. Ver o ⚠️ em `useCreateInstallmentPlan`.
           merchant: values.merchant?.trim() || null,
           lastDay: intencaoDoDia === 'ultimo' && !isCard,
+          ...(downPayment ? { downPayment } : {}),
         }
       : null;
     const entradaLancamento: EntradaLancamento = {
@@ -574,7 +616,8 @@ export function FormularioDoLancamento(props: Props) {
     if (props.converter && !editing) {
       if (destino === 'criarPlano' && entradaParcelada) {
         const { rpc, args } = argsDaParcelada(entradaParcelada);
-        props.converter({ tipo: 'parcelada', dados: { ...args, ultimo_dia: rpc === 'create_installment_plan_last_day' } });
+        props.converter({ tipo: 'parcelada', dados: { ...args, ultimo_dia: rpc === 'create_installment_plan_last_day',
+          ...(entradaParcelada.downPayment ? { down_payment: entradaParcelada.downPayment } : {}) } });
       } else {
         props.converter({ tipo: 'lancamento', dados: { linhas: linhasDoLancamento(entradaLancamento) } });
       }
@@ -630,6 +673,7 @@ export function FormularioDoLancamento(props: Props) {
             category: values.category,
             merchant: values.merchant?.trim() || null,
             accountId: contaParaConverter,
+            ...(downPayment ? { downPayment } : {}),
             paidInstallments:
               installmentHistory(values.paid_installments, values.installments, brToISO(values.occurred_at), localISODate()) || null,
           },
@@ -950,7 +994,7 @@ export function FormularioDoLancamento(props: Props) {
           <Button
             label={saving ? 'Salvando…' : 'Salvar'}
             size="sm"
-            disabled={saving || !!correcaoDaDivida.erro || (formSerie !== null && !serieOk) || (formCompra !== null && !compraOk)}
+            disabled={saving || Boolean(erroEntrada) || !!correcaoDaDivida.erro || (formSerie !== null && !serieOk) || (formCompra !== null && !compraOk)}
             loading={saving}
             onPress={editing?.recurring_id || editing?.installment_plan_id || editing?.debt_id ? salvarComAlcance : () => onSubmit()}
           />
@@ -1237,8 +1281,8 @@ export function FormularioDoLancamento(props: Props) {
               hint={
                 amountCents > 0
                   ? unidade === 'parcela'
-                    ? `${installmentCount}x de ${formatBRL(amountCents)} · total ${formatBRL(totalDigitado(amountCents, 'parcela', installmentCount))}`
-                    : `${installmentCount}x de ${formatBRL(Math.floor(amountCents / installmentCount))}`
+                    ? `${installmentCount}x de ${formatBRL(amountCents)} · total ${formatBRL(restanteCents + (entradaLigada ? entradaCents : 0))}`
+                    : `${installmentCount}x de ${formatBRL(Math.max(0, Math.floor(restanteCents / installmentCount)))}`
                   : undefined
               }>
               <Segmented options={UNIDADES_DO_VALOR} value={unidade} onChange={setUnidade} />
@@ -1246,6 +1290,15 @@ export function FormularioDoLancamento(props: Props) {
           </Presenca>
 
         <Presenca visivel={podeInformarHistorico && installmentCount > 1}>
+          <DownPaymentFields enabled={entradaLigada} onEnabled={(value) => setValue('down_payment_enabled', value)}
+            value={{ amountCents: entradaCents, dateBR: entradaData, accountId: entradaConta }}
+            onChange={(value) => {
+              setValue('down_payment_cents', value.amountCents);
+              setValue('down_payment_date', value.dateBR);
+              setValue('down_payment_account', value.accountId);
+            }} accounts={accounts ?? []}
+            error={entradaLigada && unidade === 'total' && amountCents - entradaCents < installmentCount
+              ? 'A entrada precisa ser menor que o total da compra' : undefined} />
           <Controller control={control} name="paid_installments" render={({ field }) => (
             <Field label="Parcelas já pagas" error={errors.paid_installments?.message}>
               {/*
@@ -1301,7 +1354,9 @@ export function FormularioDoLancamento(props: Props) {
                     : podeAdiar && pending && kind === 'expense' ? 'Data da compra' : 'Data'
               }
               hint={parcelaNaFatura ? 'Paga na fatura do cartão: a data desta parcela não muda' : undefined}
-              error={errors.occurred_at?.message ?? (umaData ? errors.due_at?.message : undefined)}>
+              error={errors.occurred_at?.message ?? (umaData ? errors.due_at?.message : undefined)
+                ?? ((editing?.down_payment_debt_id || editing?.down_payment_plan_id) && isValidBRDate(occurredAt) && brToISO(occurredAt) > localISODate()
+                  ? 'A entrada paga não pode ter data futura' : undefined)}>
               {/*
                 ⚠️ **O campo tem a linha inteira; o atalho fica ACIMA dele.** Espremido na mesma
                 fileira, o valor quebrava no meio do ano ("13/09/2 026") — o seletor tem ícone e
@@ -1328,6 +1383,7 @@ export function FormularioDoLancamento(props: Props) {
                   <DatePickerField
                     value={field.value}
                     onChange={mudaData}
+                    max={editing?.down_payment_debt_id || editing?.down_payment_plan_id ? localISODate() : undefined}
                     // Tudo que se repete por mês tem o último dia (28/09/2026): série mensal,
                     // pagamento de dívida e parcela fora do cartão (criando ou editando).
                     onSelectLastDay={serie?.rrule.includes('FREQ=MONTHLY') || divida?.installments ||
@@ -1426,7 +1482,7 @@ export function FormularioDoLancamento(props: Props) {
             variant="secondary"
             block
             label="Salvar e criar outro"
-            disabled={saving}
+            disabled={saving || Boolean(erroEntrada)}
             onPress={() => onSubmit(true)}
           />
         ) : null}

@@ -1,0 +1,18 @@
+Warning: Activity not started, intent has been delivered to currently running top-most instance.
+ERROR: could not get idle state.
+ERROR: null root node returned by UiTestAutomationBridge.
+ERROR: null root node returned by UiTestAutomationBridge.
+ERROR: null root node returned by UiTestAutomationBridge.
+PASS final Android dark: initial-only + kind; reset preserves kind; cancel preserves applied dates; applied reset; clear.
+Warning: Activity not started, intent has been delivered to currently running top-most instance.
+Traceback (most recent call last):
+  File "/private/tmp/proops_open_dates_android_polish.py", line 22, in <module>
+    theme('Sistema')
+    ~~~~~^^^^^^^^^^^
+  File "/private/tmp/proops_open_dates_android_polish.py", line 5, in theme
+    a.route('profile')
+    ~~~~~~~^^^^^^^^^^^
+  File "/private/tmp/proops_open_dates_android.py", line 31, in route
+    adb('shell','am','start','-n','com.proops.personal.dev/.MainActivity','-a','android.intent.action.VIEW','-d','appproops:///'+path);time.sleep(2)
+                                                                                                                                       ~~~~~~~~~~^^^
+KeyboardInterrupt

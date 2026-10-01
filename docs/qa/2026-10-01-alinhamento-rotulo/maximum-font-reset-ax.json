@@ -1,0 +1,132 @@
+[
+  {
+    "role_description": "button",
+    "frame": {
+      "width": 175.3333282470703,
+      "height": 73.33332824707031,
+      "y": 184,
+      "x": 210.6666717529297
+    },
+    "content_required": false,
+    "role": "AXButton",
+    "pid": 92690,
+    "subrole": null,
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "type": "Button",
+    "help": null,
+    "title": null,
+    "enabled": true,
+    "AXFrame": "{{210.66667175292969, 184}, {175.33332824707031, 73.333328247070312}}",
+    "AXUniqueId": null,
+    "AXLabel": "Aplicar",
+    "AXValue": null,
+    "custom_actions": []
+  },
+  {
+    "AXLabel": "Lançamento a partir de",
+    "AXValue": null,
+    "pid": 92690,
+    "role": "AXStaticText",
+    "title": null,
+    "role_description": "text",
+    "content_required": false,
+    "AXFrame": "{{16, 567.99998474121094}, {322, 128.66668701171875}}",
+    "AXUniqueId": null,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "custom_actions": [],
+    "type": "StaticText",
+    "help": null,
+    "enabled": true,
+    "frame": {
+      "width": 322,
+      "y": 567.9999847412109,
+      "height": 128.66668701171875,
+      "x": 16
+    },
+    "subrole": null
+  },
+  {
+    "custom_actions": [],
+    "pid": 92690,
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "AXUniqueId": null,
+    "enabled": true,
+    "AXLabel": "Lançamento a partir de",
+    "type": "Button",
+    "title": null,
+    "help": "Toque para escolher no calendário",
+    "role_description": "button",
+    "role": "AXButton",
+    "content_required": false,
+    "AXValue": "Escolher data",
+    "frame": {
+      "x": 17,
+      "width": 368,
+      "y": 705.6666564941406,
+      "height": 188.33331298828125
+    },
+    "AXFrame": "{{17, 705.66665649414062}, {368, 188.33331298828125}}",
+    "subrole": null
+  },
+  {
+    "AXValue": null,
+    "AXLabel": "Lançamento até",
+    "content_required": false,
+    "role": "AXStaticText",
+    "type": "StaticText",
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "role_description": "text",
+    "AXUniqueId": null,
+    "enabled": true,
+    "AXFrame": "{{16, 910.99998474121094}, {370, 64.33331298828125}}",
+    "custom_actions": [],
+    "frame": {
+      "width": 370,
+      "y": 910.9999847412109,
+      "x": 16,
+      "height": 64.33331298828125
+    },
+    "pid": 92690,
+    "help": null,
+    "subrole": null,
+    "title": null
+  },
+  {
+    "AXUniqueId": null,
+    "enabled": true,
+    "title": null,
+    "help": "Toque para escolher no calendário",
+    "AXLabel": "Lançamento até",
+    "AXValue": "Escolher data",
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "pid": 92690,
+    "role": "AXButton",
+    "content_required": false,
+    "frame": {
+      "width": 368,
+      "height": 188.33331298828125,
+      "x": 17,
+      "y": 984.3333206176758
+    },
+    "AXFrame": "{{17, 984.33332061767578}, {368, 188.33331298828125}}",
+    "role_description": "button",
+    "custom_actions": [],
+    "type": "Button",
+    "subrole": null
+  }
+]

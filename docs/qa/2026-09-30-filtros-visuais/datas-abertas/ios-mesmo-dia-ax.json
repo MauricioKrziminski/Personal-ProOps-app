@@ -1,0 +1,278 @@
+[
+  {
+    "help": null,
+    "title": null,
+    "traits": [
+      "None"
+    ],
+    "role_description": "application",
+    "AXLabel": "ProOps",
+    "AXUniqueId": null,
+    "AXValue": null,
+    "subrole": null,
+    "AXFrame": "{{0, 0}, {402, 874}}",
+    "content_required": false,
+    "role": "AXApplication",
+    "enabled": true,
+    "type": "Application",
+    "custom_actions": [],
+    "pid": 19929,
+    "frame": {
+      "width": 402,
+      "x": 0,
+      "height": 874,
+      "y": 0
+    }
+  },
+  {
+    "role": "AXGroup",
+    "title": null,
+    "custom_actions": [],
+    "enabled": true,
+    "pid": 19929,
+    "AXLabel": null,
+    "subrole": null,
+    "traits": [
+      "Scrollable"
+    ],
+    "content_required": false,
+    "help": null,
+    "AXFrame": "{{0, 62}, {402, 114}}",
+    "AXValue": null,
+    "type": "Group",
+    "frame": {
+      "width": 402,
+      "height": 114,
+      "y": 62,
+      "x": 0
+    },
+    "AXUniqueId": "Lançamentos",
+    "role_description": "Nav bar"
+  },
+  {
+    "AXLabel": "Filtros · 1",
+    "AXFrame": "{{281.66665649414062, 188}, {104.33334350585938, 36}}",
+    "content_required": false,
+    "subrole": null,
+    "help": null,
+    "type": "Button",
+    "frame": {
+      "height": 36,
+      "x": 281.6666564941406,
+      "y": 188,
+      "width": 104.33334350585938
+    },
+    "title": null,
+    "AXUniqueId": null,
+    "role_description": "button",
+    "enabled": true,
+    "pid": 19929,
+    "role": "AXButton",
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "AXValue": null,
+    "custom_actions": []
+  },
+  {
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "AXFrame": "{{16, 196.66666698455811}, {253.66665649414062, 18.999998092651367}}",
+    "custom_actions": [],
+    "title": null,
+    "role": "AXStaticText",
+    "type": "StaticText",
+    "frame": {
+      "y": 196.6666669845581,
+      "x": 16,
+      "width": 253.66665649414062,
+      "height": 18.999998092651367
+    },
+    "content_required": false,
+    "help": null,
+    "AXUniqueId": null,
+    "role_description": "text",
+    "AXValue": null,
+    "enabled": true,
+    "AXLabel": "Período: 01/09/2026 a 01/09/2026",
+    "subrole": null,
+    "pid": 19929
+  },
+  {
+    "enabled": true,
+    "AXFrame": "{{16, 256}, {136, 19}}",
+    "subrole": null,
+    "custom_actions": [],
+    "content_required": false,
+    "traits": [
+      "Header",
+      "Scrollable",
+      "StaticText"
+    ],
+    "frame": {
+      "width": 136,
+      "x": 16,
+      "y": 256,
+      "height": 19
+    },
+    "AXUniqueId": null,
+    "help": null,
+    "role": "AXHeading",
+    "AXValue": null,
+    "AXLabel": "ter., 01 de setembro",
+    "pid": 19929,
+    "role_description": "heading",
+    "title": null,
+    "type": "Heading"
+  },
+  {
+    "role_description": "text",
+    "help": null,
+    "role": "AXStaticText",
+    "AXValue": null,
+    "type": "StaticText",
+    "frame": {
+      "x": 297.3333435058594,
+      "height": 18,
+      "width": 88.66665649414062,
+      "y": 256.3333339691162
+    },
+    "AXLabel": "+R$ 16.970,00",
+    "AXFrame": "{{297.33334350585938, 256.33333396911621}, {88.666656494140625, 18}}",
+    "AXUniqueId": null,
+    "custom_actions": [],
+    "content_required": false,
+    "subrole": null,
+    "title": null,
+    "enabled": true,
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "pid": 19929
+  },
+  {
+    "enabled": true,
+    "AXLabel": "Aluguel, R$ 1.800,00, despesa, ter., 01 de setembro, atrasado",
+    "subrole": null,
+    "pid": 19929,
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "title": null,
+    "role": "AXLink",
+    "frame": {
+      "height": 67,
+      "y": 287,
+      "width": 370,
+      "x": 16
+    },
+    "AXUniqueId": null,
+    "traits": [
+      "Scrollable",
+      "Link"
+    ],
+    "AXValue": null,
+    "role_description": "link",
+    "help": null,
+    "AXFrame": "{{16, 287}, {370, 67}}",
+    "content_required": false,
+    "type": "Link"
+  },
+  {
+    "role": "AXLink",
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "pid": 19929,
+    "traits": [
+      "Scrollable",
+      "Link"
+    ],
+    "subrole": null,
+    "frame": {
+      "y": 354.3333282470703,
+      "x": 16,
+      "width": 370,
+      "height": 67
+    },
+    "title": null,
+    "type": "Link",
+    "AXLabel": "geladeira (5/8), R$ 450,00, despesa, ter., 01 de setembro",
+    "role_description": "link",
+    "help": null,
+    "AXValue": null,
+    "content_required": false,
+    "AXUniqueId": null,
+    "AXFrame": "{{16, 354.33332824707031}, {370, 67}}",
+    "enabled": true
+  },
+  {
+    "AXFrame": "{{16, 421.66667175292969}, {370, 66.999984741210938}}",
+    "role": "AXLink",
+    "content_required": false,
+    "AXLabel": "salário, R$ 20.000,00, receita, ter., 01 de setembro",
+    "frame": {
+      "x": 16,
+      "height": 66.99998474121094,
+      "width": 370,
+      "y": 421.6666717529297
+    },
+    "help": null,
+    "subrole": null,
+    "title": null,
+    "AXUniqueId": null,
+    "enabled": true,
+    "pid": 19929,
+    "AXValue": null,
+    "type": "Link",
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "role_description": "link",
+    "traits": [
+      "Scrollable",
+      "Link"
+    ]
+  },
+  {
+    "help": null,
+    "frame": {
+      "width": 370,
+      "y": 489,
+      "x": 16,
+      "height": 67
+    },
+    "AXValue": null,
+    "type": "Button",
+    "role_description": "button",
+    "AXUniqueId": null,
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "role": "AXButton",
+    "subrole": null,
+    "AXLabel": "macbook (1/12), R$ 780,00, despesa, ter., 01 de setembro",
+    "enabled": true,
+    "AXFrame": "{{16, 489}, {370, 67}}",
+    "content_required": false,
+    "pid": 19929,
+    "title": null,
+    "traits": [
+      "Scrollable",
+      "Link"
+    ]
+  }
+]

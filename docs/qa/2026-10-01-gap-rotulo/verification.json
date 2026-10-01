@@ -1,0 +1,39 @@
+{
+  "branch": "gabriel/entrada-filtros",
+  "checks": {
+    "npm test": {
+      "exit": 0,
+      "pass": 1365,
+      "fail": 0,
+      "skip": 0
+    },
+    "field-motion": {
+      "exit": 0,
+      "pass": 36
+    },
+    "npx tsc --noEmit": {
+      "exit": 0
+    },
+    "npx expo lint": {
+      "exit": 0
+    },
+    "git diff --check": {
+      "exit": 0
+    },
+    "react-doctor": {
+      "exit": 0,
+      "errors": 0,
+      "warnings": 20,
+      "newFieldDiagnostic": false
+    }
+  },
+  "nativeStatesVerified": 8,
+  "longLabelsRunnerExit": 0,
+  "nativeAutomationLimit": "Full sequence stopped while opening another sheet after changing font; six gap states already verified; final separate runner verified both remaining states and cleanup.",
+  "cleanup": {
+    "font": "large",
+    "notesActive": 2,
+    "notesArchived": 3,
+    "filters": 0
+  }
+}

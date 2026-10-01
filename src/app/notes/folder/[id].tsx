@@ -14,6 +14,8 @@ import { useFolderMenu } from '@/components/notes/use-folder-menu';
 import { TagPicker } from '@/components/notes/tag-picker';
 import { Dica } from '@/components/ui/dica';
 import { EmptyState } from '@/components/ui/empty-state';
+import { FilterBar } from '@/components/ui/filter-bar';
+import { ListFilters } from '@/components/ui/list-filters';
 import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { fecharDeslizavelAberto } from '@/components/ui/deslizavel';
@@ -40,6 +42,7 @@ import {
   type NoteFolder,
 } from '@/hooks/use-notes';
 import { useNoteSort } from '@/hooks/use-note-sort';
+import { listFiltersActive, type ListFiltersValue } from '@/lib/list-filters';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import type { NoteCardActions } from '@/components/notes/note-card';
 
@@ -63,6 +66,9 @@ export default function FolderScreen() {
   const toast = useToast();
 
   const [sort] = useNoteSort();
+  const [filters, setFilters] = useState<ListFiltersValue>({});
+  const [filtering, setFiltering] = useState(false);
+  const filtered = listFiltersActive(filters);
   const [arrastando, setArrastando] = useState(false);
   const [criandoSubpasta, setCriandoSubpasta] = useState(false);
   // O indicador é do GESTO, nunca do `isRefetching` (design.md §6) — o mesmo da aba Notas.
@@ -87,7 +93,7 @@ export default function FolderScreen() {
   const [topoNotas, setTopoNotas] = useState(0);
 
   const foldersQuery = useNoteFolders();
-  const list = useNotesList({ folderId: params.id, sort });
+  const list = useNotesList({ folderId: params.id, sort, q: filters.q, from: filters.from, to: filters.to });
 
   const togglePin = useToggleNotePin();
   const trash = useTrashNote();
@@ -108,8 +114,8 @@ export default function FolderScreen() {
   const fixadas = useMemo(() => notes.filter((n) => n.pinned), [notes]);
   const soltas = useMemo(() => notes.filter((n) => !n.pinned), [notes]);
 
-  /** Dentro da pasta não há busca nem tag: o escopo já é o recorte, e a ordem manual vale. */
-  const podeArrastar = sort === 'manual';
+  /** O recorte fica dentro desta pasta; arrastar um subconjunto não altera a ordem manual. */
+  const podeArrastar = sort === 'manual' && !filtered;
 
   const folderById = useCallback((id: string | null) => folders.find((f) => f.id === id), [folders]);
 
@@ -299,6 +305,7 @@ export default function FolderScreen() {
           const fim = e.contentSize.height - e.layoutMeasurement.height - e.contentOffset.y;
           if (fim < 600 && list.hasNextPage && !list.isFetchingNextPage) list.fetchNextPage();
         }}>
+        <FilterBar value={filters} dateLabel="Atualização" defaultLabel="Notas desta pasta" onPress={() => setFiltering(true)} />
         {!pronta ? (
           <>
             <SkeletonList linhas={4} />
@@ -404,6 +411,12 @@ export default function FolderScreen() {
                   hint="Pode ter sido a conexão."
                   action={{ label: 'Tentar de novo', onPress: () => list.refetch() }}
                 />
+              ) : filtered && fixadas.length === 0 ? (
+                <EmptyState compacto
+                  icon="magnifyingglass"
+                  title="Nenhuma nota com esses filtros"
+                  action={{ label: 'Limpar filtros', onPress: () => setFilters({}) }}
+                />
               ) : fixadas.length === 0 && subpastas.length === 0 ? (
                 <EmptyState
                   icon="tray"
@@ -415,6 +428,9 @@ export default function FolderScreen() {
           </>
         )}
       </DragScrollView>
+
+      <ListFilters visible={filtering} value={filters} onClose={() => setFiltering(false)} onApply={setFilters}
+        dateLabels={{ from: 'Atualização a partir de', to: 'Atualização até' }} />
 
       <ColorPicker
         visible={pintandoNota !== null}

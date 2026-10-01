@@ -1,0 +1,106 @@
+{
+  "calendario-seis-semanas.png": {
+    "bytes": 272904,
+    "sha256": "825b4dbd722926ab4697639d8ac608413a8dfb627e9f611d729a6bac750a2a1e"
+  },
+  "compra-entrada.png": {
+    "bytes": 390738,
+    "sha256": "7d84465ee5dd51a992d866e376e9544e5189cede338a8e2fd5245cc172ad34b2"
+  },
+  "datas-invertidas.png": {
+    "bytes": 334465,
+    "sha256": "56551670cac1febae9f63c2a8fb96da139a2ec3d1a5b0d3aa7fa7c43dad1993f"
+  },
+  "entrada-cada-parcela.png": {
+    "bytes": 325979,
+    "sha256": "5a5bdc959f13635901d759aaf31605f9002b754552bcfaec25e36721d75697fd"
+  },
+  "entrada-limite-de-data.png": {
+    "bytes": 323240,
+    "sha256": "41bf3365ea89d6f0da371026e546385183b42b4d1182199278a6a8d685c5f3b2"
+  },
+  "filtros-tema-escuro.png": {
+    "bytes": 200367,
+    "sha256": "1c6c5f14c52599318aa5cdd1fe489f64a28bb62492bc68f8a18d9101447d2531"
+  },
+  "financiamento-antes.png": {
+    "bytes": 467080,
+    "sha256": "925777aeadbeaeba553252cf02293450062764d61ed20a54d046b2406d2a3207"
+  },
+  "financiamento-entrada.png": {
+    "bytes": 327886,
+    "sha256": "c7881df680f08e712092f3b025a14e7f82ef07f8378e5ed658e9ef4da0c71463"
+  },
+  "financiamento-ficha-final.png": {
+    "bytes": 353764,
+    "sha256": "da3791770143067cdc2ada4600e44721cf9e4bf0e103b2a9b10057b4c2e5fb56"
+  },
+  "financiamento-ficha.png": {
+    "bytes": 350203,
+    "sha256": "18254cf07135b567aecc55f496fcdcb2f8de34032992f28ef7c946fd9e3b3e9f"
+  },
+  "importacoes-combinadas.png": {
+    "bytes": 207859,
+    "sha256": "399326fd59d38ed3098081ff614f123f1eeae1947e385d73cf1467c7f342c5ab"
+  },
+  "importacoes-rascunho.png": {
+    "bytes": 344018,
+    "sha256": "ed808b02c899e918c2963f3036b74c82613683454754284a8eb036aec32ffcfb"
+  },
+  "lancamento-alvo-pagina-56.png": {
+    "bytes": 317018,
+    "sha256": "e5effed13f5462375b9f33f502bb31593a919345fc334311799b7dc4ecd3a901"
+  },
+  "lancamentos-antes.png": {
+    "bytes": 546103,
+    "sha256": "070374763ec8cbe78dfad675cd683562936ae9edd75e170d8f72fd423b19b147"
+  },
+  "lancamentos-cinco-meses.png": {
+    "bytes": 471634,
+    "sha256": "4a8fbe5a6979e6a0554b4c81d16a8d10ee8c4d9e73307f47d2425ffcb6732ecb"
+  },
+  "lancamentos-combinados.png": {
+    "bytes": 370183,
+    "sha256": "85521988c3483c400a551c1b445852a95fa6f0cb9b1024683789e5d594054522"
+  },
+  "lembretes-combinados.png": {
+    "bytes": 190154,
+    "sha256": "33509388407bad6edaac8e99b6d4353d7a14ce6ccae609f3116de2be3fb8737c"
+  },
+  "lembretes-rascunho.png": {
+    "bytes": 346163,
+    "sha256": "861a27f2d86e7dfdfd76fbfa9d5d5fa27ede241a0eb4088e7880f198ab2feb21"
+  },
+  "nota-menu-contextual.png": {
+    "bytes": 437812,
+    "sha256": "ed783f6eff4bffd46d3f754bfbc224c96497010f4f097a64acae8f943f6435d8"
+  },
+  "notas-arquivadas.png": {
+    "bytes": 194273,
+    "sha256": "fcba7b1f986aa4328cd4a24adcc0f4ad210086fe0784e84a603e4e7da36a56e7"
+  },
+  "notas-lixeira.png": {
+    "bytes": 215796,
+    "sha256": "af9c25ba873a27cfe802f2f133b7461e7464187c0157e888a8061add05744fc7"
+  },
+  "notas-na-pasta.png": {
+    "bytes": 187475,
+    "sha256": "b8fbeb79de5e13db727e0e2dcc4124478616efddff6312aa742c07e27dd82b08"
+  },
+  "notas-texto-e-data.png": {
+    "bytes": 306576,
+    "sha256": "5473f1113991923aa12e7e0bbcc59cc7af1496de59ba889b3cebeb3dff1221a4"
+  },
+  "recorrentes-sem-resultados.png": {
+    "bytes": 211222,
+    "sha256": "5b9aa84d9fd05c24c3c2a5b1273a9661813dda39b03f407bbe21deca0acccc16"
+  },
+  "valor-inclusivo.png": {
+    "bytes": 475993,
+    "sha256": "c175a218489d26b8c4a05ae7369e9eca936ba1117488687ad9b5913a4a5b854e"
+  },
+  "valor-invertido.png": {
+    "bytes": 266994,
+    "sha256": "cd7e933ad1b976adaed8ce5381705ed00666c7ca0c72e33990d324e0f604bd9c"
+  }
+}

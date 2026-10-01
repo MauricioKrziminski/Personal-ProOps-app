@@ -1,10 +1,11 @@
-import { Children, Fragment, type ReactNode } from 'react';
+import { Children, Fragment, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions, type AccessibilityState } from 'react-native';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
 import { BlockHeader } from '@/components/ui/block-header';
 import { Icon } from '@/components/ui/icon';
+import { DinheiroEncolhe } from '@/components/ui/money';
 import type { NoteColorName } from '@/constants/theme';
 import { noteInk } from '@/design/note-colors';
 import { superficieDaNota } from '@/design/note-surface';
@@ -97,11 +98,17 @@ export function Row({
   const disco = tintaCheia
     ? superficieDaNota(tintaCheia, scheme, { surface: theme.backgroundElement, text: theme.text }).fundo
     : null;
-  const pisoDoTitulo = usePisoDoTitulo();
+  const { width } = useWindowDimensions();
+  const [larguraDaLinha, setLarguraDaLinha] = useState(0);
+  const larguraUtil = Math.max(0, (larguraDaLinha || width) - Space.lg * (2 + Math.max(0, indent)));
+  const pisoDoTitulo = usePisoDoTitulo(larguraUtil);
   const valor =
     trailing || (chevron ?? !!onPress) ? (
       <View style={styles.trailing}>
-        {trailing}
+        {trailing ? <View style={styles.valor}>
+          {/* Mesmo sozinho, o valor tem a largura finita da linha. Ajusta só quando não cabe. */}
+          <DinheiroEncolhe.Provider value={true}>{trailing}</DinheiroEncolhe.Provider>
+        </View> : null}
         {(chevron ?? !!onPress) ? (
           <Icon name="chevron.right" size="sm" color="textSecondary" />
         ) : null}
@@ -110,6 +117,7 @@ export function Row({
 
   const content = (pressed: boolean) => (
     <View
+      onLayout={({ nativeEvent }) => setLarguraDaLinha(nativeEvent.layout.width)}
       style={[
         styles.row,
         { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
@@ -258,9 +266,10 @@ const MIN_TITULO = 134;
  * tamanho de fonte em que ela está sendo desenhada. Uma função, três lugares: um número copiado
  * em cada um divergia (era o `anti-slop.test.ts` que os mantinha iguais à mão).
  */
-export function usePisoDoTitulo() {
+export function usePisoDoTitulo(larguraDisponivel = Infinity) {
   const { fontScale } = useWindowDimensions();
-  return { minWidth: MIN_TITULO * Math.max(1, fontScale) };
+  // Na fonte máxima o piso escalado pode exceder até a linha inteira. O painel real é o teto.
+  return { minWidth: Math.min(MIN_TITULO * Math.max(1, fontScale), larguraDisponivel) };
 }
 
 const styles = StyleSheet.create({
@@ -337,7 +346,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.xs,
     marginLeft: 'auto',
+    maxWidth: '100%',
   },
+  valor: { flexShrink: 1, minWidth: 0 },
   /** O chip do ícone é um círculo suave, como nas listas dos vídeos de referência. */
   iconChip: {
     width: 38,

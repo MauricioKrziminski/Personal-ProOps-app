@@ -1,0 +1,5 @@
+PASS final native max-font input: QA visible; height grows: {'width': 368, 'y': 454, 'height': 87, 'x': 17}
+PASS default font normal geometry and cancel/discard draft.
+FROM result dates: [('Heading', 'dom., 01 de agosto'), ('Heading', 'qui., 01 de julho'), ('Heading', 'qua., 02 de junho'), ('Heading', 'ter., 01 de junho'), ('Heading', 'dom., 02 de maio')]
+PASS iOS: labels, initial-only, final-only, true open period, reversed/cancel, both, same-day, clear/month-cycle.
+PASS final source complete iPhone date regression after shared input correction.

@@ -6,6 +6,8 @@ import { Presenca } from '@/components/motion/presenca';
 
 import { useBRL } from '@/components/ui/conceal';
 import { Button } from '@/components/ui/button';
+import { FilterBar } from '@/components/ui/filter-bar';
+import { ListFilters, type FilterSelect } from '@/components/ui/list-filters';
 import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { monthLabel, monthShort, shiftMonth } from '@/components/finance/month-picker';
@@ -35,6 +37,7 @@ import {
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { brToISO } from '@/lib/dates';
+import { semAcento } from '@/lib/text';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { compraDoRegistro, edicaoEscopadaDaCompra, payloadDaCompra, validaCompra, type CompraForm } from '@/lib/compra';
 import { askEditScope } from '@/lib/edit-scope';
@@ -45,7 +48,8 @@ import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item
 import { useTheme } from '@/hooks/use-theme';
 import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { nextPendingInstallment } from '@/lib/installment-progress';
-import { accountLabel } from '@/lib/accounts';
+import { accountLabel, accountSelectOptions } from '@/lib/accounts';
+import { listFiltersActive, type ListFiltersValue } from '@/lib/list-filters';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 import { hrefDoLancar } from '@/lib/lancar';
@@ -102,8 +106,13 @@ export default function InstallmentsScreen() {
   const plans = useInstallmentPlans();
   const removePlan = useDeleteInstallmentPlan();
   const accounts = useAccounts();
+  const accountsForFilters = useAccounts(undefined, true);
   const [aberto, setAberto] = useState<string | null>(null);
   const [verTerminadas, setVerTerminadas] = useState(false);
+  const [filtersVisible, setFiltersVisible] = useState(false);
+  const [filters, setFilters] = useState<ListFiltersValue>({});
+  const mostrarResumoGlobal = !listFiltersActive(filters);
+  const mostrarTerminadas = verTerminadas || listFiltersActive(filters);
   const params = useLocalSearchParams<{ edit?: string }>();
   const editar = useUpdateInstallmentPlan();
   const editarEscopo = useSaveInstallmentOccurrence();
@@ -121,17 +130,36 @@ export default function InstallmentsScreen() {
     return mapa;
   }, [accounts.data]);
 
-  const lista = plans.data ?? [];
+  const lista = useMemo(() => plans.data ?? [], [plans.data]);
+  const filterSelects: readonly FilterSelect[] = [
+    { key: 'conta', label: 'Conta', options: accountSelectOptions(accountsForFilters.data ?? [], 'Sem conta', 'none') },
+    { key: 'categoria', label: 'Categoria', options: Array.from(new Set(lista.map((p) => p.category).filter((v): v is string => Boolean(v)))).sort().map((v) => ({ id: v, label: v })) },
+    { key: 'estado', label: 'Estado', options: [{ id: 'em_andamento', label: 'Em andamento' }, { id: 'quitada', label: 'Quitada' }] },
+  ];
+  const listaFiltrada = useMemo(() => {
+    const termo = semAcento(filters.q ?? '');
+    return lista.filter((plano) => {
+      const texto = semAcento(`${plano.title} ${plano.description ?? ''}`);
+      return (!termo || texto.includes(termo))
+        && (!filters.selections?.conta || (filters.selections.conta === 'none' ? plano.account_id === null : plano.account_id === filters.selections.conta))
+        && (!filters.selections?.categoria || plano.category === filters.selections.categoria)
+        && (!filters.selections?.estado || (filters.selections.estado === 'em_andamento' ? plano.active : !plano.active))
+        && (!filters.from || plano.first_occurred_at >= filters.from)
+        && (!filters.to || plano.first_occurred_at <= filters.to)
+        && (filters.minCents === undefined || plano.total_cents >= filters.minCents)
+        && (filters.maxCents === undefined || plano.total_cents <= filters.maxCents);
+    });
+  }, [lista, filters]);
   const emAndamento = useMemo(
     () =>
-      (plans.data ?? [])
+      listaFiltrada
         .filter((p) => p.active)
         .sort((a, b) => b.remaining_cents - a.remaining_cents),
-    [plans.data],
+    [listaFiltrada],
   );
-  const terminadas = useMemo(() => (plans.data ?? []).filter((p) => !p.active), [plans.data]);
+  const terminadas = useMemo(() => listaFiltrada.filter((p) => !p.active), [listaFiltrada]);
   // Aos poucos (24/09/2026): as terminadas crescem para sempre.
-  const janelas = useJanelasPorGrupo('');
+  const janelas = useJanelasPorGrupo(JSON.stringify(filters));
   const jAndamento = janelas.janelaDe('andamento', emAndamento);
   const jTerminadas = janelas.janelaDe('terminadas', terminadas);
 
@@ -622,6 +650,10 @@ export default function InstallmentsScreen() {
 
   const listaParcelas = (
     <>
+      {lista.length > 0 ? <FilterBar value={filters} selects={filterSelects} dateLabel="Primeira parcela"
+        valueLabel="Total parcelado (sem a entrada)" defaultLabel="Todas as compras" onPress={() => setFiltersVisible(true)} /> : null}
+      <ListFilters visible={filtersVisible} value={filters} onClose={() => setFiltersVisible(false)} onApply={setFilters}
+        dateLabels={{ from: 'Primeira parcela a partir de', to: 'Primeira parcela até' }} showValues valueLabel="Total parcelado (sem a entrada)" selects={filterSelects} />
       {emAndamento.length > 0 ? (
         <View style={styles.lista}>
           <Section title="Em andamento">{jAndamento.visiveis.map(bloco)}</Section>
@@ -630,20 +662,20 @@ export default function InstallmentsScreen() {
       ) : null}
       {terminadas.length > 0 ? (
         <Section title="Terminadas">
-          <Row
+          {listFiltersActive(filters) ? null : <Row
             title={verTerminadas ? 'Esconder terminadas' : `Ver ${terminadas.length} terminadas`}
             icon={verTerminadas ? 'chevron.up' : 'checkmark.circle'}
             chevron={false}
             onPress={() => setVerTerminadas(!verTerminadas)}
-          />
-          {verTerminadas ? jTerminadas.visiveis.map(bloco) : null}
+          />}
+          {mostrarTerminadas ? jTerminadas.visiveis.map(bloco) : null}
         </Section>
       ) : null}
-      {terminadas.length > 0 && verTerminadas ? (
+      {terminadas.length > 0 && mostrarTerminadas ? (
         <VerMais restantes={jTerminadas.restantes} onPress={() => janelas.verMais('terminadas')} />
       ) : null}
       {/* Só terminadas: elas vêm primeiro e o vazio vira uma linha embaixo (24/09/2026). */}
-      {!plans.isLoading && !plans.isError && lista.length > 0 && emAndamento.length === 0 ? (
+      {!plans.isLoading && !plans.isError && !listFiltersActive(filters) && lista.length > 0 && emAndamento.length === 0 ? (
         <EmptyState icon="creditcard" title="Nenhuma compra em andamento" compacto />
       ) : null}
       {!plans.isLoading && !plans.isError && lista.length === 0 ? (
@@ -654,16 +686,21 @@ export default function InstallmentsScreen() {
           action={{ label: 'Lançar compra', onPress: () => router.push(hrefDoLancar('uma')) }}
         />
       ) : null}
+      {!plans.isLoading && !plans.isError && listaFiltrada.length === 0 && lista.length > 0 ? (
+        <EmptyState compacto icon="line.3.horizontal.decrease" title="Nenhuma compra encontrada"
+          hint="Ajuste ou limpe os filtros para ver outras compras."
+          action={{ label: 'Limpar filtros', onPress: () => setFilters({}) }} />
+      ) : null}
     </>
   );
 
   const parcelList = <View style={styles.paneBody}>{loading}{erro}{listaParcelas}</View>;
-  const parcelContext = <View style={styles.paneBody}>{destaque}{faixaMensal}</View>;
-  const compactBody = <>{loading}{erro}{destaque}{faixaMensal}{listaParcelas}</>;
+  const parcelContext = <View style={styles.paneBody}>{mostrarResumoGlobal ? destaque : null}{mostrarResumoGlobal ? faixaMensal : null}</View>;
+  const compactBody = <>{loading}{erro}{mostrarResumoGlobal ? destaque : null}{mostrarResumoGlobal ? faixaMensal : null}{listaParcelas}</>;
   const tabletBody = (
     <AdaptivePanes
       main={parcelList}
-      support={destaque || faixaMensal ? parcelContext : undefined}
+      support={mostrarResumoGlobal && (destaque || faixaMensal) ? parcelContext : undefined}
       singlePane="main-only"
       singlePaneContent={compactBody}
       testID="installments-tablet-workspace"

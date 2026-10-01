@@ -16,6 +16,8 @@ export interface ItemLinkProps {
   actions: ItemAction[];
   /** Título do sheet no Android e do "Mais" do arrasto. O menu do iOS não tem título. */
   title: string;
+  /** Rótulo completo do alvo acessível; sem ele, preserva o rótulo do filho ou usa o título. */
+  accessibilityLabel?: string;
   /**
    * Como o arrasto recorta o card (`Deslizavel`): `linha` dentro de uma `Section` (padrão), ou
    * `card` quando o item é um cartão com canto próprio (a nota).

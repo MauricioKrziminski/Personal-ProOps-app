@@ -1,0 +1,287 @@
+[
+  {
+    "AXValue": null,
+    "traits": [
+      "None"
+    ],
+    "role_description": "application",
+    "content_required": false,
+    "subrole": null,
+    "custom_actions": [],
+    "frame": {
+      "height": 874,
+      "y": 0,
+      "width": 402,
+      "x": 0
+    },
+    "AXUniqueId": null,
+    "AXFrame": "{{0, 0}, {402, 874}}",
+    "AXLabel": "ProOps",
+    "enabled": true,
+    "help": null,
+    "role": "AXApplication",
+    "type": "Application",
+    "pid": 20004,
+    "title": null
+  },
+  {
+    "content_required": false,
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "AXLabel": "Fechar",
+    "role": "AXLink",
+    "enabled": true,
+    "AXFrame": "{{16, 88}, {32, 32}}",
+    "help": null,
+    "custom_actions": [],
+    "subrole": null,
+    "AXValue": null,
+    "pid": 20004,
+    "title": null,
+    "AXUniqueId": null,
+    "frame": {
+      "y": 88,
+      "x": 16,
+      "width": 32,
+      "height": 32
+    },
+    "role_description": "link",
+    "type": "Link"
+  },
+  {
+    "title": null,
+    "AXUniqueId": null,
+    "role": "AXStaticText",
+    "content_required": false,
+    "AXFrame": "{{60, 92}, {241.66665649414062, 24}}",
+    "enabled": true,
+    "role_description": "text",
+    "AXValue": null,
+    "help": null,
+    "AXLabel": "Filtros",
+    "pid": 20004,
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "type": "StaticText",
+    "frame": {
+      "y": 92,
+      "width": 241.66665649414062,
+      "height": 24,
+      "x": 60
+    },
+    "subrole": null,
+    "custom_actions": []
+  },
+  {
+    "type": "Button",
+    "frame": {
+      "y": 86,
+      "width": 72.33334350585938,
+      "height": 36,
+      "x": 313.6666564941406
+    },
+    "AXUniqueId": null,
+    "title": null,
+    "role": "AXButton",
+    "AXFrame": "{{313.66665649414062, 86}, {72.333343505859375, 36}}",
+    "AXLabel": "Aplicar",
+    "help": null,
+    "custom_actions": [],
+    "content_required": false,
+    "role_description": "button",
+    "enabled": true,
+    "AXValue": null,
+    "subrole": null,
+    "pid": 20004,
+    "traits": [
+      "Button",
+      "Scrollable"
+    ]
+  },
+  {
+    "help": null,
+    "AXLabel": "Limpar filtros",
+    "title": null,
+    "AXUniqueId": null,
+    "pid": 20004,
+    "custom_actions": [],
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "role_description": "button",
+    "enabled": true,
+    "AXFrame": "{{16, 150}, {106.66666412353516, 36}}",
+    "subrole": null,
+    "frame": {
+      "y": 150,
+      "height": 36,
+      "x": 16,
+      "width": 106.66666412353516
+    },
+    "content_required": false,
+    "AXValue": null,
+    "role": "AXButton",
+    "type": "Button"
+  },
+  {
+    "title": null,
+    "AXValue": null,
+    "pid": 20004,
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "subrole": null,
+    "custom_actions": [],
+    "frame": {
+      "y": 210,
+      "x": 16,
+      "width": 322,
+      "height": 18
+    },
+    "AXLabel": "Atualização a partir de",
+    "role": "AXStaticText",
+    "help": null,
+    "content_required": false,
+    "type": "StaticText",
+    "enabled": true,
+    "role_description": "text",
+    "AXFrame": "{{16, 210}, {322, 18}}",
+    "AXUniqueId": null
+  },
+  {
+    "enabled": true,
+    "type": "Link",
+    "title": null,
+    "content_required": false,
+    "AXFrame": "{{17, 255}, {368, 48}}",
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "frame": {
+      "width": 368,
+      "height": 48,
+      "y": 255,
+      "x": 17
+    },
+    "help": "Toque para escolher no calendário",
+    "custom_actions": [],
+    "AXLabel": "Atualização a partir de",
+    "AXValue": "Escolher data",
+    "role": "AXLink",
+    "subrole": null,
+    "pid": 20004,
+    "AXUniqueId": null,
+    "role_description": "link"
+  },
+  {
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "role": "AXStaticText",
+    "AXValue": null,
+    "title": null,
+    "AXFrame": "{{16, 320}, {370, 18}}",
+    "content_required": false,
+    "AXLabel": "Atualização até",
+    "custom_actions": [],
+    "pid": 20004,
+    "enabled": true,
+    "AXUniqueId": null,
+    "role_description": "text",
+    "frame": {
+      "width": 370,
+      "x": 16,
+      "y": 320,
+      "height": 18
+    },
+    "type": "StaticText",
+    "help": null,
+    "subrole": null
+  },
+  {
+    "frame": {
+      "y": 347,
+      "width": 368,
+      "x": 17,
+      "height": 48
+    },
+    "AXUniqueId": null,
+    "pid": 20004,
+    "AXFrame": "{{17, 347}, {368, 48}}",
+    "help": "Toque para escolher no calendário",
+    "role_description": "link",
+    "role": "AXLink",
+    "custom_actions": [],
+    "title": null,
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "content_required": false,
+    "enabled": true,
+    "AXLabel": "Atualização até",
+    "type": "Link",
+    "subrole": null,
+    "AXValue": "Escolher data"
+  },
+  {
+    "AXUniqueId": null,
+    "subrole": null,
+    "AXValue": null,
+    "AXFrame": "{{16, 420}, {370, 18}}",
+    "enabled": true,
+    "type": "StaticText",
+    "content_required": false,
+    "role_description": "text",
+    "help": null,
+    "frame": {
+      "x": 16,
+      "width": 370,
+      "y": 420,
+      "height": 18
+    },
+    "title": null,
+    "AXLabel": "Tag",
+    "custom_actions": [],
+    "pid": 20004,
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "role": "AXStaticText"
+  },
+  {
+    "type": "Button",
+    "custom_actions": [],
+    "help": "Toque para escolher",
+    "subrole": null,
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "pid": 20004,
+    "role_description": "button",
+    "AXUniqueId": null,
+    "role": "AXButton",
+    "title": null,
+    "AXLabel": "Todos",
+    "frame": {
+      "width": 369.33331298828125,
+      "y": 446.33333334326744,
+      "x": 16.33333334326744,
+      "height": 60
+    },
+    "AXValue": null,
+    "AXFrame": "{{16.333333343267441, 446.33333334326744}, {369.33331298828125, 60}}",
+    "enabled": true,
+    "content_required": false
+  }
+]

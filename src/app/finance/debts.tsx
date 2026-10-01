@@ -1,15 +1,18 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Redirect, Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { useBRL } from '@/components/ui/conceal';
+import { PurchaseDownPayment } from '@/components/finance/purchase-down-payment';
 import { ThemedText } from '@/components/themed-text';
 import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Button } from '@/components/ui/button';
+import { FilterBar } from '@/components/ui/filter-bar';
+import { ListFilters, type FilterSelect } from '@/components/ui/list-filters';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
@@ -51,6 +54,9 @@ import {
 import { formatBRL, localISODate } from '@/hooks/use-items';
 import { pagamentoDaParcelaFixa } from '@/lib/confirmar-baixa';
 import { brToISO, isoToBR } from '@/lib/dates';
+import { accountSelectOptions } from '@/lib/accounts';
+import { listFiltersActive, type ListFiltersValue } from '@/lib/list-filters';
+import { semAcento } from '@/lib/text';
 import { paidInstallments, porAno, secoesDaLinha, type ItemDaLinha } from '@/lib/debt-history';
 import { lerAoVoltar } from '@/lib/volta-da-parcela';
 import { financeErrorMessage, simpleDebtValues } from '@/lib/finance-form';
@@ -95,12 +101,20 @@ export default function DebtsScreen() {
   const [ordemJaVeio, setOrdemJaVeio] = useState(false);
   if (payoff.data && !ordemJaVeio) setOrdemJaVeio(true);
   const accounts = useAccounts();
+  const accountsForFilters = useAccounts(undefined, true);
+  const filterSelects: readonly FilterSelect[] = [
+    { key: 'tipo', label: 'Tipo', options: DEBT_KINDS.map((kind) => ({ id: kind.value, label: kind.label })) },
+    { key: 'conta', label: 'Conta', options: accountSelectOptions(accountsForFilters.data ?? [], 'Sem conta', 'none') },
+    { key: 'estado', label: 'Estado', options: [{ id: 'ativa', label: 'Ativa' }, { id: 'quitada', label: 'Quitada' }, { id: 'arquivada', label: 'Arquivada' }] },
+  ];
   const save = useSaveDebt();
   const archive = useArchiveDebt();
   const unarchive = useUnarchiveDebt();
   const excluirDivida = useDeleteDebt();
   const arquivadas = useArchivedDebts();
   const [verArquivadas, setVerArquivadas] = useState(false);
+  const [filtersVisible, setFiltersVisible] = useState(false);
+  const [filters, setFilters] = useState<ListFiltersValue>({});
   const pagar = usePayDebtInstallment();
 
   /**
@@ -133,7 +147,30 @@ export default function DebtsScreen() {
   // falha, e sem este corte a lista seguia afirmando números embaixo da faixa que acabou
   // de dizer que não conseguiu carregar. Zerar aqui cobre lista, contadores e destaque de
   // uma vez; os estados vazios já checam `isError` e continuam calados.
-  const lista = debts.isError ? [] : (debts.data ?? []);
+  const lista = useMemo(() => (debts.isError ? [] : (debts.data ?? [])), [debts.isError, debts.data]);
+  const listaArquivadas = useMemo(() => (arquivadas.isError ? [] : (arquivadas.data ?? [])), [arquivadas.isError, arquivadas.data]);
+  const { listaFiltrada, listaArquivadasFiltrada } = useMemo(() => {
+    const termo = semAcento(filters.q ?? '');
+    const corresponde = (debt: Debt) => {
+      const nome = semAcento(debt.name);
+      const estado = debt.archived ? 'arquivada' : Number(debt.remaining_cents) <= 0 ? 'quitada' : 'ativa';
+      // O intervalo representa o primeiro vencimento. Sem uma âncora de cronograma, a dívida não casa.
+      const data = debt.first_due_date;
+      const dataOk = (!filters.from && !filters.to) || (data !== null
+        && (!filters.from || data >= filters.from) && (!filters.to || data <= filters.to));
+      return (!termo || nome.includes(termo))
+        && (!filters.selections?.tipo || debt.kind === filters.selections.tipo)
+        && (!filters.selections?.conta || (filters.selections.conta === 'none'
+          ? debt.account_id === null : debt.account_id === filters.selections.conta))
+        && (!filters.selections?.estado || estado === filters.selections.estado)
+        && dataOk;
+    };
+    return {
+      listaFiltrada: lista.filter(corresponde),
+      listaArquivadasFiltrada: listaArquivadas.filter(corresponde),
+    };
+  }, [lista, listaArquivadas, filters]);
+  const mostrarArquivadas = verArquivadas || (listFiltersActive(filters) && listaArquivadasFiltrada.length > 0);
   const totalDevido = lista.reduce((s, d) => s + Number(d.remaining_cents), 0);
   const jurosAteQuitar = (payoff.data ?? []).reduce(
     (s, p) => s + Number(p.total_interest_cents),
@@ -415,7 +452,7 @@ export default function DebtsScreen() {
       ) : lista.length > 0 ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <Card style={styles.hero}>
-            <HeroLabel>Total devido</HeroLabel>
+            <HeroLabel>{listFiltersActive(filters) ? 'Total devido · dívidas ativas' : 'Total devido'}</HeroLabel>
             <Money cents={totalDevido} variant="money" tone="danger" />
             {jurosAteQuitar > 0 ? (
               <ThemedText type="small" themeColor="textSecondary">
@@ -445,7 +482,7 @@ export default function DebtsScreen() {
         </Card>
       ) : lista.length > 1 && !payoff.isError ? (
         <Card style={styles.ordem}>
-          <ThemedText type="smallBold">Por onde começar</ThemedText>
+          <ThemedText type="smallBold">{listFiltersActive(filters) ? 'Por onde começar · dívidas ativas' : 'Por onde começar'}</ThemedText>
           <Segmented
             options={[
               { value: 'avalanche', label: 'Juros mais altos' },
@@ -483,21 +520,20 @@ export default function DebtsScreen() {
     </View>
   );
 
-  const listaArquivadas = arquivadas.isError ? [] : (arquivadas.data ?? []);
   const secaoArquivadas = arquivadas.isError ? (
     <ErrorBand message="Não deu para carregar as arquivadas." onRetry={arquivadas.refetch} />
-  ) : listaArquivadas.length > 0 ? (
-      <Section>
-        <Row
+  ) : listaArquivadasFiltrada.length > 0 ? (
+      <Section title={listFiltersActive(filters) ? `Arquivadas · ${listaArquivadasFiltrada.length}` : undefined}>
+        {listFiltersActive(filters) ? null : <Row
           icon="archivebox"
-          title={`Arquivadas · ${listaArquivadas.length}`}
+          title={`Arquivadas · ${listaArquivadasFiltrada.length}`}
           chevron={false}
-          trailing={<Icon name={verArquivadas ? 'chevron.up' : 'chevron.down'} size="sm" color="textSecondary" />}
+          trailing={<Icon name={mostrarArquivadas ? 'chevron.up' : 'chevron.down'} size="sm" color="textSecondary" />}
           onPress={() => setVerArquivadas((v) => !v)}
-          accessibilityState={{ expanded: verArquivadas }}
-        />
-        {verArquivadas
-          ? listaArquivadas.map((d) => (
+          accessibilityState={{ expanded: mostrarArquivadas }}
+        />}
+        {mostrarArquivadas
+          ? listaArquivadasFiltrada.map((d) => (
               <Deslizavel key={d.id} titulo={d.name} acoes={acoesDaArquivada(d)}>
                 <View style={styles.arquivada}>
                   <Row
@@ -519,7 +555,7 @@ export default function DebtsScreen() {
   // (24/09/2026): o vazio grande no meio da tela deixava "Arquivadas · 1" solto num canto.
   const semAtivas = !debts.isLoading && !debts.isError && lista.length === 0;
   const temArquivadas = listaArquivadas.length > 0;
-  const vazio = semAtivas ? (
+  const vazio = semAtivas && !arquivadas.isLoading && !arquivadas.isError && !listFiltersActive(filters) ? (
     <EmptyState
       icon="creditcard.trianglebadge.exclamationmark"
       title={temArquivadas ? 'Nenhuma dívida ativa' : 'Nenhuma dívida cadastrada'}
@@ -533,7 +569,17 @@ export default function DebtsScreen() {
   // pulava para baixo da lista (25/09/2026).
   const debtListContent = debts.isLoading ? null : (
     <View style={styles.paneBody}>
-      {lista.map(cartaoDivida)}
+      {lista.length > 0 || listaArquivadas.length > 0 ? <FilterBar value={filters} selects={filterSelects}
+        dateLabel="Primeiro vencimento" defaultLabel="Todas as dívidas" onPress={() => setFiltersVisible(true)} /> : null}
+      <ListFilters visible={filtersVisible} value={filters} onClose={() => setFiltersVisible(false)} onApply={setFilters}
+        dateLabels={{ from: 'Primeiro vencimento a partir de', to: 'Primeiro vencimento até' }} selects={filterSelects} />
+      {listaFiltrada.map(cartaoDivida)}
+      {!debts.isError && !arquivadas.isLoading && !arquivadas.isError && listFiltersActive(filters)
+        && listaFiltrada.length === 0 && listaArquivadasFiltrada.length === 0 ? (
+        <EmptyState compacto icon="line.3.horizontal.decrease" title="Nenhuma dívida encontrada"
+          hint="Ajuste ou limpe os filtros para ver outras dívidas."
+          action={{ label: 'Limpar filtros', onPress: () => setFilters({}) }} />
+      ) : null}
       {semAtivas && temArquivadas ? secaoArquivadas : null}
       {vazio}
       {semAtivas && temArquivadas ? null : secaoArquivadas}
@@ -664,6 +710,8 @@ export default function DebtsScreen() {
   /** A ficha de UMA dívida — o que era a folha "Amortização", agora a tela dela. */
   const fichaConteudo = (
     <>
+      {detalhe ? <PurchaseDownPayment type="financiamento" parentId={detalhe.id}
+        installmentsCents={detalhe.calculation_mode === 'fixed_installments' ? Number(detalhe.principal_cents) : undefined} /> : null}
       {schedule.isLoading ? (
         <>
           <SkeletonHero />

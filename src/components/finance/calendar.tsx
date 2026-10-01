@@ -127,7 +127,7 @@ export function Calendar({ value, onChange, onMonthChange, min, max }: Props) {
         {passo(1)}
       </View>
 
-      <MudancaSuave valor={mes} style={styles.grade}>
+      <View style={styles.grade}>
       <View style={styles.linha}>
         {SEMANA.map((dia) => (
           <View key={dia} style={styles.inicialDaSemana}>
@@ -167,7 +167,7 @@ export function Calendar({ value, onChange, onMonthChange, min, max }: Props) {
         })}
       </View>
       ))}
-      </MudancaSuave>
+      </View>
     </View>
   );
 }

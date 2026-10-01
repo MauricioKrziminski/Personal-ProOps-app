@@ -465,6 +465,7 @@ function AppTree() {
                     name="finance/lancar"
                     options={modalOptions}
                   />
+                  <Stack.Screen name="finance/down-payment" options={modalOptions} />
                   <Stack.Screen
                     name="reminder-form"
                     options={modalOptions}

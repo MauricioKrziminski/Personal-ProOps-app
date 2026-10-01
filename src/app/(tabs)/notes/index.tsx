@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
-import { Chip } from '@/components/finance/chip';
 import { ColorPicker } from '@/components/notes/color-picker';
 import { FolderGrid } from '@/components/notes/folder-grid';
 import { FolderPicker } from '@/components/notes/folder-picker';
@@ -17,6 +16,8 @@ import { Dica } from '@/components/ui/dica';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Forte } from '@/components/ui/forte';
 import { SearchField } from '@/components/ui/search-field';
+import { FilterBar } from '@/components/ui/filter-bar';
+import { ListFilters, type FilterSelect } from '@/components/ui/list-filters';
 import { BlockHeader } from '@/components/ui/block-header';
 import { TextField } from '@/components/ui/field';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
@@ -55,6 +56,7 @@ import { SORT_LABEL, useNoteSort } from '@/hooks/use-note-sort';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useTheme } from '@/hooks/use-theme';
 import { showItemActions } from '@/lib/item-actions';
+import { listFiltersActive, type ListFiltersValue } from '@/lib/list-filters';
 
 /**
  * O que a barra de abas cobre do pé da rolagem, para a faixa do auto-scroll ficar ALCANÇÁVEL.
@@ -81,7 +83,8 @@ const DOCK = TAB_BAR_SPACE;
  * lista só o que está SOLTO. É a régua do Apple Notes e do Files, e é a única que faz "o que
  * está dentro" e "o que está fora" serem coisas visivelmente diferentes.
  *
- * Os chips de TAG ficaram, porque tag é transversal: ela recorta pasta e nota ao mesmo tempo.
+ * Tag é transversal: recorta pasta e nota ao mesmo tempo. A escolha vive na folha de filtros;
+ * a grade continua sendo navegação, sem uma faixa de chips repetindo o editor (30/09/2026).
  *
  * ⚠️ **Com busca ou tag ativas a lista deixa de se limitar às soltas.** Os dois são modos de
  * ACHAR alguma coisa, e uma busca que esconde metade das notas porque elas estão dentro de uma
@@ -124,6 +127,16 @@ export default function NotesScreen() {
   const [typed, setTyped] = useState('');
   const [q, setQ] = useState('');
   const [tag, setTag] = useState<string | null>(null);
+  const [filters, setFilters] = useState<ListFiltersValue>({});
+  const [filtering, setFiltering] = useState(false);
+  const filterValue: ListFiltersValue = { ...filters, q, selections: { tag: tag ?? '' } };
+  const filtered = listFiltersActive(filterValue);
+  const clearFilters = () => { setFilters({}); setTyped(''); setQ(''); setTag(null); };
+  const openFilters = () => {
+    // Captura a digitação atual antes de montar o rascunho, mesmo se o debounce ainda não rodou.
+    setQ(typed.trim());
+    setFiltering(true);
+  };
   const [sort, setSort] = useNoteSort();
   const [pastasRecolhidas, setPastasRecolhidas] = useBoolPref('notes:pastas-recolhidas');
   const [arrastando, setArrastando] = useState(false);
@@ -160,7 +173,7 @@ export default function NotesScreen() {
     return () => clearTimeout(timer);
   }, [typed]);
 
-  const procurando = !!q || !!tag;
+  const procurando = filtered;
   const [criandoPasta, setCriandoPasta] = useState(false);
 
   const list = useNotesList({
@@ -168,6 +181,8 @@ export default function NotesScreen() {
     ...(procurando ? {} : { folderId: null }),
     ...(tag ? { tag } : {}),
     ...(q ? { q } : {}),
+    from: filters.from,
+    to: filters.to,
     sort,
   });
   const foldersQuery = useNoteFolders();
@@ -189,11 +204,11 @@ export default function NotesScreen() {
   const folderById = useCallback((id: string | null) => folders.find((f) => f.id === id), [folders]);
 
   /**
-   * Os chips somam tag de NOTA e tag de PASTA — o namespace é um só, e é isso que faz um toque
-   * em `#casa` recortar a tela inteira. A contagem de pasta sai em memória porque as pastas já
+   * As opções somam tag de NOTA e tag de PASTA — o namespace é um só, e é isso que faz escolher
+   * `#casa` recortar a tela inteira. A contagem de pasta sai em memória porque as pastas já
    * vieram todas; uma segunda RPC só para contar o que está na mão seria consulta por nada.
    */
-  const chips = useMemo(() => {
+  const tagsDisponiveis = useMemo(() => {
     const mapa = new Map<string, number>();
     for (const t of tagsQuery.data ?? []) mapa.set(t.tag, t.count);
     for (const f of folders) for (const t of f.tags) mapa.set(t, (mapa.get(t) ?? 0) + 1);
@@ -201,11 +216,16 @@ export default function NotesScreen() {
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([nome]) => nome);
   }, [tagsQuery.data, folders]);
+  const filterSelects: readonly FilterSelect[] = [
+    { key: 'tag', label: 'Tag', options: tagsDisponiveis.map((t) => ({ id: t, label: `#${t}` })) },
+  ];
 
   /** A grade mostra só a RAIZ: subpasta aparece dentro da mãe, que é onde ela mora. */
   const pastas = useMemo(
-    () => folders.filter((f) => f.parent_id === null && (!tag || f.tags.includes(tag))),
-    [folders, tag]
+    // Texto e atualização recortam notas, incluindo as que estão em pastas.
+    // A grade de navegação volta quando esse recorte termina.
+    () => q || filters.from || filters.to ? [] : folders.filter((f) => f.parent_id === null && (!tag || f.tags.includes(tag))),
+    [folders, tag, q, filters.from, filters.to]
   );
 
   const fixadas = useMemo(() => notes.filter((n) => n.pinned), [notes]);
@@ -372,7 +392,7 @@ export default function NotesScreen() {
     />
   );
   const semNadaNaAba =
-    !list.isError && !list.isLoading && !q && !tag && pastas.length === 0 && notes.length === 0;
+    !list.isError && !list.isLoading && !procurando && pastas.length === 0 && notes.length === 0;
   const vazio = list.isError ? (
     <EmptyState
       icon="exclamationmark.triangle"
@@ -387,6 +407,13 @@ export default function NotesScreen() {
         <NoteSkeleton key={i} />
       ))}
     </View>
+  ) : listFiltersActive(filters) ? (
+    <EmptyState
+      icon="magnifyingglass"
+      title="Nenhuma nota com esses filtros"
+      action={{ label: 'Limpar filtros', onPress: clearFilters }}
+      compacto
+    />
   ) : q ? (
     <EmptyState
       icon="magnifyingglass"
@@ -518,24 +545,8 @@ export default function NotesScreen() {
           </Pressable>
         </View>
 
-        {chips.length > 0 ? (
-          <ScrollView keyboardShouldPersistTaps="handled"
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            // A faixa SANGRA até as bordas: presa na calha da tela, o primeiro e o último chip
-            // ficariam cortados a 16px da borda em vez de saírem de baixo dela.
-            style={styles.faixaChips}
-            contentContainerStyle={styles.chips}>
-            {chips.map((t) => (
-              <Chip
-                key={t}
-                label={`#${t}`}
-                selected={tag === t}
-                onPress={() => setTag(tag === t ? null : t)}
-              />
-            ))}
-          </ScrollView>
-        ) : null}
+        <FilterBar value={filterValue} selects={filterSelects} dateLabel="Atualização"
+          defaultLabel="Notas soltas" onPress={openFilters} />
         </View>
 
         {pastas.length > 0 ? (
@@ -680,6 +691,15 @@ export default function NotesScreen() {
       }>
       {biblioteca}
 
+      <ListFilters visible={filtering} value={filterValue} showSearch={false}
+        onClose={() => setFiltering(false)} onApply={(value) => {
+          setFilters({ from: value.from, to: value.to });
+          const term = value.q?.trim() ?? '';
+          setTyped(term); setQ(term);
+          setTag(value.selections?.tag || null);
+        }} dateLabels={{ from: 'Atualização a partir de', to: 'Atualização até' }}
+        selects={filterSelects} />
+
       <NovaPastaSheet visible={criandoPasta} onClose={() => setCriandoPasta(false)} pastas={folders} />
       <NovaPastaSheet
         key={renomeandoPasta?.id ?? 'renomear'}
@@ -764,7 +784,7 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
   },
-  /** Captura, busca e chips são UM grupo — `md` entre eles, `xl` só até o próximo bloco (§2). */
+  /** Captura e filtros são um grupo — `md` entre eles, `xl` só até o próximo bloco (§2). */
   grupoDeEntrada: { gap: Space.md, paddingTop: Space.md },
   captura: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   enviar: {
@@ -775,8 +795,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
     borderCurve: 'continuous',
   },
-  faixaChips: { marginHorizontal: -Space.lg },
-  chips: { gap: Space.sm, paddingHorizontal: Space.lg },
   cresce: { flex: 1 },
   esqueleto: { gap: Space.sm, paddingVertical: Space.lg },
 });

@@ -1,0 +1,91 @@
+(node:7217) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/finance-query-filters.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ transactions combinam valor inclusivo, conta recebida e busca no servidor em todas as paginas (190.950167ms)
+✔ transactions maximo zero e sem conta nao viram ausencia de filtro; limpar recorte retira limites (123.366542ms)
+✖ transactions com uma borda mantêm o outro lado aberto em todas as páginas (69.694708ms)
+✔ previsoes de janela longa repartem todos os dias em blocos disjuntos de ate 62 dias (70.011667ms)
+✔ previsoes com mais de 1000 linhas buscam paginas seguintes sem perda nem duplicacao (59.792792ms)
+✔ falha apos um lote de previsoes rejeita periodo completo e nao devolve resultado parcial (77.174667ms)
+✔ cancelamento de previsoes chega ao fetch e rejeita consulta inteira (59.458666ms)
+✔ accounts paginam alem de 1000 e incluem apenas arquivada selecionada quando nao pedidas todas (60.85175ms)
+✔ accounts distinguem lista ativa, conta selecionada e todas arquivadas na consulta/cache (62.9205ms)
+✔ importacoes combinam datas locais, arquivo, conta e origem antes de limitar historico (56.63ms)
+✔ importacoes com sem conta, OFX e datas abertas aplicam so as bordas escolhidas (55.663125ms)
+✔ importacoes conservam placeholder ao ver mais somente se o recorte anterior e igual (56.315708ms)
+✔ erro remoto de importacao rejeita consulta; retry preserva recorte completo (55.119125ms)
+(node:7218) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/list-filters-ui.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ busca preserva nomes e termos digitados sem autocorreção do teclado (52.206917ms)
+✖ significado da data fica no rótulo de cada input, sem título de seção duplicado (15.670833ms)
+✔ digitar modifica somente draft; Aplicar publica um payload e fecha depois (15.030084ms)
+✔ Sheet: fechar/voltar cancela e reabrir remonta draft do valor publicado (12.229625ms)
+✔ TaskHeader: fechar/voltar cancela e reabrir remonta draft do valor publicado (17.724709ms)
+✔ Limpar zera busca, datas, valores e selecoes mas somente Aplicar publica a limpeza (13.415ms)
+✔ Voltar ao mês remove somente o intervalo e exige Aplicar; cancelar preserva o recorte publicado (15.757208ms)
+✔ ícone único limpa datas em listas com bordas independentes sem alterar seleções (37.52675ms)
+✔ data impossivel: erro inline desabilita Aplicar e o handler tambem recusa (13.126625ms)
+✔ ordem das datas: erro inline desabilita Aplicar e o handler tambem recusa (13.741833ms)
+✔ par incompleto: erro inline desabilita Aplicar e o handler tambem recusa (13.260208ms)
+✔ minimo acima do maximo: erro inline desabilita Aplicar e o handler tambem recusa (13.407959ms)
+✔ valor negativo: erro inline desabilita Aplicar e o handler tambem recusa (13.205792ms)
+✔ centavos fracionarios: erro inline desabilita Aplicar e o handler tambem recusa (8.189ms)
+✔ data invalida digitada atualiza validacao sem publicar o draft (12.799666ms)
+✔ minimo/maximo zero e intervalo do mesmo dia sao validos e publicados (14.215167ms)
+✔ selecao null remove so a chave escolhida e preserva objeto original/conjunto de opcoes (10.8635ms)
+✔ cabecalho fica presente e SheetScroll e o ultimo filho da folha (15.266208ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 29
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1231.923292
+
+✖ failing tests:
+
+test at src/lib/finance-query-filters.test.ts:120:1
+✖ transactions com uma borda mantêm o outro lado aberto em todas as páginas (69.694708ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      'gte.2026-09-01',
+  +   'lte.undefined'
+    ]
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/finance-query-filters.test.ts:130:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'gte.2026-09-01', 'lte.undefined' ],
+    expected: [ 'gte.2026-09-01' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/list-filters-ui.test.ts:137:1
+✖ significado da data fica no rótulo de cada input, sem título de seção duplicado (15.670833ms)
+  AssertionError [ERR_ASSERTION]: nao achei Field {"label":"Lançamento a partir de"}
+      at Object.node (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/list-filters-ui.test.ts:104:12)
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/list-filters-ui.test.ts:139:15)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

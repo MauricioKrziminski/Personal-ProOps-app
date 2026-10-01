@@ -6,6 +6,7 @@
  * `auth.uid()` no banco.
  */
 import type { Debt, TransactionInput } from '@/hooks/use-finance';
+import type { DownPaymentInput } from './down-payment.ts';
 
 export const DESCRICAO_JUROS_DO_PIX = 'Juros do Pix no crédito';
 
@@ -20,6 +21,7 @@ export type EntradaParcelada = {
   category: string | null;
   merchant: string | null;
   lastDay?: boolean;
+  downPayment?: DownPaymentInput;
 };
 export type EntradaRecorrente = {
   kind: 'expense' | 'income';
@@ -46,6 +48,7 @@ export type EntradaFinanciamento = {
   account_id: string | null;
   due_day: number | null;
   first_due_date?: string | null;
+  down_payment?: DownPaymentInput;
 };
 
 /**

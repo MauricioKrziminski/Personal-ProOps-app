@@ -1,0 +1,392 @@
+[
+  {
+    "AXValue": null,
+    "traits": [
+      "None"
+    ],
+    "role_description": "application",
+    "content_required": false,
+    "subrole": null,
+    "custom_actions": [],
+    "frame": {
+      "width": 402,
+      "x": 0,
+      "height": 874,
+      "y": 0
+    },
+    "AXUniqueId": null,
+    "AXFrame": "{{0, 0}, {402, 874}}",
+    "AXLabel": "ProOps",
+    "enabled": true,
+    "help": null,
+    "role": "AXApplication",
+    "type": "Application",
+    "pid": 20004,
+    "title": null
+  },
+  {
+    "content_required": false,
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "AXLabel": "Fechar",
+    "role": "AXButton",
+    "enabled": true,
+    "AXFrame": "{{16, 88}, {32, 32}}",
+    "help": null,
+    "custom_actions": [],
+    "subrole": null,
+    "AXValue": null,
+    "pid": 20004,
+    "title": null,
+    "AXUniqueId": null,
+    "frame": {
+      "x": 16,
+      "height": 32,
+      "y": 88,
+      "width": 32
+    },
+    "role_description": "button",
+    "type": "Button"
+  },
+  {
+    "title": null,
+    "AXUniqueId": null,
+    "role": "AXStaticText",
+    "content_required": false,
+    "AXFrame": "{{60, 92}, {241.66665649414062, 24}}",
+    "enabled": true,
+    "role_description": "text",
+    "AXValue": null,
+    "help": null,
+    "AXLabel": "Filtros",
+    "pid": 20004,
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "type": "StaticText",
+    "frame": {
+      "height": 24,
+      "y": 92,
+      "width": 241.66665649414062,
+      "x": 60
+    },
+    "subrole": null,
+    "custom_actions": []
+  },
+  {
+    "type": "Button",
+    "frame": {
+      "y": 86,
+      "x": 313.6666564941406,
+      "width": 72.33334350585938,
+      "height": 36
+    },
+    "AXUniqueId": null,
+    "title": null,
+    "role": "AXButton",
+    "AXFrame": "{{313.66665649414062, 86}, {72.333343505859375, 36}}",
+    "AXLabel": "Aplicar",
+    "help": null,
+    "custom_actions": [],
+    "content_required": false,
+    "role_description": "button",
+    "enabled": true,
+    "AXValue": null,
+    "subrole": null,
+    "pid": 20004,
+    "traits": [
+      "Button",
+      "Scrollable"
+    ]
+  },
+  {
+    "help": null,
+    "AXLabel": "Limpar filtros",
+    "title": null,
+    "AXUniqueId": null,
+    "pid": 20004,
+    "custom_actions": [],
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "role_description": "link",
+    "enabled": true,
+    "AXFrame": "{{16, 150}, {106.66666412353516, 36}}",
+    "subrole": null,
+    "frame": {
+      "y": 150,
+      "width": 106.66666412353516,
+      "height": 36,
+      "x": 16
+    },
+    "content_required": false,
+    "AXValue": null,
+    "role": "AXLink",
+    "type": "Link"
+  },
+  {
+    "title": null,
+    "AXValue": null,
+    "pid": 20004,
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "subrole": null,
+    "custom_actions": [],
+    "frame": {
+      "x": 16,
+      "height": 18,
+      "width": 370,
+      "y": 210
+    },
+    "AXLabel": "Buscar",
+    "role": "AXStaticText",
+    "help": null,
+    "content_required": false,
+    "type": "StaticText",
+    "enabled": true,
+    "role_description": "text",
+    "AXFrame": "{{16, 210}, {370, 18}}",
+    "AXUniqueId": null
+  },
+  {
+    "enabled": true,
+    "type": "TextField",
+    "title": null,
+    "content_required": false,
+    "AXFrame": "{{17, 235}, {368, 50}}",
+    "traits": [
+      "TextEntry",
+      "Scrollable",
+      "TextOperationsAvailable"
+    ],
+    "frame": {
+      "width": 368,
+      "height": 50,
+      "y": 235,
+      "x": 17
+    },
+    "help": null,
+    "custom_actions": [],
+    "AXLabel": "Texto do filtro",
+    "AXValue": "Buscar por texto",
+    "role": "AXTextField",
+    "subrole": null,
+    "pid": 20004,
+    "AXUniqueId": null,
+    "role_description": "text field"
+  },
+  {
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "role": "AXStaticText",
+    "AXValue": null,
+    "title": null,
+    "AXFrame": "{{16, 312}, {322, 18}}",
+    "content_required": false,
+    "AXLabel": "Importação a partir de",
+    "custom_actions": [],
+    "pid": 20004,
+    "enabled": true,
+    "AXUniqueId": null,
+    "role_description": "text",
+    "frame": {
+      "width": 322,
+      "x": 16,
+      "y": 312,
+      "height": 18
+    },
+    "type": "StaticText",
+    "help": null,
+    "subrole": null
+  },
+  {
+    "frame": {
+      "y": 357,
+      "width": 368,
+      "x": 17,
+      "height": 48
+    },
+    "AXUniqueId": null,
+    "pid": 20004,
+    "AXFrame": "{{17, 357}, {368, 48}}",
+    "help": "Toque para escolher no calendário",
+    "role_description": "button",
+    "role": "AXButton",
+    "custom_actions": [],
+    "title": null,
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "content_required": false,
+    "enabled": true,
+    "AXLabel": "Importação a partir de",
+    "type": "Button",
+    "subrole": null,
+    "AXValue": "Escolher data"
+  },
+  {
+    "AXUniqueId": null,
+    "subrole": null,
+    "AXValue": null,
+    "AXFrame": "{{16, 422}, {370, 18}}",
+    "enabled": true,
+    "type": "StaticText",
+    "content_required": false,
+    "role_description": "text",
+    "help": null,
+    "frame": {
+      "x": 16,
+      "width": 370,
+      "y": 422,
+      "height": 18
+    },
+    "title": null,
+    "AXLabel": "Importação até",
+    "custom_actions": [],
+    "pid": 20004,
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "role": "AXStaticText"
+  },
+  {
+    "type": "Link",
+    "custom_actions": [],
+    "help": "Toque para escolher no calendário",
+    "subrole": null,
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "pid": 20004,
+    "role_description": "link",
+    "AXUniqueId": null,
+    "role": "AXLink",
+    "title": null,
+    "AXLabel": "Importação até",
+    "frame": {
+      "width": 368,
+      "y": 449,
+      "x": 17,
+      "height": 48
+    },
+    "AXValue": "Escolher data",
+    "AXFrame": "{{17, 449}, {368, 48}}",
+    "enabled": true,
+    "content_required": false
+  },
+  {
+    "type": "StaticText",
+    "title": null,
+    "AXFrame": "{{16, 522}, {370, 18}}",
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "enabled": true,
+    "frame": {
+      "y": 522,
+      "x": 16,
+      "width": 370,
+      "height": 18
+    },
+    "AXValue": null,
+    "subrole": null,
+    "help": null,
+    "content_required": false,
+    "pid": 20004,
+    "role": "AXStaticText",
+    "AXUniqueId": null,
+    "custom_actions": [],
+    "role_description": "text",
+    "AXLabel": "Formato"
+  },
+  {
+    "AXUniqueId": null,
+    "title": null,
+    "AXFrame": "{{16.333333343267441, 548.33333334326744}, {369.33331298828125, 59.999969482421875}}",
+    "AXLabel": "Todos",
+    "pid": 20004,
+    "subrole": null,
+    "AXValue": null,
+    "type": "Link",
+    "frame": {
+      "y": 548.3333333432674,
+      "height": 59.999969482421875,
+      "x": 16.33333334326744,
+      "width": 369.33331298828125
+    },
+    "custom_actions": [],
+    "role": "AXLink",
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "content_required": false,
+    "help": "Toque para escolher",
+    "role_description": "link",
+    "enabled": true
+  },
+  {
+    "type": "StaticText",
+    "AXValue": null,
+    "role": "AXStaticText",
+    "AXUniqueId": null,
+    "AXFrame": "{{16, 632.66665649414062}, {370, 18}}",
+    "subrole": null,
+    "AXLabel": "Conta ou cartão",
+    "title": null,
+    "custom_actions": [],
+    "role_description": "text",
+    "pid": 20004,
+    "frame": {
+      "y": 632.6666564941406,
+      "width": 370,
+      "height": 18,
+      "x": 16
+    },
+    "traits": [
+      "Scrollable",
+      "StaticText"
+    ],
+    "help": null,
+    "enabled": true,
+    "content_required": false
+  },
+  {
+    "AXValue": null,
+    "frame": {
+      "x": 16.33333334326744,
+      "height": 60,
+      "width": 369.33331298828125,
+      "y": 658.9999898374081
+    },
+    "custom_actions": [],
+    "pid": 20004,
+    "content_required": false,
+    "title": null,
+    "help": "Toque para escolher",
+    "enabled": true,
+    "AXLabel": "Todos",
+    "AXUniqueId": null,
+    "type": "Button",
+    "role": "AXButton",
+    "AXFrame": "{{16.333333343267441, 658.99998983740807}, {369.33331298828125, 60}}",
+    "subrole": null,
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "role_description": "button"
+  }
+]

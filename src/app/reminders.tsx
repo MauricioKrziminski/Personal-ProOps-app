@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 
@@ -7,6 +8,8 @@ import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Deslizavel } from '@/components/ui/deslizavel';
 import { VerMais } from '@/components/ui/ver-mais';
 import { EmptyState } from '@/components/ui/empty-state';
+import { FilterBar } from '@/components/ui/filter-bar';
+import { ListFilters, type FilterSelect } from '@/components/ui/list-filters';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonRow } from '@/components/ui/skeleton';
@@ -22,6 +25,12 @@ import {
 } from '@/hooks/use-items';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { describeRRule } from '@/lib/rrule-text';
+import { listFiltersActive, type ListFiltersValue } from '@/lib/list-filters';
+
+const filterSelects: readonly FilterSelect[] = [
+  { key: 'status', label: 'Estado', options: [{ id: 'active', label: 'Ativos' }, { id: 'paused', label: 'Pausados' }] },
+  { key: 'channel', label: 'Canal', options: [{ id: 'push', label: 'Notificação' }, { id: 'whatsapp', label: 'WhatsApp' }, { id: 'both', label: 'Notificação e WhatsApp' }] },
+];
 
 /**
  * Lista completa de lembretes.
@@ -32,7 +41,16 @@ import { describeRRule } from '@/lib/rrule-text';
 export default function RemindersScreen() {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
-  const { data, isLoading, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } = useReminders();
+  const [filters, setFilters] = useState<ListFiltersValue>({});
+  const [filtering, setFiltering] = useState(false);
+  const filtered = listFiltersActive(filters);
+  const status = filters.selections?.status;
+  const channel = filters.selections?.channel;
+  const { data, isLoading, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } = useReminders({
+    from: filters.from, to: filters.to, q: filters.q,
+    active: status ? status === 'active' : undefined,
+    channel: channel === 'push' || channel === 'whatsapp' || channel === 'both' ? channel : undefined,
+  });
   const toggle = useToggleReminder();
   const remove = useDeleteReminder();
   const toast = useToast();
@@ -113,7 +131,7 @@ export default function RemindersScreen() {
     ) : null;
   // Só pausados: eles vêm primeiro e o vazio vira uma linha embaixo (24/09/2026).
   const semAtivos =
-    !isLoading && !isError && reminders.length > 0 && active.length === 0 ? (
+    !filtered && !isLoading && !isError && reminders.length > 0 && active.length === 0 ? (
       <EmptyState
         icon="bell"
         title="Nenhum lembrete ativo"
@@ -126,12 +144,6 @@ export default function RemindersScreen() {
       {activeSection}
       {pausedSection}
       {semAtivos}
-      {/* O servidor manda 20 por vez; o resto vem pelo toque. */}
-      <VerMais
-        restantes={hasNextPage ? null : 0}
-        carregando={isFetchingNextPage}
-        onPress={() => void fetchNextPage()}
-      />
     </>
   );
 
@@ -142,6 +154,9 @@ export default function RemindersScreen() {
           title: 'Lembretes',
         }}
       />
+
+      <FilterBar value={filters} selects={filterSelects} dateLabel="Próxima execução"
+        defaultLabel="Todos os lembretes" onPress={() => setFiltering(true)} />
 
       {/* Criar é `+` no header, como em Contas, Cartões, Orçamentos, Metas, Dívidas, Recorrentes
           e Regras. Aqui era um botão de bloco no CORPO, e esta era a única tela de lista do app
@@ -173,14 +188,23 @@ export default function RemindersScreen() {
         list
       )}
 
+      {/* Fora dos painéis: continua acessível no tablet com ativos e pausados lado a lado. */}
+      <VerMais
+        restantes={hasNextPage ? null : 0}
+        carregando={isFetchingNextPage}
+        onPress={() => void fetchNextPage()}
+      />
+
       {!isLoading && !isError && reminders.length === 0 ? (
         <EmptyState
           icon="bell"
-          title="Nenhum lembrete ainda"
-          hint={'Manda *me lembra de pagar o aluguel dia 5*\nno WhatsApp — ou crie um aqui.'}
-          action={{ label: 'Novo lembrete', onPress: () => router.push('/reminder-form') }}
+          title={filtered ? 'Nenhum lembrete com esses filtros' : 'Nenhum lembrete ainda'}
+          hint={filtered ? 'Ajuste os filtros para encontrar outros lembretes.' : 'Manda *me lembra de pagar o aluguel dia 5*\nno WhatsApp — ou crie um aqui.'}
+          action={filtered ? { label: 'Limpar filtros', onPress: () => setFilters({}) } : { label: 'Novo lembrete', onPress: () => router.push('/reminder-form') }}
         />
       ) : null}
+      <ListFilters visible={filtering} value={filters} onClose={() => setFiltering(false)} onApply={setFilters}
+        dateLabels={{ from: 'Próxima execução a partir de', to: 'Próxima execução até' }} selects={filterSelects} />
     </Screen>
   );
 }

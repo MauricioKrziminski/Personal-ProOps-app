@@ -83,6 +83,27 @@ export function accountLabel(
     : `${account.name} · ${tipo}`;
 }
 
+/** Opções de conta com o mesmo tipo, glifo e agrupamento em formulários e filtros. */
+export function accountSelectOptions(accounts: readonly {
+  id: string; name: string; type?: string | null; closing_day?: number | null; archived?: boolean;
+}[], emptyLabel?: string, emptyId: string | null = null) {
+  const contas = accounts.filter(a => a.type !== 'credit_card');
+  const cartoes = accounts.filter(a => a.type === 'credit_card');
+  const agrupado = contas.length > 0 && cartoes.length > 0;
+  const option = (a: typeof accounts[number]) => {
+    const tipo = accountTypeLabel(a);
+    return { id: a.id, label: a.name,
+      meta: a.archived ? `${tipo} · arquivada` : a.type === 'credit_card' && a.closing_day ? `${tipo} · fecha dia ${a.closing_day}` : tipo,
+      icon: ACCOUNT_TYPES.find(t => t.value === a.type)?.icon ?? 'building.columns',
+      group: agrupado ? a.type === 'credit_card' ? 'CARTÕES' : 'CONTAS' : undefined,
+    } as const;
+  };
+  return [
+    ...(emptyLabel ? [{ id: emptyId, label: emptyLabel, icon: 'minus' as const, neutral: true }] : []),
+    ...contas.map(option), ...cartoes.map(option),
+  ];
+}
+
 /**
  * O saldo de UMA conta, na régua da tela Contas — a mesma função nas duas telas.
  *

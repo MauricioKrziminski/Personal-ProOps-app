@@ -27,6 +27,8 @@ interface ExpectedFilters {
   source?: 'whatsapp' | 'app' | 'import' | 'recurring';
   recurringId?: string;
   q?: string;
+  minCents?: number;
+  maxCents?: number;
 }
 
 /** Keep the separate prediction block in step with the ledger's filters. */
@@ -42,6 +44,8 @@ export function filterExpectedLines<T extends ExpectedLedgerLine>(
     if (filters.accountId !== undefined && line.account_id !== filters.accountId) return false;
     if (filters.source && (filters.source !== 'recurring' || line.origin !== 'recurring')) return false;
     if (filters.recurringId && (line.origin !== 'recurring' || line.ref_id !== filters.recurringId)) return false;
+    if (filters.minCents !== undefined && line.amount_cents < filters.minCents) return false;
+    if (filters.maxCents !== undefined && line.amount_cents > filters.maxCents) return false;
     if (term && !`${line.description} ${line.category ?? ''}`.toLocaleLowerCase('pt-BR').includes(term)) return false;
     return true;
   }).sort((a, b) => a.due_date.localeCompare(b.due_date)

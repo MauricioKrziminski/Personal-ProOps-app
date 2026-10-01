@@ -1,0 +1,132 @@
+[
+  {
+    "custom_actions": [],
+    "content_required": false,
+    "type": "Link",
+    "AXFrame": "{{313.66665649414062, 86}, {72.333343505859375, 36}}",
+    "frame": {
+      "y": 86,
+      "height": 36,
+      "x": 313.6666564941406,
+      "width": 72.33334350585938
+    },
+    "enabled": true,
+    "AXLabel": "Aplicar",
+    "help": null,
+    "role": "AXLink",
+    "subrole": null,
+    "AXValue": null,
+    "role_description": "link",
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "AXUniqueId": null,
+    "title": null,
+    "pid": 92690
+  },
+  {
+    "subrole": null,
+    "content_required": false,
+    "type": "StaticText",
+    "AXUniqueId": null,
+    "role": "AXStaticText",
+    "title": null,
+    "AXLabel": "Primeiro vencimento a partir de",
+    "AXFrame": "{{16, 321}, {322, 18}}",
+    "frame": {
+      "width": 322,
+      "y": 321,
+      "height": 18,
+      "x": 16
+    },
+    "custom_actions": [],
+    "AXValue": null,
+    "enabled": true,
+    "role_description": "text",
+    "pid": 92690,
+    "help": null,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ]
+  },
+  {
+    "AXFrame": "{{17, 356}, {368, 48}}",
+    "role": "AXLink",
+    "help": "Toque para escolher no calendário",
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "enabled": true,
+    "AXValue": "Escolher data",
+    "custom_actions": [],
+    "pid": 92690,
+    "AXUniqueId": null,
+    "subrole": null,
+    "title": null,
+    "AXLabel": "Primeiro vencimento a partir de",
+    "frame": {
+      "width": 368,
+      "height": 48,
+      "y": 356,
+      "x": 17
+    },
+    "type": "Link",
+    "role_description": "link",
+    "content_required": false
+  },
+  {
+    "content_required": false,
+    "frame": {
+      "y": 421,
+      "width": 370,
+      "height": 18,
+      "x": 16
+    },
+    "AXUniqueId": null,
+    "help": null,
+    "subrole": null,
+    "enabled": true,
+    "role_description": "text",
+    "AXValue": null,
+    "role": "AXStaticText",
+    "AXLabel": "Primeiro vencimento até",
+    "type": "StaticText",
+    "title": null,
+    "AXFrame": "{{16, 421}, {370, 18}}",
+    "custom_actions": [],
+    "pid": 92690,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ]
+  },
+  {
+    "subrole": null,
+    "AXLabel": "Primeiro vencimento até",
+    "title": null,
+    "type": "Button",
+    "AXFrame": "{{17, 456}, {368, 48}}",
+    "pid": 92690,
+    "role": "AXButton",
+    "AXUniqueId": null,
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "role_description": "button",
+    "content_required": false,
+    "help": "Toque para escolher no calendário",
+    "AXValue": "Escolher data",
+    "enabled": true,
+    "frame": {
+      "height": 48,
+      "y": 456,
+      "width": 368,
+      "x": 17
+    },
+    "custom_actions": []
+  }
+]

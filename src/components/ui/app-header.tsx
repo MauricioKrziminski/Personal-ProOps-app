@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Contador } from '@/components/ui/contador';
+import { PressableScale } from '@/components/motion/pressable-scale';
 import { Icon } from '@/components/ui/icon';
 import { Mark } from '@/components/ui/mark';
 import { Fonts } from '@/constants/theme';
@@ -172,11 +173,13 @@ export function AppHeader({ title, action }: AppHeaderProps) {
 export function HeaderIconButton({
   icon,
   label,
+  hint,
   onPress,
   contagem = 0,
 }: {
   icon: React.ComponentProps<typeof Icon>['name'];
   label: string;
+  hint?: string;
   onPress: () => void;
   /** Quantos esperam do outro lado (o sino: alertas não lidos). O MESMO selo da aba (`Contador`). */
   contagem?: number;
@@ -185,16 +188,18 @@ export function HeaderIconButton({
   const vidro = supportsLiquidGlass();
 
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={contagem ? `${label}, ${contagem} ${contagem === 1 ? 'não lido' : 'não lidos'}` : label}
+      accessibilityHint={hint}
+      haptic="selection"
       hitSlop={Space.sm}
       onPress={onPress}
       style={[styles.tile, { backgroundColor: vidro ? 'transparent' : theme.backgroundElement }]}>
       {vidro ? <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} /> : null}
       <Icon name={icon} size="md" color="text" />
       <Contador valor={contagem} borda={theme.background} style={styles.contador} />
-    </Pressable>
+    </PressableScale>
   );
 }
 

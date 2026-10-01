@@ -1,0 +1,3031 @@
+[
+  {
+    "enabled": true,
+    "role_description": "application",
+    "AXValue": null,
+    "AXLabel": "ProOps",
+    "content_required": false,
+    "custom_actions": [],
+    "traits": [
+      "None"
+    ],
+    "role": "AXApplication",
+    "help": null,
+    "frame": {
+      "x": 0,
+      "height": 874,
+      "y": 0,
+      "width": 402
+    },
+    "subrole": null,
+    "AXUniqueId": null,
+    "type": "Application",
+    "pid": 92690,
+    "AXFrame": "{{0, 0}, {402, 874}}",
+    "title": null
+  },
+  {
+    "enabled": true,
+    "title": null,
+    "AXLabel": null,
+    "role_description": "Nav bar",
+    "frame": {
+      "width": 402,
+      "y": 62,
+      "height": 194,
+      "x": 0
+    },
+    "custom_actions": [],
+    "content_required": false,
+    "subrole": null,
+    "pid": 92690,
+    "role": "AXGroup",
+    "type": "Group",
+    "AXFrame": "{{0, 62}, {402, 194}}",
+    "AXValue": null,
+    "traits": [
+      "Scrollable"
+    ],
+    "help": null,
+    "AXUniqueId": "Lançamentos"
+  },
+  {
+    "role": "AXStaticText",
+    "AXLabel": "Período: A partir de 01/09/2026",
+    "frame": {
+      "width": 370,
+      "height": 136,
+      "y": -206.66666666666666,
+      "x": 16
+    },
+    "custom_actions": [],
+    "help": null,
+    "role_description": "text",
+    "content_required": false,
+    "title": null,
+    "AXUniqueId": null,
+    "type": "StaticText",
+    "AXValue": null,
+    "subrole": null,
+    "pid": 92690,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "AXFrame": "{{16, -206.66666666666666}, {370, 136}}",
+    "enabled": true
+  },
+  {
+    "subrole": null,
+    "role": "AXButton",
+    "pid": 92690,
+    "AXFrame": "{{16, -58.666666666666657}, {228, 73.333328247070312}}",
+    "frame": {
+      "width": 228,
+      "x": 16,
+      "height": 73.33332824707031,
+      "y": -58.66666666666666
+    },
+    "AXLabel": "Filtros · 1",
+    "AXValue": null,
+    "help": null,
+    "title": null,
+    "custom_actions": [],
+    "enabled": true,
+    "AXUniqueId": null,
+    "content_required": false,
+    "traits": [
+      "Button",
+      "Scrollable"
+    ],
+    "type": "Button",
+    "role_description": "button"
+  },
+  {
+    "frame": {
+      "y": 30.666661580403655,
+      "x": 16,
+      "width": 370,
+      "height": 321.66668701171875
+    },
+    "content_required": false,
+    "help": null,
+    "AXUniqueId": null,
+    "subrole": null,
+    "role_description": "text",
+    "enabled": true,
+    "AXValue": null,
+    "role": "AXStaticText",
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "AXFrame": "{{16, 30.666661580403655}, {370, 321.66668701171875}}",
+    "pid": 92690,
+    "custom_actions": [],
+    "type": "StaticText",
+    "title": null,
+    "AXLabel": "Lançamentos registrados. Escolha as duas datas para incluir previsões."
+  },
+  {
+    "help": null,
+    "type": "Heading",
+    "subrole": null,
+    "role_description": "heading",
+    "content_required": false,
+    "AXUniqueId": null,
+    "AXFrame": "{{16, 384.33333333333337}, {370, 136}}",
+    "frame": {
+      "x": 16,
+      "height": 136,
+      "width": 370,
+      "y": 384.33333333333337
+    },
+    "pid": 92690,
+    "custom_actions": [],
+    "title": null,
+    "role": "AXHeading",
+    "enabled": true,
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "AXLabel": "dom., 01/08/2027",
+    "AXValue": null
+  },
+  {
+    "title": null,
+    "AXLabel": "−R$ 780,00",
+    "custom_actions": [],
+    "help": null,
+    "frame": {
+      "y": 532.3333333333334,
+      "x": 138.33333587646484,
+      "width": 247.6666717529297,
+      "height": 64.33331298828125
+    },
+    "AXUniqueId": null,
+    "AXValue": null,
+    "type": "StaticText",
+    "pid": 92690,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "subrole": null,
+    "role_description": "text",
+    "role": "AXStaticText",
+    "enabled": true,
+    "AXFrame": "{{138.33333587646484, 532.33333333333337}, {247.66667175292969, 64.33331298828125}}",
+    "content_required": false
+  },
+  {
+    "type": "Link",
+    "role_description": "link",
+    "pid": 92690,
+    "AXValue": null,
+    "title": null,
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "AXLabel": "macbook (12/12), R$ 780,00, despesa, dom., 01/08/2027, previsto",
+    "frame": {
+      "height": 627.0000610351564,
+      "y": 608.6666463216146,
+      "width": 370,
+      "x": 16
+    },
+    "AXFrame": "{{16, 608.66664632161462}, {370, 627.00006103515636}}",
+    "role": "AXLink",
+    "AXUniqueId": null,
+    "enabled": true,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "help": null,
+    "subrole": null,
+    "content_required": false
+  },
+  {
+    "enabled": true,
+    "custom_actions": [],
+    "role": "AXHeading",
+    "role_description": "heading",
+    "title": null,
+    "type": "Heading",
+    "AXUniqueId": null,
+    "AXValue": null,
+    "content_required": false,
+    "AXFrame": "{{16, 1251.6667073567708}, {370, 136}}",
+    "AXLabel": "qui., 01/07/2027",
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "pid": 92690,
+    "help": null,
+    "subrole": null,
+    "frame": {
+      "width": 370,
+      "height": 136,
+      "y": 1251.6667073567708,
+      "x": 16
+    }
+  },
+  {
+    "AXLabel": "−R$ 780,00",
+    "AXValue": null,
+    "content_required": false,
+    "role": "AXStaticText",
+    "type": "StaticText",
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "role_description": "text",
+    "AXUniqueId": null,
+    "enabled": true,
+    "AXFrame": "{{138.33333587646484, 1399.6667073567708}, {247.66667175292969, 64.333251953125}}",
+    "custom_actions": [],
+    "frame": {
+      "width": 247.6666717529297,
+      "y": 1399.6667073567708,
+      "x": 138.33333587646484,
+      "height": 64.333251953125
+    },
+    "pid": 92690,
+    "help": null,
+    "subrole": null,
+    "title": null
+  },
+  {
+    "AXLabel": "macbook (11/12), R$ 780,00, despesa, qui., 01/07/2027, previsto",
+    "enabled": true,
+    "title": null,
+    "help": null,
+    "AXUniqueId": null,
+    "AXValue": null,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "pid": 92690,
+    "role": "AXLink",
+    "content_required": false,
+    "frame": {
+      "x": 16,
+      "height": 627.0001220703123,
+      "width": 370,
+      "y": 1475.9999593098958
+    },
+    "AXFrame": "{{16, 1475.9999593098958}, {370, 627.00012207031227}}",
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "role_description": "link",
+    "type": "Link",
+    "subrole": null
+  },
+  {
+    "enabled": true,
+    "frame": {
+      "y": 2119.0000813802085,
+      "width": 370,
+      "height": 136,
+      "x": 16
+    },
+    "content_required": false,
+    "AXUniqueId": null,
+    "title": null,
+    "role_description": "heading",
+    "pid": 92690,
+    "AXValue": null,
+    "role": "AXHeading",
+    "type": "Heading",
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "subrole": null,
+    "help": null,
+    "custom_actions": [],
+    "AXLabel": "qua., 02/06/2027",
+    "AXFrame": "{{16, 2119.0000813802085}, {370, 136}}"
+  },
+  {
+    "role": "AXStaticText",
+    "custom_actions": [],
+    "AXUniqueId": null,
+    "type": "StaticText",
+    "AXValue": null,
+    "pid": 92690,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "AXLabel": "−R$ 300,00",
+    "frame": {
+      "y": 2267.0000813802085,
+      "width": 247.6666717529297,
+      "x": 138.33333587646484,
+      "height": 64.333251953125
+    },
+    "title": null,
+    "subrole": null,
+    "content_required": false,
+    "AXFrame": "{{138.33333587646484, 2267.0000813802085}, {247.66667175292969, 64.333251953125}}",
+    "enabled": true,
+    "help": null,
+    "role_description": "text"
+  },
+  {
+    "subrole": null,
+    "help": null,
+    "enabled": true,
+    "AXLabel": "tv (10/10), R$ 300,00, despesa, qua., 02/06/2027, previsto",
+    "frame": {
+      "y": 2343.3333333333335,
+      "width": 370,
+      "x": 16,
+      "height": 545
+    },
+    "role": "AXLink",
+    "AXValue": null,
+    "role_description": "link",
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "title": null,
+    "AXUniqueId": null,
+    "AXFrame": "{{16, 2343.3333333333335}, {370, 545}}",
+    "type": "Link",
+    "content_required": false,
+    "pid": 92690
+  },
+  {
+    "frame": {
+      "width": 370,
+      "y": 2904.3333333333335,
+      "height": 136,
+      "x": 16
+    },
+    "AXUniqueId": null,
+    "title": null,
+    "custom_actions": [],
+    "type": "Heading",
+    "help": null,
+    "enabled": true,
+    "AXFrame": "{{16, 2904.3333333333335}, {370, 136}}",
+    "subrole": null,
+    "pid": 92690,
+    "role": "AXHeading",
+    "AXLabel": "ter., 01/06/2027",
+    "AXValue": null,
+    "content_required": false,
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "role_description": "heading"
+  },
+  {
+    "type": "StaticText",
+    "AXUniqueId": null,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "pid": 92690,
+    "role_description": "text",
+    "content_required": false,
+    "custom_actions": [],
+    "enabled": true,
+    "AXLabel": "−R$ 780,00",
+    "role": "AXStaticText",
+    "subrole": null,
+    "title": null,
+    "frame": {
+      "x": 138.33333587646484,
+      "width": 247.6666717529297,
+      "y": 3052.3333333333335,
+      "height": 64.333251953125
+    },
+    "AXFrame": "{{138.33333587646484, 3052.3333333333335}, {247.66667175292969, 64.333251953125}}",
+    "AXValue": null,
+    "help": null
+  },
+  {
+    "content_required": false,
+    "help": null,
+    "AXValue": null,
+    "role_description": "link",
+    "pid": 92690,
+    "type": "Link",
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "title": null,
+    "AXFrame": "{{16, 3128.6665852864585}, {370, 627}}",
+    "AXLabel": "macbook (10/12), R$ 780,00, despesa, ter., 01/06/2027, previsto",
+    "frame": {
+      "width": 370,
+      "y": 3128.6665852864585,
+      "x": 16,
+      "height": 627
+    },
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "AXUniqueId": null,
+    "subrole": null,
+    "role": "AXLink",
+    "enabled": true
+  },
+  {
+    "role": "AXHeading",
+    "AXFrame": "{{16, 3771.6665852864585}, {370, 136}}",
+    "frame": {
+      "width": 370,
+      "height": 136,
+      "x": 16,
+      "y": 3771.6665852864585
+    },
+    "AXValue": null,
+    "content_required": false,
+    "title": null,
+    "enabled": true,
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "pid": 92690,
+    "AXLabel": "dom., 02/05/2027",
+    "custom_actions": [],
+    "help": null,
+    "AXUniqueId": null,
+    "type": "Heading",
+    "role_description": "heading",
+    "subrole": null
+  },
+  {
+    "AXUniqueId": null,
+    "subrole": null,
+    "AXValue": null,
+    "AXFrame": "{{138.33333587646484, 3919.6665852864585}, {247.66667175292969, 64.33349609375}}",
+    "enabled": true,
+    "type": "StaticText",
+    "content_required": false,
+    "help": null,
+    "frame": {
+      "width": 247.6666717529297,
+      "height": 64.33349609375,
+      "y": 3919.6665852864585,
+      "x": 138.33333587646484
+    },
+    "custom_actions": [],
+    "title": null,
+    "AXLabel": "−R$ 300,00",
+    "role_description": "text",
+    "pid": 92690,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "role": "AXStaticText"
+  },
+  {
+    "type": "Link",
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "help": null,
+    "subrole": null,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "pid": 92690,
+    "title": null,
+    "AXLabel": "tv (9/10), R$ 300,00, despesa, dom., 02/05/2027, previsto",
+    "frame": {
+      "width": 370,
+      "x": 16,
+      "height": 545.0000000000005,
+      "y": 3995.9998372395835
+    },
+    "role": "AXLink",
+    "AXUniqueId": null,
+    "role_description": "link",
+    "AXValue": null,
+    "AXFrame": "{{16, 3995.9998372395835}, {370, 545.00000000000045}}",
+    "enabled": true,
+    "content_required": false
+  },
+  {
+    "AXFrame": "{{16, 4556.999837239583}, {370, 136}}",
+    "title": null,
+    "type": "Heading",
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "enabled": true,
+    "frame": {
+      "y": 4556.999837239583,
+      "width": 370,
+      "height": 136,
+      "x": 16
+    },
+    "AXValue": null,
+    "subrole": null,
+    "help": null,
+    "content_required": false,
+    "pid": 92690,
+    "role": "AXHeading",
+    "custom_actions": [],
+    "AXUniqueId": null,
+    "AXLabel": "sáb., 01/05/2027",
+    "role_description": "heading"
+  },
+  {
+    "AXLabel": "−R$ 780,00",
+    "AXFrame": "{{138.33333587646484, 4704.999837239583}, {247.66667175292969, 64.3330078125}}",
+    "title": null,
+    "AXUniqueId": null,
+    "pid": 92690,
+    "subrole": null,
+    "AXValue": null,
+    "type": "StaticText",
+    "frame": {
+      "x": 138.33333587646484,
+      "height": 64.3330078125,
+      "y": 4704.999837239583,
+      "width": 247.6666717529297
+    },
+    "custom_actions": [],
+    "role": "AXStaticText",
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "content_required": false,
+    "help": null,
+    "role_description": "text",
+    "enabled": true
+  },
+  {
+    "type": "Link",
+    "AXValue": null,
+    "role": "AXLink",
+    "AXUniqueId": null,
+    "AXFrame": "{{16, 4781.333333333333}, {370, 627}}",
+    "subrole": null,
+    "AXLabel": "macbook (9/12), R$ 780,00, despesa, sáb., 01/05/2027, previsto",
+    "title": null,
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "role_description": "link",
+    "pid": 92690,
+    "frame": {
+      "height": 627,
+      "x": 16,
+      "y": 4781.333333333333,
+      "width": 370
+    },
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "help": null,
+    "enabled": true,
+    "content_required": false
+  },
+  {
+    "frame": {
+      "y": 5424.333333333333,
+      "x": 16,
+      "width": 370,
+      "height": 136
+    },
+    "custom_actions": [],
+    "AXValue": null,
+    "pid": 92690,
+    "content_required": false,
+    "title": null,
+    "help": null,
+    "enabled": true,
+    "AXLabel": "sex., 02/04/2027",
+    "AXUniqueId": null,
+    "type": "Heading",
+    "AXFrame": "{{16, 5424.333333333333}, {370, 136}}",
+    "role": "AXHeading",
+    "subrole": null,
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "role_description": "heading"
+  },
+  {
+    "role_description": "text",
+    "enabled": true,
+    "role": "AXStaticText",
+    "AXUniqueId": null,
+    "AXValue": null,
+    "pid": 92690,
+    "type": "StaticText",
+    "AXLabel": "−R$ 300,00",
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "help": null,
+    "title": null,
+    "frame": {
+      "width": 247.6666717529297,
+      "x": 138.33333587646484,
+      "y": 5572.333333333333,
+      "height": 64.33349609375
+    },
+    "content_required": false,
+    "AXFrame": "{{138.33333587646484, 5572.333333333333}, {247.66667175292969, 64.33349609375}}",
+    "custom_actions": [],
+    "subrole": null
+  },
+  {
+    "help": null,
+    "pid": 92690,
+    "enabled": true,
+    "AXFrame": "{{16, 5648.666829427083}, {370, 545}}",
+    "subrole": null,
+    "AXLabel": "tv (8/10), R$ 300,00, despesa, sex., 02/04/2027, previsto",
+    "role_description": "link",
+    "title": null,
+    "role": "AXLink",
+    "AXUniqueId": null,
+    "content_required": false,
+    "frame": {
+      "width": 370,
+      "x": 16,
+      "y": 5648.666829427083,
+      "height": 545
+    },
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "type": "Link",
+    "AXValue": null
+  },
+  {
+    "enabled": true,
+    "role_description": "heading",
+    "title": null,
+    "frame": {
+      "y": 6209.666829427083,
+      "x": 16,
+      "width": 370,
+      "height": 136
+    },
+    "role": "AXHeading",
+    "AXValue": null,
+    "AXUniqueId": null,
+    "help": null,
+    "type": "Heading",
+    "content_required": false,
+    "AXFrame": "{{16, 6209.666829427083}, {370, 136}}",
+    "pid": 92690,
+    "subrole": null,
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "AXLabel": "qui., 01/04/2027",
+    "custom_actions": []
+  },
+  {
+    "role_description": "text",
+    "AXLabel": "−R$ 780,00",
+    "content_required": false,
+    "custom_actions": [],
+    "frame": {
+      "height": 64.3330078125,
+      "y": 6357.666829427083,
+      "x": 138.33333587646484,
+      "width": 247.6666717529297
+    },
+    "AXValue": null,
+    "title": null,
+    "AXUniqueId": null,
+    "type": "StaticText",
+    "subrole": null,
+    "enabled": true,
+    "AXFrame": "{{138.33333587646484, 6357.666829427083}, {247.66667175292969, 64.3330078125}}",
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "role": "AXStaticText",
+    "help": null,
+    "pid": 92690
+  },
+  {
+    "enabled": true,
+    "AXFrame": "{{16, 6433.999837239583}, {370, 627}}",
+    "type": "Link",
+    "content_required": false,
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "help": null,
+    "AXUniqueId": null,
+    "frame": {
+      "x": 16,
+      "y": 6433.999837239583,
+      "width": 370,
+      "height": 627
+    },
+    "AXValue": null,
+    "role_description": "link",
+    "subrole": null,
+    "AXLabel": "macbook (8/12), R$ 780,00, despesa, qui., 01/04/2027, previsto",
+    "role": "AXLink",
+    "pid": 92690,
+    "title": null,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ]
+  },
+  {
+    "subrole": null,
+    "AXUniqueId": null,
+    "frame": {
+      "y": 7076.999837239583,
+      "x": 16,
+      "height": 136,
+      "width": 370
+    },
+    "role_description": "heading",
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "enabled": true,
+    "title": null,
+    "help": null,
+    "role": "AXHeading",
+    "type": "Heading",
+    "custom_actions": [],
+    "AXFrame": "{{16, 7076.999837239583}, {370, 136}}",
+    "AXLabel": "ter., 02/03/2027",
+    "pid": 92690,
+    "content_required": false,
+    "AXValue": null
+  },
+  {
+    "help": null,
+    "AXValue": null,
+    "enabled": true,
+    "title": null,
+    "AXLabel": "−R$ 300,00",
+    "role": "AXStaticText",
+    "type": "StaticText",
+    "AXFrame": "{{138.33333587646484, 7224.999837239583}, {247.66667175292969, 64.33349609375}}",
+    "AXUniqueId": null,
+    "pid": 92690,
+    "frame": {
+      "width": 247.6666717529297,
+      "x": 138.33333587646484,
+      "y": 7224.999837239583,
+      "height": 64.33349609375
+    },
+    "custom_actions": [],
+    "role_description": "text",
+    "subrole": null,
+    "content_required": false,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ]
+  },
+  {
+    "enabled": true,
+    "type": "Link",
+    "role_description": "link",
+    "content_required": false,
+    "frame": {
+      "height": 545,
+      "width": 370,
+      "x": 16,
+      "y": 7301.333333333333
+    },
+    "pid": 92690,
+    "subrole": null,
+    "AXLabel": "tv (7/10), R$ 300,00, despesa, ter., 02/03/2027, previsto",
+    "help": null,
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "AXUniqueId": null,
+    "role": "AXLink",
+    "AXFrame": "{{16, 7301.333333333333}, {370, 545}}",
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "title": null,
+    "AXValue": null
+  },
+  {
+    "AXLabel": "seg., 01/03/2027",
+    "AXValue": null,
+    "AXUniqueId": null,
+    "title": null,
+    "pid": 92690,
+    "help": null,
+    "enabled": true,
+    "frame": {
+      "y": 7862.333333333333,
+      "width": 370,
+      "x": 16,
+      "height": 136
+    },
+    "AXFrame": "{{16, 7862.333333333333}, {370, 136}}",
+    "custom_actions": [],
+    "role_description": "heading",
+    "subrole": null,
+    "content_required": false,
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "role": "AXHeading",
+    "type": "Heading"
+  },
+  {
+    "subrole": null,
+    "AXValue": null,
+    "content_required": false,
+    "pid": 92690,
+    "type": "StaticText",
+    "AXLabel": "−R$ 780,00",
+    "custom_actions": [],
+    "title": null,
+    "role_description": "text",
+    "role": "AXStaticText",
+    "help": null,
+    "AXUniqueId": null,
+    "frame": {
+      "y": 8010.333333333333,
+      "width": 247.6666717529297,
+      "x": 138.33333587646484,
+      "height": 64.3330078125
+    },
+    "enabled": true,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "AXFrame": "{{138.33333587646484, 8010.333333333333}, {247.66667175292969, 64.3330078125}}"
+  },
+  {
+    "pid": 92690,
+    "AXFrame": "{{16, 8086.666341145833}, {370, 626.99999999999909}}",
+    "subrole": null,
+    "type": "Link",
+    "content_required": false,
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "AXValue": null,
+    "title": null,
+    "frame": {
+      "width": 370,
+      "x": 16,
+      "y": 8086.666341145833,
+      "height": 626.9999999999991
+    },
+    "role": "AXLink",
+    "help": null,
+    "enabled": true,
+    "AXLabel": "macbook (7/12), R$ 780,00, despesa, seg., 01/03/2027, previsto",
+    "AXUniqueId": null,
+    "role_description": "link",
+    "traits": [
+      "Link",
+      "Scrollable"
+    ]
+  },
+  {
+    "title": null,
+    "role_description": "heading",
+    "AXValue": null,
+    "custom_actions": [],
+    "pid": 92690,
+    "AXFrame": "{{16, 8729.6663411458339}, {370, 136}}",
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "subrole": null,
+    "enabled": true,
+    "content_required": false,
+    "help": null,
+    "AXUniqueId": null,
+    "AXLabel": "ter., 02/02/2027",
+    "frame": {
+      "y": 8729.666341145834,
+      "height": 136,
+      "x": 16,
+      "width": 370
+    },
+    "type": "Heading",
+    "role": "AXHeading"
+  },
+  {
+    "content_required": false,
+    "frame": {
+      "x": 138.33333587646484,
+      "height": 64.333984375,
+      "width": 247.6666717529297,
+      "y": 8877.666341145834
+    },
+    "AXUniqueId": null,
+    "help": null,
+    "subrole": null,
+    "enabled": true,
+    "role_description": "text",
+    "AXValue": null,
+    "role": "AXStaticText",
+    "AXLabel": "−R$ 300,00",
+    "type": "StaticText",
+    "title": null,
+    "AXFrame": "{{138.33333587646484, 8877.6663411458339}, {247.66667175292969, 64.333984375}}",
+    "custom_actions": [],
+    "pid": 92690,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ]
+  },
+  {
+    "subrole": null,
+    "AXFrame": "{{16, 8954.0003255208339}, {370, 545}}",
+    "title": null,
+    "AXLabel": "tv (6/10), R$ 300,00, despesa, ter., 02/02/2027, previsto",
+    "type": "Link",
+    "pid": 92690,
+    "role": "AXLink",
+    "AXUniqueId": null,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "role_description": "link",
+    "content_required": false,
+    "help": null,
+    "frame": {
+      "y": 8954.000325520834,
+      "height": 545,
+      "width": 370,
+      "x": 16
+    },
+    "enabled": true,
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "AXValue": null
+  },
+  {
+    "help": null,
+    "pid": 92690,
+    "title": null,
+    "role_description": "heading",
+    "custom_actions": [],
+    "AXUniqueId": null,
+    "type": "Heading",
+    "enabled": true,
+    "subrole": null,
+    "role": "AXHeading",
+    "frame": {
+      "height": 136,
+      "y": 9515.000325520834,
+      "x": 16,
+      "width": 370
+    },
+    "AXLabel": "seg., 01/02/2027",
+    "AXValue": null,
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "AXFrame": "{{16, 9515.0003255208339}, {370, 136}}",
+    "content_required": false
+  },
+  {
+    "role_description": "text",
+    "frame": {
+      "width": 247.6666717529297,
+      "y": 9663.000325520834,
+      "x": 138.33333587646484,
+      "height": 64.3330078125
+    },
+    "content_required": false,
+    "role": "AXStaticText",
+    "pid": 92690,
+    "subrole": null,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "type": "StaticText",
+    "help": null,
+    "title": null,
+    "enabled": true,
+    "AXFrame": "{{138.33333587646484, 9663.0003255208339}, {247.66667175292969, 64.3330078125}}",
+    "AXLabel": "−R$ 780,00",
+    "AXUniqueId": null,
+    "custom_actions": [],
+    "AXValue": null
+  },
+  {
+    "title": null,
+    "type": "Link",
+    "help": null,
+    "enabled": true,
+    "AXUniqueId": null,
+    "frame": {
+      "width": 370,
+      "x": 16,
+      "y": 9739.333333333334,
+      "height": 627
+    },
+    "AXValue": null,
+    "role": "AXLink",
+    "role_description": "link",
+    "subrole": null,
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "content_required": false,
+    "AXFrame": "{{16, 9739.3333333333339}, {370, 627}}",
+    "pid": 92690,
+    "AXLabel": "macbook (6/12), R$ 780,00, despesa, seg., 01/02/2027, previsto",
+    "traits": [
+      "Link",
+      "Scrollable"
+    ]
+  },
+  {
+    "type": "Heading",
+    "role_description": "heading",
+    "pid": 92690,
+    "AXLabel": "sáb., 02/01/2027",
+    "enabled": true,
+    "frame": {
+      "x": 16,
+      "height": 136,
+      "width": 370,
+      "y": 10382.333333333334
+    },
+    "AXUniqueId": null,
+    "content_required": false,
+    "help": null,
+    "role": "AXHeading",
+    "title": null,
+    "AXFrame": "{{16, 10382.333333333334}, {370, 136}}",
+    "AXValue": null,
+    "subrole": null,
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "custom_actions": []
+  },
+  {
+    "AXUniqueId": null,
+    "frame": {
+      "x": 138.33333587646484,
+      "width": 247.6666717529297,
+      "height": 64.3330078125,
+      "y": 10530.333333333334
+    },
+    "type": "StaticText",
+    "help": null,
+    "role_description": "text",
+    "AXFrame": "{{138.33333587646484, 10530.333333333334}, {247.66667175292969, 64.3330078125}}",
+    "subrole": null,
+    "content_required": false,
+    "AXValue": null,
+    "title": null,
+    "role": "AXStaticText",
+    "enabled": true,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "pid": 92690,
+    "custom_actions": [],
+    "AXLabel": "−R$ 300,00"
+  },
+  {
+    "AXLabel": "tv (5/10), R$ 300,00, despesa, sáb., 02/01/2027, previsto",
+    "AXValue": null,
+    "pid": 92690,
+    "title": null,
+    "role": "AXLink",
+    "role_description": "link",
+    "content_required": false,
+    "AXFrame": "{{16, 10606.666341145834}, {370, 545}}",
+    "AXUniqueId": null,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "type": "Link",
+    "help": null,
+    "enabled": true,
+    "frame": {
+      "height": 545,
+      "x": 16,
+      "y": 10606.666341145834,
+      "width": 370
+    },
+    "subrole": null
+  },
+  {
+    "custom_actions": [],
+    "pid": 92690,
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "enabled": true,
+    "AXLabel": "sex., 01/01/2027",
+    "AXUniqueId": null,
+    "type": "Heading",
+    "title": null,
+    "help": null,
+    "role_description": "heading",
+    "role": "AXHeading",
+    "content_required": false,
+    "frame": {
+      "x": 16,
+      "y": 11167.666341145834,
+      "width": 370,
+      "height": 136
+    },
+    "AXValue": null,
+    "AXFrame": "{{16, 11167.666341145834}, {370, 136}}",
+    "subrole": null
+  },
+  {
+    "help": null,
+    "title": null,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "role_description": "text",
+    "AXLabel": "−R$ 780,00",
+    "AXUniqueId": null,
+    "AXValue": null,
+    "subrole": null,
+    "AXFrame": "{{138.33333587646484, 11315.666341145834}, {247.66667175292969, 64.3330078125}}",
+    "content_required": false,
+    "role": "AXStaticText",
+    "enabled": true,
+    "custom_actions": [],
+    "type": "StaticText",
+    "pid": 92690,
+    "frame": {
+      "height": 64.3330078125,
+      "x": 138.33333587646484,
+      "y": 11315.666341145834,
+      "width": 247.6666717529297
+    }
+  },
+  {
+    "title": null,
+    "role": "AXLink",
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "enabled": true,
+    "pid": 92690,
+    "AXLabel": "macbook (5/12), R$ 780,00, despesa, sex., 01/01/2027, previsto",
+    "subrole": null,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "content_required": false,
+    "help": null,
+    "AXFrame": "{{16, 11392.000325520834}, {370, 627}}",
+    "AXValue": null,
+    "frame": {
+      "width": 370,
+      "height": 627,
+      "x": 16,
+      "y": 11392.000325520834
+    },
+    "type": "Link",
+    "AXUniqueId": null,
+    "role_description": "link"
+  },
+  {
+    "AXLabel": "qui., 24/12/2026",
+    "AXFrame": "{{16, 12035.000325520834}, {370, 136}}",
+    "content_required": false,
+    "subrole": null,
+    "help": null,
+    "type": "Heading",
+    "frame": {
+      "width": 370,
+      "x": 16,
+      "y": 12035.000325520834,
+      "height": 136
+    },
+    "title": null,
+    "AXUniqueId": null,
+    "role_description": "heading",
+    "enabled": true,
+    "pid": 92690,
+    "role": "AXHeading",
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "AXValue": null,
+    "custom_actions": []
+  },
+  {
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "AXFrame": "{{138.33333587646484, 12183.000325520834}, {247.66667175292969, 64.333984375}}",
+    "custom_actions": [],
+    "title": null,
+    "role": "AXStaticText",
+    "type": "StaticText",
+    "frame": {
+      "width": 247.6666717529297,
+      "y": 12183.000325520834,
+      "height": 64.333984375,
+      "x": 138.33333587646484
+    },
+    "content_required": false,
+    "help": null,
+    "AXLabel": "−R$ 250,00",
+    "AXUniqueId": null,
+    "AXValue": null,
+    "enabled": true,
+    "role_description": "text",
+    "subrole": null,
+    "pid": 92690
+  },
+  {
+    "enabled": true,
+    "AXFrame": "{{16, 12259.333333333334}, {370, 355}}",
+    "subrole": null,
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "content_required": false,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "frame": {
+      "y": 12259.333333333334,
+      "width": 370,
+      "height": 355,
+      "x": 16
+    },
+    "AXUniqueId": null,
+    "help": null,
+    "role": "AXLink",
+    "AXValue": null,
+    "AXLabel": "Fone, R$ 250,00, despesa, qui., 24/12/2026",
+    "pid": 92690,
+    "title": null,
+    "role_description": "link",
+    "type": "Link"
+  },
+  {
+    "role_description": "heading",
+    "help": null,
+    "frame": {
+      "width": 370,
+      "y": 12630.333333333334,
+      "height": 136,
+      "x": 16
+    },
+    "role": "AXHeading",
+    "AXValue": null,
+    "type": "Heading",
+    "AXFrame": "{{16, 12630.333333333334}, {370, 136}}",
+    "AXLabel": "ter., 22/12/2026",
+    "AXUniqueId": null,
+    "custom_actions": [],
+    "content_required": false,
+    "subrole": null,
+    "title": null,
+    "enabled": true,
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "pid": 92690
+  },
+  {
+    "enabled": true,
+    "AXLabel": "−R$ 650,00",
+    "subrole": null,
+    "pid": 92690,
+    "custom_actions": [],
+    "title": null,
+    "frame": {
+      "y": 12778.333333333334,
+      "width": 247.6666717529297,
+      "height": 64.3330078125,
+      "x": 138.33333587646484
+    },
+    "role": "AXStaticText",
+    "AXUniqueId": null,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "AXValue": null,
+    "role_description": "text",
+    "AXFrame": "{{138.33333587646484, 12778.333333333334}, {247.66667175292969, 64.3330078125}}",
+    "help": null,
+    "content_required": false,
+    "type": "StaticText"
+  },
+  {
+    "role": "AXButton",
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "pid": 92690,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "subrole": null,
+    "frame": {
+      "height": 355,
+      "width": 370,
+      "x": 16,
+      "y": 12854.666341145834
+    },
+    "title": null,
+    "type": "Button",
+    "AXLabel": "Aluguel, R$ 650,00, despesa, ter., 22/12/2026",
+    "AXValue": null,
+    "help": null,
+    "role_description": "button",
+    "content_required": false,
+    "AXFrame": "{{16, 12854.666341145834}, {370, 355}}",
+    "AXUniqueId": null,
+    "enabled": true
+  },
+  {
+    "AXFrame": "{{16, 13225.666341145834}, {370, 136}}",
+    "role": "AXHeading",
+    "content_required": false,
+    "AXLabel": "qua., 02/12/2026",
+    "frame": {
+      "width": 370,
+      "height": 136,
+      "x": 16,
+      "y": 13225.666341145834
+    },
+    "help": null,
+    "subrole": null,
+    "title": null,
+    "enabled": true,
+    "AXUniqueId": null,
+    "pid": 92690,
+    "AXValue": null,
+    "type": "Heading",
+    "custom_actions": [],
+    "role_description": "heading",
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ]
+  },
+  {
+    "AXValue": null,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "role_description": "text",
+    "content_required": false,
+    "subrole": null,
+    "custom_actions": [],
+    "frame": {
+      "x": 138.33333587646484,
+      "width": 247.6666717529297,
+      "y": 13373.666341145834,
+      "height": 64.3330078125
+    },
+    "AXUniqueId": null,
+    "AXFrame": "{{138.33333587646484, 13373.666341145834}, {247.66667175292969, 64.3330078125}}",
+    "AXLabel": "−R$ 300,00",
+    "enabled": true,
+    "help": null,
+    "role": "AXStaticText",
+    "type": "StaticText",
+    "pid": 92690,
+    "title": null
+  },
+  {
+    "content_required": false,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "AXLabel": "tv (4/10), R$ 300,00, despesa, qua., 02/12/2026, previsto",
+    "role": "AXLink",
+    "enabled": true,
+    "AXFrame": "{{16, 13450.000325520834}, {370, 480.666015625}}",
+    "help": null,
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "subrole": null,
+    "AXValue": null,
+    "pid": 92690,
+    "title": null,
+    "AXUniqueId": null,
+    "frame": {
+      "width": 370,
+      "x": 16,
+      "y": 13450.000325520834,
+      "height": 480.666015625
+    },
+    "type": "Link",
+    "role_description": "link"
+  },
+  {
+    "title": null,
+    "AXUniqueId": null,
+    "role": "AXHeading",
+    "content_required": false,
+    "AXFrame": "{{16, 13946.666341145834}, {370, 136}}",
+    "enabled": true,
+    "AXLabel": "ter., 01/12/2026",
+    "AXValue": null,
+    "help": null,
+    "role_description": "heading",
+    "pid": 92690,
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "type": "Heading",
+    "frame": {
+      "x": 16,
+      "y": 13946.666341145834,
+      "height": 136,
+      "width": 370
+    },
+    "subrole": null,
+    "custom_actions": []
+  },
+  {
+    "type": "StaticText",
+    "frame": {
+      "y": 14094.666341145834,
+      "width": 289,
+      "height": 64.3330078125,
+      "x": 97
+    },
+    "AXUniqueId": null,
+    "title": null,
+    "AXFrame": "{{97, 14094.666341145834}, {289, 64.3330078125}}",
+    "AXLabel": "−R$ 1.230,00",
+    "role": "AXStaticText",
+    "help": null,
+    "custom_actions": [],
+    "content_required": false,
+    "role_description": "text",
+    "enabled": true,
+    "AXValue": null,
+    "subrole": null,
+    "pid": 92690,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ]
+  },
+  {
+    "help": null,
+    "AXLabel": "geladeira (8/8), R$ 450,00, despesa, ter., 01/12/2026, previsto",
+    "title": null,
+    "AXUniqueId": null,
+    "pid": 92690,
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "role_description": "link",
+    "AXFrame": "{{16, 14171.000325520834}, {370, 562.666015625}}",
+    "enabled": true,
+    "subrole": null,
+    "frame": {
+      "width": 370,
+      "x": 16,
+      "y": 14171.000325520834,
+      "height": 562.666015625
+    },
+    "content_required": false,
+    "AXValue": null,
+    "role": "AXLink",
+    "type": "Link"
+  },
+  {
+    "title": null,
+    "AXValue": null,
+    "pid": 92690,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "subrole": null,
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "frame": {
+      "height": 627,
+      "y": 14734.000325520834,
+      "width": 370,
+      "x": 16
+    },
+    "AXLabel": "macbook (4/12), R$ 780,00, despesa, ter., 01/12/2026, previsto",
+    "role": "AXLink",
+    "help": null,
+    "content_required": false,
+    "type": "Link",
+    "AXFrame": "{{16, 14734.000325520834}, {370, 627}}",
+    "enabled": true,
+    "role_description": "link",
+    "AXUniqueId": null
+  },
+  {
+    "enabled": true,
+    "type": "Heading",
+    "title": null,
+    "content_required": false,
+    "AXFrame": "{{16, 15377.000325520834}, {370, 136}}",
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "frame": {
+      "width": 370,
+      "height": 136,
+      "y": 15377.000325520834,
+      "x": 16
+    },
+    "help": null,
+    "custom_actions": [],
+    "AXLabel": "seg., 30/11/2026",
+    "AXValue": null,
+    "role": "AXHeading",
+    "subrole": null,
+    "pid": 92690,
+    "AXUniqueId": null,
+    "role_description": "heading"
+  },
+  {
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "role": "AXStaticText",
+    "AXValue": null,
+    "title": null,
+    "AXFrame": "{{138.33333587646484, 15525.000325520834}, {247.66667175292969, 64.333984375}}",
+    "content_required": false,
+    "AXLabel": "−R$ 900,00",
+    "custom_actions": [],
+    "pid": 92690,
+    "enabled": true,
+    "AXUniqueId": null,
+    "role_description": "text",
+    "frame": {
+      "y": 15525.000325520834,
+      "x": 138.33333587646484,
+      "height": 64.333984375,
+      "width": 247.6666717529297
+    },
+    "type": "StaticText",
+    "help": null,
+    "subrole": null
+  },
+  {
+    "AXValue": null,
+    "AXUniqueId": null,
+    "pid": 92690,
+    "AXFrame": "{{16, 15601.333333333334}, {370, 562.6669921875}}",
+    "help": null,
+    "role_description": "link",
+    "role": "AXLink",
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "title": null,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "content_required": false,
+    "enabled": true,
+    "AXLabel": "pc gamer (8/8), R$ 900,00, despesa, seg., 30/11/2026, previsto",
+    "type": "Link",
+    "subrole": null,
+    "frame": {
+      "x": 16,
+      "y": 15601.333333333334,
+      "height": 562.6669921875,
+      "width": 370
+    }
+  },
+  {
+    "help": null,
+    "frame": {
+      "x": 16,
+      "height": 136,
+      "y": 16180.000325520834,
+      "width": 370
+    },
+    "AXValue": null,
+    "type": "Heading",
+    "role_description": "heading",
+    "AXUniqueId": null,
+    "custom_actions": [],
+    "role": "AXHeading",
+    "subrole": null,
+    "AXLabel": "seg., 02/11/2026",
+    "AXFrame": "{{16, 16180.000325520834}, {370, 136}}",
+    "enabled": true,
+    "content_required": false,
+    "pid": 92690,
+    "title": null,
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ]
+  },
+  {
+    "AXUniqueId": null,
+    "AXValue": null,
+    "content_required": false,
+    "type": "StaticText",
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "frame": {
+      "y": 16328.000325520834,
+      "width": 247.6666717529297,
+      "x": 138.33333587646484,
+      "height": 64.33203125000182
+    },
+    "help": null,
+    "subrole": null,
+    "pid": 92690,
+    "AXLabel": "−R$ 300,00",
+    "role_description": "text",
+    "custom_actions": [],
+    "title": null,
+    "AXFrame": "{{138.33333587646484, 16328.000325520834}, {247.66667175292969, 64.332031250001819}}",
+    "enabled": true,
+    "role": "AXStaticText"
+  },
+  {
+    "AXUniqueId": null,
+    "help": null,
+    "AXLabel": "tv (3/10), R$ 300,00, despesa, seg., 02/11/2026, previsto",
+    "frame": {
+      "y": 16404.333333333332,
+      "x": 16,
+      "width": 370,
+      "height": 480.666015625
+    },
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "AXFrame": "{{16, 16404.333333333332}, {370, 480.666015625}}",
+    "role": "AXLink",
+    "title": null,
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "enabled": true,
+    "type": "Link",
+    "content_required": false,
+    "subrole": null,
+    "pid": 92690,
+    "role_description": "link",
+    "AXValue": null
+  },
+  {
+    "role_description": "heading",
+    "AXUniqueId": null,
+    "help": null,
+    "frame": {
+      "width": 370,
+      "x": 16,
+      "height": 136,
+      "y": 16900.999348958332
+    },
+    "AXValue": null,
+    "type": "Heading",
+    "subrole": null,
+    "enabled": true,
+    "custom_actions": [],
+    "title": null,
+    "pid": 92690,
+    "AXLabel": "dom., 01/11/2026",
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "content_required": false,
+    "role": "AXHeading",
+    "AXFrame": "{{16, 16900.999348958332}, {370, 136}}"
+  },
+  {
+    "help": null,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "AXFrame": "{{97, 17048.999348958332}, {289, 64.33203125}}",
+    "frame": {
+      "height": 64.33203125,
+      "x": 97,
+      "y": 17048.999348958332,
+      "width": 289
+    },
+    "subrole": null,
+    "custom_actions": [],
+    "AXLabel": "−R$ 1.230,00",
+    "role": "AXStaticText",
+    "AXUniqueId": null,
+    "title": null,
+    "AXValue": null,
+    "pid": 92690,
+    "type": "StaticText",
+    "content_required": false,
+    "enabled": true,
+    "role_description": "text"
+  },
+  {
+    "role": "AXLink",
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "help": null,
+    "pid": 92690,
+    "content_required": false,
+    "type": "Link",
+    "role_description": "link",
+    "title": null,
+    "AXValue": null,
+    "enabled": true,
+    "frame": {
+      "height": 562.666015625,
+      "x": 16,
+      "width": 370,
+      "y": 17125.333333333332
+    },
+    "AXUniqueId": null,
+    "subrole": null,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "AXFrame": "{{16, 17125.333333333332}, {370, 562.666015625}}",
+    "AXLabel": "geladeira (7/8), R$ 450,00, despesa, dom., 01/11/2026, previsto"
+  },
+  {
+    "pid": 92690,
+    "help": null,
+    "AXFrame": "{{16, 17688.333333333332}, {370, 627}}",
+    "AXLabel": "macbook (3/12), R$ 780,00, despesa, dom., 01/11/2026, previsto",
+    "enabled": true,
+    "subrole": null,
+    "frame": {
+      "x": 16,
+      "width": 370,
+      "height": 627,
+      "y": 17688.333333333332
+    },
+    "title": null,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "content_required": false,
+    "role_description": "link",
+    "AXValue": null,
+    "type": "Link",
+    "role": "AXLink",
+    "AXUniqueId": null
+  },
+  {
+    "enabled": true,
+    "AXFrame": "{{16, 18331.333333333332}, {370, 136}}",
+    "title": null,
+    "subrole": null,
+    "help": null,
+    "custom_actions": [],
+    "AXValue": null,
+    "AXLabel": "sex., 30/10/2026",
+    "pid": 92690,
+    "role": "AXHeading",
+    "role_description": "heading",
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "content_required": false,
+    "frame": {
+      "y": 18331.333333333332,
+      "width": 370,
+      "height": 136,
+      "x": 16
+    },
+    "AXUniqueId": null,
+    "type": "Heading"
+  },
+  {
+    "role_description": "text",
+    "type": "StaticText",
+    "help": null,
+    "AXLabel": "−R$ 900,00",
+    "frame": {
+      "y": 18479.333333333332,
+      "width": 247.6666717529297,
+      "height": 64.333984375,
+      "x": 138.33333587646484
+    },
+    "custom_actions": [],
+    "subrole": null,
+    "enabled": true,
+    "AXUniqueId": null,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "title": null,
+    "role": "AXStaticText",
+    "AXValue": null,
+    "content_required": false,
+    "AXFrame": "{{138.33333587646484, 18479.333333333332}, {247.66667175292969, 64.333984375}}",
+    "pid": 92690
+  },
+  {
+    "type": "Link",
+    "AXLabel": "pc gamer (7/8), R$ 900,00, despesa, sex., 30/10/2026, previsto",
+    "enabled": true,
+    "help": null,
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "AXValue": null,
+    "role": "AXLink",
+    "content_required": false,
+    "subrole": null,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "AXUniqueId": null,
+    "AXFrame": "{{16, 18555.667317708332}, {370, 562.666015625}}",
+    "title": null,
+    "role_description": "link",
+    "pid": 92690,
+    "frame": {
+      "width": 370,
+      "height": 562.666015625,
+      "x": 16,
+      "y": 18555.667317708332
+    }
+  },
+  {
+    "type": "Heading",
+    "pid": 92690,
+    "AXValue": null,
+    "AXUniqueId": null,
+    "subrole": null,
+    "role_description": "heading",
+    "help": null,
+    "title": null,
+    "enabled": true,
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "custom_actions": [],
+    "AXFrame": "{{16, 19134.333333333332}, {370, 136}}",
+    "content_required": false,
+    "AXLabel": "sex., 09/10/2026",
+    "role": "AXHeading",
+    "frame": {
+      "height": 136,
+      "width": 370,
+      "y": 19134.333333333332,
+      "x": 16
+    }
+  },
+  {
+    "custom_actions": [],
+    "pid": 92690,
+    "subrole": null,
+    "frame": {
+      "height": 64.333984375,
+      "x": 138.33333587646484,
+      "width": 247.6666717529297,
+      "y": 19282.333333333332
+    },
+    "AXValue": null,
+    "help": null,
+    "type": "StaticText",
+    "role_description": "text",
+    "AXLabel": "−R$ 550,00",
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "AXFrame": "{{138.33333587646484, 19282.333333333332}, {247.66667175292969, 64.333984375}}",
+    "content_required": false,
+    "role": "AXStaticText",
+    "enabled": true,
+    "AXUniqueId": null,
+    "title": null
+  },
+  {
+    "enabled": true,
+    "content_required": false,
+    "subrole": null,
+    "role_description": "link",
+    "AXValue": null,
+    "role": "AXLink",
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "frame": {
+      "y": 19358.667317708332,
+      "width": 370,
+      "height": 290.666015625,
+      "x": 16
+    },
+    "pid": 92690,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "title": null,
+    "help": null,
+    "AXUniqueId": null,
+    "AXFrame": "{{16, 19358.667317708332}, {370, 290.666015625}}",
+    "AXLabel": "Aluguel, R$ 550,00, despesa, sex., 09/10/2026",
+    "type": "Link"
+  },
+  {
+    "frame": {
+      "y": 19665.333333333332,
+      "x": 16,
+      "width": 370,
+      "height": 136
+    },
+    "AXLabel": "sex., 02/10/2026",
+    "AXFrame": "{{16, 19665.333333333332}, {370, 136}}",
+    "AXUniqueId": null,
+    "subrole": null,
+    "role_description": "heading",
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "content_required": false,
+    "title": null,
+    "enabled": true,
+    "role": "AXHeading",
+    "custom_actions": [],
+    "AXValue": null,
+    "type": "Heading",
+    "pid": 92690,
+    "help": null
+  },
+  {
+    "title": null,
+    "subrole": null,
+    "type": "StaticText",
+    "frame": {
+      "y": 19813.333333333332,
+      "height": 64.333984375,
+      "width": 247.6666717529297,
+      "x": 138.33333587646484
+    },
+    "role": "AXStaticText",
+    "AXUniqueId": null,
+    "enabled": true,
+    "content_required": false,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "AXFrame": "{{138.33333587646484, 19813.333333333332}, {247.66667175292969, 64.333984375}}",
+    "AXLabel": "−R$ 300,00",
+    "AXValue": null,
+    "help": null,
+    "custom_actions": [],
+    "role_description": "text",
+    "pid": 92690
+  },
+  {
+    "help": null,
+    "AXFrame": "{{16, 19889.667317708332}, {370, 480.666015625}}",
+    "AXValue": null,
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "AXUniqueId": null,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "content_required": false,
+    "role": "AXLink",
+    "role_description": "link",
+    "title": null,
+    "enabled": true,
+    "subrole": null,
+    "AXLabel": "tv (2/10), R$ 300,00, despesa, sex., 02/10/2026, previsto",
+    "frame": {
+      "width": 370,
+      "x": 16,
+      "y": 19889.667317708332,
+      "height": 480.666015625
+    },
+    "type": "Link",
+    "pid": 92690
+  },
+  {
+    "custom_actions": [],
+    "AXUniqueId": null,
+    "frame": {
+      "height": 136,
+      "width": 370,
+      "x": 16,
+      "y": 20386.333333333332
+    },
+    "title": null,
+    "AXValue": null,
+    "AXFrame": "{{16, 20386.333333333332}, {370, 136}}",
+    "subrole": null,
+    "enabled": true,
+    "AXLabel": "qui., 01/10/2026",
+    "type": "Heading",
+    "help": null,
+    "role_description": "heading",
+    "pid": 92690,
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "role": "AXHeading",
+    "content_required": false
+  },
+  {
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "custom_actions": [],
+    "frame": {
+      "height": 64.333984375,
+      "x": 97,
+      "y": 20534.333333333332,
+      "width": 289
+    },
+    "pid": 92690,
+    "help": null,
+    "AXLabel": "−R$ 1.230,00",
+    "role": "AXStaticText",
+    "type": "StaticText",
+    "AXUniqueId": null,
+    "title": null,
+    "content_required": false,
+    "AXFrame": "{{97, 20534.333333333332}, {289, 64.333984375}}",
+    "subrole": null,
+    "AXValue": null,
+    "role_description": "text",
+    "enabled": true
+  },
+  {
+    "role_description": "link",
+    "AXLabel": "geladeira (6/8), R$ 450,00, despesa, qui., 01/10/2026, previsto",
+    "AXUniqueId": null,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "role": "AXLink",
+    "AXFrame": "{{16, 20610.667317708332}, {370, 562.666015625}}",
+    "content_required": false,
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "AXValue": null,
+    "enabled": true,
+    "frame": {
+      "y": 20610.667317708332,
+      "height": 562.666015625,
+      "width": 370,
+      "x": 16
+    },
+    "type": "Link",
+    "title": null,
+    "subrole": null,
+    "help": null,
+    "pid": 92690
+  },
+  {
+    "AXLabel": "macbook (2/12), R$ 780,00, despesa, qui., 01/10/2026, previsto",
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "frame": {
+      "x": 16,
+      "y": 21173.667317708332,
+      "width": 370,
+      "height": 627
+    },
+    "help": null,
+    "pid": 92690,
+    "role": "AXLink",
+    "title": null,
+    "AXUniqueId": null,
+    "type": "Link",
+    "subrole": null,
+    "content_required": false,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "enabled": true,
+    "role_description": "link",
+    "AXFrame": "{{16, 21173.667317708332}, {370, 627}}",
+    "AXValue": null
+  },
+  {
+    "pid": 92690,
+    "AXUniqueId": null,
+    "role": "AXHeading",
+    "title": null,
+    "AXLabel": "qua., 30/09/2026",
+    "frame": {
+      "x": 16,
+      "width": 370,
+      "height": 136,
+      "y": 21816.667317708332
+    },
+    "content_required": false,
+    "AXValue": null,
+    "AXFrame": "{{16, 21816.667317708332}, {370, 136}}",
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "subrole": null,
+    "role_description": "heading",
+    "help": null,
+    "type": "Heading",
+    "custom_actions": [],
+    "enabled": true
+  },
+  {
+    "type": "StaticText",
+    "subrole": null,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "AXLabel": "−R$ 3.233,34",
+    "role": "AXStaticText",
+    "AXValue": null,
+    "AXFrame": "{{97, 21964.667317708332}, {289, 64.333984375}}",
+    "help": null,
+    "title": null,
+    "enabled": true,
+    "custom_actions": [],
+    "AXUniqueId": null,
+    "content_required": false,
+    "frame": {
+      "width": 289,
+      "height": 64.333984375,
+      "x": 97,
+      "y": 21964.667317708332
+    },
+    "role_description": "text",
+    "pid": 92690
+  },
+  {
+    "pid": 92690,
+    "title": null,
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "help": null,
+    "role": "AXLink",
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "AXValue": null,
+    "content_required": false,
+    "type": "Link",
+    "AXFrame": "{{16, 22040.999348958332}, {370, 372.66796875}}",
+    "frame": {
+      "height": 372.66796875,
+      "y": 22040.999348958332,
+      "x": 16,
+      "width": 370
+    },
+    "AXLabel": "Parcela Carro, R$ 1.166,67, despesa, qua., 30/09/2026",
+    "role_description": "link",
+    "subrole": null,
+    "enabled": true,
+    "AXUniqueId": null
+  },
+  {
+    "role_description": "link",
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "enabled": true,
+    "AXFrame": "{{16, 22413.999348958332}, {370, 372.66796875}}",
+    "help": null,
+    "AXUniqueId": null,
+    "AXValue": null,
+    "title": null,
+    "frame": {
+      "x": 16,
+      "y": 22413.999348958332,
+      "width": 370,
+      "height": 372.66796875
+    },
+    "content_required": false,
+    "pid": 92690,
+    "type": "Link",
+    "subrole": null,
+    "AXLabel": "Parcela Carro, R$ 1.166,67, despesa, qua., 30/09/2026",
+    "role": "AXLink",
+    "traits": [
+      "Link",
+      "Scrollable"
+    ]
+  },
+  {
+    "AXFrame": "{{16, 22786.999348958332}, {370, 501.333984375}}",
+    "pid": 92690,
+    "AXValue": null,
+    "role_description": "link",
+    "AXLabel": "pc gamer (6/8), R$ 900,00, despesa, qua., 30/09/2026",
+    "subrole": null,
+    "frame": {
+      "height": 501.333984375,
+      "y": 22786.999348958332,
+      "width": 370,
+      "x": 16
+    },
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "type": "Link",
+    "enabled": true,
+    "help": null,
+    "content_required": false,
+    "role": "AXLink",
+    "title": null,
+    "AXUniqueId": null
+  },
+  {
+    "pid": 92690,
+    "help": null,
+    "frame": {
+      "height": 136,
+      "width": 370,
+      "y": 23304.333333333332,
+      "x": 16
+    },
+    "custom_actions": [],
+    "role_description": "heading",
+    "title": null,
+    "AXUniqueId": null,
+    "role": "AXHeading",
+    "type": "Heading",
+    "AXFrame": "{{16, 23304.333333333332}, {370, 136}}",
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "enabled": true,
+    "AXValue": null,
+    "AXLabel": "sex., 11/09/2026",
+    "subrole": null,
+    "content_required": false
+  },
+  {
+    "help": null,
+    "role_description": "text",
+    "type": "StaticText",
+    "enabled": true,
+    "AXValue": null,
+    "AXLabel": "−R$ 443,00",
+    "role": "AXStaticText",
+    "AXFrame": "{{138.33333587646484, 23452.333333333332}, {247.66667175292969, 64.333984375}}",
+    "frame": {
+      "height": 64.333984375,
+      "y": 23452.333333333332,
+      "x": 138.33333587646484,
+      "width": 247.6666717529297
+    },
+    "title": null,
+    "custom_actions": [],
+    "subrole": null,
+    "content_required": false,
+    "AXUniqueId": null,
+    "pid": 92690,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ]
+  },
+  {
+    "role_description": "link",
+    "AXLabel": "Ferramentas, R$ 443,00, despesa, sex., 11/09/2026",
+    "enabled": true,
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "frame": {
+      "x": 16,
+      "height": 437,
+      "width": 370,
+      "y": 23528.667317708332
+    },
+    "AXUniqueId": null,
+    "subrole": null,
+    "AXFrame": "{{16, 23528.667317708332}, {370, 437}}",
+    "AXValue": null,
+    "content_required": false,
+    "pid": 92690,
+    "role": "AXLink",
+    "type": "Link",
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "help": null,
+    "title": null
+  },
+  {
+    "AXValue": null,
+    "frame": {
+      "y": 23981.667317708332,
+      "height": 136,
+      "width": 370,
+      "x": 16
+    },
+    "enabled": true,
+    "role_description": "heading",
+    "AXUniqueId": null,
+    "subrole": null,
+    "pid": 92690,
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "title": null,
+    "content_required": false,
+    "AXLabel": "ter., 08/09/2026",
+    "help": null,
+    "custom_actions": [],
+    "AXFrame": "{{16, 23981.667317708332}, {370, 136}}",
+    "type": "Heading",
+    "role": "AXHeading"
+  },
+  {
+    "enabled": true,
+    "pid": 92690,
+    "role": "AXStaticText",
+    "AXUniqueId": null,
+    "frame": {
+      "width": 247.6666717529297,
+      "y": 24129.667317708332,
+      "height": 64.33203125,
+      "x": 138.33333587646484
+    },
+    "AXLabel": "−R$ 859,30",
+    "type": "StaticText",
+    "title": null,
+    "custom_actions": [],
+    "AXValue": null,
+    "AXFrame": "{{138.33333587646484, 24129.667317708332}, {247.66667175292969, 64.33203125}}",
+    "content_required": false,
+    "subrole": null,
+    "help": null,
+    "role_description": "text",
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ]
+  },
+  {
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "content_required": false,
+    "type": "Link",
+    "AXFrame": "{{16, 24205.999348958332}, {370, 419.333984375}}",
+    "frame": {
+      "width": 370,
+      "x": 16,
+      "y": 24205.999348958332,
+      "height": 419.333984375
+    },
+    "enabled": true,
+    "AXLabel": "Hotel Serra, R$ 645,00, despesa, ter., 08/09/2026",
+    "help": null,
+    "role": "AXLink",
+    "subrole": null,
+    "AXValue": null,
+    "role_description": "link",
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "AXUniqueId": null,
+    "title": null,
+    "pid": 92690
+  },
+  {
+    "AXFrame": "{{16, 24625.667317708332}, {370, 352}}",
+    "AXUniqueId": null,
+    "subrole": null,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "AXLabel": "Energia, R$ 214,30, despesa, ter., 08/09/2026, atrasado",
+    "title": null,
+    "enabled": true,
+    "role": "AXLink",
+    "help": null,
+    "type": "Link",
+    "role_description": "link",
+    "content_required": false,
+    "frame": {
+      "height": 352,
+      "width": 370,
+      "y": 24625.667317708332,
+      "x": 16
+    },
+    "AXValue": null,
+    "pid": 92690
+  },
+  {
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "type": "Heading",
+    "role_description": "heading",
+    "help": null,
+    "AXValue": null,
+    "role": "AXHeading",
+    "AXUniqueId": null,
+    "content_required": false,
+    "enabled": true,
+    "frame": {
+      "width": 370,
+      "y": 24993.667317708332,
+      "height": 136,
+      "x": 16
+    },
+    "AXFrame": "{{16, 24993.667317708332}, {370, 136}}",
+    "custom_actions": [],
+    "AXLabel": "sex., 04/09/2026",
+    "subrole": null,
+    "pid": 92690,
+    "title": null
+  },
+  {
+    "AXUniqueId": null,
+    "title": null,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "help": null,
+    "frame": {
+      "height": 64.33203125,
+      "y": 25141.667317708332,
+      "x": 138.33333587646484,
+      "width": 247.6666717529297
+    },
+    "pid": 92690,
+    "AXValue": null,
+    "type": "StaticText",
+    "role_description": "text",
+    "content_required": false,
+    "enabled": true,
+    "custom_actions": [],
+    "subrole": null,
+    "AXLabel": "−R$ 980,00",
+    "AXFrame": "{{138.33333587646484, 25141.667317708332}, {247.66667175292969, 64.33203125}}",
+    "role": "AXStaticText"
+  },
+  {
+    "subrole": null,
+    "content_required": false,
+    "type": "Link",
+    "title": null,
+    "AXFrame": "{{16, 25217.999348958332}, {370, 355}}",
+    "AXLabel": "Marcenaria, R$ 980,00, despesa, sex., 04/09/2026",
+    "role": "AXLink",
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "frame": {
+      "x": 16,
+      "width": 370,
+      "height": 355,
+      "y": 25217.999348958332
+    },
+    "AXUniqueId": null,
+    "enabled": true,
+    "AXValue": null,
+    "role_description": "link",
+    "pid": 92690,
+    "help": null,
+    "traits": [
+      "Link",
+      "Scrollable"
+    ]
+  },
+  {
+    "AXFrame": "{{16, 25588.999348958332}, {370, 136}}",
+    "help": null,
+    "role": "AXHeading",
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "enabled": true,
+    "AXValue": null,
+    "custom_actions": [],
+    "pid": 92690,
+    "AXUniqueId": null,
+    "subrole": null,
+    "title": null,
+    "AXLabel": "qua., 02/09/2026",
+    "frame": {
+      "x": 16,
+      "y": 25588.999348958332,
+      "height": 136,
+      "width": 370
+    },
+    "type": "Heading",
+    "role_description": "heading",
+    "content_required": false
+  },
+  {
+    "help": null,
+    "AXUniqueId": null,
+    "frame": {
+      "height": 64.333984375,
+      "width": 289,
+      "x": 97,
+      "y": 25736.999348958332
+    },
+    "role_description": "text",
+    "AXLabel": "−R$ 1.580,00",
+    "subrole": null,
+    "title": null,
+    "AXFrame": "{{97, 25736.999348958332}, {289, 64.333984375}}",
+    "enabled": true,
+    "type": "StaticText",
+    "pid": 92690,
+    "custom_actions": [],
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "role": "AXStaticText",
+    "AXValue": null,
+    "content_required": false
+  },
+  {
+    "type": "Link",
+    "pid": 92690,
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "AXFrame": "{{16, 25813.333333333332}, {370, 501.333984375}}",
+    "role_description": "link",
+    "AXLabel": "Passagem aérea, R$ 1.280,00, despesa, qua., 02/09/2026",
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "frame": {
+      "y": 25813.333333333332,
+      "width": 370,
+      "height": 501.333984375,
+      "x": 16
+    },
+    "AXValue": null,
+    "help": null,
+    "enabled": true,
+    "subrole": null,
+    "role": "AXLink",
+    "AXUniqueId": null,
+    "title": null,
+    "content_required": false
+  },
+  {
+    "role": "AXLink",
+    "pid": 92690,
+    "subrole": null,
+    "AXFrame": "{{16, 26314.999348958332}, {370, 355}}",
+    "AXLabel": "tv (1/10), R$ 300,00, despesa, qua., 02/09/2026",
+    "help": null,
+    "frame": {
+      "height": 355,
+      "y": 26314.999348958332,
+      "x": 16,
+      "width": 370
+    },
+    "AXValue": null,
+    "enabled": true,
+    "role_description": "link",
+    "content_required": false,
+    "type": "Link",
+    "AXUniqueId": null,
+    "title": null,
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "traits": [
+      "Link",
+      "Scrollable"
+    ]
+  },
+  {
+    "enabled": true,
+    "AXUniqueId": null,
+    "role": "AXHeading",
+    "custom_actions": [],
+    "help": null,
+    "traits": [
+      "Scrollable",
+      "StaticText",
+      "Header"
+    ],
+    "AXValue": null,
+    "role_description": "heading",
+    "content_required": false,
+    "AXFrame": "{{16, 26685.999348958332}, {370, 136}}",
+    "title": null,
+    "frame": {
+      "y": 26685.999348958332,
+      "width": 370,
+      "height": 136,
+      "x": 16
+    },
+    "pid": 92690,
+    "subrole": null,
+    "AXLabel": "ter., 01/09/2026",
+    "type": "Heading"
+  },
+  {
+    "frame": {
+      "x": 69.33333206176758,
+      "height": 64.333984375,
+      "y": 26833.999348958332,
+      "width": 316.6666564941406
+    },
+    "custom_actions": [],
+    "content_required": false,
+    "type": "StaticText",
+    "title": null,
+    "AXFrame": "{{69.333332061767578, 26833.999348958332}, {316.66665649414062, 64.333984375}}",
+    "help": null,
+    "AXValue": null,
+    "pid": 92690,
+    "traits": [
+      "StaticText",
+      "Scrollable"
+    ],
+    "AXLabel": "+R$ 16.970,00",
+    "AXUniqueId": null,
+    "enabled": true,
+    "role": "AXStaticText",
+    "subrole": null,
+    "role_description": "text"
+  },
+  {
+    "AXFrame": "{{16, 26910.333333333332}, {370, 416.333984375}}",
+    "custom_actions": [
+      "Paguei",
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "AXLabel": "Aluguel, R$ 1.800,00, despesa, ter., 01/09/2026, atrasado",
+    "title": null,
+    "frame": {
+      "width": 370,
+      "height": 416.333984375,
+      "y": 26910.333333333332,
+      "x": 16
+    },
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "subrole": null,
+    "AXUniqueId": null,
+    "help": null,
+    "content_required": false,
+    "AXValue": null,
+    "type": "Link",
+    "pid": 92690,
+    "enabled": true,
+    "role": "AXLink",
+    "role_description": "link"
+  },
+  {
+    "role": "AXLink",
+    "role_description": "link",
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "help": null,
+    "subrole": null,
+    "AXValue": null,
+    "AXLabel": "geladeira (5/8), R$ 450,00, despesa, ter., 01/09/2026",
+    "AXUniqueId": null,
+    "title": null,
+    "pid": 92690,
+    "AXFrame": "{{16, 27326.999348958332}, {370, 501.333984375}}",
+    "frame": {
+      "y": 27326.999348958332,
+      "width": 370,
+      "x": 16,
+      "height": 501.333984375
+    },
+    "content_required": false,
+    "enabled": true,
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "type": "Link"
+  },
+  {
+    "AXFrame": "{{16, 27828.667317708332}, {370, 419.33203125}}",
+    "frame": {
+      "x": 16,
+      "y": 27828.667317708332,
+      "width": 370,
+      "height": 419.33203125
+    },
+    "content_required": false,
+    "AXLabel": "salário, R$ 20.000,00, receita, ter., 01/09/2026",
+    "help": null,
+    "AXUniqueId": null,
+    "pid": 92690,
+    "AXValue": null,
+    "role_description": "link",
+    "subrole": null,
+    "title": null,
+    "type": "Link",
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "enabled": true,
+    "role": "AXLink",
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ]
+  },
+  {
+    "subrole": null,
+    "custom_actions": [
+      "Ver detalhe",
+      "Editar",
+      "Apagar"
+    ],
+    "AXUniqueId": null,
+    "help": null,
+    "AXLabel": "macbook (1/12), R$ 780,00, despesa, ter., 01/09/2026",
+    "content_required": false,
+    "role_description": "link",
+    "AXFrame": "{{16, 28248.333333333332}, {370, 437}}",
+    "traits": [
+      "Link",
+      "Scrollable"
+    ],
+    "enabled": true,
+    "role": "AXLink",
+    "type": "Link",
+    "pid": 92690,
+    "frame": {
+      "y": 28248.333333333332,
+      "x": 16,
+      "height": 437,
+      "width": 370
+    },
+    "AXValue": null,
+    "title": null
+  }
+]

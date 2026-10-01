@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import {
   Dimensions,
   StyleSheet,
@@ -19,7 +19,7 @@ import Animated, {
 import { DotsLoader } from '@/components/motion/dots-loader';
 import { useCortina } from '@/components/motion/session-curtain';
 import { PressableScale } from '@/components/motion/pressable-scale';
-import { MudancaSuave, usePresenca, usePresencaAtiva } from '@/components/motion/presenca';
+import { usePresenca, usePresencaAtiva } from '@/components/motion/presenca';
 import { useCoresSuaves, useOpacidadeSuave } from '@/components/motion/cores-suaves';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { Icon } from '@/components/ui/icon';
@@ -57,7 +57,7 @@ interface ButtonProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/** Altura visual. O alvo de toque do `sm` chega em 44 pelo `hitSlop`. */
+/** Altura visual mínima. O alvo de toque do `sm` chega em 44 pelo `hitSlop`. */
 const HEIGHT: Record<Size, number> = { sm: 36, md: 50, lg: 54 };
 const SLOP: Record<Size, number> = { sm: (HitTarget - HEIGHT.sm) / 2, md: 0, lg: 0 };
 /** Largura da cápsula de carregamento, em alturas. */
@@ -108,7 +108,12 @@ export function Button({
   const loadingVisual = loading;
   const { presente: loaderPresente } = usePresenca(Boolean(loadingVisual));
   const inert = disabled || loading || !ativo;
-  const altura = HEIGHT[size];
+  // O Text já aplica a escala nativa. A caixa cresce com sua medida, sem escalar a fonte de
+  // novo nem limitar Dynamic Type; a altura medida serve só para desenhar a superfície.
+  const [medida, setMedida] = useState({ width: 0, height: 0 });
+  const altura = Math.max(HEIGHT[size], medida.height);
+  // Muitas linhas podem deixar a caixa mais alta que larga. As tampas continuam dentro dela.
+  const raio = Math.min(altura, medida.width || altura) / 2;
   const off = disabled && !loadingVisual;
   /**
    * A largura medida num valor COMPARTILHADO: lida da captura do worklet, ela ficaria presa no 0
@@ -171,7 +176,7 @@ export function Button({
   }));
   const miolo = useAnimatedStyle(() => {
     const w = largura.get();
-    const meio = Math.max(1, w - altura);
+    const meio = Math.max(1, w - 2 * raio);
     const r = recuo(morph.get());
     return { transform: [{ scaleX: Math.max(0, (meio - 2 * r) / meio) }] };
   });
@@ -184,8 +189,12 @@ export function Button({
     transform: [{ scale: interpolate(morph.get(), [0, 1], [0.6, 1]) }],
   }));
 
-  const medir = (e: LayoutChangeEvent) => largura.set(e.nativeEvent.layout.width);
-  const tampa = { width: altura, height: altura, borderRadius: altura / 2, backgroundColor: cor };
+  const medir = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    largura.set(width);
+    setMedida(anterior => anterior.width === width && anterior.height === height ? anterior : { width, height });
+  };
+  const tampa = { width: 2 * raio, height: altura, borderRadius: raio, backgroundColor: cor };
 
   return (
     <Animated.View ref={caixa} style={[block ? styles.block : styles.hug, style]}>
@@ -210,22 +219,22 @@ export function Button({
           onPress();
         }}
         onLayout={medir}
-        style={[styles.pilula, { height: altura, borderRadius: altura / 2 }]}>
+        style={[styles.pilula, { minHeight: HEIGHT[size], borderRadius: raio }]}>
         {vidro ? (
           <GlassBackdrop
             fallbackColor={fill[variant]}
-            radius={altura / 2}
+            radius={raio}
             tintColor={glassTint}
             effectStyle={variant === 'ghost' ? 'clear' : 'regular'}
           />
         ) : null}
         {vidro ? <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill,
-          { backgroundColor: theme.backgroundElement, borderRadius: altura / 2 }, desligado]} /> : null}
+          { backgroundColor: theme.backgroundElement, borderRadius: raio }, desligado]} /> : null}
         {variant !== 'ghost' && !vidro ? (
           <>
             <Animated.View
               pointerEvents="none"
-              style={[styles.peca, { left: altura / 2, right: altura / 2, height: altura, backgroundColor: cor }, miolo, superficie]}
+              style={[styles.peca, { left: raio, right: raio, height: altura, backgroundColor: cor }, miolo, superficie]}
             />
             <Animated.View pointerEvents="none" style={[styles.peca, { left: 0 }, tampa, tampaEsquerda, superficie]} />
             <Animated.View pointerEvents="none" style={[styles.peca, { right: 0 }, tampa, tampaDireita, superficie]} />
@@ -235,10 +244,11 @@ export function Button({
         <Animated.View
           style={[
             styles.conteudo,
-            { height: altura, paddingHorizontal: size === 'sm' ? Space.lg : Space.xl },
+            { minHeight: HEIGHT[size], paddingHorizontal: size === 'sm' ? Space.lg : Space.xl },
             conteudo,
           ]}>
-          <MudancaSuave valor={`${labelColor}:${label}`} style={styles.conteudo}>
+          {/* Rótulo e ícone medem a largura natural imediatamente ao mudar: a pílula abraça
+              o conteúdo novo sem ficar limitada pela largura de uma camada de crossfade. */}
           {/* No `sm` o ícone acompanha o rótulo: 20px ao lado de um texto de 12 pesa demais. */}
           {icon ? <Icon name={icon} size={size === 'sm' ? 'sm' : 'md'} color={labelColor} /> : null}
           <ThemedText
@@ -247,7 +257,6 @@ export function Button({
             style={styles.semEncolher}>
             {label}
           </ThemedText>
-          </MudancaSuave>
         </Animated.View>
 
         {loaderPresente ? (
@@ -268,6 +277,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: Space.sm,
+    paddingVertical: Space.sm,
   },
   /**
    * O rótulo do botão não encolhe: ele é o identificador da ação (design.md §7), e o botão

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 import type { IconName } from '@/components/ui/icon';
 import type { NoteColorName } from '@/constants/theme';
@@ -10,7 +10,9 @@ import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClie
 
 import type { ProjecaoMensal } from '@/lib/forecast-months';
 import { supabase } from '@/lib/supabase';
-import type { Database } from '@/lib/database.types';
+import { newClientMessageId } from '@/lib/agent-chat';
+import type { DownPaymentInput } from '@/lib/down-payment';
+import type { Database, Json } from '@/lib/database.types';
 import { dataLocalDe, localISODate, mesmoMes, monthBounds, primeiroDiaDoMes } from '@/lib/dates';
 import { avisoDeDeslize } from '@/lib/serie';
 import type { Consulta } from '@/lib/tela-pronta';
@@ -18,6 +20,7 @@ import type { DebtDeclaredEstimateRow, DebtPaymentRow } from '@/lib/debt-history
 import type { ExpectedLedgerLine } from '@/lib/ledger-expected';
 import { agentFetch } from '@/lib/agent-api';
 import { toIlikeTerm } from '@/lib/search';
+import { dateWindows, timestampDateBounds, type ListFiltersValue } from '@/lib/list-filters';
 import { ACCOUNT_TYPES } from '@/lib/accounts';
 import { adiantaveisNoMes, type Adiantavel, type EscolhaDeAdiantamento } from '@/lib/anticipation';
 import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
@@ -98,6 +101,8 @@ export type Transaction = Pick<
   kind: TransactionKind;
   source: TransactionSource;
   status: TransactionStatus;
+  down_payment_debt_id?: string | null;
+  down_payment_plan_id?: string | null;
   /**
    * A data da COMPRA de uma parcela (`dataDaCompra`, `lib/data-da-compra.ts`): a parcela mora no
    * mês em que cai, e "Mostre sempre a data do lançamento" (24/09/2026) pede a da compra.
@@ -207,7 +212,7 @@ export type TxSummaryRow = Omit<Fns['transactions_summary']['Returns'][number], 
 };
 
 const TRANSACTION_COLUMNS =
-  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_balance_after_cents, edit_revision, auto_confirm, rollover_of_invoice_id, pays_invoice_id, installment_plans(first_occurred_at)';
+  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_balance_after_cents, edit_revision, auto_confirm, rollover_of_invoice_id, pays_invoice_id, down_payment_debt_id, down_payment_plan_id, installment_plans!transactions_installment_plan_id_fkey(first_occurred_at)';
 
 export interface TransactionFilters {
   /**
@@ -224,8 +229,8 @@ export interface TransactionFilters {
    *
    * O botão `Mês | Ciclo` ficava bem em cima de uma lista que o ignorava.
    */
-  from: string;
-  to: string;
+  from?: string;
+  to?: string;
   kind?: TransactionKind;
   category?: string;
   /** Ocorrências de uma série recorrente. */
@@ -236,6 +241,8 @@ export interface TransactionFilters {
   source?: TransactionSource;
   /** Busca em descrição, lugar e categoria. */
   q?: string;
+  minCents?: number;
+  maxCents?: number;
   /**
    * `false` enquanto `from`/`to` ainda são o palpite civil de `useMonthRange`.
    *
@@ -266,10 +273,9 @@ export function useTransactions(filters: TransactionFilters) {
     initialPageParam: 0,
     queryFn: async ({ pageParam }): Promise<Transaction[]> => {
       let query = supabase.from('transactions').select(TRANSACTION_COLUMNS);
-      // Both recorded and calculated occurrences use the visible bounded period.
-      // The old unbounded recurring view could only show recorded rows and hid all
-      // future dates that had not yet been materialized by the scheduler.
-      query = query.gte('occurred_at', from).lte('occurred_at', to);
+      // Borda ausente significa intervalo aberto; nunca enviar gte/lte.undefined.
+      if (from) query = query.gte('occurred_at', from);
+      if (to) query = query.lte('occurred_at', to);
       query = query
         .order('occurred_at', { ascending: false })
         .order('created_at', { ascending: false })
@@ -280,6 +286,8 @@ export function useTransactions(filters: TransactionFilters) {
         .range(pageParam, pageParam + TRANSACTION_PAGE - 1);
       if (filters.kind) query = query.eq('kind', filters.kind);
       if (filters.category) query = query.eq('category', filters.category);
+      if (filters.minCents !== undefined) query = query.gte('amount_cents', filters.minCents);
+      if (filters.maxCents !== undefined) query = query.lte('amount_cents', filters.maxCents);
       // "Em aberto"/"Concluído" na régua da DATA, a mesma da pílula (`filtroDoEstado`).
       if (filters.status) {
         const estado = filtroDoEstado(filters.status, localISODate());
@@ -321,19 +329,28 @@ export function useTransactions(filters: TransactionFilters) {
 }
 
 /** Missing, calculated occurrences for the same bounded window as Lançamentos. */
-export function useExpectedLedgerLines(from: string, to: string, pronto: boolean, recurringId?: string) {
+export function useExpectedLedgerLines(from: string | undefined, to: string | undefined, pronto: boolean, recurringId?: string) {
   useRealtimeInvalidate('transactions', ['ledger-expected']);
   useRealtimeInvalidate('debts', ['ledger-expected']);
   useRealtimeInvalidate('recurring_transactions', ['ledger-expected']);
   return useQuery({
-    enabled: pronto,
+    enabled: pronto && Boolean(from && to),
     queryKey: ['ledger-expected', from, to, recurringId ?? ''],
-    queryFn: async (): Promise<ExpectedLedgerLine[]> => {
-      const { data, error } = await supabase.rpc('ledger_expected_lines', {
-        p_from: from, p_to: to, p_recurring_id: recurringId ?? undefined,
-      });
-      if (error) throw error;
-      return (data ?? []) as ExpectedLedgerLine[];
+    queryFn: async ({ signal }): Promise<ExpectedLedgerLine[]> => {
+      // Refetch manual ignora enabled: intervalo aberto também deve ser seguro aqui.
+      if (!from || !to) return [];
+      const windows = dateWindows(from, to);
+      const rows: ExpectedLedgerLine[] = [];
+      // A RPC aceita 62 dias. Lotes de quatro limitam carga e uma falha rejeita o período inteiro.
+      for (let i = 0; i < windows.length; i += 4) {
+        const batches = await Promise.all(windows.slice(i, i + 4).map(window =>
+          fetchPaged<ExpectedLedgerLine>((start, end) => supabase.rpc('ledger_expected_lines', {
+            p_from: window.from, p_to: window.to, p_recurring_id: recurringId ?? undefined,
+          }).order('due_date').order('origin').order('ref_id').range(start, end).abortSignal(signal)),
+        ));
+        rows.push(...batches.flat());
+      }
+      return rows;
     },
   });
 }
@@ -437,12 +454,13 @@ export function useRecentTransactions(limit = 5) {
  * primeiro com o palpite civil e depois de novo com o ciclo — trabalho dobrado no caminho feliz,
  * e o número do mês ERRADO no caminho em que as bordas falham.
  */
-export function useTransactionsSummary(fromDate: string, toDate: string, pronto = true) {
+export function useTransactionsSummary(fromDate: string | undefined, toDate: string | undefined, pronto = true) {
   useRealtimeInvalidate('transactions', ['tx-summary']);
   return useQuery({
-    enabled: pronto,
+    enabled: pronto && Boolean(fromDate && toDate),
     queryKey: ['tx-summary', fromDate, toDate],
     queryFn: async (): Promise<TxSummaryRow[]> => {
+      if (!fromDate || !toDate) return [];
       const { data, error } = await supabase.rpc('transactions_summary', {
         from_date: fromDate,
         to_date: toDate,
@@ -496,18 +514,19 @@ export function useAccountBalances() {
   });
 }
 
-export function useAccounts() {
+export function useAccounts(selectedId?: string | null, includeArchived = false) {
   useRealtimeInvalidate('accounts', ['accounts']);
   return useQuery({
-    queryKey: ['accounts'],
+    queryKey: selectedId || includeArchived ? ['accounts', includeArchived ? 'all' : selectedId] : ['accounts'],
     queryFn: async (): Promise<Account[]> => {
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('id, name, type, initial_balance_cents, archived, closing_day, due_day, credit_limit_cents, payment_account_id, closing_day_inclusive, rotativo_auto, rotativo_rate_monthly, created_at')
-        .eq('archived', false)
-        .order('created_at');
-      if (error) throw error;
-      return data as Account[];
+      return fetchPaged<Account>((from, to) => {
+        let query = supabase
+          .from('accounts')
+          .select('id, name, type, initial_balance_cents, archived, closing_day, due_day, credit_limit_cents, payment_account_id, closing_day_inclusive, rotativo_auto, rotativo_rate_monthly, created_at')
+          .order('created_at').order('id');
+        if (!includeArchived) query = selectedId ? query.or(`archived.eq.false,id.eq.${selectedId}`) : query.eq('archived', false);
+        return query.range(from, to);
+      });
     },
   });
 }
@@ -642,14 +661,11 @@ export function useRecurringTransactions() {
   return useQuery({
     queryKey: ['recurring'],
     queryFn: async (): Promise<RecurringTransaction[]> => {
-      const { data, error } = await supabase
-        .from('recurring_transactions')
+      return fetchPaged<RecurringTransaction>((from, to) => supabase.from('recurring_transactions')
         .select(RECURRING_COLUMNS)
         // ativas primeiro; dentro de cada grupo, a que roda antes
         .order('active', { ascending: false })
-        .order('next_run_at');
-      if (error) throw error;
-      return data as RecurringTransaction[];
+        .order('next_run_at').order('id').range(from, to));
     },
   });
 }
@@ -687,7 +703,7 @@ export function useTransaction(id: string | undefined) {
       // no lugar do "esse lançamento não existe mais".
       const { data, error } = await supabase
         .from('transactions')
-        .select(`${TRANSACTION_COLUMNS}, debts(name, kind, calculation_mode, installments)`)
+        .select(`${TRANSACTION_COLUMNS}, debts!transactions_debt_id_fkey(name, kind, calculation_mode, installments)`)
         .eq('id', id!)
         .maybeSingle();
       if (error) throw error;
@@ -915,11 +931,18 @@ export function useSettleInvoice() {
  */
 export function useCreateInstallmentPlan() {
   const invalidate = useInvalidateFinance();
+  const attempt = useRef<{ key: string; id: string } | null>(null);
   return useMutation({
     // O que vai à RPC sai de `argsDaParcelada` — a mesma função da hipótese (`simular`).
     mutationFn: async (input: EntradaParcelada) => {
       const { rpc, args } = argsDaParcelada(input);
-      const { error } = await supabase.rpc(rpc, args);
+      const dados = { ...args, ultimo_dia: rpc === 'create_installment_plan_last_day',
+        ...(input.downPayment ? { down_payment: input.downPayment } : {}) };
+      const key = JSON.stringify(dados);
+      if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
+      const { error } = await supabase.rpc('create_purchase', {
+        p_tipo: 'parcelada', p_dados: dados, p_request_id: attempt.current.id,
+      });
       if (error) throw error;
     },
     onSuccess: invalidate,
@@ -1008,7 +1031,21 @@ export function useConvertToInstallments() {
       accountId: string;
       /** "Parcelas já pagas", como na criação (`20260926130000`). */
       paidInstallments?: number | null;
+      downPayment?: DownPaymentInput;
     }) => {
+      if (input.downPayment) {
+        const { error } = await supabase.rpc('converter_registro', {
+          p_origem: { tipo: 'transacao', id: input.transactionId }, p_alcance: 'converter',
+          p_destino: { tipo: 'parcelada', dados: {
+            p_account_id: input.accountId, p_total_cents: input.totalCents,
+            p_installments: input.installments, p_occurred_at: input.firstOccurredAt,
+            p_paid_installments: input.paidInstallments ?? 0, p_description: input.description,
+            p_category: input.category, p_merchant: input.merchant, down_payment: input.downPayment,
+          } },
+        });
+        if (error) throw error;
+        return;
+      }
       const { error } = await supabase.rpc('convert_transaction_to_installments', {
         p_transaction_id: input.transactionId,
         p_total_cents: input.totalCents,
@@ -1824,15 +1861,12 @@ export function useDebts() {
   return useQuery({
     queryKey: ['debts'],
     queryFn: async (): Promise<Debt[]> => {
-      const { data, error } = await supabase
-        .from('debts')
+      return fetchPaged<Debt>((from, to) => supabase.from('debts')
         .select(
           DEBT_COLUMNS,
         )
         .eq('archived', false)
-        .order('remaining_cents', { ascending: false });
-      if (error) throw error;
-      return data as Debt[];
+        .order('remaining_cents', { ascending: false }).order('id').range(from, to));
     },
   });
 }
@@ -1939,15 +1973,11 @@ export function useArchivedDebts() {
   useRealtimeInvalidate('debts', ['debts', 'archived']);
   return useQuery({
     queryKey: ['debts', 'archived'],
-    queryFn: async (): Promise<Debt[]> => {
-      const { data, error } = await supabase
+    queryFn: (): Promise<Debt[]> => fetchPaged<Debt>((from, to) => supabase
         .from('debts')
         .select(DEBT_COLUMNS)
         .eq('archived', true)
-        .order('name');
-      if (error) throw error;
-      return data as Debt[];
-    },
+        .order('name').order('id').range(from, to)),
   });
 }
 
@@ -2573,6 +2603,7 @@ export function useCreateRecurring() {
 
 export function useSaveDebt() {
   const invalidate = useInvalidateFinance();
+  const attempt = useRef<{ key: string; id: string } | null>(null);
   return useMutation({
     mutationFn: async (input: {
       id?: string;
@@ -2589,6 +2620,7 @@ export function useSaveDebt() {
       due_day: number | null;
       /** A âncora do contrato (`debts.first_due_date`) — só vai quando a tela a conhece. */
       first_due_date?: string | null;
+      down_payment?: DownPaymentInput;
       /**
        * O `updated_at` da dívida quando o formulário abriu (24/09/2026). Um "Paguei" pelo WhatsApp
        * com o formulário aberto muda as pagas e o saldo; sem esta trava o salvar os sobrescrevia
@@ -2596,7 +2628,7 @@ export function useSaveDebt() {
        */
       versao?: string | null;
     }) => {
-      const { id, versao, ...resto } = input;
+      const { id, versao, down_payment, ...resto } = input;
       if (id) {
         let consulta = supabase.from('debts').update(resto).eq('id', id);
         if (versao) consulta = consulta.eq('updated_at', versao);
@@ -2605,7 +2637,12 @@ export function useSaveDebt() {
         if (!data?.length) throw Object.assign(new Error('A dívida mudou enquanto você editava.'), { code: 'VERSAO' });
       } else {
         // O que vai ao banco sai de `linhaDoFinanciamento` — a mesma função da hipótese.
-        const { error } = await supabase.from('debts').insert({ ...linhaDoFinanciamento(resto), user_id: await userId() } as never);
+        const dados = { ...linhaDoFinanciamento(resto), ...(down_payment ? { down_payment } : {}) };
+        const key = JSON.stringify(dados);
+        if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
+        const { error } = await supabase.rpc('create_purchase', {
+          p_tipo: 'financiamento', p_dados: dados as Json, p_request_id: attempt.current.id,
+        });
         if (error) throw error;
       }
     },
@@ -4001,23 +4038,33 @@ export interface ImportBatchSummary {
  * a importação sumia do histórico sem aviso. `keepPreviousData` segura a lista na tela enquanto a
  * página maior chega.
  */
-export function useImportBatches(limit = 20) {
+export function useImportBatches(limit = 20, filters: ListFiltersValue = {}) {
   useRealtimeInvalidate('import_items', ['import-batches']);
   return useQuery({
-    placeholderData: keepPreviousData,
-    queryKey: ['import-batches', String(limit)],
+    placeholderData: (previous, query) => JSON.stringify(query?.queryKey[2] ?? {}) === JSON.stringify(filters) ? previous : undefined,
+    queryKey: ['import-batches', String(limit), filters],
     queryFn: async (): Promise<ImportBatchSummary[]> => {
-      const { data: batches, error } = await supabase
-        .from('import_batches')
-        .select('id, filename, source, account_id, status, error, created_at')
-        .order('created_at', { ascending: false })
-        .limit(limit);
-      if (error) throw error;
-      if (!batches?.length) return [];
+      const bounds = timestampDateBounds(filters);
+      const term = toIlikeTerm(filters.q ?? '');
+      // Novo builder por página: range e predicados nunca vazam para outro pedido.
+      const batches = await fetchPaged<Omit<ImportBatchSummary, 'total' | 'pendentes' | 'aprovados' | 'descartados' | 'duplicados'>>((from, to) => {
+        if (from >= limit) return Promise.resolve({ data: [], error: null });
+        let query = supabase.from('import_batches')
+          .select('id, filename, source, account_id, status, error, created_at')
+          .order('created_at', { ascending: false }).order('id', { ascending: false });
+        if (bounds.from) query = query.gte('created_at', bounds.from);
+        if (bounds.before) query = query.lt('created_at', bounds.before);
+        if (term) query = query.ilike('filename', `%${term}%`);
+        if (filters.selections?.source) query = query.eq('source', filters.selections.source);
+        if (filters.selections?.accountId) query = filters.selections.accountId === NO_ACCOUNT
+          ? query.is('account_id', null) : query.eq('account_id', filters.selections.accountId);
+        return query.range(from, Math.min(to, limit - 1));
+      });
+      if (!batches.length) return [];
 
       const ids = batches.map((b) => b.id);
-      const rows = await fetchPaged<{ batch_id: string; status: string }>((from, to) =>
-        supabase.from('import_items').select('batch_id, status').in('batch_id', ids).range(from, to),
+      const rows = await fetchPagedEmLotes<{ batch_id: string; status: string }>(ids, (lote, from, to) =>
+        supabase.from('import_items').select('batch_id, status').in('batch_id', lote).order('id').range(from, to),
       );
 
       const contagem = new Map<string, Record<string, number>>();

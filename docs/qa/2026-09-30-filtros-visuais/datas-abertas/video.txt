@@ -1,0 +1,44 @@
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from '/private/tmp/proops-open-dates-ios-reset-cancel.mp4':
+  Metadata:
+    major_brand     : qt  
+    minor_version   : 0
+    compatible_brands: qt  
+    creation_time   : 2026-10-01T00:03:10.000000Z
+  Duration: 00:00:28.47, start: 0.000000, bitrate: 2964 kb/s
+  Stream #0:0[0x1](und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709/smpte432/iec61966-2-1, progressive), 1206x2622, 2959 kb/s, 32.49 fps, 600 tbr, 600 tbn (default)
+    Metadata:
+      creation_time   : 2026-10-01T00:03:10.000000Z
+      handler_name    : Core Media Video
+      vendor_id       : [0][0][0][0]
+      encoder         : H.264
+Stream mapping:
+  Stream #0:0 -> #0:0 (h264 (native) -> png (native))
+Press [q] to stop, [?] for help
+[swscaler @ 0x1284c8000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0x1284c8000] [swscaler @ 0x1383c8000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0x1284c8000] [swscaler @ 0x131620000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0x1284c8000] [swscaler @ 0x131630000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0x1284c8000] [swscaler @ 0x1284d8000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0x1284c8000] [swscaler @ 0x1284e8000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0x1284c8000] [swscaler @ 0x1383d8000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0x1284c8000] [swscaler @ 0x1383e8000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0x1284c8000] [swscaler @ 0x138770000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0x1284c8000] [swscaler @ 0x138780000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0x1284c8000] [swscaler @ 0x138790000] No accelerated colorspace conversion found from yuv420p to rgb24.
+[swscaler @ 0x1284c8000] [swscaler @ 0x1387a0000] No accelerated colorspace conversion found from yuv420p to rgb24.
+Output #0, image2, to '/private/tmp/proops-open-dates-ios-video-frame3.png':
+  Metadata:
+    major_brand     : qt  
+    minor_version   : 0
+    compatible_brands: qt  
+    encoder         : Lavf62.12.102
+  Stream #0:0(und): Video: png, rgb24(pc, gbr/smpte432/iec61966-2-1, progressive), 1206x2622, q=2-31, 200 kb/s, 32.49 fps, 32.49 tbn (default)
+    Metadata:
+      encoder         : Lavc62.28.102 png
+      creation_time   : 2026-10-01T00:03:10.000000Z
+      handler_name    : Core Media Video
+      vendor_id       : [0][0][0][0]
+[image2 @ 0x146f11120] The specified filename '/private/tmp/proops-open-dates-ios-video-frame3.png' does not contain an image sequence pattern or a pattern is invalid.
+[image2 @ 0x146f11120] Use a pattern such as %03d for an image sequence or use the -update option (with -frames:v 1 if needed) to write a single image.
+[out#0/image2 @ 0x146f12f90] video:304KiB audio:0KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown
+frame=    1 fps=0.0 q=-0.0 Lsize=N/A time=00:00:00.03 bitrate=N/A speed=0.157x elapsed=0:00:00.19    

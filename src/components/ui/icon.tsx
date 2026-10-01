@@ -190,6 +190,7 @@ const MATERIAL: Record<string, MaterialName> = {
   'stop.fill': 'stop',
   'fork.knife': 'restaurant',
   'arrow.clockwise': 'sync',
+  'arrow.counterclockwise': 'replay',
   xmark: 'close',
   'xmark.circle': 'cancel',
 

@@ -683,7 +683,7 @@ test('todo Sheet abre com TaskHeader', () => {
     for (const m of code.matchAll(/<Sheet[\s>]/g)) {
       const inicio = m.index ?? 0;
       // Um corpo do formulário único (`components/finance/formulario-*`) abre com o `TaskHeader` dele.
-      if (!/<(?:TaskHeader|FormularioDaSerie|FormularioDaDivida)[\s/>]/.test(code.slice(inicio, inicio + 400))) {
+      if (!/<(?:TaskHeader|FormularioDaSerie|FormularioDaDivida|FiltersEditor)[\s/>]/.test(code.slice(inicio, inicio + 400))) {
         fora.push(`${file.replace(SRC, 'src')}:${code.slice(0, inicio).split('\n').length}`);
       }
     }
@@ -879,7 +879,8 @@ test('o resumo e a lista de lançamentos leem a mesma janela', () => {
     // Tela sem lista de lançamentos não tem o que casar — a home do Financeiro tem só o resumo.
     if (!lista) continue;
     const nome = file.replace(SRC, 'src');
-    const resumo = code.match(/useTransactionsSummary\(\s*([\w.]+)\.from\s*,\s*\1\.to\s*,\s*\1\.pronto\s*\)/);
+    // AND pode desligar o resumo oculto, mas nunca ligá-lo antes das bordas definitivas.
+    const resumo = code.match(/useTransactionsSummary\(\s*([\w.]+)\.from\s*,\s*\1\.to\s*,\s*\1\.pronto(?:\s*&&\s*!?\w+)?\s*\)/);
     if (!resumo) fora.push(`${nome}: o resumo não lê from/to/pronto da mesma variável da lista`);
     else if (resumo[1] !== lista[1]) fora.push(`${nome}: resumo lê ${resumo[1]}, lista lê ${lista[1]}`);
   }
@@ -1480,6 +1481,7 @@ test('toda tela de dados tem puxar para atualizar', () => {
     'app/paywall.tsx': 'oferta, não lista',
     'app/reminder-form.tsx': 'formulário',
     'app/finance/lancar.tsx': 'formulário',
+    'app/finance/down-payment.tsx': 'formulário de entrada',
     'app/notes/[id].tsx': 'editor: puxar competiria com a rolagem do texto',
     'app/(tabs)/agent/index.tsx': 'compositor; o histórico tem o gesto',
     'app/finance/wallet.tsx': 'carrossel de cartões',

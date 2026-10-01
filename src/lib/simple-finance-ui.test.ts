@@ -12,8 +12,10 @@ const require = createRequire(import.meta.url);
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { executarEfeitos?: boolean; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any } = {}) {
+function screen(file: string, options: { fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any } = {}) {
   const state: any[] = [];
+  const timers = new Map<number, () => void>();
+  let timerId = 0;
   const conclusoesDeAnimacao: ((terminou: boolean) => void)[] = [];
   let cursor = 0;
   let desmontado = false;
@@ -37,6 +39,10 @@ function screen(file: string, options: { executarEfeitos?: boolean; reduzirMovim
   const simulacoes: any[] = [];
   /** O que cada chamada do portão da tela recebeu — o dublê dele abre sempre, então é por aqui que se confere a COMPOSIÇÃO. */
   const gates: any[][] = [];
+  /** Contratos de consulta emitidos pela tela; cada render deixa a chamada mais recente no fim. */
+  const transactionQueries: any[] = [];
+  const expectedQueries: { from?: string; to?: string; pronto: boolean; recurringId?: string }[] = [];
+  const summaryQueries: { from?: string; to?: string; pronto: boolean }[] = [];
   const query = { data: [], isLoading: false, isError: false, isRefetching: false, refetch: async () => {} };
   /** As mesmas escritas de `writes`, com as opções (`onSuccess`/`onError`) — é por aqui que se chama o retorno. */
   const pedidos: { operation: string; value: any; opts: any }[] = [];
@@ -112,7 +118,7 @@ function screen(file: string, options: { executarEfeitos?: boolean; reduzirMovim
     // A tela do ciclo mostra o esqueleto enquanto não tem a série — sem este dublê ela nunca
     // chega a renderizar linha nenhuma, e o teste passaria a medir o esqueleto.
     // `cycleSeriesPending`: a série de OUTRO mês chegando (a troca de mês, com o portão já aberto).
-    useCycleSeries: () => options.cycleSeriesError ? { ...query, isError: true, isPending: false, data: undefined, refetch: async () => { refetches.push('serie'); } } : options.cycleSeriesPending ? { ...query, isLoading: true, isPending: true, data: undefined } : ({ ...query, isPending: false, data: [options.cycleRow ?? {
+    useCycleSeries: () => options.cycleSeriesError ? { ...query, isError: true, isPending: false, data: undefined, refetch: async () => { refetches.push('serie'); } } : options.cycleSeriesPending ? { ...query, isLoading: true, isPending: true, fetchStatus: 'fetching', data: undefined } : ({ ...query, isPending: false, data: [options.cycleRow ?? {
       mes: '2026-09-01', ini: '2026-08-11', fim: '2026-09-10', estado: 'fechado',
       comecei_com: 86797, entrou: 633062, saiu: 719787, resultado: 72,
       caixa_no_fim: 72, faltou_pagar: 37164, confere: true,
@@ -139,14 +145,23 @@ function screen(file: string, options: { executarEfeitos?: boolean; reduzirMovim
       fica desligada — `isPending` para sempre, sem dado. É exatamente o estado que prendia a
       lista no esqueleto quando as bordas falhavam, então o dublê tem que reproduzi-lo.
     */
-    useTransactions: (filters: { pronto?: boolean }) => filters.pronto === false
+    useTransactions: (filters: { pronto?: boolean }) => {
+      transactionQueries.push({ ...filters });
+      return filters.pronto === false
       ? { ...query, data: undefined, isPending: true, fetchStatus: 'idle', hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => {}, refetch: async () => { refetches.push('list'); } }
       // Uma linha: com a lista vazia o card do resumo SOME de propósito (card que soma uma lista
       // vazia é eco — design.md §1), e o caminho feliz não teria o que mostrar.
       : options.listError
         ? { ...query, data: undefined, isError: true, isPending: false, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => {}, refetch: async () => { refetches.push('list'); } }
-        : { ...query, data: { pages: [options.txs ?? [{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared' }]], pageParams: [] }, isPending: false, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => {}, refetch: async () => { refetches.push('list'); } },
-    useExpectedLedgerLines: () => ({ ...query, isError: Boolean(options.expectedError), data: options.expectedError ? undefined : options.expectedLines ?? [], refetch: async () => { refetches.push('expected'); } }),
+        : { ...query, data: { pages: [options.txs ?? [{ id: 'tx-1', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Mercado', category: 'mercado', account_id: null, status: options.txStatus ?? 'cleared' }]], pageParams: [] }, isPending: false, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => {}, refetch: async () => { refetches.push('list'); } };
+    },
+    useExpectedLedgerLines: (from?: string, to?: string, pronto = true, recurringId?: string) => {
+      expectedQueries.push({ from, to, pronto, recurringId });
+      // Desligar não apaga dados/erro em cache; a tela precisa ignorá-los deliberadamente.
+      return { ...query, isPending: !pronto && !options.expectedError, fetchStatus: 'idle',
+        isError: Boolean(options.expectedError), data: options.expectedError ? undefined : options.expectedLines ?? [],
+        refetch: async () => { refetches.push('expected'); } };
+    },
     useMonthSummary: () => ({ ...query, data: options.monthSummary ?? null }),
     useAccounts: () => ({ ...query, data: options.forecastAccounts ?? [] }),
     useCashFlowForecast: () => ({ ...query, data: [{ day: '2026-09-18', balance_cents: 10000, in_cents: 0, out_cents: 0 }] }),
@@ -206,12 +221,16 @@ function screen(file: string, options: { executarEfeitos?: boolean; reduzirMovim
     useDailySpending: (from: string, to: string) => options.gastosError
       ? { ...query, isError: true, isSuccess: false, data: undefined, refetch: async () => { refetches.push('gastos'); } }
       : { ...query, isSuccess: true, data: options.gastos ?? [], janela: [from, to], refetch: async () => { refetches.push('gastos'); } },
-    useTransactionsSummary: (from: string, to: string) => options.resumoPendente ? { ...query, isPending: true, isLoading: true, isSuccess: false, fetchStatus: 'fetching', data: undefined } : ({
+    useTransactionsSummary: (from?: string, to?: string, pronto = true) => {
+      summaryQueries.push({ from, to, pronto });
+      return !pronto ? { ...query, isPending: true, fetchStatus: 'idle', data: undefined,
+        refetch: async () => { refetches.push('summary'); } } : options.resumoPendente ? { ...query, isPending: true, isLoading: true, isSuccess: false, fetchStatus: 'fetching', data: undefined } : ({
       ...query,
       isSuccess: true,
       data: from === to ? (options.saiuHoje ?? []) : (options.saiuNoCiclo ?? []),
       refetch: async () => { refetches.push('summary'); },
-    }),
+    });
+    },
     useMarkPaid: () => mutation('markPaid'),
     useConfirmPaymentScoped: () => mutation('confirmPaymentScoped'),
     useSaveTransactionScoped: () => mutation('saveScoped'),
@@ -271,7 +290,11 @@ function screen(file: string, options: { executarEfeitos?: boolean; reduzirMovim
   const load = (path: string): any => {
     const module = { exports: {} as any };
     const code = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-    runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
+    runInNewContext(code, { module, exports: module.exports, performance,
+      ...(options.controlarTimers ? {
+        setTimeout: (fn: () => void) => { const id = ++timerId; timers.set(id, fn); return id; },
+        clearTimeout: (id: number) => timers.delete(id),
+      } : {}), require: (name: string) => {
       if (name === 'react') return react;
       // A preferência gravada vale como `useState` dentro de uma visita; o disco tem teste próprio
       // (`use-preferencia.test.ts`).
@@ -289,7 +312,7 @@ function screen(file: string, options: { executarEfeitos?: boolean; reduzirMovim
       // Import relativo dentro de `src/lib` (o `rascunho.ts` importa `./escrita.ts`): o módulo de verdade.
       if (name.startsWith('./') && path.startsWith('src/lib/')) return load(`src/lib/${name.slice(2)}`);
       if (name === 'react/jsx-runtime') return require(name);
-      if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', useWindowDimensions: () => ({ width: 384, height: 800 }), Platform: { OS: 'android', select: (o: any) => o.android ?? o.default } };
+      if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', SectionList: 'SectionList', useWindowDimensions: () => ({ width: 384, height: 800, fontScale: options.fontScale ?? 1 }), Platform: { OS: 'android', select: (o: any) => o.android ?? o.default } };
       // `View` também no topo: sem `__esModule`, o `import Animated from` do TS lê o módulo inteiro.
       if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, View: 'AnimatedView', FadeInDown: animation, FadeOut: animation, FadeIn: animation, ReduceMotion: { System: 'system' }, LinearTransition: animation, useAnimatedRef: () => ({ current: null }),
         // O crossfade do Lançar: com "reduzir movimento" a troca é imediata, e o teste lê a tela logo depois.
@@ -310,6 +333,7 @@ function screen(file: string, options: { executarEfeitos?: boolean; reduzirMovim
       if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, Redirect: 'Redirect', useLocalSearchParams: () => options.params ?? (file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), useFocusEffect: () => {}, useIsFocused: () => true, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }), dismissAll: () => navigations.push({ dismissAll: true }), dismiss: (n?: number) => navigations.push({ dismiss: n ?? 1 }), canDismiss: () => !options.primeiraDaPilha, canGoBack: () => !options.primeiraDaPilha } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
+      if (name === '@/components/ui/filter-bar') return load('src/components/ui/filter-bar.tsx');
       if (name === '@/lib/supabase' && file.endsWith('finance/recurring.tsx')) return { supabase: {
         from: () => {
           const filters: Record<string, unknown> = {};
@@ -358,7 +382,7 @@ function screen(file: string, options: { executarEfeitos?: boolean; reduzirMovim
       if (name === '@/components/finance/formulario-da-serie' && file.endsWith('finance/recurring.tsx')) return load('src/components/finance/formulario-da-serie.tsx');
       // O da dívida (Task 5): de verdade só em Dívidas, pelo mesmo motivo.
       if (name === '@/components/finance/formulario-da-divida' && file.endsWith('finance/debts.tsx')) return load('src/components/finance/formulario-da-divida.tsx');
-      if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useReminders: () => ({ ...query, isSuccess: true, data: { pages: [options.reminders ?? []], pageParams: [0] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }), useToggleReminder: () => mutation('toggleReminder'), useDeleteReminder: () => mutation('deleteReminder') };
+      if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: options.datasReais ? load('src/lib/dates.ts').formatDateBR : () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useReminders: () => ({ ...query, isSuccess: true, data: { pages: [options.reminders ?? []], pageParams: [0] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }), useToggleReminder: () => mutation('toggleReminder'), useDeleteReminder: () => mutation('deleteReminder') };
       if (name === '@/hooks/use-session') return { useSession: () => ({ session: { user: { id: 'user-1' } } }) };
       if (name === '@/hooks/use-profile') return { useProfile: () => ({ ...query, isSuccess: true, data: { display_name: 'Gabriel Almeida', phone: null } }) };
       if (name === '@/hooks/use-proximo-passo') return { useProximoPasso: () => ({ passo: options.proximo ?? null, dispensar: (id: string) => writes.push({ operation: 'dispensarProximo', value: id }), consultas: [] }) };
@@ -387,7 +411,7 @@ function screen(file: string, options: { executarEfeitos?: boolean; reduzirMovim
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
-      if (name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/categorias') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/categorias') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       // o `categorias.ts` importa o mapa de ícones por caminho relativo (roda no `node --test` puro)
       if (name === '../design/category-icons.ts') return { categoryIcon: () => 'circle' };
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
@@ -399,11 +423,12 @@ function screen(file: string, options: { executarEfeitos?: boolean; reduzirMovim
       if (name === '@/lib/ledger-expected') return load('src/lib/ledger-expected.ts');
       if (name === '@/components/finance/expected-ledger-lines') return {
         LinhaPrevista: 'LinhaPrevista',
-        useAcoesDaPrevista: () => ({ abrir: (line: any) => { refetches.push(`abrir:${line.ref_id}`); }, acoes: () => [], emTransito: [] }),
+        useAcoesDaPrevista: () => ({ abrir: (line: any) => { refetches.push(`abrir:${line.ref_id}`); }, acoes: () => [], emTransito: options.expectedInTransit ?? [] }),
       };
       if (name === '@/lib/rrule-text') return { describeRRule: () => 'todo mês' };
       if (name === '@/hooks/use-archived-folders') return { useArchivedFolders: () => ({ ...query, isSuccess: true, data: options.pastasArquivadas ?? [] }) };
       if (name === '@/hooks/use-notes') return new Proxy({
+        useNoteTags: () => ({ ...query, isSuccess: true, data: options.noteTags ?? [] }),
         useNoteFolders: () => ({ ...query, isSuccess: true, data: options.folders ?? [] }),
         useNotesList: () => options.notesError ? { ...query, isError: true, data: undefined, refetch: async () => { refetches.push('notas'); } } : ({ ...query, isSuccess: true, data: { pages: [options.notes ?? []] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }),
         folderTree: (lista: any[]) => lista.map((f) => ({ ...f, depth: 0 })),
@@ -477,11 +502,12 @@ function screen(file: string, options: { executarEfeitos?: boolean; reduzirMovim
       if (name === '@/components/ui/toast') return { useToast: () => (t: any) => toasts.push(t), useSubirAcimaDoToast: () => ({}) };
       // O provider de "esconder saldo" só existe dentro da árvore real; aqui o valor aparece.
       if (name === '@/components/ui/conceal') return {
-        useConceal: () => ({ concealed: false, toggle: () => {} }),
+        useConceal: () => ({ concealed: Boolean(options.concealed), toggle: () => {} }),
         concealText: () => '••••••',
-        useBRL: () => (cents: number) => `R$ ${(cents / 100).toFixed(2)}`,
+        useBRL: () => (cents: number) => options.concealed ? '••••••' : `R$ ${(cents / 100).toFixed(2)}`,
       };
-      if (name === '@/design/tokens') return { Motion: { duration: { fast: 120, base: 200, morph: 180 }, stagger: {}, easing: {}, spring: { morph: { stiffness: 360, damping: 26, mass: 1 } } }, IconSize: { md: 24 }, Space: {}, Radius: {}, tabular: {}, Elevation: { light: {}, dark: {} }, Type: new Proxy({}, { get: () => ({}) }) };
+      if (name === '@/components/ui/money') return { Money: 'Money', DinheiroEncolhe: { Provider: 'DinheiroEncolhe.Provider' } };
+      if (name === '@/design/tokens') return { Motion: { duration: { fast: 120, base: 200, morph: 180 }, stagger: {}, easing: {}, spring: { morph: { stiffness: 360, damping: 26, mass: 1 } } }, IconSize: { md: 24 }, Space: { xs: 4, md: 12, lg: 16 }, Radius: {}, tabular: {}, Elevation: { light: {}, dark: {} }, Type: new Proxy({}, { get: () => ({}) }) };
       return new Proxy({}, { get: (_, key) => String(key) });
     } });
     return module.exports;
@@ -494,7 +520,7 @@ function screen(file: string, options: { executarEfeitos?: boolean; reduzirMovim
     if (node.type?.name === 'Presenca' && !node.props.visivel) return;
     nodes.push(node);
     visit(node.props.children);
-    if (node.type === 'Screen' && file.endsWith('finance/recurring.tsx')) visit(node.props.search);
+    if (node.type === 'Screen' && (file.endsWith('finance/recurring.tsx') || file === 'src/app/(tabs)/notes/index.tsx')) visit(node.props.search);
     // Tablet adapters hold the existing blocks in named slots, not children. Visit those slots
     // too so the same behavior assertions cover both compositions.
     if (node.type === 'TodayTabletCanvas') {
@@ -506,7 +532,7 @@ function screen(file: string, options: { executarEfeitos?: boolean; reduzirMovim
     if (node.type === 'FinanceAnalysisPanes') visit(node.props.compact);
     // `CamposDaSerie` é um grupo de campos sem hook: desenhado aqui, a tela é a que a pessoa vê.
     // Os corpos (`FormularioDaSerie`, `FormularioDaDivida`) têm hooks: eles rodam depois dos da tela, na mesma ordem a cada render.
-    if (typeof node.type === 'function' && ['CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida'].includes(node.type.name)) visit(node.type(node.props));
+    if (typeof node.type === 'function' && ['CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida', 'TrashEmptyState', 'FilterBar'].includes(node.type.name)) visit(node.type(node.props));
     // No celular o `AdaptivePanes` desenha o slot de uma coluna só (Pastas, Recorrentes…).
     if (node.type === 'AdaptivePanes') visit(node.props.singlePaneContent ?? node.props.main);
     visit(node.props.ListHeaderComponent);
@@ -556,11 +582,12 @@ function screen(file: string, options: { executarEfeitos?: boolean; reduzirMovim
   };
   render();
   return {
-    writes, pedidos, toasts, preferenciasGravadas, pedidosDeLimite, avisos, confirmations, actions, navigations, refetches, gates, rulerViews,
+    writes, pedidos, toasts, preferenciasGravadas, pedidosDeLimite, avisos, confirmations, actions, navigations, refetches, gates, rulerViews, transactionQueries, expectedQueries, summaryQueries,
     drafts: () => forecastDrafts,
     simulacoes,
     nodes: () => nodes,
     animacoes: () => animacoes,
+    flushTimers() { const pending = [...timers.values()]; timers.clear(); pending.forEach(fn => fn()); },
     desmontar() { efeitos.forEach((efeito) => efeito?.cleanup?.()); desmontado = true; nodes = []; },
     concluirAnimacao(terminou = true) { const concluir = conclusoesDeAnimacao.shift(); assert.ok(concluir, 'animação com conclusão pendente'); concluir(terminou); render(); },
     button(label: string) { const node = nodes.find((n) => n.type === 'Button' && n.props.label === label); assert.ok(node, `visible button: ${label}`); return node; },
@@ -2451,6 +2478,27 @@ test('Todo filho de ItemLink repassa o onPress que o Link do iOS injeta', () => 
   }
   for (const [comp, arquivo] of [['Row', 'src/components/ui/row.tsx'], ['LedgerRow', 'src/components/ui/ledger-row.tsx']]) {
     assert.match(readFileSync(arquivo, 'utf8'), /\bonPress\b[\s\S]*<Pressable[\s\S]*onPress=\{onPress\}/, `${comp} repassa onPress ao Pressable`);
+  }
+});
+
+test('Row: fonte máxima e painel estreito conservam título e valor dentro da largura medida', () => {
+  for (const fontScale of [1, 1.3, 3.12]) {
+    const ui = screen('src/components/ui/row.tsx', { componente: 'Row', fontScale, props: {
+      title: 'macbook (12/12)', subtitle: 'compra em 01/09/2026', inlineValue: true,
+      trailing: { type: 'Money', props: { cents: 78000 } },
+    } });
+    const flat = (style: any) => Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
+    for (const width of [370, 260, 600, 370]) {
+      const row = ui.nodes().find(n => n.type === 'View' && n.props.onLayout);
+      assert.ok(row, 'medir a linha real: largura da janela não é a largura de um painel');
+      ui.interact(() => row.props.onLayout({ nativeEvent: { layout: { width } } }));
+      const title = ui.nodes().find(n => n.type === 'ThemedText' && n.props.children === 'macbook (12/12)');
+      assert.equal(flat(title.props.style).minWidth, Math.min(134 * Math.max(1, fontScale), width - 32));
+      assert.ok(flat(title.props.style).minWidth <= width - 32);
+      const boundedMoney = ui.nodes().find(n => n.type === 'DinheiroEncolhe.Provider');
+      assert.equal(boundedMoney?.props.value, true, 'dinheiro conserva sua fonte quando cabe e se ajusta à própria linha quando não cabe');
+      assert.ok(ui.nodes().some(n => n.type === 'View' && flat(n.props.style).maxWidth === '100%' && flat(n.props.style).marginLeft === 'auto'));
+    }
   }
 });
 
@@ -4568,4 +4616,326 @@ test('Link antigo da recorrência encerrada mostra histórico, sem montar ediç�
   ui.interact(() => vazio.props.action.onPress());
   assert.equal(fechou, true);
   assert.equal(ui.writes.length, 0);
+});
+
+
+const filterScreenText = (ui: ReturnType<typeof screen>) => JSON.stringify(ui.nodes().map(n =>
+  [n.props.label, n.props.title, n.props.titulo, n.props.accessibilityLabel, n.props.subtitle, typeof n.props.children === 'string' ? n.props.children : null]));
+
+const applyListFilters = (ui: ReturnType<typeof screen>, value: Record<string, unknown>) =>
+  ui.interact(nodes => nodes.find(n => n.type === 'ListFilters').props.onApply(value));
+
+for (const [scope, file, defaultLabel] of [
+  ['arquivadas', 'src/app/notes/archived.tsx', 'Notas arquivadas'],
+  ['lixeira', 'src/app/notes/trash.tsx', 'Notas na lixeira'],
+  ['pasta', 'src/app/notes/folder/[id].tsx', 'Notas desta pasta'],
+]) test(`Notas ${scope}: resumo único conserva busca/data e a limpeza restaura o contexto`, () => {
+  for (const tablet of [false, true]) {
+    const ui = screen(file, { tablet, params: { id: 'f1' },
+      folders: [{ id: 'f1', name: 'Casa', parent_id: null, tags: ['casa'], notes_count: 1 }],
+      notes: [{ id: 'n1', content: 'Aluguel', tags: [], folder_id: 'f1' }],
+    });
+    ui.press('Filtros');
+    applyListFilters(ui, { q: 'aluguel', from: '2026-09-30', to: '2026-09-30' });
+    assert.match(filterScreenText(ui), /Filtros · 2/);
+    assert.match(filterScreenText(ui), /Atualização: 30\/09\/2026 · Busca: aluguel/);
+    assert.ok(!ui.nodes().some(n => n.type === 'Button' && n.props.label === 'Limpar filtros'));
+    applyListFilters(ui, {});
+    assert.ok(filterScreenText(ui).includes(defaultLabel));
+  }
+});
+
+test('Notas: abrir filtros antes do debounce conserva busca atual; aplicar/limpar cancela termos antigos', () => {
+  for (const tablet of [false, true]) {
+    const ui = screen(notasFile, { tablet, executarEfeitos: true, controlarTimers: true,
+      folders: [{ id: 'f1', name: 'Casa', parent_id: null, tags: ['casa'], notes_count: 0 }],
+      noteTags: [{ tag: 'trabalho', count: 2 }],
+    });
+    const typeSearch = (text: string) => ui.interact(nodes => nodes.find(n => n.type === 'SearchField').props.onChangeText(text));
+    const sheet = () => ui.nodes().find(n => n.type === 'ListFilters');
+    typeSearch('  aluguel  ');
+    ui.press('Filtros');
+    assert.equal(sheet().props.value.q, 'aluguel', 'rascunho deve receber a última digitação sem esperar o timer');
+    assert.equal(sheet().props.showSearch, false, 'busca tem um único campo');
+    assert.deepEqual(copia(sheet().props.selects[0].options.map((t: any) => t.label)), ['#trabalho', '#casa']);
+    assert.ok(!ui.nodes().some(n => n.type === 'Chip'), 'tags são critérios na folha, pastas continuam na grade');
+    ui.interact(() => sheet().props.onClose());
+    ui.interact(() => ui.flushTimers());
+    assert.equal(sheet().props.value.q, 'aluguel', 'cancelar mantém a busca viva');
+    ui.press('Filtros · 1');
+    applyListFilters(ui, { q: '  aluguel  ', selections: { tag: 'casa' } });
+    assert.equal(ui.nodes().find(n => n.type === 'SearchField').props.value, 'aluguel');
+    assert.match(filterScreenText(ui), /Busca: aluguel · Tag: #casa/);
+    typeSearch('termo antigo pendente');
+    applyListFilters(ui, {});
+    ui.interact(() => ui.flushTimers());
+    assert.equal(sheet().props.value.q, '');
+    assert.equal(ui.nodes().find(n => n.type === 'SearchField').props.value, '');
+    assert.match(filterScreenText(ui), /Notas soltas/);
+    typeSearch('   ');
+    ui.press('Filtros');
+    assert.equal(sheet().props.value.q, '');
+    assert.ok(!filterScreenText(ui).includes('Filtros ·'));
+    ui.desmontar();
+  }
+});
+
+test('Barra compacta revela todos os critérios ao leitor de tela, conserva nomes e esconde dinheiro', () => {
+  let opened = 0;
+  for (const concealed of [false, true]) {
+    const ui = screen('src/components/ui/filter-bar.tsx', { componente: 'FilterBar', concealed, props: {
+      value: { q: 'aluguel', from: '2026-09-30', to: '2026-09-30', minCents: 0, maxCents: 20000,
+        selections: { conta: 'c1', estado: 'paused' } }, defaultLabel: 'Todos', onPress: () => opened++,
+      selects: [{ key: 'conta', label: 'Conta', options: [{ id: 'c1', label: 'Conta com nome completo e longo' }] },
+        { key: 'estado', label: 'Estado', options: [{ id: 'paused', label: 'Pausados' }] }],
+    } });
+    const summary = ui.nodes().find(n => n.type === 'ThemedText');
+    assert.equal(summary.props.children, 'Data: 30/09/2026 · Busca: aluguel · mais 3');
+    assert.match(summary.props.accessibilityLabel, /Conta com nome completo e longo.*Pausados/);
+    assert.match(summary.props.accessibilityLabel, concealed ? /•••••• a ••••••/ : /R\$ 0.00 a R\$ 200.00/);
+    assert.equal(summary.props.numberOfLines, undefined);
+    assert.equal(ui.nodes().find(n => n.type === 'MudancaSuave').key, String(concealed));
+    ui.press('Filtros · 5');
+    assert.equal(ui.nodes().filter(n => n.type === 'Button').length, 1);
+  }
+  assert.equal(opened, 2);
+});
+
+test('Lembretes: critérios têm uma entrada única e resumo; limpar no vazio continua sendo contextual', () => {
+  for (const tablet of [false, true]) {
+    const ui = screen('src/app/reminders.tsx', { tablet, reminders: [{ id: 'r1', title: 'Reunião', active: false, next_run_at: '2026-09-30T15:00:00Z' }] });
+    ui.press('Filtros');
+    assert.equal(ui.nodes().find(n => n.type === 'ListFilters').props.visible, true);
+    applyListFilters(ui, { selections: { status: 'paused', channel: 'whatsapp' } });
+    assert.match(filterScreenText(ui), /Filtros · 2/);
+    assert.match(filterScreenText(ui), /Estado: Pausados · Canal: WhatsApp/);
+    assert.ok(!ui.nodes().some(n => n.type === 'Button' && n.props.label === 'Limpar filtros'));
+    const sheet = ui.nodes().find(n => n.type === 'ListFilters');
+    assert.deepEqual(copia(sheet.props.selects), copia(ui.nodes().find(n => n.type?.name === 'FilterBar').props.selects));
+    applyListFilters(ui, {});
+    assert.match(filterScreenText(ui), /Todos os lembretes/);
+  }
+});
+
+test('Importações: barra compacta conserva formato/conta e aplicar reinicia a paginação', () => {
+  const batch = { id: 'b1', filename: 'extrato.csv', source: 'csv', account_id: null,
+    created_at: '2026-09-30T15:00:00Z', pendentes: 0, total: 2, aprovados: 2 };
+  const ui = screen('src/app/import-history.tsx', { batches: Array.from({ length: 20 }, (_, i) => ({ ...batch, id: `b${i}` })) });
+  ui.interact(nodes => nodes.find(n => n.type === 'VerMais' && n.props.restantes === null).props.onPress());
+  assert.equal(ui.pedidosDeLimite.at(-1)[1], 40);
+  applyListFilters(ui, { selections: { source: 'csv', accountId: 'none' } });
+  assert.equal(ui.pedidosDeLimite.at(-1)[1], 20);
+  assert.match(filterScreenText(ui), /Filtros · 2/);
+  assert.match(filterScreenText(ui), /Formato: CSV · Conta ou cartão: Sem conta/);
+  assert.ok(!ui.nodes().some(n => n.type === 'Button' && n.props.label === 'Limpar filtros'));
+  applyListFilters(ui, {});
+  assert.match(filterScreenText(ui), /Todas as importações/);
+});
+
+test('Lançamentos: um único editor conserva todos os critérios e resume o recorte sem repetir controles', () => {
+  for (const tablet of [false, true]) {
+    const ui = screen(transacoesFile, { tablet, forecastAccounts: [{ id: 'c1', name: 'Nubank Cartão', type: 'credit_card' }] });
+    ui.press('Filtros');
+    assert.equal(ui.nodes().find(n => n.type === 'ListFilters').props.visible, true);
+    const value = { q: 'hotel', from: '2026-09-01', to: '2026-09-30', minCents: 0, maxCents: 20000,
+      selections: { kind: 'expense', status: 'cleared', category: 'viagem', accountId: 'c1', source: 'import' } };
+    applyListFilters(ui, value);
+    assert.deepEqual(copia(ui.nodes().find(n => n.type === 'ListFilters').props.value), value);
+    assert.match(filterScreenText(ui), /Filtros · 8/);
+    const summary = ui.nodes().find(n => n.props.accessibilityLabel?.includes('Gastos · Concluído'));
+    assert.match(summary.props.accessibilityLabel, /Nubank Cartão.*Gastos.*Concluído.*viagem.*Importado.*R\$ 0.00 a R\$ 200.00.*hotel/);
+    assert.equal(summary.props.children, 'Nubank Cartão · Gastos · mais 5', 'resumo revela a quantidade de critérios adicionais sem truncar os nomes');
+    assert.ok(!ui.nodes().some(n => ['Chip', 'Segmented'].includes(n.type)), 'critérios são editados na folha');
+    assert.ok(!ui.nodes().some(n => n.type === 'PeriodSummaryCard'), 'total global não é exibido sobre um recorte');
+    const menu = ui.nodes().find(n => n.type === 'HeaderActions').props.menu.actions;
+    assert.ok(!menu.some((a: any) => ['Conta', 'Origem'].includes(a.label)), 'menu não duplica o editor');
+    applyListFilters(ui, {});
+    assert.match(filterScreenText(ui), /Todos os lançamentos/);
+    assert.ok(ui.nodes().some(n => n.type === 'PeriodBar'), 'limpeza restaura navegação mês/ciclo');
+    assert.equal(ui.nodes().find(n => n.type === 'ListFilters').props.value.selections.accountId, '');
+  }
+});
+
+test('Lançamentos: resumo financeiro e rótulo acessível respeitam ocultação de valores', () => {
+  const ui = screen(transacoesFile, { concealed: true });
+  applyListFilters(ui, { minCents: 0, maxCents: 20000 });
+  const summary = ui.nodes().find(n => n.props.accessibilityLabel?.includes('•••••• a ••••••'));
+  assert.ok(summary);
+  assert.equal(summary.props.children, '•••••• a ••••••');
+  assert.match(filterScreenText(ui), /Filtros · 1/);
+});
+
+test('Ocorrências usam o mês civil para retornar de um período personalizado', () => {
+  const ui = screen(transacoesFile, { params: { recurringId: 'r1' } });
+  assert.equal(ui.nodes().find(n => n.type === 'ListFilters').props.resetDatesLabel, 'Voltar ao mês');
+});
+
+for (const tablet of [false, true]) {
+  for (const [boundary, value, label] of [
+    ['inicial', { from: '2026-08-01' }, 'A partir de 01/08/2026'],
+    ['final', { to: '2026-10-31' }, 'Até 31/10/2026'],
+  ] as const) {
+    test(`Lançamentos: data ${boundary} sozinha consulta intervalo aberto (${tablet ? 'tablet' : 'celular'})`, () => {
+      const ui = screen(transacoesFile, { tablet, datasReais: true });
+      applyListFilters(ui, value);
+      const pedido = ui.transactionQueries.at(-1);
+      assert.equal(pedido.from, 'from' in value ? value.from : undefined);
+      assert.equal(pedido.to, 'to' in value ? value.to : undefined);
+      assert.equal(pedido.pronto, true, 'data escolhida não espera as bordas do mês');
+      assert.ok(ui.nodes().some(n => n.props.accessibilityLabel === `Período: ${label}`));
+      assert.ok(!ui.nodes().some(n => ['PeriodBar', 'MonthPicker', 'PeriodSummaryCard'].includes(n.type)));
+      assert.equal(ui.expectedQueries.at(-1)?.pronto, false, 'sem duas datas não calcula previsões');
+      assert.equal(ui.summaryQueries.at(-1)?.pronto, false, 'resumo financeiro oculto não faz consulta');
+      const folha = ui.nodes().find(n => n.type === 'ListFilters');
+      assert.deepEqual(copia(folha.props.dateLabels), { from: 'Lançamento a partir de', to: 'Lançamento até' });
+      const explicacao = `${filterScreenText(ui)} ${JSON.stringify(folha.props)}`;
+      assert.match(explicacao, /registrados/i);
+      assert.match(explicacao, /previsões/i);
+    });
+  }
+}
+
+test('Lançamentos: intervalo aberto ignora previsões em cache e em trânsito; duas datas restauram cálculo', () => {
+  for (const tablet of [false, true]) {
+    const ui = screen(transacoesFile, { tablet, expectedLines: [assinaturaPrevista],
+      expectedInTransit: [{ ...assinaturaPrevista, ref_id: 'in-flight' }] });
+    assert.ok(ui.nodes().some(n => n.type === 'LinhaPrevista'), 'mês normal conserva suas previsões');
+    const mes = ui.transactionQueries.at(-1);
+    applyListFilters(ui, { from: '2026-08-01' });
+    assert.ok(!ui.nodes().some(n => n.type === 'LinhaPrevista'), 'desligar consulta não pode vazar dados em cache');
+    applyListFilters(ui, { from: '2026-08-01', to: '2026-10-31' });
+    assert.deepEqual(ui.expectedQueries.at(-1), { from: '2026-08-01', to: '2026-10-31', pronto: true, recurringId: undefined });
+    assert.ok(ui.nodes().some(n => n.type === 'LinhaPrevista' && n.props.line.ref_id === 'in-flight'));
+    applyListFilters(ui, {});
+    assert.equal(ui.transactionQueries.at(-1)?.from, mes.from);
+    assert.equal(ui.transactionQueries.at(-1)?.to, mes.to);
+    assert.equal(ui.expectedQueries.at(-1)?.pronto, true);
+    assert.equal(ui.summaryQueries.at(-1)?.pronto, true);
+    assert.ok(ui.nodes().some(n => n.type === 'PeriodBar'));
+  }
+});
+
+for (const recurringId of [undefined, 'serie-anos']) {
+  test(`Lançamentos: período personalizado distingue anos nos dias e rótulos acessíveis (${recurringId ? 'ocorrências' : 'extrato'})`, () => {
+    for (const tablet of [false, true]) {
+      const txs = ['2027-08-01', '2026-08-01'].map((occurred_at, index) => ({
+        id: `ano-${index}`, description: `Parcela ${index + 1}`, kind: 'expense', amount_cents: 5250,
+        category: 'compras', account_id: null, status: 'pending', invoice_id: 'f1', source: 'app',
+        occurred_at, due_at: occurred_at, installment_plan_id: null, recurring_id: recurringId ?? null,
+      }));
+      const ui = screen(transacoesFile, { tablet, datasReais: true, txs, params: recurringId ? { recurringId } : {} });
+      const list = () => ui.nodes().find(n => n.type === 'SectionList');
+      const sections = () => list().props.sections;
+      for (const value of [
+        { from: '2026-08-01' },
+        { to: '2027-08-01' },
+        { from: '2026-08-01', to: '2027-08-01' },
+      ]) {
+        applyListFilters(ui, value);
+        const titles = sections().map((s: any) => s.title);
+        assert.ok(titles.some((title: string) => title.includes('01/08/2026')));
+        assert.ok(titles.some((title: string) => title.includes('01/08/2027')));
+        const header = list().props.renderSectionHeader({ section: sections()[0] }).props.children[1];
+        const headerStyle = Object.assign({}, ...header.props.style);
+        assert.equal(headerStyle.flexWrap, 'wrap', 'total do dia deve ceder uma linha quando a fonte cresce');
+        assert.ok(header.props.children[0].props.style.minWidth >= 180, 'data não vira uma coluna de dígitos ao lado do total');
+        for (const tx of txs) {
+          const link = ui.nodes().find(n => n.type === 'ItemLink' && n.props.title === tx.description);
+          const row = link.props.children({ onLongPress() {} });
+          assert.match(row.props.accessibilityLabel, new RegExp(`01/08/${tx.occurred_at.slice(0, 4)}`));
+        }
+      }
+      applyListFilters(ui, {});
+      assert.ok(sections().every((s: any) => !/202[67]/.test(s.title)), 'limpar conserva a apresentação do mês/ciclo');
+      assert.ok(sections().every((s: any) => /agosto/.test(s.title)));
+      if (recurringId) assert.deepEqual(copia(sections().map((s: any) => s.grupo).filter(Boolean)), ['A seguir', 'Anteriores']);
+    }
+  });
+}
+
+test('Lançamentos: consulta aberta não aguarda mês, ciclo ou resumo de outra janela', () => {
+  for (const tablet of [false, true]) {
+    const ui = screen(transacoesFile, { tablet, rangePending: true, cycleSeriesPending: true, resumoPendente: true });
+    assert.equal(telaPronta(...ui.gates.at(-1)!), false, 'mês pendente é relevante antes de abrir intervalo');
+    applyListFilters(ui, { to: '2026-10-31' });
+    assert.equal(ui.transactionQueries.at(-1)?.pronto, true);
+    assert.equal(telaPronta(...ui.gates.at(-1)!), true, 'consultas de outra janela não bloqueiam registros abertos');
+    assert.ok(!ui.nodes().some(n => n.type === 'SkeletonRow'));
+  }
+});
+
+test('Lançamentos: erro antigo de previsão não esconde vazio aberto nem cria retry; refresh consulta só registros', () => {
+  for (const tablet of [false, true]) {
+    for (const [value, wording] of [
+      [{ from: '2026-08-01' }, /a partir de 01\/08\/2026/i],
+      [{ to: '2026-10-31' }, /até 31\/10\/2026/i],
+    ] as const) {
+      const ui = screen(transacoesFile, { tablet, datasReais: true, txs: [], expectedError: true, rangeError: true });
+      applyListFilters(ui, value);
+      assert.ok(!ui.nodes().some(n => n.type === 'ErrorCard'), 'erro de consulta inativa não pertence à lista aberta');
+      assert.ok(ui.nodes().some(n => n.type === 'EmptyState'));
+      assert.match(filterScreenText(ui), wording);
+      assert.doesNotMatch(filterScreenText(ui), /em A partir|em Até/);
+      ui.nodes().find(n => n.type === 'SectionList').props.onRefresh();
+      assert.deepEqual(ui.refetches, ['list'], 'refetch ignora enabled: não chamar resumo/previsões desativados');
+    }
+  }
+});
+
+test('Parceladas: filtrar quitadas expande resultados e oculta o resumo global; limpar restaura', () => {
+  const ui = screen('src/app/finance/installments.tsx', { plans: [
+    { id: 'active-filter', title: 'Computador ativo', account_id: null, active: true, total_cents: 10000, remaining_cents: 5000, first_occurred_at: '2026-09-01', parcels: [], installments: 5, paid: 0, installment_cents: 2000 },
+    { id: 'done-filter', title: 'Geladeira quitada', account_id: null, active: false, total_cents: 30000, remaining_cents: 0, first_occurred_at: '2026-08-01', parcels: [], installments: 5, paid: 0, installment_cents: 2000 },
+  ] });
+  applyListFilters(ui, { selections: { estado: 'quitada' } });
+  assert.match(filterScreenText(ui), /Filtros · 1/);
+  assert.match(filterScreenText(ui), /Estado: Quitada/);
+  assert.match(filterScreenText(ui), /Geladeira quitada/);
+  assert.doesNotMatch(filterScreenText(ui), /Computador ativo/);
+  assert.ok(!ui.nodes().some(n => n.props.label?.startsWith('Ver ') && n.props.label?.includes('terminada')));
+  assert.doesNotMatch(filterScreenText(ui), /Nenhuma compra em andamento/);
+  applyListFilters(ui, {});
+  assert.match(filterScreenText(ui), /Computador ativo/);
+});
+
+test('Parceladas: busca e intervalo mostram compra terminada sem exigir expansão manual', () => {
+  const ui = screen('src/app/finance/installments.tsx', { plans: [
+    { id: 'done-text', title: 'Geladeira quitada', account_id: null, active: false, total_cents: 30000, remaining_cents: 0, first_occurred_at: '2026-08-01', parcels: [], installments: 5, paid: 0, installment_cents: 2000 },
+  ] });
+  applyListFilters(ui, { q: 'geladeira', from: '2026-08-01', to: '2026-08-01' });
+  assert.match(filterScreenText(ui), /Geladeira quitada/);
+  assert.doesNotMatch(filterScreenText(ui), /Ver 1 terminada/);
+});
+
+test('Recorrentes: encerrada e pausada têm resultados sem vazio de ativas nem resumo global', () => {
+  const ui = screen('src/app/finance/recurring.tsx', { recurring: [
+    { id: 'pause-filter', description: 'Seguro pausado', category: 'seguro', active: false, next_run_at: '2026-09-05T15:00:00Z' },
+    { id: 'end-filter', description: 'Plano encerrado', category: 'saúde', active: false, end_date: '2026-08-01', next_run_at: '2026-08-01T15:00:00Z' },
+  ] });
+  applyListFilters(ui, { selections: { estado: 'encerrada' } });
+  assert.match(filterScreenText(ui), /Filtros · 1/);
+  assert.match(filterScreenText(ui), /Estado: Encerrada/);
+  assert.match(filterScreenText(ui), /Plano encerrado/);
+  assert.doesNotMatch(filterScreenText(ui), /Seguro pausado|Nada ativo se repetindo|Próximos 30 dias/);
+  applyListFilters(ui, { selections: { estado: 'pausada' } });
+  assert.match(filterScreenText(ui), /Seguro pausado/);
+  assert.doesNotMatch(filterScreenText(ui), /Plano encerrado|Nada ativo se repetindo|Próximos 30 dias/);
+});
+
+test('Dívidas: busca, conta e primeiro vencimento filtram arquivos e abrem resultados; data nula não casa', () => {
+  const base = { kind: 'financing', calculation_mode: 'fixed_installments', installments: 5, installments_paid: 0, installment_cents: 20000, remaining_cents: 100000, principal_cents: 100000, interest_rate_monthly: 0, account_id: null, due_day: 30, archived: false, first_due_date: '2026-09-30' };
+  const ui = screen(debtsFile, { debts: [{ ...base, id: 'active-debt', name: 'Ativa' }], archivedDebts: [
+    { ...base, id: 'archive-match', name: 'Carro arquivado', archived: true },
+    { ...base, id: 'archive-legacy', name: 'Carro sem âncora', archived: true, first_due_date: null },
+  ] });
+  applyListFilters(ui, { q: 'Carro', from: '2026-09-30', to: '2026-09-30', selections: { conta: 'none', estado: 'arquivada' } });
+  assert.match(filterScreenText(ui), /Filtros · 4/);
+  assert.match(filterScreenText(ui), /Primeiro vencimento: 30\/09\/2026 · Busca: Carro · mais 2/);
+  assert.ok(ui.nodes().some(n => /Conta: Sem conta · Estado: Arquivada/.test(n.props.accessibilityLabel ?? '')));
+  assert.match(filterScreenText(ui), /Carro arquivado/);
+  assert.doesNotMatch(filterScreenText(ui), /Carro sem âncora|Nenhuma dívida encontrada/);
+  assert.ok(!ui.nodes().some(n => n.type === 'HeroLabel' && n.props.children === 'Devo no total'));
+  applyListFilters(ui, { from: '2026-10-01' });
+  assert.doesNotMatch(filterScreenText(ui), /Carro arquivado|Carro sem âncora/);
+  assert.match(filterScreenText(ui), /Nenhuma dívida encontrada/);
 });

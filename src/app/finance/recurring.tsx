@@ -20,12 +20,15 @@ import { Presenca } from '@/components/motion/presenca';
 import { VerMais } from '@/components/ui/ver-mais';
 import { useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
+import { FilterBar } from '@/components/ui/filter-bar';
+import { ListFilters, type FilterSelect } from '@/components/ui/list-filters';
 import { Search } from '@/components/ui/search';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useDeleteRecurring,
+  useAccounts,
   useRecurringTransactions,
   useToggleRecurring,
   type RecurringTransaction,
@@ -36,6 +39,8 @@ import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useDebounced } from '@/hooks/use-debounced';
 import { semAcento } from '@/lib/text';
 import { dataLocalDe, isoToBR, localISODate } from '@/lib/dates';
+import { accountSelectOptions } from '@/lib/accounts';
+import { listFiltersActive, type ListFiltersValue } from '@/lib/list-filters';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { hrefDoLancar } from '@/lib/lancar';
 import { describeRRule } from '@/lib/rrule-text';
@@ -107,6 +112,7 @@ export default function RecurringScreen() {
   const tablet = windowClass !== 'compact';
   const toast = useToast();
   const series = useRecurringTransactions();
+  const accounts = useAccounts(undefined, true);
   const proximos = useRecurringUpcoming(30);
   const toggle = useToggleRecurring();
   const remove = useDeleteRecurring();
@@ -125,17 +131,30 @@ export default function RecurringScreen() {
    * Filtra no cliente porque a lista já veio inteira (não é paginada). Casa descrição e
    * categoria, sem acento e sem caixa, que é o que a busca de Lançamentos também faz.
    */
-  const [busca, setBusca] = useState('');
-  const termo = useDebounced(busca.trim(), 200);
+  const [filtersVisible, setFiltersVisible] = useState(false);
+  const [filters, setFilters] = useState<ListFiltersValue>({});
+  const filterSelects: readonly FilterSelect[] = [
+    { key: 'conta', label: 'Conta', options: accountSelectOptions(accounts.data ?? [], 'Sem conta', 'none') },
+    { key: 'categoria', label: 'Categoria', options: Array.from(new Set(todas.map((r) => r.category).filter((v): v is string => Boolean(v)))).sort().map((v) => ({ id: v, label: v })) },
+    { key: 'estado', label: 'Estado', options: [{ id: 'ativa', label: 'Ativa' }, { id: 'pausada', label: 'Pausada' }, { id: 'encerrada', label: 'Encerrada' }] },
+  ];
+  const termo = useDebounced(filters.q?.trim() ?? '', 200);
+  const hoje = localISODate();
   const lista = useMemo(() => {
     const t = semAcento(termo);
-    if (!t) return todas;
-    return todas.filter((r) =>
-      semAcento(`${r.description ?? ''} ${r.category ?? ''}`).includes(t)
-    );
-  }, [todas, termo]);
+    return todas.filter((r) => {
+      const estado = estadoDaRecorrencia(r, hoje);
+      const data = dataLocalDe(r.next_run_at);
+      const dataOk = (!filters.from && !filters.to) || (estado === 'ativa'
+        && (!filters.from || data >= filters.from) && (!filters.to || data <= filters.to));
+      return (!t || semAcento(`${r.description ?? ''} ${r.category ?? ''}`).includes(t))
+        && (!filters.selections?.conta || (filters.selections.conta === 'none' ? r.account_id === null : r.account_id === filters.selections.conta))
+        && (!filters.selections?.categoria || r.category === filters.selections.categoria)
+        && (!filters.selections?.estado || estado === filters.selections.estado)
+        && dataOk;
+    });
+  }, [todas, termo, hoje, filters]);
 
-  const hoje = localISODate();
   const encerrada = (r: RecurringTransaction) => estadoDaRecorrencia(r, hoje) === 'encerrada';
   const encerradas = lista.filter(encerrada).sort((a, b) => (b.end_date ?? '').localeCompare(a.end_date ?? ''));
   const comErro = lista.filter((r) => !encerrada(r) && r.last_error);
@@ -143,7 +162,7 @@ export default function RecurringScreen() {
   const pausadas = lista.filter((r) => estadoDaRecorrencia(r, hoje) === 'pausada' && !r.last_error);
   const [verEncerradas, setVerEncerradas] = useState(false);
   // Aos poucos (24/09/2026): é a lista que mais cresce. Uma busca nova recomeça as seções.
-  const janelas = useJanelasPorGrupo(termo);
+  const janelas = useJanelasPorGrupo(JSON.stringify(filters));
   const jErro = janelas.janelaDe('erro', comErro);
   const jAtivas = janelas.janelaDe('ativas', ativas);
   const jPausadas = janelas.janelaDe('pausadas', pausadas);
@@ -283,7 +302,7 @@ export default function RecurringScreen() {
     </>
   ) : null;
 
-  const upcomingContext = lista.length === 0 || termo ? null : proximos.isError ? (
+  const upcomingContext = lista.length === 0 || listFiltersActive(filters) ? null : proximos.isError ? (
     <ErrorBand
       message="Não deu para somar os próximos 30 dias. A lista abaixo continua valendo."
       onRetry={proximos.refetch}
@@ -312,6 +331,10 @@ export default function RecurringScreen() {
 
   const recurringSections = (
     <>
+      {todas.length > 0 ? <FilterBar value={filters} selects={filterSelects} dateLabel="Próxima execução"
+        defaultLabel="Todas as recorrências" onPress={() => setFiltersVisible(true)} /> : null}
+      <ListFilters visible={filtersVisible} value={filters} onClose={() => setFiltersVisible(false)} onApply={setFilters}
+        dateLabels={{ from: 'Execução (ativas) a partir de', to: 'Execução (ativas) até' }} selects={filterSelects} />
       {/* Vem primeiro: série parada = conta que não vai aparecer na projeção. */}
       {comErro.length > 0 ? (
         <View style={styles.secao}>
@@ -379,15 +402,15 @@ export default function RecurringScreen() {
 
       {encerradas.length > 0 ? (
         <View style={styles.secao}>
-          <Row
+          {filters.selections?.estado === 'encerrada' ? <SectionHead title={`Encerradas · ${encerradas.length}`} /> : <Row
             icon="archivebox"
             title={`Encerradas · ${encerradas.length}`}
             chevron={false}
             trailing={<Icon name={verEncerradas ? 'chevron.up' : 'chevron.down'} size="sm" color="textSecondary" />}
             onPress={() => setVerEncerradas((v) => !v)}
             accessibilityState={{ expanded: verEncerradas }}
-          />
-          <Presenca visivel={verEncerradas} style={styles.secao}>
+          />}
+          <Presenca visivel={verEncerradas || filters.selections?.estado === 'encerrada'} style={styles.secao}>
             {jEncerradas.visiveis.map((r) => (
               <Deslizavel key={r.id} titulo={r.description ?? 'Recorrência'} acoes={acoesDaSerie(r)} forma="card">
                 <Card style={styles.serie}>
@@ -409,7 +432,7 @@ export default function RecurringScreen() {
       ) : null}
 
       {/* Só pausadas (ou com erro): elas vêm primeiro e o vazio vira uma linha embaixo (24/09/2026). */}
-      {!series.isLoading && !series.isError && lista.length > 0 && ativas.length === 0 ? (
+      {!series.isLoading && !series.isError && !listFiltersActive(filters) && lista.length > 0 && ativas.length === 0 ? (
         <EmptyState
           icon="repeat"
           title="Nada ativo se repetindo"
@@ -420,7 +443,12 @@ export default function RecurringScreen() {
           compacto
         />
       ) : null}
-      {!series.isLoading && !series.isError && lista.length === 0 ? (
+      {!series.isLoading && !series.isError && lista.length === 0 && todas.length > 0 ? (
+        <EmptyState compacto icon="line.3.horizontal.decrease" title="Nenhuma recorrência encontrada"
+          hint="Ajuste ou limpe os filtros para ver outras séries."
+          action={{ label: 'Limpar filtros', onPress: () => setFilters({}) }} />
+      ) : null}
+      {!series.isLoading && !series.isError && lista.length === 0 && todas.length === 0 ? (
         <EmptyState
           icon="repeat"
           title="Nada se repete ainda"
@@ -462,14 +490,8 @@ export default function RecurringScreen() {
       grouped
       wide={tablet}
       onRefresh={() => Promise.all([series.refetch(), proximos.refetch()])}
-      search={
-        <Search
-          value={busca}
-          onChangeText={setBusca}
-          placeholder="Buscar recorrentes"
-          accessibilityLabel="Buscar recorrências"
-        />
-      }>
+      search={<Search value={filters.q ?? ''} onChangeText={(q) => setFilters((current) => ({ ...current, q }))}
+        placeholder="Buscar recorrentes" accessibilityLabel="Buscar recorrências" />}>
       <Stack.Screen
         options={{
           title: 'Recorrentes',

@@ -1,0 +1,2 @@
+PASS combined/reset/cancel: date reset affects only dates and needs Apply; kind retained; default restored.
+PASS largest system font: label/reset/input do not overlap; applying/open summary/reset usable; font restored large.

@@ -1,8 +1,7 @@
 import { useMemo } from 'react';
 
 import { SelectField, type SelectOption } from '@/components/ui/select-field';
-import { ACCOUNT_TYPES, accountTypeLabel } from '@/lib/accounts';
-import type { IconName } from '@/components/ui/icon';
+import { accountSelectOptions } from '@/lib/accounts';
 
 /** O mínimo que o seletor precisa saber. Aceita `Account` inteiro sem conversão. */
 export type PickableAccount = {
@@ -10,27 +9,8 @@ export type PickableAccount = {
   name: string;
   type?: string | null;
   closing_day?: number | null;
+  archived?: boolean;
 };
-
-/**
- * Cada tipo tem a sua forma — é o que separa cartão de conta antes de qualquer
- * texto, e a razão de este componente existir.
- *
- * A fonte é `ACCOUNT_TYPES`: este mapa era uma cópia privada que discordava da
- * cópia da tela de contas em `cash`.
- */
-const GLIFO: Record<string, IconName> = Object.fromEntries(
-  ACCOUNT_TYPES.map((t) => [t.value, t.icon])
-);
-
-/** A segunda linha: o tipo, e no cartão o dia que muda a decisão de onde lançar. */
-function detalhe(conta: PickableAccount): string {
-  const tipo = accountTypeLabel(conta);
-  if (conta.type === 'credit_card' && conta.closing_day) {
-    return `${tipo} · fecha dia ${conta.closing_day}`;
-  }
-  return tipo;
-}
 
 /**
  * Escolher a conta de um lançamento. **O único caminho** — nenhuma tela monta
@@ -84,32 +64,7 @@ export function AccountPicker({
   emptyLabel?: string;
   placeholder?: string;
 }) {
-  const opcoes = useMemo<SelectOption[]>(() => {
-    const contas = accounts.filter((a) => a.type !== 'credit_card');
-    const cartoes = accounts.filter((a) => a.type === 'credit_card');
-    // Cabeçalho só vale quando há o que separar.
-    const agrupado = contas.length > 0 && cartoes.length > 0;
-
-    return [
-      ...(emptyLabel
-        ? [{ id: null, label: emptyLabel, icon: 'minus' as IconName, neutral: true }]
-        : []),
-      ...contas.map((a) => ({
-        id: a.id,
-        label: a.name,
-        meta: detalhe(a),
-        icon: GLIFO[a.type ?? ''] ?? 'building.columns',
-        group: agrupado ? 'CONTAS' : undefined,
-      })),
-      ...cartoes.map((a) => ({
-        id: a.id,
-        label: a.name,
-        meta: detalhe(a),
-        icon: 'creditcard' as IconName,
-        group: agrupado ? 'CARTÕES' : undefined,
-      })),
-    ];
-  }, [accounts, emptyLabel]);
+  const opcoes = useMemo<SelectOption[]>(() => accountSelectOptions(accounts, emptyLabel), [accounts, emptyLabel]);
 
   return (
     <SelectField

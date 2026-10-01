@@ -19,9 +19,10 @@ const APARENCIA: Record<TipoDeLancamento, { icon: IconName; descricao: string }>
 };
 
 /** O formato apresenta a escolha atual; as alternativas só ocupam espaço ao abrir. */
-export function FormatoDoLancamento({ value, onChange }: {
+export function FormatoDoLancamento({ value, onChange, disabled = false }: {
   value: TipoDeLancamento;
   onChange: (tipo: TipoDeLancamento) => void;
+  disabled?: boolean;
 }) {
   const theme = useTheme();
   const scheme = useScheme();
@@ -52,7 +53,7 @@ export function FormatoDoLancamento({ value, onChange }: {
   );
 
   const alternar = () => {
-    if (!ativo) return;
+    if (!ativo || disabled) return;
     escolhendo.current = false;
     setAberto((a) => !a);
   };
@@ -72,11 +73,11 @@ export function FormatoDoLancamento({ value, onChange }: {
         haptic="selection"
         scaleTo={reduzir ? 1 : Motion.pressScale}
         onPress={alternar}
-        disabled={!ativo}
+        disabled={!ativo || disabled}
         accessibilityRole="button"
         accessibilityLabel={`Formato do lançamento, ${atual.label}`}
         accessibilityHint={aberto ? 'Toque para fechar as alternativas' : 'Toque para escolher Uma vez, Recorrente ou Financiamento'}
-        accessibilityState={{ expanded: aberto, disabled: !ativo }}
+        accessibilityState={{ expanded: aberto, disabled: !ativo || disabled }}
         style={styles.destaque}>
         <View style={styles.linhaDoDestaque}>
           <View style={[styles.circulo, { backgroundColor: theme.tintFill }]}>

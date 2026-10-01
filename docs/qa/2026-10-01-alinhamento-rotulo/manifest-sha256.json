@@ -1,0 +1,19 @@
+{
+  "README.md": "58807088ec2ed2859b3aab193b8d5ed1a74f22a8355fc8e34c3b64dcb6170105",
+  "before-ax.json": "d820e23d79cac96204a7610d790497c670d530c62b03d2df4f7b63d402f55659",
+  "before.png": "b29e7cb84f441aecc37d14c27b26fd15145b9fa4002c9123ffd043e5b99bc7c7",
+  "maximum-font-reset-ax.json": "121ac26a24aa17531158d60985ff44c52ae2981b147afcbae9998f4f740d0690",
+  "maximum-font-reset.png": "3c781f45a76bf557d457faf3bdc5f6517697e55fc6366980efcc5b34d11f753b",
+  "maximum-font-selected-ax.json": "a40552564faba4edaefec19f2dc23f79f4e3be7273d076d59dec45f7d19b1ce7",
+  "maximum-font-selected.png": "baffc91f5cb673225ee147a91c2d4856c1a8bb7d80d84884a8b7c29cb19b1398",
+  "metrics.json": "40926e638e11be273e64dc36c8db4adb9085b2b3c4dd49f15dd0780682949dcc",
+  "native-qa.log": "cec54f4939dc68b6c1bb7d4cb203671421725450b5a8eacfc16b26f6f4e67be1",
+  "normal-empty-ax.json": "06e571aea12aa5e27b2d5a901515461fef628a8e9d295811ef924e3a8ff30e69",
+  "normal-empty.png": "471becb731644037996f38cecf86d52016adbc7f86c390af3b49b3a0d6c89566",
+  "normal-reset-ax.json": "37ba68d8fed7de2743dca96a7d0f47278993ee5059ab75135970b63a153ce9e1",
+  "normal-reset.png": "51fd49b31f84bf732e59fe162298655640d5d52a8ffff5dfbfc694b372bc70c8",
+  "normal-selected-ax.json": "2bdcd4ed345aadf047b4d253245dea4d77dd7bbd5b2236c08e83908cf621f64f",
+  "normal-selected.png": "81df879fc6db1b399891c47871502d79804a1375a3dd66b0eec8ea37d6681b2a",
+  "tests-summary.log": "0a624e80d3e0a7684672d6db0ba93e299ac5b5377d4b75b6a59130a1a811935f",
+  "verification.json": "111a8d587f96b1ad55c07f8d848ada91ebee40fc41f6b20dfdd88edf4ee9a88b"
+}

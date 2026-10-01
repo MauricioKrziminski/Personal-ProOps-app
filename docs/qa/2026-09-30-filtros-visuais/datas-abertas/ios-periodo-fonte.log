@@ -1,0 +1,4 @@
+PASS final period minimum width at maximum font: {'width': 370, 'height': 136, 'y': 268, 'x': 16} {'y': 416, 'width': 228, 'x': 16, 'height': 73.33332824707031}
+Field frames {'height': 128.66665649414062, 'x': 16, 'y': 530.9999847412109, 'width': 322} {'y': 577.3333168029785, 'x': 350, 'width': 36, 'height': 36} {'width': 368, 'x': 17, 'y': 668.6666564941406, 'height': 188.33331298828125}
+PASS maximum font: first label/reset/input visible without overlap; cancellation.
+PASS final source; font restored large; clear; repeated reopen/cancel.

@@ -1,0 +1,52 @@
+(node:35718) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/list-filters-ui.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ busca preserva nomes e termos digitados sem autocorreção do teclado (45.604458ms)
+✔ significado da data fica no rótulo de cada input, sem título de seção duplicado (13.83975ms)
+✔ digitar modifica somente draft; Aplicar publica um payload e fecha depois (11.528583ms)
+✔ Sheet: fechar/voltar cancela e reabrir remonta draft do valor publicado (9.490708ms)
+✔ TaskHeader: fechar/voltar cancela e reabrir remonta draft do valor publicado (13.577083ms)
+✔ Limpar zera busca, datas, valores e selecoes mas somente Aplicar publica a limpeza (8.505458ms)
+✔ Voltar ao mês remove somente o intervalo e exige Aplicar; cancelar preserva o recorte publicado (9.945375ms)
+✔ ícone único limpa datas em listas com bordas independentes sem alterar seleções (15.759625ms)
+✔ apenas uma data é aplicável e publica somente a borda escolhida (15.906167ms)
+✖ erro de intervalo aparece junto à data final e desaparece ao corrigir a ordem (8.310167ms)
+✔ data impossivel: erro inline desabilita Aplicar e o handler tambem recusa (8.25375ms)
+✔ ordem das datas: erro inline desabilita Aplicar e o handler tambem recusa (8.9845ms)
+✔ minimo acima do maximo: erro inline desabilita Aplicar e o handler tambem recusa (6.727542ms)
+✔ valor negativo: erro inline desabilita Aplicar e o handler tambem recusa (6.750917ms)
+✔ centavos fracionarios: erro inline desabilita Aplicar e o handler tambem recusa (8.030375ms)
+✔ data invalida digitada atualiza validacao sem publicar o draft (9.169292ms)
+✔ minimo/maximo zero e intervalo do mesmo dia sao validos e publicados (7.033333ms)
+✔ selecao null remove so a chave escolhida e preserva objeto original/conjunto de opcoes (6.361542ms)
+✔ cabecalho fica presente e SheetScroll e o ultimo filho da folha (7.858709ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 18
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 460.088208
+
+✖ failing tests:
+
+test at src/lib/list-filters-ui.test.ts:240:1
+✖ erro de intervalo aparece junto à data final e desaparece ao corrigir a ordem (8.310167ms)
+  AssertionError [ERR_ASSERTION]: não esconder o motivo no fim da folha
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/list-filters-ui.test.ts:243:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

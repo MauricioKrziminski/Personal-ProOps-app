@@ -1,0 +1,16 @@
+args: [-p, com.proops.personal.dev, 1]
+ arg: "-p"
+ arg: "com.proops.personal.dev"
+ arg: "1"
+data="com.proops.personal.dev"
+Warning: Activity not started, intent has been delivered to currently running top-most instance.
+Warning: Activity not started, intent has been delivered to currently running top-most instance.
+ERROR: could not get idle state.
+ERROR: null root node returned by UiTestAutomationBridge.
+PASS final Android normal source, contextual date/year/row.
+Warning: Activity not started, intent has been delivered to currently running top-most instance.
+Warning: Activity not started, intent has been delivered to currently running top-most instance.
+PASS final Android source font2: date/year and full transaction title/amount.
+Warning: Activity not started, intent has been delivered to currently running top-most instance.
+Warning: Activity not started, intent has been delivered to currently running top-most instance.
+PASS final Android original font1/night no/default filters; Sistema unchanged.

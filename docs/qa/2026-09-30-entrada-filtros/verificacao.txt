@@ -1,0 +1,30 @@
+Gates finais — 30/09/2026, gabriel/entrada-filtros, HEAD 49468625
+
+npm test — exit 0
+ℹ tests 1324
+ℹ suites 0
+ℹ pass 1324
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24306.44025
+
+npx tsc --noEmit — exit 0
+
+npx expo lint — exit 0
+env: load .env.local .env
+env: export EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_AGENT_URL
+
+supabase/tests/down_payment.sql — staging, rollback, exit 0
+PASS: entrada, atomica, retry, guards, RLS, cascade, cartao, sem entrada, simular/converter
+PASSOU: down_payment.sql
+
+React Doctor 0.9.14 — scope changed, include-untracked, no-score, no-supply-chain, no-cache, exit 0
+{"errorCount": 0, "warningCount": 18, "affectedFileCount": 17, "totalDiagnosticCount": 18, "score": null, "scoreLabel": null}
+
+Limpeza em staging — exit 0
+Preflight staging: 139 fixtures + 1 pasta, 2 contratos, 7 movimentos, 3 pedidos próprios; 4 linhas reais da fatura preservadas.
+PASS limpeza atômica: todos IDs próprios removidos; fatura existente e seus 4 movimentos/quitacao intactos.
+
+Verificação independente em nova conexão, após commit da transação de limpeza: fixtures/contratos/entradas/pedidos próprios = 0; fatura existente = 4 movimentos. App .dev reaberto no Financeiro, sem dados de QA visíveis; tema Claro preservado.
