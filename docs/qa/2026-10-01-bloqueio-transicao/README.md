@@ -60,7 +60,7 @@ restaurada e o efeito pai cancelando-o na mesma montagem. A árvore de acessibil
 execução anterior, sem instrumentação, confirma o botão ocupado e o app bloqueado.
 
 O teste de regressão reproduz a ordem de efeitos filho → pai durante a hidratação, executando
-o provider real. Antes da correção: 40 testes passaram e apenas esse falhou; depois, os
+o provider real. [Antes da correção](hydration-red-v1.6.1.log): 40 testes passaram e apenas esse falhou; depois, os
 [81 testes focados](focused-green-v1.6.2.log) passaram. A tentativa passa a guardar a conta para
 a qual nasceu: a sessão restaurada não cancela seu próprio pedido, e trocar a conta continua
 recusando o resultado antigo. Nenhuma API nativa foi substituída nessa checagem final.

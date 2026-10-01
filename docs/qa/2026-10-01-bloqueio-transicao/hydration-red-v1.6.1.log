@@ -1,0 +1,73 @@
+(node:10482) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/tmp/proops-release-v1.6.1/src/lib/lock-lifecycle.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /private/tmp/proops-release-v1.6.1/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ restored session child auto-authentication survives the parent hydration effect and opens on success plus active (255.5ms)
+✔ leaving during the successful prompt return invalidates that visit and asks again (101.761708ms)
+✔ the real departure before the prompt active event cannot be consumed as system UI (59.429209ms)
+✔ iOS legitimate prompt success before active opens once (53.367ms)
+✔ iOS legitimate prompt success after active opens once (48.660167ms)
+✔ Android system credential background with success before active is a legitimate return (37.654083ms)
+✔ Android system credential background with success after active is a legitimate return (36.726667ms)
+✔ Android biometric dialog that never pauses the app opens without waiting for a nonexistent active event (62.154042ms)
+✔ iOS actual background before a late success refuses the old result and retries on return (106.970958ms)
+✔ an iOS result delivered after the real return cannot unlock the new visit or clear its retry guard (82.426917ms)
+✔ user_cancel keeps the app locked and a manual retry can open (42.491375ms)
+✔ system_cancel keeps the app locked and a manual retry can open (31.809375ms)
+✔ authentication_failed keeps the app locked and a manual retry can open (32.161666ms)
+✔ reentrant requests share one native operation and cannot prematurely open (32.8575ms)
+✔ completed unlock respects 0s grace at the threshold (31.002667ms)
+✔ leaving after native success before active invalidates the attempt even with 0s grace (23.266166ms)
+✔ completed unlock respects 30s grace before the threshold (24.115666ms)
+✔ completed unlock respects 30s grace at the threshold (26.098208ms)
+✔ leaving after native success before active invalidates the attempt even with 30s grace (20.494042ms)
+✔ completed unlock respects 60s grace before the threshold (26.577958ms)
+✔ completed unlock respects 60s grace at the threshold (31.017166ms)
+✔ leaving after native success before active invalidates the attempt even with 60s grace (33.60975ms)
+✔ a thrown native error releases the in-flight guard so a retry can authenticate (21.746625ms)
+✔ ios external system UI returning after operation completion stays unlocked (18.816917ms)
+✔ ios external system UI returning before operation completion stays unlocked (13.321625ms)
+✔ ios nested system UI retains the exemption until the last operation returns (14.389417ms)
+✔ android external system UI returning after operation completion stays unlocked (56.784292ms)
+✔ android external system UI returning before operation completion stays unlocked (42.911459ms)
+✔ android nested system UI retains the exemption until the last operation returns (37.119709ms)
+✔ logout settles a successful authentication waiting for active as refused (22.935458ms)
+✔ account swap settles a successful authentication waiting for active as refused (36.111708ms)
+✔ a late native success after an account swap cannot release the returned account (15.200416ms)
+✔ a native result arriving after logout is refused without relying on a background event (10.713625ms)
+✔ a native result arriving after an account swap is refused without relying on a background event (20.99125ms)
+✔ account swap restores a usable locked retry after an in-flight native authentication is refused (25.7ms)
+✔ account swap restores a usable locked retry after success waiting for active is refused (12.970166ms)
+✔ unmount settles successful authentication waiting for active without a later lifecycle event (14.029291ms)
+✔ native success arriving after unmount is refused and a fresh provider remains protected (34.1195ms)
+✔ a genuine departure immediately after success and active asks again even while the visual reveal can still be running (17.824834ms)
+✔ disabling lock refuses a late native success and keeps the setting off (19.6675ms)
+✔ disabling lock refuses a success waiting for active and keeps the setting off (28.940334ms)
+ℹ tests 41
+ℹ suites 0
+ℹ pass 40
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3202.261375
+
+✖ failing tests:
+
+test at src/lib/lock-lifecycle.test.ts:186:1
+✖ restored session child auto-authentication survives the parent hydration effect and opens on success plus active (255.5ms)
+  AssertionError [ERR_ASSERTION]: hydration must not invalidate authentication already started for this account
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///private/tmp/proops-release-v1.6.1/src/lib/lock-lifecycle.test.ts:201:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

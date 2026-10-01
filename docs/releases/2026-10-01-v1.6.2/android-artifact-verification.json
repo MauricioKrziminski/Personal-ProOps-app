@@ -1,0 +1,18 @@
+{
+  "checkedAt": "2026-10-01T06:19:25.536351+00:00",
+  "package": "com.proops.personal",
+  "version": "1.6.2",
+  "versionCode": 74,
+  "sha256": "269487a997c7744ced437a174ff0f36506c9a6322a33abfe3ed3aa0a1177950d",
+  "shaMatchesBothManifests": true,
+  "signerVerified": true,
+  "sourceCommit": "f45d0621c9fa477a58961234ef6a73e3f3729590",
+  "runId": "36822983987",
+  "workflowConclusion": "success",
+  "runtimeVersion": "1.6.2",
+  "channel": "production",
+  "productionSupabaseVerified": true,
+  "productionAgentVerified": true,
+  "stagingEndpointsAbsent": true,
+  "qaAdapterAndDiagnosticsAbsent": true
+}

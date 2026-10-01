@@ -1,0 +1,22 @@
+{
+  "checkedAt": "2026-10-01T06:10:12.722589+00:00",
+  "sourceCommit": "f45d0621c9fa477a58961234ef6a73e3f3729590",
+  "bundleIdentifier": "com.proops.personal",
+  "version": "1.6.2",
+  "buildNumber": "1",
+  "runtimeVersion": "1.6.2",
+  "codesignVerified": true,
+  "profileExpiresAt": "2026-10-07T15:52:48+00:00",
+  "profileContainsTargetDevice": true,
+  "productionSupabaseVerified": true,
+  "productionAgentVerified": true,
+  "stagingEndpointsAbsent": true,
+  "qaAdapterAndDiagnosticsAbsent": true,
+  "mainJsBundleSha256": "1969a8576c082aff88ef87f17f3f635d17da1665355cbe0308ad5b12b838ee31",
+  "widgets": [
+    {
+      "bundleIdentifier": "com.proops.personal.widgets",
+      "version": "1.6.2"
+    }
+  ]
+}

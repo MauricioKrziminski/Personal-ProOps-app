@@ -1,0 +1,25 @@
+{
+  "status": "completed",
+  "conclusion": "success",
+  "workflowUrl": "https://github.com/MauricioKrziminski/Personal-ProOps-app/actions/runs/36822983987",
+  "tag": "v1.6.2",
+  "publishedAt": "2026-10-01T06:16:23Z",
+  "releaseUrl": "https://github.com/almeidagabriel01/Personal-ProOps-app-releases/releases/tag/v1.6.2",
+  "assets": [
+    {
+      "name": "native-compatibility.json",
+      "size": 1159,
+      "state": "uploaded"
+    },
+    {
+      "name": "personal-proops-1.6.2.apk",
+      "size": 69769417,
+      "state": "uploaded"
+    },
+    {
+      "name": "update.json",
+      "size": 273,
+      "state": "uploaded"
+    }
+  ]
+}
