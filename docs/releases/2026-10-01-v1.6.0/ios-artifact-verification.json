@@ -1,0 +1,22 @@
+{
+  "checkedAt": "2026-10-01T03:58:17.954685+00:00",
+  "appPath": "/private/tmp/proops-ios-release-derived-data/Build/Products/Release-iphoneos/ProOps.app",
+  "sourceCommit": "88656e7ce79a5002397a5cad13bcbcc4696908d7",
+  "bundleIdentifier": "com.proops.personal",
+  "version": "1.6.0",
+  "buildNumber": "1",
+  "runtimeVersion": "1.6.0",
+  "codesignVerified": true,
+  "profileExpiresAt": "2026-10-07T15:52:48+00:00",
+  "profileContainsTargetDevice": true,
+  "productionSupabaseVerified": true,
+  "productionAgentVerified": true,
+  "stagingEndpointsAbsent": true,
+  "mainJsBundleSha256": "1c190682277987c084d36a8941be15853934b1e46d1490ae4932ae932cc51352",
+  "widgets": [
+    {
+      "bundleIdentifier": "com.proops.personal.widgets",
+      "version": "1.6.0"
+    }
+  ]
+}

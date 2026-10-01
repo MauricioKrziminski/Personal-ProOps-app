@@ -1,0 +1,23 @@
+{
+  "sourceCommit": "88656e7ce79a5002397a5cad13bcbcc4696908d7",
+  "workingTree": "isolated release/v1.6.0 checkout",
+  "commands": [
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "tests": 1365,
+      "passed": 1365,
+      "failed": 0
+    },
+    {
+      "command": "npx tsc --noEmit",
+      "exitCode": 0
+    },
+    {
+      "command": "npx expo lint",
+      "exitCode": 0
+    }
+  ],
+  "agentChanged": false,
+  "iosNativeBuildExitCode": 0
+}

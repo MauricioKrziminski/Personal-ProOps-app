@@ -1,0 +1,11 @@
+{
+  "bundleIdentifier": "com.proops.personal",
+  "version": "1.6.0",
+  "launchSucceeded": true,
+  "launchedProcessIdentifier": 9293,
+  "sameProcessStillRunning": true,
+  "launchCapturedAt": "2026-10-01T04:09:59.821444+00:00",
+  "processCheckCapturedAt": "2026-10-01T04:11:57.555306+00:00",
+  "secondsBetweenCapturedResults": 117.7,
+  "note": "Times are local JSON capture times. Native launch and process presence; no financial writes or UI-flow validation in production."
+}

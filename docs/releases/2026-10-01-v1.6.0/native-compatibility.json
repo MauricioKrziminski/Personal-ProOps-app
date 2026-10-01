@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "sourceCommit": "88656e7ce79a5002397a5cad13bcbcc4696908d7",
+  "platform": "android",
+  "environment": "production",
+  "channel": "production",
+  "variant": "production",
+  "applicationId": "com.proops.personal",
+  "runtimeVersion": "1.6.0",
+  "projectId": "8313579c-3979-4ecd-ba6a-4dc0bf702f05",
+  "updatesUrl": "https://u.expo.dev/8313579c-3979-4ecd-ba6a-4dc0bf702f05",
+  "fingerprint": "ca317b147cd04f411819d140c8bcf401fa946c5d",
+  "fingerprintVersion": "0.20.13",
+  "publicEnvironmentHash": "5061dd50b02168a40ab3550a34af5fe8ee34f2950cf004b8fc71a560a18bbf69",
+  "build": {
+    "provider": "github-actions-local",
+    "id": "36813631730/1",
+    "sourceCommit": "88656e7ce79a5002397a5cad13bcbcc4696908d7",
+    "runId": "36813631730",
+    "runAttempt": "1",
+    "applicationId": "com.proops.personal",
+    "appVersion": "1.6.0",
+    "runtimeVersion": "1.6.0",
+    "updatesUrl": "https://u.expo.dev/8313579c-3979-4ecd-ba6a-4dc0bf702f05",
+    "channel": "production",
+    "updatesEnabled": true,
+    "projectId": "8313579c-3979-4ecd-ba6a-4dc0bf702f05",
+    "apkSha256": "8b06d6a43e1d179b917d64279f04b2f45549ef7bcdd1f915bef54bcc87e9356e"
+  }
+}

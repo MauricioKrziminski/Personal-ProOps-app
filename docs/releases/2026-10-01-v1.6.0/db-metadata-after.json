@@ -1,0 +1,420 @@
+{
+  "checkedAt": "2026-10-01T04:03:59.362799+00:00",
+  "targets": {
+    "production": {
+      "projectRef": "kwriuifcwyvdrxtspjiz",
+      "versions": [
+        "20260930164920",
+        "20260930163000",
+        "20260930160000"
+      ],
+      "columns": [
+        [
+          "down_payment_debt_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "down_payment_plan_id",
+          "uuid",
+          "YES"
+        ]
+      ],
+      "functions": [
+        [
+          "private",
+          "converter_registro_sem_entrada",
+          "p_origem jsonb, p_alcance text, p_destino jsonb",
+          false,
+          [
+            "search_path=public",
+            "TimeZone=America/Sao_Paulo"
+          ],
+          false,
+          true,
+          "23d9ea13bf4f27c23d8abc8f4beb1f51"
+        ],
+        [
+          "private",
+          "criar_registro_da_hipotese",
+          "p_tipo text, p_dados jsonb",
+          false,
+          [
+            "search_path=public",
+            "TimeZone=America/Sao_Paulo"
+          ],
+          false,
+          true,
+          "d67def749ca2722ce17179fef8e7f4e3"
+        ],
+        [
+          "private",
+          "criar_registro_da_hipotese_sem_entrada",
+          "p_tipo text, p_dados jsonb",
+          false,
+          [
+            "search_path=public",
+            "TimeZone=America/Sao_Paulo"
+          ],
+          false,
+          true,
+          "246f0bd210d3c257fe6abf4881d62ed2"
+        ],
+        [
+          "private",
+          "guard_down_payment_workspace",
+          "",
+          true,
+          [
+            "search_path=\"\""
+          ],
+          false,
+          false,
+          "b3865974ebcd0f0e1a4bc124fdc4d775"
+        ],
+        [
+          "private",
+          "guard_purchase_down_payment",
+          "",
+          true,
+          [
+            "search_path=\"\"",
+            "TimeZone=America/Sao_Paulo"
+          ],
+          false,
+          false,
+          "6d176de1f6389c490a6f06d3c7c428bc"
+        ],
+        [
+          "private",
+          "insert_purchase_down_payment",
+          "p_tipo text, p_parent_id uuid, p_entrada jsonb",
+          false,
+          [
+            "search_path=public",
+            "TimeZone=America/Sao_Paulo"
+          ],
+          false,
+          true,
+          "6b8414cd1993f8b0507ae8397378f331"
+        ],
+        [
+          "public",
+          "add_purchase_down_payment",
+          "p_tipo text, p_parent_id uuid, p_entrada jsonb, p_request_id uuid",
+          false,
+          [
+            "search_path=public",
+            "TimeZone=America/Sao_Paulo"
+          ],
+          false,
+          true,
+          "daf0b15badb48e26b23f033cb31b08a2"
+        ],
+        [
+          "public",
+          "converter_registro",
+          "p_origem jsonb, p_alcance text, p_destino jsonb",
+          false,
+          [
+            "search_path=public",
+            "TimeZone=America/Sao_Paulo"
+          ],
+          false,
+          true,
+          "c92ead755f00b2b032d2b062e02de504"
+        ],
+        [
+          "public",
+          "create_purchase",
+          "p_tipo text, p_dados jsonb, p_entrada jsonb, p_request_id uuid",
+          false,
+          [
+            "search_path=public",
+            "TimeZone=America/Sao_Paulo"
+          ],
+          false,
+          true,
+          "faa6815c6f0ad98f5a9b606025724ba3"
+        ]
+      ],
+      "rls": [
+        [
+          "private",
+          "purchase_write_requests",
+          true,
+          false,
+          false,
+          true,
+          true,
+          true
+        ]
+      ],
+      "policies": [
+        [
+          "own workspace purchase requests",
+          "PERMISSIVE",
+          [
+            "authenticated"
+          ],
+          "ALL",
+          "((user_id = ( SELECT auth.uid() AS uid)) AND (workspace_id IN ( SELECT private.my_workspace_ids() AS my_workspace_ids)))",
+          "((user_id = ( SELECT auth.uid() AS uid)) AND (workspace_id IN ( SELECT private.my_workspace_ids() AS my_workspace_ids)))"
+        ]
+      ],
+      "triggers": [
+        [
+          "public",
+          "accounts",
+          "guard_down_payment_workspace",
+          "O",
+          "CREATE TRIGGER guard_down_payment_workspace BEFORE UPDATE OF workspace_id ON public.accounts FOR EACH ROW EXECUTE FUNCTION private.guard_down_payment_workspace()"
+        ],
+        [
+          "public",
+          "debts",
+          "guard_down_payment_workspace",
+          "O",
+          "CREATE TRIGGER guard_down_payment_workspace BEFORE UPDATE OF workspace_id ON public.debts FOR EACH ROW EXECUTE FUNCTION private.guard_down_payment_workspace()"
+        ],
+        [
+          "public",
+          "installment_plans",
+          "guard_down_payment_workspace",
+          "O",
+          "CREATE TRIGGER guard_down_payment_workspace BEFORE UPDATE OF workspace_id ON public.installment_plans FOR EACH ROW EXECUTE FUNCTION private.guard_down_payment_workspace()"
+        ],
+        [
+          "public",
+          "transactions",
+          "guard_purchase_down_payment",
+          "O",
+          "CREATE TRIGGER guard_purchase_down_payment AFTER INSERT OR UPDATE ON public.transactions FOR EACH ROW EXECUTE FUNCTION private.guard_purchase_down_payment()"
+        ]
+      ],
+      "indexes": [
+        [
+          "public",
+          "transactions",
+          "transactions_one_down_payment_debt",
+          "CREATE UNIQUE INDEX transactions_one_down_payment_debt ON public.transactions USING btree (down_payment_debt_id) WHERE (down_payment_debt_id IS NOT NULL)"
+        ],
+        [
+          "public",
+          "transactions",
+          "transactions_one_down_payment_plan",
+          "CREATE UNIQUE INDEX transactions_one_down_payment_plan ON public.transactions USING btree (down_payment_plan_id) WHERE (down_payment_plan_id IS NOT NULL)"
+        ]
+      ],
+      "publicFunctionsExecutableByAnon": 0
+    },
+    "staging": {
+      "projectRef": "utkqoiigimqzeenxkxdl",
+      "versions": [
+        "20260930164920",
+        "20260930163000",
+        "20260930160000"
+      ],
+      "columns": [
+        [
+          "down_payment_debt_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "down_payment_plan_id",
+          "uuid",
+          "YES"
+        ]
+      ],
+      "functions": [
+        [
+          "private",
+          "converter_registro_sem_entrada",
+          "p_origem jsonb, p_alcance text, p_destino jsonb",
+          false,
+          [
+            "search_path=public",
+            "TimeZone=America/Sao_Paulo"
+          ],
+          false,
+          true,
+          "23d9ea13bf4f27c23d8abc8f4beb1f51"
+        ],
+        [
+          "private",
+          "criar_registro_da_hipotese",
+          "p_tipo text, p_dados jsonb",
+          false,
+          [
+            "search_path=public",
+            "TimeZone=America/Sao_Paulo"
+          ],
+          false,
+          true,
+          "d67def749ca2722ce17179fef8e7f4e3"
+        ],
+        [
+          "private",
+          "criar_registro_da_hipotese_sem_entrada",
+          "p_tipo text, p_dados jsonb",
+          false,
+          [
+            "search_path=public",
+            "TimeZone=America/Sao_Paulo"
+          ],
+          false,
+          true,
+          "246f0bd210d3c257fe6abf4881d62ed2"
+        ],
+        [
+          "private",
+          "guard_down_payment_workspace",
+          "",
+          true,
+          [
+            "search_path=\"\""
+          ],
+          false,
+          false,
+          "b3865974ebcd0f0e1a4bc124fdc4d775"
+        ],
+        [
+          "private",
+          "guard_purchase_down_payment",
+          "",
+          true,
+          [
+            "search_path=\"\"",
+            "TimeZone=America/Sao_Paulo"
+          ],
+          false,
+          false,
+          "6d176de1f6389c490a6f06d3c7c428bc"
+        ],
+        [
+          "private",
+          "insert_purchase_down_payment",
+          "p_tipo text, p_parent_id uuid, p_entrada jsonb",
+          false,
+          [
+            "search_path=public",
+            "TimeZone=America/Sao_Paulo"
+          ],
+          false,
+          true,
+          "6b8414cd1993f8b0507ae8397378f331"
+        ],
+        [
+          "public",
+          "add_purchase_down_payment",
+          "p_tipo text, p_parent_id uuid, p_entrada jsonb, p_request_id uuid",
+          false,
+          [
+            "search_path=public",
+            "TimeZone=America/Sao_Paulo"
+          ],
+          false,
+          true,
+          "daf0b15badb48e26b23f033cb31b08a2"
+        ],
+        [
+          "public",
+          "converter_registro",
+          "p_origem jsonb, p_alcance text, p_destino jsonb",
+          false,
+          [
+            "search_path=public",
+            "TimeZone=America/Sao_Paulo"
+          ],
+          false,
+          true,
+          "c92ead755f00b2b032d2b062e02de504"
+        ],
+        [
+          "public",
+          "create_purchase",
+          "p_tipo text, p_dados jsonb, p_entrada jsonb, p_request_id uuid",
+          false,
+          [
+            "search_path=public",
+            "TimeZone=America/Sao_Paulo"
+          ],
+          false,
+          true,
+          "faa6815c6f0ad98f5a9b606025724ba3"
+        ]
+      ],
+      "rls": [
+        [
+          "private",
+          "purchase_write_requests",
+          true,
+          false,
+          false,
+          true,
+          true,
+          true
+        ]
+      ],
+      "policies": [
+        [
+          "own workspace purchase requests",
+          "PERMISSIVE",
+          [
+            "authenticated"
+          ],
+          "ALL",
+          "((user_id = ( SELECT auth.uid() AS uid)) AND (workspace_id IN ( SELECT private.my_workspace_ids() AS my_workspace_ids)))",
+          "((user_id = ( SELECT auth.uid() AS uid)) AND (workspace_id IN ( SELECT private.my_workspace_ids() AS my_workspace_ids)))"
+        ]
+      ],
+      "triggers": [
+        [
+          "public",
+          "accounts",
+          "guard_down_payment_workspace",
+          "O",
+          "CREATE TRIGGER guard_down_payment_workspace BEFORE UPDATE OF workspace_id ON public.accounts FOR EACH ROW EXECUTE FUNCTION private.guard_down_payment_workspace()"
+        ],
+        [
+          "public",
+          "debts",
+          "guard_down_payment_workspace",
+          "O",
+          "CREATE TRIGGER guard_down_payment_workspace BEFORE UPDATE OF workspace_id ON public.debts FOR EACH ROW EXECUTE FUNCTION private.guard_down_payment_workspace()"
+        ],
+        [
+          "public",
+          "installment_plans",
+          "guard_down_payment_workspace",
+          "O",
+          "CREATE TRIGGER guard_down_payment_workspace BEFORE UPDATE OF workspace_id ON public.installment_plans FOR EACH ROW EXECUTE FUNCTION private.guard_down_payment_workspace()"
+        ],
+        [
+          "public",
+          "transactions",
+          "guard_purchase_down_payment",
+          "O",
+          "CREATE TRIGGER guard_purchase_down_payment AFTER INSERT OR UPDATE ON public.transactions FOR EACH ROW EXECUTE FUNCTION private.guard_purchase_down_payment()"
+        ]
+      ],
+      "indexes": [
+        [
+          "public",
+          "transactions",
+          "transactions_one_down_payment_debt",
+          "CREATE UNIQUE INDEX transactions_one_down_payment_debt ON public.transactions USING btree (down_payment_debt_id) WHERE (down_payment_debt_id IS NOT NULL)"
+        ],
+        [
+          "public",
+          "transactions",
+          "transactions_one_down_payment_plan",
+          "CREATE UNIQUE INDEX transactions_one_down_payment_plan ON public.transactions USING btree (down_payment_plan_id) WHERE (down_payment_plan_id IS NOT NULL)"
+        ]
+      ],
+      "publicFunctionsExecutableByAnon": 0
+    }
+  },
+  "aligned": true
+}

@@ -1,0 +1,13 @@
+{
+  "checkedAt": "2026-10-01T04:25:52.000375+00:00",
+  "bundlePathInApk": "assets/index.android.bundle",
+  "bundleSha256": "ffa2bd266414aac05ca95f58338c6295aea31d55c7c5018831190172dc333c8e",
+  "productionSupabaseVerified": true,
+  "productionAgentVerified": true,
+  "stagingEndpointsAbsent": true,
+  "previousVersion": "1.5.1",
+  "previousVersionCode": 71,
+  "version": "1.6.0",
+  "versionCode": 72,
+  "upgradeVersionCodeIncreased": true
+}

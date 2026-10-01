@@ -3,7 +3,18 @@
 Registro, não regra: o que está em cada banco HOJE se confere na fonte (`CLAUDE.md`, *Banco e
 fila*). Entradas movidas do `CLAUDE.md` em 26/09/2026, na ordem em que estavam lá.
 
-**Produção e staging ALINHADOS em `20260930163000`** — promoção explicitamente autorizada pelo
+**Produção e staging ALINHADOS em `20260930164920`** — promoção da entrada de compras
+explicitamente autorizada pelo Gabriel em 01/10/2026 para a v1.6.0. O dry run mostrou somente
+`20260930164920_purchase_down_payment.sql`; aplicada com
+`--project-ref kwriuifcwyvdrxtspjiz --skip-vault --yes`, sem seed e sem trocar o link local de
+staging. Conferência posterior em leitura: versão presente nos dois bancos; as duas colunas
+de entrada em `transactions`; nove definições de função e respectivas permissões idênticas;
+quatro gatilhos de integridade ativos; dois índices únicos; RLS e policy da tabela privada de
+idempotência idênticas ao staging. Nenhuma função de `public` executável por `anon`.
+Advisors de segurança: zero erros, os mesmos 11 avisos anteriores, nenhum novo achado.
+O agente não mudou nesta release. Evidências: `docs/releases/2026-10-01-v1.6.0/`.
+
+**Histórico: produção e staging ALINHADOS em `20260930163000`** — promoção explicitamente autorizada pelo
 Gabriel em 30/09/2026. Dry run de produção mostrou exatamente as nove migrações
 `20260929120000`, `20260929130000`, `20260929140000`, `20260929150000`, `20260929160000`,
 `20260929170000`, `20260930133521`, `20260930160000` e `20260930163000`. Aplicadas pelo CLI com

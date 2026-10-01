@@ -1,0 +1,51 @@
+{
+  "assets": [
+    {
+      "apiUrl": "https://api.github.com/repos/almeidagabriel01/Personal-ProOps-app-releases/releases/assets/602423460",
+      "contentType": "application/json",
+      "createdAt": "2026-10-01T04:22:13Z",
+      "digest": "sha256:6e50a7d980dc50c3f45f4d77566e75e1a0bbc776cf843fd34f9a0829819f0771",
+      "downloadCount": 0,
+      "id": "RA_kwDOUN0N8c4j6ECk",
+      "label": "",
+      "name": "native-compatibility.json",
+      "size": 1159,
+      "state": "uploaded",
+      "updatedAt": "2026-10-01T04:22:14Z",
+      "url": "https://github.com/almeidagabriel01/Personal-ProOps-app-releases/releases/download/v1.6.0/native-compatibility.json"
+    },
+    {
+      "apiUrl": "https://api.github.com/repos/almeidagabriel01/Personal-ProOps-app-releases/releases/assets/602423457",
+      "contentType": "application/vnd.android.package-archive",
+      "createdAt": "2026-10-01T04:22:13Z",
+      "digest": "sha256:8b06d6a43e1d179b917d64279f04b2f45549ef7bcdd1f915bef54bcc87e9356e",
+      "downloadCount": 0,
+      "id": "RA_kwDOUN0N8c4j6ECh",
+      "label": "",
+      "name": "personal-proops-1.6.0.apk",
+      "size": 69766565,
+      "state": "uploaded",
+      "updatedAt": "2026-10-01T04:22:16Z",
+      "url": "https://github.com/almeidagabriel01/Personal-ProOps-app-releases/releases/download/v1.6.0/personal-proops-1.6.0.apk"
+    },
+    {
+      "apiUrl": "https://api.github.com/repos/almeidagabriel01/Personal-ProOps-app-releases/releases/assets/602423459",
+      "contentType": "application/json",
+      "createdAt": "2026-10-01T04:22:13Z",
+      "digest": "sha256:3143c0b87d5bca6662c83cd937396a8906f0af3f8efb323d568d4fb922c66ad8",
+      "downloadCount": 0,
+      "id": "RA_kwDOUN0N8c4j6ECj",
+      "label": "",
+      "name": "update.json",
+      "size": 273,
+      "state": "uploaded",
+      "updatedAt": "2026-10-01T04:22:14Z",
+      "url": "https://github.com/almeidagabriel01/Personal-ProOps-app-releases/releases/download/v1.6.0/update.json"
+    }
+  ],
+  "isDraft": false,
+  "isPrerelease": false,
+  "publishedAt": "2026-10-01T04:22:17Z",
+  "tagName": "v1.6.0",
+  "url": "https://github.com/almeidagabriel01/Personal-ProOps-app-releases/releases/tag/v1.6.0"
+}

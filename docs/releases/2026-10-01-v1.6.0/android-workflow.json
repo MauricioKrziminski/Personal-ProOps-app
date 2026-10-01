@@ -1,0 +1,227 @@
+{
+  "conclusion": "success",
+  "headSha": "88656e7ce79a5002397a5cad13bcbcc4696908d7",
+  "jobs": [
+    {
+      "completedAt": "2026-10-01T04:23:24Z",
+      "conclusion": "success",
+      "databaseId": 110213856599,
+      "name": "Build, verify and publish APK",
+      "startedAt": "2026-10-01T04:07:20Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-10-01T04:07:25Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-10-01T04:07:21Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:07:28Z",
+          "conclusion": "success",
+          "name": "Check out source",
+          "number": 2,
+          "startedAt": "2026-10-01T04:07:25Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:07:35Z",
+          "conclusion": "success",
+          "name": "Set up Node",
+          "number": 3,
+          "startedAt": "2026-10-01T04:07:28Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:07:58Z",
+          "conclusion": "success",
+          "name": "Install dependencies",
+          "number": 4,
+          "startedAt": "2026-10-01T04:07:35Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:08:11Z",
+          "conclusion": "success",
+          "name": "Typecheck",
+          "number": 5,
+          "startedAt": "2026-10-01T04:07:58Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:08:54Z",
+          "conclusion": "success",
+          "name": "Lint",
+          "number": 6,
+          "startedAt": "2026-10-01T04:08:11Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:09:54Z",
+          "conclusion": "success",
+          "name": "Test",
+          "number": 7,
+          "startedAt": "2026-10-01T04:08:54Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:10:19Z",
+          "conclusion": "success",
+          "name": "Set up Expo and EAS",
+          "number": 8,
+          "startedAt": "2026-10-01T04:09:54Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:10:20Z",
+          "conclusion": "success",
+          "name": "Set up Java",
+          "number": 9,
+          "startedAt": "2026-10-01T04:10:19Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:10:52Z",
+          "conclusion": "success",
+          "name": "Set up Android build and inspection tools",
+          "number": 10,
+          "startedAt": "2026-10-01T04:10:20Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:11:15Z",
+          "conclusion": "success",
+          "name": "Restore Gradle dependencies and build cache",
+          "number": 11,
+          "startedAt": "2026-10-01T04:10:52Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:11:26Z",
+          "conclusion": "success",
+          "name": "Install native compiler cache",
+          "number": 12,
+          "startedAt": "2026-10-01T04:11:15Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:11:28Z",
+          "conclusion": "success",
+          "name": "Restore native compiler outputs",
+          "number": 13,
+          "startedAt": "2026-10-01T04:11:26Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:22:05Z",
+          "conclusion": "success",
+          "name": "Build signed APK on this runner",
+          "number": 14,
+          "startedAt": "2026-10-01T04:11:28Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:22:05Z",
+          "conclusion": "success",
+          "name": "Locate local APK",
+          "number": 15,
+          "startedAt": "2026-10-01T04:22:05Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:22:08Z",
+          "conclusion": "success",
+          "name": "Verify APK identity, version and signature",
+          "number": 16,
+          "startedAt": "2026-10-01T04:22:05Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:22:08Z",
+          "conclusion": "success",
+          "name": "Attest compatibility from the verified APK",
+          "number": 17,
+          "startedAt": "2026-10-01T04:22:08Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:22:12Z",
+          "conclusion": "success",
+          "name": "Retain verified build for inspection",
+          "number": 18,
+          "startedAt": "2026-10-01T04:22:08Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:22:12Z",
+          "conclusion": "success",
+          "name": "Generate and validate update manifest",
+          "number": 19,
+          "startedAt": "2026-10-01T04:22:12Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:22:17Z",
+          "conclusion": "success",
+          "name": "Publish release assets",
+          "number": 20,
+          "startedAt": "2026-10-01T04:22:12Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:22:21Z",
+          "conclusion": "success",
+          "name": "Post Restore native compiler outputs",
+          "number": 36,
+          "startedAt": "2026-10-01T04:22:17Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:23:19Z",
+          "conclusion": "success",
+          "name": "Post Restore Gradle dependencies and build cache",
+          "number": 37,
+          "startedAt": "2026-10-01T04:22:21Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:23:19Z",
+          "conclusion": "success",
+          "name": "Post Set up Java",
+          "number": 38,
+          "startedAt": "2026-10-01T04:23:19Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:23:19Z",
+          "conclusion": "success",
+          "name": "Post Set up Node",
+          "number": 39,
+          "startedAt": "2026-10-01T04:23:19Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:23:19Z",
+          "conclusion": "success",
+          "name": "Post Check out source",
+          "number": 40,
+          "startedAt": "2026-10-01T04:23:19Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-01T04:23:20Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 41,
+          "startedAt": "2026-10-01T04:23:19Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/MauricioKrziminski/Personal-ProOps-app/actions/runs/36813631730/job/110213856599"
+    }
+  ],
+  "status": "completed",
+  "url": "https://github.com/MauricioKrziminski/Personal-ProOps-app/actions/runs/36813631730"
+}

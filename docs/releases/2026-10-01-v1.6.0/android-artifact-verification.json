@@ -1,0 +1,19 @@
+{
+  "checkedAt": "2026-10-01T04:25:10.588Z",
+  "sourceCommit": "88656e7ce79a5002397a5cad13bcbcc4696908d7",
+  "workflowRunId": "36813631730",
+  "apkSizeBytes": 69766565,
+  "apkSha256": "8b06d6a43e1d179b917d64279f04b2f45549ef7bcdd1f915bef54bcc87e9356e",
+  "manifestHashMatches": true,
+  "nativeReceiptHashMatches": true,
+  "applicationId": "com.proops.personal",
+  "versionCode": "72",
+  "versionName": "1.6.0",
+  "appVersion": "1.6.0",
+  "runtimeVersion": "1.6.0",
+  "updatesUrl": "https://u.expo.dev/8313579c-3979-4ecd-ba6a-4dc0bf702f05",
+  "channel": "production",
+  "updatesEnabled": true,
+  "signatureVerified": true,
+  "signerSha256": "B3:1D:4D:8D:59:AC:82:F5:58:BD:5B:22:FE:C8:9A:1C:37:64:91:CF:1B:5F:17:D8:B9:EF:C4:09:8B:6F:BD:DA"
+}
