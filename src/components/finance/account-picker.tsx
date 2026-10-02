@@ -1,16 +1,57 @@
 import { useMemo } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { SelectField, type SelectAction, type SelectOption } from '@/components/ui/select-field';
-import { accountSelectOptions } from '@/lib/accounts';
+import { Button } from '@/components/ui/button';
+import { useBRL, useConceal } from '@/components/ui/conceal';
+import { usePresencaAtiva } from '@/components/motion/presenca';
+import { Space } from '@/design/tokens';
+import { useAccountBalances, useCardLimitContext } from '@/hooks/use-finance';
+import { accountSelectOptions, type AccountOptionAccount, type AccountPickerContext } from '@/lib/accounts';
 
 /** O mínimo que o seletor precisa saber. Aceita `Account` inteiro sem conversão. */
-export type PickableAccount = {
-  id: string;
-  name: string;
-  type?: string | null;
-  closing_day?: number | null;
-  archived?: boolean;
+export type PickableAccount = AccountOptionAccount;
+
+type AccountPickerProps = {
+  accounts: readonly PickableAccount[];
+  value: string | null;
+  selectedAccount?: PickableAccount | null;
+  onChange: (id: string | null) => void;
+  actions?: readonly SelectAction[];
+  disabled?: boolean;
+  emptyLabel?: string;
+  placeholder?: string;
+  /** Operações mostram dinheiro; filtros continuam escolhendo só a identidade. */
+  financialContext?: boolean;
 };
+
+export function AccountPicker(props: AccountPickerProps) {
+  return props.financialContext ? <FinancialAccountPicker {...props} /> : <AccountPickerField {...props} />;
+}
+
+function FinancialAccountPicker(props: AccountPickerProps) {
+  const active = usePresencaAtiva();
+  const visible = props.selectedAccount ? [...props.accounts, props.selectedAccount] : props.accounts;
+  const hasBanks = visible.some(account => !account.archived && account.type !== 'credit_card');
+  const hasCards = visible.some(account => !account.archived && account.type === 'credit_card');
+  const balances = useAccountBalances(active && hasBanks);
+  const cards = useCardLimitContext(active && hasCards);
+  const { concealed, ready } = useConceal();
+  const format = useBRL();
+  const context: AccountPickerContext = { balances, cards, format, concealed: concealed || !ready };
+  const options = accountSelectOptions(visible, undefined, null, context);
+  const retryBanks = hasBanks && (balances.isError || options.some(option => option.icon !== 'creditcard' && 'detailUnavailable' in option && option.detailUnavailable));
+  const retryCards = hasCards && (cards.isError || options.some(option => option.icon === 'creditcard' && 'detailUnavailable' in option && option.detailUnavailable));
+  const retry = () => Promise.allSettled([
+    ...(retryBanks ? [balances.refetch({ cancelRefetch: false })] : []), ...(retryCards ? [cards.refetch({ cancelRefetch: false })] : []),
+  ]);
+  return <View style={styles.context}>
+    <AccountPickerField {...props} context={context} />
+    {retryBanks || retryCards ? <Button label="Atualizar saldos e limites" variant="secondary" size="sm"
+      disabled={props.disabled || !active || retryBanks && balances.isFetching || retryCards && cards.isFetching}
+      onPress={() => { void retry(); }} /> : null}
+  </View>;
+}
 
 /**
  * Escolher a conta de um lançamento. **O único caminho** — nenhuma tela monta
@@ -47,7 +88,7 @@ export type PickableAccount = {
  * para caber numa linha só; neste campo o tipo tem lugar próprio embaixo, e
  * repetir o sufixo ensina a pessoa a não ler o sufixo.
  */
-export function AccountPicker({
+function AccountPickerField({
   accounts,
   value,
   selectedAccount,
@@ -56,28 +97,15 @@ export function AccountPicker({
   disabled,
   emptyLabel,
   placeholder = 'Escolher conta',
-}: {
-  accounts: readonly PickableAccount[];
-  value: string | null;
-  /** Conta do rascunho, obtida da lista completa antes de filtrar as alternativas. */
-  selectedAccount?: PickableAccount | null;
-  onChange: (id: string | null) => void;
-  actions?: readonly SelectAction[];
-  disabled?: boolean;
-  /**
-   * Rótulo da opção "sem conta". Omitido, a opção não existe — é o caso da
-   * transferência, que precisa dos dois lados para significar alguma coisa.
-   */
-  emptyLabel?: string;
-  placeholder?: string;
-}) {
-  const opcoes = useMemo<SelectOption[]>(() => accountSelectOptions(accounts, emptyLabel), [accounts, emptyLabel]);
+  context,
+}: AccountPickerProps & { context?: AccountPickerContext }) {
+  const opcoes = useMemo<SelectOption[]>(() => accountSelectOptions(accounts, emptyLabel, null, context), [accounts, emptyLabel, context]);
 
   return (
     <SelectField
       options={opcoes}
       value={value}
-      selectedOption={selectedAccount ? accountSelectOptions([selectedAccount])[0] : null}
+      selectedOption={selectedAccount ? accountSelectOptions([selectedAccount], undefined, null, context)[0] : null}
       onChange={onChange}
       actions={actions}
       disabled={disabled}
@@ -85,3 +113,5 @@ export function AccountPicker({
     />
   );
 }
+
+const styles = StyleSheet.create({ context: { gap: Space.sm } });

@@ -84,3 +84,93 @@ test('F02: resultado tardio, arquivado, apagado ou com identidade divergente nã
   assert.equal(lib.createdAccountSelection({ ...result, account: { ...result.account, archived: true } }, ['checking']), null);
   assert.equal(lib.createdAccountSelection({ ...result, account: { ...result.account, id: 'other' } }, ['checking']), null);
 });
+
+
+const f03Accounts = [
+  { id: 'bank', name: 'Corrente teste', type: 'checking' },
+  { id: 'card', name: 'Cartão teste', type: 'credit_card', closing_day: 28, credit_limit_cents: 100000 },
+];
+const f03Balance = { account_id: 'bank', cleared_cents: -1250, balance_cents: 48750, pending_in_cents: 50000, pending_out_cents: 0 };
+const f03Card = { account_id: 'card', credit_limit_cents: 100000, available_limit_cents: 19400, invoice_total_cents: 30000, limit_status: 'available' };
+const f03Query = (data: any[], other: any = {}) => ({ data, isPending: false, isError: false, isFetching: false, isPaused: false, ...other });
+function f03Options(other: any = {}, accounts: any[] = f03Accounts) {
+  return (accountSelectOptions as any)(accounts, 'Sem conta', null, {
+    balances: f03Query([f03Balance]), cards: f03Query([f03Card]),
+    format: (cents: number) => `${cents} centavos`, concealed: false, ...other,
+  });
+}
+
+test('F03: saldo é confirmado com sinal; limite vem de todas as obrigações, não da fatura visível', () => {
+  const options = f03Options();
+  assert.equal(options[0].detail, undefined, 'Sem conta não representa saldo zero');
+  assert.equal(options[1].detail, 'Saldo no ProOps −1250 centavos');
+  assert.equal(options[2].detail, 'Limite disponível 19400 centavos');
+  assert.equal(options[2].meta, 'Cartão · fecha dia 28');
+});
+
+test('F03: zero explícito é um valor; limite ausente não é zero nem ilimitado', () => {
+  assert.equal(f03Options({ balances: f03Query([{ ...f03Balance, cleared_cents: 0 }]) })[1].detail, 'Saldo no ProOps 0 centavos');
+  assert.equal(f03Options({ cards: f03Query([{ ...f03Card, credit_limit_cents: 0, available_limit_cents: 0 }]) })[2].detail, 'Limite disponível 0 centavos');
+  assert.equal(f03Options({}, [f03Accounts[0], { ...f03Accounts[1], credit_limit_cents: null }])[2].detail, 'Limite não cadastrado');
+  assert.equal(f03Options({ cards: f03Query([{ ...f03Card, credit_limit_cents: null, available_limit_cents: 0 }]) })[2].detail, 'Limite não cadastrado');
+});
+
+test('F03: carregamento, erro e pausa conservam opções sem inventar dinheiro', () => {
+  const cases = [
+    [{ data: undefined, isPending: true }, 'Carregando saldo…'],
+    [{ isError: true }, 'Saldo indisponível'],
+    [{ isPaused: true }, 'Saldo aguardando conexão'],
+    [{ data: [] }, 'Saldo indisponível'],
+  ];
+  for (const [state, detail] of cases) {
+    const option = f03Options({ balances: f03Query([f03Balance], state) })[1];
+    assert.equal(option.detail, detail);
+    assert.equal(option.id, 'bank');
+    assert.equal(option.disabled, undefined);
+  }
+  assert.equal(f03Options({ cards: f03Query([f03Card], { isPending: true, data: undefined }) })[2].detail, 'Carregando limite…');
+  assert.equal(f03Options({ cards: f03Query([f03Card], { isError: true }) })[2].detail, 'Limite indisponível');
+});
+
+test('F03: refetch tem valor sinalizado; erro posterior não apresenta cache antigo como atual', () => {
+  assert.equal(f03Options({ balances: f03Query([f03Balance], { isFetching: true }) })[1].detail, 'Saldo no ProOps −1250 centavos · atualizando');
+  assert.equal(f03Options({ balances: f03Query([f03Balance], { isFetching: true, isError: true }) })[1].detail, 'Saldo indisponível');
+});
+
+test('F03: inteiro seguro é obrigatório; strings SQL inteiras são aceitas sem perda', () => {
+  for (const bad of [null, undefined, '', '1.2', 'abc', NaN, Infinity, 1.5, 9007199254740992, '9007199254740993']) {
+    assert.equal(f03Options({ balances: f03Query([{ ...f03Balance, cleared_cents: bad }]) })[1].detail, 'Saldo indisponível');
+    assert.equal(f03Options({ cards: f03Query([{ ...f03Card, available_limit_cents: bad }]) })[2].detail, 'Limite indisponível');
+  }
+  assert.equal(f03Options({ balances: f03Query([{ ...f03Balance, cleared_cents: '-1250' }]) })[1].detail, 'Saldo no ProOps −1250 centavos');
+});
+
+test('F03: ocultação fixa protege saldo, sinal e limite sem chamar o formatador', () => {
+  const options = f03Options({ concealed: true, format() { throw new Error('Não deve formatar valor oculto'); } });
+  assert.equal(options[1].detail, 'Saldo no ProOps ••••••');
+  assert.equal(options[2].detail, 'Limite disponível ••••••');
+  assert.ok(!JSON.stringify(options).includes('1250'));
+  assert.ok(!JSON.stringify(options).includes('19400'));
+});
+
+test('F03: conta arquivada não recebe número atual e consulta por ID distingue nomes iguais', () => {
+  assert.equal(f03Options({}, [{ ...f03Accounts[0], archived: true }])[1].detail, undefined);
+  const options = f03Options({ balances: f03Query([f03Balance, { ...f03Balance, account_id: 'other', cleared_cents: 42 }]) },
+    [f03Accounts[0], { ...f03Accounts[0], id: 'other' }]);
+  assert.equal(options[1].detail, 'Saldo no ProOps −1250 centavos');
+  assert.equal(options[2].detail, 'Saldo no ProOps 42 centavos');
+});
+
+
+test('F03: exposição legada incompleta não anuncia limite disponível canônico', () => {
+  const options = f03Options({ cards: f03Query([{ ...f03Card, limit_status: 'needs_review', available_limit_cents: null }]) });
+  assert.equal(options[2].detail, 'Limite precisa de conferência');
+  assert.equal(options[2].detailUnavailable, undefined, 'Refetch não resolve uma ambiguidade contábil');
+});
+
+
+test('F03: contrato de qualidade inválido não apresenta número como confirmado', () => {
+  for (const limit_status of [undefined, null, 'unexpected']) {
+    assert.equal(f03Options({ cards: f03Query([{ ...f03Card, limit_status }]) })[2].detail, 'Limite indisponível');
+  }
+});

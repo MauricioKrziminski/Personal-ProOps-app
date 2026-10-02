@@ -1,0 +1,135 @@
+[
+  {
+    "file": "imagens/f03-ios-before-write-balance.png",
+    "sourceFlow": "write-refresh",
+    "sourceRun": "2026-10-02_204440",
+    "sha256": "122f370d9d6c7f73f322acdbef39e4a4c2f48842283c31872b7e73ab12293dc9",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-ios-after-write-balance.png",
+    "sourceFlow": "write-refresh",
+    "sourceRun": "2026-10-02_204440",
+    "sha256": "3b8b3f4d5f695d3dbc2c02499a27179eae90c3fc51946c6b668708412e1a23c9",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-android-before-write-balance.png",
+    "sourceFlow": "write-refresh",
+    "sourceRun": "2026-10-02_204222",
+    "sha256": "eba671c419178406a8ae08b9ab97fbb8ff2932564caac40d58194c931e6274cc",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-android-after-write-balance.png",
+    "sourceFlow": "write-refresh",
+    "sourceRun": "2026-10-02_204222",
+    "sha256": "90672dd1af37d8283dfcb14d11165bc3f7c11005ec08f5b0de0103fc3f2fa901",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-ios-available-limit.png",
+    "sourceFlow": "metadata-resume",
+    "sourceRun": "2026-10-02_203543",
+    "sha256": "8c1b1ccba3fac86cb0f75f7b0baa6d6153e0583e488b3971d21f2137c2a116ee",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-ios-zero-limit-selectable.png",
+    "sourceFlow": "metadata-resume",
+    "sourceRun": "2026-10-02_203543",
+    "sha256": "e2665ce61d16ce8e125c59b058d3a853ec3fe226e28b9f3dd0c29c93d2812769",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-android-available-limit.png",
+    "sourceFlow": "metadata",
+    "sourceRun": "2026-10-02_202225",
+    "sha256": "6d24a1d41814a57ffc42306b0ec0621fa22a82275ca9086a9f19c4a96c7557e6",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-android-zero-limit-selectable.png",
+    "sourceFlow": "metadata",
+    "sourceRun": "2026-10-02_202225",
+    "sha256": "0d2033b47f7b17cec76f99b9c34e4792e4ab1f1e045589d2b03b38c772eed840",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-ios-hidden-options.png",
+    "sourceFlow": "privacy",
+    "sourceRun": "2026-10-02_203630",
+    "sha256": "6bfd2faa3bbc8c76506995ba5882e93cd236d0721523a6f9cac8c593e6ad2735",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-android-hidden-options.png",
+    "sourceFlow": "privacy",
+    "sourceRun": "2026-10-02_203451",
+    "sha256": "404dd9bf02d558e6318e38ca17c19cf6f725013b7cb089c056249818447dd158",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-ios-light-large-no-limit.png",
+    "sourceFlow": "quality-large",
+    "sourceRun": "2026-10-02_204210",
+    "sha256": "feca485cc18a982e6715ac33eb71621cbc1bb030af9368c90045d23665f15c60",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-ios-light-large-needs-review.png",
+    "sourceFlow": "quality-large",
+    "sourceRun": "2026-10-02_204210",
+    "sha256": "b31dd3715ef06cd23248d328f5436cdedc6f11dfcc18afa69effc3c651898c29",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-ios-light-large-negative-limit.png",
+    "sourceFlow": "quality-large",
+    "sourceRun": "2026-10-02_204210",
+    "sha256": "6dd690816677bb98bbe3bdb1b7760bf15c1d998cfa5f85b9455d18e53180c86b",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-android-dark-large-no-limit.png",
+    "sourceFlow": "quality-large",
+    "sourceRun": "2026-10-02_203859",
+    "sha256": "9d76561fc062cef0cd0f7fc306d4a8cab5fdc1925170b0dff489b5da19adba70",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-android-dark-large-needs-review.png",
+    "sourceFlow": "quality-large",
+    "sourceRun": "2026-10-02_203859",
+    "sha256": "ebc186fa8fae7507128803ef7e857e7a0bf1a226c361f42bf2725b28870250cd",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-android-dark-large-negative-limit.png",
+    "sourceFlow": "quality-large",
+    "sourceRun": "2026-10-02_203859",
+    "sha256": "a21c5a42b7626a8664f498305de32f948d89a93c6ce0942fcb69ac09c8444911",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-ios-dark-large-context-proof.png",
+    "sourceFlow": "dark-proof",
+    "sourceRun": "2026-10-02_204625",
+    "sha256": "9993823d85a0054d194f05c07329a7d0c7ea24cffcade22d8a79811041487049",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-android-offline-unavailable.png",
+    "sourceFlow": "offline",
+    "sourceRun": "2026-10-02_204515",
+    "sha256": "a9208ca2c27f5275e49aa82fed883f1132a28f2b5287c1fcaadef065db08d9f2",
+    "primaryVisualInspection": true
+  },
+  {
+    "file": "imagens/f03-android-offline-recovered.png",
+    "sourceFlow": "offline",
+    "sourceRun": "2026-10-02_204620",
+    "sha256": "5fdb5a88ba5f33fab39368466f3bfdfd91c787d805f646ed593758b7cf15f957",
+    "primaryVisualInspection": true
+  }
+]

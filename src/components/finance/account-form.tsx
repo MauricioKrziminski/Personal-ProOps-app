@@ -224,7 +224,7 @@ export function AccountFormFields({
                 qualquer coisa. O seletor é o mesmo de todo lugar que escolhe
                 conta, colapsado e com o glifo por tipo.
               */}
-              <AccountPicker
+              <AccountPicker financialContext
                 disabled={disabled}
                 accounts={pagadoras}
                 value={form.payerId}

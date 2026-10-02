@@ -504,10 +504,11 @@ export function useMonthlyCashflow(monthsBack = 6, view?: CycleView) {
   });
 }
 
-export function useAccountBalances() {
+export function useAccountBalances(enabled = true) {
   useRealtimeInvalidate('transactions', ['account-balances']);
   return useQuery({
     queryKey: ['account-balances'],
+    enabled,
     queryFn: async (): Promise<AccountBalance[]> => {
       const { data, error } = await supabase.rpc('account_balances');
       if (error) throw error;
@@ -755,6 +756,29 @@ export function useCardSummary() {
       const { data, error } = await supabase.rpc('card_summary');
       if (error) throw error;
       return data as CardSummary[];
+    },
+  });
+}
+
+export type CardLimitContext = {
+  account_id: string;
+  credit_limit_cents: number | null;
+  available_limit_cents: number | null;
+  limit_status: 'available' | 'not_set' | 'needs_review';
+};
+
+/** Canonical invoice exposure, with explicit quality instead of an invented legacy limit. */
+export function useCardLimitContext(enabled = true) {
+  useRealtimeInvalidate('accounts', ['card-limit-context']);
+  useRealtimeInvalidate('card_invoices', ['card-limit-context']);
+  useRealtimeInvalidate('transactions', ['card-limit-context']);
+  return useQuery({
+    queryKey: ['card-limit-context'],
+    enabled,
+    queryFn: async (): Promise<CardLimitContext[]> => {
+      const { data, error } = await supabase.rpc('card_limit_context');
+      if (error) throw error;
+      return data as CardLimitContext[];
     },
   });
 }

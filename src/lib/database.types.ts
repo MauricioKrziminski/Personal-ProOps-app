@@ -2848,6 +2848,15 @@ export type Database = {
         }[]
       }
       cancel_subscription: { Args: never; Returns: string }
+      card_limit_context: {
+        Args: never
+        Returns: {
+          account_id: string
+          available_limit_cents: number
+          credit_limit_cents: number
+          limit_status: string
+        }[]
+      }
       card_summary: {
         Args: never
         Returns: {

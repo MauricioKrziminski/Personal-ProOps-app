@@ -26,7 +26,7 @@ Esses fatos e a abertura do formulário ainda não equivalem ao aceite funcional
 |---|---|---|---|---|
 | F01 | Forma de pagamento | Aceite técnico no staging em 02/10/2026 | Validado na matriz | Validado na matriz |
 | F02 | Criar origem no fluxo | Aceite técnico no staging em 02/10/2026 | Validado na matriz | Validado na matriz |
-| F03 | Saldo/limite no seletor | Liberado para implementação | Não validado | Não validado |
+| F03 | Saldo/limite no seletor | Aceito; qualidade explícita, privacidade e consultas agregadas | Validado; limites no registro | Validado; offline/recuperação incluídos |
 | F04 | Prévia do efeito | Aguardando F03 | Não validado | Não validado |
 | F05 | Filtros por pagamento | Aguardando F04 | Não validado | Não validado |
 | F06 | Classificações independentes | Aguardando F05 | Não validado | Não validado |
@@ -153,3 +153,13 @@ no iOS e Android, além de cancelamento/volta, nome duplicado/longo, teclado, es
 fonte ampliada, tablet e movimento reduzido. Snapshot final: 13 contas e 11 registros F02.
 Offline/retry nativo foi executado no Android; offline nativo iOS permanece sem execução.
 Hardware físico, release e produção não são certificados. F03 liberado após esse aceite.
+
+## F03 — aceite
+
+[Contrato e arquitetura](f03/contrato-de-implementacao.md), [registro nativo e limites](f03/registro-nativo.md).
+Gates finais: Node 1.529/1.529, TypeScript e lint exit 0; SQL de obrigações/RLS em rollback
+contra a migration aplicada no staging, exit 0. Duas consultas agregadas para 100 seletores.
+Saldo/limite, privacidade, null/zero/negativo, fonte ampliada e tema conferidos nos dois sistemas.
+Um gasto Pix por plataforma, 1.234 centavos, conferido no banco e refletido imediatamente no
+saldo do seletor. Android offline/recuperação conservou rascunho e origem. Dezenove capturas
+inspecionadas e arquivadas; configurações dos dispositivos restauradas. F04 liberado.

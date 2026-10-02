@@ -85,10 +85,10 @@ Aceite técnico em 02/10/2026 no staging; [matriz e limites](../../qa/2026-10-02
 
 Arquivos: `accounts.ts`, `AccountPicker`, hooks de saldo/cartão, consultas auxiliares e testes de opções. Interface: metadata contextual opcional com estado de consulta explícito, nenhum zero inventado.
 
-- [ ] RED: limite considera parcelas/faturas e privacidade; erro não vira saldo zero.
-- [ ] Reusar agregação e ampliar seletor sem consulta por opção.
-- [ ] Verificar parcial/adiamento/negativo/limite ausente e desempenho de lista.
-- [ ] Executar gates e matriz nativa F03; registrar aceite.
+- [x] RED: limite considera parcelas/faturas e privacidade; erro não vira saldo zero.
+- [x] Reusar agregação e ampliar seletor sem consulta por opção.
+- [x] Verificar parcial/adiamento/negativo/limite ausente e desempenho de lista.
+- [x] Executar gates e matriz nativa F03; registrar aceite em `docs/qa/2026-10-02-evolucao-financeira/f03/registro-nativo.md` (inclui limites da verificação).
 
 ### F04 — Efeito financeiro antes de salvar
 

@@ -677,7 +677,7 @@ export default function DebtsScreen() {
               ) : null}
 
               <Field label="Conta que paga">
-                <AccountPicker
+                <AccountPicker financialContext
                   accounts={pagadoras}
                   value={contaId}
                   onChange={setContaId}

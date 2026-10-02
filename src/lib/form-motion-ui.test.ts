@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 
 // Commit effects after stable renders; neither springs nor native layout finish automatically.
 // Component-local hooks and provider context exercise the real nested presence lifetimes.
-function montar(file: string, name: string, initial: any, config: { reduzir: boolean; ativo: boolean; fontScale?: number; lock?: any; creation?: any; preventRemove?: any; toasts?: any[] } = { reduzir: false, ativo: true }) {
+function montar(file: string, name: string, initial: any, config: { reduzir: boolean; ativo: boolean; fontScale?: number; lock?: any; creation?: any; preventRemove?: any; toasts?: any[]; finance?: any; conceal?: any } = { reduzir: false, ativo: true }) {
   type Instance = { slots: any[]; cursor: number; mounted: boolean; restart: boolean };
   type Animation = { shared: any; done?: (ok: boolean) => void; target: number; from: number; kind: 'spring' | 'timing'; settings: any; canceled: boolean };
   const instances = new Map<string, Instance>();
@@ -129,7 +129,8 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       require: (id: string) => {
       if (id === 'react') return react;
       if (id === 'expo-router/react-navigation') return { usePreventRemove: (active: boolean, callback: any) => { config.preventRemove = { active, callback }; } };
-      if (id === '@/hooks/use-finance') return { useAccounts: () => ({ data: [] }), useCreateAccount: () => config.creation };
+      if (id === '@/hooks/use-finance') return { useAccounts: () => ({ data: [] }), useCreateAccount: () => config.creation, useAccountBalances: (enabled: boolean) => { config.finance?.calls?.push(['balances', enabled]); return config.finance?.balances; }, useCardLimitContext: (enabled: boolean) => { config.finance?.calls?.push(['cards', enabled]); return config.finance?.cards; } };
+      if (id === '@/components/ui/conceal') return { useConceal: () => config.conceal ?? { ready: true, concealed: false }, useBRL: () => (cents: number) => `${cents} centavos` };
       if (id === '@/components/ui/toast') return { useToast: () => (toast: any) => config.toasts?.push(toast) };
       if (id === '@/components/ui/button') return { Button: 'Button' };
       if (id === '@/components/ui/card') return { Card: 'Card' };
@@ -1505,4 +1506,99 @@ test('F02: campos compartilhados explicam dias obrigatórios e a edição bloque
   limit.props.onChangeCents(50000);
   ui.find(n => n.type === 'TextField' && n.props.placeholder === 'Ex.: 28').props.onChangeText('31');
   assert.deepEqual(changes, [], 'callbacks capturados não mudam o payload congelado');
+});
+
+
+function f03Picker(count = 2, state: any = {}) {
+  const changes: any[] = [];
+  let retry = 0;
+  const ready = (data: any[]) => ({ data, isPending: false, isError: false, isPaused: false, isFetching: false,
+    refetch: async () => { retry++; } });
+  const config = { reduzir: false, ativo: true, conceal: { ready: true, concealed: false }, finance: {
+    calls: [] as any[],
+    balances: ready([{ account_id: 'bank', cleared_cents: -1250 }]),
+    cards: ready([{ account_id: 'card', credit_limit_cents: 0, available_limit_cents: 0, limit_status: 'available' }]),
+  }, ...state };
+  const props = { accounts: Array.from({ length: count }, (_, i) => i === 1
+      ? { id: 'card', name: 'Cartão teste', type: 'credit_card', credit_limit_cents: 0, closing_day: 28 }
+      : { id: i === 0 ? 'bank' : `bank-${i}`, name: `Banco ${i}`, type: 'checking' }),
+    value: 'bank', financialContext: true, onChange: (id: unknown) => changes.push(id) };
+  const ui = montar('src/components/finance/account-picker.tsx', 'AccountPicker', props, config);
+  const header = () => ui.find((n) => n.type === 'PressableScale' && n.props.accessibilityState.expanded !== undefined);
+  return { ui, props, config, changes, header, retries: () => retry };
+}
+
+test('F03: metadado real é visível e acessível; limite zero não impede selecionar cartão', () => {
+  const f = f03Picker();
+  assert.match(f.header().props.accessibilityLabel, /Saldo no ProOps −1250 centavos/);
+  assert.ok(f.ui.nodes().some(n => n.type === 'ThemedText' && n.props.children === 'Saldo no ProOps −1250 centavos'));
+  f.header().props.onPress(); f.ui.render();
+  const card = f.ui.find(n => n.props?.accessibilityRole === 'radio' && n.props.accessibilityLabel.startsWith('Cartão teste,'));
+  assert.match(card.props.accessibilityLabel, /Limite disponível 0 centavos/);
+  assert.equal(card.props.disabled, false);
+  card.props.onPress();
+  assert.deepEqual(f.changes, ['card']);
+});
+
+test('F03: preferência oculta e ainda não lida não vaza valor no texto nem na acessibilidade', () => {
+  const f = f03Picker();
+  for (const conceal of [{ ready: true, concealed: true }, { ready: false, concealed: false }]) {
+    f.config.conceal = conceal; f.ui.render();
+    assert.match(f.header().props.accessibilityLabel, /Saldo no ProOps ••••••/);
+    assert.ok(!f.ui.nodes().some(n => typeof n.props?.accessibilityLabel === 'string' && n.props.accessibilityLabel.includes('1250')));
+    assert.ok(!f.ui.nodes().some(n => n.type === 'ThemedText' && String(n.props.children).includes('1250')));
+  }
+});
+
+test('F03: erro mantém seleção e recuperação não emite outra conta', async () => {
+  const f = f03Picker();
+  f.config.finance.balances.isError = true; f.ui.render();
+  assert.match(f.header().props.accessibilityLabel, /Saldo indisponível/);
+  const retry = f.ui.find(n => n.type === 'Button' && n.props?.label === 'Atualizar saldos e limites');
+  assert.ok(retry, 'Recuperação fica junto do seletor');
+  await retry.props.onPress();
+  assert.equal(f.retries(), 1);
+  assert.deepEqual(f.changes, []);
+  f.header().props.onPress(); f.ui.render();
+  f.ui.find(n => n.props?.accessibilityRole === 'radio' && n.props.accessibilityLabel.startsWith('Cartão teste,')).props.onPress();
+  assert.deepEqual(f.changes, ['card']);
+});
+
+test('F03: muitas contas mantêm dois recursos agregados; seletor simples não consulta dinheiro', () => {
+  const small = f03Picker(2);
+  const large = f03Picker(100);
+  assert.deepEqual(large.config.finance.calls, small.config.finance.calls);
+  assert.deepEqual(small.config.finance.calls, [['balances', true], ['cards', true]]);
+  const onlyBank = f03Picker(1);
+  assert.deepEqual(onlyBank.config.finance.calls, [['balances', true], ['cards', false]]);
+  onlyBank.config.finance.calls.length = 0;
+  onlyBank.ui.render({ ...onlyBank.props, financialContext: false });
+  assert.deepEqual(onlyBank.config.finance.calls, []);
+});
+
+
+test('F03: ocultar durante fechamento da lista protege também o snapshot visual que está saindo', () => {
+  const f = f03Picker();
+  f.header().props.onPress(); f.ui.render();
+  const layer = f.ui.find(n => n.type === 'Animated.View' && n.props.onLayout && n.props.style);
+  if (layer) f.ui.layout(layer, 200);
+  const card = f.ui.find(n => n.props?.accessibilityRole === 'radio' && n.props.accessibilityLabel.startsWith('Cartão teste,'));
+  card.props.onPress(); f.ui.render({ ...f.props, value: 'card' });
+  f.config.conceal.concealed = true; f.ui.render();
+  assert.match(f.header().props.accessibilityLabel, /Limite disponível ••••••/);
+  assert.ok(!f.ui.nodes().some(n => n.type === 'ThemedText' && /1250 centavos|0 centavos/.test(String(n.props.children))),
+    'A camada antiga lê privacidade ao renderizar, mesmo guardando a opção anterior');
+});
+
+
+test('F03: recurso desabilitado em voo em outro seletor não bloqueia recuperar a conta bancária', () => {
+  const f = f03Picker(1);
+  f.config.finance.balances.isError = true;
+  f.config.finance.cards.isFetching = true;
+  f.ui.render();
+  const retry = f.ui.find(n => n.type === 'Button' && n.props.label === 'Atualizar saldos e limites');
+  assert.ok(retry);
+  assert.equal(retry.props.disabled, false);
+  retry.props.onPress();
+  assert.equal(f.retries(), 1);
 });

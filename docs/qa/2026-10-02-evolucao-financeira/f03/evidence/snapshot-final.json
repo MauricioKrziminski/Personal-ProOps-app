@@ -1,0 +1,278 @@
+{
+  "limits": [
+    {
+      "account_id": "13083ab0-c759-4026-b2ea-6fca0a7e76ca",
+      "credit_limit_cents": 1200000,
+      "available_limit_cents": -934316,
+      "limit_status": "available"
+    },
+    {
+      "account_id": "fb7740f0-0158-43f4-a73d-6a50b92850a7",
+      "credit_limit_cents": 500000,
+      "available_limit_cents": 477655,
+      "limit_status": "available"
+    },
+    {
+      "account_id": "876a0efd-0829-4bba-806e-0402d27d76b2",
+      "credit_limit_cents": 0,
+      "available_limit_cents": 0,
+      "limit_status": "available"
+    },
+    {
+      "account_id": "1788451b-0640-4793-a157-300e0e4f38cb",
+      "credit_limit_cents": 500000,
+      "available_limit_cents": 477655,
+      "limit_status": "available"
+    },
+    {
+      "account_id": "cef4f9e6-7ab8-416e-bc18-e9f17610678d",
+      "credit_limit_cents": 0,
+      "available_limit_cents": 0,
+      "limit_status": "available"
+    },
+    {
+      "account_id": "3b67ca63-3149-40a1-98eb-8d270317d221",
+      "credit_limit_cents": 100000,
+      "available_limit_cents": null,
+      "limit_status": "needs_review"
+    },
+    {
+      "account_id": "cb17ec53-b2a4-4ca0-8df2-3ab4918d1a11",
+      "credit_limit_cents": null,
+      "available_limit_cents": null,
+      "limit_status": "not_set"
+    }
+  ],
+  "accounts": [
+    {
+      "id": "60bf2681-7cc0-48c5-b0cd-f4a8b96d3328",
+      "name": "QA F02 IOS Banco 20261002",
+      "type": "checking",
+      "initial_balance_cents": -34567,
+      "archived": false,
+      "closing_day": null,
+      "due_day": null,
+      "credit_limit_cents": null,
+      "payment_account_id": null,
+      "closing_day_inclusive": false,
+      "rotativo_auto": false,
+      "rotativo_rate_monthly": null
+    },
+    {
+      "id": "1788451b-0640-4793-a157-300e0e4f38cb",
+      "name": "QA F02 IOS Cartao 20261002",
+      "type": "credit_card",
+      "initial_balance_cents": 0,
+      "archived": false,
+      "closing_day": 28,
+      "due_day": 5,
+      "credit_limit_cents": 500000,
+      "payment_account_id": "60bf2681-7cc0-48c5-b0cd-f4a8b96d3328",
+      "closing_day_inclusive": false,
+      "rotativo_auto": false,
+      "rotativo_rate_monthly": null
+    },
+    {
+      "id": "8d3b86e2-84d2-4536-b29e-cbc29110c134",
+      "name": "QA F02 ANDROID Banco 20261002",
+      "type": "checking",
+      "initial_balance_cents": -34567,
+      "archived": false,
+      "closing_day": null,
+      "due_day": null,
+      "credit_limit_cents": null,
+      "payment_account_id": null,
+      "closing_day_inclusive": false,
+      "rotativo_auto": false,
+      "rotativo_rate_monthly": null
+    },
+    {
+      "id": "fb7740f0-0158-43f4-a73d-6a50b92850a7",
+      "name": "QA F02 ANDROID Cartao 20261002",
+      "type": "credit_card",
+      "initial_balance_cents": 0,
+      "archived": false,
+      "closing_day": 28,
+      "due_day": 5,
+      "credit_limit_cents": 500000,
+      "payment_account_id": null,
+      "closing_day_inclusive": false,
+      "rotativo_auto": false,
+      "rotativo_rate_monthly": null
+    },
+    {
+      "id": "cef4f9e6-7ab8-416e-bc18-e9f17610678d",
+      "name": "QA F02 IOS Confirmação final 20261002",
+      "type": "credit_card",
+      "initial_balance_cents": 0,
+      "archived": false,
+      "closing_day": 31,
+      "due_day": 1,
+      "credit_limit_cents": 0,
+      "payment_account_id": null,
+      "closing_day_inclusive": false,
+      "rotativo_auto": false,
+      "rotativo_rate_monthly": null
+    },
+    {
+      "id": "876a0efd-0829-4bba-806e-0402d27d76b2",
+      "name": "QA F02 ANDROID Confirmação final 20261002",
+      "type": "credit_card",
+      "initial_balance_cents": 0,
+      "archived": false,
+      "closing_day": 31,
+      "due_day": 1,
+      "credit_limit_cents": 0,
+      "payment_account_id": null,
+      "closing_day_inclusive": false,
+      "rotativo_auto": false,
+      "rotativo_rate_monthly": null
+    },
+    {
+      "id": "cb17ec53-b2a4-4ca0-8df2-3ab4918d1a11",
+      "name": "QA F03 Sem limite 20261002",
+      "type": "credit_card",
+      "initial_balance_cents": 0,
+      "archived": false,
+      "closing_day": 3,
+      "due_day": 10,
+      "credit_limit_cents": null,
+      "payment_account_id": null,
+      "closing_day_inclusive": false,
+      "rotativo_auto": false,
+      "rotativo_rate_monthly": null
+    },
+    {
+      "id": "3b67ca63-3149-40a1-98eb-8d270317d221",
+      "name": "QA F03 Legado 20261002",
+      "type": "credit_card",
+      "initial_balance_cents": 1000,
+      "archived": false,
+      "closing_day": 3,
+      "due_day": 10,
+      "credit_limit_cents": 100000,
+      "payment_account_id": null,
+      "closing_day_inclusive": false,
+      "rotativo_auto": false,
+      "rotativo_rate_monthly": null
+    }
+  ],
+  "balances": [
+    {
+      "account_id": "1788451b-0640-4793-a157-300e0e4f38cb",
+      "name": "QA F02 IOS Cartao 20261002",
+      "type": "credit_card",
+      "balance_cents": -22345,
+      "cleared_cents": -22345,
+      "pending_in_cents": 0,
+      "pending_out_cents": 0
+    },
+    {
+      "account_id": "3b67ca63-3149-40a1-98eb-8d270317d221",
+      "name": "QA F03 Legado 20261002",
+      "type": "credit_card",
+      "balance_cents": 1000,
+      "cleared_cents": 1000,
+      "pending_in_cents": 0,
+      "pending_out_cents": 0
+    },
+    {
+      "account_id": "60bf2681-7cc0-48c5-b0cd-f4a8b96d3328",
+      "name": "QA F02 IOS Banco 20261002",
+      "type": "checking",
+      "balance_cents": -48146,
+      "cleared_cents": -48146,
+      "pending_in_cents": 0,
+      "pending_out_cents": 0
+    },
+    {
+      "account_id": "876a0efd-0829-4bba-806e-0402d27d76b2",
+      "name": "QA F02 ANDROID Confirmação final 20261002",
+      "type": "credit_card",
+      "balance_cents": 0,
+      "cleared_cents": 0,
+      "pending_in_cents": 0,
+      "pending_out_cents": 0
+    },
+    {
+      "account_id": "8d3b86e2-84d2-4536-b29e-cbc29110c134",
+      "name": "QA F02 ANDROID Banco 20261002",
+      "type": "checking",
+      "balance_cents": -48146,
+      "cleared_cents": -48146,
+      "pending_in_cents": 0,
+      "pending_out_cents": 0
+    },
+    {
+      "account_id": "cb17ec53-b2a4-4ca0-8df2-3ab4918d1a11",
+      "name": "QA F03 Sem limite 20261002",
+      "type": "credit_card",
+      "balance_cents": 0,
+      "cleared_cents": 0,
+      "pending_in_cents": 0,
+      "pending_out_cents": 0
+    },
+    {
+      "account_id": "cef4f9e6-7ab8-416e-bc18-e9f17610678d",
+      "name": "QA F02 IOS Confirmação final 20261002",
+      "type": "credit_card",
+      "balance_cents": 0,
+      "cleared_cents": 0,
+      "pending_in_cents": 0,
+      "pending_out_cents": 0
+    },
+    {
+      "account_id": "fb7740f0-0158-43f4-a73d-6a50b92850a7",
+      "name": "QA F02 ANDROID Cartao 20261002",
+      "type": "credit_card",
+      "balance_cents": -22345,
+      "cleared_cents": -22345,
+      "pending_in_cents": 0,
+      "pending_out_cents": 0
+    }
+  ],
+  "environment": "staging",
+  "records": [
+    {
+      "id": "778fac2f-cc20-46b7-a746-3b906141e875",
+      "description": "QA F03 ANDROID atualizacao 20261002",
+      "amount_cents": 1234,
+      "kind": "expense",
+      "status": "cleared",
+      "account_id": "8d3b86e2-84d2-4536-b29e-cbc29110c134",
+      "payment_method": "pix",
+      "pix_fee_for_transaction_id": null,
+      "edit_revision": 0,
+      "occurred_at": "2026-10-02",
+      "due_at": null,
+      "counterparty_account_id": null,
+      "installment_plan_id": null,
+      "recurring_id": null,
+      "debt_id": null,
+      "down_payment_plan_id": null,
+      "installment_no": null,
+      "paid_at": "2026-10-02"
+    },
+    {
+      "id": "4daef78c-795b-4f44-8a6b-c9921d676a79",
+      "description": "QA F03 IOS atualizacao 20261002",
+      "amount_cents": 1234,
+      "kind": "expense",
+      "status": "cleared",
+      "account_id": "60bf2681-7cc0-48c5-b0cd-f4a8b96d3328",
+      "payment_method": "pix",
+      "pix_fee_for_transaction_id": null,
+      "edit_revision": 0,
+      "occurred_at": "2026-10-02",
+      "due_at": null,
+      "counterparty_account_id": null,
+      "installment_plan_id": null,
+      "recurring_id": null,
+      "debt_id": null,
+      "down_payment_plan_id": null,
+      "installment_no": null,
+      "paid_at": "2026-10-02"
+    }
+  ],
+  "fees": []
+}

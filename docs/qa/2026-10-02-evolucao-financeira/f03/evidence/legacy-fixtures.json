@@ -1,0 +1,39 @@
+{
+  "environment": "staging",
+  "fixtures": [
+    {
+      "id": "cb17ec53-b2a4-4ca0-8df2-3ab4918d1a11",
+      "name": "QA F03 Sem limite 20261002",
+      "credit_limit_cents": null,
+      "initial_balance_cents": 0,
+      "type": "credit_card",
+      "closing_day": 3,
+      "due_day": 10,
+      "archived": false
+    },
+    {
+      "id": "3b67ca63-3149-40a1-98eb-8d270317d221",
+      "name": "QA F03 Legado 20261002",
+      "credit_limit_cents": 100000,
+      "initial_balance_cents": 1000,
+      "type": "credit_card",
+      "closing_day": 3,
+      "due_day": 10,
+      "archived": false
+    }
+  ],
+  "limits": [
+    {
+      "account_id": "3b67ca63-3149-40a1-98eb-8d270317d221",
+      "credit_limit_cents": 100000,
+      "available_limit_cents": null,
+      "limit_status": "needs_review"
+    },
+    {
+      "account_id": "cb17ec53-b2a4-4ca0-8df2-3ab4918d1a11",
+      "credit_limit_cents": null,
+      "available_limit_cents": null,
+      "limit_status": "not_set"
+    }
+  ]
+}

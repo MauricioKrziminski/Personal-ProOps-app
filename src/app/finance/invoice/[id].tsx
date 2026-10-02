@@ -769,7 +769,7 @@ export default function InvoiceScreen() {
               />
             ) : (
               <Field label="Pagar com">
-                <AccountPicker
+                <AccountPicker financialContext
                   accounts={pagadoras}
                   value={payerId}
                   onChange={setPayerId}

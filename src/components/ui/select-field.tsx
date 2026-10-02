@@ -7,9 +7,10 @@ import { Icon, type IconName } from '@/components/ui/icon';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { ThemedText } from '@/components/themed-text';
 import { useScheme, useTheme } from '@/hooks/use-theme';
-import { Elevation, Motion, Radius, Space, Type } from '@/design/tokens';
+import { Elevation, Motion, Radius, Space, Type, tabular } from '@/design/tokens';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { MudancaSuave, Presenca, usePresencaAtiva } from '@/components/motion/presenca';
+import { useConceal } from '@/components/ui/conceal';
 
 export type SelectOption = {
   /** `null` é a opção "nenhum" — ela existe se você a incluir na lista. */
@@ -17,6 +18,10 @@ export type SelectOption = {
   label: string;
   /** Segunda linha: o que DISTINGUE esta opção das outras. */
   meta?: string;
+  /** Contexto opcional já formatado e protegido pela preferência de privacidade. */
+  detail?: string;
+  /** Máscara para o texto sensível, inclusive em uma camada que ainda está saindo. */
+  detailHidden?: string;
   icon?: IconName;
   /** Cabeçalho que precede esta opção. Repetido em opções seguidas, desenha uma vez. */
   group?: string;
@@ -171,6 +176,7 @@ export function SelectField({
         {o?.label ?? placeholder}
       </ThemedText>
       {o?.meta ? <ThemedText type="caption" themeColor="textSecondary" style={styles.textoInteiro}>{o.meta}</ThemedText> : null}
+      {o?.detail ? <SelectDetail text={o.detail} hidden={o.detailHidden} /> : null}
     </>;
     const indicador = mostrarCheck ? (
       <View style={[styles.marca, { backgroundColor: theme.tintFill }]}><Icon name="checkmark" size="xs" color="onTint" /></View>
@@ -181,7 +187,7 @@ export function SelectField({
         disabled={!ativo}
         accessibilityRole={aberto && !cabecalhoPreservado ? 'radio' : 'button'}
         accessibilityState={{ selected: aberto && marcada && !cabecalhoPreservado, expanded: cabecalho ? aberto : undefined, disabled: !ativo }}
-        accessibilityLabel={o ? o.meta ? `${o.label}, ${o.meta}` : o.label : placeholder}
+        accessibilityLabel={o ? [o.label, o.meta, o.detail].filter(Boolean).join(', ') : placeholder}
         accessibilityHint={aberto && cabecalhoPreservado ? 'Toque para fechar as opções' : aberto ? 'Toque para escolher e fechar' : 'Toque para escolher'}>
         {({ pressed }) => <LinhaRealcada pressionada={pressed} confirmar={confirmada}>
           {/* Só o cabeçalho troca conteúdo; alternativas estáveis não precisam de três morphs. */}
@@ -223,6 +229,14 @@ export function SelectField({
       </Presenca>
     </View>
   );
+}
+
+function SelectDetail({ text, hidden }: { text: string; hidden?: string }) {
+  const { concealed, ready } = useConceal();
+  // Presence/morph layers can retain an old option snapshot; privacy is read live inside it.
+  return <ThemedText type="footnote" themeColor="textSecondary" style={[styles.textoInteiro, tabular]}>
+    {hidden && (concealed || !ready) ? hidden : text}
+  </ThemedText>;
 }
 
 function LinhaRealcada({ pressionada, confirmar, children }: {

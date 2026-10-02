@@ -83,19 +83,73 @@ export function accountLabel(
     : `${account.name} · ${tipo}`;
 }
 
-/** Opções de conta com o mesmo tipo, glifo e agrupamento em formulários e filtros. */
-export function accountSelectOptions(accounts: readonly {
+export type AccountOptionAccount = {
   id: string; name: string; type?: string | null; closing_day?: number | null; archived?: boolean;
-}[], emptyLabel?: string, emptyId: string | null = null) {
+  credit_limit_cents?: number | null;
+};
+type FinancialQuery<Row> = {
+  data?: readonly Row[];
+  isPending: boolean;
+  isError: boolean;
+  isFetching: boolean;
+  isPaused: boolean;
+};
+export type AccountPickerContext = {
+  balances: FinancialQuery<{ account_id: string | null; cleared_cents: unknown }>;
+  cards: FinancialQuery<{ account_id: string; credit_limit_cents: unknown; available_limit_cents: unknown; limit_status?: string }>;
+  format: (cents: number) => string;
+  concealed: boolean;
+};
+
+/** SQL bigint may arrive as text; never round an unsafe aggregate or turn null into zero. */
+function safeCents(value: unknown): number | null {
+  if (typeof value !== 'number' && (typeof value !== 'string' || !/^-?\d+$/.test(value))) return null;
+  const cents = Number(value);
+  return Number.isSafeInteger(cents) ? cents : null;
+}
+
+/** Opções de conta com o mesmo tipo, glifo e agrupamento em formulários e filtros. */
+export function accountSelectOptions(accounts: readonly AccountOptionAccount[], emptyLabel?: string,
+  emptyId: string | null = null, context?: AccountPickerContext) {
   const contas = accounts.filter(a => a.type !== 'credit_card');
   const cartoes = accounts.filter(a => a.type === 'credit_card');
   const agrupado = contas.length > 0 && cartoes.length > 0;
+  // Two aggregate resources, indexed once. No query or scan for each option.
+  const balances = new Map(context?.balances.data?.map(row => [row.account_id, row]));
+  const cards = new Map(context?.cards.data?.map(row => [row.account_id, row]));
+  const financialDetail = (a: AccountOptionAccount) => {
+    if (!context || a.archived) return {};
+    const card = a.type === 'credit_card';
+    const resource = card ? context.cards : context.balances;
+    const noun = card ? 'Limite' : 'Saldo';
+    if (resource.isPaused) return { detail: `${noun} aguardando conexão` };
+    if (resource.isError) return { detail: `${noun} indisponível`, detailUnavailable: true };
+    if (resource.isPending) return { detail: `Carregando ${noun.toLowerCase()}…` };
+    const row = card ? cards.get(a.id) : balances.get(a.id);
+    if (card && row && 'limit_status' in row && row.limit_status === 'needs_review') {
+      return { detail: 'Limite precisa de conferência' };
+    }
+    if (card && (a.credit_limit_cents === null || row && 'credit_limit_cents' in row && row.credit_limit_cents === null)) {
+      return { detail: 'Limite não cadastrado' };
+    }
+    if (card && row && (!('limit_status' in row) || row.limit_status !== 'available')) {
+      return { detail: 'Limite indisponível', detailUnavailable: true };
+    }
+    const cents = safeCents(card ? (row && 'available_limit_cents' in row ? row.available_limit_cents : undefined)
+      : (row && 'cleared_cents' in row ? row.cleared_cents : undefined));
+    const limit = card && row && 'credit_limit_cents' in row ? safeCents(row.credit_limit_cents) : 0;
+    if (cents === null || limit === null || limit < 0) return { detail: `${noun} indisponível`, detailUnavailable: true };
+    const value = context.concealed ? '••••••' : `${cents < 0 ? '−' : ''}${context.format(Math.abs(cents))}`;
+    const label = card ? 'Limite disponível' : 'Saldo no ProOps';
+    return { detail: `${label} ${value}${resource.isFetching ? ' · atualizando' : ''}`, detailHidden: `${label} ••••••` };
+  };
   const option = (a: typeof accounts[number]) => {
     const tipo = accountTypeLabel(a);
     return { id: a.id, label: a.name,
       meta: a.archived ? `${tipo} · arquivada` : a.type === 'credit_card' && a.closing_day ? `${tipo} · fecha dia ${a.closing_day}` : tipo,
       icon: ACCOUNT_TYPES.find(t => t.value === a.type)?.icon ?? 'building.columns',
       group: agrupado ? a.type === 'credit_card' ? 'CARTÕES' : 'CONTAS' : undefined,
+      ...financialDetail(a),
     } as const;
   };
   return [

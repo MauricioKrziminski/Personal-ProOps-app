@@ -102,7 +102,7 @@ export function CamposDaHipotese({
       </Presenca>
 
       <Field label={h.forma === 'financiamento' ? 'Conta que paga' : 'Conta ou cartão'}>
-        <AccountPicker
+        <AccountPicker financialContext
           accounts={opcoesDeConta}
           value={h.conta}
           onChange={(conta) => set({ conta })}

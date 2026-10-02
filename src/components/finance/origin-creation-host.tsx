@@ -153,7 +153,7 @@ export function OriginAccountPicker({ paymentMethod, excludeCredit = false, ...p
   useEffect(() => { cancelOwner.current = context?.cancelOwner; });
   useEffect(() => () => { latest.current.active = false; cancelOwner.current?.(owner); }, [owner]);
   useEffect(() => { if (!active || props.disabled) context?.cancelOwner(owner); }, [active, props.disabled, context, owner]);
-  if (!context) return <AccountPicker {...props} />;
+  if (!context) return <AccountPicker financialContext {...props} />;
   const accountTypes = types.filter((type) => type !== 'credit_card');
   const open = (type: AccountType) => context.open({ owner, types,
     isActive: () => latest.current.active && !latest.current.disabled,
@@ -169,7 +169,7 @@ export function OriginAccountPicker({ paymentMethod, excludeCredit = false, ...p
   ];
   const editing = context.owner === owner;
   return <TrocaSuave estado={editing ? 'cadastro' : 'seletor'}>
-    {editing ? context.editor(types) : <AccountPicker {...props} actions={actions} />}
+    {editing ? context.editor(types) : <AccountPicker financialContext {...props} actions={actions} />}
   </TrocaSuave>;
 }
 

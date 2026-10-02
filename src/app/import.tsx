@@ -438,7 +438,7 @@ export default function ImportScreen() {
               ⚠️ Obrigatória desde 22/09/2026: a conta decide o SENTIDO das linhas (numa fatura a
               compra vem positiva) e é contra ela que a prévia procura o que já está lançado.
             */}
-            <AccountPicker accounts={accounts ?? []} value={accountId} onChange={setAccountId} />
+            <AccountPicker financialContext accounts={accounts ?? []} value={accountId} onChange={setAccountId} />
           </View>
         ) : (
           <EmptyState compacto
