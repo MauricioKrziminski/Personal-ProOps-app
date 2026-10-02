@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import type { CorpoProps } from '@/components/finance/corpo-do-lancar';
@@ -84,6 +84,8 @@ export function FormularioDaSerie(props: Props) {
 function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
   const { comum, editandoId, converter, deHipotese, onSalvo, onFechar, registrarComum, registrarEstado, alvo } = props;
   const toast = useToast();
+  const salvarBloqueadoAtual = useRef(Boolean(props.salvarBloqueado));
+  useLayoutEffect(() => { salvarBloqueadoAtual.current = Boolean(props.salvarBloqueado); }, [props.salvarBloqueado]);
   const series = useRecurringTransactions();
   const accounts = useAccounts();
   const create = useCreateRecurring();
@@ -128,7 +130,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
   const podeSalvar = basicoPodeSalvar && !erroMetodo;
 
   const salvar = (criarOutro: boolean) => {
-    if (!podeSalvar) return;
+    if (salvarBloqueadoAtual.current || !podeSalvar) return;
     if (form.id) {
       /**
        * Só o que MUDOU. `update_recurring_series` propaga toda chave presente para as
@@ -271,7 +273,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
             label={form.id || converter ? 'Salvar' : 'Criar'}
             size="sm"
             loading={salvando}
-            disabled={!podeSalvar || salvando}
+            disabled={Boolean(props.salvarBloqueado) || !podeSalvar || salvando}
             onPress={() => salvar(false)}
           />
         }
@@ -285,7 +287,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
               variant="secondary"
               block
               label="Salvar e criar outro"
-              disabled={!podeSalvar || salvando}
+              disabled={Boolean(props.salvarBloqueado) || !podeSalvar || salvando}
               onPress={() => salvar(true)}
             />
           ) : null}

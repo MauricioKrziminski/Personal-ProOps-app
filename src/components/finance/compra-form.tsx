@@ -9,7 +9,7 @@ import { paymentMethodAccounts, paymentMethodError } from '@/lib/payment-method'
  * "A compra toda". A ordem é a do formulário de EVENTO (`frontend.md`): o nome, o dinheiro, como
  * ele se divide, quando. O que não muda continua VISÍVEL, com o motivo.
  */
-import { AccountPicker } from '@/components/finance/account-picker';
+import { OriginAccountPicker } from '@/components/finance/origin-creation-host';
 import { CategoryPicker } from '@/components/finance/category-picker';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { PurchaseDownPayment } from '@/components/finance/purchase-down-payment';
@@ -35,7 +35,7 @@ export function CamposDaCompra({
 }: {
   form: CompraForm;
   onChange: (form: CompraForm) => void;
-  contas: Parameters<typeof AccountPicker>[0]['accounts'];
+  contas: Parameters<typeof OriginAccountPicker>[0]['accounts'];
 }) {
   const { travado, tituloOk, totalOk, contaOk, faixa, dataLivre } = validaCompra(form);
   const origem = contas.find((c) => c.id === form.accountId) ?? null;
@@ -94,7 +94,8 @@ export function CamposDaCompra({
 
       <Field label="Conta" error={origem && erroMetodo ? erroMetodo : contaOk ? undefined : 'Escolha a conta desta compra'} hint={origem && erroMetodo ? `Origem selecionada: ${origem.name}${motivo ? `. ${motivo}` : ''}` : dataLivre ? undefined : motivo}>
         {dataLivre ? (
-          <AccountPicker
+          <OriginAccountPicker
+            paymentMethod={form.paymentMethod}
             accounts={paymentMethodAccounts(form.paymentMethod, contas)}
             value={form.accountId}
             selectedAccount={origem}

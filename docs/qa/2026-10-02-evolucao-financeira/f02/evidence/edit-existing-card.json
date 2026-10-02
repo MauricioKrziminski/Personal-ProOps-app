@@ -1,0 +1,102 @@
+{
+  "environment": "staging",
+  "case": "Editar cartão com compra existente sem alterar campos",
+  "before": {
+    "accounts": [
+      {
+        "id": "1788451b-0640-4793-a157-300e0e4f38cb",
+        "name": "QA F02 IOS Cartao 20261002",
+        "type": "credit_card",
+        "initial_balance_cents": 0,
+        "archived": false,
+        "closing_day": 28,
+        "due_day": 5,
+        "credit_limit_cents": 500000,
+        "payment_account_id": "60bf2681-7cc0-48c5-b0cd-f4a8b96d3328",
+        "closing_day_inclusive": false,
+        "rotativo_auto": false,
+        "rotativo_rate_monthly": null
+      }
+    ],
+    "balances": [
+      {
+        "account_id": "1788451b-0640-4793-a157-300e0e4f38cb",
+        "name": "QA F02 IOS Cartao 20261002",
+        "type": "credit_card",
+        "balance_cents": -22345,
+        "cleared_cents": -22345,
+        "pending_in_cents": 0,
+        "pending_out_cents": 0
+      }
+    ],
+    "cards": [
+      {
+        "account_id": "1788451b-0640-4793-a157-300e0e4f38cb",
+        "name": "QA F02 IOS Cartao 20261002",
+        "credit_limit_cents": 500000,
+        "closing_day": 28,
+        "due_day": 5,
+        "invoice_id": "69cc3494-4fb6-4c0b-8cc8-97cb32324b3c",
+        "reference_month": "2026-10-01",
+        "closing_date": "2026-10-28",
+        "due_date": "2026-11-05",
+        "invoice_total_cents": 22345,
+        "unpaid_total_cents": 22345,
+        "available_limit_cents": 477655,
+        "overdue_count": 0,
+        "overdue_total_cents": 0,
+        "oldest_overdue_invoice_id": null,
+        "invoice_open_cents": 22345
+      }
+    ]
+  },
+  "after": {
+    "accounts": [
+      {
+        "id": "1788451b-0640-4793-a157-300e0e4f38cb",
+        "name": "QA F02 IOS Cartao 20261002",
+        "type": "credit_card",
+        "initial_balance_cents": 0,
+        "archived": false,
+        "closing_day": 28,
+        "due_day": 5,
+        "credit_limit_cents": 500000,
+        "payment_account_id": "60bf2681-7cc0-48c5-b0cd-f4a8b96d3328",
+        "closing_day_inclusive": false,
+        "rotativo_auto": false,
+        "rotativo_rate_monthly": null
+      }
+    ],
+    "balances": [
+      {
+        "account_id": "1788451b-0640-4793-a157-300e0e4f38cb",
+        "name": "QA F02 IOS Cartao 20261002",
+        "type": "credit_card",
+        "balance_cents": -22345,
+        "cleared_cents": -22345,
+        "pending_in_cents": 0,
+        "pending_out_cents": 0
+      }
+    ],
+    "cards": [
+      {
+        "account_id": "1788451b-0640-4793-a157-300e0e4f38cb",
+        "name": "QA F02 IOS Cartao 20261002",
+        "credit_limit_cents": 500000,
+        "closing_day": 28,
+        "due_day": 5,
+        "invoice_id": "69cc3494-4fb6-4c0b-8cc8-97cb32324b3c",
+        "reference_month": "2026-10-01",
+        "closing_date": "2026-10-28",
+        "due_date": "2026-11-05",
+        "invoice_total_cents": 22345,
+        "unpaid_total_cents": 22345,
+        "available_limit_cents": 477655,
+        "overdue_count": 0,
+        "overdue_total_cents": 0,
+        "oldest_overdue_invoice_id": null,
+        "invoice_open_cents": 22345
+      }
+    ]
+  }
+}

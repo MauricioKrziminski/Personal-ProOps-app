@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import type { IconName } from '@/components/ui/icon';
 import type { NoteColorName } from '@/constants/theme';
@@ -3430,6 +3430,100 @@ export function useContaTemLancamentos(id: string | null | undefined) {
       return (count ?? 0) > 0;
     },
   });
+}
+
+export type CreateAccountInput = {
+  name: string;
+  type: Account['type'];
+  initial_balance_cents: number;
+  closing_day?: number | null;
+  due_day?: number | null;
+  credit_limit_cents?: number | null;
+  payment_account_id?: string | null;
+  closing_day_inclusive?: boolean;
+  rotativo_auto?: boolean;
+  rotativo_rate_monthly?: number | null;
+};
+
+export type CreateAccountResult = {
+  id: string;
+  availability: 'active' | 'archived' | 'unavailable';
+  account: Account | null;
+};
+
+/** An imperative write receipt has its own lifetime; React renders only its pending draft. */
+function accountCreationController(publish: (input: CreateAccountInput | null) => void) {
+  let attempt: { id: string; key: string; input: CreateAccountInput; ambiguous: boolean } | null = null;
+  let inFlight: Promise<CreateAccountResult> | null = null;
+  return {
+    submit: (input: CreateAccountInput): Promise<CreateAccountResult> => {
+      // All fields are scalars. Sorting also treats a different object insertion order as retry.
+      const snapshot = Object.freeze(Object.fromEntries(
+        Object.entries(input).filter(([, value]) => value !== undefined).sort(([a], [b]) => a.localeCompare(b)),
+      )) as CreateAccountInput;
+      const key = JSON.stringify(snapshot);
+      if (attempt && attempt.key !== key) {
+        return Promise.reject(new Error('Confirme a tentativa anterior antes de alterar os dados da conta.'));
+      }
+      if (inFlight) return inFlight;
+      if (!attempt) {
+        attempt = { id: newClientMessageId(), key, input: snapshot, ambiguous: false };
+        publish(snapshot);
+      }
+      const original = attempt;
+      // Defer dispatch until inFlight is assigned, including a synchronous transport exception.
+      const promise = Promise.resolve().then(async () => {
+        try {
+          const { data: response, error } = await supabase.rpc('create_account', { p_input: original.input as Json, p_request_id: original.id });
+          const data = response as CreateAccountResult | null;
+          if (error) {
+            // An initial SQL refusal proves rollback. A retry refusal cannot disprove an earlier commit.
+            if (!original.ambiguous && error.code && (/^(22|23)/.test(error.code) || ['42501', 'P0001'].includes(error.code))) {
+              attempt = null;
+              publish(null);
+            }
+            throw error;
+          }
+          const current = data?.account;
+          // Validate the current row's shape, not its old creation values: later edits are valid.
+          // Signed seeds and nullable card days are legal in a later edit; creation rules do not apply to replay.
+          const currentValid = current && current.id === data?.id
+            && typeof current.name === 'string' && current.name.trim().length > 0
+            && ACCOUNT_TYPES.some(type => type.value === current.type)
+            && Number.isSafeInteger(current.initial_balance_cents)
+            && current.archived === (data?.availability === 'archived')
+            && (current.type !== 'credit_card' || [current.closing_day, current.due_day].every(
+              day => day === null || typeof day === 'number' && Number.isInteger(day) && day >= 1 && day <= 31,
+            ));
+          if (!data || typeof data.id !== 'string' || !data.id
+            || !['active', 'archived', 'unavailable'].includes(data.availability)
+            || (data.availability === 'unavailable' ? data.account !== null
+              : !currentValid)) {
+            throw new Error('Não foi possível confirmar a criação da conta. Tente novamente.');
+          }
+          attempt = null;
+          publish(null);
+          return data;
+        } catch (failure) {
+          if (attempt === original) original.ambiguous = true;
+          throw failure;
+        } finally {
+          inFlight = null;
+        }
+      });
+      inFlight = promise;
+      return promise;
+    },
+  };
+}
+
+/** Creation has its own receipt: a lost response must never become a second account. */
+export function useCreateAccount() {
+  const invalidate = useInvalidateFinance();
+  const [unconfirmedInput, setUnconfirmedInput] = useState<CreateAccountInput | null>(null);
+  const [controller] = useState(() => accountCreationController(setUnconfirmedInput));
+  const mutation = useMutation({ mutationFn: controller.submit, onSuccess: invalidate });
+  return { ...mutation, unconfirmedInput };
 }
 
 /** Cria ou edita (mesma forma de useSaveTransaction: com `id` vira update). */

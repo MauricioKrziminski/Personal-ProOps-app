@@ -66,3 +66,21 @@ test('filtros e formulários distinguem cartão, conta histórica e ausência co
   assert.equal(options[2].icon, 'creditcard');
   assert.equal(accountSelectOptions([{ id: 'cash', name: 'Carteira', type: 'cash' }])[0].group, undefined);
 });
+
+
+test('F02: confirma origem por UUID e compatibilidade atual, sem adotar por nome', async () => {
+  const lib = await import('./accounts.ts');
+  const card = { id: 'created-card', availability: 'active', account: { id: 'created-card', type: 'credit_card', archived: false } };
+  assert.equal(lib.createdAccountSelection(card, ['credit_card']), 'created-card');
+  assert.equal(lib.createdAccountSelection(card, ['checking', 'savings']), null, 'método mudou para débito enquanto o cadastro respondia');
+});
+
+test('F02: resultado tardio, arquivado, apagado ou com identidade divergente não sobrescreve origem', async () => {
+  const lib = await import('./accounts.ts');
+  const result = { id: 'created', availability: 'active', account: { id: 'created', type: 'checking', archived: false } };
+  assert.equal(lib.createdAccountSelection(result, ['checking'], false), null);
+  assert.equal(lib.createdAccountSelection({ ...result, availability: 'archived' }, ['checking']), null);
+  assert.equal(lib.createdAccountSelection({ ...result, availability: 'unavailable', account: null }, ['checking']), null);
+  assert.equal(lib.createdAccountSelection({ ...result, account: { ...result.account, archived: true } }, ['checking']), null);
+  assert.equal(lib.createdAccountSelection({ ...result, account: { ...result.account, id: 'other' } }, ['checking']), null);
+});

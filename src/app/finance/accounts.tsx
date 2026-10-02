@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import type { SymbolViewProps } from 'expo-symbols';
-import { Presenca, TrocaSuave } from '@/components/motion/presenca';
+import { AccountFormFields } from '@/components/finance/account-form';
+import { accountFormFromAccount, accountFormErrors, accountFormPayload, accountFormErrorMessage, emptyAccountForm, type AccountFormState } from '@/lib/account-form';
 
 import { SecaoDeArquivados } from '@/components/ui/secao-de-arquivados';
 import { useBRL } from '@/components/ui/conceal';
@@ -14,21 +15,15 @@ import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { ItemLink } from '@/components/ui/item-link';
 import { Button } from '@/components/ui/button';
-import { AccountPicker } from '@/components/finance/account-picker';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Card } from '@/components/ui/card';
 import { Dica } from '@/components/ui/dica';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Field, MoneyField, TextField } from '@/components/ui/field';
-import { formatNumberBR } from '@/lib/dates';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
-import { SwitchRow } from '@/components/ui/switch-row';
-import { Segmented } from '@/components/ui/segmented';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
-import { SelectField } from '@/components/ui/select-field';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
@@ -42,13 +37,15 @@ import {
   useArchiveAccount,
   useDefaultAccount,
   useSaveAccount,
+  useCreateAccount,
+  type CreateAccountResult,
   useContaTemLancamentos,
   useSetDefaultAccount,
   type Account,
   type AccountBalance,
 } from '@/hooks/use-finance';
 import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
-import { inicialParaOSaldo, saldoDaConta } from '@/lib/accounts';
+import { saldoDaConta } from '@/lib/accounts';
 import { confirmDestructive } from '@/lib/item-actions';
 
 /**
@@ -80,49 +77,6 @@ const ICONE: Record<string, SymbolViewProps['name']> = {
 };
 
 const GUARDA_DINHEIRO = ['checking', 'savings', 'cash'];
-
-interface FormState {
-  id?: string;
-  name: string;
-  type: Account['type'];
-  /** O saldo no campo, SEM sinal: ATUAL na edição, e na criação o de hoje (que é o inicial). */
-  saldoCents: number;
-  /** O sinal do saldo. `MoneyField` só digita positivo; conta corrente pode estar no vermelho. */
-  negativo: boolean;
-  /** Na edição, o saldo que a lista mostrava e o inicial gravado — gravar anda o inicial pela diferença. */
-  base: { atual: number; inicial: number } | null;
-  closingDay: string;
-  dueDay: string;
-  limitCents: number;
-  payerId: string | null;
-  /** Compra feita NO dia do fechamento entra na fatura que fecha nesse dia? Varia por emissor. */
-  fechamentoInclusivo: boolean;
-  rotativoAuto: boolean;
-  /** Texto, porque é digitado: "15,5". Vira fração na hora de salvar. */
-  rotativoRate: string;
-}
-
-const FORM_VAZIO: FormState = {
-  name: '',
-  type: 'checking',
-  saldoCents: 0,
-  negativo: false,
-  base: null,
-  closingDay: '',
-  dueDay: '',
-  limitCents: 0,
-  payerId: null,
-  fechamentoInclusivo: false,
-  rotativoAuto: false,
-  rotativoRate: '',
-};
-
-const diaValido = (v: string) => /^\d{1,2}$/.test(v) && Number(v) >= 1 && Number(v) <= 31;
-/** Percentual mensal digitado em pt-BR: "15,5". Vírgula, nunca ponto (regra do frontend). */
-const taxaValida = (v: string) => {
-  const n = Number(v.replace(',', '.'));
-  return Number.isFinite(n) && n >= 0 && n <= 100;
-};
 
 /**
  * Confirmação de ação destrutiva.
@@ -165,14 +119,19 @@ export default function AccountsScreen() {
   const contaPadrao = useDefaultAccount();
   const definirPadrao = useSetDefaultAccount();
   const save = useSaveAccount();
+  const createAccount = useCreateAccount();
+  const savingRef = useRef(false);
+  const formSession = useRef(0);
+  const creationDraft = useRef<AccountFormState | null>(null);
+  const [creationError, setCreationError] = useState<string | null>(null);
   const archive = useArchiveAccount();
   // `?create=1` (conta) e `?create=cartao` vêm do "Cadastrar conta/cartão" de outra tela: abre o
   // formulário direto, já no tipo, e fechar ou salvar devolve para ela (25/09/2026) — antes caía
   // na lista, a pessoa ainda tinha que achar o "+", e ali ficava.
   const params = useLocalSearchParams<{ create?: string; edit?: string }>();
   const criando = params.create === '1' || params.create === 'cartao';
-  const [form, setForm] = useState<FormState | null>(() =>
-    criando ? { ...FORM_VAZIO, type: params.create === 'cartao' ? 'credit_card' : FORM_VAZIO.type } : null,
+  const [form, setForm] = useState<AccountFormState | null>(() =>
+    criando ? emptyAccountForm(params.create === 'cartao' ? 'credit_card' : 'checking') : null,
   );
   /** Editando uma conta com lançamento: cartão não vira conta nem o contrário (`20260926170000`). */
   const temLancamentos = useContaTemLancamentos(form?.id).data === true;
@@ -215,9 +174,6 @@ export default function AccountsScreen() {
   const dividaCartao = cartoes.reduce((s, l) => s + Math.min(0, Number(l.balance_cents)), 0);
 
   const contaDe = (id: string | null) => (accounts.data ?? []).find((a) => a.id === id);
-  const pagadoras = (accounts.data ?? []).filter(
-    (a) => a.type !== 'credit_card' && a.id !== form?.id
-  );
   /** Candidatas a conta padrão: guardar dinheiro é requisito, e o banco também exige. */
   const guardamDinheiro = (accounts.data ?? []).filter((a) => a.type !== 'credit_card');
 
@@ -232,31 +188,24 @@ export default function AccountsScreen() {
   // o erro fica DENTRO do sheet (toast aparece atrás de um Modal nativo); sem o reset, o erro
   // da tentativa anterior receberia o usuário na próxima abertura
   const abrirNova = () => {
+    formSession.current += 1;
+    savingRef.current = false;
+    setCreationError(null);
     save.reset();
-    setForm({ ...FORM_VAZIO });
+    createAccount.reset();
+    setForm((createAccount.isPending || createAccount.unconfirmedInput) && creationDraft.current
+      ? creationDraft.current : emptyAccountForm());
   };
   const abrirEdicao = (a: Account) => {
+    formSession.current += 1;
+    savingRef.current = false;
+    setCreationError(null);
     save.reset();
     // O campo abre no saldo que a lista mostra, não no inicial (28/09/2026): o Nubank mostrava
     // 162,51 e a edição abria em 867,86. Sem a linha do saldo, cai no inicial com o rótulo dele.
     const linha = balances.data?.find((b) => b.account_id === a.id);
     const atual = linha ? saldoDaConta(linha).cents : null;
-    setForm({
-      id: a.id,
-      name: a.name,
-      type: a.type,
-      saldoCents: Math.abs(atual ?? a.initial_balance_cents),
-      negativo: (atual ?? a.initial_balance_cents) < 0,
-      base: atual == null ? null : { atual, inicial: a.initial_balance_cents },
-      closingDay: a.closing_day ? String(a.closing_day) : '',
-      dueDay: a.due_day ? String(a.due_day) : '',
-      limitCents: a.credit_limit_cents ?? 0,
-      payerId: a.payment_account_id,
-      fechamentoInclusivo: a.closing_day_inclusive ?? false,
-      rotativoAuto: a.rotativo_auto ?? false,
-      rotativoRate:
-        a.rotativo_rate_monthly == null ? '' : formatNumberBR(a.rotativo_rate_monthly * 100),
-    });
+    setForm(accountFormFromAccount(a, atual));
   };
   /**
    * `?edit=<conta>` vem de fora (a Carteira, "Editar este cartão"): abre a edição DAQUELA conta
@@ -269,55 +218,47 @@ export default function AccountsScreen() {
     if (alvo && !balances.isPending) {
       setEdicaoAberta(params.edit);
       volta.marcar();
-      abrirEdicao(alvo);
+      const linha = balances.data?.find((b) => b.account_id === alvo.id);
+      setForm(accountFormFromAccount(alvo, linha ? saldoDaConta(linha).cents : null));
     }
   }
 
-  const ehCartao = form?.type === 'credit_card';
-  const nomeOk = (form?.name.trim().length ?? 0) >= 1;
-  const cicloOk = !ehCartao || (diaValido(form!.closingDay) && diaValido(form!.dueDay));
-  const taxaOk = !ehCartao || !form!.rotativoRate.trim() || taxaValida(form!.rotativoRate);
-
-  // Só a corrente fica no vermelho; nas outras o sinal nem aparece e não pode sobrar escondido.
-  const podeNegativo = form?.type === 'checking';
-  const saldoComSinal = form ? (podeNegativo && form.negativo ? -form.saldoCents : form.saldoCents) : 0;
+  const formErrors = form ? accountFormErrors(form) : { name: 'Informe o nome' };
+  const formValid = Object.keys(formErrors).length === 0;
+  const mutationPending = form?.id ? save.isPending : createAccount.isPending;
+  const fieldsLocked = mutationPending || (!form?.id && Boolean(createAccount.unconfirmedInput));
+  const fecharForm = () => {
+    formSession.current += 1;
+    volta.aoFechar(() => setForm(null));
+  };
 
   const salvar = () => {
-    if (!form || !nomeOk || !cicloOk || !taxaOk) return;
-    save.mutate(
-      {
-        id: form.id,
-        name: form.name.trim(),
-        type: form.type,
-        initial_balance_cents: form.base
-          ? inicialParaOSaldo(saldoComSinal, form.base.atual, form.base.inicial)
-          : saldoComSinal,
-        closing_day: ehCartao ? Number(form.closingDay) : null,
-        due_day: ehCartao ? Number(form.dueDay) : null,
-        credit_limit_cents: ehCartao ? form.limitCents : null,
-        closing_day_inclusive: ehCartao ? form.fechamentoInclusivo : false,
-        rotativo_auto: ehCartao ? form.rotativoAuto : false,
-        // Percentual digitado vira FRAÇÃO, igual a `debts.interest_rate_monthly`: 15,5 -> 0.155.
-        // Vazio é null de propósito — o app não estima juros que não conhece.
-        rotativo_rate_monthly:
-          ehCartao && form.rotativoRate.trim()
-            ? Number(form.rotativoRate.replace(',', '.')) / 100
-            : null,
-        // sem isto o cartão nunca sabe qual conta paga a fatura dele (bug antigo: null fixo)
-        payment_account_id: ehCartao ? form.payerId : null,
+    if (!form || !formValid || savingRef.current || mutationPending) return;
+    savingRef.current = true;
+    const session = formSession.current;
+    const callbacks = {
+      onSuccess: (result?: CreateAccountResult) => {
+        if (session !== formSession.current) return;
+        if (result && result.availability !== 'active') {
+          setCreationError(result.availability === 'archived'
+            ? 'A conta foi criada, mas está arquivada. Confira em Arquivadas.'
+            : 'A conta criada não está disponível. Atualize a lista e confira.');
+          return;
+        }
+        toast({ message: form.id ? 'Conta atualizada.' : 'Conta criada.', tone: 'success' });
+        fecharForm();
       },
-      {
-        onSuccess: () => {
-          toast({ message: form.id ? 'Conta atualizada.' : 'Conta criada.', tone: 'success' });
-          volta.aoFechar(() => setForm(null));
-        },
-        onError: () =>
-          toast({
-            message: 'Não deu para salvar. Já existe uma conta com esse nome?',
-            tone: 'error',
-          }),
-      }
-    );
+      onError: (error: unknown) => {
+        if (session === formSession.current) toast({ message: accountFormErrorMessage(error), tone: 'error' });
+      },
+      onSettled: () => { if (session === formSession.current) savingRef.current = false; },
+    };
+    if (form.id) save.mutate(accountFormPayload(form), { ...callbacks, onSuccess: () => callbacks.onSuccess() });
+    else {
+      creationDraft.current = form;
+      createAccount.mutate(createAccount.unconfirmedInput ?? accountFormPayload(form), callbacks);
+    }
+
   };
 
   const arquivar = (a: Account) =>
@@ -596,17 +537,17 @@ export default function AccountsScreen() {
 
       {tablet ? tabletBody : compactBody}
 
-      <Sheet visible={form !== null} onClose={() => volta.aoFechar(() => setForm(null))}>
+      <Sheet visible={form !== null} onClose={fecharForm}>
 
           <TaskHeader
             title={`${form?.id ? 'Editar' : form?.type === 'credit_card' ? 'Novo' : 'Nova'} ${form?.type === 'credit_card' ? 'cartão' : 'conta'}`}
-            onClose={() => volta.aoFechar(() => setForm(null))}
+            onClose={fecharForm}
             action={
               <Button
                 label="Salvar"
                 size="sm"
-                loading={save.isPending}
-                disabled={!nomeOk || !cicloOk || !taxaOk}
+                loading={mutationPending}
+                disabled={!formValid || mutationPending}
                 onPress={salvar}
               />
             }
@@ -614,192 +555,11 @@ export default function AccountsScreen() {
 
           {form ? (
             <SheetScroll contentContainerStyle={styles.sheetBody}>
-              <Field label="Nome">
-                <TextField
-                  value={form.name}
-                  onChangeText={(name) => setForm({ ...form, name })}
-                  placeholder="Ex.: Conta do banco"
-                  autoFocus
-                  invalid={form.name.length > 0 && !nomeOk}
-                />
-              </Field>
+              <AccountFormFields form={form} onChange={setForm} accounts={accounts.data ?? []} hasTransactions={temLancamentos} disabled={fieldsLocked} />
 
-              {/*
-                `SelectField`, não `Segmented`: cinco rótulos não cabem numa linha.
-                Medido a 384dp × fonte 1,3 — cada célula fica com ~62pt de texto e
-                "Investimento" precisa de ~117, então a palavra partia no meio
-                ("Investimen/to"), o que design.md §3 proíbe. `minWidth` não
-                resolveria: não existe largura que caiba cinco células num sheet.
-
-                De quebra o campo ganha o GLIFO por tipo, que é o que separa cartão
-                de conta antes de qualquer texto — o mesmo motivo do `AccountPicker`.
-              */}
-              <Field
-                label="Tipo"
-                hint={temLancamentos ? (form.type === 'credit_card' ? 'Com lançamentos, o cartão continua cartão' : 'Com lançamentos, a conta não vira cartão') : undefined}>
-                <SelectField
-                  options={ACCOUNT_TYPES
-                    // Com lançamento, só dentro da mesma família: as compras do cartão moram em
-                    // faturas, e a conta não tem fatura (o banco recusa, com o motivo).
-                    .filter((t) => !temLancamentos || (t.value === 'credit_card') === (form.type === 'credit_card'))
-                    .map((t) => ({
-                      id: t.value,
-                      label: t.label,
-                      icon: t.icon,
-                    }))}
-                  value={form.type}
-                  /* Nenhuma opção tem `id: null`, então o campo nunca devolve nulo. */
-                  onChange={(id) => setForm({ ...form, type: id as Account['type'] })}
-                  placeholder="Escolher tipo"
-                />
-              </Field>
-
-              <TrocaSuave estado={form.type === 'credit_card' ? 'cartao' : 'conta'} style={styles.camposDoTipo}>
-              {form.type === 'credit_card' ? (
-                <>
-                  {/*
-                    ⚠️ **Valores antes do cronograma** (`frontend.md`: nome → tipo → valores →
-                    cronograma → conta). O limite ficava lá embaixo, depois do par fecha/vence e
-                    de três extras — ordem invertida, e diferente do ramo não-cartão do MESMO
-                    sheet, que é Nome → Tipo → Saldo inicial.
-                  */}
-                  <Field label="Limite do cartão">
-                    <MoneyField
-                      valueCents={form.limitCents}
-                      onChangeCents={(limitCents) => setForm({ ...form, limitCents })}
-                    />
-                  </Field>
-
-                  <View style={styles.diaRow}>
-                    <View style={styles.diaCampo}>
-                      <Field
-                        label="Fecha dia"
-                        error={form.closingDay && !diaValido(form.closingDay) ? 'De 1 a 31' : undefined}
-                        // Editando: as faturas abertas se refazem com os dias novos (`20260926170000`);
-                        // a dica vale para os dois dias e para a chave logo abaixo, e aparece UMA vez.
-                        hint={form.id ? 'Mudar os dias refaz as faturas em aberto' : undefined}>
-                        <TextField
-                          value={form.closingDay}
-                          onChangeText={(v) =>
-                            setForm({ ...form, closingDay: v.replace(/\D/g, '').slice(0, 2) })
-                          }
-                          placeholder="Ex.: 28"
-                          keyboardType="number-pad"
-                        />
-                      </Field>
-                    </View>
-                    <View style={styles.diaCampo}>
-                      <Field
-                        label="Vence dia"
-                        error={form.dueDay && !diaValido(form.dueDay) ? 'De 1 a 31' : undefined}>
-                        <TextField
-                          value={form.dueDay}
-                          onChangeText={(v) =>
-                            setForm({ ...form, dueDay: v.replace(/\D/g, '').slice(0, 2) })
-                          }
-                          placeholder="Ex.: 5"
-                          keyboardType="number-pad"
-                        />
-                      </Field>
-                    </View>
-                  </View>
-
-                  {/*
-                    ⚠️ **Aqui havia uma AFIRMAÇÃO, e ela era chute de um emissor só.**
-
-                    A frase era "Compra depois do fechamento cai na fatura do mês seguinte" e o
-                    código cravava `<` (a compra DO dia já é da próxima) desde a `20260909050000`
-                    — medido contra duas faturas reais do Nubank. Pesquisado em 11/09/2026, não
-                    é padrão: o Mobills escreve "a partir do dia de fechamento entra na
-                    seguinte", a Serasa escreve "antes ou NO DIA EXATO entram na fatura do mês
-                    atual", e diz que depende do horário e do sistema da instituição.
-
-                    Sem padrão, quem sabe é o dono do cartão. O default é o que já valia, então
-                    ninguém acorda com a fatura remontada.
-                  */}
-                  <Field
-                    label="Compra no dia do fechamento">
-                    <Segmented
-                      value={form.fechamentoInclusivo ? 'atual' : 'seguinte'}
-                      onChange={(v) =>
-                        setForm({ ...form, fechamentoInclusivo: v === 'atual' })
-                      }
-                      options={[
-                        { value: 'seguinte', label: 'Na próxima' },
-                        { value: 'atual', label: 'Nesta fatura' },
-                      ]}
-                    />
-                  </Field>
-
-                  {/*
-                    O rotativo, e por que ele nasce DESLIGADO.
-                    Ligado para todo cartão, um que a pessoa paga em dia nunca mais apareceria
-                    como atrasado — o aviso que mais importa sumiria justamente de quem não
-                    precisa da feature. Por isso é escolha, e é aqui: junto do ciclo, que é o
-                    outro campo que só existe em cartão.
-                  */}
-                  <SwitchRow
-                    label="Adiar fatura vencida sozinho"
-                    value={form.rotativoAuto}
-                    onValueChange={(rotativoAuto: boolean) => setForm({ ...form, rotativoAuto })}
-                  />
-
-                  <Field
-                    label="Juros do rotativo (% ao mês)"
-                    error={
-                      form.rotativoRate.trim() && !taxaValida(form.rotativoRate)
-                        ? 'Use um número de 0 a 100, como 15,5'
-                        : undefined
-                    }>
-                    <TextField
-                      value={form.rotativoRate}
-                      onChangeText={(rotativoRate) =>
-                        setForm({ ...form, rotativoRate: rotativoRate.replace(/[^\d,.]/g, '').slice(0, 6) })
-                      }
-                      keyboardType="decimal-pad"
-                      placeholder="Ex.: 15,5"
-                    />
-                  </Field>
-
-                  <Field label="Conta que paga a fatura">
-                    {/*
-                      `AccountPicker`, não uma `Section` de `Row` com checkmark:
-                      era a sexta implementação do mesmo campo no app, e ela nasce
-                      ABERTA — com seis contas, meia tela antes de o usuário pedir
-                      qualquer coisa. O seletor é o mesmo de todo lugar que escolhe
-                      conta, colapsado e com o glifo por tipo.
-                    */}
-                    <AccountPicker
-                      accounts={pagadoras}
-                      value={form.payerId}
-                      onChange={(payerId) => setForm({ ...form, payerId })}
-                      emptyLabel="Escolher na hora de pagar"
-                    />
-                  </Field>
-                </>
-              ) : (
-                <Field label={form.id && !form.base ? 'Saldo inicial' : 'Saldo atual'}>
-                  <MoneyField
-                    valueCents={form.saldoCents}
-                    onChangeCents={(saldoCents) => setForm({ ...form, saldoCents })}
-                  />
-                  <Presenca visivel={podeNegativo}>
-                    <Segmented
-                      value={form.negativo ? 'negativo' : 'positivo'}
-                      onChange={(v) => setForm({ ...form, negativo: v === 'negativo' })}
-                      options={[
-                        { value: 'positivo', label: 'Positivo' },
-                        { value: 'negativo', label: 'No vermelho' },
-                      ]}
-                    />
-                  </Presenca>
-                </Field>
-              )}
-              </TrocaSuave>
-
-              {save.isError ? (
+              {creationError || (form.id ? save.isError : createAccount.isError) ? (
                 <ThemedText type="small" themeColor="danger" style={styles.bandText}>
-                  Não deu para salvar. Já existe uma conta com esse nome?
+                  {creationError ?? accountFormErrorMessage(form.id ? save.error : createAccount.error)}
                 </ThemedText>
               ) : null}
             </SheetScroll>
@@ -835,13 +595,5 @@ const styles = StyleSheet.create({
     gap: Space.xl,
     padding: Space.lg,
     paddingBottom: Space.xxxl,
-  },
-  camposDoTipo: { gap: Space.xl },
-  diaRow: {
-    flexDirection: 'row',
-    gap: Space.lg,
-  },
-  diaCampo: {
-    flex: 1,
   },
 });

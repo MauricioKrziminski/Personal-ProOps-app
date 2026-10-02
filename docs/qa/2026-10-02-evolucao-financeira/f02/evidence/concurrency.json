@@ -1,0 +1,41 @@
+{
+  "staging_ref": "utkqoiigimqzeenxkxdl",
+  "request_ids": [
+    "4ac23ae1-30c4-4178-b7cb-30bd06bb6787",
+    "8147327d-40f3-447b-a027-54471b1840f5"
+  ],
+  "names": [
+    "F02 concurrency 4ac23ae1-30c4-4178-b7cb-30bd06bb6787",
+    "F02 concurrency 8147327d-40f3-447b-a027-54471b1840f5"
+  ],
+  "cases": [
+    {
+      "case": "identical_payload",
+      "request_id": "4ac23ae1-30c4-4178-b7cb-30bd06bb6787",
+      "account_id": "a4d313bf-7229-4856-8205-c82e00ff18c3",
+      "first_backend_pid": 3556515,
+      "second_backend_pid": 3556516,
+      "second_waited_for_first_lock": true,
+      "account_count": 1,
+      "identical_rpc_results": true
+    },
+    {
+      "case": "conflicting_payload",
+      "request_id": "8147327d-40f3-447b-a027-54471b1840f5",
+      "account_id": "2c26c9c4-bd9a-4b49-9d92-36cc66448ef9",
+      "first_backend_pid": 3556515,
+      "second_backend_pid": 3556516,
+      "second_waited_for_first_lock": true,
+      "account_count": 1,
+      "sqlstate": "P0001",
+      "message": "Identificador de requisição reutilizado com dados diferentes"
+    }
+  ],
+  "status": "passed",
+  "cleanup": {
+    "removed_accounts": 2,
+    "removed_receipts": 2,
+    "remaining_accounts": 0,
+    "remaining_receipts": 0
+  }
+}

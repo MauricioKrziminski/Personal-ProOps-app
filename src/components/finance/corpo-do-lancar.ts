@@ -27,5 +27,7 @@ export type CorpoProps = {
   deHipotese?: string;
   /** O hospedeiro está gravando (a conversão): Salvar e "Salvar e criar outro" esperam. */
   salvando?: boolean;
+  /** A subtask is open: save waits without showing mutation progress. */
+  salvarBloqueado?: boolean;
 
 };

@@ -619,3 +619,18 @@ Spec: `docs/superpowers/specs/2026-09-29-formulario-unico-e-categorias-design.md
 |---|---|
 | Editar um registro, trocar Uma vez \| Recorrente \| Financiamento e salvar: Converter / Só esta / Desta em diante / Todas, apagando as anteriores / Manter e criar um novo (`converter_registro`) | **não — só no app, por decisão.** O agente não converte: pela conversa o mesmo resultado sai em dois pedidos que ele já faz (criar o registro novo; apagar ou editar o antigo), cada um com o SIM dele. Juntar os dois numa ação exigiria campo novo em `FinanceAction`, que está no teto de 252, e a opção "Todas" apaga o que já foi pago — caminho destrutivo que a tela confirma à parte |
 | Categorias: criar, dar ícone e cor, renomear, juntar e apagar (tela Categorias; `save_category`, `rename_category`, `delete_category`) | **não — só no app.** O agente grava o NOME, como sempre (texto livre), e a aparência vem sozinha da tabela `categories`. Renomear e juntar reescrevem sete colunas de uma vez e perguntam antes de juntar; trazer isso para a conversa exigiria campo novo em `FinanceAction` (teto de 252) |
+
+## Criar conta ou cartão durante o lançamento — F02 (02/10/2026)
+
+| app | agente |
+|---|---|
+| "Criar conta" / "Criar cartão" no seletor de origem de `/finance/lancar` | O cadastro já existe por `resource_create accounts` / `resource_create cards`. O novo subfluxo preserva o formulário montado e seleciona a entidade confirmada; esse comportamento de tela não cria uma ação conversacional. |
+| "Cancelar cadastro" / "Verificar cadastro" no formulário contextual | Controles da tentativa local: cancelar conserva o lançamento; verificar reutiliza o mesmo UUID e payload de `create_account`. O agente mantém seu fluxo atual de confirmação; não usa essa nova RPC. |
+
+O app passa a criar contas por `useCreateAccount` → `create_account`, com recibo idempotente
+e retorno da disponibilidade atual da entidade. A edição continua em `useSaveAccount`.
+O agente conserva suas escritas e proteções existentes; a idempotência dessa RPC do app
+não certifica um contrato novo para o agente. Nenhum campo de `FinanceAction`, prompt ou
+tool foi alterado no F02, e não foi executada uma nova sonda de criação no Gemini real.
+
+Contrato e evidência: `docs/qa/2026-10-02-evolucao-financeira/f02/`.

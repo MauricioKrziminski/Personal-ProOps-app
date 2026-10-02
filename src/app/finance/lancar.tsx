@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { TrocaSuave } from '@/components/motion/presenca';
 
+import { OriginCreationHost, type OriginCreationController } from '@/components/finance/origin-creation-host';
 import { FormularioDaDivida } from '@/components/finance/formulario-da-divida';
 import { FormatoDoLancamento } from '@/components/finance/formato-do-lancamento';
 import { FormularioDaSerie } from '@/components/finance/formulario-da-serie';
@@ -65,6 +66,8 @@ export default function LancarScreen() {
   const lerEstado = useRef<() => unknown>(() => undefined);
   const toast = useToast();
   const converter = useConverterRegistro();
+  const originCreation = useRef<OriginCreationController | null>(null);
+  const [creatingOrigin, setCreatingOrigin] = useState(false);
   /**
    * Uma conversão por vez. `isPending` só chega no render seguinte, e a pergunta aberta guarda o
    * `onPress` de antes: o segundo toque gravaria de novo (com "Manter", um segundo registro).
@@ -184,10 +187,11 @@ export default function LancarScreen() {
     },
     estadoGuardado: estados[tipo],
     onSalvo,
-    onFechar: () => router.back(),
+    onFechar: () => { if (!originCreation.current?.close()) router.back(); },
     deHipotese: doAplicar ? p.deHipotese : undefined,
     editandoId: editandoAqui,
     converter: editandoId && tipo !== tipoOriginal ? converterPara : undefined,
+    salvarBloqueado: creatingOrigin,
     salvando: converter.isPending || (tipo !== tipoOriginal && conferindoHistorico),
     focarAoAbrir,
   };
@@ -195,6 +199,7 @@ export default function LancarScreen() {
   return (
     // `Screen` sem rolagem: o fundo e as laterais seguras no contêiner da pilha, para os três corpos.
     <Screen scroll={false}>
+      <OriginCreationHost controllerRef={originCreation} onActiveChange={setCreatingOrigin}>
       <FormularioEmTela.Provider value>
         <TrocaSuave estado={`${tipo}:${geracao}`} preencher>
         {tipo === 'uma' && editandoAqui ? (
@@ -221,6 +226,7 @@ export default function LancarScreen() {
         )}
         </TrocaSuave>
       </FormularioEmTela.Provider>
+      </OriginCreationHost>
       {/* O corpo do lançamento já traz o dele; os outros dois nasceram para uma folha. */}
       {tipo !== 'uma' ? <ToastDoModal /> : null}
     </Screen>

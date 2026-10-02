@@ -4,12 +4,13 @@ import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+import { emptyAccountForm } from './account-form.ts';
 
 const require = createRequire(import.meta.url);
 
 // Commit effects after stable renders; neither springs nor native layout finish automatically.
 // Component-local hooks and provider context exercise the real nested presence lifetimes.
-function montar(file: string, name: string, initial: any, config: { reduzir: boolean; ativo: boolean; fontScale?: number; lock?: any } = { reduzir: false, ativo: true }) {
+function montar(file: string, name: string, initial: any, config: { reduzir: boolean; ativo: boolean; fontScale?: number; lock?: any; creation?: any; preventRemove?: any; toasts?: any[] } = { reduzir: false, ativo: true }) {
   type Instance = { slots: any[]; cursor: number; mounted: boolean; restart: boolean };
   type Animation = { shared: any; done?: (ok: boolean) => void; target: number; from: number; kind: 'spring' | 'timing'; settings: any; canceled: boolean };
   const instances = new Map<string, Instance>();
@@ -23,7 +24,7 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
   let mounted = true;
   let props = initial;
   let tree: any;
-  let effects: { instance: Instance; index: number; fn: () => any; deps: any[] }[] = [];
+  let effects: { instance: Instance; index: number; fn: () => any; deps: any[] | undefined }[] = [];
   let postUnmountWrites = 0;
   let animatedStyles = 0;
   const timers: { fn: () => void; canceled: boolean }[] = [];
@@ -61,13 +62,14 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       return current.slots[index].value;
     },
     useCallback: (fn: any, deps: any[]) => react.useMemo(() => fn, deps),
-    useEffect: (fn: () => any, deps: any[]) => effect(fn, deps),
-    useLayoutEffect: (fn: () => any, deps: any[]) => effect(fn, deps),
+    useImperativeHandle: (ref: any, create: any, deps: any[]) => effect(() => { ref.current = create(); return () => { ref.current = null; }; }, deps),
+    useEffect: (fn: () => any, deps?: any[]) => effect(fn, deps),
+    useLayoutEffect: (fn: () => any, deps?: any[]) => effect(fn, deps),
   };
-  function effect(fn: () => any, deps: any[]) {
+  function effect(fn: () => any, deps?: any[]) {
     const index = current.cursor++;
     const previous = current.slots[index];
-    if (!previous || deps.length !== previous.deps.length || deps.some((value, i) => !Object.is(value, previous.deps[i]))) {
+    if (!previous || !deps || !previous.deps || deps.length !== previous.deps.length || deps.some((value, i) => !Object.is(value, previous.deps[i]))) {
       effects.push({ instance: current, index, fn, deps });
     }
   }
@@ -126,6 +128,15 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       clearTimeout: (timer: typeof timers[number]) => { timer.canceled = true; },
       require: (id: string) => {
       if (id === 'react') return react;
+      if (id === 'expo-router/react-navigation') return { usePreventRemove: (active: boolean, callback: any) => { config.preventRemove = { active, callback }; } };
+      if (id === '@/hooks/use-finance') return { useAccounts: () => ({ data: [] }), useCreateAccount: () => config.creation };
+      if (id === '@/components/ui/toast') return { useToast: () => (toast: any) => config.toasts?.push(toast) };
+      if (id === '@/components/ui/button') return { Button: 'Button' };
+      if (id === '@/components/ui/card') return { Card: 'Card' };
+      if (id === '@/components/finance/account-form') return { AccountFormFields: 'AccountFormFields' };
+      if (id === '@/components/finance/origin-creation-host') return file.endsWith('/origin-creation-host.tsx') ? load('src/components/finance/origin-creation-host.tsx') : { OriginAccountPicker: 'AccountPicker' };
+      if (id === '@/lib/account-form') return load('src/lib/account-form.ts');
+      if (id.startsWith('./') && path.startsWith('src/lib/')) return load(`src/lib/${id.slice(2)}`);
       if (id === 'react/jsx-runtime') return require(id);
       if (id === 'react-native') return { Pressable: 'Pressable', View: 'View', TextInput: 'TextInput', useWindowDimensions: () => ({ width: 402, fontScale: config.fontScale ?? 1 }), Platform: { OS: 'android' }, StyleSheet: { create: (s: any) => s, flatten, hairlineWidth: 1 } };
       if (id === 'react-native-reanimated') return reanimated;
@@ -149,6 +160,7 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === '@/components/finance/account-picker') return { AccountPicker: 'AccountPicker' };
       if (id === '@/components/finance/date-picker-field') return { DatePickerField: 'DatePickerField' };
       if (id === '@/components/ui/switch-row') return { SwitchRow: 'SwitchRow' };
+      if (id === '@/components/ui/segmented') return { Segmented: 'Segmented' };
       if (id === '@/lib/down-payment') return load('src/lib/down-payment.ts');
       if (id === '@/lib/payment-method' || id === './payment-method.ts') return load('src/lib/payment-method.ts');
       if (id === '@/components/finance/payment-method-field') return load('src/components/finance/payment-method-field.tsx');
@@ -1350,4 +1362,147 @@ test('erros de conta e data não pintam a borda do valor; limite da compra apare
   change({ value: { ...value, accountId: 'conta' }, error: 'A entrada precisa ser menor que o total da compra' });
   assert.ok(campoEntrada(ui, 'Entrada').props.error);
   assert.equal(Boolean(ui.find(n => n.type === 'MoneyField').props.invalid), true);
+});
+
+
+test('F02: ação contextual do seletor fecha a lista sem selecionar uma entidade e ignora duplo toque', () => {
+  const selected: any[] = []; const created: any[] = [];
+  const props = { options: [{ id: 'bank', label: 'Banco' }], value: 'bank', onChange: (id: any) => selected.push(id),
+    actions: [{ id: 'create', label: 'Criar conta', icon: 'plus', onPress: () => created.push('account') }] };
+  const ui = montar('src/components/ui/select-field.tsx', 'SelectField', props);
+  const header = () => ui.find(n => n.type === 'PressableScale' && n.props.accessibilityLabel === 'Banco');
+  header().props.onPress(); ui.render();
+  const action = ui.find(n => n.type === 'PressableScale' && n.props.accessibilityLabel === 'Criar conta');
+  assert.ok(action, 'a criação é uma ação explícita dentro do seletor');
+  assert.equal(action.props.accessibilityRole, 'button');
+  action.props.onPress(); action.props.onPress(); ui.render();
+  assert.deepEqual(created, ['account']); assert.deepEqual(selected, []);
+  assert.equal(header().props.accessibilityState.expanded, false);
+});
+
+test('F02: seletor desabilitado protege ações capturadas e permite criar na lista vazia depois de reativar', () => {
+  const created: any[] = [];
+  const props = { options: [], value: null, placeholder: 'Escolher conta', onChange: () => assert.fail('ação não escolhe conta'),
+    actions: [{ id: 'create', label: 'Criar conta', icon: 'plus', onPress: () => created.push('account') }] };
+  const ui = montar('src/components/ui/select-field.tsx', 'SelectField', props);
+  const header = () => ui.find(n => n.type === 'PressableScale' && n.props.accessibilityLabel === 'Escolher conta');
+  header().props.onPress(); ui.render();
+  const stale = ui.find(n => n.type === 'PressableScale' && n.props.accessibilityLabel === 'Criar conta');
+  assert.ok(stale, 'uma lista vazia ainda oferece cadastro');
+  ui.render({ ...props, disabled: true });
+  assert.equal(header().props.disabled, true);
+  stale.props.onPress(); assert.deepEqual(created, []);
+  ui.render(props); header().props.onPress(); ui.render();
+  ui.find(n => n.type === 'PressableScale' && n.props.accessibilityLabel === 'Criar conta').props.onPress();
+  assert.deepEqual(created, ['account']);
+});
+
+function originUI(paymentMethod: string | null = 'pix') {
+  const selected: string[] = [];
+  const active: boolean[] = [];
+  const dispatched: any[] = [];
+  let resolve: (result: any) => void;
+  let reject: (error: any) => void;
+  const receipt = new Promise((yes, no) => { resolve = yes; reject = no; });
+  const config: any = { reduzir: true, ativo: true, toasts: [], creation: {
+    isPending: false, unconfirmedInput: null, reset() {},
+    mutateAsync(input: any) { dispatched.push(input); return receipt; },
+  } };
+  const controller: any = { current: null };
+  const props: any = { controllerRef: controller, onActiveChange: (value: boolean) => active.push(value), children: null };
+  const ui = montar('src/components/finance/origin-creation-host.tsx', 'OriginCreationHost', props, config);
+  const picker = (method = paymentMethod) => ui.element('src/components/finance/origin-creation-host.tsx', 'OriginAccountPicker', {
+    accounts: [], value: 'previous', paymentMethod: method, onChange: (id: string) => selected.push(id),
+  });
+  const render = (method = paymentMethod) => ui.render({ ...props, children: picker(method) });
+  render();
+  const open = (id = 'create-account') => { ui.find(n => n.type === 'AccountPicker').props.actions.find((a: any) => a.id === id).onPress(); render(); };
+  const fill = (name = 'Conta contextual') => { const fields = ui.find(n => n.type === 'AccountFormFields'); fields.props.onChange({ ...fields.props.form, name }); render(); };
+  const save = () => ui.find(n => n.type === 'Button' && n.props.block).props.onPress();
+  return { ui, config, controller, selected, active, dispatched, open, fill, save, render, resolve: (value: any) => resolve(value), reject: (e: any) => reject(e) };
+}
+const confirmedOrigin = (type = 'checking') => ({ id: 'actual-uuid', availability: 'active', account: { id: 'actual-uuid', type, archived: false, name: 'Confirmada' } });
+const settleOrigin = async () => { await new Promise<void>(resolve => setImmediate(resolve)); };
+
+test('F02: cadastro contextual aplica somente UUID confirmado, bloqueia duplo toque e volta ao seletor', async () => {
+  const flow = originUI(); flow.open(); flow.fill();
+  assert.equal(flow.config.preventRemove.active, true);
+  assert.equal(flow.ui.find(n => n.type === 'AccountFormFields').props.form.name, 'Conta contextual');
+  flow.save(); flow.save();
+  assert.equal(flow.dispatched.length, 1);
+  assert.deepEqual(flow.selected, []);
+  flow.resolve(confirmedOrigin()); await settleOrigin(); flow.render();
+  assert.deepEqual(flow.selected, ['actual-uuid']);
+  assert.deepEqual(flow.active, [true, false]);
+  assert.ok(flow.ui.find(n => n.type === 'AccountPicker'));
+  assert.equal(flow.config.preventRemove.active, false);
+});
+
+test('F02: cancelar ou voltar durante envio impede seleção tardia e conserva a ação de cadastro', async () => {
+  for (const back of [false, true]) {
+    const flow = originUI(); flow.open(); flow.fill(); flow.save();
+    if (back) flow.config.preventRemove.callback(); else assert.equal(flow.controller.current.close(), true);
+    flow.render(); flow.resolve(confirmedOrigin()); await settleOrigin(); flow.render();
+    assert.deepEqual(flow.selected, []);
+    assert.ok(flow.ui.find(n => n.type === 'AccountPicker'));
+    assert.equal(flow.controller.current.close(), false);
+    assert.match(flow.config.toasts.at(-1).message, /disponível no seletor/);
+  }
+});
+
+test('F02: forma de pagamento atual governa a seleção depois de uma criação já enviada', async () => {
+  const flow = originUI('credit'); flow.open('create-card');
+  const fields = flow.ui.find(n => n.type === 'AccountFormFields');
+  fields.props.onChange({ ...fields.props.form, name: 'Card', closingDay: '28', dueDay: '5' }); flow.render();
+  flow.save(); flow.render('debit'); flow.resolve(confirmedOrigin('credit_card')); await settleOrigin(); flow.render('debit');
+  assert.deepEqual(flow.selected, []);
+  assert.match(flow.config.toasts.at(-1).message, /compatível/);
+  assert.equal(flow.ui.find(n => n.type === 'AccountPicker').props.value, 'previous');
+});
+
+test('F02: mudar método antes do envio não cria uma origem agora incompatível', () => {
+  const flow = originUI('debit'); flow.open(); flow.fill(); flow.render('cash'); flow.save(); flow.render('cash');
+  assert.equal(flow.dispatched.length, 0);
+  assert.deepEqual(flow.selected, []);
+  assert.ok(flow.ui.find(n => n.type === 'ThemedText' && /compatível/.test(n.props.children)));
+});
+
+test('F02: confirmação perdida permanece congelada mesmo fechando e reabrindo o cadastro', async () => {
+  const flow = originUI(); flow.open(); flow.fill(); flow.save();
+  flow.config.creation.unconfirmedInput = flow.dispatched[0];
+  flow.reject(new Error('offline')); await settleOrigin(); flow.render();
+  assert.equal(flow.ui.find(n => n.type === 'AccountFormFields').props.disabled, true);
+  assert.ok(flow.ui.find(n => n.type === 'Button' && n.props.label === 'Verificar cadastro'));
+  flow.controller.current.close(); flow.render(); flow.open();
+  const fields = flow.ui.find(n => n.type === 'AccountFormFields');
+  assert.equal(fields.props.form.name, 'Conta contextual');
+  assert.equal(fields.props.disabled, true);
+  assert.deepEqual(flow.selected, []);
+});
+
+test('F02: campo que sai da presença e host desmontado recusam callback financeiro tardio', async () => {
+  const flow = originUI(); flow.open(); flow.fill(); flow.save();
+  flow.config.ativo = false; flow.render();
+  flow.ui.unmount(); flow.resolve(confirmedOrigin()); await settleOrigin();
+  assert.deepEqual(flow.selected, []);
+  assert.equal(flow.ui.writesAfterUnmount(), 0);
+});
+
+test('F02: campos compartilhados explicam dias obrigatórios e a edição bloqueada não altera o cadastro', () => {
+  const changes: any[] = [];
+  const form = { ...emptyAccountForm('credit_card'), name: 'Cartão' };
+  const props = { form, accounts: [], onChange: (next: any) => changes.push(next) };
+  const ui = montar('src/components/finance/account-form.tsx', 'AccountFormFields', props, { reduzir: true, ativo: true });
+  assert.ok(ui.find(n => n.type === 'ThemedText' && /Informe fechamento e vencimento/.test(n.props.children)));
+  ui.render({ ...props, form: { ...form, closingDay: '28', dueDay: '5' } });
+  assert.equal(ui.find(n => n.type === 'ThemedText' && /Informe fechamento e vencimento/.test(n.props.children)), undefined);
+  ui.render({ ...props, disabled: true });
+  const name = ui.find(n => n.type === 'TextField' && n.props.accessibilityLabel === 'Nome do cartão');
+  assert.equal(name.props.editable, false);
+  name.props.onChangeText('Outra intenção');
+  const limit = ui.find(n => n.type === 'MoneyField');
+  assert.equal(limit.props.readOnly, true);
+  limit.props.onChangeCents(50000);
+  ui.find(n => n.type === 'TextField' && n.props.placeholder === 'Ex.: 28').props.onChangeText('31');
+  assert.deepEqual(changes, [], 'callbacks capturados não mudam o payload congelado');
 });

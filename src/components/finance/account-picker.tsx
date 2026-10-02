@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { SelectField, type SelectOption } from '@/components/ui/select-field';
+import { SelectField, type SelectAction, type SelectOption } from '@/components/ui/select-field';
 import { accountSelectOptions } from '@/lib/accounts';
 
 /** O mínimo que o seletor precisa saber. Aceita `Account` inteiro sem conversão. */
@@ -52,6 +52,8 @@ export function AccountPicker({
   value,
   selectedAccount,
   onChange,
+  actions,
+  disabled,
   emptyLabel,
   placeholder = 'Escolher conta',
 }: {
@@ -60,6 +62,8 @@ export function AccountPicker({
   /** Conta do rascunho, obtida da lista completa antes de filtrar as alternativas. */
   selectedAccount?: PickableAccount | null;
   onChange: (id: string | null) => void;
+  actions?: readonly SelectAction[];
+  disabled?: boolean;
   /**
    * Rótulo da opção "sem conta". Omitido, a opção não existe — é o caso da
    * transferência, que precisa dos dois lados para significar alguma coisa.
@@ -75,6 +79,8 @@ export function AccountPicker({
       value={value}
       selectedOption={selectedAccount ? accountSelectOptions([selectedAccount])[0] : null}
       onChange={onChange}
+      actions={actions}
+      disabled={disabled}
       placeholder={emptyLabel ?? placeholder}
     />
   );

@@ -218,6 +218,7 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
     usePayDebtInstallment: () => mutation('payDebt'),
     useDeleteTransaction: () => mutation('deleteTransaction'),
     useSaveAccount: () => mutation('saveAccount'),
+    useCreateAccount: () => ({ ...mutation('createAccount'), unconfirmedInput: null }),
     useContaTemLancamentos: () => ({ ...query, isSuccess: true, data: Boolean(options.contaTemLancamentos) }),
     useArchiveDebt: () => mutation('archiveDebt'),
     useUnarchiveDebt: () => mutation('unarchiveDebt'),
@@ -336,6 +337,28 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
         clearTimeout: (id: number) => timers.delete(id),
       } : {}), require: (name: string) => {
       if (name === 'react') return react;
+      if (name === '@/components/ui/sheet') return { Sheet: 'Sheet', SheetScroll: 'SheetScroll', SheetHeader: 'SheetHeader', FormularioEmTela: { Provider: 'FormularioEmTela.Provider' }, molduraEmTela: () => ({}) };
+      if (name === 'zod') return require(name);
+      if (name === '@hookform/resolvers/zod') return { zodResolver: (schema: any) => schema };
+      // Stateful form boundary; the production JSX, handlers and Zod schema remain real.
+      if (name === 'react-hook-form') return {
+        useForm: ({ defaultValues, resolver }: any) => {
+          const [control] = react.useState(() => ({ values: { ...defaultValues }, resolver }));
+          const getValues = (name?: string) => name ? control.values[name] : { ...control.values };
+          const setValue = (name: string, value: any) => { control.values[name] = value; };
+          return { control, getValues, setValue, formState: { errors: {} },
+            handleSubmit: (submit: any) => () => {
+              const parsed = control.resolver.safeParse(control.values);
+              if (parsed.success) submit(parsed.data);
+            },
+          };
+        },
+        useWatch: ({ control, name }: any) => control.values[name],
+        Controller: function Controller({ control, name, render }: any) {
+          return render({ field: { value: control.values[name], onChange: (value: any) => { control.values[name] = value; } } });
+        },
+      };
+
       // A preferência gravada vale como `useState` dentro de uma visita; o disco tem teste próprio
       // (`use-preferencia.test.ts`).
       if (name === '@/hooks/use-preferencia') return { umDe: () => () => true, usePreferencia: (nome: string, padrao: unknown) => {
@@ -373,6 +396,7 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
       if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, Redirect: 'Redirect', useLocalSearchParams: () => options.params ?? (file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), useFocusEffect: () => {}, useIsFocused: () => true, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }), dismissAll: () => navigations.push({ dismissAll: true }), dismiss: (n?: number) => navigations.push({ dismiss: n ?? 1 }), canDismiss: () => !options.primeiraDaPilha, canGoBack: () => !options.primeiraDaPilha } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
+      if (name === '@/components/finance/origin-creation-host') return { OriginCreationHost: ({ children }: any) => children, OriginAccountPicker: 'AccountPicker' };
       if (name === '@/lib/payment-method') return load('src/lib/payment-method.ts');
       if (name === '@/components/ui/filter-bar') return load('src/components/ui/filter-bar.tsx');
       if (name === '@/lib/supabase' && file.endsWith('finance/recurring.tsx')) return { supabase: {
@@ -454,6 +478,8 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
+      if (name === '@/lib/account-form') return load('src/lib/account-form.ts');
+      if (name === '@/components/finance/account-form') return load('src/components/finance/account-form.tsx');
       if (name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/categorias') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       // o `categorias.ts` importa o mapa de ícones por caminho relativo (roda no `node --test` puro)
       if (name === '../design/category-icons.ts') return { categoryIcon: () => 'circle' };
@@ -575,7 +601,7 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
     if (node.type === 'FinanceAnalysisPanes') visit(node.props.compact);
     // `CamposDaSerie` é um grupo de campos sem hook: desenhado aqui, a tela é a que a pessoa vê.
     // Os corpos (`FormularioDaSerie`, `FormularioDaDivida`) têm hooks: eles rodam depois dos da tela, na mesma ordem a cada render.
-    if (typeof node.type === 'function' && ['CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida', 'TrashEmptyState', 'FilterBar'].includes(node.type.name)) visit(node.type(node.props));
+    if (typeof node.type === 'function' && ['Controller', 'AccountFormFields', 'CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida', 'TrashEmptyState', 'FilterBar'].includes(node.type.name)) visit(node.type(node.props));
     // No celular o `AdaptivePanes` desenha o slot de uma coluna só (Pastas, Recorrentes…).
     if (node.type === 'AdaptivePanes') visit(node.props.singlePaneContent ?? node.props.main);
     visit(node.props.ListHeaderComponent);
@@ -5171,5 +5197,138 @@ test('Lançar: parcela histórica carregada supera passado=0 mesmo sem entrada',
     ui.interact(() => ui.actions.find(a => a.label === 'Todas, apagando as anteriores')!.onPress());
     assert.equal(ui.writes.length, 0);
     assert.equal(ui.confirmations.length, 1);
+  }
+});
+
+test('conta recusa centavos fracionários, não finitos e acima do inteiro seguro antes de gravar', () => {
+  const ui = screen('src/app/finance/accounts.tsx', { params: { create: '1' } });
+  ui.fill('Nome', 'Conta segura');
+  for (const value of [1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, -1]) {
+    ui.fill('Saldo atual', value);
+    assert.equal(ui.button('Salvar').props.disabled, true, `saldo inválido ${value}`);
+  }
+  ui.fill('Saldo atual', 0);
+  assert.equal(ui.button('Salvar').props.disabled, false);
+});
+
+test('editar cartão com dívida não altera o saldo inicial pelo saldo negativo da fatura', () => {
+  const card = { id: 'c1', name: 'Cartão', type: 'credit_card', initial_balance_cents: 0, closing_day: 3, due_day: 10, credit_limit_cents: 500000, payment_account_id: null };
+  const ui = screen('src/app/finance/accounts.tsx', {
+    params: { edit: 'c1' }, forecastAccounts: [card],
+    balances: [{ account_id: 'c1', name: 'Cartão', type: 'credit_card', balance_cents: -45000, cleared_cents: 0, pending_in_cents: 0, pending_out_cents: 45000 }],
+  });
+  ui.press('Salvar');
+  assert.equal(ui.writes.at(-1).value.initial_balance_cents, 0);
+});
+
+
+test('campos compartilhados respeitam tipos elegíveis e travam todos os valores sem criar conta pagadora', () => {
+  const changes: any[] = [];
+  const form = { name: 'Card', type: 'credit_card', saldoCents: 0, negativo: false, base: null, originalInitialBalanceCents: null, closingDay: '3', dueDay: '10', limitCents: 50000, payerId: null, fechamentoInclusivo: false, rotativoAuto: false, rotativoRate: '' };
+  const ui = screen('src/components/finance/account-form.tsx', { componente: 'AccountFormFields', props: {
+    form, onChange: (next: any) => changes.push(next), accounts: [
+      { id: 'payer', name: 'Bank', type: 'checking' }, { id: 'card', name: 'Other card', type: 'credit_card' },
+    ], allowedTypes: ['credit_card'], disabled: true, autoFocus: false,
+  } });
+  const fields = ui.nodes().filter((n: any) => n.type === 'Field');
+  assert.deepEqual(fields.map((n: any) => n.props.label), ['Nome', 'Tipo', 'Limite do cartão', 'Fecha dia', 'Vence dia', 'Compra no dia do fechamento', 'Juros do rotativo (% ao mês)', 'Conta que paga a fatura']);
+  assert.ok(ui.nodes().filter((n: any) => n.type === 'TextField').every((n: any) => n.props.editable === false));
+  assert.equal(ui.nodes().find((n: any) => n.type === 'MoneyField').props.readOnly, true);
+  const type = ui.nodes().find((n: any) => n.type === 'SelectField');
+  assert.equal(type.props.disabled, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(type.props.options.map((o: any) => o.id))), ['credit_card']);
+  const payer = ui.nodes().find((n: any) => n.type === 'AccountPicker');
+  assert.equal(payer.props.disabled, true);
+  assert.equal(payer.props.creationActions, undefined);
+  assert.deepEqual(payer.props.accounts.map((a: any) => a.id), ['payer']);
+  ui.fill('Nome', 'Ignored');
+  ui.interact((nodes: any[]) => nodes.find((n: any) => n.type === 'SwitchRow').props.onValueChange(true));
+  assert.equal(changes.length, 0);
+});
+
+test('contas usa criação idempotente e recusa toque duplo no mesmo formulário', () => {
+  const ui = screen('src/app/finance/accounts.tsx', { params: { create: '1' } });
+  ui.fill('Nome', 'Bank');
+  const save = ui.button('Salvar').props.onPress;
+  ui.interact(() => { save(); save(); });
+  assert.equal(ui.pedidos.length, 1);
+  assert.equal(ui.pedidos[0].operation, 'createAccount');
+  assert.equal(ui.pedidos[0].value.name, 'Bank');
+});
+
+test('sucesso de uma criação fechada não fecha nem anuncia sucesso de uma nova abertura', () => {
+  const ui = screen('src/app/finance/accounts.tsx', { params: {} });
+  ui.press('Nova conta');
+  ui.fill('Nome', 'Original');
+  ui.press('Salvar');
+  const first = ui.pedidos.at(-1);
+  ui.interact((nodes: any[]) => nodes.find((n: any) => n.type === 'TaskHeader').props.onClose());
+  ui.press('Nova conta');
+  ui.fill('Nome', 'New');
+  ui.interact(() => first.opts.onSuccess({ id: 'first', availability: 'active' }));
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Sheet' && n.props.visible));
+  assert.equal(ui.nodes().find((n: any) => n.type === 'TextField').props.value, 'New');
+  assert.equal(ui.toasts.length, 0);
+});
+
+
+test('cadastro de origem bloqueia salvar dos três corpos sem anunciar mutação em andamento', () => {
+  const base = { registrarComum: () => {}, registrarEstado: () => {}, onSalvo: () => {}, onFechar: () => {}, salvarBloqueado: true };
+  const comum = { kind: 'expense', descricao: 'Academia', valorCents: 5000, contaId: null, dataBR: '06/10/2026', categoria: null };
+  for (const [file, componente, topLabel] of [
+    ['formulario-do-lancamento', 'FormularioDoLancamento', 'Salvar'],
+    ['formulario-da-serie', 'FormularioDaSerie', 'Criar'],
+    ['formulario-da-divida', 'FormularioDaDivida', 'Salvar'],
+  ]) {
+    const ui = screen(`src/components/finance/${file}.tsx`, { componente, props: { ...base, comum } });
+    if (componente === 'FormularioDaDivida') ui.fill('Total de parcelas', '48');
+    for (const label of [topLabel, 'Salvar e criar outro']) {
+      const button = ui.button(label);
+      assert.equal(button.props.disabled, true, `${componente}: ${label} bloqueado`);
+      assert.ok(!button.props.loading, `${componente}: cadastro aberto não é gravação`);
+      ui.interact(() => button.props.onPress());
+    }
+    assert.equal(ui.writes.length, 0, `${componente}: handler bloqueado não grava`);
+  }
+});
+
+test('callback capturado antes do cadastro não grava enquanto salvarBloqueado estiver ativo', () => {
+  const comum = { kind: 'expense', descricao: 'Academia', valorCents: 5000, contaId: null, dataBR: '06/10/2026', categoria: null };
+  const base = { comum, registrarComum: () => {}, registrarEstado: () => {}, onSalvo: () => {}, onFechar: () => {}, salvarBloqueado: false };
+  for (const [file, componente, topLabel] of [
+    ['formulario-do-lancamento', 'FormularioDoLancamento', 'Salvar'],
+    ['formulario-da-serie', 'FormularioDaSerie', 'Criar'],
+    ['formulario-da-divida', 'FormularioDaDivida', 'Salvar'],
+  ]) {
+    const options = { componente, executarEfeitos: true, props: { ...base } };
+    const ui = screen(`src/components/finance/${file}.tsx`, options);
+    if (componente === 'FormularioDaDivida') ui.fill('Total de parcelas', '48');
+    const captured = [ui.button(topLabel), ui.button('Salvar e criar outro')];
+    assert.ok(captured.every((button) => !button.props.disabled), `${componente}: fixture habilitada`);
+    options.props = { ...options.props, salvarBloqueado: true };
+    ui.interact(() => {});
+    for (const button of captured) ui.interact(() => button.props.onPress());
+    assert.equal(ui.writes.length, 0, `${componente}: callback anterior respeita o bloqueio atual`);
+    options.props = { ...options.props, salvarBloqueado: false };
+    ui.interact(() => {});
+    ui.press(topLabel);
+    assert.equal(ui.writes.length, 1, `${componente}: desbloqueado volta a salvar`);
+  }
+});
+
+test('gravação real continua carregando nos três corpos, separada do bloqueio do cadastro', () => {
+  const comum = { kind: 'expense', descricao: 'Academia', valorCents: 5000, contaId: null, dataBR: '06/10/2026', categoria: null };
+  for (const [file, componente, label] of [
+    ['formulario-do-lancamento', 'FormularioDoLancamento', 'Salvando…'],
+    ['formulario-da-serie', 'FormularioDaSerie', 'Criar'],
+    ['formulario-da-divida', 'FormularioDaDivida', 'Salvar'],
+  ]) {
+    const ui = screen(`src/components/finance/${file}.tsx`, { componente, props: {
+      comum, registrarComum: () => {}, registrarEstado: () => {}, onSalvo: () => {}, onFechar: () => {},
+      salvando: true, salvarBloqueado: false,
+    } });
+    assert.equal(ui.button(label).props.loading, true, `${componente}: mutação real mantém o progresso`);
+    assert.equal(ui.button(label).props.disabled, true);
+    assert.equal(ui.button('Salvar e criar outro').props.disabled, true);
   }
 });

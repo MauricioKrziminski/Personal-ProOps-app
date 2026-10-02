@@ -25,8 +25,8 @@ Esses fatos e a abertura do formulário ainda não equivalem ao aceite funcional
 | Id | Feature | Estado | iOS | Android |
 |---|---|---|---|---|
 | F01 | Forma de pagamento | Aceite técnico no staging em 02/10/2026 | Validado na matriz | Validado na matriz |
-| F02 | Criar origem no fluxo | Aguardando F01 | Não validado | Não validado |
-| F03 | Saldo/limite no seletor | Aguardando F02 | Não validado | Não validado |
+| F02 | Criar origem no fluxo | Aceite técnico no staging em 02/10/2026 | Validado na matriz | Validado na matriz |
+| F03 | Saldo/limite no seletor | Liberado para implementação | Não validado | Não validado |
 | F04 | Prévia do efeito | Aguardando F03 | Não validado | Não validado |
 | F05 | Filtros por pagamento | Aguardando F04 | Não validado | Não validado |
 | F06 | Classificações independentes | Aguardando F05 | Não validado | Não validado |
@@ -141,3 +141,15 @@ resultados dos comandos, capturas e persistência. [Registro e rastreabilidade](
 F02 liberado. Offline nativo iOS e teclado virtual iPad continuam explicitamente sem
 execução, conforme limites complementares do registro; não foram transformados em passes.
 Hardware físico, release, produção e paridade de criação Gemini não são certificados.
+
+## F02 — implementação e aceite técnico
+
+[Contrato](f02/contrato-de-implementacao.md) e [registro de execução](f02/registro-nativo.md).
+Cadastro contextual compartilha campos com Contas e conserva o lançamento. Criação atômica,
+UUID de intenção, confirmação perdida/retry e leitura da entidade atual foram verificados.
+Fonte final: 1.512 testes, TypeScript/lint exit 0; SQL rollback e concorrência real passaram.
+Criação/persistência de corrente negativa, cartão, recorrente e conta da entrada conferidas
+no iOS e Android, além de cancelamento/volta, nome duplicado/longo, teclado, escuro,
+fonte ampliada, tablet e movimento reduzido. Snapshot final: 13 contas e 11 registros F02.
+Offline/retry nativo foi executado no Android; offline nativo iOS permanece sem execução.
+Hardware físico, release e produção não são certificados. F03 liberado após esse aceite.

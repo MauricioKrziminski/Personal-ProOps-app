@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -81,7 +81,7 @@ import {
 } from '@/lib/settle-labels';
 import { confirmDestructive } from '@/lib/item-actions';
 import { correcaoDoPagamento } from '@/lib/confirmar-baixa';
-import { AccountPicker } from '@/components/finance/account-picker';
+import { OriginAccountPicker } from '@/components/finance/origin-creation-host';
 import { PaymentMethodField } from '@/components/finance/payment-method-field';
 import { PAYMENT_METHODS, normalizePaymentMethod, paymentMethodAccounts, paymentMethodError } from '@/lib/payment-method';
 import { Presenca } from '@/components/motion/presenca';
@@ -200,6 +200,8 @@ export function FormularioDoLancamento(props: Props) {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const toast = useToast();
+  const salvarBloqueadoAtual = useRef(Boolean(props.salvarBloqueado));
+  useLayoutEffect(() => { salvarBloqueadoAtual.current = Boolean(props.salvarBloqueado); }, [props.salvarBloqueado]);
   const contas = useAccounts(editing?.account_id);
   const accounts = contas.data;
 
@@ -401,6 +403,7 @@ export function FormularioDoLancamento(props: Props) {
 
   /** Linhas e regra são uma transação no banco: nenhum resultado parcial. */
   const salvarAsProximas = (form = formSerie) => {
+    if (salvarBloqueadoAtual.current) return;
     if (!form || !editing || !serie) return;
     if (!validaSerie(form).podeSalvar || paymentMethodError(form.paymentMethod, (accounts ?? []).find((a) => a.id === form.accountId) ?? null)) {
       toast({ message: 'Confira o vencimento e os dados da série antes de salvar.', tone: 'error' });
@@ -451,6 +454,7 @@ export function FormularioDoLancamento(props: Props) {
   };
 
   const salvarTodaSerie = (form = formSerie ?? rascunhoDaSerie()) => {
+    if (salvarBloqueadoAtual.current) return;
     if (!form || !editing || !serie) return;
     if (!validaSerie(form).podeSalvar || paymentMethodError(form.paymentMethod, (accounts ?? []).find((a) => a.id === form.accountId) ?? null)) {
       toast({ message: 'Confira o vencimento e os dados da série antes de salvar.', tone: 'error' });
@@ -489,9 +493,11 @@ export function FormularioDoLancamento(props: Props) {
    * confirmação destrutiva que NOMEIA o estrago (`design.md §6`), como em Parceladas.
    */
   const salvarCompraToda = () => {
+    if (salvarBloqueadoAtual.current) return;
     if (!formCompra || !compraOk) return;
     const compra = formCompra;
-    const gravarCompra = () =>
+    const gravarCompra = () => {
+      if (salvarBloqueadoAtual.current) return;
       atualizarCompra.mutate(payloadDaCompra(compra, brToISO(compra.inicio)), {
         onSuccess: () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -507,6 +513,7 @@ export function FormularioDoLancamento(props: Props) {
         onError: (error) =>
           toast({ message: financeErrorMessage(error, 'Não deu para editar a compra. Tenta de novo.'), tone: 'error' }),
       });
+    };
     if (compra.installments === 1) {
       const somem = Math.max(compra.original.installments - 1, 0);
       confirmDestructive(
@@ -540,6 +547,7 @@ export function FormularioDoLancamento(props: Props) {
 
   /** `criarOutro`: o "Salvar e criar outro" — o hospedeiro recebe no `onSalvo` e remonta limpo. */
   const onSubmit = (criarOutro = false) => handleSubmit((values) => {
+    if (salvarBloqueadoAtual.current) return;
     if (contas.isPending || contas.isError || erroPagamento || erroEntrada) return;
     if ((editing?.down_payment_debt_id || editing?.down_payment_plan_id) && brToISO(values.occurred_at) > localISODate()) {
       toast({ message: 'A entrada paga não pode ter data futura', tone: 'error' });
@@ -796,6 +804,7 @@ export function FormularioDoLancamento(props: Props) {
   })();
 
   const salvarPagamento = (scope: DebtPaymentScope) => handleSubmit((values) => {
+    if (salvarBloqueadoAtual.current) return;
     if (erroPagamento || contas.isError || contas.isPending) return;
     if (!editing || !divida || editing.debt_payment_no === null) return;
     if (!versoesPagamentos.data || versoesPagamentos.isError) {
@@ -858,6 +867,7 @@ export function FormularioDoLancamento(props: Props) {
   // Configurar a série/compra troca o formulário visível. O rascunho RHF da ocorrência
   // fica preservado, mas seus campos ocultos não validam nem impedem o contrato visível.
   const submeterFormularioVisivel = (submit: (values: FormValues) => void) => {
+    if (salvarBloqueadoAtual.current) return;
     if (contas.isError || contas.isPending) return;
     if (formCompra || formSerie) {
       if (formCompra ? !compraOk : !serieOk) return;
@@ -920,8 +930,10 @@ export function FormularioDoLancamento(props: Props) {
   });
 
   const salvarComAlcance = () => {
+    if (salvarBloqueadoAtual.current) return;
     if (editing?.recurring_id && serie) {
       askEditScope('occurrence', (scope) => {
+        if (salvarBloqueadoAtual.current) return;
         if (scope === 'all') return salvarTodaSerie();
         if (scope === 'future') return salvarAsProximas(formSerie ?? rascunhoDaSerie());
         submeterFormularioVisivel((values) => {
@@ -1031,7 +1043,7 @@ export function FormularioDoLancamento(props: Props) {
           <Button
             label={saving ? 'Salvando…' : 'Salvar'}
             size="sm"
-             disabled={saving || contas.isError || contas.isPending ||
+             disabled={Boolean(props.salvarBloqueado) || saving || contas.isError || contas.isPending ||
                (formCompra ? !compraOk : formSerie ? !serieOk : Boolean(erroPagamento || erroEntrada || correcaoDaDivida.erro))}
             loading={saving}
             onPress={editing?.recurring_id || editing?.installment_plan_id || editing?.debt_id ? salvarComAlcance : () => onSubmit()}
@@ -1234,15 +1246,10 @@ export function FormularioDoLancamento(props: Props) {
                 <Skeleton height={56} />
               ) : contas.isError ? (
                 <Button label="Tentar de novo" variant="secondary" size="sm" onPress={() => contas.refetch()} />
-              ) : (accounts ?? []).length === 0 ? (
-                <Button
-                  label="Cadastrar uma conta"
-                  variant="secondary"
-                  size="sm"
-                  onPress={() => router.push('/finance/accounts?create=1')}
-                />
               ) : (
-                <AccountPicker
+                <OriginAccountPicker
+                  paymentMethod={paymentMethod}
+                  excludeCredit={Boolean(editing?.debt_id)}
                   // Pagamento de dívida sai de conta, nunca de cartão: o trigger da dívida recusa.
                   accounts={paymentMethodAccounts(paymentMethod, (accounts ?? []).filter((a) => !editing?.debt_id || a.type !== 'credit_card'))}
                   value={field.value ?? null}
@@ -1267,15 +1274,14 @@ export function FormularioDoLancamento(props: Props) {
         />
         )}
 
-        {/* Sem conta nenhuma, o "Cadastrar uma conta" de cima responde pelas duas: o destino seria
-            uma lista vazia. */}
-        <Presenca visivel={kind === 'transfer' && !(contas.isSuccess && (accounts ?? []).length === 0)}>
+        {/* O destino pode ser cadastrado sem abandonar a transferência. */}
+        <Presenca visivel={kind === 'transfer'}>
             <Controller
               control={control}
               name="counterparty_account_id"
               render={({ field }) => (
                 <Field label="Para a conta" error={errors.counterparty_account_id?.message}>
-                  <AccountPicker
+                  <OriginAccountPicker
                     accounts={accounts ?? []}
                     value={field.value ?? null}
                     onChange={field.onChange}
@@ -1527,7 +1533,7 @@ export function FormularioDoLancamento(props: Props) {
             variant="secondary"
             block
             label="Salvar e criar outro"
-            disabled={saving || contas.isPending || contas.isError || Boolean(erroPagamento) || Boolean(erroEntrada)}
+            disabled={Boolean(props.salvarBloqueado) || saving || contas.isPending || contas.isError || Boolean(erroPagamento) || Boolean(erroEntrada)}
             onPress={() => onSubmit(true)}
           />
         ) : null}

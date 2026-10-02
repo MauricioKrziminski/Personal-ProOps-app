@@ -74,10 +74,12 @@ Aceite técnico em 02/10/2026 no staging; [matriz e limites](../../qa/2026-10-02
 
 Arquivos: `accounts.tsx`, `account-picker.tsx`, `useSaveAccount`, componente extraído `account-form.tsx` e host contextual do launcher. Interfaces: formulário recebe valor inicial/modo e devolve id persistido; seletor recebe ação de criação, não instancia cadastro em cada tela.
 
-- [ ] RED: retornar origem criada mantém draft; retry não duplica cadastro.
-- [ ] Extrair os campos reais e guardas de conta/cartão sem copiar markup.
-- [ ] Integrar criação/cancelamento/erro/seleção e invalidação mínima.
-- [ ] Executar gates e cenários F02 da spec nos dois sistemas; registrar aceite.
+- [x] RED: retornar origem criada mantém draft; retry não duplica cadastro.
+- [x] Extrair os campos reais e guardas de conta/cartão sem copiar markup.
+- [x] Integrar criação/cancelamento/erro/seleção e invalidação mínima.
+- [x] Executar gates e cenários F02 da spec nos dois sistemas; registrar aceite.
+
+Aceite técnico em 02/10/2026 no staging; [matriz e limites](../../qa/2026-10-02-evolucao-financeira/f02/registro-nativo.md).
 
 ### F03 — Saldo/limite no seletor
 

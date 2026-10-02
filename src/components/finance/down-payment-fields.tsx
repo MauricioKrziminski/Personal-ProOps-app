@@ -1,6 +1,6 @@
 import { PaymentMethodField } from '@/components/finance/payment-method-field';
 import { paymentMethodAccounts, paymentMethodError } from '@/lib/payment-method';
-import { AccountPicker } from '@/components/finance/account-picker';
+import { OriginAccountPicker } from '@/components/finance/origin-creation-host';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { Presenca } from '@/components/motion/presenca';
 import { Field, MoneyField } from '@/components/ui/field';
@@ -16,7 +16,7 @@ export function DownPaymentFields({ enabled, onEnabled, value, onChange, account
   onEnabled: (enabled: boolean) => void;
   value: DownPaymentForm;
   onChange: (value: DownPaymentForm) => void;
-  accounts: Parameters<typeof AccountPicker>[0]['accounts'];
+  accounts: Parameters<typeof OriginAccountPicker>[0]['accounts'];
   error?: string;
   showToggle?: boolean;
 }) {
@@ -42,7 +42,7 @@ export function DownPaymentFields({ enabled, onEnabled, value, onChange, account
       </Field>
       <PaymentMethodField value={value.paymentMethod} onChange={(paymentMethod) => onChange({ ...value, paymentMethod })} error={!origem ? erroMetodo ?? undefined : undefined} />
       <Field label="Conta da entrada" error={origem && erroMetodo ? erroMetodo : revisado.account && !value.accountId ? 'Escolha a conta da entrada' : undefined} hint={origem && erroMetodo ? `Origem selecionada: ${origem.name}` : undefined}>
-        <AccountPicker accounts={paymentMethodAccounts(value.paymentMethod, accounts)} value={value.accountId} selectedAccount={origem} onChange={(accountId) => {
+        <OriginAccountPicker paymentMethod={value.paymentMethod} accounts={paymentMethodAccounts(value.paymentMethod, accounts)} value={value.accountId} selectedAccount={origem} onChange={(accountId) => {
           setRevisado((r) => ({ ...r, account: true })); onChange({ ...value, accountId });
         }}
           placeholder="Escolher a conta da entrada" />

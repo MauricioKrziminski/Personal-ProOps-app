@@ -28,6 +28,14 @@ export type SelectOption = {
   neutral?: boolean;
 };
 
+export type SelectAction = {
+  id: string;
+  label: string;
+  icon?: IconName;
+  onPress: () => void;
+  disabled?: boolean;
+};
+
 /**
  * Escolher UM item de uma lista curta, dentro de um formulário.
  *
@@ -58,6 +66,8 @@ export function SelectField({
   value,
   selectedOption,
   onChange,
+  actions = [],
+  disabled = false,
   placeholder = 'Escolher uma opção',
 }: {
   options: readonly SelectOption[];
@@ -65,12 +75,15 @@ export function SelectField({
   /** Identidade preservada no rascunho quando a lista de escolhas foi filtrada. */
   selectedOption?: SelectOption | null;
   onChange: (id: string | null) => void;
+  /** Ações contextuais não representam opções nem emitem um id selecionado. */
+  actions?: readonly SelectAction[];
+  disabled?: boolean;
   /** O que o campo diz quando nada foi escolhido. */
   placeholder?: string;
 }) {
   const theme = useTheme();
   const scheme = useScheme();
-  const ativo = usePresencaAtiva();
+  const ativo = usePresencaAtiva() && !disabled;
   const [escolha, setEscolha] = useState({ aberto: false, abertura: 0 });
   const { aberto, abertura } = escolha;
   const [confirmacao, setConfirmacao] = useState<{ id: string | null } | null>(null);
@@ -117,6 +130,16 @@ export function SelectField({
     if (id !== value) Haptics.selectionAsync();
     onChange(id);
     setEscolha({ ...escolha, aberto: false });
+  }
+
+  function acionar(action: SelectAction) {
+    if (action.disabled || !ativoAtual.current || visitaAtual.current !== presenca.visita || !abertoAtual.current || escolhendo.current || aberturaAtual.current !== abertura) return;
+    escolhendo.current = true;
+    abertoAtual.current = false;
+    setConfirmacao(null);
+    setEscolha({ ...escolha, aberto: false });
+    Haptics.selectionAsync();
+    action.onPress();
   }
 
   const ladrilho = (icone: IconName | undefined, aceso: boolean) =>
@@ -186,6 +209,17 @@ export function SelectField({
             {linha(o)}
           </Fragment>
         ))}
+        {actions.map((action) => <Fragment key={`action:${action.id}`}>
+          <View style={[styles.divisorCheio, { backgroundColor: theme.separator }]} />
+          <PressableScale scaleTo={1} onPress={() => acionar(action)} disabled={!ativo || action.disabled}
+            accessibilityRole="button" accessibilityLabel={action.label}
+            accessibilityState={{ disabled: !ativo || Boolean(action.disabled) }}>
+            {({ pressed }) => <LinhaRealcada pressionada={pressed} confirmar={false}>
+              {ladrilho(action.icon ?? 'plus', false)}
+              <View style={styles.textos}><ThemedText type="default" style={styles.textoInteiro}>{action.label}</ThemedText></View>
+            </LinhaRealcada>}
+          </PressableScale>
+        </Fragment>)}
       </Presenca>
     </View>
   );

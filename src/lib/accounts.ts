@@ -139,3 +139,16 @@ export function saldoDaConta(saldo: {
 export function inicialParaOSaldo(desejado: number, atualMostrado: number, inicial: number): number {
   return inicial + (desejado - atualMostrado);
 }
+
+
+/** Só a confirmação atual e ainda desejada pode escolher a origem do rascunho. */
+export function createdAccountSelection(result: {
+  id: string;
+  availability: string;
+  account: { id: string; type?: string | null; archived?: boolean } | null;
+}, allowedTypes: readonly string[], active = true): string | null {
+  const account = result.account;
+  if (!active || result.availability !== 'active' || !account || account.archived
+    || account.id !== result.id || !allowedTypes.includes(account.type ?? '')) return null;
+  return account.id;
+}

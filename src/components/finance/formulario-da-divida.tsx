@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import type { CorpoProps } from '@/components/finance/corpo-do-lancar';
 import { Presenca, TrocaSuave } from '@/components/motion/presenca';
-import { AccountPicker } from '@/components/finance/account-picker';
+import { OriginAccountPicker } from '@/components/finance/origin-creation-host';
 import { PaymentMethodField } from '@/components/finance/payment-method-field';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { DownPaymentFields } from '@/components/finance/down-payment-fields';
@@ -232,6 +232,8 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
   const toast = useToast();
+  const salvarBloqueadoAtual = useRef(Boolean(props.salvarBloqueado));
+  useLayoutEffect(() => { salvarBloqueadoAtual.current = Boolean(props.salvarBloqueado); }, [props.salvarBloqueado]);
   const accounts = useAccounts(alvo?.account_id);
   const save = useSaveDebt();
   const saveScoped = useSaveDebtContractScoped();
@@ -374,7 +376,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   const podeSalvar = Boolean(nomeOk && !erroEntrada && !erroPagamento && !accounts.isError && !accounts.isPending && validDueDay && (!form.id || payments.isSuccess) && (form.calculationMode === 'fixed_installments' ? simpleValues : advancedValid));
 
   const salvar = (criarOutro: boolean) => {
-    if (!podeSalvar) return;
+    if (salvarBloqueadoAtual.current || !podeSalvar) return;
     const target = {
         id: form.id,
         name: form.name.trim(),
@@ -428,6 +430,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
         dia, conta, nome), as duas dariam o mesmo resultado: salva sem perguntar.
       */
       const salvarNo = (scope: 'future' | 'all') => {
+        if (salvarBloqueadoAtual.current) return;
         if (!Object.keys(patch).length) {
           onFechar();
           return;
@@ -517,7 +520,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
             label="Salvar"
             size="sm"
             loading={salvando}
-            disabled={!podeSalvar || salvando}
+            disabled={Boolean(props.salvarBloqueado) || !podeSalvar || salvando}
             onPress={() => salvar(false)}
           />
         }
@@ -552,7 +555,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
         <PaymentMethodField value={form.paymentMethod ?? null} onChange={(paymentMethod) => setForm({ ...form, paymentMethod })} error={erroPagamento ?? undefined} />
         <Field label="Conta que paga" error={accounts.isError ? 'Não consegui carregar suas contas. Tente novamente.' : undefined}
           hint={erroPagamento && contaEscolhida ? `Conta escolhida: ${contaEscolhida.name}. Escolha uma conta compatível ou mude a forma de pagamento.` : undefined}>
-          <AccountPicker accounts={pagadoras} value={form.accountId} selectedAccount={contaEscolhida} onChange={(accountId: string | null) => setForm({ ...form, accountId })} emptyLabel="Não informar" />
+          <OriginAccountPicker paymentMethod={form.paymentMethod} excludeCredit accounts={pagadoras} value={form.accountId} selectedAccount={contaEscolhida} onChange={(accountId: string | null) => setForm({ ...form, accountId })} emptyLabel="Não informar" />
         </Field>
         {/*
           `Chip` é filtro de lista — muitos, ligáveis, resposta imediata. Aqui são cinco
@@ -758,7 +761,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
             variant="secondary"
             block
             label="Salvar e criar outro"
-            disabled={!podeSalvar || salvando}
+            disabled={Boolean(props.salvarBloqueado) || !podeSalvar || salvando}
             onPress={() => salvar(true)}
           />
         ) : null}

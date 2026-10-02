@@ -11,7 +11,7 @@ import { paymentMethodAccounts, paymentMethodError } from '@/lib/payment-method'
  */
 import { CategoryPicker } from '@/components/finance/category-picker';
 import { MudancaSuave, Presenca } from '@/components/motion/presenca';
-import { AccountPicker } from '@/components/finance/account-picker';
+import { OriginAccountPicker } from '@/components/finance/origin-creation-host';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
@@ -32,7 +32,7 @@ export function CamposDaSerie({
 }: {
   form: SerieForm;
   onChange: (form: SerieForm) => void;
-  contas: Parameters<typeof AccountPicker>[0]['accounts'];
+  contas: Parameters<typeof OriginAccountPicker>[0]['accounts'];
   /** Editando, o nome da data: "Próximo vencimento" na série; "Vence em" na ocorrência. */
   rotuloDaData?: string;
 }) {
@@ -94,7 +94,8 @@ export function CamposDaSerie({
       <PaymentMethodField value={form.paymentMethod} onChange={(paymentMethod) => onChange({ ...form, paymentMethod })} error={!origem ? erroMetodo ?? undefined : undefined} />
 
       <Field label="Conta" error={origem ? erroMetodo ?? undefined : undefined} hint={origem && erroMetodo ? `Origem selecionada: ${origem.name}` : undefined}>
-        <AccountPicker
+        <OriginAccountPicker
+          paymentMethod={form.paymentMethod}
           accounts={paymentMethodAccounts(form.paymentMethod, contas)}
           value={form.accountId}
           selectedAccount={origem}

@@ -1386,13 +1386,12 @@ test('Pagamento de dívida não troca de tipo, não vira "vou pagar depois" nem 
   assert.doesNotMatch(fonte, /salvarDivida\.mutate\(/, 'sem duas gravações sequenciais');
 });
 
-test('Formulário de lançamento só diz "Cadastrar uma conta" com as contas carregadas e vazias', () => {
-  // 25/09/2026, no s26: abrindo o formulário, o campo Conta mostrava "Cadastrar uma conta" até a
-  // consulta chegar — afirmar vazio exige a consulta respondida (frontend.md), e o botão levava
-  // para outra tela quem tem contas.
+test('Formulário distingue consulta pendente/erro antes de oferecer o seletor com cadastro contextual', () => {
+  // F02 oferece criação no seletor tanto vazio como preenchido. Carregar/erro continuam
+  // distintos do vazio; o cadastro conserva o lançamento em vez de abrir outra rota.
   const fonte = readFileSync(join(SRC, 'components/finance/formulario-do-lancamento.tsx'), 'utf8');
-  // A ordem é o que conta: carregando → esqueleto; erro → tentar de novo; só então o vazio.
-  assert.match(fonte, /contas\.isPending \? \(\s*<Skeleton[\s\S]{0,200}?contas\.isError \? \([\s\S]{0,200}?\(accounts \?\? \[\]\)\.length === 0 \? \(/);
+  assert.match(fonte, /contas\.isPending \? \(\s*<Skeleton[\s\S]{0,200}?contas\.isError \? \([\s\S]{0,200}?<OriginAccountPicker/);
+  assert.doesNotMatch(fonte, /router\.push\('\/finance\/accounts\?create=1'\)/);
 });
 
 test('Formulário aberto por link remonta quando o registro muda (key pelo id)', () => {

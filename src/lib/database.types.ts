@@ -2973,6 +2973,10 @@ export type Database = {
             }
             Returns: Json
           }
+      create_account: {
+        Args: { p_input: Json; p_request_id: string }
+        Returns: Json
+      }
       create_installment_plan: {
         Args: {
           p_account_id: string

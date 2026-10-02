@@ -22,6 +22,7 @@ function component(file: string) {
     require: (id: string) => {
       if (id === 'react/jsx-runtime') return { jsx: (type: string, props: Node['props']) => ({ type, props }), jsxs: (type: string, props: Node['props']) => ({ type, props }), Fragment: 'Fragment' };
       if (id === 'react') return { useState: (value: unknown) => [value, () => {}] };
+      if (id === '@/components/finance/origin-creation-host') return { OriginAccountPicker: 'AccountPicker' };
       if (id === '@/design/tokens') return { Space: { lg: 16 } };
       if (id.startsWith('@/lib/')) return libs[id.slice(6)] ?? {};
       return new Proxy({}, { get: (_, key) => String(key) });

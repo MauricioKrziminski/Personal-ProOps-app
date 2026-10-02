@@ -1,0 +1,11 @@
+{
+  "environment": "iPad QA staging",
+  "device": "1CA89C1F-D8AF-4606-8BD2-51F978CA5AFA",
+  "preference": {
+    "original": "0",
+    "enabled": "1",
+    "after-test": "1",
+    "restored": "0"
+  },
+  "app_relaunched_after_enable": true
+}
