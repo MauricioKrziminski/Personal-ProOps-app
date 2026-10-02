@@ -771,18 +771,24 @@ export type Database = {
           debt_id: string
           due_date: string | null
           installment_no: number
+          payment_method: string | null
+          payment_method_set: boolean
         }
         Insert: {
           amount_cents?: number | null
           debt_id: string
           due_date?: string | null
           installment_no: number
+          payment_method?: string | null
+          payment_method_set?: boolean
         }
         Update: {
           amount_cents?: number | null
           debt_id?: string
           due_date?: string | null
           installment_no?: number
+          payment_method?: string | null
+          payment_method_set?: boolean
         }
         Relationships: [
           {
@@ -813,6 +819,7 @@ export type Database = {
           payment_category: string | null
           payment_description: string | null
           payment_merchant: string | null
+          payment_method: string | null
           principal_cents: number
           remaining_cents: number
           started_at: string
@@ -838,6 +845,7 @@ export type Database = {
           payment_category?: string | null
           payment_description?: string | null
           payment_merchant?: string | null
+          payment_method?: string | null
           principal_cents: number
           remaining_cents: number
           started_at?: string
@@ -863,6 +871,7 @@ export type Database = {
           payment_category?: string | null
           payment_description?: string | null
           payment_merchant?: string | null
+          payment_method?: string | null
           principal_cents?: number
           remaining_cents?: number
           started_at?: string
@@ -1183,6 +1192,7 @@ export type Database = {
           merchant: string | null
           nature: string | null
           occurred_at: string
+          payment_method: string | null
           raw: Json | null
           status: string
           suggested_account_id: string | null
@@ -1207,6 +1217,7 @@ export type Database = {
           merchant?: string | null
           nature?: string | null
           occurred_at: string
+          payment_method?: string | null
           raw?: Json | null
           status?: string
           suggested_account_id?: string | null
@@ -1231,6 +1242,7 @@ export type Database = {
           merchant?: string | null
           nature?: string | null
           occurred_at?: string
+          payment_method?: string | null
           raw?: Json | null
           status?: string
           suggested_account_id?: string | null
@@ -1275,10 +1287,12 @@ export type Database = {
           category: string | null
           created_at: string
           description: string | null
+          edit_revision: number
           first_occurred_at: string
           id: string
           installments: number
           merchant: string | null
+          payment_method: string | null
           total_cents: number
           updated_at: string | null
           user_id: string
@@ -1289,10 +1303,12 @@ export type Database = {
           category?: string | null
           created_at?: string
           description?: string | null
+          edit_revision?: number
           first_occurred_at: string
           id?: string
           installments: number
           merchant?: string | null
+          payment_method?: string | null
           total_cents: number
           updated_at?: string | null
           user_id: string
@@ -1303,10 +1319,12 @@ export type Database = {
           category?: string | null
           created_at?: string
           description?: string | null
+          edit_revision?: number
           first_occurred_at?: string
           id?: string
           installments?: number
           merchant?: string | null
+          payment_method?: string | null
           total_cents?: number
           updated_at?: string | null
           user_id?: string
@@ -1792,6 +1810,7 @@ export type Database = {
           materialized_until: string | null
           merchant: string | null
           next_run_at: string
+          payment_method: string | null
           rrule: string
           run_attempts: number
           updated_at: string
@@ -1816,6 +1835,7 @@ export type Database = {
           materialized_until?: string | null
           merchant?: string | null
           next_run_at: string
+          payment_method?: string | null
           rrule: string
           run_attempts?: number
           updated_at?: string
@@ -1840,6 +1860,7 @@ export type Database = {
           materialized_until?: string | null
           merchant?: string | null
           next_run_at?: string
+          payment_method?: string | null
           rrule?: string
           run_attempts?: number
           updated_at?: string
@@ -2055,7 +2076,9 @@ export type Database = {
           merchant: string | null
           occurred_at: string
           paid_at: string | null
+          payment_method: string | null
           pays_invoice_id: string | null
+          pix_fee_for_transaction_id: string | null
           recurring_id: string | null
           rollover_of_invoice_id: string | null
           source: string
@@ -2091,7 +2114,9 @@ export type Database = {
           merchant?: string | null
           occurred_at?: string
           paid_at?: string | null
+          payment_method?: string | null
           pays_invoice_id?: string | null
+          pix_fee_for_transaction_id?: string | null
           recurring_id?: string | null
           rollover_of_invoice_id?: string | null
           source?: string
@@ -2127,7 +2152,9 @@ export type Database = {
           merchant?: string | null
           occurred_at?: string
           paid_at?: string | null
+          payment_method?: string | null
           pays_invoice_id?: string | null
+          pix_fee_for_transaction_id?: string | null
           recurring_id?: string | null
           rollover_of_invoice_id?: string | null
           source?: string
@@ -2191,6 +2218,13 @@ export type Database = {
             columns: ["pays_invoice_id"]
             isOneToOne: false
             referencedRelation: "card_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_pix_fee_for_transaction_id_fkey"
+            columns: ["pix_fee_for_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
             referencedColumns: ["id"]
           },
           {
@@ -2986,6 +3020,10 @@ export type Database = {
         }
         Returns: Json
       }
+      create_recurring_payment: {
+        Args: { p_input: Json; p_request_id: string }
+        Returns: Json
+      }
       cycle_lines: {
         Args: { p_month: string; p_view?: string }
         Returns: {
@@ -3176,6 +3214,24 @@ export type Database = {
           installments_total: number
           kind: string
           origin: string
+          ref_id: string
+          status: string
+        }[]
+      }
+      ledger_expected_lines_payment: {
+        Args: { p_from: string; p_recurring_id?: string; p_to: string }
+        Returns: {
+          account_id: string
+          amount_cents: number
+          category: string
+          description: string
+          due_date: string
+          inferred_start: boolean
+          installment_no: number
+          installments_total: number
+          kind: string
+          origin: string
+          payment_method: string | null
           ref_id: string
           status: string
         }[]
@@ -3391,6 +3447,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      save_transaction_payment: {
+        Args: {
+          p_expected_revision: number | null
+          p_fee_cents: number | null
+          p_input: Json
+          p_request_id: string
+          p_transaction_id: string | null
+        }
+        Returns: Json
+      }
       settle_invoice: {
         Args: { p_invoice_id: string; p_paid_at?: string }
         Returns: string
@@ -3501,6 +3567,10 @@ export type Database = {
           p_plan_id: string
           p_total_cents: number
         }
+        Returns: number
+      }
+      update_installment_plan_payment: {
+        Args: { p_input: Json }
         Returns: number
       }
       update_installment_scope: {
@@ -3694,7 +3764,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: { Enums: {} },
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

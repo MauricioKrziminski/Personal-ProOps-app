@@ -3,7 +3,23 @@
 Registro, não regra: o que está em cada banco HOJE se confere na fonte (`CLAUDE.md`, *Banco e
 fila*). Entradas movidas do `CLAUDE.md` em 26/09/2026, na ordem em que estavam lá.
 
-**Produção e staging ALINHADOS em `20260930164920`** — promoção da entrada de compras
+**Só no STAGING: `20261002134032_payment_methods.sql`** — aplicada em 02/10/2026 no projeto
+`utkqoiigimqzeenxkxdl`, após `supabase-target.sh` e dry run com somente essa migration,
+sem roles ou seeds. F01 adiciona método de pagamento independente de conta/status, revisões e
+RPCs atômicas/idempotentes de lançamento com taxa Pix explicitamente vinculada e de criação
+recorrente. Adapta compra, entrada, conversão, importação, edição com alcance e projeção,
+preservando os contratos anteriores e o histórico por data. Cores privados revogados e
+portas públicas autenticadas; nenhuma mudança remota foi feita em produção nesta execução.
+
+Antes da aplicação, a migration exata e `payment_methods.sql` passaram em transação com
+rollback, assim como as 18 suítes de regressão financeira selecionadas. SHA-256 da migration:
+`01a54fd1f3ca6f0eadeb7aa37f5e80bc0d56a0721cad75c62dfb25a5632a17cd`.
+Tipos gerados diretamente do staging, com nulabilidade SQL aceita preservada (o gerador não
+expressa argumentos nullable de função). Testes nativos e aceite ainda em curso; evidência em
+`docs/qa/2026-10-02-evolucao-financeira/`. Agente e app não foram publicados; promoção para
+produção depende de uma etapa futura de release.
+
+**Histórico: produção e staging ALINHADOS em `20260930164920`** — promoção da entrada de compras
 explicitamente autorizada pelo Gabriel em 01/10/2026 para a v1.6.0. O dry run mostrou somente
 `20260930164920_purchase_down_payment.sql`; aplicada com
 `--project-ref kwriuifcwyvdrxtspjiz --skip-vault --yes`, sem seed e sem trocar o link local de

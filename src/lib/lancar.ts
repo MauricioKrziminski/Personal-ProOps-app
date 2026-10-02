@@ -3,6 +3,7 @@
  * as opções da pergunta de conversão — pura, para as três telas e o teste lerem a mesma coisa.
  */
 import { dataLocalDe } from './dates.ts';
+import type { PaymentMethod } from './payment-method.ts';
 import type { RegistroSimulado } from './hipotese.ts';
 
 export type TipoDeLancamento = 'uma' | 'recorrente' | 'financiamento';
@@ -15,6 +16,7 @@ export type Comum = {
   categoria: string | null;
   /** Lançamento e série têm; o financiamento não. */
   estabelecimento?: string;
+  paymentMethod?: PaymentMethod | null;
 };
 export type OrigemDaConversao = { tipo: 'transacao' | 'serie' | 'plano' | 'divida'; id: string; papel: 'avulsa' | 'ocorrencia' | 'parcela' | 'pagamento' | 'registro'; temPassado: boolean };
 export type Alcance = 'so_esta' | 'desta_em_diante' | 'todas' | 'manter' | 'converter';
@@ -92,9 +94,9 @@ export function papelDaTransacao(tx: { recurring_id?: string | null; installment
 
 /** Editar um lançamento que se tem à mão: o avulso não tem passado, os outros o hospedeiro pergunta. */
 export function hrefDoLancamento(
-  tx: { id: string; recurring_id?: string | null; installment_plan_id?: string | null; debt_id?: string | null },
+  tx: { id: string; recurring_id?: string | null; installment_plan_id?: string | null; debt_id?: string | null; pix_fee_for_transaction_id?: string | null },
   extra: Record<string, string> = {},
 ) {
   const papel = papelDaTransacao(tx);
-  return hrefDoLancar('uma', { id: tx.id, origem: 'transacao', papel, ...(papel === 'avulsa' ? { passado: '0' } : {}), ...extra });
+  return hrefDoLancar('uma', { id: tx.pix_fee_for_transaction_id ?? tx.id, origem: 'transacao', papel, ...(papel === 'avulsa' ? { passado: '0' } : {}), ...extra });
 }

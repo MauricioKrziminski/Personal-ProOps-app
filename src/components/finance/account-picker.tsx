@@ -50,12 +50,15 @@ export type PickableAccount = {
 export function AccountPicker({
   accounts,
   value,
+  selectedAccount,
   onChange,
   emptyLabel,
   placeholder = 'Escolher conta',
 }: {
   accounts: readonly PickableAccount[];
   value: string | null;
+  /** Conta do rascunho, obtida da lista completa antes de filtrar as alternativas. */
+  selectedAccount?: PickableAccount | null;
   onChange: (id: string | null) => void;
   /**
    * Rótulo da opção "sem conta". Omitido, a opção não existe — é o caso da
@@ -70,6 +73,7 @@ export function AccountPicker({
     <SelectField
       options={opcoes}
       value={value}
+      selectedOption={selectedAccount ? accountSelectOptions([selectedAccount])[0] : null}
       onChange={onChange}
       placeholder={emptyLabel ?? placeholder}
     />

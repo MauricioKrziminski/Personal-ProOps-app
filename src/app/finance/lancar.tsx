@@ -13,6 +13,7 @@ import { useConverterRegistro, useDebts, useInstallmentPlan, useTransaction } fr
 import { usePurchaseDownPayment } from '@/hooks/use-down-payment';
 import { isoToBR, localISODate } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
+import { normalizePaymentMethod } from '@/lib/payment-method';
 import type { RegistroSimulado } from '@/lib/hipotese';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import {
@@ -54,6 +55,7 @@ export default function LancarScreen() {
     contaId: p.conta ?? p.account ?? null,
     dataBR: p.data ?? p.start ?? isoToBR(localISODate()),
     categoria: p.category || null,
+    ...(p.paymentMethod !== undefined ? { paymentMethod: normalizePaymentMethod(p.paymentMethod) } : {}),
   }));
   /** O que foi digitado em cada tipo antes de a pessoa trocar para outro. */
   const [estados, setEstados] = useState<Partial<Record<TipoDeLancamento, unknown>>>({});
@@ -214,7 +216,7 @@ export default function LancarScreen() {
             key={`fin:${geracao}`}
             {...base}
             pagamentoConvertido={transacao.data?.status === 'cleared'}
-            dadosDoAplicar={doAplicar && p.deHipotese ? { parcela: p.parcela, parcelas: p.parcelas, conta: p.conta, data: p.data } : undefined}
+            dadosDoAplicar={doAplicar && p.deHipotese ? { parcela: p.parcela, parcelas: p.parcelas, conta: p.conta, data: p.data, paymentMethod: p.paymentMethod } : undefined}
           />
         )}
         </TrocaSuave>

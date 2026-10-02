@@ -1614,22 +1614,26 @@ test('Juros do Pix no crédito também se edita: abre com o juro que nasceu junt
   const fonte = readFileSync(join(SRC, 'components/finance/formulario-do-lancamento.tsx'), 'utf8');
   assert.doesNotMatch(fonte, /const mostraJuros = [^;]*!editing &&/, 'o campo não some na edição');
   assert.match(fonte, /fee_cents: jurosDoPix\?\.amount_cents \?\?/);
-  assert.match(fonte, /juros: editing && mostraJuros \? \{ id: jurosDoPix\?\.id \?\? null, cents: values\.fee_cents \}/);
+  assert.match(fonte, /Boolean\(jurosDoPix\)/, 'taxa existente continua visível até ser zerada explicitamente');
+  assert.match(fonte, /juros: editing && \(mostraJuros \|\| jurosDoPix\)/);
   const hook = readFileSync(join(SRC, 'hooks/use-finance.ts'), 'utf8');
-  assert.match(hook, /export function useJurosDoPix/);
+  const consulta = hook.split('export function useJurosDoPix')[1].split('export function useSaveTransaction')[0];
+  assert.match(consulta, /\.eq\('pix_fee_for_transaction_id', tx!\.id\)/);
+  assert.doesNotMatch(consulta, /\.eq\('(invoice_id|account_id|occurred_at|description)'/, 'não adota uma taxa pelo nome, conta ou dia');
 });
 
 test('Pix no crédito para conta própria: a transferência do cartão tem juro, e ele é despesa no cartão', () => {
   // 28/09/2026: o Pix de R$ 340 do cartão para o Itaú, com R$ 16,99 de juro, não era representável.
   const fonte = readFileSync(join(SRC, 'components/finance/formulario-do-lancamento.tsx'), 'utf8');
-  assert.match(fonte, /const mostraJuros =\s*isCard && \(kind === 'expense' \|\| kind === 'transfer'\)/);
+  assert.match(fonte, /isCard && paymentMethod === 'pix' && \(kind === 'expense' \|\| kind === 'transfer'\)/);
   const hook = readFileSync(join(SRC, 'hooks/use-finance.ts'), 'utf8');
   // As linhas do lançamento moram em `escrita.ts` (29/09/2026), a mesma função da hipótese.
   const escrita = readFileSync(join(SRC, 'lib/escrita.ts'), 'utf8');
   // copiado de uma transferência, o juro herdaria o tipo e o destino — e viraria dinheiro movido
   assert.match(escrita, /function linhaDeJuros[\s\S]{0,200}?kind: 'expense' as const,\s*counterparty_account_id: null,/);
   assert.match(escrita, /if \(fee_cents && fee_cents > 0 && input\.kind !== 'income'\) \{?\s*linhas\.push\(linhaDeJuros\(/);
-  assert.match(hook, /linhasDoLancamento\(\{ \.\.\.input, fee_cents \}\)/, 'o hook grava as linhas da escrita');
+  assert.match(hook, /rpc\('save_transaction_payment'/, 'compra e taxa pertencem à mesma operação atômica');
+  assert.match(hook, /p_fee_cents: juros\?\.cents \?\? fee_cents \?\? null/);
   assert.match(hook, /tx\?\.invoice_id && contaNaFatura\(tx\.kind\)/, 'a edição acha o juro do Pix também');
   // a fatura soma o que a lista mostra: despesa E a transferência que sai do cartão
   for (const arquivo of ['app/finance/invoice/[id].tsx', 'components/finance/invoice-dock.tsx']) {

@@ -5,12 +5,13 @@
  * byte, o que é aplicado. `user_id` fica de fora — o hook põe o da sessão, e `simular` põe
  * `auth.uid()` no banco.
  */
+import { assertPaymentMethod, type PaymentMethod } from './payment-method.ts';
 import type { Debt, TransactionInput } from '@/hooks/use-finance';
 import type { DownPaymentInput } from './down-payment.ts';
 
 export const DESCRICAO_JUROS_DO_PIX = 'Juros do Pix no crédito';
 
-export type EntradaLancamento = TransactionInput & { fee_cents?: number };
+export type EntradaLancamento = TransactionInput & { fee_cents?: number; payment_method?: PaymentMethod | null };
 export type EntradaParcelada = {
   accountId: string;
   totalCents: number;
@@ -22,8 +23,10 @@ export type EntradaParcelada = {
   merchant: string | null;
   lastDay?: boolean;
   downPayment?: DownPaymentInput;
+  paymentMethod?: PaymentMethod | null;
 };
 export type EntradaRecorrente = {
+  payment_method?: PaymentMethod | null;
   kind: 'expense' | 'income';
   amount_cents: number;
   description: string | null;
@@ -36,6 +39,7 @@ export type EntradaRecorrente = {
   auto_confirm: boolean;
 };
 export type EntradaFinanciamento = {
+  payment_method?: PaymentMethod | null;
   name: string;
   kind: Debt['kind'];
   calculation_mode?: Debt['calculation_mode'];
@@ -68,18 +72,32 @@ export function linhaDeJuros<T extends Record<string, unknown>>(base: T, cents: 
 }
 
 export function linhasDoLancamento({ fee_cents, ...input }: EntradaLancamento): Record<string, unknown>[] {
+  assertPaymentMethod(input.payment_method);
   const compra = { ...input, source: 'app' as const };
   const linhas: Record<string, unknown>[] = [compra];
   if (fee_cents && fee_cents > 0 && input.kind !== 'income') linhas.push(linhaDeJuros(compra, fee_cents));
   return linhas;
 }
 
+/** Canonical conversion/simulation destination: the server links the fee atomically to its owner. */
+export function dadosDoLancamento({ fee_cents, ...input }: EntradaLancamento): {
+  linhas: Record<string, unknown>[];
+  fee_cents?: number;
+} {
+  return {
+    linhas: linhasDoLancamento(input),
+    ...(input.kind !== 'income' && fee_cents && fee_cents > 0 ? { fee_cents } : {}),
+  };
+}
+
 export function argsDaParcelada(e: EntradaParcelada) {
+  assertPaymentMethod(e.paymentMethod);
   return {
     rpc: (e.lastDay ? 'create_installment_plan_last_day' : 'create_installment_plan_with_history') as
       | 'create_installment_plan_last_day'
       | 'create_installment_plan_with_history',
     args: {
+      ...(e.paymentMethod !== undefined ? { p_payment_method: e.paymentMethod } : {}),
       p_account_id: e.accountId,
       p_total_cents: e.totalCents,
       p_installments: e.installments,
@@ -93,11 +111,13 @@ export function argsDaParcelada(e: EntradaParcelada) {
 }
 
 export function linhaDaRecorrente(e: EntradaRecorrente): Record<string, unknown> {
+  assertPaymentMethod(e.payment_method);
   // âncora da série: sem ela a hora de parede deriva a cada rodada do cron
   return { ...e, dtstart: e.next_run_at };
 }
 
 export function linhaDoFinanciamento(e: EntradaFinanciamento): Record<string, unknown> {
+  assertPaymentMethod(e.payment_method);
   const { ...linha } = e as EntradaFinanciamento & { id?: string; versao?: string | null };
   delete (linha as { id?: string }).id;
   delete (linha as { versao?: string | null }).versao;

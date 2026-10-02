@@ -1,7 +1,8 @@
+import { assertPaymentMethod, type PaymentMethod } from './payment-method.ts';
 import { brToISO, isValidBRDate } from './dates.ts';
 
-export type DownPaymentForm = { amountCents: number; dateBR: string; accountId: string | null };
-export type DownPaymentInput = { amount_cents: number; occurred_at: string; account_id: string };
+export type DownPaymentForm = { amountCents: number; dateBR: string; accountId: string | null; paymentMethod?: PaymentMethod | null };
+export type DownPaymentInput = { amount_cents: number; occurred_at: string; account_id: string; payment_method?: PaymentMethod | null };
 
 /** O contrato contém só prestações; a entrada é um movimento separado, nunca parcela nº 1. */
 export function purchaseAmounts(valueCents: number, unit: 'total' | 'parcela', installments: number, downPaymentCents = 0) {
@@ -23,7 +24,8 @@ export function downPaymentError(form: DownPaymentForm, today: string): string |
 }
 
 export function downPaymentInput(form: DownPaymentForm, today: string): DownPaymentInput {
+  assertPaymentMethod(form.paymentMethod);
   const error = downPaymentError(form, today);
   if (error) throw new Error(error);
-  return { amount_cents: form.amountCents, occurred_at: brToISO(form.dateBR), account_id: form.accountId! };
+  return { amount_cents: form.amountCents, occurred_at: brToISO(form.dateBR), account_id: form.accountId!, ...(form.paymentMethod !== undefined ? { payment_method: form.paymentMethod } : {}) };
 }

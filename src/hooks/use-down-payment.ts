@@ -15,7 +15,7 @@ export function usePurchaseDownPayment(type: PurchaseType, parentId?: string) {
     enabled: Boolean(parentId),
     queryFn: async () => {
       const { data, error } = await supabase.from('transactions')
-        .select('id, amount_cents, occurred_at, account_id, status, description')
+        .select('id, amount_cents, occurred_at, account_id, status, description, payment_method')
         .eq(type === 'financiamento' ? 'down_payment_debt_id' : 'down_payment_plan_id', parentId!)
         .maybeSingle();
       if (error) throw error;

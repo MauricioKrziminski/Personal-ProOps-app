@@ -1,0 +1,190 @@
+{
+  "cases": [
+    {
+      "platform": "iOS",
+      "case": "financiamento-criado",
+      "uuid": "fa702f17-f154-4dfb-a0df-94f4441d6497",
+      "amount_cents": 38697,
+      "payment_method": "boleto",
+      "installment_cents": 12899,
+      "installments": 3,
+      "first_due_date": "2026-10-03",
+      "origin": "584ef2de-431f-4a57-88cf-e1a38c8c1e56",
+      "source_case": "proops-f01-ios-financing-proof.json"
+    },
+    {
+      "platform": "iOS",
+      "case": "salvar-e-criar-outro",
+      "uuid": "3cac5186-bbed-4e9e-930c-cc742478f8c5",
+      "amount_cents": 1276,
+      "status": "cleared",
+      "payment_method": "pix",
+      "origin": "584ef2de-431f-4a57-88cf-e1a38c8c1e56",
+      "source_case": "proops-f01-ios-another-proof.json"
+    },
+    {
+      "platform": "iOS",
+      "case": "conversao-pontual-para-recorrente",
+      "uuid": "9c791e73-e8ed-417f-8227-8546a99fd04c",
+      "amount_cents": 23456,
+      "status": "cleared",
+      "payment_method": "pix",
+      "recurring_fk": "cb5818fd-c49f-44a8-a3aa-d18219fe7155",
+      "origin": "584ef2de-431f-4a57-88cf-e1a38c8c1e56",
+      "source_case": "proops-f01-post-conversion.json"
+    },
+    {
+      "platform": "Android",
+      "case": "recorrencia-criada-duplo-toque",
+      "uuid": "f4984d34-771f-479c-99da-cbac98a14228",
+      "amount_cents": 3210,
+      "payment_method": "boleto",
+      "rrule": "FREQ=MONTHLY;BYMONTHDAY=2",
+      "edit_revision": 1,
+      "origin": "584ef2de-431f-4a57-88cf-e1a38c8c1e56",
+      "source_case": "proops-f01-android-recurring-created-proof.json"
+    },
+    {
+      "platform": "Android",
+      "case": "recorrencia-so-esta-e-materializacao-trimestre",
+      "uuid": "f4984d34-771f-479c-99da-cbac98a14228",
+      "edit_revision": 2,
+      "occurrences": [
+        {"uuid": "f95b00ac-36d8-4dcd-9a92-7010af9f8206", "amount_cents": 3210, "payment_method": "debit", "status": "cleared", "occurred_at": "2026-10-02"},
+        {"uuid": "e76276d4-5e71-4437-8c7c-837c9006483e", "amount_cents": 3210, "payment_method": "boleto", "status": "pending", "occurred_at": "2026-11-02"},
+        {"uuid": "ae605f31-7565-4cb5-8b24-9d8df305925a", "amount_cents": 3210, "payment_method": "boleto", "status": "pending", "occurred_at": "2026-12-02"}
+      ],
+      "default_payment_method": "boleto",
+      "origin": "584ef2de-431f-4a57-88cf-e1a38c8c1e56",
+      "source_case": "proops-f01-android-one-proof.json"
+    },
+    {
+      "platform": "Android",
+      "case": "recorrencia-esta-e-proximas",
+      "uuid": "f4984d34-771f-479c-99da-cbac98a14228",
+      "edit_revision": 4,
+      "occurrences": [
+        {"uuid": "f95b00ac-36d8-4dcd-9a92-7010af9f8206", "amount_cents": 3210, "payment_method": "debit", "status": "cleared", "occurred_at": "2026-10-02"},
+        {"uuid": "e76276d4-5e71-4437-8c7c-837c9006483e", "amount_cents": 3210, "payment_method": "pix", "status": "pending", "occurred_at": "2026-11-02"},
+        {"uuid": "ae605f31-7565-4cb5-8b24-9d8df305925a", "amount_cents": 3210, "payment_method": "pix", "status": "pending", "occurred_at": "2026-12-02"}
+      ],
+      "default_payment_method": "pix",
+      "source_case": "proops-f01-android-future-proof.json"
+    },
+    {
+      "platform": "Android",
+      "case": "recorrencia-todas-inclusive-passadas",
+      "uuid": "f4984d34-771f-479c-99da-cbac98a14228",
+      "edit_revision": 6,
+      "occurrences": [
+        {"uuid": "f95b00ac-36d8-4dcd-9a92-7010af9f8206", "amount_cents": 3210, "payment_method": "bank_transfer", "status": "cleared", "occurred_at": "2026-10-02"},
+        {"uuid": "e76276d4-5e71-4437-8c7c-837c9006483e", "amount_cents": 3210, "payment_method": "bank_transfer", "status": "pending", "occurred_at": "2026-11-02"},
+        {"uuid": "ae605f31-7565-4cb5-8b24-9d8df305925a", "amount_cents": 3210, "payment_method": "bank_transfer", "status": "pending", "occurred_at": "2026-12-02"}
+      ],
+      "default_payment_method": "bank_transfer",
+      "source_case": "proops-f01-android-all-proof.json"
+    },
+    {
+      "platform": "Android",
+      "case": "parcelamento-entrada-independente",
+      "plan_uuid": "7f580613-441e-4115-b4dc-bc7813007c2f",
+      "installments": [
+        {"uuid": "eeb3aea0-1029-4138-9a68-2a579c1a26a8", "amount_cents": 2667, "payment_method": "boleto", "status": "cleared", "occurred_at": "2026-10-01"},
+        {"uuid": "ff7ea8ac-0881-46e1-bbba-6069b218190b", "amount_cents": 2667, "payment_method": "boleto", "status": "pending", "occurred_at": "2026-11-01"},
+        {"uuid": "b20a198f-5212-4dda-95f5-87d40e965e5f", "amount_cents": 2668, "payment_method": "boleto", "status": "pending", "occurred_at": "2026-12-01"}
+      ],
+      "down_payment": {"uuid": "f8024dcb-da9a-49cb-ad59-7c28f1d9b9bf", "amount_cents": 2000, "kind": "expense", "payment_method": "debit", "status": "cleared", "account": "poupanca", "occurred_at": "2026-10-01", "down_payment_plan_fk": "7f580613-441e-4115-b4dc-bc7813007c2f", "installment_plan_fk": null},
+      "economic_total_cents": 10002,
+      "source_case": "proops-f01-android-parcel-proof.json"
+    },
+    {
+      "platform": "Android",
+      "case": "financiamento-criado",
+      "uuid": "4bb1f8cb-3352-4626-b3a3-d7d165bf2da6",
+      "principal_cents": 38697,
+      "remaining_cents": 38697,
+      "payment_method": "boleto",
+      "installment_cents": 12899,
+      "installments": 3,
+      "installments_paid": 0,
+      "first_due_date": "2026-10-03",
+      "source_case": "proops-f01-android-financing-proof.json"
+    },
+    {
+      "platform": "iOS",
+      "case": "pagamento-de-parcela-do-financiamento",
+      "debt_uuid": "fa702f17-f154-4dfb-a0df-94f4441d6497",
+      "payment_uuid": "608d612e-3bcd-4c19-aa16-689afc8078fe",
+      "amount_cents": 12899,
+      "payment_method": "boleto",
+      "kind": "expense",
+      "status": "cleared",
+      "paid_at": "2026-10-02",
+      "installments_paid": 1,
+      "remaining_cents": 25798,
+      "source_case": "proops-f01-ios-debt-payment-proof.json"
+    },
+    {
+      "platform": "Android",
+      "case": "troca-de-formato-cancelada-sem-persistencia",
+      "description": "QA F01 ANDROID troca 20261002",
+      "amount_cents": 4567,
+      "payment_method": "boleto",
+      "origin": "584ef2de-431f-4a57-88cf-e1a38c8c1e56",
+      "visible_after_round_trip": ["uma vez", "recorrente", "financiamento", "uma vez"],
+      "persisted_records": 0,
+      "persisted_recurring": 0,
+      "persisted_debts": 0,
+      "persisted_plans": 0,
+      "source_case": "proops-f01-android-format-switch-stable-run.log and proops-f01-android-another-proof.json"
+    },
+    {
+      "platform": "Android",
+      "case": "salvar-e-criar-outro",
+      "uuid": "46a48201-0348-4580-8e4b-fccf36448124",
+      "amount_cents": 1276,
+      "kind": "expense",
+      "status": "cleared",
+      "payment_method": "pix",
+      "origin": "584ef2de-431f-4a57-88cf-e1a38c8c1e56",
+      "source_case": "proops-f01-android-another-proof.json"
+    },
+    {
+      "platform": "Android",
+      "case": "conversao-pontual-para-recorrente",
+      "uuid": "1b383566-fa8e-461e-9aaa-bd20a3213683",
+      "amount_cents": 23456,
+      "kind": "expense",
+      "status": "cleared",
+      "payment_method": "pix",
+      "recurring_fk": "6540b6f8-fb10-4fcf-935e-e22bd162ad3d",
+      "origin": "584ef2de-431f-4a57-88cf-e1a38c8c1e56",
+      "series_amount_cents": 23456,
+      "series_payment_method": "pix",
+      "source_case": "proops-f01-android-conversion-proof.json"
+    },
+    {
+      "platform": "Android",
+      "case": "salvar-offline-sem-persistir",
+      "description": "QA F01 ANDROID offline 20261002",
+      "amount_cents": 1457,
+      "payment_method": "pix",
+      "origin": "584ef2de-431f-4a57-88cf-e1a38c8c1e56",
+      "offline_record_count": 0,
+      "source_case": "proops-f01-android-offline-zero-proof.json"
+    },
+    {
+      "platform": "Android",
+      "case": "retry-online-apos-offline",
+      "uuid": "9f1c369e-352b-4193-8f96-ddfd01de4fd1",
+      "amount_cents": 1457,
+      "kind": "expense",
+      "status": "cleared",
+      "payment_method": "pix",
+      "origin": "584ef2de-431f-4a57-88cf-e1a38c8c1e56",
+      "recurring_fk": null,
+      "installment_plan_fk": null,
+      "source_case": "proops-f01-android-offline-retry-proof.json"
+    }
+  ]
+}

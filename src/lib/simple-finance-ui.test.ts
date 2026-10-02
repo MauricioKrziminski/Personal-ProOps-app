@@ -9,6 +9,46 @@ import { telaPronta } from './tela-pronta.ts';
 import { ladosDoArrasto } from './arrasto.ts';
 
 const require = createRequire(import.meta.url);
+// Execute the actual guarded field/payload declarations, without reproducing their rules.
+// The full launch form uses react-hook-form; this isolates the identity regression while
+// keeping both UI visibility and the save payload sourced from the production component.
+function pixFeeFieldAndPayload(editing: Record<string, unknown>) {
+  const path = 'src/components/finance/formulario-do-lancamento.tsx';
+  const source = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const declarations = new Map<string, ts.VariableDeclaration>();
+  const visit = (node: ts.Node) => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) declarations.set(node.name.text, node);
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  const init = (name: string) => {
+    const declaration = declarations.get(name);
+    assert.ok(declaration?.initializer, `production declaration ${name} must exist`);
+    return declaration.initializer.getText(source);
+  };
+  return runInNewContext(`const mostraJuros = ${init('mostraJuros')}; const entradaLancamento = ${init('entradaLancamento')}; ({ mostraJuros, fee: entradaLancamento.fee_cents });`, {
+    editing, jurosDoPix: null, isCard: true, paymentMethod: 'pix', kind: 'expense', installmentCount: 1,
+    DESCRICAO_JUROS_DO_PIX: 'Juros do Pix no crédito', status: 'cleared', dueAt: null, autoConfirm: false,
+    brToISO: (value: string) => value,
+    values: { kind: 'expense', amount_cents: 10000, category: null, description: editing.description,
+      merchant: null, account_id: 'card', payment_method: 'pix', occurred_at: '2026-10-02', fee_cents: 500 },
+  });
+}
+
+test('F01: título de juros no pai mantém campo e taxa no payload; vínculo explícito oculta campo da filha', () => {
+  const parent = pixFeeFieldAndPayload({ description: 'Juros do Pix no crédito', pix_fee_for_transaction_id: null });
+  assert.equal(parent.mostraJuros, true, 'renomear compra não pode ocultar a taxa nem zerar seu payload');
+  assert.equal(parent.fee, 500);
+  const child = pixFeeFieldAndPayload({ description: 'Taxa renomeada', pix_fee_for_transaction_id: 'purchase-renamed' });
+  assert.equal(child.mostraJuros, false, 'filha explícita não oferece taxa da própria taxa');
+  assert.equal(child.fee, 0);
+});
+
+/** A régua das fixtures fica estável quando o teste roda depois de 01/10. */
+const fixtureDate = new Proxy(Date, {
+  construct: (target, args) => Reflect.construct(target, args.length ? args : ['2026-10-01T12:00:00-03:00']),
+  get: (target, key) => key === 'now' ? () => Date.parse('2026-10-01T12:00:00-03:00') : Reflect.get(target, key),
+});
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
@@ -280,7 +320,7 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
       if (!options.executarEfeitos) return;
       const index = cursor++;
       const anterior = efeitos[index];
-      if (!anterior || deps.some((v, i) => !Object.is(v, anterior.deps[i]))) efeitosPendentes.push({ index, fn, deps });
+      if (!anterior || !deps || deps.some((v, i) => !Object.is(v, anterior.deps?.[i]))) efeitosPendentes.push({ index, fn, deps });
     },
     useLayoutEffect: (fn: () => any, deps: any[]): void => { react.useEffect(fn, deps); },
     memo: (componente: unknown) => componente,
@@ -290,7 +330,7 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
   const load = (path: string): any => {
     const module = { exports: {} as any };
     const code = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-    runInNewContext(code, { module, exports: module.exports, performance,
+    runInNewContext(code, { module, exports: module.exports, performance, Date: options.datasReais ? Date : fixtureDate,
       ...(options.controlarTimers ? {
         setTimeout: (fn: () => void) => { const id = ++timerId; timers.set(id, fn); return id; },
         clearTimeout: (id: number) => timers.delete(id),
@@ -333,6 +373,7 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
       if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, Redirect: 'Redirect', useLocalSearchParams: () => options.params ?? (file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), useFocusEffect: () => {}, useIsFocused: () => true, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }), dismissAll: () => navigations.push({ dismissAll: true }), dismiss: (n?: number) => navigations.push({ dismiss: n ?? 1 }), canDismiss: () => !options.primeiraDaPilha, canGoBack: () => !options.primeiraDaPilha } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
+      if (name === '@/lib/payment-method') return load('src/lib/payment-method.ts');
       if (name === '@/components/ui/filter-bar') return load('src/components/ui/filter-bar.tsx');
       if (name === '@/lib/supabase' && file.endsWith('finance/recurring.tsx')) return { supabase: {
         from: () => {
@@ -3196,7 +3237,7 @@ test('Pasta: o "…" renomeia na folha da pasta e move sem ir a Organizar pastas
 test('Série: editar tem os campos da criação, e só o calendário mexido vai com regra e vencimento', async () => {
   // 26/09/2026: *"ao clicar nele e em editar, eu não consigo editar a data de vencimento?? … ter
   // todos os campos de quando eu crio ao editar"*. Repete, a cada, vencimento, tipo e estabelecimento.
-  const hoje = new Date();
+  const hoje = new fixtureDate();
   const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const br = (d: Date) => iso(d).split('-').reverse().join('/');
   const proxima = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 4, 12);
@@ -3547,7 +3588,7 @@ test('Financiamento aberto pelo Aplicar: parcela, parcelas, conta e a próxima p
   const rascunho = JSON.stringify({ versao: 2, adiantamentos: [], hipoteses: [
     { id: 'f', kind: 'expense', forma: 'financiamento', valor_cents: 147000, parcelas: 48, repete: 'monthly', conta: 'cc', data: '2026-10-31' } ] });
   // O que o formulário único entrega ao corpo da dívida vindo do "Aplicar" (o hospedeiro tem teste próprio).
-  const ui = formDivida({ segurarMutacoes: true, preferencias: { 'projecao:rascunho': rascunho } }, {
+  const ui = formDivida({ segurarMutacoes: true, forecastAccounts: [{ id: 'cc', name: 'Itaú', type: 'checking' }], preferencias: { 'projecao:rascunho': rascunho } }, {
     comum: { kind: 'expense', descricao: '', valorCents: 0, contaId: 'cc', dataBR: '31/10/2026', categoria: null },
     deHipotese: 'f', dadosDoAplicar: { parcela: '147000', parcelas: '48', conta: 'cc', data: '31/10/2026' },
   });
@@ -4009,6 +4050,57 @@ test('FormularioDaDivida: convertendo, Salvar entrega o financiamento ao hospede
 });
 
 const lancarFile = 'src/app/finance/lancar.tsx';
+
+test('F01: detalhe da taxa encaminha edição à compra e não cria taxa avulsa pelo menu', () => {
+  const fee = { id: 'fee', kind: 'expense', status: 'cleared', amount_cents: 500, description: 'Juros do Pix no crédito',
+    category: 'juros', account_id: 'card', counterparty_account_id: null, occurred_at: '2026-10-02', created_at: '2026-10-02T12:00:00Z',
+    payment_method: 'pix', pix_fee_for_transaction_id: 'purchase', invoice_id: null, installment_plan_id: null, recurring_id: null, debt_id: null };
+  const ui = screen('src/app/finance/[txId].tsx', { txs: [fee], params: { txId: 'fee' } });
+  const header = ui.nodes().find((n: any) => n.type === 'HeaderActions');
+  ui.interact(() => header.props.actions.find((a: any) => a.label === 'Editar').onPress());
+  assert.equal(ui.navigations.at(-1).params.id, 'purchase');
+  assert.equal(header.props.menu.actions.some((a: any) => ['Duplicar', 'Mudar categoria'].includes(a.label)), false);
+});
+
+test('F01: o link da hipótese entrega a forma de pagamento ao formulário único', () => {
+  const ui = screen(lancarFile, { params: { tipo: 'uma', paymentMethod: 'pix' } });
+  const form = ui.nodes().find((n: any) => n.type === 'FormularioDoLancamento');
+  assert.equal(form.props.comum.paymentMethod, 'pix');
+});
+
+test('F01: aplicar hipótese de financiamento conserva a forma no inicializador específico', () => {
+  const ui = screen(lancarFile, { params: { tipo: 'financiamento', deHipotese: 'h1', parcela: '5000', parcelas: '12', paymentMethod: 'boleto' } });
+  const form = ui.nodes().find((n: any) => n.type === 'FormularioDaDivida');
+  assert.equal(form.props.dadosDoAplicar.paymentMethod, 'boleto');
+});
+
+test('F01: financiamento conserva a forma entre formatos e grava o padrão do contrato', () => {
+  const comum = { kind: 'expense', descricao: 'Carro', valorCents: 5000, contaId: 'cc', dataBR: '06/10/2026', categoria: null, paymentMethod: 'boleto' };
+  const registrados: any[] = [];
+  const ui = formDivida({ executarEfeitos: true, forecastAccounts: [{ id: 'cc', name: 'Itaú', type: 'checking' }] },
+    { comum, registrarComum: (ler: () => any) => registrados.push(ler()) });
+  const escolha = ui.nodes().find((n: any) => n.type === 'PaymentMethodField');
+  assert.equal(escolha?.props.value, 'boleto');
+  ui.fill('Total de parcelas', '12');
+  ui.press('Salvar');
+  assert.equal(ui.writes.at(-1)?.value.payment_method, 'boleto');
+  assert.equal(registrados.at(-1)?.paymentMethod, 'boleto');
+});
+
+test('F01: trocar a forma em financiamento não apaga campos; origem incompatível impede gravação', () => {
+  const comum = { kind: 'expense', descricao: 'Carro', valorCents: 5000, contaId: 'cc', dataBR: '06/10/2026', categoria: null, paymentMethod: 'boleto' };
+  const ui = formDivida({ forecastAccounts: [{ id: 'cc', name: 'Itaú', type: 'checking' }] }, { comum });
+  ui.fill('Total de parcelas', '12');
+  const escolha = ui.nodes().find((n: any) => n.type === 'PaymentMethodField');
+  assert.ok(escolha, 'forma de pagamento disponível');
+  ui.interact(() => escolha.props.onChange('cash'));
+  assert.equal(ui.button('Salvar').props.disabled, true);
+  ui.interact(() => ui.button('Salvar').props.onPress());
+  assert.equal(ui.writes.length, 0);
+  assert.ok(ui.nodes().some((n: any) => n.type === 'TextField' && n.props.value === 'Carro'));
+  assert.ok(ui.nodes().some((n: any) => n.type === 'MoneyField' && n.props.valueCents === 5000));
+  assert.equal(ui.nodes().find((n: any) => n.type === 'AccountPicker')?.props.value, 'cc');
+});
 
 test('Formato do lançamento: abre as três escolhas acessíveis e devolve a escolha ao recolher o menu', () => {
   const escolhas: string[] = [];

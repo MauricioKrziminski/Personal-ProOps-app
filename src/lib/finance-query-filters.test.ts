@@ -150,12 +150,14 @@ test('previsões e resumo sem ambas as bordas não enviam RPC inválida, inclusi
 test('previsoes de janela longa repartem todos os dias em blocos disjuntos de ate 62 dias', async () => {
   const from = '2027-11-01'; const to = '2028-09-30';
   const h = harness(request => ({ data: days(String(request.body.p_from), String(request.body.p_to))
-    .map(due_date => ({ ref_id: 'series-one', due_date, origin: 'recurring' })) }));
+    .map((due_date, i) => ({ ref_id: 'series-one', due_date, origin: 'recurring', payment_method: i % 2 ? null : 'boleto' })) }));
   const query = h.hooks.useExpectedLedgerLines(from, to, true, 'series-one');
   const controller = new AbortController();
   const rows = await query.queryFn({ signal: controller.signal });
   assert.deepEqual(wire(rows.map(r => r.due_date)), days(from, to));
   assert.equal(new Set(rows.map(r => `${r.ref_id}:${r.due_date}`)).size, rows.length);
+  assert.equal(rows[0].payment_method, 'boleto');
+  assert.equal(rows[1].payment_method, null, 'metadata desconhecida não é inferida na leitura');
   assert.ok(h.requests.length > 4, 'janela deve exercitar mais de um lote paralelo');
   const windows = h.requests.map(r => r.body);
   assert.equal(windows[0].p_from, from);
@@ -167,7 +169,7 @@ test('previsoes de janela longa repartem todos os dias em blocos disjuntos de at
   });
   for (const request of h.requests) {
     assert.equal(request.signal, controller.signal);
-    assert.equal(request.url.pathname, '/rest/v1/rpc/ledger_expected_lines');
+    assert.equal(request.url.pathname, '/rest/v1/rpc/ledger_expected_lines_payment');
     assert.equal(request.url.searchParams.get('order'), 'due_date.asc,origin.asc,ref_id.asc');
   }
   assert.equal(query.enabled, true);

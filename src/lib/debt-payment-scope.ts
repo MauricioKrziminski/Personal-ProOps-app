@@ -1,3 +1,5 @@
+import type { PaymentMethod } from './payment-method.ts';
+
 /** Campos do pagamento que a edição com alcance pode aplicar sem alterar a data da baixa. */
 export type DebtPaymentEditable = {
   amount_cents: number;
@@ -6,6 +8,7 @@ export type DebtPaymentEditable = {
   merchant: string | null;
   account_id: string | null;
   occurred_at: string;
+  payment_method?: PaymentMethod | null;
 };
 
 export type DebtPaymentScope = 'one' | 'from_here' | 'all';
@@ -15,6 +18,8 @@ export function debtPaymentPatch(
   newValue: DebtPaymentEditable,
 ): Partial<DebtPaymentEditable> {
   const patch: Partial<DebtPaymentEditable> = {};
+  if ('payment_method' in newValue && (oldValue.payment_method ?? null) !== newValue.payment_method)
+    patch.payment_method = newValue.payment_method;
   for (const field of ['amount_cents', 'category', 'description', 'merchant', 'account_id', 'occurred_at'] as const) {
     if (oldValue[field] !== newValue[field]) {
       // Cada chave conserva o seu tipo e `null` intencional.

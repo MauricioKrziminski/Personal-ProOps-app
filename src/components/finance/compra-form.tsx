@@ -1,3 +1,5 @@
+import { PaymentMethodField } from '@/components/finance/payment-method-field';
+import { paymentMethodAccounts, paymentMethodError } from '@/lib/payment-method';
 /**
  * Os campos de "Editar a compra" num lugar só (26/09/2026, *"uma tela só de editar
  * componentizada… ter todos os campos de quando eu crio ao editar"*). As regras, puras e com
@@ -36,6 +38,8 @@ export function CamposDaCompra({
   contas: Parameters<typeof AccountPicker>[0]['accounts'];
 }) {
   const { travado, tituloOk, totalOk, contaOk, faixa, dataLivre } = validaCompra(form);
+  const origem = contas.find((c) => c.id === form.accountId) ?? null;
+  const erroMetodo = paymentMethodError(form.paymentMethod, origem);
   const motivo = motivoDaTrava(form);
   const nomeDaConta = form.accountId ? (contas.find((c) => c.id === form.accountId)?.name ?? 'Conta') : 'Sem conta';
   const cartao = contas.find((c) => c.id === form.accountId)?.type === 'credit_card';
@@ -86,11 +90,14 @@ export function CamposDaCompra({
         <CategoryPicker value={form.category} onChange={(category) => onChange({ ...form, category })} />
       </Field>
 
-      <Field label="Conta" error={contaOk ? undefined : 'Escolha a conta desta compra'} hint={dataLivre ? undefined : motivo}>
+      <PaymentMethodField value={form.paymentMethod} onChange={(paymentMethod) => onChange({ ...form, paymentMethod })} error={!origem ? erroMetodo ?? undefined : undefined} />
+
+      <Field label="Conta" error={origem && erroMetodo ? erroMetodo : contaOk ? undefined : 'Escolha a conta desta compra'} hint={origem && erroMetodo ? `Origem selecionada: ${origem.name}${motivo ? `. ${motivo}` : ''}` : dataLivre ? undefined : motivo}>
         {dataLivre ? (
           <AccountPicker
-            accounts={contas}
+            accounts={paymentMethodAccounts(form.paymentMethod, contas)}
             value={form.accountId}
+            selectedAccount={origem}
             onChange={(accountId: string | null) => onChange({ ...form, accountId })}
             placeholder="Escolher a conta da compra"
           />

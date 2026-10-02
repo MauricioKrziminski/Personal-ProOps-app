@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import type { CorpoProps } from '@/components/finance/corpo-do-lancar';
 import { Presenca, TrocaSuave } from '@/components/motion/presenca';
 import { AccountPicker } from '@/components/finance/account-picker';
+import { PaymentMethodField } from '@/components/finance/payment-method-field';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { DownPaymentFields } from '@/components/finance/down-payment-fields';
 import { PurchaseDownPayment } from '@/components/finance/purchase-down-payment';
@@ -40,6 +41,7 @@ import { newClientMessageId } from '@/lib/agent-chat';
 import { brToISO, formatNumberBR, isValidBRDate, isoToBR } from '@/lib/dates';
 import { askEditScope } from '@/lib/edit-scope';
 import { linhaDoFinanciamento } from '@/lib/escrita';
+import { normalizePaymentMethod, paymentMethodAccounts, paymentMethodError, type PaymentMethod } from '@/lib/payment-method';
 import {
   camposNoOutroModo,
   debtTerm,
@@ -86,6 +88,7 @@ export interface FormState {
   historyConfirmed: boolean;
   installmentCents: number;
   accountId: string | null;
+  paymentMethod?: PaymentMethod | null;
   /** Parcela fixa: o valor DIGITADO, na unidade escolhida (cada parcela ou total a pagar). */
   unidade: UnidadeDoValor;
   valorCents: number;
@@ -146,7 +149,7 @@ export function ErrorBand({ message, onRetry }: { message: string; onRetry: () =
  * O financiamento a partir da hipótese do "E se…?" (`paramsDoAplicar`): parcela fixa, sem juros
  * digitados, a próxima parcela na data da hipótese. O nome é o que falta — a pessoa dá aqui.
  */
-function formDoAplicar(p: { parcela?: string; parcelas?: string; conta?: string; data?: string }): FormState {
+function formDoAplicar(p: { parcela?: string; parcelas?: string; conta?: string; data?: string; paymentMethod?: string }): FormState {
   const parcela = Math.max(0, Number(p.parcela) || 0);
   const data = p.data && isValidBRDate(p.data) ? p.data : null;
   return {
@@ -157,6 +160,7 @@ function formDoAplicar(p: { parcela?: string; parcelas?: string; conta?: string;
     installmentCents: parcela,
     parcelas: p.parcelas ?? '',
     accountId: p.conta ?? null,
+    paymentMethod: normalizePaymentMethod(p.paymentMethod),
     diaVencimento: data ? String(Number(data.slice(0, 2))) : '',
     ancora: data ? brToISO(data) : null,
   };
@@ -186,13 +190,14 @@ function formDaDivida(d: Debt): FormState {
     historyConfirmed: true,
     installmentCents: Number(d.installment_cents ?? 0),
     accountId: d.account_id,
+    paymentMethod: normalizePaymentMethod(d.payment_method),
     diaVencimento: d.due_day ? String(d.due_day) : '',
   };
 }
 
 type Props = CorpoProps & {
   /** Aberta pelo "Aplicar" de uma hipótese: parcela, parcelas, conta e data dela. */
-  dadosDoAplicar?: { parcela?: string; parcelas?: string; conta?: string; data?: string };
+  dadosDoAplicar?: { parcela?: string; parcelas?: string; conta?: string; data?: string; paymentMethod?: string };
   /** Convertendo um lançamento PAGO: o banco o adota como um pagamento, e as pagas não o somam. */
   pagamentoConvertido?: boolean;
 };
@@ -251,6 +256,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
       valorCents: comum.valorCents,
       installmentCents: comum.valorCents,
       accountId: comum.contaId,
+      paymentMethod: comum.paymentMethod ?? null,
       ancora: data ? brToISO(data) : null,
       diaVencimento: data ? String(Number(data.slice(0, 2))) : '',
     };
@@ -260,7 +266,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   const dicaDoConvertido = converter && props.pagamentoConvertido ? 'O lançamento convertido já conta como uma paga.' : undefined;
 
   useEffect(() => {
-    registrarComum(() => ({ kind: 'expense', descricao: form.name, valorCents: form.valorCents, contaId: form.accountId, dataBR: form.ancora ? isoToBR(form.ancora) : comum.dataBR, categoria: comum.categoria }));
+    registrarComum(() => ({ kind: 'expense', descricao: form.name, valorCents: form.valorCents, contaId: form.accountId, dataBR: form.ancora ? isoToBR(form.ancora) : comum.dataBR, categoria: comum.categoria, paymentMethod: form.paymentMethod ?? null }));
     registrarEstado(() => form);
   });
 
@@ -269,7 +275,11 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   const schedule = useDebtSchedule(form.id);
   const payments = useDebtPayments(form.id);
   const paymentVersions = useDebtPaymentVersions(form.id);
-  const pagadoras = (accounts.data ?? []).filter((a) => a.type !== 'credit_card');
+  const contaEscolhida = accounts.data?.find((a) => a.id === form.accountId) ?? null;
+  const erroPagamento = form.paymentMethod === 'credit' ? 'As parcelas deste financiamento saem de uma conta. Escolha outra forma de pagamento.'
+    : paymentMethodError(form.paymentMethod ?? null, contaEscolhida)
+      ?? (form.accountId && !accounts.isPending && !accounts.isError && !contaEscolhida ? 'Esta conta não está disponível. Escolha outra conta.' : null);
+  const pagadoras = paymentMethodAccounts(form.paymentMethod ?? null, (accounts.data ?? []).filter((a) => a.type !== 'credit_card'));
 
   const fracao = parseTaxa(form.taxa);
   const totalDeParcelas = /^\d+$/.test(form.parcelas) ? Number(form.parcelas) : 0;
@@ -277,7 +287,9 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   const entrada = form.downPayment ?? { amountCents: 0, dateBR: isoToBR(localISODate()), accountId: form.accountId };
   const valorDasParcelas = form.valorCents - (entradaAtiva && form.unidade === 'total' ? entrada.amountCents : 0);
   const erroEntrada = entradaAtiva
-    ? downPaymentError(entrada, localISODate()) ?? (form.calculationMode === 'fixed_installments' && form.unidade === 'total' && valorDasParcelas < totalDeParcelas
+    ? downPaymentError(entrada, localISODate())
+      ?? paymentMethodError(entrada.paymentMethod, accounts.data?.find((a) => a.id === entrada.accountId) ?? null)
+      ?? (form.calculationMode === 'fixed_installments' && form.unidade === 'total' && valorDasParcelas < totalDeParcelas
       ? 'A entrada precisa ser menor que o total da compra' : undefined)
     : undefined;
   /** A parcela do contrato fixo, venha o valor digitado como parcela ou como total a pagar. */
@@ -359,7 +371,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     (!form.parcelas || Number(form.parcelas) > 0) &&
     (form.kind !== 'financing' || (form.taxa.trim() !== '' && !!form.parcelas)) &&
     Number.isFinite(Number(form.taxa.replace(',', '.'))) && Number(form.taxa.replace(',', '.')) >= 0;
-  const podeSalvar = Boolean(nomeOk && !erroEntrada && validDueDay && (!form.id || payments.isSuccess) && (form.calculationMode === 'fixed_installments' ? simpleValues : advancedValid));
+  const podeSalvar = Boolean(nomeOk && !erroEntrada && !erroPagamento && !accounts.isError && !accounts.isPending && validDueDay && (!form.id || payments.isSuccess) && (form.calculationMode === 'fixed_installments' ? simpleValues : advancedValid));
 
   const salvar = (criarOutro: boolean) => {
     if (!podeSalvar) return;
@@ -377,6 +389,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
         installment_cents: form.installmentCents || null,
         ...(form.calculationMode === 'fixed_installments' && simpleValues ? simpleValues : {}),
         account_id: form.accountId,
+        payment_method: form.paymentMethod ?? null,
         due_day: diaDoContrato,
         // Só com âncora conhecida: sem ela o cronograma segue o jeito antigo, sem data inventada.
         ...(ancoraEfetiva ? { first_due_date: ancoraEfetiva } : {}),
@@ -395,10 +408,11 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
       const original = form.original;
       const patch: Record<string, string | number | null> = {};
       const fields = ['name','kind','calculation_mode','principal_cents','remaining_cents','interest_rate_monthly',
-        'installments','installments_paid','installment_cents','account_id','due_day','first_due_date'] as const;
+        'installments','installments_paid','installment_cents','account_id','payment_method','due_day','first_due_date'] as const;
       for (const field of fields) {
         const wanted = target[field as keyof typeof target];
-        if (wanted !== undefined && wanted !== original[field as keyof Debt])
+        const previous = field === 'payment_method' ? normalizePaymentMethod(original.payment_method) : original[field as keyof Debt];
+        if (wanted !== undefined && wanted !== previous)
           patch[field] = wanted as string | number | null;
       }
       // Fixed-installment principal and balance are derived from the installment amount.
@@ -439,7 +453,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
         });
       };
       const mexeNoPassado = Number(original.installments_paid ?? 0) > 0 &&
-        ['installment_cents', 'due_day', 'first_due_date', 'account_id', 'name'].some((k) => k in patch);
+        ['installment_cents', 'due_day', 'first_due_date', 'account_id', 'payment_method', 'name'].some((k) => k in patch);
       // Trocar o modo com pagamentos reais conserva os fatos anteriores. "Todas" exigiria
       // recalcular esse histórico e é recusado pelo contrato; ofereça apenas o alcance válido.
       if (!mexeNoPassado || (mudouModo && payments.data?.length)) {
@@ -535,8 +549,10 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
             invalid={faltaNome}
           />
         </Field>
-        <Field label="Conta que paga">
-          <AccountPicker accounts={pagadoras} value={form.accountId} onChange={(accountId: string | null) => setForm({ ...form, accountId })} emptyLabel="Não informar" />
+        <PaymentMethodField value={form.paymentMethod ?? null} onChange={(paymentMethod) => setForm({ ...form, paymentMethod })} error={erroPagamento ?? undefined} />
+        <Field label="Conta que paga" error={accounts.isError ? 'Não consegui carregar suas contas. Tente novamente.' : undefined}
+          hint={erroPagamento && contaEscolhida ? `Conta escolhida: ${contaEscolhida.name}. Escolha uma conta compatível ou mude a forma de pagamento.` : undefined}>
+          <AccountPicker accounts={pagadoras} value={form.accountId} selectedAccount={contaEscolhida} onChange={(accountId: string | null) => setForm({ ...form, accountId })} emptyLabel="Não informar" />
         </Field>
         {/*
           `Chip` é filtro de lista — muitos, ligáveis, resposta imediata. Aqui são cinco

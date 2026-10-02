@@ -85,6 +85,7 @@ function harness() {
         if (name in dependencies) return dependencies[name];
         // O mapeamento do formulario para contrato e codigo real, nao um resultado combinado.
         if (name === '@/lib/escrita') return load('src/lib/escrita.ts');
+        if (name === '@/lib/payment-method' || name === './payment-method.ts') return load('src/lib/payment-method.ts');
         return {};
       },
     }, { filename: path });

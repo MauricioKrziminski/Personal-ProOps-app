@@ -10,6 +10,7 @@ import { useAddPurchaseDownPayment } from '@/hooks/use-down-payment';
 import { downPaymentError, downPaymentInput, type DownPaymentForm } from '@/lib/down-payment';
 import { isoToBR, localISODate } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
+import { paymentMethodError } from '@/lib/payment-method';
 
 export default function AddDownPayment() {
   const params = useLocalSearchParams<{ tipo?: string; parent?: string }>();
@@ -17,10 +18,11 @@ export default function AddDownPayment() {
   const save = useAddPurchaseDownPayment();
   const toast = useToast();
   const [form, setForm] = useState<DownPaymentForm>({ amountCents: 0, dateBR: isoToBR(localISODate()), accountId: null });
-  const error = downPaymentError(form, localISODate());
+  const error = downPaymentError(form, localISODate())
+    ?? paymentMethodError(form.paymentMethod, accounts.data?.find((a) => a.id === form.accountId) ?? null);
   const validParent = Boolean(params.parent && (params.tipo === 'financiamento' || params.tipo === 'parcelada'));
   const salvar = () => {
-    if (error || !validParent || save.isPending) return;
+    if (error || !validParent || save.isPending || accounts.isPending || accounts.isError) return;
     save.mutate({ type: params.tipo === 'parcelada' ? 'parcelada' : 'financiamento', parentId: params.parent!,
       payment: downPaymentInput(form, localISODate()) }, {
       onSuccess: () => { toast({ message: 'Entrada registrada.', tone: 'success' }); router.back(); },
@@ -29,7 +31,7 @@ export default function AddDownPayment() {
   };
   return <Screen>
     <TaskHeader title="Adicionar entrada" onClose={() => router.back()}
-      action={<Button label="Salvar" size="sm" loading={save.isPending} disabled={Boolean(error) || !validParent} onPress={salvar} />} />
+      action={<Button label="Salvar" size="sm" loading={save.isPending} disabled={Boolean(error) || !validParent || accounts.isPending || accounts.isError} onPress={salvar} />} />
     <DownPaymentFields enabled showToggle={false} onEnabled={() => {}} value={form} onChange={setForm} accounts={accounts.data ?? []} />
   </Screen>;
 }

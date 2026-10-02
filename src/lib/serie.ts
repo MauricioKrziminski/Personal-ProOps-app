@@ -3,6 +3,7 @@
  * Aqui fica o que tem conta: a RRULE que o formulário monta, o que ele vale e o que o salvar grava.
  */
 import { brToISO, dataLocalDe, fimQueSegueOInicio, isValidBRDate, isoToBR, localDateTime, localISODate } from './dates.ts';
+import { normalizePaymentMethod, assertPaymentMethod, type PaymentMethod } from './payment-method.ts';
 import { validRecurringRange } from './finance-form.ts';
 
 export interface SerieForm {
@@ -30,6 +31,7 @@ export interface SerieForm {
   merchant: string;
   category: string | null;
   accountId: string | null;
+  paymentMethod?: PaymentMethod | null;
   preset: 'monthly' | 'weekly' | 'yearly';
   /** Só no preset mensal: `A cada N meses`. */
   intervalo: string;
@@ -67,6 +69,7 @@ export interface SerieGravada {
   merchant: string | null;
   category: string | null;
   account_id: string | null;
+  payment_method?: PaymentMethod | null;
   rrule: string;
   next_run_at: string;
   end_date: string | null;
@@ -114,6 +117,7 @@ export function serieDoRegistro(r: SerieGravada): SerieForm {
     merchant: r.merchant ?? '',
     category: r.category,
     accountId: r.account_id,
+    ...(r.payment_method !== undefined ? { paymentMethod: normalizePaymentMethod(r.payment_method) } : {}),
     preset: r.rrule.includes('FREQ=WEEKLY') ? 'weekly' : r.rrule.includes('FREQ=YEARLY') ? 'yearly' : 'monthly',
     intervalo: /INTERVAL=(\d+)/.exec(r.rrule)?.[1] ?? '1',
     inicio: isoToBR(dataLocalDe(r.next_run_at)),
@@ -172,6 +176,7 @@ export interface OcorrenciaDaSerie {
   merchant: string | null;
   category: string | null;
   account_id: string | null;
+  payment_method?: PaymentMethod | null;
   occurred_at: string;
   due_at: string | null;
   invoice_id: string | null;
@@ -195,6 +200,7 @@ export function serieDaOcorrencia(serie: SerieGravada, linha: OcorrenciaDaSerie)
     merchant: linha.merchant ?? '',
     category: linha.category,
     accountId: linha.account_id,
+    ...(linha.payment_method !== undefined ? { paymentMethod: normalizePaymentMethod(linha.payment_method) } : { paymentMethod: undefined }),
     inicio:
       linha.status === 'cleared'
         ? isoToBR(dataLocalDe(serie.next_run_at))
@@ -214,12 +220,14 @@ export function serieDaOcorrencia(serie: SerieGravada, linha: OcorrenciaDaSerie)
  *   atualiza a regra e as linhas juntas, ou desfaz tudo em caso de erro.
  */
 export function mudancasDaOcorrencia(form: SerieForm, linha: OcorrenciaDaSerie, serie: SerieGravada) {
+  assertPaymentMethod(form.paymentMethod);
   const linhas: {
     amount_cents?: number;
     category?: string | null;
     description?: string;
     merchant?: string | null;
     account_id?: string | null;
+    payment_method?: PaymentMethod | null;
   } = {};
   if (form.amountCents !== linha.amount_cents) linhas.amount_cents = form.amountCents;
   if (form.category !== linha.category) linhas.category = form.category;
@@ -228,15 +236,18 @@ export function mudancasDaOcorrencia(form: SerieForm, linha: OcorrenciaDaSerie, 
   const merchant = form.merchant.trim() || null;
   if (merchant !== linha.merchant) linhas.merchant = merchant;
   if (form.accountId !== linha.account_id) linhas.account_id = form.accountId;
+  if (form.paymentMethod !== undefined && form.paymentMethod !== normalizePaymentMethod(linha.payment_method)) linhas.payment_method = form.paymentMethod;
 
   const regra: {
     kind?: 'expense' | 'income';
+    payment_method?: PaymentMethod | null;
     end_date?: string | null;
     auto_confirm?: boolean;
     rrule?: string;
     next_run_at?: string;
   } = {};
   if (form.kind !== serie.kind) regra.kind = form.kind;
+  if (linhas.payment_method !== undefined && form.paymentMethod !== normalizePaymentMethod(serie.payment_method)) regra.payment_method = form.paymentMethod;
   const fim = form.fim ? brToISO(form.fim) : null;
   if (fim !== serie.end_date) regra.end_date = fim;
   if (form.autoConfirm !== serie.auto_confirm) regra.auto_confirm = form.autoConfirm;

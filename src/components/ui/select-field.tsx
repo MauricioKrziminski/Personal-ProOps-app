@@ -56,14 +56,17 @@ export type SelectOption = {
 export function SelectField({
   options,
   value,
+  selectedOption,
   onChange,
-  placeholder,
+  placeholder = 'Escolher uma opção',
 }: {
   options: readonly SelectOption[];
   value: string | null;
+  /** Identidade preservada no rascunho quando a lista de escolhas foi filtrada. */
+  selectedOption?: SelectOption | null;
   onChange: (id: string | null) => void;
   /** O que o campo diz quando nada foi escolhido. */
-  placeholder: string;
+  placeholder?: string;
 }) {
   const theme = useTheme();
   const scheme = useScheme();
@@ -91,7 +94,8 @@ export function SelectField({
     return () => { ativoAtual.current = false; abertoAtual.current = false; };
   }, [ativo, aberto, presenca.visita]);
 
-  const escolhida = options.find((o) => o.id === value);
+  const elegivel = options.find((o) => o.id === value);
+  const escolhida = elegivel ?? (value !== null && selectedOption?.id === value ? selectedOption : undefined);
 
   function alternar() {
     if (!ativoAtual.current || visitaAtual.current !== presenca.visita || aberturaAtual.current !== abertura) return;
@@ -133,10 +137,11 @@ export function SelectField({
     ) : null;
 
   const linha = (o: SelectOption | undefined, cabecalho = false) => {
+    const cabecalhoPreservado = cabecalho && !elegivel;
     const marcada = o?.id === value;
     const aceso = marcada && !o?.neutral;
     const confirmada = confirmacao !== null && confirmacao.id === o?.id && marcada;
-    const mostrarCheck = marcada && (aberto || confirmada);
+    const mostrarCheck = marcada && ((aberto && !cabecalhoPreservado) || confirmada);
     const icone = ladrilho(o?.icon ?? (cabecalho ? 'circle' : undefined), aceso);
     const textos = <>
       <ThemedText type={marcada ? 'headline' : 'default'} themeColor={o ? 'text' : 'textSecondary'} style={styles.textoInteiro}>
@@ -149,12 +154,12 @@ export function SelectField({
     ) : cabecalho ? <Icon name="chevron.down" size="sm" color="textSecondary" /> : null;
     return (
       <PressableScale scaleTo={1}
-        onPress={cabecalho ? aberto ? () => escolher(value) : alternar : () => escolher(o!.id)}
+        onPress={cabecalho ? aberto && !cabecalhoPreservado ? () => escolher(value) : alternar : () => escolher(o!.id)}
         disabled={!ativo}
-        accessibilityRole={aberto ? 'radio' : 'button'}
-        accessibilityState={{ selected: aberto && marcada, expanded: cabecalho ? aberto : undefined, disabled: !ativo }}
+        accessibilityRole={aberto && !cabecalhoPreservado ? 'radio' : 'button'}
+        accessibilityState={{ selected: aberto && marcada && !cabecalhoPreservado, expanded: cabecalho ? aberto : undefined, disabled: !ativo }}
         accessibilityLabel={o ? o.meta ? `${o.label}, ${o.meta}` : o.label : placeholder}
-        accessibilityHint={aberto ? 'Toque para escolher e fechar' : 'Toque para escolher'}>
+        accessibilityHint={aberto && cabecalhoPreservado ? 'Toque para fechar as opções' : aberto ? 'Toque para escolher e fechar' : 'Toque para escolher'}>
         {({ pressed }) => <LinhaRealcada pressionada={pressed} confirmar={confirmada}>
           {/* Só o cabeçalho troca conteúdo; alternativas estáveis não precisam de três morphs. */}
           {cabecalho ? <MudancaSuave valor={`${o?.icon}:${aceso}`}>{icone}</MudancaSuave> : <View>{icone}</View>}

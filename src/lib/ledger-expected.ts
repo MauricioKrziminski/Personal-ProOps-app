@@ -1,3 +1,5 @@
+import type { PaymentMethod } from './payment-method.ts';
+
 /** An occurrence calculated for the visible period but absent from the transaction ledger. */
 export interface ExpectedLedgerLine {
   origin: 'recurring' | 'debt_schedule' | 'debt_estimate';
@@ -8,6 +10,7 @@ export interface ExpectedLedgerLine {
   description: string;
   category: string | null;
   account_id: string | null;
+  payment_method?: PaymentMethod | null;
   installment_no: number | null;
   installments_total: number | null;
   /** A first period inferred from legacy creation metadata rather than a saved start date. */

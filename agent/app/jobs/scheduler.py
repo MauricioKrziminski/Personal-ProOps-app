@@ -294,8 +294,9 @@ async def materialize_horizon(agora, so_novas: bool = False, workspace_id=None) 
                         insert into public.transactions
                           (user_id, workspace_id, kind, amount_cents, currency, category,
                            description, merchant, account_id, occurred_at, due_at, source, status,
-                           recurring_id, auto_confirm)
-                        values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'recurring', %s, %s, %s)
+                           recurring_id, auto_confirm, payment_method)
+                        values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'recurring', %s, %s, %s,
+                                private.payment_method_at(%s,%s::date))
                         """,
                         rec["user_id"], rec["workspace_id"], rec["kind"], rec["amount_cents"],
                         rec["currency"], rec["category"], rec["description"],
@@ -308,6 +309,9 @@ async def materialize_horizon(agora, so_novas: bool = False, workspace_id=None) 
                         # `default false` da coluna e `_promote_due_transactions` (que agora olha a
                         # LINHA, nao a serie) nunca daria baixa nem no salario.
                         rec["auto_confirm"],
+                        # Method is metadata from the version covering THIS civil day;
+                        # using the current series default would rewrite backfilled history.
+                        rec["id"], dia,
                     )
                     criadas += 1
                 except UniqueViolation:

@@ -1,3 +1,5 @@
+import { PaymentMethodField } from '@/components/finance/payment-method-field';
+import { paymentMethodAccounts, paymentMethodError } from '@/lib/payment-method';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { Presenca } from '@/components/motion/presenca';
@@ -21,6 +23,8 @@ export function DownPaymentFields({ enabled, onEnabled, value, onChange, account
   const [revisado, setRevisado] = useState({ enabled, amount: false, account: false, date: false });
   // Reativar mantém o rascunho, mas não trata um campo recém-aberto como já revisado.
   if (revisado.enabled !== enabled) setRevisado({ enabled, amount: false, account: false, date: false });
+  const origem = accounts.find((c) => c.id === value.accountId) ?? null;
+  const erroMetodo = paymentMethodError(value.paymentMethod, origem);
   const invalid = enabled ? downPaymentError(value, localISODate()) : undefined;
   // Um limite imposto pelo total precisa explicar o bloqueio, mesmo se a entrada
   // já preenchida acabou de ser reativada. Só o vazio depende da revisão do campo.
@@ -36,8 +40,9 @@ export function DownPaymentFields({ enabled, onEnabled, value, onChange, account
           onBlur={() => setRevisado((r) => ({ ...r, amount: true }))}
           accessibilityLabel="Valor da entrada" invalid={Boolean(erroValor)} />
       </Field>
-      <Field label="Conta da entrada" error={revisado.account && !value.accountId ? 'Escolha a conta da entrada' : undefined}>
-        <AccountPicker accounts={accounts} value={value.accountId} onChange={(accountId) => {
+      <PaymentMethodField value={value.paymentMethod} onChange={(paymentMethod) => onChange({ ...value, paymentMethod })} error={!origem ? erroMetodo ?? undefined : undefined} />
+      <Field label="Conta da entrada" error={origem && erroMetodo ? erroMetodo : revisado.account && !value.accountId ? 'Escolha a conta da entrada' : undefined} hint={origem && erroMetodo ? `Origem selecionada: ${origem.name}` : undefined}>
+        <AccountPicker accounts={paymentMethodAccounts(value.paymentMethod, accounts)} value={value.accountId} selectedAccount={origem} onChange={(accountId) => {
           setRevisado((r) => ({ ...r, account: true })); onChange({ ...value, accountId });
         }}
           placeholder="Escolher a conta da entrada" />

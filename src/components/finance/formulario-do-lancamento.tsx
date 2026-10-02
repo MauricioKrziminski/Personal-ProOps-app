@@ -26,7 +26,7 @@ import { molduraEmTela } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useRascunho } from '@/hooks/use-rascunho';
 import { pendenciaDoAplicar } from '@/lib/hipotese';
-import { argsDaParcelada, linhasDoLancamento, type EntradaLancamento, type EntradaParcelada } from '@/lib/escrita';
+import { argsDaParcelada, dadosDoLancamento, type EntradaLancamento, type EntradaParcelada } from '@/lib/escrita';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { Segmented } from '@/components/ui/segmented';
 import { SelectField, type SelectOption } from '@/components/ui/select-field';
@@ -55,7 +55,6 @@ import {
   useTransaction,
   useSaveRecurringAll,
   useSaveRecurringOne,
-  DESCRICAO_JUROS_DO_PIX,
   type InstallmentPlanSummary,
   type Transaction,
   type TransactionKind,
@@ -83,6 +82,8 @@ import {
 import { confirmDestructive } from '@/lib/item-actions';
 import { correcaoDoPagamento } from '@/lib/confirmar-baixa';
 import { AccountPicker } from '@/components/finance/account-picker';
+import { PaymentMethodField } from '@/components/finance/payment-method-field';
+import { PAYMENT_METHODS, normalizePaymentMethod, paymentMethodAccounts, paymentMethodError } from '@/lib/payment-method';
 import { Presenca } from '@/components/motion/presenca';
 import { debtPaymentPatch, selectedDebtPaymentVersions, type DebtPaymentScope } from '@/lib/debt-payment-scope';
 import { newClientMessageId } from '@/lib/agent-chat';
@@ -111,6 +112,7 @@ const schema = z
     description: z.string().trim().min(1, 'Escreva um título para este lançamento'),
     merchant: z.string().nullable(),
     account_id: z.string().nullable(),
+    payment_method: z.enum(PAYMENT_METHODS).nullable(),
     counterparty_account_id: z.string().nullable(),
     // 1 = à vista; >= 2 vira plano de parcelas (RPC create_installment_plan)
     installments: z.number().int().min(1).max(72),
@@ -123,6 +125,7 @@ const schema = z
     down_payment_cents: z.number().int().nonnegative(),
     down_payment_date: z.string(),
     down_payment_account: z.string().nullable(),
+    down_payment_method: z.enum(PAYMENT_METHODS).nullable(),
     value_unit: z.enum(['total', 'parcela']),
     occurred_at: z.string().refine(isValidBRDate, 'Data em dd/mm/aaaa'),
     /** "Isso ainda vai acontecer" — vira `status='pending'`, a base da projeção de caixa. */
@@ -231,10 +234,11 @@ export function FormularioDoLancamento(props: Props) {
       category: editing ? editing.category : comum.categoria,
       description: editing ? (editing.description ?? '') : comum.descricao,
       merchant: editing ? (editing.merchant ?? null) : (comum.estabelecimento || null),
-      // A conta de `?conta=`, da hipótese ou do tipo anterior: só vale se está entre as contas da pessoa.
+      // Preserva a escolha enquanto as contas carregam; só grava depois de conferir a origem.
       account_id: editing
         ? editing.account_id
-        : (comum.contaId && accounts?.some((a) => a.id === comum.contaId) ? comum.contaId : null),
+         : comum.contaId ?? null,
+      payment_method: normalizePaymentMethod(editing ? editing.payment_method : comum.paymentMethod),
       counterparty_account_id: editing?.counterparty_account_id ?? null,
       // Receita não parcela: a hipótese de entrada abre à vista, com o total.
       installments: (!editing && comum.kind === 'expense' ? parcelas : undefined) ?? 1,
@@ -243,6 +247,7 @@ export function FormularioDoLancamento(props: Props) {
       down_payment_cents: 0,
       down_payment_date: isoToBR(localISODate()),
       down_payment_account: comum.contaId ?? null,
+      down_payment_method: null,
       value_unit: 'total',
       fee_cents: jurosDoPix?.amount_cents ?? 0,
       auto_confirm: editing?.auto_confirm ?? false,
@@ -257,6 +262,8 @@ export function FormularioDoLancamento(props: Props) {
   const kind = useWatch({ control, name: 'kind' });
   const occurredAt = useWatch({ control, name: 'occurred_at' });
   const accountId = useWatch({ control, name: 'account_id' });
+  const paymentMethod = useWatch({ control, name: 'payment_method' });
+  const feeCents = useWatch({ control, name: 'fee_cents' });
   const amountCents = useWatch({ control, name: 'amount_cents' });
   const installmentCount = useWatch({ control, name: 'installments' });
   const pending = useWatch({ control, name: 'pending' });
@@ -267,7 +274,7 @@ export function FormularioDoLancamento(props: Props) {
   useEffect(() => {
     props.registrarComum(() => {
       const v = getValues();
-      return { kind: v.kind, descricao: v.description, valorCents: v.amount_cents, contaId: v.account_id, dataBR: v.occurred_at, categoria: v.category, estabelecimento: v.merchant ?? undefined };
+      return { kind: v.kind, descricao: v.description, valorCents: v.amount_cents, contaId: v.account_id, dataBR: v.occurred_at, categoria: v.category, estabelecimento: v.merchant ?? undefined, paymentMethod: v.payment_method };
     });
     props.registrarEstado(() => getValues());
   });
@@ -281,6 +288,10 @@ export function FormularioDoLancamento(props: Props) {
 
   const account = (accounts ?? []).find((a) => a.id === accountId);
   const isCard = account?.type === 'credit_card';
+  const erroPagamento = paymentMethodError(paymentMethod, account ?? null)
+    ?? (accountId && !contas.isPending && !contas.isError && !account ? 'Esta conta não está disponível. Escolha outra conta.' : null)
+    ?? (jurosDoPix && feeCents > 0 && ((paymentMethod !== null && paymentMethod !== 'pix') || !isCard || kind === 'income')
+      ? 'Zere os juros do Pix antes de mudar a forma de pagamento, a conta ou o tipo.' : null);
   /**
    * Onde o campo "Juros do Pix no crédito" EXISTE. É a mesma condição no campo e no payload: o
    * valor ficava no formulário quando o campo sumia (trocar a conta para a corrente, o tipo para
@@ -292,9 +303,9 @@ export function FormularioDoLancamento(props: Props) {
   // Transferência saindo do cartão é o Pix no crédito para conta PRÓPRIA (28/09/2026): o cartão
   // cobra o juro do mesmo jeito.
   const mostraJuros =
-    isCard && (kind === 'expense' || kind === 'transfer') && installmentCount === 1 &&
+    Boolean(jurosDoPix) || isCard && paymentMethod === 'pix' && (kind === 'expense' || kind === 'transfer') && installmentCount === 1 &&
     !(editing?.installment_plan_id || editing?.recurring_id || editing?.debt_id) &&
-    editing?.description !== DESCRICAO_JUROS_DO_PIX;
+    !editing?.pix_fee_for_transaction_id;
   /**
    * Conta a pagar não existe em cartão: a compra já entra na fatura e o caixa sai quando a
    * fatura vence. Marcar `pending` aqui contaria o MESMO gasto duas vezes na projeção.
@@ -325,9 +336,11 @@ export function FormularioDoLancamento(props: Props) {
   const entradaCents = useWatch({ control, name: 'down_payment_cents' });
   const entradaData = useWatch({ control, name: 'down_payment_date' });
   const entradaConta = useWatch({ control, name: 'down_payment_account' });
+  const entradaMetodo = useWatch({ control, name: 'down_payment_method' });
   const [formCompra, setFormCompra] = useState<CompraForm | null>(null);
   const atualizarCompra = useUpdateInstallmentPlan();
-  const compraOk = validaCompra(formCompra).podeSalvar;
+  const compraOk = validaCompra(formCompra).podeSalvar && !paymentMethodError(formCompra?.paymentMethod,
+    (accounts ?? []).find((a) => a.id === formCompra?.accountId) ?? null);
 
   /**
    * ⚠️ **Parcelar também vale EDITANDO.** A régua mora em `finance-form.ts`, com teste — aqui
@@ -342,7 +355,8 @@ export function FormularioDoLancamento(props: Props) {
   const podeInformarHistorico = podeParcelarAqui;
   const entradaVisivel = podeParcelarAqui && installmentCount > 1;
   const erroEntrada = entradaVisivel && entradaLigada
-    ? downPaymentError({ amountCents: entradaCents, dateBR: entradaData, accountId: entradaConta }, localISODate())
+    ? downPaymentError({ amountCents: entradaCents, dateBR: entradaData, accountId: entradaConta, paymentMethod: entradaMetodo }, localISODate())
+      ?? paymentMethodError(entradaMetodo, (accounts ?? []).find((a) => a.id === entradaConta) ?? null)
       ?? (unidade === 'total' && amountCents - entradaCents < installmentCount
         ? 'A entrada precisa ser menor que o total da compra' : undefined)
     : undefined;
@@ -377,7 +391,8 @@ export function FormularioDoLancamento(props: Props) {
   const tentativaTodaSerie = useRef<{ key: string; id: string } | null>(null);
   const tentativaUmaRecorrencia = useRef<{ key: string; id: string } | null>(null);
   const tentativaFuturoSerie = useRef<{ key: string; id: string } | null>(null);
-  const serieOk = validaSerie(formSerie).podeSalvar;
+  const serieOk = validaSerie(formSerie).podeSalvar && !paymentMethodError(formSerie?.paymentMethod,
+    (accounts ?? []).find((a) => a.id === formSerie?.accountId) ?? null);
   const mudaData = (br: string, intencao: 'fixo' | 'ultimo' = 'fixo') => {
     setValue('occurred_at', br, { shouldValidate: true });
     if (umaData) setValue('due_at', br);
@@ -387,7 +402,7 @@ export function FormularioDoLancamento(props: Props) {
   /** Linhas e regra são uma transação no banco: nenhum resultado parcial. */
   const salvarAsProximas = (form = formSerie) => {
     if (!form || !editing || !serie) return;
-    if (!validaSerie(form).podeSalvar) {
+    if (!validaSerie(form).podeSalvar || paymentMethodError(form.paymentMethod, (accounts ?? []).find((a) => a.id === form.accountId) ?? null)) {
       toast({ message: 'Confira o vencimento e os dados da série antes de salvar.', tone: 'error' });
       return;
     }
@@ -427,6 +442,7 @@ export function FormularioDoLancamento(props: Props) {
       merchant: values.merchant,
       category: values.category,
       account_id: values.account_id,
+      payment_method: values.payment_method,
     });
     const alterouData = values.occurred_at !== isoToBR(dataDaSerie ?? editing.occurred_at);
     return alterouData || intencaoDoDia
@@ -436,7 +452,7 @@ export function FormularioDoLancamento(props: Props) {
 
   const salvarTodaSerie = (form = formSerie ?? rascunhoDaSerie()) => {
     if (!form || !editing || !serie) return;
-    if (!validaSerie(form).podeSalvar) {
+    if (!validaSerie(form).podeSalvar || paymentMethodError(form.paymentMethod, (accounts ?? []).find((a) => a.id === form.accountId) ?? null)) {
       toast({ message: 'Confira o vencimento e os dados da série antes de salvar.', tone: 'error' });
       return;
     }
@@ -524,6 +540,7 @@ export function FormularioDoLancamento(props: Props) {
 
   /** `criarOutro`: o "Salvar e criar outro" — o hospedeiro recebe no `onSalvo` e remonta limpo. */
   const onSubmit = (criarOutro = false) => handleSubmit((values) => {
+    if (contas.isPending || contas.isError || erroPagamento || erroEntrada) return;
     if ((editing?.down_payment_debt_id || editing?.down_payment_plan_id) && brToISO(values.occurred_at) > localISODate()) {
       toast({ message: 'A entrada paga não pode ter data futura', tone: 'error' });
       return;
@@ -543,7 +560,7 @@ export function FormularioDoLancamento(props: Props) {
     if (temEntrada) {
       try {
         downPayment = downPaymentInput({ amountCents: values.down_payment_cents,
-          dateBR: values.down_payment_date, accountId: values.down_payment_account }, localISODate());
+          dateBR: values.down_payment_date, accountId: values.down_payment_account, paymentMethod: values.down_payment_method }, localISODate());
         totalDaCompraNova = purchaseAmounts(values.amount_cents, unidade, values.installments, values.down_payment_cents).financedCents;
       } catch (error) {
         toast({ message: (error as Error).message, tone: 'error' });
@@ -578,6 +595,7 @@ export function FormularioDoLancamento(props: Props) {
     const entradaParcelada: EntradaParcelada | null = values.account_id
       ? {
           accountId: values.account_id,
+          paymentMethod: values.payment_method,
           totalCents: totalDaCompraNova,
           installments: values.installments,
           paidInstallments: installmentHistory(values.paid_installments, values.installments, brToISO(values.occurred_at), localISODate()),
@@ -599,6 +617,7 @@ export function FormularioDoLancamento(props: Props) {
       description: values.description.trim(),
       merchant: values.merchant?.trim() || null,
       account_id: values.account_id,
+      payment_method: values.payment_method,
       counterparty_account_id: values.kind === 'transfer' ? values.counterparty_account_id : null,
       occurred_at: brToISO(values.occurred_at),
       status,
@@ -619,7 +638,7 @@ export function FormularioDoLancamento(props: Props) {
         props.converter({ tipo: 'parcelada', dados: { ...args, ultimo_dia: rpc === 'create_installment_plan_last_day',
           ...(entradaParcelada.downPayment ? { down_payment: entradaParcelada.downPayment } : {}) } });
       } else {
-        props.converter({ tipo: 'lancamento', dados: { linhas: linhasDoLancamento(entradaLancamento) } });
+        props.converter({ tipo: 'lancamento', dados: dadosDoLancamento(entradaLancamento) });
       }
       return;
     }
@@ -673,6 +692,7 @@ export function FormularioDoLancamento(props: Props) {
             category: values.category,
             merchant: values.merchant?.trim() || null,
             accountId: contaParaConverter,
+            paymentMethod: values.payment_method,
             ...(downPayment ? { downPayment } : {}),
             paidInstallments:
               installmentHistory(values.paid_installments, values.installments, brToISO(values.occurred_at), localISODate()) || null,
@@ -732,6 +752,7 @@ export function FormularioDoLancamento(props: Props) {
           description: values.description.trim(),
           merchant: values.merchant?.trim() || null,
           occurred_at: brToISO(values.occurred_at),
+          payment_method: values.payment_method,
           status,
           due_at: dueAt,
           auto_confirm: autoConfirm,
@@ -750,7 +771,8 @@ export function FormularioDoLancamento(props: Props) {
       {
         ...entradaLancamento,
         id: editing?.id,
-        juros: editing && mostraJuros ? { id: jurosDoPix?.id ?? null, cents: values.fee_cents } : undefined,
+        expectedRevision: editing?.edit_revision,
+        juros: editing && (mostraJuros || jurosDoPix) ? { id: jurosDoPix?.id ?? null, cents: mostraJuros ? values.fee_cents : 0 } : undefined,
       }).then(
         () => {
           tirarRapida();
@@ -763,10 +785,7 @@ export function FormularioDoLancamento(props: Props) {
         (error) => {
           if (!montado.current) return;
           toast({
-            message:
-              error && typeof error === 'object' && 'compraSalva' in error
-                ? 'Salvei a compra, mas não o juro do Pix. Tenta de novo.'
-                : financeErrorMessage(error, 'Não deu para salvar. Tenta de novo.'),
+            message: financeErrorMessage(error, 'Nada foi salvo. Tenta de novo.'),
             tone: 'error',
           });
         },
@@ -777,6 +796,7 @@ export function FormularioDoLancamento(props: Props) {
   })();
 
   const salvarPagamento = (scope: DebtPaymentScope) => handleSubmit((values) => {
+    if (erroPagamento || contas.isError || contas.isPending) return;
     if (!editing || !divida || editing.debt_payment_no === null) return;
     if (!versoesPagamentos.data || versoesPagamentos.isError) {
       toast({ message: 'Não consegui carregar os pagamentos desta dívida. Tente novamente.', tone: 'error' });
@@ -788,6 +808,7 @@ export function FormularioDoLancamento(props: Props) {
       description: values.description.trim(),
       merchant: values.merchant?.trim() || null,
       account_id: values.account_id,
+      payment_method: values.payment_method,
       occurred_at: brToISO(values.occurred_at),
     });
     /*
@@ -834,7 +855,20 @@ export function FormularioDoLancamento(props: Props) {
     });
   })();
 
-  const salvarParcelaEscopada = (scope: 'one' | 'future' | 'all') => handleSubmit((values) => {
+  // Configurar a série/compra troca o formulário visível. O rascunho RHF da ocorrência
+  // fica preservado, mas seus campos ocultos não validam nem impedem o contrato visível.
+  const submeterFormularioVisivel = (submit: (values: FormValues) => void) => {
+    if (contas.isError || contas.isPending) return;
+    if (formCompra || formSerie) {
+      if (formCompra ? !compraOk : !serieOk) return;
+      submit(getValues());
+    } else {
+      if (erroPagamento || erroEntrada) return;
+      handleSubmit(submit)();
+    }
+  };
+
+  const salvarParcelaEscopada = (scope: 'one' | 'future' | 'all') => submeterFormularioVisivel((values) => {
     if (!editing?.installment_plan_id || !plano) return;
     if (formCompra) {
       const decisao = edicaoEscopadaDaCompra(formCompra, plano, scope, editing.installment_no ?? 1);
@@ -862,6 +896,7 @@ export function FormularioDoLancamento(props: Props) {
     const patch: Parameters<typeof salvarParcela.mutate>[0]['patch'] = {};
     if (values.amount_cents !== editing.amount_cents) patch.amount_cents = values.amount_cents;
     if (values.category !== editing.category) patch.category = values.category;
+    if (values.payment_method !== (editing.payment_method ?? null)) patch.payment_method = values.payment_method;
     if (values.description.trim() !== (editing.description ?? '')) patch.description = values.description.trim();
     const merchant = values.merchant?.trim() || null;
     if (merchant !== editing.merchant) patch.merchant = merchant;
@@ -882,14 +917,14 @@ export function FormularioDoLancamento(props: Props) {
         tone: 'error',
       }),
     });
-  })();
+  });
 
   const salvarComAlcance = () => {
     if (editing?.recurring_id && serie) {
       askEditScope('occurrence', (scope) => {
         if (scope === 'all') return salvarTodaSerie();
         if (scope === 'future') return salvarAsProximas(formSerie ?? rascunhoDaSerie());
-        handleSubmit((values) => {
+        submeterFormularioVisivel((values) => {
           if (!editing) return;
           if (formSerie && (formSerie.fim ? brToISO(formSerie.fim) : null) !== serie.end_date) {
             toast({ message: 'O término pertence à série. Escolha o alcance para próximas ocorrências ou para todas.', tone: 'error' });
@@ -909,6 +944,8 @@ export function FormularioDoLancamento(props: Props) {
           if (description !== (editing.description ?? '')) patch.description = description;
           if (merchant !== editing.merchant) patch.merchant = merchant;
           if (accountId !== editing.account_id) patch.account_id = accountId;
+          const method = formSerie ? formSerie.paymentMethod ?? null : values.payment_method;
+          if (method !== (editing.payment_method ?? null)) patch.payment_method = method;
           if (kind !== editing.kind) patch.kind = kind;
           if (autoConfirm !== editing.auto_confirm) patch.auto_confirm = autoConfirm;
           if (date !== editing.occurred_at) patch.occurred_at = date;
@@ -936,7 +973,7 @@ export function FormularioDoLancamento(props: Props) {
             },
             onError: (error) => toast({ message: financeErrorMessage(error, 'Nada foi salvo. Confira a ocorrência e tente novamente.'), tone: 'error' }),
           });
-        })();
+        });
       }, 'Todos corrige também as ocorrências passadas. Uma fatura paga protege valor, conta e data.');
       return;
     }
@@ -994,7 +1031,8 @@ export function FormularioDoLancamento(props: Props) {
           <Button
             label={saving ? 'Salvando…' : 'Salvar'}
             size="sm"
-            disabled={saving || Boolean(erroEntrada) || !!correcaoDaDivida.erro || (formSerie !== null && !serieOk) || (formCompra !== null && !compraOk)}
+             disabled={saving || contas.isError || contas.isPending ||
+               (formCompra ? !compraOk : formSerie ? !serieOk : Boolean(erroPagamento || erroEntrada || correcaoDaDivida.erro))}
             loading={saving}
             onPress={editing?.recurring_id || editing?.installment_plan_id || editing?.debt_id ? salvarComAlcance : () => onSubmit()}
           />
@@ -1173,6 +1211,10 @@ export function FormularioDoLancamento(props: Props) {
             />
           </Presenca>
 
+        <Controller control={control} name="payment_method" render={({ field }) => (
+          <PaymentMethodField value={field.value} onChange={field.onChange} error={erroPagamento ?? undefined} />
+        )} />
+
         {/* Numa parcela a conta é da COMPRA: muda em "A compra toda" (uma parcela sozinha noutro
             cartão não existe). */}
         {naCompra ? null : (
@@ -1184,7 +1226,8 @@ export function FormularioDoLancamento(props: Props) {
               label={kind === 'transfer' ? 'Da conta' : 'Conta'}
               // Sem a fileira de parcelas (sem conta ou fora de gasto), o erro dela mora aqui:
               // senão o Salvar recusava sem dizer por quê.
-              error={contas.isError ? 'Não deu para carregar as contas.' : !podeParcelarAqui ? errors.installments?.message : undefined}>
+              error={contas.isError ? 'Não deu para carregar as contas.' : !podeParcelarAqui ? errors.installments?.message : undefined}
+              hint={erroPagamento && account ? `Conta escolhida: ${account.name}. Escolha uma conta compatível ou mude a forma de pagamento.` : undefined}>
               {/* Afirmar "não tem conta" exige a consulta respondida: carregando, era o
                   "Cadastrar uma conta" que aparecia para quem tem contas. */}
               {contas.isPending ? (
@@ -1201,8 +1244,9 @@ export function FormularioDoLancamento(props: Props) {
               ) : (
                 <AccountPicker
                   // Pagamento de dívida sai de conta, nunca de cartão: o trigger da dívida recusa.
-                  accounts={(accounts ?? []).filter((a) => !editing?.debt_id || a.type !== 'credit_card')}
+                  accounts={paymentMethodAccounts(paymentMethod, (accounts ?? []).filter((a) => !editing?.debt_id || a.type !== 'credit_card'))}
                   value={field.value ?? null}
+                  selectedAccount={account}
                   onChange={(next: string | null) => {
                     field.onChange(next);
                     // Trocar para cartão desliga "vou pagar depois" em vez de só escondê-lo.
@@ -1291,11 +1335,12 @@ export function FormularioDoLancamento(props: Props) {
 
         <Presenca visivel={podeInformarHistorico && installmentCount > 1}>
           <DownPaymentFields enabled={entradaLigada} onEnabled={(value) => setValue('down_payment_enabled', value)}
-            value={{ amountCents: entradaCents, dateBR: entradaData, accountId: entradaConta }}
+            value={{ amountCents: entradaCents, dateBR: entradaData, accountId: entradaConta, paymentMethod: entradaMetodo }}
             onChange={(value) => {
               setValue('down_payment_cents', value.amountCents);
               setValue('down_payment_date', value.dateBR);
               setValue('down_payment_account', value.accountId);
+              setValue('down_payment_method', value.paymentMethod ?? null);
             }} accounts={accounts ?? []}
             error={entradaLigada && unidade === 'total' && amountCents - entradaCents < installmentCount
               ? 'A entrada precisa ser menor que o total da compra' : undefined} />
@@ -1333,7 +1378,7 @@ export function FormularioDoLancamento(props: Props) {
                       ? `Total na fatura: ${formatBRL(amountCents + field.value)}`
                       : 'Só para Pix pago no cartão'
                   }>
-                  <MoneyField valueCents={field.value} onChangeCents={field.onChange} />
+                  <MoneyField valueCents={field.value} onChangeCents={field.onChange} accessibilityLabel="Juros do Pix no crédito em reais" />
                 </Field>
               )}
             />
@@ -1482,7 +1527,7 @@ export function FormularioDoLancamento(props: Props) {
             variant="secondary"
             block
             label="Salvar e criar outro"
-            disabled={saving || Boolean(erroEntrada)}
+            disabled={saving || contas.isPending || contas.isError || Boolean(erroPagamento) || Boolean(erroEntrada)}
             onPress={() => onSubmit(true)}
           />
         ) : null}
@@ -1545,7 +1590,7 @@ export function LancamentoEditando({ editandoId, ...props }: CorpoProps & { edit
 
   // Nunca cair em modo criação por omissão: um id que não resolve é erro, não formulário vazio.
   // A compra da parcela também: sem ela o campo Valor não sabe o que "cada parcela" alcança.
-  if (query.isError || !query.data || (planoId && plano.isError)) {
+  if (query.isError || !query.data || (planoId && plano.isError) || juros.isError) {
     const semLinha = query.isError || !query.data;
     return (
       <Screen scroll={false}>
@@ -1555,7 +1600,7 @@ export function LancamentoEditando({ editandoId, ...props }: CorpoProps & { edit
             <View style={styles.errorCard}>
               <Icon name="exclamationmark.triangle" size="xl" color="danger" />
               <ThemedText type="smallBold">
-                {semLinha ? 'Não encontrei esse lançamento' : 'Não deu para carregar a compra desta parcela'}
+                {semLinha ? 'Não encontrei esse lançamento' : juros.isError ? 'Não deu para conferir os juros deste Pix' : 'Não deu para carregar a compra desta parcela'}
               </ThemedText>
               <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
                 {semLinha ? 'Ele pode ter sido apagado em outro aparelho.' : 'Pode ter sido a conexão.'}
@@ -1565,7 +1610,7 @@ export function LancamentoEditando({ editandoId, ...props }: CorpoProps & { edit
                   label="Tentar de novo"
                   variant="secondary"
                   size="sm"
-                  onPress={() => (semLinha ? query.refetch() : plano.refetch())}
+                  onPress={() => (semLinha ? query.refetch() : juros.isError ? juros.refetch() : plano.refetch())}
                 />
                 <Button label="Voltar" size="sm" onPress={props.onFechar} />
               </View>

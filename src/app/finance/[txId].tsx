@@ -16,6 +16,7 @@ import { Row, Section } from '@/components/ui/row';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { describeRRule } from '@/lib/rrule-text';
+import { paymentMethodLabel } from '@/lib/payment-method';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
@@ -134,6 +135,7 @@ export default function TransactionDetailScreen() {
     save.mutate(
       {
         id: tx.id,
+        expectedRevision: tx.edit_revision,
         kind: tx.kind,
         amount_cents: tx.amount_cents,
         category: tx.category,
@@ -161,6 +163,7 @@ export default function TransactionDetailScreen() {
         account_id: tx.account_id,
         counterparty_account_id: tx.counterparty_account_id,
         occurred_at: localISODate(),
+        payment_method: tx.payment_method ?? null,
       },
       {
         onSuccess: () => toast({ message: 'Dupliquei para hoje.', tone: 'success' }),
@@ -353,6 +356,7 @@ export default function TransactionDetailScreen() {
     <>
       <Section title="Como isso entrou">
         <Row title={SOURCE_LABEL[tx.source]} subtitle="Origem" icon={SOURCE_ICON[tx.source]} />
+        <Row title={paymentMethodLabel(tx.payment_method)} subtitle="Forma de pagamento" icon="creditcard" />
         {tx.merchant ? <Row title={tx.merchant} subtitle="Estabelecimento" icon="storefront" /> : null}
         {created !== tx.occurred_at ? (
           <Row title={formatDateBR(created)} subtitle="Registrado em" icon="calendar" />
@@ -491,19 +495,19 @@ export default function TransactionDetailScreen() {
         menu={{
           title: 'Lançamento',
           actions: [
-            {
+            ...(tx.pix_fee_for_transaction_id ? [] : [{
               label: 'Mudar categoria',
-              icon: 'tag',
+              icon: 'tag' as const,
               // Numa série, parcela ou dívida, a categoria tem alcance. O formulário pergunta
               // depois da edição; o atalho de uma escrita só ignoraria essa decisão.
               ...(tx.recurring_id || tx.installment_plan_id || tx.debt_id
                 ? { onPress: () => router.push(hrefDoLancamento(tx, { month })) }
                 : { actions: acoesDeCategoria }),
-            },
+            }]),
             // Pagamento de dívida não duplica: a cópia seria um gasto solto, sem baixar a dívida.
             // A próxima parcela se paga no "Paguei" de Dívidas. O de FATURA também: a cópia seria
             // uma transferência para o cartão que a fatura não conta — paga-se de novo na fatura.
-            ...(tx.debt_id || tx.pays_invoice_id
+            ...(tx.debt_id || tx.pays_invoice_id || tx.pix_fee_for_transaction_id
               ? []
               : [{ label: 'Duplicar', icon: 'plus.square.on.square' as const, onPress: duplicate }]),
             {

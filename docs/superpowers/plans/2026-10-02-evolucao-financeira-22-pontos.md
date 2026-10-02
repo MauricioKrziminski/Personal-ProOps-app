@@ -59,14 +59,16 @@ assert.equal(paymentMethodError('debit', { type: 'credit_card' }), 'Escolha uma 
 assert.equal(paymentMethodLabel(null), 'Não informado');
 ```
 
-- [ ] Provar RED do contrato, conservação entre formatos/builders e round trip SQL.
-- [ ] Implementar schema/defaults por tipo e compatibilidade legado/cliente anterior.
-- [ ] Implementar componente e campos compartilhados, edição/conversão/simulação.
-- [ ] Resolver atomicidade e vínculo dos juros no fluxo tocado; não selecionar juro ambíguo.
-- [ ] Rodar testes focados + types/lint/node tests; pytest/ruff quando Python mudar.
-- [ ] Provar SQL: null, seis métodos, campo omitido, limpar, workspace errado, escopos, idempotência, preview sem persistência, duas compras Pix no mesmo dia e entrada independente.
-- [ ] Testar criação/edição/cancelamento/troca de formato e salvar/criar outro no iOS/Android, com conferência de método/saldo/fatura.
-- [ ] Registrar aceite, imagens e limitações; liberar F02.
+- [x] Provar RED do contrato, conservação entre formatos/builders e round trip SQL.
+- [x] Implementar schema/defaults por tipo e compatibilidade legado/cliente anterior.
+- [x] Implementar componente e campos compartilhados, edição/conversão/simulação.
+- [x] Resolver atomicidade e vínculo dos juros no fluxo tocado; não selecionar juro ambíguo.
+- [x] Rodar testes focados + types/lint/node tests; pytest/ruff quando Python mudar.
+- [x] Provar SQL: null, seis métodos, campo omitido, limpar, workspace errado, escopos, idempotência, preview sem persistência, duas compras Pix no mesmo dia e entrada independente.
+- [x] Testar criação/edição/cancelamento/troca de formato e salvar/criar outro no iOS/Android, com conferência de método/saldo/fatura.
+- [x] Registrar aceite, imagens e limitações; liberar F02.
+
+Aceite técnico em 02/10/2026 no staging; [matriz e limites](../../qa/2026-10-02-evolucao-financeira/f01/registro-nativo.md).
 
 ### F02 — Cadastro de origem no contexto
 

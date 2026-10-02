@@ -4,6 +4,7 @@ import type { IconName } from '@/components/ui/icon';
 import type { NoteColorName } from '@/constants/theme';
 import { aparenciaDaCategoria, nomeDaCategoria, type Categoria } from '@/lib/categorias';
 import { contaNaFatura } from '@/lib/card-status';
+import { assertPaymentMethod, type PaymentMethod } from '@/lib/payment-method';
 import { invalidateFinance, invalidateKeys } from '@/lib/query-invalidation';
 import type { Natureza } from '@/lib/import-preview';
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -33,9 +34,7 @@ import {
   DESCRICAO_JUROS_DO_PIX,
   argsDaParcelada,
   linhaDaRecorrente,
-  linhaDeJuros,
   linhaDoFinanciamento,
-  linhasDoLancamento,
   type EntradaParcelada,
   type EntradaRecorrente,
 } from '@/lib/escrita';
@@ -99,6 +98,9 @@ export type Transaction = Pick<
   | 'auto_confirm'
 > & {
   kind: TransactionKind;
+  payment_method?: PaymentMethod | null;
+  /** Taxa explícita pertence a um lançamento e é editada pelo formulário dele. */
+  pix_fee_for_transaction_id?: string | null;
   source: TransactionSource;
   status: TransactionStatus;
   down_payment_debt_id?: string | null;
@@ -203,7 +205,7 @@ export type RecurringTransaction = Pick<
   // O estabelecimento da série (`20260926120000`): o "Recorrente" do lançamento o perdia.
   | 'merchant'
   | 'edit_revision'
-> & { kind: 'expense' | 'income' };
+> & { kind: 'expense' | 'income'; payment_method?: PaymentMethod | null };
 
 export type MonthlyCashflow = Fns['monthly_cashflow']['Returns'][number];
 
@@ -212,7 +214,7 @@ export type TxSummaryRow = Omit<Fns['transactions_summary']['Returns'][number], 
 };
 
 const TRANSACTION_COLUMNS =
-  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_balance_after_cents, edit_revision, auto_confirm, rollover_of_invoice_id, pays_invoice_id, down_payment_debt_id, down_payment_plan_id, installment_plans!transactions_installment_plan_id_fkey(first_occurred_at)';
+  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, payment_method, pix_fee_for_transaction_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_balance_after_cents, edit_revision, auto_confirm, rollover_of_invoice_id, pays_invoice_id, down_payment_debt_id, down_payment_plan_id, installment_plans!transactions_installment_plan_id_fkey(first_occurred_at)';
 
 export interface TransactionFilters {
   /**
@@ -344,7 +346,7 @@ export function useExpectedLedgerLines(from: string | undefined, to: string | un
       // A RPC aceita 62 dias. Lotes de quatro limitam carga e uma falha rejeita o período inteiro.
       for (let i = 0; i < windows.length; i += 4) {
         const batches = await Promise.all(windows.slice(i, i + 4).map(window =>
-          fetchPaged<ExpectedLedgerLine>((start, end) => supabase.rpc('ledger_expected_lines', {
+          fetchPaged<ExpectedLedgerLine>((start, end) => supabase.rpc('ledger_expected_lines_payment', {
             p_from: window.from, p_to: window.to, p_recurring_id: recurringId ?? undefined,
           }).order('due_date').order('origin').order('ref_id').range(start, end).abortSignal(signal)),
         ));
@@ -549,7 +551,7 @@ export function useGoals() {
 }
 
 const RECURRING_COLUMNS =
-  'id, kind, amount_cents, currency, category, description, merchant, account_id, rrule, next_run_at, active, run_attempts, last_error, created_at, dtstart, end_date, auto_confirm, edit_revision';
+  'id, kind, amount_cents, currency, category, description, merchant, account_id, payment_method, rrule, next_run_at, active, run_attempts, last_error, created_at, dtstart, end_date, auto_confirm, edit_revision';
 
 /**
  * As categorias do espaço, mais usada primeiro: as que os lançamentos usam e as criadas no app,
@@ -969,6 +971,7 @@ export function useCreateInstallmentPlan() {
  */
 export function useUpdateInstallmentPlan() {
   const invalidate = useInvalidateFinance();
+  const attempt = useRef<{ key: string; id: string } | null>(null);
   return useMutation({
     mutationFn: async (input: {
       planId: string;
@@ -981,8 +984,11 @@ export function useUpdateInstallmentPlan() {
       accountId: string | null;
       /** "Parcelas já pagas" (`20260926130000`): só quando mudou — ausente, nada muda nelas. */
       paidInstallments?: number | null;
+      paymentMethod?: PaymentMethod | null;
+      expectedRevision?: number;
     }) => {
-      const { error } = await supabase.rpc('update_installment_plan', {
+      assertPaymentMethod(input.paymentMethod);
+      const dados = {
         p_plan_id: input.planId,
         p_total_cents: input.totalCents,
         p_installments: input.installments,
@@ -992,6 +998,13 @@ export function useUpdateInstallmentPlan() {
         p_merchant: input.merchant ?? undefined,
         p_account_id: input.accountId ?? undefined,
         p_paid_installments: input.paidInstallments ?? undefined,
+        ...(input.paymentMethod !== undefined ? { p_payment_method: input.paymentMethod } : {}),
+        ...(input.expectedRevision !== undefined ? { p_expected_revision: input.expectedRevision } : {}),
+      };
+      const key = JSON.stringify(dados);
+      if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
+      const { error } = await supabase.rpc('update_installment_plan_payment', {
+        p_input: { ...dados, p_request_id: attempt.current.id } as Json,
       });
       if (error) throw error;
     },
@@ -1033,15 +1046,18 @@ export function useConvertToInstallments() {
       /** "Parcelas já pagas", como na criação (`20260926130000`). */
       paidInstallments?: number | null;
       downPayment?: DownPaymentInput;
+      paymentMethod?: PaymentMethod | null;
     }) => {
-      if (input.downPayment) {
+      if (input.downPayment || input.paymentMethod !== undefined) {
         const payload = {
           p_origem: { tipo: 'transacao', id: input.transactionId }, p_alcance: 'converter',
           p_destino: { tipo: 'parcelada', dados: {
             p_account_id: input.accountId, p_total_cents: input.totalCents,
             p_installments: input.installments, p_occurred_at: input.firstOccurredAt,
             p_paid_installments: input.paidInstallments ?? 0, p_description: input.description,
-            p_category: input.category, p_merchant: input.merchant, down_payment: input.downPayment,
+            p_category: input.category, p_merchant: input.merchant,
+            ...(input.downPayment ? { down_payment: input.downPayment } : {}),
+            ...(input.paymentMethod !== undefined ? { p_payment_method: input.paymentMethod } : {}),
           } },
         };
         const key = JSON.stringify(payload);
@@ -1859,7 +1875,7 @@ export type Debt = Pick<
   | 'payment_category'
   | 'payment_description'
   | 'payment_merchant'
-> & { kind: (typeof DEBT_KINDS)[number]['value']; calculation_mode: 'amortized' | 'fixed_installments' };
+> & { kind: (typeof DEBT_KINDS)[number]['value']; calculation_mode: 'amortized' | 'fixed_installments'; payment_method?: PaymentMethod | null };
 
 export type DebtScheduleRow = Omit<Fns['debt_schedule']['Returns'][number], 'interest_cents' | 'principal_cents'> & { interest_cents: number | null; principal_cents: number | null };
 export type PayoffRow = Omit<Fns['payoff_strategy']['Returns'][number], 'interest_rate_monthly' | 'total_interest_cents'> & { interest_rate_monthly: number | null; total_interest_cents: number | null };
@@ -1880,7 +1896,7 @@ export function useDebts() {
 }
 
 const DEBT_COLUMNS =
-  'id, name, kind, calculation_mode, principal_cents, remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, account_id, due_day, archived, first_due_date, updated_at, edit_revision, payment_category, payment_description, payment_merchant';
+  'id, name, kind, calculation_mode, principal_cents, remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, account_id, payment_method, due_day, archived, first_due_date, updated_at, edit_revision, payment_category, payment_description, payment_merchant';
 
 /**
  * As arquivadas (23/09/2026). Arquivar tirava a dívida da lista e não havia volta em lugar
@@ -2087,7 +2103,7 @@ export function useSaveDebtPaymentScoped() {
     mutationFn: async (input: {
       anchorId: string;
       scope: 'one' | 'from_here' | 'all';
-      patch: Partial<Pick<Transaction, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'occurred_at'>>;
+      patch: Partial<Pick<Transaction, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'occurred_at' | 'payment_method'>>;
       debtRevision: number;
       anchorRevision: number;
       paymentVersions: Record<string, number>;
@@ -2598,12 +2614,20 @@ export function usePayoffStrategy(estrategia: 'avalanche' | 'snowball') {
  */
 export function useCreateRecurring() {
   const invalidate = useInvalidateFinance();
+  const attempt = useRef<{ key: string; id: string } | null>(null);
   return useMutation({
     mutationFn: async (input: EntradaRecorrente) => {
-      const { error } = await supabase
-        .from('recurring_transactions')
-        .insert({ ...linhaDaRecorrente(input), user_id: await userId() } as never);
+      const payload = linhaDaRecorrente(input);
+      const key = JSON.stringify(payload);
+      if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
+      const requestId = attempt.current.id;
+      const { data, error } = await supabase.rpc('create_recurring_payment', {
+        p_input: payload as Json,
+        p_request_id: requestId,
+      });
       if (error) throw error;
+      if (attempt.current?.id === requestId) attempt.current = null;
+      return data as { id: string; revision: number };
     },
     onSuccess: invalidate,
   });
@@ -2625,6 +2649,7 @@ export function useSaveDebt() {
       installments_paid?: number;
       installment_cents: number | null;
       account_id: string | null;
+      payment_method?: PaymentMethod | null;
       due_day: number | null;
       /** A âncora do contrato (`debts.first_due_date`) — só vai quando a tela a conhece. */
       first_due_date?: string | null;
@@ -3062,6 +3087,8 @@ export interface TransactionInput {
   merchant?: string | null;
   /** Só muda algo em `pending`: `_promote_due_transactions` não olha linha já baixada. */
   auto_confirm?: boolean;
+  /** Omitido preserva o método; null limpa a escolha explicitamente. */
+  payment_method?: PaymentMethod | null;
 }
 
 /**
@@ -3074,17 +3101,16 @@ export interface TransactionInput {
  * Quem resolve a fatura das duas é o trigger `set_invoice`: mesma conta e mesma data caem
  * no mesmo ciclo, sem o app calcular nada.
  */
-/** O texto que marca a linha de juros do Pix no crédito — é por ele que a edição a acha. */
+/** Rótulo humano da taxa; sua propriedade é definida pelo vínculo no banco. */
 export { DESCRICAO_JUROS_DO_PIX };
 
 /**
- * A linha de juros do Pix que nasceu junto com esta compra (26/09/2026: *"tudo que se cria se
- * edita"*). Ela é gravada solta, na mesma conta e data, com a descrição fixa — sem coluna de
- * vínculo —, então é por esses três que a edição a encontra.
+ * Somente a taxa vinculada explicitamente a esta compra. Linhas antigas sem vínculo
+ * continuam independentes: descrição, conta e data não provam a quem uma taxa pertence.
  */
 export function useJurosDoPix(tx: Transaction | null | undefined) {
   // A compra no cartão OU o Pix no crédito para conta própria (transferência que sai do cartão).
-  const procura = Boolean(tx?.invoice_id && contaNaFatura(tx.kind) && tx.description !== DESCRICAO_JUROS_DO_PIX && !tx.installment_plan_id);
+  const procura = Boolean(tx?.invoice_id && contaNaFatura(tx.kind) && !tx.pix_fee_for_transaction_id && !tx.installment_plan_id);
   return useQuery({
     queryKey: ['transactions', 'juros-do-pix', tx?.id],
     enabled: procura,
@@ -3092,12 +3118,7 @@ export function useJurosDoPix(tx: Transaction | null | undefined) {
       const { data, error } = await supabase
         .from('transactions')
         .select('id, amount_cents')
-        .eq('account_id', tx!.account_id!)
-        .eq('occurred_at', tx!.occurred_at)
-        .eq('category', 'juros')
-        .eq('description', DESCRICAO_JUROS_DO_PIX)
-        .neq('id', tx!.id)
-        .limit(1)
+        .eq('pix_fee_for_transaction_id', tx!.id)
         .maybeSingle();
       if (error) throw error;
       return data;
@@ -3107,46 +3128,34 @@ export function useJurosDoPix(tx: Transaction | null | undefined) {
 
 export function useSaveTransaction() {
   const invalidate = useInvalidateFinance();
+  const attempt = useRef<{ key: string; id: string } | null>(null);
   return useMutation({
-    mutationFn: async ({
-      id,
-      fee_cents,
-      juros,
-      ...input
-    }: TransactionInput & {
+    mutationFn: async ({ id, fee_cents, juros, expectedRevision, ...input }: TransactionInput & {
       id?: string;
+      expectedRevision?: number;
       fee_cents?: number;
-      /** Editando: a linha de juros do Pix desta compra (`useJurosDoPix`) e o valor novo dela. */
+      /** O vínculo é resolvido pelo banco; o cliente informa apenas o valor pretendido. */
       juros?: { id: string | null; cents: number };
     }) => {
-      if (id) {
-        const { error } = await supabase.from('transactions').update(input).eq('id', id).select('id').single();
-        if (error) throw error;
-        // O juro acompanha a compra: valor novo, data e conta dela; zero apaga; sem linha, nasce.
-        if (juros?.id && juros.cents > 0) {
-          const { error: e } = await supabase
-            .from('transactions')
-            .update({ amount_cents: juros.cents, occurred_at: input.occurred_at, account_id: input.account_id })
-            .eq('id', juros.id);
-          if (e) throw Object.assign(e, { compraSalva: true });
-        } else if (juros?.id) {
-          const { error: e } = await supabase.from('transactions').delete().eq('id', juros.id);
-          if (e) throw Object.assign(e, { compraSalva: true });
-        } else if (juros && juros.cents > 0) {
-          const { error: e } = await supabase
-            .from('transactions')
-            .insert(linhaDeJuros({ ...input, user_id: await userId(), source: 'app' as const }, juros.cents));
-          if (e) throw Object.assign(e, { compraSalva: true });
-        }
-        return;
+      if (id && expectedRevision === undefined) {
+        throw new Error('Atualize o lançamento antes de salvar. Não consegui conferir a versão.');
       }
-      const uid = await userId();
-      // As linhas saem de `linhasDoLancamento` — a mesma função da hipótese (`simular`). Ela
-      // também é a segunda trava do juro do Pix (nunca numa receita).
-      const linhas = linhasDoLancamento({ ...input, fee_cents }).map((l) => ({ ...l, user_id: uid }));
-      // Um insert só: meia gravação deixaria o juro sem a compra (ou o contrário) na fatura.
-      const { error } = await supabase.from('transactions').insert(linhas as never);
+      if (input.payment_method !== undefined) assertPaymentMethod(input.payment_method);
+      const payload = {
+        p_transaction_id: id ?? null,
+        p_input: input as unknown as Json,
+        p_fee_cents: juros?.cents ?? fee_cents ?? null,
+        p_expected_revision: expectedRevision ?? null,
+      };
+      const key = JSON.stringify(payload);
+      if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
+      const requestId = attempt.current.id;
+      const { data, error } = await supabase.rpc('save_transaction_payment', {
+        ...payload, p_request_id: requestId,
+      });
       if (error) throw error;
+      if (attempt.current?.id === requestId) attempt.current = null;
+      return data as unknown as { id: string; revision: number; fee_id: string | null };
     },
     onSuccess: invalidate,
   });
@@ -3203,7 +3212,7 @@ export function useSaveTransactionScoped() {
     }: {
       id: string;
       scope: 'one' | 'future';
-      patch: Partial<Pick<TransactionInput, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id'>>;
+      patch: Partial<Pick<TransactionInput, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'payment_method'>>;
     }) => {
       const { data, error } = await supabase.rpc('update_transaction_scoped', {
         p_transaction_id: id,
@@ -3226,7 +3235,7 @@ export function useSaveInstallmentOccurrence() {
       scope?: 'one' | 'future' | 'all';
       patch: Partial<Pick<TransactionInput,
         'amount_cents' | 'category' | 'description' | 'merchant' | 'occurred_at' |
-        'status' | 'due_at' | 'auto_confirm'>> & { total_cents?: number };
+        'status' | 'due_at' | 'auto_confirm' | 'payment_method'>> & { total_cents?: number };
       /** "Último dia de todo mês": depois da edição, as parcelas do alcance vão ao fim do mês. */
       lastDay?: boolean;
     }) => {
@@ -3263,6 +3272,7 @@ export function useSaveRecurringSeries() {
         merchant?: string | null;
         kind?: 'expense' | 'income';
         account_id?: string | null;
+        payment_method?: PaymentMethod | null;
         auto_confirm?: boolean;
         end_date?: string | null;
         /** O calendário vai junto: regra nova e o próximo vencimento (`20260926120000`). */
@@ -3303,7 +3313,7 @@ export function useSaveRecurringAll() {
     mutationFn: async (input: {
       recurringId: string;
       linePatch: Partial<Pick<TransactionInput,
-        'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id'>>;
+        'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'payment_method'>>;
       seriesPatch: {
         amount_cents?: number;
         category?: string | null;
@@ -3365,7 +3375,7 @@ export function useSaveRecurringOccurrenceAndSeries() {
       recurringId: string;
       expectedRevision: number;
       requestId: string;
-      linePatch: Partial<Pick<TransactionInput, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id'>>;
+      linePatch: Partial<Pick<TransactionInput, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'payment_method'>>;
       seriesPatch: {
         amount_cents?: number;
         category?: string | null;
@@ -3703,6 +3713,8 @@ export interface InstallmentParcel {
 
 export interface InstallmentPlanSummary {
   id: string;
+  payment_method?: PaymentMethod | null;
+  edit_revision?: number;
   /**
    * O TÍTULO da compra, com o estabelecimento de reserva — `description || merchant`.
    *
@@ -3808,11 +3820,12 @@ async function buscarPlanos(apenas?: string): Promise<InstallmentPlanSummary[]> 
   type Plano = {
     id: string; merchant: string | null; description: string | null; category: string | null;
     account_id: string | null; total_cents: number; installments: number; first_occurred_at: string;
+    payment_method: PaymentMethod | null; edit_revision: number;
   };
   const plans = await fetchPaged<Plano>((from, to) => {
     const consulta = supabase
       .from('installment_plans')
-      .select('id, merchant, description, category, account_id, total_cents, installments, first_occurred_at');
+      .select('id, merchant, description, category, account_id, total_cents, installments, first_occurred_at, payment_method, edit_revision');
     return (apenas ? consulta.eq('id', apenas) : consulta.order('first_occurred_at', { ascending: false }).order('id')).range(from, to);
   });
   if (!plans.length) return [];
@@ -3878,6 +3891,8 @@ async function buscarPlanos(apenas?: string): Promise<InstallmentPlanSummary[]> 
       merchant: plan.merchant,
       category: plan.category,
       account_id: plan.account_id,
+      payment_method: plan.payment_method,
+      edit_revision: plan.edit_revision,
       total_cents: plan.total_cents,
       installments: n,
       paid: parcels.filter((p) => p.status === 'cleared').length,

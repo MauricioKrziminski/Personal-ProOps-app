@@ -38,6 +38,184 @@ function loadHooks(client: QueryClient, entry = 'src/hooks/use-finance.ts', depe
   return load(entry);
 }
 
+test('F01: compra e taxa usam uma RPC atômica; perda da resposta repete a mesma intenção', async () => {
+  const client = new QueryClient();
+  const calls: any[] = [];
+  let sequence = 0;
+  const mutation = loadHooks(client, 'src/hooks/use-finance.ts', {
+    '@/lib/agent-chat': { newClientMessageId: () => `request-${++sequence}` },
+    '@/lib/supabase': { supabase: {
+      auth: { getUser: async () => ({ data: { user: { id: 'user-1' } } }) },
+      from: () => ({ insert: async () => ({ error: null }) }),
+      rpc: async (name: string, args: any) => {
+      calls.push({ name, args });
+      return calls.length === 1 ? { error: new Error('response lost') } : { data: { id: 'tx-1', revision: 1, fee_id: 'fee-1' }, error: null };
+    } } },
+  }).useSaveTransaction();
+  const input = { kind: 'expense', amount_cents: 10000, category: 'mercado', description: 'Mercado',
+    account_id: 'card', counterparty_account_id: null, occurred_at: '2026-10-02', payment_method: 'pix', fee_cents: 500 };
+  try {
+    await assert.rejects(mutation.mutationFn(input), /response lost/);
+    const result = await mutation.mutationFn(input);
+    assert.equal(result.id, 'tx-1');
+    assert.equal(calls[0].name, 'save_transaction_payment');
+    assert.equal(calls[0].args.p_input.payment_method, 'pix');
+    assert.equal(calls[0].args.p_fee_cents, 500);
+    assert.equal(calls[0].args.p_request_id, calls[1].args.p_request_id);
+    await mutation.mutationFn({ ...input, fee_cents: 600 });
+    assert.notEqual(calls[1].args.p_request_id, calls[2].args.p_request_id);
+  } finally { client.clear(); }
+});
+
+test('F01: edição envia a revisão lida e distingue método omitido de limpeza explícita', async () => {
+  const client = new QueryClient();
+  const calls: any[] = [];
+  const mutation = loadHooks(client, 'src/hooks/use-finance.ts', {
+    '@/lib/agent-chat': { newClientMessageId: () => `request-${calls.length}` },
+    '@/lib/supabase': { supabase: {
+      from: () => ({ update: () => ({ eq: () => ({ select: () => ({ single: async () => ({ error: null }) }) }) }) }),
+      rpc: async (name: string, args: any) => {
+      calls.push({ name, args }); return { data: { id: 'tx-1', revision: 8, fee_id: null }, error: null };
+    } } },
+  }).useSaveTransaction();
+  const input = { id: 'tx-1', expectedRevision: 7, kind: 'income', amount_cents: 10000, category: null,
+    description: 'Freela', account_id: 'bank', counterparty_account_id: null, occurred_at: '2026-10-02' };
+  try {
+    await mutation.mutationFn(input);
+    await mutation.mutationFn({ ...input, payment_method: null });
+    assert.equal(calls.length, 2, 'cada intenção é enviada à operação atômica');
+    assert.equal(calls[0].args.p_expected_revision, 7);
+    assert.equal('payment_method' in calls[0].args.p_input, false);
+    assert.equal(calls[1].args.p_input.payment_method, null);
+    assert.equal(calls[0].args.p_fee_cents, null, 'campo omitido preserva taxa vinculada');
+    assert.equal('expectedRevision' in calls[0].args.p_input, false);
+  } finally { client.clear(); }
+});
+
+test('F01: editar compra inteira envia forma e revisão e reutiliza a intenção no retry', async () => {
+  const client = new QueryClient();
+  const calls: any[] = [];
+  let sequence = 0;
+  const mutation = loadHooks(client, 'src/hooks/use-finance.ts', {
+    '@/lib/agent-chat': { newClientMessageId: () => `request-${++sequence}` },
+    '@/lib/supabase': { supabase: { rpc: async (name: string, args: any) => {
+      calls.push({ name, args }); return calls.length === 1 ? { error: new Error('lost') } : { data: 3, error: null };
+    } } },
+  }).useUpdateInstallmentPlan();
+  const input = { planId: 'plan-1', totalCents: 10000, installments: 3, firstOccurredAt: '2026-10-02',
+    description: 'Compra', category: null, merchant: null, accountId: 'card', paymentMethod: 'credit', expectedRevision: 4 };
+  try {
+    await assert.rejects(mutation.mutationFn(input), /lost/);
+    await mutation.mutationFn(input);
+    assert.equal(calls[0].name, 'update_installment_plan_payment');
+    assert.equal(calls[0].args.p_input.p_payment_method, 'credit');
+    assert.equal(calls[0].args.p_input.p_expected_revision, 4);
+    assert.equal(calls[0].args.p_input.p_request_id, calls[1].args.p_input.p_request_id);
+    await mutation.mutationFn({ ...input, paymentMethod: null });
+    assert.equal(calls[2].args.p_input.p_payment_method, null);
+    assert.notEqual(calls[1].args.p_input.p_request_id, calls[2].args.p_input.p_request_id);
+  } finally { client.clear(); }
+});
+
+test('F01: duplicar deliberadamente depois do sucesso cria uma nova intenção', async () => {
+  const client = new QueryClient();
+  const requests: string[] = [];
+  let sequence = 0;
+  const mutation = loadHooks(client, 'src/hooks/use-finance.ts', {
+    '@/lib/agent-chat': { newClientMessageId: () => `request-${++sequence}` },
+    '@/lib/supabase': { supabase: { rpc: async (_name: string, args: any) => {
+      requests.push(args.p_request_id); return { data: { id: `tx-${requests.length}`, revision: 0, fee_id: null }, error: null };
+    } } },
+  }).useSaveTransaction();
+  const input = { kind: 'expense', amount_cents: 10000, category: null, description: 'Mercado',
+    account_id: 'bank', counterparty_account_id: null, occurred_at: '2026-10-02', payment_method: 'pix' };
+  try {
+    await mutation.mutationFn(input);
+    await mutation.mutationFn(input);
+    assert.notEqual(requests[0], requests[1], 'um novo toque após confirmação é uma nova criação');
+  } finally { client.clear(); }
+});
+
+test('F01: criação recorrente repete a intenção após perder resposta e renova após confirmação', async () => {
+  const client = new QueryClient();
+  const calls: any[] = [];
+  let sequence = 0;
+  const mutation = loadHooks(client, 'src/hooks/use-finance.ts', {
+    '@/lib/agent-chat': { newClientMessageId: () => `request-${++sequence}` },
+    '@/lib/supabase': { supabase: {
+      auth: { getUser: async () => ({ data: { user: { id: 'user-1' } } }) },
+      from: () => ({ insert: async (args: any) => {
+        calls.push({ name: 'insert', args });
+        return calls.length === 1 ? { error: new Error('response lost') } : { error: null };
+      } }),
+      rpc: async (name: string, args: any) => {
+      calls.push({ name, args });
+      return calls.length === 1 ? { error: new Error('response lost') } : { data: { id: 'rec-1', revision: 0 }, error: null };
+    } } },
+  }).useCreateRecurring();
+  const input = { kind: 'expense', amount_cents: 10000, category: null, description: 'Internet',
+    account_id: 'bank', start_date: '2026-10-02', rrule: 'FREQ=MONTHLY;BYMONTHDAY=2', payment_method: 'boleto', auto_confirm: false };
+  try {
+    await assert.rejects(mutation.mutationFn(input), /response lost/);
+    await mutation.mutationFn(input);
+    assert.equal(calls[0].name, 'create_recurring_payment');
+    assert.equal(calls[0].args.p_input.payment_method, 'boleto');
+    assert.equal(calls[0].args.p_request_id, calls[1].args.p_request_id);
+    await mutation.mutationFn(input);
+    assert.notEqual(calls[1].args.p_request_id, calls[2].args.p_request_id);
+  } finally { client.clear(); }
+});
+
+test('F01: editar juros consulta somente o vínculo explícito, mesmo com mesma conta e data', async () => {
+  const client = new QueryClient();
+  const filters: any[] = [];
+  const query = loadHooks(client, 'src/hooks/use-finance.ts', {
+    '@tanstack/react-query': { useQuery: (options: any) => options },
+    '@/lib/supabase': { supabase: { from: () => ({ select: () => ({
+      eq: (name: string, value: unknown) => { filters.push([name, value]); return { maybeSingle: async () => ({ data: { id: 'fee-2', amount_cents: 500 }, error: null }) }; },
+    }) }) } },
+  }).useJurosDoPix({ id: 'purchase-2', invoice_id: 'invoice-1', kind: 'transfer', description: 'Pix', account_id: 'card', occurred_at: '2026-10-02' });
+  try {
+    assert.equal(query.enabled, true);
+    const result = await query.queryFn();
+    assert.equal(result.id, 'fee-2');
+    assert.deepEqual(filters, [['pix_fee_for_transaction_id', 'purchase-2']]);
+  } finally { client.clear(); }
+});
+
+test('F01: título de juros no pai não impede carregar sua taxa vinculada; filho explícito não procura outra taxa', async () => {
+  const client = new QueryClient();
+  const filters: any[] = [];
+  const hooks = loadHooks(client, 'src/hooks/use-finance.ts', {
+    '@tanstack/react-query': { useQuery: (options: any) => options },
+    '@/lib/supabase': { supabase: { from: () => ({ select: () => ({
+      eq: (name: string, value: unknown) => { filters.push([name, value]); return { maybeSingle: async () => ({ data: { id: 'fee-linked', amount_cents: 500 }, error: null }) }; },
+    }) }) } },
+  });
+  const parent = { id: 'purchase-renamed', invoice_id: 'invoice-1', kind: 'expense',
+    description: 'Juros do Pix no crédito', account_id: 'card', occurred_at: '2026-10-02',
+    payment_method: 'pix', pix_fee_for_transaction_id: null };
+  try {
+    const query = hooks.useJurosDoPix(parent);
+    assert.equal(query.enabled, true, 'título editável não é identidade da linha filha');
+    const fee = await query.queryFn();
+    assert.equal(fee.amount_cents, 500, 'a taxa existente precisa chegar ao formulário ao reabrir');
+    assert.deepEqual(filters, [['pix_fee_for_transaction_id', parent.id]]);
+  } finally { client.clear(); }
+});
+
+test('F01: linha filha de juros com título alterado não consulta como compra pai', () => {
+  const client = new QueryClient();
+  try {
+    const hooks = loadHooks(client, 'src/hooks/use-finance.ts', {
+      '@tanstack/react-query': { useQuery: (options: any) => options },
+    });
+    const query = hooks.useJurosDoPix({ id: 'fee-linked', invoice_id: 'invoice-1', kind: 'expense',
+      description: 'Taxa renomeada', pix_fee_for_transaction_id: 'purchase-renamed' });
+    assert.equal(query.enabled, false, 'o vínculo explícito identifica a filha mesmo sem o título padrão');
+  } finally { client.clear(); }
+});
+
 test('conversion retries after a committed response is lost reuse the request and result', async () => {
   const client = new QueryClient();
   const committed = new Map<string, { ids: string[] }>();

@@ -13,17 +13,20 @@
  * A tela só oferece o que o banco aceita — botão habilitado que o servidor recusa é o espelho do
  * botão desabilitado que não explica.
  */
+import { normalizePaymentMethod, assertPaymentMethod, type PaymentMethod } from './payment-method.ts';
 import { brToISO, isValidBRDate, isoToBR, monthBounds } from './dates.ts';
 import { addMonthsISO } from './debt-history.ts';
 import { MAX_PARCELAS, digitarValor, valorExibido, parcelaDoTotal, type Contrato, type UnidadeDoValor } from './finance-form.ts';
 
 /** O que a compra gravada precisa ter para virar formulário (`InstallmentPlanSummary`). */
 export interface CompraGravada {
+  edit_revision?: number;
   id: string;
   description: string | null;
   merchant: string | null;
   category: string | null;
   account_id: string | null;
+  payment_method?: PaymentMethod | null;
   total_cents: number;
   installments: number;
   first_occurred_at: string;
@@ -38,11 +41,13 @@ export interface CompraGravada {
 }
 
 export interface CompraForm {
+  editRevision?: number;
   id: string;
   description: string;
   merchant: string;
   category: string | null;
   accountId: string | null;
+  paymentMethod?: PaymentMethod | null;
   totalCents: number;
   installments: number;
   /** `dd/mm/aaaa`, como a pessoa digita. */
@@ -78,10 +83,12 @@ export interface CompraForm {
 export function compraDoRegistro(p: CompraGravada): CompraForm {
   return {
     id: p.id,
+    ...(p.edit_revision !== undefined ? { editRevision: p.edit_revision } : {}),
     description: p.description ?? '',
     merchant: p.merchant ?? '',
     category: p.category,
     accountId: p.account_id,
+    ...(p.payment_method !== undefined ? { paymentMethod: normalizePaymentMethod(p.payment_method) } : {}),
     totalCents: p.total_cents,
     installments: p.installments,
     inicio: isoToBR(p.first_occurred_at),
@@ -112,7 +119,7 @@ export function compraDoRegistro(p: CompraGravada): CompraForm {
 export function compraParaRevisaoDaParcela(
   plano: CompraGravada,
   parcela: { installment_no: number | null; occurred_at: string; amount_cents: number; description: string | null },
-  rascunho: { occurred_at: string; amount_cents: number; description: string; merchant: string | null; category: string | null },
+  rascunho: { occurred_at: string; amount_cents: number; description: string; merchant: string | null; category: string | null; payment_method?: PaymentMethod | null },
 ): CompraForm {
   const base = compraDoRegistro(plano);
   const numero = parcela.installment_no ?? 1;
@@ -127,6 +134,7 @@ export function compraParaRevisaoDaParcela(
     description: tituloDaCompra,
     merchant: rascunho.merchant ?? '',
     category: rascunho.category,
+    ...(rascunho.payment_method !== undefined ? { paymentMethod: normalizePaymentMethod(rascunho.payment_method) } : {}),
     inicio: mudouData ? isoToBR(addMonthsISO(rascunho.occurred_at, 1 - numero)) : base.inicio,
     totalCents: mudouValor && abertas > 0
       ? plano.locked_cents + abertas * rascunho.amount_cents
@@ -196,8 +204,11 @@ export function mudarParcelas(f: CompraForm, n: number): Partial<CompraForm> {
 
 /** O que `update_installment_plan` recebe: as pagas só quando mudaram (senão nada muda nelas). */
 export function payloadDaCompra(f: CompraForm, isoDaData: string) {
+  assertPaymentMethod(f.paymentMethod);
   return {
     planId: f.id,
+    ...(f.editRevision !== undefined ? { expectedRevision: f.editRevision } : {}),
+    ...(f.paymentMethod !== undefined ? { paymentMethod: f.paymentMethod } : {}),
     totalCents: f.totalCents,
     installments: f.installments,
     firstOccurredAt: isoDaData,
@@ -223,11 +234,12 @@ export type EscopoDaCompra = 'one' | 'future' | 'all';
  * numa fatura de cartão o banco segura com o motivo.
  */
 export function edicaoEscopadaDaCompra(f: CompraForm, original: CompraGravada, scope: EscopoDaCompra, ancoraNo = 1):
-  | { kind: 'scope'; lastDay: boolean; patch: { total_cents?: number; amount_cents?: number; description?: string; merchant?: string | null; category?: string | null; occurred_at?: string } }
+  | { kind: 'scope'; lastDay: boolean; patch: { total_cents?: number; amount_cents?: number; description?: string; merchant?: string | null; category?: string | null; occurred_at?: string; payment_method?: PaymentMethod | null } }
   | { kind: 'contract' }
   | { kind: 'no-op' }
   | { kind: 'structural-rejection'; reason: string }
   | { kind: 'protected-rejection'; reason: string } {
+  assertPaymentMethod(f.paymentMethod);
   const changedCount = f.installments !== original.installments;
   const ultimoDia = Boolean(f.ultimoDia);
   const changedDate = f.inicio !== isoToBR(original.first_occurred_at) || ultimoDia;
@@ -265,12 +277,13 @@ export function edicaoEscopadaDaCompra(f: CompraForm, original: CompraGravada, s
   }
   if (structural) return { kind: 'contract' };
 
-  const patch: { total_cents?: number; amount_cents?: number; description?: string; merchant?: string | null; category?: string | null; occurred_at?: string } = {};
+  const patch: { total_cents?: number; amount_cents?: number; description?: string; merchant?: string | null; category?: string | null; occurred_at?: string; payment_method?: PaymentMethod | null } = {};
   if (changedAmount) patch.amount_cents = f.parcelaCents!;
   else if (changedTotal) patch.total_cents = f.totalCents;
   if (f.description.trim() !== (original.description ?? '')) patch.description = f.description.trim();
   if ((f.merchant.trim() || null) !== original.merchant) patch.merchant = f.merchant.trim() || null;
   if (f.category !== original.category) patch.category = f.category;
+  if (f.paymentMethod !== undefined && f.paymentMethod !== normalizePaymentMethod(original.payment_method)) patch.payment_method = f.paymentMethod;
   if (changedDate && isValidBRDate(f.inicio)) {
     const naAncora = addMonthsISO(brToISO(f.inicio), ancoraNo - 1);
     // "Só esta" não é regra: o último dia vira a data dela mesma

@@ -1,3 +1,5 @@
+import { PaymentMethodField } from '@/components/finance/payment-method-field';
+import { paymentMethodAccounts, paymentMethodError } from '@/lib/payment-method';
 /**
  * Os campos da SÉRIE recorrente num lugar só (26/09/2026, *"uma tela só de editar
  * componentizada… ter todos os campos de quando eu crio ao editar"*). As regras, puras e com
@@ -35,6 +37,8 @@ export function CamposDaSerie({
   rotuloDaData?: string;
 }) {
   const { inicioOk, fimOk, tituloOk, agendaNoPassado, inicioDate } = validaSerie(form);
+  const origem = contas.find((c) => c.id === form.accountId) ?? null;
+  const erroMetodo = paymentMethodError(form.paymentMethod, origem);
   const editando = Boolean(form.id);
   const mudaAgenda = (parte: Partial<SerieForm>) => onChange({ ...form, ...parte, agendaMudou: editando || form.agendaMudou });
   const periodo = form.preset === 'weekly' ? 'da semana' : form.preset === 'yearly' ? 'do ano' : 'do mês';
@@ -87,10 +91,13 @@ export function CamposDaSerie({
         <CategoryPicker value={form.category} onChange={(category) => onChange({ ...form, category })} />
       </Field>
 
-      <Field label="Conta">
+      <PaymentMethodField value={form.paymentMethod} onChange={(paymentMethod) => onChange({ ...form, paymentMethod })} error={!origem ? erroMetodo ?? undefined : undefined} />
+
+      <Field label="Conta" error={origem ? erroMetodo ?? undefined : undefined} hint={origem && erroMetodo ? `Origem selecionada: ${origem.name}` : undefined}>
         <AccountPicker
-          accounts={contas}
+          accounts={paymentMethodAccounts(form.paymentMethod, contas)}
           value={form.accountId}
+          selectedAccount={origem}
           onChange={(accountId: string | null) => onChange({ ...form, accountId })}
           emptyLabel="Não informar"
         />

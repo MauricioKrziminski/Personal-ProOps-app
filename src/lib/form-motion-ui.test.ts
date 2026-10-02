@@ -150,6 +150,11 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === '@/components/finance/date-picker-field') return { DatePickerField: 'DatePickerField' };
       if (id === '@/components/ui/switch-row') return { SwitchRow: 'SwitchRow' };
       if (id === '@/lib/down-payment') return load('src/lib/down-payment.ts');
+      if (id === '@/lib/payment-method' || id === './payment-method.ts') return load('src/lib/payment-method.ts');
+      if (id === '@/components/finance/payment-method-field') return load('src/components/finance/payment-method-field.tsx');
+      if (id === '@/components/ui/select-field') return file.endsWith('/account-picker.tsx') ? load('src/components/ui/select-field.tsx') : { SelectField: 'SelectField' };
+      if (id === '@/lib/accounts') return load('src/lib/accounts.ts');
+      if (id === './text.ts') return load('src/lib/text.ts');
       if (id === '@/components/finance/calendar') return { Calendar: 'Calendar' };
       if (id === '@/lib/dates') return load('src/lib/dates.ts');
       if (id === './dates.ts') return load('src/lib/dates.ts');
@@ -601,6 +606,39 @@ test('TrocaSuave reduced motion interrupts pending work and full-screen mode pre
   ui.finish(pending);
   assert.equal(content(ui), 'c');
   assert.equal(ui.animations.length, 1, 'reduced motion does not enqueue another transition');
+});
+
+test('AccountPicker preserves a filtered selected identity without offering it as an eligible choice', () => {
+  const changes: any[] = [];
+  const selectedAccount = { id: 'bank', name: 'Nubank corrente', type: 'checking' };
+  const props = { accounts: [{ id: 'card', name: 'Nubank', type: 'credit_card', closing_day: 10 }],
+    selectedAccount, value: 'bank', emptyLabel: 'Sem conta', onChange: (id: unknown) => changes.push(id) };
+  const ui = montar('src/components/finance/account-picker.tsx', 'AccountPicker', props);
+  const header = () => ui.find((n) => n.type === 'PressableScale' && n.props.accessibilityState.expanded !== undefined);
+  assert.equal(header().props.accessibilityLabel, 'Nubank corrente, Corrente');
+  assert.ok(ui.nodes().some((n) => n.type === 'Icon' && n.props.name === 'building.columns'));
+  header().props.onPress(); ui.render();
+  assert.equal(header().props.accessibilityRole, 'button', 'fallback header closes; it is not an eligible radio');
+  assert.deepEqual(ui.nodes().filter((n) => n.props?.accessibilityRole === 'radio').map((n) => n.props.accessibilityLabel), ['Sem conta', 'Nubank, Cartão · fecha dia 10']);
+  header().props.onPress(); ui.render();
+  assert.deepEqual(changes, [], 'closing the preserved header must neither select an invalid account nor clear it');
+  header().props.onPress(); ui.render();
+  ui.find((n) => n.props?.accessibilityRole === 'radio' && n.props.accessibilityLabel.startsWith('Nubank,')).props.onPress();
+  assert.deepEqual(changes, ['card']);
+  ui.render({ ...props, value: 'card' });
+  assert.equal(header().props.accessibilityLabel, 'Nubank, Cartão · fecha dia 10');
+});
+
+test('SelectField ignores a mismatched fallback and prefers an eligible current option', () => {
+  const props = { value: 'a', options: [{ id: 'b', label: 'B' }], selectedOption: { id: 'b', label: 'Incorrect identity' },
+    placeholder: 'Escolher conta', onChange() {} };
+  const ui = montar('src/components/ui/select-field.tsx', 'SelectField', props);
+  const header = () => ui.find((n) => n.type === 'PressableScale' && n.props.accessibilityState.expanded !== undefined);
+  assert.equal(header().props.accessibilityLabel, 'Escolher conta');
+  ui.render({ ...props, value: 'b' });
+  assert.equal(header().props.accessibilityLabel, 'B');
+  ui.render({ ...props, value: null, selectedOption: { id: null, label: 'Invalid null fallback' } });
+  assert.equal(header().props.accessibilityLabel, 'Escolher conta');
 });
 
 test('SelectField delivers selection synchronously once, keeps one chosen row, and can reopen while closing', () => {

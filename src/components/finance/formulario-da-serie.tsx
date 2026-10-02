@@ -25,6 +25,7 @@ import { brToISO } from '@/lib/dates';
 import { askEditScope } from '@/lib/edit-scope';
 import { linhaDaRecorrente, type EntradaRecorrente } from '@/lib/escrita';
 import { financeErrorMessage } from '@/lib/finance-form';
+import { normalizePaymentMethod, paymentMethodError } from '@/lib/payment-method';
 import { comumParaSerie } from '@/lib/lancar';
 import { estadoDaRecorrencia } from '@/lib/recurring-state';
 import { SERIE_VAZIA, serieDoRegistro, validaSerie, type SerieForm } from '@/lib/serie';
@@ -111,18 +112,23 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
       merchant: c.estabelecimento ?? '',
       category: c.categoria,
       accountId: c.contaId,
+      paymentMethod: c.paymentMethod,
       inicio: c.dataBR,
     };
   });
 
   useEffect(() => {
-    registrarComum(() => ({ kind: form.kind, descricao: form.description, valorCents: form.amountCents, contaId: form.accountId, dataBR: form.inicio, categoria: form.category, estabelecimento: form.merchant }));
+    registrarComum(() => ({ kind: form.kind, descricao: form.description, valorCents: form.amountCents, contaId: form.accountId, dataBR: form.inicio, categoria: form.category, estabelecimento: form.merchant, paymentMethod: form.paymentMethod }));
     registrarEstado(() => form);
   });
 
-  const { inicioDate, agendaNoPassado, podeSalvar, rrulePrevia } = validaSerie(form);
+  const { inicioDate, agendaNoPassado, podeSalvar: basicoPodeSalvar, rrulePrevia } = validaSerie(form);
+
+  const erroMetodo = paymentMethodError(form.paymentMethod, (accounts.data ?? []).find((c) => c.id === form.accountId) ?? null);
+  const podeSalvar = basicoPodeSalvar && !erroMetodo;
 
   const salvar = (criarOutro: boolean) => {
+    if (!podeSalvar) return;
     if (form.id) {
       /**
        * Só o que MUDOU. `update_recurring_series` propaga toda chave presente para as
@@ -137,6 +143,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
       const desc = form.description.trim();
       if (!antes || desc !== antes.description) patch.description = desc;
       if (!antes || form.accountId !== antes.account_id) patch.account_id = form.accountId;
+      if (form.paymentMethod !== undefined && (!antes || form.paymentMethod !== normalizePaymentMethod(antes.payment_method))) patch.payment_method = form.paymentMethod;
       if (!antes || form.autoConfirm !== antes.auto_confirm) patch.auto_confirm = form.autoConfirm;
       const fim = form.fim ? brToISO(form.fim) : null;
       if (!antes || fim !== antes.end_date) patch.end_date = fim;
@@ -154,6 +161,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
       if (patch.description !== undefined) linePatch.description = patch.description;
       if (patch.merchant !== undefined) linePatch.merchant = patch.merchant;
       if (patch.account_id !== undefined) linePatch.account_id = patch.account_id;
+      if (patch.payment_method !== undefined) linePatch.payment_method = patch.payment_method;
 
       /*
         Aqui a pessoa edita a SÉRIE, não uma ocorrência (28/09/2026): "Das próximas em diante" ou
@@ -225,6 +233,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
       merchant: form.merchant.trim() || null,
       category: form.category,
       account_id: form.accountId,
+      ...(form.paymentMethod !== undefined ? { payment_method: form.paymentMethod } : {}),
       rrule: rrulePrevia,
       next_run_at: inicioDate.toISOString(),
       end_date: form.fim ? brToISO(form.fim) : null,

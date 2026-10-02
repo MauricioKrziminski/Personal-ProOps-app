@@ -4,6 +4,11 @@ import { comumDepoisDeSalvar, comumParaSerie, hrefDoLancar, hrefDoResultadoDaCon
 
 const c = { kind: 'transfer' as const, descricao: 'Aluguel', valorCents: 150000, contaId: 'cc', dataBR: '05/10/2026', categoria: 'moradia' };
 
+test('F01: editar taxa vinculada abre sua compra; taxa antiga sem vínculo continua independente', () => {
+  assert.equal(hrefDoLancamento({ id: 'fee', pix_fee_for_transaction_id: 'purchase' }, { month: '2026-10' }).params.id, 'purchase');
+  assert.equal(hrefDoLancamento({ id: 'legacy-fee' }).params.id, 'legacy-fee');
+});
+
 test('a conversão abre o registro devolvido pelo banco, inclusive financiamento sem transação', () => {
   assert.deepEqual(hrefDoResultadoDaConversao({ tipo: 'financiamento', dados: {} }, { ids: ['debt'] }),
     { pathname: '/finance/debts', params: { id: 'debt' } });
