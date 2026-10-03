@@ -137,6 +137,7 @@ async def run(
 
     # ── categoria e natureza ───────────────────────────────────────────────
     categorias: list[str | None] = [None] * len(linhas)
+    detalhes: list[UUID | None] = [None] * len(linhas)
     naturezas: list[str | None] = [None] * len(linhas)
     try:
         classes = await classify_statement_lines(
@@ -160,11 +161,12 @@ async def run(
     for i, linha in enumerate(linhas):
         # regra do usuário GANHA da IA (é a decisão que ele já tomou)
         regra = await db.fetch_one(
-            "select category from public._match_rule(%s, %s) limit 1",
+            "select category, subcategory_id from private.match_rule_subcategory(%s, %s) limit 1",
             workspace_id, linha.description,
         )
         if regra and regra["category"]:
             categorias[i] = regra["category"]
+            detalhes[i] = regra.get("subcategory_id")
 
     # ── conciliação ───────────────────────────────────────────────────────
     datas = [date.fromisoformat(l.occurred_at) for l in linhas]
@@ -241,7 +243,7 @@ async def run(
         except Exception:  # noqa: BLE001
             log.exception("julgamento dos pares falhou — fica a conciliação por estrutura")
 
-    for linha, v, chave, cat, nat in zip(linhas, vereditos, chaves, categorias, naturezas, strict=True):
+    for linha, v, chave, cat, nat, detalhe in zip(linhas, vereditos, chaves, categorias, naturezas, detalhes, strict=True):
         # Só compra no CARTÃO vira compra parcelada; "1/2" num Pix da conta é outra coisa.
         parcela = parse_parcela(linha.description) if cartao and linha.kind == "expense" else None
         await db.execute(
@@ -249,14 +251,15 @@ async def run(
             insert into public.import_items
               (batch_id, workspace_id, kind, amount_cents, occurred_at, description, merchant,
                suggested_category, external_id, installment_no, installments, nature,
-               status, transaction_id, match_layer, match_note, adopt_ids)
-            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::uuid, %s, %s, %s::uuid[])
+               status, transaction_id, match_layer, match_note, adopt_ids, suggested_subcategory_id)
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::uuid, %s, %s, %s::uuid[], %s)
             """,
             lote["id"], workspace_id, linha.kind, linha.amount_cents, linha.occurred_at,
             linha.description, parcela[0] if parcela else None, cat, chave,
             parcela[1] if parcela else None, parcela[2] if parcela else None, nat,
             "pending" if v.status == "novo" else v.status,
             v.transaction_id, v.camada, v.nota, v.adotar or None,
+            detalhe,
         )
 
     await db.execute("select public._prepare_import_batch(%s)", lote["id"])

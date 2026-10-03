@@ -64,3 +64,22 @@ test('financiamento não leva id nem versão e mantém a entrada e a âncora do 
     first_due_date: '2026-09-30', down_payment: { amount_cents: 5000, occurred_at: '2026-09-01', account_id: 'entrada' },
   } } });
 });
+
+test('F09 identidade/null opcional percorrem intents e previews sem contaminar a entrada', () => {
+  const child = '33333333-3333-4333-8333-333333333333';
+  assert.equal((escritaDoLancamento({ ...linha, subcategory_id: child }).args.p_input as Record<string, unknown>).subcategory_id, child);
+  assert.equal((escritaDoLancamento({ ...linha, subcategory_id: null }).args.p_input as Record<string, unknown>).subcategory_id, null);
+  const input = { accountId: 'conta', totalCents: 10000, installments: 2, paidInstallments: 0,
+    occurredAt: '2026-10-01', description: 'Compra', category: 'casa', merchant: null };
+  assert.equal(Object.hasOwn(escritaDaParcelada(input).args.p_dados as object, 'subcategory_id'), false);
+  assert.equal((escritaDaParcelada({ ...input, subcategory_id: child }).args.p_dados as Record<string, unknown>).subcategory_id, child);
+  assert.equal((escritaDaParcelada({ ...input, subcategory_id: null }).args.p_dados as Record<string, unknown>).subcategory_id, null);
+  const recurring = { kind: 'income' as const, amount_cents: 1000, description: 'Salário', merchant: null, category: 'salário', account_id: null,
+    rrule: 'FREQ=MONTHLY;BYMONTHDAY=1', next_run_at: '2026-11-01', end_date: null, auto_confirm: false, subcategory_id: child };
+  assert.equal((escritaDaRecorrente(recurring).args.p_input as Record<string, unknown>).subcategory_id, child);
+  const financing = { name: 'Crédito', kind: 'financing' as const, principal_cents: 1000, remaining_cents: 1000,
+    interest_rate_monthly: 0, installments: 2, installment_cents: 500, account_id: null, due_day: 1,
+    payment_category: 'casa', subcategory_id: child };
+  assert.equal((escritaDoFinanciamento(financing).args.p_dados as Record<string, unknown>).subcategory_id, child);
+  assert.equal((escritaDoFinanciamento(financing).args.p_dados as Record<string, unknown>).payment_category, 'casa');
+});

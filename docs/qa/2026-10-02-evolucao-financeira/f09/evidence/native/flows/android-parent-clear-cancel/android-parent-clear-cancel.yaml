@@ -1,0 +1,7 @@
+appId: com.proops.personal.dev
+---
+- tapOn: {text: "eletrônicos"}
+- assertVisible: "Sem detalhe"
+- takeScreenshot: android-f09-parent-clears-draft
+- tapOn: {text: "Fechar"}
+- takeScreenshot: android-f09-editor-cancelled

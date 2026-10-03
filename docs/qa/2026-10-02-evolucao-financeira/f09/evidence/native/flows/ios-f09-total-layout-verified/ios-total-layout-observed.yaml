@@ -1,0 +1,8 @@
+appId: com.proops.personal.dev
+---
+- tapOn: { point: "50%,47%" }
+- extendedWaitUntil:
+    visible: "Sem detalhe"
+    timeout: 20000
+- assertVisible: "Total da categoria"
+- takeScreenshot: ios-f09-total-layout-verified

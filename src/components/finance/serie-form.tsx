@@ -10,6 +10,8 @@ import { paymentMethodAccounts, paymentMethodError } from '@/lib/payment-method'
  * divergiriam — foi assim que a edição ficou sem Repete, sem vencimento e sem Tipo.
  */
 import { CategoryPicker } from '@/components/finance/category-picker';
+import { SubcategoryField } from '@/components/finance/subcategory-field';
+import { subcategoryAfterParentChange } from '@/lib/subcategories';
 import { MudancaSuave, Presenca } from '@/components/motion/presenca';
 import { OriginAccountPicker } from '@/components/finance/origin-creation-host';
 import { DatePickerField } from '@/components/finance/date-picker-field';
@@ -33,6 +35,7 @@ export function CamposDaSerie({
   rotuloDaData = 'Próximo vencimento',
   classificationDefaults,
   onUseCategoryDefaults,
+  workspaceId,
 }: {
   form: SerieForm;
   onChange: (form: SerieForm) => void;
@@ -41,6 +44,7 @@ export function CamposDaSerie({
   rotuloDaData?: string;
   classificationDefaults?: ExpenseClassificationDefaults;
   onUseCategoryDefaults?: () => void;
+  workspaceId?: string;
 }) {
   const { inicioOk, fimOk, tituloOk, agendaNoPassado, inicioDate } = validaSerie(form);
   const origem = contas.find((c) => c.id === form.accountId) ?? null;
@@ -94,8 +98,12 @@ export function CamposDaSerie({
       </Field>
 
       <Field label="Categoria">
-        <CategoryPicker value={form.category} onChange={(category) => onChange({ ...form, category })} />
+        <CategoryPicker value={form.category} onChange={(category) => onChange({ ...form, category,
+          ...(form.subcategory_id !== undefined ? { subcategory_id: subcategoryAfterParentChange(form.subcategory_id, form.category, category) } : {}),
+        })} />
       </Field>
+      <SubcategoryField parent={form.category} value={form.subcategory_id ?? null} workspaceId={workspaceId} sessionKey={form.id ?? 'new'}
+        onChange={subcategory_id => onChange({ ...form, subcategory_id })} />
 
       <Presenca visivel={form.kind === 'expense'}>
         <ExpenseClassificationField value={normalizeExpenseClassification(form.expenseClassification)}

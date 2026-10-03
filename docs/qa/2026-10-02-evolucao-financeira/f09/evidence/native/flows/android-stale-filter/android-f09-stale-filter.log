@@ -1,0 +1,11 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-stale-filter
+Press back... COMPLETED
+Assert that "Não consegui conferir este detalhe" is visible... COMPLETED
+Assert that ".*QA F09 Android Detalhe.*" is not visible... COMPLETED
+Take screenshot android-f09-removed-source-filter-blocked... COMPLETED
+Tap on "Ajustar filtros"... COMPLETED
+Scrolling DOWN until "Detalhe" is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering enabled... COMPLETED
+Take screenshot android-f09-stale-filter-adjust... COMPLETED

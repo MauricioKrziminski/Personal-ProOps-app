@@ -1,0 +1,23 @@
+(node:78349) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/subcategory-read-ui.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ UUID link scopes recorded and expected reads, suppresses global summary, and offers named filter (163.976167ms)
+✔ none is explicit null, reset removes it, and malformed links never broaden reads (166.064416ms)
+✔ missing, wrong-parent and unconfirmed catalog identities cannot expose an unfiltered list (290.049459ms)
+✔ changing parent drops inherited identity; aliases preserve it; explicit none remains meaningful (69.447458ms)
+✔ transaction subtitles display child name and never the UUID (73.207292ms)
+✔ transaction detail displays the resolved child name and stays clean for legacy null (90.994875ms)
+✔ collapsed breakdown reads only on expansion and keeps Sem detalhe alongside exact total (3.692209ms)
+✔ privacy hides child/workspace/count and different scope collapses without retained old lines (2.533292ms)
+✔ mounted links hydrate new identities and catalog removal blocks cached rows (69.550792ms)
+✔ expected and in-transit rows obey the same child filter including Sem detalhe (77.243042ms)
+✔ a failed breakdown ignores cached successful data and offers the scoped retry (2.527833ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1355.120875

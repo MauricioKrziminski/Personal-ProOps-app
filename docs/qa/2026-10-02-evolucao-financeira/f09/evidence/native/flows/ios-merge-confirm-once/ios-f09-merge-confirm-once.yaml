@@ -1,0 +1,12 @@
+appId: com.proops.personal.dev
+---
+- tapOn: "Juntar detalhes"
+- extendedWaitUntil:
+    notVisible: "Nome do detalhe"
+    timeout: 15000
+- assertVisible: "Esta categoria ainda não tem detalhes."
+- takeScreenshot: ios-f09-merge-source-removed
+- tapOn: "Fechar"
+- assertVisible: "casa, 21 lançamentos"
+- assertVisible: "mercado, 3 lançamentos"
+- takeScreenshot: ios-f09-merge-samevisit-counts

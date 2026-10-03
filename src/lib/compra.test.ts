@@ -214,3 +214,30 @@ test('Todas inclui parcela paga fora do cartão; fatura protegida continua bloqu
   assert.equal(edicaoEscopadaDaCompra(f, { ...tv, locked_in_invoice: 1 }, 'all').kind, 'protected-rejection');
   assert.equal(edicaoEscopadaDaCompra(compraDoRegistro(tv), tv, 'all').kind, 'no-op');
 });
+
+const detail = '33333333-3333-4333-8333-333333333333';
+test('F09 compra roundtrip e alcance só carregam mudança de detalhe; pai incompatível limpa', () => {
+  const saved = { ...tv, subcategory_id: detail };
+  const form = compraDoRegistro(saved);
+  assert.equal(form.subcategory_id, detail); assert.equal(form.original.subcategory_id, detail);
+  assert.equal(Object.hasOwn(payloadDaCompra(form, saved.first_occurred_at), 'subcategory_id'), false);
+  assert.deepEqual(edicaoEscopadaDaCompra({ ...form, subcategory_id: null }, saved, 'future'), { kind: 'scope', lastDay: false, patch: { subcategory_id: null } });
+  assert.deepEqual(edicaoEscopadaDaCompra({ ...form, category: 'saúde' }, saved, 'future'), { kind: 'scope', lastDay: false, patch: { category: 'saúde', subcategory_id: null } });
+  assert.equal(payloadDaCompra({ ...form, category: 'saúde' }, saved.first_occurred_at).subcategory_id, null);
+  assert.deepEqual(edicaoEscopadaDaCompra({ ...form, category: 'CASA' }, saved, 'future'), { kind: 'scope', lastDay: false, patch: { category: 'CASA' } });
+});
+test('F09 revisão da parcela propaga detalhe alterado mesmo quando já coincide com contrato', () => {
+  const contract = { ...tv, subcategory_id: detail };
+  const row = { installment_no: 5, occurred_at: '2026-10-05', amount_cents: 10000, description: 'TV (5/10)', category: 'casa', subcategory_id: null };
+  const draft = { occurred_at: row.occurred_at, amount_cents: row.amount_cents, description: row.description,
+    merchant: null, category: 'casa', subcategory_id: detail };
+  const review = compraParaRevisaoDaParcela(contract, row, draft);
+  assert.equal(payloadDaCompra(review, contract.first_occurred_at).subcategory_id, detail);
+});
+test('F09 intenção de detalhe da parcela não ressuscita filho após mudar pai na revisão', () => {
+  const contract = { ...tv, subcategory_id: detail };
+  const row = { installment_no: 5, occurred_at: '2026-10-05', amount_cents: 10000, description: 'TV (5/10)', category: 'casa', subcategory_id: null };
+  const review = compraParaRevisaoDaParcela(contract, row, { occurred_at: row.occurred_at, amount_cents: row.amount_cents,
+    description: row.description, merchant: null, category: 'casa', subcategory_id: detail });
+  assert.equal(payloadDaCompra({ ...review, category: 'saúde' }, contract.first_occurred_at).subcategory_id, null);
+});

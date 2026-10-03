@@ -1,0 +1,6 @@
+appId: com.proops.personal.dev
+---
+- assertVisible: "Sem detalhe"
+- assertVisible: "3 registros"
+- assertVisible: "Total da categoria"
+- takeScreenshot: ios-f09-annual-market-verified

@@ -167,10 +167,12 @@ Baseline de QA restaurado; ANR F07 permanece aberta. F09 liberado.
 
 Arquivos: categorias, categoria sheet/picker, novo contrato de subcategoria, RPCs de rename/merge/delete e propagação pelos registros/rules.
 
-- [ ] RED: mudança de pai limpa vínculo incompatível; filhos + sem detalhe fecham total.
-- [ ] Implementar identidade/defaults/migração compatível e operações atômicas.
-- [ ] Integrar cadastro/edição local, preservando texto livre legado.
-- [ ] Provar colisões/merge/escopos/importação e gates nativos F09; registrar aceite.
+- [x] RED: mudança de pai limpa vínculo incompatível; filhos + sem detalhe fecham total.
+- [x] Implementar identidade/defaults/migração compatível e operações atômicas.
+- [x] Integrar cadastro/edição local, preservando texto livre legado.
+- [x] Provar colisões/merge/escopos/importação e gates nativos F09; registrar aceite.
+
+Aceite funcional e limites: [F09](../../qa/2026-10-02-evolucao-financeira/f09/aceite.md).
 
 ### F10 — Planejar por contribuição
 

@@ -87,7 +87,7 @@ async def test_serie_recriada_adota_o_mes_pago_em_vez_de_duplicar(monkeypatch):
         "amount_cents": 119885, "currency": "BRL", "category": "estudo", "description": "Fundacred",
         "merchant": None, "account_id": uuid4(), "rrule": "FREQ=MONTHLY;BYMONTHDAY=4",
         "next_run_at": datetime(2026, 9, 4, 12, tzinfo=UTC), "dtstart": datetime(2026, 9, 4, 12, tzinfo=UTC),
-        "end_date": None, "auto_confirm": True, "materialized_until": None, "timezone": "America/Sao_Paulo",
+        "end_date": None, "auto_confirm": True, "materialized_until": None, "timezone": "America/Sao_Paulo", "edit_revision": 1,
     }
     escritas, procuras = [], []
 
@@ -95,8 +95,11 @@ async def test_serie_recriada_adota_o_mes_pago_em_vez_de_duplicar(monkeypatch):
         return [serie] if "from public.recurring_transactions" in sql else []
 
     async def fetch_one(sql, *args):
-        procuras.append(args[4])  # o dia procurado
-        return {"id": "setembro-antigo"} if args[4] == "2026-09-04" else None
+        if args[5]:
+            procuras.append(args[4])  # Atomic command attempts adoption only for past dates.
+        adopted = args[4] == "2026-09-04"
+        escritas.append("update adota" if adopted else "insert")
+        return {"intent_current": True, "created": not adopted}
 
     async def execute(sql, *args):
         escritas.append(sql.split()[0] + (" adota" if "recurring_id = %s where id" in sql else ""))
@@ -138,7 +141,7 @@ def _serie_fundacred():
         "amount_cents": 119885, "currency": "BRL", "category": "estudo", "description": "Fundacred",
         "merchant": None, "account_id": uuid4(), "rrule": "FREQ=MONTHLY;BYMONTHDAY=4",
         "next_run_at": datetime(2026, 10, 4, 12, tzinfo=UTC), "dtstart": datetime(2026, 10, 4, 12, tzinfo=UTC),
-        "end_date": None, "auto_confirm": False, "materialized_until": None, "timezone": "America/Sao_Paulo",
+        "end_date": None, "auto_confirm": False, "materialized_until": None, "timezone": "America/Sao_Paulo", "edit_revision": 1,
     }
 
 
@@ -157,12 +160,16 @@ async def test_dia_apagado_no_app_nao_volta_pelo_agendador(monkeypatch):
             return [serie]
         return [{"original_date": date(2026, 11, 4)}]
 
+    async def one(sql, *args):
+        dias.append(args[4])
+        return {"intent_current": True, "created": True}
+
     async def execute(sql, *args):
-        if sql.split()[0] == "insert":
-            dias.append(args[9])
+        return 1
 
     monkeypatch.setattr(scheduler.db, "fetch", fetch)
     monkeypatch.setattr(scheduler.db, "execute", execute)
+    monkeypatch.setattr(scheduler.db, "fetch_one", one)
     await scheduler.materialize_horizon(datetime(2026, 9, 28, 15, tzinfo=UTC), so_novas=True)
     assert "2026-11-04" not in dias
     assert "2026-10-04" in dias and "2026-12-04" in dias
@@ -183,7 +190,10 @@ async def test_gemea_ja_adotada_pelo_app_nao_trava_a_serie(monkeypatch):
         return [serie] if "from public.recurring_transactions" in sql else []
 
     async def fetch_one(sql, *args):
-        return {"id": "setembro-solto"} if args[4] == "2026-09-04" else None
+        if args[4] == "2026-09-04":
+            raise UniqueViolation("já existe")
+        escritas.append("insert")
+        return {"intent_current": True, "created": True}
 
     async def execute(sql, *args):
         if "recurring_id = %s where id" in sql:

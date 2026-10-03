@@ -94,3 +94,16 @@ test('Aplicar de uma data futura fora do cartão nasce A PAGAR, como foi simulad
   assert.deepEqual(pendenciaDoAplicar('29/09/2026', 'checking', '2026-09-29'), { pending: false, due_at: null });
   assert.deepEqual(pendenciaDoAplicar(undefined, 'checking', '2026-09-29'), { pending: false, due_at: null });
 });
+
+test('F09 hipótese leva pai/detalhe à simulação e ao aplicar com ausência legacy distinta de null', () => {
+  const child = '33333333-3333-4333-8333-333333333333';
+  for (const forma of ['uma', 'parcelado', 'repete', 'financiamento'] as const) {
+    const h = { ...base, forma, category: 'casa', subcategory_id: child };
+    const record = registroDaHipotese(h)!;
+    const row = record.tipo === 'lancamento' ? (record.dados.linhas as Record<string, unknown>[])[0] : record.dados;
+    assert.equal(row.subcategory_id, child);
+    assert.equal(row[forma === 'parcelado' ? 'p_category' : forma === 'financiamento' ? 'payment_category' : 'category'], 'casa');
+    assert.equal(paramsDoAplicar(h).params.subcategory_id, child);
+    assert.equal(paramsDoAplicar({ ...h, subcategory_id: null }).params.subcategory_id, '');
+  }
+});

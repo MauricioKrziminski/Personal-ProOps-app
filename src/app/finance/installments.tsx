@@ -755,7 +755,7 @@ export default function InstallmentsScreen() {
         {form ? (
           <SheetScroll contentContainerStyle={styles.sheetBody}>
             {classification.isError ? <ErrorCard onRetry={() => void classification.refetch()} /> : null}
-            <CamposDaCompra form={form} onChange={setForm} contas={accounts.data ?? []}
+            <CamposDaCompra form={form} onChange={setForm} contas={accounts.data ?? []} workspaceId={editingPlan?.workspace_id}
               classificationDefaults={classification.defaults}
               onUseCategoryDefaults={() => setForm({ ...form, expenseClassification: classification.adoptCategoryDefaults() })} />
           </SheetScroll>

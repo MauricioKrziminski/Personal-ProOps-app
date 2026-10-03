@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import Animated from 'react-native-reanimated';
@@ -32,6 +32,9 @@ import { formatDateBR } from '@/hooks/use-items';
 import { useBRL } from '@/components/ui/conceal';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { CategoryPicker } from '@/components/finance/category-picker';
+import { SubcategoryField } from '@/components/finance/subcategory-field';
+import { subcategoryAfterParentChange } from '@/lib/subcategories';
+import { foldCategory } from '@/lib/categories-merge';
 import { Field, TextField } from '@/components/ui/field';
 import {
   useAccounts,
@@ -165,6 +168,12 @@ export default function ImportScreen() {
   const semPro = plano.data?.plan === 'free';
   const [falha, setFalha] = useState<FalhaImport | null>(null);
   const [editando, setEditando] = useState<ImportItem | null>(null);
+  const visitaLinha = useRef(0);
+  const [detailVisit, setDetailVisit] = useState(0);
+  const linhaAtual = useRef<ImportItem | null>(null);
+  const gravandoDetalhe = useRef(false);
+  const [linhaPending, setLinhaPending] = useState(false);
+  const [erroLinha, setErroLinha] = useState<string | null>(null);
   // O título que a pessoa está escrevendo na linha aberta (grava ao terminar ou ao fechar).
   const [titulo, setTitulo] = useState('');
   /** `null` = ainda a seleção sugerida (`selecaoInicial`); tocar numa linha a torna explícita. */
@@ -293,6 +302,12 @@ export default function ImportScreen() {
 
   /** Abre a linha para editar: título, tipo e categoria, como no lançamento. */
   const abrirLinha = (item: ImportItem) => {
+    visitaLinha.current += 1;
+    setDetailVisit(visitaLinha.current);
+    linhaAtual.current = item;
+    gravandoDetalhe.current = false;
+    setLinhaPending(false);
+    setErroLinha(null);
     setTitulo(nomeDoItem(item) === 'Sem descrição' ? '' : nomeDoItem(item));
     setEditando(item);
   };
@@ -311,16 +326,23 @@ export default function ImportScreen() {
   const fecharLinha = () => {
     if (editando) salvarTitulo(editando);
     setEditando(null);
+    visitaLinha.current += 1;
+    setDetailVisit(visitaLinha.current);
+    linhaAtual.current = null;
   };
 
   const trocarSentido = (item: ImportItem, kind: 'income' | 'expense') => {
-    if (item.kind === kind) return;
+    if (item.kind === kind || gravandoDetalhe.current || visitaLinha.current !== detailVisit || linhaAtual.current?.id !== item.id) return;
+    const owner = visitaLinha.current;
+    linhaAtual.current = { ...item, kind };
     setEditando({ ...item, kind });
     atualizar.mutate(
       { id: item.id, kind },
       {
         onError: () => {
+          if (visitaLinha.current !== owner || linhaAtual.current?.id !== item.id) return;
           // volta o controle para o que o banco tem: ele não gravou
+          linhaAtual.current = { ...linhaAtual.current, kind: item.kind };
           setEditando((e) => (e?.id === item.id ? { ...e, kind: item.kind } : e));
           toast({ message: 'Não deu para trocar o tipo.', tone: 'error' });
         },
@@ -329,14 +351,58 @@ export default function ImportScreen() {
   };
 
   const trocarCategoria = (item: ImportItem, cat: string | null) => {
-    salvarTitulo(item);
-    setEditando(null);
+    if (gravandoDetalhe.current || linhaAtual.current?.id !== item.id || visitaLinha.current !== detailVisit) return;
+    const owner = visitaLinha.current;
+    const before = linhaAtual.current;
+    const next = { ...before, suggested_category: cat,
+      suggested_subcategory_id: subcategoryAfterParentChange(before.suggested_subcategory_id ?? null, before.suggested_category, cat) };
+    gravandoDetalhe.current = true;
+    setLinhaPending(true);
+    setErroLinha(null);
+    linhaAtual.current = next;
+    setEditando(next);
     atualizar.mutate(
-      { id: item.id, category: cat },
+      { id: item.id, category: cat, workspaceId: item.workspace_id, expectedCategory: before.suggested_category },
       {
-        onError: () => toast({ message: 'Não deu para trocar a categoria.', tone: 'error' }),
+        onSuccess: () => {
+          if (visitaLinha.current !== owner || linhaAtual.current?.id !== item.id) return;
+          gravandoDetalhe.current = false; setLinhaPending(false);
+        },
+        onError: () => {
+          if (visitaLinha.current !== owner || linhaAtual.current?.id !== item.id) return;
+          const restored = { ...linhaAtual.current, suggested_category: before.suggested_category,
+            suggested_subcategory_id: before.suggested_subcategory_id, suggested_subcategory_set: before.suggested_subcategory_set };
+          linhaAtual.current = restored; setEditando(restored);
+          gravandoDetalhe.current = false; setLinhaPending(false);
+          setErroLinha('Não deu para trocar a categoria. Tenta de novo.');
+          toast({ message: 'Não deu para trocar a categoria.', tone: 'error' });
+        },
       }
     );
+  };
+  const trocarDetalhe = (item: ImportItem, subcategory_id: string | null) => {
+    if (gravandoDetalhe.current || !item.workspace_id || visitaLinha.current !== detailVisit
+      || linhaAtual.current?.id !== item.id || linhaAtual.current?.workspace_id !== item.workspace_id
+      || foldCategory(linhaAtual.current?.suggested_category ?? '') !== foldCategory(item.suggested_category ?? '')) return;
+    const owner = visitaLinha.current;
+    const before = linhaAtual.current;
+    const next = { ...before, suggested_subcategory_id: subcategory_id, suggested_subcategory_set: true };
+    gravandoDetalhe.current = true; setLinhaPending(true); setErroLinha(null);
+    linhaAtual.current = next; setEditando(next);
+    atualizar.mutate({ id: item.id, workspaceId: item.workspace_id, expectedCategory: item.suggested_category, subcategory_id }, {
+      onSuccess: () => {
+        if (visitaLinha.current !== owner || linhaAtual.current?.id !== item.id) return;
+        gravandoDetalhe.current = false; setLinhaPending(false);
+      },
+      onError: () => {
+        if (visitaLinha.current !== owner || linhaAtual.current?.id !== item.id) return;
+        const restored = { ...linhaAtual.current, suggested_subcategory_id: before.suggested_subcategory_id,
+          suggested_subcategory_set: before.suggested_subcategory_set };
+        linhaAtual.current = restored; setEditando(restored);
+        gravandoDetalhe.current = false; setLinhaPending(false);
+        setErroLinha('Não deu para trocar o detalhe. Confira a categoria e tente novamente.');
+      },
+    });
   };
 
   /**
@@ -713,11 +779,17 @@ export default function ImportScreen() {
 
             {/* As categorias que a pessoa USA, mais as sugeridas (`finance.md`), como no lançamento. */}
             <View style={styles.sentido}>
+              <Field label="Categoria" error={erroLinha ?? undefined}>
               <CategoryPicker
                 value={editando?.suggested_category ?? null}
                 onChange={(cat) => editando && trocarCategoria(editando, cat)}
               />
+              </Field>
             </View>
+            <SubcategoryField parent={editando?.suggested_category ?? null} value={editando?.suggested_subcategory_id ?? null}
+              workspaceId={editando?.workspace_id} sessionKey={`${editando?.id ?? ''}:${detailVisit}`}
+              enabled={Boolean(editando?.workspace_id) && !linhaPending && !atualizar.isPending}
+              onChange={(id) => { if (editando) trocarDetalhe(editando, id); }} />
           </SheetScroll>
       </Sheet>
     </Screen>

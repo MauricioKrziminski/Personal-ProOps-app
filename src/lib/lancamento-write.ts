@@ -1,7 +1,7 @@
 import type { Transaction, TransactionKind } from '@/hooks/use-finance';
 import { brToISO, isValidBRDate } from './dates.ts';
 import { downPaymentInput, purchaseAmounts } from './down-payment.ts';
-import type { EntradaLancamento, EntradaParcelada } from './escrita.ts';
+import { detalheDaEscrita, mudancaDoDetalhe, type EntradaLancamento, type EntradaParcelada } from './escrita.ts';
 import { destinoDoSalvar, installmentHistory, totalDigitado, vencimentoPendenteValido,
   type DestinoDoSalvar, type UnidadeDoValor } from './finance-form.ts';
 import type { PaymentMethod } from './payment-method.ts';
@@ -13,6 +13,7 @@ export type LancamentoFormValues = {
   kind: TransactionKind;
   amount_cents: number;
   category: string | null;
+  subcategory_id?: string | null;
   description: string;
   merchant: string | null;
   account_id: string | null;
@@ -35,7 +36,7 @@ export type LancamentoFormValues = {
 };
 
 export type ContextoDoLancamento = {
-  editing?: Partial<Transaction> & { id: string };
+  editing?: Partial<Transaction> & { id: string; subcategory_id?: string | null };
   podeAdiar: boolean;
   podeParcelarAqui: boolean;
   intencaoDoDia: 'fixo' | 'ultimo' | null;
@@ -83,8 +84,11 @@ export function prepararLancamento(values: LancamentoFormValues, context: Contex
   const status = podeAdiar ? (adiado ? 'pending' : 'cleared') : (editing?.status ?? 'cleared');
   const dueAt = adiado && values.due_at ? brToISO(values.due_at) : editing?.due_at ?? null;
   const autoConfirm = podeAdiar ? (adiado ? values.auto_confirm : false) : (editing?.auto_confirm ?? false);
+  const detail = detalheDaEscrita({ ...detalheDaEscrita(values),
+    ...(editing ? mudancaDoDetalhe(editing, values, editing.category ?? null, values.category) : {}) }, values.kind);
   const entradaParcelada: EntradaParcelada | null = values.account_id ? {
     ...(classification ?? {}),
+    ...detail,
     accountId: values.account_id,
     paymentMethod: values.payment_method,
     totalCents: totalDaCompraNova,
@@ -98,6 +102,7 @@ export function prepararLancamento(values: LancamentoFormValues, context: Contex
     ...(downPayment ? { downPayment } : {}),
   } : null;
   const entradaLancamento: EntradaLancamento = {
+    ...detail,
     ...(classification ? values.kind === 'expense' ? classification : UNKNOWN_EXPENSE_CLASSIFICATION : {}),
     kind: values.kind,
     amount_cents: values.amount_cents,

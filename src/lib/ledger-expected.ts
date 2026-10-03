@@ -15,6 +15,8 @@ export interface ExpectedLedgerLine extends Partial<ExpenseClassification> {
   kind: 'expense' | 'income';
   description: string;
   category: string | null;
+  subcategory_id?: string | null;
+  subcategory_name?: string | null;
   account_id: string | null;
   payment_method?: PaymentMethod | null;
   installment_no: number | null;
@@ -32,6 +34,7 @@ interface ExpectedFilters {
   kind?: 'expense' | 'income' | 'transfer';
   status?: 'pending' | 'cleared';
   category?: string;
+  subcategoryId?: string | null;
   accountId?: string | null;
   source?: 'whatsapp' | 'app' | 'import' | 'recurring';
   recurringId?: string;
@@ -56,6 +59,7 @@ export function filterExpectedLines<T extends ExpectedLedgerLine>(
     if (filters.status && line.status !== filters.status) return false;
     if (filters.kind && line.kind !== filters.kind) return false;
     if (filters.category && line.category !== filters.category) return false;
+    if (filters.subcategoryId !== undefined && (line.subcategory_id ?? null) !== filters.subcategoryId) return false;
     if (filters.accountId !== undefined && line.account_id !== filters.accountId) return false;
     if (filters.source && (filters.source !== 'recurring' || line.origin !== 'recurring')) return false;
     if (filters.recurringId && (line.origin !== 'recurring' || line.ref_id !== filters.recurringId)) return false;
@@ -66,7 +70,7 @@ export function filterExpectedLines<T extends ExpectedLedgerLine>(
     if ((expensePatterns.length || expenseNecessities.length) && line.kind !== 'expense') return false;
     if (expensePatterns.length && !expensePatterns.includes(line.expense_pattern ?? 'not_informed')) return false;
     if (expenseNecessities.length && !expenseNecessities.includes(line.expense_necessity ?? 'not_informed')) return false;
-    if (term && !`${line.description} ${line.category ?? ''}`.toLocaleLowerCase('pt-BR').includes(term)) return false;
+    if (term && !`${line.description} ${line.category ?? ''} ${line.subcategory_name ?? ''}`.toLocaleLowerCase('pt-BR').includes(term)) return false;
     return true;
   }).sort((a, b) => a.due_date.localeCompare(b.due_date)
     || a.description.localeCompare(b.description, 'pt-BR')

@@ -1,9 +1,11 @@
+import { mudancaDoDetalhe } from './escrita.ts';
 import type { PaymentMethod } from './payment-method.ts';
 
 /** Campos do pagamento que a edição com alcance pode aplicar sem alterar a data da baixa. */
 export type DebtPaymentEditable = {
   amount_cents: number;
   category: string | null;
+  subcategory_id?: string | null;
   description: string | null;
   merchant: string | null;
   account_id: string | null;
@@ -17,7 +19,7 @@ export function debtPaymentPatch(
   oldValue: DebtPaymentEditable,
   newValue: DebtPaymentEditable,
 ): Partial<DebtPaymentEditable> {
-  const patch: Partial<DebtPaymentEditable> = {};
+  const patch: Partial<DebtPaymentEditable> = mudancaDoDetalhe(oldValue, newValue, oldValue.category, newValue.category);
   if ('payment_method' in newValue && (oldValue.payment_method ?? null) !== newValue.payment_method)
     patch.payment_method = newValue.payment_method;
   for (const field of ['amount_cents', 'category', 'description', 'merchant', 'account_id', 'occurred_at'] as const) {

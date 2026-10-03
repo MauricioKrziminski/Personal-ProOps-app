@@ -2,6 +2,7 @@
  * As regras da SÉRIE recorrente, puras (os campos moram em `components/finance/serie-form.tsx`).
  * Aqui fica o que tem conta: a RRULE que o formulário monta, o que ele vale e o que o salvar grava.
  */
+import { detalheDaEscrita, mudancaDoDetalhe } from './escrita.ts';
 import { brToISO, dataLocalDe, fimQueSegueOInicio, isValidBRDate, isoToBR, localDateTime, localISODate } from './dates.ts';
 import { normalizePaymentMethod, assertPaymentMethod, type PaymentMethod } from './payment-method.ts';
 import { validRecurringRange } from './finance-form.ts';
@@ -32,6 +33,7 @@ export interface SerieForm {
   /** Opcional, como no lançamento: nem toda conta fixa tem um estabelecimento. */
   merchant: string;
   category: string | null;
+  subcategory_id?: string | null;
   accountId: string | null;
   paymentMethod?: PaymentMethod | null;
   preset: 'monthly' | 'weekly' | 'yearly';
@@ -70,6 +72,7 @@ export interface SerieGravada extends Partial<ExpenseClassification> {
   description: string | null;
   merchant: string | null;
   category: string | null;
+  subcategory_id?: string | null;
   account_id: string | null;
   payment_method?: PaymentMethod | null;
   rrule: string;
@@ -118,6 +121,7 @@ export function serieDoRegistro(r: SerieGravada): SerieForm {
     description: r.description ?? '',
     merchant: r.merchant ?? '',
     category: r.category,
+    ...detalheDaEscrita(r),
     accountId: r.account_id,
     expenseClassification: expenseClassificationFromRecord(r),
     ...(r.payment_method !== undefined ? { paymentMethod: normalizePaymentMethod(r.payment_method) } : {}),
@@ -178,6 +182,7 @@ export interface OcorrenciaDaSerie extends Partial<ExpenseClassification> {
   description: string | null;
   merchant: string | null;
   category: string | null;
+  subcategory_id?: string | null;
   account_id: string | null;
   payment_method?: PaymentMethod | null;
   occurred_at: string;
@@ -196,8 +201,10 @@ export interface OcorrenciaDaSerie extends Partial<ExpenseClassification> {
  * setembro pago virava "30/09" (27/09/2026). O banco desliza de todo jeito; aqui ele não precisa.
  */
 export function serieDaOcorrencia(serie: SerieGravada, linha: OcorrenciaDaSerie): SerieForm {
+  const { subcategory_id: _contractDetail, ...base } = serieDoRegistro(serie);
   return {
-    ...serieDoRegistro(serie),
+    ...base,
+    ...detalheDaEscrita(linha),
     amountCents: linha.amount_cents,
     description: linha.description ?? '',
     merchant: linha.merchant ?? '',
@@ -228,6 +235,7 @@ export function mudancasDaOcorrencia(form: SerieForm, linha: OcorrenciaDaSerie, 
   const linhas: Partial<ExpenseClassification> & {
     amount_cents?: number;
     category?: string | null;
+    subcategory_id?: string | null;
     description?: string;
     merchant?: string | null;
     account_id?: string | null;
@@ -244,6 +252,7 @@ export function mudancasDaOcorrencia(form: SerieForm, linha: OcorrenciaDaSerie, 
 
   const regra: Partial<ExpenseClassification> & {
     kind?: 'expense' | 'income';
+    subcategory_id?: string | null;
     payment_method?: PaymentMethod | null;
     end_date?: string | null;
     auto_confirm?: boolean;
@@ -268,6 +277,9 @@ export function mudancasDaOcorrencia(form: SerieForm, linha: OcorrenciaDaSerie, 
     ? { ...after }
     : expenseClassificationPatch(before, after);
   // The changed pair is one intent shared by the occurrence and the contract.
+  const detailPatch = mudancaDoDetalhe(linha, form, linha.category, form.category);
+  Object.assign(linhas, detailPatch);
+  Object.assign(regra, detailPatch);
   Object.assign(linhas, classificationPatch);
   Object.assign(regra, classificationPatch);
   return { linhas, regra };

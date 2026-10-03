@@ -302,7 +302,7 @@ export default function TransactionDetailScreen() {
             </ThemedText>
           ) : null}
           <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-            {[longDate(tx.occurred_at), tx.category, accountLabel].filter(Boolean).join(' · ')}
+            {[longDate(tx.occurred_at), tx.category, tx.subcategories?.name, accountLabel].filter(Boolean).join(' · ')}
           </ThemedText>
         </Card>
       </Animated.View>

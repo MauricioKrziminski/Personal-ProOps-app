@@ -1,0 +1,12 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on iPhone 17 Pro - iOS 26.5 - F0BDF23C-0286-4183-97E3-3BCC61D4267D
+ > Flow ios-f09-merge-confirm-once
+Tap on "Juntar detalhes"... COMPLETED
+Assert that "Nome do detalhe" is not visible... COMPLETED
+Assert that "Esta categoria ainda não tem detalhes." is visible... COMPLETED
+Take screenshot ios-f09-merge-source-removed... COMPLETED
+Tap on "Fechar"... COMPLETED
+Assert that "casa, 21 lançamentos" is visible... COMPLETED
+Assert that "mercado, 3 lançamentos" is visible... COMPLETED
+Take screenshot ios-f09-merge-samevisit-counts... COMPLETED

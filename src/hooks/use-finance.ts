@@ -37,6 +37,7 @@ import type { Alcance, OrigemDaConversao } from '@/lib/lancar';
 import {
   DESCRICAO_JUROS_DO_PIX,
   classificacaoDaEscrita,
+  detalheDaEscrita,
   type EntradaParcelada,
   type EntradaRecorrente,
 } from '@/lib/escrita';
@@ -62,6 +63,7 @@ type Tables = Database['public']['Tables'];
 type Fns = Database['public']['Functions'];
 
 export type TransactionKind = 'expense' | 'income' | 'transfer';
+type SubcategoryMetadata = { subcategory_id?: string | null };
 export type TransactionSource = 'whatsapp' | 'app' | 'import' | 'recurring';
 /** `pending` = ainda vai acontecer (parcela futura, conta a pagar). */
 export type TransactionStatus = 'pending' | 'cleared';
@@ -100,10 +102,12 @@ export type Transaction = Pick<
   // `20260909110000`: entra sozinho na data em vez de esperar baixa. Em receita o padrão é
   // false — Pix de terceiro precisa de comprovação; salário é onde ligar faz sentido.
   | 'auto_confirm'
-> & Partial<ExpenseClassification> & {
+> & Partial<ExpenseClassification> & SubcategoryMetadata & {
   kind: TransactionKind;
   workspace_id?: string;
   payment_method?: PaymentMethod | null;
+  subcategory_id?: string | null;
+  subcategories?: { name: string } | null;
   /** Taxa explícita pertence a um lançamento e é editada pelo formulário dele. */
   pix_fee_for_transaction_id?: string | null;
   source: TransactionSource;
@@ -210,7 +214,7 @@ export type RecurringTransaction = Pick<
   // O estabelecimento da série (`20260926120000`): o "Recorrente" do lançamento o perdia.
   | 'merchant'
   | 'edit_revision'
-> & Partial<ExpenseClassification> & { kind: 'expense' | 'income'; payment_method?: PaymentMethod | null; workspace_id?: string };
+> & Partial<ExpenseClassification> & SubcategoryMetadata & { kind: 'expense' | 'income'; payment_method?: PaymentMethod | null; subcategory_id?: string | null; workspace_id?: string };
 
 export type MonthlyCashflow = Fns['monthly_cashflow']['Returns'][number];
 
@@ -219,7 +223,7 @@ export type TxSummaryRow = Omit<Fns['transactions_summary']['Returns'][number], 
 };
 
 const TRANSACTION_COLUMNS =
-  'id, workspace_id, expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, payment_method, pix_fee_for_transaction_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_balance_after_cents, edit_revision, auto_confirm, rollover_of_invoice_id, pays_invoice_id, down_payment_debt_id, down_payment_plan_id, installment_plans!transactions_installment_plan_id_fkey(first_occurred_at)';
+  'id, workspace_id, subcategory_id, subcategories!transactions_subcategory_id_fkey(name), expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, payment_method, pix_fee_for_transaction_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_balance_after_cents, edit_revision, auto_confirm, rollover_of_invoice_id, pays_invoice_id, down_payment_debt_id, down_payment_plan_id, installment_plans!transactions_installment_plan_id_fkey(first_occurred_at)';
 
 export interface TransactionFilters {
   /**
@@ -240,6 +244,7 @@ export interface TransactionFilters {
   to?: string;
   kind?: TransactionKind;
   category?: string;
+  subcategoryId?: string | null;
   /** Ocorrências de uma série recorrente. */
   recurringId?: string;
   /** Extrato de uma conta ou cartão. `null` = lançamentos sem conta; `undefined` = todas. */
@@ -309,6 +314,8 @@ export function useTransactions(filters: TransactionFilters) {
         .range(pageParam, pageParam + TRANSACTION_PAGE - 1);
       if (filters.kind) query = query.eq('kind', filters.kind);
       if (filters.category) query = query.eq('category', filters.category);
+      if (filters.subcategoryId !== undefined) query = filters.subcategoryId === null
+        ? query.is('subcategory_id', null) : query.eq('subcategory_id', filters.subcategoryId);
       if (filters.minCents !== undefined) query = query.gte('amount_cents', filters.minCents);
       if (filters.maxCents !== undefined) query = query.lte('amount_cents', filters.maxCents);
       // "Em aberto"/"Concluído" na régua da DATA, a mesma da pílula (`filtroDoEstado`).
@@ -371,7 +378,7 @@ export function useExpectedLedgerLines(from: string | undefined, to: string | un
       // A RPC aceita 62 dias. Lotes de quatro limitam carga e uma falha rejeita o período inteiro.
       for (let i = 0; i < windows.length; i += 4) {
         const batches = await Promise.all(windows.slice(i, i + 4).map(window =>
-          fetchPaged<ExpectedLedgerLine>((start, end) => supabase.rpc('ledger_expected_lines_classified', {
+          fetchPaged<ExpectedLedgerLine>((start, end) => supabase.rpc('ledger_expected_lines_detailed', {
             p_from: window.from, p_to: window.to, p_recurring_id: recurringId ?? undefined,
           }).order('due_date').order('origin').order('ref_id').range(start, end).abortSignal(signal)),
         ));
@@ -577,7 +584,7 @@ export function useGoals() {
 }
 
 const RECURRING_COLUMNS =
-  'id, workspace_id, expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, kind, amount_cents, currency, category, description, merchant, account_id, payment_method, rrule, next_run_at, active, run_attempts, last_error, created_at, dtstart, end_date, auto_confirm, edit_revision';
+  'id, workspace_id, subcategory_id, subcategories!recurring_transactions_subcategory_id_fkey(name), expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, kind, amount_cents, currency, category, description, merchant, account_id, payment_method, rrule, next_run_at, active, run_attempts, last_error, created_at, dtstart, end_date, auto_confirm, edit_revision';
 
 /**
  * As categorias do espaço, mais usada primeiro: as que os lançamentos usam e as criadas no app,
@@ -1049,7 +1056,7 @@ export function useUpdateInstallmentPlan() {
       paidInstallments?: number | null;
       paymentMethod?: PaymentMethod | null;
       expectedRevision?: number;
-    } & Partial<ExpenseClassification>) => {
+    } & Partial<ExpenseClassification> & SubcategoryMetadata) => {
       assertPaymentMethod(input.paymentMethod);
       const dados = {
         p_plan_id: input.planId,
@@ -1064,6 +1071,7 @@ export function useUpdateInstallmentPlan() {
         ...(input.paymentMethod !== undefined ? { p_payment_method: input.paymentMethod } : {}),
         ...(input.expectedRevision !== undefined ? { p_expected_revision: input.expectedRevision } : {}),
         ...classificacaoDaEscrita(input),
+        ...detalheDaEscrita(input),
       };
       const key = JSON.stringify(dados);
       if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
@@ -1111,8 +1119,8 @@ export function useConvertToInstallments() {
       paidInstallments?: number | null;
       downPayment?: DownPaymentInput;
       paymentMethod?: PaymentMethod | null;
-    } & Partial<ExpenseClassification>) => {
-      const classification = classificacaoDaEscrita(input);
+    } & Partial<ExpenseClassification> & SubcategoryMetadata) => {
+      const classification = { ...classificacaoDaEscrita(input), ...detalheDaEscrita(input) };
       if (input.downPayment || input.paymentMethod !== undefined || Object.keys(classification).length) {
         const payload = {
           p_origem: { tipo: 'transacao', id: input.transactionId }, p_alcance: 'converter',
@@ -1528,6 +1536,9 @@ export type ImportItem = Pick<
 > & {
   kind: 'expense' | 'income';
   status: 'pending' | 'approved' | 'discarded' | 'duplicate' | 'near_match' | 'uncertain';
+  workspace_id?: string;
+  suggested_subcategory_id?: string | null;
+  suggested_subcategory_set?: boolean;
   /** Os campos da conciliação (`20260922150000`) — ver `src/lib/import-preview.ts`. */
   nature: Natureza | null;
   installment_no: number | null;
@@ -1548,7 +1559,8 @@ export type ImportItem = Pick<
 export type CategorizationRule = Pick<
   Tables['categorization_rules']['Row'],
   'id' | 'pattern' | 'category' | 'account_id' | 'priority' | 'hits'
-> & { match_type: 'contains' | 'merchant' | 'regex'; source: 'user' | 'learned' };
+> & SubcategoryMetadata & { workspace_id?: string; subcategories?: { name: string } | null;
+  match_type: 'contains' | 'merchant' | 'regex'; source: 'user' | 'learned' };
 
 export interface ImportResult {
   batch_id: string;
@@ -1607,7 +1619,7 @@ export function useImportItems(batchId: string | undefined) {
       const { data, error } = await supabase
         .from('import_items')
         .select(
-          'id, batch_id, kind, amount_cents, occurred_at, description, merchant, suggested_category, status, transaction_id, nature, installment_no, installments, match_layer, match_note, adopt_ids, transactions!import_items_transaction_id_fkey(id, occurred_at, description, amount_cents, account_id)',
+          'id, workspace_id, batch_id, kind, amount_cents, occurred_at, description, merchant, suggested_category, suggested_subcategory_id, suggested_subcategory_set, status, transaction_id, nature, installment_no, installments, match_layer, match_note, adopt_ids, transactions!import_items_transaction_id_fkey(id, occurred_at, description, amount_cents, account_id)',
         )
         .eq('batch_id', batchId!)
         .order('occurred_at', { ascending: false });
@@ -1699,6 +1711,9 @@ export function useUpdateImportItem() {
     mutationFn: async (input: {
       id: string;
       category?: string | null;
+      subcategory_id?: string | null;
+      workspaceId?: string;
+      expectedCategory?: string | null;
       /**
        * ⚠️ **O sentido precisa ser EDITÁVEL porque nem todo banco o expressa.** Medido em dois
        * extratos reais do Banco do Brasil (agosto e setembro de 2026): a linha "Pagto cartão
@@ -1712,13 +1727,23 @@ export function useUpdateImportItem() {
       description?: string;
       merchant?: string;
     }) => {
-      const patch: { suggested_category?: string | null; kind?: string; description?: string; merchant?: string } = {};
+      const patch: { suggested_category?: string | null; suggested_subcategory_id?: string | null;
+        suggested_subcategory_set?: boolean; kind?: string; description?: string; merchant?: string } = {};
       if ('category' in input) patch.suggested_category = input.category ?? null;
+      if (Object.hasOwn(input, 'subcategory_id')) {
+        patch.suggested_subcategory_id = detalheDaEscrita(input).subcategory_id;
+        patch.suggested_subcategory_set = true;
+      }
       if (input.kind) patch.kind = input.kind;
       if (input.description !== undefined) patch.description = input.description;
       if (input.merchant !== undefined) patch.merchant = input.merchant;
-      const { error } = await supabase.from('import_items').update(patch).eq('id', input.id);
+      let request = supabase.from('import_items').update(patch).eq('id', input.id);
+      if (input.workspaceId) request = request.eq('workspace_id', input.workspaceId);
+      if (Object.hasOwn(input, 'expectedCategory')) request = input.expectedCategory === null
+        ? request.is('suggested_category', null) : request.eq('suggested_category', input.expectedCategory!);
+      const { data, error } = await request.select('id');
       if (error) throw error;
+      if (!data?.length) throw new Error('A linha da importação mudou. Reabra para conferir.');
     },
     onSuccess: () => invalidateKeys(queryClient, [['import-items'], ['import-batches']]),
   });
@@ -1838,7 +1863,7 @@ export function useRules() {
     queryFn: async (): Promise<CategorizationRule[]> => {
       const { data, error } = await supabase
         .from('categorization_rules')
-        .select('id, match_type, pattern, category, account_id, priority, hits, source')
+        .select('id, workspace_id, subcategory_id, subcategories!categorization_rules_subcategory_id_fkey(name), match_type, pattern, category, account_id, priority, hits, source')
         .order('priority')
         .order('hits', { ascending: false });
       if (error) throw error;
@@ -1867,25 +1892,32 @@ export function useSaveRule() {
       pattern: string;
       category: string;
       accountId?: string | null;
-    }) => {
+      workspaceId?: string;
+    } & SubcategoryMetadata) => {
       if (input.id) {
-        const { error } = await supabase
+        let request = supabase
           .from('categorization_rules')
           .update({
             pattern: input.pattern,
             category: input.category,
             account_id: input.accountId ?? null,
+            ...detalheDaEscrita(input),
           })
           .eq('id', input.id);
+        if (input.workspaceId) request = request.eq('workspace_id', input.workspaceId);
+        const { data, error } = await request.select('id');
         if (error) throw error;
+        if (!data?.length) throw new Error('A regra mudou. Reabra para conferir.');
       } else {
         const { error } = await supabase.from('categorization_rules').insert({
           user_id: await userId(),
+          workspace_id: input.workspaceId ?? await workspaceId(),
           match_type: 'contains',
           pattern: input.pattern,
           category: input.category,
           account_id: input.accountId ?? null,
           source: 'user',
+          ...detalheDaEscrita(input),
         });
         if (error) throw error;
       }
@@ -1941,7 +1973,7 @@ export type Debt = Pick<
   | 'payment_category'
   | 'payment_description'
   | 'payment_merchant'
-> & Partial<ExpenseClassification> & { kind: (typeof DEBT_KINDS)[number]['value']; calculation_mode: 'amortized' | 'fixed_installments'; payment_method?: PaymentMethod | null; workspace_id?: string };
+> & Partial<ExpenseClassification> & SubcategoryMetadata & { kind: (typeof DEBT_KINDS)[number]['value']; calculation_mode: 'amortized' | 'fixed_installments'; payment_method?: PaymentMethod | null; subcategory_id?: string | null; workspace_id?: string };
 
 export type DebtScheduleRow = Omit<Fns['debt_schedule']['Returns'][number], 'interest_cents' | 'principal_cents'> & { interest_cents: number | null; principal_cents: number | null };
 export type PayoffRow = Omit<Fns['payoff_strategy']['Returns'][number], 'interest_rate_monthly' | 'total_interest_cents'> & { interest_rate_monthly: number | null; total_interest_cents: number | null };
@@ -1962,7 +1994,7 @@ export function useDebts() {
 }
 
 const DEBT_COLUMNS =
-  'id, workspace_id, expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, name, kind, calculation_mode, principal_cents, remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, account_id, payment_method, due_day, archived, first_due_date, updated_at, edit_revision, payment_category, payment_description, payment_merchant';
+  'id, workspace_id, subcategory_id, subcategories!debts_subcategory_id_fkey(name), expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, name, kind, calculation_mode, principal_cents, remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, account_id, payment_method, due_day, archived, first_due_date, updated_at, edit_revision, payment_category, payment_description, payment_merchant';
 
 /**
  * As arquivadas (23/09/2026). Arquivar tirava a dívida da lista e não havia volta em lugar
@@ -2169,7 +2201,7 @@ export function useSaveDebtPaymentScoped() {
     mutationFn: async (input: {
       anchorId: string;
       scope: 'one' | 'from_here' | 'all';
-      patch: Partial<Pick<Transaction, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'occurred_at' | 'payment_method'>> & Partial<ExpenseClassification>;
+      patch: Partial<Pick<Transaction, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'occurred_at' | 'payment_method'>> & Partial<ExpenseClassification> & SubcategoryMetadata;
       debtRevision: number;
       anchorRevision: number;
       paymentVersions: Record<string, number>;
@@ -2717,6 +2749,7 @@ export function useSaveDebt() {
       account_id: string | null;
       payment_method?: PaymentMethod | null;
       due_day: number | null;
+      payment_category?: string | null;
       /** A âncora do contrato (`debts.first_due_date`) — só vai quando a tela a conhece. */
       first_due_date?: string | null;
       down_payment?: DownPaymentInput;
@@ -2726,7 +2759,7 @@ export function useSaveDebt() {
        * com o que a tela tinha lido antes. Mudou no meio: nada é gravado, e o erro diz por quê.
        */
       versao?: string | null;
-    } & Partial<ExpenseClassification>) => {
+    } & Partial<ExpenseClassification> & SubcategoryMetadata) => {
       const { id, versao, down_payment, ...resto } = input;
       if (id) {
         let consulta = supabase.from('debts').update(resto).eq('id', id);
@@ -3132,7 +3165,7 @@ export function useCancelSubscription() {
   });
 }
 
-export interface TransactionInput extends Partial<ExpenseClassification> {
+export interface TransactionInput extends Partial<ExpenseClassification>, SubcategoryMetadata {
   kind: TransactionKind;
   amount_cents: number;
   category: string | null;
@@ -3262,7 +3295,7 @@ export function useSaveTransactionScoped() {
     }: {
       id: string;
       scope: 'one' | 'future';
-      patch: Partial<Pick<TransactionInput, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'payment_method'>> & Partial<ExpenseClassification>;
+      patch: Partial<Pick<TransactionInput, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'payment_method'>> & Partial<ExpenseClassification> & SubcategoryMetadata;
     }) => {
       const { data, error } = await supabase.rpc('update_transaction_scoped', {
         p_transaction_id: id,
@@ -3285,7 +3318,7 @@ export function useSaveInstallmentOccurrence() {
       scope?: 'one' | 'future' | 'all';
       patch: Partial<Pick<TransactionInput,
         'amount_cents' | 'category' | 'description' | 'merchant' | 'occurred_at' |
-        'status' | 'due_at' | 'auto_confirm' | 'payment_method'>> & Partial<ExpenseClassification> & { total_cents?: number };
+        'status' | 'due_at' | 'auto_confirm' | 'payment_method'>> & Partial<ExpenseClassification> & SubcategoryMetadata & { total_cents?: number };
       expectedPlanRevision: number;
       expectedAnchorRevision: number;
       requestId: string;
@@ -3336,7 +3369,7 @@ export function useSaveRecurringSeries() {
         /** O calendário vai junto: regra nova e o próximo vencimento (`20260926120000`). */
         rrule?: string;
         next_run_at?: string;
-      } & Partial<ExpenseClassification>;
+      } & Partial<ExpenseClassification> & SubcategoryMetadata;
     }) => {
       const { data, error } = await supabase.rpc('update_recurring_future', {
         p_transaction_id: null,
@@ -3371,7 +3404,7 @@ export function useSaveRecurringAll() {
     mutationFn: async (input: {
       recurringId: string;
       linePatch: Partial<Pick<TransactionInput,
-        'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'payment_method'>> & Partial<ExpenseClassification>;
+        'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'payment_method'>> & Partial<ExpenseClassification> & SubcategoryMetadata;
       seriesPatch: {
         amount_cents?: number;
         category?: string | null;
@@ -3383,7 +3416,7 @@ export function useSaveRecurringAll() {
         end_date?: string | null;
         rrule?: string;
         next_run_at?: string;
-      } & Partial<ExpenseClassification>;
+      } & Partial<ExpenseClassification> & SubcategoryMetadata;
       expectedRevision: number;
       requestId: string;
     }) => {
@@ -3433,7 +3466,7 @@ export function useSaveRecurringOccurrenceAndSeries() {
       recurringId: string;
       expectedRevision: number;
       requestId: string;
-      linePatch: Partial<Pick<TransactionInput, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'payment_method'>> & Partial<ExpenseClassification>;
+      linePatch: Partial<Pick<TransactionInput, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'payment_method'>> & Partial<ExpenseClassification> & SubcategoryMetadata;
       seriesPatch: {
         amount_cents?: number;
         category?: string | null;
@@ -3445,7 +3478,7 @@ export function useSaveRecurringOccurrenceAndSeries() {
         end_date?: string | null;
         rrule?: string;
         next_run_at?: string;
-      } & Partial<ExpenseClassification>;
+      } & Partial<ExpenseClassification> & SubcategoryMetadata;
     }) => {
       const { data, error } = await supabase.rpc('update_recurring_future', {
         p_transaction_id: id,
@@ -3864,7 +3897,7 @@ export interface InstallmentParcel {
   status: 'pending' | 'cleared';
 }
 
-export interface InstallmentPlanSummary extends Partial<ExpenseClassification> {
+export interface InstallmentPlanSummary extends Partial<ExpenseClassification>, SubcategoryMetadata {
   id: string;
   workspace_id?: string;
   payment_method?: PaymentMethod | null;
@@ -3974,12 +4007,12 @@ async function buscarPlanos(apenas?: string): Promise<InstallmentPlanSummary[]> 
   type Plano = {
     id: string; merchant: string | null; description: string | null; category: string | null;
     account_id: string | null; total_cents: number; installments: number; first_occurred_at: string;
-    payment_method: PaymentMethod | null; edit_revision: number; workspace_id: string;
+    payment_method: PaymentMethod | null; edit_revision: number; workspace_id: string; subcategory_id: string | null;
   } & ExpenseClassification;
   const plans = await fetchPaged<Plano>((from, to) => {
     const consulta = supabase
       .from('installment_plans')
-      .select('id, merchant, description, category, account_id, total_cents, installments, first_occurred_at, payment_method, edit_revision, workspace_id, expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source');
+      .select('id, merchant, description, category, subcategory_id, account_id, total_cents, installments, first_occurred_at, payment_method, edit_revision, workspace_id, expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source');
     return (apenas ? consulta.eq('id', apenas) : consulta.order('first_occurred_at', { ascending: false }).order('id')).range(from, to);
   });
   if (!plans.length) return [];
@@ -4046,6 +4079,7 @@ async function buscarPlanos(apenas?: string): Promise<InstallmentPlanSummary[]> 
       description: plan.description,
       merchant: plan.merchant,
       category: plan.category,
+      subcategory_id: plan.subcategory_id,
       account_id: plan.account_id,
       payment_method: plan.payment_method,
       edit_revision: plan.edit_revision,

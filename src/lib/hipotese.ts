@@ -1,6 +1,6 @@
 import type { PaymentMethod } from './payment-method.ts';
 import { brToISO, isValidBRDate, isoToBR, localISODate } from './dates.ts';
-import { argsDaParcelada, dadosDoLancamento, linhaDaRecorrente, linhaDoFinanciamento } from './escrita.ts';
+import { argsDaParcelada, dadosDoLancamento, detalheDaEscrita, linhaDaRecorrente, linhaDoFinanciamento } from './escrita.ts';
 import { hrefDoLancar } from './lancar.ts';
 import { montaRRule } from './serie.ts';
 
@@ -24,6 +24,8 @@ export type Hipotese = {
   repete: Repete;
   conta: string | null;
   paymentMethod?: PaymentMethod | null;
+  category?: string | null;
+  subcategory_id?: string | null;
   /** ISO `YYYY-MM-DD`; nunca antes de hoje (a folha não deixa). */
   data: string;
 };
@@ -82,17 +84,19 @@ export function registroDaHipotese(hipotese: Hipotese, posicao: number): Registr
       return {
         tipo: 'lancamento',
         dados: dadosDoLancamento({
+          ...detalheDaEscrita(h),
           ...(h.paymentMethod !== undefined ? { payment_method: h.paymentMethod } : {}),
-          kind: h.kind, amount_cents: h.valor_cents, category: null, description: TITULO, merchant: null,
+          kind: h.kind, amount_cents: h.valor_cents, category: h.category ?? null, description: TITULO, merchant: null,
           account_id: h.conta, counterparty_account_id: null, occurred_at: h.data, status: 'pending', due_at: null,
           auto_confirm: false,
         }),
       };
     case 'parcelado': {
       const { rpc, args } = argsDaParcelada({
+        ...detalheDaEscrita(h),
         ...(h.paymentMethod !== undefined ? { paymentMethod: h.paymentMethod } : {}),
         accountId: h.conta!, totalCents: h.valor_cents, installments: h.parcelas, paidInstallments: 0,
-        occurredAt: h.data, description: TITULO, category: null, merchant: null,
+        occurredAt: h.data, description: TITULO, category: h.category ?? null, merchant: null,
       });
       return { tipo: 'parcelada', dados: { ...args, ultimo_dia: rpc === 'create_installment_plan_last_day' } };
     }
@@ -101,8 +105,9 @@ export function registroDaHipotese(hipotese: Hipotese, posicao: number): Registr
       return {
         tipo: 'recorrente',
         dados: linhaDaRecorrente({
+          ...detalheDaEscrita(h),
           ...(h.paymentMethod !== undefined ? { payment_method: h.paymentMethod } : {}),
-          kind: h.kind, amount_cents: h.valor_cents, description: TITULO, merchant: null, category: null,
+          kind: h.kind, amount_cents: h.valor_cents, description: TITULO, merchant: null, category: h.category ?? null,
           account_id: h.conta, rrule: montaRRule(h.repete, new Date(y, m - 1, d), 1),
           next_run_at: `${h.data}T12:00:00.000Z`, end_date: null, auto_confirm: false,
         }),
@@ -112,7 +117,9 @@ export function registroDaHipotese(hipotese: Hipotese, posicao: number): Registr
       return {
         tipo: 'financiamento',
         dados: linhaDoFinanciamento({
+          ...detalheDaEscrita(h),
           ...(h.paymentMethod !== undefined ? { payment_method: h.paymentMethod } : {}),
+          ...(h.category !== undefined ? { payment_category: h.category } : {}),
           name: `Financiamento da hipótese ${posicao + 1}`, kind: 'financing', calculation_mode: 'fixed_installments',
           principal_cents: h.valor_cents * h.parcelas, remaining_cents: h.valor_cents * h.parcelas,
           interest_rate_monthly: 0, installments: h.parcelas, installments_paid: 0, installment_cents: h.valor_cents,
@@ -140,7 +147,9 @@ export function resumoDaHipotese(h: Hipotese, brl: (c: number) => string, nomeDa
  */
 export function paramsDoAplicar(h: Hipotese): ReturnType<typeof hrefDoLancar> {
   const data = isoToBR(dataDaHipotese(h));
-  const payment: Record<string, string> = h.paymentMethod !== undefined ? { paymentMethod: h.paymentMethod ?? '' } : {};
+  const payment: Record<string, string> = { ...(h.paymentMethod !== undefined ? { paymentMethod: h.paymentMethod ?? '' } : {}),
+    ...(h.category !== undefined ? { category: h.category ?? '' } : {}),
+    ...(Object.hasOwn(h, 'subcategory_id') ? { subcategory_id: detalheDaEscrita(h).subcategory_id ?? '' } : {}) };
   if (h.forma === 'repete') {
     return hrefDoLancar('recorrente', { ...payment, deHipotese: h.id, kind: h.kind, amount: String(h.valor_cents), start: data, ...(h.conta ? { account: h.conta } : {}), repete: h.repete });
   }

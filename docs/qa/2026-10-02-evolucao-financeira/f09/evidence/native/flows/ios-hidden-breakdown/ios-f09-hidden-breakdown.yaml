@@ -1,0 +1,11 @@
+appId: com.proops.personal.dev
+---
+- tapOn:
+    point: "50%,49%"
+- extendedWaitUntil:
+    visible: "Detalhe oculto"
+    timeout: 15000
+- assertVisible: "Registros ocultos"
+- assertNotVisible: "Sem detalhe"
+- assertNotVisible: "3 registros"
+- takeScreenshot: ios-f09-hidden-breakdown-verified

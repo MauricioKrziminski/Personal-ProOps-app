@@ -2,6 +2,7 @@
  * A régua do formulário único (spec 2026-09-29): os tipos, os campos comuns que viajam entre eles e
  * as opções da pergunta de conversão — pura, para as três telas e o teste lerem a mesma coisa.
  */
+import { detalheDaEscrita } from './escrita.ts';
 import { dataLocalDe } from './dates.ts';
 import type { PaymentMethod } from './payment-method.ts';
 import type { RegistroSimulado } from './hipotese.ts';
@@ -16,6 +17,7 @@ export type Comum = {
   contaId: string | null;
   dataBR: string;
   categoria: string | null;
+  subcategory_id?: string | null;
   /** Lançamento e série têm; o financiamento não. */
   estabelecimento?: string;
   paymentMethod?: PaymentMethod | null;
@@ -47,11 +49,11 @@ export function opcoesDaConversao(o: OrigemDaConversao): OpcaoDaConversao[] {
 
 export function comumDepoisDeSalvar(c: Comum): Comum {
   const { estabelecimento: _, expenseClassification: _classification, ...fica } = c;
-  return { ...fica, descricao: '', valorCents: 0, categoria: null };
+  return { ...fica, ...(Object.hasOwn(c, 'subcategory_id') ? { subcategory_id: null } : {}), descricao: '', valorCents: 0, categoria: null };
 }
 
 export function comumParaSerie(c: Comum): Comum {
-  return { ...c, kind: c.kind === 'transfer' ? 'expense' : c.kind };
+  return { ...c, ...detalheDaEscrita(c, c.kind), kind: c.kind === 'transfer' ? 'expense' : c.kind };
 }
 
 export function hrefDoLancar(tipo: TipoDeLancamento, extra: Record<string, string> = {}) {

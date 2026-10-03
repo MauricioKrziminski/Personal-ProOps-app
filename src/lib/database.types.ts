@@ -641,6 +641,8 @@ export type Database = {
           pattern: string
           priority: number
           source: string
+          subcategory_id: string | null
+          subcategory_parent_key: string | null
           updated_at: string
           user_id: string
           workspace_id: string
@@ -655,6 +657,8 @@ export type Database = {
           pattern: string
           priority?: number
           source?: string
+          subcategory_id?: string | null
+          subcategory_parent_key?: string | null
           updated_at?: string
           user_id: string
           workspace_id?: string
@@ -669,6 +673,8 @@ export type Database = {
           pattern?: string
           priority?: number
           source?: string
+          subcategory_id?: string | null
+          subcategory_parent_key?: string | null
           updated_at?: string
           user_id?: string
           workspace_id?: string
@@ -680,6 +686,24 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "categorization_rules_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "categorization_rules_subcategory_scope_fkey"
+            columns: [
+              "subcategory_id",
+              "workspace_id",
+              "subcategory_parent_key",
+            ]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id", "workspace_id", "parent_key"]
           },
           {
             foreignKeyName: "categorization_rules_user_id_fkey"
@@ -752,6 +776,8 @@ export type Database = {
       debt_installment_edits: {
         Row: {
           amount_cents: number | null
+          category: string | null
+          category_set: boolean
           debt_id: string
           due_date: string | null
           expense_necessity: string | null
@@ -763,9 +789,15 @@ export type Database = {
           installment_no: number
           payment_method: string | null
           payment_method_set: boolean
+          subcategory_id: string | null
+          subcategory_parent_key: string | null
+          subcategory_set: boolean
+          subcategory_workspace_id: string | null
         }
         Insert: {
           amount_cents?: number | null
+          category?: string | null
+          category_set?: boolean
           debt_id: string
           due_date?: string | null
           expense_necessity?: string | null
@@ -777,9 +809,15 @@ export type Database = {
           installment_no: number
           payment_method?: string | null
           payment_method_set?: boolean
+          subcategory_id?: string | null
+          subcategory_parent_key?: string | null
+          subcategory_set?: boolean
+          subcategory_workspace_id?: string | null
         }
         Update: {
           amount_cents?: number | null
+          category?: string | null
+          category_set?: boolean
           debt_id?: string
           due_date?: string | null
           expense_necessity?: string | null
@@ -791,6 +829,10 @@ export type Database = {
           installment_no?: number
           payment_method?: string | null
           payment_method_set?: boolean
+          subcategory_id?: string | null
+          subcategory_parent_key?: string | null
+          subcategory_set?: boolean
+          subcategory_workspace_id?: string | null
         }
         Relationships: [
           {
@@ -799,6 +841,24 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "debts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "debt_installment_edits_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "debt_installment_subcategory_scope_fkey"
+            columns: [
+              "subcategory_id",
+              "subcategory_workspace_id",
+              "subcategory_parent_key",
+            ]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id", "workspace_id", "parent_key"]
           },
         ]
       }
@@ -829,6 +889,8 @@ export type Database = {
           principal_cents: number
           remaining_cents: number
           started_at: string
+          subcategory_id: string | null
+          subcategory_parent_key: string | null
           updated_at: string
           user_id: string
           workspace_id: string
@@ -859,6 +921,8 @@ export type Database = {
           principal_cents: number
           remaining_cents: number
           started_at?: string
+          subcategory_id?: string | null
+          subcategory_parent_key?: string | null
           updated_at?: string
           user_id: string
           workspace_id?: string
@@ -889,6 +953,8 @@ export type Database = {
           principal_cents?: number
           remaining_cents?: number
           started_at?: string
+          subcategory_id?: string | null
+          subcategory_parent_key?: string | null
           updated_at?: string
           user_id?: string
           workspace_id?: string
@@ -900,6 +966,24 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "debts_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "debts_subcategory_scope_fkey"
+            columns: [
+              "subcategory_id",
+              "workspace_id",
+              "subcategory_parent_key",
+            ]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id", "workspace_id", "parent_key"]
           },
           {
             foreignKeyName: "debts_user_id_fkey"
@@ -1423,8 +1507,11 @@ export type Database = {
           payment_method: string | null
           raw: Json | null
           status: string
+          subcategory_parent_key: string | null
           suggested_account_id: string | null
           suggested_category: string | null
+          suggested_subcategory_id: string | null
+          suggested_subcategory_set: boolean
           transaction_id: string | null
           workspace_id: string
         }
@@ -1448,8 +1535,11 @@ export type Database = {
           payment_method?: string | null
           raw?: Json | null
           status?: string
+          subcategory_parent_key?: string | null
           suggested_account_id?: string | null
           suggested_category?: string | null
+          suggested_subcategory_id?: string | null
+          suggested_subcategory_set?: boolean
           transaction_id?: string | null
           workspace_id: string
         }
@@ -1473,8 +1563,11 @@ export type Database = {
           payment_method?: string | null
           raw?: Json | null
           status?: string
+          subcategory_parent_key?: string | null
           suggested_account_id?: string | null
           suggested_category?: string | null
+          suggested_subcategory_id?: string | null
+          suggested_subcategory_set?: boolean
           transaction_id?: string | null
           workspace_id?: string
         }
@@ -1487,10 +1580,28 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "import_items_subcategory_scope_fkey"
+            columns: [
+              "suggested_subcategory_id",
+              "workspace_id",
+              "subcategory_parent_key",
+            ]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id", "workspace_id", "parent_key"]
+          },
+          {
             foreignKeyName: "import_items_suggested_account_id_fkey"
             columns: ["suggested_account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_items_suggested_subcategory_id_fkey"
+            columns: ["suggested_subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
             referencedColumns: ["id"]
           },
           {
@@ -1525,6 +1636,8 @@ export type Database = {
           installments: number
           merchant: string | null
           payment_method: string | null
+          subcategory_id: string | null
+          subcategory_parent_key: string | null
           total_cents: number
           updated_at: string | null
           user_id: string
@@ -1545,6 +1658,8 @@ export type Database = {
           installments: number
           merchant?: string | null
           payment_method?: string | null
+          subcategory_id?: string | null
+          subcategory_parent_key?: string | null
           total_cents: number
           updated_at?: string | null
           user_id: string
@@ -1565,6 +1680,8 @@ export type Database = {
           installments?: number
           merchant?: string | null
           payment_method?: string | null
+          subcategory_id?: string | null
+          subcategory_parent_key?: string | null
           total_cents?: number
           updated_at?: string | null
           user_id?: string
@@ -1577,6 +1694,24 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "installment_plans_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "installment_plans_subcategory_scope_fkey"
+            columns: [
+              "subcategory_id",
+              "workspace_id",
+              "subcategory_parent_key",
+            ]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id", "workspace_id", "parent_key"]
           },
           {
             foreignKeyName: "installment_plans_user_id_fkey"
@@ -2057,6 +2192,8 @@ export type Database = {
           payment_method: string | null
           rrule: string
           run_attempts: number
+          subcategory_id: string | null
+          subcategory_parent_key: string | null
           updated_at: string
           user_id: string
           workspace_id: string
@@ -2086,6 +2223,8 @@ export type Database = {
           payment_method?: string | null
           rrule: string
           run_attempts?: number
+          subcategory_id?: string | null
+          subcategory_parent_key?: string | null
           updated_at?: string
           user_id: string
           workspace_id?: string
@@ -2115,6 +2254,8 @@ export type Database = {
           payment_method?: string | null
           rrule?: string
           run_attempts?: number
+          subcategory_id?: string | null
+          subcategory_parent_key?: string | null
           updated_at?: string
           user_id?: string
           workspace_id?: string
@@ -2126,6 +2267,24 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_transactions_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_transactions_subcategory_scope_fkey"
+            columns: [
+              "subcategory_id",
+              "workspace_id",
+              "subcategory_parent_key",
+            ]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id", "workspace_id", "parent_key"]
           },
           {
             foreignKeyName: "recurring_transactions_user_id_fkey"
@@ -2286,6 +2445,60 @@ export type Database = {
           },
         ]
       }
+      subcategories: {
+        Row: {
+          created_at: string
+          edit_revision: number
+          id: string
+          name: string
+          name_key: string
+          parent_category: string
+          parent_key: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          edit_revision?: number
+          id?: string
+          name: string
+          name_key: string
+          parent_category: string
+          parent_key: string
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          edit_revision?: number
+          id?: string
+          name?: string
+          name_key?: string
+          parent_category?: string
+          parent_key?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subcategories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subcategories_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           canceled_at: string | null
@@ -2378,6 +2591,9 @@ export type Database = {
           rollover_of_invoice_id: string | null
           source: string
           status: string
+          subcategory_id: string | null
+          subcategory_parent_key: string | null
+          subcategory_snapshot_set: boolean
           updated_at: string
           user_id: string
           workspace_id: string
@@ -2420,6 +2636,9 @@ export type Database = {
           rollover_of_invoice_id?: string | null
           source?: string
           status?: string
+          subcategory_id?: string | null
+          subcategory_parent_key?: string | null
+          subcategory_snapshot_set?: boolean
           updated_at?: string
           user_id: string
           workspace_id?: string
@@ -2462,6 +2681,9 @@ export type Database = {
           rollover_of_invoice_id?: string | null
           source?: string
           status?: string
+          subcategory_id?: string | null
+          subcategory_parent_key?: string | null
+          subcategory_snapshot_set?: boolean
           updated_at?: string
           user_id?: string
           workspace_id?: string
@@ -2543,6 +2765,24 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "card_invoices"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_subcategory_scope_fkey"
+            columns: [
+              "subcategory_id",
+              "workspace_id",
+              "subcategory_parent_key",
+            ]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id", "workspace_id", "parent_key"]
           },
           {
             foreignKeyName: "transactions_user_id_fkey"
@@ -3206,6 +3446,16 @@ export type Database = {
           uses: number
         }[]
       }
+      category_detail_breakdown: {
+        Args: {
+          p_from: string
+          p_kind: string
+          p_parent_category: string
+          p_to: string
+          p_workspace_id?: string
+        }
+        Returns: Json
+      }
       claim_jobs: {
         Args: { batch_size?: number }
         Returns: {
@@ -3574,6 +3824,31 @@ export type Database = {
           status: string
         }[]
       }
+      ledger_expected_lines_detailed: {
+        Args: { p_from: string; p_recurring_id?: string; p_to: string }
+        Returns: {
+          account_id: string
+          amount_cents: number
+          category: string
+          description: string
+          due_date: string
+          expense_necessity: string
+          expense_necessity_source: string
+          expense_pattern: string
+          expense_pattern_source: string
+          inferred_start: boolean
+          installment_no: number
+          installments_total: number
+          kind: string
+          origin: string
+          payment_method: string
+          ref_id: string
+          status: string
+          subcategory_id: string
+          subcategory_name: string
+          workspace_id: string
+        }[]
+      }
       ledger_expected_lines_payment: {
         Args: { p_from: string; p_recurring_id?: string; p_to: string }
         Returns: {
@@ -3766,6 +4041,10 @@ export type Database = {
         Args: { p_input: Json; p_request_id: string }
         Returns: Json
       }
+      resolve_subcategory_attempt: {
+        Args: { p_input: Json; p_request_id: string }
+        Returns: Json
+      }
       roll_invoice: {
         Args: {
           p_invoice_id: string
@@ -3866,6 +4145,8 @@ export type Database = {
           title: string
         }[]
       }
+      subcategory_filter_states: { Args: never; Returns: Json }
+      subcategory_state: { Args: { p_workspace_id: string }; Returns: Json }
       transactions_summary: {
         Args: { from_date: string; to_date: string }
         Returns: {
@@ -4019,6 +4300,10 @@ export type Database = {
       update_transaction_scoped: {
         Args: { p_patch: Json; p_scope: string; p_transaction_id: string }
         Returns: number
+      }
+      write_subcategory: {
+        Args: { p_input: Json; p_request_id: string }
+        Returns: Json
       }
       year_end_balances: {
         Args: { p_year: number }

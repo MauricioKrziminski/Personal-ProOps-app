@@ -25,7 +25,7 @@ import { useRascunho } from '@/hooks/use-rascunho';
 import { newClientMessageId } from '@/lib/agent-chat';
 import { brToISO } from '@/lib/dates';
 import { askEditScope } from '@/lib/edit-scope';
-import { linhaDaRecorrente, type EntradaRecorrente } from '@/lib/escrita';
+import { linhaDaRecorrente, detalheDaEscrita, mudancaDoDetalhe, type EntradaRecorrente } from '@/lib/escrita';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { normalizePaymentMethod, paymentMethodError } from '@/lib/payment-method';
 import { comumParaSerie } from '@/lib/lancar';
@@ -115,12 +115,15 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
     // aberto: realtime não pode trocar o baseline do diff nem a revisão do CAS.
     if (guardado && 'form' in guardado) return {
       ...guardado,
-      form: { ...guardado.form, expenseClassification: comum.expenseClassification ?? guardado.form.expenseClassification },
+      form: { ...guardado.form,
+        ...(Object.hasOwn(comum, 'subcategory_id') ? { category: comum.categoria, ...detalheDaEscrita(comum) } : {}),
+        expenseClassification: comum.expenseClassification ?? guardado.form.expenseClassification },
     };
     const baseline = alvo ? { ...alvo } : undefined;
     // A classificação segue a última intenção comum; o baseline continua sendo o registro aberto.
     if (guardado) return { form: {
       ...guardado, expenseClassification: comum.expenseClassification ?? guardado.expenseClassification,
+      ...(Object.hasOwn(comum, 'subcategory_id') ? { category: comum.categoria, ...detalheDaEscrita(comum) } : {}),
     }, baseline };
     if (baseline) return { form: serieDoRegistro(baseline), baseline };
     const c = comumParaSerie(comum);
@@ -133,6 +136,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
         description: c.descricao,
         merchant: c.estabelecimento ?? '',
         category: c.categoria,
+        ...detalheDaEscrita(c),
         accountId: c.contaId,
         paymentMethod: c.paymentMethod,
         expenseClassification: c.expenseClassification,
@@ -148,7 +152,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
   const resolvedForm = { ...form, expenseClassification: classification.classification };
 
   useEffect(() => {
-    registrarComum(() => ({ kind: form.kind, descricao: form.description, valorCents: form.amountCents, contaId: form.accountId, dataBR: form.inicio, categoria: form.category, estabelecimento: form.merchant, paymentMethod: form.paymentMethod, expenseClassification: classification.classification }));
+    registrarComum(() => ({ kind: form.kind, descricao: form.description, valorCents: form.amountCents, contaId: form.accountId, dataBR: form.inicio, categoria: form.category, ...detalheDaEscrita(form), estabelecimento: form.merchant, paymentMethod: form.paymentMethod, expenseClassification: classification.classification }));
     registrarEstado(() => estado);
   });
 
@@ -164,6 +168,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
     description: form.description.trim(),
     merchant: form.merchant.trim() || null,
     category: form.category,
+    ...detalheDaEscrita(form),
     account_id: form.accountId,
     ...(form.paymentMethod !== undefined ? { payment_method: form.paymentMethod } : {}),
     rrule: rrulePrevia,
@@ -186,6 +191,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
       const patch: Parameters<typeof editar.mutate>[0]['patch'] = {};
       if (!antes || form.amountCents !== Number(antes.amount_cents)) patch.amount_cents = form.amountCents;
       if (!antes || form.category !== antes.category) patch.category = form.category;
+      Object.assign(patch, mudancaDoDetalhe(antes ?? {}, form, antes?.category ?? null, form.category));
       const desc = form.description.trim();
       if (!antes || desc !== antes.description) patch.description = desc;
       if (!antes || form.accountId !== antes.account_id) patch.account_id = form.accountId;
@@ -206,6 +212,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
       const linePatch: Parameters<typeof editarTudo.mutate>[0]['linePatch'] = {};
       if (patch.amount_cents !== undefined) linePatch.amount_cents = patch.amount_cents;
       if (patch.category !== undefined) linePatch.category = patch.category;
+      if ('subcategory_id' in patch) linePatch.subcategory_id = patch.subcategory_id as string | null;
       if (patch.description !== undefined) linePatch.description = patch.description;
       if (patch.merchant !== undefined) linePatch.merchant = patch.merchant;
       if (patch.account_id !== undefined) linePatch.account_id = patch.account_id;
@@ -316,7 +323,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
       <SheetScroll contentContainerStyle={styles.corpo}>
         {props.topo}
         <View style={styles.conteudo}>
-          <CamposDaSerie form={resolvedForm} onChange={setForm} contas={accounts.data ?? []}
+          <CamposDaSerie form={resolvedForm} onChange={setForm} contas={accounts.data ?? []} workspaceId={baseline?.workspace_id}
             classificationDefaults={classification.defaults}
             onUseCategoryDefaults={classification.defaults ? () => setForm({ ...form, expenseClassification: classification.adoptCategoryDefaults() }) : undefined} />
           {classification.isError ? <ErrorCard onRetry={() => void classification.refetch()} /> : null}

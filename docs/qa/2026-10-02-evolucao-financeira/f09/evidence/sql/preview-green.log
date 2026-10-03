@@ -1,0 +1,8 @@
+produção : kwriuifcwyvdrxtspjiz  (Personal ProOps app)
+staging  : utkqoiigimqzeenxkxdl  (Personal ProOps app - staging)
+
+CLI linkado (destino do db push) : utkqoiigimqzeenxkxdl  → staging
+app (.env.local)                 : utkqoiigimqzeenxkxdl  → staging
+{"phase": "migration-rollback", "attributes_unchanged": true}
+{"mode": "green", "file": "subcategory_financial_preview.sql", "result": "pass", "committed": false}
+{"mode": "green", "file": "finance_write_preview.sql", "result": "pass", "committed": false}

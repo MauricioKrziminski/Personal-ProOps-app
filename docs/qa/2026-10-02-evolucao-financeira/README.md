@@ -31,9 +31,9 @@ Esses fatos e a abertura do formulário ainda não equivalem ao aceite funcional
 | F05 | Filtros por pagamento | Aceito; seleção múltipla, paginação e dados preservados | Validado; fonte/privacidade/iPad; limites no registro | Validado; página 2/offline/recuperação/compacto |
 | F06 | Classificações independentes | Aceito; snapshots, defaults e recortes independentes | Matriz nativa e oráculos aprovados; limites no registro | Matriz nativa, offline/retry e oráculos aprovados; limites no registro |
 | F07 | Reserva dedicada | Aceite funcional no staging; incidente ANR aberto com disposição explícita | Persistência, temas, privacidade, fonte XL/teto, lifecycle/rotação iPad e Reduce Motion do iOS conferidos | Conta + investimento, offline/retry, terminal/CAS, matriz visual/lifecycle e APK embutido conferidos; limites no aceite |
-| F08 | Metas no planejamento | Liberado após aceite funcional F07 | Não validado | Não validado |
-| F09 | Subcategorias | Aguardando F08 | Não validado | Não validado |
-| F10 | Prazo pela contribuição | Aguardando F09 | Não validado | Não validado |
+| F08 | Metas no planejamento | Aceito; commit local `8641fa38`, limites no registro | Matriz e persistência aprovadas | Matriz e persistência aprovadas |
+| F09 | Subcategorias | Aceito funcionalmente; contratos, corridas, gates e limpeza comprovados; limites no registro | Matriz e oráculos aprovados | Matriz, fonte ampliada/escuro e oráculos aprovados; repintura registrada |
+| F10 | Prazo pela contribuição | Próximo incremento, F09 aceito | Não validado | Não validado |
 | F11 | Alocar/transferir | Aguardando F10 | Não validado | Não validado |
 | F12 | Aporte/resgate | Aguardando F11 | Não validado | Não validado |
 | F13 | Resultado/reavaliação | Aguardando F12 | Não validado | Não validado |
@@ -250,3 +250,13 @@ da ANR. FPS/frames e fluidez não foram medidos.
 [registro nativo e limites](f07/registro-nativo.md),
 [banco](f07/registro-sql.md), [revisão visual](f07/revisao-visual.md) e
 [manifesto de capturas](f07/captures.json).
+
+## F09 — subcategorias opcionais
+
+[Aceite e limites](f09/aceite.md), [contrato](f09/contrato.md), [banco](f09/banco.md),
+[código](f09/registro-codigo.md) e [matriz nativa](f09/nativo.md). Seis migrations somente
+no staging; criação em ambos os sistemas e alterações estruturais preservaram valores e
+histórico. Remoção de detalhe virou Sem detalhe, sem apagar lançamentos. Limpeza de duas
+fixtures/oito recibos próprios reconcilia 17 fontes e caixa com baseline independente.
+ANR F07, repintura Android e limites de cobertura/deployment permanecem explicitamente
+registrados. F10 liberado para o próximo ciclo.

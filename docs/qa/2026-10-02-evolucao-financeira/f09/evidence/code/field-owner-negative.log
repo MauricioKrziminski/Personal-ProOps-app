@@ -1,0 +1,68 @@
+(node:5509) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/subcategory-field-ui.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Sem detalhe comes first; parent namespace filters actual selector and read errors hide old choices (28.813ms)
+✔ committed inline creation selects only its current record/parent visit (14.81575ms)
+✖ stale selector handler cannot choose an old parent child into a new parent (4.854917ms)
+✔ late creation after leaving presence cannot select on the returning visit (5.583792ms)
+✖ resolving an earlier record creation confirms catalog without selecting into a later record (4.628042ms)
+✔ unmounted inline creation never selects on confirmation (4.589167ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 4
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 277.81675
+
+✖ failing tests:
+
+test at src/lib/subcategory-field-ui.test.ts:79:1
+✖ stale selector handler cannot choose an old parent child into a new parent (4.854917ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+  + [
+  +   '20000000-0000-4000-8000-000000000001'
+  + ]
+  - []
+
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/subcategory-field-ui.test.ts:80:107)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ '20000000-0000-4000-8000-000000000001' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/subcategory-field-ui.test.ts:85:1
+✖ resolving an earlier record creation confirms catalog without selecting into a later record (4.628042ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+  + [
+  +   '20000000-0000-4000-8000-000000000001'
+  + ]
+  - []
+
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/subcategory-field-ui.test.ts:88:58)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ '20000000-0000-4000-8000-000000000001' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

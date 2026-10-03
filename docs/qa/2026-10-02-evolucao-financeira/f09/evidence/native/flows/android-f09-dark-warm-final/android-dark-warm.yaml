@@ -1,0 +1,29 @@
+appId: com.proops.personal.dev
+---
+- openLink: appproops://finance/reports
+- extendedWaitUntil:
+    visible: "Relatórios"
+    timeout: 20000
+- scrollUntilVisible:
+    element: { text: "mercado" }
+    direction: DOWN
+    timeout: 30000
+    visibilityPercentage: 50
+    centerElement: true
+- tapOn: { text: "Detalhes", below: "mercado", index: 0 }
+- extendedWaitUntil:
+    visible: "Sem detalhe"
+    timeout: 20000
+- scrollUntilVisible:
+    element: { text: "Total da categoria" }
+    direction: DOWN
+    timeout: 15000
+    visibilityPercentage: 50
+- takeScreenshot: android-f09-dark-large-final
+- openLink: appproops://profile
+- scrollUntilVisible:
+    element: { text: "Claro" }
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 50
+- tapOn: { text: "Claro" }

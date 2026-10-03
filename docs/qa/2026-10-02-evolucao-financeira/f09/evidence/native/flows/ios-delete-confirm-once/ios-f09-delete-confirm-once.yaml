@@ -1,0 +1,8 @@
+appId: com.proops.personal.dev
+---
+- tapOn: "Remover detalhe"
+- extendedWaitUntil:
+    visible: "Esta categoria ainda não tem detalhes."
+    timeout: 15000
+- assertNotVisible: "Nome do detalhe"
+- takeScreenshot: ios-f09-receiver-deleted-catalog

@@ -1,0 +1,9 @@
+appId: com.proops.personal.dev
+---
+- hideKeyboard
+- tapOn: {text: "Aplicar"}
+- extendedWaitUntil:
+    visible: ".*QA F09 Android Detalhe.*"
+    timeout: 20000
+- assertNotVisible: ".*qa f09 ios editado.*"
+- takeScreenshot: android-f09-none-filter-two-preserved

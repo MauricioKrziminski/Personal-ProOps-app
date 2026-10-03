@@ -1,0 +1,9 @@
+appId: com.proops.personal.dev
+---
+- launchApp:
+    clearState: false
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Conhecer o app"
+    timeout: 30000
+- takeScreenshot: android-f09-restored-light-home

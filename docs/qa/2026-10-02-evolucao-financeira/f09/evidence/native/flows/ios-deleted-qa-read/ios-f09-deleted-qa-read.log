@@ -1,0 +1,13 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on iPhone 17 Pro - iOS 26.5 - F0BDF23C-0286-4183-97E3-3BCC61D4267D
+ > Flow ios-f09-deleted-qa-read
+Assert that "QA F09 iOS detalhe 20261003, R.*" is visible... COMPLETED
+Assert that "QA F09 Android Detalhe, R.*" is visible... COMPLETED
+Assert that ".*qa f09 ios editado.*" is not visible... COMPLETED
+Take screenshot ios-f09-deleted-child-qa-rows... COMPLETED
+Tap on "QA F09 iOS detalhe 20261003, R.*"... COMPLETED
+Assert that ".*03 de outubro de 2026.*mercado" is visible... COMPLETED
+Assert that "Pix" is visible... COMPLETED
+Assert that ".*qa f09 ios editado.*" is not visible... COMPLETED
+Take screenshot ios-f09-deleted-child-ios-ficha... COMPLETED

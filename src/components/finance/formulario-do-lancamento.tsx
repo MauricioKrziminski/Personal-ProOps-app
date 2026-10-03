@@ -9,6 +9,8 @@ import * as Haptics from 'expo-haptics';
 import { z } from 'zod';
 
 import { CategoryPicker } from '@/components/finance/category-picker';
+import { SubcategoryField } from '@/components/finance/subcategory-field';
+import { subcategoryAfterParentChange } from '@/lib/subcategories';
 import { ErrorCard } from '@/components/error-card';
 import { ExpenseClassificationField } from '@/components/finance/expense-classification-field';
 import { useExpenseClassificationDraft } from '@/hooks/use-expense-classification';
@@ -30,7 +32,7 @@ import { molduraEmTela } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useRascunho } from '@/hooks/use-rascunho';
 import { pendenciaDoAplicar } from '@/lib/hipotese';
-import { argsDaParcelada, dadosDoLancamento } from '@/lib/escrita';
+import { argsDaParcelada, dadosDoLancamento, detalheDaEscrita, mudancaDoDetalhe } from '@/lib/escrita';
 import { prepararLancamento, type LancamentoPreparado } from '@/lib/lancamento-write';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { Segmented } from '@/components/ui/segmented';
@@ -114,6 +116,7 @@ const schema = z
     kind: z.enum(['expense', 'income', 'transfer']),
     amount_cents: z.number().int().positive('Informe o valor'),
     category: z.string().nullable(),
+    subcategory_id: z.string().uuid().nullable().optional(),
     expenseClassification: z.object({
       expense_pattern: z.enum(EXPENSE_PATTERNS).nullable(),
       expense_pattern_source: z.enum(CLASSIFICATION_SOURCES).nullable(),
@@ -247,11 +250,13 @@ export function FormularioDoLancamento(props: Props) {
     // a última intenção viaja entre formatos, inclusive NULL explícito e adotar um padrão.
     defaultValues: guardado ? {
       ...guardado,
+      ...(Object.hasOwn(comum, 'subcategory_id') ? { category: comum.categoria, ...detalheDaEscrita(comum) } : {}),
       expenseClassification: comum.expenseClassification ?? guardado.expenseClassification,
     } : {
       kind: editing ? editing.kind : comum.kind,
       amount_cents: editing ? editing.amount_cents : comum.valorCents,
       category: editing ? editing.category : comum.categoria,
+      ...(Object.hasOwn(editing ?? comum, 'subcategory_id') ? { subcategory_id: editing ? editing.subcategory_id : comum.subcategory_id } : {}),
       expenseClassification: editing ? expenseClassificationFromRecord(editing) : comum.expenseClassification,
       description: editing ? (editing.description ?? '') : comum.descricao,
       merchant: editing ? (editing.merchant ?? null) : (comum.estabelecimento || null),
@@ -285,6 +290,7 @@ export function FormularioDoLancamento(props: Props) {
   const accountId = useWatch({ control, name: 'account_id' });
   const paymentMethod = useWatch({ control, name: 'payment_method' });
   const category = useWatch({ control, name: 'category' });
+  const subcategoryId = useWatch({ control, name: 'subcategory_id' });
   const classificationDraft = useWatch({ control, name: 'expenseClassification' });
   const classification = useExpenseClassificationDraft(classificationDraft, category, kind, Boolean(editing), editing?.workspace_id);
   const feeCents = useWatch({ control, name: 'fee_cents' });
@@ -298,7 +304,7 @@ export function FormularioDoLancamento(props: Props) {
   useEffect(() => {
     props.registrarComum(() => {
       const v = getValues();
-      return { kind: v.kind, descricao: v.description, valorCents: v.amount_cents, contaId: v.account_id, dataBR: v.occurred_at, categoria: v.category, estabelecimento: v.merchant ?? undefined, paymentMethod: v.payment_method, expenseClassification: classification.classification };
+      return { kind: v.kind, descricao: v.description, valorCents: v.amount_cents, contaId: v.account_id, dataBR: v.occurred_at, categoria: v.category, ...detalheDaEscrita(v, v.kind), estabelecimento: v.merchant ?? undefined, paymentMethod: v.payment_method, expenseClassification: classification.classification };
     });
     props.registrarEstado(() => getValues());
   });
@@ -480,6 +486,7 @@ export function FormularioDoLancamento(props: Props) {
       description: values.description,
       merchant: values.merchant,
       category: values.category,
+      ...detalheDaEscrita(values),
       account_id: values.account_id,
       payment_method: values.payment_method,
       ...classification.classification,
@@ -685,6 +692,7 @@ export function FormularioDoLancamento(props: Props) {
             firstOccurredAt: brToISO(values.occurred_at),
             description: values.description.trim(),
             category: values.category,
+            ...detalheDaEscrita(values),
             merchant: values.merchant?.trim() || null,
             accountId: contaParaConverter,
             paymentMethod: values.payment_method,
@@ -744,6 +752,7 @@ export function FormularioDoLancamento(props: Props) {
         ...expenseClassificationPatch(expenseClassificationFromRecord(editing), classification.classification),
         amount_cents: values.amount_cents,
         category: values.category,
+        ...mudancaDoDetalhe(editing, values, editing.category, values.category),
         description: values.description.trim(),
         merchant: values.merchant?.trim() || null,
         occurred_at: brToISO(values.occurred_at),
@@ -805,6 +814,7 @@ export function FormularioDoLancamento(props: Props) {
     const patch = { ...debtPaymentPatch(editing, {
       amount_cents: values.amount_cents,
       category: values.category,
+      ...detalheDaEscrita(values),
       description: values.description.trim(),
       merchant: values.merchant?.trim() || null,
       account_id: values.account_id,
@@ -899,6 +909,7 @@ export function FormularioDoLancamento(props: Props) {
     const dueAt = adiado && values.due_at ? brToISO(values.due_at) : editing.due_at;
     const patch: Parameters<typeof salvarParcela.mutate>[0]['patch'] = {};
     Object.assign(patch, expenseClassificationPatch(expenseClassificationFromRecord(editing), classification.classification));
+    Object.assign(patch, mudancaDoDetalhe(editing, values, editing.category, values.category));
     if (values.amount_cents !== editing.amount_cents) patch.amount_cents = values.amount_cents;
     if (values.category !== editing.category) patch.category = values.category;
     if (values.payment_method !== (editing.payment_method ?? null)) patch.payment_method = values.payment_method;
@@ -1095,6 +1106,7 @@ export function FormularioDoLancamento(props: Props) {
                 setFormCompra(compraParaRevisaoDaParcela(plano, editing, {
                   occurred_at: brToISO(values.occurred_at), amount_cents: values.amount_cents,
                   description: values.description, merchant: values.merchant, category: values.category,
+                  ...detalheDaEscrita(values),
                   payment_method: values.payment_method, expenseClassification: classification.classification,
                 }));
               }}
@@ -1113,14 +1125,14 @@ export function FormularioDoLancamento(props: Props) {
         {formSerie ? (
           <>
           {seriesClassification.isError ? <ErrorCard onRetry={() => seriesClassification.refetch()} /> : null}
-          <CamposDaSerie form={formSerie} onChange={setFormSerie} contas={accounts ?? []} rotuloDaData="Vence em"
+          <CamposDaSerie form={formSerie} onChange={setFormSerie} contas={accounts ?? []} rotuloDaData="Vence em" workspaceId={editing?.workspace_id}
             classificationDefaults={seriesClassification.defaults}
             onUseCategoryDefaults={() => setFormSerie({ ...formSerie, expenseClassification: seriesClassification.adoptCategoryDefaults() })} />
           </>
         ) : formCompra ? (
           <>
           {purchaseClassification.isError ? <ErrorCard onRetry={() => purchaseClassification.refetch()} /> : null}
-          <CamposDaCompra form={formCompra} onChange={setFormCompra} contas={accounts ?? []}
+          <CamposDaCompra form={formCompra} onChange={setFormCompra} contas={accounts ?? []} workspaceId={editing?.workspace_id}
             classificationDefaults={purchaseClassification.defaults}
             onUseCategoryDefaults={() => setFormCompra({ ...formCompra, expenseClassification: purchaseClassification.adoptCategoryDefaults() })} />
           </>
@@ -1232,10 +1244,17 @@ export function FormularioDoLancamento(props: Props) {
               name="category"
               render={({ field }) => (
                 <Field label="Categoria">
-                  <CategoryPicker value={field.value} onChange={field.onChange} />
+                  <CategoryPicker value={field.value} onChange={next => {
+                    const detail = getValues('subcategory_id');
+                    if (detail !== undefined) setValue('subcategory_id', subcategoryAfterParentChange(detail, field.value, next), { shouldDirty: true });
+                    field.onChange(next);
+                  }} />
                 </Field>
               )}
             />
+            <SubcategoryField parent={category} value={subcategoryId ?? null} workspaceId={editing?.workspace_id}
+              sessionKey={editing?.id ?? 'new'} enabled={kind !== 'transfer' && !editing?.pays_invoice_id}
+              onChange={id => setValue('subcategory_id', id, { shouldDirty: true })} />
           </Presenca>
 
         <Presenca visivel={kind === 'expense' && !editing?.pays_invoice_id} imediata>

@@ -1,0 +1,537 @@
+[
+  {
+    "path": "code/category-refresh.log",
+    "bytes": 5158,
+    "sha256": "60aa9476dd7ea432bd6e7799d7ed530649683f29c6f0818ac9f4aede2cc0fe3d"
+  },
+  {
+    "path": "code/detail-readback.log",
+    "bytes": 1783,
+    "sha256": "d91d4c6de76a25675ea3b95d9debb1277ba408b29ea4afd1c6a32a2a3fe2b7d3"
+  },
+  {
+    "path": "code/field-compiler-fix.log",
+    "bytes": 1233,
+    "sha256": "78ff63d7930860159f37c2aca3a64148d04f8e919a11d29578e293d47c9cc215"
+  },
+  {
+    "path": "code/field-owner-negative.log",
+    "bytes": 3289,
+    "sha256": "aa5144aee648e2197e04130f1c58dce68683d74cba7c5eb36de3a5e17490c5d3"
+  },
+  {
+    "path": "code/lint.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "code/node-final.log",
+    "bytes": 271253,
+    "sha256": "99ffbcaab7d2f5065621c072cf716a466a8a193400aa5dcc66e5ee8cac5bd4af"
+  },
+  {
+    "path": "code/python-integration.log",
+    "bytes": 724,
+    "sha256": "49e7289d22b9485b09eb173a24a724dcd036b4c77c66bfc16988af614b866f04"
+  },
+  {
+    "path": "code/react-doctor.log",
+    "bytes": 3772,
+    "sha256": "d517fcb10ee2f549f4149c730355888b678e761aae1451b93c711633de2e7126"
+  },
+  {
+    "path": "code/row-lint.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "code/row-presentation.log",
+    "bytes": 1779,
+    "sha256": "7357b6431c9b46a7aa6d26441a8be66b356bf59d139f5fd4e867f6f6fdd117f5"
+  },
+  {
+    "path": "code/row-types.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "code/save-green.log",
+    "bytes": 8351,
+    "sha256": "34b69dfa4a294e0025c4918a37dad60c254a4bbbd695d1605d1f2a92f0005119"
+  },
+  {
+    "path": "code/save-red.log",
+    "bytes": 35605,
+    "sha256": "1dda12bea6d24b8da527cad61ad568b4a1045fb01cfacb3e0f540b0830dead56"
+  },
+  {
+    "path": "code/scheduler-error-cas-red.log",
+    "bytes": 2332,
+    "sha256": "2d31371e85053170b0e35cfb6a33d2805e8e91def2d920f808075faf3b9fd072"
+  },
+  {
+    "path": "code/scheduler-history-green.log",
+    "bytes": 638,
+    "sha256": "0413b5581bd7f8c1036c82a7c83cc7bc7c38ece41e463e56fd6d139be97333e8"
+  },
+  {
+    "path": "code/scheduler-history-red.log",
+    "bytes": 3323,
+    "sha256": "8dbf0aa7af434b68c555a8360cb33666e2dc776990e6420dcd0692e819f3cced"
+  },
+  {
+    "path": "code/typecheck.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "native/android-runtime-window.json",
+    "bytes": 642,
+    "sha256": "5d8cfafed1454f5a0038fc75ce9db19af0e77dace4f20b1ba3fcbfebaa55de2e"
+  },
+  {
+    "path": "native/android-settings-restored.json",
+    "bytes": 138,
+    "sha256": "04e6a2e2320fb6295f349c547fb01683599498f1f64a44fd597d2b949fadb5e5"
+  },
+  {
+    "path": "native/flows/android-edit-readonly/android-edit-readonly.yaml",
+    "bytes": 228,
+    "sha256": "90bb330e87bfe710d8e101d90536f48f7e4db5c1649fa1489c2c9382200178d3"
+  },
+  {
+    "path": "native/flows/android-edit-readonly/android-f09-edit-readonly-result.json",
+    "bytes": 171,
+    "sha256": "dd85656659cee773f4c149555c34243e47453560b6534e6a0db63bc7e747cc32"
+  },
+  {
+    "path": "native/flows/android-edit-readonly/android-f09-edit-readonly.log",
+    "bytes": 446,
+    "sha256": "1079523dcec5ba88c462eec94c1286175bf93bbfc00b479a71859333596030dd"
+  },
+  {
+    "path": "native/flows/android-f09-dark-warm-final/android-dark-warm.yaml",
+    "bytes": 775,
+    "sha256": "2a20b9883713c48fa28c8f4d3bcf214bc9c5fc70fc28c0b14fcea61109ced57b"
+  },
+  {
+    "path": "native/flows/android-f09-dark-warm-final/android-f09-dark-warm-final-result.json",
+    "bytes": 173,
+    "sha256": "d08211b8b6c910f3448951c24c40d009921cd61494e9a2ed276856e7e9c14750"
+  },
+  {
+    "path": "native/flows/android-f09-dark-warm-final/android-f09-dark-warm-final.log",
+    "bytes": 965,
+    "sha256": "692b5bcd476d5aa21f86f712987549a7491126646871aec7ea1ffd978638fe0a"
+  },
+  {
+    "path": "native/flows/android-f09-restored-original/android-f09-restored-original-result.json",
+    "bytes": 175,
+    "sha256": "15f59ed688d4f1bbf50111b1194ed372624d538b43eb1d211879a3ee581b24b7"
+  },
+  {
+    "path": "native/flows/android-f09-restored-original/android-f09-restored-original.log",
+    "bytes": 379,
+    "sha256": "b8f27202edf36410bfcba5206bc4310939671cbd94551de171f02488684f6717"
+  },
+  {
+    "path": "native/flows/android-f09-restored-original/android-restore-cold.yaml",
+    "bytes": 208,
+    "sha256": "ddd70a4e08ae765f958608ab126c82cc124b6e6047f5aa62a0bcb3f0fadd77bc"
+  },
+  {
+    "path": "native/flows/android-filter-crossread/android-f09-filter-crossread-result.json",
+    "bytes": 174,
+    "sha256": "b9e3b521855f669c15c74a3fc4f503b8ea2ea976cfacb1e209000ec1d748aa0b"
+  },
+  {
+    "path": "native/flows/android-filter-crossread/android-f09-filter-crossread.log",
+    "bytes": 745,
+    "sha256": "4b3847470444734564cdc9eb53da689c627030f511084e4602628d71c6062582"
+  },
+  {
+    "path": "native/flows/android-filter-crossread/android-filter-child-select.yaml",
+    "bytes": 559,
+    "sha256": "2b34ca20ba2f22760fb896acf90605c36e5a17aa7660fd5b786b818a919d6354"
+  },
+  {
+    "path": "native/flows/android-none-filter-applied/android-f09-none-filter-applied-result.json",
+    "bytes": 177,
+    "sha256": "340b28b2ca09dd56e6ee1722e9a28d57ac714437ba22991b7e197bc453b01607"
+  },
+  {
+    "path": "native/flows/android-none-filter-applied/android-f09-none-filter-applied.log",
+    "bytes": 474,
+    "sha256": "c5711a1001bb7721e0ff32c3dd1511cc0a8db22e2d7e8df4c697a807bc7cc3c3"
+  },
+  {
+    "path": "native/flows/android-none-filter-applied/android-none-filter-apply.yaml",
+    "bytes": 260,
+    "sha256": "eb04514c3427462eb5e04d307405edc37a74c8ba07e29a6fe6f91dc5c0137d58"
+  },
+  {
+    "path": "native/flows/android-parent-clear-cancel/android-f09-parent-clear-cancel-result.json",
+    "bytes": 177,
+    "sha256": "8f841f0a257f36a61d64b435458305bb3f1728094fdec75b669ed7d38711251a"
+  },
+  {
+    "path": "native/flows/android-parent-clear-cancel/android-f09-parent-clear-cancel.log",
+    "bytes": 455,
+    "sha256": "29b1886044c40fc4d3cff7ebbb446ddbccc4adfc691bc54e64e7025582730b5c"
+  },
+  {
+    "path": "native/flows/android-parent-clear-cancel/android-parent-clear-cancel.yaml",
+    "bytes": 221,
+    "sha256": "667854ed81fd3d26fdfa48311565c7bd76825ccb33cf8d0fa6b08de4513ec2d6"
+  },
+  {
+    "path": "native/flows/android-preview-save/android-f09-preview-save-result.json",
+    "bytes": 170,
+    "sha256": "0a17e37bdbf3c262f67acf88b5ca9c049328fcb99fb8c0fb8335b50fab92a3e5"
+  },
+  {
+    "path": "native/flows/android-preview-save/android-f09-preview-save.log",
+    "bytes": 660,
+    "sha256": "f1d9d1cd0fbc508cab8b2f2d1b7595d8deb8cca4cace9add5bac03aec25520e3"
+  },
+  {
+    "path": "native/flows/android-preview-save/android-preview-bottom.yaml",
+    "bytes": 401,
+    "sha256": "d71ecf2fc98f12816e74e34c71aa428402ad2ccb2688f62d8f59bfaf7d864d5b"
+  },
+  {
+    "path": "native/flows/android-report-expanded-large/android-f09-report-expanded-large-result.json",
+    "bytes": 179,
+    "sha256": "6cadfb15f6e46a63f7d1b3dd155c9dee8ab848cbea37f9f338b33ec17be8d8ef"
+  },
+  {
+    "path": "native/flows/android-report-expanded-large/android-f09-report-expanded-large.log",
+    "bytes": 653,
+    "sha256": "d4bdee7f47af9489fcf1ce910db92ba92cb5698654b3c06b4f044e00a88bc932"
+  },
+  {
+    "path": "native/flows/android-report-expanded-large/android-report-expand-large.yaml",
+    "bytes": 418,
+    "sha256": "c78519533e5ac3495b205cd92f739f6245387f56181e16113ae2540dc1faf144"
+  },
+  {
+    "path": "native/flows/android-stale-filter/android-f09-stale-filter-result.json",
+    "bytes": 170,
+    "sha256": "cf5edde9f3f50c80050a63247ae231cd328cc0adfa1f744980d4383a22039a5d"
+  },
+  {
+    "path": "native/flows/android-stale-filter/android-f09-stale-filter.log",
+    "bytes": 691,
+    "sha256": "314ba0b8500aa645af904acc0662c9ccdd858ee8628b8029921879c2f98a123c"
+  },
+  {
+    "path": "native/flows/android-stale-filter/android-stale-filter.yaml",
+    "bytes": 443,
+    "sha256": "7dafe8e3020a2b7302342a1128fc1516ec25d5a6fa9b730ed439081ae7c80206"
+  },
+  {
+    "path": "native/flows/ios-delete-confirm-once/ios-f09-delete-confirm-once-result.json",
+    "bytes": 196,
+    "sha256": "9df72e0f412b5e203c42a4d2d1751ae2c979bd9996820d79ce105aff53fb1839"
+  },
+  {
+    "path": "native/flows/ios-delete-confirm-once/ios-f09-delete-confirm-once.log",
+    "bytes": 497,
+    "sha256": "cc2c19dbc6340513ef046bc69ad58aecc2fec4c65ab3872ad2360e2d44d92028"
+  },
+  {
+    "path": "native/flows/ios-delete-confirm-once/ios-f09-delete-confirm-once.yaml",
+    "bytes": 246,
+    "sha256": "68f00a275b90cbcb694addddaafc0d6a957441b3b5e6cd5f87026df109e0942a"
+  },
+  {
+    "path": "native/flows/ios-deleted-qa-read/ios-f09-deleted-qa-read-result.json",
+    "bytes": 192,
+    "sha256": "3ebbfca40808b7db467a45e2ac0fee06316441465ed3eb04c84eb22fc4e3491b"
+  },
+  {
+    "path": "native/flows/ios-deleted-qa-read/ios-f09-deleted-qa-read.log",
+    "bytes": 812,
+    "sha256": "277737ba36cf0af11a8df24b182a11c2ff69c6c7c90edd578ff6452df8269c2a"
+  },
+  {
+    "path": "native/flows/ios-deleted-qa-read/ios-f09-deleted-qa-read.yaml",
+    "bytes": 477,
+    "sha256": "b9e4699abfbd6a62b50def4f0fe2f365a1ec9df44cc1c3b7b2465c7715571a95"
+  },
+  {
+    "path": "native/flows/ios-f09-total-layout-verified/ios-f09-total-layout-verified-result.json",
+    "bytes": 198,
+    "sha256": "78816c8c856c326584362bcf461c85ef66b92b23a071dc63d6ba1b727a3cbd79"
+  },
+  {
+    "path": "native/flows/ios-f09-total-layout-verified/ios-f09-total-layout-verified.log",
+    "bytes": 461,
+    "sha256": "5fe6a1ff27f58f333f7ff204d99e8350d4f9dc4762b10e3eface7290469b0f10"
+  },
+  {
+    "path": "native/flows/ios-f09-total-layout-verified/ios-total-layout-observed.yaml",
+    "bytes": 218,
+    "sha256": "e9a69ad5040660069d5c818ce64d7fc663b6b685a5f6d74eebb9a0fdb1ea42ce"
+  },
+  {
+    "path": "native/flows/ios-hidden-breakdown/ios-f09-hidden-breakdown-result.json",
+    "bytes": 193,
+    "sha256": "dd824dac6584accd623c661097246ce2bb23f3d713c3f6b9b85bb847a18da559"
+  },
+  {
+    "path": "native/flows/ios-hidden-breakdown/ios-f09-hidden-breakdown.log",
+    "bytes": 574,
+    "sha256": "a98ad7c1550106030e3c43161d0d3ea16d6f8969f45ade88cbae3bb6382af5c2"
+  },
+  {
+    "path": "native/flows/ios-hidden-breakdown/ios-f09-hidden-breakdown.yaml",
+    "bytes": 292,
+    "sha256": "82b09fbc89e79facf11e717efcecf196e6f64ae1fc2c82e24515ca30bc587764"
+  },
+  {
+    "path": "native/flows/ios-merge-confirm-once/ios-f09-merge-confirm-once-result.json",
+    "bytes": 195,
+    "sha256": "edbd856be08c6625ed7a052697521cc5b821671962a1a13fa6c16367dde08b5d"
+  },
+  {
+    "path": "native/flows/ios-merge-confirm-once/ios-f09-merge-confirm-once.log",
+    "bytes": 703,
+    "sha256": "f9f0029385b2dacb842539e7f7bacee234e333a92db64465c2b5f8458e48027a"
+  },
+  {
+    "path": "native/flows/ios-merge-confirm-once/ios-f09-merge-confirm-once.yaml",
+    "bytes": 393,
+    "sha256": "6d07fe578c1c376fc5cf525fbb54f6704a15aa33ccc816e1d428c5062b5b975e"
+  },
+  {
+    "path": "native/flows/ios-move-save/ios-f09-move-save-result.json",
+    "bytes": 186,
+    "sha256": "dc600e84a63e221190eec55013ae47c1eeb98ae6b07da2e04e544c60e008830a"
+  },
+  {
+    "path": "native/flows/ios-move-save/ios-f09-move-save.log",
+    "bytes": 337,
+    "sha256": "7acfde62afe5390116d06f5678ec82223cc904b4e0efbdadc2369a419d0664d0"
+  },
+  {
+    "path": "native/flows/ios-move-save/ios-f09-move-save.yaml",
+    "bytes": 99,
+    "sha256": "d0793fcae2168715240fae85368efe8adc5ed4c4532048bba1713761b5a85b5e"
+  },
+  {
+    "path": "native/flows/ios-report-breakdown-verified/ios-f09-report-breakdown-verified-result.json",
+    "bytes": 202,
+    "sha256": "621721baf1a650cd2f837bc1703b0a048807528e8266820e273435bd05402f30"
+  },
+  {
+    "path": "native/flows/ios-report-breakdown-verified/ios-f09-report-breakdown-verified.log",
+    "bytes": 484,
+    "sha256": "1d61dd6b5ac4fb62feb7e0c994d013c5f0d97389c9b050819c8329b91cef8ced"
+  },
+  {
+    "path": "native/flows/ios-report-breakdown-verified/ios-f09-report-breakdown-verified.yaml",
+    "bytes": 184,
+    "sha256": "62ae2420b4dbaba64099c0d89c038aa0ebf98665754be0d03cb8364e1d20517f"
+  },
+  {
+    "path": "native/flows/ios-save-once/ios-f09-save-once-result.json",
+    "bytes": 186,
+    "sha256": "71d9fbfc55fd912fac0550e12a7659967d1b85a7af9d973b189347335b5abae2"
+  },
+  {
+    "path": "native/flows/ios-save-once/ios-f09-save-once.log",
+    "bytes": 387,
+    "sha256": "ab2b6abe2b6afaa279b6ea06a23b1ed3ecbf59222f7e836dbfc3616391f31b87"
+  },
+  {
+    "path": "native/flows/ios-save-once/ios-f09-save-once.yaml",
+    "bytes": 175,
+    "sha256": "0d883b9556d259e3045f39bbed12ba07d66f515450a1081b0dd5e72892ff01a8"
+  },
+  {
+    "path": "native/native-after-independent-proof.json",
+    "bytes": 208,
+    "sha256": "581c8ea6fa4d2d2bbe9d260f41d98163f0a3ec2bd5c5d9b3096b65032b4a3435"
+  },
+  {
+    "path": "native/native-cleanup-dry-run.json",
+    "bytes": 678,
+    "sha256": "302cbeb37946bd2c23ea85131b3a77f06ccf886c8f85f7700dd834c5d4cbeda8"
+  },
+  {
+    "path": "native/native-cleanup-proof.json",
+    "bytes": 765,
+    "sha256": "f46a49517a76c25aa6e2a5eab5e769ea05a187d4c9def49070e0f73516ef8fbf"
+  },
+  {
+    "path": "native/native-oracle-progress.json",
+    "bytes": 695,
+    "sha256": "3b16a51ca0d51a853b62d77258ff94cd672d662ddc28068b00952ccf9124904c"
+  },
+  {
+    "path": "native/native-report-comparison.json",
+    "bytes": 507,
+    "sha256": "447fc09eeb0aa723544e492753251ca29f7e00dd2ee66b02abbd6dcc15b6680c"
+  },
+  {
+    "path": "native/native-report-oracle.json",
+    "bytes": 306,
+    "sha256": "0f026dc8a9cf51e9fadb1dc205df8a18a5487cb81d81856b82cfff2b2a39c8ee"
+  },
+  {
+    "path": "native/screenshots/android-crossread-filtered-detail.png",
+    "bytes": 171804,
+    "sha256": "cc8db10fe8031d87d668232e780fa2d1a124071dd392fcc81508ceaafeeb0a3b"
+  },
+  {
+    "path": "native/screenshots/android-none-filter.png",
+    "bytes": 200811,
+    "sha256": "4e160831088548c38fd3dab659f11d357d41bab9208bdbe8c9f9c11b3d7b6e28"
+  },
+  {
+    "path": "native/screenshots/android-parent-clears-draft.png",
+    "bytes": 210164,
+    "sha256": "e024993716f215129a932f403fc9534e4a0ef99184d2f54b9779ce71a317211a"
+  },
+  {
+    "path": "native/screenshots/android-readonly-editor.png",
+    "bytes": 213207,
+    "sha256": "4b90d6e2616252ca0be51e57e1771a1a1b0da7efb0377e42ef39bad8e9fbe146"
+  },
+  {
+    "path": "native/screenshots/android-report-large-font.png",
+    "bytes": 235163,
+    "sha256": "d2bf13cc73766efa57778eb498c055acfdd1a6a8ff4bfffe406c5ac55d9e633c"
+  },
+  {
+    "path": "native/screenshots/android-saved-once.png",
+    "bytes": 1138793,
+    "sha256": "6baa0220da4558ff89d85fc48f306937acc1035a5f8560505ccf5e232ce789cc"
+  },
+  {
+    "path": "native/screenshots/android-stale-filter-blocked.png",
+    "bytes": 150083,
+    "sha256": "f3542d67e9f824a5c44c38ac7a099d56956dd2d2cd4dd0472a83c19b93f44660"
+  },
+  {
+    "path": "native/screenshots/ios-annual-breakdown.png",
+    "bytes": 324859,
+    "sha256": "30b62b9098e81e67069517560f2689194c9ef7f5d98570c7c87c5bec2edcac92"
+  },
+  {
+    "path": "native/screenshots/ios-created-row.png",
+    "bytes": 431110,
+    "sha256": "62d6c7533bea320fdce06654244cd81b60deb60d15910aee6c67f94352e84410"
+  },
+  {
+    "path": "native/screenshots/ios-deleted-catalog.png",
+    "bytes": 154391,
+    "sha256": "5e1683561c92d4ca5f787a7b1a4845014e3104fe506d82b29eba3082f8a4569e"
+  },
+  {
+    "path": "native/screenshots/ios-merge-samevisit-counts.png",
+    "bytes": 262219,
+    "sha256": "c6a8f178b2988df8661eaea5b3f28142646cb53a9ba84ada9e1ad975969cab0c"
+  },
+  {
+    "path": "native/screenshots/ios-moved-child.png",
+    "bytes": 153484,
+    "sha256": "3cf1a8e055d6dcf5c03e8c7d4c7b9662a7e41ed54bd7591a4ffca6241d1fe258"
+  },
+  {
+    "path": "native/screenshots/ios-privacy-breakdown.png",
+    "bytes": 297087,
+    "sha256": "04477db66babb6cbc1ef7570fe703a3f825a515943a4b18be4073d0baf40fc4d"
+  },
+  {
+    "path": "native/screenshots/ios-rows-after-delete.png",
+    "bytes": 322169,
+    "sha256": "c2d2cf7a948080acc080c36284bb3a4547a9b485ae30cac6ad4f3ee3ad3c6870"
+  },
+  {
+    "path": "native/screenshots/ios-total-layout-final.png",
+    "bytes": 310017,
+    "sha256": "b7f20e691ef720eb78a1ae138b72189f21a8d87d23d7698db0b1acbc55ce707d"
+  },
+  {
+    "path": "sql/advisors-after.json",
+    "bytes": 21514,
+    "sha256": "3fb4f166d280a0d23b2c72b9c6d119e83b85e8335e92859d088ba77252ded91c"
+  },
+  {
+    "path": "sql/advisors-before.json",
+    "bytes": 21514,
+    "sha256": "89b4a6ff014ae19a2a43728d52125f2f16ce58ba7ce326e48924c5385fee8184"
+  },
+  {
+    "path": "sql/advisors-delta.json",
+    "bytes": 80,
+    "sha256": "31af37d3e99a6043bbc20b260bc9508faed6a79c5c79b9aaf2a0fa6029c5de89"
+  },
+  {
+    "path": "sql/applied-contracts.log",
+    "bytes": 725,
+    "sha256": "e301bb7cbadb3ea7ca36680ef5274e975c763e9c5f16c769991c53a804c99125"
+  },
+  {
+    "path": "sql/db-applied.log",
+    "bytes": 1242,
+    "sha256": "19fc1ca4986fa695c3425548e267b94508d8006c1979b65cf4175419f826f519"
+  },
+  {
+    "path": "sql/db-dry-run.log",
+    "bytes": 938,
+    "sha256": "496f75c0c98ff7e0872c869a08d2d925fe7b625a83290e3bbaef4c0c2f788674"
+  },
+  {
+    "path": "sql/financial-future-green.log",
+    "bytes": 696,
+    "sha256": "4be6aee20886019a6cfaa8a457a27b9c47216318a5b0b94bc315c95ce3b0e74b"
+  },
+  {
+    "path": "sql/financial-future-red.log",
+    "bytes": 782,
+    "sha256": "fe643e6fd798086612bdbb22aefca7919783a11cc2056d673e700ded33a13e3d"
+  },
+  {
+    "path": "sql/preview-applied-proof.log",
+    "bytes": 364,
+    "sha256": "eefc35d4d549eddd13fb90aaca3fde78701ec55b46bacdb5952f6752e9bb6e3d"
+  },
+  {
+    "path": "sql/preview-applied.log",
+    "bytes": 643,
+    "sha256": "0ceb894c53beb8cb6939c6c9500ce43d5f805dfd885c470d2cb9573daada981c"
+  },
+  {
+    "path": "sql/preview-dry-run.log",
+    "bytes": 588,
+    "sha256": "0427755deeec6680cd2c20198e222c751e041a225f8e3d4256d715d3e3282107"
+  },
+  {
+    "path": "sql/preview-green.log",
+    "bytes": 517,
+    "sha256": "5398b25ad9c1c72ada71671e470093562a18f270d02c0c6e11c7bae27f08d574"
+  },
+  {
+    "path": "sql/preview-red.log",
+    "bytes": 760,
+    "sha256": "a75653a776f600ddba746417879ad3b6de788461ce4cd7cc421883677c17b1f3"
+  },
+  {
+    "path": "sql/races-results.jsonl",
+    "bytes": 4447,
+    "sha256": "8e7b547f5f653a039654bc4a67ea5c8abf029316d3c4ffec042af9ef48c64909"
+  },
+  {
+    "path": "sql/regressions.log",
+    "bytes": 1816,
+    "sha256": "0bc092093c01227e469bb5f6a90a636f631299a78f8a09b143e41caf1301ebbd"
+  },
+  {
+    "path": "sql/scheduler-results.jsonl",
+    "bytes": 1978,
+    "sha256": "63ce31d600269f22d1ed89d21704af3ec4cb8092fed83ebed9b826b9f2dd36a2"
+  }
+]

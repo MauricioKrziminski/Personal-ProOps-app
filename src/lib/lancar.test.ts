@@ -78,3 +78,14 @@ test('o papel do lançamento sai do registro: série, compra parcelada, dívida 
   assert.equal(hrefDoLancamento({ id: 't' }).params.passado, '0');
   assert.equal('passado' in hrefDoLancamento({ id: 't', recurring_id: 'r' }).params, false);
 });
+
+test('F09 comum conserva filho compatível em conversão e limpa depois de salvar ou transferir', () => {
+  const child = '33333333-3333-4333-8333-333333333333';
+  const common = { kind: 'expense' as const, descricao: 'Compra', valorCents: 100, contaId: null,
+    dataBR: '03/10/2026', categoria: 'casa', subcategory_id: child };
+  assert.equal(comumParaSerie(common).subcategory_id, child);
+  assert.equal(comumDepoisDeSalvar(common).subcategory_id, null);
+  assert.equal(comumParaSerie({ ...common, kind: 'transfer' }).subcategory_id, null);
+  const { subcategory_id, ...legacy } = common;
+  assert.equal(Object.hasOwn(comumDepoisDeSalvar(legacy), 'subcategory_id'), false);
+});

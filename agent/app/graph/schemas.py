@@ -434,7 +434,7 @@ class ResourceActionType(str, Enum):
 class ResourceField(BaseModel):
     """Field names and values are data, validated against the server catalogue."""
     name: str
-    value: str | None = None
+    value: str | None = Field(None, description="Valor do campo. subcategory_id em recurring/rules/debts aceita somente UUID existente informado no contexto, nunca inventado; null explícito remove o detalhe. Se não solicitado, omita o campo.")
 
 
 class ResourceAction(BaseModel):

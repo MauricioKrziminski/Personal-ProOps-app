@@ -412,6 +412,10 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
 
       // A preferência gravada vale como `useState` dentro de uma visita; o disco tem teste próprio
       // (`use-preferencia.test.ts`).
+      if (name === '@/lib/subcategories') return load('src/lib/subcategories.ts');
+      if (name === '@/lib/category-detail-breakdown') return load('src/lib/category-detail-breakdown.ts');
+      if (name === '@/hooks/use-category-details') return { useSubcategoryFilterOptions: () => ({ data: [], isError: false, isPending: false, isLoading: false, refetch: async () => {} }) };
+      if (name === '@/hooks/use-subcategories') return { useSubcategories: () => ({ data: { workspace_id: '10000000-0000-4000-8000-000000000001', items: [] }, isError: false, isPending: false, isLoading: false, refetch: async () => {} }) };
       if (name === '@/hooks/use-preferencia') return { umDe: () => () => true, usePreferencia: (nome: string, padrao: unknown) => {
         const [v, setV] = react.useState(options.preferencias?.[nome] ?? padrao);
         // Por função, parte do GRAVADO (como o hook de verdade), não do valor deste render.
@@ -960,7 +964,7 @@ test('E se: Ver resultado depois de Somar não duplica a hipótese já adicionad
 test('new financing: Nome and Conta first, the name is required and the typed one is saved', () => {
   const ui = formDivida();
   // 23/09/2026: "Nome e conta" era uma linha recolhida no FIM, e o nome caía em "Financiamento 2".
-  assert.deepEqual(ui.nodes().filter((n) => n.type === 'Field').map((n) => n.props.label), ['Nome', 'Conta que paga', 'Tipo', 'Cobrança', 'Valor', 'Total de parcelas', 'Parcelas já pagas', 'Primeira parcela']);
+  assert.deepEqual(ui.nodes().filter((n) => n.type === 'Field').map((n) => n.props.label), ['Nome', 'Conta que paga', 'Categoria dos pagamentos', 'Tipo', 'Cobrança', 'Valor', 'Total de parcelas', 'Parcelas já pagas', 'Primeira parcela']);
   assert.equal(ui.nodes().some((n) => n.type === 'Row' && n.props.title === 'Nome e conta'), false);
   assert.equal(ui.button('Salvar').props.disabled, true);
   ui.fill('Valor', 147000);
@@ -1126,7 +1130,7 @@ test('na ficha da dívida o Salvar pergunta só próximas ou todas: não há "es
     operation: 'saveDebtContractScoped',
     value: { debtId: 'd1', anchorNo: 9, scope: 'future',
       patch: { installment_cents: 150000 }, debtRevision: 0, paymentVersions: {},
-      requestId: '00000000-0000-4000-8000-000000000001' },
+      requestId: '00000000-0000-4000-8000-000000000002' },
   });
 });
 
@@ -4745,7 +4749,7 @@ const CATS = [
   { category: 'roupas', uses: 1, icon: null, color: null, budgets: 1 },
 ];
 
-test('Categorias: lista com o uso e a cor, cria pelo "+" e edita tocando', () => {
+test('Categorias: uso e cor, cria pelo "+" e oferece detalhes e edição no toque', () => {
   const ui = screen(categoriasFile, { categoriasUsadas: CATS });
   const linha = ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === 'mercado');
   assert.equal(linha.props.subtitle, '9 lançamentos');
@@ -4755,6 +4759,8 @@ test('Categorias: lista com o uso e a cor, cria pelo "+" e edita tocando', () =>
   const folha = () => ui.nodes().find((n: any) => n.type === 'CategoriaSheet');
   assert.equal(folha().props.visible, false);
   ui.interact(() => linha.props.onPress());
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Detalhes', 'Editar', 'Apagar']);
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Editar')!.onPress());
   assert.equal(folha().props.visible, true);
   assert.equal(folha().props.categoria.category, 'mercado');
   ui.interact(() => folha().props.onClose());

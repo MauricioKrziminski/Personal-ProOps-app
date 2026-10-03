@@ -1,0 +1,14 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-filter-child-select
+Tap on point (50%,57%)... COMPLETED
+Assert that "casa · qa f09 ios editado" is visible... COMPLETED
+Take screenshot android-f09-filter-options... COMPLETED
+Tap on "casa · qa f09 ios editado"... COMPLETED
+Tap on "Aplicar"... COMPLETED
+Assert that ".*QA F09 Android Detalhe.*" is visible... COMPLETED
+Take screenshot android-f09-child-filter-two... COMPLETED
+Tap on ".*QA F09 Android Detalhe.*"... COMPLETED
+Assert that ".*qa f09 ios editado.*" is visible... COMPLETED
+Take screenshot android-f09-moved-detail... COMPLETED

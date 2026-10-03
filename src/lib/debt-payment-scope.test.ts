@@ -27,3 +27,14 @@ test('as versões seguem exatamente o escopo escolhido, inclusive o histórico e
   assert.deepEqual(selectedDebtPaymentVersions(rows, 'meio', 2, 'all'), { primeiro: 2, meio: 0, ultimo: 9 });
   assert.throws(() => selectedDebtPaymentVersions([{ ...rows[1], debt_payment_no: null }], 'meio', 2, 'all'), /sem número/);
 });
+
+test('F09 pagamento muda detalhe por alcance e troca de pai limpa UUID herdado', () => {
+  const child = '33333333-3333-4333-8333-333333333333';
+  const before = { amount_cents: 1000, category: 'crédito', description: null, merchant: null, account_id: null,
+    occurred_at: '2026-10-03', subcategory_id: child };
+  assert.deepEqual(debtPaymentPatch(before, { ...before }), {});
+  assert.deepEqual(debtPaymentPatch(before, { ...before, subcategory_id: null }), { subcategory_id: null });
+  assert.deepEqual(debtPaymentPatch(before, { ...before, category: 'saúde' }), { category: 'saúde', subcategory_id: null });
+  const { subcategory_id, ...legacy } = before;
+  assert.deepEqual(debtPaymentPatch(before, legacy), {});
+});

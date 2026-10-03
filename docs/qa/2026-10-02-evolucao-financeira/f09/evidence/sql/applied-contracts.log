@@ -1,0 +1,10 @@
+produção : kwriuifcwyvdrxtspjiz  (Personal ProOps app)
+staging  : utkqoiigimqzeenxkxdl  (Personal ProOps app - staging)
+
+CLI linkado (destino do db push) : utkqoiigimqzeenxkxdl  → staging
+app (.env.local)                 : utkqoiigimqzeenxkxdl  → staging
+{"phase": "test", "file": "subcategories_catalog.sql", "result": "pass", "committed": false}
+{"phase": "test", "file": "subcategory_writes.sql", "result": "pass", "committed": false}
+{"phase": "test", "file": "subcategory_financial_metadata.sql", "result": "pass", "committed": false}
+{"phase": "test", "file": "subcategory_import.sql", "result": "pass", "committed": false}
+{"phase": "test", "file": "subcategory_reads.sql", "result": "pass", "committed": false}

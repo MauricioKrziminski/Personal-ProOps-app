@@ -11,6 +11,8 @@ import { paymentMethodAccounts, paymentMethodError } from '@/lib/payment-method'
  */
 import { OriginAccountPicker } from '@/components/finance/origin-creation-host';
 import { CategoryPicker } from '@/components/finance/category-picker';
+import { SubcategoryField } from '@/components/finance/subcategory-field';
+import { subcategoryAfterParentChange } from '@/lib/subcategories';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { PurchaseDownPayment } from '@/components/finance/purchase-down-payment';
 import { Presenca } from '@/components/motion/presenca';
@@ -36,12 +38,14 @@ export function CamposDaCompra({
   contas,
   classificationDefaults,
   onUseCategoryDefaults,
+  workspaceId,
 }: {
   form: CompraForm;
   onChange: (form: CompraForm) => void;
   contas: Parameters<typeof OriginAccountPicker>[0]['accounts'];
   classificationDefaults?: ExpenseClassificationDefaults;
   onUseCategoryDefaults?: () => void;
+  workspaceId?: string;
 }) {
   const { travado, tituloOk, totalOk, contaOk, faixa, dataLivre } = validaCompra(form);
   const origem = contas.find((c) => c.id === form.accountId) ?? null;
@@ -93,8 +97,12 @@ export function CamposDaCompra({
       </Field>
 
       <Field label="Categoria">
-        <CategoryPicker value={form.category} onChange={(category) => onChange({ ...form, category })} />
+        <CategoryPicker value={form.category} onChange={(category) => onChange({ ...form, category,
+          ...(form.subcategory_id !== undefined ? { subcategory_id: subcategoryAfterParentChange(form.subcategory_id, form.category, category) } : {}),
+        })} />
       </Field>
+      <SubcategoryField parent={form.category} value={form.subcategory_id ?? null} workspaceId={workspaceId} sessionKey={form.id}
+        onChange={subcategory_id => onChange({ ...form, subcategory_id, subcategoryIntent: true })} />
 
       <ExpenseClassificationField value={normalizeExpenseClassification(form.expenseClassification)}
         defaults={classificationDefaults} onUseCategoryDefaults={onUseCategoryDefaults}

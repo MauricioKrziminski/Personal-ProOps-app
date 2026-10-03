@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 
 import { ErrorCard } from '@/components/error-card';
 import { FinanceAnalysisPanes } from '@/components/finance/finance-analysis-panes';
+import { CategoryDetailBreakdown } from '@/components/finance/category-detail-breakdown';
 import { Card } from '@/components/ui/card';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
@@ -204,6 +205,7 @@ export default function ReportsScreen() {
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
               {c.tx_count} {Number(c.tx_count) === 1 ? 'lançamento' : 'lançamentos'}
             </ThemedText>
+            <CategoryDetailBreakdown from={`${ano}-01-01`} to={`${ano}-12-31`} parent={c.category} kind="expense" />
           </View>
         ))}
       </Section>
@@ -224,12 +226,14 @@ export default function ReportsScreen() {
     >
       <Section title="De onde veio">
         {receitas.map((c) => (
+          <View key={c.category}>
           <Row
-            key={c.category}
             title={c.category}
             chevron={false}
             trailing={<Money cents={Number(c.total_cents)} variant="headline" tone="success" />}
           />
+          <CategoryDetailBreakdown from={`${ano}-01-01`} to={`${ano}-12-31`} parent={c.category} kind="income" />
+          </View>
         ))}
       </Section>
     </Animated.View>

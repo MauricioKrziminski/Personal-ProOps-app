@@ -1,0 +1,14 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-dark-warm
+Open appproops://finance/reports... COMPLETED
+Assert that "Relatórios" is visible... COMPLETED
+Scrolling DOWN until "mercado" is visible with speed 40, visibility percentage 50%, timeout 30000 ms, with centering enabled... COMPLETED
+Tap on "Detalhes", Below "mercado", Index: 0... COMPLETED
+Assert that "Sem detalhe" is visible... COMPLETED
+Scrolling DOWN until "Total da categoria" is visible with speed 40, visibility percentage 50%, timeout 15000 ms, with centering disabled... COMPLETED
+Take screenshot android-f09-dark-large-final... COMPLETED
+Open appproops://profile... COMPLETED
+Scrolling DOWN until "Claro" is visible with speed 40, visibility percentage 50%, timeout 20000 ms, with centering disabled... COMPLETED
+Tap on "Claro"... COMPLETED

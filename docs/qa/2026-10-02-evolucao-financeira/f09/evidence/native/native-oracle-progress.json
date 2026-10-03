@@ -1,0 +1,28 @@
+{
+  "project_ref": "utkqoiigimqzeenxkxdl",
+  "baseline_transactions": 132,
+  "current_transactions": 134,
+  "qa_transaction_ids": [
+    "1302b2cb-97eb-4d6a-ac79-2ee84d39e0df",
+    "b2089413-9cb0-4fc7-85a2-bfc6fb321e7f"
+  ],
+  "qa_subcategory_ids": [
+    "217489d6-b689-40c6-a325-34ca4d030ad1",
+    "a261510e-9fea-49de-8552-22af35d47210"
+  ],
+  "original_sources_unchanged": 17,
+  "cash_delta_cents": -357,
+  "stages": [
+    "db-two-saved",
+    "db-renamed",
+    "db-moved",
+    "db-receiver",
+    "db-merged",
+    "db-deleted"
+  ],
+  "merged_receiver_revision": 2,
+  "merge_redirected_transactions": 2,
+  "deleted_children": 2,
+  "transactions_preserved": 2,
+  "qa_subcategories_remaining": 0
+}

@@ -169,7 +169,7 @@ test('previsoes de janela longa repartem todos os dias em blocos disjuntos de at
   });
   for (const request of h.requests) {
     assert.equal(request.signal, controller.signal);
-    assert.equal(request.url.pathname, '/rest/v1/rpc/ledger_expected_lines_classified');
+    assert.equal(request.url.pathname, '/rest/v1/rpc/ledger_expected_lines_detailed');
     assert.equal(request.url.searchParams.get('order'), 'due_date.asc,origin.asc,ref_id.asc');
   }
   assert.equal(query.enabled, true);

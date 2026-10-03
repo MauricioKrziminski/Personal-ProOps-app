@@ -45,3 +45,13 @@ test('o motivo: a frase NOSSA passa, o texto cru do Postgres não', () => {
   assert.equal(motivoDaHipotese({ mensagem: 'A conta foi arquivada.', codigo: 'P0001' }), 'A conta foi arquivada.');
   assert.equal(motivoDaHipotese({ mensagem: 'new row violates check constraint', codigo: '23514' }), 'o banco recusou esta hipótese. Abra e confira os campos.');
 });
+
+test('F09 rascunho preserva UUID/null e descarta item com identidade inválida sem quebrar legado', () => {
+  const child = '33333333-3333-4333-8333-333333333333';
+  const base = { id: 'h1', kind: 'expense' as const, forma: 'uma' as const, valor_cents: 1, parcelas: 1,
+    repete: 'monthly' as const, conta: null, data: '2026-10-01', category: 'casa' };
+  const valid = { versao: 2 as const, hipoteses: [{ ...base, subcategory_id: child }, { ...base, id: 'h2', subcategory_id: null }, base], adiantamentos: [] };
+  assert.deepEqual(lerRascunho(gravarRascunho(valid)), valid);
+  const read = lerRascunho(JSON.stringify({ ...valid, hipoteses: [...valid.hipoteses, { ...base, subcategory_id: 'bad' }] }));
+  assert.equal(read.hipoteses.length, 3);
+});

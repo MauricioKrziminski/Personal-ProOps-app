@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Stack } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -6,6 +6,11 @@ import * as Haptics from 'expo-haptics';
 
 import { ErrorCard } from '@/components/error-card';
 import { CategoryPicker } from '@/components/finance/category-picker';
+import { SubcategoryField } from '@/components/finance/subcategory-field';
+import { useSubcategories } from '@/hooks/use-subcategories';
+import { subcategoryAfterParentChange } from '@/lib/subcategories';
+import { detalheDaEscrita } from '@/lib/escrita';
+import { foldCategory } from '@/lib/categories-merge';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetScroll } from '@/components/ui/sheet';
@@ -48,6 +53,8 @@ function ehGatilhoRepetido(err: unknown): boolean {
 
 interface Rascunho {
   id?: string;
+  workspaceId?: string;
+  subcategory_id?: string | null;
   pattern: string;
   category: string | null;
   accountId: string | null;
@@ -74,6 +81,21 @@ export default function RulesScreen() {
 
   const [rascunho, setRascunho] = useState<Rascunho | null>(null);
   const [erroSalvar, setErroSalvar] = useState<ReactNode>(null);
+  const defaultDetails = useSubcategories(undefined, !rascunho?.id);
+  const visita = useRef(0);
+  const [detailVisit, setDetailVisit] = useState(0);
+  const gravando = useRef(false);
+  const atual = useRef(rascunho);
+  const detailWorkspace = rascunho?.workspaceId ?? (!rascunho?.id && !defaultDetails.isError
+    ? defaultDetails.data?.workspace_id : undefined);
+  const workspaceAtual = useRef(detailWorkspace);
+  useLayoutEffect(() => {
+    atual.current = rascunho;
+    workspaceAtual.current = detailWorkspace;
+  }, [rascunho, detailWorkspace]);
+  const detailOwner = `${detailVisit}:${rascunho?.id ?? 'new'}:${detailWorkspace ?? ''}`;
+  const podeEditarDetalhe = Boolean(rascunho && detailWorkspace) && !save.isPending;
+  const visitaAtual = (visit: number) => visita.current === visit && atual.current !== null;
 
   // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
   // falha, e sem este corte a tela seguia afirmando números embaixo da faixa de erro.
@@ -86,11 +108,16 @@ export default function RulesScreen() {
     id ? ((accounts ?? []).find((c) => c.id === id)?.name ?? 'conta') : null;
 
   const abrir = (rule?: CategorizationRule) => {
+    visita.current += 1;
+    setDetailVisit(visita.current);
+    gravando.current = false;
     setErroSalvar(null);
     setRascunho(
       rule
         ? {
             id: rule.id,
+            workspaceId: rule.workspace_id,
+            ...detalheDaEscrita(rule),
             pattern: rule.pattern,
             category: rule.category,
             accountId: rule.account_id,
@@ -100,12 +127,17 @@ export default function RulesScreen() {
   };
 
   const fechar = () => {
+    visita.current += 1;
+    setDetailVisit(visita.current);
+    atual.current = null;
     setRascunho(null);
     setErroSalvar(null);
   };
 
   const salvar = () => {
-    if (!rascunho || !podeSalvar) return;
+    if (!rascunho || !podeSalvar || gravando.current || save.isPending || !detailWorkspace) return;
+    const owner = visita.current;
+    gravando.current = true;
     setErroSalvar(null);
     save.mutate(
       {
@@ -113,13 +145,19 @@ export default function RulesScreen() {
         pattern: rascunho.pattern.trim(),
         category: rascunho.category!,
         accountId: rascunho.accountId,
+        workspaceId: detailWorkspace,
+        ...detalheDaEscrita(rascunho),
       },
       {
         onSuccess: () => {
+          if (!visitaAtual(owner)) return;
+          gravando.current = false;
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           fechar();
         },
         onError: (err) => {
+          if (!visitaAtual(owner)) return;
+          gravando.current = false;
           // Erro adivinhado ("regra repetida?") é o app chutando. O motivo real é o unique da
           // `0017`, e dá para dizer QUAL regra já existe.
           if (ehGatilhoRepetido(err)) {
@@ -164,6 +202,7 @@ export default function RulesScreen() {
   const legenda = (rule: CategorizationRule) => {
     const conta = nomeConta(rule.account_id);
     return [
+      rule.subcategory_id && rule.subcategories?.name ? rule.subcategories.name : null,
       rule.hits > 0 ? `aplicada ${rule.hits}x` : 'ainda não pegou nada',
       conta ? `só em ${conta}` : null,
       rule.source === 'learned' ? 'aprendida' : null,
@@ -277,7 +316,7 @@ export default function RulesScreen() {
                 label="Salvar"
                 size="sm"
                 loading={save.isPending}
-                disabled={!podeSalvar}
+                disabled={!podeSalvar || !detailWorkspace}
                 onPress={salvar}
               />
             }
@@ -304,14 +343,37 @@ export default function RulesScreen() {
               />
             </Field>
 
-            <Field label="Categorizar como">
+            <Field label="Categorizar como" error={!detailWorkspace && rascunho?.id
+              ? 'Não consegui conferir o espaço desta regra. Reabra a lista para tentar novamente.'
+              : !rascunho?.id && defaultDetails.isError ? 'Não consegui consultar os detalhes. Tente novamente.' : undefined}>
               <CategoryPicker
                 value={rascunho?.category ?? null}
-                onChange={(category) =>
-                  setRascunho((atual) => (atual ? { ...atual, category } : atual))
-                }
+                onChange={(category) => {
+                  if (!visitaAtual(detailVisit) || gravando.current || save.isPending) return;
+                  const current = atual.current;
+                  if (!current) return;
+                  const next = { ...current, category,
+                    ...(Object.hasOwn(current, 'subcategory_id') ? { subcategory_id: subcategoryAfterParentChange(
+                      current.subcategory_id ?? null, current.category, category) } : {}) };
+                  atual.current = next;
+                  setRascunho(next);
+                }}
               />
             </Field>
+            {!rascunho?.id && defaultDetails.isError ? <Button label="Tentar novamente" variant="secondary" size="sm"
+              onPress={() => { void defaultDetails.refetch(); }} /> : null}
+            <SubcategoryField parent={rascunho?.category ?? null} value={rascunho?.subcategory_id ?? null}
+              workspaceId={detailWorkspace} sessionKey={detailOwner} enabled={podeEditarDetalhe}
+              onChange={(subcategory_id) => {
+                if (!visitaAtual(detailVisit) || gravando.current || !podeEditarDetalhe
+                  || workspaceAtual.current !== detailWorkspace
+                  || foldCategory(atual.current?.category ?? '') !== foldCategory(rascunho?.category ?? '')) return;
+                const current = atual.current;
+                if (!current) return;
+                const next = { ...current, subcategory_id };
+                atual.current = next;
+                setRascunho(next);
+              }} />
 
             {(accounts ?? []).length > 0 ? (
               <Field label="Só nesta conta">

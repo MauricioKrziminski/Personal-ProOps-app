@@ -10,6 +10,9 @@ import { PaymentMethodField } from '@/components/finance/payment-method-field';
 import { ExpenseClassificationField } from '@/components/finance/expense-classification-field';
 import { useExpenseClassificationDraft } from '@/hooks/use-expense-classification';
 import { expenseClassificationFromRecord, expenseClassificationPatch, type ExpenseClassification } from '@/lib/expense-classification';
+import { CategoryPicker } from '@/components/finance/category-picker';
+import { SubcategoryField } from '@/components/finance/subcategory-field';
+import { subcategoryAfterParentChange } from '@/lib/subcategories';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { DownPaymentFields } from '@/components/finance/down-payment-fields';
 import { PurchaseDownPayment } from '@/components/finance/purchase-down-payment';
@@ -45,7 +48,7 @@ import { useRascunho } from '@/hooks/use-rascunho';
 import { newClientMessageId } from '@/lib/agent-chat';
 import { brToISO, formatNumberBR, isValidBRDate, isoToBR } from '@/lib/dates';
 import { askEditScope } from '@/lib/edit-scope';
-import { linhaDoFinanciamento } from '@/lib/escrita';
+import { detalheDaEscrita, mudancaDoDetalhe, linhaDoFinanciamento } from '@/lib/escrita';
 import { normalizePaymentMethod, paymentMethodAccounts, paymentMethodError, type PaymentMethod } from '@/lib/payment-method';
 import {
   camposNoOutroModo,
@@ -77,6 +80,8 @@ function parseTaxa(texto: string): number {
 
 export interface FormState {
   expenseClassification?: ExpenseClassification;
+  payment_category?: string | null;
+  subcategory_id?: string | null;
   calculationMode: 'amortized' | 'fixed_installments';
   id?: string;
   original?: Debt;
@@ -155,7 +160,7 @@ export function ErrorBand({ message, onRetry }: { message: string; onRetry: () =
  * O financiamento a partir da hipótese do "E se…?" (`paramsDoAplicar`): parcela fixa, sem juros
  * digitados, a próxima parcela na data da hipótese. O nome é o que falta — a pessoa dá aqui.
  */
-function formDoAplicar(p: { parcela?: string; parcelas?: string; conta?: string; data?: string; paymentMethod?: string }): FormState {
+function formDoAplicar(p: { parcela?: string; parcelas?: string; conta?: string; data?: string; paymentMethod?: string; category?: string; subcategory_id?: string }): FormState {
   const parcela = Math.max(0, Number(p.parcela) || 0);
   const data = p.data && isValidBRDate(p.data) ? p.data : null;
   return {
@@ -167,6 +172,8 @@ function formDoAplicar(p: { parcela?: string; parcelas?: string; conta?: string;
     parcelas: p.parcelas ?? '',
     accountId: p.conta ?? null,
     paymentMethod: normalizePaymentMethod(p.paymentMethod),
+    ...(p.category !== undefined ? { payment_category: p.category || null } : {}),
+    ...(p.subcategory_id !== undefined ? detalheDaEscrita({ subcategory_id: p.subcategory_id === '' ? null : p.subcategory_id }) : {}),
     diaVencimento: data ? String(Number(data.slice(0, 2))) : '',
     ancora: data ? brToISO(data) : null,
   };
@@ -176,6 +183,8 @@ function formDoAplicar(p: { parcela?: string; parcelas?: string; conta?: string;
 function formDaDivida(d: Debt): FormState {
   return {
     expenseClassification: expenseClassificationFromRecord(d),
+    payment_category: d.payment_category,
+    ...detalheDaEscrita(d),
     calculationMode: d.calculation_mode,
     unidade: 'parcela',
     valorCents: Number(d.installment_cents ?? 0),
@@ -204,7 +213,7 @@ function formDaDivida(d: Debt): FormState {
 
 type Props = CorpoProps & {
   /** Aberta pelo "Aplicar" de uma hipótese: parcela, parcelas, conta e data dela. */
-  dadosDoAplicar?: { parcela?: string; parcelas?: string; conta?: string; data?: string; paymentMethod?: string };
+  dadosDoAplicar?: { parcela?: string; parcelas?: string; conta?: string; data?: string; paymentMethod?: string; category?: string; subcategory_id?: string };
   /** Convertendo um lançamento PAGO: o banco o adota como um pagamento, e as pagas não o somam. */
   pagamentoConvertido?: boolean;
 };
@@ -244,6 +253,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   const accounts = useAccounts(alvo?.account_id);
   const save = useSaveDebt();
   const saveScoped = useSaveDebtContractScoped();
+  const [detailSession] = useState(newClientMessageId);
   const contractAttempt = useRef<{ key: string; id: string; versions: Record<string, number> } | null>(null);
   /** `deHipotese`: aberta pelo "Aplicar" do "E se…?" — criar tira aquela hipótese do rascunho. */
   const { tirar } = useRascunho();
@@ -256,7 +266,10 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   const [form, setForm] = useState<FormState>(() => {
     if (props.estadoGuardado) {
       const guardado = props.estadoGuardado as FormState;
-      return { ...guardado, expenseClassification: comum.expenseClassification ?? guardado.expenseClassification };
+      return { ...guardado, payment_category: guardado.payment_category !== undefined
+        ? guardado.payment_category : guardado.original?.payment_category ?? comum.categoria,
+        ...(Object.hasOwn(comum, 'subcategory_id') ? { payment_category: comum.categoria, ...detalheDaEscrita(comum) } : {}),
+        expenseClassification: comum.expenseClassification ?? guardado.expenseClassification };
     }
     if (alvo) return formDaDivida(alvo);
     if (dadosDoAplicar) return formDoAplicar(dadosDoAplicar);
@@ -266,6 +279,8 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
       kind: 'financing',
       name: comum.descricao,
       expenseClassification: comum.expenseClassification,
+      payment_category: comum.categoria,
+      ...detalheDaEscrita(comum),
       valorCents: comum.valorCents,
       installmentCents: comum.valorCents,
       accountId: comum.contaId,
@@ -275,18 +290,17 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     };
   });
 
-  // Criando, a categoria comum comprova o padrão herdado do formato anterior, sem
-  // adicionar um campo de categoria aqui. Editando, só o contrato prova categoria e workspace.
+  // A categoria do draft alimenta os padrões; edição conserva o snapshot e o workspace do contrato.
   const editando = Boolean(editandoId || form.id);
   const classification = useExpenseClassificationDraft(form.expenseClassification,
-    editando ? form.original?.payment_category ?? null : comum.categoria,
+    form.payment_category ?? null,
     'expense', editando, editando ? form.original?.workspace_id : undefined);
 
   /** O lançamento convertido entra como pagamento sozinho: somá-lo às pagas o contaria duas vezes. */
   const dicaDoConvertido = converter && props.pagamentoConvertido ? 'O lançamento convertido já conta como uma paga.' : undefined;
 
   useEffect(() => {
-    registrarComum(() => ({ kind: 'expense', descricao: form.name, valorCents: form.valorCents, contaId: form.accountId, dataBR: form.ancora ? isoToBR(form.ancora) : comum.dataBR, categoria: comum.categoria, paymentMethod: form.paymentMethod ?? null, expenseClassification: classification.classification }));
+    registrarComum(() => ({ kind: 'expense', descricao: form.name, valorCents: form.valorCents, contaId: form.accountId, dataBR: form.ancora ? isoToBR(form.ancora) : comum.dataBR, categoria: form.payment_category ?? null, ...detalheDaEscrita(form), paymentMethod: form.paymentMethod ?? null, expenseClassification: classification.classification }));
     registrarEstado(() => form);
   });
 
@@ -397,6 +411,8 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   const target = podeSalvar ? {
         id: form.id,
         name: form.name.trim(),
+        ...(form.payment_category !== undefined ? { payment_category: form.payment_category } : {}),
+        ...detalheDaEscrita(form),
         calculation_mode: form.calculationMode,
         kind: form.kind,
         // sem os dois campos separados a barra de progresso nasce sempre em 0%
@@ -429,9 +445,10 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     if (form.id && form.original) {
       const original = form.original;
       const patch: Record<string, string | number | null> = {};
+      Object.assign(patch, mudancaDoDetalhe(original, form, original.payment_category, form.payment_category ?? null));
       Object.assign(patch, expenseClassificationPatch(expenseClassificationFromRecord(original), classification.classification));
       const fields = ['name','kind','calculation_mode','principal_cents','remaining_cents','interest_rate_monthly',
-        'installments','installments_paid','installment_cents','account_id','payment_method','due_day','first_due_date'] as const;
+        'installments','installments_paid','installment_cents','account_id','payment_method','due_day','first_due_date','payment_category'] as const;
       for (const field of fields) {
         const wanted = target[field as keyof typeof target];
         const previous = field === 'payment_method' ? normalizePaymentMethod(original.payment_method) : original[field as keyof Debt];
@@ -477,7 +494,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
         });
       };
       const mexeNoPassado = Number(original.installments_paid ?? 0) > 0 &&
-        ['installment_cents', 'due_day', 'first_due_date', 'account_id', 'payment_method', 'name',
+        ['installment_cents', 'due_day', 'first_due_date', 'account_id', 'payment_method', 'name', 'payment_category', 'subcategory_id',
           'expense_pattern', 'expense_necessity', 'expense_pattern_source', 'expense_necessity_source'].some((k) => k in patch);
       // Trocar o modo com pagamentos reais conserva os fatos anteriores. "Todas" exigiria
       // recalcular esse histórico e é recusado pelo contrato; ofereça apenas o alcance válido.
@@ -584,6 +601,15 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
           hint={erroPagamento && contaEscolhida ? `Conta escolhida: ${contaEscolhida.name}. Escolha uma conta compatível ou mude a forma de pagamento.` : undefined}>
           <OriginAccountPicker paymentMethod={form.paymentMethod} excludeCredit accounts={pagadoras} value={form.accountId} selectedAccount={contaEscolhida} onChange={(accountId: string | null) => setForm({ ...form, accountId })} emptyLabel="Não informar" />
         </Field>
+        <Field label="Categoria dos pagamentos"><CategoryPicker value={form.payment_category ?? null} onChange={(payment_category) => {
+          if (salvando || salvarBloqueadoAtual.current) return;
+          setForm({ ...form, payment_category,
+            ...(Object.hasOwn(form, 'subcategory_id') ? { subcategory_id: subcategoryAfterParentChange(form.subcategory_id ?? null, form.payment_category ?? null, payment_category) } : {}) });
+        }} /></Field>
+        <SubcategoryField parent={form.payment_category ?? null} value={form.subcategory_id ?? null}
+          workspaceId={form.original?.workspace_id} sessionKey={detailSession}
+          enabled={!salvando && !props.salvarBloqueado && (!editando || Boolean(form.original?.workspace_id))}
+          onChange={(subcategory_id) => { if (!salvando && !salvarBloqueadoAtual.current && (!editando || form.original?.workspace_id)) setForm({ ...form, subcategory_id }); }} />
         {/*
           `Chip` é filtro de lista — muitos, ligáveis, resposta imediata. Aqui são cinco
           opções mutuamente exclusivas GRAVADAS num campo, que é o papel do `SelectField`:

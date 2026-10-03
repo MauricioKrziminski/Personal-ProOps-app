@@ -138,7 +138,8 @@ export function LinhaPrevista({ line, hoje, conta, acoes, onAbrir }: {
   const brl = useBRL();
   const aparencia = useAparencia()(line.category, line.kind);
   const estado = estadoDaPrevista(line, hoje);
-  const subtitulo = [origemDaPrevista(line), line.category, conta?.replace(/ /g, ' ')].filter(Boolean).join(' · ');
+  const detail = line.subcategory_name ?? (line.subcategory_id ? 'Conferir detalhe' : null);
+  const subtitulo = [origemDaPrevista(line), line.category, detail, conta?.replace(/ /g, ' ')].filter(Boolean).join(' · ');
   return (
     <Deslizavel titulo={line.description} acoes={acoes}>
       <Row
@@ -151,7 +152,7 @@ export function LinhaPrevista({ line, hoje, conta, acoes, onAbrir }: {
         subtitle={subtitulo}
         icon={aparencia.icon}
         tinta={aparencia.cor}
-        accessibilityLabel={`${line.description}, ${brl(line.amount_cents)}, ${line.kind === 'income' ? 'receita' : 'despesa'}, ${origemDaPrevista(line)}${estado ? `, ${estado}` : ''}`}
+        accessibilityLabel={`${line.description}, ${brl(line.amount_cents)}, ${line.kind === 'income' ? 'receita' : 'despesa'}, ${origemDaPrevista(line)}${detail ? `, ${detail}` : ''}${estado ? `, ${estado}` : ''}`}
         onPress={onAbrir}
         onLongPress={() => showItemActions(line.description, acoes)}
         trailing={

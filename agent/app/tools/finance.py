@@ -320,6 +320,22 @@ async def apply_rules(workspace_id: UUID, action: FinanceAction) -> FinanceActio
     return action.model_copy(update={"category": regra["category"] or action.category})
 
 
+async def _subcategory_from_rule(workspace_id, action: FinanceAction, category: str | None):
+    """Only an existing user rule can supply detail; the model never guesses UUIDs.
+
+    Keep the measured Gemini wire schema and restrict the lookup to the resolved
+    workspace and final parent. The INSERT trigger revalidates any catalog race.
+    """
+    text = " ".join(p for p in (action.description, action.category) if p)
+    if not text or not category:
+        return None
+    rule = await db.fetch_one(
+        "select subcategory_id from private.match_rule_subcategory(%s,%s) "
+        "where private.fold(category)=private.fold(%s)", workspace_id, text, category,
+    )
+    return (rule or {}).get("subcategory_id")
+
+
 def _amount_with_fallback(ctx: ExecContext, action: FinanceAction) -> int | None:
     """Valor da IA ou, se ela omitiu, do texto cru.
 
@@ -345,6 +361,7 @@ async def create_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     valor = guards.require_amount(_amount_with_fallback(ctx, action))
     quando = guards.require_date(action.occurred_at, ctx.timezone)
     categoria = guards.clean_category(action.category)
+    detalhe = await _subcategory_from_rule(ctx.workspace_id, action, categoria)
     # Citou conta que não existe (ou ambígua) -> pergunta. Só quem NÃO citou cai
     # na conta padrão, que é preferência do usuário e não dedução nossa.
     if matching.sem_conta_explicita(action.account):
@@ -361,12 +378,19 @@ async def create_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
             """
             insert into public.recurring_transactions
               (user_id, workspace_id, kind, amount_cents, currency, category,
+               description, account_id, rrule, dtstart, next_run_at, subcategory_id)
+            values (%s, %s, %s, %s, 'BRL', %s, %s, %s, %s, %s, %s, %s)
+            returning id
+            """ if detalhe is not None else """
+            insert into public.recurring_transactions
+              (user_id, workspace_id, kind, amount_cents, currency, category,
                description, account_id, rrule, dtstart, next_run_at)
             values (%s, %s, %s, %s, 'BRL', %s, %s, %s, %s, %s, %s)
             returning id
             """,
             ctx.user_id, ctx.workspace_id, kind, valor, categoria,
             action.description, conta, rrule, proxima, proxima,
+            *((detalhe,) if detalhe is not None else ()),
         )
         emoji = "🔁💸" if kind == "expense" else "🔁💰"
         return ToolResult(
@@ -380,12 +404,19 @@ async def create_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
         """
         insert into public.transactions
           (user_id, workspace_id, kind, amount_cents, currency, category,
+           description, account_id, occurred_at, source, subcategory_id, subcategory_snapshot_set)
+        values (%s, %s, %s, %s, 'BRL', %s, %s, %s, %s, 'whatsapp', %s, true)
+        returning id
+        """ if detalhe is not None else """
+        insert into public.transactions
+          (user_id, workspace_id, kind, amount_cents, currency, category,
            description, account_id, occurred_at, source)
         values (%s, %s, %s, %s, 'BRL', %s, %s, %s, %s, 'whatsapp')
         returning id
         """,
         ctx.user_id, ctx.workspace_id, kind, valor, categoria,
         action.description, conta, quando,
+        *((detalhe,) if detalhe is not None else ()),
     )
     emoji = "💸" if kind == "expense" else "💰"
     return ToolResult(
@@ -459,15 +490,23 @@ async def create_installment_purchase(
     # Current position only anchors the schedule; it never determines payment.
     if atual > 1:
         quando = add_months(quando, -(atual - 1))
+    categoria = guards.clean_category(action.category)
+    detalhe = await _subcategory_from_rule(ctx.workspace_id, action, categoria)
+    query = "select public.create_installment_plan_with_history(%s, %s, %s, %s, %s, %s, %s) as id"
+    extra = ()
+    if detalhe is not None:
+        query = "select private.attach_import_rule_purchase(public.create_installment_plan_with_history(%s, %s, %s, %s, %s, %s, %s), %s, %s) as id"
+        extra = (ctx.workspace_id, detalhe)
     row = await db.fetch_one(
-        "select public.create_installment_plan_with_history(%s, %s, %s, %s, %s, %s, %s) as id",
+        query,
         conta,
         total,
         parcelas,
         quando,
         paid,
         action.description,
-        guards.clean_category(action.category),
+        categoria,
+        *extra,
     )
     por_parcela = guards.split_installment_total(total, parcelas)[0]
     historico = f"\n{paid} parcelas iniciais pagas; {parcelas - paid} pendentes."

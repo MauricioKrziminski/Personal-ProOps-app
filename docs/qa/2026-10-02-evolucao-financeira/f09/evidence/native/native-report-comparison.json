@@ -1,0 +1,26 @@
+{
+  "matches_annual_by_category": true,
+  "annual": {
+    "kind": "expense",
+    "category": "mercado",
+    "total_cents": 4857,
+    "tx_count": 3
+  },
+  "breakdown": {
+    "to": "2026-12-31",
+    "from": "2026-01-01",
+    "kind": "expense",
+    "lines": [
+      {
+        "name": null,
+        "tx_count": 3,
+        "total_cents": 4857,
+        "subcategory_id": null,
+        "workspace_name": null
+      }
+    ],
+    "total_cents": 4857,
+    "workspace_id": null,
+    "parent_category": "mercado"
+  }
+}

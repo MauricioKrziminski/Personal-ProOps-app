@@ -13,6 +13,7 @@
  * A tela só oferece o que o banco aceita — botão habilitado que o servidor recusa é o espelho do
  * botão desabilitado que não explica.
  */
+import { detalheDaEscrita, mudancaDoDetalhe } from './escrita.ts';
 import { normalizePaymentMethod, assertPaymentMethod, type PaymentMethod } from './payment-method.ts';
 import { brToISO, isValidBRDate, isoToBR, monthBounds } from './dates.ts';
 import { addMonthsISO } from './debt-history.ts';
@@ -26,6 +27,7 @@ export interface CompraGravada extends Partial<ExpenseClassification> {
   description: string | null;
   merchant: string | null;
   category: string | null;
+  subcategory_id?: string | null;
   account_id: string | null;
   payment_method?: PaymentMethod | null;
   total_cents: number;
@@ -45,11 +47,13 @@ export interface CompraForm {
   expenseClassification?: ExpenseClassification;
   /** A changed occurrence dimension remains an intent even when it already matches the contract. */
   expenseClassificationIntent?: { pattern?: boolean; necessity?: boolean };
+  subcategoryIntent?: boolean;
   editRevision?: number;
   id: string;
   description: string;
   merchant: string;
   category: string | null;
+  subcategory_id?: string | null;
   accountId: string | null;
   paymentMethod?: PaymentMethod | null;
   totalCents: number;
@@ -81,7 +85,7 @@ export interface CompraForm {
    */
   ultimoDia?: boolean;
   /** Como a compra abriu — "cada parcela" antes de qualquer edição, e o que o salvar compara. */
-  original: { totalCents: number; installments: number; parcelaCents: number; accountId: string | null; pagas: number; expenseClassification?: ExpenseClassification };
+  original: { category?: string | null; subcategory_id?: string | null; totalCents: number; installments: number; parcelaCents: number; accountId: string | null; pagas: number; expenseClassification?: ExpenseClassification };
 }
 
 export function compraDoRegistro(p: CompraGravada): CompraForm {
@@ -91,6 +95,7 @@ export function compraDoRegistro(p: CompraGravada): CompraForm {
     description: p.description ?? '',
     merchant: p.merchant ?? '',
     category: p.category,
+    ...detalheDaEscrita(p),
     accountId: p.account_id,
     expenseClassification: expenseClassificationFromRecord(p),
     ...(p.payment_method !== undefined ? { paymentMethod: normalizePaymentMethod(p.payment_method) } : {}),
@@ -107,6 +112,8 @@ export function compraDoRegistro(p: CompraGravada): CompraForm {
     unidade: 'total',
     parcelaCents: null,
     original: {
+      ...(Object.hasOwn(p, 'subcategory_id') ? { category: p.category } : {}),
+      ...detalheDaEscrita(p),
       totalCents: p.total_cents,
       installments: p.installments,
       parcelaCents: p.installment_cents,
@@ -124,10 +131,11 @@ export function compraDoRegistro(p: CompraGravada): CompraForm {
  */
 export function compraParaRevisaoDaParcela(
   plano: CompraGravada,
-  parcela: Partial<ExpenseClassification> & { installment_no: number | null; occurred_at: string; amount_cents: number; description: string | null },
-  rascunho: { occurred_at: string; amount_cents: number; description: string; merchant: string | null; category: string | null; payment_method?: PaymentMethod | null; expenseClassification?: ExpenseClassification },
+  parcela: Partial<ExpenseClassification> & { subcategory_id?: string | null; category?: string | null; installment_no: number | null; occurred_at: string; amount_cents: number; description: string | null },
+  rascunho: { occurred_at: string; amount_cents: number; description: string; merchant: string | null; category: string | null; subcategory_id?: string | null; payment_method?: PaymentMethod | null; expenseClassification?: ExpenseClassification },
 ): CompraForm {
   const base = compraDoRegistro(plano);
+  const detailPatch = mudancaDoDetalhe(parcela, rascunho, parcela.category ?? plano.category, rascunho.category);
   const classificationPatch = rascunho.expenseClassification !== undefined
     ? expenseClassificationPatch(expenseClassificationFromRecord(parcela), rascunho.expenseClassification)
     : {};
@@ -143,6 +151,8 @@ export function compraParaRevisaoDaParcela(
     description: tituloDaCompra,
     merchant: rascunho.merchant ?? '',
     category: rascunho.category,
+    ...detailPatch,
+    ...(Object.hasOwn(detailPatch, 'subcategory_id') ? { subcategoryIntent: true } : {}),
     expenseClassification: {
       ...expenseClassificationFromRecord(plano),
       ...classificationPatch,
@@ -235,10 +245,16 @@ export function payloadDaCompra(f: CompraForm, isoDaData: string) {
     accountId: f.accountId,
     paidInstallments: f.pagas !== f.original.pagas ? f.pagas : null,
     ...classificationPatchDaCompra(f, f.original.expenseClassification),
+    ...detailPatchDaCompra(f, f.original, f.original.category ?? f.category),
   };
 }
 
 export type EscopoDaCompra = 'one' | 'future' | 'all';
+
+function detailPatchDaCompra(f: CompraForm, before: { subcategory_id?: string | null }, parent: string | null) {
+  const patch = mudancaDoDetalhe(before, f, parent, f.category);
+  return f.subcategoryIntent ? { ...detalheDaEscrita(f), ...patch } : patch;
+}
 
 function classificationPatchDaCompra(f: CompraForm, before: ExpenseClassification | undefined): Partial<ExpenseClassification> {
   const current = normalizeExpenseClassification(f.expenseClassification ?? before);
@@ -266,7 +282,7 @@ function classificationPatchDaCompra(f: CompraForm, before: ExpenseClassificatio
  * numa fatura de cartão o banco segura com o motivo.
  */
 export function edicaoEscopadaDaCompra(f: CompraForm, original: CompraGravada, scope: EscopoDaCompra, ancoraNo = 1):
-  | { kind: 'scope'; lastDay: boolean; patch: Partial<ExpenseClassification> & { total_cents?: number; amount_cents?: number; description?: string; merchant?: string | null; category?: string | null; occurred_at?: string; payment_method?: PaymentMethod | null } }
+  | { kind: 'scope'; lastDay: boolean; patch: Partial<ExpenseClassification> & { total_cents?: number; amount_cents?: number; description?: string; merchant?: string | null; category?: string | null; subcategory_id?: string | null; occurred_at?: string; payment_method?: PaymentMethod | null } }
   | { kind: 'contract' }
   | { kind: 'no-op' }
   | { kind: 'structural-rejection'; reason: string }
@@ -309,8 +325,9 @@ export function edicaoEscopadaDaCompra(f: CompraForm, original: CompraGravada, s
   }
   if (structural) return { kind: 'contract' };
 
-  const patch: Partial<ExpenseClassification> & { total_cents?: number; amount_cents?: number; description?: string; merchant?: string | null; category?: string | null; occurred_at?: string; payment_method?: PaymentMethod | null } = {
+  const patch: Partial<ExpenseClassification> & { total_cents?: number; amount_cents?: number; description?: string; merchant?: string | null; category?: string | null; subcategory_id?: string | null; occurred_at?: string; payment_method?: PaymentMethod | null } = {
     ...classificationPatchDaCompra(f, expenseClassificationFromRecord(original)),
+    ...detailPatchDaCompra(f, original, original.category),
   };
   if (changedAmount) patch.amount_cents = f.parcelaCents!;
   else if (changedTotal) patch.total_cents = f.totalCents;

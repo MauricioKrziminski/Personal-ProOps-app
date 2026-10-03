@@ -3,6 +3,7 @@
  * adiantamentos (continuam `Draft` de cancelamento). Mora no aparelho — ler aceita qualquer coisa
  * e devolve vazio no que não reconhece, para um dado velho nunca quebrar a tela.
  */
+import { detalheDaEscrita } from './escrita.ts';
 import type { Draft } from '@/hooks/use-finance';
 import { financeErrorMessage } from './finance-form.ts';
 import type { Hipotese } from './hipotese.ts';
@@ -11,10 +12,13 @@ export type Rascunho = { versao: 2; hipoteses: Hipotese[]; adiantamentos: Draft[
 export const RASCUNHO_VAZIO: Rascunho = { versao: 2, hipoteses: [], adiantamentos: [] };
 
 const ehObjeto = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+function detailValid(value: Record<string, unknown>): boolean {
+  try { detalheDaEscrita(value as { subcategory_id?: string | null }); return true; } catch { return false; }
+}
 const FORMAS = new Set(['uma', 'parcelado', 'repete', 'financiamento']);
 
 function hipoteseValida(h: unknown): h is Hipotese {
-  return ehObjeto(h) && typeof h.id === 'string' && (h.kind === 'income' || h.kind === 'expense')
+  return ehObjeto(h) && detailValid(h) && (!Object.hasOwn(h, 'category') || h.category === null || typeof h.category === 'string') && typeof h.id === 'string' && (h.kind === 'income' || h.kind === 'expense')
     && FORMAS.has(h.forma as string) && typeof h.valor_cents === 'number' && typeof h.parcelas === 'number'
     && typeof h.data === 'string';
 }

@@ -1,0 +1,4 @@
+appId: com.proops.personal.dev
+---
+- tapOn: "Salvar detalhe"
+- takeScreenshot: ios-f09-move-result

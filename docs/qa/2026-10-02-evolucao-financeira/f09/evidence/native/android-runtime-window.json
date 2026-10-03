@@ -1,0 +1,18 @@
+{
+  "device": "emulator-5574",
+  "counts": {
+    "ANR in": 0,
+    "FATAL EXCEPTION": 0,
+    "Input dispatching timed out": 0,
+    "Unable to find SurfaceMountingManager": 7689
+  },
+  "first_samples": {
+    "ANR in": null,
+    "FATAL EXCEPTION": null,
+    "Input dispatching timed out": null,
+    "Unable to find SurfaceMountingManager": "10-03 18:25:01.563 28652 28652 W Reanimated: Caused by: com.facebook.react.bridge.RetryableMountingLayerException: Unable to find SurfaceMountingManager for tag: [10234]"
+  },
+  "anr_incident_F07_closed": false,
+  "theme_repaint_root_cause_proven": false,
+  "dark_report_after_relaunch_verified": true
+}

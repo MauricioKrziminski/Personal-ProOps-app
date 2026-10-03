@@ -42,7 +42,7 @@ CATALOG = {
         "debts",
         "name",
         "archived",
-        "name kind calculation_mode principal_cents remaining_cents interest_rate_monthly installments installments_paid installment_cents due_day account_id started_at archived first_due_date next_due_date trashed",
+        "name kind calculation_mode principal_cents remaining_cents interest_rate_monthly installments installments_paid installment_cents due_day account_id started_at archived first_due_date next_due_date trashed payment_category subcategory_id",
     ),
     # O MES FINANCEIRO do workspace. Nao tem nome, e linha UNICA e o escopo e o
     # `id`, nao `workspace_id` - por isso `prepare` e `execute` o tratam a parte,
@@ -61,13 +61,13 @@ CATALOG = {
         "recurring_transactions",
         "description",
         "active",
-        "kind amount_cents category description account_id rrule dtstart auto_confirm active",
+        "kind amount_cents category subcategory_id description account_id rrule dtstart auto_confirm active",
     ),
     "rules": (
         "categorization_rules",
         "pattern",
         None,
-        "match_type pattern category account_id priority",
+        "match_type pattern category subcategory_id account_id priority",
     ),
     "notes": (
         "notes",
@@ -152,6 +152,8 @@ LABELS = {
     "target_cents": "valor da meta",
     "deadline": "prazo",
     "category": "categoria",
+    "payment_category": "categoria do pagamento",
+    "subcategory_id": "detalhe",
     "limit_cents": "limite",
     "rollover": "acumular sobra",
     "month": "mês",
@@ -362,7 +364,12 @@ def validate_fields(action: ResourceAction) -> dict:
             values[key] = None
             continue
         value = value.strip()
-        if key in BOOLS:
+        if key == "subcategory_id":
+            try:
+                value = str(UUID(value))
+            except ValueError:
+                _error("Escolha um detalhe existente desta categoria no app; não consigo usar esse identificador.")
+        elif key in BOOLS:
             if value not in {"true", "false"}:
                 _error(f"Informe sim ou não para {LABELS[key]}.")
             value = value == "true"
@@ -1304,6 +1311,21 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         values["first_due_date"] = _meses_antes(proxima, pagas).isoformat()
         prepared["proxima_label"] = format_date_br(proxima)
     display = {}
+    if "subcategory_id" in values:
+        parent_column = "payment_category" if action.resource == "debts" else "category"
+        parent = values[parent_column] if parent_column in values else (
+            old.get(parent_column) if action.type != Op.CREATE else None)
+        prepared["subcategory_parent"] = parent
+        if values["subcategory_id"] is not None:
+            details = await db.fetch(
+                "select id,name from public.subcategories where id=%s and workspace_id=%s "
+                "and parent_key=private.fold(%s)", values["subcategory_id"], ctx.workspace_id, parent,
+            )
+            if len(details) != 1:
+                _error("Esse detalhe não pertence à categoria e ao espaço escolhidos. Confira no app.")
+            display["subcategory_id"] = details[0]["name"]
+        else:
+            display["subcategory_id"] = "Sem detalhe"
     for key, linked_table in LINKS.items():
         if values.get(key):
             rows = await db.fetch(
@@ -1695,6 +1717,9 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
             guards.append(condition + ")")
             link_args.extend([values[key], ctx.workspace_id])
     reference_guard = (" and " + " and ".join(guards)) if guards else ""
+    if values.get("subcategory_id") is not None:
+        reference_guard += " and exists (select 1 from public.subcategories s where s.id=%s and s.workspace_id=%s and s.parent_key=private.fold(%s))"
+        link_args.extend([values["subcategory_id"], ctx.workspace_id, proposal["subcategory_parent"]])
     if action.type == Op.PAY:
         # MATERIALIZED locks the exact reviewed debt before evaluating the RPC.
         # The RPC and transaction trigger apply the debt's calculation mode.
@@ -1856,7 +1881,7 @@ async def _editar_alcance_do_limite(ctx: ExecContext, values: dict, args: list):
 
 # O que, mudando na REGRA, tem que alcançar as ocorrências já materializadas.
 # Pausar (`active`) não reescreve nada do que já existe.
-_SERIE_PROPAGA = {"amount_cents", "category", "description", "account_id", "kind"}
+_SERIE_PROPAGA = {"amount_cents", "category", "subcategory_id", "description", "account_id", "kind"}
 # O calendário vai pela MESMA RPC desde `20260926120000`: ela refaz as futuras em aberto. Pelo
 # UPDATE cru, o calendário velho ficava materializado por um ano ao lado do novo.
 _SERIE_CALENDARIO = {"rrule", "dtstart", "next_run_at"}

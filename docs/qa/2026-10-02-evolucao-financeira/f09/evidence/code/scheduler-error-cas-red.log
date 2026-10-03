@@ -1,0 +1,38 @@
+......F                                                                  [100%]
+=================================== FAILURES ===================================
+________ test_failed_old_statement_cannot_attach_error_to_newer_intent _________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a59e390>
+
+    @pytest.mark.asyncio
+    async def test_failed_old_statement_cannot_attach_error_to_newer_intent(monkeypatch):
+        server = Boundary(monkeypatch)
+        async def failed_one(sql, *args):
+            server.row['edit_revision'] += 1
+            raise RuntimeError('old materialization failed after a concurrent edit')
+        monkeypatch.setattr(scheduler.db, 'fetch_one', failed_one)
+        assert await scheduler.materialize_horizon(NOW) == 0
+        assert len(server.updates) == 1
+        sql, args = server.updates[0]
+>       assert 'edit_revision = %s' in sql and args[-1] == 7
+E       AssertionError: assert ('edit_revision = %s' in 'update public.recurring_transactions set last_error = %s where id = %s')
+
+tests/test_scheduler_history.py:136: AssertionError
+------------------------------ Captured log call -------------------------------
+ERROR    app.jobs.scheduler:scheduler.py:366 série dc6889e1-1424-4c06-9cb8-0726fdbe79a9 falhou
+Traceback (most recent call last):
+  File "/Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/agent/app/jobs/scheduler.py", line 320, in materialize_horizon
+    outcome = await _materialize_occurrence(rec, dia, ja_aconteceu)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/agent/app/jobs/scheduler.py", line 161, in _materialize_occurrence
+    return await db.fetch_one(
+           ^^^^^^^^^^^^^^^^^^^
+    ...<56 lines>...
+    )
+    ^
+  File "/Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/agent/tests/test_scheduler_history.py", line 131, in failed_one
+    raise RuntimeError('old materialization failed after a concurrent edit')
+RuntimeError: old materialization failed after a concurrent edit
+=========================== short test summary info ============================
+FAILED tests/test_scheduler_history.py::test_failed_old_statement_cannot_attach_error_to_newer_intent
+1 failed, 6 passed in 0.11s

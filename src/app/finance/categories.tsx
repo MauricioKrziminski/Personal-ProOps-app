@@ -5,6 +5,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ErrorCard } from '@/components/error-card';
 import { CategoriaSheet } from '@/components/finance/categoria-sheet';
+import { SubcategoryManager } from '@/components/finance/subcategory-manager';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 import { ThemedText } from '@/components/themed-text';
 import { Deslizavel } from '@/components/ui/deslizavel';
@@ -38,6 +39,7 @@ export default function CategoriesScreen() {
   const apagar = useApagarCategoria();
   // `undefined` = fechada; `null` = nova.
   const [aberta, setAberta] = useState<Categoria | null | undefined>(undefined);
+  const [detalhes, setDetalhes] = useState<string | null>(null);
 
   const lista = isError ? [] : (data ?? []);
   const itens = useAosPoucos(lista);
@@ -56,6 +58,7 @@ export default function CategoriesScreen() {
     );
 
   const acoesDe = (c: Categoria): ItemAction[] => [
+    { label: 'Detalhes', icon: 'list.bullet', onPress: () => setDetalhes(c.category) },
     { label: 'Editar', icon: 'pencil', arrasto: 'direita', onPress: () => setAberta(c) },
     { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => pedirApagar(c) },
   ];
@@ -78,7 +81,7 @@ export default function CategoriesScreen() {
         <View style={styles.lista}>
           <View style={styles.faixa}>
             <ThemedText type="small" themeColor="textSecondary">
-              Renomear muda todos os lançamentos, recorrentes e orçamentos da categoria.
+              Toque para organizar detalhes ou editar a categoria. Renomear também muda os lançamentos e orçamentos.
             </ThemedText>
           </View>
           <Section title="Suas categorias">
@@ -98,7 +101,7 @@ export default function CategoriesScreen() {
                       icon={a.icon}
                       tinta={a.cor}
                       chevron={false}
-                      onPress={() => setAberta(c)}
+                      onPress={() => showItemActions(c.category, acoesDe(c))}
                       onLongPress={() => showItemActions(c.category, acoesDe(c))}
                     />
                   </Deslizavel>
@@ -125,6 +128,8 @@ export default function CategoriesScreen() {
         onClose={() => setAberta(undefined)}
         onSalva={() => {}}
       />
+      <SubcategoryManager visible={detalhes !== null} parent={detalhes ?? ''}
+        onClose={() => setDetalhes(null)} />
     </Screen>
   );
 }

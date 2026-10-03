@@ -1,0 +1,8 @@
+appId: com.proops.personal.dev
+---
+- tapOn:
+    text: "Salvar"
+- extendedWaitUntil:
+    notVisible: "Novo lançamento"
+    timeout: 20000
+- takeScreenshot: ios-f09-after-save

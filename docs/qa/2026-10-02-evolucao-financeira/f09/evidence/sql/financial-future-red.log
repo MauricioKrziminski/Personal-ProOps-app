@@ -1,0 +1,9 @@
+produção : kwriuifcwyvdrxtspjiz  (Personal ProOps app)
+staging  : utkqoiigimqzeenxkxdl  (Personal ProOps app - staging)
+
+CLI linkado (destino do db push) : utkqoiigimqzeenxkxdl  → staging
+app (.env.local)                 : utkqoiigimqzeenxkxdl  → staging
+{"phase": "migration-in-rollback", "file": "20261003192000_subcategories_catalog.sql", "result": "compiled"}
+{"phase": "migration-in-rollback", "file": "20261003192500_subcategory_writes.sql", "result": "compiled"}
+{"phase": "migration-in-rollback", "file": "20261003193000_subcategory_financial_metadata.sql", "result": "compiled"}
+{"mode": "metadata", "result": "fail", "code": "P0004", "message": "mixed future parent edit violated dated child scope\nCONTEXT:  PL/pgSQL function inline_code_block line 159 at ASSERT"}

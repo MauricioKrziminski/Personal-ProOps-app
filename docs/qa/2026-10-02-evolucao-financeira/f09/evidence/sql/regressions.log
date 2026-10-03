@@ -1,0 +1,21 @@
+produção : kwriuifcwyvdrxtspjiz  (Personal ProOps app)
+staging  : utkqoiigimqzeenxkxdl  (Personal ProOps app - staging)
+
+CLI linkado (destino do db push) : utkqoiigimqzeenxkxdl  → staging
+app (.env.local)                 : utkqoiigimqzeenxkxdl  → staging
+{"phase": "migration-in-rollback", "file": "20261003192000_subcategories_catalog.sql", "result": "compiled"}
+{"phase": "migration-in-rollback", "file": "20261003192500_subcategory_writes.sql", "result": "compiled"}
+{"phase": "migration-in-rollback", "file": "20261003193000_subcategory_financial_metadata.sql", "result": "compiled"}
+{"phase": "test", "file": "expense_classification.sql", "result": "pass", "committed": false}
+{"phase": "test", "file": "expense_classification_writes.sql", "result": "pass", "committed": false}
+{"phase": "test", "file": "recurring_one_scope.sql", "result": "pass", "committed": false}
+{"phase": "test", "file": "recurring_all_scope.sql", "result": "pass", "committed": false}
+{"phase": "test", "file": "recurring_future_scope.sql", "result": "pass", "committed": false}
+{"phase": "test", "file": "debt_payment_scoped.sql", "result": "pass", "committed": false}
+{"phase": "test", "file": "debt_contract_scoped.sql", "result": "pass", "committed": false}
+{"phase": "test", "file": "installment_scope_atomic.sql", "result": "pass", "committed": false}
+{"phase": "test", "file": "converter_request_idempotency.sql", "result": "pass", "committed": false}
+{"phase": "test", "file": "converter_registro.sql", "result": "pass", "committed": false}
+{"phase": "test", "file": "converter_recorrente_datas.sql", "result": "pass", "committed": false}
+{"phase": "test", "file": "converter_entrada.sql", "result": "pass", "committed": false}
+{"phase": "test", "file": "converter_parcelamento.sql", "result": "pass", "committed": false}

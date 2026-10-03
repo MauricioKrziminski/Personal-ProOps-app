@@ -1,0 +1,9 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-parent-clear-cancel
+Tap on "eletrônicos"... COMPLETED
+Assert that "Sem detalhe" is visible... COMPLETED
+Take screenshot android-f09-parent-clears-draft... COMPLETED
+Tap on "Fechar"... COMPLETED
+Take screenshot android-f09-editor-cancelled... COMPLETED

@@ -1,0 +1,13 @@
+appId: com.proops.personal.dev
+---
+- extendedWaitUntil:
+    visible: "QA F09 iOS detalhe 20261003, R.*"
+    timeout: 15000
+- assertVisible: "QA F09 Android Detalhe, R.*"
+- assertNotVisible: ".*qa f09 ios editado.*"
+- takeScreenshot: ios-f09-deleted-child-qa-rows
+- tapOn: "QA F09 iOS detalhe 20261003, R.*"
+- assertVisible: ".*03 de outubro de 2026.*mercado"
+- assertVisible: "Pix"
+- assertNotVisible: ".*qa f09 ios editado.*"
+- takeScreenshot: ios-f09-deleted-child-ios-ficha

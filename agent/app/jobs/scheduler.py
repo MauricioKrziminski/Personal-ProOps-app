@@ -151,39 +151,71 @@ async def reparar_gemeas() -> int:
     return reparados
 
 
-async def _adotar_gemea(rec, dia: str) -> bool:
-    """A ocorrência PASSADA que já existe como lançamento solto é adotada, não criada de novo.
+async def _materialize_occurrence(rec, dia: str, ja_aconteceu: bool) -> dict:
+    """Lock/CAS and dated tuple, adoption or insert share one database snapshot.
 
-    27/09/2026, produção: a pessoa apagou a série do Fundacred (o setembro PAGO ficou — é histórico,
-    `recurring_drop_future` só leva as futuras em aberto) e a recriou começando em 04/09 com "entra
-    como pago". O agendador lançou outro 04/09 pago ao lado, e a conta corrente caiu R$ 1.198,85 a
-    mais. O mesmo vale para quem lança a conta à mão e depois cria a série. Gêmea = mesmo espaço,
-    tipo, valor, conta, dia e título (sem acento e caixa), e nenhuma série dona.
+    The WHERE belongs to the base row being locked: PostgreSQL rechecks the
+    captured revision after a concurrent writer releases it. An obsolete fetch
+    produces no financial write. Genuine null version values stay null.
     """
-    gemea = await db.fetch_one(
+    return await db.fetch_one(
         """
-        select id from public.transactions
-        where workspace_id = %s and recurring_id is null and kind = %s and amount_cents = %s
-          and account_id is not distinct from %s and occurred_at = %s
-          and extensions.unaccent(lower(coalesce(description, ''))) = extensions.unaccent(lower(coalesce(%s, '')))
-        order by created_at
-        limit 1
-        """,
-        rec["workspace_id"], rec["kind"], rec["amount_cents"], rec["account_id"], dia, rec["description"],
-    )
-    if not gemea:
-        return False
-    try:
-        await db.execute(
-            "update public.transactions set recurring_id = %s where id = %s and recurring_id is null",
-            rec["id"], gemea["id"],
+        with locked_series as materialized (
+          select r.* from public.recurring_transactions r
+          where r.id = %s and r.edit_revision = %s and r.rrule = %s
+            and r.dtstart is not distinct from %s and r.active
+          for share of r
+        ), input as (
+          select %s::date as day, %s::boolean as past
+        ), dated as materialized (
+          select r.*, i.day, i.past,
+            case when v.recurring_id is not null then v.kind else r.kind end as occurrence_kind,
+            case when v.recurring_id is not null then v.amount_cents else r.amount_cents end as occurrence_amount,
+            case when v.recurring_id is not null then v.category else r.category end as occurrence_category,
+            case when v.recurring_id is not null then v.description else r.description end as occurrence_description,
+            case when v.recurring_id is not null then v.account_id else r.account_id end as occurrence_account,
+            private.payment_method_at(r.id,i.day) as occurrence_method,
+            private.recurring_subcategory_at(r.id,i.day) as occurrence_child
+          from locked_series r cross join input i
+          left join lateral (
+            select h.* from private.recurring_history_versions h
+            where h.recurring_id=r.id and h.workspace_id=r.workspace_id
+              and h.valid_from<=i.day and (h.valid_through is null or h.valid_through>=i.day)
+            order by h.valid_from desc limit 1
+          ) v on true
+        ), candidate as materialized (
+          select t.id from public.transactions t join dated d on t.workspace_id=d.workspace_id
+          where d.past and t.recurring_id is null and t.kind=d.occurrence_kind
+            and t.amount_cents=d.occurrence_amount and t.account_id is not distinct from d.occurrence_account
+            and t.occurred_at=d.day
+            and extensions.unaccent(lower(coalesce(t.description,'')))
+                =extensions.unaccent(lower(coalesce(d.occurrence_description,'')))
+            and (t.subcategory_id is null or exists (
+              select 1 from public.subcategories c where c.id=t.subcategory_id
+                and c.workspace_id=t.workspace_id and c.parent_key=private.fold(t.category)))
+            and not exists(select 1 from public.transactions own where own.recurring_id=d.id and own.occurred_at=d.day)
+          order by t.created_at,t.id limit 1
+        ), adopted as (
+          update public.transactions t set recurring_id=d.id, subcategory_snapshot_set=true
+          from dated d,candidate c where t.id=c.id and t.recurring_id is null
+          returning t.id
+        ), inserted as (
+          insert into public.transactions
+            (user_id,workspace_id,kind,amount_cents,currency,category,description,merchant,account_id,
+             occurred_at,due_at,source,status,recurring_id,auto_confirm,payment_method,subcategory_id,subcategory_snapshot_set)
+          select d.user_id,d.workspace_id,d.occurrence_kind,d.occurrence_amount,d.currency,d.occurrence_category,
+            d.occurrence_description,d.merchant,d.occurrence_account,d.day,d.day,'recurring',
+            case when d.past and d.auto_confirm then 'cleared' else 'pending' end,
+            d.id,d.auto_confirm,d.occurrence_method,d.occurrence_child,true
+          from dated d where not exists(select 1 from adopted)
+          on conflict (recurring_id,occurred_at) where recurring_id is not null do nothing
+          returning id
         )
-    except UniqueViolation:
-        # A série já tem esse dia: o app o gravou no toque (`materialize_recurring_occurrence`)
-        # entre a leitura e esta rodada. Sem este `except`, a série travava em `last_error` e
-        # `materialized_until` nunca mais andava.
-        pass
-    return True
+        select exists(select 1 from locked_series) as intent_current,
+               exists(select 1 from inserted) as created
+        """,
+        rec["id"], rec["edit_revision"], rec["rrule"], rec["dtstart"], dia, ja_aconteceu,
+    )
 
 
 async def materialize_horizon(agora, so_novas: bool = False, workspace_id=None) -> int:
@@ -225,7 +257,7 @@ async def materialize_horizon(agora, so_novas: bool = False, workspace_id=None) 
         """
         select r.id, r.user_id, r.workspace_id, r.kind, r.amount_cents, r.currency,
                r.category, r.description, r.merchant, r.account_id, r.rrule, r.next_run_at,
-               r.dtstart, r.end_date, r.auto_confirm, r.materialized_until,
+               r.dtstart, r.end_date, r.auto_confirm, r.materialized_until, r.edit_revision,
                p.timezone
         from public.recurring_transactions r
         left join public.profiles p on p.id = r.user_id
@@ -268,6 +300,7 @@ async def materialize_horizon(agora, so_novas: bool = False, workspace_id=None) 
             cursor = rec["materialized_until"] or (rec["next_run_at"] - timedelta(seconds=1))
             ultima = rec["materialized_until"]
             geradas = 0
+            obsolete = False
 
             while geradas < MAX_OCCURRENCES_PER_SERIES:
                 occ = next_occurrence(rec["rrule"], cursor, fuso, dtstart)
@@ -283,44 +316,26 @@ async def materialize_horizon(agora, so_novas: bool = False, workspace_id=None) 
                     continue
 
                 ja_aconteceu = occ <= agora
-                if ja_aconteceu and await _adotar_gemea(rec, dia):
-                    cursor = occ
-                    ultima = occ
-                    geradas += 1
-                    continue
                 try:
-                    await db.execute(
-                        """
-                        insert into public.transactions
-                          (user_id, workspace_id, kind, amount_cents, currency, category,
-                           description, merchant, account_id, occurred_at, due_at, source, status,
-                           recurring_id, auto_confirm, payment_method)
-                        values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'recurring', %s, %s, %s,
-                                private.payment_method_at(%s,%s::date))
-                        """,
-                        rec["user_id"], rec["workspace_id"], rec["kind"], rec["amount_cents"],
-                        rec["currency"], rec["category"], rec["description"],
-                        # o estabelecimento da série (`20260926120000`) vai para cada ocorrência
-                        rec.get("merchant"), rec["account_id"],
-                        dia, dia,
-                        "cleared" if (ja_aconteceu and rec["auto_confirm"]) else "pending",
-                        rec["id"],
-                        # A ocorrencia HERDA o interruptor da serie. Sem isto ela nasceria com o
-                        # `default false` da coluna e `_promote_due_transactions` (que agora olha a
-                        # LINHA, nao a serie) nunca daria baixa nem no salario.
-                        rec["auto_confirm"],
-                        # Method is metadata from the version covering THIS civil day;
-                        # using the current series default would rewrite backfilled history.
-                        rec["id"], dia,
-                    )
-                    criadas += 1
+                    outcome = await _materialize_occurrence(rec, dia, ja_aconteceu)
+                    if not outcome["intent_current"]:
+                        obsolete = True
+                        break
+                    criadas += int(outcome["created"])
                 except UniqueViolation:
-                    # ocorrência já materializada numa rodada anterior: segue
+                    # A concurrent app adoption may own this date already. The statement
+                    # rolled back atomically; the unique occurrence prevents a duplicate.
                     pass
 
                 cursor = occ
                 ultima = occ
                 geradas += 1
+
+            if obsolete:
+                # A legitimate edit won the CAS. Do not publish this fetched cursor
+                # or a last_error; the next cron reads the new intent. Adoption can
+                # itself bump the parent revision, safely requiring that next pass.
+                continue
 
             # next_run_at continua sendo a PRÓXIMA ocorrência FUTURA (é o que o
             # app mostra), independente de quanto já foi materializado à frente
@@ -334,7 +349,7 @@ async def materialize_horizon(agora, so_novas: bool = False, workspace_id=None) 
                 update public.recurring_transactions
                 set dtstart = %s, materialized_until = coalesce(%s, materialized_until),
                     next_run_at = %s, active = %s, run_attempts = 0, last_error = null
-                where id = %s and rrule = %s and dtstart is not distinct from %s
+                where id = %s and rrule = %s and dtstart is not distinct from %s and edit_revision = %s
                 """,
                 dtstart,
                 ultima,
@@ -345,13 +360,15 @@ async def materialize_horizon(agora, so_novas: bool = False, workspace_id=None) 
                 # (`update_recurring_series`), gravar isto por cima desfaria o reset dela.
                 rec["rrule"],
                 rec["dtstart"],
+                rec["edit_revision"],
             )
         except Exception as err:  # noqa: BLE001
             log.exception("série %s falhou", rec["id"])
             await db.execute(
-                "update public.recurring_transactions set last_error = %s where id = %s",
+                "update public.recurring_transactions set last_error = %s where id = %s and edit_revision = %s",
                 repr(err)[:2000],
                 rec["id"],
+                rec["edit_revision"],
             )
 
     return criadas

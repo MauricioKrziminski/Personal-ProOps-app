@@ -1,0 +1,24 @@
+{
+  "project_ref": "utkqoiigimqzeenxkxdl",
+  "dry_run": false,
+  "workspace_id": "b94c2f3e-e1f1-450e-b549-bc570b5e8b0e",
+  "qa_transactions": 2,
+  "qa_children_remaining": 0,
+  "sealed_commands": 6,
+  "financial_commands": 2,
+  "owned_request_ids": [
+    "1b3d9277-54af-4d16-a650-cea702eefe5c",
+    "b70dd942-1989-406b-b2fc-0a0cdc688b96",
+    "defc911b-4fef-4954-a2e0-fb1a0f3e48d0",
+    "527fd599-9d7c-4b7e-9d73-cae194992582",
+    "84a85806-0948-4434-aa0f-96663c324baf",
+    "995b883b-05e1-4e98-8653-f0027e128b16",
+    "68274b95-e77b-4a35-a7bb-a9b818424be3",
+    "3bae6e24-ed07-4a58-ae6a-50a8fb5dd0f9"
+  ],
+  "original_sources_unchanged": 17,
+  "private_history_unchanged": 12,
+  "cleaned": true,
+  "restored_cash_cents": 3924915,
+  "remaining_transactions": 132
+}

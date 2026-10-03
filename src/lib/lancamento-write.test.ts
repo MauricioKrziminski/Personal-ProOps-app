@@ -95,3 +95,27 @@ test('histórico passado em branco e entrada futura falham com a regra já exist
   assert.throws(() => prepararLancamento({ ...values, installments: 3, down_payment_enabled: true,
     down_payment_cents: 10000 }, context), /pelo menos/);
 });
+
+const detail = '33333333-3333-4333-8333-333333333333';
+test('F09 principal conserva detalhe explícito e parcelada usa o mesmo UUID; transferência limpa', () => {
+  const input = { ...values, subcategory_id: detail, installments: 3, down_payment_enabled: true };
+  const result = prepararLancamento(input, context);
+  assert.equal(result.entradaLancamento.subcategory_id, detail);
+  assert.equal(result.entradaParcelada?.subcategory_id, detail);
+  assert.equal(Object.hasOwn(result.entradaParcelada!.downPayment!, 'subcategory_id'), false);
+  assert.equal(prepararLancamento({ ...input, kind: 'transfer' }, context).entradaLancamento.subcategory_id, null);
+  assert.equal(prepararLancamento({ ...values, subcategory_id: null }, context).entradaLancamento.subcategory_id, null);
+});
+test('F09 troca de pai limpa filho herdado; alias conserva e novo filho explícito fica para preflight', () => {
+  const editing = { id: 'tx', category: 'casa', subcategory_id: detail };
+  assert.equal(prepararLancamento({ ...values, category: 'saúde' }, { ...context, editing }).entradaLancamento.subcategory_id, null);
+  assert.equal(Object.hasOwn(prepararLancamento(values, { ...context, editing }).entradaLancamento, 'subcategory_id'), false);
+  assert.equal(prepararLancamento({ ...values, category: ' CASA ', subcategory_id: detail }, { ...context, editing }).entradaLancamento.subcategory_id, detail);
+  const next = '44444444-4444-4444-8444-444444444444';
+  assert.equal(prepararLancamento({ ...values, category: 'saúde', subcategory_id: next }, { ...context, editing }).entradaLancamento.subcategory_id, next);
+});
+test('F09 transferência editada limpa também filho novo explícito após comparar o snapshot', () => {
+  const result = prepararLancamento({ ...values, kind: 'transfer', subcategory_id: '44444444-4444-4444-8444-444444444444' },
+    { ...context, editing: { id: 'tx', category: 'casa', subcategory_id: detail } });
+  assert.equal(result.entradaLancamento.subcategory_id, null);
+});

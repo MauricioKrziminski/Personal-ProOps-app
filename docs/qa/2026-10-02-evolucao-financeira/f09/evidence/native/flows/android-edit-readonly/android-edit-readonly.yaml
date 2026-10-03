@@ -1,0 +1,9 @@
+appId: com.proops.personal.dev
+---
+- tapOn: {text: "Editar"}
+- scrollUntilVisible:
+    element: {text: "Detalhe"}
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+- takeScreenshot: android-f09-edit-persisted-child

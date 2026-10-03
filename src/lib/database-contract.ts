@@ -17,12 +17,13 @@ type NullableArgs<Name extends keyof Functions, Keys extends keyof Functions[Nam
  * This changes types only; required argument names and all other schema still come from staging.
  */
 type ContractFunctions = Omit<Functions,
-  'save_transaction_payment' | 'update_recurring_future' | 'save_reminder_scoped' | 'save_reminder_child_scoped' | 'edit_budget'> & {
+  'save_transaction_payment' | 'update_recurring_future' | 'save_reminder_scoped' | 'save_reminder_child_scoped' | 'edit_budget' | 'category_detail_breakdown'> & {
   save_transaction_payment: NullableArgs<'save_transaction_payment', 'p_transaction_id' | 'p_fee_cents' | 'p_expected_revision'>;
   update_recurring_future: NullableArgs<'update_recurring_future', 'p_transaction_id'>;
   save_reminder_scoped: NullableArgs<'save_reminder_scoped', 'p_recurrence'>;
   save_reminder_child_scoped: NullableArgs<'save_reminder_child_scoped', 'p_recurrence'>;
   edit_budget: NullableArgs<'edit_budget', 'p_month_antes'>;
+  category_detail_breakdown: NullableArgs<'category_detail_breakdown', 'p_workspace_id'>;
 };
 export type Database = Omit<GeneratedDatabase, 'public'> & {
   public: Omit<GeneratedDatabase['public'], 'Functions'> & { Functions: ContractFunctions };

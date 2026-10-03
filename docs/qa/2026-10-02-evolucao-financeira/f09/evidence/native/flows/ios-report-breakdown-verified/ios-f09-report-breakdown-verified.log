@@ -1,0 +1,8 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on iPhone 17 Pro - iOS 26.5 - F0BDF23C-0286-4183-97E3-3BCC61D4267D
+ > Flow ios-f09-report-breakdown-verified
+Assert that "Sem detalhe" is visible... COMPLETED
+Assert that "3 registros" is visible... COMPLETED
+Assert that "Total da categoria" is visible... COMPLETED
+Take screenshot ios-f09-annual-market-verified... COMPLETED

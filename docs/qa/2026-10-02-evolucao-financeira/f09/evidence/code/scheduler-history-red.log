@@ -1,0 +1,63 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_____ test_delayed_first_materialization_keeps_whole_old_tuple_then_future _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10bfe5480>
+
+    @pytest.mark.asyncio
+    async def test_delayed_first_materialization_keeps_whole_old_tuple_then_future(monkeypatch):
+        server=Boundary(monkeypatch)
+        assert await scheduler.materialize_horizon(NOW)==2
+        past=server.ledger['2026-09-04']
+>       assert {key:past[key] for key in server.history}==server.history
+E       AssertionError: assert {'kind': 'inc...o atual', ...} == {'kind': 'exp... antigo', ...}
+E
+E         Omitting 3 identical items, use -vv to show
+E         Differing items:
+E         {'account_id': UUID('f28d87c6-463a-452d-a70d-8c80aa58a935')} != {'account_id': UUID('6fde8535-339f-41b6-bd35-40add5204d7a')}
+E         {'kind': 'income'} != {'kind': 'expense'}
+E         {'description': 'Título atual'} != {'description': 'Título antigo'}
+E         {'amount_cents': 2500} != {'amount_cents': 1000}
+E         Use -v to get more diff
+
+tests/test_scheduler_history.py:63: AssertionError
+___________ test_genuine_null_history_does_not_take_current_defaults ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10c0845f0>
+
+    @pytest.mark.asyncio
+    async def test_genuine_null_history_does_not_take_current_defaults(monkeypatch):
+        server=Boundary(monkeypatch,null_history=True);await scheduler.materialize_horizon(NOW)
+        for field in ('category','description','account_id','payment_method','subcategory_id'):
+>           assert server.ledger['2026-09-04'][field] is None
+E           AssertionError: assert 'Título atual' is None
+
+tests/test_scheduler_history.py:72: AssertionError
+_______ test_edit_after_fetch_aborts_without_write_cursor_or_false_error _______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10c023570>
+
+    @pytest.mark.asyncio
+    async def test_edit_after_fetch_aborts_without_write_cursor_or_false_error(monkeypatch):
+        server=Boundary(monkeypatch,obsolete=True)
+>       assert await scheduler.materialize_horizon(NOW)==0
+E       assert 2 == 0
+
+tests/test_scheduler_history.py:76: AssertionError
+_ test_adoption_preserves_original_null_and_parent_bump_retries_without_duplicate _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10c049850>
+
+    @pytest.mark.asyncio
+    async def test_adoption_preserves_original_null_and_parent_bump_retries_without_duplicate(monkeypatch):
+        server=Boundary(monkeypatch,adoption=True)
+>       assert await scheduler.materialize_horizon(NOW)==0
+E       assert 2 == 0
+
+tests/test_scheduler_history.py:82: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_scheduler_history.py::test_delayed_first_materialization_keeps_whole_old_tuple_then_future
+FAILED tests/test_scheduler_history.py::test_genuine_null_history_does_not_take_current_defaults
+FAILED tests/test_scheduler_history.py::test_edit_after_fetch_aborts_without_write_cursor_or_false_error
+FAILED tests/test_scheduler_history.py::test_adoption_preserves_original_null_and_parent_bump_retries_without_duplicate
+4 failed in 0.12s

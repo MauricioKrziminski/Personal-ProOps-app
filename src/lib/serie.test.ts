@@ -163,3 +163,18 @@ test('A data que o banco deslizou vira aviso; a mesma data, nada', () => {
   assert.equal(avisoDeDeslize('2026-09-30', '2026-09-30'), null);
   assert.equal(avisoDeDeslize('2026-09-30', '2026-10-31'), 'Setembro já tinha a cobrança dela: a próxima fica em 31/10/2026.');
 });
+
+const detail = '33333333-3333-4333-8333-333333333333';
+test('F09 snapshot da ocorrência substitui filho do contrato; patch difere omitido/null e alias', () => {
+  const contract = { ...fundacred, subcategory_id: detail };
+  const row = { ...outubro, subcategory_id: detail };
+  const base = serieDaOcorrencia(contract, row);
+  assert.equal(serieDoRegistro(contract).subcategory_id, detail);
+  assert.equal(base.subcategory_id, detail);
+  assert.equal(serieDaOcorrencia(contract, { ...outubro, subcategory_id: null }).subcategory_id, null);
+  assert.equal(Object.hasOwn(serieDaOcorrencia(contract, outubro), 'subcategory_id'), false);
+  assert.deepEqual(mudancasDaOcorrencia(base, row, contract), { linhas: {}, regra: {} });
+  assert.deepEqual(mudancasDaOcorrencia({ ...base, subcategory_id: null }, row, contract), { linhas: { subcategory_id: null }, regra: { subcategory_id: null } });
+  assert.deepEqual(mudancasDaOcorrencia({ ...base, category: 'saúde' }, row, contract), { linhas: { category: 'saúde', subcategory_id: null }, regra: { subcategory_id: null } });
+  assert.deepEqual(mudancasDaOcorrencia({ ...base, category: 'ESTUDO' }, row, contract), { linhas: { category: 'ESTUDO' }, regra: {} });
+});

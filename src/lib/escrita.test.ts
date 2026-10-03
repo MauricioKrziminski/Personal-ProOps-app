@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { argsDaParcelada, linhaDaRecorrente, linhaDoFinanciamento, linhasDoLancamento } from './escrita.ts';
+import { argsDaParcelada, linhaDaRecorrente, linhaDoFinanciamento, linhaDeJuros, linhasDoLancamento } from './escrita.ts';
 
 const base = {
   kind: 'expense' as const, amount_cents: 35699, category: 'outros', description: 'Pix', merchant: null,
@@ -41,4 +41,11 @@ test('financiamento: a linha é a entrada, sem id nem versão', () => {
   const f = linhaDoFinanciamento({ name: 'Carro', kind: 'financing', principal_cents: 1, remaining_cents: 1, interest_rate_monthly: 0, installments: 1, installment_cents: 1, account_id: null, due_day: 10 });
   assert.ok(!('id' in f) && !('versao' in f));
   assert.equal(f.name, 'Carro');
+});
+
+test('F09 juros técnicos não herdam detalhe da compra, legado segue omitido', () => {
+  const uuid = '33333333-3333-4333-8333-333333333333';
+  const owned = linhaDeJuros({ category: 'casa', subcategory_id: uuid }, 20);
+  assert.equal(owned.subcategory_id, null);
+  assert.equal(Object.hasOwn(linhaDeJuros({ category: 'casa' }, 20), 'subcategory_id'), false);
 });

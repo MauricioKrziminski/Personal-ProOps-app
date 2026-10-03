@@ -1,0 +1,13 @@
+appId: com.proops.personal.dev
+---
+- scrollUntilVisible:
+    element: {text: "Prévia do registro. Nada foi gravado."}
+    direction: DOWN
+    timeout: 20000
+- assertNotVisible: "Não consegui conferir a prévia.*"
+- takeScreenshot: android-f09-preview-ready
+- tapOn: {text: "Salvar"}
+- extendedWaitUntil:
+    notVisible: "Novo lançamento"
+    timeout: 20000
+- takeScreenshot: android-f09-saved-once

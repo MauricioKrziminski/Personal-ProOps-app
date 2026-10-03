@@ -1,0 +1,55 @@
+(node:8205) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/refresh-consistency.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ F06: padrões de categoria leem todas as páginas do workspace e não aceitam leitura incompleta (293.236125ms)
+✔ F06: edição de parcela exige as duas revisões e envia snapshot no comando idempotente (177.711625ms)
+✔ F06: categoria salva configuração, rename e período numa única RPC e devolve contagem real (176.982416ms)
+✔ F06: edição estrutural de compra não perde patch parcial nem muda nonce no retry (170.411916ms)
+✔ F01: compra e taxa usam uma RPC atômica; perda da resposta repete a mesma intenção (135.715417ms)
+✔ F01: edição envia a revisão lida e distingue método omitido de limpeza explícita (140.872042ms)
+✔ F01: editar compra inteira envia forma e revisão e reutiliza a intenção no retry (139.78575ms)
+✔ F01: duplicar deliberadamente depois do sucesso cria uma nova intenção (131.028417ms)
+✔ F01: criação recorrente repete a intenção após perder resposta e renova após confirmação (137.453167ms)
+✔ F01: editar juros consulta somente o vínculo explícito, mesmo com mesma conta e data (147.532ms)
+✔ F01: título de juros no pai não impede carregar sua taxa vinculada; filho explícito não procura outra taxa (165.75975ms)
+✔ F01: linha filha de juros com título alterado não consulta como compra pai (144.792125ms)
+✔ conversion retries after a committed response is lost reuse the request and result (141.533084ms)
+✔ conversion shares concurrent identical intent but changes request for a new scope or entry (132.7295ms)
+✔ converting a transaction to installments with an entry also keys response-loss retries (153.171292ms)
+✔ settling a historical invoice refreshes history without realtime and invalidates inactive installment/report caches (147.735042ms)
+✔ F09: save refreshes mounted category counts without realtime (161.709209ms)
+✔ F09: resolved-save refreshes mounted category counts without realtime (154.421167ms)
+✔ F09: resolved-cancellation refreshes mounted category counts without realtime (139.072541ms)
+✔ financial mutation remains pending until active reads finish (128.937583ms)
+✔ completed agent turn invalidates writable domains without relying on realtime (7.763792ms)
+✔ every ledger mutation invalidates historical derived reads and search (144.428125ms)
+✔ import create/approve/discard/update refresh batch history without waiting for realtime (161.23325ms)
+✔ agent processing response preserves domain caches until completion (8.306625ms)
+✔ criar conversa: onMutate volta a local para processing; onError marca failed, invalida a lista e abre o paywall (10.394375ms)
+✔ realtime account change refreshes balances/forecast derived reads once per table (75.744208ms)
+✔ native resume reloads fresh active data, skips disabled reads and does not fetch on initial active event (2.293916ms)
+✔ native resume cancels an old inflight read before fetching current data (2.205625ms)
+✔ realtime remount does not reuse a channel whose asynchronous removal is still pending (22.917125ms)
+✔ 48 realtime row events coalesce and an event during refetch still gets a final fresh read (106.939458ms)
+✔ Today routes an overdue invoice to invoice payment instead of writing its ID into transactions (13.087708ms)
+✔ Today opens the pay confirmation for the standalone transaction and exposes pull to refresh (7.902ms)
+✔ mark paid rejects a zero-row write instead of reporting success (143.55325ms)
+✔ toda chave de consulta financeira está em FINANCE_KEYS, ou tem motivo escrito (0.810625ms)
+✔ a simulação é marcada velha na escrita, mas NÃO recalcula ali (o rascunho ainda tem a hipótese aplicada) (1.055208ms)
+✔ excluir compra chama exclusão atômica de entrada e plano; erro do banco é propagado (137.731125ms)
+✔ F07 hooks: consulta escopa workspace/data e resposta de outro workspace nunca vira reserva (17.607167ms)
+✔ F07 hooks: retry da escrita usa mesmo recibo e confirmação invalida a reserva (10.07225ms)
+✔ F07 hooks: o dia validado pelo servidor não depende do fuso ou relógio do aparelho (17.469875ms)
+✔ F07 hooks: resolução usa identidade original e cancelamento selado invalida a reserva sem gravar (9.729084ms)
+✔ F08 hooks: one workspace RPC owns the complete horizon and previous query data is not a placeholder (16.946291ms)
+✔ F08 hooks: ambiguous outcomes do not invalidate a scenario; sealed cancellation and success do (9.829ms)
+✔ F08 fresh editor read preserves explicit workspace, draft and cancellation signal (16.493584ms)
+ℹ tests 43
+ℹ suites 0
+ℹ pass 43
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4318.025167

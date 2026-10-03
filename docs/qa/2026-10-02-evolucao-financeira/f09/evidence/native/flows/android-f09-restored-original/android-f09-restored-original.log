@@ -1,0 +1,7 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-restore-cold
+Launch app "com.proops.personal.dev"... COMPLETED
+Assert that "Conhecer o app" is visible... COMPLETED
+Take screenshot android-f09-restored-light-home... COMPLETED

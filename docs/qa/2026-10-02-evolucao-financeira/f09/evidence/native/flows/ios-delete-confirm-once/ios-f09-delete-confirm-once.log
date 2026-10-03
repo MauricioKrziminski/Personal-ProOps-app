@@ -1,0 +1,8 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on iPhone 17 Pro - iOS 26.5 - F0BDF23C-0286-4183-97E3-3BCC61D4267D
+ > Flow ios-f09-delete-confirm-once
+Tap on "Remover detalhe"... COMPLETED
+Assert that "Esta categoria ainda não tem detalhes." is visible... COMPLETED
+Assert that "Nome do detalhe" is not visible... COMPLETED
+Take screenshot ios-f09-receiver-deleted-catalog... COMPLETED

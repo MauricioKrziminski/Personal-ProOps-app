@@ -1,0 +1,15 @@
+appId: com.proops.personal.dev
+---
+- back
+- extendedWaitUntil:
+    visible: "Não consegui conferir este detalhe"
+    timeout: 20000
+- assertNotVisible: ".*QA F09 Android Detalhe.*"
+- takeScreenshot: android-f09-removed-source-filter-blocked
+- tapOn: {text: "Ajustar filtros"}
+- scrollUntilVisible:
+    element: {text: "Detalhe"}
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+- takeScreenshot: android-f09-stale-filter-adjust

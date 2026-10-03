@@ -1,0 +1,16 @@
+appId: com.proops.personal.dev
+---
+- tapOn: { point: "50%,78%" }
+- extendedWaitUntil:
+    visible: "Sem detalhe"
+    timeout: 20000
+- takeScreenshot: android-f09-report-expanded-large
+- openLink: appproops://profile
+- extendedWaitUntil:
+    visible: "Perfil"
+    timeout: 20000
+- scrollUntilVisible:
+    element: {text: "Escuro"}
+    direction: DOWN
+    timeout: 20000
+- takeScreenshot: android-f09-original-app-theme

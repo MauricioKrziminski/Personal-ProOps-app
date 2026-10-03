@@ -1,0 +1,10 @@
+{"event": "target_verified", "target": "utkqoiigimqzeenxkxdl", "branch": "gabriel/financas-22-melhorias", "guard_passed": true}
+{"event": "fixture_committed", "case": 1, "no_password_identity_or_session": true, "owned_workspaces": 2}
+{"event": "case_passed", "case": 1, "scenario": "whole_dated_tuple_and_unique_replay", "exact_financial_tuple": true, "genuine_nulls_preserved": false, "replay_unique": true, "ordinary_fixture_rolled_back": true}
+{"event": "case_passed", "case": 2, "scenario": "genuine_null_history", "exact_financial_tuple": true, "genuine_nulls_preserved": true, "replay_unique": true, "ordinary_fixture_rolled_back": true}
+{"event": "case_passed", "case": 3, "scenario": "adoption_preserves_null_and_manual_parent_child_with_invalid_reference_refusal", "original_null_preserved": true, "manual_other_parent_child_preserved": true, "no_duplicate": true, "invalid_reference_sqlstate": "22023", "ordinary_fixture_rolled_back": true}
+{"event": "case_passed", "case": 4, "scenario": "future_commit_between_fetch_and_statement", "exact_outcome": {"intent_current": false, "created": false}, "zero_financial_write": true, "cash_unchanged": true, "actual_lock_observed": false}
+{"event": "share_wait_rechecked", "holder_changed_at": "2026-10-03 18:11:11.018014-03", "waiter_started_at": "2026-10-03 18:11:11.045021-03", "waiter_committed_at": "2026-10-03 18:11:11.191641-03", "overlap": {"state": "active", "wait_event_type": "Lock", "wait_event": "transactionid", "blocked_by_holder": true, "observed_at": "2026-10-03 18:11:11.094449-03"}}
+{"event": "case_passed", "case": 5, "scenario": "future_commit_while_statement_waits_for_share", "exact_outcome": {"intent_current": false, "created": false}, "zero_financial_write": true, "cash_unchanged": true, "actual_lock_observed": true}
+{"event": "cleanup_verified", "case": 1, "zero_residue": true, "checked_boundary_columns": 86}
+{"event": "completed", "passed": true, "scenarios_passed": 5, "cleanup_passed": true}

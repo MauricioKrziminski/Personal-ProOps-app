@@ -433,6 +433,73 @@ test('settling a historical invoice refreshes history without realtime and inval
   } finally { unsubscribe(); client.clear(); }
 });
 
+for (const terminal of ['save', 'resolved-save', 'resolved-cancellation'] as const) {
+  test(`F09: ${terminal} refreshes mounted category counts without realtime`, async () => {
+    const client = new QueryClient();
+    const workspace = '11111111-1111-4111-8111-111111111111';
+    const child = '33333333-3333-4333-8333-333333333333';
+    const before = [{ category: 'mercado', uses: 3 }, { category: 'casa', uses: 21 }];
+    const after = [{ category: 'mercado', uses: 1 }, { category: 'casa', uses: 23 }];
+    let rows = before;
+    let reads = 0;
+    let categoryInvalidations = 0;
+    const originalInvalidate = client.invalidateQueries.bind(client);
+    client.invalidateQueries = ((filters: any) => {
+      if (filters.queryKey[0] === 'categories-used') categoryInvalidations++;
+      return originalInvalidate(filters);
+    }) as typeof client.invalidateQueries;
+    const query = loadHooks(client, 'src/hooks/use-finance.ts', {
+      '@tanstack/react-query': { useQuery: (options: any) => options },
+      '@/hooks/use-items': { useRealtimeInvalidate: () => undefined },
+      '@/lib/supabase': { supabase: { rpc: async () => { reads++; return { data: rows, error: null }; } } },
+    }).useCategoriesUsed();
+    const initial = await query.queryFn();
+    client.setQueryData(query.queryKey, initial);
+    reads = 0;
+    const observer = new QueryObserver(client, query);
+    const unsubscribe = observer.subscribe(() => {});
+    const hooks = loadHooks(client, 'src/hooks/use-subcategories.ts', {
+      react: { useState: (initial: any) => [typeof initial === 'function' ? initial() : initial, () => undefined] },
+      '@tanstack/react-query': {
+        useQueryClient: () => client,
+        useMutation: (options: any) => ({ ...options, mutateAsync: async (input: any) => {
+          let result;
+          try { result = await options.mutationFn(input); }
+          catch (error) { await options.onError(error); throw error; }
+          await options.onSuccess(result);
+          return result;
+        } }),
+      },
+      '@/lib/agent-chat': { newClientMessageId: () => '55555555-5555-4555-8555-555555555555' },
+      '@/lib/supabase': { supabase: { rpc: async (name: string) => {
+        if (name === 'write_subcategory' && terminal !== 'save') return { data: null, error: new Error('lost response') };
+        rows = after;
+        return { error: null, data: terminal === 'resolved-cancellation'
+          ? { workspace_id: workspace, cancelled: true }
+          : { workspace_id: workspace, subcategory_id: child, edit_revision: 8,
+            merged: false, deleted: false, affected_records: 2 } };
+      } } },
+    });
+    try {
+      const mutation = hooks.useWriteSubcategory();
+      const input = { action: 'save', workspace_id: workspace, subcategory_id: child, expected_revision: 7,
+        parent_category: 'casa', name: 'feira', merge_into_id: null, expected_merge_revision: null };
+      if (terminal === 'save') await mutation.mutateAsync(input);
+      else {
+        await assert.rejects(mutation.mutateAsync(input), /lost response/);
+        assert.equal(reads, 0, 'an ambiguous write must not claim fresh counts');
+        assert.equal(categoryInvalidations, 0);
+        if (terminal === 'resolved-cancellation') await assert.rejects(mutation.resolveAsync(), { name: 'SubcategoryAttemptCancelledError' });
+        else await mutation.resolveAsync();
+      }
+      assert.equal(reads, 1, 'the mounted categories query must refetch before mutation settles');
+      assert.equal(categoryInvalidations, 1, 'one confirmation must invalidate the category key once');
+      assert.deepEqual(Array.from(client.getQueryData<any[]>(query.queryKey)!, row => [row.category, row.uses]),
+        [['mercado', 1], ['casa', 23]]);
+    } finally { unsubscribe(); client.clear(); }
+  });
+}
+
 test('financial mutation remains pending until active reads finish', async () => {
   const client = new QueryClient();
   client.setQueryData(['invoice', 'old'], 'open');
@@ -844,13 +911,7 @@ const FORA_DE_PROPOSITO: Record<string, string> = {
   rules: 'muda com a regra, não com o lançamento',
   // O paywall tem caminho próprio: `invalidateAgentData` a inclui, e o gate lê do servidor.
   'plan-status': 'invalidada por `invalidateAgentData`',
-  /*
-    ⚠️ Estas duas são DISCUTÍVEIS e ficaram como estavam de propósito — mexer nelas é decisão de
-    produto, não consequência de um teste novo. `categories-used` não vê uma categoria inédita até
-    o refetch (o seletor mescla com as sugeridas, então o defeito é discreto), e `debt-payments` é
-    derivada de `pay_debt_installment`. Quem for mexer, mexa sabendo.
-  */
-  'categories-used': 'discutível: categoria inédita só aparece no próximo refetch',
+  // Pagamentos de dívida derivam de `pay_debt_installment`.
   'debt-payments': 'discutível: deriva de pagamento de dívida',
 };
 

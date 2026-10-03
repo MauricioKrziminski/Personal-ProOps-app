@@ -51,6 +51,9 @@ import {
   type TransactionSource,
   useAparencia,
 } from '@/hooks/use-finance';
+import { useSubcategoryFilterOptions } from '@/hooks/use-category-details';
+import { parseSubcategoryFilter } from '@/lib/category-detail-breakdown';
+import { subcategoryAfterParentChange } from '@/lib/subcategories';
 import { usarDica } from '@/hooks/use-dicas';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
@@ -213,6 +216,7 @@ export default function TransactionsScreen() {
     recurringId?: string;
     /** Id da conta/cartão, ou `none` para os lançamentos sem conta. */
     accountId?: string;
+    subcategoryId?: string | string[];
     paymentMethods?: string | string[];
     expensePatterns?: string | string[];
     expenseNecessities?: string | string[];
@@ -244,7 +248,16 @@ export default function TransactionsScreen() {
   const [patternLinkInvalid, setPatternLinkInvalid] = useState(() => parseExpensePatternFilters(params.expensePatterns) === null);
   const [necessityLinkInvalid, setNecessityLinkInvalid] = useState(() => parseExpenseNecessityFilters(params.expenseNecessities) === null);
   const classificationLinkInvalid = patternLinkInvalid || necessityLinkInvalid;
-  const filterLinkInvalid = paymentLinkInvalid || classificationLinkInvalid;
+  const [subcategoryId, setSubcategoryId] = useState<string | null | undefined>(() => parseSubcategoryFilter(params.subcategoryId).id);
+  const hasDetailFilter = subcategoryId !== undefined;
+  const [detailLinkInvalid, setDetailLinkInvalid] = useState(() => !parseSubcategoryFilter(params.subcategoryId).valid);
+  const detailCatalog = useSubcategoryFilterOptions();
+  const detailItems = detailCatalog.isSuccess && !detailCatalog.isError ? detailCatalog.data?.flatMap(state => state.items) ?? [] : [];
+  const selectedDetail = typeof subcategoryId === 'string' ? detailItems.find(item => item.id === subcategoryId) : undefined;
+  const detailPending = typeof subcategoryId === 'string' && detailCatalog.isPending;
+  const detailUnavailable = typeof subcategoryId === 'string' && !detailPending && (!selectedDetail || detailCatalog.isError
+    || subcategoryAfterParentChange(subcategoryId, selectedDetail.parent_category, category ?? selectedDetail.parent_category) === null);
+  const filterLinkInvalid = paymentLinkInvalid || classificationLinkInvalid || detailLinkInvalid || detailUnavailable || detailPending;
   const [search, setSearch] = useState('');
   const [puxando, setPuxando] = useState(false);
   const [filtersVisible, setFiltersVisible] = useState(false);
@@ -271,7 +284,7 @@ export default function TransactionsScreen() {
    * desfaz escolha que o usuário fez na tela. `recurringId` fica de fora: é lido direto de
    * `params`, sem estado.
    */
-  const link = JSON.stringify([params.month, params.kind, params.category, params.accountId, params.paymentMethods, params.expensePatterns, params.expenseNecessities]);
+  const link = JSON.stringify([params.month, params.kind, params.category, params.accountId, params.paymentMethods, params.expensePatterns, params.expenseNecessities, params.subcategoryId]);
   const [linkAplicado, setLinkAplicado] = useState(link);
   if (link !== linkAplicado) {
     setLinkAplicado(link);
@@ -279,7 +292,15 @@ export default function TransactionsScreen() {
     if (params.kind === 'expense' || params.kind === 'income' || params.kind === 'transfer') {
       setKind(params.kind);
     }
-    if (params.category) setCategory(params.category);
+    if (params.category) {
+      setCategory(params.category);
+      if (params.subcategoryId === undefined && typeof subcategoryId === 'string')
+        setSubcategoryId(subcategoryAfterParentChange(subcategoryId, category ?? selectedDetail?.parent_category ?? null, params.category) ?? undefined);
+    }
+    if (params.subcategoryId !== undefined) {
+      const parsed = parseSubcategoryFilter(params.subcategoryId);
+      setDetailLinkInvalid(!parsed.valid); setSubcategoryId(parsed.id);
+    }
     if (params.accountId) setAccountId(params.accountId);
     if (params.paymentMethods !== undefined) {
       const parsed = parsePaymentMethodFilters(params.paymentMethods);
@@ -334,7 +355,7 @@ export default function TransactionsScreen() {
     to: range.to,
     pronto: range.pronto && !filterLinkInvalid,
     kind: kind === 'all' ? undefined : kind,
-    category,
+    category, subcategoryId,
     recurringId: params.recurringId,
     accountId: accountId === undefined ? undefined : accountId === NO_ACCOUNT ? null : accountId,
     status: status === 'all' ? undefined : status,
@@ -344,7 +365,7 @@ export default function TransactionsScreen() {
   });
   const expected = useExpectedLedgerLines(range.from, range.to, forecastsEnabled, params.recurringId);
   // O card global fica oculto em períodos personalizados; nenhuma RPC de total é necessária.
-  const summary = useTransactionsSummary(range.from, range.to, range.pronto && !customPeriod && !filterLinkInvalid);
+  const summary = useTransactionsSummary(range.from, range.to, range.pronto && !customPeriod && !filterLinkInvalid && !hasDetailFilter);
   /*
     ⚠️ **O card do topo soma a LISTA, e o ciclo virou o link do rodapé.** Ele já foi o contrário
     — lia `cycle_series` para bater com a home — e aí parou de bater com a lista logo abaixo
@@ -378,20 +399,20 @@ export default function TransactionsScreen() {
   const expectedLines = useMemo(() => openPeriod || filterLinkInvalid ? [] : filterExpectedLines(expected.data ?? [], {
     kind: kind === 'all' ? undefined : kind,
     status: status === 'all' ? undefined : status,
-    category,
+    category, subcategoryId,
     accountId: accountId === undefined ? undefined : accountId === NO_ACCOUNT ? null : accountId,
     source,
     recurringId: params.recurringId,
     q: term,
     minCents, maxCents, paymentMethods, expensePatterns, expenseNecessities,
-  }), [openPeriod, filterLinkInvalid, expected.data, kind, status, category, accountId, source, params.recurringId, term, minCents, maxCents, paymentMethods, expensePatterns, expenseNecessities]);
+  }), [openPeriod, filterLinkInvalid, expected.data, kind, status, category, subcategoryId, accountId, source, params.recurringId, term, minCents, maxCents, paymentMethods, expensePatterns, expenseNecessities]);
   // Trocar de filtro durante a gravação não pode trazer uma ocorrência de outro recorte.
   const transitoFiltrado = useMemo(() => openPeriod || filterLinkInvalid ? [] : filterExpectedLines(previstas.emTransito.filter(p =>
     (!range.from || p.due_date >= range.from) && (!range.to || p.due_date <= range.to)), {
       kind: kind === 'all' ? undefined : kind, status: status === 'all' ? undefined : status,
-      category, accountId: accountId === undefined ? undefined : accountId === NO_ACCOUNT ? null : accountId,
+      category, subcategoryId, accountId: accountId === undefined ? undefined : accountId === NO_ACCOUNT ? null : accountId,
       source, recurringId: params.recurringId, q: term, minCents, maxCents, paymentMethods, expensePatterns, expenseNecessities,
-    }), [openPeriod, filterLinkInvalid, previstas.emTransito, range.from, range.to, kind, status, category, accountId, source, params.recurringId, term, minCents, maxCents, paymentMethods, expensePatterns, expenseNecessities]);
+    }), [openPeriod, filterLinkInvalid, previstas.emTransito, range.from, range.to, kind, status, category, subcategoryId, accountId, source, params.recurringId, term, minCents, maxCents, paymentMethods, expensePatterns, expenseNecessities]);
   const previstasVisiveis = useMemo(
     () => previstasNaTela(expectedLines, transitoFiltrado, rows),
     [expectedLines, transitoFiltrado, rows]
@@ -474,7 +495,7 @@ export default function TransactionsScreen() {
       ...(cicloFalhou ? [regua.cycle.refetch()] : []),
       ...(range.isError ? [range.refetch()] : []),
       ...(range.pronto && !filterLinkInvalid ? [list.refetch()] : []),
-      ...(range.pronto && !customPeriod && !filterLinkInvalid ? [summary.refetch()] : []),
+      ...(range.pronto && !customPeriod && !filterLinkInvalid && !hasDetailFilter ? [summary.refetch()] : []),
       ...(forecastsEnabled ? [expected.refetch()] : []),
     ]);
 
@@ -529,7 +550,7 @@ export default function TransactionsScreen() {
   const filterValue: ListFiltersValue = {
     q: search, ...customDates, minCents, maxCents, selections: {
       kind: kind === 'all' ? '' : kind, status: status === 'all' ? '' : status,
-      category: category ?? '', accountId: accountId ?? '', source: source ?? '',
+      category: category ?? '', ...(subcategoryId !== undefined ? { subcategoryId: subcategoryId === null ? 'none' : subcategoryId } : {}), accountId: accountId ?? '', source: source ?? '',
     },
     ...(paymentMethods.length || expensePatterns.length || expenseNecessities.length ? {
       multiSelections: {
@@ -553,6 +574,7 @@ export default function TransactionsScreen() {
     kind !== 'all' ? KIND_OPTIONS.find(o => o.value === kind)?.label : undefined,
     status !== 'all' ? STATUS_OPTIONS.find(o => o.value === status)?.label : undefined,
     category,
+    subcategoryId === null ? 'Sem detalhe' : subcategoryId !== undefined ? selectedDetail ? `${selectedDetail.parent_category} · ${selectedDetail.name}` : 'Detalhe a conferir' : undefined,
     source ? SOURCE_FILTER.find(o => o.value === source)?.label : undefined,
     paymentMethods.length ? PAYMENT_METHOD_FILTER_OPTIONS.filter(o => selectedPaymentMethods.has(o.id)).map(o => o.label).join(', ') : undefined,
     expensePatterns.length ? `Previsibilidade dos gastos: ${EXPENSE_PATTERN_FILTER_OPTIONS.filter(o => selectedPatterns.has(o.id)).map(o => o.label).join(', ')}` : undefined,
@@ -589,7 +611,7 @@ export default function TransactionsScreen() {
   const clearFilters = () => {
     setKind('all');
     setStatus('all');
-    setCategory(undefined);
+    setCategory(undefined); setSubcategoryId(undefined); setDetailLinkInvalid(false);
     setAccountId(undefined);
     setSource(undefined);
     setPaymentMethods([]); setPaymentLinkInvalid(false);
@@ -610,7 +632,18 @@ export default function TransactionsScreen() {
     setMinCents(value.minCents); setMaxCents(value.maxCents);
     setKind((value.selections?.kind || 'all') as typeof kind);
     setStatus((value.selections?.status || 'all') as typeof status);
-    setCategory(value.selections?.category || undefined);
+    const nextCategory = value.selections?.category || undefined;
+    const parsedDetail = parseSubcategoryFilter(value.selections?.subcategoryId || undefined);
+    const nextDetail = typeof parsedDetail.id === 'string' ? detailItems.find(item => item.id === parsedDetail.id) : undefined;
+    // Changing the parent clears an inherited choice. A new explicit identity must still
+    // exist in this catalog and belong to its selected parent before reads can run.
+    const inherited = parsedDetail.id === subcategoryId && typeof subcategoryId === 'string';
+    const parentChanged = inherited && subcategoryAfterParentChange(subcategoryId,
+      category ?? selectedDetail?.parent_category ?? null, nextCategory ?? selectedDetail?.parent_category ?? null) === null;
+    setSubcategoryId(parentChanged ? undefined : parsedDetail.id);
+    setDetailLinkInvalid(!parsedDetail.valid || (!parentChanged && typeof parsedDetail.id === 'string' &&
+      (!nextDetail || subcategoryAfterParentChange(parsedDetail.id, nextDetail.parent_category, nextCategory ?? nextDetail.parent_category) === null)));
+    setCategory(nextCategory);
     setAccountId(value.selections?.accountId || undefined);
     setSource((value.selections?.source || undefined) as typeof source);
   };
@@ -755,7 +788,15 @@ export default function TransactionsScreen() {
     consulta desligada fica `isPending` para sempre — o ramo de cima desenharia três linhas de
     esqueleto indefinidamente, mesmo com o portão da tela já aberto.
   */
-  const empty = classificationLinkInvalid ? (
+  const empty = typeof subcategoryId === 'string' && detailCatalog.isError ? (
+    <ErrorCard message="Não consegui conferir este detalhe" onRetry={() => { void detailCatalog.refetch(); }} />
+  ) : detailLinkInvalid || detailUnavailable ? (
+    <EmptyState compacto icon="line.3.horizontal.decrease" title={detailLinkInvalid ? "Detalhe inválido no link" : "Não consegui conferir este detalhe"}
+      hint="Abra os filtros para escolher um detalhe disponível nesta categoria."
+      action={{ label: 'Ajustar filtros', onPress: () => setFiltersVisible(true) }} />
+  ) : detailPending ? (
+    <SkeletonRow />
+  ) : classificationLinkInvalid ? (
     <EmptyState compacto icon="line.3.horizontal.decrease" title="Classificação de gasto inválida no link"
       hint="Abra os filtros para ajustar a seleção."
       action={{ label: 'Ajustar filtros', onPress: () => setFiltersVisible(true) }} />
@@ -979,6 +1020,7 @@ export default function TransactionsScreen() {
 
             const context = [
               tx.category,
+              tx.subcategories?.name ?? (tx.subcategory_id ? 'Detalhe a conferir' : null),
               // O nome da conta não parte ao meio ("Nubank / Cartão"): espaço inseparável nele.
               tx.account_id ? accountName.get(tx.account_id)?.replace(/ /g, '\u00A0') : null,
               SOURCE_LABEL[tx.source],
@@ -1060,7 +1102,7 @@ export default function TransactionsScreen() {
                       subtitle={[...badges, ...context].join(' · ')}
                       icon={aparencia(tx.category, tx.kind).icon}
                       tinta={aparencia(tx.category, tx.kind).cor}
-                      accessibilityLabel={`${tx.description || tx.merchant || tx.category || 'Lançamento'}, ${brl(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}, ${dayTitle(tx.occurred_at, customPeriod)}${estado ? `, ${estado}` : ''}`}
+                      accessibilityLabel={`${tx.description || tx.merchant || tx.category || 'Lançamento'}, ${brl(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}, ${dayTitle(tx.occurred_at, customPeriod)}${tx.subcategories?.name ? `, ${tx.subcategories.name}` : ''}${estado ? `, ${estado}` : ''}`}
                       onLongPress={onLongPress}
                       trailing={
                         <Money
@@ -1127,6 +1169,8 @@ export default function TransactionsScreen() {
           { key: 'kind', label: 'Tipo', options: KIND_OPTIONS.filter(o => o.value !== 'all').map(o => ({ id: o.value, label: o.label })) },
           { key: 'status', label: 'Situação', options: STATUS_OPTIONS.filter(o => o.value !== 'all').map(o => ({ id: o.value, label: o.label })) },
           { key: 'category', label: 'Categoria', options: (categories.data ?? []).map(c => ({ id: c.category, label: c.category })) },
+          { key: 'subcategoryId', label: 'Detalhe', options: [{ id: 'none', label: 'Sem detalhe' },
+            ...detailItems.map(item => ({ id: item.id, label: `${item.parent_category} · ${item.name}` }))] },
           { key: 'accountId', label: 'Conta ou cartão', options: accountSelectOptions(accounts.data ?? [], 'Sem conta', 'none') },
           { key: 'source', label: 'Origem', options: SOURCE_FILTER.map(o => ({ id: o.value, label: o.label })) },
         ]} />

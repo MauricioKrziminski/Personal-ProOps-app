@@ -405,6 +405,8 @@ const GHOST_PERMITIDO = new Set([
   'src/app/signup.tsx', // "Já tenho conta" sob "Criar conta"; "Reenviar código"
   'src/components/auth/email-login-screen.tsx', // "Criar conta" sob "Entrar"; links da linha
   'src/components/login-screen.tsx', // "Voltar"/"Trocar número" e "Reenviar código"
+  'src/components/finance/subcategory-field.tsx', // Cancelar criação, ao lado de Criar detalhe
+  'src/components/finance/subcategory-manager.tsx', // Voltar aos detalhes, sob Salvar detalhe
 ]);
 
 test('botão ghost só como par do primário', () => {

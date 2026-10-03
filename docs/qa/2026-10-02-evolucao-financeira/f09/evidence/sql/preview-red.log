@@ -1,0 +1,6 @@
+produção : kwriuifcwyvdrxtspjiz  (Personal ProOps app)
+staging  : utkqoiigimqzeenxkxdl  (Personal ProOps app - staging)
+
+CLI linkado (destino do db push) : utkqoiigimqzeenxkxdl  → staging
+app (.env.local)                 : utkqoiigimqzeenxkxdl  → staging
+{"mode": "red", "result": "fail", "sqlstate": "P0001", "message": "Campos de prévia inválidos\nCONTEXT:  PL/pgSQL function preview_finance_write(text,jsonb,integer) line 73 at RAISE\nPL/pgSQL function pg_temp_19.f09_preview_check(text,jsonb,uuid) line 4 at assignment\nSQL statement \"SELECT pg_temp.f09_preview_check('transaction',jsonb_build_object('p_input',input||child_patch,'p_fee_cents',0),(child_patch->>'subcategory_id')::uuid)\"\nPL/pgSQL function inline_code_block line 21 at PERFORM"}
