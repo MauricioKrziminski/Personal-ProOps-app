@@ -27,7 +27,6 @@ import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
-import { formatBRL } from '@/hooks/use-items';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import {
   ACCOUNT_TYPES,
@@ -336,7 +335,7 @@ export default function AccountsScreen() {
             icon={ICONE[saldo.type]}
             // o valor negativo não pode ser comunicado só pela cor — e o previsto precisa
             // estar aqui também, senão o leitor de tela esconde o que a tela mostra
-            accessibilityLabel={`${saldo.name}, ${tipo}, ${negativo ? 'deve' : 'tem'} ${formatBRL(Math.abs(cents))}${previstoTexto ? `, ${previstoTexto}` : ''}`}
+            accessibilityLabel={`${saldo.name}, ${tipo}, ${negativo ? 'deve' : 'tem'} ${brl(Math.abs(cents))}${previstoTexto ? `, ${previstoTexto}` : ''}`}
             onLongPress={onLongPress}
             trailing={
               <Money

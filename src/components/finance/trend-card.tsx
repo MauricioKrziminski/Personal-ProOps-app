@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { BarTrack } from '@/components/ui/sparkline';
 import { Radius, Space } from '@/design/tokens';
 import type { MonthlyCashflow } from '@/hooks/use-finance';
-import { formatBRL } from '@/hooks/use-items';
+import { useBRL } from '@/components/ui/conceal';
 import { useTheme } from '@/hooks/use-theme';
 
 const JANELAS = [
@@ -46,6 +46,7 @@ export function TrendCard({
   loading?: boolean;
 }) {
   const theme = useTheme();
+  const brl = useBRL();
   const [escolhido, setEscolhido] = useState<number | null>(null);
   const [largura, setLargura] = useState(0);
   const ultimo = useSharedValue(-1);
@@ -111,7 +112,7 @@ export function TrendCard({
         accessible
         accessibilityRole="button"
         accessibilityState={{ selected: i === indice }}
-        accessibilityLabel={`${monthTitle(m.month.slice(0, 7))}: entrou ${formatBRL(entrou)}, saiu ${formatBRL(saiu)}`}
+        accessibilityLabel={`${monthTitle(m.month.slice(0, 7))}: entrou ${brl(entrou)}, saiu ${brl(saiu)}`}
         accessibilityActions={[{ name: 'activate' }]}
         onAccessibilityAction={() => escolher(i)}>
         <View style={styles.par}>

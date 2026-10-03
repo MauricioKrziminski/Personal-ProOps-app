@@ -4,6 +4,7 @@ export type ListFiltersValue = {
   from?: string; to?: string; q?: string;
   minCents?: number; maxCents?: number;
   selections?: Record<string, string>;
+  multiSelections?: Record<string, readonly string[]>;
 };
 const validDate = (iso: string) => /^\d{4}-\d{2}-\d{2}$/.test(iso) && isValidBRDate(isoToBR(iso));
 export function listFilterError(value: ListFiltersValue): string | undefined {
@@ -21,13 +22,14 @@ export function listFiltersActive(value: ListFiltersValue): boolean {
 export function listFilterCount(value: ListFiltersValue): number {
   return Number(Boolean(value.from || value.to)) + Number(Boolean(value.q?.trim()))
     + Number(value.minCents !== undefined || value.maxCents !== undefined)
-    + Object.values(value.selections ?? {}).filter(Boolean).length;
+    + Object.values(value.selections ?? {}).filter(Boolean).length
+    + Object.values(value.multiSelections ?? {}).filter(ids => ids.some(Boolean)).length;
 }
 type SummarySelect = { key: string; label: string; options: readonly { id: string | null; label: string }[] };
 /** O resumo lê os mesmos critérios e opções da folha; identificadores internos nunca viram texto. */
 export function listFilterDetails(value: ListFiltersValue, {
-  selects = [], dateLabel = 'Data', valueLabel = 'Valor', formatAmount,
-}: { selects?: readonly SummarySelect[]; dateLabel?: string; valueLabel?: string; formatAmount: (cents: number) => string }): string[] {
+  selects = [], multiSelects = [], dateLabel = 'Data', valueLabel = 'Valor', formatAmount,
+}: { selects?: readonly SummarySelect[]; multiSelects?: readonly SummarySelect[]; dateLabel?: string; valueLabel?: string; formatAmount: (cents: number) => string }): string[] {
   const details: string[] = [];
   if (value.from || value.to) {
     const from = value.from ? isoToBR(value.from) : undefined;
@@ -47,6 +49,18 @@ export function listFilterDetails(value: ListFiltersValue, {
     if (!id) continue;
     const select = selectsByKey.get(key);
     details.push(select ? `${select.label}: ${select.options.get(id) ?? 'seleção indisponível'}` : 'Critério selecionado');
+  }
+  const multiSelections = value.multiSelections ?? {};
+  const multiByKey = new Map(multiSelects.map(select => [select.key, select]));
+  const multiKeys = [...multiByKey.keys(), ...Object.keys(multiSelections).filter(key => !multiByKey.has(key))];
+  for (const key of multiKeys) {
+    const ids = new Set(multiSelections[key]?.filter(Boolean));
+    if (!ids.size) continue;
+    const select = multiByKey.get(key);
+    if (!select) { details.push('Critério selecionado'); continue; }
+    const labels = select.options.filter(option => option.id !== null && ids.has(option.id)).map(option => option.label);
+    if ([...ids].some(id => !select.options.some(option => option.id === id))) labels.push('seleção indisponível');
+    details.push(`${select.label}: ${labels.join(', ')}`);
   }
   if (value.minCents !== undefined || value.maxCents !== undefined) {
     const min = value.minCents !== undefined ? formatAmount(value.minCents) : undefined;

@@ -286,7 +286,7 @@ export default function TransactionDetailScreen() {
       {/* O único destaque: é o que a pessoa veio conferir em três segundos. */}
       <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
         <Card style={styles.hero}>
-          <HeroLabel accessibilityLabel={`${KIND_LABEL[tx.kind]} de ${formatBRL(tx.amount_cents)}`}>
+          <HeroLabel accessibilityLabel={`${KIND_LABEL[tx.kind]} de ${brl(tx.amount_cents)}`}>
             {KIND_LABEL[tx.kind]}
           </HeroLabel>
           <Money

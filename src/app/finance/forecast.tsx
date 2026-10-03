@@ -55,7 +55,6 @@ import { currentMonth, monthTitle } from '@/components/finance/month-picker';
 import { mesDoCorte, veioDe, type MesProjetado } from '@/lib/forecast-months';
 import {
   diasAte,
-  formatBRL,
   isoToBR,
   localISODate,
   somaDias,
@@ -514,7 +513,7 @@ export default function ForecastScreen() {
         }
         icon={fatura ? 'creditcard' : parcelaDeDivida ? 'banknote' : receita ? 'arrow.down.left' : 'doc.text'}
         chevron
-        accessibilityLabel={`${b.title}, ${b.overdue ? (receita ? 'ainda não caiu, era esperado' : 'atrasado, vencia') : receita ? 'chega' : 'vence'} em ${isoToBR(b.due_date)}, ${formatBRL(cents)}`}
+        accessibilityLabel={`${b.title}, ${b.overdue ? (receita ? 'ainda não caiu, era esperado' : 'atrasado, vencia') : receita ? 'chega' : 'vence'} em ${isoToBR(b.due_date)}, ${brl(cents)}`}
         // Lançamento avulso agora ABRE, como fatura e dívida já abriam. Dar baixa num
         // valor que veio diferente do previsto grava o valor errado, e esta tela não
         // tinha caminho nenhum para corrigir antes — só o "marcar como pago".
@@ -705,7 +704,7 @@ export default function ForecastScreen() {
             </View>
             <View
               accessible
-              accessibilityLabel={`Saldo hoje ${formatBRL(hoje)}, no fim do período ${formatBRL(fim)}${primeiroNegativo ? `, negativo a partir de ${isoToBR(primeiroNegativo)}` : ''}`}>
+              accessibilityLabel={`Saldo hoje ${brl(hoje)}, no fim do período ${brl(fim)}${primeiroNegativo ? `, negativo a partir de ${isoToBR(primeiroNegativo)}` : ''}`}>
               <MeasuredSparkline
                 values={valores}
                 height={96}
@@ -1009,7 +1008,7 @@ export default function ForecastScreen() {
               <Row
                 title={monthTitle(m.mes)}
                 subtitle={legendaDoMes(m, iMes === 0, iMes === meses.length - 1, brl)}
-                accessibilityLabel={`${monthTitle(m.mes)}, veio de ${formatBRL(veioDe(m))}, entra ${formatBRL(m.entra)}, sai ${formatBRL(m.sai)}, sobra ${formatBRL(m.saldo)}`}
+                accessibilityLabel={`${monthTitle(m.mes)}, veio de ${brl(veioDe(m))}, entra ${brl(m.entra)}, sai ${brl(m.sai)}, sobra ${brl(m.saldo)}`}
                 accessibilityState={{ expanded: mesAberto === m.mes }}
                 onPress={() => setMesAberto(mesAberto === m.mes ? null : m.mes)}
                 trailing={

@@ -177,14 +177,18 @@
       "Do manter um bloco de destaque por tela, em ink-hero.",
       "Do escrever rótulo curto + valor; a explicação vai na confirmação da ação.",
       "Do usar tabular-nums em todo número que conta, mede ou custa.",
-      "Do verificar em 384dp com fonte 1,3 e nos dois temas."
+      "Do verificar em 384dp com fonte 1,3 e nos dois temas.",
+      "Do reutilizar `ListFilters.multiSelects` e `multiSelections`: rascunho por abertura, Aplicar confirma, cancelar descarta, Todos limpa só o grupo e Limpar filtros limpa o rascunho inteiro.",
+      "Do contar cada grupo múltiplo como um critério e conservar nomes humanos completos no resumo acessível, mesmo quando o resumo visual usa “mais N”.",
+      "Do usar `useBRL` em frases de leitura e labels monetários para manter a mesma ocultação do valor visível."
     ],
     "donts": [
       "Don't colocar legenda embaixo de botão nem parágrafo explicativo em tela de conferir.",
       "Don't usar cor como decoração — nem a do banco fora do cartão, nem roxo como accent.",
       "Don't usar vidro, degradê ou brilho em conteúdo.",
       "Don't truncar identificador; quebre a linha.",
-      "Don't mover dado que a pessoa está lendo por estética."
+      "Don't mover dado que a pessoa está lendo por estética.",
+      "Don't encolher todo dinheiro inline: preserve o tamanho quando cabe e deixe o `Row` reservar uma linha inteira quando largura e escala exigirem."
     ]
   }
 }

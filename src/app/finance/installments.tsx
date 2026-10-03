@@ -469,7 +469,7 @@ export default function InstallmentsScreen() {
                 <Pressable
                   key={parcela.id}
                   accessibilityRole="button"
-                  accessibilityLabel={`Parcela ${parcela.installment_no ?? ''} de ${plano.installments}, ${formatBRL(parcela.amount_cents)}, ${rotulo}, ${formatDateBR(parcela.occurred_at)}`}
+                  accessibilityLabel={`Parcela ${parcela.installment_no ?? ''} de ${plano.installments}, ${brl(parcela.amount_cents)}, ${rotulo}, ${formatDateBR(parcela.occurred_at)}`}
                   onPress={() =>
                     router.push({
                       pathname: '/finance/[txId]',
@@ -514,7 +514,7 @@ export default function InstallmentsScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ expanded: expandido }}
-          accessibilityLabel={`${plano.title}, parcela ${atual} de ${plano.installments}, ${formatBRL(plano.installment_cents)} por mês${plano.active ? `, faltam ${formatBRL(plano.remaining_cents)}` : ', quitada'}`}
+          accessibilityLabel={`${plano.title}, parcela ${atual} de ${plano.installments}, ${brl(plano.installment_cents)} por mês${plano.active ? `, faltam ${brl(plano.remaining_cents)}` : ', quitada'}`}
           onPress={() => setAberto(expandido ? null : plano.id)}
           onLongPress={() => acoes(plano)}>
           {({ pressed }) => (
@@ -623,7 +623,7 @@ export default function InstallmentsScreen() {
           <Pressable
             key={mes.month}
             accessibilityRole="button"
-            accessibilityLabel={`${monthLabel(mes.month)}, ${formatBRL(mes.cents)} em parcelas${mes.month < mesAtual ? ', já passou' : ''}`}
+            accessibilityLabel={`${monthLabel(mes.month)}, ${brl(mes.cents)} em parcelas${mes.month < mesAtual ? ', já passou' : ''}`}
             style={styles.barSlot}
             onPress={() =>
               router.push({ pathname: '/finance/transactions', params: { month: mes.month } })

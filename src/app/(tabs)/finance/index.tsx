@@ -546,7 +546,7 @@ export default function FinanceScreen() {
                       date={formatDateBR(tx.occurred_at)}
                       quote={citacoes.get(tx.id) ?? null}
                       onLongPress={onLongPress}
-                      accessibilityLabel={`${titulo}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}`}
+                      accessibilityLabel={`${titulo}, ${brl(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}`}
                     />
                   )}
                 </ItemLink>

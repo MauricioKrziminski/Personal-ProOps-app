@@ -44,7 +44,7 @@ import {
 import { umDe, usePreferencia } from '@/hooks/use-preferencia';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
-import { formatBRL } from '@/hooks/use-items';
+import { useBRL } from '@/components/ui/conceal';
 import { formatNumberBR } from '@/lib/dates';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 
@@ -151,6 +151,7 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 export default function NetWorthScreen() {
+  const brl = useBRL();
   const toast = useToast();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
@@ -267,7 +268,7 @@ export default function NetWorthScreen() {
         icon={CLASSE_ICONE[b.class]}
         onPress={() => abrirEdicao(b)}
         onLongPress={() => showItemActions(b.name, acoesDoBem(b))}
-        accessibilityLabel={`${b.name}, ${b.is_liability ? 'dívida de' : 'vale'} ${formatBRL(b.current_value_cents)}. Toque para atualizar o valor.`}
+        accessibilityLabel={`${b.name}, ${b.is_liability ? 'dívida de' : 'vale'} ${brl(b.current_value_cents)}. Toque para atualizar o valor.`}
         trailing={
           <Money
             cents={b.is_liability ? -b.current_value_cents : b.current_value_cents}
@@ -342,7 +343,7 @@ export default function NetWorthScreen() {
             title={c.title}
             subtitle={c.subtitle}
             icon={c.icon}
-            accessibilityLabel={`${c.title}, ${c.passivo ? 'menos' : 'mais'} ${formatBRL(bruto)}`}
+            accessibilityLabel={`${c.title}, ${c.passivo ? 'menos' : 'mais'} ${brl(bruto)}`}
             trailing={
               <Money
                 cents={cents}

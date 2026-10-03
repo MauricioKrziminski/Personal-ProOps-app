@@ -113,6 +113,7 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
   } });
   const animation = { duration: () => animation, delay: () => animation, reduceMotion: () => animation };
   const finance = new Proxy({
+    NO_ACCOUNT: 'none',
     DEBT_KINDS: [{ value: 'financing', label: 'Financiamento' }, { value: 'loan', label: 'Empréstimo' }],
     SUGGESTED_CATEGORIES: [],
     ACCOUNT_TYPES: [
@@ -404,6 +405,7 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
       if (name === '@/hooks/use-finance') return finance;
       if (name === '@/components/finance/origin-creation-host') return { OriginCreationHost: ({ children }: any) => children, OriginAccountPicker: 'AccountPicker' };
       if (name === '@/lib/payment-method') return load('src/lib/payment-method.ts');
+      if (name === '@/lib/payment-method-filters') return load('src/lib/payment-method-filters.ts');
       if (name === '@/components/ui/filter-bar') return load('src/components/ui/filter-bar.tsx');
       if (name === '@/lib/supabase' && file.endsWith('finance/recurring.tsx')) return { supabase: {
         from: () => {
@@ -2299,6 +2301,30 @@ test('Lançamentos: o valor da linha não encolhe a fonte', () => {
   assert.notEqual(linha.props.trailing.props.encolhe, true);
 });
 
+test('Row: extrato deixa dinheiro quebrar de linha sem herdar ajuste de fonte do trailing', () => {
+  for (const inlineValue of [true, false]) {
+    const ui = screen('src/components/ui/row.tsx', { componente: 'Row', props: {
+      title: 'QA F04 IOS Pix 20261002', inlineValue,
+      trailing: { type: 'Money', props: { cents: -1235 } },
+    } });
+    const context = ui.nodes().find(n => n.type === 'DinheiroEncolhe.Provider');
+    assert.ok(context, 'testar a fronteira real entre Row e Money, além dos props da tela');
+    assert.equal(context.props.value, !inlineValue, 'somente a coluna fixa opta pelo ajuste; o extrato usa a linha seguinte');
+    assert.equal(ui.nodes().find(n => n.type === 'Money').props.cents, -1235);
+  }
+});
+
+test('Row: fonte de acessibilidade reserva uma linha completa antes de ajustar dinheiro grande', () => {
+  const ui = screen('src/components/ui/row.tsx', { componente: 'Row', fontScale: 3.12, props: {
+    title: 'Extrato com valor grande', inlineValue: true, icon: 'banknote', chevron: true,
+    trailing: { type: 'Money', props: { cents: -99999999999 } },
+  } });
+  const context = ui.nodes().find(n => n.type === 'DinheiroEncolhe.Provider');
+  assert.equal(context.props.value, true, 'o ajuste só pode ocorrer sobre a linha inteira');
+  const value = ui.nodes().find(n => n.type === 'View' && n.props.style?.some?.((s: any) => typeof s?.width === 'number' && s.width > 200));
+  assert.ok(value, 'largura explícita para a linha do valor, sem disputar com o título');
+});
+
 /**
  * Quem já está no Pro via o card do Pro marcado e, embaixo, "Começar 7 dias grátis" — oferta de
  * teste para o plano que a pessoa já tem (visto no iPhone em 24/09/2026). O botão diz o que é.
@@ -2637,13 +2663,17 @@ test('Todo filho de ItemLink repassa o onPress que o Link do iOS injeta', () => 
 });
 
 test('Row: fonte máxima e painel estreito conservam título e valor dentro da largura medida', () => {
-  for (const fontScale of [1, 1.3, 3.12]) {
+  for (const { fontScale, ajustes } of [
+    { fontScale: 1, ajustes: [false, true, false, false] },
+    { fontScale: 1.3, ajustes: [true, true, false, true] },
+    { fontScale: 3.12, ajustes: [true, true, true, true] },
+  ]) {
     const ui = screen('src/components/ui/row.tsx', { componente: 'Row', fontScale, props: {
       title: 'macbook (12/12)', subtitle: 'compra em 01/09/2026', inlineValue: true,
       trailing: { type: 'Money', props: { cents: 78000 } },
     } });
     const flat = (style: any) => Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
-    for (const width of [370, 260, 600, 370]) {
+    for (const [index, width] of [370, 260, 600, 370].entries()) {
       const row = ui.nodes().find(n => n.type === 'View' && n.props.onLayout);
       assert.ok(row, 'medir a linha real: largura da janela não é a largura de um painel');
       ui.interact(() => row.props.onLayout({ nativeEvent: { layout: { width } } }));
@@ -2651,7 +2681,7 @@ test('Row: fonte máxima e painel estreito conservam título e valor dentro da l
       assert.equal(flat(title.props.style).minWidth, Math.min(134 * Math.max(1, fontScale), width - 32));
       assert.ok(flat(title.props.style).minWidth <= width - 32);
       const boundedMoney = ui.nodes().find(n => n.type === 'DinheiroEncolhe.Provider');
-      assert.equal(boundedMoney?.props.value, true, 'dinheiro conserva sua fonte quando cabe e se ajusta à própria linha quando não cabe');
+      assert.equal(boundedMoney?.props.value, ajustes[index], 'extrato normal conserva a fonte; painel sem espaço para duas colunas ajusta o valor na linha inteira');
       assert.ok(ui.nodes().some(n => n.type === 'View' && flat(n.props.style).maxWidth === '100%' && flat(n.props.style).marginLeft === 'auto'));
     }
   }
@@ -4831,6 +4861,73 @@ const filterScreenText = (ui: ReturnType<typeof screen>) => JSON.stringify(ui.no
 const applyListFilters = (ui: ReturnType<typeof screen>, value: Record<string, unknown>) =>
   ui.interact(nodes => nodes.find(n => n.type === 'ListFilters').props.onApply(value));
 
+test('F05: métodos múltiplos seguem query, folha, previstas e resumo sem exibir total global', () => {
+  const base = { origin: 'recurring', ref_id: 'r', due_date: '2026-09-20', amount_cents: 1200, kind: 'expense',
+    description: 'Prevista Pix', category: null, account_id: null, payment_method: 'pix', status: 'pending', inferred_start: false };
+  const ui = screen(transacoesFile, { txs: [], expectedLines: [base,
+    { ...base, ref_id: 'legacy', description: 'Prevista histórica', payment_method: null },
+    { ...base, ref_id: 'boleto', description: 'Prevista boleto', payment_method: 'boleto' }],
+    expectedInTransit: [{ ...base, ref_id: 'transit', description: 'Em trânsito boleto', payment_method: 'boleto' }] });
+  applyListFilters(ui, { multiSelections: { paymentMethods: ['not_informed', 'pix', 'pix'] } });
+  assert.deepEqual(copia(ui.transactionQueries.at(-1)?.paymentMethods), ['pix', 'not_informed']);
+  const sheet = ui.nodes().find(n => n.type === 'ListFilters');
+  assert.deepEqual(copia(sheet.props.value.multiSelections.paymentMethods), ['pix', 'not_informed']);
+  assert.ok(sheet.props.multiSelects[0].options.some((o: any) => o.id === 'not_informed' && o.label === 'Não informado'));
+  assert.match(filterScreenText(ui), /Filtros · 1/);
+  assert.match(filterScreenText(ui), /Pix, Não informado/);
+  assert.ok(!ui.nodes().some(n => n.type === 'PeriodSummaryCard'));
+  const shown = ui.nodes().filter(n => n.type === 'LinhaPrevista').map(n => n.props.line.description);
+  assert.deepEqual(shown.sort(), ['Prevista Pix', 'Prevista histórica'].sort());
+  applyListFilters(ui, {});
+  assert.deepEqual(copia(ui.transactionQueries.at(-1)?.paymentMethods), []);
+  assert.ok(!ui.nodes().find(n => n.type === 'ListFilters').props.value.multiSelections);
+});
+
+test('F05: link altera tela montada; ausência conserva método e vazio limpa somente este grupo', () => {
+  const params: Record<string, string> = { paymentMethods: 'pix,not_informed' };
+  const ui = screen(transacoesFile, { params });
+  assert.deepEqual(copia(ui.transactionQueries.at(-1)?.paymentMethods), ['pix', 'not_informed']);
+  applyListFilters(ui, { q: 'salário', selections: { status: 'pending' }, multiSelections: { paymentMethods: ['boleto'] } });
+  delete params.paymentMethods; params.month = '2026-10';
+  ui.interact(() => {});
+  assert.deepEqual(copia(ui.transactionQueries.at(-1)?.paymentMethods), ['boleto']);
+  params.paymentMethods = 'credit,pix'; ui.interact(() => {});
+  assert.deepEqual(copia(ui.transactionQueries.at(-1)?.paymentMethods), ['pix', 'credit']);
+  params.paymentMethods = ''; ui.interact(() => {});
+  assert.deepEqual(copia(ui.transactionQueries.at(-1)?.paymentMethods), []);
+  assert.equal(ui.transactionQueries.at(-1)?.q, 'salário');
+  assert.equal(ui.transactionQueries.at(-1)?.status, 'pending');
+});
+
+test('F05: link malformado mostra recuperação e bloqueia leitura ampliada, Aplicar resolve', () => {
+  const ui = screen(transacoesFile, { params: { paymentMethods: 'pix,mystery' }, expectedLines: [
+    { origin: 'recurring', ref_id: 'r', due_date: '2026-09-20', amount_cents: 1200, kind: 'expense',
+      description: 'Cache anterior', category: null, account_id: null, status: 'pending', inferred_start: false },
+  ] });
+  assert.equal(ui.transactionQueries.at(-1)?.pronto, false);
+  assert.equal(ui.expectedQueries.at(-1)?.pronto, false);
+  assert.match(filterScreenText(ui), /Forma de pagamento inválida no link/);
+  assert.ok(!ui.nodes().some(n => ['SkeletonRow', 'LinhaPrevista', 'PeriodSummaryCard'].includes(n.type)));
+  ui.interact(nodes => nodes.find(n => n.type === 'SectionList').props.onRefresh());
+  assert.ok(!ui.refetches.includes('list'), 'puxar para atualizar não consulta um filtro inválido');
+  applyListFilters(ui, { multiSelections: { paymentMethods: ['pix'] } });
+  assert.equal(ui.transactionQueries.at(-1)?.pronto, true);
+  assert.deepEqual(copia(ui.transactionQueries.at(-1)?.paymentMethods), ['pix']);
+  assert.doesNotMatch(filterScreenText(ui), /Forma de pagamento inválida no link/);
+});
+
+test('F05: método combina com datas abertas e erro continua erro, sem previstas de cache', () => {
+  const ui = screen(transacoesFile, { listError: true });
+  applyListFilters(ui, { from: '2026-08-01', minCents: 0, selections: { accountId: 'none', status: 'pending' },
+    multiSelections: { paymentMethods: ['not_informed'] } });
+  assert.equal(ui.transactionQueries.at(-1)?.accountId, null);
+  assert.equal(ui.transactionQueries.at(-1)?.from, '2026-08-01');
+  assert.deepEqual(copia(ui.transactionQueries.at(-1)?.paymentMethods), ['not_informed']);
+  assert.equal(ui.expectedQueries.at(-1)?.pronto, false);
+  assert.ok(ui.nodes().some(n => n.type === 'ErrorCard'));
+  assert.ok(!ui.nodes().some(n => n.type === 'EmptyState'));
+});
+
 for (const [scope, file, defaultLabel] of [
   ['arquivadas', 'src/app/notes/archived.tsx', 'Notas arquivadas'],
   ['lixeira', 'src/app/notes/trash.tsx', 'Notas na lixeira'],
@@ -4969,6 +5066,37 @@ test('Lançamentos: resumo financeiro e rótulo acessível respeitam ocultação
   assert.ok(summary);
   assert.equal(summary.props.children, '•••••• a ••••••');
   assert.match(filterScreenText(ui), /Filtros · 1/);
+});
+
+test('F05: ocultar valores protege o rótulo acessível das linhas gravadas e previstas', () => {
+  const tx = { id: 'privacy-payment', kind: 'expense', amount_cents: 1001, description: 'Compra privada',
+    payment_method: 'pix', occurred_at: '2026-10-01', due_at: null, status: 'cleared',
+    category: null, merchant: null, account_id: null, source: 'app', invoice_id: null };
+  for (const concealed of [false, true]) {
+    const ui = screen(transacoesFile, { concealed, txs: [tx], params: { paymentMethods: 'pix' } });
+    const link = ui.nodes().find(n => n.type === 'ItemLink' && n.props.title === tx.description);
+    assert.ok(link);
+    const row = link.props.children({ onLongPress() {} });
+    assert.match(row.props.accessibilityLabel, concealed ? /Compra privada, ••••••, despesa/ : /Compra privada, R\$\s10[.,]01, despesa/);
+    const prevista = screen('src/components/finance/expected-ledger-lines.tsx', {
+      componente: 'LinhaPrevista', concealed,
+      props: { line: { ...assinaturaPrevista, description: 'Prevista privada', amount_cents: 1001 },
+        hoje: '2026-10-01', acoes: [], onAbrir() {} },
+    }).nodes().find(n => n.type === 'Row');
+    assert.ok(prevista);
+    assert.match(prevista.props.accessibilityLabel, concealed ? /Prevista privada, ••••••, despesa/ : /Prevista privada, R\$\s10[.,]01, despesa/);
+  }
+});
+
+test('F05: ocultar valores protege o rótulo acessível do destaque no detalhe', () => {
+  for (const concealed of [false, true]) {
+    const ui = screen('src/app/finance/[txId].tsx', { concealed, params: { txId: 'privacy-detail' }, txs: [{ id: 'privacy-detail', kind: 'expense',
+      amount_cents: 1001, description: 'Compra privada', occurred_at: '2026-10-01', category: null,
+      account_id: null, status: 'cleared', source: 'app', payment_method: 'pix' }] });
+    const hero = ui.nodes().find(n => n.type === 'HeroLabel');
+    assert.ok(hero);
+    assert.match(hero.props.accessibilityLabel, concealed ? /^Despesa de ••••••$/ : /^Despesa de R\$\s10[.,]01$/);
+  }
 });
 
 test('Ocorrências usam o mês civil para retornar de um período personalizado', () => {

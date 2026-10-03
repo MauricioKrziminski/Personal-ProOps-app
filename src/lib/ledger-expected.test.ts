@@ -83,3 +83,33 @@ test('previsões respeitam valor mínimo/máximo inclusivos e combinados com con
   assert.deepEqual(filterExpectedLines([recurrence, debt], { maxCents: 5589 }), []);
   assert.deepEqual(filterExpectedLines([recurrence, debt], { minCents: 0, maxCents: 5590, accountId: null }), [recurrence]);
 });
+
+test('previsões filtram pagamento histórico sem inferir o método pela conta atual', () => {
+  const pix = { ...recurrence, ref_id: 'historical-pix', account_id: 'card-now', payment_method: 'pix' as const };
+  const credit = { ...recurrence, ref_id: 'historical-credit', account_id: 'checking-now', payment_method: 'credit' as const };
+  const boleto = { ...debt, ref_id: 'historical-boleto', account_id: null, payment_method: 'boleto' as const };
+  const unknown = { ...debt, ref_id: 'unknown', payment_method: null };
+  const legacy = { ...recurrence, ref_id: 'legacy', account_id: 'card-now' };
+  const lines = [pix, credit, boleto, unknown, legacy];
+  assert.deepEqual(filterExpectedLines(lines, { paymentMethods: ['pix'] }), [pix]);
+  assert.deepEqual(filterExpectedLines(lines, { paymentMethods: ['credit'] }), [credit]);
+  assert.deepEqual(filterExpectedLines(lines, { paymentMethods: ['boleto'] }), [boleto]);
+  assert.deepEqual(filterExpectedLines(lines, { paymentMethods: ['not_informed'] }), [legacy, unknown]);
+  assert.deepEqual(filterExpectedLines(lines, { paymentMethods: ['pix', 'not_informed'] }), [pix, legacy, unknown]);
+  assert.deepEqual(filterExpectedLines(lines, { paymentMethods: [] }), filterExpectedLines(lines, {}));
+  assert.deepEqual(filterExpectedLines(lines, { paymentMethods: undefined }), filterExpectedLines(lines, {}));
+});
+
+test('pagamento previsto combina categoria, status, conta, origem, série, busca e valor inclusivo', () => {
+  const match = { ...recurrence, payment_method: 'boleto' as const };
+  const different = { ...match, ref_id: 'other', payment_method: 'pix' as const };
+  const filters = { paymentMethods: ['boleto'] as const, category: 'lazer', status: 'pending' as const,
+    kind: 'expense' as const, accountId: null, source: 'recurring' as const, recurringId: 'series',
+    q: 'STREAM', minCents: 5590, maxCents: 5590 };
+  const lines = Object.freeze([Object.freeze(match), Object.freeze(different)]);
+  assert.deepEqual(filterExpectedLines(lines, filters), [match]);
+  assert.deepEqual(filterExpectedLines(lines, { ...filters, minCents: 5591 }), []);
+  assert.deepEqual(filterExpectedLines(lines, { ...filters, paymentMethods: ['not_informed'] }), []);
+  assert.deepEqual(lines, [match, different]);
+  assert.throws(() => filterExpectedLines(lines, { paymentMethods: ['invalid'] as never }), /forma de pagamento válida/i);
+});

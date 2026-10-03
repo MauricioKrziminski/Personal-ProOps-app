@@ -67,6 +67,7 @@ import { accountLabel, accountSelectOptions, saldoDaConta } from '@/lib/accounts
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { tabletPaneWidths } from '@/design/adaptive-window';
 import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
+import { normalizePaymentMethodFilters, parsePaymentMethodFilters, PAYMENT_METHOD_FILTER_OPTIONS, type PaymentMethodFilter } from '@/lib/payment-method-filters';
 
 /**
  * Lançamentos — "cadê aquele lançamento, e o que entrou e saiu neste mês?".
@@ -206,6 +207,7 @@ export default function TransactionsScreen() {
     recurringId?: string;
     /** Id da conta/cartão, ou `none` para os lançamentos sem conta. */
     accountId?: string;
+    paymentMethods?: string | string[];
   }>();
 
   /*
@@ -227,6 +229,8 @@ export default function TransactionsScreen() {
   const [category, setCategory] = useState<string | undefined>(params.category);
   const [accountId, setAccountId] = useState<string | undefined>(params.accountId);
   const [source, setSource] = useState<TransactionSource | undefined>(undefined);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodFilter[]>(() => parsePaymentMethodFilters(params.paymentMethods) ?? []);
+  const [paymentLinkInvalid, setPaymentLinkInvalid] = useState(() => parsePaymentMethodFilters(params.paymentMethods) === null);
   const [search, setSearch] = useState('');
   const [puxando, setPuxando] = useState(false);
   const [filtersVisible, setFiltersVisible] = useState(false);
@@ -253,7 +257,7 @@ export default function TransactionsScreen() {
    * desfaz escolha que o usuário fez na tela. `recurringId` fica de fora: é lido direto de
    * `params`, sem estado.
    */
-  const link = `${params.month ?? ''}|${params.kind ?? ''}|${params.category ?? ''}|${params.accountId ?? ''}`;
+  const link = JSON.stringify([params.month, params.kind, params.category, params.accountId, params.paymentMethods]);
   const [linkAplicado, setLinkAplicado] = useState(link);
   if (link !== linkAplicado) {
     setLinkAplicado(link);
@@ -263,6 +267,11 @@ export default function TransactionsScreen() {
     }
     if (params.category) setCategory(params.category);
     if (params.accountId) setAccountId(params.accountId);
+    if (params.paymentMethods !== undefined) {
+      const parsed = parsePaymentMethodFilters(params.paymentMethods);
+      setPaymentLinkInvalid(parsed === null);
+      if (parsed !== null) setPaymentMethods(parsed);
+    }
   }
 
   // Abrir o extrato de uma conta é o que a dica das contas ensina (`conta-extrato`).
@@ -290,7 +299,7 @@ export default function TransactionsScreen() {
       : customDates.to ? `Até ${formatDateBR(customDates.to)}` : monthTitle(month);
   const periodDescription = openPeriod ? periodLabel.charAt(0).toLowerCase() + periodLabel.slice(1)
     : customPeriod ? `de ${periodLabel}` : `em ${periodLabel}`;
-  const forecastsEnabled = range.pronto && !openPeriod;
+  const forecastsEnabled = range.pronto && !openPeriod && !paymentLinkInvalid;
   const list = useTransactions({
     /*
       ⚠️ **As MESMAS bordas do resumo, não `month`.** O hook recortava o mês civil por conta
@@ -299,7 +308,7 @@ export default function TransactionsScreen() {
     */
     from: range.from,
     to: range.to,
-    pronto: range.pronto,
+    pronto: range.pronto && !paymentLinkInvalid,
     kind: kind === 'all' ? undefined : kind,
     category,
     recurringId: params.recurringId,
@@ -307,11 +316,11 @@ export default function TransactionsScreen() {
     status: status === 'all' ? undefined : status,
     source,
     q: term,
-    minCents, maxCents,
+    minCents, maxCents, paymentMethods,
   });
   const expected = useExpectedLedgerLines(range.from, range.to, forecastsEnabled, params.recurringId);
   // O card global fica oculto em períodos personalizados; nenhuma RPC de total é necessária.
-  const summary = useTransactionsSummary(range.from, range.to, range.pronto && !customPeriod);
+  const summary = useTransactionsSummary(range.from, range.to, range.pronto && !customPeriod && !paymentLinkInvalid);
   /*
     ⚠️ **O card do topo soma a LISTA, e o ciclo virou o link do rodapé.** Ele já foi o contrário
     — lia `cycle_series` para bater com a home — e aí parou de bater com a lista logo abaixo
@@ -342,7 +351,7 @@ export default function TransactionsScreen() {
   // páginas continua sendo uma seção só depois do `flat()`.
   const rows = useMemo(() => list.data?.pages.flat() ?? [], [list.data]);
   // Queries desligadas podem conservar cache e erro. O modo aberto exclui também esses dados.
-  const expectedLines = useMemo(() => openPeriod ? [] : filterExpectedLines(expected.data ?? [], {
+  const expectedLines = useMemo(() => openPeriod || paymentLinkInvalid ? [] : filterExpectedLines(expected.data ?? [], {
     kind: kind === 'all' ? undefined : kind,
     status: status === 'all' ? undefined : status,
     category,
@@ -350,15 +359,15 @@ export default function TransactionsScreen() {
     source,
     recurringId: params.recurringId,
     q: term,
-    minCents, maxCents,
-  }), [openPeriod, expected.data, kind, status, category, accountId, source, params.recurringId, term, minCents, maxCents]);
+    minCents, maxCents, paymentMethods,
+  }), [openPeriod, paymentLinkInvalid, expected.data, kind, status, category, accountId, source, params.recurringId, term, minCents, maxCents, paymentMethods]);
   // Trocar de filtro durante a gravação não pode trazer uma ocorrência de outro recorte.
-  const transitoFiltrado = useMemo(() => openPeriod ? [] : filterExpectedLines(previstas.emTransito.filter(p =>
+  const transitoFiltrado = useMemo(() => openPeriod || paymentLinkInvalid ? [] : filterExpectedLines(previstas.emTransito.filter(p =>
     (!range.from || p.due_date >= range.from) && (!range.to || p.due_date <= range.to)), {
       kind: kind === 'all' ? undefined : kind, status: status === 'all' ? undefined : status,
       category, accountId: accountId === undefined ? undefined : accountId === NO_ACCOUNT ? null : accountId,
-      source, recurringId: params.recurringId, q: term, minCents, maxCents,
-    }), [openPeriod, previstas.emTransito, range.from, range.to, kind, status, category, accountId, source, params.recurringId, term, minCents, maxCents]);
+      source, recurringId: params.recurringId, q: term, minCents, maxCents, paymentMethods,
+    }), [openPeriod, paymentLinkInvalid, previstas.emTransito, range.from, range.to, kind, status, category, accountId, source, params.recurringId, term, minCents, maxCents, paymentMethods]);
   const previstasVisiveis = useMemo(
     () => previstasNaTela(expectedLines, transitoFiltrado, rows),
     [expectedLines, transitoFiltrado, rows]
@@ -440,15 +449,15 @@ export default function TransactionsScreen() {
     Promise.all([
       ...(cicloFalhou ? [regua.cycle.refetch()] : []),
       ...(range.isError ? [range.refetch()] : []),
-      ...(range.pronto ? [list.refetch()] : []),
-      ...(range.pronto && !customPeriod ? [summary.refetch()] : []),
+      ...(range.pronto && !paymentLinkInvalid ? [list.refetch()] : []),
+      ...(range.pronto && !customPeriod && !paymentLinkInvalid ? [summary.refetch()] : []),
       ...(forecastsEnabled ? [expected.refetch()] : []),
     ]);
 
   // Falhou a leitura dos lançamentos: a lista mostra o erro, nunca uma lista só de previstas.
   const itens = useMemo(
-    () => (list.isError ? [] : mesclarPrevistas(rows, previstasVisiveis, Boolean(list.hasNextPage))),
-    [rows, previstasVisiveis, list.hasNextPage, list.isError]
+    () => (list.isError || paymentLinkInvalid ? [] : mesclarPrevistas(rows, previstasVisiveis, Boolean(list.hasNextPage))),
+    [rows, previstasVisiveis, list.hasNextPage, list.isError, paymentLinkInvalid]
   );
   const sections = useMemo(
     () => (params.recurringId ? toSeriesSections(itens, hoje, customPeriod) : toSections(itens, customPeriod)),
@@ -498,6 +507,7 @@ export default function TransactionsScreen() {
       kind: kind === 'all' ? '' : kind, status: status === 'all' ? '' : status,
       category: category ?? '', accountId: accountId ?? '', source: source ?? '',
     },
+    ...(paymentMethods.length ? { multiSelections: { paymentMethods } } : {}),
   };
   const filterCount = listFilterCount(filterValue);
   const hasFilters = filterCount > 0;
@@ -505,12 +515,14 @@ export default function TransactionsScreen() {
     ? `${brl(minCents)} a ${brl(maxCents)}`
     : minCents !== undefined ? `A partir de ${brl(minCents)}`
       : maxCents !== undefined ? `Até ${brl(maxCents)}` : undefined;
+  const selectedPaymentMethods = new Set(paymentMethods);
   const filterDetails = [
     tituloDaConta,
     kind !== 'all' ? KIND_OPTIONS.find(o => o.value === kind)?.label : undefined,
     status !== 'all' ? STATUS_OPTIONS.find(o => o.value === status)?.label : undefined,
     category,
     source ? SOURCE_FILTER.find(o => o.value === source)?.label : undefined,
+    paymentMethods.length ? PAYMENT_METHOD_FILTER_OPTIONS.filter(o => selectedPaymentMethods.has(o.id)).map(o => o.label).join(', ') : undefined,
     valueSummary, search.trim() ? `Busca: ${search.trim()}` : undefined,
   ].filter(Boolean);
   const fullFilterSummary = filterDetails.join(' · ');
@@ -528,7 +540,7 @@ export default function TransactionsScreen() {
    * período inteiro em cima de uma ocorrência só, escrevendo "GASTEI EM OUTUBRO R$ 3.842,78 ·
    * 1 lançamento" sobre uma linha de R$ 88,85. É o mesmo defeito que o card acabou de perder.
    */
-  const listaRecortada = hasFilters || Boolean(params.recurringId);
+  const listaRecortada = hasFilters || Boolean(params.recurringId) || paymentLinkInvalid;
   /*
     ⚠️ **`!anyEver.isError` junto.** Com a query falhando, `data` é undefined, `?? []` vira lista
     vazia e quem tem anos de histórico recebia "Nenhum lançamento ainda" com a dica de
@@ -546,10 +558,13 @@ export default function TransactionsScreen() {
     setCategory(undefined);
     setAccountId(undefined);
     setSource(undefined);
+    setPaymentMethods([]); setPaymentLinkInvalid(false);
     setSearch('');
     setCustomDates({}); setMinCents(undefined); setMaxCents(undefined);
   };
   const applyFilters = (value: ListFiltersValue) => {
+    setPaymentMethods(normalizePaymentMethodFilters(value.multiSelections?.paymentMethods));
+    setPaymentLinkInvalid(false);
     setSearch(value.q ?? ''); setCustomDates({ from: value.from, to: value.to });
     setMinCents(value.minCents); setMaxCents(value.maxCents);
     setKind((value.selections?.kind || 'all') as typeof kind);
@@ -696,7 +711,11 @@ export default function TransactionsScreen() {
     consulta desligada fica `isPending` para sempre — o ramo de cima desenharia três linhas de
     esqueleto indefinidamente, mesmo com o portão da tela já aberto.
   */
-  const empty = periodoFalhou ? (
+  const empty = paymentLinkInvalid ? (
+    <EmptyState compacto icon="line.3.horizontal.decrease" title="Forma de pagamento inválida no link"
+      hint="Abra os filtros para escolher as formas de pagamento."
+      action={{ label: 'Ajustar filtros', onPress: () => setFiltersVisible(true) }} />
+  ) : periodoFalhou ? (
     <ErrorCard onRetry={() => { void refazerPeriodo(); }} />
   ) : list.isError ? (
     <ErrorCard onRetry={list.refetch} />
@@ -809,7 +828,7 @@ export default function TransactionsScreen() {
           ListFooterComponent={list.isFetchingNextPage ? <SkeletonRow /> : null}
           onEndReachedThreshold={0.5}
           onEndReached={() => {
-            if (list.hasNextPage && !list.isFetchingNextPage) list.fetchNextPage();
+            if (!paymentLinkInvalid && list.hasNextPage && !list.isFetchingNextPage) list.fetchNextPage();
           }}
           // O indicador é do GESTO (§6 do design), não do `isRefetching`.
           refreshing={puxando}
@@ -993,7 +1012,7 @@ export default function TransactionsScreen() {
                       subtitle={[...badges, ...context].join(' · ')}
                       icon={aparencia(tx.category, tx.kind).icon}
                       tinta={aparencia(tx.category, tx.kind).cor}
-                      accessibilityLabel={`${tx.description || tx.merchant || tx.category || 'Lançamento'}, ${formatBRL(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}, ${dayTitle(tx.occurred_at, customPeriod)}${estado ? `, ${estado}` : ''}`}
+                      accessibilityLabel={`${tx.description || tx.merchant || tx.category || 'Lançamento'}, ${brl(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}, ${dayTitle(tx.occurred_at, customPeriod)}${estado ? `, ${estado}` : ''}`}
                       onLongPress={onLongPress}
                       trailing={
                         <Money
@@ -1051,6 +1070,7 @@ export default function TransactionsScreen() {
       <ListFilters visible={filtersVisible} onClose={() => setFiltersVisible(false)} onApply={applyFilters}
         value={filterValue} showValues dateLabels={{ from: 'Lançamento a partir de', to: 'Lançamento até' }}
         resetDatesLabel={view === 'cycle' ? 'Voltar ao ciclo' : 'Voltar ao mês'}
+        multiSelects={[{ key: 'paymentMethods', label: 'Formas de pagamento', options: PAYMENT_METHOD_FILTER_OPTIONS }]}
         selects={[
           { key: 'kind', label: 'Tipo', options: KIND_OPTIONS.filter(o => o.value !== 'all').map(o => ({ id: o.value, label: o.label })) },
           { key: 'status', label: 'Situação', options: STATUS_OPTIONS.filter(o => o.value !== 'all').map(o => ({ id: o.value, label: o.label })) },

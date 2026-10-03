@@ -1,0 +1,257 @@
+{
+  "captures": [
+    {
+      "file": "evidence/phone-ios-chips.png",
+      "review_path": ".impeccable/review/f05/phone-ios-chips.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_234518/proops-f05-ios-final-cancel-resume/takeScreenshot/f05-ios-light-cancel-restored.png",
+      "sha256": "80f34415cfdc52153e257cc8b9b07a89adee9f6e5532b6af0effc18ff1694f28",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "context": "iPhone iOS 26.5; claro; fonte large; cancelamento restaura seleção",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/phone-ios-list.png",
+      "review_path": ".impeccable/review/f05/phone-ios-list.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_234233/proops-f05-ios-final-light/takeScreenshot/f05-ios-light-multiple-applied.png",
+      "sha256": "3857b201116dd82837c8c691bdc2cdbf9abda4f4ad72f11a6491b87d00ff4458",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "context": "iPhone iOS 26.5; claro; seleção múltipla aplicada",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/phone-ios-dark-chips.png",
+      "review_path": ".impeccable/review/f05/phone-ios-dark-chips.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-03_001518/proops-f05-ios-chip-focus/takeScreenshot/f05-ios-dark-chip-focus.png",
+      "sha256": "c8629a69db405f8905657899d2edf6d6307b0519a9f1e34fa81741ec5e6236d0",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "context": "iPhone iOS 26.5; escuro; extra-extra-extra-large; grupo completo",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/phone-ios-dark-list.png",
+      "review_path": ".impeccable/review/f05/phone-ios-dark-list.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_235614/proops-f05-ios-final-large/takeScreenshot/f05-ios-large-dark-list.png",
+      "sha256": "7bd10a30deb4fbae4f522687b9d5dd1d45f89d7b34f84c896eea000befacf5f4",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "context": "iPhone iOS 26.5; escuro; extra-extra-extra-large",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/phone-ios-money-max.png",
+      "review_path": ".impeccable/review/f05/phone-ios-money-max.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_233418/proops-f05-ios-row-large-final/takeScreenshot/f05-ios-row-large-final-value.png",
+      "sha256": "d5f016827bc8fff8784b742ce8bb9478df03e7004beabb87c77548ca1d0ff81a",
+      "width": 1206,
+      "height": 2622,
+      "environment": "catálogo local sintético (__DEV__); nenhuma escrita",
+      "context": "iPhone iOS 26.5; extra-extra-extra-large; catálogo sintético 999.999.999,99",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/privacy-ios.png",
+      "review_path": ".impeccable/review/f05/privacy-ios.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_235822/proops-f05-ios-final-privacy/takeScreenshot/f05-ios-hidden-list.png",
+      "sha256": "b2c9e8459f7b36f838e8eb8cb21f521b3f2a78f646108555f5b72beba3c74398",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "context": "iPhone iOS 26.5; valor oculto na lista",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/invalid-ios.png",
+      "review_path": ".impeccable/review/f05/invalid-ios.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_234034/proops-f05-ios-final-start/takeScreenshot/f05-ios-invalid-link.png",
+      "sha256": "e98f822c5039a79837513cbd0ea7e0157cb2432deb742e9700fd53e1c832d5ff",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "context": "iPhone iOS 26.5; link inválido não amplia consulta",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/transfer-ios.png",
+      "review_path": ".impeccable/review/f05/transfer-ios.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_235415/proops-f05-ios-final-methods/takeScreenshot/f05-ios-receiving-transfer.png",
+      "sha256": "407d2b0374708a38b2c4a5338c1c79fb3aa8c049656e08ce5bd2af2d202cc2cd",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "context": "iPhone iOS 26.5; conta destino e transferências recebidas",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/predictions-ios.png",
+      "review_path": ".impeccable/review/f05/predictions-ios.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_235415/proops-f05-ios-final-methods/takeScreenshot/f05-ios-boleto-predictions.png",
+      "sha256": "343e307e398ca91f3ec1c52c1ef7a367e383bd0e0b98c2cc988b4e94b9a955ec",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "context": "iPhone iOS 26.5; Boleto seleciona previsões sem materializar",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/phone-android-chips.png",
+      "review_path": ".impeccable/review/f05/phone-android-chips.png",
+      "source": "/private/tmp/proops-f05-android-todos.png",
+      "sha256": "53b283b126ec0219228b176ff9f7a49ee6b164440509c5097f9721a99778ee79",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "context": "Android API36; claro; Todos",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/phone-android-list.png",
+      "review_path": ".impeccable/review/f05/phone-android-list.png",
+      "source": "/private/tmp/proops-f05-android-pix-search.png",
+      "sha256": "415dfdcfc0eb910ec68758cff06664f584451cf14d6e9cda7882215d0f4cf40e",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "context": "Android API36; claro; busca + Pix",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/phone-android-compact-chips.png",
+      "review_path": ".impeccable/review/f05/phone-android-compact-chips.png",
+      "source": "/private/tmp/proops-f05-android-row-f05-compact-dark-chips.png",
+      "sha256": "6e3a966700490dcfebcfcf7d2034abcd377914551e4f2bf04a8c9cc08c8ee7f2",
+      "width": 1152,
+      "height": 2568,
+      "environment": "staging TEST",
+      "context": "Android API36; escuro; 384dp; fonte 1,3",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/phone-android-compact-money.png",
+      "review_path": ".impeccable/review/f05/phone-android-compact-money.png",
+      "source": "/private/tmp/proops-f05-android-row-f05-large-value.png",
+      "sha256": "13969ea03a787037a04624ed20f9c0752f510d33046e91ad36f7221b1fac481e",
+      "width": 1152,
+      "height": 2568,
+      "environment": "staging TEST",
+      "context": "Android API36; escuro; 384dp; fonte 1,3; salário 20.000,00",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/phone-android-money-max.png",
+      "review_path": ".impeccable/review/f05/phone-android-money-max.png",
+      "source": "/private/tmp/proops-f05-android-row-max-inline.png",
+      "sha256": "c8ea0020510e243c4f68de4f009e83897b50c442f18bf14dc310e55e80d2c56c",
+      "width": 1152,
+      "height": 2568,
+      "environment": "catálogo local sintético (__DEV__); nenhuma escrita",
+      "context": "Android API36; 384dp; fonte 3; catálogo sintético 999.999.999,99",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/privacy-android.png",
+      "review_path": ".impeccable/review/f05/privacy-android.png",
+      "source": "/private/tmp/proops-f05-android-extra-fixed-hidden-list.png",
+      "sha256": "e6ea69bbb01dce2d4e44749520b3ac20e71885ea3a7ed8741ff311892a7ec948",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "context": "Android API36; lista oculta; versão final",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/privacy-detail-android.png",
+      "review_path": ".impeccable/review/f05/privacy-detail-android.png",
+      "source": "/private/tmp/proops-f05-android-extra-fixed-hidden-detail.png",
+      "sha256": "9b6760d85ad00f88fcb6dd5d175eb98783de42014f0334fe72685dc196e87e0f",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "context": "Android API36; detalhe oculto; versão final",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/offline-android.png",
+      "review_path": ".impeccable/review/f05/offline-android.png",
+      "source": "/private/tmp/proops-f05-android-extra-offline-error.png",
+      "sha256": "77ebf2387bd72a6ba9b4eec63fd6fe3c27833623563643c101a381e2b67feb50",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "context": "Android API36; avião 1 / wifi 0; período não carregado",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/recovered-android.png",
+      "review_path": ".impeccable/review/f05/recovered-android.png",
+      "source": "/private/tmp/proops-f05-android-extra-recovered.png",
+      "sha256": "6864e24b1e430f132963290f4445758df764b9765d521ec5e01fa5a264fdea51",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "context": "Android API36; rede restaurada; período real vazio; seleção preservada",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/page-two-android.png",
+      "review_path": ".impeccable/review/f05/page-two-android.png",
+      "source": "/private/tmp/proops-f05-android-null-page2.png",
+      "sha256": "0726e7074a1f4e85a06a427ee7e736cf3e8e67b318a8ea0e0a1383dd86f6734a",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "context": "Android API36; Não informado; registro 57 além da primeira página",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/tablet-ios-chips.png",
+      "review_path": ".impeccable/review/f05/tablet-ios-chips.png",
+      "source": "/private/tmp/proops-f02-ipad-qa/.maestro/tests/2026-10-03_002024/proops-f05-ipad-chip-focus/takeScreenshot/f05-ipad-chip-focus.png",
+      "sha256": "6a6f9b949f1d9e43a07f52a3adcfed965f4e8bc01abe67b496ccf6d2976284e5",
+      "width": 1640,
+      "height": 2360,
+      "environment": "staging TEST",
+      "context": "iPad A16 iOS26.5; claro; fonte large; grupo completo",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/tablet-ios-list.png",
+      "review_path": ".impeccable/review/f05/tablet-ios-list.png",
+      "source": "/private/tmp/proops-f02-ipad-qa/.maestro/tests/2026-10-03_000139/proops-f05-ipad-final/takeScreenshot/f05-ipad-list.png",
+      "sha256": "d25138c14db9d040f5e3807754b0c32ad245261ce12574e15822bc85ac1cf765",
+      "width": 1640,
+      "height": 2360,
+      "environment": "staging TEST",
+      "context": "iPad A16 iOS26.5; claro; lista real",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/tablet-android-chips.png",
+      "review_path": ".impeccable/review/f05/tablet-android-chips.png",
+      "source": "/private/tmp/proops-f05-android-tablet-chips.png",
+      "sha256": "94166958c036e270fe72462721647919c67863351088280528fcabe7956b0a49",
+      "width": 2400,
+      "height": 3200,
+      "environment": "staging TEST",
+      "context": "Android API36; viewport 800dp no AVD de telefone",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/tablet-android-list.png",
+      "review_path": ".impeccable/review/f05/tablet-android-list.png",
+      "source": "/private/tmp/proops-f05-android-tablet-list.png",
+      "sha256": "3a9599eb70c1451a200997b2f88b69ca64da6160f58f323a8b9f476564708f64",
+      "width": 2400,
+      "height": 3200,
+      "environment": "staging TEST",
+      "context": "Android API36; viewport 800dp no AVD de telefone",
+      "primary_opened": true
+    }
+  ]
+}

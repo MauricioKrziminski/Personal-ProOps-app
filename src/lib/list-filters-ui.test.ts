@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { createElement, Fragment, isValidElement } from 'react';
 import ts from 'typescript';
 
-type Value = { q?: string; from?: string; to?: string; minCents?: number; maxCents?: number; selections?: Record<string, string> };
+type Value = { q?: string; from?: string; to?: string; minCents?: number; maxCents?: number; selections?: Record<string, string>; multiSelections?: Record<string, readonly string[]> };
 type Props = Record<string, unknown>;
 type Node = { type: unknown; props: Props; children: Node[]; actions: Node[] };
 type Frame = { slots: unknown[]; next: number };
@@ -124,6 +124,69 @@ const original: Value = {
   q: 'mercado', from: '2026-09-01', to: '2026-09-30', minCents: 100, maxCents: 20000,
   selections: { accountId: 'a', source: 'csv' },
 };
+
+const multipleOptions = { multiSelects: [{ key: 'paymentMethods', label: 'Formas de pagamento', options: [
+  { id: 'pix', label: 'Pix' }, { id: 'boleto', label: 'Boleto' }, { id: 'not_informed', label: 'Não informado' },
+] }] };
+
+test('múltiplas formas são um rascunho independente e só Aplicar publica', () => {
+  const value = wire({ ...original, multiSelections: { paymentMethods: ['pix'] } });
+  const h = renderFilters(value, multipleOptions);
+  assert.equal(h.node('Chip', { label: 'Pix' }).props.selected, true);
+  assert.equal(h.node('Chip', { label: 'Todos' }).props.selected, false);
+  h.act(h.node('Chip', { label: 'Boleto' }), 'onPress');
+  h.act(h.node('Chip', { label: 'Não informado' }), 'onPress');
+  assert.equal(h.node('Chip', { label: 'Pix' }).props.selected, true);
+  assert.equal(h.node('Chip', { label: 'Boleto' }).props.selected, true);
+  assert.equal(h.node('Chip', { label: 'Não informado' }).props.selected, true);
+  assert.deepEqual(value.multiSelections.paymentMethods, ['pix']);
+  assert.deepEqual(h.applied, []);
+  h.act(h.button('Aplicar'), 'onPress');
+  assert.deepEqual(h.applied, [{ ...value, multiSelections: { paymentMethods: ['pix', 'boleto', 'not_informed'] } }]);
+  assert.deepEqual(h.events, ['apply', 'close']);
+});
+
+test('cancelar múltiplas formas preserva valor publicado e reabrir descarta alterações', () => {
+  const value = wire({ ...original, multiSelections: { paymentMethods: ['pix'] } });
+  const h = renderFilters(value, multipleOptions);
+  h.act(h.node('Chip', { label: 'Pix' }), 'onPress');
+  h.act(h.node('Chip', { label: 'Não informado' }), 'onPress');
+  h.act(h.node('Sheet'), 'onClose');
+  assert.deepEqual(h.applied, []);
+  assert.deepEqual(value.multiSelections.paymentMethods, ['pix']);
+  h.open();
+  assert.equal(h.node('Chip', { label: 'Pix' }).props.selected, true);
+  assert.equal(h.node('Chip', { label: 'Não informado' }).props.selected, false);
+});
+
+test('Todos limpa somente o grupo; último toggle vazio é Todos, distinto de Não informado', () => {
+  const value = { ...original, multiSelections: { paymentMethods: ['not_informed'] } };
+  const h = renderFilters(wire(value), multipleOptions);
+  h.act(h.node('Chip', { label: 'Não informado' }), 'onPress');
+  assert.equal(h.node('Chip', { label: 'Todos' }).props.selected, true);
+  h.act(h.node('Chip', { label: 'Pix' }), 'onPress');
+  h.act(h.node('Chip', { label: 'Todos' }), 'onPress');
+  assert.equal(h.select('Conta').props.value, 'a');
+  assert.equal(h.node('TextField').props.value, 'mercado');
+  h.act(h.button('Aplicar'), 'onPress');
+  assert.deepEqual(h.applied, [{ ...value, multiSelections: { paymentMethods: [] } }]);
+});
+
+test('Limpar inclui seleção múltipla, mas cancelar não altera o pai', () => {
+  const value = wire({ ...original, multiSelections: { paymentMethods: ['pix', 'not_informed'] } });
+  const h = renderFilters(value, multipleOptions);
+  h.act(h.button('Limpar filtros'), 'onPress');
+  assert.equal(h.node('Chip', { label: 'Todos' }).props.selected, true);
+  assert.equal(h.node('Chip', { label: 'Pix' }).props.selected, false);
+  assert.deepEqual(h.applied, []);
+  h.act(h.node('TaskHeader'), 'onClose');
+  h.open();
+  assert.equal(h.node('Chip', { label: 'Não informado' }).props.selected, true);
+  h.act(h.button('Limpar filtros'), 'onPress');
+  h.act(h.button('Aplicar'), 'onPress');
+  assert.deepEqual(h.applied, [{}]);
+  assert.deepEqual(value.multiSelections.paymentMethods, ['pix', 'not_informed']);
+});
 
 test('busca preserva nomes e termos digitados sem autocorreção do teclado', () => {
   const h = renderFilters();

@@ -882,7 +882,7 @@ test('o resumo e a lista de lançamentos leem a mesma janela', () => {
     if (!lista) continue;
     const nome = file.replace(SRC, 'src');
     // AND pode desligar o resumo oculto, mas nunca ligá-lo antes das bordas definitivas.
-    const resumo = code.match(/useTransactionsSummary\(\s*([\w.]+)\.from\s*,\s*\1\.to\s*,\s*\1\.pronto(?:\s*&&\s*!?\w+)?\s*\)/);
+    const resumo = code.match(/useTransactionsSummary\(\s*([\w.]+)\.from\s*,\s*\1\.to\s*,\s*\1\.pronto(?:\s*&&\s*!?\w+)*\s*\)/);
     if (!resumo) fora.push(`${nome}: o resumo não lê from/to/pronto da mesma variável da lista`);
     else if (resumo[1] !== lista[1]) fora.push(`${nome}: resumo lê ${resumo[1]}, lista lê ${lista[1]}`);
   }

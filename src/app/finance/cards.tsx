@@ -24,7 +24,7 @@ import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { useArchiveAccount, useArquivados, useCardSummary, type CardSummary } from '@/hooks/use-finance';
-import { formatBRL, formatDateBR } from '@/hooks/use-items';
+import { formatDateBR } from '@/hooks/use-items';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { Deslizavel } from '@/components/ui/deslizavel';
@@ -296,7 +296,7 @@ export default function CardsScreen() {
                 { label: 'Editar cartão', icon: 'pencil', onPress: () => router.push(`/finance/accounts?edit=${card.account_id}`) },
                 { label: 'Arquivar cartão', curto: 'Arquivar', icon: 'archivebox', destructive: true, arrasto: 'esquerda', onPress: () => arquivar(card) },
               ]}
-              accessibilityLabel={`${card.name}, ${estado ? `fatura ${estado.toLowerCase()}` : 'sem fatura aberta'}, ${formatBRL(totalFatura)}${card.due_date ? `, ${prazoLabel(card.due_date, 'vence')}` : ''}`}>
+              accessibilityLabel={`${card.name}, ${estado ? `fatura ${estado.toLowerCase()}` : 'sem fatura aberta'}, ${brl(totalFatura)}${card.due_date ? `, ${prazoLabel(card.due_date, 'vence')}` : ''}`}>
               <View style={styles.cardHead}>
                 <Miniatura card={card} onPress={() => abrirNaCarteira(card)} />
                 <ThemedText type="smallBold" style={styles.cardName}>

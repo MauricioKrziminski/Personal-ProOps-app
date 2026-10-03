@@ -28,7 +28,7 @@ Esses fatos e a abertura do formulário ainda não equivalem ao aceite funcional
 | F02 | Criar origem no fluxo | Aceite técnico no staging em 02/10/2026 | Validado na matriz | Validado na matriz |
 | F03 | Saldo/limite no seletor | Aceito; qualidade explícita, privacidade e consultas agregadas | Validado; limites no registro | Validado; offline/recuperação incluídos |
 | F04 | Prévia do efeito | Aceito; argumentos compartilhados, rollback e identidade | Validado; entrada/edição/pendente/fonte/iPad | Validado; centavos/privacidade/offline/compacto |
-| F05 | Filtros por pagamento | Aguardando F04 | Não validado | Não validado |
+| F05 | Filtros por pagamento | Aceito; seleção múltipla, paginação e dados preservados | Validado; fonte/privacidade/iPad; limites no registro | Validado; página 2/offline/recuperação/compacto |
 | F06 | Classificações independentes | Aguardando F05 | Não validado | Não validado |
 | F07 | Reserva dedicada | Aguardando F06 | Não validado | Não validado |
 | F08 | Metas no planejamento | Aguardando F07 | Não validado | Não validado |
@@ -174,8 +174,31 @@ no cartão usa a conta pagadora e a fatura resolvida na regra compartilhada do s
 
 [Contrato e fronteira](f04/contrato.md), [registro completo](f04/registro-nativo.md),
 [31 capturas com origem/SHA](f04/captures.json), [persistência sanitizada](f04/persistencia-test.json)
-e [veredito visual ship](f04/revisao-visual.md). TypeScript/lint exit0; Node1560/1560;
+e [veredito visual ship](f04/revisao-visual.md). TypeScript/lint exit 0; Node1560/1560;
 SQL do incremento/API/staging e saves únicos conferidos. A suíte antiga de recorrência
 com fixture vencida/assertion física de histórico continua registrada como falha; não foi
 contada como verde. Limites nativos e de hardware constam do registro. Duas migrations
 aplicadas só no staging, sem seeds/roles. Nenhum push/release/produção. F05 liberado.
+
+
+## F05 — recortes por pagamento
+
+Aceite técnico no staging em 03/10/2026. Seleção múltipla no componente compartilhado,
+rascunho cancelável, Todos por grupo, Não informado explícito, contagem/resumo humano,
+links validados e filtragem no servidor antes da paginação. As previsões usam a mesma
+seleção sem materialização; o resumo global fica oculto em recortes. QA também corrigiu
+dinheiro excessivamente encolhido no Row iOS e nomes acessíveis que revelavam valores ocultos.
+
+TypeScript/lint exit 0; suíte completa **1.590 passed, 0 failed/skip/cancelled**. HTTP real
+compara 10 recortes e todas as páginas com leitura independente; todas as colunas dos
+121 lançamentos, 7 recorrências, 10 planos e 4 dívidas permanecem idênticas.
+iOS/Android cobrem draft/aplicar/limpar/links/busca/conta/detalhe, previsões, dinheiro
+máximo sintético, ocultação visual/acessível, temas e fonte ampliada; Android inclui
+página 2 e offline/recuperação. iPad e viewport 800dp Android conferidos. Revisão independente
+**ship**, após abrir as 23 capturas finais; nenhum defeito visual material de F05.
+
+[Contrato](f05/contrato.md), [registro nativo e limites](f05/registro-nativo.md),
+[prova sanitizada de leitura](f05/leitura-staging.json), [capturas verificadas](f05/captures.json)
+e [revisão visual](f05/revisao-visual.md). Sem migration, escrita financeira, produção,
+push ou release. Offline iOS, fala de leitor de tela, hardware físico e benchmark de
+frames não foram certificados. A restauração das preferências dos simuladores foi concluída.

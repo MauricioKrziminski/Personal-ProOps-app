@@ -326,6 +326,31 @@ material já escolhido pelo kit em cada plataforma. O bloco não acrescenta her�
   [contrato F04](docs/qa/2026-10-02-evolucao-financeira/f04/contrato.md), não amplia a regra para
   operações ainda sem comando de edição conectado.
 
+### Filtros de lista e dinheiro acessível (F05)
+Extensão do kit Suave / Papel e Tinta: `ListFilters` reúne os critérios na folha existente,
+com `Field`, `Chip`, `TaskHeader` e `SheetScroll`. Os chips quebram em fileiras, conservam
+rótulos completos e estado selecionado acessível, com material, feedback tátil e Reduce Motion
+do primitivo em cada plataforma.
+
+- **Seleção múltipla reutilizável:** `multiSelects` define grupos e opções;
+  `ListFiltersValue.multiSelections` guarda suas escolhas. Cada abertura copia a seleção aplicada
+  para um rascunho. Aplicar confirma; fechar, arrastar ou voltar descarta. Todos remove só o grupo;
+  Limpar filtros limpa o rascunho inteiro e também depende de Aplicar. Cada grupo múltiplo ativo
+  conta como um critério. Filtros são locais à visita, sem preferência persistida.
+- **Recorte compreensível:** Formas de pagamento reúne Pix, Crédito, Débito, Dinheiro,
+  Transferência, Boleto e Não informado. Não informado significa metadata ausente, sem deduzir
+  pela conta. Folha, contagem e resumo compartilham opções e nomes humanos. O resumo visual
+  pode mostrar dois critérios e “mais N”; o acessível conserva todos os nomes. Em Lançamentos,
+  um recorte retira o resumo financeiro global, sem substituí-lo por soma parcial de páginas.
+- **Dinheiro legível:** `Row` com `inlineValue` preserva o tamanho do dinheiro quando duas
+  colunas cabem. Largura medida e piso do título ajustado à escala da fonte governam o fallback:
+  reservar uma linha inteira ao valor e só então permitir ajuste nessa linha. Valor e chevron
+  permanecem juntos; título e legenda quebram e a célula cresce. A coluna fixa mantém seu ajuste.
+- **Mesma privacidade em texto e acessibilidade:** frases de leitura e labels monetários usam
+  `useBRL`; ocultos, mostram a máscara uniforme `••••••`; revelados, conservam centavos e sinal.
+  `FilterBar` desmonta a camada anterior do crossfade ao alternar ocultação. Campos editáveis
+  continuam sendo campos de valor, não frases mascaradas.
+
 ## Do's and Don'ts
 
 ### Do:
@@ -334,6 +359,9 @@ material já escolhido pelo kit em cada plataforma. O bloco não acrescenta her�
 - **Do** escrever rótulo curto + valor; a explicação vai na confirmação da ação.
 - **Do** usar `tabular-nums` em todo número que conta, mede ou custa.
 - **Do** verificar em 384dp com fonte 1,3 e nos dois temas.
+- **Do** reutilizar `ListFilters.multiSelects` e `multiSelections`: rascunho por abertura, Aplicar confirma, cancelar descarta, Todos limpa só o grupo e Limpar filtros limpa o rascunho inteiro.
+- **Do** contar cada grupo múltiplo como um critério e conservar nomes humanos completos no resumo acessível, mesmo quando o resumo visual usa “mais N”.
+- **Do** usar `useBRL` em frases de leitura e labels monetários para manter a mesma ocultação do valor visível.
 - **Do** resolver cor FORA do `Canvas` do Skia e passá-la por prop — lá dentro não há contexto do
   React, e `useTheme()` devolve a paleta errada sem erro nenhum.
 
@@ -342,6 +370,7 @@ material já escolhido pelo kit em cada plataforma. O bloco não acrescenta her�
 - **Don't** usar cor como decoração — nem a do banco fora do cartão, nem roxo como accent.
 - **Don't** usar vidro, degradê ou brilho em conteúdo.
 - **Don't** truncar identificador; quebre a linha.
+- **Don't** encolher todo dinheiro inline: preserve o tamanho quando cabe e deixe o `Row` reservar uma linha inteira quando largura e escala exigirem.
 - **Don't** mover dado que a pessoa está lendo por estética.
 - **Don't** pôr etiqueta acima de um título: ela gasta a primeira linha dizendo o que ninguém veio
   ler. A data vem DEPOIS da saudação.

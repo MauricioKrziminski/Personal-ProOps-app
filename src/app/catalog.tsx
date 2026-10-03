@@ -44,10 +44,24 @@ export default function CatalogScreen() {
   const [temaVisual, setTemaVisual] = useState<'system' | 'light' | 'dark'>('system');
   const [bloqueioVisual, setBloqueioVisual] = useState<'off' | 'on'>('off');
   const [valor, setValor] = useState(4500);
-  const { glass } = useLocalSearchParams<{ glass?: string }>();
+  const { glass, rows } = useLocalSearchParams<{ glass?: string; rows?: string }>();
 
   // Rota de desenvolvimento: não existe em build de produção.
   if (!__DEV__) return <Redirect href="/" />;
+
+  // Casos de geometria do dinheiro: nenhuma query ou gravação financeira é necessária.
+  if (rows === '1') return <Screen grouped>
+    <Section title="Dinheiro nas linhas">
+      <Row title="Extrato com valor curto" icon="banknote" inlineValue chevron
+        trailing={<Money cents={-1235} variant="ticker" />} />
+      <Row title="Extrato com valor grande" icon="banknote" inlineValue chevron
+        trailing={<Money cents={-99999999999} variant="ticker" />} />
+      <Row title="Coluna com valor curto" icon="banknote" chevron
+        trailing={<Money cents={-1235} variant="ticker" />} />
+      <Row title="Coluna com valor grande" icon="banknote" chevron
+        trailing={<Money cents={-99999999999} variant="ticker" />} />
+    </Section>
+  </Screen>;
 
   // Rota de inspeção: superfícies em cima de cores diferentes tornam a refração do
   // material nativo visível no simulador, sem depender de dados da conta.

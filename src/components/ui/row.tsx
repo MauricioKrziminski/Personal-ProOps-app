@@ -102,12 +102,16 @@ export function Row({
   const [larguraDaLinha, setLarguraDaLinha] = useState(0);
   const larguraUtil = Math.max(0, (larguraDaLinha || width) - Space.lg * (2 + Math.max(0, indent)));
   const pisoDoTitulo = usePisoDoTitulo(larguraUtil);
+  // Se duas colunas com o piso tipográfico não cabem, o extrato dá a linha inteira ao valor.
+  // Largura explícita impede o ajuste de fonte durante uma medida estreita ao lado do título.
+  const valorEmLinhaInteira = inlineValue && pisoDoTitulo.minWidth * 2 > larguraUtil - (icon ? styles.iconChip.width + Space.md : 0);
   const valor =
     trailing || (chevron ?? !!onPress) ? (
-      <View style={styles.trailing}>
+      <View style={[styles.trailing, valorEmLinhaInteira && { width: larguraUtil }]}>
         {trailing ? <View style={styles.valor}>
-          {/* Mesmo sozinho, o valor tem a largura finita da linha. Ajusta só quando não cabe. */}
-          <DinheiroEncolhe.Provider value={true}>{trailing}</DinheiroEncolhe.Provider>
+          {/* Ajuste na coluna fixa, ou sobre a linha inteira reservada ao valor. O extrato
+              normal quebra sem ajustar na medida transitória ao lado do título. */}
+          <DinheiroEncolhe.Provider value={!inlineValue || valorEmLinhaInteira}>{trailing}</DinheiroEncolhe.Provider>
         </View> : null}
         {(chevron ?? !!onPress) ? (
           <Icon name="chevron.right" size="sm" color="textSecondary" />
@@ -347,6 +351,7 @@ const styles = StyleSheet.create({
     gap: Space.xs,
     marginLeft: 'auto',
     maxWidth: '100%',
+    justifyContent: 'flex-end',
   },
   valor: { flexShrink: 1, minWidth: 0 },
   /** O chip do ícone é um círculo suave, como nas listas dos vídeos de referência. */

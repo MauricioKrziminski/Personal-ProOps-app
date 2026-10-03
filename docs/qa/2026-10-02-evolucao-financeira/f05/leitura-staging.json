@@ -1,0 +1,139 @@
+{
+  "environment": "staging TEST",
+  "financialWrites": 0,
+  "queryCases": [
+    {
+      "case": "pix",
+      "records": 19,
+      "pages": [
+        19
+      ],
+      "recordsBeyondGlobalFirst50": 14
+    },
+    {
+      "case": "null",
+      "records": 57,
+      "pages": [
+        50,
+        7
+      ],
+      "recordsBeyondGlobalFirst50": 32
+    },
+    {
+      "case": "multiple-plus-null",
+      "records": 86,
+      "pages": [
+        50,
+        36
+      ],
+      "recordsBeyondGlobalFirst50": 50
+    },
+    {
+      "case": "method-account-status-search",
+      "records": 4,
+      "pages": [
+        4
+      ],
+      "recordsBeyondGlobalFirst50": 1
+    },
+    {
+      "case": "method-pending-values",
+      "records": 4,
+      "pages": [
+        4
+      ],
+      "recordsBeyondGlobalFirst50": 0
+    },
+    {
+      "case": "from-only",
+      "records": 19,
+      "pages": [
+        19
+      ],
+      "recordsBeyondGlobalFirst50": 14
+    },
+    {
+      "case": "to-only",
+      "records": 27,
+      "pages": [
+        27
+      ],
+      "recordsBeyondGlobalFirst50": 27
+    },
+    {
+      "case": "empty",
+      "records": 0,
+      "pages": [
+        0
+      ],
+      "recordsBeyondGlobalFirst50": 0
+    },
+    {
+      "case": "receiving-transfer",
+      "records": 2,
+      "pages": [
+        2
+      ],
+      "recordsBeyondGlobalFirst50": 2
+    },
+    {
+      "case": "clear",
+      "records": 121,
+      "pages": [
+        50,
+        50,
+        21
+      ],
+      "recordsBeyondGlobalFirst50": 71
+    }
+  ],
+  "expectedLines": 3,
+  "expectedMethods": [
+    "boleto"
+  ],
+  "comparison": [
+    {
+      "table": "transactions",
+      "before": 121,
+      "after": 121,
+      "allFieldsUnchanged": true,
+      "snapshotSha256": "f66b81f39c6a30255b588e39368ab8e88c61f67d3bd641a73587236b0fd4f936"
+    },
+    {
+      "table": "recurring_transactions",
+      "before": 7,
+      "after": 7,
+      "allFieldsUnchanged": true,
+      "snapshotSha256": "e18870b7c8ee7dc5326c48c3803f735c218a86544bab19b5ba84ee1a9ffdf024"
+    },
+    {
+      "table": "installment_plans",
+      "before": 10,
+      "after": 10,
+      "allFieldsUnchanged": true,
+      "snapshotSha256": "d9f1b62005cd87b23355798e71386baf9abe19993ead0ab77df3dfa313586a2b"
+    },
+    {
+      "table": "debts",
+      "before": 4,
+      "after": 4,
+      "allFieldsUnchanged": true,
+      "snapshotSha256": "214c3a160906c25b2e8214cb23bfe9beda85328b9ca582d434ce9dd220ec48cc"
+    }
+  ],
+  "checks": {
+    "typecheck": {
+      "exit": 0
+    },
+    "lint": {
+      "exit": 0
+    },
+    "node": {
+      "exit": 0,
+      "tests": 1590,
+      "pass": 1590,
+      "fail": 0,
+      "skipped": 0
+    }
+  }
+}

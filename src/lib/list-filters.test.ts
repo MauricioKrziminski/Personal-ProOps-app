@@ -2,6 +2,19 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as filters from './list-filters.ts';
 
+test('seleção múltipla conta um critério por grupo e descreve opções em ordem estável', () => {
+  const value = { q: 'mercado', multiSelections: { paymentMethods: ['unknown', 'pix', 'pix'], empty: [] } };
+  const multiSelects = [{ key: 'paymentMethods', label: 'Formas de pagamento', options: [
+    { id: 'pix', label: 'Pix' }, { id: 'boleto', label: 'Boleto' }, { id: 'unknown', label: 'Não informado' },
+  ] }];
+  assert.equal(filters.listFilterCount(value), 2);
+  assert.deepEqual(filters.listFilterDetails(value, { multiSelects, formatAmount: String }),
+    ['Busca: mercado', 'Formas de pagamento: Pix, Não informado']);
+  assert.equal(filters.listFilterCount({ multiSelections: { one: ['', ''], two: [] } }), 0);
+  assert.deepEqual(filters.listFilterDetails({ multiSelections: { paymentMethods: ['private-id'], other: ['raw-id'] } },
+    { multiSelects, formatAmount: String }), ['Formas de pagamento: seleção indisponível', 'Critério selecionado']);
+});
+
 test('resumo descreve datas e valores como intervalos e resolve seleções pelos mesmos rótulos da folha', () => {
   const value = { q: '  aluguel  ', from: '2026-09-01', to: '2026-09-30', minCents: 0, maxCents: 20000,
     selections: { account: 'a', status: 'paused', empty: '' } };

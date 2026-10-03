@@ -5,6 +5,7 @@ import type { NoteColorName } from '@/constants/theme';
 import { aparenciaDaCategoria, nomeDaCategoria, type Categoria } from '@/lib/categorias';
 import { contaNaFatura } from '@/lib/card-status';
 import { assertPaymentMethod, type PaymentMethod } from '@/lib/payment-method';
+import { normalizePaymentMethodFilters, paymentMethodFilterExpression, type PaymentMethodFilter } from '@/lib/payment-method-filters';
 import { invalidateFinance, invalidateKeys } from '@/lib/query-invalidation';
 import type { Natureza } from '@/lib/import-preview';
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -240,6 +241,8 @@ export interface TransactionFilters {
   accountId?: string | null;
   status?: TransactionStatus;
   source?: TransactionSource;
+  /** Empty = all; `not_informed` explicitly includes historical null metadata. */
+  paymentMethods?: readonly PaymentMethodFilter[];
   /** Busca em descrição, lugar e categoria. */
   q?: string;
   minCents?: number;
@@ -264,13 +267,17 @@ const TRANSACTION_PAGE = 50;
 
 /** Lista paginada. Antes era `limit(200)` fixo, que sumia com o resto do mês sem avisar. */
 export function useTransactions(filters: TransactionFilters) {
+  const { paymentMethods: rawPaymentMethods, ...otherFilters } = filters;
+  const paymentMethods = normalizePaymentMethodFilters(rawPaymentMethods);
+  const paymentExpression = paymentMethodFilterExpression(paymentMethods);
+  const canonicalFilters = paymentMethods.length ? { ...otherFilters, paymentMethods } : otherFilters;
   useRealtimeInvalidate('transactions', ['transactions']);
   const { from, to } = filters;
   return useInfiniteQuery({
     // Chaveada por `from`/`to`, que é como toda leitura de período do app já se conserta sozinha
     // na troca de régua (ver `REGUA_MUDOU`). Chaveada pelo RÓTULO do mês ela não se corrigiria:
     // `2026-10` é o mesmo texto nas duas réguas.
-    queryKey: ['transactions', 'list', filters],
+    queryKey: ['transactions', 'list', canonicalFilters],
     initialPageParam: 0,
     queryFn: async ({ pageParam }): Promise<Transaction[]> => {
       let query = supabase.from('transactions').select(TRANSACTION_COLUMNS);
@@ -296,6 +303,7 @@ export function useTransactions(filters: TransactionFilters) {
         query = query.or(estado.ou);
       }
       if (filters.source) query = query.eq('source', filters.source);
+      if (paymentExpression) query = query.or(paymentExpression);
       // "Ver ocorrências" de uma recorrente passa por aqui; sem o filtro a tela abriria o mês
       // inteiro sem avisar que ignorou o pedido.
       if (filters.recurringId) query = query.eq('recurring_id', filters.recurringId);

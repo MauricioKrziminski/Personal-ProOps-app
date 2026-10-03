@@ -103,10 +103,15 @@ Arquivos: `finance-write-input.ts`, `lancamento-write.ts`, `finance-write-previe
 
 Arquivos: `transactions.tsx`, detalhe, `TransactionFilters`, query do ledger esperado e testes de filtros. Interface: métodos[]/não informado explicitamente distinguíveis de filtro ausente.
 
-- [ ] RED: filtragem antes de paginação e paridade materializado/previsto.
-- [ ] Implementar filtros/links/chaves/cache e detalhe com a mesma semântica.
-- [ ] Provar combinações/datas abertas/páginas e total coerente.
-- [ ] Executar gates e matriz nativa F05; registrar aceite.
+- [x] RED: filtragem antes de paginação e paridade materializado/previsto.
+- [x] Implementar filtros/links/chaves/cache e detalhe com a mesma semântica.
+- [x] Provar combinações/datas abertas/páginas e total coerente.
+- [x] Executar gates e matriz nativa F05; registrar aceite.
+
+Aceite técnico no staging em 03/10/2026: [contrato e evidências F05](../../qa/2026-10-02-evolucao-financeira/f05/registro-nativo.md),
+1.590 testes verdes, HTTP real/paginação, iOS/Android/iPad/viewport 800dp e revisão visual
+independente ship. Dados financeiros idênticos antes/depois. Offline iOS e aparelhos
+físicos permanecem limites explícitos; não são substituídos por testes de código.
 
 ### F06 — Duas classificações independentes
 

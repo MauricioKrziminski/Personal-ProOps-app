@@ -302,7 +302,7 @@ export default function GoalsScreen() {
         <Deslizavel titulo={g.name} acoes={acoesDaMeta(g)} forma="card">
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel={`${g.name}, ${formatBRL(saved)} de ${formatBRL(target)}, ${Math.round(pct * 100)} por cento${concluida ? ', concluída' : `, faltam ${formatBRL(falta)}`}`}
+          accessibilityLabel={`${g.name}, ${brl(saved)} de ${brl(target)}, ${Math.round(pct * 100)} por cento${concluida ? ', concluída' : `, faltam ${brl(falta)}`}`}
           onPress={() => abrirAporte(g)}
           onLongPress={() => acoes(g)}>
           <Card style={styles.meta}>
@@ -641,7 +641,7 @@ export default function GoalsScreen() {
                     title={isoToBR(c.occurred_at)}
                     subtitle={c.note ?? undefined}
                     chevron={false}
-                    accessibilityLabel={`${isoToBR(c.occurred_at)}, ${Number(c.amount_cents) < 0 ? 'retirada' : 'depósito'} de ${formatBRL(Math.abs(Number(c.amount_cents)))}`}
+                    accessibilityLabel={`${isoToBR(c.occurred_at)}, ${Number(c.amount_cents) < 0 ? 'retirada' : 'depósito'} de ${brl(Math.abs(Number(c.amount_cents)))}`}
                     onLongPress={acoesDoAporte.length ? () => showItemActions(isoToBR(c.occurred_at), acoesDoAporte) : undefined}
                     trailing={
                       <Money cents={Number(c.amount_cents)} variant="ticker" tone="auto" signed />

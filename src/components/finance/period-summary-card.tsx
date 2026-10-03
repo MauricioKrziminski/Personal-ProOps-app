@@ -10,7 +10,7 @@ import { ProgressBar } from '@/components/ui/sparkline';
 import { Motion, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import type { CycleRow } from '@/hooks/use-finance';
-import { formatBRL } from '@/hooks/use-items';
+import { useBRL } from '@/components/ui/conceal';
 import { describeCycle } from '@/lib/cycle-label';
 
 interface Props {
@@ -77,6 +77,7 @@ export function PeriodSummaryCard({
   onAbrirCiclo,
 }: Props) {
   const theme = useTheme();
+  const brl = useBRL();
   const escala = Math.max(entrou, saiu, 1);
 
   /*
@@ -120,7 +121,7 @@ export function PeriodSummaryCard({
               ⚠️ `cents / 100` é lido como "35196.9". Quem escreve dinheiro para leitor de tela
               é o mesmo formatador da tela — senão o número falado não é o número visto.
             */
-            accessibilityLabel={`${d.label} ${formatBRL(d.cents)}, por data do pagamento. Ver tudo que fecha o ciclo`}
+            accessibilityLabel={`${d.label} ${brl(d.cents)}, por data do pagamento. Ver tudo que fecha o ciclo`}
             accessibilityHint="Abre a lista por data do pagamento, com as faturas">
             {({ pressed }) => (
               <View
@@ -214,6 +215,7 @@ function Fluxo({
   /** A barra de "entrou" é a mais clara das duas; "saiu" fica em cinza de dado. */
   forte?: boolean;
 }) {
+  const brl = useBRL();
   const jaAconteceu = Math.max(0, cents - previsto);
   // Nada pendente = a barra cheia já diz tudo, e a linha repetiria o total (§1, eco).
   const mostrarSplit = previsto > 0;
@@ -228,8 +230,8 @@ function Fluxo({
     <View
       style={styles.fluxo}
       accessible
-      accessibilityLabel={`${rotulo} ${formatBRL(cents)}${
-        mostrarSplit ? `, já aconteceu ${jaAconteceu === 0 ? 'nada ainda' : formatBRL(jaAconteceu)}` : ''
+      accessibilityLabel={`${rotulo} ${brl(cents)}${
+        mostrarSplit ? `, já aconteceu ${jaAconteceu === 0 ? 'nada ainda' : brl(jaAconteceu)}` : ''
       }`}>
       <View style={styles.fluxoTopo}>
         <ThemedText type="caption" themeColor="textSecondary">

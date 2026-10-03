@@ -44,7 +44,6 @@ import {
 } from '@/hooks/use-finance';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useRealtimeInvalidate } from '@/hooks/use-items';
-import { formatBRL } from '@/lib/dates';
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
 import { supabase } from '@/lib/supabase';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
@@ -334,7 +333,7 @@ export default function BudgetsScreen() {
         <Deslizavel titulo={b.category} acoes={acoesDoOrcamento(b)} forma="card">
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel={`${b.category}, gastou ${formatBRL(gastoCents)} de ${formatBRL(limiteCents)}${comprometido > 0 ? `, mais ${formatBRL(comprometido)} comprometidos` : ''}, ${Math.round(pct * 100)} por cento${estourou ? ', estourou' : ''}`}
+          accessibilityLabel={`${b.category}, gastou ${brl(gastoCents)} de ${brl(limiteCents)}${comprometido > 0 ? `, mais ${brl(comprometido)} comprometidos` : ''}, ${Math.round(pct * 100)} por cento${estourou ? ', estourou' : ''}`}
           onPress={() => verLancamentos(b.category)}
           onLongPress={() => acoes(b)}>
           <Card style={styles.linha}>

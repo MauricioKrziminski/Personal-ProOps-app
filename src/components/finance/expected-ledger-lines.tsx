@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 
 import { Deslizavel } from '@/components/ui/deslizavel';
+import { useBRL } from '@/components/ui/conceal';
 import { Money } from '@/components/ui/money';
 import { Row } from '@/components/ui/row';
 import { useToast } from '@/components/ui/toast';
@@ -134,6 +135,7 @@ export function LinhaPrevista({ line, hoje, conta, acoes, onAbrir }: {
   acoes: ItemAction[];
   onAbrir: () => void;
 }) {
+  const brl = useBRL();
   const aparencia = useAparencia()(line.category, line.kind);
   const estado = estadoDaPrevista(line, hoje);
   const subtitulo = [origemDaPrevista(line), line.category, conta?.replace(/ /g, ' ')].filter(Boolean).join(' · ');
@@ -149,7 +151,7 @@ export function LinhaPrevista({ line, hoje, conta, acoes, onAbrir }: {
         subtitle={subtitulo}
         icon={aparencia.icon}
         tinta={aparencia.cor}
-        accessibilityLabel={`${line.description}, ${formatBRL(line.amount_cents)}, ${line.kind === 'income' ? 'receita' : 'despesa'}, ${origemDaPrevista(line)}${estado ? `, ${estado}` : ''}`}
+        accessibilityLabel={`${line.description}, ${brl(line.amount_cents)}, ${line.kind === 'income' ? 'receita' : 'despesa'}, ${origemDaPrevista(line)}${estado ? `, ${estado}` : ''}`}
         onPress={onAbrir}
         onLongPress={() => showItemActions(line.description, acoes)}
         trailing={

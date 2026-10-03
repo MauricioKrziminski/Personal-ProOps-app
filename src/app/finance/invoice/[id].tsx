@@ -706,7 +706,7 @@ export default function InvoiceScreen() {
                         subtitle={[tx.category, parcela, rotuloDaCompra(tx), prevista ? 'prevista' : null]
                           .filter(Boolean)
                           .join(' · ')}
-                        accessibilityLabel={`${tx.description ?? 'Sem descrição'}, ${formatBRL(tx.amount_cents)}${prevista ? ', parcela prevista' : ''}`}
+                        accessibilityLabel={`${tx.description ?? 'Sem descrição'}, ${brl(tx.amount_cents)}${prevista ? ', parcela prevista' : ''}`}
                         onLongPress={onLongPress}
                         trailing={
                           <Money

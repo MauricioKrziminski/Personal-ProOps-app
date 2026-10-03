@@ -4,19 +4,20 @@ import { MudancaSuave } from '@/components/motion/presenca';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { useBRL, useConceal } from '@/components/ui/conceal';
-import type { FilterSelect } from '@/components/ui/list-filters';
+import type { FilterMultiSelect, FilterSelect } from '@/components/ui/list-filters';
 import { Space } from '@/design/tokens';
 import { listFilterCount, listFilterDetails, type ListFiltersValue } from '@/lib/list-filters';
 
 /** Um ponto de edição; texto explica o recorte sem repetir controles da folha. */
-export function FilterBar({ value, onPress, selects, dateLabel, valueLabel, defaultLabel }: {
+export function FilterBar({ value, onPress, selects, multiSelects, dateLabel, valueLabel, defaultLabel }: {
   value: ListFiltersValue; onPress: () => void; selects?: readonly FilterSelect[];
+  multiSelects?: readonly FilterMultiSelect[];
   dateLabel?: string; valueLabel?: string; defaultLabel: string;
 }) {
   const brl = useBRL();
   const { concealed } = useConceal();
   const count = listFilterCount(value);
-  const details = listFilterDetails(value, { selects, dateLabel, valueLabel, formatAmount: brl });
+  const details = listFilterDetails(value, { selects, multiSelects, dateLabel, valueLabel, formatAmount: brl });
   const summary = [...details.slice(0, 2), ...(details.length > 2 ? [`mais ${details.length - 2}`] : [])].join(' · ') || defaultLabel;
   return <View style={styles.row}>
     <View style={styles.summary}>

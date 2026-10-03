@@ -25,7 +25,7 @@ import { useAccounts, useCardInvoices, type CardInvoiceHistory } from '@/hooks/u
 import { useAosPoucos } from '@/hooks/use-aos-poucos';
 import { VerMais } from '@/components/ui/ver-mais';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
-import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
+import { formatDateBR, localISODate } from '@/hooks/use-items';
 import { showItemActions } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
 import { hrefDoLancar } from '@/lib/lancar';
@@ -318,7 +318,7 @@ export default function InvoicesScreen() {
             <HeroLabel>Últimas {serie.length} faturas</HeroLabel>
             <View
               accessibilityRole="image"
-              accessibilityLabel={`Fatura entre ${formatBRL(Math.min(...serie.map((i) => i.total_cents)))} e ${formatBRL(maior)} nas últimas ${serie.length} faturas, média de ${formatBRL(media)}`}
+              accessibilityLabel={`Fatura entre ${brl(Math.min(...serie.map((i) => i.total_cents)))} e ${brl(maior)} nas últimas ${serie.length} faturas, média de ${brl(media)}`}
               style={styles.bars}>
               {serie.map((invoice, index) => (
                 <Pressable
@@ -392,7 +392,7 @@ export default function InvoicesScreen() {
                   }
                   icon={situacao.atrasada ? 'exclamationmark.triangle' : 'creditcard'}
                   destructive={situacao.atrasada}
-                  accessibilityLabel={`${monthTitle(mes)}, ${formatBRL(invoice.total_cents)}, ${situacao.texto}, vence ${formatDateBR(invoice.due_date)}`}
+                  accessibilityLabel={`${monthTitle(mes)}, ${brl(invoice.total_cents)}, ${situacao.texto}, vence ${formatDateBR(invoice.due_date)}`}
                   trailing={
                     <Money
                       cents={invoice.total_cents}

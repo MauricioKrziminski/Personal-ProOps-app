@@ -313,3 +313,107 @@ test('erro remoto de importacao rejeita consulta; retry preserva recorte complet
   assert.deepEqual(wire(await query.queryFn({})), []);
   assert.equal(h.requests[0].url.search, h.requests[1].url.search);
 });
+
+test('transactions aplicam múltiplos meios e null antes de paginar, junto às outras condições OR', async () => {
+  const dataset = Array.from({ length: 173 }, (_, i) => ({
+    id: `tx-${i}`, payment_method: i % 3 === 0 ? 'pix' : i % 3 === 1 ? null : 'credit',
+    account_id: 'sender', counterparty_account_id: 'received', occurred_at: '2026-12-31',
+    created_at: '2026-12-31T00:00:00Z', amount_cents: 5000,
+  }));
+  const matching = dataset.filter(row => row.payment_method === 'pix' || row.payment_method === null);
+  const h = harness(request => {
+    const p = request.url.searchParams;
+    assert.ok(p.getAll('or').includes('(payment_method.in.(pix),payment_method.is.null)'),
+      'o servidor precisa receber o recorte antes de devolver qualquer página');
+    const offset = Number(p.get('offset'));
+    return { data: matching.slice(offset, offset + Number(p.get('limit'))) };
+  });
+  const input = Object.freeze({ from: '2026-12-31', to: '2027-01-01', paymentMethods: Object.freeze(['not_informed', 'pix', 'pix']),
+    status: 'pending', accountId: 'received', source: 'import', recurringId: 'series', kind: 'income',
+    q: 'loja', category: 'casa', minCents: 0, maxCents: 5000 });
+  const query = h.hooks.useTransactions(input);
+  const pages: Row[][] = [];
+  let next: number | undefined = 0;
+  while (next !== undefined) {
+    const page = await query.queryFn({ pageParam: next });
+    pages.push(page);
+    next = query.getNextPageParam!(page, pages);
+  }
+  assert.deepEqual(wire(pages.flat()), matching);
+  assert.equal(pages.flat().length, 116);
+  assert.ok(pages.flat().some(row => row.id === 'tx-171'), 'linha além das primeiras 50 originais também chega');
+  assert.deepEqual(h.requests.map(r => r.url.searchParams.get('offset')), ['0', '50', '100']);
+  for (const { url } of h.requests) {
+    const p = url.searchParams;
+    const ors = p.getAll('or');
+    assert.equal(ors.length, 4, 'status, pagamento, conta recebida e busca são grupos independentes em AND');
+    assert.ok(ors.includes('(invoice_id.is.null,occurred_at.gt.' + new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) + ')'));
+    assert.ok(ors.includes('(account_id.eq.received,counterparty_account_id.eq.received)'));
+    assert.ok(ors.includes('(description.ilike.%loja%,merchant.ilike.%loja%,category.ilike.%loja%)'));
+    assert.deepEqual(p.getAll('occurred_at'), ['gte.2026-12-31', 'lte.2027-01-01']);
+    assert.deepEqual(p.getAll('amount_cents'), ['gte.0', 'lte.5000']);
+    assert.equal(p.get('category'), 'eq.casa');
+    assert.equal(p.get('kind'), 'eq.income');
+    assert.equal(p.get('source'), 'eq.import');
+    assert.equal(p.get('status'), 'eq.pending');
+    assert.equal(p.get('recurring_id'), 'eq.series');
+    assert.equal(p.get('order'), 'occurred_at.desc,created_at.desc,id.desc');
+    assert.equal(p.get('limit'), '50');
+  }
+  assert.deepEqual(input.paymentMethods, ['not_informed', 'pix', 'pix']);
+});
+
+test('transactions distinguem null exclusivo, vários conhecidos, vazio e todos os métodos', async () => {
+  const h = harness();
+  const cases: [unknown[] | undefined, string | null][] = [
+    [['not_informed'], '(payment_method.is.null)'],
+    [['boleto', 'pix'], '(payment_method.in.(pix,boleto))'],
+    [[], null], [undefined, null],
+    [['pix', 'credit', 'debit', 'cash', 'bank_transfer', 'boleto', 'not_informed'],
+      '(payment_method.in.(pix,credit,debit,cash,bank_transfer,boleto),payment_method.is.null)'],
+  ];
+  for (const [paymentMethods, expression] of cases) {
+    await h.hooks.useTransactions({ to: '2026-09-30', paymentMethods, accountId: null }).queryFn({ pageParam: 0 });
+    const p = h.requests.at(-1)!.url.searchParams;
+    assert.equal(p.get('or'), expression);
+    assert.equal(p.get('account_id'), 'is.null');
+    assert.deepEqual(p.getAll('occurred_at'), ['lte.2026-09-30']);
+  }
+});
+
+test('transactions normalizam chave por métodos equivalentes e vazio sem alterar filtros antigos', () => {
+  const h = harness();
+  const base = { from: '2026-09-30', minCents: 0, pronto: false };
+  const reordered = Object.freeze({ ...base, paymentMethods: Object.freeze(['boleto', 'pix', 'pix']) });
+  const a = h.hooks.useTransactions(reordered);
+  const b = h.hooks.useTransactions({ ...base, paymentMethods: ['pix', 'boleto'] });
+  assert.deepEqual(wire(a.queryKey), wire(b.queryKey));
+  assert.deepEqual(wire(a.queryKey), ['transactions', 'list', { ...base, paymentMethods: ['pix', 'boleto'] }]);
+  assert.deepEqual(wire(h.hooks.useTransactions({ ...base, paymentMethods: [] }).queryKey),
+    wire(h.hooks.useTransactions(base).queryKey));
+  assert.deepEqual(wire(h.hooks.useTransactions({ ...base, paymentMethods: undefined }).queryKey),
+    ['transactions', 'list', base]);
+  assert.notDeepEqual(wire(a.queryKey), wire(h.hooks.useTransactions({ ...base, paymentMethods: ['not_informed'] }).queryKey));
+  assert.deepEqual(reordered.paymentMethods, ['boleto', 'pix', 'pix']);
+  assert.equal(a.enabled, false);
+});
+
+test('transactions recusam método inesperado antes de qualquer request', () => {
+  const h = harness();
+  for (const paymentMethods of [['pix', 'bad'], [null], ['pix),id.not.is.null']])
+    assert.throws(() => h.hooks.useTransactions({ paymentMethods }), /forma de pagamento válida/i);
+  assert.deepEqual(h.requests, []);
+});
+
+test('erro remoto de transactions mantém filtro de pagamento e data aberta no retry', async () => {
+  let fail = true;
+  const h = harness(() => fail ? { data: { code: 'XX000', message: 'pagamentos indisponíveis' }, status: 500 } : { data: [] });
+  const query = h.hooks.useTransactions({ from: '2026-09-30', paymentMethods: ['boleto', 'not_informed'] });
+  await assert.rejects(query.queryFn({ pageParam: 50 }), error => Boolean(error && typeof error === 'object'
+    && 'message' in error && error.message === 'pagamentos indisponíveis'));
+  fail = false;
+  assert.deepEqual(wire(await query.queryFn({ pageParam: 50 })), []);
+  assert.equal(h.requests[0].url.search, h.requests[1].url.search);
+  assert.equal(h.requests[1].url.searchParams.get('or'), '(payment_method.in.(boleto),payment_method.is.null)');
+  assert.deepEqual(h.requests[1].url.searchParams.getAll('occurred_at'), ['gte.2026-09-30']);
+});
