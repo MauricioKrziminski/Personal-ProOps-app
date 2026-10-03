@@ -1,0 +1,36 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-final-reading
+Launch app "com.proops.personal.dev" without stopping app... COMPLETED
+Tap on "Navigate up"... COMPLETED
+Scrolling UP until "Mais opções" is visible with speed 40, visibility percentage 100%, timeout 30000 ms, with centering disabled... COMPLETED
+Tap on "Mais opções"... COMPLETED
+Tap on "Projeção"... COMPLETED
+Scrolling DOWN until "Ajustar plano.*" is visible with speed 40, visibility percentage 100%, timeout 30000 ms, with centering enabled... COMPLETED
+Tap on "Ajustar plano.*"... COMPLETED
+Assert that "Menor disponibilidade no período" is visible... COMPLETED
+Take screenshot android-projection-context-final... COMPLETED
+Tap on "Fechar"... COMPLETED
+Tap on "Navigate up"... COMPLETED
+Scrolling UP until "Ocultar valor" is visible with speed 40, visibility percentage 100%, timeout 30000 ms, with centering disabled... COMPLETED
+Tap on "Ocultar valor"... COMPLETED
+Tap on "Mais opções"... COMPLETED
+Tap on "Metas"... COMPLETED
+Tap on "Simular juntas.*"... COMPLETED
+Assert that "Menor disponibilidade no período" is visible... COMPLETED
+Assert that id: goal-plan-result is visible... COMPLETED
+Assert that ".*R\$.*", Child of: id: goal-plan-result is not visible... COMPLETED
+Assert that "Disponibilidade negativa a partir de.*" is not visible... COMPLETED
+Assert that "Comparação do caixa previsto com disponibilidade após o plano.*" is not visible... COMPLETED
+Take screenshot android-planning-concealed-top... COMPLETED
+Tap on "Ver períodos"... COMPLETED
+Scrolling DOWN until "Caixa e disponível" is visible with speed 40, visibility percentage 100%, timeout 30000 ms, with centering enabled... COMPLETED
+Assert that ".*R\$.*", Child of: id: goal-plan-result is not visible... COMPLETED
+Take screenshot android-planning-concealed-periods... COMPLETED
+Tap on "Fechar"... COMPLETED
+Tap on "Navigate up"... COMPLETED
+Scrolling UP until "Mostrar valor" is visible with speed 40, visibility percentage 100%, timeout 30000 ms, with centering disabled... COMPLETED
+Tap on "Mostrar valor"... COMPLETED
+Assert that "Ocultar valor" is visible... COMPLETED
+Take screenshot android-conceal-preference-restored... COMPLETED

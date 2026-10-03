@@ -1,0 +1,35 @@
+appId: com.proops.personal.dev
+---
+- launchApp:
+    clearState: false
+    stopApp: false
+- tapOn: 'Fechar'
+- tapOn: 'Simular juntas.*'
+- extendedWaitUntil:
+    visible: 'Menor disponibilidade no período'
+    timeout: 30000
+- takeScreenshot: android-cross-device-fresh-top
+- scrollUntilVisible:
+    element:
+      text: 'Aporte mensal para Reserva de emergência'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- assertVisible: '700,00'
+- assertVisible: 'Primeiro aporte para Reserva de emergência.*31/10/2026'
+- takeScreenshot: android-cross-device-fresh-form
+- tapOn: 'Aporte mensal para Reserva de emergência'
+- eraseText: 6
+- inputText: '80000'
+- tapOn:
+    text: 'Done'
+    optional: true
+- assertVisible: '800,00'
+- assertVisible: 'Primeiro aporte para Reserva de emergência.*31/10/2026'
+- takeScreenshot: android-save-800-draft
+- tapOn: 'Salvar'
+- extendedWaitUntil:
+    notVisible: 'Plano de metas'
+    timeout: 30000
+- assertVisible: 'Simular juntas.*'
+- takeScreenshot: android-save-800-returned-goals

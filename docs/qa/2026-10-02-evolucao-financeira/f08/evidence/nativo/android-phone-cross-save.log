@@ -1,0 +1,35 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-cross-save
+Launch app "com.proops.personal.dev" without stopping app... COMPLETED
+Tap on "Fechar"... COMPLETED
+Tap on "Simular juntas.*"... COMPLETED
+Assert that "Menor disponibilidade no período" is visible... COMPLETED
+Take screenshot android-cross-device-fresh-top... COMPLETED
+Scrolling DOWN until "Aporte mensal para Reserva de emergência" is visible with speed 40, visibility percentage 100%, timeout 30000 ms, with centering enabled... COMPLETED
+Assert that "700,00" is visible... COMPLETED
+Assert that "Primeiro aporte para Reserva de emergência.*31/10/2026" is visible... COMPLETED
+Take screenshot android-cross-device-fresh-form... COMPLETED
+Tap on "Aporte mensal para Reserva de emergência"... COMPLETED
+Erase 6 characters... COMPLETED
+Input text 80000... COMPLETED
+Tap on (Optional) "Done"... COMPLETED
+Assert that "800,00" is visible... COMPLETED
+Assert that "Primeiro aporte para Reserva de emergência.*31/10/2026" is visible... COMPLETED
+Take screenshot android-save-800-draft... COMPLETED
+Tap on "Salvar"... COMPLETED
+Assert that "Plano de metas" is not visible... FAILED
+
+Assertion is false: "Plano de metas" is not visible
+
+Assertion '"Plano de metas" is not visible' failed. Check the UI hierarchy in debug artifacts to verify the element state and properties.
+
+Possible causes:
+- Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
+- Element may be temporarily unavailable due to loading state
+- This could be a real regression that needs to be addressed
+
+==== Debug output (logs & screenshots) ====
+
+/private/tmp/proops-f08-native/android-phone-cross-save/.maestro/tests/2026-10-03_153925

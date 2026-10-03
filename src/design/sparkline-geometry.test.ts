@@ -15,6 +15,13 @@ test('série plana não divide por zero', () => {
   assert.ok(Number.isFinite(e.y(500)));
 });
 
+test('comparison shares the vertical scale and preserves the chronological width', () => {
+  const e = escalaDaSerie([0, 50], 112, 56, [100, 150])!;
+  assert.ok(e.lo <= 0 && e.hi >= 150, 'both series must fit the same financial scale');
+  assert.equal(e.x(1), 106);
+  assert.ok(e.y(150) < e.y(50));
+});
+
 test('menos de dois pontos ou largura zero não têm escala', () => {
   assert.equal(escalaDaSerie([1], 100, 50), null);
   assert.equal(escalaDaSerie([1, 2], 0, 50), null);

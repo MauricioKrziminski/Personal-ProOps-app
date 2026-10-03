@@ -1,0 +1,8 @@
+184:✔ F08 hooks: one workspace RPC owns the complete horizon and previous query data is not a placeholder (14.664833ms)
+185:✔ F08 hooks: ambiguous outcomes do not invalidate a scenario; sealed cancellation and success do (8.889625ms)
+186:✔ F08 fresh editor read preserves explicit workspace, draft and cancellation signal (13.419083ms)
+193:ℹ tests 176
+195:ℹ pass 176
+196:ℹ fail 0
+197:ℹ cancelled 0
+198:ℹ skipped 0

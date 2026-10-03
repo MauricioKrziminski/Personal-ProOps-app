@@ -1,0 +1,16 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on iPhone 17 Pro - iOS 26.5 - F0BDF23C-0286-4183-97E3-3BCC61D4267D
+ > Flow ios-forecast-open
+Tap on "Finanças"... COMPLETED
+Assert that "Mais opções.*" is visible... COMPLETED
+Tap on "Mais opções.*"... COMPLETED
+Tap on "Projeção"... COMPLETED
+Assert that "Projeção" is visible... COMPLETED
+Scrolling DOWN until "Ajustar plano.*" is visible with speed 40, visibility percentage 100%, timeout 20000 ms, with centering disabled... COMPLETED
+Take screenshot ios-forecast-plan-entry... COMPLETED
+Tap on "Ajustar plano.*"... COMPLETED
+Assert that "Menor disponibilidade no período" is visible... COMPLETED
+Take screenshot ios-forecast-plan-open... COMPLETED
+Tap on "Fechar"... COMPLETED
+Assert that "Ajustar plano.*" is visible... COMPLETED

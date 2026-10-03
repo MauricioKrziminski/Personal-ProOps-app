@@ -1,0 +1,9 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-save-readback
+Launch app "com.proops.personal.dev" without stopping app... COMPLETED
+Assert that "Ajuste intenções futuras de um mesmo espaço" is not visible... COMPLETED
+Assert that "Simular juntas.*" is visible... COMPLETED
+Assert that ".*800,00/mês.*" is visible... COMPLETED
+Take screenshot android-save-returned-goals... COMPLETED

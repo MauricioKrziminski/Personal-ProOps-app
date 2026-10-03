@@ -1,0 +1,185 @@
+{
+  "captured_at_utc": "2026-10-03T18:00:03.240476+00:00",
+  "artifacts": [
+    {
+      "artifact": "push-dry-run.log",
+      "source": "/private/tmp/proops-f08-push-dry-run.log",
+      "source_sha256": "ec953fcb94f383747922ca9bd3d0aa7f2a69df9590ff83c54a1f367d69d1e648",
+      "modified_for_portability": false,
+      "artifact_sha256": "ec953fcb94f383747922ca9bd3d0aa7f2a69df9590ff83c54a1f367d69d1e648"
+    },
+    {
+      "artifact": "push.log",
+      "source": "/private/tmp/proops-f08-push.log",
+      "source_sha256": "b5139469e5df9cb301dcbbb442be856590987a1a6387f19ef8f8c51a24ab32cb",
+      "modified_for_portability": false,
+      "artifact_sha256": "b5139469e5df9cb301dcbbb442be856590987a1a6387f19ef8f8c51a24ab32cb"
+    },
+    {
+      "artifact": "context-dry-run.log",
+      "source": "/private/tmp/proops-f08-context-dry-run.log",
+      "source_sha256": "577bb59ba7a2785e6cb542e637e6e0c0af74d7069ca81d9852eb34b0683a872b",
+      "modified_for_portability": false,
+      "artifact_sha256": "577bb59ba7a2785e6cb542e637e6e0c0af74d7069ca81d9852eb34b0683a872b"
+    },
+    {
+      "artifact": "context-push.log",
+      "source": "/private/tmp/proops-f08-context-push.log",
+      "source_sha256": "93ee37fa2f9d7a1a25449f68d54ceb4f73b66aaf91890f597136dc4ad6677880",
+      "modified_for_portability": false,
+      "artifact_sha256": "93ee37fa2f9d7a1a25449f68d54ceb4f73b66aaf91890f597136dc4ad6677880"
+    },
+    {
+      "artifact": "sql-red.log",
+      "source": "/private/tmp/proops-f08-sql-red.log",
+      "source_sha256": "6a39a655ac1cf6c9c7062fec263dff9ac192076913fa37e32f3b82224b3a9eee",
+      "modified_for_portability": false,
+      "artifact_sha256": "6a39a655ac1cf6c9c7062fec263dff9ac192076913fa37e32f3b82224b3a9eee"
+    },
+    {
+      "artifact": "sql-green.log",
+      "source": "/private/tmp/proops-f08-sql-green.log",
+      "source_sha256": "f246b5d302904239acce55298d77eaaf88bf510bd2bd614096cb85dbabe50112",
+      "modified_for_portability": false,
+      "artifact_sha256": "f246b5d302904239acce55298d77eaaf88bf510bd2bd614096cb85dbabe50112"
+    },
+    {
+      "artifact": "projection-negative.log",
+      "source": "/private/tmp/proops-f08-projection-negative.log",
+      "source_sha256": "0d243b5585565454a6b7490b79082936bd029b226ecb1960979dfc184533fdc0",
+      "modified_for_portability": false,
+      "artifact_sha256": "0d243b5585565454a6b7490b79082936bd029b226ecb1960979dfc184533fdc0"
+    },
+    {
+      "artifact": "projection-green.log",
+      "source": "/private/tmp/proops-f08-projection-green.log",
+      "source_sha256": "88049dd540081b1c72d8cffda68be5867e2cdae3aa35a0cbbf48e8121495ef6a",
+      "modified_for_portability": false,
+      "artifact_sha256": "88049dd540081b1c72d8cffda68be5867e2cdae3aa35a0cbbf48e8121495ef6a"
+    },
+    {
+      "artifact": "context-green.log",
+      "source": "/private/tmp/proops-f08-context-green.log",
+      "source_sha256": "da9f5f448e35339acb130e5e6e4dba23578e013eff63032af7a6da3f00a9109b",
+      "modified_for_portability": false,
+      "artifact_sha256": "da9f5f448e35339acb130e5e6e4dba23578e013eff63032af7a6da3f00a9109b"
+    },
+    {
+      "artifact": "sql-applied.log",
+      "source": "/private/tmp/proops-f08-sql-applied.log",
+      "source_sha256": "908f7b8b8d162ff3746f8c2e6b05c3ff0e5cd4260609465a4255bfe1b1256697",
+      "modified_for_portability": false,
+      "artifact_sha256": "908f7b8b8d162ff3746f8c2e6b05c3ff0e5cd4260609465a4255bfe1b1256697"
+    },
+    {
+      "artifact": "races-results.jsonl",
+      "source": "/private/tmp/proops-f08-races-results.jsonl",
+      "source_sha256": "023a646a48360d9181971704aeb4f9ababd355d8919fe35643a8f1dffd12e7e5",
+      "modified_for_portability": false,
+      "artifact_sha256": "023a646a48360d9181971704aeb4f9ababd355d8919fe35643a8f1dffd12e7e5"
+    },
+    {
+      "artifact": "races-fixtures.json",
+      "source": "/private/tmp/proops-f08-races-fixtures.json",
+      "source_sha256": "20022021ef47792ee3b3a55348141da6064fba80b67abf50ec23ccaf99a75dd2",
+      "modified_for_portability": false,
+      "artifact_sha256": "20022021ef47792ee3b3a55348141da6064fba80b67abf50ec23ccaf99a75dd2"
+    },
+    {
+      "artifact": "advisors-before.json",
+      "source": "/private/tmp/proops-f08-advisors-before.json",
+      "source_sha256": "489b36aee8085fa3a379f32e2ff341621c4e110d6058f500cc6a8447fbf76920",
+      "modified_for_portability": false,
+      "artifact_sha256": "489b36aee8085fa3a379f32e2ff341621c4e110d6058f500cc6a8447fbf76920"
+    },
+    {
+      "artifact": "advisors-after.json",
+      "source": "/private/tmp/proops-f08-advisors-after.json",
+      "source_sha256": "489b36aee8085fa3a379f32e2ff341621c4e110d6058f500cc6a8447fbf76920",
+      "modified_for_portability": false,
+      "artifact_sha256": "489b36aee8085fa3a379f32e2ff341621c4e110d6058f500cc6a8447fbf76920"
+    },
+    {
+      "artifact": "goal-plans.test.sql",
+      "source": "supabase/tests/goal_plans.sql",
+      "source_sha256": "8553d5aea55a02235e2490cab3cbee7d32ee37b2d040e956479c3564a64fad1c",
+      "modified_for_portability": false,
+      "artifact_sha256": "8553d5aea55a02235e2490cab3cbee7d32ee37b2d040e956479c3564a64fad1c"
+    },
+    {
+      "artifact": "goal-planning-projection.test.sql",
+      "source": "supabase/tests/goal_planning_projection.sql",
+      "source_sha256": "8c52d7caeb102f78b09531991954a149211a968669394b4f15787424f6c14b09",
+      "modified_for_portability": false,
+      "artifact_sha256": "8c52d7caeb102f78b09531991954a149211a968669394b4f15787424f6c14b09"
+    },
+    {
+      "artifact": "sql_runner.py",
+      "source": "/private/tmp/proops-f08-sql-runner.py",
+      "source_sha256": "0e4fa4b18bc001dc855250f928dce753fdb4d284dae08e8d445611505f8c9872",
+      "modified_for_portability": true,
+      "changes": [
+        "discover repository root from file location",
+        "target guard stdin=DEVNULL"
+      ],
+      "artifact_sha256": "16e765052538a87a72ccf633bf03e1b24be6aa0949adb8b8eaeb7bae4fab4c3e"
+    },
+    {
+      "artifact": "races_helpers.py",
+      "source": "/private/tmp/proops-f07-concurrency.py",
+      "source_sha256": "bc1e02867519bf6b853a64b2863bc0ba482d8e913fedcc182f5a3695ddec9b29",
+      "modified_for_portability": true,
+      "changes": [
+        "copy only eleven helper functions actually used by F08",
+        "discover repository root from file location"
+      ],
+      "artifact_sha256": "3aa23b0ac6fbc068484e9d9a646b9f3d8a8acc418df26f5aa795025ba4a85fba"
+    },
+    {
+      "artifact": "races_runner.py",
+      "source": "/private/tmp/proops-f08-races-runner.py",
+      "source_sha256": "190cd5cadb3d19eaf3172ddb5b14b9949a3c2861008a5a14fd6f4c83a6476376",
+      "modified_for_portability": true,
+      "changes": [
+        "import adjacent selected helpers",
+        "write recovery manifest to system tempdir"
+      ],
+      "artifact_sha256": "9cdd68cedb2df0583d8304b10199580f635c3d7d06ccbb3399bf54d6ec51589d"
+    },
+    {
+      "artifact": "advisors-post-context.json",
+      "source": "/private/tmp/proops-f08-advisors-post-context.json",
+      "source_sha256": "3fb4f166d280a0d23b2c72b9c6d119e83b85e8335e92859d088ba77252ded91c",
+      "modified_for_portability": false,
+      "artifact_sha256": "3fb4f166d280a0d23b2c72b9c6d119e83b85e8335e92859d088ba77252ded91c"
+    },
+    {
+      "artifact": "advisors-post-context.stderr",
+      "source": "/private/tmp/proops-f08-advisors-post-context.stderr",
+      "source_sha256": "3ee7598b1155af3f20ccc68c87a8f4a7e6b1cc395cc6af587c24a9ba89983b5b",
+      "modified_for_portability": false,
+      "artifact_sha256": "3ee7598b1155af3f20ccc68c87a8f4a7e6b1cc395cc6af587c24a9ba89983b5b"
+    },
+    {
+      "artifact": "advisors-help.txt",
+      "source": "/private/tmp/proops-f08-advisors-post-context-help.txt",
+      "source_sha256": "d1a0c8e6d9ac089844a95ddfc877c76198d483766d7ddc8cea4f88414ab7af06",
+      "modified_for_portability": false,
+      "artifact_sha256": "d1a0c8e6d9ac089844a95ddfc877c76198d483766d7ddc8cea4f88414ab7af06"
+    },
+    {
+      "artifact": "advisors-delta.json",
+      "source": "/private/tmp/proops-f08-advisors-delta.json",
+      "source_sha256": "066c08f668bbccab6f5bd159226891abf4e1cead5da7b17422146b72ab9b0397",
+      "modified_for_portability": false,
+      "artifact_sha256": "066c08f668bbccab6f5bd159226891abf4e1cead5da7b17422146b72ab9b0397"
+    },
+    {
+      "artifact": "races-summary.md",
+      "source": "/private/tmp/proops-f08-races-summary.md",
+      "source_sha256": "0bd5adbe2a3149576454da8dee524a79bedb702b1fdf48738bb02c37f5444b8c",
+      "modified_for_portability": false,
+      "artifact_sha256": "0bd5adbe2a3149576454da8dee524a79bedb702b1fdf48738bb02c37f5444b8c"
+    }
+  ]
+}

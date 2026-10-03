@@ -1,0 +1,21 @@
+appId: com.proops.personal.dev
+---
+- tapOn: "Finanças"
+- extendedWaitUntil:
+    visible: "Ocultar valor"
+    timeout: 15000
+- tapOn: "Ocultar valor"
+- tapOn: "Mais opções.*"
+- tapOn: "Metas"
+- extendedWaitUntil:
+    visible: "Simular juntas.*"
+    timeout: 20000
+- takeScreenshot: ios-concealed-summary
+- tapOn: "Simular juntas.*"
+- extendedWaitUntil:
+    visible: "Menor disponibilidade no período"
+    timeout: 20000
+- assertNotVisible: "Comparação do caixa previsto.*"
+- assertNotVisible: "Linha contínua.*"
+- assertNotVisible: "Disponibilidade negativa a partir.*"
+- takeScreenshot: ios-concealed-plan-top

@@ -1,0 +1,65 @@
+appId: com.proops.personal.dev
+---
+- launchApp:
+    clearState: false
+    stopApp: false
+- tapOn:
+    text: 'Fechar'
+    optional: true
+- tapOn: 'Simular juntas.*'
+- extendedWaitUntil:
+    visible: 'Menor disponibilidade no período'
+    timeout: 30000
+- tapOn: 'Ver períodos'
+- scrollUntilVisible:
+    element:
+      text: 'Aporte mensal para Reserva de emergência'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn: 'Aporte mensal para Reserva de emergência'
+- eraseText: 6
+- inputText: '54321'
+- takeScreenshot: android-stable-after-input
+- tapOn:
+    text: 'Done'
+    optional: true
+- scrollUntilVisible:
+    element:
+      text: 'Primeiro aporte para Reserva de emergência.*'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn: 'Primeiro aporte para Reserva de emergência.*'
+- scrollUntilVisible:
+    element:
+      text: '31/10/2026.*'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- takeScreenshot: android-stable-calendar
+- tapOn: '31/10/2026.*'
+- assertVisible: 'Primeiro aporte para Reserva de emergência.*31/10/2026'
+- takeScreenshot: android-stable-draft-date
+- tapOn:
+    text: 'Reserva de emergência'
+    index: 1
+- takeScreenshot: android-stable-goal-excluded
+- tapOn:
+    text: 'Reserva de emergência'
+    index: 1
+- takeScreenshot: android-stable-goal-restored
+- tapOn: 'Fechar'
+- tapOn: 'Simular juntas.*'
+- extendedWaitUntil:
+    visible: 'Menor disponibilidade no período'
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: 'Aporte mensal para Reserva de emergência'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- assertVisible: '2.500,00'
+- assertVisible: 'Primeiro aporte para Reserva de emergência.*03/10/2026'
+- takeScreenshot: android-stable-cancel-reopen

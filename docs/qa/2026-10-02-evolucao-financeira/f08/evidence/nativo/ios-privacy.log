@@ -1,0 +1,17 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on iPhone 17 Pro - iOS 26.5 - F0BDF23C-0286-4183-97E3-3BCC61D4267D
+ > Flow ios-privacy
+Tap on "Finanças"... COMPLETED
+Assert that "Ocultar valor" is visible... COMPLETED
+Tap on "Ocultar valor"... COMPLETED
+Tap on "Mais opções.*"... COMPLETED
+Tap on "Metas"... COMPLETED
+Assert that "Simular juntas.*" is visible... COMPLETED
+Take screenshot ios-concealed-summary... COMPLETED
+Tap on "Simular juntas.*"... COMPLETED
+Assert that "Menor disponibilidade no período" is visible... COMPLETED
+Assert that "Comparação do caixa previsto.*" is not visible... COMPLETED
+Assert that "Linha contínua.*" is not visible... COMPLETED
+Assert that "Disponibilidade negativa a partir.*" is not visible... COMPLETED
+Take screenshot ios-concealed-plan-top... COMPLETED

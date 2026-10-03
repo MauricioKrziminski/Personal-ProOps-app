@@ -1,0 +1,67 @@
+{
+  "target": "utkqoiigimqzeenxkxdl",
+  "fixtures": [
+    {
+      "user": "4fbcc2f3-279f-4266-981b-167cae37a674",
+      "workspace": "3357c1d2-c3e4-46d2-a2df-3a8649478246",
+      "account": "20f87c5f-bdb9-485d-9e82-3f0c29537346",
+      "goal": "2c656d55-ce78-4288-b2d0-1efcfb9e5496",
+      "goal2": "d2378adf-1f50-495c-92eb-c85619d2d4cd",
+      "case": 1,
+      "owned_workspaces": [
+        "3357c1d2-c3e4-46d2-a2df-3a8649478246",
+        "d800b26e-764b-45d3-bdac-e25f71e5b0b8"
+      ],
+      "requests": [
+        "c8799bd7-389a-433c-8ea0-daec10e47185"
+      ]
+    },
+    {
+      "user": "03acd409-45a9-4621-9fa1-80b014bb2e53",
+      "workspace": "ad92fbff-56da-4c74-8ec3-730682b480af",
+      "account": "f86301ce-95d8-42ba-8dc1-590ed73e3a15",
+      "goal": "c4e4e16e-60e3-44f3-852d-d073ccea5f3d",
+      "goal2": "4545b863-0e7a-402d-969d-735c79f7d4c6",
+      "case": 2,
+      "owned_workspaces": [
+        "28790001-8a5a-4a1a-b3b6-941bc7e88569",
+        "ad92fbff-56da-4c74-8ec3-730682b480af"
+      ],
+      "requests": [
+        "acf8cdca-956f-4464-a8e1-bc2dbbdc6b75",
+        "311626cd-fbd9-4ed2-b30e-e1aba7a38327"
+      ]
+    },
+    {
+      "user": "8fc31f5c-a95f-4e16-bf28-b4e462365984",
+      "workspace": "80a888bf-2aef-47e3-90ab-413995152ddf",
+      "account": "20d07628-4bee-4124-8aac-001afb7163cf",
+      "goal": "4b7ea44f-fc2d-4320-9f89-c4f7bdcea50f",
+      "goal2": "4eee3f87-6a57-4f33-a72e-08ab0f017b18",
+      "case": 3,
+      "owned_workspaces": [
+        "7cecb52a-f176-4a91-b6ba-b06c24e1a2d6",
+        "80a888bf-2aef-47e3-90ab-413995152ddf"
+      ],
+      "requests": [
+        "abfb9d6c-5b59-4de0-b57b-86b6045576c7"
+      ]
+    },
+    {
+      "user": "c6b2406e-a055-4325-8a5b-c8acaef2a703",
+      "workspace": "d9b493e7-9431-4dd5-a969-e74163778fbe",
+      "account": "acf0f394-b658-4c10-9f3f-2b7668470407",
+      "goal": "3fa07bff-e08f-413e-9d31-46ca30450673",
+      "goal2": "b6e2505e-9ccf-4e74-869e-077249911740",
+      "case": 4,
+      "owned_workspaces": [
+        "aea2a89a-9226-4b2e-a3a4-68f61256171c",
+        "d9b493e7-9431-4dd5-a969-e74163778fbe"
+      ],
+      "requests": [
+        "25f535df-0454-49c6-9423-c0dabd2ec4aa"
+      ]
+    }
+  ],
+  "cleaned": true
+}

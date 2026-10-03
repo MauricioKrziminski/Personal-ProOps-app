@@ -1,0 +1,33 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-stable-retest
+Launch app "com.proops.personal.dev" without stopping app... COMPLETED
+Tap on (Optional) "Fechar"... COMPLETED
+Tap on "Simular juntas.*"... COMPLETED
+Assert that "Menor disponibilidade no período" is visible... COMPLETED
+Tap on "Ver períodos"... COMPLETED
+Scrolling DOWN until "Aporte mensal para Reserva de emergência" is visible with speed 40, visibility percentage 100%, timeout 30000 ms, with centering enabled... COMPLETED
+Tap on "Aporte mensal para Reserva de emergência"... COMPLETED
+Erase 6 characters... COMPLETED
+Input text 54321... COMPLETED
+Take screenshot android-stable-after-input... COMPLETED
+Tap on (Optional) "Done"... COMPLETED
+Scrolling DOWN until "Primeiro aporte para Reserva de emergência.*" is visible with speed 40, visibility percentage 100%, timeout 30000 ms, with centering enabled... COMPLETED
+Tap on "Primeiro aporte para Reserva de emergência.*"... COMPLETED
+Scrolling DOWN until "31/10/2026.*" is visible with speed 40, visibility percentage 100%, timeout 30000 ms, with centering enabled... COMPLETED
+Take screenshot android-stable-calendar... COMPLETED
+Tap on "31/10/2026.*"... COMPLETED
+Assert that "Primeiro aporte para Reserva de emergência.*31/10/2026" is visible... COMPLETED
+Take screenshot android-stable-draft-date... COMPLETED
+Tap on "Reserva de emergência", Index: 1... COMPLETED
+Take screenshot android-stable-goal-excluded... COMPLETED
+Tap on "Reserva de emergência", Index: 1... COMPLETED
+Take screenshot android-stable-goal-restored... COMPLETED
+Tap on "Fechar"... COMPLETED
+Tap on "Simular juntas.*"... COMPLETED
+Assert that "Menor disponibilidade no período" is visible... COMPLETED
+Scrolling DOWN until "Aporte mensal para Reserva de emergência" is visible with speed 40, visibility percentage 100%, timeout 30000 ms, with centering enabled... COMPLETED
+Assert that "2.500,00" is visible... COMPLETED
+Assert that "Primeiro aporte para Reserva de emergência.*03/10/2026" is visible... COMPLETED
+Take screenshot android-stable-cancel-reopen... COMPLETED

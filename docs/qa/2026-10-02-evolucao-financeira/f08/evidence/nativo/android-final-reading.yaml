@@ -1,0 +1,72 @@
+appId: com.proops.personal.dev
+---
+- launchApp:
+    clearState: false
+    stopApp: false
+- tapOn: 'Navigate up'
+- scrollUntilVisible:
+    element:
+      text: 'Mais opções'
+    direction: UP
+    timeout: 30000
+    centerElement: false
+- tapOn: 'Mais opções'
+- tapOn: 'Projeção'
+- scrollUntilVisible:
+    element:
+      text: 'Ajustar plano.*'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn: 'Ajustar plano.*'
+- extendedWaitUntil:
+    visible: 'Menor disponibilidade no período'
+    timeout: 30000
+- takeScreenshot: android-projection-context-final
+- tapOn: 'Fechar'
+- tapOn: 'Navigate up'
+- scrollUntilVisible:
+    element:
+      text: 'Ocultar valor'
+    direction: UP
+    timeout: 30000
+    centerElement: false
+- tapOn: 'Ocultar valor'
+- tapOn: 'Mais opções'
+- tapOn: 'Metas'
+- tapOn: 'Simular juntas.*'
+- extendedWaitUntil:
+    visible: 'Menor disponibilidade no período'
+    timeout: 30000
+- assertVisible:
+    id: 'goal-plan-result'
+- assertNotVisible:
+    text: '.*R\$.*'
+    childOf:
+      id: 'goal-plan-result'
+- assertNotVisible: 'Disponibilidade negativa a partir de.*'
+- assertNotVisible: 'Comparação do caixa previsto com disponibilidade após o plano.*'
+- takeScreenshot: android-planning-concealed-top
+- tapOn: 'Ver períodos'
+- scrollUntilVisible:
+    element:
+      text: 'Caixa e disponível'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- assertNotVisible:
+    text: '.*R\$.*'
+    childOf:
+      id: 'goal-plan-result'
+- takeScreenshot: android-planning-concealed-periods
+- tapOn: 'Fechar'
+- tapOn: 'Navigate up'
+- scrollUntilVisible:
+    element:
+      text: 'Mostrar valor'
+    direction: UP
+    timeout: 30000
+    centerElement: false
+- tapOn: 'Mostrar valor'
+- assertVisible: 'Ocultar valor'
+- takeScreenshot: android-conceal-preference-restored

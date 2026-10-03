@@ -1014,3 +1014,85 @@ test('F07 hooks: resolução usa identidade original e cancelamento selado inval
     assert.equal(client.getQueryState(['emergency-reserve', 'default'])?.isInvalidated, true);
   } finally { client.clear(); }
 });
+
+function f08ReadFixture(ws: string, mode = 'month') {
+  return { workspace_id: ws, workspace_name: 'F08 QA workspace', cycle_close_day: 15, as_of: dates.localISODate(), days: 3650, view: 'cycle', mode,
+    edit_revision: null, goals_fingerprint: 'a'.repeat(32), goals: [], reserved_cash_cents: '0',
+    unassigned_goals_cents: '0', income_present: false, incomplete_goal_ids: [], excluded_goal_ids: [],
+    missed_deadline_goal_ids: [], points: [], months: [], first_pressure_on: null, minimum_available_cents: '0' };
+}
+test('F08 hooks: one workspace RPC owns the complete horizon and previous query data is not a placeholder', async () => {
+  const client = new QueryClient();const ws = '10000000-0000-4000-8000-000000000001';
+  const subscriptions: string[] = [];const calls: any[] = [];let foreign = false;
+  const hooks = loadHooks(client, 'src/hooks/use-goal-planning.ts', {
+    '@tanstack/react-query': { useQuery: (options: any) => options },
+    '@/hooks/use-items': { workspaceId: async () => ws, useRealtimeInvalidate: (table: string) => subscriptions.push(table) },
+    '@/lib/supabase': { supabase: { rpc: async (name: string, args: any) => {
+      calls.push({ name, args });return { data: f08ReadFixture(foreign ? '10000000-0000-4000-8000-000000000009' : ws), error: null };
+    } } },
+  });
+  try {
+    const query = hooks.useGoalPlanning(3650, 'cycle', 'month');const state = await query.queryFn();
+    assert.equal(state.workspace_id, ws);assert.equal(calls.length, 1);
+    assert.equal(calls[0].name, 'goal_planning_state');assert.equal(calls[0].args.p_workspace_id, ws);
+    assert.equal(calls[0].args.p_days, 3650);assert.equal(calls[0].args.p_view, 'cycle');assert.equal(calls[0].args.p_mode, 'month');
+    assert.equal(calls[0].args.p_preview, null);assert.equal(query.placeholderData, undefined);
+    const preview = { goals_fingerprint: 'a'.repeat(32), items: [] };
+    assert.notDeepEqual(query.queryKey, hooks.useGoalPlanning(3650, 'cycle', 'month', preview).queryKey);
+    assert.notDeepEqual(query.queryKey, hooks.useGoalPlanning(3650, 'civil', 'day').queryKey);
+    assert.notDeepEqual(query.queryKey, hooks.useGoalPlanning(3650, 'cycle', 'month', null, false, ws).queryKey);
+    assert.equal(hooks.useGoalPlanning(3650, 'cycle', 'month', null, false).enabled, false);
+    for (const table of ['transactions', 'accounts', 'card_invoices', 'recurring_transactions', 'debts', 'goals',
+      'goal_contributions', 'financial_allocations', 'emergency_reserves', 'goal_plans', 'goal_plan_items']) assert.ok(subscriptions.includes(table), `planning follows ${table}`);
+    foreign = true;await assert.rejects(query.queryFn(), /workspace|espaço|plano/i);
+  } finally { client.clear(); }
+});
+test('F08 hooks: ambiguous outcomes do not invalidate a scenario; sealed cancellation and success do', async () => {
+  const client = new QueryClient();const calls: any[] = [];const mutations: any[] = [];
+  const ws = '10000000-0000-4000-8000-000000000001';
+  client.setQueryData(['goal-planning', 'default'], { previous: true });
+  const hooks = loadHooks(client, 'src/hooks/use-goal-planning.ts', {
+    react: { useState: (value: any) => [typeof value === 'function' ? value() : value, () => undefined] },
+    '@tanstack/react-query': { useQueryClient: () => client, useMutation: (options: any) => {
+      mutations.push(options);return { ...options, mutateAsync: options.mutationFn, isPending: false };
+    } },
+    '@/lib/agent-chat': { newClientMessageId: () => '10000000-0000-4000-8000-000000000002' },
+    '@/lib/supabase': { supabase: { rpc: async (name: string, args: any) => {
+      calls.push({ name, args });return name === 'save_goal_plan' ? { error: new Error('response lost'), data: null }
+        : { error: null, data: { workspace_id: ws, cancelled: true } };
+    } } },
+  });
+  const input = { workspace_id: ws, expected_revision: null, goals_fingerprint: 'a'.repeat(32), items: [] };
+  try {
+    const mutation = hooks.useSaveGoalPlan();let lost: unknown;let cancelled: unknown;
+    await assert.rejects(mutation.mutateAsync(input), error => { lost = error;return true; });
+    await mutations[0].onError(lost);assert.equal(client.getQueryState(['goal-planning', 'default'])?.isInvalidated, false);
+    await assert.rejects(mutation.resolveAsync(), error => { cancelled = error;return (error as any).name === 'GoalPlanAttemptCancelledError'; });
+    assert.equal(calls.length, 2);assert.equal(calls[0].name, 'save_goal_plan');assert.equal(calls[1].name, 'resolve_goal_plan_attempt');
+    assert.equal(calls[0].args.p_request_id, calls[1].args.p_request_id);assert.deepEqual(calls[0].args.p_input, calls[1].args.p_input);
+    await mutations[1].onError(cancelled);assert.equal(client.getQueryState(['goal-planning', 'default'])?.isInvalidated, true);
+    client.setQueryData(['goal-planning', 'default'], { previous: true });
+    await mutations[0].onSuccess();assert.equal(client.getQueryState(['goal-planning', 'default'])?.isInvalidated, true);
+  } finally { client.clear(); }
+});
+test('F08 fresh editor read preserves explicit workspace, draft and cancellation signal', async () => {
+  const client = new QueryClient();const ws = '10000000-0000-4000-8000-000000000007';
+  const calls: any[] = [];const signals: AbortSignal[] = [];let defaults = 0;let offline = false;
+  const hooks = loadHooks(client, 'src/hooks/use-goal-planning.ts', {
+    '@/hooks/use-items': { workspaceId: async () => { defaults++;return '10000000-0000-4000-8000-000000000001'; } },
+    '@/lib/supabase': { supabase: { rpc: (name: string, args: any) => {
+      calls.push({ name, args });
+      const response = () => Promise.resolve(offline ? { error: new Error('read failed'), data: null }
+        : { error: null, data: f08ReadFixture(ws) });
+      return { then: (yes: any, no: any) => response().then(yes, no),
+        abortSignal: (signal: AbortSignal) => { signals.push(signal);return response(); } };
+    } } },
+  });
+  const preview = { goals_fingerprint: 'a'.repeat(32), items: [] };const signal = new AbortController().signal;
+  try {
+    const state = await hooks.fetchGoalPlanning(3650, 'cycle', 'month', preview, ws, signal);
+    assert.equal(state.workspace_id, ws);assert.equal(defaults, 0);assert.equal(calls.length, 1);
+    assert.equal(calls[0].args.p_workspace_id, ws);assert.deepEqual(JSON.parse(JSON.stringify(calls[0].args.p_preview)), preview);assert.equal(signals[0], signal);
+    offline = true;await assert.rejects(hooks.fetchGoalPlanning(3650, 'cycle', 'month', null, ws), /read failed/);
+  } finally { client.clear(); }
+});

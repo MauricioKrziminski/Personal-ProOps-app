@@ -153,10 +153,15 @@ testes e sem alegação de correção. F08 liberado; não repetir passes sem nov
 
 Arquivos: `goals.tsx`, `forecast.tsx`, hipóteses, domínio de plano de metas. Interface: metas ativas + compromissos → cenário de caixa, sem movimentação persistida.
 
-- [ ] RED: duas metas somam compromissos e cancelamento não grava.
-- [ ] Implementar plano/simulação com regra atual, avisos e ajuste.
-- [ ] Provar renda incerta, saldo negativo, fatura e prazos próximos.
-- [ ] Executar gates e matriz nativa F08; registrar aceite.
+- [x] RED: duas metas somam compromissos e cancelamento não grava.
+- [x] Implementar plano/simulação com regra atual, avisos e ajuste.
+- [x] Provar renda incerta, saldo negativo, fatura e prazos próximos.
+- [x] Executar gates e matriz nativa F08; registrar aceite.
+
+Aceite funcional no staging em 03/10/2026: plano/simulação persistente sem movimentação,
+quatro corridas SQL, 1.936 testes, saves/leitura recíproca iOS/Android, conflito aberto e
+privacidade. [Evidências e limites F08](../../qa/2026-10-02-evolucao-financeira/f08/aceite.md).
+Baseline de QA restaurado; ANR F07 permanece aberta. F09 liberado.
 
 ### F09 — Subcategoria opcional
 

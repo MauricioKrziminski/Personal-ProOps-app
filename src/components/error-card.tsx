@@ -30,11 +30,11 @@ export function LoadingCard() {
 }
 
 /** Estado de erro padrão das telas — obrigatório junto com loading/empty. */
-export function ErrorCard({ onRetry }: { onRetry: () => void }) {
+export function ErrorCard({ onRetry, message = 'Não deu para carregar' }: { onRetry: () => void; message?: string }) {
   return (
     <Card style={styles.card}>
       <Icon name="exclamationmark.triangle" size="xl" color="warning" />
-      <ThemedText type="headline">Não deu para carregar</ThemedText>
+      <ThemedText type="headline">{message}</ThemedText>
       {/*
         ⚠️ `alignSelf` explícito: sem `block`, o `Button` traz `alignSelf: 'flex-start'` (para
         um pai com `alignItems: 'stretch'` não o esticar) e isso GANHA do `alignItems: 'center'`

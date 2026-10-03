@@ -1,0 +1,10 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on iPhone 17 Pro - iOS 26.5 - F0BDF23C-0286-4183-97E3-3BCC61D4267D
+ > Flow ios-before-cleanup
+Tap on "Mais opções.*"... COMPLETED
+Tap on "Metas"... COMPLETED
+Assert that "Simular juntas.*" is visible... COMPLETED
+Tap on "Simular juntas.*"... COMPLETED
+Assert that "Menor disponibilidade no período" is visible... COMPLETED
+Take screenshot ios-revision-2-before-cleanup... COMPLETED

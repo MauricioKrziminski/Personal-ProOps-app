@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       accounts: {
@@ -1219,6 +1194,94 @@ export type Database = {
             foreignKeyName: "goal_contributions_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      goal_plan_items: {
+        Row: {
+          first_on: string | null
+          goal_id: string
+          included: boolean
+          monthly_cents: number | null
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          first_on?: string | null
+          goal_id: string
+          included: boolean
+          monthly_cents?: number | null
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          first_on?: string | null
+          goal_id?: string
+          included?: boolean
+          monthly_cents?: number | null
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_plan_items_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_plan_items_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_plan_items_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "goal_plans"
+            referencedColumns: ["workspace_id"]
+          },
+        ]
+      }
+      goal_plans: {
+        Row: {
+          created_at: string
+          edit_revision: number
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          edit_revision: number
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          edit_revision?: number
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_plans_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_plans_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -3449,6 +3512,16 @@ export type Database = {
         }
         Returns: number
       }
+      goal_planning_state: {
+        Args: {
+          p_days: number
+          p_mode: string
+          p_preview?: Json
+          p_view: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       import_unmatched: {
         Args: { p_batch_id: string }
         Returns: {
@@ -3689,6 +3762,10 @@ export type Database = {
         Args: { p_input: Json; p_request_id: string }
         Returns: Json
       }
+      resolve_goal_plan_attempt: {
+        Args: { p_input: Json; p_request_id: string }
+        Returns: Json
+      }
       roll_invoice: {
         Args: {
           p_invoice_id: string
@@ -3716,6 +3793,10 @@ export type Database = {
         Returns: Json
       }
       save_emergency_reserve: {
+        Args: { p_input: Json; p_request_id: string }
+        Returns: Json
+      }
+      save_goal_plan: {
         Args: { p_input: Json; p_request_id: string }
         Returns: Json
       }
@@ -4075,9 +4156,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },

@@ -1,0 +1,25 @@
+appId: com.proops.personal.dev
+---
+- tapOn: "Finanças"
+- extendedWaitUntil:
+    visible: "Mais opções.*"
+    timeout: 20000
+- tapOn: "Mais opções.*"
+- tapOn: "Projeção"
+- extendedWaitUntil:
+    visible: "Projeção"
+    timeout: 20000
+- scrollUntilVisible:
+    element: "Ajustar plano.*"
+    direction: DOWN
+    timeout: 20000
+- takeScreenshot: ios-forecast-plan-entry
+- tapOn: "Ajustar plano.*"
+- extendedWaitUntil:
+    visible: "Menor disponibilidade no período"
+    timeout: 20000
+- takeScreenshot: ios-forecast-plan-open
+- tapOn: "Fechar"
+- extendedWaitUntil:
+    visible: "Ajustar plano.*"
+    timeout: 20000

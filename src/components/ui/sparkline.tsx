@@ -32,6 +32,8 @@ import { useTheme } from '@/hooks/use-theme';
 interface SparklineProps {
   /** Série na ordem cronológica. Em centavos, como todo dinheiro do app. */
   values: number[];
+  /** Optional aligned baseline, drawn dashed on the same financial scale. */
+  comparisonValues?: number[];
   width: number;
   height?: number;
   /** Desenha a linha do zero — essencial quando a projeção fica negativa. */
@@ -93,6 +95,7 @@ function curva(b: SkPathBuilder, pts: Ponto[], inicio: boolean) {
  */
 export function Sparkline({
   values,
+  comparisonValues,
   width,
   height = 56,
   showZero = false,
@@ -104,12 +107,18 @@ export function Sparkline({
 
   const geo = useMemo(() => {
     // A escala é a MESMA do cursor do `ScrubChart` — duas cópias poriam o ponto fora da curva.
-    const escala = escalaDaSerie(values, width, height);
+    const escala = escalaDaSerie(values, width, height, comparisonValues);
     if (!escala) return null;
     const { lo, hi, y } = escala;
     const dataMin = Math.min(...values);
     const dataMax = Math.max(...values);
     const pts = values.map((v, i) => ({ x: escala.x(i), y: y(v) }));
+    let comparison = null;
+    if (comparisonValues?.length) {
+      const b = Skia.PathBuilder.Make();
+      curva(b, comparisonValues.map((v, i) => ({ x: escala.x(i), y: y(v) })), true);
+      comparison = b.detach();
+    }
 
     // Índice do "hoje": último ponto do passado e PRIMEIRO do futuro ao mesmo tempo, senão a
     // emenda ficaria com um buraco de um passo.
@@ -142,16 +151,17 @@ export function Sparkline({
       temPassado,
       futuro: futuro.detach(),
       passado,
+      comparison,
       area: area.detach(),
       zeroY: y(0),
       zeroVisivel: lo <= 0 && hi >= 0,
       negativo: values[values.length - 1] < 0,
       pino,
     };
-  }, [values, width, height, pastCount]);
+  }, [values, comparisonValues, width, height, pastCount]);
 
   /** A série redesenha quando MUDA — um array novo com os mesmos números não é mudança. */
-  const assinatura = values.join(',');
+  const assinatura = `${values.join(',')}|${comparisonValues?.join(',') ?? ''}`;
   const desenho = useSharedValue(reduzido ? 1 : 0);
   const anel = useSharedValue(0);
   useEffect(() => {
@@ -210,6 +220,12 @@ export function Sparkline({
         </Line>
       ) : null}
       {/* Histórico: mesma forma, sem cor. O futuro é o que a tela afirma; o passado é contexto. */}
+      {geo.comparison ? (
+        <Path path={geo.comparison} color={corPassado} style="stroke" strokeWidth={2}
+          strokeCap="round" strokeJoin="round" end={desenho}>
+          <DashPathEffect intervals={[5, 5]} />
+        </Path>
+      ) : null}
       {geo.passado ? (
         <Path
           path={geo.passado}

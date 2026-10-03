@@ -1,0 +1,34 @@
+{
+  "checked_at_utc": "2026-10-03T18:03:38.521451+00:00",
+  "target": "utkqoiigimqzeenxkxdl",
+  "readonly": true,
+  "command": "scripts/supabase-target.sh < /dev/null; supabase db advisors --linked --project-ref utkqoiigimqzeenxkxdl --type all --level warn --fail-on none -o json",
+  "historical_command_known": false,
+  "comparison": "Complete advisor records including cache key and metadata. Normalize MCP results envelope versus CLI array, cacheKey to cache_key, and escaped Markdown backticks; sort JSON keys. No fields dropped.",
+  "current_levels": {
+    "WARN": 23,
+    "ERROR": 0
+  },
+  "current_names": {
+    "function_search_path_mutable": 3,
+    "extension_in_public": 1,
+    "authenticated_security_definer_function_executable": 5,
+    "auth_leaked_password_protection": 1,
+    "multiple_permissive_policies": 12,
+    "duplicate_index": 1
+  },
+  "baselines": {
+    "before": {
+      "WARN": 23,
+      "ERROR": 0,
+      "added": [],
+      "removed": []
+    },
+    "after": {
+      "WARN": 23,
+      "ERROR": 0,
+      "added": [],
+      "removed": []
+    }
+  }
+}

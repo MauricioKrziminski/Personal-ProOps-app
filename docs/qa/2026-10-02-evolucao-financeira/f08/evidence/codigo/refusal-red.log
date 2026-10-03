@@ -1,0 +1,124 @@
+(node:77785) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file://<repo>/src/lib/simple-finance-ui.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to <repo>/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ F08 editor: a confirmed CAS refusal removes the old scenario until a fresh reopening (70.504625ms)
+✖ F08 editor: retrying a transient preview error preserves the editable draft (25.250458ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 408.709291
+
+✖ failing tests:
+
+test at src/lib/simple-finance-ui.test.ts:6633:1
+✖ F08 editor: a confirmed CAS refusal removes the old scenario until a fresh reopening (70.504625ms)
+  AssertionError [ERR_ASSERTION]: A rejected financial snapshot cannot remain authoritative
+  + actual - expected
+
+  + {
+  +   as_of: '2026-10-03',
+  +   cycle_close_day: 20,
+  +   days: 365,
+  +   edit_revision: 4,
+  +   excluded_goal_ids: [],
+  +   first_pressure_on: '2026-10-10',
+  +   goals: [
+  +     {
+  +       deadline: null,
+  +       deadline_status: 'none',
+  +       first_on: '2026-10-03',
+  +       goal_id: '20000000-0000-4000-8000-000000000001',
+  +       included: true,
+  +       monthly_cents: 2500,
+  +       name: 'Meta A',
+  +       origin: 'saved',
+  +       saved_cents: 1000,
+  +       suggested_cents: null,
+  +       target_cents: 10000
+  +     },
+  +     {
+  +       deadline: null,
+  +       deadline_status: 'none',
+  +       first_on: '2026-10-08',
+  +       goal_id: '20000000-0000-4000-8000-000000000002',
+  +       included: true,
+  +       monthly_cents: 4000,
+  +       name: 'Meta B',
+  +       origin: 'saved',
+  +       saved_cents: 3000,
+  +       suggested_cents: null,
+  +       target_cents: 20000
+  +     }
+  +   ],
+  +   goals_fingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  +   income_present: false,
+  +   incomplete_goal_ids: [],
+  +   minimum_available_cents: -843,
+  +   missed_deadline_goal_ids: [],
+  +   mode: 'month',
+  +   months: [
+  +     {
+  +       available_cents: 7879,
+  +       cash_cents: 9000,
+  +       cumulative_planned_cents: 800,
+  +       first_pressure_on: '2026-10-10',
+  +       from: '2026-09-21',
+  +       month: '2026-10',
+  +       partial: true,
+  +       planned_cents: 800,
+  +       to: '2026-10-20'
+  +     },
+  +     {
+  +       available_cents: 8679,
+  +       cash_cents: 10000,
+  +       cumulative_planned_cents: 1000,
+  +       first_pressure_on: null,
+  +       from: '2026-10-21',
+  +       month: '2026-11',
+  +       partial: false,
+  +       planned_cents: 200,
+  +       to: '2026-11-20'
+  +     }
+  +   ],
+  +   points: [],
+  +   reserved_cash_cents: 321,
+  +   unassigned_goals_cents: 654,
+  +   view: 'cycle',
+  +   workspace_id: '10000000-0000-4000-8000-000000000008',
+  +   workspace_name: 'F08 espaço escolhido'
+  + }
+  - null
+
+      at TestContext.<anonymous> (file://<repo>/src/lib/simple-finance-ui.test.ts:6637:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { workspace_id: '10000000-0000-4000-8000-000000000008', workspace_name: 'F08 espaço escolhido', cycle_close_day: 20, as_of: '2026-10-03', days: 365, view: 'cycle', mode: 'month', edit_revision: 4, goals_fingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', goals: [ [Object], [Object] ], reserved_cash_cents: 321, unassigned_goals_cents: 654, income_present: false, incomplete_goal_ids: [], excluded_goal_ids: [], missed_deadline_goal_ids: [], points: [], months: [ [Object], [Object] ], first_pressure_on: '2026-10-10', minimum_available_cents: -843 },
+    expected: null,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/simple-finance-ui.test.ts:6650:1
+✖ F08 editor: retrying a transient preview error preserves the editable draft (25.250458ms)
+  AssertionError [ERR_ASSERTION]: visible button: Tentar de novo
+      at Object.button (file://<repo>/src/lib/simple-finance-ui.test.ts:769:116)
+      at Object.press (file://<repo>/src/lib/simple-finance-ui.test.ts:770:46)
+      at TestContext.<anonymous> (file://<repo>/src/lib/simple-finance-ui.test.ts:6654:57)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

@@ -1,0 +1,42 @@
+appId: com.proops.personal.dev
+---
+- tapOn: "Finanças"
+- extendedWaitUntil:
+    visible: "Mais opções.*"
+    timeout: 20000
+- tapOn: "Mais opções.*"
+- tapOn: "Metas"
+- extendedWaitUntil:
+    visible: "Simular juntas.*"
+    timeout: 20000
+- tapOn: "Simular juntas.*"
+- extendedWaitUntil:
+    visible: "Menor disponibilidade no período"
+    timeout: 20000
+- scrollUntilVisible:
+    element: "Primeiro aporte para Reserva de emergência.*"
+    direction: DOWN
+    timeout: 18000
+- tapOn: "Primeiro aporte para Reserva de emergência.*"
+- scrollUntilVisible:
+    element: "31/10/2026"
+    direction: DOWN
+    timeout: 18000
+- tapOn: "31/10/2026"
+- assertVisible: "31/10/2026"
+- takeScreenshot: ios-fresh-date-31
+- scrollUntilVisible:
+    element: "Aporte mensal para Reserva de emergência"
+    direction: UP
+    timeout: 18000
+- tapOn: "Aporte mensal para Reserva de emergência"
+- eraseText: 20
+- assertVisible: "0,00"
+- inputText: "70000"
+- assertVisible: "700,00"
+- takeScreenshot: ios-fresh-save-draft
+- tapOn: "Salvar"
+- extendedWaitUntil:
+    visible: "Simular juntas.*"
+    timeout: 30000
+- takeScreenshot: ios-fresh-save-summary

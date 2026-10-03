@@ -1,0 +1,26 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on iPhone 17 Pro - iOS 26.5 - F0BDF23C-0286-4183-97E3-3BCC61D4267D
+ > Flow ios-cross-update
+Assert that "O plano mudou em outro lugar.*" is visible... COMPLETED
+Assert that "Menor disponibilidade no período" is not visible... COMPLETED
+Take screenshot ios-external-revision-invalidated... COMPLETED
+Tap on "Reabrir plano"... COMPLETED
+Assert that "Menor disponibilidade no período" is visible... COMPLETED
+Take screenshot ios-concealed-reopened-current... COMPLETED
+Scrolling DOWN until "Ver períodos.*" is visible with speed 40, visibility percentage 100%, timeout 15000 ms, with centering disabled... COMPLETED
+Tap on "Ver períodos.*"... COMPLETED
+Scrolling DOWN until "Caixa e disponível" is visible with speed 40, visibility percentage 100%, timeout 15000 ms, with centering disabled... COMPLETED
+Take screenshot ios-concealed-periods... COMPLETED
+Scrolling DOWN until "Aporte mensal para Reserva de emergência" is visible with speed 40, visibility percentage 100%, timeout 18000 ms, with centering disabled... COMPLETED
+Assert that "800,00" is visible... COMPLETED
+Scrolling DOWN until "Primeiro aporte para Reserva de emergência.*" is visible with speed 40, visibility percentage 100%, timeout 18000 ms, with centering disabled... COMPLETED
+Assert that "31/10/2026" is visible... COMPLETED
+Take screenshot ios-read-android-800... COMPLETED
+Tap on "Fechar"... COMPLETED
+Assert that "Simular juntas.*" is visible... COMPLETED
+Tap on "Finanças"... COMPLETED
+Assert that "Mostrar valor" is visible... COMPLETED
+Tap on "Mostrar valor"... COMPLETED
+Assert that "Ocultar valor" is visible... COMPLETED
+Take screenshot ios-privacy-restored... COMPLETED

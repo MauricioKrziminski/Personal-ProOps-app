@@ -1,0 +1,9 @@
+appId: com.proops.personal.dev
+---
+- launchApp:
+    clearState: false
+    stopApp: false
+- assertNotVisible: 'Ajuste intenções futuras de um mesmo espaço'
+- assertVisible: 'Simular juntas.*'
+- assertVisible: '.*800,00/mês.*'
+- takeScreenshot: android-save-returned-goals

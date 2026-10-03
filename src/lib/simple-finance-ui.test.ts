@@ -58,7 +58,7 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any } = {}) {
+function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any } = {}) {
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
@@ -108,6 +108,9 @@ function screen(file: string, options: { reserveState?: any; reserveError?: bool
   const expectedQueries: { from?: string; to?: string; pronto: boolean; recurringId?: string }[] = [];
   const summaryQueries: { from?: string; to?: string; pronto: boolean }[] = [];
   const categoryDefaultsQueries: { workspaceId?: string; enabled: boolean }[] = [];
+  const planningQueries: any[][] = [];
+  const freshPlanningQueries: any[][] = [];
+  let hookResult: any;
   const query = { data: [], isLoading: false, isError: false, isRefetching: false, refetch: async () => {} };
   /** As mesmas escritas de `writes`, com as opções (`onSuccess`/`onError`) — é por aqui que se chama o retorno. */
   const pedidos: { operation: string; value: any; opts: any }[] = [];
@@ -376,6 +379,7 @@ function screen(file: string, options: { reserveState?: any; reserveError?: bool
     useContext: (ctx: any) => ctx?.valor,
   };
   let reserveCancellationConstructor: any;
+  let goalCancellationConstructor: any;
   const load = (path: string): any => {
     const module = { exports: {} as any };
     const sourcePath = path === 'src/components/finance/categoria-sheet.tsx'
@@ -451,6 +455,32 @@ function screen(file: string, options: { reserveState?: any; reserveError?: bool
           resolveAsync: mutation('resolveEmergencyReserve').mutateAsync,
           unconfirmedInput: options.reserveUnconfirmed ?? null }),
       };
+      if (name === '@/hooks/use-goal-planning') return {
+        fetchGoalPlanning: async (...args: any[]) => {
+          freshPlanningQueries.push(args);
+          const snapshot = await (options.freshPlanning ? options.freshPlanning(...args) : Promise.resolve(options.planningState ?? f08UIState()));
+          return inRealm(JSON.parse(JSON.stringify(snapshot)));
+        },
+        useGoalPlanning: (...args: any[]) => {
+          planningQueries.push(args);
+          return inRealm({ ...query, data: options.planningState ?? f08UIState(),
+            isPending: Boolean(options.planningPending), isLoading: Boolean(options.planningPending),
+            isFetching: Boolean(options.planningFetching), isError: Boolean(options.planningError),
+            isSuccess: !options.planningPending && !options.planningError,
+            error: options.planningError ? new Error('scenario failed') : null,
+            refetch: async () => { refetches.push('goal-planning'); } });
+        },
+        useSaveGoalPlan: () => ({ ...mutation('saveGoalPlan'),
+          isPending: (emCurso.saveGoalPlan ?? 0) > 0 || (emCurso.resolveGoalPlan ?? 0) > 0,
+          isResolving: (emCurso.resolveGoalPlan ?? 0) > 0,
+          resolveAsync: mutation('resolveGoalPlan').mutateAsync,
+          unconfirmedInput: options.planningUnconfirmed ? inRealm(options.planningUnconfirmed) : null }),
+      };
+      if (name === '@/components/finance/goal-planning') return load('src/components/finance/goal-planning.tsx');
+      if (name === '@/lib/goal-planning') return load('src/lib/goal-planning.ts');
+      if (name === '@/lib/goal-plan-save') {
+        const domain = load('src/lib/goal-plan-save.ts');goalCancellationConstructor = domain.GoalPlanAttemptCancelledError;return domain;
+      }
       if (name === '@/components/finance/emergency-reserve-section') return load('src/components/finance/emergency-reserve-section.tsx');
       if (name === '@/lib/emergency-reserve') {
         const domain = load('src/lib/emergency-reserve.ts');
@@ -642,6 +672,7 @@ function screen(file: string, options: { reserveState?: any; reserveError?: bool
         concealText: () => '••••••',
         useBRL: () => (cents: number) => options.concealed ? '••••••' : `R$ ${(cents / 100).toFixed(2)}`,
       };
+      if (name === '@/components/ui/money' && options.realMoney) return load('src/components/ui/money.tsx');
       if (name === '@/components/ui/money') return { Money: 'Money', DinheiroEncolhe: { Provider: 'DinheiroEncolhe.Provider' } };
       if (name === '@/design/tokens') return { Motion: { duration: { fast: 120, base: 200, morph: 180 }, stagger: {}, easing: {}, spring: { morph: { stiffness: 360, damping: 26, mass: 1 } } }, IconSize: { md: 24 }, Space: { xs: 4, md: 12, lg: 16 }, Radius: {}, tabular: {}, Elevation: { light: {}, dark: {} }, Type: new Proxy({}, { get: () => ({}) }) };
       return new Proxy({}, { get: (_, key) => String(key) });
@@ -650,7 +681,11 @@ function screen(file: string, options: { reserveState?: any; reserveError?: bool
     return module.exports;
   };
   // `componente`: um componente nomeado (o card de nota), renderizado com `props`.
-  const Component = load(file)[options.componente ?? 'default'];
+  const loaded = load(file);
+  const Component = options.hook ? () => {
+    hookResult = loaded[options.hook!](...(options.hookArgs ?? []));
+    return options.componente ? loaded[options.componente]({ editor: hookResult }) : null;
+  } : loaded[options.componente ?? 'default'];
   const visit = (node: any) => {
     if (Array.isArray(node)) return node.forEach(visit);
     if (!node?.props || (node.type === 'Sheet' && !node.props.visible)) return;
@@ -669,7 +704,7 @@ function screen(file: string, options: { reserveState?: any; reserveError?: bool
     if (node.type === 'FinanceAnalysisPanes') visit(node.props.compact);
     // `CamposDaSerie` é um grupo de campos sem hook: desenhado aqui, a tela é a que a pessoa vê.
     // Os corpos (`FormularioDaSerie`, `FormularioDaDivida`) têm hooks: eles rodam depois dos da tela, na mesma ordem a cada render.
-    if (typeof node.type === 'function' && ['Controller', 'AccountFormFields', 'CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida', 'TrashEmptyState', 'FilterBar', 'ExpenseClassificationControls', 'EmergencyReserveSection', 'EmergencyReserveSheet', 'EmergencyReserveEditor'].includes(node.type.name)) visit(node.type(node.props));
+    if (typeof node.type === 'function' && ['Controller', 'AccountFormFields', 'CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida', 'TrashEmptyState', 'FilterBar', 'ExpenseClassificationControls', 'EmergencyReserveSection', 'EmergencyReserveSheet', 'EmergencyReserveEditor', 'GoalPlanningSummary', 'GoalPlanSheet', 'PlanningResult', 'Qualifications', ...(options.realMoney ? ['Money'] : [])].includes(node.type.name)) visit(node.type(node.props));
     // No celular o `AdaptivePanes` desenha o slot de uma coluna só (Pastas, Recorrentes…).
     if (node.type === 'AdaptivePanes') visit(node.props.singlePaneContent ?? node.props.main);
     visit(node.props.ListHeaderComponent);
@@ -691,6 +726,7 @@ function screen(file: string, options: { reserveState?: any; reserveError?: bool
     // O "Salvar" do sheet mora no slot `action` do `SheetHeader`, não em `children` — sem esta
     // linha o botão existe na tela e some daqui, que foi o que estas seis asserções viram.
     visit(node.props.action);
+    if (options.realMoney) visit(node.props.trailing);
     // O seletor do Lançar mora no `topo` do corpo (que aqui é um nó com nome, não a árvore dele).
     visit(node.props.topo);
     // A barra das raízes de aba (`AppHeader`) — é nela que mora o "…" da tela.
@@ -722,6 +758,8 @@ function screen(file: string, options: { reserveState?: any; reserveError?: bool
     writes, pedidos, toasts, preferenciasGravadas, pedidosDeLimite, avisos, confirmations, actions, navigations, refetches, gates, rulerViews, transactionQueries, expectedQueries, summaryQueries, categoryDefaultsQueries,
     drafts: () => forecastDrafts,
     cancelledReserveAttempt: () => new reserveCancellationConstructor(),
+    cancelledGoalPlanAttempt: () => new goalCancellationConstructor(),
+    planningQueries, freshPlanningQueries, editor: () => hookResult,
     simulacoes,
     nodes: () => nodes,
     animacoes: () => animacoes,
@@ -6523,4 +6561,184 @@ test('F07: conferir tentativa já salva recupera sucesso e falha de conferência
   assert.equal(ui.nodes().some(n => n.type === 'Sheet' && n.props.visible), false);
   assert.equal(ui.toasts.at(-1)?.tone, 'success');
   assert.equal(ui.writes.filter(w => w.operation === 'saveEmergencyReserve').length, 1);
+});
+
+
+const f08UIFile = 'src/components/finance/goal-planning.tsx';
+const f08Workspace = '10000000-0000-4000-8000-000000000008';
+const f08GoalA = '20000000-0000-4000-8000-000000000001';
+const f08GoalB = '20000000-0000-4000-8000-000000000002';
+function f08UIState(withGoals = false): any {
+  return { workspace_id: f08Workspace, workspace_name: 'F08 espaço escolhido', cycle_close_day: 20,
+    as_of: '2026-10-03', days: 365, view: 'cycle', mode: 'month', edit_revision: 4, goals_fingerprint: 'a'.repeat(32),
+    goals: withGoals ? [{ goal_id: f08GoalA, name: 'Meta A', target_cents: 10000, saved_cents: 1000,
+      deadline: null, included: true, monthly_cents: 2500, first_on: '2026-10-03', suggested_cents: null, origin: 'saved', deadline_status: 'none' },
+      { goal_id: f08GoalB, name: 'Meta B', target_cents: 20000, saved_cents: 3000,
+      deadline: null, included: true, monthly_cents: 4000, first_on: '2026-10-08', suggested_cents: null, origin: 'saved', deadline_status: 'none' }] : [],
+    reserved_cash_cents: 321, unassigned_goals_cents: 654, income_present: false,
+    incomplete_goal_ids: [], excluded_goal_ids: [], missed_deadline_goal_ids: [],
+    points: [], months: [{ month: '2026-10', from: '2026-09-21', to: '2026-10-20', partial: true,
+      cash_cents: 9000, planned_cents: 800, cumulative_planned_cents: 800, available_cents: 7879, first_pressure_on: '2026-10-10' },
+      { month: '2026-11', from: '2026-10-21', to: '2026-11-20', partial: false,
+      cash_cents: 10000, planned_cents: 200, cumulative_planned_cents: 1000, available_cents: 8679, first_pressure_on: null }],
+    first_pressure_on: '2026-10-10', minimum_available_cents: -843 };
+}
+const f08EditorUI = (options: Parameters<typeof screen>[1] = {}) => screen(f08UIFile, Object.assign(options, {
+  hook: 'useGoalPlanEditor', hookArgs: [365, 'cycle', 'month'], componente: 'GoalPlanSheet',
+}));
+const f08Flush = async (ui: ReturnType<typeof screen>) => { for (let i = 0; i < 6; i++) await Promise.resolve();ui.interact(() => {}); };
+const f08Visible = (ui: ReturnType<typeof screen>) => ui.nodes().some(node => node.type === 'Sheet' && node.props.visible);
+async function f08Open(ui: ReturnType<typeof screen>, scope = { ws: f08Workspace, goalId: f08GoalA }) {
+  ui.interact(() => ui.editor().open(scope));await f08Flush(ui);
+}
+
+test('F08 editor: fresh requested workspace opens once and closing ignores a late snapshot', async () => {
+  let reply!: (value: unknown) => void;
+  const ui = f08EditorUI({ planningState: f08UIState(true), freshPlanning: () => new Promise(resolve => { reply = resolve; }) });
+  ui.interact(() => { ui.editor().open({ ws: f08Workspace, goalId: f08GoalB });ui.editor().open({ ws: f08Workspace }); });
+  assert.equal(ui.freshPlanningQueries.length, 1);assert.equal(ui.freshPlanningQueries[0][4], f08Workspace);
+  assert.equal(ui.editor().opening, true);assert.equal(f08Visible(ui), true);
+  ui.interact(() => ui.editor().close());assert.equal(f08Visible(ui), false);
+  reply(f08UIState(true));await f08Flush(ui);
+  assert.equal(ui.editor().session, null);assert.equal(f08Visible(ui), false);assert.equal(ui.writes.length, 0);
+});
+test('F08 editor: draft and snapshot survive query updates and width changes', async () => {
+  const options = { planningState: f08UIState(true), tablet: false };const ui = f08EditorUI(options);
+  await f08Open(ui);const originalSnapshot = ui.editor().session.snapshot;
+  ui.interact(() => ui.editor().update(f08GoalA, { monthly_cents: 5100, first_on: '2026-11-17' }));
+  options.tablet = true;options.planningState = { ...f08UIState(true), edit_revision: 5 };
+  ui.interact(() => {});
+  assert.equal(ui.editor().session.snapshot, originalSnapshot);
+  assert.equal(ui.editor().session.snapshot.edit_revision, 4);
+  assert.equal(ui.editor().session.items[0].monthly_cents, 5100);assert.equal(ui.editor().session.items[0].first_on, '2026-11-17');
+  assert.equal(ui.editor().current, null);assert.equal(ui.button('Salvar').props.disabled, true);
+  assert.equal(ui.writes.length, 0);
+});
+for (const condition of ['error', 'fetching', 'pending', 'revision', 'fingerprint'] as const) {
+  test(`F08 editor: ${condition} cannot present or save a previous scenario`, async () => {
+    const options = { planningState: f08UIState(true), planningError: false, planningFetching: false, planningPending: false };
+    const ui = f08EditorUI(options);await f08Open(ui);assert.equal(ui.button('Salvar').props.disabled, false);
+    if (condition === 'error') options.planningError = true;
+    if (condition === 'fetching') options.planningFetching = true;
+    if (condition === 'pending') options.planningPending = true;
+    if (condition === 'revision') options.planningState.edit_revision = 5;
+    if (condition === 'fingerprint') options.planningState.goals_fingerprint = 'b'.repeat(32);
+    ui.interact(() => {});
+    assert.equal(ui.editor().current, null);assert.equal(ui.button('Salvar').props.disabled, true);
+    assert.equal(ui.nodes().some(node => node.props.children === 'Menor disponibilidade no período'), false);
+    ui.interact(() => ui.editor().submit());assert.equal(ui.writes.length, 0);
+    if (condition === 'error') assert.ok(ui.nodes().some(node => node.props.accessibilityRole === 'alert'));
+  });
+}
+test('F08 editor: a confirmed CAS refusal removes the old scenario until a fresh reopening', async () => {
+  const options = { planningState: f08UIState(true), segurarMutacoes: true };
+  const ui = f08EditorUI(options);await f08Open(ui);ui.press('Salvar');
+  (ui.pedidos.at(-1) as any).rejeitar({ code: 'PT409', message: 'Plano alterado. Confira novamente' });await f08Flush(ui);
+  assert.equal(ui.editor().current, null, 'A rejected financial snapshot cannot remain authoritative');
+  assert.equal(ui.button('Salvar').props.disabled, true);
+  assert.equal(ui.nodes().some(node => node.props.children === 'Menor disponibilidade no período'), false);
+  const alert = ui.nodes().find(node => node.props.accessibilityRole === 'alert');assert.ok(alert);
+  const scroll = ui.nodes().find(node => node.type === 'SheetScroll');
+  const contains = (value: any): boolean => value === alert || (Array.isArray(value) ? value.some(contains) : Boolean(value?.props && contains(value.props.children)));
+  assert.equal(contains(scroll.props.children), false, 'The error remains visible above the form scroll');
+  ui.interact(() => { ui.editor().update(f08GoalA, { monthly_cents: 6300 });ui.editor().submit(); });
+  assert.equal(ui.writes.length, 1, 'Editing cannot clear a confirmed stale-snapshot refusal');
+  options.planningState = { ...f08UIState(true), edit_revision: 5 };
+  ui.press('Reabrir plano');await f08Flush(ui);
+  assert.equal(ui.editor().session.snapshot.edit_revision, 5);assert.equal(ui.button('Salvar').props.disabled, false);
+});
+test('F08 editor: retrying a transient preview error preserves the editable draft', async () => {
+  const options = { planningState: f08UIState(true), planningError: false };
+  const ui = f08EditorUI(options);await f08Open(ui);
+  ui.interact(() => ui.editor().update(f08GoalA, { monthly_cents: 6300 }));
+  options.planningError = true;ui.interact(() => {});ui.press('Tentar de novo');
+  assert.ok(ui.refetches.includes('goal-planning'));
+  assert.equal(ui.editor().session.items[0].monthly_cents, 6300);
+  assert.equal(ui.freshPlanningQueries.length, 1, 'A transport retry does not discard the editor snapshot');
+  assert.equal(ui.writes.length, 0);
+});
+test('F08 result: recalculation preserves its component and measured space without showing old financial readings', async () => {
+  const options = { planningState: f08UIState(true), planningFetching: false };
+  const ui = f08EditorUI(options);await f08Open(ui);
+  const result = () => ui.nodes().find(node => node.type?.name === 'PlanningResult');
+  assert.ok(result());ui.interact(nodes => nodes.find(node => node.props.title === 'Ver períodos').props.onPress());
+  options.planningFetching = true;ui.interact(() => {});
+  assert.ok(result(), 'Recalculation must not unmount the expanded result');
+  options.planningFetching = false;ui.interact(() => {});
+  const frame = ui.nodes().find(node => node.props.testID === 'goal-plan-result');assert.ok(frame);
+  ui.interact(() => frame.props.onLayout({ nativeEvent: { layout: { height: 780 } } }));
+  options.planningFetching = true;ui.interact(() => {});
+  assert.ok(result(), 'The same result component survives the query transition');
+  assert.ok(ui.nodes().some(node => node.type === 'Skeleton' && node.props.height === 780));
+  assert.equal(ui.nodes().some(node => node.props.children === 'Menor disponibilidade no período'), false);
+  options.planningFetching = false;ui.interact(() => {});
+  assert.ok(ui.nodes().some(node => node.props.title === 'Caixa e disponível'), 'Expanded period details survive recalculation');
+  assert.equal(ui.writes.length, 0);
+});
+test('F08 result: a refused or failed scenario does not pretend to keep loading', async () => {
+  const options = { planningState: f08UIState(true), planningError: false };
+  const ui = f08EditorUI(options);await f08Open(ui);
+  options.planningError = true;ui.interact(() => {});
+  assert.equal(ui.nodes().some(node => node.type === 'Skeleton'), false, 'A failed query needs its retry action, not a perpetual loading placeholder');
+  options.planningError = false;options.planningState.edit_revision = 5;ui.interact(() => {});
+  assert.equal(ui.nodes().some(node => node.type === 'Skeleton'), false, 'A changed revision needs reopening, not a perpetual loading placeholder');
+  assert.ok(ui.button('Reabrir plano'));assert.equal(ui.button('Salvar').props.disabled, true);
+});
+test('F08 editor: actual excluded fields disappear and retoggle preserves its own monthly draft', async () => {
+  const ui = f08EditorUI({ planningState: f08UIState(true) });await f08Open(ui);
+  const field = () => ui.nodes().find(node => node.type === 'MoneyField' && node.props.accessibilityLabel === 'Aporte mensal para Meta A');
+  ui.interact(() => field().props.onChangeCents(6100));
+  ui.interact(nodes => nodes.find(node => node.type === 'SwitchRow' && node.props.label === 'Meta A').props.onValueChange(false));
+  assert.equal(field(), undefined);
+  const preview = ui.planningQueries.at(-1)[3];
+  assert.equal(preview.items.find((item: any) => item.goal_id === f08GoalA).monthly_cents, null);
+  ui.interact(nodes => nodes.find(node => node.type === 'SwitchRow' && node.props.label === 'Meta A').props.onValueChange(true));
+  assert.equal(field().props.valueCents, 6100);assert.equal(ui.editor().session.items[1].monthly_cents, 4000);
+  assert.equal(ui.writes.length, 0);
+});
+test('F08 editor: an ambiguous attempt freezes editing and close; retry uses the confirmed immutable input', async () => {
+  const options = { planningState: f08UIState(true), planningUnconfirmed: null as any, segurarMutacoes: true };
+  const ui = f08EditorUI(options);await f08Open(ui);
+  ui.interact(() => ui.editor().update(f08GoalA, { monthly_cents: 5100 }));ui.press('Salvar');
+  options.planningUnconfirmed = ui.writes.at(-1)!.value;
+  (ui.pedidos.at(-1) as any).rejeitar(new Error('lost'));await f08Flush(ui);
+  ui.interact(() => { ui.editor().close();ui.editor().update(f08GoalA, { monthly_cents: 9200 }); });
+  assert.equal(f08Visible(ui), true);assert.equal(ui.editor().session.items[0].monthly_cents, 5100);
+  assert.ok(ui.nodes().filter(node => node.type === 'SwitchRow').every(node => node.props.disabled));
+  assert.ok(ui.nodes().filter(node => node.type === 'MoneyField').every(node => node.props.readOnly));
+  ui.press('Conferir');assert.equal(ui.writes.length, 2);
+  assert.deepEqual(ui.writes[0].value, ui.writes[1].value);
+  options.planningUnconfirmed = null;(ui.pedidos.at(-1) as any).resolver({ workspace_id: f08Workspace, edit_revision: 5 });
+  await f08Flush(ui);assert.equal(f08Visible(ui), false);assert.equal(ui.toasts.at(-1)?.tone, 'success');
+});
+test('F08 sheet: actual workspace cycle controls the ruler, independent of default profile capability', async () => {
+  const state = f08UIState(true);const options = { planningState: state };const ui = f08EditorUI(options);
+  await f08Open(ui);let ruler = ui.nodes().find(node => node.type === 'MonthRuler');
+  assert.equal(ruler.props.visible, true);assert.equal(ruler.props.value, 'cycle');
+  ui.interact(() => ui.editor().close());state.cycle_close_day = null;await f08Open(ui);
+  ruler = ui.nodes().find(node => node.type === 'MonthRuler');assert.equal(ruler.props.visible, false);
+});
+test('F08 result: conceal suppresses derived numbers, pressure date, comparison chart and accessibility values', async () => {
+  const options = { planningState: f08UIState(true), concealed: false, realMoney: true };const ui = f08EditorUI(options);
+  await f08Open(ui);
+  assert.ok(ui.nodes().some(node => node.type === 'MeasuredSparkline'));
+  assert.ok(ui.nodes().some(node => String(node.props.accessibilityLabel).includes('caixa R$')));
+  assert.ok(ui.nodes().some(node => node.type === 'Money' || node.type?.name === 'Money'));
+  options.concealed = true;ui.interact(() => {});
+  assert.equal(ui.nodes().some(node => node.type === 'MeasuredSparkline'), false);
+  const text = ui.nodes().filter(node => node.type === 'ThemedText').map(node => [node.props.children, node.props.accessibilityLabel].flat().join(' ')).join(' ');
+  assert.doesNotMatch(text, /R\$|8[.,]43|6[.,]54|10\/10\/2026|caixa R\$/);
+  assert.ok(ui.nodes().some(node => node.props.accessibilityLabel === 'Valor oculto'));
+  assert.equal(ui.nodes().find(node => node.type === 'MoneyField').props.valueCents, 2500,'Own editable values remain visible while aggregate results are concealed');
+});
+test('F08 goals menu forwards the selected goal workspace instead of the default summary workspace', async () => {
+  const state = f08UIState(true);const ui = screen('src/app/finance/goals.tsx', { planningState: state, goals: [
+    { id: f08GoalB, workspace_id: f08Workspace, name: 'Meta de outro espaço', target_cents: 20000, saved_cents: 3000, deadline: null, archived: false },
+  ] });
+  const row = ui.nodes().find(node => typeof node.props.onLongPress === 'function' && String(node.props.accessibilityLabel).startsWith('Meta de outro espaço,'));
+  assert.ok(row);ui.interact(() => row.props.onLongPress());
+  const action = ui.actions.find(action => action.label === 'Simular com outras metas');assert.ok(action);
+  ui.interact(() => action.onPress());await f08Flush(ui);
+  assert.equal(ui.freshPlanningQueries.at(-1)[4], f08Workspace);
+  const switches = ui.nodes().filter(node => node.type === 'SwitchRow');assert.equal(switches[0].props.label, 'Meta B');
 });

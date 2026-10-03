@@ -7,6 +7,8 @@ import * as Haptics from 'expo-haptics';
 import { useBRL } from '@/components/ui/conceal';
 import { umDe, usePreferencia } from '@/hooks/use-preferencia';
 import { FinanceAnalysisPanes } from '@/components/finance/finance-analysis-panes';
+import { GoalPlanningSummary, GoalPlanSheet, useGoalPlanEditor } from '@/components/finance/goal-planning';
+import { useGoalPlanning } from '@/hooks/use-goal-planning';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
@@ -265,6 +267,8 @@ export default function ForecastScreen() {
   // segue sem drafts — curva e tabela não têm como discordar por caminho.
   const regua = useMonthRuler('projecao');
   const mensal = useForecastMonths(dias, [], emMes, regua.view);
+  const goalPlanning = useGoalPlanning(dias, regua.view, emMes ? 'month' : 'day');
+  const goalPlanEditor = useGoalPlanEditor(dias, regua.view, emMes ? 'month' : 'day');
   const simulando = hipoteses.length > 0 || adiantamentos.length > 0;
   const temCompletas = hipoteses.some((h) => !faltaNaHipotese(h));
   const simulacao = useSimulacao({
@@ -953,6 +957,9 @@ export default function ForecastScreen() {
           compact={<>{curveDecision}{scenario}</>}
         />
       ) : null}
+      <GoalPlanningSummary query={goalPlanning} editor={goalPlanEditor} actionLabel="Ajustar plano"
+        hint={simulando ? 'Compromissos atuais do espaço principal. Hipóteses deste simulador ficam fora do plano.' : undefined} />
+      <GoalPlanSheet editor={goalPlanEditor} onViewChange={regua.setView} />
 
       {/*
         Por dia × Por mês. Governa só o que vem ABAIXO — o destaque e o simulador continuam nos

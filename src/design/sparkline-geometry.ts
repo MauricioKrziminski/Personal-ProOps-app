@@ -15,10 +15,11 @@ export type EscalaDaSerie = {
   y: (v: number) => number;
 };
 
-export function escalaDaSerie(values: readonly number[], width: number, height: number): EscalaDaSerie | null {
+export function escalaDaSerie(values: readonly number[], width: number, height: number, comparison: readonly number[] = []): EscalaDaSerie | null {
   if (values.length < 2 || width <= 0) return null;
-  const dataMin = Math.min(...values);
-  const dataMax = Math.max(...values);
+  if (comparison.length && comparison.length !== values.length) return null;
+  const dataMin = Math.min(...values, ...comparison);
+  const dataMax = Math.max(...values, ...comparison);
   const span = Math.max(dataMax - dataMin, Math.abs(dataMax) * MIN_SPAN_RATIO, 1);
   const mid = (dataMin + dataMax) / 2;
   const lo = mid - span / 2;

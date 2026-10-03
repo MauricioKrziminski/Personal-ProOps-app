@@ -16,6 +16,9 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { DatePickerField } from '@/components/finance/date-picker-field';
+import { GoalPlanningSummary, GoalPlanSheet, useGoalPlanEditor } from '@/components/finance/goal-planning';
+import { useMonthRuler } from '@/components/finance/month-ruler';
+import { useGoalPlanning } from '@/hooks/use-goal-planning';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
@@ -72,13 +75,6 @@ interface FormState {
 
 const FORM_VAZIO: FormState = { name: '', targetCents: 0, deadline: '' };
 
-/** Meses inteiros de hoje até a data (mínimo 1: "este mês" ainda dá). */
-function mesesAte(deadlineISO: string): number {
-  const hoje = new Date();
-  const [y, m] = deadlineISO.split('-').map(Number);
-  return Math.max(1, (y - hoje.getFullYear()) * 12 + (m - 1 - hoje.getMonth()));
-}
-
 /** `2026-12-31` → `dezembro de 2026`. */
 /** `2027-09-30` → `set/2027`: curto para a linha do card caber inteira a 384dp × fonte 1,3. */
 function mesDoPrazo(deadlineISO: string): string {
@@ -105,6 +101,9 @@ export default function GoalsScreen() {
   const tablet = windowClass !== 'compact';
   const toast = useToast();
   const goals = useGoals();
+  const planRuler = useMonthRuler('metas', 'civil');
+  const planning = useGoalPlanning(365, planRuler.view, 'month');
+  const planEditor = useGoalPlanEditor(365, planRuler.view);
   const save = useSaveGoal();
   const deposit = useGoalDeposit();
   const editarAporte = useEditGoalContribution();
@@ -280,6 +279,7 @@ export default function GoalsScreen() {
     { label: 'Guardar', icon: 'plus.circle', arrasto: 'direita', onPress: () => abrirAporte(g) },
     { label: 'Editar', onPress: () => abrirEdicao(g) },
     { label: 'Ver extrato', onPress: () => setExtrato(g) },
+    { label: 'Simular com outras metas', onPress: () => planEditor.open({ ws: g.workspace_id, goalId: g.id }) },
     { label: 'Arquivar', icon: 'archivebox', arrasto: 'esquerda', onPress: () => arquivar(g) },
   ];
   const acoes = (g: Goal) => showItemActions(g.name, acoesDaMeta(g));
@@ -290,7 +290,8 @@ export default function GoalsScreen() {
     const falta = Math.max(0, target - saved);
     const pct = target > 0 ? Math.min(1, saved / target) : 0;
     const concluida = falta === 0;
-    const porMes = g.deadline && !concluida ? Math.ceil(falta / mesesAte(g.deadline)) : null;
+    const planned = !planning.isError ? planning.data?.goals.find(goal => goal.goal_id === g.id) : undefined;
+    const porMes = !concluida && planned?.included ? planned.monthly_cents : null;
 
     return (
       <Animated.View
@@ -341,12 +342,13 @@ export default function GoalsScreen() {
               ) : null}
             </ThemedText>
 
-            {porMes && g.deadline ? (
+            {porMes ? (
               <ThemedText type="footnote" themeColor="textSecondary">
-                <Money cents={porMes} variant="footnote" tone="textSecondary" />/mês até{' '}
-                {mesDoPrazo(g.deadline)}
+                <Money cents={porMes} variant="footnote" tone="textSecondary" />/mês{g.deadline ? ` até ${mesDoPrazo(g.deadline)}` : ' no plano'}
               </ThemedText>
-            ) : null}
+            ) : g.deadline && !concluida ? <ThemedText type="footnote" themeColor="textSecondary">
+              Prazo: {mesDoPrazo(g.deadline)}
+            </ThemedText> : null}
 
             {!concluida ? (
               <Button label="Guardar" size="sm" variant="secondary" onPress={() => abrirAporte(g)} />
@@ -405,6 +407,7 @@ export default function GoalsScreen() {
           </Card>
         </Animated.View>
       ) : null}
+      {lista.length > 0 && !goals.isError ? <GoalPlanningSummary query={planning} editor={planEditor} /> : null}
     </View>
   );
 
@@ -492,7 +495,7 @@ export default function GoalsScreen() {
   );
 
   return (
-    <Screen grouped wide={tablet} onRefresh={() => Promise.all([goals.refetch(), extrato?.id ? contribuicoes.refetch() : Promise.resolve()])}>
+    <Screen grouped wide={tablet} onRefresh={() => Promise.all([goals.refetch(), planning.refetch(), extrato?.id ? contribuicoes.refetch() : Promise.resolve()])}>
       <Stack.Screen
         options={{
           title: 'Metas',
@@ -502,6 +505,7 @@ export default function GoalsScreen() {
       <HeaderActions actions={[{ label: 'Nova meta', icon: 'plus', onPress: abrirNova }]} />
 
       {tablet ? tabletBody : compactBody}
+      <GoalPlanSheet editor={planEditor} onViewChange={planRuler.setView} />
 
       {/* Aportar — detent pequeno: um valor, uma nota, dois botões de intenção. */}
       <Sheet visible={aporte !== null} onClose={() => setAporte(null)}>

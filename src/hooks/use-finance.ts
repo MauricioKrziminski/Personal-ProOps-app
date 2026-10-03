@@ -180,7 +180,7 @@ export type AccountBalance = Fns['account_balances']['Returns'][number];
 
 export type Goal = Pick<
   Tables['goals']['Row'],
-  'id' | 'name' | 'target_cents' | 'saved_cents' | 'deadline' | 'archived'
+  'id' | 'workspace_id' | 'name' | 'target_cents' | 'saved_cents' | 'deadline' | 'archived'
 >;
 
 export type BudgetStatus = Fns['budgets_status']['Returns'][number];
@@ -566,7 +566,7 @@ export function useGoals() {
     queryFn: async (): Promise<Goal[]> => {
       const { data, error } = await supabase
         .from('goals')
-        .select('id, name, target_cents, saved_cents, deadline, archived')
+        .select('id, workspace_id, name, target_cents, saved_cents, deadline, archived')
         .eq('archived', false)
         // A mais recente primeiro (24/09/2026: "em tudo, do mais recente para o mais antigo").
         .order('created_at', { ascending: false });

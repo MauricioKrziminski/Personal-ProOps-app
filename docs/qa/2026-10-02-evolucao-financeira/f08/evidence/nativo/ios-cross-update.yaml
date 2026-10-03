@@ -1,0 +1,42 @@
+appId: com.proops.personal.dev
+---
+- assertVisible: "O plano mudou em outro lugar.*"
+- assertNotVisible: "Menor disponibilidade no período"
+- takeScreenshot: ios-external-revision-invalidated
+- tapOn: "Reabrir plano"
+- extendedWaitUntil:
+    visible: "Menor disponibilidade no período"
+    timeout: 20000
+- takeScreenshot: ios-concealed-reopened-current
+- scrollUntilVisible:
+    element: "Ver períodos.*"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "Ver períodos.*"
+- scrollUntilVisible:
+    element: "Caixa e disponível"
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: ios-concealed-periods
+- scrollUntilVisible:
+    element: "Aporte mensal para Reserva de emergência"
+    direction: DOWN
+    timeout: 18000
+- assertVisible: "800,00"
+- scrollUntilVisible:
+    element: "Primeiro aporte para Reserva de emergência.*"
+    direction: DOWN
+    timeout: 18000
+- assertVisible: "31/10/2026"
+- takeScreenshot: ios-read-android-800
+- tapOn: "Fechar"
+- extendedWaitUntil:
+    visible: "Simular juntas.*"
+    timeout: 18000
+- tapOn: "Finanças"
+- extendedWaitUntil:
+    visible: "Mostrar valor"
+    timeout: 15000
+- tapOn: "Mostrar valor"
+- assertVisible: "Ocultar valor"
+- takeScreenshot: ios-privacy-restored

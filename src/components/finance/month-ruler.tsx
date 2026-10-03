@@ -40,7 +40,7 @@ import { umDe, usePreferencia } from '@/hooks/use-preferencia';
 export type MonthRulerState = ReturnType<typeof useMonthRuler>;
 
 /** As telas que têm régua; cada uma grava a sua. */
-export type TelaComRegua = 'financeiro' | 'orcamentos' | 'lancamentos' | 'projecao';
+export type TelaComRegua = 'financeiro' | 'orcamentos' | 'lancamentos' | 'projecao' | 'metas';
 
 const REGUAS = umDe<CycleView>(['civil', 'cycle']);
 

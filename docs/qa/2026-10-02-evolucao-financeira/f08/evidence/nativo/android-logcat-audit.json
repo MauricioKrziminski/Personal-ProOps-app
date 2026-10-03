@@ -1,0 +1,23 @@
+{
+  "started": "2026-10-03T14:48:26-03:00",
+  "finished": "2026-10-03T15:54:27.415946-03:00",
+  "stopped_owned_logcat_pids": [
+    78307,
+    78311
+  ],
+  "devices": {
+    "emulator-5574": {
+      "path": "/private/tmp/proops-f08-native/android-emulator-5574-logcat.log",
+      "lines": 91961,
+      "signal_matches": [],
+      "last_line_timestamp": "10-03 15:54:26.695"
+    },
+    "emulator-5576": {
+      "path": "/private/tmp/proops-f08-native/android-emulator-5576-logcat.log",
+      "lines": 28331,
+      "signal_matches": [],
+      "last_line_timestamp": "10-03 15:54:26.916"
+    }
+  },
+  "limit": "Only the observed logcat window; historical F07 ANR remains open."
+}

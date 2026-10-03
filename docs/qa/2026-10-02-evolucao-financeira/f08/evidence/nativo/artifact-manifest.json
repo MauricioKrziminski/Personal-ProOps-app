@@ -1,0 +1,411 @@
+[
+  {
+    "file": "ios-fresh-save.yaml",
+    "source": "/private/tmp/proops-f08-native/ios-fresh-save.yaml",
+    "sha256": "3038b6cb5f725c69305f85687ab994a702162935b304c515f5839b321037858a",
+    "bytes": 1140
+  },
+  {
+    "file": "ios-fresh-save.log",
+    "source": "/private/tmp/proops-f08-native/ios-fresh-save.log",
+    "sha256": "4e0528ea668a61a5f8412154a088a19ab268de6d4de6d61c1b4d4ca06a2b2263",
+    "bytes": 1657
+  },
+  {
+    "file": "ios-fresh-save-result.json",
+    "source": "/private/tmp/proops-f08-native/ios-fresh-save-result.json",
+    "sha256": "24ce26f538ed6a7555c0e5509a5020645cf73ba234f44e612bda893d887cef59",
+    "bytes": 183
+  },
+  {
+    "file": "ios-persistence.yaml",
+    "source": "/private/tmp/proops-f08-native/ios-persistence.yaml",
+    "sha256": "985efd28e2d9c65d1ff620c1d3ca47dde58061b890e2601900f1f4a239971bb4",
+    "bytes": 887
+  },
+  {
+    "file": "ios-persistence.log",
+    "source": "/private/tmp/proops-f08-native/ios-persistence.log",
+    "sha256": "ce6aad4b3c52da8d8eb50e472fe7666f5dd3d119f9d7d6ae9c4fb6c4fdcb1890",
+    "bytes": 1247
+  },
+  {
+    "file": "ios-persistence-result.json",
+    "source": "/private/tmp/proops-f08-native/ios-persistence-result.json",
+    "sha256": "c02f985b2007eb86126e4cb394488f50561b00df917e4a644063b3266f73871e",
+    "bytes": 184
+  },
+  {
+    "file": "ios-forecast-open.yaml",
+    "source": "/private/tmp/proops-f08-native/ios-forecast-open.yaml",
+    "sha256": "608ae1db3220200f2aef90313d608250447809d52fbb627b52746529d5aa4c3d",
+    "bytes": 622
+  },
+  {
+    "file": "ios-forecast-open.log",
+    "source": "/private/tmp/proops-f08-native/ios-forecast-open.log",
+    "sha256": "5456ac8f449b95ab68ea1c13eaf174059fbd5aa58ef05e30aca4f1251fc5aed3",
+    "bytes": 903
+  },
+  {
+    "file": "ios-forecast-open-result.json",
+    "source": "/private/tmp/proops-f08-native/ios-forecast-open-result.json",
+    "sha256": "593e69b2af3592d65584d3f613a9cd7e44be9ce0e6c0e4ac5a46103e79678568",
+    "bytes": 186
+  },
+  {
+    "file": "ios-privacy.yaml",
+    "source": "/private/tmp/proops-f08-native/ios-privacy.yaml",
+    "sha256": "6809eb227a48cd3806cd1d500d1242e346a3c044b71fe43b76ddecea87f977da",
+    "bytes": 617
+  },
+  {
+    "file": "ios-privacy.log",
+    "source": "/private/tmp/proops-f08-native/ios-privacy.log",
+    "sha256": "f789e305d9250811429c4d268fbe3a06b7292a16149a5cee9f02c1c65616e238",
+    "bytes": 913
+  },
+  {
+    "file": "ios-privacy-result.json",
+    "source": "/private/tmp/proops-f08-native/ios-privacy-result.json",
+    "sha256": "7a640b605d1db689c802d6941d93e12174a7aeed5fb7506ceae2c9e5a5fa5910",
+    "bytes": 180
+  },
+  {
+    "file": "ios-cross-update.yaml",
+    "source": "/private/tmp/proops-f08-native/ios-cross-update.yaml",
+    "sha256": "0ebc3424d097d1164c80cc0fb864e98174ce25e260375f0c01c35ee447ae624a",
+    "bytes": 1223
+  },
+  {
+    "file": "ios-cross-update.log",
+    "source": "/private/tmp/proops-f08-native/ios-cross-update.log",
+    "sha256": "ff493ee4098da03144019d639dd929610b48fe625592bd4687ade4e6158099b8",
+    "bytes": 1817
+  },
+  {
+    "file": "ios-cross-update-result.json",
+    "source": "/private/tmp/proops-f08-native/ios-cross-update-result.json",
+    "sha256": "2eef7ee691d8a22c65fafbf071054108106f7d4c798d38da1ef96ae208b07148",
+    "bytes": 185
+  },
+  {
+    "file": "ios-before-cleanup.yaml",
+    "source": "/private/tmp/proops-f08-native/ios-before-cleanup.yaml",
+    "sha256": "00cc32d02f55a7c80a15e8e158e56ccdf87ac75540c9684e445bfd7e582263fa",
+    "bytes": 316
+  },
+  {
+    "file": "ios-before-cleanup.log",
+    "source": "/private/tmp/proops-f08-native/ios-before-cleanup.log",
+    "sha256": "3d383d597c3ec1d3530c453a00055618b3c6dfac04e692a9ae0769ce3b95951e",
+    "bytes": 543
+  },
+  {
+    "file": "ios-before-cleanup-result.json",
+    "source": "/private/tmp/proops-f08-native/ios-before-cleanup-result.json",
+    "sha256": "4d46ffe60241f14d2d6b330295f7f85891cc114af92acdda9313a29d929fd6a4",
+    "bytes": 187
+  },
+  {
+    "file": "ios-fresh-date-31.png",
+    "source": "/private/tmp/proops-f08-native/ios-fresh-save/.maestro/tests/2026-10-03_153726/ios-fresh-save/takeScreenshot/ios-fresh-date-31.png",
+    "sha256": "e69a2c638d41e25a3d631d6e13c1a63fb20cc132a3f0ec930442d2989fac6199",
+    "bytes": 292910
+  },
+  {
+    "file": "ios-fresh-save-draft.png",
+    "source": "/private/tmp/proops-f08-native/ios-fresh-save/.maestro/tests/2026-10-03_153726/ios-fresh-save/takeScreenshot/ios-fresh-save-draft.png",
+    "sha256": "c1ab31217bbf31730d3541d62b54fe36297c2c072116cd9a9b74384f32125ab5",
+    "bytes": 378474
+  },
+  {
+    "file": "ios-cold-persisted-700.png",
+    "source": "/private/tmp/proops-f08-native/ios-persistence/.maestro/tests/2026-10-03_153921/ios-persistence/takeScreenshot/ios-cold-persisted-700.png",
+    "sha256": "d5dfb4220c0c1a5156b78dfe72c74ca551ebbd4a1e29207ce71b84869004aad9",
+    "bytes": 296166
+  },
+  {
+    "file": "ios-forecast-plan-open.png",
+    "source": "/private/tmp/proops-f08-native/ios-forecast-open/.maestro/tests/2026-10-03_154055/ios-forecast-open/takeScreenshot/ios-forecast-plan-open.png",
+    "sha256": "e8b3174aac05ddb91f0d46b795b30890fab8c2e26f4a96f0e4f3727a87e6775f",
+    "bytes": 308763
+  },
+  {
+    "file": "ios-concealed-plan-top.png",
+    "source": "/private/tmp/proops-f08-native/ios-privacy/.maestro/tests/2026-10-03_154133/ios-privacy/takeScreenshot/ios-concealed-plan-top.png",
+    "sha256": "b1c1a9e90cf0ead5ccad8e4b887f896060f8801e96edf3c06fb33a8d08c63bb3",
+    "bytes": 276957
+  },
+  {
+    "file": "ios-read-android-800.png",
+    "source": "/private/tmp/proops-f08-native/ios-cross-update/.maestro/tests/2026-10-03_154535/ios-cross-update/takeScreenshot/ios-read-android-800.png",
+    "sha256": "e1ec7c9b0fc2fe3806c39c8a0d6d9ff99491830c1b5db9cc427190ded944ccfa",
+    "bytes": 292723
+  },
+  {
+    "file": "ios-concealed-periods.png",
+    "source": "/private/tmp/proops-f08-native/ios-cross-update/.maestro/tests/2026-10-03_154535/ios-cross-update/takeScreenshot/ios-concealed-periods.png",
+    "sha256": "cf8f94f16fcffd0cb713b92e72c42fc15df42d2885af1981ac5ec61d80e58db1",
+    "bytes": 272055
+  },
+  {
+    "file": "android-phone-stable-after-input.png",
+    "source": "/private/tmp/proops-f08-native/android-phone-stable-after-input.png",
+    "sha256": "e1f5730fd3b252a802047a59eddbeb66b056863edc41739f10e4451357596743",
+    "bytes": 343367
+  },
+  {
+    "file": "android-phone-stable-calendar.png",
+    "source": "/private/tmp/proops-f08-native/android-phone-stable-calendar.png",
+    "sha256": "57cbbca4df2fc88f953462909e3afaac2f5b9bc6ed475c511a257d18ae754cf4",
+    "bytes": 209970
+  },
+  {
+    "file": "android-phone-cancel-reopen.png",
+    "source": "/private/tmp/proops-f08-native/android-phone-cancel-reopen.png",
+    "sha256": "195dde61cdfdf9e9f38383b361b984cabc716ed597ea4297c37e30f32d73201d",
+    "bytes": 266371
+  },
+  {
+    "file": "android-phone-cross-fresh-700.png",
+    "source": "/private/tmp/proops-f08-native/android-phone-cross-fresh-700.png",
+    "sha256": "7320680300ef2ade23d81492d0c91cff1d6261f13cd2cea480d76fa50f70c660",
+    "bytes": 271219
+  },
+  {
+    "file": "android-phone-save-800-draft.png",
+    "source": "/private/tmp/proops-f08-native/android-phone-save-800-draft.png",
+    "sha256": "ef35795ccf3f563db50bd2d9f3239c39f25a731853b186b2b3187aac02391576",
+    "bytes": 271146
+  },
+  {
+    "file": "android-phone-save-returned-goals.png",
+    "source": "/private/tmp/proops-f08-native/android-phone-save-returned-goals.png",
+    "sha256": "42e8aa18abec202ee18169680eeb71ad2f7ffd507202eb94032462326f137c1d",
+    "bytes": 213611
+  },
+  {
+    "file": "db-before-summary.json",
+    "source": "db-before.json (summary)",
+    "source_sha256": "00dd67cc2f0f61c2d6066a58eb63d2b904ed1e16d4b8d9bd40ac012d6a66fe18",
+    "sha256": "4906a14d742c4ab295cda5e5e14edeea63b44a2557cc394dd108fd303fc96c2c",
+    "bytes": 1735
+  },
+  {
+    "file": "db-ios-saved-summary.json",
+    "source": "db-ios-saved.json (summary)",
+    "source_sha256": "f8b83c3a875ec5e3ce2250e69618ab65a56b8d74fa9c217f48f8d9ad91819e12",
+    "sha256": "9f10c8b95f904c770082b900f13ec40d9b0e80b7d1b0260c3ff06bec6b1ba568",
+    "bytes": 1979
+  },
+  {
+    "file": "db-android-saved-summary.json",
+    "source": "db-android-saved.json (summary)",
+    "source_sha256": "24c8a35da2a55bc102cde66c12c71b33d54c89f711945e9ab9cae6eef4cd9f6e",
+    "sha256": "87a441ec15eaa5c720ec52c724e265b3f113fae2738929647fee2c095efc0add",
+    "bytes": 2225
+  },
+  {
+    "file": "ios-privacy-state.json",
+    "source": "/private/tmp/proops-f08-native/ios-privacy-state.json",
+    "sha256": "a8ad7a6518c401e1fdf58e1268638e7229e5cb0727c33c0cf8303e6ee7cc5577",
+    "bytes": 94478
+  },
+  {
+    "file": "ios-after-privacy-update.json",
+    "source": "/private/tmp/proops-f08-native/ios-after-privacy-update.json",
+    "sha256": "fc6afe60ab87a025698ac0f21ed3f99e3511fd4836460e14e4b34b8aef21c0ce",
+    "bytes": 47504
+  },
+  {
+    "file": "android-stable-retest.yaml",
+    "source": "/private/tmp/proops-f08-native/android-stable-retest.yaml",
+    "sha256": "02047baf4d0070ca899ced5fe61e20884cda17139f7410d1264a92e312dccd91",
+    "bytes": 1783
+  },
+  {
+    "file": "android-phone-stable-retest.log",
+    "source": "/private/tmp/proops-f08-native/android-phone-stable-retest.log",
+    "sha256": "1bad1ddc0e32cb38702a6b39599a1fc9a6bb75ea24afe20df877c1848fdb3a6e",
+    "bytes": 2231
+  },
+  {
+    "file": "android-phone-stable-retest-result.json",
+    "source": "/private/tmp/proops-f08-native/android-phone-stable-retest-result.json",
+    "sha256": "fdda15a5c78cb7b7018812456dcb81bbdc98aebc6f5d1cb72016a08cad80c7c8",
+    "bytes": 173
+  },
+  {
+    "file": "android-cross-save.yaml",
+    "source": "/private/tmp/proops-f08-native/android-cross-save.yaml",
+    "sha256": "561296a532e755b9f8732713d2ec1f5f86c4ba76dac6356db4e9a5cfd3dd7597",
+    "bytes": 1031
+  },
+  {
+    "file": "android-phone-cross-save.log",
+    "source": "/private/tmp/proops-f08-native/android-phone-cross-save.log",
+    "sha256": "855425fa5e5c32647d85da173fc3d91d4435048110f9966462aeb4eb208020bf",
+    "bytes": 1879
+  },
+  {
+    "file": "android-phone-cross-save-result.json",
+    "source": "/private/tmp/proops-f08-native/android-phone-cross-save-result.json",
+    "sha256": "bed941ff03bacc1904982ddd31b4715a822ae2e7a974226fcba3495924db0fe1",
+    "bytes": 170
+  },
+  {
+    "file": "android-save-readback.yaml",
+    "source": "/private/tmp/proops-f08-native/android-save-readback.yaml",
+    "sha256": "06da2c4998ecb13680ed4f49633742b9fa7779fbc43740e01f4e535eef2c0c48",
+    "bytes": 275
+  },
+  {
+    "file": "android-phone-save-readback.log",
+    "source": "/private/tmp/proops-f08-native/android-phone-save-readback.log",
+    "sha256": "ac45cee8936637aa04a4d69963941ba721182d08b30277e41a5ee443a34f7b3d",
+    "bytes": 542
+  },
+  {
+    "file": "android-phone-save-readback-result.json",
+    "source": "/private/tmp/proops-f08-native/android-phone-save-readback-result.json",
+    "sha256": "6019c99d7d7a5089ad17eda875955157f89937eb3bb92d392b5b0fb35d8cbba4",
+    "bytes": 173
+  },
+  {
+    "file": "android-final-reading.yaml",
+    "source": "/private/tmp/proops-f08-native/android-final-reading.yaml",
+    "sha256": "acb3beebccd58d502a01e0bf6bdab2bd003ac29549cda28e3118af8f11e13363",
+    "bytes": 1824
+  },
+  {
+    "file": "android-phone-final-reading.log",
+    "source": "/private/tmp/proops-f08-native/android-phone-final-reading.log",
+    "sha256": "53ee3164bd9bf487b451b8b4f2dc1613332aa141afa833d05e9132e7861052f3",
+    "bytes": 2353
+  },
+  {
+    "file": "android-phone-final-reading-result.json",
+    "source": "/private/tmp/proops-f08-native/android-phone-final-reading-result.json",
+    "sha256": "9737c3b96667d004d3ebc3bed086e3040c216fe9d8afb0dc0a2e3ca3aa98039e",
+    "bytes": 173
+  },
+  {
+    "file": "ios-baseline-restored.yaml",
+    "source": "/private/tmp/proops-f08-native/ios-baseline-restored.yaml",
+    "sha256": "0c1ec3cea801b7649fb289933c500621bce893382f75021bf8ce81f3e7d18821",
+    "bytes": 808
+  },
+  {
+    "file": "ios-baseline-restored.log",
+    "source": "/private/tmp/proops-f08-native/ios-baseline-restored.log",
+    "sha256": "46bb4a99c7b6d725f0c6ea9e5ad1ad1f7860646d9ed5dfbb6dd20614136be49b",
+    "bytes": 1210
+  },
+  {
+    "file": "ios-baseline-restored-result.json",
+    "source": "/private/tmp/proops-f08-native/ios-baseline-restored-result.json",
+    "sha256": "689446e30dc2a9b69f27968eeb79a9e9679537c1f1b3c452b41cc366aab2f346",
+    "bytes": 190
+  },
+  {
+    "file": "ios-baseline-restored.png",
+    "source": "/private/tmp/proops-f08-native/ios-baseline-restored/.maestro/tests/2026-10-03_155354/ios-baseline-restored/takeScreenshot/ios-baseline-restored.png",
+    "sha256": "8d957bd3d814869f128b891954fcf8f0edb5ccf240fbba3827a4497e0ec7a17c",
+    "bytes": 292734
+  },
+  {
+    "file": "ios-outdated-without-loading.png",
+    "source": "/private/tmp/proops-f08-native/ios-baseline-restored/.maestro/tests/2026-10-03_155354/ios-baseline-restored/takeScreenshot/ios-outdated-without-loading.png",
+    "sha256": "6260e80327d8e55015fe6b488dda80417b06db7a2e4f772716edac39f0a8c354",
+    "bytes": 307156
+  },
+  {
+    "file": "android-phone-projection-context.png",
+    "source": "/private/tmp/proops-f08-native/android-phone-projection-context.png",
+    "sha256": "059aae1571d3f8e71793317063c257b94a7f2f33a7027e3d232db85c9d973368",
+    "bytes": 319432
+  },
+  {
+    "file": "android-phone-concealed-top.png",
+    "source": "/private/tmp/proops-f08-native/android-phone-concealed-top.png",
+    "sha256": "69da3c28a9cfee45e1bda99047338ce46cbe373e5da26f7f02cd74fba03b3de3",
+    "bytes": 286760
+  },
+  {
+    "file": "android-phone-concealed-periods.png",
+    "source": "/private/tmp/proops-f08-native/android-phone-concealed-periods.png",
+    "sha256": "5c91446d30d962c08c50fa4c6088502f1c6813a36e0bab4eabaa51a338c3a2e1",
+    "bytes": 271477
+  },
+  {
+    "file": "android-qa-report.md",
+    "source": "/private/tmp/proops-f08-native/android-qa-report.md",
+    "sha256": "5dad54640c3ff50110fe3d9725d54634f35b5689b0ba0413b991fc54faa1e8f5",
+    "bytes": 5205
+  },
+  {
+    "file": "android-logcat-audit.json",
+    "source": "/private/tmp/proops-f08-native/android-logcat-audit.json",
+    "sha256": "6bd1cc17eadb48390e832418150ac81775b41177ad1287a2eef2f4f80832ed32",
+    "bytes": 674
+  },
+  {
+    "file": "cleanup-rollback.json",
+    "source": "/private/tmp/proops-f08-native/cleanup-rollback.json",
+    "sha256": "3a804ba220d4f31b89344ac626cab68aaa5cbabea3d2bd11b5d98fc7b7637b92",
+    "bytes": 390
+  },
+  {
+    "file": "cleanup-commit.json",
+    "source": "/private/tmp/proops-f08-native/cleanup-commit.json",
+    "sha256": "3be6f2c8bcb575193f7e080432d161c4accf8335cf4034dfb0fbe8f2df4fe2c7",
+    "bytes": 388
+  },
+  {
+    "file": "db-before.json",
+    "source": "/private/tmp/proops-f08-native/db-before.json",
+    "sha256": "00dd67cc2f0f61c2d6066a58eb63d2b904ed1e16d4b8d9bd40ac012d6a66fe18",
+    "bytes": 5342
+  },
+  {
+    "file": "db-android-saved.json",
+    "source": "/private/tmp/proops-f08-native/db-android-saved.json",
+    "sha256": "24c8a35da2a55bc102cde66c12c71b33d54c89f711945e9ab9cae6eef4cd9f6e",
+    "bytes": 6412
+  },
+  {
+    "file": "db-after-cleanup.json",
+    "source": "/private/tmp/proops-f08-native/db-after-cleanup.json",
+    "sha256": "00dd67cc2f0f61c2d6066a58eb63d2b904ed1e16d4b8d9bd40ac012d6a66fe18",
+    "bytes": 5342
+  },
+  {
+    "file": "cleanup-native-qa.py",
+    "source": "/private/tmp/proops-f08-clean-native.py",
+    "sha256": "cc8b8d81be0deaa9aad983164c5c96e03005e55ff8720ffacaf50d01e8450b1d",
+    "bytes": 4292
+  },
+  {
+    "file": "restoration-check.json",
+    "source": "/private/tmp/proops-f08-native/restoration-check.json",
+    "sha256": "73dbf275c16ad58516e935b283fab8f31e6f60f7aed0b6e4ffce9fac830604c5",
+    "bytes": 133
+  },
+  {
+    "source": "/private/tmp/proops-f08-native/android-emulator-5574-logcat.log",
+    "source_sha256": "28dd1ae073d375d0a36369632055bc94154649bec24aea6e8e736c9b6f5fb15c",
+    "lines": 91961,
+    "signal_matches": [],
+    "file": null,
+    "note": "Raw log retained privately; observed stability audit, not release certification"
+  },
+  {
+    "source": "/private/tmp/proops-f08-native/android-emulator-5576-logcat.log",
+    "source_sha256": "24509b2d209d052d6ff04810d9cb54d6ec253acc911a0f5facc81be658ffaab2",
+    "lines": 28331,
+    "signal_matches": [],
+    "file": null,
+    "note": "Raw log retained privately; observed stability audit, not release certification"
+  }
+]

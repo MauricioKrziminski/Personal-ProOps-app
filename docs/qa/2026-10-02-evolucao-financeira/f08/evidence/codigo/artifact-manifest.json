@@ -1,0 +1,44 @@
+{
+  "scope": "F08 code QA artifacts; logs copied or excerpted without rerunning checks",
+  "files_sha256": {
+    "domain-green-summary.log": "c2ad0a201ef74b88f349d1a16f53935dfef891a5a4d1f0f425005b6b7ab5ad53",
+    "domain-red-summary.log": "b5df48589afc95ec060d1eb15310dd74f4d05ff7d06eba01e8d1a1081e487cb1",
+    "full-suite-f08-excerpt.log": "66e5a86b68eff1365ceaf7d05fcc6439bab0520899192f9227cb9197bf3efd34",
+    "layout-green.log": "ae696b805074e4d1f4bc370dc586a87b970cf2ed7e001a09ebf032be0dec253b",
+    "layout-red.log": "1b1d6ed7cf8886a1a191c93bfa0073a79c989fb0c9adc680d604894a06af6818",
+    "lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "react-doctor.log": "6db9215110c4ffc3564b7b379ee5c543950318cffe0a9c3412afe088126a52fe",
+    "refusal-green.log": "ebc8d3d140df054b2c74eb26eb69d2e38ab740ba1f430ce4926e61b9d677608d",
+    "refusal-red.log": "d64b86abf705ab3f17a4b31da0f7caaa36d9bff01424dee6e77ec581cc218a95",
+    "save-green-summary.log": "8753866abd50cd43da86aa4af5bf445cef1df3ccd50c0b4e3128ff9fb9b1b517",
+    "types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "loading-state-red.log": "3c9fcde39c0f08d1b01f0d2ddd73762d61d4d68064497d95219f6d35f62702a7",
+    "loading-state-green.log": "7392e38e0ba1d5ec088053b67e251c66c96d8bfd5ff7d53c7ad79ef955827e36",
+    "react-doctor-current.log": "922499f0797e5299477f7897e12c18b8415a71fde87599200b5e840572f6d3a0"
+  },
+  "source_logs_sha256": {
+    "proops-f08-final-full-tests.log": "dc28479808585b7ea1ce5ca61e88fefa356b36bc8a0effb5621a5a2329be9036",
+    "proops-f08-domain-red.log": "27fdb4b279184f2932f3792fd7a4b21c495c2e23f67e9460a2de9696cee1828d",
+    "proops-f08-domain-green.log": "d6b944b7580a8f21359acbdf0685f982dec1880a49e59bb9bf7d593f14935cb7",
+    "proops-f08-save-green.log": "bf9931ee8a638f2c8050104e68c993ca981d53651a4f4b31cbd5629a21eae79f",
+    "proops-f08-types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "proops-f08-lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "proops-f08-layout-red.log": "e5d0e20c7a99fb0b98ae38b17ac8ee4b8d4035de3ceb0c6b653d197ef31922b7",
+    "proops-f08-layout-green.log": "cc8ab56f9c275b925de49bebe1b81656f99861f1757f9d03605abd69c4fcad83",
+    "proops-f08-refusal-red.log": "ab73932adbe94b7f16bae44d5d201a9a4bfc7a32351553076edaa7411e1bedf9",
+    "proops-f08-refusal-green.log": "8d3b6ff50224bbf0008ad02eb16bad908dec7b43105d3f5c41706f4bfb37d0bc",
+    "proops-f08-react-doctor-final.log": "e0b1360a8a8beedb290e0ee412c84452bbb20c00947aa1ac42b87b922e316ceb",
+    "proops-f08-loading-state-red.log": "c5bd398486bde64875d8dc3979ffbd29b7b575564dbb78e598de5edced9b3a28",
+    "proops-f08-loading-state-green.log": "c52f4ba28a113ff922b1e945ef9b29d457a8a8fbfb625e21e2a56e6c7fa7c1ba",
+    "proops-f08-current-full-tests.log": "cbc3787851b09425284911615cd9258d3ebf7a2824b0177ddccdfee9d06f084f",
+    "proops-f08-current-types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "proops-f08-current-lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "proops-f08-current-react-doctor.log": "fb53d7e759b9e7a5970db60138ad2b5ccf8c5f96e65c3bad730d176e137ad580"
+  },
+  "limitations": [
+    "Temporary source logs are identified by basename and SHA-256; committed copies replace machine-specific checkout/temp paths, and large logs are represented by focused excerpts.",
+    "Type and lint source logs are empty and do not independently encode exit status or command; exit 0 is from the primary agent's run record.",
+    "This manifest does not hash itself."
+  ],
+  "normalization": "Local paths normalized and trailing whitespace removed from stored logs; source hashes retain the originals."
+}

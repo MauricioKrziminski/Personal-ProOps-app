@@ -1,0 +1,61 @@
+{
+  "workspace_id": "b94c2f3e-e1f1-450e-b549-bc570b5e8b0e",
+  "revision": null,
+  "goals": [
+    {
+      "goal_id": "0a6f63e1-9c61-44c1-a0b2-26977a348669",
+      "name": "Reserva de emergência",
+      "included": true,
+      "monthly_cents": "250000",
+      "first_on": "2026-10-03"
+    },
+    {
+      "goal_id": "6e94e5b2-99bb-4654-99f2-3d23bd4520d8",
+      "name": "Troca do notebook",
+      "included": true,
+      "monthly_cents": "132000",
+      "first_on": "2026-10-03"
+    }
+  ],
+  "plans": 0,
+  "items": 0,
+  "receipts": [],
+  "financial": {
+    "accounts": {
+      "count": 20,
+      "sha256": "1ad60c52bf9d3731f4214b78a78d96df40a0695372357c8cde3684143dd05afd"
+    },
+    "assets": {
+      "count": 3,
+      "sha256": "360ec945afa8febe88055182c0f0cd2b8c5522b4d7620f2ebd437291fb47856e"
+    },
+    "goals": {
+      "count": 2,
+      "sha256": "1a29c0421544d7cf4c7842333dbb06312c71f64e7f9ba39bed0a90ee329603b2"
+    },
+    "goal_contributions": {
+      "count": 2,
+      "sha256": "564510ad46af0ea5b7e1c9abb9736ce3a45ea650cfa56869bb677b1febe0e2b5"
+    },
+    "transactions": {
+      "count": 132,
+      "sha256": "670cff1766629db17d9b869e765c2b773445d6505d3d642a06aedf8a300bfc46"
+    },
+    "financial_allocations": {
+      "count": 2,
+      "sha256": "79702910981bae0c5659e79e5169b745144debf677bc6589728f5eb0d0ab3345"
+    },
+    "emergency_reserves": {
+      "count": 1,
+      "sha256": "343234abec22e05d3acb5e415b080bc6bf097bd1c1beb057e7c31d6a4b7447d8"
+    },
+    "net_worth": {
+      "count": 1,
+      "sha256": "f8ebbe4ec1bd8bac245b08d8d2e68e61ed69a7abb17a150ccb899ba6367615c7"
+    },
+    "account_balances": {
+      "count": 21,
+      "sha256": "0259c7e2c05d1a096be10ac8ff0f2f35aea6a08bf1333dd32738e122f8eca1d4"
+    }
+  }
+}

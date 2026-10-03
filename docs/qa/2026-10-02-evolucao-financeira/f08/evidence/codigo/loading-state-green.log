@@ -1,0 +1,28 @@
+(node:49474) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file://<repo>/src/lib/simple-finance-ui.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to <repo>/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ F08 editor: fresh requested workspace opens once and closing ignores a late snapshot (78.862125ms)
+✔ F08 editor: draft and snapshot survive query updates and width changes (28.4485ms)
+✔ F08 editor: error cannot present or save a previous scenario (25.437ms)
+✔ F08 editor: fetching cannot present or save a previous scenario (20.443042ms)
+✔ F08 editor: pending cannot present or save a previous scenario (19.633833ms)
+✔ F08 editor: revision cannot present or save a previous scenario (19.897333ms)
+✔ F08 editor: fingerprint cannot present or save a previous scenario (15.063791ms)
+✔ F08 editor: a confirmed CAS refusal removes the old scenario until a fresh reopening (17.553125ms)
+✔ F08 editor: retrying a transient preview error preserves the editable draft (17.217833ms)
+✔ F08 result: recalculation preserves its component and measured space without showing old financial readings (14.687334ms)
+✔ F08 result: a refused or failed scenario does not pretend to keep loading (16.120167ms)
+✔ F08 editor: actual excluded fields disappear and retoggle preserves its own monthly draft (13.479625ms)
+✔ F08 editor: an ambiguous attempt freezes editing and close; retry uses the confirmed immutable input (23.221416ms)
+✔ F08 sheet: actual workspace cycle controls the ruler, independent of default profile capability (16.629125ms)
+✔ F08 result: conceal suppresses derived numbers, pressure date, comparison chart and accessibility values (29.725542ms)
+✔ F08 goals menu forwards the selected goal workspace instead of the default summary workspace (47.403583ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 703.752042

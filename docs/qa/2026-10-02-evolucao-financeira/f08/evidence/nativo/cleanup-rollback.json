@@ -1,0 +1,14 @@
+{
+  "target": "utkqoiigimqzeenxkxdl",
+  "workspace_id": "b94c2f3e-e1f1-450e-b549-bc570b5e8b0e",
+  "restored_absent_plan": true,
+  "deleted_plan": 1,
+  "deleted_items_by_cascade": 2,
+  "deleted_sealed_receipts": 2,
+  "deleted_matching_generic_receipts": 2,
+  "request_ids": [
+    "f268646c-7554-4bc6-bb64-ffc217a44951",
+    "8007f381-1f4c-474b-af58-dde4c5170074"
+  ],
+  "mode": "rollback"
+}

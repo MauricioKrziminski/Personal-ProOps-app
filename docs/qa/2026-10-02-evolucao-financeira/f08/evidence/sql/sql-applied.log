@@ -1,0 +1,7 @@
+produção : kwriuifcwyvdrxtspjiz  (Personal ProOps app)
+staging  : utkqoiigimqzeenxkxdl  (Personal ProOps app - staging)
+
+CLI linkado (destino do db push) : utkqoiigimqzeenxkxdl  → staging
+app (.env.local)                 : utkqoiigimqzeenxkxdl  → staging
+{"test": "goal_plans.sql", "mode": "applied", "result": "pass", "committed": false}
+{"test": "goal_planning_projection.sql", "mode": "applied", "result": "pass", "committed": false}

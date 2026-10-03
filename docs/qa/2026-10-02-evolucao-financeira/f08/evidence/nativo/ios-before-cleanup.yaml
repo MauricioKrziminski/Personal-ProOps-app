@@ -1,0 +1,12 @@
+appId: com.proops.personal.dev
+---
+- tapOn: "Mais opções.*"
+- tapOn: "Metas"
+- extendedWaitUntil:
+    visible: "Simular juntas.*"
+    timeout: 20000
+- tapOn: "Simular juntas.*"
+- extendedWaitUntil:
+    visible: "Menor disponibilidade no período"
+    timeout: 20000
+- takeScreenshot: ios-revision-2-before-cleanup

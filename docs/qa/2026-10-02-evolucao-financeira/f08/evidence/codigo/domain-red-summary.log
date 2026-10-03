@@ -1,0 +1,34 @@
+5:✖ decodes safe cents without deriving or overwriting server scenario (0.540416ms)
+34:✖ daily mode accepts leap day and detects duplicate daily points (0.033042ms)
+35:✖ cycle month bounds may start in previous civil month (0.022166ms)
+36:✖ empty goals permit clearing an empty plan (0.024042ms)
+37:✖ builders copy and sort all current goals and normalize excluded fields without mutating draft (0.028208ms)
+38:✖ preview retains incomplete included proposals but save refuses them (0.0355ms)
+39:✖ builders reject missing items (0.020792ms)
+40:✖ builders reject extra items (0.012208ms)
+41:✖ builders reject duplicate items (0.01475ms)
+42:✖ builders reject unsafe items (0.018041ms)
+43:✖ builders reject zero items (0.013083ms)
+44:✖ builders reject decimal items (0.014041ms)
+45:✖ builders reject invalid date items (0.01675ms)
+46:✖ builders reject unknown field items (0.1245ms)
+47:ℹ tests 42
+49:ℹ pass 28
+50:ℹ fail 14
+51:ℹ cancelled 0
+52:ℹ skipped 0
+56:✖ failing tests:
+59:✖ decodes safe cents without deriving or overwriting server scenario (0.540416ms)
+70:✖ daily mode accepts leap day and detects duplicate daily points (0.033042ms)
+83:✖ cycle month bounds may start in previous civil month (0.022166ms)
+96:✖ empty goals permit clearing an empty plan (0.024042ms)
+109:✖ builders copy and sort all current goals and normalize excluded fields without mutating draft (0.028208ms)
+122:✖ preview retains incomplete included proposals but save refuses them (0.0355ms)
+135:✖ builders reject missing items (0.020792ms)
+148:✖ builders reject extra items (0.012208ms)
+161:✖ builders reject duplicate items (0.01475ms)
+174:✖ builders reject unsafe items (0.018041ms)
+187:✖ builders reject zero items (0.013083ms)
+200:✖ builders reject decimal items (0.014041ms)
+213:✖ builders reject invalid date items (0.01675ms)
+226:✖ builders reject unknown field items (0.1245ms)

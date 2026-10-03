@@ -1,3 +1,5 @@
+import { createSealedSaveController } from './sealed-save.ts';
+
 /** F07's pure boundary: decimal bigint DTOs become safe integer cents before use. */
 export type EmergencyReserveBaseMode = 'manual' | 'observed';
 export type EmergencyReserveSourceKind = 'account' | 'asset';
@@ -312,11 +314,6 @@ export function formatEmergencyReserveCoverage(summary: Pick<EmergencyReserveSum
   return `${value} ${tenths === 10n ? 'mês' : 'meses'}`;
 }
 
-function freezeInput(input: EmergencyReserveInput): EmergencyReserveInput {
-  input.allocations.forEach(Object.freeze); Object.freeze(input.allocations);
-  input.reviewed_months.forEach(Object.freeze); Object.freeze(input.reviewed_months);
-  return Object.freeze(input);
-}
 function definitiveRefusal(error: unknown): boolean {
   if (typeof error !== 'object' || error === null || !('code' in error) || typeof error.code !== 'string') return false;
   return /^(22|23)[0-9A-Z]{3}$/.test(error.code)
@@ -356,57 +353,22 @@ export function createEmergencyReserveSaveController(
   publish?: (input: EmergencyReserveInput | null) => void,
   resolveAttempt?: (input: EmergencyReserveInput, requestId: string) => Promise<unknown>,
 ): { submit: (input: EmergencyReserveInput) => Promise<EmergencyReserveSaveResult>; resolve: () => Promise<EmergencyReserveSaveResult> } {
-  type Attempt = { input: EmergencyReserveInput; canonical: string; requestId: string; ambiguous: boolean; inflight: Promise<EmergencyReserveSaveResult> | null };
-  let pending: Attempt | null = null;
-  const dispatchAttempt = (attempt: Attempt, dispatchCommand: typeof send) => {
-    if (attempt.inflight) return attempt.inflight;
-    let resolve!: (value: EmergencyReserveSaveResult) => void;
-    let reject!: (error: unknown) => void;
-    const inflight = new Promise<EmergencyReserveSaveResult>((yes, no) => { resolve = yes; reject = no; });
-    attempt.inflight = inflight;
-    const refused = (error: unknown) => {
-      attempt.inflight = null;
-      if ((!attempt.ambiguous && definitiveRefusal(error)) || confirmedRevisionRefusal(error)
-        || error instanceof EmergencyReserveAttemptCancelledError) { pending = null; publish?.(null); }
-      else attempt.ambiguous = true;
-      reject(error);
-    };
-    let dispatch: Promise<unknown>;
-    try { dispatch = dispatchCommand(attempt.input, attempt.requestId); } catch (error) { refused(error); return inflight; }
-    Promise.resolve(dispatch).then(value => {
-      let result: EmergencyReserveSaveResult;
-      try {
-        if (typeof value === 'object' && value !== null && 'cancelled' in value) {
-          const cancellation = record(value, ['workspace_id', 'cancelled'], 'encerramento da tentativa');
-          if (id(cancellation.workspace_id, 'espaço confirmado') !== attempt.input.workspace_id || cancellation.cancelled !== true) invalid('encerramento da tentativa');
-          throw new EmergencyReserveAttemptCancelledError();
-        }
-        const receipt = record(value, ['workspace_id', 'edit_revision'], 'confirmação da gravação');
-        result = { workspace_id: id(receipt.workspace_id, 'espaço confirmado'), edit_revision: integer(receipt.edit_revision, 'revisão confirmada') };
-        if (result.workspace_id !== attempt.input.workspace_id || result.edit_revision !== (attempt.input.expected_revision ?? 0) + 1) invalid('confirmação da tentativa');
-      } catch (error) { refused(error); return; }
-      attempt.inflight = null; pending = null; publish?.(null); resolve(result);
-    }, refused);
-    return inflight;
-  };
-  return {
-    submit(input) {
-      let copy: EmergencyReserveInput;
-      try { copy = copyInput(input); } catch (error) { return Promise.reject(error); }
-      const canonical = JSON.stringify(copy);
-      if (pending && pending.canonical !== canonical) return Promise.reject(new Error('A tentativa anterior ainda aguarda confirmação. Tente novamente com os mesmos valores.'));
-      if (pending?.inflight) return pending.inflight;
-      if (!pending) {
-        let requestId: string;
-        try { requestId = id(newId(), 'identidade da tentativa'); } catch (error) { return Promise.reject(error); }
-        pending = { input: freezeInput(copy), canonical, requestId, ambiguous: false, inflight: null };
-        publish?.(pending.input);
+  return createSealedSaveController(send, newId, {
+    normalize: copyInput,
+    requestId: value => id(value, 'identidade da tentativa'),
+    definitiveRefusal,
+    confirmedRefusal: confirmedRevisionRefusal,
+    terminalRefusal: error => error instanceof EmergencyReserveAttemptCancelledError,
+    decode(value, input) {
+      if (typeof value === 'object' && value !== null && 'cancelled' in value) {
+        const cancellation = record(value, ['workspace_id', 'cancelled'], 'encerramento da tentativa');
+        if (id(cancellation.workspace_id, 'espaço confirmado') !== input.workspace_id || cancellation.cancelled !== true) invalid('encerramento da tentativa');
+        throw new EmergencyReserveAttemptCancelledError();
       }
-      return dispatchAttempt(pending, send);
+      const receipt = record(value, ['workspace_id', 'edit_revision'], 'confirmação da gravação');
+      const result = { workspace_id: id(receipt.workspace_id, 'espaço confirmado'), edit_revision: integer(receipt.edit_revision, 'revisão confirmada') };
+      if (result.workspace_id !== input.workspace_id || result.edit_revision !== (input.expected_revision ?? 0) + 1) invalid('confirmação da tentativa');
+      return result;
     },
-    resolve() {
-      if (!pending || !resolveAttempt) return Promise.reject(new Error('Nenhuma tentativa disponível para conferir.'));
-      return dispatchAttempt(pending, resolveAttempt);
-    },
-  };
+  }, publish, resolveAttempt);
 }
