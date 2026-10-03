@@ -3474,6 +3474,10 @@ export type Database = {
         Args: { p_invoice_id: string; p_paid_at?: string }
         Returns: string
       }
+      preview_finance_write: {
+        Args: { p_args: Json; p_days?: number; p_operation: string }
+        Returns: Json
+      }
       simular: { Args: { p_leituras: Json; p_registros: Json }; Returns: Json }
       skip_recurring_occurrence: {
         Args: { p_date: string; p_recurring_id: string }

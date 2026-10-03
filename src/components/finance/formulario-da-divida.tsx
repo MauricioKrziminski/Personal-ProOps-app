@@ -4,6 +4,8 @@ import { StyleSheet, View } from 'react-native';
 import type { CorpoProps } from '@/components/finance/corpo-do-lancar';
 import { Presenca, TrocaSuave } from '@/components/motion/presenca';
 import { OriginAccountPicker } from '@/components/finance/origin-creation-host';
+import { FinanceWritePreview } from '@/components/finance/finance-write-preview';
+import { escritaDoFinanciamento } from '@/lib/finance-write-input';
 import { PaymentMethodField } from '@/components/finance/payment-method-field';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { DownPaymentFields } from '@/components/finance/down-payment-fields';
@@ -375,9 +377,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     Number.isFinite(Number(form.taxa.replace(',', '.'))) && Number(form.taxa.replace(',', '.')) >= 0;
   const podeSalvar = Boolean(nomeOk && !erroEntrada && !erroPagamento && !accounts.isError && !accounts.isPending && validDueDay && (!form.id || payments.isSuccess) && (form.calculationMode === 'fixed_installments' ? simpleValues : advancedValid));
 
-  const salvar = (criarOutro: boolean) => {
-    if (salvarBloqueadoAtual.current || !podeSalvar) return;
-    const target = {
+  const target = podeSalvar ? {
         id: form.id,
         name: form.name.trim(),
         calculation_mode: form.calculationMode,
@@ -397,7 +397,9 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
         ...(ancoraEfetiva ? { first_due_date: ancoraEfetiva } : {}),
         ...(form.id ? { versao: form.versao ?? null } : {}),
         ...(entradaAtiva ? { down_payment: downPaymentInput(entrada, localISODate()) } : {}),
-      };
+      } : null;
+  const salvar = (criarOutro: boolean) => {
+    if (salvarBloqueadoAtual.current || !target) return;
     const aoFalhar = (error: Error) =>
       toast({
         message:
@@ -756,6 +758,8 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
         </Presenca>
         </>}
         </TrocaSuave>
+        <FinanceWritePreview accounts={accounts.data ?? []} write={target && !editandoId && !form.id && !converter
+          && !props.salvarBloqueado && !salvando ? escritaDoFinanciamento(target) : null} />
         {!editandoId && !converter ? (
           <Button
             variant="secondary"

@@ -17,7 +17,7 @@ import { DatePickerField } from '@/components/finance/date-picker-field';
 import { CamposDaSerie } from '@/components/finance/serie-form';
 import { CamposDaCompra } from '@/components/finance/compra-form';
 import { DownPaymentFields } from '@/components/finance/down-payment-fields';
-import { downPaymentError, downPaymentInput, purchaseAmounts } from '@/lib/down-payment';
+import { downPaymentError } from '@/lib/down-payment';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
@@ -26,7 +26,8 @@ import { molduraEmTela } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useRascunho } from '@/hooks/use-rascunho';
 import { pendenciaDoAplicar } from '@/lib/hipotese';
-import { argsDaParcelada, dadosDoLancamento, type EntradaLancamento, type EntradaParcelada } from '@/lib/escrita';
+import { argsDaParcelada, dadosDoLancamento } from '@/lib/escrita';
+import { prepararLancamento, type LancamentoPreparado } from '@/lib/lancamento-write';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { Segmented } from '@/components/ui/segmented';
 import { SelectField, type SelectOption } from '@/components/ui/select-field';
@@ -63,12 +64,10 @@ import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/
 import { mudaInicioDaSerie, mudancasDaOcorrencia, serieDaOcorrencia, validaSerie, type SerieForm } from '@/lib/serie';
 import { compraDoRegistro, edicaoEscopadaDaCompra, payloadDaCompra, validaCompra, type CompraForm } from '@/lib/compra';
 import {
-  destinoDoSalvar,
   faixaDeParcelas,
   financeErrorMessage,
   installmentHistory,
   podeParcelar,
-  totalDigitado,
   UNIDADES_DO_VALOR,
   vencimentoPendenteValido,
   type UnidadeDoValor,
@@ -82,6 +81,8 @@ import {
 import { confirmDestructive } from '@/lib/item-actions';
 import { correcaoDoPagamento } from '@/lib/confirmar-baixa';
 import { OriginAccountPicker } from '@/components/finance/origin-creation-host';
+import { FinanceWritePreview } from '@/components/finance/finance-write-preview';
+import { escritaDaParcelada, escritaDoLancamento, type FinanceWrite } from '@/lib/finance-write-input';
 import { PaymentMethodField } from '@/components/finance/payment-method-field';
 import { PAYMENT_METHODS, normalizePaymentMethod, paymentMethodAccounts, paymentMethodError } from '@/lib/payment-method';
 import { Presenca } from '@/components/motion/presenca';
@@ -545,6 +546,25 @@ export function FormularioDoLancamento(props: Props) {
   const correcaoDaDivida =
     divida && editing ? correcaoDoPagamento(divida, editing, amountCents) : { erro: null, perguntaAsProximas: false };
 
+  const draftValues = useWatch({ control });
+  const draftParsed = schema.safeParse(draftValues);
+  let previewWrite: FinanceWrite | null = null;
+  // Scope-sensitive edits and conversions cannot be previewed as if they created a new record.
+  if (!props.converter && !props.salvarBloqueado && !saving && !erroPagamento && !erroEntrada
+    && !contas.isPending && !contas.isError && draftParsed.success
+    && !(editing?.installment_plan_id || editing?.recurring_id || editing?.debt_id
+      || editing?.down_payment_debt_id || editing?.down_payment_plan_id || editing?.pix_fee_for_transaction_id)) {
+    try {
+      const draft = prepararLancamento(draftParsed.data, {
+        editing, podeAdiar, podeParcelarAqui, intencaoDoDia, isCard, mostraJuros, hoje: localISODate(),
+      });
+      if (draft.destino === 'criarPlano' && draft.entradaParcelada) previewWrite = escritaDaParcelada(draft.entradaParcelada);
+      else if (draft.destino === 'salvar') previewWrite = escritaDoLancamento({ ...draft.entradaLancamento,
+        ...(editing ? { id: editing.id, expectedRevision: editing.edit_revision } : {}),
+      });
+    } catch { /* Incomplete draft: validation stays with the existing fields. */ }
+  }
+
   /** `criarOutro`: o "Salvar e criar outro" — o hospedeiro recebe no `onSalvo` e remonta limpo. */
   const onSubmit = (criarOutro = false) => handleSubmit((values) => {
     if (salvarBloqueadoAtual.current) return;
@@ -553,87 +573,17 @@ export function FormularioDoLancamento(props: Props) {
       toast({ message: 'A entrada paga não pode ter data futura', tone: 'error' });
       return;
     }
-    /**
-     * UMA escrita, e qual delas é decisão pura (`destinoDoSalvar`, com teste). As três são
-     * exclusivas de propósito: duas escritas para uma intenção é a compra duplicada na fatura.
-     */
-    const destino = destinoDoSalvar(editing, {
-      installments: values.installments,
-      account_id: values.account_id,
-    });
-    // O que o número digitado vale como TOTAL — criando e convertendo, a unidade o reinterpreta.
-    const temEntrada = podeParcelarAqui && values.installments > 1 && values.down_payment_enabled;
-    let totalDaCompraNova = totalDigitado(values.amount_cents, unidade, values.installments);
-    let downPayment: ReturnType<typeof downPaymentInput> | undefined;
-    if (temEntrada) {
-      try {
-        downPayment = downPaymentInput({ amountCents: values.down_payment_cents,
-          dateBR: values.down_payment_date, accountId: values.down_payment_account, paymentMethod: values.down_payment_method }, localISODate());
-        totalDaCompraNova = purchaseAmounts(values.amount_cents, unidade, values.installments, values.down_payment_cents).financedCents;
-      } catch (error) {
-        toast({ message: (error as Error).message, tone: 'error' });
-        return;
-      }
+    // A prévia e o salvar recebem a mesma preparação dos valores do formulário.
+    let preparado: LancamentoPreparado;
+    try {
+      preparado = prepararLancamento(values, {
+        editing, podeAdiar, podeParcelarAqui, intencaoDoDia, isCard, mostraJuros, hoje: localISODate(),
+      });
+    } catch (error) {
+      toast({ message: (error as Error).message, tone: 'error' });
+      return;
     }
-    // Reforço do `podeAdiar`: trocar para cartão depois de marcar "vou pagar depois" não
-    // pode vazar um `pending` que a UI já escondeu.
-    const adiado = podeAdiar && values.pending;
-    /**
-     * ⚠️ Em cartão o campo "vou pagar depois" NÃO existe (`podeAdiar` é false), então
-     * `adiado` é sempre false ali — e escrever `'cleared'` a partir disso DAVA BAIXA numa
-     * parcela futura só porque alguém corrigiu o nome dela. A projeção de caixa e o total
-     * da fatura mudavam sozinhos, sem nada na tela dizendo isso.
-     *
-     * Onde o campo não aparece, o status não é do formulário: ele é o que já era.
-     */
-    const status = podeAdiar ? (adiado ? 'pending' : 'cleared') : (editing?.status ?? 'cleared');
-    const dueAt = adiado && values.due_at ? brToISO(values.due_at) : editing?.due_at ?? null;
-    /**
-     * ⚠️ **Mesma regra do `status` logo acima, e pelo mesmo motivo.** Em cartão e em
-     * transferência o campo "vou pagar depois" não existe (`podeAdiar` é false), então
-     * `adiado` é sempre false ali — e escrever `false` a partir disso DESLIGAVA o automático
-     * de um lançamento só porque alguém corrigiu o nome dele. **Onde o campo não aparece, o
-     * valor é o que já era.**
-     */
-    const autoConfirm = podeAdiar
-      ? (adiado ? values.auto_confirm : false)
-      : (editing?.auto_confirm ?? false);
-
-    /** O que cada gravação recebe, montado UMA vez. */
-    const entradaParcelada: EntradaParcelada | null = values.account_id
-      ? {
-          accountId: values.account_id,
-          paymentMethod: values.payment_method,
-          totalCents: totalDaCompraNova,
-          installments: values.installments,
-          paidInstallments: installmentHistory(values.paid_installments, values.installments, brToISO(values.occurred_at), localISODate()),
-          occurredAt: brToISO(values.occurred_at),
-          description: values.description.trim(),
-          category: values.category,
-          // Sem esta linha o campo "Estabelecimento" era preenchido e descartado: a compra
-          // parcelada nascia como "Compra parcelada (1/N)" e o nome não existia em lugar
-          // nenhum. Ver o ⚠️ em `useCreateInstallmentPlan`.
-          merchant: values.merchant?.trim() || null,
-          lastDay: intencaoDoDia === 'ultimo' && !isCard,
-          ...(downPayment ? { downPayment } : {}),
-        }
-      : null;
-    const entradaLancamento: EntradaLancamento = {
-      kind: values.kind,
-      amount_cents: values.amount_cents,
-      category: values.kind === 'transfer' ? null : values.category,
-      description: values.description.trim(),
-      merchant: values.merchant?.trim() || null,
-      account_id: values.account_id,
-      payment_method: values.payment_method,
-      counterparty_account_id: values.kind === 'transfer' ? values.counterparty_account_id : null,
-      occurred_at: brToISO(values.occurred_at),
-      status,
-      due_at: dueAt,
-      // Campo que não aparece não escreve (finance.md): juro só onde a pergunta existe
-      fee_cents: mostraJuros ? values.fee_cents : 0,
-      auto_confirm: autoConfirm,
-    };
+    const { destino, entradaParcelada, entradaLancamento } = preparado;
 
     /*
       Convertendo OUTRO registro neste lançamento: nada é gravado aqui. O destino sai pelos MESMOS
@@ -687,13 +637,13 @@ export function FormularioDoLancamento(props: Props) {
      * `values.amount_cents` é o TOTAL da compra aqui, como na criação; o `hint` do campo escreve
      * isso na tela.
      */
-    if (destino === 'converter' && editing && values.account_id) {
+    if (destino === 'converter' && editing && values.account_id && entradaParcelada) {
       const contaParaConverter = values.account_id;
       const parcelar = () =>
         converter.mutate(
           {
             transactionId: editing.id,
-            totalCents: totalDaCompraNova,
+            totalCents: entradaParcelada.totalCents,
             installments: values.installments,
             firstOccurredAt: brToISO(values.occurred_at),
             description: values.description.trim(),
@@ -701,9 +651,9 @@ export function FormularioDoLancamento(props: Props) {
             merchant: values.merchant?.trim() || null,
             accountId: contaParaConverter,
             paymentMethod: values.payment_method,
-            ...(downPayment ? { downPayment } : {}),
+            ...(entradaParcelada.downPayment ? { downPayment: entradaParcelada.downPayment } : {}),
             paidInstallments:
-              installmentHistory(values.paid_installments, values.installments, brToISO(values.occurred_at), localISODate()) || null,
+              entradaParcelada.paidInstallments || null,
           },
           {
             onSuccess: () => {
@@ -761,9 +711,9 @@ export function FormularioDoLancamento(props: Props) {
           merchant: values.merchant?.trim() || null,
           occurred_at: brToISO(values.occurred_at),
           payment_method: values.payment_method,
-          status,
-          due_at: dueAt,
-          auto_confirm: autoConfirm,
+          status: entradaLancamento.status,
+          due_at: entradaLancamento.due_at,
+          auto_confirm: entradaLancamento.auto_confirm,
         },
       }, {
         onSuccess: fechar,
@@ -1528,6 +1478,7 @@ export function FormularioDoLancamento(props: Props) {
 
 
 
+        <FinanceWritePreview write={previewWrite} accounts={accounts ?? []} />
         {!editing && !props.converter ? (
           <Button
             variant="secondary"

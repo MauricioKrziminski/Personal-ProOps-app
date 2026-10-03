@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 
 // Commit effects after stable renders; neither springs nor native layout finish automatically.
 // Component-local hooks and provider context exercise the real nested presence lifetimes.
-function montar(file: string, name: string, initial: any, config: { reduzir: boolean; ativo: boolean; fontScale?: number; lock?: any; creation?: any; preventRemove?: any; toasts?: any[]; finance?: any; conceal?: any } = { reduzir: false, ativo: true }) {
+function montar(file: string, name: string, initial: any, config: { reduzir: boolean; ativo: boolean; fontScale?: number; lock?: any; creation?: any; preventRemove?: any; toasts?: any[]; finance?: any; conceal?: any; preview?: any; moneyCalls?: number[] } = { reduzir: false, ativo: true }) {
   type Instance = { slots: any[]; cursor: number; mounted: boolean; restart: boolean };
   type Animation = { shared: any; done?: (ok: boolean) => void; target: number; from: number; kind: 'spring' | 'timing'; settings: any; canceled: boolean };
   const instances = new Map<string, Instance>();
@@ -130,7 +130,12 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === 'react') return react;
       if (id === 'expo-router/react-navigation') return { usePreventRemove: (active: boolean, callback: any) => { config.preventRemove = { active, callback }; } };
       if (id === '@/hooks/use-finance') return { useAccounts: () => ({ data: [] }), useCreateAccount: () => config.creation, useAccountBalances: (enabled: boolean) => { config.finance?.calls?.push(['balances', enabled]); return config.finance?.balances; }, useCardLimitContext: (enabled: boolean) => { config.finance?.calls?.push(['cards', enabled]); return config.finance?.cards; } };
-      if (id === '@/components/ui/conceal') return { useConceal: () => config.conceal ?? { ready: true, concealed: false }, useBRL: () => (cents: number) => `${cents} centavos` };
+      if (id === '@/components/ui/conceal') return { useConceal: () => config.conceal ?? { ready: true, concealed: false }, concealText: () => '••••••', useBRL: () => (cents: number) => { config.moneyCalls?.push(cents); return `${cents} centavos`; } };
+      if (id === '@/hooks/use-finance-write-preview') return { useFinanceWritePreview: () => config.preview };
+      if (id === '@/lib/finance-write-preview') return load('src/lib/finance-write-preview.ts');
+      if (id === 'zod') return require(id);
+      if (id === '@/components/ui/row') return { Row: 'Row', Section: 'Section' };
+      if (id === '@/components/ui/note') return { Note: 'Note' };
       if (id === '@/components/ui/toast') return { useToast: () => (toast: any) => config.toasts?.push(toast) };
       if (id === '@/components/ui/button') return { Button: 'Button' };
       if (id === '@/components/ui/card') return { Card: 'Card' };
@@ -287,6 +292,70 @@ test('Presenca shrinks space and opacity on the same spring, preserving an inact
   ui.render({ visivel: false, children: null });
   ui.finish(ui.close());
   assert.equal(ui.nodes().length, 0);
+});
+
+function f04Preview() {
+  const snapshot = { balances: [{ account_id: 'bank', cleared_cents: -48146 }], limits: [],
+    accounts: [{ account_id: 'bank', saldo_fim: -48146 }], cards: [] };
+  const preview = { as_of: '2026-10-02', horizon_end: '2026-12-31', before: snapshot,
+    after: { ...snapshot, balances: [{ account_id: 'bank', cleared_cents: -49380 }],
+      accounts: [{ account_id: 'bank', saldo_fim: -49380 }] }, write: { operation: 'transaction', result: {} },
+    schedule: [{ origin: 'transaction', id: 'tx', ref_id: null, occurred_at: '2026-10-02', due_at: null,
+      account_id: 'bank', counterparty_account_id: null, kind: 'expense', amount_cents: 1234, status: 'cleared',
+      description: 'Pix', installment_no: null, installments_total: null, invoice_id: null,
+      invoice_closing_date: null, invoice_due_date: null, invoice_status: null, paid_at: null, invoice_paid_at: null,
+      is_entry: false, is_fee: false, payment_method: 'pix', estimated: false }],
+    schedule_total: 1, schedule_truncated: false, schedule_scope: 'contract', horizon_days: 90 };
+  const config = { reduzir: false, ativo: true, conceal: { ready: true, concealed: false }, moneyCalls: [] as number[],
+    preview: { identity: 'first', state: { kind: 'ready', preview }, retry() {} } as any };
+  const ui = montar('src/components/finance/finance-write-preview.tsx', 'FinanceWritePreview', {
+    write: { operation: 'transaction', args: {} }, accounts: [{ id: 'bank', name: 'Conta teste', type: 'bank' }],
+  }, config);
+  return { ui, config, preview };
+}
+
+test('F04: live privacy masks summary and schedule, including every accessibility label', () => {
+  const f = f04Preview();
+  assert.ok(f.ui.find(n => n.props?.accessibilityLabel?.includes('-49380 centavos')));
+  f.config.moneyCalls.length = 0;
+  f.config.conceal.concealed = true; f.ui.render();
+  assert.ok(f.ui.find(n => n.props?.accessibilityLabel?.includes('••••••')));
+  assert.ok(!f.ui.find(n => /49380|48146|1234/.test(n.props?.accessibilityLabel ?? '')));
+  assert.deepEqual(f.config.moneyCalls, []);
+  f.config.conceal = { ready: false, concealed: false }; f.ui.render();
+  assert.ok(!f.ui.find(n => /49380|48146|1234/.test(n.props?.accessibilityLabel ?? '')));
+});
+
+test('F04: ready numbers disappear from retained motion layers as soon as the draft changes', () => {
+  const f = f04Preview();
+  assert.ok(f.ui.find(n => n.props?.accessibilityLabel?.includes('1234 centavos')));
+  f.config.preview = { ...f.config.preview, identity: 'second', state: { kind: 'loading' } }; f.ui.render();
+  assert.ok(!f.ui.find(n => /49380|48146|1234/.test(n.props?.accessibilityLabel ?? '')));
+  assert.equal(f.ui.find(n => n.type === 'Section').props.title, 'Ao salvar');
+  f.config.preview.state = { kind: 'unavailable' }; f.ui.render();
+  const retry = f.ui.find(n => n.type === 'Button' && n.props.label === 'Atualizar prévia');
+  assert.ok(retry);
+  assert.ok(!f.ui.find(n => /49380|48146|1234/.test(n.props?.accessibilityLabel ?? '')));
+});
+
+test('F04: collapsing schedule rows read live privacy while the presence exit is still running', () => {
+  const f = f04Preview();
+  f.preview.schedule.push({ ...f.preview.schedule[0], id: 'tx2', amount_cents: 5678 });
+  f.preview.schedule_total = 2; f.ui.render();
+  f.ui.find(n => n.type === 'Button' && n.props.label.startsWith('Ver cronograma')).props.onPress(); f.ui.render();
+  assert.ok(f.ui.find(n => n.props?.accessibilityLabel?.includes('5678 centavos')));
+  f.ui.find(n => n.type === 'Button' && n.props.label === 'Recolher cronograma').props.onPress(); f.ui.render();
+  f.config.conceal.concealed = true; f.ui.render();
+  assert.ok(!f.ui.find(n => /5678|1234|49380|48146/.test(n.props?.accessibilityLabel ?? '')));
+});
+
+test('F04: an automatic virtual occurrence is a forecast, never a claim that money was received', () => {
+  const f = f04Preview();
+  Object.assign(f.preview.schedule[0], { origin: 'recurring', estimated: true, status: 'cleared', kind: 'income', paid_at: null });
+  f.ui.render();
+  const receipt = f.ui.find(n => n.type === 'Row' && n.props.title === 'Recebimento');
+  assert.match(receipt.props.accessibilityLabel, /Confirmação automática prevista/);
+  assert.doesNotMatch(receipt.props.accessibilityLabel, /Recebido em/);
 });
 
 test('Presenca ignores completion after unmount and reduced motion closes without waiting', () => {

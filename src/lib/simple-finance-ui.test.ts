@@ -4,6 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
+import { prepararLancamento } from './lancamento-write.ts';
 
 import { telaPronta } from './tela-pronta.ts';
 import { ladosDoArrasto } from './arrasto.ts';
@@ -26,13 +27,18 @@ function pixFeeFieldAndPayload(editing: Record<string, unknown>) {
     assert.ok(declaration?.initializer, `production declaration ${name} must exist`);
     return declaration.initializer.getText(source);
   };
-  return runInNewContext(`const mostraJuros = ${init('mostraJuros')}; const entradaLancamento = ${init('entradaLancamento')}; ({ mostraJuros, fee: entradaLancamento.fee_cents });`, {
+  const mostraJuros = runInNewContext(`${init('mostraJuros')}`, {
     editing, jurosDoPix: null, isCard: true, paymentMethod: 'pix', kind: 'expense', installmentCount: 1,
-    DESCRICAO_JUROS_DO_PIX: 'Juros do Pix no crédito', status: 'cleared', dueAt: null, autoConfirm: false,
-    brToISO: (value: string) => value,
-    values: { kind: 'expense', amount_cents: 10000, category: null, description: editing.description,
-      merchant: null, account_id: 'card', payment_method: 'pix', occurred_at: '2026-10-02', fee_cents: 500 },
   });
+  const prepared = prepararLancamento({ kind: 'expense', amount_cents: 10000, category: null,
+    description: String(editing.description), merchant: null, account_id: 'card', payment_method: 'pix',
+    counterparty_account_id: null, occurred_at: '02/10/2026', fee_cents: 500, installments: 1,
+    value_unit: 'total', auto_confirm: false, pending: false, installment_occurrence: false, due_at: null,
+    paid_installments: '0', down_payment_enabled: false, down_payment_cents: 0,
+    down_payment_date: '', down_payment_account: null, down_payment_method: null,
+  }, { editing: { ...editing, id: 'purchase' }, podeAdiar: false, podeParcelarAqui: false,
+    intencaoDoDia: null, isCard: true, mostraJuros, hoje: '2026-10-02' });
+  return { mostraJuros, fee: prepared.entradaLancamento.fee_cents };
 }
 
 test('F01: título de juros no pai mantém campo e taxa no payload; vínculo explícito oculta campo da filha', () => {
@@ -480,7 +486,7 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
       if (name === '@/lib/account-form') return load('src/lib/account-form.ts');
       if (name === '@/components/finance/account-form') return load('src/components/finance/account-form.tsx');
-      if (name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/categorias') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/categorias') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       // o `categorias.ts` importa o mapa de ícones por caminho relativo (roda no `node --test` puro)
       if (name === '../design/category-icons.ts') return { categoryIcon: () => 'circle' };
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };

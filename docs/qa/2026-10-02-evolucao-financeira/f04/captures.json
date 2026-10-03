@@ -1,0 +1,284 @@
+{
+  "captures": [
+    {
+      "file": "evidence/f04-android-card-last-cent.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-02_214555/proops-f04-android-card-preview/takeScreenshot/f04-android-card-last-cent.png",
+      "sha256": "14429c9db7c3370854620a3b29353090cfc0241ef98d3f9dbb5bddd63dc04775",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-android-card-preview.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-02_214555/proops-f04-android-card-preview/takeScreenshot/f04-android-card-preview.png",
+      "sha256": "0ea84264b3a849b5a9b57ec657a6200b4abaea690449d2077380e0c18a60377e",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-android-compact-dark-header.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-02_223329/proops-f04-android-recapture-dark/takeScreenshot/f04-android-compact-dark-header.png",
+      "sha256": "0bd54e3656f1a2e5a9563f7f2ea9e7d9409f9f39e334e29ac5c8f4c0ca648ff6",
+      "width": 1152,
+      "height": 2568,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-android-compact-dark-summary.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-02_223329/proops-f04-android-recapture-dark/takeScreenshot/f04-android-compact-dark-summary.png",
+      "sha256": "98b35b052173fc6a0446b7f6531bb116a41626aecd3e0cdaee36701c8722a36b",
+      "width": 1152,
+      "height": 2568,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-android-draft-changed.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-02_215952/proops-f04-android-draft-final/takeScreenshot/f04-android-draft-changed.png",
+      "sha256": "bc606e039ebe7256631876fbe5480e27dd783e441a95f237fec3c7a54d6cc2fa",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-android-financing-preview.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-02_215151/proops-f04-android-financing-preview/takeScreenshot/f04-android-financing-preview.png",
+      "sha256": "1a7c3805bf040bf5d2fe2cfdf9297e5a73d059068aa08af2c885ec6def01da1c",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-android-hidden-preview.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-02_215502/proops-f04-android-privacy/takeScreenshot/f04-android-hidden-preview.png",
+      "sha256": "5a6f13456b9b71c345ee7e54f00f8f61c60a568e674c59f1d0c66ae3198f1446",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-android-hidden-schedule.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-02_215502/proops-f04-android-privacy/takeScreenshot/f04-android-hidden-schedule.png",
+      "sha256": "2939539268183f6eb41dddaefc884eda1c17d49b8fd5c2600435b7c5eaea33c2",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-android-offline-preview.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-02_223005/proops-f04-android-recapture-offline/takeScreenshot/f04-android-offline-preview.png",
+      "sha256": "6ea7cb252ee28aa934478c782a36c94f051e5a8359e5382c7eedaf8d973b738f",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-android-pix-preview.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-02_214439/proops-f04-android-pix-verify/takeScreenshot/f04-android-pix-preview.png",
+      "sha256": "3038e8621e812ad99801d729e1ce5d4c59abfaf7bcb975ed86a8cebf540ee628",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-android-recurring-preview.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-02_214839/proops-f04-android-recurring-preview/takeScreenshot/f04-android-recurring-preview.png",
+      "sha256": "9962dcc1e30529f5cdbb596a2cdd6d90850039e1ad20e74d5ae0e9ef867cb7c3",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-android-resume-draft.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-02_223158/proops-f04-android-recapture-recovery/takeScreenshot/f04-android-resume-draft.png",
+      "sha256": "6a746deee487ede365d33dcfd0c412a4c53f4eb33184e840713b79e6b3f8c676",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-android-resume-online.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-02_223158/proops-f04-android-recapture-recovery/takeScreenshot/f04-android-resume-online.png",
+      "sha256": "1c7debcf4e95901ddd91f933a0e7d3f81fdf321da5a6beb52ac4da62cdfbbed9",
+      "width": 1344,
+      "height": 2992,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-android-tablet-dark-header.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-02_221630/proops-f04-android-tablet-retry/takeScreenshot/f04-android-tablet-dark-header.png",
+      "sha256": "bd2bace1d68d99a6521abe4aa2ae7f6aa30fb58861102e3c39751488f380f8d3",
+      "width": 2400,
+      "height": 3200,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-android-tablet-dark-summary.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-02_221630/proops-f04-android-tablet-retry/takeScreenshot/f04-android-tablet-dark-summary.png",
+      "sha256": "bd2bace1d68d99a6521abe4aa2ae7f6aa30fb58861102e3c39751488f380f8d3",
+      "width": 2400,
+      "height": 3200,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-ios-card-entry-final-confirmation.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_215021/proops-f04-ios-card-entry-save/takeScreenshot/f04-ios-card-entry-final-confirmation.png",
+      "sha256": "c8e70436f9574ebce60438d0d1c61abf6cd890337b848bdb78f1092d852340fb",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-ios-card-entry-preview.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_214726/proops-f04-ios-card-entry-resume/takeScreenshot/f04-ios-card-entry-preview.png",
+      "sha256": "14dbb04ddb604c069a970a97b556c5815b3713584b4cf8095c4e03724ddb8d27",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-ios-card-entry-schedule.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_214726/proops-f04-ios-card-entry-resume/takeScreenshot/f04-ios-card-entry-schedule.png",
+      "sha256": "f2bcd6318cd07acd7e1cca15ea2665f7ee988922dce83a877d41f087be325d98",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-ios-dark-large-limit.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_221658/proops-f04-ios-dark-large/takeScreenshot/f04-ios-dark-large-limit.png",
+      "sha256": "8110d6cfed5d6549d3921412ebea64a3b9bcaab7c0847f140dee18ae4e1ebfc9",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-ios-dark-large-schedule.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_221658/proops-f04-ios-dark-large/takeScreenshot/f04-ios-dark-large-schedule.png",
+      "sha256": "7145a66bc09e2884461fd0d508666e1f51c9625770050be3010e7887a92b4412",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-ios-financing-preview.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_215432/proops-f04-ios-financing-resume/takeScreenshot/f04-ios-financing-preview.png",
+      "sha256": "428633048ac95a43ad117c6ead47f522996ab1ecdc7738cb76fecdc07a25d43f",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-ios-financing-schedule.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_215432/proops-f04-ios-financing-resume/takeScreenshot/f04-ios-financing-schedule.png",
+      "sha256": "32bcbb058fced9083ecd6cc800de8646ad70564a67af52088526739dc77842f6",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-ios-future-pending.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_220730/proops-f04-ios-future-verify/takeScreenshot/f04-ios-future-pending.png",
+      "sha256": "656427b50e06d8b28685440a55a815d1c3c55edb9955a3245316a3f28d82f9d3",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-ios-hidden-preview.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_221452/proops-f04-ios-privacy-resume/takeScreenshot/f04-ios-hidden-preview.png",
+      "sha256": "94c3071f0a8f566bec54fa3e5d6d2dcaf839467584a979dc7c44b766f11cc791",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-ios-hidden-schedule.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_221452/proops-f04-ios-privacy-resume/takeScreenshot/f04-ios-hidden-schedule.png",
+      "sha256": "9a0efe6edeaa28e81ca03d76bcab49e07f321bffdb3b4adf984f49bfba156cd8",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-ios-pix-preview.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_214356/proops-f04-ios-pix-preview/takeScreenshot/f04-ios-pix-preview.png",
+      "sha256": "7b4745a03e11c27ec567280534626d9fc1f2927e1cf5b30f831643620308ccd4",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-ios-recurring-preview.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_215106/proops-f04-ios-recurring-preview/takeScreenshot/f04-ios-recurring-preview.png",
+      "sha256": "5df431a958bea6b6a36467ac07b1449440b442a1165becc77e70bce8415da460",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-ios-recurring-schedule.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_215106/proops-f04-ios-recurring-preview/takeScreenshot/f04-ios-recurring-schedule.png",
+      "sha256": "5646fc6abec5317cc989b3a2c49efb97dfc112ee4358b28ccc9efe36de33c1c8",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-ios-standalone-edit.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-02_220938/proops-f04-ios-edit-cancel/takeScreenshot/f04-ios-standalone-edit.png",
+      "sha256": "54b8ad95ca7dfdad68642c6232337d1f1d18baf37e620c6066438e61e8e62be0",
+      "width": 1206,
+      "height": 2622,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-ipad-preview.png",
+      "source": "/private/tmp/proops-f02-ipad-qa/.maestro/tests/2026-10-02_222012/proops-f04-ipad-preview/takeScreenshot/f04-ipad-preview.png",
+      "sha256": "92df8f2f98bb26e7282c10931b434522fdc4b06c444fee07753d7e3497e1ecc0",
+      "width": 1640,
+      "height": 2360,
+      "environment": "staging TEST",
+      "primary_opened": true
+    },
+    {
+      "file": "evidence/f04-ipad-schedule.png",
+      "source": "/private/tmp/proops-f02-ipad-qa/.maestro/tests/2026-10-02_222012/proops-f04-ipad-preview/takeScreenshot/f04-ipad-schedule.png",
+      "sha256": "f561ef16f1669eb5ee186258284496b4711dd6e56371482121ced0c20ec9f6a6",
+      "width": 1640,
+      "height": 2360,
+      "environment": "staging TEST",
+      "primary_opened": true
+    }
+  ],
+  "note": "Synthetic TEST only. Android tablet images use emulated 800dp viewport, not tablet hardware."
+}

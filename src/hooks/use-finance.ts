@@ -32,12 +32,11 @@ import type { CartaoNoHorizonte, ContaNoHorizonte } from '@/lib/onde-muda';
 import type { Alcance, OrigemDaConversao } from '@/lib/lancar';
 import {
   DESCRICAO_JUROS_DO_PIX,
-  argsDaParcelada,
-  linhaDaRecorrente,
-  linhaDoFinanciamento,
   type EntradaParcelada,
   type EntradaRecorrente,
 } from '@/lib/escrita';
+import { escritaDaParcelada, escritaDaRecorrente, escritaDoFinanciamento, escritaDoLancamento,
+  type EntradaEscritaLancamento } from '@/lib/finance-write-input';
 
 // Categorias vivem em @/lib/categories (fonte única, travada por teste contra o
 // prompt do Gemini); reexportadas aqui para não quebrar os imports das telas.
@@ -959,15 +958,13 @@ export function useCreateInstallmentPlan() {
   const invalidate = useInvalidateFinance();
   const attempt = useRef<{ key: string; id: string } | null>(null);
   return useMutation({
-    // O que vai à RPC sai de `argsDaParcelada` — a mesma função da hipótese (`simular`).
+    // A prévia e o salvar usam exatamente os mesmos argumentos da compra.
     mutationFn: async (input: EntradaParcelada) => {
-      const { rpc, args } = argsDaParcelada(input);
-      const dados = { ...args, ultimo_dia: rpc === 'create_installment_plan_last_day',
-        ...(input.downPayment ? { down_payment: input.downPayment } : {}) };
-      const key = JSON.stringify(dados);
+      const { args } = escritaDaParcelada(input);
+      const key = JSON.stringify(args.p_dados);
       if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
       const { error } = await supabase.rpc('create_purchase', {
-        p_tipo: 'parcelada', p_dados: dados, p_request_id: attempt.current.id,
+        ...args, p_request_id: attempt.current.id,
       });
       if (error) throw error;
     },
@@ -2641,12 +2638,12 @@ export function useCreateRecurring() {
   const attempt = useRef<{ key: string; id: string } | null>(null);
   return useMutation({
     mutationFn: async (input: EntradaRecorrente) => {
-      const payload = linhaDaRecorrente(input);
-      const key = JSON.stringify(payload);
+      const { args } = escritaDaRecorrente(input);
+      const key = JSON.stringify(args.p_input);
       if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
       const requestId = attempt.current.id;
       const { data, error } = await supabase.rpc('create_recurring_payment', {
-        p_input: payload as Json,
+        ...args,
         p_request_id: requestId,
       });
       if (error) throw error;
@@ -2693,12 +2690,11 @@ export function useSaveDebt() {
         if (error) throw error;
         if (!data?.length) throw Object.assign(new Error('A dívida mudou enquanto você editava.'), { code: 'VERSAO' });
       } else {
-        // O que vai ao banco sai de `linhaDoFinanciamento` — a mesma função da hipótese.
-        const dados = { ...linhaDoFinanciamento(resto), ...(down_payment ? { down_payment } : {}) };
-        const key = JSON.stringify(dados);
+        const { args } = escritaDoFinanciamento({ ...resto, ...(down_payment ? { down_payment } : {}) });
+        const key = JSON.stringify(args.p_dados);
         if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
         const { error } = await supabase.rpc('create_purchase', {
-          p_tipo: 'financiamento', p_dados: dados as Json, p_request_id: attempt.current.id,
+          ...args, p_request_id: attempt.current.id,
         });
         if (error) throw error;
       }
@@ -3154,23 +3150,8 @@ export function useSaveTransaction() {
   const invalidate = useInvalidateFinance();
   const attempt = useRef<{ key: string; id: string } | null>(null);
   return useMutation({
-    mutationFn: async ({ id, fee_cents, juros, expectedRevision, ...input }: TransactionInput & {
-      id?: string;
-      expectedRevision?: number;
-      fee_cents?: number;
-      /** O vínculo é resolvido pelo banco; o cliente informa apenas o valor pretendido. */
-      juros?: { id: string | null; cents: number };
-    }) => {
-      if (id && expectedRevision === undefined) {
-        throw new Error('Atualize o lançamento antes de salvar. Não consegui conferir a versão.');
-      }
-      if (input.payment_method !== undefined) assertPaymentMethod(input.payment_method);
-      const payload = {
-        p_transaction_id: id ?? null,
-        p_input: input as unknown as Json,
-        p_fee_cents: juros?.cents ?? fee_cents ?? null,
-        p_expected_revision: expectedRevision ?? null,
-      };
+    mutationFn: async (input: EntradaEscritaLancamento) => {
+      const { args: payload } = escritaDoLancamento(input);
       const key = JSON.stringify(payload);
       if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
       const requestId = attempt.current.id;

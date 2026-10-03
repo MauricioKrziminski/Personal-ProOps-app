@@ -2,6 +2,7 @@
 """Roda um `supabase/tests/*.sql` contra o STAGING dentro de uma transação que SEMPRE volta.
 
     agent/.venv/bin/python scripts/sql-test.py supabase/tests/roll_invoice.sql
+    agent/.venv/bin/python scripts/sql-test.py supabase/tests/finance_write_preview.sql --repeatable-read
 
 ## Por que isto existe
 
@@ -302,8 +303,9 @@ def corpo(arquivo: pathlib.Path) -> list[str]:
 
 
 def main() -> None:
-    if len(sys.argv) != 2:
+    if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "--repeatable-read"):
         raise SystemExit(__doc__)
+    repetir_snapshot = len(sys.argv) == 3
     arquivo = (RAIZ / sys.argv[1]).resolve()
     if not arquivo.is_file():
         raise SystemExit(f"não achei {arquivo}")
@@ -322,6 +324,10 @@ def main() -> None:
     indice_atual = 0
     xid_inicial: int | None = None
     try:
+        # Must precede EVERY statement (including the runner's xid guard). SET TRANSACTION
+        # inside the test file would run after that SELECT and cannot change its snapshot.
+        if repetir_snapshot:
+            conexao.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
         with conexao.cursor() as cursor:
             cursor.execute("set local timezone to 'America/Sao_Paulo'")
             # ⚠️ DUAS camadas agora, não três (revisão da Tarefa 0, round 4 — o marcador de

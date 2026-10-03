@@ -1,0 +1,104 @@
+{
+  "environment": "staging TEST",
+  "operation": "read-only final audit",
+  "platforms": {
+    "ios": {
+      "records": 4,
+      "plans": 1,
+      "pix": {
+        "amount_cents": 1235,
+        "status": "cleared",
+        "payment_method": "pix",
+        "edit_revision": 0
+      },
+      "plan": {
+        "total_cents": 8002,
+        "payment_method": "credit",
+        "installments": [
+          {
+            "number": 1,
+            "amount_cents": 2667,
+            "due_at": "2026-11-05",
+            "status": "pending",
+            "revision": 1
+          },
+          {
+            "number": 2,
+            "amount_cents": 2667,
+            "due_at": "2026-12-05",
+            "status": "pending",
+            "revision": 1
+          },
+          {
+            "number": 3,
+            "amount_cents": 2668,
+            "due_at": "2027-01-05",
+            "status": "pending",
+            "revision": 1
+          }
+        ]
+      },
+      "entry": {
+        "amount_cents": 2000,
+        "payment_method": "pix"
+      },
+      "extra_fees": 0,
+      "extra_recurring": 0,
+      "extra_debts": 0
+    },
+    "android": {
+      "records": 4,
+      "plans": 1,
+      "pix": {
+        "amount_cents": 1001,
+        "status": "cleared",
+        "payment_method": "pix",
+        "edit_revision": 0
+      },
+      "plan": {
+        "total_cents": 10001,
+        "payment_method": "credit",
+        "installments": [
+          {
+            "number": 1,
+            "amount_cents": 3333,
+            "due_at": "2026-11-05",
+            "status": "pending",
+            "revision": 1
+          },
+          {
+            "number": 2,
+            "amount_cents": 3333,
+            "due_at": "2026-12-05",
+            "status": "pending",
+            "revision": 1
+          },
+          {
+            "number": 3,
+            "amount_cents": 3335,
+            "due_at": "2027-01-05",
+            "status": "pending",
+            "revision": 1
+          }
+        ]
+      },
+      "entry": {
+        "amount_cents": 0,
+        "payment_method": null
+      },
+      "extra_fees": 0,
+      "extra_recurring": 0,
+      "extra_debts": 0
+    }
+  },
+  "assertions": [
+    "Exactly one Pix and one 3-installment plan per OS",
+    "All final iOS rows identical after canceled matrix",
+    "No QA F04 recurrence/debt/fees persisted",
+    "No QA F04 IPAD transaction persisted"
+  ],
+  "migration_sha256": {
+    "20261003000528_finance_write_preview.sql": "319e701934aea4d36c081122d3da6da37b03c9f727168d2385f5185609f13cc6",
+    "20261003002625_finance_projected_card_cash.sql": "7cdc389b1e717ba141e6925d01fbef583f31d2e7b78b59389e5c0022f9bbf182"
+  }
+}

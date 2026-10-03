@@ -92,12 +92,12 @@ Arquivos: `accounts.ts`, `AccountPicker`, hooks de saldo/cartão, consultas auxi
 
 ### F04 — Efeito financeiro antes de salvar
 
-Arquivos: `escrita.ts`, `hipotese.ts`, hook de simulação e componente de preview financeiro; integrar nos corpos do launcher. Interface: draft canônico → consequência identificada pelo mesmo draft, sem aritmética de fatura duplicada.
+Arquivos: `finance-write-input.ts`, `lancamento-write.ts`, `finance-write-preview.ts`, hook/componente de prévia, três corpos do launcher e RPC de rollback. Interface: draft canônico → consequência identificada pelo mesmo draft, sem aritmética de fatura duplicada.
 
-- [ ] RED: resposta atrasada não aparece sob draft novo; preview confere com aplicação.
-- [ ] Extrair preview de leitura usando regra de servidor existente e rollback.
-- [ ] Integrar resumo/cronograma/entrada/erro e movimento do kit.
-- [ ] Executar bordas de fechamento/data/centavos e gates nativos F04; registrar aceite.
+- [x] RED: resposta atrasada não aparece sob draft novo; preview confere com aplicação.
+- [x] Extrair prévia usando regra de servidor existente e subtransação revertida.
+- [x] Integrar resumo/cronograma/entrada/erro e movimento do kit.
+- [x] Executar bordas de fechamento/data/centavos e gates nativos F04; registrar aceite em `docs/qa/2026-10-02-evolucao-financeira/f04/registro-nativo.md`, com limites e revisão visual.
 
 ### F05 — Recortes por pagamento
 

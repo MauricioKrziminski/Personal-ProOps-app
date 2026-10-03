@@ -4,6 +4,8 @@ import { StyleSheet, View } from 'react-native';
 import type { CorpoProps } from '@/components/finance/corpo-do-lancar';
 import { ErrorCard } from '@/components/error-card';
 import { CamposDaSerie } from '@/components/finance/serie-form';
+import { FinanceWritePreview } from '@/components/finance/finance-write-preview';
+import { escritaDaRecorrente } from '@/lib/finance-write-input';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SheetScroll } from '@/components/ui/sheet';
@@ -129,6 +131,20 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
   const erroMetodo = paymentMethodError(form.paymentMethod, (accounts.data ?? []).find((c) => c.id === form.accountId) ?? null);
   const podeSalvar = basicoPodeSalvar && !erroMetodo;
 
+  const creationInput: EntradaRecorrente | null = podeSalvar && inicioDate && rrulePrevia ? {
+    kind: form.kind,
+    amount_cents: form.amountCents,
+    description: form.description.trim(),
+    merchant: form.merchant.trim() || null,
+    category: form.category,
+    account_id: form.accountId,
+    ...(form.paymentMethod !== undefined ? { payment_method: form.paymentMethod } : {}),
+    rrule: rrulePrevia,
+    next_run_at: inicioDate.toISOString(),
+    end_date: form.fim ? brToISO(form.fim) : null,
+    auto_confirm: form.autoConfirm,
+  } : null;
+
   const salvar = (criarOutro: boolean) => {
     if (salvarBloqueadoAtual.current || !podeSalvar) return;
     if (form.id) {
@@ -227,20 +243,8 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
     }
     // Editando, o formulário SEMPRE tem o id: sem ele, nunca cai na criação (seria uma duplicata).
     if (editandoId) return;
-    if (!podeSalvar || !inicioDate || !rrulePrevia) return;
-    const entrada: EntradaRecorrente = {
-      kind: form.kind,
-      amount_cents: form.amountCents,
-      description: form.description.trim(),
-      merchant: form.merchant.trim() || null,
-      category: form.category,
-      account_id: form.accountId,
-      ...(form.paymentMethod !== undefined ? { payment_method: form.paymentMethod } : {}),
-      rrule: rrulePrevia,
-      next_run_at: inicioDate.toISOString(),
-      end_date: form.fim ? brToISO(form.fim) : null,
-      auto_confirm: form.autoConfirm,
-    };
+    if (!creationInput) return;
+    const entrada = creationInput;
     // Convertendo outro registro nesta série: o hospedeiro pergunta o alcance e grava.
     if (converter) {
       converter({ tipo: 'recorrente', dados: linhaDaRecorrente(entrada) });
@@ -282,6 +286,8 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
         {props.topo}
         <View style={styles.conteudo}>
           <CamposDaSerie form={form} onChange={setForm} contas={accounts.data ?? []} />
+          <FinanceWritePreview accounts={accounts.data ?? []} write={creationInput && !editandoId && !form.id && !converter
+            && !props.salvarBloqueado && !salvando && !accounts.isError && !accounts.isPending ? escritaDaRecorrente(creationInput) : null} />
           {!editandoId && !converter ? (
             <Button
               variant="secondary"

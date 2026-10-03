@@ -294,6 +294,38 @@ A abertura e toda troca de conta passam por uma cortina de tinta com borda curva
 splash com um anel que se desenha, depois a tinta sobe. Entrar a partir de um botão cobre com um
 círculo que nasce dele. As raízes entram em cascata junto com a tinta saindo.
 
+### Ao salvar — prévia financeira (F04)
+Uma consequência curta dentro do formulário, no mundo Suave / Papel e Tinta. `FinanceWritePreview`
+agrupa o efeito numa `Section` com título em caixa normal e superfície opaca; `Row` mantém rótulo
+antes do valor, corpo do kit e subtítulo `footnote` com números tabulares. As linhas crescem com o
+texto. Contexto usa `Note`; recuperar e revelar detalhes usa `Button` secundário pequeno, com o
+material já escolhido pelo kit em cada plataforma. O bloco não acrescenta herói, cor, fonte ou token.
+
+- **Efeito legível:** saldo atual, caixa previsto com a data do horizonte e limite disponível são
+  informações distintas. O par antes → depois só aparece com base confiável; igualdade diz “sem
+  alteração”. Limite não cadastrado, histórico a revisar e valor indisponível usam texto, sem zero
+  substituto. Cor de alerta só se aplica ao estado conhecido e com valores visíveis.
+- **Cronograma progressivo:** o resumo mostra o primeiro pagamento e, na compra parcelada com
+  mais de uma parcela e cronograma completo, o compromisso total. Entrada e juros aparecem separadamente. “Ver
+  cronograma” revela seis registros; “Ver mais registros” acrescenta seis por vez. Datas e valores
+  vêm do cronograma retornado, sem recalcular parcelas ou inventar vencimento de fatura. Histórico
+  informado, estimativa e confirmação automática prevista conservam seus rótulos distintos.
+  Horizonte e eventual recorte são explícitos; a nota final diz que nada foi gravado.
+- **Estados e identidade:** rascunho incompleto não apresenta números. Carregamento usa
+  “Conferindo o efeito deste lançamento…”; falha usa uma nota e “Atualizar prévia”, preservando o
+  rascunho. Cada operação com todos os seus argumentos define a identidade: alterá-la retira os
+  números anteriores imediatamente, antes da próxima consulta. Refetch e pausa de rede também
+  retiram valores que deixaram de estar confirmados.
+- **Privacidade e movimento:** a ocultação cobre resumo, parcelas e texto numérico de
+  acessibilidade, inclusive camadas retidas na saída. `Presenca` e `TrocaSuave` costuram presença,
+  troca de estado e expansão pelo movimento do kit, com Reduce Motion; valores não são contadores
+  animados. A camada que sai consulta identidade e privacidade atuais, sem reexibir dinheiro antigo.
+- **Alcance construído:** criação de lançamento avulso, compra parcelada, recorrência e
+  financiamento, além de edição avulsa. Edições vinculadas e conversões continuam escolhendo
+  alcance na confirmação; não recebem uma prévia numérica de criação. Essa fronteira pertence ao
+  [contrato F04](docs/qa/2026-10-02-evolucao-financeira/f04/contrato.md), não amplia a regra para
+  operações ainda sem comando de edição conectado.
+
 ## Do's and Don'ts
 
 ### Do:

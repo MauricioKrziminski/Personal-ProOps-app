@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { test } from 'node:test';
 import ts from 'typescript';
@@ -85,7 +85,9 @@ function harness() {
         if (name in dependencies) return dependencies[name];
         // O mapeamento do formulario para contrato e codigo real, nao um resultado combinado.
         if (name === '@/lib/escrita') return load('src/lib/escrita.ts');
+        if (name === '@/lib/finance-write-input') return load('src/lib/finance-write-input.ts');
         if (name === '@/lib/payment-method' || name === './payment-method.ts') return load('src/lib/payment-method.ts');
+        if (name.startsWith('./')) return load(resolve(dirname(path), name));
         return {};
       },
     }, { filename: path });

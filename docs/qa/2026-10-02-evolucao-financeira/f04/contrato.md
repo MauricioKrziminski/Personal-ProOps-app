@@ -1,0 +1,17 @@
+# F04 — prévia do efeito financeiro
+
+Implementado e aceito no escopo registrado na branch `gabriel/financas-22-melhorias`, após F03 (`ae42c6a4`). Backend autorizado: **staging `utkqoiigimqzeenxkxdl`**.
+
+O resumo “Ao salvar” usa os mesmos argumentos das operações reais de lançamento, compra parcelada, recorrência e financiamento. A construção dos argumentos é compartilhada com os hooks de gravação; a prévia não usa os defaults do editor de hipóteses. Avulsos já existentes usam o contrato real de edição, incluindo a revisão lida na abertura.
+
+`preview_finance_write` executa uma única operação pública autorizada dentro de uma subtransação, confere também as constraints adiadas e lê o resultado com as regras existentes. Antes e depois usam a mesma fotografia de dados; todas as gravações simuladas, vínculos, versões e reservas de idempotência são desfeitas antes de retornar. A configuração de isolamento é específica desta RPC, conforme o [contrato de transações do PostgREST](https://docs.postgrest.org/en/stable/references/transactions.html#isolation-level). A função recusa execução sem esse isolamento, para não atribuir alterações concorrentes ao formulário.
+
+O resumo diferencia saldo confirmado, caixa previsto na data informada pelo servidor e limite disponível com a qualidade introduzida no F03. Zero, negativo, limite ausente e histórico que exige revisão são distintos. Entrada paga e juros são identificados separadamente. Parcelas usam seu cronograma real, inclusive histórico; recorrências mostram apenas o horizonte explicitamente informado. O detalhamento é progressivo e permanece no formulário.
+
+A identidade inclui a operação e todos os seus argumentos. Uma alteração do rascunho retira os números anteriores imediatamente; a consulta seguinte aguarda 350 ms, cancela a anterior e não usa `placeholderData`. Refetch, falha e pausa de rede retiram números potencialmente desatualizados. O resumo oferece recuperação e não altera o rascunho nem a política de confirmação da gravação. A preferência de ocultação vale para números, cronograma e rótulos de acessibilidade, também durante as transições.
+
+Edições de série, parcela, pagamento de dívida e conversões dependem do alcance que hoje é escolhido no salvamento. Esse incremento não exibirá uma simulação de **criação** nesses editores. O seu contrato de alcance continua explícito; a cobertura numérica do F04 será registrada por fluxo, sem alegar uma prévia que não existe. A extensão a esses alcances exige ligar o próprio comando de edição escolhido, com revisões e versões de pagamentos, antes de apresentar números.
+
+Direção visual: extensão do mundo Suave existente. Reusar `Section`, `Row`, `Note`, `Button`, tipografia e espaçamentos do kit; movimento de presença e troca de estado pelo kit Reanimated, sem contador fictício de dinheiro. Tema, fonte ampliada, largura compacta, tablet e teclado entram na validação nativa. Nenhuma dependência nova prevista.
+
+Aceite técnico: SQL com rollback e comparação prévia/gravação; isolamento e permissões; datas de fatura e mês curto; centavos, parcelas, juros, entrada e histórico; resposta atrasada e identidade; gates e execução real em iOS e Android. [Registro de evidências e limites](registro-nativo.md), [revisão visual independente](revisao-visual.md) e padrão construído em `DESIGN.md`. F05 liberado após esse aceite; a lista de limites não foi tratada como teste executado.

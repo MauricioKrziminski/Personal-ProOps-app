@@ -27,7 +27,7 @@ Esses fatos e a abertura do formulário ainda não equivalem ao aceite funcional
 | F01 | Forma de pagamento | Aceite técnico no staging em 02/10/2026 | Validado na matriz | Validado na matriz |
 | F02 | Criar origem no fluxo | Aceite técnico no staging em 02/10/2026 | Validado na matriz | Validado na matriz |
 | F03 | Saldo/limite no seletor | Aceito; qualidade explícita, privacidade e consultas agregadas | Validado; limites no registro | Validado; offline/recuperação incluídos |
-| F04 | Prévia do efeito | Aguardando F03 | Não validado | Não validado |
+| F04 | Prévia do efeito | Aceito; argumentos compartilhados, rollback e identidade | Validado; entrada/edição/pendente/fonte/iPad | Validado; centavos/privacidade/offline/compacto |
 | F05 | Filtros por pagamento | Aguardando F04 | Não validado | Não validado |
 | F06 | Classificações independentes | Aguardando F05 | Não validado | Não validado |
 | F07 | Reserva dedicada | Aguardando F06 | Não validado | Não validado |
@@ -163,3 +163,19 @@ Saldo/limite, privacidade, null/zero/negativo, fonte ampliada e tema conferidos 
 Um gasto Pix por plataforma, 1.234 centavos, conferido no banco e refletido imediatamente no
 saldo do seletor. Android offline/recuperação conservou rascunho e origem. Dezenove capturas
 inspecionadas e arquivadas; configurações dos dispositivos restauradas. F04 liberado.
+
+## F04 — prévia do efeito e aceite técnico
+
+O resumo “Ao salvar” simula a operação real com os mesmos argumentos da gravação e desfaz
+todas as alterações antes de responder. Mostra saldo atual, caixa previsto com horizonte,
+limite disponível, entrada/juros e cronograma progressivo. A identidade do rascunho e a
+privacidade impedem números antigos ou ocultos de reaparecerem nas transições. Recorrência
+no cartão usa a conta pagadora e a fatura resolvida na regra compartilhada do servidor.
+
+[Contrato e fronteira](f04/contrato.md), [registro completo](f04/registro-nativo.md),
+[31 capturas com origem/SHA](f04/captures.json), [persistência sanitizada](f04/persistencia-test.json)
+e [veredito visual ship](f04/revisao-visual.md). TypeScript/lint exit0; Node1560/1560;
+SQL do incremento/API/staging e saves únicos conferidos. A suíte antiga de recorrência
+com fixture vencida/assertion física de histórico continua registrada como falha; não foi
+contada como verde. Limites nativos e de hardware constam do registro. Duas migrations
+aplicadas só no staging, sem seeds/roles. Nenhum push/release/produção. F05 liberado.

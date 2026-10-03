@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { escritaDoLancamento } from './finance-write-input.ts';
+import { linhasDoLancamento } from './escrita.ts';
 
 /**
  * A contagem anti-slop (`design.md` §10) medida por teste, não afirmada por quem escreveu.
@@ -1626,13 +1628,18 @@ test('Pix no crédito para conta própria: a transferência do cartão tem juro,
   const fonte = readFileSync(join(SRC, 'components/finance/formulario-do-lancamento.tsx'), 'utf8');
   assert.match(fonte, /isCard && paymentMethod === 'pix' && \(kind === 'expense' \|\| kind === 'transfer'\)/);
   const hook = readFileSync(join(SRC, 'hooks/use-finance.ts'), 'utf8');
-  // As linhas do lançamento moram em `escrita.ts` (29/09/2026), a mesma função da hipótese.
-  const escrita = readFileSync(join(SRC, 'lib/escrita.ts'), 'utf8');
-  // copiado de uma transferência, o juro herdaria o tipo e o destino — e viraria dinheiro movido
-  assert.match(escrita, /function linhaDeJuros[\s\S]{0,200}?kind: 'expense' as const,\s*counterparty_account_id: null,/);
-  assert.match(escrita, /if \(fee_cents && fee_cents > 0 && input\.kind !== 'income'\) \{?\s*linhas\.push\(linhaDeJuros\(/);
+  const transfer = { kind: 'transfer' as const, amount_cents: 34000, account_id: 'card',
+    counterparty_account_id: 'itau', occurred_at: '2026-10-02', description: 'Pix próprio', category: null };
+  // A taxa é despesa no cartão; não vira uma segunda transferência para a conta de destino.
+  const lines = linhasDoLancamento({ ...transfer, fee_cents: 1699 });
+  assert.equal(lines.length, 2);
+  assert.deepEqual({ kind: lines[1].kind, counterparty: lines[1].counterparty_account_id,
+    account: lines[1].account_id, cents: lines[1].amount_cents },
+  { kind: 'expense', counterparty: null, account: 'card', cents: 1699 });
   assert.match(hook, /rpc\('save_transaction_payment'/, 'compra e taxa pertencem à mesma operação atômica');
-  assert.match(hook, /p_fee_cents: juros\?\.cents \?\? fee_cents \?\? null/);
+  assert.deepEqual(escritaDoLancamento({ ...transfer, fee_cents: 1699 }).args, {
+    p_transaction_id: null, p_input: transfer, p_fee_cents: 1699, p_expected_revision: null,
+  });
   assert.match(hook, /tx\?\.invoice_id && contaNaFatura\(tx\.kind\)/, 'a edição acha o juro do Pix também');
   // a fatura soma o que a lista mostra: despesa E a transferência que sai do cartão
   for (const arquivo of ['app/finance/invoice/[id].tsx', 'components/finance/invoice-dock.tsx']) {
