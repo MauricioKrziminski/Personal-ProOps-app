@@ -1,7 +1,9 @@
 import { createContext, forwardRef, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Platform,
+  PixelRatio,
   StyleSheet,
+  Text,
   TextInput,
   View,
   useWindowDimensions,
@@ -32,6 +34,7 @@ import { Fonts } from '@/constants/theme';
 import { HitTarget, Motion, Radius, Space, Type, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { maskBRDate } from '@/lib/dates';
+import { fitMoneyFieldScale } from '@/lib/money-field-fit';
 
 /** Duração da transição da borda ao focar. */
 const FOCUS_BORDER_MS = 160;
@@ -342,7 +345,7 @@ const ROLA = 0.62;
  * cima dos novos para sempre ("0,45" com um "0,04" fantasma). Cada posição é uma casa fixa que
  * guarda o dígito anterior e o atual, e a troca é um valor de 0 a 1 — igual nas duas plataformas.
  */
-function Digito({ ch, cor, animar }: { ch: string; cor: string; animar: boolean }) {
+function Digito({ ch, cor, animar, fontScale }: { ch: string; cor: string; animar: boolean; fontScale: number }) {
   const reduzido = useReducedMotion();
   const [atual, setAtual] = useState(ch);
   const [antigo, setAntigo] = useState<string | null>(animar ? '' : null);
@@ -361,8 +364,7 @@ function Digito({ ch, cor, animar }: { ch: string; cor: string; animar: boolean 
     t.set(withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) }));
   }, [atual, antigo, reduzido, t]);
 
-  // O texto cresce com a fonte do sistema; a rolagem anda a altura que ele tem de verdade.
-  const { fontScale } = useWindowDimensions();
+  // Todas as casas usam a mesma escala que cabe na faixa; a rolagem anda essa altura.
   const altura = Type.money.lineHeight * fontScale;
   const entra = useAnimatedStyle(() => ({
     opacity: t.get(),
@@ -372,7 +374,12 @@ function Digito({ ch, cor, animar }: { ch: string; cor: string; animar: boolean 
     opacity: 1 - t.get(),
     transform: [{ translateY: -t.get() * direcao.value * altura * ROLA }],
   }));
-  const estilo = [Type.money, tabular, styles.digito, { color: cor }];
+  const estilo = [Type.money, tabular, styles.digito, {
+    color: cor,
+    fontSize: Type.money.fontSize * fontScale,
+    lineHeight: altura,
+    letterSpacing: Type.money.letterSpacing * fontScale,
+  }];
 
   return (
     <View style={styles.casa}>
@@ -381,9 +388,9 @@ function Digito({ ch, cor, animar }: { ch: string; cor: string; animar: boolean 
         Com uma terceira camada invisível só para medir, o Android desenhava as duas deslocadas —
         "0,00" dobrado logo no primeiro quadro.
       */}
-      <Animated.Text style={[estilo, entra]}>{atual}</Animated.Text>
+      <Animated.Text allowFontScaling={false} style={[estilo, entra]}>{atual}</Animated.Text>
       {antigo ? (
-        <Animated.Text style={[estilo, styles.sobre, sai]}>{antigo}</Animated.Text>
+        <Animated.Text allowFontScaling={false} style={[estilo, styles.sobre, sai]}>{antigo}</Animated.Text>
       ) : null}
     </View>
   );
@@ -456,20 +463,53 @@ export function MoneyField({
 
   const cor = readOnly ? theme.textSecondary : theme.text;
   const { fontScale } = useWindowDimensions();
+  const [largura, setLargura] = useState(0);
+  const [medidas, setMedidas] = useState<Record<string, Record<string, number>>>({});
+  // Numerais tabulares têm a largura do zero. Pontuação é medida à parte: um Text
+  // com o valor inteiro aplica kerning, mas o odômetro é uma fileira de Texts isolados.
+  // A medida usa a escala SOLICITADA, nunca a ajustada, evitando ciclos de medição.
+  const glifos = medidas[fontScale] ?? {};
+  const larguraNatural = caracteres.reduce((total, ch) =>
+    total + (glifos[/\d/.test(ch) ? '0' : ch] ?? Type.money.fontSize * fontScale), 0);
+  const escalaDoValor = fitMoneyFieldScale(fontScale, largura, larguraNatural, caracteres.length, PixelRatio.get());
+  const alturaDoValor = Type.money.lineHeight * escalaDoValor;
 
   return moldura(
     <View style={styles.valor}>
+      <View pointerEvents="none" accessible={false} accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants" style={styles.medidor}>
+        {['0', '.', ','].map((ch) => <Text key={`${fontScale}:${ch}`} allowFontScaling={false}
+          accessible={false}
+          style={[Type.money, tabular, {
+            width: Type.money.fontSize * fontScale * 2,
+            fontSize: Type.money.fontSize * fontScale,
+            lineHeight: Type.money.lineHeight * fontScale,
+            letterSpacing: Type.money.letterSpacing * fontScale,
+          }]}
+          onTextLayout={({ nativeEvent: { lines } }) => {
+            const width = lines.length === 1 ? lines[0].width : 0;
+            if (!Number.isFinite(width) || width <= 0) return;
+            setMedidas((antes) => {
+              // Um callback atrasado da escala anterior não substitui a medida atual.
+              const anteriores = antes[fontScale] ?? {};
+              if (anteriores[ch] === width) return antes;
+              return { ...antes, [fontScale]: { ...anteriores, [ch]: width } };
+            });
+          }}>{ch}</Text>)}
+      </View>
       <ThemedText themeColor="textSecondary" style={[Type.title2, styles.moeda]}>
         R$
       </ThemedText>
-      {/* A altura da caixa acompanha a fonte do sistema: em 1× ela cortava o "0,00" com fonte grande. */}
-      <View style={[styles.digitos, { height: Type.money.lineHeight * fontScale }]} pointerEvents="none">
+      <View style={[styles.digitos, { height: alturaDoValor, opacity: largura > 0 && escalaDoValor > 0 ? 1 : 0 }]} pointerEvents="none"
+        onLayout={({ nativeEvent: { layout } }) => {
+          if (Number.isFinite(layout.width) && layout.width >= 0) setLargura(layout.width);
+        }}>
         {caracteres.map((c, i) => {
           const posicao = caracteres.length - 1 - i;
-          return <Digito key={posicao} ch={c} cor={cor} animar={posicao >= iniciais} />;
+          return <Digito key={posicao} ch={c} cor={cor} animar={posicao >= iniciais} fontScale={escalaDoValor} />;
         })}
         {focado && !readOnly ? (
-          <Animated.View style={[styles.cursor, { backgroundColor: theme.tintFill }, cursor]} />
+          <Animated.View style={[styles.cursor, { backgroundColor: theme.tintFill, height: Type.money.fontSize * escalaDoValor * 0.8 }, cursor]} />
         ) : null}
       </View>
       <TextInput
@@ -554,6 +594,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
   },
   moeda: { flexShrink: 0 },
+  medidor: { position: 'absolute', left: 0, top: 0, opacity: 0 },
   digitos: {
     flex: 1,
     flexDirection: 'row',

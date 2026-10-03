@@ -916,3 +916,101 @@ test('excluir compra chama exclusão atômica de entrada e plano; erro do banco 
     await assert.rejects(hooks.useDeleteInstallmentPlan().mutationFn('plano-1'), error => error === refusal);
   } finally { client.clear(); }
 });
+
+
+function f07ReadFixture(ws: string): any {
+  const asOf = dates.localISODate();
+  const start = new Date(`${asOf.slice(0,7)}-01T12:00:00`);
+  return { workspace_id: ws, workspace_name: 'QA reserva', as_of: asOf, config: null, sources: [],
+    months: [3,2,1].map(n => {
+      const d = new Date(start.getFullYear(),start.getMonth()-n,1);
+      return { month: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`,expense_count:0,
+        essential_cents:'0',unclassified_count:0,unclassified_cents:'0',fingerprint:'a'.repeat(32),reviewed:false };
+    }),unassigned_goals_cents:'0' };
+}
+test('F07 hooks: consulta escopa workspace/data e resposta de outro workspace nunca vira reserva', async () => {
+  const client = new QueryClient();const ws='10000000-0000-4000-8000-000000000001';
+  const subscriptions: string[]=[];const calls:any[]=[];let foreign=false;
+  const hooks=loadHooks(client,'src/hooks/use-emergency-reserve.ts',{
+    '@tanstack/react-query':{useQuery:(opts:any)=>opts},
+    '@/hooks/use-items':{workspaceId:async()=>ws,useRealtimeInvalidate:(table:string)=>subscriptions.push(table)},
+    '@/lib/supabase':{supabase:{rpc:async(name:string,args:any)=>{calls.push({name,args});return{data:f07ReadFixture(foreign?'10000000-0000-4000-8000-000000000009':ws),error:null};}}},
+  });
+  try {
+    const query=hooks.useEmergencyReserve();const state=await query.queryFn();
+    assert.equal(state.workspace_id,ws);assert.equal(state.unassigned_goals_cents,0);
+    assert.equal(calls[0].name,'emergency_reserve_state');assert.equal(calls[0].args.p_workspace_id,ws);
+    assert.equal(Object.hasOwn(calls[0].args, 'p_as_of'), false);
+    for(const table of ['accounts','assets','asset_valuations','transactions','goals','goal_contributions','emergency_reserves','financial_allocations','reserve_month_reviews'])assert.ok(subscriptions.includes(table), `a reserva acompanha ${table}`);
+    foreign=true;await assert.rejects(query.queryFn(),/workspace|reserva|espaço/i);
+  }finally{client.clear();}
+});
+test('F07 hooks: retry da escrita usa mesmo recibo e confirmação invalida a reserva', async()=>{
+  const client=new QueryClient();const calls:any[]=[];const published:any[]=[];let sequence=0;
+  const ws='10000000-0000-4000-8000-000000000001';
+  client.setQueryData(['emergency-reserve','default'],{previous:true});
+  const hooks=loadHooks(client,'src/hooks/use-emergency-reserve.ts',{
+    react:{useState:(value:any)=>[typeof value==='function'?value():value,(next:any)=>published.push(next)]},
+    '@/lib/agent-chat':{newClientMessageId:()=>`10000000-0000-4000-8000-${String(++sequence).padStart(12,'0')}`},
+    '@/lib/supabase':{supabase:{rpc:async(name:string,args:any)=>{calls.push({name,args});return calls.length===1?{data:null,error:new Error('response lost')}:{data:{workspace_id:ws,edit_revision:1},error:null};}}},
+  });
+  const input={workspace_id:ws,expected_revision:null,base_mode:'manual',manual_monthly_cents:10000,target_months:6,
+    unassigned_goals_ack_cents:0,allocations:[],reviewed_months:[]};
+  try{
+    const mutation=hooks.useSaveEmergencyReserve();
+    await assert.rejects(mutation.mutationFn(input),/response lost/);
+    assert.equal(calls[0].name,'save_emergency_reserve');assert.equal(published.at(-1)?.manual_monthly_cents,10000);
+    const result=await mutation.mutationFn(input);assert.equal(result.edit_revision,1);
+    assert.equal(calls[0].args.p_request_id,calls[1].args.p_request_id);assert.equal(published.at(-1),null);
+    await mutation.onSuccess();assert.equal(client.getQueryState(['emergency-reserve','default'])?.isInvalidated,true);
+  }finally{client.clear();}
+});
+
+test('F07 hooks: o dia validado pelo servidor não depende do fuso ou relógio do aparelho', async () => {
+  const client = new QueryClient(); const ws = '10000000-0000-4000-8000-000000000001'; const calls: any[] = [];
+  const hooks = loadHooks(client, 'src/hooks/use-emergency-reserve.ts', {
+    '@tanstack/react-query': { useQuery: (opts: any) => opts },
+    '@/lib/dates': { ...dates, localISODate: () => '2099-01-01' },
+    '@/hooks/use-items': { workspaceId: async () => ws, useRealtimeInvalidate: () => {} },
+    '@/lib/supabase': { supabase: { rpc: async (_name: string, args: any) => {
+      calls.push(args); return { data: f07ReadFixture(ws), error: null };
+    } } },
+  });
+  try {
+    const state = await hooks.useEmergencyReserve().queryFn();
+    assert.equal(state.as_of, dates.localISODate());
+    assert.equal(Object.hasOwn(calls[0], 'p_as_of'), false, 'a RPC determina hoje em America/Sao_Paulo');
+  } finally { client.clear(); }
+});
+
+test('F07 hooks: resolução usa identidade original e cancelamento selado invalida a reserva sem gravar', async () => {
+  const client = new QueryClient(); const calls: any[] = []; const published: any[] = []; const mutations: any[] = [];
+  const ws = '10000000-0000-4000-8000-000000000001';
+  client.setQueryData(['emergency-reserve', 'default'], { previous: true });
+  const hooks = loadHooks(client, 'src/hooks/use-emergency-reserve.ts', {
+    react: { useState: (value: any) => [typeof value === 'function' ? value() : value, (next: any) => published.push(next)] },
+    '@tanstack/react-query': { useQueryClient: () => client, useMutation: (options: any) => {
+      mutations.push(options); return { ...options, mutateAsync: options.mutationFn, isPending: false };
+    } },
+    '@/lib/agent-chat': { newClientMessageId: () => '10000000-0000-4000-8000-000000000002' },
+    '@/lib/supabase': { supabase: { rpc: async (name: string, args: any) => {
+      calls.push({ name, args });
+      return name === 'save_emergency_reserve' ? { data: null, error: new Error('response lost') }
+        : { data: { workspace_id: ws, cancelled: true }, error: null };
+    } } },
+  });
+  const input = { workspace_id: ws, expected_revision: null, base_mode: 'manual', manual_monthly_cents: 10000,
+    target_months: 6, unassigned_goals_ack_cents: 0, allocations: [], reviewed_months: [] };
+  try {
+    const mutation = hooks.useSaveEmergencyReserve();
+    await assert.rejects(mutation.mutateAsync(input), /response lost/);
+    let cancellation: any;
+    await assert.rejects(mutation.resolveAsync(), error => { cancellation = error; return (error as any).name === 'EmergencyReserveAttemptCancelledError'; });
+    assert.equal(calls.length, 2); assert.equal(calls[1].name, 'resolve_emergency_reserve_attempt');
+    assert.equal(calls[0].args.p_request_id, calls[1].args.p_request_id);
+    assert.deepEqual(calls[0].args.p_input, calls[1].args.p_input);
+    assert.equal(published.at(-1), null);
+    await mutations[1].onError(cancellation);
+    assert.equal(client.getQueryState(['emergency-reserve', 'default'])?.isInvalidated, true);
+  } finally { client.clear(); }
+});

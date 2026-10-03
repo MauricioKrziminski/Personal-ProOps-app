@@ -42,6 +42,19 @@ APIs existentes permitidas: `SelectField(options,value,onChange)`, `Field(label,
 
 Não registrar etapa como feita porque foi planejada. Se faltar um dos gates, permanecer no ponto.
 
+### Organização da validação a partir de 03/10
+
+- Definir os casos e critérios de saída do ponto antes de operar os aparelhos; separar
+  falha do produto, falha do runner e limite de cobertura.
+- Delegar recortes independentes com contexto completo e um responsável por aparelho.
+  A primary integra mudanças, confere evidências e decide o aceite. Testes com escrita
+  concorrente no mesmo workspace precisam de fixtures isoladas ou execução sequencial.
+- Não disputar emulador/servidor nem executar suites pesadas durante coleta de travamento.
+  Repetir um passe somente após mudança relacionada, nova falha ou dúvida concreta.
+- Investigações têm cenário, instrumentação, limite de tentativas e resultado esperado
+  definidos. Ausência de reprodução não é correção; documentar o próximo teste decisivo
+  em vez de prolongar polimento ou afirmar uma causa sem evidência.
+
 ## Tarefas e arquivos
 
 ### F01 — Pagamento independente da origem
@@ -126,10 +139,15 @@ Arquivos: metadata de categorias, campos compartilhados, builders, ledger/série
 
 Arquivos: `net-worth.tsx`, health query, novo domínio/configuração de reserva e unidade de fonte/alocação. Interface: configuração + fontes + histórico essencial → cobertura/alvo/qualidade da base.
 
-- [ ] RED: sem histórico não é zero; fontes repetidas não duplicam patrimônio.
-- [ ] Implementar cálculo/configuração/vínculo e leitura explicável.
-- [ ] Integrar ficha/configuração usando objetivos/componentes existentes.
-- [ ] Provar dados insuficientes/fontes parciais/concorrência e gates nativos F07; registrar aceite.
+- [x] RED: sem histórico não é zero; fontes repetidas não duplicam patrimônio.
+- [x] Implementar cálculo/configuração/vínculo e leitura explicável.
+- [x] Integrar ficha/configuração usando objetivos/componentes existentes.
+- [x] Provar dados insuficientes/fontes parciais/concorrência e gates nativos F07; registrar aceite funcional no staging e seus limites.
+
+Código, banco e matriz nativa executados no staging; o APK diagnóstico embutido passou
+sem Metro e manteve os sete oráculos financeiros. [Aceite funcional e disposição da ANR](../../qa/2026-10-02-evolucao-financeira/f07/aceite.md).
+O incidente de estabilidade Android permanece aberto, com monitoramento nos próximos
+testes e sem alegação de correção. F08 liberado; não repetir passes sem nova hipótese.
 
 ### F08 — Capacidade conjunta das metas
 
@@ -222,6 +240,8 @@ Arquivos: catálogo de ajuda, detalhes e alertas/deep links. Interface: indicado
 - [ ] Provar privacidade/item ausente e gates nativos F17; registrar aceite.
 
 ### F18 — Transferência recorrente
+
+- [ ] Incluir encerramento claro para assinaturas e demais séries: manter a regra encerrada consultável, conservar histórico/quitados/vencidos e limpar apenas o futuro pendente atomicamente; testar repetição e fatura parcialmente paga (pedido de 03/10).
 
 Arquivos: tipos comuns/série, CamposDaSerie, scheduler, projeção/ledger, materialização e escopos.
 

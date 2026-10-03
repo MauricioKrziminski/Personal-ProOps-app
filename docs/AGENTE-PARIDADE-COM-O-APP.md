@@ -634,3 +634,15 @@ não certifica um contrato novo para o agente. Nenhum campo de `FinanceAction`, 
 tool foi alterado no F02, e não foi executada uma nova sonda de criação no Gemini real.
 
 Contrato e evidência: `docs/qa/2026-10-02-evolucao-financeira/f02/`.
+
+## Reserva dedicada — F07 (03/10/2026)
+
+| app | agente |
+|---|---|
+| Configurar/editar base essencial, horizonte e valores separados de contas/investimentos (`save_emergency_reserve`) | Paridade conversacional pendente da etapa final do plano de 22 pontos. Não há nova tool/prompt nem alteração de `FinanceAction` no F07. |
+| Retirar vínculo de uma fonte e cancelar rascunho | O app retira somente a alocação de reserva; não apaga conta/bem e não lança dinheiro. Cancelamento pertence à sessão local. |
+| Confirmar tentativa de resultado desconhecido | Retry conserva payload e UUID até recibo selado ou recusa específica comprovada do comando. Não certifica idempotência de uma operação nova do agente. |
+| Conferir e encerrar tentativa (`resolve_emergency_reserve_attempt`) | Devolve o sucesso já selado ou sela um cancelamento terminal sob o mesmo lock/UUID/payload. Original atrasada recebe esse comprovante antes de qualquer efeito. Caminho do agente ainda pendente. |
+
+Contrato e evidência: `docs/qa/2026-10-02-evolucao-financeira/f07/`. O F07 não
+promete configuração da reserva pelo WhatsApp antes da implementação/avaliação da paridade.

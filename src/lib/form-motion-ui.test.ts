@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 
 // Commit effects after stable renders; neither springs nor native layout finish automatically.
 // Component-local hooks and provider context exercise the real nested presence lifetimes.
-function montar(file: string, name: string, initial: any, config: { reduzir: boolean; ativo: boolean; fontScale?: number; width?: number; lock?: any; creation?: any; preventRemove?: any; toasts?: any[]; finance?: any; conceal?: any; preview?: any; moneyCalls?: number[] } = { reduzir: false, ativo: true }) {
+function montar(file: string, name: string, initial: any, config: { reduzir: boolean; ativo: boolean; fontScale?: number; width?: number; height?: number; platform?: string; focused?: boolean; insets?: { top: number; bottom: number; left: number; right: number }; lock?: any; creation?: any; preventRemove?: any; toasts?: any[]; finance?: any; conceal?: any; preview?: any; moneyCalls?: number[] } = { reduzir: false, ativo: true }) {
   type Instance = { slots: any[]; cursor: number; mounted: boolean; restart: boolean };
   type Animation = { shared: any; done?: (ok: boolean) => void; target: number; from: number; kind: 'spring' | 'timing'; settings: any; canceled: boolean };
   const instances = new Map<string, Instance>();
@@ -128,6 +128,7 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       clearTimeout: (timer: typeof timers[number]) => { timer.canceled = true; },
       require: (id: string) => {
       if (id === 'react') return react;
+      if (id === 'expo-router') return { useIsFocused: () => config.focused ?? true };
       if (id === 'expo-router/react-navigation') return { usePreventRemove: (active: boolean, callback: any) => { config.preventRemove = { active, callback }; } };
       if (id === '@/hooks/use-finance') return { useAccounts: () => ({ data: [] }), useCreateAccount: () => config.creation, useAccountBalances: (enabled: boolean) => { config.finance?.calls?.push(['balances', enabled]); return config.finance?.balances; }, useCardLimitContext: (enabled: boolean) => { config.finance?.calls?.push(['cards', enabled]); return config.finance?.cards; } };
       if (id === '@/components/ui/conceal') return { useConceal: () => config.conceal ?? { ready: true, concealed: false }, concealText: () => '••••••', useBRL: () => (cents: number) => { config.moneyCalls?.push(cents); return `${cents} centavos`; } };
@@ -139,7 +140,7 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === 'zod') return require(id);
       if (id === '@/components/ui/row') return { Row: 'Row', Section: 'Section' };
       if (id === '@/components/ui/note') return { Note: 'Note' };
-      if (id === '@/components/ui/toast') return { useToast: () => (toast: any) => config.toasts?.push(toast) };
+      if (id === '@/components/ui/toast') return { ToastOutlet: 'ToastOutlet', useToast: () => (toast: any) => config.toasts?.push(toast) };
       if (id === '@/components/ui/button') return { Button: 'Button' };
       if (id === '@/components/ui/card') return { Card: 'Card' };
       if (id === '@/components/finance/account-form') return { AccountFormFields: 'AccountFormFields' };
@@ -147,7 +148,11 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === '@/lib/account-form') return load('src/lib/account-form.ts');
       if (id.startsWith('./') && path.startsWith('src/lib/')) return load(`src/lib/${id.slice(2)}`);
       if (id === 'react/jsx-runtime') return require(id);
-      if (id === 'react-native') return { Pressable: 'Pressable', View: 'View', TextInput: 'TextInput', useWindowDimensions: () => ({ width: config.width ?? 402, fontScale: config.fontScale ?? 1 }), Platform: { OS: 'android' }, StyleSheet: { create: (s: any) => s, flatten, hairlineWidth: 1 } };
+      if (id === 'react-native') return { Modal: 'Modal', ScrollView: 'ScrollView', Pressable: 'Pressable', View: 'View', TextInput: 'TextInput', useWindowDimensions: () => ({ width: config.width ?? 402, height: config.height ?? 874, fontScale: config.fontScale ?? 1 }), Platform: { OS: config.platform ?? 'android' }, StyleSheet: { create: (s: any) => s, flatten, absoluteFill: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }, hairlineWidth: 1 } };
+      if (id === 'react-native-gesture-handler') return { GestureHandlerRootView: 'GestureHandlerRootView' };
+      if (id === 'react-native-keyboard-controller') return { KeyboardAwareScrollView: 'KeyboardAwareScrollView' };
+      if (id === '@/design/adaptive-window') return load('src/design/adaptive-window.ts');
+      if (id === '@/design/adaptive-sheet') return load('src/design/adaptive-sheet.ts');
       if (id === 'react-native-reanimated') return reanimated;
       if (id === 'expo-haptics') return { selectionAsync() {} };
       if (id === '@/components/motion/presenca') return load('src/components/motion/presenca.tsx');
@@ -159,12 +164,12 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === '@/components/motion/session-curtain') return { useCortinaSaindo: () => config.ativo };
       if (id === '@/components/motion/wave-curtain') return { WaveCurtain: 'WaveCurtain' };
       if (id === '@/components/ui/mark') return { Mark: 'Mark' };
-      if (id === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) };
+      if (id === 'react-native-safe-area-context') return { useSafeAreaInsets: () => config.insets ?? { top: 0, bottom: 0, left: 0, right: 0 } };
       if (id === '@/components/ui/glass-backdrop') return { GlassBackdrop: 'GlassBackdrop', supportsLiquidGlass: () => false };
       if (id === '@/components/themed-text') return { ThemedText: 'ThemedText' };
       if (id === '@/components/ui/icon') return { Icon: 'Icon' };
       if (id === '@/components/ui/forte') return { ComNegrito: 'ComNegrito' };
-      if (id === '@/constants/theme') return { Fonts: {} };
+      if (id === '@/constants/theme') return { Fonts: {}, MaxContentWidth: 800 };
       if (id === '@/components/ui/field') return { TextField: 'TextField', Field: 'Field', MoneyField: 'MoneyField' };
       if (id === '@/components/finance/account-picker') return { AccountPicker: 'AccountPicker' };
       if (id === '@/components/finance/date-picker-field') return { DatePickerField: 'DatePickerField' };
@@ -178,6 +183,7 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === './text.ts') return load('src/lib/text.ts');
       if (id === '@/components/finance/calendar') return { Calendar: 'Calendar' };
       if (id === '@/lib/dates') return load('src/lib/dates.ts');
+      if (id === '@/lib/money-field-fit') return load('src/lib/money-field-fit.ts');
       if (id === './dates.ts') return load('src/lib/dates.ts');
       if (id === '@/lib/lancar') return load('src/lib/lancar.ts');
       if (id === '@/lib/atalhos-de-lancamento') return load('src/lib/atalhos-de-lancamento.ts');
@@ -248,7 +254,7 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
   }
   render();
   return {
-    render, nodes, animations, sharedValues, config, timers,
+    render, nodes, animations, sharedValues, config, timers, hooks: react,
     element: (path: string, component: string, componentProps: any) => ({ type: load(path)[component], props: componentProps }),
     find: (predicate: (node: any) => boolean) => nodes().find(predicate),
     style: (node: any) => flatten(node.props.style),
@@ -263,6 +269,102 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
 }
 
 const helper = 'src/components/motion/presenca.tsx';
+const sheetFile = 'src/components/ui/sheet.tsx';
+
+test('Sheet Android preserves its open window and mounted draft while layout crosses the tablet breakpoint', () => {
+  const config = { reduzir: false, ativo: true, width: 448, height: 900, platform: 'android', focused: true,
+    insets: { top: 32, bottom: 24, left: 0, right: 0 } };
+  let closes = 0;
+  let mounts = 0;
+  let unmounts = 0;
+  const props = { visible: false, onClose: () => { closes++; }, children: null as any };
+  const ui = montar(sheetFile, 'Sheet', props, config);
+  const useTabletContext = ui.element(sheetFile, 'useTabletSheetContext', {}).type;
+  function DraftProbe() {
+    const [draft, setDraft] = ui.hooks.useState({ amount: '', months: '', attempt: '' });
+    ui.hooks.useEffect(() => { mounts++; return () => { unmounts++; }; }, []);
+    return { type: 'DraftInput', props: { draft, onChange: setDraft, tablet: useTabletContext(),
+      children: ui.element(sheetFile, 'SheetScroll', { children: 'form' }) } };
+  }
+  props.children = { type: DraftProbe, props: {} };
+  ui.render(props);
+  props.visible = true; ui.render(props);
+  const draft = { amount: '543,21', months: '10', attempt: 'attempt-1' };
+  ui.find(n => n.type === 'DraftInput').props.onChange(draft); ui.render(props);
+  const modal = () => ui.find(n => n.type === 'Modal');
+  const assertDraft = (tablet: boolean) => {
+    const input = ui.find(n => n.type === 'DraftInput');
+    assert.deepEqual(input.props.draft, draft);
+    assert.equal(input.props.tablet, tablet);
+    assert.equal(mounts, 1, 'resize keeps the form instance and its live attempt');
+    assert.equal(unmounts, 0);
+    assert.equal(closes, 0);
+    assert.equal(modal().props.visible, true);
+  };
+  assert.equal(modal().props.animationType, 'slide');
+  assert.equal(modal().props.transparent, false);
+  assert.equal(modal().props.presentationStyle, 'pageSheet');
+  config.width = 800; ui.render(props);
+  assert.equal(modal().props.animationType, 'slide', 'resize must not recreate the Android dialog');
+  assert.equal(modal().props.transparent, true, 'the responsive tablet overlay replaces native dimming');
+  assert.equal(modal().props.presentationStyle, 'pageSheet');
+  assertDraft(true);
+  const panel = ui.find(n => n.props?.accessibilityViewIsModal);
+  assert.equal(ui.style(panel).width, 720);
+  assert.equal(ui.style(panel).maxHeight, 780);
+  assert.equal(ui.find(n => n.type === 'KeyboardAwareScrollView').props.extraKeyboardSpace, -56);
+  config.width = 448; ui.render(props);
+  assertDraft(false);
+  assert.equal(modal().props.animationType, 'slide');
+  assert.equal(modal().props.transparent, false);
+  assert.equal(ui.find(n => n.type === 'KeyboardAwareScrollView').props.extraKeyboardSpace, -24);
+  assert.ok(!ui.find(n => n.props?.accessibilityViewIsModal));
+  props.visible = false; ui.render(props);
+  config.width = 800; ui.render(props);
+  props.visible = true; ui.render(props);
+  assert.equal(modal().props.animationType, 'fade', 'the next tablet opening adopts its own animation');
+  assert.equal(modal().props.transparent, true);
+  assert.equal(modal().props.presentationStyle, 'overFullScreen');
+  assertDraft(true);
+  config.width = 448; ui.render(props);
+  assertDraft(false);
+  assert.equal(modal().props.animationType, 'fade');
+  assert.equal(modal().props.transparent, false, 'the compact sheet restores native dimming');
+  assert.equal(modal().props.presentationStyle, 'overFullScreen');
+  modal().props.onRequestClose();
+  assert.equal(closes, 1, 'native back still uses the shared close callback');
+});
+
+test('Sheet iOS keeps pageSheet or formSheet and the matching keyboard mechanism for each opening', () => {
+  const config = { reduzir: false, ativo: true, width: 402, height: 874, platform: 'ios', focused: true,
+    insets: { top: 44, bottom: 34, left: 0, right: 0 } };
+  let closes = 0;
+  const props = { visible: false, onClose: () => { closes++; }, children: null as any };
+  const ui = montar(sheetFile, 'Sheet', props, config);
+  props.children = ui.element(sheetFile, 'SheetScroll', { children: 'form' });
+  props.visible = true; ui.render(props);
+  const modal = () => ui.find(n => n.type === 'Modal');
+  assert.equal(modal().props.presentationStyle, 'pageSheet');
+  assert.equal(modal().props.animationType, 'slide');
+  assert.equal(modal().props.transparent, false);
+  assert.equal(ui.find(n => n.type === 'KeyboardAwareScrollView').props.extraKeyboardSpace, -34);
+  config.width = 820; ui.render(props);
+  assert.equal(modal().props.presentationStyle, 'pageSheet');
+  assert.equal(ui.find(n => n.type === 'KeyboardAwareScrollView').props.extraKeyboardSpace, -34);
+  props.visible = false; ui.render(props);
+  props.visible = true; ui.render(props);
+  assert.equal(modal().props.presentationStyle, 'formSheet');
+  assert.deepEqual([...modal().props.supportedOrientations], ['portrait', 'landscape']);
+  assert.equal(ui.find(n => n.type === 'ScrollView').props.automaticallyAdjustKeyboardInsets, true);
+  config.width = 402; ui.render(props);
+  assert.equal(modal().props.presentationStyle, 'formSheet');
+  assert.equal(ui.find(n => n.type === 'ScrollView').props.automaticallyAdjustKeyboardInsets, true);
+  assert.equal(closes, 0);
+  config.focused = false; ui.render(props);
+  assert.equal(modal().props.visible, false, 'loss of route focus hides the native window');
+  assert.equal(closes, 1, 'loss of route focus closes the session once');
+});
+
 const outgoing = (ui: ReturnType<typeof montar>) => ui.find((n) => n.type === 'Animated.View' && n.props.pointerEvents === 'none');
 const incoming = (ui: ReturnType<typeof montar>) => ui.find((n) => n.type === 'Animated.View' && n.props.onLayout)
   ?? ui.find((n) => n.type === 'Animated.View' && n.props.pointerEvents !== undefined)?.props.children;

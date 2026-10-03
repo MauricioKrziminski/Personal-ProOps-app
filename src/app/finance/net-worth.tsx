@@ -8,6 +8,7 @@ import { Stack, router } from 'expo-router';
 
 import { monthShort } from '@/components/finance/month-picker';
 import { FinanceAnalysisPanes } from '@/components/finance/finance-analysis-panes';
+import { EmergencyReserveSection, EmergencyReserveSheet, useEmergencyReserveEditor } from '@/components/finance/emergency-reserve-section';
 import { ThemedText } from '@/components/themed-text';
 import { SecaoDeArquivados } from '@/components/ui/secao-de-arquivados';
 import { Forte } from '@/components/ui/forte';
@@ -44,6 +45,7 @@ import {
 import { umDe, usePreferencia } from '@/hooks/use-preferencia';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { useEmergencyReserve } from '@/hooks/use-emergency-reserve';
 import { useBRL } from '@/components/ui/conceal';
 import { formatNumberBR } from '@/lib/dates';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
@@ -159,6 +161,8 @@ export default function NetWorthScreen() {
   const [janela, setJanela] = usePreferencia<'6' | '12' | '24'>('patrimonio:janela', '12', umDe(['6', '12', '24']));
   const serie = useNetWorthSeries(Number(janela));
   const saude = useFinancialHealth();
+  const reserva = useEmergencyReserve();
+  const reserveEditor = useEmergencyReserveEditor(reserva);
   const bens = useAssets();
   const save = useSaveAsset();
   const archive = useArchiveAsset();
@@ -284,7 +288,7 @@ export default function NetWorthScreen() {
   /*
     O PORTÃO DA TELA (Fase 5) — 6 consultas, 5 portões antes disto.
   */
-  const pronta = useTelaPronta(patrimonio, serie, saude, bens);
+  const pronta = useTelaPronta(patrimonio, serie, saude, bens, reserva);
 
   if (!pronta) {
     return (
@@ -437,7 +441,7 @@ export default function NetWorthScreen() {
         trailing={<ThemedText type="small" style={tabular}>{formatNumberBR(saude.data.budget_adherence)}%</ThemedText>}
       />
       <Row
-        title="Reserva"
+        title="Caixa cobre"
         trailing={<ThemedText type="small" style={tabular}>{formatNumberBR(saude.data.months_of_reserve)} meses</ThemedText>}
       />
       <Row
@@ -491,6 +495,7 @@ export default function NetWorthScreen() {
       {composition}
       {trend}
       {health}
+      <EmergencyReserveSection query={reserva} editor={reserveEditor} />
       {assetEvidence}
     </>
   );
@@ -499,7 +504,7 @@ export default function NetWorthScreen() {
     <Screen wide={tablet}
       stagger
       grouped
-      onRefresh={() => Promise.all([patrimonio.refetch(), serie.refetch(), saude.refetch(), bens.refetch()])}>
+      onRefresh={() => Promise.all([patrimonio.refetch(), serie.refetch(), saude.refetch(), bens.refetch(), reserva.refetch()])}>
       <Stack.Screen
         options={{
           title: 'Patrimônio',
@@ -519,9 +524,11 @@ export default function NetWorthScreen() {
 
       <FinanceAnalysisPanes
         primary={<>{hero}{trend}</>}
-        support={<>{composition}{health}{assetEvidence}</>}
+        support={<>{composition}{health}<EmergencyReserveSection query={reserva} editor={reserveEditor} />{assetEvidence}</>}
         compact={content}
       />
+
+      <EmergencyReserveSheet editor={reserveEditor} />
 
       <Sheet visible={form !== null} onClose={() => setForm(null)}>
           <TaskHeader

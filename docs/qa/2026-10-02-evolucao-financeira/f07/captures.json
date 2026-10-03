@@ -1,0 +1,468 @@
+{
+  "scope": "F07, staging, native visual evidence; raster bytes remain private and are not shipped",
+  "private_manifest": "/private/tmp/proops-f07-final-review/captures.json",
+  "captures": [
+    {
+      "file": "proops-f07-iphone-final-dark-editor.png",
+      "source": "/private/tmp/proops-f07-iphone-final-dark-editor.png",
+      "raw_pixel_size": [
+        1206,
+        2622
+      ],
+      "display_orientation": 1,
+      "sha256": "04a5de56f4d43db8cafe16224caebbffa16c5deb1fbd252f659c11144f9e4f0c",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-iphone-final-light-summary.png",
+      "source": "/private/tmp/proops-f07-iphone-final-light-summary.png",
+      "raw_pixel_size": [
+        1206,
+        2622
+      ],
+      "display_orientation": 1,
+      "sha256": "62e0b5e196598ee3a6229311430ffbda9d8aa24bea9c636c90b0c763b1792682",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-iphone-final-privacy-sources.png",
+      "source": "/private/tmp/proops-f07-iphone-final-privacy-sources.png",
+      "raw_pixel_size": [
+        1206,
+        2622
+      ],
+      "display_orientation": 1,
+      "sha256": "993a26b4065b2e6216810a35d8102f1c230d003a7da8ebff562c5827f4492b03",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-iphone-final-light-editor.png",
+      "source": "/private/tmp/proops-f07-iphone-final-light-editor.png",
+      "raw_pixel_size": [
+        1206,
+        2622
+      ],
+      "display_orientation": 1,
+      "sha256": "e527b87df78c9b5166d82848fc7655e58a9dcf8e32871790aa11353c0d207470",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-iphone-final-privacy-summary.png",
+      "source": "/private/tmp/proops-f07-iphone-final-privacy-summary.png",
+      "raw_pixel_size": [
+        1206,
+        2622
+      ],
+      "display_orientation": 1,
+      "sha256": "1084f6a5df8e8f5fb2a7e15930b3dd47cdc8569357afab8151fa096bebda9e22",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-iphone-final-privacy-editor-hints.png",
+      "source": "/private/tmp/proops-f07-iphone-final-privacy-editor-hints.png",
+      "raw_pixel_size": [
+        1206,
+        2622
+      ],
+      "display_orientation": 1,
+      "sha256": "75cdad4fe165a39f946afacf8dd348efd1a3e3181c11b5677b9368a4b6cfe692",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-iphone-final-dark-summary.png",
+      "source": "/private/tmp/proops-f07-iphone-final-dark-summary.png",
+      "raw_pixel_size": [
+        1206,
+        2622
+      ],
+      "display_orientation": 1,
+      "sha256": "a544fee4bd680aec40a80086f3805cf770d2a825e7d060078692e67bfe833d44",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-dark-editor.png",
+      "source": "/private/tmp/proops-f07-android-final-matrix-dark-editor.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "c9b9b1ab2afc73d67de1a139c2ca3e1d1f5b44d2c84b821f17286cf97e4a2ff8",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-ack-valid.png",
+      "source": "/private/tmp/proops-f07-android-final-matrix-ack-valid.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "bb7e36a9410e89027fd20823cc55bd878e4f7018d370c4cf3d1a1009b5ef6f84",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-zero.png",
+      "source": "/private/tmp/proops-f07-android-final-matrix-zero.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "f04e83186aedff3f2a49e9634c3b8e32606b0f313a536cd4ce18022309c28237",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-removed-draft.png",
+      "source": "/private/tmp/proops-f07-android-final-matrix-removed-draft.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "cca41b0e1a568629ea0795f62ab98af0bbb6f51537135553c64b3fa7f516ffac",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-overcapacity-cancel.png",
+      "source": "/private/tmp/proops-f07-android-final-matrix-overcapacity-cancel.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "404848a89b3bb61bdc298b7ce21fc70bd8bff1b01cc97610b2773e16709d9b5c",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-cancel-two-sources.png",
+      "source": "/private/tmp/proops-f07-android-final-matrix-cancel-two-sources.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "54eba6c7a6dc091d473a560b70e513df1b160c74c35c507b2bf63049b9aec549",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-liquidity-off.png",
+      "source": "/private/tmp/proops-f07-android-final-matrix-liquidity-off.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "68bc3da2a6f06db3647d0478f993d23108ca8a2861bc79baffab731ba7cd94e0",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-overcapacity.png",
+      "source": "/private/tmp/proops-f07-android-final-matrix-overcapacity.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "a8483d8f146454264d521e471de4b090c83660c60557d70c7317c19634587a7f",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-zero-cancel.png",
+      "source": "/private/tmp/proops-f07-android-final-matrix-zero-cancel.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "76c7538b715d546c4535128206824d8af26326c7f1c75434923cc4dee53587a3",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-editor-baseline.png",
+      "source": "/private/tmp/proops-f07-android-final-matrix-editor-baseline.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "d0712396df7e49ed9a2cd3ddc29d0cf9c99518626e1dfa340f133201a39c7856",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-dark-summary.png",
+      "source": "/private/tmp/proops-f07-android-final-matrix-dark-summary.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "88968d95b31e8c8779a44ed3824901771e8fb7ac2c4e5f7f34db79fba8889881",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-light-summary.png",
+      "source": "/private/tmp/proops-f07-android-final-matrix-light-summary.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "9d01c63616a12ca2ae1567708dd5a6ef67ee9dc83cbee0ee3d351b5fc986355e",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-ipad-postfit-portrait.png",
+      "source": "/private/tmp/proops-f07-ipad-postfit-portrait.png",
+      "raw_pixel_size": [
+        1640,
+        2360
+      ],
+      "display_orientation": 1,
+      "sha256": "600bb36386f284ed9e625407e878b3982dd2376bb813591011903479a7380156",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-ipad-postfit-landscape.png",
+      "source": "/private/tmp/proops-f07-ipad-postfit-landscape.png",
+      "raw_pixel_size": [
+        1640,
+        2360
+      ],
+      "display_orientation": 8,
+      "sha256": "eb1181ff860713dfed338ab46c05f85b2c507ce1c3f17515c5a9d86ebb7e7aa7",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-ipad-postfit-accessibility.png",
+      "source": "/private/tmp/proops-f07-ipad-postfit-accessibility.png",
+      "raw_pixel_size": [
+        1640,
+        2360
+      ],
+      "display_orientation": 1,
+      "sha256": "f5ec6b17828473f8d6ee16f6e000c87c9776b06aac38696e45892bc3027f8223",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-ios-final-accessibility-summary.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-03_092225/proops-f07-ios-accessibility-direct/takeScreenshot/proops-f07-ios-final-accessibility-summary.png",
+      "raw_pixel_size": [
+        1206,
+        2622
+      ],
+      "display_orientation": 1,
+      "sha256": "d1fbc240770b16d1e945ef1c316b5fef68c1b9495dcee4849e51278c1c5e748c",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-ios-final-accessibility-editor.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-03_092225/proops-f07-ios-accessibility-direct/takeScreenshot/proops-f07-ios-final-accessibility-editor.png",
+      "raw_pixel_size": [
+        1206,
+        2622
+      ],
+      "display_orientation": 1,
+      "sha256": "6c84b6c1b8930f12c3e948173efa1cf7e7229cefa55c0057aecab7a00460b06f",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-ios-final-accessibility-editor-bottom.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-03_092225/proops-f07-ios-accessibility-direct/takeScreenshot/proops-f07-ios-final-accessibility-editor-bottom.png",
+      "raw_pixel_size": [
+        1206,
+        2622
+      ],
+      "display_orientation": 1,
+      "sha256": "7278bde02b80c5689dd082d181c4e597f4a852dbda121e01f9d0bef8e968f616",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-ios-final-accessibility-ceiling-keyboard.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-03_093025/proops-f07-ios-accessibility-ceiling-capture/takeScreenshot/proops-f07-ios-final-accessibility-ceiling-keyboard.png",
+      "raw_pixel_size": [
+        1206,
+        2622
+      ],
+      "display_orientation": 1,
+      "sha256": "f5e800bb8888d6c40ed2ef8764a7ae0f7d39b5c9c5150196377a5d0edd2ab1da",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-privacy-summary.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-03_101304/proops-f07-android-matrix-privacy/takeScreenshot/proops-f07-android-final-matrix-privacy-summary.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "8804871d0999844d1ae00e83319d6cede794df26db52cd1a5a702688cfa89fb0",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-privacy-editor.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-03_101304/proops-f07-android-matrix-privacy/takeScreenshot/proops-f07-android-final-matrix-privacy-editor.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "d722c10aa583687694474c60b9ed79152bbeda7a2a142af13ab0fe71ed8a3f98",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-privacy-sources.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-03_104934/proops-f07-android-privacy-sources-recapture/takeScreenshot/proops-f07-android-privacy-sources-expanded.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "536c687d359c135e0239a6dcaa6f69c913a87b91acb7377a74b384ef82062c5f",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-compact-xl-money.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-03_102148/proops-f07-android-matrix-compact/takeScreenshot/proops-f07-android-final-matrix-compact-xl-money.png",
+      "raw_pixel_size": [
+        1152,
+        2560
+      ],
+      "display_orientation": 1,
+      "sha256": "e365ece94d9028ecb13727f30f680ec3ad7dac65e464f638fb1aa40ced45ea1b",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-compact-xl-money-max.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-03_102353/proops-f07-android-compact-ceiling-resume/takeScreenshot/proops-f07-android-final-matrix-compact-xl-money-max.png",
+      "raw_pixel_size": [
+        1152,
+        2560
+      ],
+      "display_orientation": 1,
+      "sha256": "15bdb7fbd5b9594c1e34ddb534486d32c049d2b6bc17b407f4e6c3c46b43768f",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-resize-before.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-03_110440/proops-f07-android-matrix-resize-prepare/takeScreenshot/proops-f07-android-final-matrix-resize-before.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "09980d74206fddb419c9da90347eafa2886a077169c97879ff2cad932967776d",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-resize-large.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-03_110803/proops-f07-sheet-fixed-large-capture/takeScreenshot/proops-f07-android-final-matrix-resize-large.png",
+      "raw_pixel_size": [
+        2400,
+        3000
+      ],
+      "display_orientation": 1,
+      "sha256": "a392e9f3c499a08ba0d6126fa6a743e58287d700a0d2b96acc94a1b115f66760",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-resize-cancel.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-03_111806/proops-f07-android-matrix-resize-return/takeScreenshot/proops-f07-android-final-matrix-resize-cancel.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "340a27877a0fc1dc54f8d9a720ad4b23d86b6919f59f90ad0499ac8a706ed2f9",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-final-matrix-resize-return.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-03_111806/proops-f07-android-matrix-resize-return/takeScreenshot/proops-f07-android-final-matrix-resize-return.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "401a22837efa84ca0aa56d004e945b404831521ddf41ef0d3d211dd6974b6421",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-iphone-sheet-regression.png",
+      "source": "/private/tmp/proops-f01-ios-qa/.maestro/tests/2026-10-03_111018/proops-f07-ios-sheet-regression/takeScreenshot/proops-f07-iphone-sheet-regression.png",
+      "raw_pixel_size": [
+        1206,
+        2622
+      ],
+      "display_orientation": 1,
+      "sha256": "263ddb7ddc287a242777bb1985131226b1d1b631491a3b3f19ee4452a635d8d7",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-ipad-sheet-portrait.png",
+      "source": "/private/tmp/proops-f02-ipad-qa/.maestro/tests/2026-10-03_111146/proops-f07-ipad-sheet-regression/takeScreenshot/proops-f07-ipad-sheet-portrait.png",
+      "raw_pixel_size": [
+        1640,
+        2360
+      ],
+      "display_orientation": 1,
+      "sha256": "bd30a3b0b9f958341c0ec66fe432728b33c039517728999a97cf4ac2699624b6",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-ipad-sheet-landscape.png",
+      "source": "/private/tmp/proops-f02-ipad-qa/.maestro/tests/2026-10-03_111146/proops-f07-ipad-sheet-regression/takeScreenshot/proops-f07-ipad-sheet-landscape.png",
+      "raw_pixel_size": [
+        1640,
+        2360
+      ],
+      "display_orientation": 8,
+      "sha256": "17d3c00801c401d266a1598e65326add97ea25860ddc80c3f4a104e817c4f953",
+      "review_phase": "full-review-before-switch-fix"
+    },
+    {
+      "file": "proops-f07-android-switch-dark-on.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-03_113509/proops-f07-android-switch-verdict/takeScreenshot/proops-f07-android-switch-dark-on.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "c23a2e41eb804223f96a135062c9dc91de4ce9f5c2a02ddba023e854afd1f9c3",
+      "review_phase": "switch-fix-verdict"
+    },
+    {
+      "file": "proops-f07-android-switch-dark-off.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-03_113509/proops-f07-android-switch-verdict/takeScreenshot/proops-f07-android-switch-dark-off.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "f9c13fd524eb2760f5909f3b551fa9afe996f758da48319d408d660e66037145",
+      "review_phase": "switch-fix-verdict"
+    },
+    {
+      "file": "proops-f07-android-switch-light-on.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-03_113509/proops-f07-android-switch-verdict/takeScreenshot/proops-f07-android-switch-light-on.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "70daa57b924e8b331efde0b888ff63076169cc58176a109bb8f41525370977ae",
+      "review_phase": "switch-fix-verdict"
+    },
+    {
+      "file": "proops-f07-android-switch-light-off.png",
+      "source": "/private/tmp/proops-f01-android-qa/.maestro/tests/2026-10-03_113509/proops-f07-android-switch-verdict/takeScreenshot/proops-f07-android-switch-light-off.png",
+      "raw_pixel_size": [
+        1344,
+        2992
+      ],
+      "display_orientation": 1,
+      "sha256": "5ff6cee4c7a68a0668241d517c58b9aa86c330aae65358c8482dbdaa12bc1d6a",
+      "review_phase": "switch-fix-verdict"
+    }
+  ]
+}

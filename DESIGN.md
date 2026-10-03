@@ -250,6 +250,25 @@ faz uma barriga e sobe para a direita.
 - **Style:** caixa branca de canto 12 com fio claro; rótulo acima, em 13/500.
 - **Focus:** um anel de tinta de 1,5px acende em volta.
 - **Error:** o anel vira tijolo e a caixa treme uma vez.
+- **MoneyField:** só a área de numerais tabulares ajusta sua escala ao espaço medido, partindo
+  da fonte solicitada e medindo zero e pontuação separadamente. Reserva arredondamento das casas
+  e cursor antes do foco; rótulos, dicas e controles mantêm Dynamic Type. O ajuste conserva o
+  odômetro do kit e seu tratamento de Reduce Motion; o campo em edição exibe o próprio valor.
+- **SwitchRow:** uma frase que explica a escolha e um interruptor nativo. Só no Android, trilho
+  desligado usa `textSecondary`, ligado usa `tint`; polegar usa `surface` desligado e `onTint`
+  ligado. No iOS, as cores permanecem nativas. O rótulo também nomeia o controle acessível.
+
+**The Measured Numerals Rule.** Ajustar dinheiro em edição limita-se aos numerais e ao espaço medido; rótulos e dicas conservam a escala de fonte solicitada.
+
+### Folhas e sessão de edição
+A sessão, o snapshot e o rascunho pertencem à tela; a folha é irmã estável dos painéis
+adaptativos. Trocar a disposição dos painéis não recria o formulário. `Sheet` conserva a árvore
+que possui o conteúdo e fixa a apresentação nativa e o tipo de animação por abertura; layout e
+transparência Android acompanham a largura atual. A próxima abertura adota a nova classe de
+janela. `TaskHeader` mantém as ações acima de `SheetScroll`, responsável pelo teclado; conteúdo
+não soma novamente os insets que a folha já aplica.
+
+**The Stable Editing Session Rule.** Resize e rotação adaptam a moldura; a sessão de edição e a apresentação nativa pertencem à abertura, fora dos ramos adaptativos.
 
 ### Navigation
 - **iOS:** a barra de abas do sistema em Liquid Glass, seleção em tinta.
@@ -387,9 +406,36 @@ primitivos; nenhuma paleta, fonte ou superfície de destaque nova.
 
 **The Available Reveal Rule.** Revelar campos interativos disponibiliza geometria natural e toque no mesmo render; o movimento só acompanha o estado.
 
+### Reserva de emergência (F07)
+Extensão Operate de Suave / Papel e Tinta: `Section` e `Row` integram a leitura ao Patrimônio;
+`Field`, `MoneyField`, `SelectField`, `QuantityField` e `SwitchRow` compõem a folha compartilhada.
+Calha, intervalos, materiais opacos, tipografia tabular e revelações `Presenca` imediatas vêm do
+kit; nenhum novo bloco de destaque, paleta ou família de fonte.
+
+- **Separação e lastro:** reserva aloca parte do dinheiro existente. Leitura distingue o valor
+  separado com lastro, cobertura, alvo e falta; perda de saldo ou disponibilidade revela o valor
+  sem lastro e pede conferência das fontes. Configurar não cria ativo, aporte ou transferência.
+- **Base explicável:** valor mensal informado ou média dos três meses completos revisados, com
+  necessidade classificada. Falta de revisão, classificação incompleta e período sem base positiva
+  permanecem estados nomeados; alvo e falta só aparecem com base válida. Mês revisado sem gasto
+  pode valer zero; ausência de revisão não comprova zero. Cobertura não arredonda proteção para cima.
+- **Fontes e escolhas:** detalhes revelam origem, lastro e meses; a edição mostra disponibilidade
+  sem outra alocação identificada e exige confirmação de liquidez. Fonte duplicada não é nova
+  origem; metas sem origem exigem confirmação separada. Erro de valor aparece no `Field`; conflito
+  ou resultado incerto fica acima da rolagem. A tentativa incerta conserva os mesmos dados e
+  bloqueia edição e fechamento até ser conferida; atualização externa não substitui o snapshot.
+- **Privacidade dos derivados:** ocultação cobre dinheiro em leitura, cobertura, disponibilidade,
+  frases e labels acessíveis; a barra de progresso some. Campos monetários em edição continuam
+  mostrando o próprio valor, com o ajuste de numerais compartilhado.
+
+**The Reserve Is Existing Money Rule.** Reserva é alocação com lastro do dinheiro existente; base desconhecida permanece desconhecida e privacidade inclui os derivados.
+
 ## Do's and Don'ts
 
 ### Do:
+- **Do** manter sessão e folha de edição fora dos painéis adaptativos, com snapshot por abertura e feedback de resultado incerto acima da rolagem.
+- **Do** ajustar apenas os numerais do MoneyField ao espaço medido e manter Dynamic Type nos rótulos, dicas e controles.
+- **Do** distinguir reserva com lastro, cobertura e base explicável, com privacidade também nos derivados e na acessibilidade.
 - **Do** reutilizar os controles de classificação e os grupos de `ListFilters`, com escolhas independentes, geometria natural e seleção aplicada separada do rascunho.
 - **Do** preservar o snapshot ao editar e oferecer “Usar padrão da categoria” como ação explícita no rascunho; aplicação histórica da categoria revela alcance e período.
 - **Do** combinar opções de classificação por OR no grupo e AND entre grupos, restringir o recorte a gastos, tratar “Não informado” como NULL e ocultar totais globais no recorte; link inválido oferece “Ajustar filtros” e cancelar mantém o bloqueio.
@@ -405,6 +451,8 @@ primitivos; nenhuma paleta, fonte ou superfície de destaque nova.
   React, e `useTheme()` devolve a paleta errada sem erro nenhum.
 
 ### Don't:
+- **Don't** somar reserva como novo ativo, aporte ou transferência nem converter base desconhecida em zero.
+- **Don't** trocar a apresentação nativa durante uma abertura do Sheet nem substituir o Switch nativo por um controle paralelo.
 - **Don't** substituir “Não classificar” manual por padrão de categoria nem apresentar link de classificação inválida como falha de carregamento.
 - **Don't** colocar legenda embaixo de botão nem parágrafo explicativo em tela de conferir.
 - **Don't** usar cor como decoração — nem a do banco fora do cartão, nem roxo como accent.

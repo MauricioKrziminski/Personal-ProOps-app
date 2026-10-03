@@ -58,7 +58,7 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any } = {}) {
+function screen(file: string, options: { reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any } = {}) {
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
@@ -375,6 +375,7 @@ function screen(file: string, options: { categoryDefaultsCached?: boolean; categ
     createContext: (valor: unknown) => ({ valor, Provider: 'Provider' }),
     useContext: (ctx: any) => ctx?.valor,
   };
+  let reserveCancellationConstructor: any;
   const load = (path: string): any => {
     const module = { exports: {} as any };
     const sourcePath = path === 'src/components/finance/categoria-sheet.tsx'
@@ -442,6 +443,20 @@ function screen(file: string, options: { categoryDefaultsCached?: boolean; categ
       if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, Redirect: 'Redirect', useLocalSearchParams: () => options.params ?? (file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), useFocusEffect: () => {}, useIsFocused: () => true, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }), dismissAll: () => navigations.push({ dismissAll: true }), dismiss: (n?: number) => navigations.push({ dismiss: n ?? 1 }), canDismiss: () => !options.primeiraDaPilha, canGoBack: () => !options.primeiraDaPilha } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
+      if (name === '@/hooks/use-emergency-reserve') return {
+        useEmergencyReserve: () => inRealm({ ...query, data: options.reserveState, isPending: Boolean(options.reservePending), isSuccess: !options.reservePending && !options.reserveError, isError: Boolean(options.reserveError), refetch: async () => { refetches.push('emergency-reserve'); } }),
+        useSaveEmergencyReserve: () => ({ ...mutation('saveEmergencyReserve'),
+          isPending: (emCurso.saveEmergencyReserve ?? 0) > 0 || (emCurso.resolveEmergencyReserve ?? 0) > 0,
+          isResolving: (emCurso.resolveEmergencyReserve ?? 0) > 0,
+          resolveAsync: mutation('resolveEmergencyReserve').mutateAsync,
+          unconfirmedInput: options.reserveUnconfirmed ?? null }),
+      };
+      if (name === '@/components/finance/emergency-reserve-section') return load('src/components/finance/emergency-reserve-section.tsx');
+      if (name === '@/lib/emergency-reserve') {
+        const domain = load('src/lib/emergency-reserve.ts');
+        reserveCancellationConstructor = domain.EmergencyReserveAttemptCancelledError;
+        return domain;
+      }
       if (name === '@/hooks/use-expense-classification') return load('src/hooks/use-expense-classification.ts');
       if (name === '@/components/finance/origin-creation-host') return { OriginCreationHost: ({ children }: any) => children, OriginAccountPicker: 'AccountPicker' };
       if (name === '@/lib/payment-method') return load('src/lib/payment-method.ts');
@@ -654,7 +669,7 @@ function screen(file: string, options: { categoryDefaultsCached?: boolean; categ
     if (node.type === 'FinanceAnalysisPanes') visit(node.props.compact);
     // `CamposDaSerie` é um grupo de campos sem hook: desenhado aqui, a tela é a que a pessoa vê.
     // Os corpos (`FormularioDaSerie`, `FormularioDaDivida`) têm hooks: eles rodam depois dos da tela, na mesma ordem a cada render.
-    if (typeof node.type === 'function' && ['Controller', 'AccountFormFields', 'CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida', 'TrashEmptyState', 'FilterBar', 'ExpenseClassificationControls'].includes(node.type.name)) visit(node.type(node.props));
+    if (typeof node.type === 'function' && ['Controller', 'AccountFormFields', 'CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida', 'TrashEmptyState', 'FilterBar', 'ExpenseClassificationControls', 'EmergencyReserveSection', 'EmergencyReserveSheet', 'EmergencyReserveEditor'].includes(node.type.name)) visit(node.type(node.props));
     // No celular o `AdaptivePanes` desenha o slot de uma coluna só (Pastas, Recorrentes…).
     if (node.type === 'AdaptivePanes') visit(node.props.singlePaneContent ?? node.props.main);
     visit(node.props.ListHeaderComponent);
@@ -706,6 +721,7 @@ function screen(file: string, options: { categoryDefaultsCached?: boolean; categ
   return {
     writes, pedidos, toasts, preferenciasGravadas, pedidosDeLimite, avisos, confirmations, actions, navigations, refetches, gates, rulerViews, transactionQueries, expectedQueries, summaryQueries, categoryDefaultsQueries,
     drafts: () => forecastDrafts,
+    cancelledReserveAttempt: () => new reserveCancellationConstructor(),
     simulacoes,
     nodes: () => nodes,
     animacoes: () => animacoes,
@@ -6064,4 +6080,447 @@ test('F06 extracted controls preserve labels, options and whitelist each indepen
   assert.deepEqual(patterns, [null, 'fixed', 'variable']); assert.deepEqual(necessities, []);
   for (const id of [null, 'essential', 'discretionary']) selects[1].onChange(id);
   assert.deepEqual(necessities, [null, 'essential', 'discretionary']);
+});
+
+
+const f07Workspace = '10000000-0000-4000-8000-000000000001';
+const f07Account = '10000000-0000-4000-8000-000000000002';
+function f07State(configured = false): any {
+  return {
+    workspace_id: f07Workspace, workspace_name: 'QA reserva', as_of: '2026-10-03',
+    config: configured ? { base_mode: 'manual', manual_monthly_cents: 10000, target_months: 6, edit_revision: 4 } : null,
+    sources: [{ kind: 'account', id: f07Account, name: 'Conta QA reserva', eligible: true, archived: false,
+      available_cents: 100000, other_allocated_cents: 0, allocated_cents: configured ? 30000 : 0,
+      effective_cents: configured ? 30000 : 0, liquidity_confirmed: configured, valuation_date: null }],
+    months: ['2026-07-01','2026-08-01','2026-09-01'].map(month => ({ month, expense_count: 0,
+      essential_cents: 0, unclassified_count: 0, unclassified_cents: 0, fingerprint: 'a'.repeat(32), reviewed: false })),
+    unassigned_goals_cents: 0,
+  };
+}
+const f07Screen = 'src/app/finance/net-worth.tsx';
+test('F07: reserva nova explica configuração, base zero não salva e cancelamento não cria saldo', () => {
+  const ui = screen(f07Screen, { reserveState: f07State() });
+  ui.press('Configurar reserva');
+  assert.equal(ui.button('Salvar reserva').props.disabled, true);
+  ui.fill('Essenciais por mês', 10000);
+  ui.press('Salvar reserva');
+  assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'saveEmergencyReserve', value: {
+    workspace_id: f07Workspace, expected_revision: null, base_mode: 'manual', manual_monthly_cents: 10000,
+    target_months: 6, unassigned_goals_ack_cents: 0, allocations: [], reviewed_months: [],
+  } });
+  const cancel = screen(f07Screen, { reserveState: f07State() });
+  cancel.press('Configurar reserva'); cancel.fill('Essenciais por mês', 10000);
+  const header = cancel.nodes().find(n => n.type === 'TaskHeader' && n.props.title === 'Reserva de emergência');
+  assert.ok(header);cancel.interact(() => header.props.onClose());assert.equal(cancel.writes.length,0);
+});
+test('F07: erro de reserva com cache anterior oculta cobertura e refaz somente sua consulta', async () => {
+  const ui = screen(f07Screen, { reserveState: f07State(true), reserveError: true });
+  assert.equal(ui.nodes().filter(n => n.type === 'Money' && n.props.cents === 30000).length,0);
+  const error = ui.nodes().find(n => n.type === 'ErrorCard');assert.ok(error);
+  await error.props.onRetry();assert.ok(ui.refetches.includes('emergency-reserve'));
+  assert.equal(ui.nodes().some(n => n.type === 'Button' && n.props.label === 'Editar reserva'),false);
+});
+test('F07: atualização em background não substitui revisão e valores do editor aberto', () => {
+  const state = f07State(true);const ui = screen(f07Screen,{reserveState:state});
+  ui.press('Editar reserva');ui.fill('Essenciais por mês',12000);
+  state.config.manual_monthly_cents=19000;state.config.edit_revision=5;
+  ui.interact(() => {});ui.press('Salvar reserva');
+  assert.equal(ui.writes.at(-1)?.value.expected_revision,4);
+  assert.equal(ui.writes.at(-1)?.value.manual_monthly_cents,12000);
+  assert.equal(ui.writes.at(-1)?.value.allocations[0].amount_cents,30000);
+});
+
+const f07Header = (ui: ReturnType<typeof screen>) => {
+  const header = ui.nodes().find(n => n.type === 'TaskHeader' && n.props.title === 'Reserva de emergência');
+  assert.ok(header, 'editor real está aberto');
+  return header;
+};
+const f07Flush = async (ui: ReturnType<typeof screen>) => {
+  await new Promise<void>(resolve => setImmediate(resolve));
+  ui.interact(() => {});
+};
+const f07Select = (ui: ReturnType<typeof screen>, label: string) => {
+  const field = ui.nodes().find(n => n.type === 'Field' && n.props.label === label);
+  assert.ok(field, `campo real ${label}`);
+  return field.props.children;
+};
+const f07Toggle = (ui: ReturnType<typeof screen>, label: string, value: boolean) => {
+  ui.interact(nodes => {
+    const control = nodes.find(n => n.type === 'SwitchRow' && n.props.label === label);
+    assert.ok(control, `confirmação real ${label}`);
+    control.props.onValueChange(value);
+  });
+};
+const f07AddSource = (ui: ReturnType<typeof screen>, kind: string, id: string) => {
+  const picker = f07Select(ui, 'Adicionar fonte');
+  const option = picker.props.options.find((item: any) => item.id === `${kind}:${id}`);
+  assert.ok(option, 'somente fonte oferecida pelo seletor é escolhida');
+  ui.interact(() => picker.props.onChange(option.id));
+  ui.press('Adicionar à reserva');
+};
+const f07Asset = '10000000-0000-4000-8000-000000000003';
+const f07Section = (state: any, concealed = false) => {
+  const ui = screen(f07Screen, { reserveState: state, concealed });
+  return { ...ui, nodes: () => {
+    // Inspect only the real reserve subtree/modal: the incumbent health bar is unrelated.
+    const nodes = ui.nodes();
+    const start = nodes.findIndex(n => n.type?.name === 'EmergencyReserveSection');
+    const end = nodes.findIndex((n, i) => i > start && n.type === 'Button'
+      && ['Editar reserva', 'Configurar reserva'].includes(n.props.label));
+    const modal = nodes.findIndex(n => n.type?.name === 'EmergencyReserveSheet');
+    return [...nodes.slice(start, end + 1), ...nodes.slice(modal)];
+  } };
+};
+
+test('F07: conta e investimento separam só os valores escolhidos após confirmar disponibilidade', () => {
+  const state = f07State();
+  state.sources[0].other_allocated_cents = 40000;
+  state.sources.push({ kind: 'asset', id: f07Asset, name: 'Investimento QA', eligible: true, archived: false,
+    available_cents: 90000, other_allocated_cents: 10000, allocated_cents: 0, effective_cents: 0,
+    liquidity_confirmed: false, valuation_date: '2026-10-02' });
+  const ui = screen(f07Screen, { reserveState: state });
+  ui.press('Configurar reserva');
+  ui.fill('Essenciais por mês', 10000);
+  f07AddSource(ui, 'account', f07Account);
+  ui.fill('Separar em Conta QA reserva', 25000);
+  assert.equal(ui.button('Salvar reserva').props.disabled, true, 'valor sem liquidez confirmada ainda não salva');
+  f07Toggle(ui, 'Disponível para imprevistos em Conta QA reserva', true);
+  f07AddSource(ui, 'asset', f07Asset);
+  ui.fill('Separar em Investimento QA', 15000);
+  assert.equal(ui.button('Salvar reserva').props.disabled, true, 'investimento exige sua própria confirmação');
+  f07Toggle(ui, 'Disponível para imprevistos em Investimento QA', true);
+  ui.fill('Meses de proteção', 9);
+  ui.press('Salvar reserva');
+  assert.deepEqual(copia(ui.writes), [{ operation: 'saveEmergencyReserve', value: {
+    workspace_id: f07Workspace, expected_revision: null, base_mode: 'manual', manual_monthly_cents: 10000,
+    target_months: 9, unassigned_goals_ack_cents: 0, reviewed_months: [], allocations: [
+      { kind: 'account', id: f07Account, amount_cents: 25000, liquidity_confirmed: true },
+      { kind: 'asset', id: f07Asset, amount_cents: 15000, liquidity_confirmed: true },
+    ],
+  } }], 'grava somente vínculos parciais, sem criar gasto, transferência ou nova avaliação');
+  assert.equal(state.sources[0].available_cents, 100000, 'saldo da origem permanece intocado');
+  assert.equal(state.sources[1].available_cents, 90000, 'marcação do investimento permanece intocada');
+});
+
+test('F07: retirar disponibilidade confirmada bloqueia salvar sem alterar o valor digitado', () => {
+  const ui = screen(f07Screen, { reserveState: f07State(true) });
+  ui.press('Editar reserva');
+  assert.equal(ui.button('Salvar reserva').props.disabled, false);
+  f07Toggle(ui, 'Disponível para imprevistos em Conta QA reserva', false);
+  assert.equal(ui.button('Salvar reserva').props.disabled, true);
+  ui.interact(() => ui.button('Salvar reserva').props.onPress());
+  assert.equal(ui.writes.length, 0, 'handler também valida a disponibilidade');
+  assert.equal(f07Select(ui, 'Separar em Conta QA reserva').props.valueCents, 30000);
+  f07Toggle(ui, 'Disponível para imprevistos em Conta QA reserva', true);
+  assert.equal(ui.button('Salvar reserva').props.disabled, false);
+});
+
+test('F07: alocação acima do saldo livre explica limite e só libera ao corrigir o valor', () => {
+  const state = f07State(true);
+  state.sources[0].other_allocated_cents = 40000;
+  const ui = screen(f07Screen, { reserveState: state });
+  ui.press('Editar reserva');
+  ui.fill('Separar em Conta QA reserva', 60001);
+  const field = ui.nodes().find(n => n.type === 'Field' && n.props.label === 'Separar em Conta QA reserva');
+  assert.match(field.props.error, /ultrapassa.*disponível/i);
+  assert.equal(field.props.children.props.valueCents, 60001, 'valor monetário digitado não sofre ajuste silencioso');
+  assert.equal(ui.button('Salvar reserva').props.disabled, true);
+  ui.interact(() => ui.button('Salvar reserva').props.onPress());
+  assert.equal(ui.writes.length, 0);
+  ui.fill('Separar em Conta QA reserva', 60000);
+  assert.equal(ui.button('Salvar reserva').props.disabled, false);
+  ui.press('Salvar reserva');
+  assert.equal(ui.writes.at(-1)?.value.allocations[0].amount_cents, 60000);
+});
+
+test('F07: adicionar fonte exclui cartão, arquivada, saldo vazio, saldo comprometido e vínculo duplicado', () => {
+  const state = f07State(true);
+  state.sources.push(...[
+    { suffix: '003', name: 'Cartão QA', eligible: false, available_cents: 20000 },
+    { suffix: '004', name: 'Arquivada QA', archived: true, available_cents: 20000 },
+    { suffix: '005', name: 'Vazia QA', available_cents: 0 },
+    { suffix: '006', name: 'Comprometida QA', available_cents: 20000, other_allocated_cents: 20000 },
+    { suffix: '007', name: 'Conta livre QA', available_cents: 20000 },
+  ].map(({ suffix, ...extra }) => ({ ...state.sources[0], id: `10000000-0000-4000-8000-000000000${suffix}`,
+    allocated_cents: 0, effective_cents: 0, liquidity_confirmed: false, other_allocated_cents: 0, ...extra })));
+  const ui = screen(f07Screen, { reserveState: state });
+  ui.press('Editar reserva');
+  assert.deepEqual(copia(f07Select(ui, 'Adicionar fonte').props.options.map((item: any) => item.label)), ['Conta livre QA']);
+  const freeOption = f07Select(ui, 'Adicionar fonte').props.options[0];
+  assert.match(freeOption.detail, /200[.,]00.*sem alocação identificada/);
+  assert.match(freeOption.detailHidden, /••••••.*sem alocação identificada/);
+  f07AddSource(ui, 'account', '10000000-0000-4000-8000-000000000007');
+  assert.deepEqual(copia(f07Select(ui, 'Adicionar fonte').props.options), [], 'segunda seleção não oferece a mesma origem');
+  assert.equal(ui.nodes().some(n => n.type === 'Button' && n.props.label === 'Adicionar à reserva'), false);
+});
+
+test('F07: retirar vínculo libera apenas a reserva e preserva conta e saldo existentes', () => {
+  const state = f07State(true);
+  const ui = screen(f07Screen, { reserveState: state });
+  ui.press('Editar reserva');
+  ui.press('Retirar vínculo de Conta QA reserva');
+  assert.equal(f07Select(ui, 'Adicionar fonte').props.options[0].id, `account:${f07Account}`);
+  assert.equal(ui.nodes().some(n => n.type === 'Field' && n.props.label === 'Separar em Conta QA reserva'), false);
+  ui.press('Salvar reserva');
+  assert.deepEqual(copia(ui.writes), [{ operation: 'saveEmergencyReserve', value: {
+    workspace_id: f07Workspace, expected_revision: 4, base_mode: 'manual', manual_monthly_cents: 10000,
+    target_months: 6, unassigned_goals_ack_cents: 0, allocations: [], reviewed_months: [],
+  } }]);
+  assert.equal(state.sources[0].allocated_cents, 30000, 'rascunho não altera cache ou ledger antes da confirmação');
+  assert.equal(state.sources[0].available_cents, 100000);
+});
+
+test('F07: histórico com gasto sem necessidade não oferece revisão nem envia mês como revisado', () => {
+  const state = f07State();
+  state.months[0] = { ...state.months[0], expense_count: 1, unclassified_count: 1, unclassified_cents: 8000 };
+  const ui = screen(f07Screen, { reserveState: state });
+  ui.press('Configurar reserva');
+  ui.interact(() => f07Select(ui, 'Base mensal').props.onChange('observed'));
+  const reviews = ui.nodes().filter(n => n.type === 'SwitchRow' && n.props.label.startsWith('Revisei '));
+  assert.equal(reviews.length, 2, 'mês sem classificação não pode ser marcado como revisado');
+  assert.ok(ui.nodes().some(n => n.type === 'ThemedText' && String(n.props.children).includes('gastos sem necessidade classificada')));
+  for (const control of reviews) f07Toggle(ui, control.props.label, true);
+  ui.press('Salvar reserva');
+  assert.deepEqual(copia(ui.writes.at(-1)?.value.reviewed_months), [
+    { month: '2026-08-01', fingerprint: 'a'.repeat(32) }, { month: '2026-09-01', fingerprint: 'a'.repeat(32) },
+  ]);
+  assert.equal(ui.writes.at(-1)?.value.manual_monthly_cents, null);
+});
+
+for (const scenario of ['revisão incompleta', 'base revisada zero', 'necessidade sem classificação'] as const) {
+  test(`F07: histórico com ${scenario} nunca afirma cobertura ou alvo coberto`, () => {
+    const state = f07State(true);
+    state.config.base_mode = 'observed'; state.config.manual_monthly_cents = null;
+    for (const month of state.months) month.reviewed = true;
+    if (scenario === 'revisão incompleta') {
+      state.months[0].reviewed = false; state.months[1].expense_count = 1; state.months[1].essential_cents = 12000;
+    }
+    if (scenario === 'necessidade sem classificação') {
+      state.months[0].reviewed = false; state.months[0].expense_count = 1;
+      state.months[0].unclassified_count = 1; state.months[0].unclassified_cents = 12000;
+    }
+    const ui = f07Section(state);
+    const coverage = ui.nodes().find(n => n.type === 'Row' && n.props.title === 'Cobertura');
+    assert.ok(coverage);
+    assert.equal(coverage.props.trailing.props.children, 'Base a definir');
+    assert.equal(ui.nodes().some(n => n.type === 'ProgressBar'), false);
+    assert.equal(ui.nodes().some(n => n.type === 'Row' && ['Alvo coberto', 'Falta para o alvo'].includes(n.props.title)), false);
+  });
+}
+
+test('F07: meta sem origem exige confirmação consciente e envia o total exato conferido', () => {
+  const state = f07State(true); state.unassigned_goals_cents = 45678;
+  const ui = screen(f07Screen, { reserveState: state });
+  ui.press('Editar reserva');
+  assert.equal(ui.button('Salvar reserva').props.disabled, true);
+  ui.interact(() => ui.button('Salvar reserva').props.onPress());
+  assert.equal(ui.writes.length, 0, 'metas legadas não são ignoradas pelo handler');
+  f07Toggle(ui, 'Estes valores não estão também nas metas sem origem', true);
+  assert.equal(ui.button('Salvar reserva').props.disabled, false);
+  ui.press('Salvar reserva');
+  assert.equal(ui.writes.at(-1)?.value.unassigned_goals_ack_cents, 45678);
+  assert.equal(ui.writes.length, 1);
+});
+
+test('F07: ocultar valores mascara cobertura, textos, acessibilidade e todos os Money reais da reserva', () => {
+  const state = f07State(true); state.sources[0].effective_cents = 15000; state.sources[0].available_cents = 15000;
+  state.unassigned_goals_cents = 45678;
+  const ui = f07Section(state, true);
+  ui.interact(nodes => nodes.find(n => n.type === 'Row' && n.props.title === 'Base e fontes').props.onPress());
+  const rows = ui.nodes().filter(n => n.type === 'Row');
+  const coverage = rows.find(n => n.props.title === 'Cobertura');
+  assert.equal(coverage.props.trailing.props.children, '••••••', 'meses derivados também são privados');
+  assert.equal(ui.nodes().some(n => n.type === 'ProgressBar'), false, 'barra não revela fração do alvo');
+  assert.match(rows.find(n => n.props.title === 'Separado para imprevistos').props.accessibilityLabel, /••••••/);
+  const source = rows.find(n => n.props.title === 'Conta QA reserva');
+  assert.match(source.props.subtitle, /••••••/);
+  assert.match(source.props.accessibilityLabel, /•••••• com lastro, •••••• separado/);
+  const moneyValues = rows.map(n => n.props.trailing).filter(n => n?.type === 'Money');
+  assert.ok(moneyValues.some(n => n.props.cents === 15000));
+  assert.ok(moneyValues.some(n => n.props.cents === 60000));
+  assert.ok(moneyValues.some(n => n.props.cents === 45000));
+  for (const money of moneyValues) {
+    const rendered = screen('src/components/ui/money.tsx', { componente: 'Money', concealed: true, props: money.props });
+    const text = rendered.nodes().find(n => n.type === 'ThemedText');
+    assert.equal(text.props.children, '••••••', 'valor atual ou derivado usa ocultação do primitivo real');
+  }
+  ui.press('Editar reserva');
+  const displayedText = ui.nodes().filter(n => n.type === 'ThemedText')
+    .map(n => [n.props.children].flat(Infinity).join('')).join(' ');
+  assert.match(displayedText, /metas têm •••••• sem origem/);
+  assert.match(ui.nodes().find(n => n.type === 'Field' && n.props.label === 'Separar em Conta QA reserva').props.hint, /••••••/);
+  assert.doesNotMatch(displayedText, /R\$/);
+});
+
+test('F07: salvar pendente impede fechamento, edição e segunda gravação antes da confirmação', async () => {
+  const ui = screen(f07Screen, { reserveState: f07State(true), segurarMutacoes: true });
+  ui.press('Editar reserva'); ui.fill('Essenciais por mês', 12000); ui.press('Salvar reserva');
+  assert.equal(ui.button('Salvar reserva').props.loading, true);
+  ui.interact(() => f07Header(ui).props.onClose());
+  ui.interact(nodes => nodes.find(n => n.type === 'Sheet' && n.props.visible).props.onClose());
+  ui.fill('Essenciais por mês', 18000);
+  ui.fill('Meses de proteção', 12);
+  ui.press('Retirar vínculo de Conta QA reserva');
+  assert.equal(f07Select(ui, 'Essenciais por mês').props.valueCents, 12000);
+  assert.equal(f07Select(ui, 'Meses de proteção').props.value, 6);
+  assert.ok(ui.nodes().some(n => n.type === 'Field' && n.props.label === 'Separar em Conta QA reserva'));
+  ui.interact(() => ui.button('Salvar reserva').props.onPress());
+  assert.equal(ui.writes.length, 1, 'guarda de intenção impede toque duplo');
+  (ui.pedidos.at(-1) as any).resolver({ workspace_id: f07Workspace, edit_revision: 5 });
+  await f07Flush(ui);
+  assert.equal(ui.nodes().some(n => n.type === 'Sheet' && n.props.visible), false);
+  assert.equal(ui.toasts.at(-1)?.tone, 'success');
+});
+
+test('F07: tentativa ambígua mantém editor travado e Confirmar tentativa reenvia entrada exata', async () => {
+  const options = { reserveState: f07State(true), segurarMutacoes: true, reserveUnconfirmed: null as any };
+  const ui = screen(f07Screen, options);
+  ui.press('Editar reserva'); ui.fill('Essenciais por mês', 12000); ui.press('Salvar reserva');
+  const original = ui.writes.at(-1)!.value;
+  options.reserveUnconfirmed = original;
+  (ui.pedidos.at(-1) as any).rejeitar(new Error('Conexão interrompida'));
+  await f07Flush(ui);
+  assert.equal(ui.button('Confirmar tentativa').props.disabled, false);
+  ui.interact(() => f07Header(ui).props.onClose());
+  ui.fill('Essenciais por mês', 18000);
+  ui.press('Retirar vínculo de Conta QA reserva');
+  assert.equal(f07Select(ui, 'Essenciais por mês').props.valueCents, 12000);
+  assert.ok(ui.nodes().some(n => n.type === 'ThemedText' && /mesmos dados antes de editar ou fechar/.test(String(n.props.children))));
+  options.reserveState.config.edit_revision = 5; options.reserveState.config.manual_monthly_cents = 19000;
+  ui.interact(() => {});
+  ui.press('Confirmar tentativa');
+  assert.equal(ui.writes.length, 2);
+  assert.equal(ui.writes[1].value, original, 'mesma identidade recebida do hook, sem reconstruir intenção');
+  assert.deepEqual(copia(ui.writes[1].value), {
+    workspace_id: f07Workspace, expected_revision: 4, base_mode: 'manual', manual_monthly_cents: 12000,
+    target_months: 6, unassigned_goals_ack_cents: 0, reviewed_months: [],
+    allocations: [{ kind: 'account', id: f07Account, amount_cents: 30000, liquidity_confirmed: true }],
+  });
+  options.reserveUnconfirmed = null;
+  (ui.pedidos.at(-1) as any).resolver({ workspace_id: f07Workspace, edit_revision: 5 });
+  await f07Flush(ui);
+  assert.equal(ui.nodes().some(n => n.type === 'Sheet' && n.props.visible), false);
+});
+
+test('F07: cancelar rascunho de fontes e reabrir descarta mudanças sem qualquer mutação', () => {
+  const state = f07State(true);
+  const ui = screen(f07Screen, { reserveState: state });
+  ui.press('Editar reserva'); ui.fill('Essenciais por mês', 12000);
+  ui.fill('Separar em Conta QA reserva', 25000); ui.fill('Meses de proteção', 9);
+  ui.interact(() => f07Header(ui).props.onClose());
+  assert.equal(ui.writes.length, 0);
+  ui.press('Editar reserva');
+  assert.equal(f07Select(ui, 'Essenciais por mês').props.valueCents, 10000);
+  assert.equal(f07Select(ui, 'Separar em Conta QA reserva').props.valueCents, 30000);
+  assert.equal(f07Select(ui, 'Meses de proteção').props.value, 6);
+  assert.equal(ui.writes.length, 0);
+});
+test('F07: conflito HTTP PT409 libera fechamento e orienta reabrir com revisão atual', async () => {
+  const state = f07State(true);
+  const ui = screen(f07Screen, { reserveState: state, segurarMutacoes: true });
+  ui.press('Editar reserva');
+  ui.fill('Essenciais por mês', 12000);
+  ui.press('Salvar reserva');
+  (ui.pedidos.at(-1) as any).rejeitar({ code: 'PT409', message: 'Reserva alterada; confira novamente' });
+  await f07Flush(ui);
+  const alert = ui.nodes().find(n => n.props.accessibilityRole === 'alert');
+  assert.ok(alert, 'conflito conhecido mostra orientação de recuperação');
+  const scroll = ui.nodes().find(n => n.type === 'SheetScroll');
+  assert.ok(scroll);
+  assert.equal([scroll.props.children].flat(Infinity).includes(alert), false,
+    'a recuperação de uma falha global permanece visível quando o formulário está rolado');
+  assert.match(String(alert.props.children), /feche.*abra novamente/i,
+    'mensagem precisa explicar como recuperar a revisão, sem deixar tentativa ambígua');
+  ui.interact(() => f07Header(ui).props.onClose());
+  assert.equal(ui.nodes().some(n => n.type === 'Sheet' && n.props.visible), false);
+  state.config.edit_revision = 5;
+  state.config.manual_monthly_cents = 19000;
+  ui.interact(() => {}); // A changed query result renders before its new open handler is pressed.
+  ui.press('Editar reserva');
+  ui.press('Salvar reserva');
+  assert.equal(ui.writes.at(-1)?.value.expected_revision, 5);
+  assert.equal(ui.writes.at(-1)?.value.manual_monthly_cents, 19000);
+  (ui.pedidos.at(-1) as any).resolver({ workspace_id: f07Workspace, edit_revision: 6 });
+  await f07Flush(ui);
+});
+
+test('F07: a folha de edição pertence à tela, fora dos painéis que desmontam ao redimensionar', () => {
+  const ui = screen(f07Screen, { reserveState: f07State(true) });
+  const root = ui.nodes().find(n => n.type === 'Screen');
+  assert.ok(root);
+  assert.ok([root.props.children].flat(Infinity).some(n => n?.type?.name === 'EmergencyReserveSheet'),
+    'a folha e seu rascunho não podem pertencer aos ramos alternativos de FinanceAnalysisPanes');
+});
+
+test('F07: cobertura conserva décimos inteiros e não arredonda proteção para cima', () => {
+  const state = f07State(true);
+  state.config.manual_monthly_cents = 112000;
+  const ui = screen(f07Screen, { reserveState: state });
+  const coverage = ui.nodes().find(n => n.type === 'Row' && n.props.title === 'Cobertura');
+  assert.equal(coverage.props.trailing.props.children, '0,2 meses');
+  state.config.manual_monthly_cents = 1000000;
+  ui.interact(() => {});
+  const low = ui.nodes().find(n => n.type === 'Row' && n.props.title === 'Cobertura');
+  assert.equal(low.props.trailing.props.children, 'Menos de 0,1 mês');
+});
+
+test('F07: falha de rede explica recuperação sem expor endereço e exceção nativa', async () => {
+  const options = { reserveState: f07State(true), segurarMutacoes: true, reserveUnconfirmed: null as any };
+  const ui = screen(f07Screen, options);
+  ui.press('Editar reserva'); ui.press('Salvar reserva');
+  options.reserveUnconfirmed = ui.writes.at(-1)!.value;
+  (ui.pedidos.at(-1) as any).rejeitar(new Error('Error: fetch failed: java.net.UnknownHostException: staging.example.invalid'));
+  await f07Flush(ui);
+  const text = String(ui.nodes().find(n => n.props.accessibilityRole === 'alert')?.props.children);
+  assert.match(text, /conexão.*tente novamente/i);
+  assert.doesNotMatch(text, /java|Exception|staging|fetch|Error:/);
+  assert.ok(ui.button('Conferir e encerrar tentativa'));
+});
+
+test('F07: conferência terminal permite encerrar sem salvar e só fecha após comprovante', async () => {
+  const options = { reserveState: f07State(true), segurarMutacoes: true, reserveUnconfirmed: null as any };
+  const ui = screen(f07Screen, options);
+  ui.press('Editar reserva'); ui.fill('Essenciais por mês', 12000); ui.press('Salvar reserva');
+  options.reserveUnconfirmed = ui.writes.at(-1)!.value;
+  (ui.pedidos.at(-1) as any).rejeitar({ code: '22023', message: 'Metas sem origem mudaram; confira novamente' });
+  await f07Flush(ui);
+  ui.press('Conferir e encerrar tentativa');
+  assert.equal(ui.writes.at(-1)?.operation, 'resolveEmergencyReserve');
+  assert.equal(ui.button('Conferir e encerrar tentativa').props.loading, true,
+    'a ação mantém o indicador durante a conferência, mesmo após limpar o erro anterior');
+  ui.interact(() => f07Header(ui).props.onClose());
+  ui.fill('Essenciais por mês', 18000);
+  assert.equal(f07Select(ui, 'Essenciais por mês').props.valueCents, 12000);
+  ui.interact(() => ui.button('Confirmar tentativa').props.onPress());
+  assert.equal(ui.writes.length, 2, 'não envia save enquanto confere a tentativa');
+  options.reserveUnconfirmed = null;
+  (ui.pedidos.at(-1) as any).rejeitar(ui.cancelledReserveAttempt());
+  await f07Flush(ui);
+  assert.equal(ui.nodes().some(n => n.type === 'Sheet' && n.props.visible), false);
+  assert.equal(ui.toasts.at(-1)?.tone, 'info');
+  assert.match(String(ui.toasts.at(-1)?.message), /encerrada sem salvar/i);
+  ui.press('Editar reserva');
+  assert.equal(f07Select(ui, 'Essenciais por mês').props.valueCents, 10000);
+  assert.equal(ui.writes.length, 2);
+});
+
+test('F07: conferir tentativa já salva recupera sucesso e falha de conferência mantém rascunho', async () => {
+  const options = { reserveState: f07State(true), segurarMutacoes: true, reserveUnconfirmed: null as any };
+  const ui = screen(f07Screen, options);
+  ui.press('Editar reserva'); ui.press('Salvar reserva');
+  options.reserveUnconfirmed = ui.writes.at(-1)!.value;
+  (ui.pedidos.at(-1) as any).rejeitar(new Error('response lost'));
+  await f07Flush(ui);
+  ui.press('Conferir e encerrar tentativa');
+  (ui.pedidos.at(-1) as any).rejeitar(new Error('resolution response lost'));
+  await f07Flush(ui);
+  ui.interact(() => f07Header(ui).props.onClose());
+  assert.ok(ui.nodes().some(n => n.type === 'Sheet' && n.props.visible));
+  ui.press('Conferir e encerrar tentativa');
+  options.reserveUnconfirmed = null;
+  (ui.pedidos.at(-1) as any).resolver({ workspace_id: f07Workspace, edit_revision: 5 });
+  await f07Flush(ui);
+  assert.equal(ui.nodes().some(n => n.type === 'Sheet' && n.props.visible), false);
+  assert.equal(ui.toasts.at(-1)?.tone, 'success');
+  assert.equal(ui.writes.filter(w => w.operation === 'saveEmergencyReserve').length, 1);
 });

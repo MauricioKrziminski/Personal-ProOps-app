@@ -1,5 +1,5 @@
 import { useIsFocused } from 'expo-router';
-import { createContext, useContext, useEffect } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import {
   Modal,
   Platform,
@@ -158,7 +158,17 @@ export function Sheet({
   const { width, height } = useWindowDimensions();
   const focused = useIsFocused();
   const tablet = classifyWindow(width) !== 'compact';
-  const iosTablet = Platform.OS === 'ios' && tablet;
+  const modalVisible = visible && focused;
+  const [presentation, setPresentation] = useState({ visible: modalVisible, tablet });
+  // No Android, trocar animationType recria o Dialog nativo. A apresentação pertence à
+  // abertura, não à largura de cada render: só a próxima abertura adota outro tipo de janela.
+  // Ajustar no render evita abrir primeiro com a apresentação antiga e recriá-la num efeito.
+  if (presentation.visible !== modalVisible || (!modalVisible && presentation.tablet !== tablet)) {
+    setPresentation({ visible: modalVisible, tablet });
+  }
+  const iosTablet = Platform.OS === 'ios' && presentation.tablet;
+  const androidTabletPresentation = Platform.OS === 'android' && presentation.tablet;
+  // Transparência atualiza as flags do Dialog existente, sem recriá-lo. Acompanha o fundo.
   const androidTablet = Platform.OS === 'android' && tablet;
   const insets = useSafeAreaInsets();
   const frame = tabletSheetFrame(width, height, insets);
@@ -173,9 +183,9 @@ export function Sheet({
 
   return (
     <Modal
-      visible={visible && focused}
-      animationType={androidTablet ? 'fade' : 'slide'}
-      presentationStyle={iosTablet ? 'formSheet' : androidTablet ? 'overFullScreen' : 'pageSheet'}
+      visible={modalVisible}
+      animationType={androidTabletPresentation ? 'fade' : 'slide'}
+      presentationStyle={iosTablet ? 'formSheet' : androidTabletPresentation ? 'overFullScreen' : 'pageSheet'}
       transparent={androidTablet}
       supportedOrientations={iosTablet ? ['portrait', 'landscape'] : undefined}
       onRequestClose={onClose}>
@@ -183,59 +193,50 @@ export function Sheet({
       <GestureHandlerRootView style={styles.raizDoGesto}>
         {/* Uma folha aberta de dentro do formulário em tela volta a ser folha. */}
         <FormularioEmTela.Provider value={false}>
-        <AbaixoDaFolha.Provider value={abaixo}>
-        {androidTablet ? (
-        <View style={[styles.raizDoGesto, { backgroundColor: theme.overlay }]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Fechar janela"
-            onPress={onClose}
-            style={StyleSheet.absoluteFill}
-          />
-          <View
-            pointerEvents="box-none"
-            style={[
-              styles.dialogHost,
-              {
-                paddingTop: insets.top + Space.lg,
-                paddingBottom: insets.bottom + Space.lg,
-                paddingLeft: insets.left + Space.lg,
-                paddingRight: insets.right + Space.lg,
-              },
-            ]}>
-          <TabletSheetContext.Provider value>
-            <View
-              accessibilityViewIsModal
-              style={[
-                styles.dialogPanel,
-                {
-                  width: frame.width,
-                  maxHeight: frame.height,
-                  backgroundColor: theme.groupedBackground,
-                },
-              ]}>
-              {children}
-              <ToastOutlet />
+          <AbaixoDaFolha.Provider value={abaixo}>
+            {/* A moldura adapta o layout sem trocar a árvore que possui o formulário. */}
+            <View style={[styles.raizDoGesto, androidTablet && { backgroundColor: theme.overlay }]}>
+              {androidTablet && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Fechar janela"
+                  onPress={onClose}
+                  style={StyleSheet.absoluteFill}
+                />
+              )}
+              <View
+                pointerEvents={androidTablet ? 'box-none' : undefined}
+                style={androidTablet ? [
+                  styles.dialogHost,
+                  {
+                    paddingTop: insets.top + Space.lg,
+                    paddingBottom: insets.bottom + Space.lg,
+                    paddingLeft: insets.left + Space.lg,
+                    paddingRight: insets.right + Space.lg,
+                  },
+                ] : styles.raizDoGesto}>
+                <TabletSheetContext.Provider value={androidTablet}>
+                  <View
+                    accessibilityViewIsModal={androidTablet || undefined}
+                    style={[
+                      androidTablet ? styles.dialogPanel : styles.sheet,
+                      { backgroundColor: theme.groupedBackground },
+                      androidTablet ? {
+                        width: frame.width,
+                        maxHeight: frame.height,
+                      } : {
+                        paddingBottom: iosTablet ? 0 : insets.bottom,
+                        paddingLeft: iosTablet ? 0 : insets.left,
+                        paddingRight: iosTablet ? 0 : insets.right,
+                      },
+                    ]}>
+                    {children}
+                    <ToastOutlet />
+                  </View>
+                </TabletSheetContext.Provider>
+              </View>
             </View>
-          </TabletSheetContext.Provider>
-          </View>
-        </View>
-      ) : (
-        <View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: theme.groupedBackground,
-              paddingBottom: iosTablet ? 0 : insets.bottom,
-              paddingLeft: iosTablet ? 0 : insets.left,
-              paddingRight: iosTablet ? 0 : insets.right,
-            },
-          ]}>
-          {children}
-          <ToastOutlet />
-        </View>
-        )}
-        </AbaixoDaFolha.Provider>
+          </AbaixoDaFolha.Provider>
         </FormularioEmTela.Provider>
       </GestureHandlerRootView>
     </Modal>

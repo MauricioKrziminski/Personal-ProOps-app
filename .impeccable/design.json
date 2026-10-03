@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-17T03:22:01.179432+00:00",
+  "generatedAt": "2026-10-03T14:47:18.593044+00:00",
   "title": "Design System: Personal ProOps app",
   "extensions": {
     "colorMeta": {
@@ -142,6 +142,13 @@
       "description": "Section opaca do kit Suave, Row com rótulo antes do valor e footnote tabular; Note para contexto e Button secundário pequeno para recuperação e cronograma. Saldo atual, previsto com horizonte e limite são distintos; limite não cadastrado, histórico a revisar e indisponibilidade não viram zero. Entrada e juros separados; datas, histórico informado e estimativas vêm do cronograma retornado. Revelação de seis registros, mais seis por ação, com recorte e “Nada foi gravado” explícitos. Loading, falha/retry e troca de identidade retiram números antigos sem alterar o rascunho. Presenca/TrocaSuave usam o movimento do kit e Reduce Motion, sem contador de dinheiro; privacidade também cobre parcelas, acessibilidade e camadas retidas. Construído para criação dos quatro comandos e edição avulsa; edições vinculadas e conversões não têm prévia numérica de criação. Snippet abaixo é tradução estática do estado oculto em material opaco, não reprodução do Liquid Glass nativo ou da animação.",
       "html": "<section class=\"ds-f04\"><h3 class=\"ds-f04-heading\">Ao salvar</h3><div class=\"ds-f04-group\"><div class=\"ds-f04-row\"><div class=\"ds-f04-title\">Pagamento</div><div class=\"ds-f04-detail\">•••••• · Pago em 02/10/2026</div></div><div class=\"ds-f04-row\"><div class=\"ds-f04-title\">Conta de pagamento</div><div class=\"ds-f04-detail\">Saldo atual: •••••• → ••••••</div></div><div class=\"ds-f04-notice\"><button class=\"ds-f04-button\" type=\"button\">Ver cronograma · 3 registros</button><p class=\"ds-f04-note\">Prévia do registro. Nada foi gravado.</p></div></div></section>",
       "css": ".ds-f04{color:#0B0B0C;font-family:\"Plus Jakarta Sans\",sans-serif}.ds-f04-heading{font-size:14px;line-height:19px;font-weight:600;letter-spacing:-.2px;margin:0 16px 12px}.ds-f04-group{background:#FFFFFF;border:1px solid rgba(11,11,12,.06);border-radius:18px;overflow:hidden}.ds-f04-row{padding:12px 16px;min-height:44px}.ds-f04-title{font-size:16px;line-height:23px;font-weight:400;letter-spacing:-.1px}.ds-f04-detail{font-size:13px;line-height:18px;font-weight:400;color:#6B6B70;font-variant-numeric:tabular-nums;margin-top:2px;white-space:pre-line}.ds-f04-notice{padding:16px;display:flex;flex-direction:column;align-items:flex-start;gap:12px}.ds-f04-button{background:#E8E7E3;color:#0B0B0C;border:none;border-radius:999px;min-height:36px;padding:8px 16px;font:500 12px/16px \"Plus Jakarta Sans\",sans-serif}.ds-f04-button:hover{background:#DDDCD7}.ds-f04-button:focus-visible{outline:1.5px solid #0B0B0C;outline-offset:3px}.ds-f04-button:active{transform:scale(.96)}.ds-f04-note{margin:0;color:#6B6B70;font-size:13px;line-height:18px;font-weight:400}@media(prefers-reduced-motion:reduce){.ds-f04-button:active{transform:none}}"
+    },
+    {
+      "name": "Reserva de emergência (F07)",
+      "kind": "custom",
+      "description": "Section e Row de Papel e Tinta distinguem reserva com lastro, cobertura e base explicável. Detalhes revelam fontes e meses; desconhecido permanece desconhecido e a privacidade inclui derivados. Folha compartilhada conserva sessão e snapshot fora dos painéis adaptativos, feedback acima da rolagem e apresentação nativa por abertura. MoneyField ajusta só numerais ao espaço medido; rótulos e dicas mantêm Dynamic Type. SwitchRow conserva Switch nativo, com tints dos tokens somente no Android. Snippet traduz apenas a leitura estática oculta em tema claro; não reproduz a folha nativa, animação ou operação financeira.",
+      "html": "<section class=\"ds-f07\"><h3 class=\"ds-f07-heading\">Reserva de emergência</h3><div class=\"ds-f07-group\"><div class=\"ds-f07-row\"><span class=\"ds-f07-title\">Separado para imprevistos</span><span class=\"ds-f07-value\">••••••</span></div><div class=\"ds-f07-row\"><span class=\"ds-f07-title\">Cobertura</span><span class=\"ds-f07-value\">••••••</span><p class=\"ds-f07-note\">Essenciais mensais informados por você.</p></div><button class=\"ds-f07-detail\" type=\"button\" aria-expanded=\"false\">Base e fontes</button></div></section>",
+      "css": ".ds-f07{color:#0B0B0C;font-family:\"Plus Jakarta Sans\",sans-serif}.ds-f07-heading{font-size:14px;line-height:19px;font-weight:600;letter-spacing:-.2px;margin:0 16px 12px}.ds-f07-group{background:#FFFFFF;border:1px solid rgba(11,11,12,.06);border-radius:18px;overflow:hidden}.ds-f07-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:2px 12px;padding:12px 16px;min-height:44px}.ds-f07-title{font-size:16px;line-height:23px;font-weight:400;letter-spacing:-.1px}.ds-f07-value{font-size:13px;line-height:18px;font-variant-numeric:tabular-nums;color:#6B6B70}.ds-f07-note{flex-basis:100%;margin:0;font-size:13px;line-height:18px;color:#6B6B70}.ds-f07-detail{display:block;width:100%;text-align:left;background:#FFFFFF;color:#0B0B0C;border:0;min-height:44px;padding:12px 16px;font:400 16px/23px \"Plus Jakarta Sans\",sans-serif}.ds-f07-detail:hover{background:#E8E7E3}.ds-f07-detail:focus-visible{outline:1.5px solid #0B0B0C;outline-offset:-3px}.ds-f07-detail:active{background:#DDDCD7}"
     }
   ],
   "narrative": {
@@ -190,6 +197,21 @@
         "name": "The Available Reveal Rule",
         "body": "Revelar campos interativos disponibiliza geometria natural e toque no mesmo render; o movimento só acompanha o estado.",
         "section": "components"
+      },
+      {
+        "name": "The Measured Numerals Rule",
+        "body": "Ajustar dinheiro em edição limita-se aos numerais e ao espaço medido; rótulos e dicas conservam a escala de fonte solicitada.",
+        "section": "components"
+      },
+      {
+        "name": "The Stable Editing Session Rule",
+        "body": "Resize e rotação adaptam a moldura; a sessão de edição e a apresentação nativa pertencem à abertura, fora dos ramos adaptativos.",
+        "section": "components"
+      },
+      {
+        "name": "The Reserve Is Existing Money Rule",
+        "body": "Reserva é alocação com lastro do dinheiro existente; base desconhecida permanece desconhecida e privacidade inclui os derivados.",
+        "section": "components"
       }
     ],
     "dos": [
@@ -203,7 +225,10 @@
       "Do usar `useBRL` em frases de leitura e labels monetários para manter a mesma ocultação do valor visível.",
       "Do reutilizar os controles de classificação e os grupos de `ListFilters`, com escolhas independentes, geometria natural e seleção aplicada separada do rascunho.",
       "Do preservar o snapshot ao editar e oferecer “Usar padrão da categoria” como ação explícita no rascunho; aplicação histórica da categoria revela alcance e período.",
-      "Do combinar opções de classificação por OR no grupo e AND entre grupos, restringir o recorte a gastos, tratar “Não informado” como NULL e ocultar totais globais no recorte; link inválido oferece “Ajustar filtros” e cancelar mantém o bloqueio."
+      "Do combinar opções de classificação por OR no grupo e AND entre grupos, restringir o recorte a gastos, tratar “Não informado” como NULL e ocultar totais globais no recorte; link inválido oferece “Ajustar filtros” e cancelar mantém o bloqueio.",
+      "Do manter sessão e folha de edição fora dos painéis adaptativos, com snapshot por abertura e feedback de resultado incerto acima da rolagem.",
+      "Do ajustar apenas os numerais do MoneyField ao espaço medido e manter Dynamic Type nos rótulos, dicas e controles.",
+      "Do distinguir reserva com lastro, cobertura e base explicável, com privacidade também nos derivados e na acessibilidade."
     ],
     "donts": [
       "Don't colocar legenda embaixo de botão nem parágrafo explicativo em tela de conferir.",
@@ -212,7 +237,9 @@
       "Don't truncar identificador; quebre a linha.",
       "Don't mover dado que a pessoa está lendo por estética.",
       "Don't encolher todo dinheiro inline: preserve o tamanho quando cabe e deixe o `Row` reservar uma linha inteira quando largura e escala exigirem.",
-      "Don't substituir “Não classificar” manual por padrão de categoria nem apresentar link de classificação inválida como falha de carregamento."
+      "Don't substituir “Não classificar” manual por padrão de categoria nem apresentar link de classificação inválida como falha de carregamento.",
+      "Don't somar reserva como novo ativo, aporte ou transferência nem converter base desconhecida em zero.",
+      "Don't trocar a apresentação nativa durante uma abertura do Sheet nem substituir o Switch nativo por um controle paralelo."
     ]
   }
 }

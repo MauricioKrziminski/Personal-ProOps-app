@@ -1,8 +1,9 @@
-import { StyleSheet, Switch, View } from 'react-native';
+import { Platform, StyleSheet, Switch, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { MudancaSuave, usePresencaAtiva } from '@/components/motion/presenca';
 import { Space } from '@/design/tokens';
+import { useTheme } from '@/hooks/use-theme';
 
 /**
  * Interruptor de formulário: UMA linha — o que ele faz — e o switch.
@@ -24,6 +25,7 @@ export function SwitchRow({
   disabled?: boolean;
 }) {
   const ativo = usePresencaAtiva();
+  const theme = useTheme();
   return (
     <View style={styles.linha}>
       <MudancaSuave valor={label} style={styles.texto}>
@@ -31,7 +33,14 @@ export function SwitchRow({
         {label}
       </ThemedText>
       </MudancaSuave>
-      <Switch value={value} onValueChange={onValueChange} disabled={disabled || !ativo} accessibilityLabel={label} />
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        disabled={disabled || !ativo}
+        accessibilityLabel={label}
+        trackColor={Platform.OS === 'android' ? { false: theme.textSecondary, true: theme.tint } : undefined}
+        thumbColor={Platform.OS === 'android' ? (value ? theme.onTint : theme.surface) : undefined}
+      />
     </View>
   );
 }

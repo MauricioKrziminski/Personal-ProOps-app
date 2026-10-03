@@ -995,6 +995,54 @@ export type Database = {
           },
         ]
       }
+      emergency_reserves: {
+        Row: {
+          base_mode: string
+          created_at: string
+          edit_revision: number
+          manual_monthly_cents: number | null
+          target_months: number
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          base_mode: string
+          created_at?: string
+          edit_revision?: number
+          manual_monthly_cents?: number | null
+          target_months: number
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          base_mode?: string
+          created_at?: string
+          edit_revision?: number
+          manual_monthly_cents?: number | null
+          target_months?: number
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emergency_reserves_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emergency_reserves_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       executed_actions: {
         Row: {
           action_index: number
@@ -1036,6 +1084,84 @@ export type Database = {
           },
           {
             foreignKeyName: "executed_actions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      financial_allocations: {
+        Row: {
+          account_id: string | null
+          amount_cents: number
+          asset_id: string | null
+          created_at: string
+          goal_id: string | null
+          id: string
+          liquidity_confirmed: boolean
+          purpose: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          amount_cents: number
+          asset_id?: string | null
+          created_at?: string
+          goal_id?: string | null
+          id?: string
+          liquidity_confirmed?: boolean
+          purpose: string
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          account_id?: string | null
+          amount_cents?: number
+          asset_id?: string | null
+          created_at?: string
+          goal_id?: string | null
+          id?: string
+          liquidity_confirmed?: boolean
+          purpose?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_allocations_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_allocations_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_allocations_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_allocations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_allocations_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -2051,6 +2177,45 @@ export type Database = {
           },
           {
             foreignKeyName: "reminders_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reserve_month_reviews: {
+        Row: {
+          fingerprint: string
+          month: string
+          reviewed_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          fingerprint: string
+          month: string
+          reviewed_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          fingerprint?: string
+          month?: string
+          reviewed_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reserve_month_reviews_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reserve_month_reviews_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -3199,6 +3364,10 @@ export type Database = {
         }
         Returns: number
       }
+      emergency_reserve_state: {
+        Args: { p_as_of?: string; p_workspace_id?: string }
+        Returns: Json
+      }
       expected_recurring_occurrences: {
         Args: { p_from: string; p_recurring_id?: string; p_to: string }
         Returns: {
@@ -3516,6 +3685,10 @@ export type Database = {
         Args: { p_from: string; p_juntar?: boolean; p_to: string }
         Returns: Json
       }
+      resolve_emergency_reserve_attempt: {
+        Args: { p_input: Json; p_request_id: string }
+        Returns: Json
+      }
       roll_invoice: {
         Args: {
           p_invoice_id: string
@@ -3539,6 +3712,10 @@ export type Database = {
         Returns: undefined
       }
       save_category_configuration: {
+        Args: { p_input: Json; p_request_id: string }
+        Returns: Json
+      }
+      save_emergency_reserve: {
         Args: { p_input: Json; p_request_id: string }
         Returns: Json
       }

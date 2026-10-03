@@ -1753,11 +1753,13 @@ test('TaskHeader: ação longa desce de linha antes de espremer o título', () =
   assert.match(bloco('headAction'), /marginLeft: 'auto'/);
 });
 
-test('MoneyField: a caixa dos dígitos cresce com a fonte do sistema', () => {
+test('MoneyField: caixa e odômetro usam a mesma escala que cabe com Dynamic Type', () => {
   // 29/09/2026, iPhone em accessibility-large: "0,00" cortado embaixo em TODO formulário. A caixa
   // tinha a altura da linha em 1×, com `overflow: hidden`, e o texto dentro dela crescia.
   const fonte = readFileSync(join(SRC, 'components/ui/field.tsx'), 'utf8');
-  assert.match(fonte, /height: Type\.money\.lineHeight \* fontScale/, 'a caixa acompanha o texto');
+  assert.match(fonte, /const alturaDoValor = Type\.money\.lineHeight \* escalaDoValor/, 'a caixa acompanha a escala efetiva do texto');
+  assert.match(fonte, /height: alturaDoValor/, 'a caixa recebe a altura efetiva');
+  assert.match(fonte, /fontScale=\{escalaDoValor\}/, 'o odômetro recebe a mesma escala da caixa');
   assert.match(fonte, /const altura = Type\.money\.lineHeight \* fontScale/, 'o dígito rola a altura real');
 });
 

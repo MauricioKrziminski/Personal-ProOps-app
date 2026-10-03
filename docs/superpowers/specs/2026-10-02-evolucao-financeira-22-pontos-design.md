@@ -318,6 +318,10 @@ Guardar e hidratar nos registros avulsos, séries, planos parcelados e defaults 
 
 **UI:** mesmos `CamposDaSerie` com apresentação condicionada, destino logo após origem; resumo compacto. Reusar calendário e descrição de regra própria.
 
+**Encerramento de assinaturas e demais séries (pedido de 03/10):** oferecer uma ação clara de cancelar/encerrar, mantendo a série consultável como encerrada. Exemplo: cancelar ChatGPT conserva os meses pagos e remove somente ocorrências futuras ainda pendentes. A confirmação deve explicar o que permanece e o que sai, distinguindo encerramento de pausa. Encerrar e limpar o futuro devem ser uma única operação idempotente; preservar lançamentos quitados e vencidos, e tratar explicitamente ocorrências vinculadas a faturas com pagamento parcial. O atual menu “Apagar” já remove futuros pendentes, mas apaga a regra e dificulta entender essa proteção. Não considerar a nova experiência entregue apenas por mudar o texto.
+
+Ao adaptar o editor existente, não confundir o início original com o próximo vencimento: hoje `formDaSerie` hidrata `inicio` a partir de `next_run_at`, e “Termina em” exige fim igual ou posterior a esse campo. Uma assinatura cujo próximo vencimento é no mês seguinte precisa poder encerrar hoje, sem antecipar ou recriar a próxima cobrança para passar nessa validação.
+
 **Aceite:** contas iguais/de outro workspace, mensal31/semanal/anual, cron repetido, série pausada, editar só/futuras/todas, mover data, ocorrência prevista tocada, registro importado adotado, futuro além da janela e saldo negativo. Receita/despesa consolidadas não mudam.
 
 ### F19 — Marcos e identidade visual das metas

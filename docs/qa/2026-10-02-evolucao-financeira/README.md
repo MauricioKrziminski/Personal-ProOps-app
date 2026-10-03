@@ -30,8 +30,8 @@ Esses fatos e a abertura do formulário ainda não equivalem ao aceite funcional
 | F04 | Prévia do efeito | Aceito; argumentos compartilhados, rollback e identidade | Validado; entrada/edição/pendente/fonte/iPad | Validado; centavos/privacidade/offline/compacto |
 | F05 | Filtros por pagamento | Aceito; seleção múltipla, paginação e dados preservados | Validado; fonte/privacidade/iPad; limites no registro | Validado; página 2/offline/recuperação/compacto |
 | F06 | Classificações independentes | Aceito; snapshots, defaults e recortes independentes | Matriz nativa e oráculos aprovados; limites no registro | Matriz nativa, offline/retry e oráculos aprovados; limites no registro |
-| F07 | Reserva dedicada | Liberado após aceite F06 | Não validado | Não validado |
-| F08 | Metas no planejamento | Aguardando F07 | Não validado | Não validado |
+| F07 | Reserva dedicada | Aceite funcional no staging; incidente ANR aberto com disposição explícita | Persistência, temas, privacidade, fonte XL/teto, lifecycle/rotação iPad e Reduce Motion do iOS conferidos | Conta + investimento, offline/retry, terminal/CAS, matriz visual/lifecycle e APK embutido conferidos; limites no aceite |
+| F08 | Metas no planejamento | Liberado após aceite funcional F07 | Não validado | Não validado |
 | F09 | Subcategorias | Aguardando F08 | Não validado | Não validado |
 | F10 | Prazo pela contribuição | Aguardando F09 | Não validado | Não validado |
 | F11 | Alocar/transferir | Aguardando F10 | Não validado | Não validado |
@@ -220,3 +220,33 @@ Documentação visual reconciliada por merge, sem trocar tokens ou identidade.
 [Aceite e limites](f06/aceite.md), [contrato](f06/contrato.md),
 [registro nativo](f06/registro-nativo.md), [banco](f06/registro-sql.md),
 [revisão visual](f06/revisao-visual.md). Sem push/release/produção. F07 liberado.
+
+## F07 — aceite funcional no staging
+
+Reserva com fontes e lastro identificados, base manual ou três meses completos revisados,
+cobertura conservadora, configuração atômica e recuperação de tentativa incerta. A alocação
+não aumenta caixa/patrimônio nem cria contribuição. Quatro migrations somente no staging.
+
+Após o ajuste do Sheet: Node 1.839/1.839. Após o ajuste final do SwitchRow: TypeScript,
+lint e quatro testes de contraste passaram. SQL, concorrência em conexões reais, replay,
+recuperação terminal e conflito HTTP PT409 passaram. iOS/Android conferidos nos cenários
+descritos no registro; privacidade, fonte ampliada, teto monetário e adaptação da folha
+incluídos. Revisão de 38 imagens pediu um fix de contraste, resolvido em quatro recapturas;
+o veredito cobre essa correção. DESIGN e sidecar reconciliados preservando tokens/regras.
+
+O incidente Android anterior continua com causa aberta. Recuperação e execuções posteriores
+sem recorrência não equivalem a correção. O recorte delegado de três reproduções passou,
+com privacidade/painel Android/rascunho/cancelamento e logs conferidos pela primary; zero
+novas ANRs nesse intervalo. O APK diagnóstico local com JS embutido/OTA desativada também
+passou, sem Metro; os sete oráculos financeiros, reserva e dez recibos ficaram idênticos.
+Debug original reinstalado e reaberto, runner exit 0. Aceite funcional F07 registrado;
+F08 liberado. A investigação de estabilidade acompanha os próximos testes, sem alegação
+de causa/correção ou de estabilidade completa.
+Reduce Motion foi exercitado pela configuração do iOS; no Android, a escala de transição
+do sistema foi alternada e restaurada. A rodada Android longa terminou por timeout do
+wrapper, seguida de clean finish independente com exit 0. Isso não encerra o diagnóstico
+da ANR. FPS/frames e fluidez não foram medidos.
+[Aceite e disposição do incidente](f07/aceite.md), [contrato](f07/contrato.md),
+[registro nativo e limites](f07/registro-nativo.md),
+[banco](f07/registro-sql.md), [revisão visual](f07/revisao-visual.md) e
+[manifesto de capturas](f07/captures.json).
