@@ -29,8 +29,8 @@ Esses fatos e a abertura do formulário ainda não equivalem ao aceite funcional
 | F03 | Saldo/limite no seletor | Aceito; qualidade explícita, privacidade e consultas agregadas | Validado; limites no registro | Validado; offline/recuperação incluídos |
 | F04 | Prévia do efeito | Aceito; argumentos compartilhados, rollback e identidade | Validado; entrada/edição/pendente/fonte/iPad | Validado; centavos/privacidade/offline/compacto |
 | F05 | Filtros por pagamento | Aceito; seleção múltipla, paginação e dados preservados | Validado; fonte/privacidade/iPad; limites no registro | Validado; página 2/offline/recuperação/compacto |
-| F06 | Classificações independentes | Aguardando F05 | Não validado | Não validado |
-| F07 | Reserva dedicada | Aguardando F06 | Não validado | Não validado |
+| F06 | Classificações independentes | Aceito; snapshots, defaults e recortes independentes | Matriz nativa e oráculos aprovados; limites no registro | Matriz nativa, offline/retry e oráculos aprovados; limites no registro |
+| F07 | Reserva dedicada | Liberado após aceite F06 | Não validado | Não validado |
 | F08 | Metas no planejamento | Aguardando F07 | Não validado | Não validado |
 | F09 | Subcategorias | Aguardando F08 | Não validado | Não validado |
 | F10 | Prazo pela contribuição | Aguardando F09 | Não validado | Não validado |
@@ -202,3 +202,21 @@ página 2 e offline/recuperação. iPad e viewport 800dp Android conferidos. Rev
 e [revisão visual](f05/revisao-visual.md). Sem migration, escrita financeira, produção,
 push ou release. Offline iOS, fala de leitor de tela, hardware físico e benchmark de
 frames não foram certificados. A restauração das preferências dos simuladores foi concluída.
+
+## F06 — classificações independentes
+
+Aceite técnico em 03/10/2026 no staging. Previsibilidade e necessidade são escolhas
+opcionais independentes; padrões da categoria viram snapshots, decisões manuais/null
+ficam protegidas e alterar histórico exige uma ação explícita. Criação, edição por
+alcance, troca de formatos, prévia, detalhe e recortes compartilham o mesmo contrato.
+
+Node1.703/1.703, TypeScript/lint exit0, quatro migrations novas e suites SQL/replay/CAS/
+concorrência aprovadas. iOS/Android passaram a matriz e recuperação final de URL inválida;
+Android inclui retry offline com exatamente uma escrita. Oito hashes financeiros
+comprovam preservação nas reclassificações. Revisão independente de17 capturas pediu
+uma correção de copy, resolvida e recapturada: ship para a correção pontuada.
+Documentação visual reconciliada por merge, sem trocar tokens ou identidade.
+
+[Aceite e limites](f06/aceite.md), [contrato](f06/contrato.md),
+[registro nativo](f06/registro-nativo.md), [banco](f06/registro-sql.md),
+[revisão visual](f06/revisao-visual.md). Sem push/release/produção. F07 liberado.

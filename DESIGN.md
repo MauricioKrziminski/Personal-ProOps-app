@@ -351,9 +351,48 @@ do primitivo em cada plataforma.
   `FilterBar` desmonta a camada anterior do crossfade ao alternar ocultação. Campos editáveis
   continuam sendo campos de valor, não frases mascaradas.
 
+### Classificação de gastos e recortes (F06)
+Extensão Operate de Suave / Papel e Tinta. `ExpenseClassificationField` começa numa `Row`
+compacta junto da categoria, com resumo e estado expandido acessível. Ao abrir, revela
+`ExpenseClassificationControls`: os mesmos `Field` e `SelectField` do kit também usados em
+“Padrões de gastos” da categoria. Calha, espaçamento, tipografia e materiais continuam nos
+primitivos; nenhuma paleta, fonte ou superfície de destaque nova.
+
+- **Duas escolhas opcionais:** Previsibilidade distingue Fixo de Variável; Necessidade distingue
+  Essencial de Não essencial (`discretionary`). Cada dimensão tem “Não classificar”. Ajuda curta
+  explica que previsibilidade não define repetição e necessidade depende da pessoa, sem julgamento.
+  O resumo usa os valores conhecidos ou “Não classificado”; o label acessível nomeia as duas dimensões.
+- **Escolha e origem:** cada dimensão conserva sua origem explícita ou padrão de categoria.
+  Na criação, o padrão pode preencher a dimensão ainda não escolhida; seleção manual, inclusive
+  `NULL` em “Não classificar”, permanece protegida ao trocar categoria. Editar conserva o snapshot
+  existente; “Usar padrão da categoria” é uma ação explícita no rascunho, sujeita a Salvar ou cancelar.
+  Configurar categoria separa novos gastos de aplicação histórica por período, com alcance e datas
+  revelados no lugar. Classificação não altera dinheiro nem deduz frequência.
+- **Revelação disponível:** campos interativos usam `Presenca imediata`: geometria natural e
+  opacidade visível no render da ação, sem esperar medição ou animação para receber toque. Só o
+  pequeno deslocamento usa `Space.xs`, `Motion.duration.fast` e `Motion.easing.out`; Reduce Motion
+  retira esse deslocamento. Fonte grande, resize e rotação deixam o conteúdo recalcular sua altura.
+- **Recorte e recuperação:** Previsibilidade dos gastos e Necessidade dos gastos reutilizam os
+  grupos múltiplos de `ListFilters`. Opções no mesmo grupo combinam por OR; os grupos combinam
+  por AND e, quando ativos, selecionam apenas gastos. “Não informado” (`not_informed`) significa
+  `NULL` naquela dimensão. Aplicar confirma o rascunho; cancelar preserva a seleção aplicada.
+  Recortes escondem o resumo financeiro global, sem soma parcial substituta. Link com classificação
+  inválida mantém consultas de resultados desligadas e apresenta `EmptyState` compacto com
+  “Ajustar filtros”, que abre a folha; cancelar conserva a invalidação até aplicar uma seleção válida.
+  Privacidade de dinheiro continua compartilhada entre valores visíveis, frases e acessibilidade.
+
+**The Independent Expense Choices Rule.** Previsibilidade e necessidade são escolhas opcionais independentes; repetir um gasto não escolhe nenhuma delas.
+
+**The Explicit Unknown Rule.** “Não classificar” escolhido manualmente conserva sua origem explícita; padrão de categoria não o substitui implicitamente.
+
+**The Available Reveal Rule.** Revelar campos interativos disponibiliza geometria natural e toque no mesmo render; o movimento só acompanha o estado.
+
 ## Do's and Don'ts
 
 ### Do:
+- **Do** reutilizar os controles de classificação e os grupos de `ListFilters`, com escolhas independentes, geometria natural e seleção aplicada separada do rascunho.
+- **Do** preservar o snapshot ao editar e oferecer “Usar padrão da categoria” como ação explícita no rascunho; aplicação histórica da categoria revela alcance e período.
+- **Do** combinar opções de classificação por OR no grupo e AND entre grupos, restringir o recorte a gastos, tratar “Não informado” como NULL e ocultar totais globais no recorte; link inválido oferece “Ajustar filtros” e cancelar mantém o bloqueio.
 - **Do** usar a pílula de tinta para a única ação primária da tela.
 - **Do** manter um bloco de destaque por tela, em `ink-hero`.
 - **Do** escrever rótulo curto + valor; a explicação vai na confirmação da ação.
@@ -366,6 +405,7 @@ do primitivo em cada plataforma.
   React, e `useTheme()` devolve a paleta errada sem erro nenhum.
 
 ### Don't:
+- **Don't** substituir “Não classificar” manual por padrão de categoria nem apresentar link de classificação inválida como falha de carregamento.
 - **Don't** colocar legenda embaixo de botão nem parágrafo explicativo em tela de conferir.
 - **Don't** usar cor como decoração — nem a do banco fora do cartão, nem roxo como accent.
 - **Don't** usar vidro, degradê ou brilho em conteúdo.

@@ -117,10 +117,10 @@ físicos permanecem limites explícitos; não são substituídos por testes de c
 
 Arquivos: metadata de categorias, campos compartilhados, builders, ledger/série/plano, SQL de classificação e snapshots. Interface: duas dimensões nullable e defaults aplicados explicitamente, sem inferir recorrência.
 
-- [ ] RED: todas combinações, override, omissão/limpeza e reclassificação por alcance.
-- [ ] Implementar snapshots/defaults/propagação e mudança explícita de histórico.
-- [ ] Provar consumo inalterado e isolamento/concorrência.
-- [ ] Executar gates e matriz nativa F06; registrar aceite.
+- [x] RED: todas combinações, override, omissão/limpeza e reclassificação por alcance.
+- [x] Implementar snapshots/defaults/propagação e mudança explícita de histórico.
+- [x] Provar consumo inalterado e isolamento/concorrência.
+- [x] Executar gates e matriz nativa F06; registrar aceite.
 
 ### F07 — Reserva identificada
 

@@ -7,6 +7,9 @@ import { OriginAccountPicker } from '@/components/finance/origin-creation-host';
 import { FinanceWritePreview } from '@/components/finance/finance-write-preview';
 import { escritaDoFinanciamento } from '@/lib/finance-write-input';
 import { PaymentMethodField } from '@/components/finance/payment-method-field';
+import { ExpenseClassificationField } from '@/components/finance/expense-classification-field';
+import { useExpenseClassificationDraft } from '@/hooks/use-expense-classification';
+import { expenseClassificationFromRecord, expenseClassificationPatch, type ExpenseClassification } from '@/lib/expense-classification';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { DownPaymentFields } from '@/components/finance/down-payment-fields';
 import { PurchaseDownPayment } from '@/components/finance/purchase-down-payment';
@@ -73,6 +76,7 @@ function parseTaxa(texto: string): number {
 }
 
 export interface FormState {
+  expenseClassification?: ExpenseClassification;
   calculationMode: 'amortized' | 'fixed_installments';
   id?: string;
   original?: Debt;
@@ -171,6 +175,7 @@ function formDoAplicar(p: { parcela?: string; parcelas?: string; conta?: string;
 /** A dívida aberta para editar. No editar, nome e conta já aparecem: quem abriu veio mudar alguma coisa. */
 function formDaDivida(d: Debt): FormState {
   return {
+    expenseClassification: expenseClassificationFromRecord(d),
     calculationMode: d.calculation_mode,
     unidade: 'parcela',
     valorCents: Number(d.installment_cents ?? 0),
@@ -239,7 +244,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   const accounts = useAccounts(alvo?.account_id);
   const save = useSaveDebt();
   const saveScoped = useSaveDebtContractScoped();
-  const contractAttempt = useRef<{ key: string; id: string } | null>(null);
+  const contractAttempt = useRef<{ key: string; id: string; versions: Record<string, number> } | null>(null);
   /** `deHipotese`: aberta pelo "Aplicar" do "E se…?" — criar tira aquela hipótese do rascunho. */
   const { tirar } = useRascunho();
   /** O corpo ainda está aberto? O que é dele (toast, avisar o hospedeiro) só roda com ele montado. */
@@ -249,7 +254,10 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   }, [montado]);
 
   const [form, setForm] = useState<FormState>(() => {
-    if (props.estadoGuardado) return props.estadoGuardado as FormState;
+    if (props.estadoGuardado) {
+      const guardado = props.estadoGuardado as FormState;
+      return { ...guardado, expenseClassification: comum.expenseClassification ?? guardado.expenseClassification };
+    }
     if (alvo) return formDaDivida(alvo);
     if (dadosDoAplicar) return formDoAplicar(dadosDoAplicar);
     const data = comum.dataBR && isValidBRDate(comum.dataBR) ? comum.dataBR : null;
@@ -257,6 +265,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
       ...FORM_VAZIO,
       kind: 'financing',
       name: comum.descricao,
+      expenseClassification: comum.expenseClassification,
       valorCents: comum.valorCents,
       installmentCents: comum.valorCents,
       accountId: comum.contaId,
@@ -266,11 +275,18 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     };
   });
 
+  // Criando, a categoria comum comprova o padrão herdado do formato anterior, sem
+  // adicionar um campo de categoria aqui. Editando, só o contrato prova categoria e workspace.
+  const editando = Boolean(editandoId || form.id);
+  const classification = useExpenseClassificationDraft(form.expenseClassification,
+    editando ? form.original?.payment_category ?? null : comum.categoria,
+    'expense', editando, editando ? form.original?.workspace_id : undefined);
+
   /** O lançamento convertido entra como pagamento sozinho: somá-lo às pagas o contaria duas vezes. */
   const dicaDoConvertido = converter && props.pagamentoConvertido ? 'O lançamento convertido já conta como uma paga.' : undefined;
 
   useEffect(() => {
-    registrarComum(() => ({ kind: 'expense', descricao: form.name, valorCents: form.valorCents, contaId: form.accountId, dataBR: form.ancora ? isoToBR(form.ancora) : comum.dataBR, categoria: comum.categoria, paymentMethod: form.paymentMethod ?? null }));
+    registrarComum(() => ({ kind: 'expense', descricao: form.name, valorCents: form.valorCents, contaId: form.accountId, dataBR: form.ancora ? isoToBR(form.ancora) : comum.dataBR, categoria: comum.categoria, paymentMethod: form.paymentMethod ?? null, expenseClassification: classification.classification }));
     registrarEstado(() => form);
   });
 
@@ -375,7 +391,8 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     (!form.parcelas || Number(form.parcelas) > 0) &&
     (form.kind !== 'financing' || (form.taxa.trim() !== '' && !!form.parcelas)) &&
     Number.isFinite(Number(form.taxa.replace(',', '.'))) && Number(form.taxa.replace(',', '.')) >= 0;
-  const podeSalvar = Boolean(nomeOk && !erroEntrada && !erroPagamento && !accounts.isError && !accounts.isPending && validDueDay && (!form.id || payments.isSuccess) && (form.calculationMode === 'fixed_installments' ? simpleValues : advancedValid));
+  const podeSalvar = Boolean(classification.ready && (editando || !classification.isError)
+    && nomeOk && !erroEntrada && !erroPagamento && !accounts.isError && !accounts.isPending && validDueDay && (!form.id || payments.isSuccess) && (form.calculationMode === 'fixed_installments' ? simpleValues : advancedValid));
 
   const target = podeSalvar ? {
         id: form.id,
@@ -392,6 +409,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
         ...(form.calculationMode === 'fixed_installments' && simpleValues ? simpleValues : {}),
         account_id: form.accountId,
         payment_method: form.paymentMethod ?? null,
+        ...classification.classification,
         due_day: diaDoContrato,
         // Só com âncora conhecida: sem ela o cronograma segue o jeito antigo, sem data inventada.
         ...(ancoraEfetiva ? { first_due_date: ancoraEfetiva } : {}),
@@ -411,6 +429,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     if (form.id && form.original) {
       const original = form.original;
       const patch: Record<string, string | number | null> = {};
+      Object.assign(patch, expenseClassificationPatch(expenseClassificationFromRecord(original), classification.classification));
       const fields = ['name','kind','calculation_mode','principal_cents','remaining_cents','interest_rate_monthly',
         'installments','installments_paid','installment_cents','account_id','payment_method','due_day','first_due_date'] as const;
       for (const field of fields) {
@@ -443,12 +462,12 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
         }
         const versions = Object.fromEntries(paymentVersions.data.map((p) => [p.id, p.edit_revision]));
         const key = JSON.stringify([form.id, original.installments_paid + 1, scope,
-          patch, original.edit_revision, versions]);
+          patch, original.edit_revision]);
         if (contractAttempt.current?.key !== key)
-          contractAttempt.current = { key, id: newClientMessageId() };
+          contractAttempt.current = { key, id: newClientMessageId(), versions };
         saveScoped.mutate({ debtId: form.id!, anchorNo: original.installments_paid + 1,
           scope, patch, debtRevision: original.edit_revision,
-          paymentVersions: versions, requestId: contractAttempt.current.id }, {
+          paymentVersions: contractAttempt.current.versions, requestId: contractAttempt.current.id }, {
           onSuccess: () => {
             contractAttempt.current = null;
             toast({ message: 'Dívida atualizada.', tone: 'success' });
@@ -458,7 +477,8 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
         });
       };
       const mexeNoPassado = Number(original.installments_paid ?? 0) > 0 &&
-        ['installment_cents', 'due_day', 'first_due_date', 'account_id', 'payment_method', 'name'].some((k) => k in patch);
+        ['installment_cents', 'due_day', 'first_due_date', 'account_id', 'payment_method', 'name',
+          'expense_pattern', 'expense_necessity', 'expense_pattern_source', 'expense_necessity_source'].some((k) => k in patch);
       // Trocar o modo com pagamentos reais conserva os fatos anteriores. "Todas" exigiria
       // recalcular esse histórico e é recusado pelo contrato; ofereça apenas o alcance válido.
       if (!mexeNoPassado || (mudouModo && payments.data?.length)) {
@@ -554,6 +574,11 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
             invalid={faltaNome}
           />
         </Field>
+        {classification.isError ? <ErrorBand message="Não consegui carregar o padrão desta categoria." onRetry={() => void classification.refetch()} /> : null}
+        <ExpenseClassificationField value={classification.classification}
+          onChange={(expenseClassification) => setForm({ ...form, expenseClassification })}
+          defaults={classification.defaults}
+          onUseCategoryDefaults={() => setForm({ ...form, expenseClassification: classification.adoptCategoryDefaults() })} />
         <PaymentMethodField value={form.paymentMethod ?? null} onChange={(paymentMethod) => setForm({ ...form, paymentMethod })} error={erroPagamento ?? undefined} />
         <Field label="Conta que paga" error={accounts.isError ? 'Não consegui carregar suas contas. Tente novamente.' : undefined}
           hint={erroPagamento && contaEscolhida ? `Conta escolhida: ${contaEscolhida.name}. Escolha uma conta compatível ou mude a forma de pagamento.` : undefined}>

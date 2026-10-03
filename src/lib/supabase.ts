@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { createClient } from '@supabase/supabase-js';
 
-import type { Database } from '@/lib/database.types';
+import type { Database } from '@/lib/database-contract';
 import { comTeto } from '@/lib/com-teto';
 import { resolvePublicRuntimeConfig, type PublicRuntimeConfig } from '@/lib/runtime-config';
 import { Platform } from 'react-native';

@@ -5,9 +5,11 @@ import type { EntradaLancamento, EntradaParcelada } from './escrita.ts';
 import { destinoDoSalvar, installmentHistory, totalDigitado, vencimentoPendenteValido,
   type DestinoDoSalvar, type UnidadeDoValor } from './finance-form.ts';
 import type { PaymentMethod } from './payment-method.ts';
+import { normalizeExpenseClassification, UNKNOWN_EXPENSE_CLASSIFICATION, type ExpenseClassification } from './expense-classification.ts';
 
 /** Complete values of the transaction form, shared by submit and watched preview. */
 export type LancamentoFormValues = {
+  expenseClassification?: ExpenseClassification;
   kind: TransactionKind;
   amount_cents: number;
   category: string | null;
@@ -63,6 +65,8 @@ export function prepararLancamento(values: LancamentoFormValues, context: Contex
     throw new Error('O vencimento não pode ser antes da data do lançamento');
 
   const destino = destinoDoSalvar(editing, values);
+  const classification = values.expenseClassification !== undefined
+    ? normalizeExpenseClassification(values.expenseClassification) : undefined;
   const temEntrada = podeParcelarAqui && values.installments > 1 && values.down_payment_enabled;
   let totalDaCompraNova = totalDigitado(values.amount_cents, values.value_unit, values.installments);
   if (!Number.isSafeInteger(totalDaCompraNova)) throw new Error('Informe valores válidos');
@@ -80,6 +84,7 @@ export function prepararLancamento(values: LancamentoFormValues, context: Contex
   const dueAt = adiado && values.due_at ? brToISO(values.due_at) : editing?.due_at ?? null;
   const autoConfirm = podeAdiar ? (adiado ? values.auto_confirm : false) : (editing?.auto_confirm ?? false);
   const entradaParcelada: EntradaParcelada | null = values.account_id ? {
+    ...(classification ?? {}),
     accountId: values.account_id,
     paymentMethod: values.payment_method,
     totalCents: totalDaCompraNova,
@@ -93,6 +98,7 @@ export function prepararLancamento(values: LancamentoFormValues, context: Contex
     ...(downPayment ? { downPayment } : {}),
   } : null;
   const entradaLancamento: EntradaLancamento = {
+    ...(classification ? values.kind === 'expense' ? classification : UNKNOWN_EXPENSE_CLASSIFICATION : {}),
     kind: values.kind,
     amount_cents: values.amount_cents,
     category: values.kind === 'transfer' ? null : values.category,

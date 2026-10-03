@@ -6,6 +6,9 @@ import { aparenciaDaCategoria, nomeDaCategoria, type Categoria } from '@/lib/cat
 import { contaNaFatura } from '@/lib/card-status';
 import { assertPaymentMethod, type PaymentMethod } from '@/lib/payment-method';
 import { normalizePaymentMethodFilters, paymentMethodFilterExpression, type PaymentMethodFilter } from '@/lib/payment-method-filters';
+import { expenseClassificationFromRecord, type ExpenseClassification, type ExpenseClassificationDefaults } from '@/lib/expense-classification';
+import { normalizeExpensePatternFilters, normalizeExpenseNecessityFilters, expensePatternFilterExpression, expenseNecessityFilterExpression, type ExpensePatternFilter, type ExpenseNecessityFilter } from '@/lib/expense-classification-filters';
+import type { CategoryConfigurationInput, CategoryConfigurationResult } from '@/lib/category-configuration';
 import { invalidateFinance, invalidateKeys } from '@/lib/query-invalidation';
 import type { Natureza } from '@/lib/import-preview';
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -33,6 +36,7 @@ import type { CartaoNoHorizonte, ContaNoHorizonte } from '@/lib/onde-muda';
 import type { Alcance, OrigemDaConversao } from '@/lib/lancar';
 import {
   DESCRICAO_JUROS_DO_PIX,
+  classificacaoDaEscrita,
   type EntradaParcelada,
   type EntradaRecorrente,
 } from '@/lib/escrita';
@@ -96,8 +100,9 @@ export type Transaction = Pick<
   // `20260909110000`: entra sozinho na data em vez de esperar baixa. Em receita o padrão é
   // false — Pix de terceiro precisa de comprovação; salário é onde ligar faz sentido.
   | 'auto_confirm'
-> & {
+> & Partial<ExpenseClassification> & {
   kind: TransactionKind;
+  workspace_id?: string;
   payment_method?: PaymentMethod | null;
   /** Taxa explícita pertence a um lançamento e é editada pelo formulário dele. */
   pix_fee_for_transaction_id?: string | null;
@@ -205,7 +210,7 @@ export type RecurringTransaction = Pick<
   // O estabelecimento da série (`20260926120000`): o "Recorrente" do lançamento o perdia.
   | 'merchant'
   | 'edit_revision'
-> & { kind: 'expense' | 'income'; payment_method?: PaymentMethod | null };
+> & Partial<ExpenseClassification> & { kind: 'expense' | 'income'; payment_method?: PaymentMethod | null; workspace_id?: string };
 
 export type MonthlyCashflow = Fns['monthly_cashflow']['Returns'][number];
 
@@ -214,7 +219,7 @@ export type TxSummaryRow = Omit<Fns['transactions_summary']['Returns'][number], 
 };
 
 const TRANSACTION_COLUMNS =
-  'id, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, payment_method, pix_fee_for_transaction_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_balance_after_cents, edit_revision, auto_confirm, rollover_of_invoice_id, pays_invoice_id, down_payment_debt_id, down_payment_plan_id, installment_plans!transactions_installment_plan_id_fkey(first_occurred_at)';
+  'id, workspace_id, expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, payment_method, pix_fee_for_transaction_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_balance_after_cents, edit_revision, auto_confirm, rollover_of_invoice_id, pays_invoice_id, down_payment_debt_id, down_payment_plan_id, installment_plans!transactions_installment_plan_id_fkey(first_occurred_at)';
 
 export interface TransactionFilters {
   /**
@@ -243,6 +248,8 @@ export interface TransactionFilters {
   source?: TransactionSource;
   /** Empty = all; `not_informed` explicitly includes historical null metadata. */
   paymentMethods?: readonly PaymentMethodFilter[];
+  expensePatterns?: readonly ExpensePatternFilter[];
+  expenseNecessities?: readonly ExpenseNecessityFilter[];
   /** Busca em descrição, lugar e categoria. */
   q?: string;
   minCents?: number;
@@ -267,10 +274,18 @@ const TRANSACTION_PAGE = 50;
 
 /** Lista paginada. Antes era `limit(200)` fixo, que sumia com o resto do mês sem avisar. */
 export function useTransactions(filters: TransactionFilters) {
-  const { paymentMethods: rawPaymentMethods, ...otherFilters } = filters;
+  const { paymentMethods: rawPaymentMethods, expensePatterns: rawPatterns, expenseNecessities: rawNecessities, ...otherFilters } = filters;
   const paymentMethods = normalizePaymentMethodFilters(rawPaymentMethods);
+  const expensePatterns = normalizeExpensePatternFilters(rawPatterns);
+  const expenseNecessities = normalizeExpenseNecessityFilters(rawNecessities);
   const paymentExpression = paymentMethodFilterExpression(paymentMethods);
-  const canonicalFilters = paymentMethods.length ? { ...otherFilters, paymentMethods } : otherFilters;
+  const patternExpression = expensePatternFilterExpression(expensePatterns);
+  const necessityExpression = expenseNecessityFilterExpression(expenseNecessities);
+  const canonicalFilters = { ...otherFilters,
+    ...(paymentMethods.length ? { paymentMethods } : {}),
+    ...(expensePatterns.length ? { expensePatterns } : {}),
+    ...(expenseNecessities.length ? { expenseNecessities } : {}),
+  };
   useRealtimeInvalidate('transactions', ['transactions']);
   const { from, to } = filters;
   return useInfiniteQuery({
@@ -304,6 +319,9 @@ export function useTransactions(filters: TransactionFilters) {
       }
       if (filters.source) query = query.eq('source', filters.source);
       if (paymentExpression) query = query.or(paymentExpression);
+      if (patternExpression || necessityExpression) query = query.eq('kind', 'expense').is('pays_invoice_id', null);
+      if (patternExpression) query = query.or(patternExpression);
+      if (necessityExpression) query = query.or(necessityExpression);
       // "Ver ocorrências" de uma recorrente passa por aqui; sem o filtro a tela abriria o mês
       // inteiro sem avisar que ignorou o pedido.
       if (filters.recurringId) query = query.eq('recurring_id', filters.recurringId);
@@ -353,7 +371,7 @@ export function useExpectedLedgerLines(from: string | undefined, to: string | un
       // A RPC aceita 62 dias. Lotes de quatro limitam carga e uma falha rejeita o período inteiro.
       for (let i = 0; i < windows.length; i += 4) {
         const batches = await Promise.all(windows.slice(i, i + 4).map(window =>
-          fetchPaged<ExpectedLedgerLine>((start, end) => supabase.rpc('ledger_expected_lines_payment', {
+          fetchPaged<ExpectedLedgerLine>((start, end) => supabase.rpc('ledger_expected_lines_classified', {
             p_from: window.from, p_to: window.to, p_recurring_id: recurringId ?? undefined,
           }).order('due_date').order('origin').order('ref_id').range(start, end).abortSignal(signal)),
         ));
@@ -559,7 +577,7 @@ export function useGoals() {
 }
 
 const RECURRING_COLUMNS =
-  'id, kind, amount_cents, currency, category, description, merchant, account_id, payment_method, rrule, next_run_at, active, run_attempts, last_error, created_at, dtstart, end_date, auto_confirm, edit_revision';
+  'id, workspace_id, expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, kind, amount_cents, currency, category, description, merchant, account_id, payment_method, rrule, next_run_at, active, run_attempts, last_error, created_at, dtstart, end_date, auto_confirm, edit_revision';
 
 /**
  * As categorias do espaço, mais usada primeiro: as que os lançamentos usam e as criadas no app,
@@ -584,6 +602,10 @@ export function useCategoriesUsed() {
         icon: (r.icon ?? null) as IconName | null,
         color: (r.color ?? null) as NoteColorName | null,
         budgets: Number(r.budgets ?? 0),
+        configuration_id: r.configuration_id ?? null,
+        edit_revision: r.edit_revision == null ? null : Number(r.edit_revision),
+        default_expense_pattern: (r.default_expense_pattern ?? null) as ExpenseClassificationDefaults['default_expense_pattern'],
+        default_expense_necessity: (r.default_expense_necessity ?? null) as ExpenseClassificationDefaults['default_expense_necessity'],
       }));
     },
     staleTime: 60_000,
@@ -601,48 +623,59 @@ export function useAparencia() {
 }
 const SEM_CATEGORIAS: Categoria[] = [];
 
+/** Configuration proof belongs to the record workspace, independently of global appearance. */
+export function useCategoryClassificationDefaults(recordWorkspaceId?: string, enabled = true) {
+  useRealtimeInvalidate('categories', ['category-classification-defaults']);
+  return useQuery({
+    queryKey: ['category-classification-defaults', recordWorkspaceId ?? 'default'],
+    enabled,
+    queryFn: async () => {
+      const ws = recordWorkspaceId ?? await workspaceId();
+      type Configuration = Pick<Database['public']['Tables']['categories']['Row'], 'name' | 'default_expense_pattern' | 'default_expense_necessity'>;
+      const data = await fetchPaged<Configuration>((from, to) => supabase.from('categories')
+        .select('name, default_expense_pattern, default_expense_necessity')
+        .eq('workspace_id', ws).order('name').order('id').range(from, to));
+      return data.map(row => ({ category: row.name,
+        default_expense_pattern: (row.default_expense_pattern ?? null) as ExpenseClassificationDefaults['default_expense_pattern'],
+        default_expense_necessity: (row.default_expense_necessity ?? null) as ExpenseClassificationDefaults['default_expense_necessity'],
+      }));
+    },
+    staleTime: 60_000,
+  });
+}
+
 /** Recusa do `rename_category` quando o nome novo já é outra categoria: a tela pergunta se junta. */
 export type CategoriaExiste = Error & { code: 'CATEGORIA_EXISTE'; existente: string };
 
 /**
- * Cria ou edita uma categoria. Renomeando (`renomearDe` diferente de `name`), primeiro reescreve o
- * nome em todo registro (`rename_category`) e só depois grava a aparência no nome novo.
+ * Aparência, padrões, rename/merge e backfill têm uma única transação, revisão e intenção.
  */
 export function useSalvarCategoria() {
   const queryClient = useQueryClient();
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async (input: {
-      name: string;
-      icon: IconName | null;
-      color: NoteColorName | null;
-      renomearDe?: string | null;
-      juntar?: boolean;
-    }) => {
+    mutationFn: async (input: CategoryConfigurationInput): Promise<CategoryConfigurationResult> => {
       const name = nomeDaCategoria(input.name);
-      if (input.renomearDe && input.renomearDe !== name) {
-        const { data, error } = await supabase.rpc('rename_category', {
-          p_from: input.renomearDe,
-          p_to: name,
-          p_juntar: input.juntar ?? false,
-        });
-        if (error) {
-          const m = /CATEGORIA_EXISTE: (.+)$/.exec(error.message ?? '');
-          if (m) throw Object.assign(new Error(error.message), { code: 'CATEGORIA_EXISTE' as const, existente: m[1].trim() });
-          throw error;
-        }
-        const juntou = (data as { juntou?: boolean } | null)?.juntou;
-        if (juntou) return; // juntando, fica a aparência da que recebe
-      }
-      const { error } = await supabase.rpc('save_category', {
-        p_name: name,
-        p_icon: input.icon as string,
-        p_color: input.color as string,
+      const { data, error } = await supabase.rpc('save_category_configuration', {
+        p_request_id: input.requestId,
+        p_input: { name, icon: input.icon, color: input.color,
+          rename_from: input.renomearDe ?? null, juntar: input.juntar ?? false,
+          default_expense_pattern: input.default_expense_pattern,
+          default_expense_necessity: input.default_expense_necessity,
+          ...(input.configurationId ? { category_id: input.configurationId, expected_revision: input.expectedRevision } : {}),
+          ...(input.backfill ? { backfill_from: input.backfill.from, backfill_to: input.backfill.to } : {}),
+        },
       });
-      if (error) throw error;
+      if (error) {
+        const m = /CATEGORIA_EXISTE: (.+)$/.exec(error.message ?? '');
+        if (m) throw Object.assign(new Error(error.message), { code: 'CATEGORIA_EXISTE' as const, existente: m[1].trim() });
+        throw error;
+      }
+      return data as unknown as CategoryConfigurationResult;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['categories-used'] });
+      void queryClient.invalidateQueries({ queryKey: ['category-classification-defaults'] });
       invalidate();
     },
   });
@@ -660,6 +693,7 @@ export function useApagarCategoria() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['categories-used'] });
+      void queryClient.invalidateQueries({ queryKey: ['category-classification-defaults'] });
       invalidate();
     },
   });
@@ -1015,7 +1049,7 @@ export function useUpdateInstallmentPlan() {
       paidInstallments?: number | null;
       paymentMethod?: PaymentMethod | null;
       expectedRevision?: number;
-    }) => {
+    } & Partial<ExpenseClassification>) => {
       assertPaymentMethod(input.paymentMethod);
       const dados = {
         p_plan_id: input.planId,
@@ -1029,6 +1063,7 @@ export function useUpdateInstallmentPlan() {
         p_paid_installments: input.paidInstallments ?? undefined,
         ...(input.paymentMethod !== undefined ? { p_payment_method: input.paymentMethod } : {}),
         ...(input.expectedRevision !== undefined ? { p_expected_revision: input.expectedRevision } : {}),
+        ...classificacaoDaEscrita(input),
       };
       const key = JSON.stringify(dados);
       if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
@@ -1076,8 +1111,9 @@ export function useConvertToInstallments() {
       paidInstallments?: number | null;
       downPayment?: DownPaymentInput;
       paymentMethod?: PaymentMethod | null;
-    }) => {
-      if (input.downPayment || input.paymentMethod !== undefined) {
+    } & Partial<ExpenseClassification>) => {
+      const classification = classificacaoDaEscrita(input);
+      if (input.downPayment || input.paymentMethod !== undefined || Object.keys(classification).length) {
         const payload = {
           p_origem: { tipo: 'transacao', id: input.transactionId }, p_alcance: 'converter',
           p_destino: { tipo: 'parcelada', dados: {
@@ -1087,6 +1123,7 @@ export function useConvertToInstallments() {
             p_category: input.category, p_merchant: input.merchant,
             ...(input.downPayment ? { down_payment: input.downPayment } : {}),
             ...(input.paymentMethod !== undefined ? { p_payment_method: input.paymentMethod } : {}),
+            ...classification,
           } },
         };
         const key = JSON.stringify(payload);
@@ -1904,7 +1941,7 @@ export type Debt = Pick<
   | 'payment_category'
   | 'payment_description'
   | 'payment_merchant'
-> & { kind: (typeof DEBT_KINDS)[number]['value']; calculation_mode: 'amortized' | 'fixed_installments'; payment_method?: PaymentMethod | null };
+> & Partial<ExpenseClassification> & { kind: (typeof DEBT_KINDS)[number]['value']; calculation_mode: 'amortized' | 'fixed_installments'; payment_method?: PaymentMethod | null; workspace_id?: string };
 
 export type DebtScheduleRow = Omit<Fns['debt_schedule']['Returns'][number], 'interest_cents' | 'principal_cents'> & { interest_cents: number | null; principal_cents: number | null };
 export type PayoffRow = Omit<Fns['payoff_strategy']['Returns'][number], 'interest_rate_monthly' | 'total_interest_cents'> & { interest_rate_monthly: number | null; total_interest_cents: number | null };
@@ -1925,7 +1962,7 @@ export function useDebts() {
 }
 
 const DEBT_COLUMNS =
-  'id, name, kind, calculation_mode, principal_cents, remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, account_id, payment_method, due_day, archived, first_due_date, updated_at, edit_revision, payment_category, payment_description, payment_merchant';
+  'id, workspace_id, expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, name, kind, calculation_mode, principal_cents, remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, account_id, payment_method, due_day, archived, first_due_date, updated_at, edit_revision, payment_category, payment_description, payment_merchant';
 
 /**
  * As arquivadas (23/09/2026). Arquivar tirava a dívida da lista e não havia volta em lugar
@@ -2132,7 +2169,7 @@ export function useSaveDebtPaymentScoped() {
     mutationFn: async (input: {
       anchorId: string;
       scope: 'one' | 'from_here' | 'all';
-      patch: Partial<Pick<Transaction, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'occurred_at' | 'payment_method'>>;
+      patch: Partial<Pick<Transaction, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'occurred_at' | 'payment_method'>> & Partial<ExpenseClassification>;
       debtRevision: number;
       anchorRevision: number;
       paymentVersions: Record<string, number>;
@@ -2689,7 +2726,7 @@ export function useSaveDebt() {
        * com o que a tela tinha lido antes. Mudou no meio: nada é gravado, e o erro diz por quê.
        */
       versao?: string | null;
-    }) => {
+    } & Partial<ExpenseClassification>) => {
       const { id, versao, down_payment, ...resto } = input;
       if (id) {
         let consulta = supabase.from('debts').update(resto).eq('id', id);
@@ -3095,7 +3132,7 @@ export function useCancelSubscription() {
   });
 }
 
-export interface TransactionInput {
+export interface TransactionInput extends Partial<ExpenseClassification> {
   kind: TransactionKind;
   amount_cents: number;
   category: string | null;
@@ -3225,7 +3262,7 @@ export function useSaveTransactionScoped() {
     }: {
       id: string;
       scope: 'one' | 'future';
-      patch: Partial<Pick<TransactionInput, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'payment_method'>>;
+      patch: Partial<Pick<TransactionInput, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'payment_method'>> & Partial<ExpenseClassification>;
     }) => {
       const { data, error } = await supabase.rpc('update_transaction_scoped', {
         p_transaction_id: id,
@@ -3243,20 +3280,28 @@ export function useSaveTransactionScoped() {
 export function useSaveInstallmentOccurrence() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async ({ id, scope = 'one', patch, lastDay = false }: {
+    mutationFn: async ({ id, scope = 'one', patch, lastDay = false, expectedPlanRevision, expectedAnchorRevision, requestId }: {
       id: string;
       scope?: 'one' | 'future' | 'all';
       patch: Partial<Pick<TransactionInput,
         'amount_cents' | 'category' | 'description' | 'merchant' | 'occurred_at' |
-        'status' | 'due_at' | 'auto_confirm' | 'payment_method'>> & { total_cents?: number };
+        'status' | 'due_at' | 'auto_confirm' | 'payment_method'>> & Partial<ExpenseClassification> & { total_cents?: number };
+      expectedPlanRevision: number;
+      expectedAnchorRevision: number;
+      requestId: string;
       /** "Último dia de todo mês": depois da edição, as parcelas do alcance vão ao fim do mês. */
       lastDay?: boolean;
     }) => {
-      const { data, error } = await supabase.rpc(
-        lastDay && scope !== 'one' ? 'update_installment_scope_last_day' : 'update_installment_scope', {
+      if (!Number.isSafeInteger(expectedPlanRevision) || !Number.isSafeInteger(expectedAnchorRevision) || !requestId)
+        throw new Error('Atualize a compra e a parcela antes de salvar. Não consegui conferir a versão.');
+      const { data, error } = await supabase.rpc('update_installment_scope_checked', {
         p_transaction_id: id,
         p_scope: scope,
         p_patch: patch,
+        p_expected_plan_revision: expectedPlanRevision,
+        p_expected_anchor_revision: expectedAnchorRevision,
+        p_request_id: requestId,
+        p_last_day: lastDay,
       });
       if (error) throw error;
       return Number(data ?? 0);
@@ -3291,7 +3336,7 @@ export function useSaveRecurringSeries() {
         /** O calendário vai junto: regra nova e o próximo vencimento (`20260926120000`). */
         rrule?: string;
         next_run_at?: string;
-      };
+      } & Partial<ExpenseClassification>;
     }) => {
       const { data, error } = await supabase.rpc('update_recurring_future', {
         p_transaction_id: null,
@@ -3326,7 +3371,7 @@ export function useSaveRecurringAll() {
     mutationFn: async (input: {
       recurringId: string;
       linePatch: Partial<Pick<TransactionInput,
-        'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'payment_method'>>;
+        'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'payment_method'>> & Partial<ExpenseClassification>;
       seriesPatch: {
         amount_cents?: number;
         category?: string | null;
@@ -3338,7 +3383,7 @@ export function useSaveRecurringAll() {
         end_date?: string | null;
         rrule?: string;
         next_run_at?: string;
-      };
+      } & Partial<ExpenseClassification>;
       expectedRevision: number;
       requestId: string;
     }) => {
@@ -3388,7 +3433,7 @@ export function useSaveRecurringOccurrenceAndSeries() {
       recurringId: string;
       expectedRevision: number;
       requestId: string;
-      linePatch: Partial<Pick<TransactionInput, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'payment_method'>>;
+      linePatch: Partial<Pick<TransactionInput, 'amount_cents' | 'category' | 'description' | 'merchant' | 'account_id' | 'payment_method'>> & Partial<ExpenseClassification>;
       seriesPatch: {
         amount_cents?: number;
         category?: string | null;
@@ -3400,7 +3445,7 @@ export function useSaveRecurringOccurrenceAndSeries() {
         end_date?: string | null;
         rrule?: string;
         next_run_at?: string;
-      };
+      } & Partial<ExpenseClassification>;
     }) => {
       const { data, error } = await supabase.rpc('update_recurring_future', {
         p_transaction_id: id,
@@ -3811,6 +3856,7 @@ async function fetchPagedEmLotes<T>(
 
 export interface InstallmentParcel {
   id: string;
+  edit_revision?: number;
   installment_no: number | null;
   amount_cents: number;
   occurred_at: string;
@@ -3818,8 +3864,9 @@ export interface InstallmentParcel {
   status: 'pending' | 'cleared';
 }
 
-export interface InstallmentPlanSummary {
+export interface InstallmentPlanSummary extends Partial<ExpenseClassification> {
   id: string;
+  workspace_id?: string;
   payment_method?: PaymentMethod | null;
   edit_revision?: number;
   /**
@@ -3927,12 +3974,12 @@ async function buscarPlanos(apenas?: string): Promise<InstallmentPlanSummary[]> 
   type Plano = {
     id: string; merchant: string | null; description: string | null; category: string | null;
     account_id: string | null; total_cents: number; installments: number; first_occurred_at: string;
-    payment_method: PaymentMethod | null; edit_revision: number;
-  };
+    payment_method: PaymentMethod | null; edit_revision: number; workspace_id: string;
+  } & ExpenseClassification;
   const plans = await fetchPaged<Plano>((from, to) => {
     const consulta = supabase
       .from('installment_plans')
-      .select('id, merchant, description, category, account_id, total_cents, installments, first_occurred_at, payment_method, edit_revision');
+      .select('id, merchant, description, category, account_id, total_cents, installments, first_occurred_at, payment_method, edit_revision, workspace_id, expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source');
     return (apenas ? consulta.eq('id', apenas) : consulta.order('first_occurred_at', { ascending: false }).order('id')).range(from, to);
   });
   if (!plans.length) return [];
@@ -3943,7 +3990,7 @@ async function buscarPlanos(apenas?: string): Promise<InstallmentPlanSummary[]> 
     (lote, from, to) =>
       supabase
         .from('transactions')
-        .select('id, installment_plan_id, installment_no, amount_cents, occurred_at, status, invoice_id')
+        .select('id, edit_revision, installment_plan_id, installment_no, amount_cents, occurred_at, status, invoice_id')
         .in('installment_plan_id', lote)
         .order('installment_no')
         .range(from, to),
@@ -3993,6 +4040,8 @@ async function buscarPlanos(apenas?: string): Promise<InstallmentPlanSummary[]> 
     );
     return {
       id: plan.id,
+      workspace_id: plan.workspace_id,
+      ...expenseClassificationFromRecord(plan),
       title: plan.description || plan.merchant || 'Compra parcelada',
       description: plan.description,
       merchant: plan.merchant,

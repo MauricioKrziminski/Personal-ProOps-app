@@ -1,0 +1,36 @@
+appId: com.proops.personal.dev
+---
+- openLink: 'appproops:///finance'
+- extendedWaitUntil:
+    visible: Ocultar valor
+    timeout: 60000
+- openLink: 'appproops:///finance/lancar?tipo=uma&description=QA+F06+fonte+grande&amount=5&category=qa+f06+ios+padr%C3%A3o'
+- extendedWaitUntil:
+    visible: Novo lançamento
+    timeout: 30000
+- pressKey: Enter
+- scrollUntilVisible:
+    element: '^Classificação. Previsibilidade:.*'
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn: '^Classificação. Previsibilidade:.*'
+- scrollUntilVisible:
+    element: Necessidade
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: Não essencial
+- assertVisible: Salvar
+- takeScreenshot: proops-f06-ios-accessibility-large-necessity
+- scrollUntilVisible:
+    element: Previsibilidade
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- assertVisible: Variável
+- takeScreenshot: proops-f06-ios-accessibility-large-pattern
+- tapOn: Fechar
+- extendedWaitUntil:
+    notVisible: Novo lançamento
+    timeout: 15000

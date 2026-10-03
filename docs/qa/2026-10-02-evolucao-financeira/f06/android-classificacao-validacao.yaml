@@ -1,0 +1,41 @@
+appId: com.proops.personal.dev
+---
+- openLink: 'appproops:///finance'
+- extendedWaitUntil:
+    visible: Ocultar valor
+    timeout: 30000
+- openLink: 'appproops:///finance/transactions?expensePatterns=invalid&expenseNecessities=discretionary&category=qa+f06+android+padr%C3%A3o'
+- extendedWaitUntil:
+    visible: Classificação de gasto inválida no link
+    timeout: 30000
+- assertVisible: Ajustar filtros
+- assertNotVisible: Não deu para carregar
+- assertNotVisible: Tentar de novo
+- tapOn: Ajustar filtros
+- extendedWaitUntil:
+    visible: Aplicar
+    timeout: 15000
+- tapOn: Fechar
+- extendedWaitUntil:
+    notVisible: Aplicar
+    timeout: 15000
+- assertVisible: Classificação de gasto inválida no link
+- assertVisible: Ajustar filtros
+- waitForAnimationToEnd:
+    timeout: 10000
+- takeScreenshot: proops-f06-android-filter-invalid-cancel
+- tapOn: Ajustar filtros
+- extendedWaitUntil:
+    visible: Aplicar
+    timeout: 15000
+- tapOn: Aplicar
+- extendedWaitUntil:
+    notVisible: Classificação de gasto inválida no link
+    timeout: 30000
+- scrollUntilVisible:
+    element: '^QA F06 android automático,.*'
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: '^QA F06 android automático,.*'
+- takeScreenshot: proops-f06-android-validation-recovered

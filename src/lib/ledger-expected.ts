@@ -1,8 +1,13 @@
 import type { PaymentMethod } from './payment-method.ts';
 import { normalizePaymentMethodFilters, type PaymentMethodFilter } from './payment-method-filters.ts';
+import type { ExpenseClassification } from './expense-classification.ts';
+import {
+  normalizeExpensePatternFilters, normalizeExpenseNecessityFilters,
+  type ExpensePatternFilter, type ExpenseNecessityFilter,
+} from './expense-classification-filters.ts';
 
 /** An occurrence calculated for the visible period but absent from the transaction ledger. */
-export interface ExpectedLedgerLine {
+export interface ExpectedLedgerLine extends Partial<ExpenseClassification> {
   origin: 'recurring' | 'debt_schedule' | 'debt_estimate';
   ref_id: string;
   due_date: string;
@@ -34,6 +39,8 @@ interface ExpectedFilters {
   minCents?: number;
   maxCents?: number;
   paymentMethods?: readonly PaymentMethodFilter[];
+  expensePatterns?: readonly ExpensePatternFilter[];
+  expenseNecessities?: readonly ExpenseNecessityFilter[];
 }
 
 /** Keep the separate prediction block in step with the ledger's filters. */
@@ -42,6 +49,8 @@ export function filterExpectedLines<T extends ExpectedLedgerLine>(
 ): T[] {
   const term = filters.q?.trim().toLocaleLowerCase('pt-BR');
   const paymentMethods = normalizePaymentMethodFilters(filters.paymentMethods);
+  const expensePatterns = normalizeExpensePatternFilters(filters.expensePatterns);
+  const expenseNecessities = normalizeExpenseNecessityFilters(filters.expenseNecessities);
   return lines.filter((line) => {
     if (filters.kind === 'transfer') return false;
     if (filters.status && line.status !== filters.status) return false;
@@ -53,6 +62,10 @@ export function filterExpectedLines<T extends ExpectedLedgerLine>(
     if (filters.minCents !== undefined && line.amount_cents < filters.minCents) return false;
     if (filters.maxCents !== undefined && line.amount_cents > filters.maxCents) return false;
     if (paymentMethods.length && !paymentMethods.includes(line.payment_method ?? 'not_informed')) return false;
+    // Expected rows never pay an invoice; only consumption expenses are classifiable.
+    if ((expensePatterns.length || expenseNecessities.length) && line.kind !== 'expense') return false;
+    if (expensePatterns.length && !expensePatterns.includes(line.expense_pattern ?? 'not_informed')) return false;
+    if (expenseNecessities.length && !expenseNecessities.includes(line.expense_necessity ?? 'not_informed')) return false;
     if (term && !`${line.description} ${line.category ?? ''}`.toLocaleLowerCase('pt-BR').includes(term)) return false;
     return true;
   }).sort((a, b) => a.due_date.localeCompare(b.due_date)

@@ -9,6 +9,10 @@ import * as Haptics from 'expo-haptics';
 import { z } from 'zod';
 
 import { CategoryPicker } from '@/components/finance/category-picker';
+import { ErrorCard } from '@/components/error-card';
+import { ExpenseClassificationField } from '@/components/finance/expense-classification-field';
+import { useExpenseClassificationDraft } from '@/hooks/use-expense-classification';
+import { EXPENSE_PATTERNS, EXPENSE_NECESSITIES, CLASSIFICATION_SOURCES, expenseClassificationFromRecord, expenseClassificationPatch } from '@/lib/expense-classification';
 import type { CorpoProps } from '@/components/finance/corpo-do-lancar';
 import { Chip } from '@/components/finance/chip';
 import { Note } from '@/components/ui/note';
@@ -62,7 +66,7 @@ import {
 } from '@/hooks/use-finance';
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
 import { mudaInicioDaSerie, mudancasDaOcorrencia, serieDaOcorrencia, validaSerie, type SerieForm } from '@/lib/serie';
-import { compraDoRegistro, edicaoEscopadaDaCompra, payloadDaCompra, validaCompra, type CompraForm } from '@/lib/compra';
+import { compraParaRevisaoDaParcela, edicaoEscopadaDaCompra, payloadDaCompra, validaCompra, type CompraForm } from '@/lib/compra';
 import {
   faixaDeParcelas,
   financeErrorMessage,
@@ -110,6 +114,12 @@ const schema = z
     kind: z.enum(['expense', 'income', 'transfer']),
     amount_cents: z.number().int().positive('Informe o valor'),
     category: z.string().nullable(),
+    expenseClassification: z.object({
+      expense_pattern: z.enum(EXPENSE_PATTERNS).nullable(),
+      expense_pattern_source: z.enum(CLASSIFICATION_SOURCES).nullable(),
+      expense_necessity: z.enum(EXPENSE_NECESSITIES).nullable(),
+      expense_necessity_source: z.enum(CLASSIFICATION_SOURCES).nullable(),
+    }).optional(),
     description: z.string().trim().min(1, 'Escreva um título para este lançamento'),
     merchant: z.string().nullable(),
     account_id: z.string().nullable(),
@@ -187,7 +197,9 @@ type Props = CorpoProps & {
 };
 
 export function FormularioDoLancamento(props: Props) {
-  const { editing, plano, jurosDoPix, comum, parcelas, deHipotese } = props;
+  const { comum, parcelas, deHipotese } = props;
+  // The form and its CAS baseline start together. Realtime must not replace the version being edited.
+  const [{ editing, plano, jurosDoPix }] = useState(() => ({ editing: props.editing, plano: props.plano, jurosDoPix: props.jurosDoPix }));
   const insets = useSafeAreaInsets();
   const { tirar } = useRascunho();
   /** A tela ainda está aberta? O que é dela (voltar, toast) só roda com ela montada. */
@@ -226,15 +238,21 @@ export function FormularioDoLancamento(props: Props) {
   const doAplicar = !editing && deHipotese
     ? pendenciaDoAplicar(comum.dataBR, accounts?.find((a) => a.id === comum.contaId)?.type, localISODate())
     : null;
+  const guardado = props.estadoGuardado as FormValues | undefined;
   const { control, handleSubmit, setValue, getValues, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),
     // `editing` já chegou resolvido pelo gate — sem `useEffect`+`reset`, sem corrida. Criando, os
     // campos comuns vêm do `comum` (o tipo anterior do formulário único, ou os parâmetros); o que foi
-    // digitado NESTE tipo antes de trocar para outro (`estadoGuardado`) vence os dois.
-    defaultValues: (props.estadoGuardado as FormValues | undefined) ?? {
+    // digitado NESTE tipo antes de trocar para outro vence os dois, exceto a classificação:
+    // a última intenção viaja entre formatos, inclusive NULL explícito e adotar um padrão.
+    defaultValues: guardado ? {
+      ...guardado,
+      expenseClassification: comum.expenseClassification ?? guardado.expenseClassification,
+    } : {
       kind: editing ? editing.kind : comum.kind,
       amount_cents: editing ? editing.amount_cents : comum.valorCents,
       category: editing ? editing.category : comum.categoria,
+      expenseClassification: editing ? expenseClassificationFromRecord(editing) : comum.expenseClassification,
       description: editing ? (editing.description ?? '') : comum.descricao,
       merchant: editing ? (editing.merchant ?? null) : (comum.estabelecimento || null),
       // Preserva a escolha enquanto as contas carregam; só grava depois de conferir a origem.
@@ -266,6 +284,9 @@ export function FormularioDoLancamento(props: Props) {
   const occurredAt = useWatch({ control, name: 'occurred_at' });
   const accountId = useWatch({ control, name: 'account_id' });
   const paymentMethod = useWatch({ control, name: 'payment_method' });
+  const category = useWatch({ control, name: 'category' });
+  const classificationDraft = useWatch({ control, name: 'expenseClassification' });
+  const classification = useExpenseClassificationDraft(classificationDraft, category, kind, Boolean(editing), editing?.workspace_id);
   const feeCents = useWatch({ control, name: 'fee_cents' });
   const amountCents = useWatch({ control, name: 'amount_cents' });
   const installmentCount = useWatch({ control, name: 'installments' });
@@ -277,7 +298,7 @@ export function FormularioDoLancamento(props: Props) {
   useEffect(() => {
     props.registrarComum(() => {
       const v = getValues();
-      return { kind: v.kind, descricao: v.description, valorCents: v.amount_cents, contaId: v.account_id, dataBR: v.occurred_at, categoria: v.category, estabelecimento: v.merchant ?? undefined, paymentMethod: v.payment_method };
+      return { kind: v.kind, descricao: v.description, valorCents: v.amount_cents, contaId: v.account_id, dataBR: v.occurred_at, categoria: v.category, estabelecimento: v.merchant ?? undefined, paymentMethod: v.payment_method, expenseClassification: classification.classification };
     });
     props.registrarEstado(() => getValues());
   });
@@ -385,8 +406,22 @@ export function FormularioDoLancamento(props: Props) {
   /* A ocorrência começa com os campos da linha. Em Salvar, a pessoa escolhe o alcance; os
      campos da série, quando abertos, usam o mesmo grupo de Recorrentes. */
   const series = useRecurringTransactions();
-  const serie = editing?.recurring_id ? series.data?.find((r) => r.id === editing.recurring_id) : undefined;
+  const loadedSeries = editing?.recurring_id ? series.data?.find((r) => r.id === editing.recurring_id) : undefined;
+  const [seriesBaseline, setSeriesBaseline] = useState(loadedSeries);
+  if (!seriesBaseline && loadedSeries) setSeriesBaseline(loadedSeries);
+  // Form values, diff and CAS revision share the same baseline throughout an open editor.
+  const serie = seriesBaseline ?? loadedSeries;
   const [formSerie, setFormSerie] = useState<SerieForm | null>(null);
+  const seriesClassification = useExpenseClassificationDraft(formSerie?.expenseClassification, formSerie?.category ?? null, formSerie?.kind ?? 'expense', true, editing?.workspace_id);
+  const purchaseClassification = useExpenseClassificationDraft(formCompra?.expenseClassification, formCompra?.category ?? null, 'expense', true, editing?.workspace_id);
+  const [installmentRevisions] = useState(() => ({ plan: plano?.edit_revision, anchor: editing?.edit_revision }));
+  const installmentAttempt = useRef<{ key: string; id: string } | null>(null);
+  const installmentIntent = (scope: 'one' | 'future' | 'all', patch: Parameters<typeof salvarParcela.mutate>[0]['patch'], lastDay = false) => {
+    const key = JSON.stringify([editing?.id, scope, patch, lastDay, installmentRevisions]);
+    if (installmentAttempt.current?.key !== key) installmentAttempt.current = { key, id: newClientMessageId() };
+    return { expectedPlanRevision: installmentRevisions.plan ?? Number.NaN,
+      expectedAnchorRevision: installmentRevisions.anchor ?? Number.NaN, requestId: installmentAttempt.current.id };
+  };
   const [intencaoDoDia, setIntencaoDoDia] = useState<'fixo' | 'ultimo' | null>(null);
   const editarSerie = useSaveRecurringOccurrenceAndSeries();
   const editarTodaSerie = useSaveRecurringAll();
@@ -447,6 +482,7 @@ export function FormularioDoLancamento(props: Props) {
       category: values.category,
       account_id: values.account_id,
       payment_method: values.payment_method,
+      ...classification.classification,
     });
     const alterouData = values.occurred_at !== isoToBR(dataDaSerie ?? editing.occurred_at);
     return alterouData || intencaoDoDia
@@ -531,7 +567,7 @@ export function FormularioDoLancamento(props: Props) {
   };
   const salvarPagamentoDivida = useSaveDebtPaymentScoped();
   const versoesPagamentos = useDebtPaymentVersions(editing?.debt_id ?? undefined);
-  const tentativaPagamento = useRef<{ key: string; id: string } | null>(null);
+  const tentativaPagamento = useRef<{ key: string; id: string; debtRevision: number; paymentVersions: Record<string, number> } | null>(null);
   const saving =
     props.salvando || save.isPending || createPlan.isPending || converter.isPending || atualizarCompra.isPending || salvarPagamentoDivida.isPending ||
     salvarParcela.isPending || editarSerie.isPending || editarTodaSerie.isPending || editarUmaRecorrencia.isPending;
@@ -551,11 +587,11 @@ export function FormularioDoLancamento(props: Props) {
   let previewWrite: FinanceWrite | null = null;
   // Scope-sensitive edits and conversions cannot be previewed as if they created a new record.
   if (!props.converter && !props.salvarBloqueado && !saving && !erroPagamento && !erroEntrada
-    && !contas.isPending && !contas.isError && draftParsed.success
+    && classification.ready && !contas.isPending && !contas.isError && draftParsed.success
     && !(editing?.installment_plan_id || editing?.recurring_id || editing?.debt_id
       || editing?.down_payment_debt_id || editing?.down_payment_plan_id || editing?.pix_fee_for_transaction_id)) {
     try {
-      const draft = prepararLancamento(draftParsed.data, {
+      const draft = prepararLancamento({ ...draftParsed.data, expenseClassification: classification.classification }, {
         editing, podeAdiar, podeParcelarAqui, intencaoDoDia, isCard, mostraJuros, hoje: localISODate(),
       });
       if (draft.destino === 'criarPlano' && draft.entradaParcelada) previewWrite = escritaDaParcelada(draft.entradaParcelada);
@@ -566,9 +602,10 @@ export function FormularioDoLancamento(props: Props) {
   }
 
   /** `criarOutro`: o "Salvar e criar outro" — o hospedeiro recebe no `onSalvo` e remonta limpo. */
-  const onSubmit = (criarOutro = false) => handleSubmit((values) => {
+  const onSubmit = (criarOutro = false) => handleSubmit((rawValues) => {
+    const values = { ...rawValues, expenseClassification: classification.classification };
     if (salvarBloqueadoAtual.current) return;
-    if (contas.isPending || contas.isError || erroPagamento || erroEntrada) return;
+    if (!classification.ready || contas.isPending || contas.isError || erroPagamento || erroEntrada) return;
     if ((editing?.down_payment_debt_id || editing?.down_payment_plan_id) && brToISO(values.occurred_at) > localISODate()) {
       toast({ message: 'A entrada paga não pode ter data futura', tone: 'error' });
       return;
@@ -651,6 +688,7 @@ export function FormularioDoLancamento(props: Props) {
             merchant: values.merchant?.trim() || null,
             accountId: contaParaConverter,
             paymentMethod: values.payment_method,
+            ...classification.classification,
             ...(entradaParcelada.downPayment ? { downPayment: entradaParcelada.downPayment } : {}),
             paidInstallments:
               entradaParcelada.paidInstallments || null,
@@ -702,19 +740,22 @@ export function FormularioDoLancamento(props: Props) {
       props.onFechar();
     };
     if (naCompra && editing) {
+      const patch = {
+        ...expenseClassificationPatch(expenseClassificationFromRecord(editing), classification.classification),
+        amount_cents: values.amount_cents,
+        category: values.category,
+        description: values.description.trim(),
+        merchant: values.merchant?.trim() || null,
+        occurred_at: brToISO(values.occurred_at),
+        payment_method: values.payment_method,
+        status: entradaLancamento.status,
+        due_at: entradaLancamento.due_at,
+        auto_confirm: entradaLancamento.auto_confirm,
+      };
       salvarParcela.mutate({
         id: editing.id,
-        patch: {
-          amount_cents: values.amount_cents,
-          category: values.category,
-          description: values.description.trim(),
-          merchant: values.merchant?.trim() || null,
-          occurred_at: brToISO(values.occurred_at),
-          payment_method: values.payment_method,
-          status: entradaLancamento.status,
-          due_at: entradaLancamento.due_at,
-          auto_confirm: entradaLancamento.auto_confirm,
-        },
+        ...installmentIntent('one', patch),
+        patch,
       }, {
         onSuccess: fechar,
         onError: (error) => toast({
@@ -761,7 +802,7 @@ export function FormularioDoLancamento(props: Props) {
       toast({ message: 'Não consegui carregar os pagamentos desta dívida. Tente novamente.', tone: 'error' });
       return;
     }
-    const patch = debtPaymentPatch(editing, {
+    const patch = { ...debtPaymentPatch(editing, {
       amount_cents: values.amount_cents,
       category: values.category,
       description: values.description.trim(),
@@ -769,7 +810,7 @@ export function FormularioDoLancamento(props: Props) {
       account_id: values.account_id,
       payment_method: values.payment_method,
       occurred_at: brToISO(values.occurred_at),
-    });
+    }), ...expenseClassificationPatch(expenseClassificationFromRecord(editing), classification.classification) };
     /*
       Com "Este e os próximos"/"Todos", mexer na data muda o VENCIMENTO do contrato (28/09/2026,
       decisão do dono do produto): o dia escolhido — ou "último dia de todo mês" — vale para as
@@ -792,16 +833,18 @@ export function FormularioDoLancamento(props: Props) {
       toast({ message: error instanceof Error ? error.message : 'Atualize os pagamentos e tente novamente.', tone: 'error' });
       return;
     }
-    const key = JSON.stringify([editing.id, scope, patch, dueDay, divida.edit_revision, editing.edit_revision, paymentVersions]);
-    if (tentativaPagamento.current?.key !== key) tentativaPagamento.current = { key, id: newClientMessageId() };
+    const key = JSON.stringify([editing.id, scope, patch, dueDay, editing.edit_revision]);
+    if (tentativaPagamento.current?.key !== key) tentativaPagamento.current = {
+      key, id: newClientMessageId(), debtRevision: divida.edit_revision, paymentVersions,
+    };
     salvarPagamentoDivida.mutate({
       anchorId: editing.id,
       scope,
       // com o dia do contrato, a data vai sempre (o banco só a grava se mudou)
       patch: dueDay === undefined ? patch : { ...patch, occurred_at: novaData },
-      debtRevision: divida.edit_revision,
+      debtRevision: tentativaPagamento.current.debtRevision,
       anchorRevision: editing.edit_revision,
-      paymentVersions,
+      paymentVersions: tentativaPagamento.current.paymentVersions,
       requestId: tentativaPagamento.current.id,
       dueDay,
     }, {
@@ -838,7 +881,8 @@ export function FormularioDoLancamento(props: Props) {
         return;
       }
       if (decisao.kind === 'contract') return salvarCompraToda();
-      salvarParcela.mutate({ id: editing.id, scope, patch: decisao.patch, lastDay: decisao.lastDay }, {
+      salvarParcela.mutate({ id: editing.id, scope, patch: decisao.patch, lastDay: decisao.lastDay,
+        ...installmentIntent(scope, decisao.patch, decisao.lastDay) }, {
         onSuccess: () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           props.onFechar();
@@ -854,6 +898,7 @@ export function FormularioDoLancamento(props: Props) {
     const status = podeAdiar ? (adiado ? 'pending' : 'cleared') : editing.status;
     const dueAt = adiado && values.due_at ? brToISO(values.due_at) : editing.due_at;
     const patch: Parameters<typeof salvarParcela.mutate>[0]['patch'] = {};
+    Object.assign(patch, expenseClassificationPatch(expenseClassificationFromRecord(editing), classification.classification));
     if (values.amount_cents !== editing.amount_cents) patch.amount_cents = values.amount_cents;
     if (values.category !== editing.category) patch.category = values.category;
     if (values.payment_method !== (editing.payment_method ?? null)) patch.payment_method = values.payment_method;
@@ -867,7 +912,7 @@ export function FormularioDoLancamento(props: Props) {
     if (values.auto_confirm !== editing.auto_confirm) patch.auto_confirm = values.auto_confirm;
     const lastDay = intencaoDoDia === 'ultimo' && scope !== 'one';
     if (!Object.keys(patch).length && !lastDay) return props.onFechar();
-    salvarParcela.mutate({ id: editing.id, scope, patch, lastDay }, {
+    salvarParcela.mutate({ id: editing.id, scope, patch, lastDay, ...installmentIntent(scope, patch, lastDay) }, {
       onSuccess: () => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         props.onFechar();
@@ -893,6 +938,8 @@ export function FormularioDoLancamento(props: Props) {
             return;
           }
           const patch: Record<string, string | number | boolean | null> = {};
+          Object.assign(patch, expenseClassificationPatch(expenseClassificationFromRecord(editing),
+            formSerie ? seriesClassification.classification : classification.classification));
           const amount = formSerie?.amountCents ?? values.amount_cents;
           const category = formSerie ? formSerie.category : values.category;
           const description = (formSerie?.description ?? values.description).trim();
@@ -993,7 +1040,7 @@ export function FormularioDoLancamento(props: Props) {
           <Button
             label={saving ? 'Salvando…' : 'Salvar'}
             size="sm"
-             disabled={Boolean(props.salvarBloqueado) || saving || contas.isError || contas.isPending ||
+             disabled={Boolean(props.salvarBloqueado) || saving || !classification.ready || contas.isError || contas.isPending ||
                (formCompra ? !compraOk : formSerie ? !serieOk : Boolean(erroPagamento || erroEntrada || correcaoDaDivida.erro))}
             loading={saving}
             onPress={editing?.recurring_id || editing?.installment_plan_id || editing?.debt_id ? salvarComAlcance : () => onSubmit()}
@@ -1033,7 +1080,7 @@ export function FormularioDoLancamento(props: Props) {
               icon="arrow.triangle.branch"
               title={formSerie ? 'Voltar ao lançamento' : 'Configurar a repetição'}
               subtitle={formSerie ? 'Revise esta ocorrência separadamente' : 'Frequência, término e demais detalhes'}
-              onPress={() => setFormSerie(formSerie ? null : serieDaOcorrencia(serie, editing))}
+              onPress={() => setFormSerie(formSerie ? null : rascunhoDaSerie())}
             />
           </Section>
         ) : editing?.installment_plan_id && plano ? (
@@ -1042,7 +1089,15 @@ export function FormularioDoLancamento(props: Props) {
               icon="arrow.triangle.branch"
               title={formCompra ? 'Voltar à parcela' : 'Configurar a compra parcelada'}
               subtitle={formCompra ? 'Revise esta parcela separadamente' : 'Total, parcelas pagas e demais detalhes'}
-              onPress={() => setFormCompra(formCompra ? null : compraDoRegistro(plano))}
+              onPress={() => {
+                if (formCompra) return setFormCompra(null);
+                const values = getValues();
+                setFormCompra(compraParaRevisaoDaParcela(plano, editing, {
+                  occurred_at: brToISO(values.occurred_at), amount_cents: values.amount_cents,
+                  description: values.description, merchant: values.merchant, category: values.category,
+                  payment_method: values.payment_method, expenseClassification: classification.classification,
+                }));
+              }}
             />
           </Section>
         ) : editing && (editing.recurring_id || editing.installment_plan_id) ? (
@@ -1056,9 +1111,19 @@ export function FormularioDoLancamento(props: Props) {
 
         <View style={styles.conteudo}>
         {formSerie ? (
-          <CamposDaSerie form={formSerie} onChange={setFormSerie} contas={accounts ?? []} rotuloDaData="Vence em" />
+          <>
+          {seriesClassification.isError ? <ErrorCard onRetry={() => seriesClassification.refetch()} /> : null}
+          <CamposDaSerie form={formSerie} onChange={setFormSerie} contas={accounts ?? []} rotuloDaData="Vence em"
+            classificationDefaults={seriesClassification.defaults}
+            onUseCategoryDefaults={() => setFormSerie({ ...formSerie, expenseClassification: seriesClassification.adoptCategoryDefaults() })} />
+          </>
         ) : formCompra ? (
-          <CamposDaCompra form={formCompra} onChange={setFormCompra} contas={accounts ?? []} />
+          <>
+          {purchaseClassification.isError ? <ErrorCard onRetry={() => purchaseClassification.refetch()} /> : null}
+          <CamposDaCompra form={formCompra} onChange={setFormCompra} contas={accounts ?? []}
+            classificationDefaults={purchaseClassification.defaults}
+            onUseCategoryDefaults={() => setFormCompra({ ...formCompra, expenseClassification: purchaseClassification.adoptCategoryDefaults() })} />
+          </>
         ) : (
         <>
 
@@ -1172,6 +1237,14 @@ export function FormularioDoLancamento(props: Props) {
               )}
             />
           </Presenca>
+
+        <Presenca visivel={kind === 'expense' && !editing?.pays_invoice_id} imediata>
+          {classification.isError ? <ErrorCard onRetry={() => void classification.refetch()} /> : null}
+          <ExpenseClassificationField value={classification.classification}
+            onChange={(value) => setValue('expenseClassification', value, { shouldDirty: true })}
+            defaults={classification.defaults}
+            onUseCategoryDefaults={() => setValue('expenseClassification', classification.adoptCategoryDefaults(), { shouldDirty: true })} />
+        </Presenca>
 
         <Controller control={control} name="payment_method" render={({ field }) => (
           <PaymentMethodField value={field.value} onChange={field.onChange} error={erroPagamento ?? undefined} />
@@ -1484,7 +1557,7 @@ export function FormularioDoLancamento(props: Props) {
             variant="secondary"
             block
             label="Salvar e criar outro"
-            disabled={Boolean(props.salvarBloqueado) || saving || contas.isPending || contas.isError || Boolean(erroPagamento) || Boolean(erroEntrada)}
+            disabled={Boolean(props.salvarBloqueado) || saving || !classification.ready || contas.isPending || contas.isError || Boolean(erroPagamento) || Boolean(erroEntrada)}
             onPress={() => onSubmit(true)}
           />
         ) : null}

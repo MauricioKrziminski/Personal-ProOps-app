@@ -27,15 +27,21 @@ import {
 } from '@/lib/compra';
 import { formatBRL, isValidBRDate } from '@/lib/dates';
 import { UNIDADES_DO_VALOR, recusaDoValor } from '@/lib/finance-form';
+import { ExpenseClassificationField } from '@/components/finance/expense-classification-field';
+import { normalizeExpenseClassification, type ExpenseClassificationDefaults } from '@/lib/expense-classification';
 
 export function CamposDaCompra({
   form,
   onChange,
   contas,
+  classificationDefaults,
+  onUseCategoryDefaults,
 }: {
   form: CompraForm;
   onChange: (form: CompraForm) => void;
   contas: Parameters<typeof OriginAccountPicker>[0]['accounts'];
+  classificationDefaults?: ExpenseClassificationDefaults;
+  onUseCategoryDefaults?: () => void;
 }) {
   const { travado, tituloOk, totalOk, contaOk, faixa, dataLivre } = validaCompra(form);
   const origem = contas.find((c) => c.id === form.accountId) ?? null;
@@ -89,6 +95,10 @@ export function CamposDaCompra({
       <Field label="Categoria">
         <CategoryPicker value={form.category} onChange={(category) => onChange({ ...form, category })} />
       </Field>
+
+      <ExpenseClassificationField value={normalizeExpenseClassification(form.expenseClassification)}
+        defaults={classificationDefaults} onUseCategoryDefaults={onUseCategoryDefaults}
+        onChange={(expenseClassification) => onChange({ ...form, expenseClassification })} />
 
       <PaymentMethodField value={form.paymentMethod} onChange={(paymentMethod) => onChange({ ...form, paymentMethod })} error={!origem ? erroMetodo ?? undefined : undefined} />
 

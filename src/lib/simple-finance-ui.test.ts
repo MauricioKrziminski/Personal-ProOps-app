@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { runInNewContext } from 'node:vm';
+import { createContext, runInContext, runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { prepararLancamento } from './lancamento-write.ts';
 
@@ -58,10 +58,28 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any } = {}) {
+function screen(file: string, options: { categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any } = {}) {
   const state: any[] = [];
+  // Metro executes these modules in one realm. Per-module VMs reject valid records in the
+  // strict classification domain, so all production modules share a context here as well.
+  const realm = createContext({ performance, Date: options.datasReais ? Date : fixtureDate });
+  const inRealm = runInContext(`(() => {
+    const copies = new WeakMap();
+    function copy(value) {
+      if (!value || typeof value !== 'object') return value;
+      const prototype = Object.getPrototypeOf(value);
+      if (prototype === Object.prototype || prototype === Array.prototype) return value;
+      let result = copies.get(value);
+      if (!result) { result = Array.isArray(value) ? [] : {}; copies.set(value, result); }
+      for (const key of Object.keys(result)) if (!(key in value)) delete result[key];
+      for (const key of Object.keys(value)) result[key] = copy(value[key]);
+      return result;
+    }
+    return copy;
+  })()`, realm);
   const timers = new Map<number, () => void>();
   let timerId = 0;
+  let clientRequest = 0;
   const conclusoesDeAnimacao: ((terminou: boolean) => void)[] = [];
   let cursor = 0;
   let desmontado = false;
@@ -89,6 +107,7 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
   const transactionQueries: any[] = [];
   const expectedQueries: { from?: string; to?: string; pronto: boolean; recurringId?: string }[] = [];
   const summaryQueries: { from?: string; to?: string; pronto: boolean }[] = [];
+  const categoryDefaultsQueries: { workspaceId?: string; enabled: boolean }[] = [];
   const query = { data: [], isLoading: false, isError: false, isRefetching: false, refetch: async () => {} };
   /** As mesmas escritas de `writes`, com as opções (`onSuccess`/`onError`) — é por aqui que se chama o retorno. */
   const pedidos: { operation: string; value: any; opts: any }[] = [];
@@ -127,6 +146,19 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
     useCardSummary: () => ({ ...query, isSuccess: true, data: options.cards ?? [] }),
     useCardInvoices: () => ({ ...query, isSuccess: true, data: options.faturas ?? [] }),
     useCategoriesUsed: () => ({ ...query, isSuccess: true, data: options.categoriasUsadas ?? [] }),
+    useCategoryClassificationDefaults: (workspaceId?: string, enabled = true) => {
+      categoryDefaultsQueries.push({ workspaceId, enabled });
+      // A disabled TanStack query can still expose a successful cached result.
+      const available = enabled || Boolean(options.categoryDefaultsCached);
+      return { ...query,
+      data: options.categoryDefaults ?? [], isPending: !available || Boolean(options.categoryDefaultsPending),
+      status: enabled && options.categoryDefaultsError ? 'error'
+        : !available || options.categoryDefaultsPending ? 'pending' : 'success',
+      fetchStatus: enabled && options.categoryDefaultsPending ? 'fetching' : 'idle',
+      isSuccess: available && !options.categoryDefaultsPending && !options.categoryDefaultsError,
+      isError: enabled && Boolean(options.categoryDefaultsError),
+      refetch: async () => { refetches.push('category-defaults'); },
+    }; },
     // A aparência sai da régua de verdade (`lib/categorias.ts`) sobre as categorias do teste.
     useAparencia: () => (nome: string | null, kind?: string | null) => load('src/lib/categorias.ts').aparenciaDaCategoria(nome, options.categoriasUsadas ?? [], kind),
     useSalvarCategoria: () => mutation('salvarCategoria'),
@@ -315,10 +347,18 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
       transactions: [{ id: 'purchase-1', kind: 'expense', amount_cents: 147000, occurred_at: '2026-08-01' }],
       pagamentos: options.pagamentos ?? [],
     } }),
-  }, { get: (target, key) => key in target ? target[key as keyof typeof target] : () => query });
+  }, { get: (target, key) => {
+    const value = key in target ? target[key as keyof typeof target] : () => query;
+    if (key === 'ContaComLancamentos' || typeof value !== 'function') return value;
+    return (...args: any[]) => {
+      const result = value(...args);
+      // Keep live mutation getters; only read fixtures cross the domain boundary.
+      return result?.mutateAsync ? result : inRealm(result);
+    };
+  } });
   const react = {
     Fragment: Symbol.for('react.fragment'),
-    useState(initial: any) { const index = cursor++; if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial; return [state[index], (value: any) => { state[index] = typeof value === 'function' ? value(state[index]) : value; if (renderizando || options.executarEfeitos) deNovo = true; }]; },
+    useState(initial: any) { const index = cursor++; if (!(index in state)) state[index] = inRealm(typeof initial === 'function' ? initial() : initial); return [state[index], (value: any) => { state[index] = inRealm(typeof value === 'function' ? value(state[index]) : value); if (renderizando || options.executarEfeitos) deNovo = true; }]; },
     useMemo: (fn: () => unknown) => fn(),
     useCallback: (fn: unknown) => fn,
     // Persistente entre renders, como no React: um `ref` que zera a cada render esconde o guarda
@@ -337,12 +377,11 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
   };
   const load = (path: string): any => {
     const module = { exports: {} as any };
-    const code = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-    runInNewContext(code, { module, exports: module.exports, performance, Date: options.datasReais ? Date : fixtureDate,
-      ...(options.controlarTimers ? {
-        setTimeout: (fn: () => void) => { const id = ++timerId; timers.set(id, fn); return id; },
-        clearTimeout: (id: number) => timers.delete(id),
-      } : {}), require: (name: string) => {
+    const sourcePath = path === 'src/components/finance/categoria-sheet.tsx'
+      ? process.env.PROOPS_F06_CATEGORY_SHEET_FIXTURE ?? path : path;
+    const code = ts.transpileModule(readFileSync(sourcePath, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+    const evaluate = runInContext(`(function(module, exports, require, setTimeout, clearTimeout) { ${code}\n })`, realm);
+    evaluate(module, module.exports, (name: string) => {
       if (name === 'react') return react;
       if (name === '@/components/ui/sheet') return { Sheet: 'Sheet', SheetScroll: 'SheetScroll', SheetHeader: 'SheetHeader', FormularioEmTela: { Provider: 'FormularioEmTela.Provider' }, molduraEmTela: () => ({}) };
       if (name === 'zod') return require(name);
@@ -360,7 +399,7 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
             },
           };
         },
-        useWatch: ({ control, name }: any) => control.values[name],
+        useWatch: ({ control, name }: any) => name === undefined ? control.values : control.values[name],
         Controller: function Controller({ control, name, render }: any) {
           return render({ field: { value: control.values[name], onChange: (value: any) => { control.values[name] = value; } } });
         },
@@ -403,9 +442,14 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
       if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, Redirect: 'Redirect', useLocalSearchParams: () => options.params ?? (file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), useFocusEffect: () => {}, useIsFocused: () => true, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }), dismissAll: () => navigations.push({ dismissAll: true }), dismiss: (n?: number) => navigations.push({ dismiss: n ?? 1 }), canDismiss: () => !options.primeiraDaPilha, canGoBack: () => !options.primeiraDaPilha } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
+      if (name === '@/hooks/use-expense-classification') return load('src/hooks/use-expense-classification.ts');
       if (name === '@/components/finance/origin-creation-host') return { OriginCreationHost: ({ children }: any) => children, OriginAccountPicker: 'AccountPicker' };
       if (name === '@/lib/payment-method') return load('src/lib/payment-method.ts');
       if (name === '@/lib/payment-method-filters') return load('src/lib/payment-method-filters.ts');
+      if (name === '@/lib/expense-classification-filters') return load('src/lib/expense-classification-filters.ts');
+      if (name === '@/components/finance/expense-classification-controls') return load('src/components/finance/expense-classification-controls.tsx');
+      if (name === '@/lib/expense-classification') return load('src/lib/expense-classification.ts');
+      if (name === '@/lib/category-configuration') return load('src/lib/category-configuration.ts');
       if (name === '@/components/ui/filter-bar') return load('src/components/ui/filter-bar.tsx');
       if (name === '@/lib/supabase' && file.endsWith('finance/recurring.tsx')) return { supabase: {
         from: () => {
@@ -575,7 +619,7 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
         { label: 'Esta e próximas', onPress: () => onSelect('future') },
         { label: 'Todas', onPress: () => onSelect('all') },
       ) };
-      if (name === '@/lib/agent-chat') return { newClientMessageId: () => '00000000-0000-4000-8000-000000000001' };
+      if (name === '@/lib/agent-chat') return { newClientMessageId: () => `00000000-0000-4000-8000-${String(++clientRequest).padStart(12, '0')}` };
       if (name === '@/components/ui/toast') return { useToast: () => (t: any) => toasts.push(t), useSubirAcimaDoToast: () => ({}) };
       // O provider de "esconder saldo" só existe dentro da árvore real; aqui o valor aparece.
       if (name === '@/components/ui/conceal') return {
@@ -586,7 +630,8 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
       if (name === '@/components/ui/money') return { Money: 'Money', DinheiroEncolhe: { Provider: 'DinheiroEncolhe.Provider' } };
       if (name === '@/design/tokens') return { Motion: { duration: { fast: 120, base: 200, morph: 180 }, stagger: {}, easing: {}, spring: { morph: { stiffness: 360, damping: 26, mass: 1 } } }, IconSize: { md: 24 }, Space: { xs: 4, md: 12, lg: 16 }, Radius: {}, tabular: {}, Elevation: { light: {}, dark: {} }, Type: new Proxy({}, { get: () => ({}) }) };
       return new Proxy({}, { get: (_, key) => String(key) });
-    } });
+    }, options.controlarTimers ? (fn: () => void) => { const id = ++timerId; timers.set(id, fn); return id; } : undefined,
+    options.controlarTimers ? (id: number) => timers.delete(id) : undefined);
     return module.exports;
   };
   // `componente`: um componente nomeado (o card de nota), renderizado com `props`.
@@ -609,7 +654,7 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
     if (node.type === 'FinanceAnalysisPanes') visit(node.props.compact);
     // `CamposDaSerie` é um grupo de campos sem hook: desenhado aqui, a tela é a que a pessoa vê.
     // Os corpos (`FormularioDaSerie`, `FormularioDaDivida`) têm hooks: eles rodam depois dos da tela, na mesma ordem a cada render.
-    if (typeof node.type === 'function' && ['Controller', 'AccountFormFields', 'CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida', 'TrashEmptyState', 'FilterBar'].includes(node.type.name)) visit(node.type(node.props));
+    if (typeof node.type === 'function' && ['Controller', 'AccountFormFields', 'CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida', 'TrashEmptyState', 'FilterBar', 'ExpenseClassificationControls'].includes(node.type.name)) visit(node.type(node.props));
     // No celular o `AdaptivePanes` desenha o slot de uma coluna só (Pastas, Recorrentes…).
     if (node.type === 'AdaptivePanes') visit(node.props.singlePaneContent ?? node.props.main);
     visit(node.props.ListHeaderComponent);
@@ -648,7 +693,7 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
     if (desmontado) return;
     for (let vez = 0; vez < 10; vez++) {
       cursor = 0; nodes = []; deNovo = false; efeitosPendentes = []; renderizando = true;
-      try { visit(Component(options.props ?? {})); } finally { renderizando = false; }
+      try { visit(Component(inRealm(options.props ?? {}))); } finally { renderizando = false; }
       if (deNovo) continue;
       for (const efeito of efeitosPendentes) {
         efeitos[efeito.index]?.cleanup?.();
@@ -659,7 +704,7 @@ function screen(file: string, options: { debtsPending?: boolean; debtsError?: bo
   };
   render();
   return {
-    writes, pedidos, toasts, preferenciasGravadas, pedidosDeLimite, avisos, confirmations, actions, navigations, refetches, gates, rulerViews, transactionQueries, expectedQueries, summaryQueries,
+    writes, pedidos, toasts, preferenciasGravadas, pedidosDeLimite, avisos, confirmations, actions, navigations, refetches, gates, rulerViews, transactionQueries, expectedQueries, summaryQueries, categoryDefaultsQueries,
     drafts: () => forecastDrafts,
     simulacoes,
     nodes: () => nodes,
@@ -4681,20 +4726,22 @@ test('Folha de categoria: renomear para um nome que existe pergunta antes de jun
     props: { visible: true, categoria: CATS[1], onClose: () => {}, onSalva: (n: string) => salvas.push(n) } });
   ui.fill('Nome', 'Roupas');
   ui.press('Salvar');
-  assert.deepEqual({ ...ui.writes.at(-1)?.value }, { name: 'roupas', icon: 'circle', color: null, renomearDe: 'roupa' });
+  assert.deepEqual({ ...ui.writes.at(-1)?.value }, { name: 'roupas', icon: 'circle', color: null, renomearDe: 'roupa',
+    default_expense_pattern: null, default_expense_necessity: null, configurationId: null, expectedRevision: null, backfill: null,
+    requestId: '00000000-0000-4000-8000-000000000001' });
   (ui.pedidos.at(-1) as any).rejeitar(Object.assign(new Error('CATEGORIA_EXISTE: roupas'), { code: 'CATEGORIA_EXISTE', existente: 'roupas' }));
   await new Promise((r) => setTimeout(r, 0));
-  assert.equal(ui.avisos.at(-1), 'Tudo que está em roupa passa para roupas. No mês em que as duas têm orçamento, fica o de roupas.');
+  assert.equal(ui.avisos.at(-1), 'Tudo que está em roupa passa para roupas. Os padrões de roupas prevalecem; as classificações dos gastos ficam como estão. No mês em que as duas têm orçamento, fica o de roupas.');
   assert.equal(ui.writes.length, 1, 'não junta sem a resposta');
   ui.interact(() => ui.confirmations.at(-1)!());
   assert.equal(ui.writes.at(-1)?.value.juntar, true);
   assert.equal(ui.writes.at(-1)?.value.renomearDe, 'roupa');
-  (ui.pedidos.at(-1) as any).resolver();
+  (ui.pedidos.at(-1) as any).resolver({ category: 'roupas', juntou: true, backfill_updated: 0 });
   await new Promise((r) => setTimeout(r, 0));
   assert.deepEqual(salvas, ['roupas'], 'o seletor recebe o nome que ficou');
 });
 
-test('Folha de categoria: sem nome não salva; criando um nome que já existe, avisa que muda a aparência dela', () => {
+test('Folha de categoria: sem nome não salva; criando um nome que já existe, conserva a aparência dela', () => {
   const ui = screen('src/components/finance/categoria-sheet.tsx', { componente: 'CategoriaSheet', categoriasUsadas: CATS,
     props: { visible: true, categoria: null, onClose: () => {}, onSalva: () => {} } });
   assert.equal(ui.button('Salvar').props.disabled, true);
@@ -4703,7 +4750,171 @@ test('Folha de categoria: sem nome não salva; criando um nome que já existe, a
   ui.press('Salvar');
   // grava na que EXISTE: com o nome digitado, nasceria uma segunda aparência para a mesma categoria
   assert.equal(ui.writes.at(-1)?.operation, 'salvarCategoria');
-  assert.deepEqual({ ...ui.writes.at(-1)?.value }, { name: 'mercado', icon: 'tag', color: null, renomearDe: null });
+  assert.deepEqual({ ...ui.writes.at(-1)?.value }, { name: 'mercado', icon: 'cart', color: 'musgo', renomearDe: null,
+    default_expense_pattern: null, default_expense_necessity: null, configurationId: null, expectedRevision: null, backfill: null,
+    requestId: '00000000-0000-4000-8000-000000000001' });
+});
+
+// F06 uses the real editor and pure configuration/classification domains. Query and native
+// boundaries remain inert: these assertions prove JS behavior, not a rendered device flow.
+const F06_CATS = CATS.map((c, index) => ({ ...c, configuration_id: `configuration-${index}`,
+  edit_revision: index + 7, default_expense_pattern: index === 0 ? 'variable' : 'fixed',
+  default_expense_necessity: index === 0 ? 'essential' : 'discretionary' }));
+const categoriaF06 = (categoria: any = F06_CATS[0], extra: Parameters<typeof screen>[1] = {}) =>
+  screen('src/components/finance/categoria-sheet.tsx', { componente: 'CategoriaSheet', categoriasUsadas: F06_CATS,
+    executarEfeitos: true, segurarMutacoes: true, ...extra,
+    props: { visible: true, categoria, onClose: () => {}, onSalva: () => {}, ...extra.props } });
+const abrirPadroesCategoria = (ui: ReturnType<typeof screen>) => ui.interact((nodes) => {
+  const row = nodes.find((n) => n.type === 'Row' && n.props.title === 'Padrões de gastos');
+  assert.ok(row, 'o editor existente oferece os padrões');
+  row.props.onPress();
+});
+const selecionarCategoria = (ui: ReturnType<typeof screen>, label: string, value: string | null) =>
+  ui.interact((nodes) => {
+    const field = nodes.find((n) => n.type === 'Field' && n.props.label === label);
+    assert.ok(field, `campo visível: ${label}`);
+    assert.equal(field.props.children.type, 'SelectField');
+    field.props.children.props.onChange(value);
+  });
+const dadosDaCategoria = (ui: ReturnType<typeof screen>) => JSON.parse(JSON.stringify(ui.writes.at(-1)?.value));
+const aguardarCategoria = async (ui: ReturnType<typeof screen>) => {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  ui.interact(() => {});
+};
+
+test('F06 categoria: padrões independentes salvam com CAS e só novos cadastros não pede histórico', () => {
+  for (const [dimension, chosen, pattern, necessity] of [
+    ['Previsibilidade', 'fixed', 'fixed', 'essential'],
+    ['Necessidade', null, 'variable', null],
+  ] as const) {
+    const ui = categoriaF06();
+    assert.equal(ui.nodes().some((n) => n.type === 'Field' && n.props.label === 'Previsibilidade'), false,
+      'a revelação começa recolhida');
+    abrirPadroesCategoria(ui);
+    selecionarCategoria(ui, dimension, chosen);
+    const scope = ui.nodes().find((n) => n.type === 'Field' && n.props.label === 'Aplicar padrões');
+    assert.equal(scope.props.children.props.value, 'new');
+    assert.equal(ui.nodes().some((n) => n.type === 'DatePickerField'), false);
+    ui.press('Salvar');
+    assert.equal(ui.confirmations.length, 0);
+    assert.deepEqual(dadosDaCategoria(ui), { name: 'mercado', icon: 'cart', color: 'musgo', renomearDe: 'mercado',
+      default_expense_pattern: pattern, default_expense_necessity: necessity,
+      configurationId: 'configuration-0', expectedRevision: 7, backfill: null,
+      requestId: '00000000-0000-4000-8000-000000000001' });
+    assert.deepEqual(ui.writes.map((w) => w.operation), ['salvarCategoria'], 'uma escrita atômica');
+  }
+});
+
+test('F06 categoria: nome existente adota configuração própria e aparência externa não prova padrões', () => {
+  const ui = categoriaF06(null);
+  ui.fill('Nome', 'Mércado');
+  abrirPadroesCategoria(ui);
+  ui.press('Salvar');
+  const input = dadosDaCategoria(ui);
+  assert.equal(input.configurationId, 'configuration-0');
+  assert.equal(input.expectedRevision, 7);
+  assert.equal(input.icon, 'cart');
+  assert.equal(input.color, 'musgo');
+  assert.equal(input.default_expense_pattern, 'variable');
+  assert.equal(input.default_expense_necessity, 'essential');
+  const external = { ...F06_CATS[0], configuration_id: null, edit_revision: null };
+  const outside = categoriaF06(external, { categoriasUsadas: [external] });
+  abrirPadroesCategoria(outside);
+  outside.press('Salvar');
+  assert.equal(dadosDaCategoria(outside).default_expense_pattern, null);
+  assert.equal(dadosDaCategoria(outside).default_expense_necessity, null);
+  assert.equal(dadosDaCategoria(outside).icon, 'cart');
+});
+
+test('F06 categoria: histórico parcial, impossível ou invertido impede salvar', () => {
+  for (const [from, to] of [['', ''], ['01/10/2026', ''], ['', '31/10/2026'],
+    ['31/02/2026', '31/10/2026'], ['20/10/2026', '01/10/2026']]) {
+    const ui = categoriaF06();
+    abrirPadroesCategoria(ui);
+    selecionarCategoria(ui, 'Previsibilidade', 'fixed');
+    selecionarCategoria(ui, 'Aplicar padrões', 'period');
+    ui.fill('De', from); ui.fill('Até', to);
+    assert.equal(ui.button('Salvar').props.disabled, true, `${from} → ${to}`);
+    ui.interact(() => ui.button('Salvar').props.onPress());
+    assert.equal(ui.writes.length, 0);
+    assert.equal(ui.confirmations.length, 0);
+  }
+});
+
+test('F06 categoria: confirma período, explica manuais e anuncia contagem real do backfill', async () => {
+  const salvas: string[] = []; let fechou = 0;
+  const ui = categoriaF06(undefined, { props: { onSalva: (name: string) => salvas.push(name), onClose: () => { fechou++; } } });
+  abrirPadroesCategoria(ui);
+  selecionarCategoria(ui, 'Necessidade', 'discretionary');
+  selecionarCategoria(ui, 'Aplicar padrões', 'period');
+  ui.fill('De', '01/10/2026'); ui.fill('Até', '31/10/2026');
+  ui.press('Salvar');
+  assert.equal(ui.writes.length, 0, 'o período só segue depois da confirmação');
+  assert.match(ui.avisos.at(-1)!, /Ajustes manuais, inclusive Não classificar, ficam/);
+  assert.match(ui.avisos.at(-1)!, /Recorrências, compras e dívidas conservam seus padrões/);
+  ui.interact(() => ui.confirmations.at(-1)!());
+  assert.deepEqual(dadosDaCategoria(ui).backfill, { from: '2026-10-01', to: '2026-10-31' });
+  assert.equal(dadosDaCategoria(ui).default_expense_pattern, 'variable');
+  assert.equal(dadosDaCategoria(ui).default_expense_necessity, 'discretionary');
+  (ui.pedidos.at(-1) as any).resolver({ category: 'mercado', juntou: false, backfill_updated: 23 });
+  await aguardarCategoria(ui);
+  assert.equal(ui.toasts.at(-1).message, '23 gastos atualizados.');
+  assert.deepEqual(salvas, ['mercado']); assert.equal(fechou, 1);
+});
+
+test('F06 categoria: erro conserva rascunho e intenção; alteração do payload gera nova intenção', async () => {
+  const ui = categoriaF06();
+  ui.fill('Nome', 'Mercado da semana');
+  abrirPadroesCategoria(ui);
+  selecionarCategoria(ui, 'Previsibilidade', 'fixed');
+  ui.press('Salvar');
+  const first = dadosDaCategoria(ui);
+  (ui.pedidos.at(-1) as any).rejeitar(new Error('Sem conexão'));
+  await aguardarCategoria(ui);
+  assert.equal(ui.nodes().find((n) => n.type === 'Field' && n.props.label === 'Nome').props.children.props.value, 'Mercado da semana');
+  assert.equal(ui.nodes().find((n) => n.type === 'Field' && n.props.label === 'Previsibilidade').props.children.props.value, 'fixed');
+  ui.press('Salvar');
+  assert.deepEqual(dadosDaCategoria(ui), first, 'retry reusa nonce, CAS e todo o payload');
+  (ui.pedidos.at(-1) as any).rejeitar(new Error('Sem conexão'));
+  await aguardarCategoria(ui);
+  selecionarCategoria(ui, 'Necessidade', null);
+  ui.press('Salvar');
+  assert.notEqual(dadosDaCategoria(ui).requestId, first.requestId);
+  assert.equal(dadosDaCategoria(ui).default_expense_necessity, null);
+});
+
+test('F06 categoria: juntar descarta backfill, explica receptor e reusa intenção de merge no retry', async () => {
+  const salvas: string[] = [];
+  const ui = categoriaF06(F06_CATS[1], { props: { onSalva: (name: string) => salvas.push(name) } });
+  ui.fill('Nome', 'Mercado');
+  abrirPadroesCategoria(ui);
+  selecionarCategoria(ui, 'Necessidade', 'essential');
+  selecionarCategoria(ui, 'Aplicar padrões', 'period');
+  ui.fill('De', '01/10/2026'); ui.fill('Até', '31/10/2026');
+  ui.press('Salvar');
+  ui.interact(() => ui.confirmations.at(-1)!());
+  const beforeMerge = dadosDaCategoria(ui);
+  (ui.pedidos.at(-1) as any).rejeitar(Object.assign(new Error('CATEGORIA_EXISTE: mercado'), { code: 'CATEGORIA_EXISTE', existente: 'mercado' }));
+  await aguardarCategoria(ui);
+  assert.match(ui.avisos.at(-1)!, /Os padrões de mercado prevalecem/);
+  assert.match(ui.avisos.at(-1)!, /classificações dos gastos ficam como estão/);
+  assert.match(ui.avisos.at(-1)!, /O período escolhido não será aplicado/);
+  ui.interact(() => ui.confirmations.at(-1)!());
+  const merged = dadosDaCategoria(ui);
+  assert.equal(merged.juntar, true); assert.equal(merged.backfill, null);
+  assert.equal(merged.configurationId, 'configuration-1');
+  assert.notEqual(merged.requestId, beforeMerge.requestId, 'merge é outra intenção atômica');
+  (ui.pedidos.at(-1) as any).rejeitar(new Error('Sem conexão'));
+  await aguardarCategoria(ui);
+  const confirmations = ui.confirmations.length;
+  ui.press('Salvar');
+  assert.equal(ui.confirmations.length, confirmations, 'a intenção de junção já foi confirmada');
+  assert.deepEqual(dadosDaCategoria(ui), merged);
+  (ui.pedidos.at(-1) as any).resolver({ category: 'mercado', juntou: true, backfill_updated: 0,
+    default_expense_pattern: 'variable', default_expense_necessity: 'essential' });
+  await aguardarCategoria(ui);
+  assert.deepEqual(salvas, ['mercado']);
+  assert.equal(ui.toasts.length, 1, 'somente o erro transitório: merge não anuncia backfill');
 });
 
 test('Seletor de categoria: chips com ícone e cor, "Nova" cria e já escolhe, "Gerenciar categorias" leva à tela', () => {
@@ -4860,6 +5071,85 @@ const filterScreenText = (ui: ReturnType<typeof screen>) => JSON.stringify(ui.no
 
 const applyListFilters = (ui: ReturnType<typeof screen>, value: Record<string, unknown>) =>
   ui.interact(nodes => nodes.find(n => n.type === 'ListFilters').props.onApply(value));
+
+test('F06: grupos independentes combinam pagamento e previsões, contam um critério por grupo e ocultam total global', () => {
+  for (const tablet of [false, true]) {
+    const base = { origin: 'recurring', ref_id: 'r', due_date: '2026-09-20', amount_cents: 1200, kind: 'expense',
+      description: 'Fixa essencial', category: null, account_id: null, payment_method: 'pix', status: 'pending', inferred_start: false,
+      expense_pattern: 'fixed', expense_pattern_source: 'explicit', expense_necessity: 'essential', expense_necessity_source: 'explicit' };
+    const ui = screen(transacoesFile, { tablet, txs: [], expectedLines: [base,
+      { ...base, ref_id: 'other-pattern', description: 'Variável essencial', expense_pattern: 'variable' },
+      { ...base, ref_id: 'other-necessity', description: 'Fixa não essencial', expense_necessity: 'discretionary' },
+      { ...base, ref_id: 'other-payment', description: 'Fixa essencial boleto', payment_method: 'boleto' },
+      { ...base, ref_id: 'legacy', description: 'Legado', expense_pattern: null, expense_necessity: null }],
+    expectedInTransit: [{ ...base, ref_id: 'transit-yes', description: 'Em trânsito compatível' },
+      { ...base, ref_id: 'transit-no', description: 'Em trânsito fora do filtro', expense_pattern: 'variable' }] });
+    applyListFilters(ui, { multiSelections: { paymentMethods: ['pix'], expensePatterns: ['not_informed', 'fixed', 'fixed'], expenseNecessities: ['essential', 'not_informed'] } });
+    const query = ui.transactionQueries.at(-1);
+    assert.deepEqual(copia(query?.expensePatterns ?? null), ['fixed', 'not_informed']);
+    assert.deepEqual(copia(query?.expenseNecessities ?? null), ['essential', 'not_informed']);
+    assert.deepEqual(copia(query?.paymentMethods), ['pix']);
+    const sheet = ui.nodes().find(n => n.type === 'ListFilters');
+    assert.deepEqual(copia(sheet.props.value.multiSelections.expensePatterns), ['fixed', 'not_informed']);
+    assert.deepEqual(copia(sheet.props.value.multiSelections.expenseNecessities), ['essential', 'not_informed']);
+    assert.match(filterScreenText(ui), /Filtros · 3/);
+    assert.match(filterScreenText(ui), /Previsibilidade dos gastos: Fixo, Não informado/);
+    assert.match(filterScreenText(ui), /Necessidade dos gastos: Essencial, Não informado/);
+    assert.ok(!ui.nodes().some(n => n.type === 'PeriodSummaryCard'));
+    assert.deepEqual(ui.nodes().filter(n => n.type === 'LinhaPrevista').map(n => n.props.line.description).sort(),
+      ['Em trânsito compatível', 'Fixa essencial', 'Legado']);
+    applyListFilters(ui, {});
+    assert.deepEqual(copia(ui.transactionQueries.at(-1)?.expensePatterns ?? null), []);
+    assert.deepEqual(copia(ui.transactionQueries.at(-1)?.expenseNecessities ?? null), []);
+  }
+});
+
+test('F06: links atualizam cada dimensão na tela montada; ausência conserva e vazio limpa só seu grupo', () => {
+  const params: Record<string, string> = { expensePatterns: 'variable,fixed', expenseNecessities: 'essential', paymentMethods: 'pix' };
+  const ui = screen(transacoesFile, { params });
+  assert.deepEqual(copia(ui.transactionQueries.at(-1)?.expensePatterns ?? null), ['fixed', 'variable']);
+  assert.deepEqual(copia(ui.transactionQueries.at(-1)?.expenseNecessities ?? null), ['essential']);
+  delete params.expensePatterns; delete params.expenseNecessities; params.month = '2026-10'; ui.interact(() => {});
+  assert.deepEqual(copia(ui.transactionQueries.at(-1)?.expensePatterns ?? null), ['fixed', 'variable']);
+  params.expensePatterns = ''; params.expenseNecessities = 'discretionary,not_informed'; ui.interact(() => {});
+  assert.deepEqual(copia(ui.transactionQueries.at(-1)?.expensePatterns ?? null), []);
+  assert.deepEqual(copia(ui.transactionQueries.at(-1)?.expenseNecessities ?? null), ['discretionary', 'not_informed']);
+  assert.deepEqual(copia(ui.transactionQueries.at(-1)?.paymentMethods), ['pix']);
+});
+
+test('F06: dimensão inválida bloqueia leitura, cache e refresh; cancelar preserva erro e Aplicar recupera', () => {
+  for (const params of [{ expensePatterns: 'fixed,mystery' }, { expenseNecessities: 'essential,fixed' }]) {
+    const ui = screen(transacoesFile, { params, maisPaginas: true, expectedLines: [assinaturaPrevista], expectedInTransit: [assinaturaPrevista] });
+    assert.equal(ui.transactionQueries.at(-1)?.pronto, false);
+    assert.equal(ui.expectedQueries.at(-1)?.pronto, false);
+    assert.match(filterScreenText(ui), /Classificação de gasto inválida no link/);
+    const validation = ui.nodes().find(n => n.type === 'EmptyState');
+    assert.ok(validation, 'link inválido usa o estado de validação do kit');
+    assert.equal(validation.props.action.label, 'Ajustar filtros');
+    assert.ok(!ui.nodes().some(n => n.type === 'ErrorCard'), 'validação não é falha de carga');
+    assert.ok(!ui.nodes().some(n => ['SkeletonRow', 'LinhaPrevista', 'PeriodSummaryCard', 'LedgerRow'].includes(n.type)));
+    ui.interact(() => validation.props.action.onPress());
+    assert.equal(ui.nodes().find(n => n.type === 'ListFilters').props.visible, true);
+    ui.interact(nodes => nodes.find(n => n.type === 'ListFilters').props.onClose());
+    assert.equal(ui.transactionQueries.at(-1)?.pronto, false);
+    ui.interact(nodes => nodes.find(n => n.type === 'SectionList').props.onRefresh());
+    assert.ok(!ui.refetches.includes('list'));
+    applyListFilters(ui, { multiSelections: { expensePatterns: ['fixed'], expenseNecessities: ['essential'] } });
+    assert.equal(ui.transactionQueries.at(-1)?.pronto, true);
+    assert.doesNotMatch(filterScreenText(ui), /Classificação de gasto inválida no link/);
+  }
+});
+
+test('F06: classificar com Receitas ou Transferências conserva Tipo e exclui previstas', () => {
+  for (const kind of ['income', 'transfer']) {
+    const ui = screen(transacoesFile, { txs: [], expectedLines: [assinaturaPrevista, { ...assinaturaPrevista, ref_id: 'income', kind: 'income' }] });
+    applyListFilters(ui, { selections: { kind }, multiSelections: { expensePatterns: ['not_informed'] } });
+    assert.equal(ui.transactionQueries.at(-1)?.kind, kind);
+    assert.equal(ui.nodes().find(n => n.type === 'ListFilters').props.value.selections.kind, kind);
+    assert.ok(!ui.nodes().some(n => n.type === 'LinhaPrevista'));
+    assert.ok(!ui.nodes().some(n => n.type === 'PeriodSummaryCard'));
+  }
+});
 
 test('F05: métodos múltiplos seguem query, folha, previstas e resumo sem exibir total global', () => {
   const base = { origin: 'recurring', ref_id: 'r', due_date: '2026-09-20', amount_cents: 1200, kind: 'expense',
@@ -5374,7 +5664,7 @@ test('campos compartilhados respeitam tipos elegíveis e travam todos os valores
   const payer = ui.nodes().find((n: any) => n.type === 'AccountPicker');
   assert.equal(payer.props.disabled, true);
   assert.equal(payer.props.creationActions, undefined);
-  assert.deepEqual(payer.props.accounts.map((a: any) => a.id), ['payer']);
+  assert.deepEqual(Array.from(payer.props.accounts, (a: any) => a.id), ['payer']);
   ui.fill('Nome', 'Ignored');
   ui.interact((nodes: any[]) => nodes.find((n: any) => n.type === 'SwitchRow').props.onValueChange(true));
   assert.equal(changes.length, 0);
@@ -5465,4 +5755,313 @@ test('gravação real continua carregando nos três corpos, separada do bloqueio
     assert.equal(ui.button(label).props.disabled, true);
     assert.equal(ui.button('Salvar e criar outro').props.disabled, true);
   }
+});
+// The real series editor must bind its diff and CAS to the record opened by the user.
+const f06SeriesBaselineFixture = () => ({
+  id: 'f06-series', workspace_id: 'workspace-1', kind: 'expense', amount_cents: 5000,
+  description: 'Academia', merchant: null, category: null, account_id: null, payment_method: null,
+  rrule: 'FREQ=MONTHLY;BYMONTHDAY=6', next_run_at: '2026-10-06T12:00:00Z',
+  dtstart: '2026-09-06T12:00:00Z', active: true, end_date: null, auto_confirm: false,
+  edit_revision: 7, expense_pattern: 'fixed', expense_pattern_source: 'explicit',
+  expense_necessity: 'essential', expense_necessity_source: 'explicit',
+});
+
+function f06SeriesBaselineOptions(recurring = [f06SeriesBaselineFixture()], extraProps: Record<string, unknown> = {}) {
+  return { componente: 'FormularioDaSerie', executarEfeitos: true, recurring, props: {
+    comum: { kind: 'expense', descricao: '', valorCents: 0, contaId: null, dataBR: '', categoria: null },
+    editandoId: 'f06-series', registrarComum: () => {}, registrarEstado: () => {},
+    onSalvo: () => {}, onFechar: () => {}, ...extraProps,
+  } };
+}
+
+const f06SaveSeriesScope = (ui: ReturnType<typeof screen>, scope: 'future' | 'all') => {
+  ui.press('Salvar');
+  const action = ui.actions.findLast(a => a.label === (scope === 'all' ? 'Todas' : 'Esta e próximas'));
+  assert.ok(action, 'edição de série oferece o alcance solicitado');
+  ui.interact(() => action.onPress());
+  assert.equal(ui.writes.at(-1)?.operation, scope === 'all' ? 'saveRecurringAll' : 'saveRecurringSeries');
+  return copia(ui.writes.at(-1)!.value);
+};
+
+test('F06 baseline da série: aceita estadoGuardado legado com campos planos', () => {
+  const legacy = { id: 'f06-series', kind: 'expense', amountCents: 5000,
+    description: 'Rascunho legado', merchant: '', category: null, accountId: null, paymentMethod: null,
+    preset: 'monthly', intervalo: '1', inicio: '06/10/2026', fim: '', autoConfirm: false,
+    expenseClassification: { expense_pattern: 'fixed', expense_pattern_source: 'explicit',
+      expense_necessity: 'essential', expense_necessity_source: 'explicit' },
+  };
+  const ui = screen('src/components/finance/formulario-da-serie.tsx', f06SeriesBaselineOptions(undefined, { estadoGuardado: legacy }));
+  const value = f06SaveSeriesScope(ui, 'future');
+  assert.deepEqual(value.patch, { description: 'Rascunho legado' });
+  assert.equal(value.expectedRevision, 7);
+});
+
+for (const scope of ['future', 'all'] as const) {
+  test(`F06 baseline da série: realtime não transforma classificação concorrente em edição (${scope})`, () => {
+    const options = f06SeriesBaselineOptions();
+    const ui = screen('src/components/finance/formulario-da-serie.tsx', options);
+    options.recurring = [{ ...f06SeriesBaselineFixture(), edit_revision: 8,
+      expense_necessity: 'discretionary', amount_cents: 9000, merchant: 'Outra unidade' }];
+    ui.interact(() => {});
+    ui.fill('Título', 'Academia corrigida');
+    const value = f06SaveSeriesScope(ui, scope);
+    assert.deepEqual(scope === 'all' ? value.seriesPatch : value.patch, { description: 'Academia corrigida' });
+    if (scope === 'all') assert.deepEqual(value.linePatch, { description: 'Academia corrigida' });
+    assert.equal(value.expectedRevision, 7, 'CAS usa a revisão aberta, para recusar a edição concorrente');
+  });
+
+  test(`F06 baseline da série: resposta perdida e realtime conservam intenção no retry (${scope})`, () => {
+    const options = f06SeriesBaselineOptions();
+    const ui = screen('src/components/finance/formulario-da-serie.tsx', options);
+    ui.fill('Título', 'Academia corrigida');
+    const first = f06SaveSeriesScope(ui, scope);
+    ui.interact(() => ui.pedidos.at(-1)!.opts.onError(new Error('Resposta perdida')));
+    options.recurring = [{ ...f06SeriesBaselineFixture(), description: 'Academia corrigida',
+      edit_revision: 8, expense_necessity: 'discretionary' }];
+    ui.interact(() => {});
+    const retry = f06SaveSeriesScope(ui, scope);
+    assert.deepEqual(retry, first, 'mesmos patch, revisão e requestId, mesmo que o realtime reflita a gravação');
+    assert.equal(retry.expectedRevision, 7);
+  });
+
+  test(`F06 baseline da série: estadoGuardado preserva o registro inicial depois de remontar (${scope})`, () => {
+    let readSaved: (() => unknown) | undefined;
+    const options = f06SeriesBaselineOptions(undefined, { registrarEstado: (read: () => unknown) => { readSaved = read; } });
+    const ui = screen('src/components/finance/formulario-da-serie.tsx', options);
+    ui.fill('Título', 'Academia corrigida');
+    assert.ok(readSaved, 'o corpo registra seu estado no hospedeiro');
+    const estadoGuardado = readSaved();
+    ui.desmontar();
+    const updated = { ...f06SeriesBaselineFixture(), edit_revision: 8, expense_necessity: 'discretionary' };
+    const reopened = screen('src/components/finance/formulario-da-serie.tsx', f06SeriesBaselineOptions([updated], { estadoGuardado }));
+    const value = f06SaveSeriesScope(reopened, scope);
+    assert.deepEqual(scope === 'all' ? value.seriesPatch : value.patch, { description: 'Academia corrigida' });
+    assert.equal(value.expectedRevision, 7);
+  });
+}
+
+// A format-switch draft carries classification separately from the new debt's category UI.
+const f06DebtCategory = 'qa f06 ios padrão';
+const f06DebtDefaultClassification = {
+  expense_pattern: 'variable', expense_pattern_source: 'category_default',
+  expense_necessity: 'discretionary', expense_necessity_source: 'category_default',
+};
+const f06DebtDefaults = [{ category: f06DebtCategory,
+  default_expense_pattern: 'variable', default_expense_necessity: 'discretionary' }];
+const f06DebtCommon = (expenseClassification = f06DebtDefaultClassification) => ({
+  kind: 'expense', descricao: 'Financiamento após trocar formato', valorCents: 5000,
+  contaId: null, dataBR: '06/10/2026', categoria: f06DebtCategory, expenseClassification,
+});
+const f06DebtClassification = (ui: ReturnType<typeof screen>) =>
+  copia(ui.nodes().find(n => n.type === 'ExpenseClassificationField').props.value);
+const f06DebtPreview = (ui: ReturnType<typeof screen>) =>
+  copia(ui.nodes().find(n => n.type === 'FinanceWritePreview').props.write);
+const f06ReadClassification = (value: Record<string, unknown>) => Object.fromEntries(
+  ['expense_pattern', 'expense_pattern_source', 'expense_necessity', 'expense_necessity_source'].map(k => [k, value[k]]));
+
+for (const [name, expenseClassification] of [
+  ['padrões da categoria', f06DebtDefaultClassification],
+  ['previsibilidade manual sem classificação', { ...f06DebtDefaultClassification, expense_pattern: null, expense_pattern_source: 'explicit' }],
+  ['necessidade manual sem classificação', { ...f06DebtDefaultClassification, expense_necessity: null, expense_necessity_source: 'explicit' }],
+  ['previsibilidade explícita', { ...f06DebtDefaultClassification, expense_pattern: 'fixed', expense_pattern_source: 'explicit' }],
+] as const) {
+  test(`F06 formato financiamento: conserva ${name} no campo, prévia e salvar`, () => {
+    let readCommon: (() => unknown) | undefined;
+    const ui = formDivida({ executarEfeitos: true, categoryDefaults: f06DebtDefaults, categoryDefaultsCached: true }, {
+      comum: f06DebtCommon(expenseClassification as any),
+      registrarComum: (read: () => unknown) => { readCommon = read; },
+    });
+    assert.deepEqual(f06DebtClassification(ui), expenseClassification);
+    ui.fill('Total de parcelas', '12');
+    const preview = f06DebtPreview(ui);
+    assert.deepEqual(f06ReadClassification(preview.args.p_dados), expenseClassification);
+    assert.ok(readCommon);
+    assert.deepEqual(copia((readCommon() as any).expenseClassification), expenseClassification, 'retornar a outro formato recebe o mesmo snapshot');
+    ui.press('Salvar');
+    assert.equal(ui.writes.at(-1)!.operation, 'saveDebt');
+    assert.deepEqual(f06ReadClassification(copia(ui.writes.at(-1)!.value)), expenseClassification);
+    assert.equal(ui.nodes().filter(n => n.type === 'Field').map(n => n.props.label).includes('Categoria'), false);
+  });
+}
+
+for (const failure of ['pending', 'error'] as const) {
+  test(`F06 formato financiamento: consulta de padrões ${failure} bloqueia criação e prévia`, () => {
+    const options = { componente: 'FormularioDaDivida', categoryDefaults: f06DebtDefaults,
+      categoryDefaultsPending: failure === 'pending', categoryDefaultsError: failure === 'error',
+      props: { comum: f06DebtCommon(), registrarComum: () => {}, registrarEstado: () => {}, onSalvo: () => {}, onFechar: () => {} } };
+    const ui = screen('src/components/finance/formulario-da-divida.tsx', options);
+    ui.fill('Total de parcelas', '12');
+    assert.equal(ui.button('Salvar').props.disabled, true);
+    assert.equal(ui.button('Salvar e criar outro').props.disabled, true);
+    assert.equal(f06DebtPreview(ui), null);
+    ui.interact(() => ui.button('Salvar').props.onPress());
+    assert.equal(ui.writes.length, 0, 'handler também não grava enquanto padrões não estão conferidos');
+    if (failure === 'error') {
+      const band = ui.nodes().find(n => n.type?.name === 'ErrorBand');
+      assert.ok(band, 'falha de padrões oferece uma recuperação visível');
+      ui.interact(() => band.props.onRetry());
+      assert.deepEqual(ui.refetches, ['category-defaults']);
+    }
+    options.categoryDefaultsPending = false;
+    options.categoryDefaultsError = false;
+    ui.interact(() => {});
+    assert.equal(ui.button('Salvar').props.disabled, false);
+    assert.deepEqual(f06ReadClassification(f06DebtPreview(ui).args.p_dados), f06DebtDefaultClassification);
+  });
+}
+
+for (const proof of ['sem categoria', 'sem workspace', 'com workspace próprio'] as const) {
+  test(`F06 formato financiamento: editar ${proof} nunca adota categoria comum implicitamente`, () => {
+    const original = { ...carro, installments_paid: 0, payment_category: proof === 'sem categoria' ? null : f06DebtCategory,
+      ...(proof === 'sem workspace' ? {} : { workspace_id: 'contract-workspace' }) };
+    const ui = formDivida({ executarEfeitos: true, debts: [original], categoryDefaults: f06DebtDefaults,
+      categoryDefaultsCached: true, categoryDefaultsError: proof === 'com workspace próprio' },
+    { editandoId: original.id, comum: f06DebtCommon() });
+    assert.deepEqual(f06DebtClassification(ui), { expense_pattern: null, expense_pattern_source: null,
+      expense_necessity: null, expense_necessity_source: null });
+    assert.deepEqual(ui.categoryDefaultsQueries.at(-1), { workspaceId: proof === 'sem workspace' ? undefined : 'contract-workspace',
+      enabled: proof === 'com workspace próprio' }, 'consulta usa somente a prova de categoria e workspace do contrato');
+    assert.equal(ui.nodes().find(n => n.type === 'ExpenseClassificationField').props.defaults, undefined,
+      'cache do workspace padrão não pode oferecer adoção sem prova do workspace original');
+    ui.fill('Nome', 'Contrato corrigido');
+    ui.press('Salvar');
+    assert.equal(ui.writes.at(-1)!.operation, 'saveDebtContractScoped');
+    assert.ok(!Object.keys(ui.writes.at(-1)!.value.patch).some(k => k.startsWith('expense_')), 'erro de defaults não impede edição nem preenche legado');
+  });
+}
+
+// Round-trip uses the real host plus separately mounted real form bodies. This retains
+// each React mount's own hook state while native components/queries stay isolated.
+const f06RoundTripPreviewInput = (ui: ReturnType<typeof screen>) => {
+  const write = f06DebtPreview(ui);
+  assert.ok(write, 'rascunho válido apresenta prévia financeira');
+  return write.args.p_input ?? write.args.p_dados;
+};
+const f06RoundTripFormats = {
+  uma: { file: 'formulario-do-lancamento', component: 'FormularioDoLancamento', title: 'Título', save: 'Salvar' },
+  recorrente: { file: 'formulario-da-serie', component: 'FormularioDaSerie', title: 'Título', save: 'Criar' },
+  financiamento: { file: 'formulario-da-divida', component: 'FormularioDaDivida', title: 'Nome', save: 'Salvar' },
+};
+function f06RoundTripHost(initial: keyof typeof f06RoundTripFormats, extra: Parameters<typeof screen>[1] = {}) {
+  const host = screen(lancarFile, { executarEfeitos: true,
+    params: { tipo: initial, description: 'Compra', amount: '5000', data: '06/10/2026', category: f06DebtCategory }, ...extra });
+  let readCommon: () => any;
+  const mount = () => {
+    const body = host.nodes().find(n => Object.values(f06RoundTripFormats).some(f => f.component === n.type || n.type === 'LancamentoEditando'));
+    assert.ok(body, 'host publica um corpo ativo');
+    const format = Object.entries(f06RoundTripFormats).find(([, f]) => f.component === body.type)?.[0] as keyof typeof f06RoundTripFormats
+      ?? 'uma';
+    const spec = f06RoundTripFormats[format];
+    const ui = screen(`src/components/finance/${spec.file}.tsx`, { executarEfeitos: true,
+      categoryDefaults: f06DebtDefaults, categoryDefaultsCached: true, ...extra,
+      componente: spec.component, props: { ...body.props, registrarComum: (read: () => any) => {
+        readCommon = read; body.props.registrarComum(read);
+      } } });
+    return { ui, spec, common: () => copia(readCommon()) };
+  };
+  let active = mount();
+  return {
+    get active() { return active; },
+    switchTo(format: keyof typeof f06RoundTripFormats) {
+      host.interact(() => host.nodes().find(n => n.type === 'FormatoDoLancamento').props.onChange(format));
+      active.ui.desmontar();
+      active = mount();
+      return active;
+    },
+  };
+}
+
+const f06RoundTripChoices = [
+  ['previsibilidade NULL explícita', { ...f06DebtDefaultClassification, expense_pattern: null, expense_pattern_source: 'explicit' }],
+  ['necessidade NULL explícita', { ...f06DebtDefaultClassification, expense_necessity: null, expense_necessity_source: 'explicit' }],
+  ['previsibilidade explícita', { ...f06DebtDefaultClassification, expense_pattern: 'fixed', expense_pattern_source: 'explicit' }],
+  ['necessidade explícita', { ...f06DebtDefaultClassification, expense_necessity: 'essential', expense_necessity_source: 'explicit' }],
+] as const;
+for (const initial of Object.keys(f06RoundTripFormats) as (keyof typeof f06RoundTripFormats)[]) {
+  for (const [choice, wanted] of f06RoundTripChoices) {
+    test(`F06 volta de formato: ${initial} conserva ${choice} em todos os formatos visitados`, () => {
+      const order = [initial, ...Object.keys(f06RoundTripFormats).filter(f => f !== initial)] as (keyof typeof f06RoundTripFormats)[];
+      const flow = f06RoundTripHost(initial);
+      for (const [index, format] of order.entries()) {
+        const { ui, spec } = index ? flow.switchTo(format) : flow.active;
+        ui.fill(spec.title, `Título próprio ${format}`);
+        if (format === 'financiamento') ui.fill('Total de parcelas', '12');
+      }
+      flow.active.ui.interact(nodes => { const field = nodes.find(n => n.type === 'ExpenseClassificationField');
+        field.props.onChange(Object.assign(field.props.value, wanted)); });
+      for (const format of order) {
+        const { ui, spec, common } = flow.switchTo(format);
+        assert.deepEqual(f06DebtClassification(ui), wanted, 'campo conserva a intenção mais recente');
+        assert.deepEqual(common().expenseClassification, wanted, 'próxima troca lê a mesma intenção');
+        assert.equal(common().descricao, `Título próprio ${format}`, 'campos próprios conservam a precedência anterior');
+        assert.deepEqual(f06ReadClassification(f06RoundTripPreviewInput(ui)), wanted, 'prévia usa o snapshot exibido');
+        ui.press(spec.save);
+        assert.equal(ui.writes.length, 1, 'formulário realmente submete o rascunho');
+        assert.deepEqual(f06ReadClassification(copia(ui.writes.at(-1)!.value)), wanted, 'gravação usa o snapshot exibido');
+      }
+    });
+  }
+}
+
+for (const format of ['uma', 'recorrente'] as const) {
+  test(`F06 volta de formato: ${format} recalcula apenas sugestões para a categoria própria restaurada`, () => {
+    const flow = f06RoundTripHost(format, { categoryDefaults: [...f06DebtDefaults, { category: 'Outra categoria',
+      default_expense_pattern: 'fixed', default_expense_necessity: 'essential' }] });
+    flow.switchTo(format === 'uma' ? 'recorrente' : 'uma');
+    flow.active.ui.interact(nodes => nodes.find(n => n.type === 'CategoryPicker').props.onChange('Outra categoria'));
+    const wanted = { expense_pattern: null, expense_pattern_source: 'explicit',
+      expense_necessity: 'essential', expense_necessity_source: 'category_default' };
+    flow.active.ui.interact(nodes => { const field = nodes.find(n => n.type === 'ExpenseClassificationField');
+        field.props.onChange(Object.assign(field.props.value, wanted)); });
+    const restored = flow.switchTo(format);
+    assert.equal(restored.common().categoria, f06DebtCategory, 'restauração mantém a categoria própria');
+    const expected = { ...wanted, expense_necessity: 'discretionary' };
+    assert.deepEqual(f06DebtClassification(restored.ui), expected, 'NULL manual vence; sugestão pertence à categoria exibida');
+    assert.deepEqual(f06ReadClassification(f06RoundTripPreviewInput(restored.ui)), expected);
+  });
+}
+
+for (const scope of ['future', 'all'] as const) {
+  test(`F06 volta de formato: série adota último padrão escolhido sem substituir baseline congelado (${scope})`, () => {
+    let readSaved: () => any;
+    const ui = screen('src/components/finance/formulario-da-serie.tsx', f06SeriesBaselineOptions(undefined,
+      { registrarEstado: (read: () => any) => { readSaved = read; } }));
+    ui.fill('Título', 'Academia corrigida');
+    const saved = readSaved();
+    ui.desmontar();
+    const latest = { expense_pattern: 'variable', expense_pattern_source: 'category_default',
+      expense_necessity: null, expense_necessity_source: 'explicit' };
+    const reopened = screen('src/components/finance/formulario-da-serie.tsx', f06SeriesBaselineOptions(
+      [{ ...f06SeriesBaselineFixture(), edit_revision: 8, expense_pattern: 'variable' }],
+      { estadoGuardado: saved, comum: { ...f06DebtCommon(), expenseClassification: latest } }));
+    assert.deepEqual(f06DebtClassification(reopened), latest, 'ação explícita de adotar padrão também viaja');
+    const write = f06SaveSeriesScope(reopened, scope);
+    assert.equal(write.expectedRevision, 7);
+    const expected = { description: 'Academia corrigida', ...latest };
+    assert.deepEqual(scope === 'all' ? write.seriesPatch : write.patch, expected);
+    if (scope === 'all') assert.deepEqual(write.linePatch, expected);
+  });
+}
+
+
+test('F06 extracted controls preserve labels, options and whitelist each independent dimension', () => {
+  const patterns: any[] = []; const necessities: any[] = [];
+  const ui = screen('src/components/finance/expense-classification-controls.tsx', {
+    componente: 'ExpenseClassificationControls', props: { pattern: 'variable', necessity: 'essential',
+      onPatternChange: (value: any) => patterns.push(value), onNecessityChange: (value: any) => necessities.push(value) },
+  });
+  const fields = ui.nodes().filter((n: any) => n.type === 'Field');
+  assert.deepEqual(fields.map((n: any) => n.props.label), ['Previsibilidade', 'Necessidade']);
+  assert.equal(fields[0].props.hint, 'Fixo é previsível; variável pode mudar. Isso não define a repetição.');
+  assert.equal(fields[1].props.hint, 'Essencial ou não essencial depende das suas necessidades, não da frequência.');
+  const selects = fields.map((n: any) => n.props.children.props);
+  assert.deepEqual(JSON.parse(JSON.stringify(selects[0].options)), [{ id: null, label: 'Não classificar', neutral: true }, { id: 'fixed', label: 'Fixo' }, { id: 'variable', label: 'Variável' }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(selects[1].options)), [{ id: null, label: 'Não classificar', neutral: true }, { id: 'essential', label: 'Essencial' }, { id: 'discretionary', label: 'Não essencial' }]);
+  for (const id of ['essential', 'discretionary', 'income', undefined, 0, {}]) selects[0].onChange(id);
+  for (const id of ['fixed', 'variable', 'income', undefined, 0, {}]) selects[1].onChange(id);
+  assert.deepEqual(patterns, []); assert.deepEqual(necessities, []);
+  for (const id of [null, 'fixed', 'variable']) selects[0].onChange(id);
+  assert.deepEqual(patterns, [null, 'fixed', 'variable']); assert.deepEqual(necessities, []);
+  for (const id of [null, 'essential', 'discretionary']) selects[1].onChange(id);
+  assert.deepEqual(necessities, [null, 'essential', 'discretionary']);
 });

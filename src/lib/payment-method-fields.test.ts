@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as payment from './payment-method.ts';
+import * as expenseClassification from './expense-classification.ts';
 import * as dates from './dates.ts';
 import * as series from './serie.ts';
 import * as purchase from './compra.ts';
@@ -15,7 +16,7 @@ type Node = { type: string; props: Record<string, any> };
 // Execute the actual field components; native primitives remain opaque boundaries.
 function component(file: string) {
   const exports: Record<string, any> = {};
-  const libs: Record<string, unknown> = { 'payment-method': payment, dates, serie: series, compra: purchase, 'down-payment': downPayment, 'finance-form': financeForm, 'rrule-text': rruleText };
+  const libs: Record<string, unknown> = { 'payment-method': payment, 'expense-classification': expenseClassification, dates, serie: series, compra: purchase, 'down-payment': downPayment, 'finance-form': financeForm, 'rrule-text': rruleText };
   const code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS } }).outputText;
   runInNewContext(code, {
     exports,

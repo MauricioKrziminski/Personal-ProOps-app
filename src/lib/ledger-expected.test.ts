@@ -14,6 +14,36 @@ const debt: ExpectedLedgerLine = {
   installment_no: 9, installments_total: 48,
 };
 
+test('classificação prevista combina dimensões por AND e conhecidos/null por OR', () => {
+  const fixedEssential = { ...recurrence, ref_id: 'a', expense_pattern: 'fixed' as const, expense_necessity: 'essential' as const };
+  const fixedDiscretionary = { ...recurrence, ref_id: 'b', expense_pattern: 'fixed' as const, expense_necessity: 'discretionary' as const };
+  const variableEssential = { ...debt, ref_id: 'c', expense_pattern: 'variable' as const, expense_necessity: 'essential' as const };
+  const unknown = { ...debt, ref_id: 'd', expense_pattern: null, expense_necessity: null };
+  const lines = [fixedEssential, fixedDiscretionary, variableEssential, unknown];
+  assert.deepEqual(filterExpectedLines(lines, { expensePatterns: ['fixed'] }), [fixedEssential, fixedDiscretionary]);
+  assert.deepEqual(filterExpectedLines(lines, { expenseNecessities: ['essential'] }), [fixedEssential, variableEssential]);
+  assert.deepEqual(filterExpectedLines(lines, { expensePatterns: ['fixed', 'not_informed'], expenseNecessities: ['essential', 'not_informed'] }), [fixedEssential, unknown]);
+  assert.deepEqual(filterExpectedLines(lines, { expensePatterns: ['variable'], expenseNecessities: ['discretionary'] }), []);
+});
+
+test('classificação Não informado inclui legado sem deduzir pela origem e exclui receitas', () => {
+  const income = { ...recurrence, ref_id: 'income', kind: 'income' as const };
+  assert.deepEqual(filterExpectedLines([recurrence, debt, income], { expensePatterns: ['not_informed'] }), [recurrence, debt]);
+  assert.deepEqual(filterExpectedLines([recurrence, debt, income], { expenseNecessities: ['not_informed'] }), [recurrence, debt]);
+  assert.deepEqual(filterExpectedLines([recurrence, debt, income], { kind: 'income', expensePatterns: ['not_informed'] }), []);
+  assert.deepEqual(filterExpectedLines([recurrence, debt, income], { kind: 'transfer', expenseNecessities: ['not_informed'] }), []);
+  assert.deepEqual(filterExpectedLines([recurrence, income], { expensePatterns: [], expenseNecessities: [] }), [income, recurrence]);
+});
+
+test('classificação prevista mantém demais filtros e valida antes de ler linhas', () => {
+  const fixed = { ...debt, expense_pattern: 'fixed' as const, expense_necessity: 'essential' as const, payment_method: 'pix' as const };
+  assert.deepEqual(filterExpectedLines([recurrence, fixed], { expensePatterns: ['fixed'], expenseNecessities: ['essential'], paymentMethods: ['pix'], accountId: 'checking', minCents: 5590 }), [fixed]);
+  assert.deepEqual(filterExpectedLines([fixed], { expensePatterns: ['fixed'], paymentMethods: ['credit'] }), []);
+  assert.deepEqual(filterExpectedLines([fixed], { expenseNecessities: ['essential'], maxCents: 5589 }), []);
+  assert.throws(() => filterExpectedLines([], { expensePatterns: ['bad'] as never }), /classificação.*válid/i);
+  assert.throws(() => filterExpectedLines([], { expenseNecessities: ['fixed'] as never }), /classificação.*válid/i);
+});
+
 test('previsões respeitam filtros da lista, sem se passarem por lançamentos concluídos', () => {
   assert.deepEqual(filterExpectedLines([recurrence, debt], { status: 'cleared' }), []);
   const paga = { ...recurrence, ref_id: 'paga', status: 'cleared' as const };

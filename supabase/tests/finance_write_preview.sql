@@ -48,9 +48,14 @@ create function pg_temp.f04_reads(days integer) returns jsonb language sql secur
     'limits',coalesce((select jsonb_agg(to_jsonb(l) order by l.account_id) from public.card_limit_context() l),'[]'::jsonb),
     'accounts',public.accounts_horizon(days),'cards',public.cards_horizon(days));
 $$;
-create function pg_temp.f04_preview(op text,args jsonb,days integer default 90)
+-- Missing fields differ from four JSON nulls: consumers must see the canonical snapshot.
+create function pg_temp.f06_classification(p_row jsonb) returns jsonb language sql as $$
+  select coalesce(jsonb_object_agg(key,value),'{}'::jsonb) from jsonb_each(p_row)
+  where key in('expense_pattern','expense_pattern_source','expense_necessity','expense_necessity_source');
+$$;
+create function pg_temp.f04_preview(op text,args jsonb,days integer default 90,classification jsonb default null)
 returns jsonb language plpgsql security invoker as $$
-declare contents jsonb:=pg_temp.f04_contents(); reads jsonb:=pg_temp.f04_reads(days); preview jsonb; saved jsonb;
+declare contents jsonb:=pg_temp.f04_contents(); reads jsonb:=pg_temp.f04_reads(days); preview jsonb; saved jsonb; line jsonb; actual jsonb; parent uuid; expected jsonb;
 begin
   preview:=public.preview_finance_write(op,args,days);
   assert preview is not null and preview->'before'=reads,'before snapshot differs from actual canonical reads';
@@ -73,6 +78,36 @@ begin
     set constraints public.payment_method_compatibility,public.owned_fee_graph immediate;
     assert pg_temp.f04_without_ids(preview->'after')=pg_temp.f04_without_ids(pg_temp.f04_reads(days)),
       'preview and actual-save financial projections differ';
+    if classification is not null then
+      assert jsonb_array_length(preview->'schedule')>0,'classification parity needs a visible occurrence';
+      parent:=coalesce((saved->>'id')::uuid,(saved->'ids'->>0)::uuid);
+      for line in select value from jsonb_array_elements(preview->'schedule') loop
+        actual:=null;
+        if line->>'origin'='transaction' then
+          select to_jsonb(t) into actual from public.transactions t where
+            (op='transaction' and t.id=case when (line->>'is_fee')::boolean then (saved->>'fee_id')::uuid else parent end)
+            or (op='purchase' and (t.installment_plan_id=parent and t.installment_no=(line->>'installment_no')::int
+              or (line->>'is_entry')::boolean and (t.down_payment_plan_id=parent or t.down_payment_debt_id=parent)))
+            or (op='recurring' and t.recurring_id=parent and t.occurred_at=(line->>'occurred_at')::date);
+        elsif line->>'origin'='recurring' then
+          select to_jsonb(e) into actual from public.ledger_expected_lines_classified(
+            (line->>'occurred_at')::date,(line->>'occurred_at')::date,parent) e
+          where e.origin='recurring' and e.ref_id=parent;
+        else
+          -- Both unpaid schedule and declared history of a NEW debt inherit its stored snapshot.
+          select to_jsonb(d) into actual from public.debts d where d.id=parent;
+        end if;
+        assert actual is not null,format('missing actual-save classification oracle: %s',line->>'origin');
+        expected:=case when (line->>'is_fee')::boolean then
+          '{"expense_pattern":null,"expense_pattern_source":null,"expense_necessity":null,"expense_necessity_source":null}'::jsonb
+          else classification end;
+        assert pg_temp.f06_classification(actual)=expected,
+          format('actual writer classification differs from independently expected snapshot: %s',line->>'origin');
+        assert pg_temp.f06_classification(line)=pg_temp.f06_classification(actual),
+          format('preview classification differs from actual-save canonical row: %s; preview=%s actual=%s',
+            line->>'origin',pg_temp.f06_classification(line),pg_temp.f06_classification(actual));
+      end loop;
+    end if;
     raise exception using errcode='PTF04',message='actual parity write rollback';
   exception when sqlstate 'PTF04' then null; end;
   assert pg_temp.f04_contents()=contents,'actual parity test leaked its write';
@@ -124,6 +159,78 @@ begin
 end $$;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000f401',true);
 set local role authenticated;
+
+-- F06 adds metadata parity to F04's financial/read-only oracle. These literals
+-- describe user decisions, not the preview implementation or a second preview.
+do $$
+declare bank uuid:='00000000-0000-0000-0000-00000000f405';
+  card uuid:='00000000-0000-0000-0000-00000000f408';
+  snapshot jsonb; expected jsonb; input jsonb; purchase jsonb; debt jsonb; recurring jsonb; args jsonb;
+  empty_snapshot jsonb:='{"expense_pattern":null,"expense_pattern_source":null,"expense_necessity":null,"expense_necessity_source":null}';
+  saved jsonb; tx uuid; revision bigint; start date:=current_date+5;
+begin
+  -- The edit oracle needs one saved row, but must not affect F04's fixed balances.
+  begin
+    input:=jsonb_build_object('kind','expense','amount_cents',1200,'description','F06 preview snapshot',
+      'account_id',bank,'occurred_at',start,'status','pending','payment_method','pix');
+    purchase:=jsonb_build_object('p_account_id',bank,'p_total_cents',1200,'p_installments',3,
+      'p_paid_installments',0,'p_occurred_at',start,'p_description','F06 preview purchase','p_payment_method','pix');
+    debt:=jsonb_build_object('name','F06 preview debt','kind','financing','calculation_mode','fixed_installments',
+      'principal_cents',1200,'remaining_cents',1200,'interest_rate_monthly',0,'installments',3,
+      'installments_paid',0,'installment_cents',400,'account_id',bank,'due_day',extract(day from start)::int,
+      'first_due_date',start,'payment_method','pix');
+    recurring:=jsonb_build_object('kind','expense','amount_cents',1200,'description','F06 preview recurring',
+      'account_id',bank,'rrule','FREQ=MONTHLY;BYMONTHDAY='||extract(day from start)::int,
+      'next_run_at',start::timestamp at time zone 'America/Sao_Paulo',
+      'dtstart',start::timestamp at time zone 'America/Sao_Paulo','payment_method','pix');
+    foreach snapshot in array array[
+      empty_snapshot,
+      '{"expense_pattern":"fixed","expense_pattern_source":"explicit","expense_necessity":"essential","expense_necessity_source":"category_default"}'::jsonb,
+      '{"expense_pattern":"variable","expense_pattern_source":"category_default","expense_necessity":"discretionary","expense_necessity_source":"explicit"}'::jsonb,
+      '{"expense_pattern":"variable","expense_pattern_source":"explicit","expense_necessity":"essential","expense_necessity_source":"category_default"}'::jsonb,
+      '{"expense_pattern":"fixed","expense_pattern_source":"category_default","expense_necessity":"discretionary","expense_necessity_source":"explicit"}'::jsonb,
+      '{"expense_pattern":null,"expense_pattern_source":"explicit","expense_necessity":null,"expense_necessity_source":"explicit"}'::jsonb,
+      '{"expense_necessity":"essential","expense_necessity_source":"explicit"}'::jsonb,
+      '{"expense_pattern":"variable","expense_pattern_source":"category_default"}'::jsonb
+    ] loop
+      expected:=empty_snapshot||snapshot;
+      perform pg_temp.f04_preview('transaction',jsonb_build_object('p_input',input||snapshot,'p_fee_cents',0),90,expected);
+      perform pg_temp.f04_preview('purchase',jsonb_build_object('p_tipo','parcelada','p_dados',purchase||snapshot,
+        'p_entrada',jsonb_build_object('amount_cents',100,'account_id',bank,'occurred_at',current_date,'payment_method','pix')),90,expected);
+      perform pg_temp.f04_preview('purchase',jsonb_build_object('p_tipo','financiamento','p_dados',debt||snapshot,
+        'p_entrada',jsonb_build_object('amount_cents',100,'account_id',bank,'occurred_at',current_date,'payment_method','pix')),90,expected);
+      perform pg_temp.f04_preview('recurring',jsonb_build_object('p_input',recurring||snapshot),90,expected);
+    end loop;
+    snapshot:='{"expense_pattern":"fixed","expense_pattern_source":"explicit","expense_necessity":"essential","expense_necessity_source":"category_default"}';
+    -- Declared paid history keeps the same snapshot as the unpaid debt contract.
+    perform pg_temp.f04_preview('purchase',jsonb_build_object('p_tipo','financiamento','p_dados',debt||snapshot||
+      jsonb_build_object('remaining_cents',800,'installments_paid',1,'first_due_date',current_date-40)),90,snapshot);
+    -- Card recurrence uses occurrence date for classification, invoice date for due_at.
+    perform pg_temp.f04_preview('recurring',jsonb_build_object('p_input',recurring||snapshot||
+      jsonb_build_object('account_id',card,'payment_method','credit')),90,snapshot);
+    perform pg_temp.f04_reject('transaction',jsonb_build_object('p_input',input||
+      '{"expense_pattern":"sometimes","expense_pattern_source":"explicit"}'::jsonb),'Classificação de gasto inválida');
+    perform pg_temp.f04_reject('recurring',jsonb_build_object('p_input',recurring||
+      '{"expense_necessity":"essential"}'::jsonb),'Classificação exige valor e origem juntos');
+    -- A Pix fee is its own expense; never copy the parent's non-null snapshot.
+    perform pg_temp.f04_preview('transaction',jsonb_build_object('p_input',input||snapshot||
+      jsonb_build_object('account_id',card),'p_fee_cents',50),90,snapshot);
+    saved:=public.save_transaction_payment(null,input||snapshot,0,null,gen_random_uuid());
+    tx:=(saved->>'id')::uuid; revision:=(saved->>'revision')::bigint;
+    -- Omitted dimensions survive edits; a deliberate clear replaces only one pair.
+    args:=jsonb_build_object('p_transaction_id',tx,'p_expected_revision',revision,'p_fee_cents',0);
+    perform pg_temp.f04_preview('transaction',args||jsonb_build_object('p_input','{"description":"F06 title only"}'::jsonb),90,snapshot);
+    perform pg_temp.f04_preview('transaction',args||jsonb_build_object('p_input',
+      '{"expense_pattern":null,"expense_pattern_source":"explicit"}'::jsonb),90,
+      snapshot||'{"expense_pattern":null,"expense_pattern_source":"explicit"}'::jsonb);
+    perform pg_temp.f04_preview('transaction',args||jsonb_build_object('p_input',empty_snapshot||'{"kind":"income"}'::jsonb),90,empty_snapshot);
+    perform pg_temp.f04_preview('recurring',jsonb_build_object('p_input',recurring||empty_snapshot||'{"kind":"income"}'::jsonb),90,empty_snapshot);
+    assert (select pg_temp.f06_classification(to_jsonb(t)) from public.transactions t where id=tx)=snapshot,
+      'preview metadata edit or income clear persisted';
+    raise exception using errcode='PTF06',message='classification fixtures rollback';
+  exception when sqlstate 'PTF06' then null; end;
+  raise notice 'PASS F06 preview: explicit/default/NULL/single-dimension snapshots; real transaction/purchase/entry/debt/recurring parity; edit omission/clear; income; independent Pix fee; no persistence';
+end $$;
 
 do $$
 declare bank uuid:='00000000-0000-0000-0000-00000000f405';

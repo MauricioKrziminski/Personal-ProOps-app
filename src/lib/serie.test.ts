@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { avisoDeDeslize, montaRRule, mudaInicioDaSerie, mudancasDaOcorrencia, regraDoApp, serieDaOcorrencia, serieDoRegistro, validaSerie, type OcorrenciaDaSerie, type SerieGravada } from './serie.ts';
 import { diaAmbiguo } from './dates.ts';
+import { selectExpenseClassification, UNKNOWN_EXPENSE_CLASSIFICATION } from './expense-classification.ts';
 
 // O Fundacred de produção (26/09/2026): dia 4 no cadastro, vence no último dia do mês.
 const fundacred: SerieGravada = {
@@ -12,6 +13,61 @@ const outubro: OcorrenciaDaSerie = {
   amount_cents: 119885, description: 'Fundacred', merchant: null, category: 'estudo', account_id: null,
   occurred_at: '2026-10-04', due_at: '2026-10-04', invoice_id: null,
 };
+
+test('F06 série: leitura conserva snapshot do contrato ou ocorrência e legado não vira fixo', () => {
+  const contrato = { ...fundacred, expense_pattern: 'fixed' as const, expense_pattern_source: 'category_default' as const,
+    expense_necessity: 'essential' as const, expense_necessity_source: 'explicit' as const };
+  const ocorrencia = { ...outubro, expense_pattern: 'variable' as const, expense_pattern_source: 'explicit' as const,
+    expense_necessity: null, expense_necessity_source: 'explicit' as const };
+  assert.deepEqual(serieDoRegistro(contrato).expenseClassification, {
+    expense_pattern: 'fixed', expense_pattern_source: 'category_default', expense_necessity: 'essential', expense_necessity_source: 'explicit',
+  });
+  assert.deepEqual(serieDaOcorrencia(contrato, ocorrencia).expenseClassification, {
+    expense_pattern: 'variable', expense_pattern_source: 'explicit', expense_necessity: null, expense_necessity_source: 'explicit',
+  });
+  assert.deepEqual(serieDoRegistro(fundacred).expenseClassification, UNKNOWN_EXPENSE_CLASSIFICATION);
+});
+
+test('F06 série: renomear conserva overrides; uma dimensão alterada publica seu par nas linhas e regra', () => {
+  const contrato = { ...fundacred, expense_pattern: 'fixed' as const, expense_pattern_source: 'category_default' as const };
+  const ocorrencia = { ...outubro, expense_pattern: 'variable' as const, expense_pattern_source: 'explicit' as const };
+  const base = serieDaOcorrencia(contrato, ocorrencia);
+  assert.deepEqual(mudancasDaOcorrencia({ ...base, description: 'Título novo' }, ocorrencia, contrato), { linhas: { description: 'Título novo' }, regra: {} });
+  const changed = { ...base, expenseClassification: selectExpenseClassification(base.expenseClassification, 'necessity', null) };
+  assert.deepEqual(mudancasDaOcorrencia(changed, ocorrencia, contrato), {
+    linhas: { expense_necessity: null, expense_necessity_source: 'explicit' },
+    regra: { expense_necessity: null, expense_necessity_source: 'explicit' },
+  });
+});
+
+test('F06 série: mudança de previsibilidade propaga intenção mesmo quando contrato já tem o valor escolhido', () => {
+  const contrato = { ...fundacred, expense_pattern: 'fixed' as const, expense_pattern_source: 'explicit' as const };
+  const ocorrencia = { ...outubro, expense_pattern: 'variable' as const, expense_pattern_source: 'explicit' as const };
+  const base = serieDaOcorrencia(contrato, ocorrencia);
+  const changed = { ...base, expenseClassification: selectExpenseClassification(base.expenseClassification, 'pattern', 'fixed') };
+  assert.deepEqual(mudancasDaOcorrencia(changed, ocorrencia, contrato), {
+    linhas: { expense_pattern: 'fixed', expense_pattern_source: 'explicit' },
+    regra: { expense_pattern: 'fixed', expense_pattern_source: 'explicit' },
+  });
+});
+
+test('F06 série: converter gasto classificado em receita limpa os quatro campos', () => {
+  const classified = { expense_pattern: 'fixed' as const, expense_pattern_source: 'explicit' as const,
+    expense_necessity: 'essential' as const, expense_necessity_source: 'category_default' as const };
+  const base = serieDaOcorrencia({ ...fundacred, ...classified }, { ...outubro, ...classified });
+  assert.deepEqual(mudancasDaOcorrencia({ ...base, kind: 'income' }, { ...outubro, ...classified }, { ...fundacred, ...classified }), {
+    linhas: { ...UNKNOWN_EXPENSE_CLASSIFICATION }, regra: { kind: 'income', ...UNKNOWN_EXPENSE_CLASSIFICATION },
+  });
+});
+
+test('F06 série: converter ocorrência legado em receita também limpa snapshot conhecido do contrato', () => {
+  const contrato = { ...fundacred, expense_pattern: 'fixed' as const, expense_pattern_source: 'explicit' as const,
+    expense_necessity: 'essential' as const, expense_necessity_source: 'explicit' as const };
+  const base = serieDaOcorrencia(contrato, outubro);
+  assert.deepEqual(mudancasDaOcorrencia({ ...base, kind: 'income' }, outubro, contrato), {
+    linhas: { ...UNKNOWN_EXPENSE_CLASSIFICATION }, regra: { kind: 'income', ...UNKNOWN_EXPENSE_CLASSIFICATION },
+  });
+});
 
 test('Esta e as próximas: valor e vencimento mudados — o valor vai pelas linhas, o calendário pela regra', () => {
   const form = { ...serieDaOcorrencia(fundacred, outubro), amountCents: 120000, inicio: '31/10/2026', agendaMudou: true };

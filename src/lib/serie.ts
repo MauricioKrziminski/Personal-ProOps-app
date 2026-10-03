@@ -5,8 +5,10 @@
 import { brToISO, dataLocalDe, fimQueSegueOInicio, isValidBRDate, isoToBR, localDateTime, localISODate } from './dates.ts';
 import { normalizePaymentMethod, assertPaymentMethod, type PaymentMethod } from './payment-method.ts';
 import { validRecurringRange } from './finance-form.ts';
+import { expenseClassificationFromRecord, expenseClassificationPatch, resolveExpenseClassification, type ExpenseClassification } from './expense-classification.ts';
 
 export interface SerieForm {
+  expenseClassification?: ExpenseClassification;
   /**
    * Presente = está EDITANDO uma série que já existe. Todos os campos da criação continuam na tela:
    * mudar a repetição ou o vencimento refaz as ocorrências futuras em aberto.
@@ -61,7 +63,7 @@ export function mudaInicioDaSerie(form: SerieForm, inicio: string, ultimoDia: bo
 }
 
 /** O que a série gravada precisa ter para virar formulário. */
-export interface SerieGravada {
+export interface SerieGravada extends Partial<ExpenseClassification> {
   id: string;
   kind: string;
   amount_cents: number;
@@ -117,6 +119,7 @@ export function serieDoRegistro(r: SerieGravada): SerieForm {
     merchant: r.merchant ?? '',
     category: r.category,
     accountId: r.account_id,
+    expenseClassification: expenseClassificationFromRecord(r),
     ...(r.payment_method !== undefined ? { paymentMethod: normalizePaymentMethod(r.payment_method) } : {}),
     preset: r.rrule.includes('FREQ=WEEKLY') ? 'weekly' : r.rrule.includes('FREQ=YEARLY') ? 'yearly' : 'monthly',
     intervalo: /INTERVAL=(\d+)/.exec(r.rrule)?.[1] ?? '1',
@@ -170,7 +173,7 @@ export function validaSerie(form: SerieForm | null) {
 }
 
 /** A ocorrência aberta no formulário do lançamento. */
-export interface OcorrenciaDaSerie {
+export interface OcorrenciaDaSerie extends Partial<ExpenseClassification> {
   amount_cents: number;
   description: string | null;
   merchant: string | null;
@@ -200,6 +203,7 @@ export function serieDaOcorrencia(serie: SerieGravada, linha: OcorrenciaDaSerie)
     merchant: linha.merchant ?? '',
     category: linha.category,
     accountId: linha.account_id,
+    expenseClassification: expenseClassificationFromRecord(linha),
     ...(linha.payment_method !== undefined ? { paymentMethod: normalizePaymentMethod(linha.payment_method) } : { paymentMethod: undefined }),
     inicio:
       linha.status === 'cleared'
@@ -221,7 +225,7 @@ export function serieDaOcorrencia(serie: SerieGravada, linha: OcorrenciaDaSerie)
  */
 export function mudancasDaOcorrencia(form: SerieForm, linha: OcorrenciaDaSerie, serie: SerieGravada) {
   assertPaymentMethod(form.paymentMethod);
-  const linhas: {
+  const linhas: Partial<ExpenseClassification> & {
     amount_cents?: number;
     category?: string | null;
     description?: string;
@@ -238,7 +242,7 @@ export function mudancasDaOcorrencia(form: SerieForm, linha: OcorrenciaDaSerie, 
   if (form.accountId !== linha.account_id) linhas.account_id = form.accountId;
   if (form.paymentMethod !== undefined && form.paymentMethod !== normalizePaymentMethod(linha.payment_method)) linhas.payment_method = form.paymentMethod;
 
-  const regra: {
+  const regra: Partial<ExpenseClassification> & {
     kind?: 'expense' | 'income';
     payment_method?: PaymentMethod | null;
     end_date?: string | null;
@@ -256,6 +260,16 @@ export function mudancasDaOcorrencia(form: SerieForm, linha: OcorrenciaDaSerie, 
     regra.rrule = rrulePrevia;
     regra.next_run_at = inicioDate.toISOString();
   }
+  const before = expenseClassificationFromRecord(linha);
+  const after = resolveExpenseClassification(form.expenseClassification ?? before, undefined, form.kind, false);
+  const contractClassification = expenseClassificationFromRecord(serie);
+  const classificationPatch = form.kind === 'income'
+    && [...Object.values(before), ...Object.values(contractClassification)].some(value => value !== null)
+    ? { ...after }
+    : expenseClassificationPatch(before, after);
+  // The changed pair is one intent shared by the occurrence and the contract.
+  Object.assign(linhas, classificationPatch);
+  Object.assign(regra, classificationPatch);
   return { linhas, regra };
 }
 

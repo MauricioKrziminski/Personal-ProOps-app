@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { compraDoRegistro, compraParaRevisaoDaParcela, edicaoEscopadaDaCompra, mudarParcelas, payloadDaCompra, validaCompra, type CompraGravada } from './compra.ts';
+import { selectExpenseClassification, UNKNOWN_EXPENSE_CLASSIFICATION } from './expense-classification.ts';
 
 // Uma compra de 10x de R$ 100 com as 3 primeiras pagas.
 const tv: CompraGravada = {
@@ -8,6 +9,78 @@ const tv: CompraGravada = {
   installments: 10, first_occurred_at: '2026-06-05', installment_cents: 10000, paid: 3, locked: 3,
   locked_cents: 30000, locked_paid: 3, locked_in_invoice: 0, last_locked_no: 3, paid_floor: 0,
 };
+
+test('F06 compra: leitura conserva snapshot e original, sem classificar parcelamento legado', () => {
+  const classified = { expense_pattern: 'fixed' as const, expense_pattern_source: 'category_default' as const,
+    expense_necessity: null, expense_necessity_source: 'explicit' as const };
+  const form = compraDoRegistro({ ...tv, ...classified });
+  assert.deepEqual(form.expenseClassification, classified);
+  assert.deepEqual(form.original.expenseClassification, classified);
+  assert.deepEqual(compraDoRegistro(tv).expenseClassification, UNKNOWN_EXPENSE_CLASSIFICATION);
+});
+
+test('F06 compra: escopada e estrutural enviam só o par alterado, título conserva classificações', () => {
+  const original = { ...tv, expense_pattern: 'fixed' as const, expense_pattern_source: 'explicit' as const,
+    expense_necessity: 'essential' as const, expense_necessity_source: 'category_default' as const };
+  const base = compraDoRegistro(original);
+  const renamed = { ...base, description: 'TV nova' };
+  assert.deepEqual(edicaoEscopadaDaCompra(renamed, original, 'future'), { kind: 'scope', lastDay: false, patch: { description: 'TV nova' } });
+  assert.equal(payloadDaCompra(renamed, original.first_occurred_at).expense_pattern, undefined);
+  assert.equal(payloadDaCompra(renamed, original.first_occurred_at).expense_necessity, undefined);
+  const changed = { ...base, expenseClassification: selectExpenseClassification(base.expenseClassification, 'necessity', null) };
+  for (const scope of ['one', 'future', 'all'] as const)
+    assert.deepEqual(edicaoEscopadaDaCompra(changed, original, scope), { kind: 'scope', lastDay: false,
+      patch: { expense_necessity: null, expense_necessity_source: 'explicit' } });
+  const payload = payloadDaCompra({ ...changed, installments: 12 }, original.first_occurred_at);
+  assert.equal(payload.expense_necessity, null);
+  assert.equal(payload.expense_necessity_source, 'explicit');
+  assert.equal(payload.expense_pattern, undefined);
+  assert.equal(payload.expense_pattern_source, undefined);
+});
+
+test('F06 compra: revisão da parcela aplica intenção alterada ao contrato e conserva override intocado', () => {
+  const original = { ...tv, expense_pattern: 'fixed' as const, expense_pattern_source: 'category_default' as const,
+    expense_necessity: 'essential' as const, expense_necessity_source: 'explicit' as const };
+  const parcela = { installment_no: 5, occurred_at: '2026-10-05', amount_cents: 10000, description: 'TV (5/10)',
+    expense_pattern: 'variable' as const, expense_pattern_source: 'explicit' as const,
+    expense_necessity: 'essential' as const, expense_necessity_source: 'explicit' as const };
+  const snapshot = { expense_pattern: parcela.expense_pattern, expense_pattern_source: parcela.expense_pattern_source,
+    expense_necessity: parcela.expense_necessity, expense_necessity_source: parcela.expense_necessity_source };
+  const draft = { occurred_at: parcela.occurred_at, amount_cents: parcela.amount_cents, description: parcela.description,
+    merchant: null, category: original.category, expenseClassification: snapshot };
+  const untouched = compraParaRevisaoDaParcela(original, parcela, draft);
+  assert.deepEqual(untouched.expenseClassification, {
+    expense_pattern: 'fixed', expense_pattern_source: 'category_default', expense_necessity: 'essential', expense_necessity_source: 'explicit',
+  });
+  const changed = compraParaRevisaoDaParcela(original, parcela, { ...draft,
+    expenseClassification: selectExpenseClassification(snapshot, 'necessity', null) });
+  assert.deepEqual(changed.expenseClassification, {
+    expense_pattern: 'fixed', expense_pattern_source: 'category_default', expense_necessity: null, expense_necessity_source: 'explicit',
+  });
+  const payload = payloadDaCompra(changed, original.first_occurred_at);
+  assert.equal(payload.expense_necessity, null);
+  assert.equal(payload.expense_necessity_source, 'explicit');
+  assert.equal(payload.expense_pattern, undefined);
+  assert.equal(payload.expense_pattern_source, undefined);
+});
+
+test('F06 compra: intenção da âncora propaga mesmo igual ao contrato e acompanha alterações posteriores na revisão', () => {
+  const original = { ...tv, expense_pattern: 'fixed' as const, expense_pattern_source: 'explicit' as const };
+  const parcela = { installment_no: 5, occurred_at: '2026-10-05', amount_cents: 10000, description: 'TV (5/10)',
+    expense_pattern: 'variable' as const, expense_pattern_source: 'explicit' as const };
+  const draft = { occurred_at: parcela.occurred_at, amount_cents: parcela.amount_cents, description: parcela.description,
+    merchant: null, category: tv.category, expenseClassification: { ...UNKNOWN_EXPENSE_CLASSIFICATION,
+      expense_pattern: 'fixed' as const, expense_pattern_source: 'explicit' as const } };
+  const review = compraParaRevisaoDaParcela(original, parcela, draft);
+  assert.deepEqual(edicaoEscopadaDaCompra(review, original, 'all'), { kind: 'scope', lastDay: false,
+    patch: { expense_pattern: 'fixed', expense_pattern_source: 'explicit' } });
+  const changed = { ...review, expenseClassification: selectExpenseClassification(review.expenseClassification, 'pattern', null) };
+  const payload = payloadDaCompra(changed, original.first_occurred_at);
+  assert.equal(payload.expense_pattern, null);
+  assert.equal(payload.expense_pattern_source, 'explicit');
+  assert.deepEqual(review.original.expenseClassification, { ...UNKNOWN_EXPENSE_CLASSIFICATION,
+    expense_pattern: 'fixed', expense_pattern_source: 'explicit' });
+});
 
 test('Com parcela paga o número muda, só não fica abaixo da última paga nem vira à vista', () => {
   const f = compraDoRegistro(tv);

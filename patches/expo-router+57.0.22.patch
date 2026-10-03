@@ -1,0 +1,97 @@
+diff --git a/node_modules/expo-router/build/fork/NavigationContainer.js b/node_modules/expo-router/build/fork/NavigationContainer.js
+index 3db5ea4..919dad4 100644
+--- a/node_modules/expo-router/build/fork/NavigationContainer.js
++++ b/node_modules/expo-router/build/fork/NavigationContainer.js
+@@ -41,16 +41,49 @@ function NavigationContainerInner({ direction = react_native_1.I18nManager.getCo
+     (0, useDocumentTitle_1.useDocumentTitle)(refContainer, documentTitle);
+     (0, imperative_api_1.useImperativeApiEmitter)(refContainer);
+     const [lastUnhandledLink, setLastUnhandledLink] = react_1.default.useState();
++    // Initial linking can resolve from render before this container commits.
++    // Retain its bookkeeping without dispatching to an unmounted React owner.
++    const unhandledLinkRef = react_1.default.useRef({ mounted: false, disposed: false, pending: undefined });
++    const onUnhandledLinking = react_1.default.useCallback((path) => {
++        const lifecycle = unhandledLinkRef.current;
++        if (lifecycle.disposed) {
++            return;
++        }
++        if (!lifecycle.mounted) {
++            lifecycle.pending = { path };
++            return;
++        }
++        const currentPath = refContainer.current?.getCurrentRoute()?.path;
++        setLastUnhandledLink(path === currentPath ? undefined : path);
++    }, []);
++    react_1.default.useEffect(() => {
++        const lifecycle = unhandledLinkRef.current;
++        lifecycle.mounted = true;
++        lifecycle.disposed = false;
++        const pending = lifecycle.pending;
++        lifecycle.pending = undefined;
++        if (pending) {
++            onUnhandledLinking(pending.path);
++        }
++        return () => {
++            lifecycle.mounted = false;
++            lifecycle.disposed = true;
++            lifecycle.pending = undefined;
++        };
++    }, [onUnhandledLinking]);
+     const { getInitialState } = (0, useLinking_1.useLinking)(refContainer, {
+         enabled: isLinkingEnabled,
+         prefixes: [],
+         ...linking,
+-    }, setLastUnhandledLink);
++    }, onUnhandledLinking);
+     const linkingContext = react_1.default.useMemo(() => ({ options: linking }), [linking]);
+     const unhandledLinkingContext = react_1.default.useMemo(() => ({ lastUnhandledLink, setLastUnhandledLink }), [lastUnhandledLink, setLastUnhandledLink]);
+     const onReadyForLinkingHandling = (0, useLatestCallback_1.default)(() => {
+         // If the screen path matches lastUnhandledLink, we do not track it
+         const path = refContainer.current?.getCurrentRoute()?.path;
++        if (unhandledLinkRef.current.pending?.path === path) {
++            unhandledLinkRef.current.pending = undefined;
++        }
+         setLastUnhandledLink((previousLastUnhandledLink) => {
+             if (previousLastUnhandledLink === path) {
+                 return undefined;
+@@ -62,6 +95,9 @@ function NavigationContainerInner({ direction = react_native_1.I18nManager.getCo
+     const onStateChangeForLinkingHandling = (0, useLatestCallback_1.default)((state) => {
+         // If the screen path matches lastUnhandledLink, we do not track it
+         const path = refContainer.current?.getCurrentRoute()?.path;
++        if (unhandledLinkRef.current.pending?.path === path) {
++            unhandledLinkRef.current.pending = undefined;
++        }
+         setLastUnhandledLink((previousLastUnhandledLink) => {
+             if (previousLastUnhandledLink === path) {
+                 return undefined;
+diff --git a/node_modules/expo-router/build/fork/useLinking.native.js b/node_modules/expo-router/build/fork/useLinking.native.js
+index c080a58..051dda2 100644
+--- a/node_modules/expo-router/build/fork/useLinking.native.js
++++ b/node_modules/expo-router/build/fork/useLinking.native.js
+@@ -114,7 +114,10 @@ function useLinking(ref, { enabled = true, prefixes, filter, config, getInitialU
+         const path = (0, extractPathFromURL_1.extractExpoPathFromURL)(prefixesRef.current, url);
+         return path !== undefined ? getStateFromPathRef.current(path, configRef.current) : undefined;
+     }, []);
++    // A newer warm link or initial-state request supersedes initial URL bookkeeping.
++    const initialLinkRequestRef = (0, react_1.useRef)(0);
+     const getInitialState = (0, react_1.useCallback)(() => {
++        const request = ++initialLinkRequestRef.current;
+         let state;
+         if (enabledRef.current) {
+             const url = getInitialURLRef.current();
+@@ -122,7 +125,7 @@ function useLinking(ref, { enabled = true, prefixes, filter, config, getInitialU
+                 if (typeof url !== 'string') {
+                     return url.then((url) => {
+                         const state = getStateFromURL(url);
+-                        if (typeof url === 'string') {
++                        if (typeof url === 'string' && enabledRef.current && request === initialLinkRequestRef.current) {
+                             // If the link were handled, it gets cleared in NavigationContainer
+                             onUnhandledLinking((0, extractPathFromURL_1.extractExpoPathFromURL)(prefixes, url));
+                         }
+@@ -153,6 +156,7 @@ function useLinking(ref, { enabled = true, prefixes, filter, config, getInitialU
+             const navigation = ref.current;
+             const state = navigation ? getStateFromURL(url) : undefined;
+             if (navigation && state) {
++                initialLinkRequestRef.current++;
+                 // If the link were handled, it gets cleared in NavigationContainer
+                 onUnhandledLinking((0, extractPathFromURL_1.extractExpoPathFromURL)(prefixes, url));
+                 const rootState = navigation.getRootState();

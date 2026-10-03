@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  CLASSIFICATION_SOURCES, EXPENSE_NECESSITIES, EXPENSE_PATTERNS,
+  expenseClassificationFromRecord, type ExpenseClassification,
+} from './expense-classification.ts';
 
 export type PreviewSnapshot = {
   balances: { account_id: string | null; cleared_cents: number }[];
@@ -6,7 +10,7 @@ export type PreviewSnapshot = {
   accounts: { account_id: string | null; saldo_fim: number }[];
   cards: unknown[];
 };
-export type PreviewScheduleLine = {
+export type PreviewScheduleLine = Partial<ExpenseClassification> & {
   origin: 'transaction' | 'recurring' | 'debt_schedule' | 'debt_estimate';
   id: string | null;
   ref_id: string | null;
@@ -97,6 +101,18 @@ const previewSchema = z.object({
     invoice_id: z.string().nullable(), invoice_closing_date: date.nullable(), invoice_due_date: date.nullable(),
     invoice_status: z.string().nullable(), paid_at: date.nullable().optional(), invoice_paid_at: date.nullable().optional(),
     is_entry: z.boolean(), is_fee: z.boolean(), payment_method: z.string().nullable(), estimated: z.boolean(),
+    expense_pattern: z.enum(EXPENSE_PATTERNS).nullable().optional(),
+    expense_pattern_source: z.enum(CLASSIFICATION_SOURCES).nullable().optional(),
+    expense_necessity: z.enum(EXPENSE_NECESSITIES).nullable().optional(),
+    expense_necessity_source: z.enum(CLASSIFICATION_SOURCES).nullable().optional(),
+  }).superRefine((line, ctx) => {
+    try {
+      const classification = expenseClassificationFromRecord(line);
+      if (line.kind !== 'expense' && Object.values(classification).some((value) => value !== null))
+        ctx.addIssue({ code: 'custom', message: 'Classificação só se aplica a gastos' });
+    } catch {
+      ctx.addIssue({ code: 'custom', message: 'Classificação de gasto inválida' });
+    }
   })).max(366),
   schedule_total: cents.refine((n) => n >= 0), schedule_truncated: z.boolean(),
   schedule_scope: z.enum(['contract', 'horizon']), horizon_days: cents.refine((n) => n >= 1 && n <= 366),

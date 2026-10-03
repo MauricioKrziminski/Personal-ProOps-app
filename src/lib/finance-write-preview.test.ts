@@ -80,3 +80,113 @@ test('unassigned canonical balances remain readable and distinct from a missing 
   assert.equal(unassigned.balanceAfter, -1234);
   assert.equal(unassigned.name, 'Sem conta');
 });
+
+const classificationKeys = ['expense_pattern', 'expense_pattern_source', 'expense_necessity', 'expense_necessity_source'] as const;
+const unknownClassification = {
+  expense_pattern: null, expense_pattern_source: null, expense_necessity: null, expense_necessity_source: null,
+};
+const explicitClassification = {
+  expense_pattern: 'fixed', expense_pattern_source: 'explicit',
+  expense_necessity: 'essential', expense_necessity_source: 'category_default',
+};
+function previewWithClassification(classification: Record<string, unknown>, line: Record<string, unknown> = {}) {
+  return { ...preview, schedule: [{ ...preview.schedule[0], ...line, ...classification }] };
+}
+
+test('legacy F04 schedule without classification columns stays absent and is never inferred from origin', () => {
+  for (const origin of ['transaction', 'recurring', 'debt_schedule', 'debt_estimate']) {
+    const read = lerPrevia(previewWithClassification({}, { origin, estimated: origin !== 'transaction' }));
+    for (const key of classificationKeys) assert.equal(Object.hasOwn(read.schedule[0], key), false);
+  }
+});
+
+test('schedule preserves the server snapshot for recorded, recurring, debt and declared lines', () => {
+  for (const origin of ['transaction', 'recurring', 'debt_schedule', 'debt_estimate']) {
+    for (const classification of [explicitClassification, {
+      expense_pattern: 'variable', expense_pattern_source: 'category_default',
+      expense_necessity: 'discretionary', expense_necessity_source: 'explicit',
+    }]) {
+      const raw = previewWithClassification(classification, {
+        origin, estimated: origin !== 'transaction', status: origin === 'debt_estimate' ? 'declared' : 'pending',
+      });
+      assert.deepEqual(lerPrevia(raw).schedule[0], raw.schedule[0]);
+    }
+  }
+});
+
+test('explicit NULL, four unknown columns and one classified dimension preserve distinct snapshots', () => {
+  for (const classification of [unknownClassification, {
+    expense_pattern: null, expense_pattern_source: 'explicit',
+    expense_necessity: null, expense_necessity_source: 'explicit',
+  }, {
+    expense_pattern: null, expense_pattern_source: 'explicit',
+    expense_necessity: 'essential', expense_necessity_source: 'category_default',
+  }, {
+    expense_pattern: 'variable', expense_pattern_source: 'explicit',
+  }, {
+    expense_necessity: 'discretionary', expense_necessity_source: 'category_default',
+  }]) {
+    const raw = previewWithClassification(classification);
+    assert.deepEqual(lerPrevia(raw).schedule[0], raw.schedule[0]);
+  }
+});
+
+test('a Pix fee retains its own unknown snapshot independently of the classified purchase', () => {
+  const raw = { ...preview, schedule: [
+    { ...preview.schedule[0], ...explicitClassification, account_id: 'card' },
+    { ...preview.schedule[0], ...unknownClassification, id: 'fee', ref_id: 'tx',
+      account_id: 'card', is_fee: true, amount_cents: 50, description: 'Juros do Pix no crédito' },
+  ], schedule_total: 2 };
+  assert.deepEqual(lerPrevia(raw).schedule, raw.schedule);
+});
+
+test('schedule rejects classification enums and provenance outside the closed domain', () => {
+  for (const invalid of [
+    { expense_pattern: 'sometimes', expense_pattern_source: 'explicit' },
+    { expense_pattern: 'FIXED', expense_pattern_source: 'explicit' },
+    { expense_pattern: 'fixed', expense_pattern_source: 'recurring' },
+    { expense_pattern: 'fixed', expense_pattern_source: true },
+    { expense_pattern: 1, expense_pattern_source: 'explicit' },
+    { expense_necessity: 'optional', expense_necessity_source: 'explicit' },
+    { expense_necessity: 'essential', expense_necessity_source: 'inferred' },
+    { expense_necessity: 'essential', expense_necessity_source: {} },
+  ]) assert.throws(() => lerPrevia(previewWithClassification(invalid)), JSON.stringify(invalid));
+});
+
+test('schedule rejects a known value without source and a category default whose value is NULL', () => {
+  for (const invalid of [
+    { expense_pattern: 'fixed' },
+    { expense_pattern: 'fixed', expense_pattern_source: null },
+    { expense_necessity: 'essential' },
+    { expense_necessity: 'essential', expense_necessity_source: null },
+    { expense_pattern: null, expense_pattern_source: 'category_default' },
+    { expense_necessity: null, expense_necessity_source: 'category_default' },
+  ]) assert.throws(() => lerPrevia(previewWithClassification(invalid)), JSON.stringify(invalid));
+});
+
+test('income and transfers preserve four cleared metadata columns', () => {
+  for (const kind of ['income', 'transfer']) {
+    const raw = previewWithClassification(unknownClassification, { kind });
+    assert.deepEqual(lerPrevia(raw).schedule[0], raw.schedule[0]);
+  }
+});
+
+test('income and transfers reject known expense classification', () => {
+  for (const kind of ['income', 'transfer']) {
+    for (const classification of [explicitClassification, {
+      expense_pattern: 'variable', expense_pattern_source: 'category_default',
+    }, {
+      expense_necessity: 'essential', expense_necessity_source: 'explicit',
+    }]) assert.throws(() => lerPrevia(previewWithClassification(classification, { kind })));
+  }
+});
+
+test('income and transfers reject explicit NULL provenance as expense metadata', () => {
+  for (const kind of ['income', 'transfer']) {
+    for (const classification of [{
+      expense_pattern: null, expense_pattern_source: 'explicit',
+    }, {
+      expense_necessity: null, expense_necessity_source: 'explicit',
+    }]) assert.throws(() => lerPrevia(previewWithClassification(classification, { kind })));
+  }
+});

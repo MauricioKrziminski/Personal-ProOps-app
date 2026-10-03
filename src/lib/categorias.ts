@@ -7,6 +7,7 @@
  */
 import type { IconName } from '@/components/ui/icon';
 import type { NoteColorName } from '@/constants/theme';
+import type { ExpensePattern, ExpenseNecessity } from './expense-classification.ts';
 import { categoryIcon } from '../design/category-icons.ts';
 import { foldCategory } from './categories-merge.ts';
 
@@ -16,6 +17,11 @@ export type Categoria = {
   icon: IconName | null;
   color: NoteColorName | null;
   budgets: number;
+  /** Identity/defaults only from the caller's default workspace; appearance may be global. */
+  configuration_id?: string | null;
+  edit_revision?: number | null;
+  default_expense_pattern?: ExpensePattern | null;
+  default_expense_necessity?: ExpenseNecessity | null;
 };
 
 export type Aparencia = { icon: IconName; cor: NoteColorName | null };

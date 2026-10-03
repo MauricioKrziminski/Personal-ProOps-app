@@ -1,0 +1,71 @@
+appId: com.proops.personal.dev
+---
+- pressKey: Back
+- openLink: 'appproops:///finance'
+- extendedWaitUntil:
+    visible: Ocultar valor
+    timeout: 90000
+- openLink: 'appproops:///finance/lancar?tipo=uma&description=QA+F06+tablet+rascunho&amount=5&category=qa+f06+android+padr%C3%A3o'
+- extendedWaitUntil:
+    visible: Novo lançamento
+    timeout: 90000
+- assertVisible: QA F06 tablet rascunho
+- pressKey: Enter
+- scrollUntilVisible:
+    element: '^Classificação. Previsibilidade:.*'
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: 'Classificação. Previsibilidade: Variável. Necessidade: Não essencial.'
+- tapOn: '^Classificação. Previsibilidade:.*'
+- scrollUntilVisible:
+    element: Necessidade
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: Previsibilidade
+- assertVisible: Variável
+- assertVisible: Necessidade
+- assertVisible: Não essencial
+- takeScreenshot: proops-f06-android-tablet-large-controls
+- tapOn: Variável
+- tapOn:
+    text: Não classificar
+    index: 0
+- scrollUntilVisible:
+    element: '^Classificação. Previsibilidade:.*'
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- assertVisible: 'Classificação. Previsibilidade: Não classificar. Necessidade: Não essencial.'
+- takeScreenshot: proops-f06-android-tablet-null-manual
+- tapOn: Fechar
+- extendedWaitUntil:
+    notVisible: Novo lançamento
+    timeout: 15000
+- openLink: 'appproops:///finance/categories'
+- extendedWaitUntil:
+    visible: Nova categoria
+    timeout: 30000
+- tapOn: '^qa f06 android padrão,.*'
+- extendedWaitUntil:
+    visible: Editar categoria
+    timeout: 15000
+- scrollUntilVisible:
+    element: '^Padrões de gastos. Previsibilidade:.*'
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn: '^Padrões de gastos. Previsibilidade:.*'
+- scrollUntilVisible:
+    element: Necessidade
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: Variável
+- assertVisible: Não essencial
+- takeScreenshot: proops-f06-android-tablet-category-controls
+- tapOn: Fechar
+- extendedWaitUntil:
+    notVisible: Editar categoria
+    timeout: 15000

@@ -23,18 +23,24 @@ import { brToISO, localISODate } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
 import { describeRRule } from '@/lib/rrule-text';
 import { mudaInicioDaSerie, validaSerie, type SerieForm } from '@/lib/serie';
+import { ExpenseClassificationField } from '@/components/finance/expense-classification-field';
+import { normalizeExpenseClassification, type ExpenseClassificationDefaults } from '@/lib/expense-classification';
 
 export function CamposDaSerie({
   form,
   onChange,
   contas,
   rotuloDaData = 'Próximo vencimento',
+  classificationDefaults,
+  onUseCategoryDefaults,
 }: {
   form: SerieForm;
   onChange: (form: SerieForm) => void;
   contas: Parameters<typeof OriginAccountPicker>[0]['accounts'];
   /** Editando, o nome da data: "Próximo vencimento" na série; "Vence em" na ocorrência. */
   rotuloDaData?: string;
+  classificationDefaults?: ExpenseClassificationDefaults;
+  onUseCategoryDefaults?: () => void;
 }) {
   const { inicioOk, fimOk, tituloOk, agendaNoPassado, inicioDate } = validaSerie(form);
   const origem = contas.find((c) => c.id === form.accountId) ?? null;
@@ -90,6 +96,12 @@ export function CamposDaSerie({
       <Field label="Categoria">
         <CategoryPicker value={form.category} onChange={(category) => onChange({ ...form, category })} />
       </Field>
+
+      <Presenca visivel={form.kind === 'expense'}>
+        <ExpenseClassificationField value={normalizeExpenseClassification(form.expenseClassification)}
+          defaults={classificationDefaults} onUseCategoryDefaults={onUseCategoryDefaults}
+          onChange={(expenseClassification) => onChange({ ...form, expenseClassification })} />
+      </Presenca>
 
       <PaymentMethodField value={form.paymentMethod} onChange={(paymentMethod) => onChange({ ...form, paymentMethod })} error={!origem ? erroMetodo ?? undefined : undefined} />
 

@@ -1,8 +1,9 @@
 import type { TransactionInput } from '@/hooks/use-finance';
 import type { Json } from './database.types.ts';
-import { argsDaParcelada, linhaDaRecorrente, linhaDoFinanciamento,
+import { argsDaParcelada, classificacaoDaEscrita, linhaDaRecorrente, linhaDoFinanciamento,
   type EntradaFinanciamento, type EntradaParcelada, type EntradaRecorrente } from './escrita.ts';
 import { assertPaymentMethod } from './payment-method.ts';
+import type { ExpenseClassification } from './expense-classification.ts';
 
 /** Arguments shared by the rollback preview and the real public write, without request ids. */
 export type FinanceWrite =
@@ -11,7 +12,7 @@ export type FinanceWrite =
   | { operation: 'purchase'; args: { p_tipo: 'parcelada' | 'financiamento'; p_dados: Json } }
   | { operation: 'recurring'; args: { p_input: Json } };
 
-export type EntradaEscritaLancamento = TransactionInput & {
+export type EntradaEscritaLancamento = TransactionInput & Partial<ExpenseClassification> & {
   id?: string;
   expectedRevision?: number;
   fee_cents?: number;
@@ -25,7 +26,7 @@ export function escritaDoLancamento({ id, fee_cents, juros, expectedRevision, ..
   assertPaymentMethod(input.payment_method);
   return { operation: 'transaction', args: {
     p_transaction_id: id ?? null,
-    p_input: input as unknown as Json,
+    p_input: { ...input, ...classificacaoDaEscrita(input, input.kind) } as unknown as Json,
     p_fee_cents: juros?.cents ?? fee_cents ?? null,
     p_expected_revision: expectedRevision ?? null,
   } };

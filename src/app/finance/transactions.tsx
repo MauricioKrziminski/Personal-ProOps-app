@@ -68,6 +68,12 @@ import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { tabletPaneWidths } from '@/design/adaptive-window';
 import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
 import { normalizePaymentMethodFilters, parsePaymentMethodFilters, PAYMENT_METHOD_FILTER_OPTIONS, type PaymentMethodFilter } from '@/lib/payment-method-filters';
+import {
+  normalizeExpensePatternFilters, normalizeExpenseNecessityFilters,
+  parseExpensePatternFilters, parseExpenseNecessityFilters,
+  EXPENSE_PATTERN_FILTER_OPTIONS, EXPENSE_NECESSITY_FILTER_OPTIONS,
+  type ExpensePatternFilter, type ExpenseNecessityFilter,
+} from '@/lib/expense-classification-filters';
 
 /**
  * Lançamentos — "cadê aquele lançamento, e o que entrou e saiu neste mês?".
@@ -208,6 +214,8 @@ export default function TransactionsScreen() {
     /** Id da conta/cartão, ou `none` para os lançamentos sem conta. */
     accountId?: string;
     paymentMethods?: string | string[];
+    expensePatterns?: string | string[];
+    expenseNecessities?: string | string[];
   }>();
 
   /*
@@ -231,6 +239,12 @@ export default function TransactionsScreen() {
   const [source, setSource] = useState<TransactionSource | undefined>(undefined);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodFilter[]>(() => parsePaymentMethodFilters(params.paymentMethods) ?? []);
   const [paymentLinkInvalid, setPaymentLinkInvalid] = useState(() => parsePaymentMethodFilters(params.paymentMethods) === null);
+  const [expensePatterns, setExpensePatterns] = useState<ExpensePatternFilter[]>(() => parseExpensePatternFilters(params.expensePatterns) ?? []);
+  const [expenseNecessities, setExpenseNecessities] = useState<ExpenseNecessityFilter[]>(() => parseExpenseNecessityFilters(params.expenseNecessities) ?? []);
+  const [patternLinkInvalid, setPatternLinkInvalid] = useState(() => parseExpensePatternFilters(params.expensePatterns) === null);
+  const [necessityLinkInvalid, setNecessityLinkInvalid] = useState(() => parseExpenseNecessityFilters(params.expenseNecessities) === null);
+  const classificationLinkInvalid = patternLinkInvalid || necessityLinkInvalid;
+  const filterLinkInvalid = paymentLinkInvalid || classificationLinkInvalid;
   const [search, setSearch] = useState('');
   const [puxando, setPuxando] = useState(false);
   const [filtersVisible, setFiltersVisible] = useState(false);
@@ -257,7 +271,7 @@ export default function TransactionsScreen() {
    * desfaz escolha que o usuário fez na tela. `recurringId` fica de fora: é lido direto de
    * `params`, sem estado.
    */
-  const link = JSON.stringify([params.month, params.kind, params.category, params.accountId, params.paymentMethods]);
+  const link = JSON.stringify([params.month, params.kind, params.category, params.accountId, params.paymentMethods, params.expensePatterns, params.expenseNecessities]);
   const [linkAplicado, setLinkAplicado] = useState(link);
   if (link !== linkAplicado) {
     setLinkAplicado(link);
@@ -271,6 +285,16 @@ export default function TransactionsScreen() {
       const parsed = parsePaymentMethodFilters(params.paymentMethods);
       setPaymentLinkInvalid(parsed === null);
       if (parsed !== null) setPaymentMethods(parsed);
+    }
+    if (params.expensePatterns !== undefined) {
+      const parsed = parseExpensePatternFilters(params.expensePatterns);
+      setPatternLinkInvalid(parsed === null);
+      if (parsed !== null) setExpensePatterns(parsed);
+    }
+    if (params.expenseNecessities !== undefined) {
+      const parsed = parseExpenseNecessityFilters(params.expenseNecessities);
+      setNecessityLinkInvalid(parsed === null);
+      if (parsed !== null) setExpenseNecessities(parsed);
     }
   }
 
@@ -299,7 +323,7 @@ export default function TransactionsScreen() {
       : customDates.to ? `Até ${formatDateBR(customDates.to)}` : monthTitle(month);
   const periodDescription = openPeriod ? periodLabel.charAt(0).toLowerCase() + periodLabel.slice(1)
     : customPeriod ? `de ${periodLabel}` : `em ${periodLabel}`;
-  const forecastsEnabled = range.pronto && !openPeriod && !paymentLinkInvalid;
+  const forecastsEnabled = range.pronto && !openPeriod && !filterLinkInvalid;
   const list = useTransactions({
     /*
       ⚠️ **As MESMAS bordas do resumo, não `month`.** O hook recortava o mês civil por conta
@@ -308,7 +332,7 @@ export default function TransactionsScreen() {
     */
     from: range.from,
     to: range.to,
-    pronto: range.pronto && !paymentLinkInvalid,
+    pronto: range.pronto && !filterLinkInvalid,
     kind: kind === 'all' ? undefined : kind,
     category,
     recurringId: params.recurringId,
@@ -316,11 +340,11 @@ export default function TransactionsScreen() {
     status: status === 'all' ? undefined : status,
     source,
     q: term,
-    minCents, maxCents, paymentMethods,
+    minCents, maxCents, paymentMethods, expensePatterns, expenseNecessities,
   });
   const expected = useExpectedLedgerLines(range.from, range.to, forecastsEnabled, params.recurringId);
   // O card global fica oculto em períodos personalizados; nenhuma RPC de total é necessária.
-  const summary = useTransactionsSummary(range.from, range.to, range.pronto && !customPeriod && !paymentLinkInvalid);
+  const summary = useTransactionsSummary(range.from, range.to, range.pronto && !customPeriod && !filterLinkInvalid);
   /*
     ⚠️ **O card do topo soma a LISTA, e o ciclo virou o link do rodapé.** Ele já foi o contrário
     — lia `cycle_series` para bater com a home — e aí parou de bater com a lista logo abaixo
@@ -351,7 +375,7 @@ export default function TransactionsScreen() {
   // páginas continua sendo uma seção só depois do `flat()`.
   const rows = useMemo(() => list.data?.pages.flat() ?? [], [list.data]);
   // Queries desligadas podem conservar cache e erro. O modo aberto exclui também esses dados.
-  const expectedLines = useMemo(() => openPeriod || paymentLinkInvalid ? [] : filterExpectedLines(expected.data ?? [], {
+  const expectedLines = useMemo(() => openPeriod || filterLinkInvalid ? [] : filterExpectedLines(expected.data ?? [], {
     kind: kind === 'all' ? undefined : kind,
     status: status === 'all' ? undefined : status,
     category,
@@ -359,15 +383,15 @@ export default function TransactionsScreen() {
     source,
     recurringId: params.recurringId,
     q: term,
-    minCents, maxCents, paymentMethods,
-  }), [openPeriod, paymentLinkInvalid, expected.data, kind, status, category, accountId, source, params.recurringId, term, minCents, maxCents, paymentMethods]);
+    minCents, maxCents, paymentMethods, expensePatterns, expenseNecessities,
+  }), [openPeriod, filterLinkInvalid, expected.data, kind, status, category, accountId, source, params.recurringId, term, minCents, maxCents, paymentMethods, expensePatterns, expenseNecessities]);
   // Trocar de filtro durante a gravação não pode trazer uma ocorrência de outro recorte.
-  const transitoFiltrado = useMemo(() => openPeriod || paymentLinkInvalid ? [] : filterExpectedLines(previstas.emTransito.filter(p =>
+  const transitoFiltrado = useMemo(() => openPeriod || filterLinkInvalid ? [] : filterExpectedLines(previstas.emTransito.filter(p =>
     (!range.from || p.due_date >= range.from) && (!range.to || p.due_date <= range.to)), {
       kind: kind === 'all' ? undefined : kind, status: status === 'all' ? undefined : status,
       category, accountId: accountId === undefined ? undefined : accountId === NO_ACCOUNT ? null : accountId,
-      source, recurringId: params.recurringId, q: term, minCents, maxCents, paymentMethods,
-    }), [openPeriod, paymentLinkInvalid, previstas.emTransito, range.from, range.to, kind, status, category, accountId, source, params.recurringId, term, minCents, maxCents, paymentMethods]);
+      source, recurringId: params.recurringId, q: term, minCents, maxCents, paymentMethods, expensePatterns, expenseNecessities,
+    }), [openPeriod, filterLinkInvalid, previstas.emTransito, range.from, range.to, kind, status, category, accountId, source, params.recurringId, term, minCents, maxCents, paymentMethods, expensePatterns, expenseNecessities]);
   const previstasVisiveis = useMemo(
     () => previstasNaTela(expectedLines, transitoFiltrado, rows),
     [expectedLines, transitoFiltrado, rows]
@@ -449,15 +473,15 @@ export default function TransactionsScreen() {
     Promise.all([
       ...(cicloFalhou ? [regua.cycle.refetch()] : []),
       ...(range.isError ? [range.refetch()] : []),
-      ...(range.pronto && !paymentLinkInvalid ? [list.refetch()] : []),
-      ...(range.pronto && !customPeriod && !paymentLinkInvalid ? [summary.refetch()] : []),
+      ...(range.pronto && !filterLinkInvalid ? [list.refetch()] : []),
+      ...(range.pronto && !customPeriod && !filterLinkInvalid ? [summary.refetch()] : []),
       ...(forecastsEnabled ? [expected.refetch()] : []),
     ]);
 
   // Falhou a leitura dos lançamentos: a lista mostra o erro, nunca uma lista só de previstas.
   const itens = useMemo(
-    () => (list.isError || paymentLinkInvalid ? [] : mesclarPrevistas(rows, previstasVisiveis, Boolean(list.hasNextPage))),
-    [rows, previstasVisiveis, list.hasNextPage, list.isError, paymentLinkInvalid]
+    () => (list.isError || filterLinkInvalid ? [] : mesclarPrevistas(rows, previstasVisiveis, Boolean(list.hasNextPage))),
+    [rows, previstasVisiveis, list.hasNextPage, list.isError, filterLinkInvalid]
   );
   const sections = useMemo(
     () => (params.recurringId ? toSeriesSections(itens, hoje, customPeriod) : toSections(itens, customPeriod)),
@@ -507,7 +531,13 @@ export default function TransactionsScreen() {
       kind: kind === 'all' ? '' : kind, status: status === 'all' ? '' : status,
       category: category ?? '', accountId: accountId ?? '', source: source ?? '',
     },
-    ...(paymentMethods.length ? { multiSelections: { paymentMethods } } : {}),
+    ...(paymentMethods.length || expensePatterns.length || expenseNecessities.length ? {
+      multiSelections: {
+        ...(paymentMethods.length ? { paymentMethods } : {}),
+        ...(expensePatterns.length ? { expensePatterns } : {}),
+        ...(expenseNecessities.length ? { expenseNecessities } : {}),
+      },
+    } : {}),
   };
   const filterCount = listFilterCount(filterValue);
   const hasFilters = filterCount > 0;
@@ -516,6 +546,8 @@ export default function TransactionsScreen() {
     : minCents !== undefined ? `A partir de ${brl(minCents)}`
       : maxCents !== undefined ? `Até ${brl(maxCents)}` : undefined;
   const selectedPaymentMethods = new Set(paymentMethods);
+  const selectedPatterns = new Set(expensePatterns);
+  const selectedNecessities = new Set(expenseNecessities);
   const filterDetails = [
     tituloDaConta,
     kind !== 'all' ? KIND_OPTIONS.find(o => o.value === kind)?.label : undefined,
@@ -523,6 +555,8 @@ export default function TransactionsScreen() {
     category,
     source ? SOURCE_FILTER.find(o => o.value === source)?.label : undefined,
     paymentMethods.length ? PAYMENT_METHOD_FILTER_OPTIONS.filter(o => selectedPaymentMethods.has(o.id)).map(o => o.label).join(', ') : undefined,
+    expensePatterns.length ? `Previsibilidade dos gastos: ${EXPENSE_PATTERN_FILTER_OPTIONS.filter(o => selectedPatterns.has(o.id)).map(o => o.label).join(', ')}` : undefined,
+    expenseNecessities.length ? `Necessidade dos gastos: ${EXPENSE_NECESSITY_FILTER_OPTIONS.filter(o => selectedNecessities.has(o.id)).map(o => o.label).join(', ')}` : undefined,
     valueSummary, search.trim() ? `Busca: ${search.trim()}` : undefined,
   ].filter(Boolean);
   const fullFilterSummary = filterDetails.join(' · ');
@@ -540,7 +574,7 @@ export default function TransactionsScreen() {
    * período inteiro em cima de uma ocorrência só, escrevendo "GASTEI EM OUTUBRO R$ 3.842,78 ·
    * 1 lançamento" sobre uma linha de R$ 88,85. É o mesmo defeito que o card acabou de perder.
    */
-  const listaRecortada = hasFilters || Boolean(params.recurringId) || paymentLinkInvalid;
+  const listaRecortada = hasFilters || Boolean(params.recurringId) || filterLinkInvalid;
   /*
     ⚠️ **`!anyEver.isError` junto.** Com a query falhando, `data` é undefined, `?? []` vira lista
     vazia e quem tem anos de histórico recebia "Nenhum lançamento ainda" com a dica de
@@ -559,12 +593,19 @@ export default function TransactionsScreen() {
     setAccountId(undefined);
     setSource(undefined);
     setPaymentMethods([]); setPaymentLinkInvalid(false);
+    setExpensePatterns([]); setExpenseNecessities([]);
+    setPatternLinkInvalid(false); setNecessityLinkInvalid(false);
     setSearch('');
     setCustomDates({}); setMinCents(undefined); setMaxCents(undefined);
   };
   const applyFilters = (value: ListFiltersValue) => {
-    setPaymentMethods(normalizePaymentMethodFilters(value.multiSelections?.paymentMethods));
+    const nextPaymentMethods = normalizePaymentMethodFilters(value.multiSelections?.paymentMethods);
+    const nextPatterns = normalizeExpensePatternFilters(value.multiSelections?.expensePatterns);
+    const nextNecessities = normalizeExpenseNecessityFilters(value.multiSelections?.expenseNecessities);
+    setPaymentMethods(nextPaymentMethods);
+    setExpensePatterns(nextPatterns); setExpenseNecessities(nextNecessities);
     setPaymentLinkInvalid(false);
+    setPatternLinkInvalid(false); setNecessityLinkInvalid(false);
     setSearch(value.q ?? ''); setCustomDates({ from: value.from, to: value.to });
     setMinCents(value.minCents); setMaxCents(value.maxCents);
     setKind((value.selections?.kind || 'all') as typeof kind);
@@ -644,6 +685,9 @@ export default function TransactionsScreen() {
       {openPeriod ? <ThemedText type="footnote" themeColor="textSecondary">
         Lançamentos registrados. Escolha as duas datas para incluir previsões.
       </ThemedText> : null}
+      {expensePatterns.length || expenseNecessities.length ? <ThemedText type="footnote" themeColor="textSecondary">
+        Classificação filtra apenas gastos de consumo, sem pagamentos de fatura.
+      </ThemedText> : null}
 
       {/*
         ⚠️ **Com filtro ativo o card SOME.** Ele soma o período inteiro; a lista filtrada soma
@@ -711,7 +755,11 @@ export default function TransactionsScreen() {
     consulta desligada fica `isPending` para sempre — o ramo de cima desenharia três linhas de
     esqueleto indefinidamente, mesmo com o portão da tela já aberto.
   */
-  const empty = paymentLinkInvalid ? (
+  const empty = classificationLinkInvalid ? (
+    <EmptyState compacto icon="line.3.horizontal.decrease" title="Classificação de gasto inválida no link"
+      hint="Abra os filtros para ajustar a seleção."
+      action={{ label: 'Ajustar filtros', onPress: () => setFiltersVisible(true) }} />
+  ) : paymentLinkInvalid ? (
     <EmptyState compacto icon="line.3.horizontal.decrease" title="Forma de pagamento inválida no link"
       hint="Abra os filtros para escolher as formas de pagamento."
       action={{ label: 'Ajustar filtros', onPress: () => setFiltersVisible(true) }} />
@@ -828,7 +876,7 @@ export default function TransactionsScreen() {
           ListFooterComponent={list.isFetchingNextPage ? <SkeletonRow /> : null}
           onEndReachedThreshold={0.5}
           onEndReached={() => {
-            if (!paymentLinkInvalid && list.hasNextPage && !list.isFetchingNextPage) list.fetchNextPage();
+            if (!filterLinkInvalid && list.hasNextPage && !list.isFetchingNextPage) list.fetchNextPage();
           }}
           // O indicador é do GESTO (§6 do design), não do `isRefetching`.
           refreshing={puxando}
@@ -1070,7 +1118,11 @@ export default function TransactionsScreen() {
       <ListFilters visible={filtersVisible} onClose={() => setFiltersVisible(false)} onApply={applyFilters}
         value={filterValue} showValues dateLabels={{ from: 'Lançamento a partir de', to: 'Lançamento até' }}
         resetDatesLabel={view === 'cycle' ? 'Voltar ao ciclo' : 'Voltar ao mês'}
-        multiSelects={[{ key: 'paymentMethods', label: 'Formas de pagamento', options: PAYMENT_METHOD_FILTER_OPTIONS }]}
+        multiSelects={[
+          { key: 'paymentMethods', label: 'Formas de pagamento', options: PAYMENT_METHOD_FILTER_OPTIONS },
+          { key: 'expensePatterns', label: 'Previsibilidade dos gastos', options: EXPENSE_PATTERN_FILTER_OPTIONS },
+          { key: 'expenseNecessities', label: 'Necessidade dos gastos', options: EXPENSE_NECESSITY_FILTER_OPTIONS },
+        ]}
         selects={[
           { key: 'kind', label: 'Tipo', options: KIND_OPTIONS.filter(o => o.value !== 'all').map(o => ({ id: o.value, label: o.label })) },
           { key: 'status', label: 'Situação', options: STATUS_OPTIONS.filter(o => o.value !== 'all').map(o => ({ id: o.value, label: o.label })) },

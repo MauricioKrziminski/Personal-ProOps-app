@@ -1,0 +1,125 @@
+{
+  "location": "/private/tmp/proops-f06-final-review",
+  "source": "Maestro native screenshots, original bytes; QA staging only; no image edits",
+  "captures": [
+    {
+      "filename": "proops-f06-ios-adopt-explicit-draft.png",
+      "sha256": "96213e35631e7b96f87e15c722cec95fd12a34c94db1c4534515e1b85cf80a08",
+      "width": 1206,
+      "height": 2622,
+      "opened_by_root": true
+    },
+    {
+      "filename": "proops-f06-ios-category-shared-controls.png",
+      "sha256": "9a9b34aa6f553712c24b13fd632945121280ee9bdd491f097ae9dc1a98aedb7f",
+      "width": 1206,
+      "height": 2622,
+      "opened_by_root": true
+    },
+    {
+      "filename": "proops-f06-ios-classified-privacy-hidden.png",
+      "sha256": "ba848a923524173f1691628a424bdb4af4d3a5dfa6ac859be93c528f1c09b759",
+      "width": 1206,
+      "height": 2622,
+      "opened_by_root": true
+    },
+    {
+      "filename": "proops-f06-android-dark-large-draft.png",
+      "sha256": "8fc9b67dff83a2b91d09ea9abbf48079c65a6ed0c45c68dca1d9e4c4a656c2de",
+      "width": 1344,
+      "height": 2992,
+      "opened_by_root": true
+    },
+    {
+      "filename": "proops-f06-android-classified-privacy-hidden.png",
+      "sha256": "00b039d82fa56c06ddea419afdfe689fae8440b707e3bdc7b8424e3295417cb0",
+      "width": 1344,
+      "height": 2992,
+      "opened_by_root": true
+    },
+    {
+      "filename": "proops-f06-android-filter-invalid-cancel.png",
+      "sha256": "6ac11c916fdefd6ac286e5444748cee65631681c05a9129e9b9aedd88d047bdf",
+      "width": 1344,
+      "height": 2992,
+      "opened_by_root": true
+    },
+    {
+      "filename": "f06-ipad-light-accessibility-rotation-settled.png",
+      "sha256": "0e058b7c113214787ee851f9d8fbd4341a9a3e5caafc6a8744a93a28c7a0a84c",
+      "width": 1640,
+      "height": 2360,
+      "opened_by_root": true
+    },
+    {
+      "filename": "proops-f06-ios-accessibility-large-necessity.png",
+      "sha256": "cf50afa9c40aa88c21413eb0756d3c5b640e1b50e37f45b7d2cb91ca4a50ca35",
+      "width": 1206,
+      "height": 2622,
+      "opened_by_root": true
+    },
+    {
+      "filename": "proops-f06-ios-accessibility-large-pattern.png",
+      "sha256": "6acdec74e2424e094e298596e4118819a6fe776d895ed809d2d8d7a35381b963",
+      "width": 1206,
+      "height": 2622,
+      "opened_by_root": true
+    },
+    {
+      "filename": "proops-f06-android-cold-classified-ledger.png",
+      "sha256": "9ccc39ea73c97021f720cb0c038760b880a03dd96c6ef640eb8d399d7b63b6f7",
+      "width": 1344,
+      "height": 2992,
+      "opened_by_root": true
+    },
+    {
+      "filename": "proops-f06-android-warm-null-classified-ledger.png",
+      "sha256": "921eed12b2da7488a25e2dd4e283c66b548f8e8b3cc43520230bcd1ac6fe84d3",
+      "width": 1344,
+      "height": 2992,
+      "opened_by_root": true
+    },
+    {
+      "filename": "proops-f06-android-tablet-large-controls.png",
+      "sha256": "5dfc08d544a4ee8d9bef93b2110cf2ec00a8c1ebeac4727b4f3b644e0315538a",
+      "width": 1600,
+      "height": 2560,
+      "opened_by_root": true
+    },
+    {
+      "filename": "proops-f06-android-tablet-null-manual.png",
+      "sha256": "54a2ff61831a7b31bc0816d79ec46712d9a162d66938cb8ddaf01268c5214e23",
+      "width": 1600,
+      "height": 2560,
+      "opened_by_root": true
+    },
+    {
+      "filename": "proops-f06-android-tablet-category-controls.png",
+      "sha256": "f379fa02bf25efa8f7931079c01679445b39a403c77d56cef238e48f6abe502f",
+      "width": 1600,
+      "height": 2560,
+      "opened_by_root": true
+    },
+    {
+      "filename": "proops-f06-android-compact-large-controls.png",
+      "sha256": "413de29d1c26c1195812520b0ab86672c0f5775dff0466b6dea7b10cefaceaba",
+      "width": 1152,
+      "height": 2496,
+      "opened_by_root": true
+    },
+    {
+      "filename": "proops-f06-ios-classified-detail.png",
+      "sha256": "2a19ea15ef4fdcb3f2df174e54e94eeed4d9cc50b3d3dfdab434b2c869d87f02",
+      "width": 1206,
+      "height": 2622,
+      "opened_by_root": true
+    },
+    {
+      "filename": "proops-f06-android-filters-pattern-selected.png",
+      "sha256": "8556dd6fab3333b941936828ba20f0c4b9e00dc4075f08b011744514eb0ca0ad",
+      "width": 1344,
+      "height": 2992,
+      "opened_by_root": true
+    }
+  ]
+}

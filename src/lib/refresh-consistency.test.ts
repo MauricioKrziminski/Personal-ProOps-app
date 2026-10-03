@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { runInNewContext } from 'node:vm';
+import { createContext, runInContext, runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 
@@ -18,12 +18,23 @@ import * as widgetSnapshot from './widget-snapshot.ts';
 
 const require = createRequire(import.meta.url);
 function loadHooks(client: QueryClient, entry = 'src/hooks/use-finance.ts', dependencies: Record<string, unknown> = {}) {
+  // All modules share one JS realm, as they do in Metro. SQL inputs are plain data in that realm.
+  const context = createContext({ console, setTimeout, clearTimeout });
+  const copyInput = runInContext(`(function copy(value) {
+    if (value === null || typeof value !== 'object') return value;
+    if (Array.isArray(value)) return value.map(copy);
+    const result = {};
+    for (const key of Object.keys(value)) result[key] = copy(value[key]);
+    return result;
+  })`, context);
   const load = (file: string): any => {
     const module = { exports: {} };
     const code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-    runInNewContext(code, { module, exports: module.exports, require: (name: string) => {
+    const evaluate = runInContext(`(function(require, module, exports) { ${code}\n})`, context);
+    evaluate((name: string) => {
       if (name in dependencies) return dependencies[name];
-      if (name === '@tanstack/react-query') return { ...require(name), useQueryClient: () => client, useMutation: (options: unknown) => options };
+      if (name === '@tanstack/react-query') return { ...require(name), useQueryClient: () => client,
+        useMutation: (options: any) => ({ ...options, mutationFn: (input: unknown) => options.mutationFn(copyInput(input)) }) };
       if (name === 'react') return { useCallback: (fn: unknown) => fn, useRef: (value: unknown) => ({ current: value }) };
       if (name === '@/lib/agent-api') return {};
       if (name === '@/lib/supabase') return { supabase: { rpc: async () => ({ error: null }) } };
@@ -32,11 +43,121 @@ function loadHooks(client: QueryClient, entry = 'src/hooks/use-finance.ts', depe
       // `{}` e quebra quando usa o helper na carga (`serie.ts` monta `SERIE_VAZIA` com a data).
       if (name.startsWith('./') && file.startsWith('src/lib/') && existsSync(`src/lib/${name.slice(2)}`)) return load(`src/lib/${name.slice(2)}`);
       return {};
-    }, console, setTimeout, clearTimeout });
+    }, module, module.exports);
     return module.exports;
   };
   return load(entry);
 }
+
+test('F06: padrões de categoria leem todas as páginas do workspace e não aceitam leitura incompleta', async () => {
+  const client = new QueryClient();
+  const ranges: number[][] = [];
+  const scopes: string[] = [];
+  let truncated = false;
+  const hook = loadHooks(client, 'src/hooks/use-finance.ts', {
+    '@tanstack/react-query': { useQuery: (options: any) => options },
+    '@/hooks/use-items': { useRealtimeInvalidate: () => undefined },
+    '@/lib/supabase': { supabase: { from: (table: string) => {
+      assert.equal(table, 'categories');
+      const builder = {
+        select: () => builder,
+        eq: (column: string, value: string) => { assert.equal(column, 'workspace_id'); scopes.push(value); return builder; },
+        order: () => builder,
+        range: async (from: number, to: number) => {
+          ranges.push([from, to]);
+          return { data: Array.from({ length: truncated || from === 0 ? 1000 : 1 }, (_, i) => ({
+            name: `categoria-${from + i}`, default_expense_pattern: 'fixed', default_expense_necessity: null,
+          })), error: null };
+        },
+      };
+      return builder;
+    } } },
+  }).useCategoryClassificationDefaults('workspace-do-registro');
+  try {
+    const rows = await hook.queryFn();
+    assert.equal(rows.length, 1001);
+    assert.equal(rows[1000].category, 'categoria-1000');
+    assert.deepEqual(ranges, [[0, 999], [1000, 1999]]);
+    assert.equal(scopes.every(value => value === 'workspace-do-registro'), true);
+    truncated = true;
+    await assert.rejects(hook.queryFn(), /Leitura truncada/);
+  } finally { client.clear(); }
+});
+
+test('F06: edição de parcela exige as duas revisões e envia snapshot no comando idempotente', async () => {
+  const client = new QueryClient();
+  const calls: any[] = [];
+  const mutation = loadHooks(client, 'src/hooks/use-finance.ts', {
+    '@/lib/supabase': { supabase: { rpc: async (name: string, args: any) => {
+      calls.push({ name, args }); return { data: 2, error: null };
+    } } },
+  }).useSaveInstallmentOccurrence();
+  const patch = { expense_pattern: null, expense_pattern_source: 'explicit' };
+  try {
+    await assert.rejects(mutation.mutationFn({ id: 'part', scope: 'future', patch }), /versão|revisão/i);
+    assert.equal(calls.length, 0);
+    const input = { id: 'part', scope: 'future', patch, expectedPlanRevision: 8,
+      expectedAnchorRevision: 3, requestId: 'intent-1', lastDay: true };
+    assert.equal(await mutation.mutationFn(input), 2);
+    await mutation.mutationFn(input);
+    assert.equal(calls[0].name, 'update_installment_scope_checked');
+    assert.equal(calls[0].args.p_expected_plan_revision, 8);
+    assert.equal(calls[0].args.p_expected_anchor_revision, 3);
+    assert.equal(calls[0].args.p_last_day, true);
+    assert.equal(calls[0].args.p_request_id, calls[1].args.p_request_id);
+    assert.equal(calls[0].args.p_patch.expense_pattern_source, 'explicit');
+    assert.equal('expense_necessity' in calls[0].args.p_patch, false);
+  } finally { client.clear(); }
+});
+
+test('F06: categoria salva configuração, rename e período numa única RPC e devolve contagem real', async () => {
+  const client = new QueryClient();
+  const calls: any[] = [];
+  const mutation = loadHooks(client, 'src/hooks/use-finance.ts', {
+    '@/lib/supabase': { supabase: { rpc: async (name: string, args: any) => {
+      calls.push({ name, args }); return { data: { category: 'casa', backfill_updated: 4, juntou: false }, error: null };
+    } } },
+  }).useSalvarCategoria();
+  try {
+    const result = await mutation.mutationFn({ name: ' Casa ', icon: 'house', color: null,
+      renomearDe: 'moradia', configurationId: 'cat', expectedRevision: 7,
+      default_expense_pattern: 'fixed', default_expense_necessity: null,
+      backfill: { from: '2026-09-01', to: '2026-09-30' }, requestId: 'intent-cat' });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].name, 'save_category_configuration');
+    assert.equal(calls[0].args.p_request_id, 'intent-cat');
+    assert.equal(calls[0].args.p_input.name, 'casa');
+    assert.equal(calls[0].args.p_input.rename_from, 'moradia');
+    assert.equal(calls[0].args.p_input.category_id, 'cat');
+    assert.equal(calls[0].args.p_input.expected_revision, 7);
+    assert.equal(calls[0].args.p_input.default_expense_necessity, null);
+    assert.equal(calls[0].args.p_input.backfill_to, '2026-09-30');
+    assert.equal(result.backfill_updated, 4);
+  } finally { client.clear(); }
+});
+
+test('F06: edição estrutural de compra não perde patch parcial nem muda nonce no retry', async () => {
+  const client = new QueryClient();
+  const calls: any[] = [];
+  let sequence = 0;
+  const mutation = loadHooks(client, 'src/hooks/use-finance.ts', {
+    '@/lib/agent-chat': { newClientMessageId: () => `request-${++sequence}` },
+    '@/lib/supabase': { supabase: { rpc: async (name: string, args: any) => {
+      calls.push({ name, args }); return { data: 3, error: null };
+    } } },
+  }).useUpdateInstallmentPlan();
+  const input = { planId: 'plan', totalCents: 30000, installments: 3, firstOccurredAt: '2026-10-03',
+    description: 'Compra', category: 'casa', merchant: null, accountId: 'bank', expectedRevision: 2,
+    expense_necessity: 'essential', expense_necessity_source: 'explicit' };
+  try {
+    await mutation.mutationFn(input); await mutation.mutationFn(input);
+    assert.equal(calls[0].args.p_input.expense_necessity, 'essential');
+    assert.equal('expense_pattern' in calls[0].args.p_input, false);
+    assert.equal(calls[0].args.p_input.p_request_id, calls[1].args.p_input.p_request_id);
+    await mutation.mutationFn({ ...input, expense_necessity: null });
+    assert.notEqual(calls[1].args.p_input.p_request_id, calls[2].args.p_input.p_request_id);
+  } finally { client.clear(); }
+});
 
 test('F01: compra e taxa usam uma RPC atômica; perda da resposta repete a mesma intenção', async () => {
   const client = new QueryClient();

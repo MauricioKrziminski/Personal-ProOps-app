@@ -1,0 +1,24 @@
+appId: com.proops.personal.dev
+---
+- stopApp
+- openLink: 'appproops:///finance/transactions?expensePatterns=variable&expenseNecessities=essential&category=qa+f06+android+padr%C3%A3o'
+- extendedWaitUntil:
+    visible: '^QA F06 Android classificação,.*'
+    timeout: 90000
+- assertVisible: 'Filtros · 3'
+- assertNotVisible: '^QA F06 android retry,.*'
+- assertNotVisible: '^QA F06 android automático,.*'
+- assertNotVisible: "Can't perform a React state update.*"
+- waitForAnimationToEnd
+- takeScreenshot: proops-f06-android-cold-classified-ledger
+- openLink: 'appproops:///finance/transactions?expensePatterns=not_informed&expenseNecessities=discretionary&category=qa+f06+android+padr%C3%A3o'
+- extendedWaitUntil:
+    visible: '^QA F06 android retry,.*'
+    timeout: 30000
+- assertVisible: '^QA F06 android nulo,.*'
+- assertNotVisible: '^QA F06 Android classificação,.*'
+- assertNotVisible: '^QA F06 android automático,.*'
+- assertNotVisible: "Can't perform a React state update.*"
+- waitForAnimationToEnd
+- takeScreenshot: proops-f06-android-warm-null-classified-ledger
+- openLink: 'appproops:///finance'

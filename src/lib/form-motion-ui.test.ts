@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 
 // Commit effects after stable renders; neither springs nor native layout finish automatically.
 // Component-local hooks and provider context exercise the real nested presence lifetimes.
-function montar(file: string, name: string, initial: any, config: { reduzir: boolean; ativo: boolean; fontScale?: number; lock?: any; creation?: any; preventRemove?: any; toasts?: any[]; finance?: any; conceal?: any; preview?: any; moneyCalls?: number[] } = { reduzir: false, ativo: true }) {
+function montar(file: string, name: string, initial: any, config: { reduzir: boolean; ativo: boolean; fontScale?: number; width?: number; lock?: any; creation?: any; preventRemove?: any; toasts?: any[]; finance?: any; conceal?: any; preview?: any; moneyCalls?: number[] } = { reduzir: false, ativo: true }) {
   type Instance = { slots: any[]; cursor: number; mounted: boolean; restart: boolean };
   type Animation = { shared: any; done?: (ok: boolean) => void; target: number; from: number; kind: 'spring' | 'timing'; settings: any; canceled: boolean };
   const instances = new Map<string, Instance>();
@@ -133,6 +133,9 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === '@/components/ui/conceal') return { useConceal: () => config.conceal ?? { ready: true, concealed: false }, concealText: () => '••••••', useBRL: () => (cents: number) => { config.moneyCalls?.push(cents); return `${cents} centavos`; } };
       if (id === '@/hooks/use-finance-write-preview') return { useFinanceWritePreview: () => config.preview };
       if (id === '@/lib/finance-write-preview') return load('src/lib/finance-write-preview.ts');
+      // Fixtures live in Node; execute the pure closed-record domain in that same realm.
+      if (id === '@/components/finance/expense-classification-controls') return load('src/components/finance/expense-classification-controls.tsx');
+      if (id === '@/lib/expense-classification') return require('./expense-classification.ts');
       if (id === 'zod') return require(id);
       if (id === '@/components/ui/row') return { Row: 'Row', Section: 'Section' };
       if (id === '@/components/ui/note') return { Note: 'Note' };
@@ -144,7 +147,7 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === '@/lib/account-form') return load('src/lib/account-form.ts');
       if (id.startsWith('./') && path.startsWith('src/lib/')) return load(`src/lib/${id.slice(2)}`);
       if (id === 'react/jsx-runtime') return require(id);
-      if (id === 'react-native') return { Pressable: 'Pressable', View: 'View', TextInput: 'TextInput', useWindowDimensions: () => ({ width: 402, fontScale: config.fontScale ?? 1 }), Platform: { OS: 'android' }, StyleSheet: { create: (s: any) => s, flatten, hairlineWidth: 1 } };
+      if (id === 'react-native') return { Pressable: 'Pressable', View: 'View', TextInput: 'TextInput', useWindowDimensions: () => ({ width: config.width ?? 402, fontScale: config.fontScale ?? 1 }), Platform: { OS: 'android' }, StyleSheet: { create: (s: any) => s, flatten, hairlineWidth: 1 } };
       if (id === 'react-native-reanimated') return reanimated;
       if (id === 'expo-haptics') return { selectionAsync() {} };
       if (id === '@/components/motion/presenca') return load('src/components/motion/presenca.tsx');
@@ -1670,4 +1673,36 @@ test('F03: recurso desabilitado em voo em outro seletor não bloqueia recuperar 
   assert.equal(retry.props.disabled, false);
   retry.props.onPress();
   assert.equal(f.retries(), 1);
+});
+
+for (const reduzir of [false, true]) test(`F06 classificação: controles têm geometria natural sem aguardar animação, inclusive resize e reversão (${reduzir ? 'reduced' : 'full'} motion)`, () => {
+  const config = { reduzir, ativo: true, width: 820, fontScale: 1 };
+  const value = { expense_pattern: 'variable', expense_pattern_source: 'category_default',
+    expense_necessity: 'discretionary', expense_necessity_source: 'category_default' };
+  const changes: any[] = [];
+  const props = { value, onChange: (next: any) => changes.push(next) };
+  const ui = montar('src/components/finance/expense-classification-field.tsx', 'ExpenseClassificationField', props, config);
+  const toggle = () => { ui.find(n => n.type === 'Row' && n.props.title === 'Classificação').props.onPress(); ui.render(props); };
+  const assertAvailable = () => {
+    const envelope = ui.find(n => n.type === 'Animated.View' && n.props.pointerEvents === 'auto');
+    assert.ok(envelope, 'controles expandidos precisam receber toque');
+    assert.equal(ui.style(envelope).height, 'auto', 'a área interativa não depende de medição ou conclusão da animação');
+    assert.equal(envelope.props.accessibilityElementsHidden, false);
+    assert.equal(ui.style(incoming(ui)).opacity, 1, 'movimento não esconde escolhas disponíveis');
+    assert.equal(ui.nodes().filter(n => n.type === 'SelectField').length, 2);
+  };
+  toggle(); assertAvailable();
+  config.width = 1180; config.fontScale = 2.2; ui.render(props); assertAvailable();
+  config.width = 820; ui.render(props); assertAvailable();
+  const pattern = ui.nodes().find(n => n.type === 'SelectField' && n.props.value === 'variable');
+  pattern.props.onChange(null);
+  assert.equal(changes.at(-1).expense_pattern, null);
+  assert.equal(changes.at(-1).expense_pattern_source, 'explicit');
+  assert.equal(changes.at(-1).expense_necessity, 'discretionary');
+  toggle();
+  assert.equal(ui.nodes().filter(n => n.type === 'Animated.View' && n.props.pointerEvents === 'auto').length, 0);
+  toggle(); assertAvailable();
+  ui.unmount();
+  for (const animation of ui.animations) animation.done?.(true);
+  assert.equal(ui.writesAfterUnmount(), 0);
 });

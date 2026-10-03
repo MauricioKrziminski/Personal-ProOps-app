@@ -1,15 +1,19 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { GradeDeCores } from '@/components/notes/color-picker';
 import { useCoresSuaves } from '@/components/motion/cores-suaves';
-import { TrocaSuave } from '@/components/motion/presenca';
+import { Presenca, TrocaSuave } from '@/components/motion/presenca';
+import { DatePickerField } from '@/components/finance/date-picker-field';
+import { ExpenseClassificationControls } from '@/components/finance/expense-classification-controls';
 import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
 import { Forte } from '@/components/ui/forte';
 import { Icon, type IconName } from '@/components/ui/icon';
+import { Row } from '@/components/ui/row';
+import { SelectField, type SelectOption } from '@/components/ui/select-field';
 import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useToast } from '@/components/ui/toast';
@@ -22,9 +26,23 @@ import { foldCategory } from '@/lib/categories-merge';
 import { aparenciaDaCategoria, ICONES_DE_CATEGORIA, nomeDaCategoria, ROTULO_DO_ICONE, type Categoria } from '@/lib/categorias';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive } from '@/lib/item-actions';
+import { newClientMessageId } from '@/lib/agent-chat';
+import {
+  categoryBackfillPeriod, categoryConfigurationAttempt, categoryConfigurationKey, categoryDefaults,
+  type CategoryConfigurationAttempt, type CategoryConfigurationInput, type CategoryConfigurationResult,
+} from '@/lib/category-configuration';
+import {
+  EXPENSE_PATTERN_LABELS, EXPENSE_NECESSITY_LABELS,
+} from '@/lib/expense-classification';
+
+const SCOPE_OPTIONS: readonly SelectOption[] = [
+  { id: 'new', label: 'Só novos cadastros', meta: 'Conserva contratos e histórico' },
+  { id: 'period', label: 'Aplicar ao histórico', meta: 'Escolher um período' },
+];
+type ConfigurationCommand = Omit<CategoryConfigurationInput, 'requestId'>;
 
 /**
- * Criar ou editar uma categoria: nome, ícone e cor (spec 2026-09-29, Parte 4). Usada pela tela
+ * Criar ou editar uma categoria: aparência e padrões independentes de gastos (F06). Usada pela tela
  * Categorias e pelo "+ Nova" do seletor de categoria.
  *
  * A cor entra INLINE (`GradeDeCores`): esta folha já é um `Modal`, e abrir o `ColorPicker` aqui
@@ -47,68 +65,123 @@ export function CategoriaSheet({
   onSalva: (nome: string) => void;
 }) {
   const toast = useToast();
-  const usadas = useCategoriesUsed().data ?? [];
+  const consulta = useCategoriesUsed();
+  const usadas = consulta.data ?? [];
   const salvarCategoria = useSalvarCategoria();
   const inicial = (c: Categoria | null) => ({
     nome: c?.category ?? '',
     icon: (c?.icon ?? (c ? aparenciaDaCategoria(c.category, usadas).icon : 'tag')) as IconName,
     cor: c?.color ?? null,
+    ...categoryDefaults(c),
+    configuracao: c,
+    alvo: c ? c.configuration_id ?? c.category : null,
+    expandido: false,
+    alcance: 'new' as 'new' | 'period',
+    de: '',
+    ate: '',
+    tentada: false,
   });
   const [campos, setCampos] = useState(() => inicial(categoria));
   // Reaberta (para outra categoria, ou nova), a folha começa do que ELA é, não do que foi digitado
   // da última vez. Estado ajustado no render, o padrão do React para "resetar quando a prop muda".
   const [abertaPara, setAbertaPara] = useState<string | null>(visible ? (categoria?.category ?? '') : null);
+  const [visita, setVisita] = useState(0);
+  const tentativa = useRef<{ visita: number; attempt: CategoryConfigurationAttempt } | null>(null);
+  const mergeRetry = useRef<{ visita: number; baseKey: string; input: ConfigurationCommand } | null>(null);
+  const ativa = useRef({ visible, visita });
+  useLayoutEffect(() => { ativa.current = { visible, visita }; }, [visible, visita]);
   const chave = visible ? (categoria?.category ?? '') : null;
-  if (chave !== abertaPara) {
-    setAbertaPara(chave);
-    if (chave !== null) setCampos(inicial(categoria));
-  }
-  const { nome, icon, cor } = campos;
-
-  const limpo = nomeDaCategoria(nome);
-  // Criando com um nome que já existe: salvar só muda a aparência DELA — a folha diz isso antes.
+  const limpo = nomeDaCategoria(campos.nome);
   const jaExiste = !categoria && limpo
     ? usadas.find((c) => foldCategory(c.category) === foldCategory(limpo))
     : undefined;
-  const podeSalvar = limpo.length > 0 && limpo.length <= 40 && !salvarCategoria.isPending;
+  const alvo = jaExiste ? jaExiste.configuration_id ?? jaExiste.category : null;
+  if (chave !== abertaPara) {
+    setAbertaPara(chave);
+    if (chave !== null) { setCampos(inicial(categoria)); setVisita((v) => v + 1); }
+  } else if (!categoria && !campos.tentada && campos.alvo !== alvo) {
+    // Naming an existing category edits its own configuration. Adopt its defaults once,
+    // rather than silently replacing them with the new form's nulls; manual changes then stay.
+    setCampos({ ...campos, ...(jaExiste ? { ...categoryDefaults(jaExiste),
+      icon: jaExiste.icon ?? aparenciaDaCategoria(jaExiste.category, usadas).icon, cor: jaExiste.color ?? null } : {}),
+      alvo, configuracao: jaExiste ?? null, alcance: 'new' });
+  }
+  const { nome, icon, cor, default_expense_pattern: pattern, default_expense_necessity: necessity } = campos;
+  const originais = categoryDefaults(campos.configuracao);
+  const padroesMudaram = pattern !== originais.default_expense_pattern || necessity !== originais.default_expense_necessity;
+  const podeAplicarHistorico = Boolean(campos.configuracao?.configuration_id && padroesMudaram);
+  const periodo = categoryBackfillPeriod(campos.de, campos.ate);
+  const aplicaHistorico = podeAplicarHistorico && campos.alcance === 'period';
+  const podeSalvar = limpo.length > 0 && limpo.length <= 40 && !salvarCategoria.isPending
+    && !consulta.isPending && !consulta.isError && (!aplicaHistorico || Boolean(periodo));
+  const resumo = [pattern && EXPENSE_PATTERN_LABELS[pattern], necessity && EXPENSE_NECESSITY_LABELS[necessity]]
+    .filter(Boolean).join(' · ') || 'Sem padrões';
 
-  const terminou = (nomeFinal: string) => {
+  const terminou = (result: CategoryConfigurationResult, historico: boolean) => {
+    if (!ativa.current.visible || ativa.current.visita !== visita) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    onSalva(nomeFinal);
+    if (historico) toast({ message: `${result.backfill_updated} ${result.backfill_updated === 1 ? 'gasto atualizado' : 'gastos atualizados'}.`, tone: 'success' });
+    onSalva(result.category);
     onClose();
   };
 
-  const salvar = () =>
-    salvarCategoria
-      .mutateAsync({ name: jaExiste?.category ?? limpo, icon, color: cor, renomearDe: categoria?.category ?? null })
+  const executar = (input: ConfigurationCommand) => {
+    if (!ativa.current.visible || ativa.current.visita !== visita || salvarCategoria.isPending) return;
+    // A realtime read after a committed/lost response must not change CREATE into EDIT on
+    // retry. Freeze the configuration snapshot after sending; a new name starts a new draft.
+    setCampos((c) => ({ ...c, tentada: true }));
+    const attempt = categoryConfigurationAttempt(tentativa.current?.visita === visita ? tentativa.current.attempt : null, input, newClientMessageId);
+    tentativa.current = { visita, attempt };
+    return salvarCategoria
+      .mutateAsync({ ...input, requestId: attempt.requestId })
       .then(
-        () => terminou(jaExiste?.category ?? limpo),
+        (result) => terminou(result, Boolean(input.backfill)),
         (e: unknown) => {
+          if (!ativa.current.visible || ativa.current.visita !== visita) return;
           const erro = e as { code?: string; existente?: string };
           if (erro?.code === 'CATEGORIA_EXISTE' && erro.existente) {
-            const alvo = erro.existente;
-            const de = categoria?.category ?? limpo;
-            const temOrcamento =
-              (categoria?.budgets ?? 0) > 0 &&
-              (usadas.find((c) => c.category === alvo)?.budgets ?? 0) > 0;
-            // Diálogo nativo não tem negrito: a frase nomeia o tipo (design.md §3).
-            confirmDestructive(
-              `Juntar a categoria ${de} com ${alvo}?`,
-              'Juntar',
-              () =>
-                void salvarCategoria
-                  .mutateAsync({ name: alvo, icon, color: cor, renomearDe: de, juntar: true })
-                  .then(
-                    () => terminou(alvo),
-                    (e2: unknown) => toast({ message: financeErrorMessage(e2, 'Não deu para juntar as categorias.'), tone: 'error' })
-                  ),
-              `Tudo que está em ${de} passa para ${alvo}.${temOrcamento ? ` No mês em que as duas têm orçamento, fica o de ${alvo}.` : ''}`
-            );
+            const destino = erro.existente;
+            const de = input.renomearDe ?? categoria?.category ?? input.name;
+            const temOrcamento = (campos.configuracao?.budgets ?? 0) > 0
+              && (usadas.find((c) => c.category === destino)?.budgets ?? 0) > 0;
+            confirmDestructive(`Juntar a categoria ${de} com ${destino}?`, 'Juntar', () => {
+              const merged = { ...input, name: destino, renomearDe: de, juntar: true, backfill: null };
+              mergeRetry.current = { visita, baseKey: categoryConfigurationKey(input), input: merged };
+              void executar(merged);
+            }, `Tudo que está em ${de} passa para ${destino}. Os padrões de ${destino} prevalecem; as classificações dos gastos ficam como estão.${temOrcamento ? ` No mês em que as duas têm orçamento, fica o de ${destino}.` : ''}${input.backfill ? ' O período escolhido não será aplicado.' : ''}`);
             return;
           }
-          toast({ message: financeErrorMessage(e, 'Não deu para salvar a categoria.'), tone: 'error' });
+          if (e && typeof e === 'object' && 'message' in e && typeof e.message === 'string'
+            && e.message.startsWith('CATEGORIA_CONFIGURACAO_DESATUALIZADA')) {
+            toast({ message: 'Essa categoria mudou enquanto você editava. Reabra para conferir as mudanças.', tone: 'error' });
+            return;
+          }
+          toast({ message: financeErrorMessage(e, input.juntar ? 'Não deu para juntar as categorias.' : 'Não deu para salvar a categoria. Tente de novo.'), tone: 'error' });
         }
       );
+  };
+
+  const salvar = () => {
+    if (!podeSalvar) return;
+    const input: ConfigurationCommand = {
+      name: jaExiste?.category ?? limpo, icon, color: cor, renomearDe: categoria?.category ?? null,
+      default_expense_pattern: pattern, default_expense_necessity: necessity,
+      configurationId: campos.configuracao?.configuration_id ?? null,
+      expectedRevision: campos.configuracao?.edit_revision ?? null,
+      backfill: aplicaHistorico ? periodo : null,
+    };
+    const retry = mergeRetry.current;
+    if (retry?.visita === visita && retry.baseKey === categoryConfigurationKey(input)) {
+      void executar(retry.input); return;
+    }
+    if (input.backfill) {
+      confirmDestructive(`Aplicar padrões ao histórico de ${input.name}?`, 'Aplicar e salvar',
+        () => void executar(input),
+        `Os gastos de ${campos.de} a ${campos.ate} recebem os padrões escolhidos. Ajustes manuais, inclusive Não classificar, ficam. Recorrências, compras e dívidas conservam seus padrões.`);
+      return;
+    }
+    void executar(input);
+  };
 
   return (
     <Sheet visible={visible} onClose={onClose}>
@@ -126,21 +199,24 @@ export function CategoriaSheet({
         }
       />
       <SheetScroll contentContainerStyle={styles.corpo} keyboardShouldPersistTaps="handled">
+        <View style={styles.fields} pointerEvents={salvarCategoria.isPending ? 'none' : 'auto'}>
         <Field
           label="Nome"
           hint={
             jaExiste
-              ? <>Essa categoria já existe: salvar muda o ícone e a cor de <Forte>{jaExiste.category}</Forte>.</>
+              ? <>Essa categoria já existe: você está editando <Forte>{jaExiste.category}</Forte>.</>
               : undefined
           }>
           <TextField
             value={nome}
-            onChangeText={(n) => setCampos((c) => ({ ...c, nome: n }))}
+            onChangeText={(n) => setCampos((c) => ({ ...c, nome: n,
+              tentada: foldCategory(nomeDaCategoria(n)) === foldCategory(nomeDaCategoria(c.nome)) && c.tentada }))}
             placeholder="Ex.: viagem"
             autoCapitalize="none"
             autoCorrect={false}
             autoFocus={!categoria}
             maxLength={40}
+            editable={!salvarCategoria.isPending}
           />
         </Field>
         <Field label="Ícone">
@@ -149,6 +225,42 @@ export function CategoriaSheet({
         <Field label="Cor">
           <GradeDeCores value={cor} onPick={(k) => setCampos((c) => ({ ...c, cor: k }))} />
         </Field>
+        <View>
+          <View style={styles.row}>
+            <Row title="Padrões de gastos" subtitle={resumo} chevron={false}
+              trailing={<Icon name={campos.expandido ? 'chevron.up' : 'chevron.down'} size="sm" color="textSecondary" />}
+              accessibilityLabel={`Padrões de gastos. Previsibilidade: ${pattern ? EXPENSE_PATTERN_LABELS[pattern] : 'Não classificar'}. Necessidade: ${necessity ? EXPENSE_NECESSITY_LABELS[necessity] : 'Não classificar'}.`}
+              accessibilityState={{ expanded: campos.expandido }}
+              onPress={() => setCampos((c) => ({ ...c, expandido: !c.expandido }))} />
+          </View>
+          <Presenca visivel={campos.expandido} imediata style={styles.defaults}>
+            <ExpenseClassificationControls
+              pattern={pattern}
+              necessity={necessity}
+              onPatternChange={(pattern) => setCampos((c) => ({ ...c, default_expense_pattern: pattern }))}
+              onNecessityChange={(necessity) => setCampos((c) => ({ ...c, default_expense_necessity: necessity }))}
+            />
+            <Presenca visivel={podeAplicarHistorico} imediata style={styles.fields}>
+              <Field label="Aplicar padrões">
+                <SelectField options={SCOPE_OPTIONS} value={campos.alcance} onChange={(id) => {
+                  if (id === 'new' || id === 'period') setCampos((c) => ({ ...c, alcance: id }));
+                }} />
+              </Field>
+              <Presenca visivel={aplicaHistorico} imediata style={styles.fields}>
+                <Field label="De" error={!campos.de ? 'Escolha o início do período.' : !periodo && campos.ate ? 'Confira as datas do período.' : undefined}>
+                  <DatePickerField value={campos.de || null} onChange={(de) => setCampos((c) => ({ ...c, de }))}
+                    accessibilityLabel="Início do período histórico" invalid={!campos.de} />
+                </Field>
+                <Field label="Até" error={!campos.ate ? 'Escolha o fim do período.' : !periodo && campos.de ? 'O fim não pode ser antes do início.' : undefined}>
+                  <DatePickerField value={campos.ate || null} onChange={(ate) => setCampos((c) => ({ ...c, ate }))}
+                    accessibilityLabel="Fim do período histórico" invalid={!campos.ate || Boolean(campos.de && !periodo)} />
+                </Field>
+              </Presenca>
+            </Presenca>
+          </Presenca>
+        </View>
+        </View>
+        {consulta.isError ? <Button label="Tentar carregar categorias de novo" variant="secondary" onPress={() => void consulta.refetch()} /> : null}
       </SheetScroll>
     </Sheet>
   );
@@ -202,6 +314,9 @@ function AmostraDoIcone({ icon, selecionado, cor, onPick }: {
 
 const styles = StyleSheet.create({
   corpo: { gap: Space.xl, padding: Space.lg, paddingBottom: Space.xxl },
+  fields: { gap: Space.xl },
+  defaults: { gap: Space.xl, paddingTop: Space.md },
+  row: { marginHorizontal: -Space.lg },
   grade: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm },
   glifo: { width: IconSize.md, height: IconSize.md, alignItems: 'center', justifyContent: 'center' },
   icone: {

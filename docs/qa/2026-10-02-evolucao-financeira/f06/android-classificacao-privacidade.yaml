@@ -1,0 +1,25 @@
+appId: com.proops.personal.dev
+---
+- openLink: 'appproops:///finance'
+- extendedWaitUntil:
+    visible: Ocultar valor
+    timeout: 30000
+- tapOn:
+    text: Ocultar valor
+    index: 0
+- openLink: 'appproops:///finance/transactions?expensePatterns=variable&expenseNecessities=essential&category=qa+f06+android+padr%C3%A3o'
+- extendedWaitUntil:
+    visible: '^QA F06 Android classificação,.*'
+    timeout: 30000
+- assertVisible: '^QA F06 Android classificação,.*••••••.*'
+- assertNotVisible: '^QA F06 Android classificação,.*R\$.*'
+- assertVisible: 'Filtros · 3'
+- takeScreenshot: proops-f06-android-classified-privacy-hidden
+- openLink: 'appproops:///finance'
+- extendedWaitUntil:
+    visible: Mostrar valor
+    timeout: 20000
+- tapOn:
+    text: Mostrar valor
+    index: 0
+- takeScreenshot: proops-f06-android-privacy-restored

@@ -5,9 +5,11 @@
 import { dataLocalDe } from './dates.ts';
 import type { PaymentMethod } from './payment-method.ts';
 import type { RegistroSimulado } from './hipotese.ts';
+import type { ExpenseClassification } from './expense-classification.ts';
 
 export type TipoDeLancamento = 'uma' | 'recorrente' | 'financiamento';
 export type Comum = {
+  expenseClassification?: ExpenseClassification;
   kind: 'expense' | 'income' | 'transfer';
   descricao: string;
   valorCents: number;
@@ -44,12 +46,12 @@ export function opcoesDaConversao(o: OrigemDaConversao): OpcaoDaConversao[] {
 }
 
 export function comumDepoisDeSalvar(c: Comum): Comum {
-  const { estabelecimento: _, ...fica } = c;
+  const { estabelecimento: _, expenseClassification: _classification, ...fica } = c;
   return { ...fica, descricao: '', valorCents: 0, categoria: null };
 }
 
 export function comumParaSerie(c: Comum): Comum {
-  return c.kind === 'transfer' ? { ...c, kind: 'expense' } : c;
+  return { ...c, kind: c.kind === 'transfer' ? 'expense' : c.kind };
 }
 
 export function hrefDoLancar(tipo: TipoDeLancamento, extra: Record<string, string> = {}) {

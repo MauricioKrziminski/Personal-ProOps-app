@@ -5,6 +5,9 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Presenca } from '@/components/motion/presenca';
 
 import { useBRL } from '@/components/ui/conceal';
+import { ErrorCard } from '@/components/error-card';
+import { useExpenseClassificationDraft } from '@/hooks/use-expense-classification';
+import { newClientMessageId } from '@/lib/agent-chat';
 import { Button } from '@/components/ui/button';
 import { FilterBar } from '@/components/ui/filter-bar';
 import { ListFilters, type FilterSelect } from '@/components/ui/list-filters';
@@ -117,6 +120,7 @@ export default function InstallmentsScreen() {
   const editar = useUpdateInstallmentPlan();
   const editarEscopo = useSaveInstallmentOccurrence();
   const [form, setForm] = useState<CompraForm | null>(null);
+  const scopeAttempt = useRef<{ key: string; id: string; anchorRevision: number } | null>(null);
   /** Qual `?edit=` já foi consumido — sem isto, fechar o sheet reabriria no render seguinte. */
   const [edicaoAberta, setEdicaoAberta] = useState<string | null>(null);
   const volta = useVoltarQuandoFechar();
@@ -131,6 +135,8 @@ export default function InstallmentsScreen() {
   }, [accounts.data]);
 
   const lista = useMemo(() => plans.data ?? [], [plans.data]);
+  const editingPlan = form ? lista.find(plan => plan.id === form.id) : undefined;
+  const classification = useExpenseClassificationDraft(form?.expenseClassification, form?.category ?? null, 'expense', true, editingPlan?.workspace_id);
   const filterSelects: readonly FilterSelect[] = [
     { key: 'conta', label: 'Conta', options: accountSelectOptions(accountsForFilters.data ?? [], 'Sem conta', 'none') },
     { key: 'categoria', label: 'Categoria', options: Array.from(new Set(lista.map((p) => p.category).filter((v): v is string => Boolean(v)))).sort().map((v) => ({ id: v, label: v })) },
@@ -413,7 +419,15 @@ export default function InstallmentsScreen() {
         ], 'Quantidade, data inicial, conta e parcelas já pagas seguem as regras do contrato. Parcelas já pagas conservam seu valor e sua data.');
         return;
       }
-      editarEscopo.mutate({ id: ancora.id, scope, patch: decisao.patch, lastDay: decisao.lastDay }, {
+      const key = JSON.stringify([ancora.id, scope, decisao.patch, decisao.lastDay, form.editRevision]);
+      if (scopeAttempt.current?.key !== key) scopeAttempt.current = {
+        key, id: newClientMessageId(), anchorRevision: ancora.edit_revision ?? Number.NaN,
+      };
+      editarEscopo.mutate({ id: ancora.id, scope, patch: decisao.patch, lastDay: decisao.lastDay,
+        expectedPlanRevision: form.editRevision ?? Number.NaN,
+        expectedAnchorRevision: scopeAttempt.current.anchorRevision,
+        requestId: scopeAttempt.current.id,
+      }, {
         onSuccess: () => {
           volta.aoFechar(() => setForm(null));
           toast({ message: 'Alteração salva nas parcelas escolhidas.', tone: 'success' });
@@ -740,7 +754,10 @@ export default function InstallmentsScreen() {
         />
         {form ? (
           <SheetScroll contentContainerStyle={styles.sheetBody}>
-            <CamposDaCompra form={form} onChange={setForm} contas={accounts.data ?? []} />
+            {classification.isError ? <ErrorCard onRetry={() => void classification.refetch()} /> : null}
+            <CamposDaCompra form={form} onChange={setForm} contas={accounts.data ?? []}
+              classificationDefaults={classification.defaults}
+              onUseCategoryDefaults={() => setForm({ ...form, expenseClassification: classification.adoptCategoryDefaults() })} />
           </SheetScroll>
         ) : null}
       </Sheet>

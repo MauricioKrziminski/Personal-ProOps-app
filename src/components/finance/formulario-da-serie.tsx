@@ -31,6 +31,8 @@ import { normalizePaymentMethod, paymentMethodError } from '@/lib/payment-method
 import { comumParaSerie } from '@/lib/lancar';
 import { estadoDaRecorrencia } from '@/lib/recurring-state';
 import { SERIE_VAZIA, serieDoRegistro, validaSerie, type SerieForm } from '@/lib/serie';
+import { useExpenseClassificationDraft } from '@/hooks/use-expense-classification';
+import { expenseClassificationFromRecord, expenseClassificationPatch } from '@/lib/expense-classification';
 
 /**
  * O formulário da série recorrente como CORPO (spec 2026-09-29, formulário único): estado, campos e
@@ -42,6 +44,11 @@ import { SERIE_VAZIA, serieDoRegistro, validaSerie, type SerieForm } from '@/lib
  */
 type Props = CorpoProps & {
   preset?: SerieForm['preset'];
+};
+
+type EstadoDaSerie = {
+  form: SerieForm;
+  baseline?: RecurringTransaction;
 };
 
 export function FormularioDaSerie(props: Props) {
@@ -88,7 +95,6 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
   const toast = useToast();
   const salvarBloqueadoAtual = useRef(Boolean(props.salvarBloqueado));
   useLayoutEffect(() => { salvarBloqueadoAtual.current = Boolean(props.salvarBloqueado); }, [props.salvarBloqueado]);
-  const series = useRecurringTransactions();
   const accounts = useAccounts();
   const create = useCreateRecurring();
   const editar = useSaveRecurringSeries();
@@ -103,33 +109,54 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
     montado.current = false;
   }, [montado]);
 
-  const [form, setForm] = useState<SerieForm>(() => {
-    if (props.estadoGuardado) return props.estadoGuardado as SerieForm;
-    if (alvo) return serieDoRegistro(alvo);
+  const [estado, setEstado] = useState<EstadoDaSerie>(() => {
+    const guardado = props.estadoGuardado as EstadoDaSerie | SerieForm | undefined;
+    // Estados antigos guardavam só os campos. Os novos preservam também o registro
+    // aberto: realtime não pode trocar o baseline do diff nem a revisão do CAS.
+    if (guardado && 'form' in guardado) return {
+      ...guardado,
+      form: { ...guardado.form, expenseClassification: comum.expenseClassification ?? guardado.form.expenseClassification },
+    };
+    const baseline = alvo ? { ...alvo } : undefined;
+    // A classificação segue a última intenção comum; o baseline continua sendo o registro aberto.
+    if (guardado) return { form: {
+      ...guardado, expenseClassification: comum.expenseClassification ?? guardado.expenseClassification,
+    }, baseline };
+    if (baseline) return { form: serieDoRegistro(baseline), baseline };
     const c = comumParaSerie(comum);
     return {
-      ...SERIE_VAZIA,
-      kind: c.kind === 'income' ? 'income' : 'expense',
-      preset: props.preset ?? SERIE_VAZIA.preset,
-      amountCents: c.valorCents,
-      description: c.descricao,
-      merchant: c.estabelecimento ?? '',
-      category: c.categoria,
-      accountId: c.contaId,
-      paymentMethod: c.paymentMethod,
-      inicio: c.dataBR,
+      form: {
+        ...SERIE_VAZIA,
+        kind: c.kind === 'income' ? 'income' : 'expense',
+        preset: props.preset ?? SERIE_VAZIA.preset,
+        amountCents: c.valorCents,
+        description: c.descricao,
+        merchant: c.estabelecimento ?? '',
+        category: c.categoria,
+        accountId: c.contaId,
+        paymentMethod: c.paymentMethod,
+        expenseClassification: c.expenseClassification,
+        inicio: c.dataBR,
+      },
     };
   });
+  const { form, baseline } = estado;
+  const setForm = (form: SerieForm) => setEstado((anterior) => ({ ...anterior, form }));
+
+  const classification = useExpenseClassificationDraft(form.expenseClassification, form.category, form.kind,
+    Boolean(editandoId || form.id), baseline?.workspace_id);
+  const resolvedForm = { ...form, expenseClassification: classification.classification };
 
   useEffect(() => {
-    registrarComum(() => ({ kind: form.kind, descricao: form.description, valorCents: form.amountCents, contaId: form.accountId, dataBR: form.inicio, categoria: form.category, estabelecimento: form.merchant, paymentMethod: form.paymentMethod }));
-    registrarEstado(() => form);
+    registrarComum(() => ({ kind: form.kind, descricao: form.description, valorCents: form.amountCents, contaId: form.accountId, dataBR: form.inicio, categoria: form.category, estabelecimento: form.merchant, paymentMethod: form.paymentMethod, expenseClassification: classification.classification }));
+    registrarEstado(() => estado);
   });
 
   const { inicioDate, agendaNoPassado, podeSalvar: basicoPodeSalvar, rrulePrevia } = validaSerie(form);
 
   const erroMetodo = paymentMethodError(form.paymentMethod, (accounts.data ?? []).find((c) => c.id === form.accountId) ?? null);
-  const podeSalvar = basicoPodeSalvar && !erroMetodo;
+  const podeSalvar = basicoPodeSalvar && !erroMetodo && classification.ready
+    && (Boolean(editandoId || form.id) || !classification.isError);
 
   const creationInput: EntradaRecorrente | null = podeSalvar && inicioDate && rrulePrevia ? {
     kind: form.kind,
@@ -143,6 +170,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
     next_run_at: inicioDate.toISOString(),
     end_date: form.fim ? brToISO(form.fim) : null,
     auto_confirm: form.autoConfirm,
+    ...classification.classification,
   } : null;
 
   const salvar = (criarOutro: boolean) => {
@@ -154,7 +182,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
        * aluguel" reescrever a categoria e o nome de ocorrências que alguém ajustou à
        * mão. É a mesma regra do `patchDaSerie` do formulário de lançamento.
        */
-      const antes = (series.data ?? []).find((r) => r.id === form.id);
+      const antes = baseline;
       const patch: Parameters<typeof editar.mutate>[0]['patch'] = {};
       if (!antes || form.amountCents !== Number(antes.amount_cents)) patch.amount_cents = form.amountCents;
       if (!antes || form.category !== antes.category) patch.category = form.category;
@@ -168,6 +196,8 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
       const merchant = form.merchant.trim() || null;
       if (!antes || merchant !== (antes.merchant ?? null)) patch.merchant = merchant;
       if (!antes || form.kind !== antes.kind) patch.kind = form.kind;
+      const classificationPatch = expenseClassificationPatch(expenseClassificationFromRecord(antes), classification.classification);
+      Object.assign(patch, classificationPatch);
       if (form.agendaMudou) {
         if (!inicioDate || !rrulePrevia || agendaNoPassado) return;
         patch.rrule = rrulePrevia;
@@ -180,6 +210,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
       if (patch.merchant !== undefined) linePatch.merchant = patch.merchant;
       if (patch.account_id !== undefined) linePatch.account_id = patch.account_id;
       if (patch.payment_method !== undefined) linePatch.payment_method = patch.payment_method;
+      Object.assign(linePatch, classificationPatch);
 
       /*
         Aqui a pessoa edita a SÉRIE, não uma ocorrência (28/09/2026): "Das próximas em diante" ou
@@ -285,7 +316,10 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
       <SheetScroll contentContainerStyle={styles.corpo}>
         {props.topo}
         <View style={styles.conteudo}>
-          <CamposDaSerie form={form} onChange={setForm} contas={accounts.data ?? []} />
+          <CamposDaSerie form={resolvedForm} onChange={setForm} contas={accounts.data ?? []}
+            classificationDefaults={classification.defaults}
+            onUseCategoryDefaults={classification.defaults ? () => setForm({ ...form, expenseClassification: classification.adoptCategoryDefaults() }) : undefined} />
+          {classification.isError ? <ErrorCard onRetry={() => void classification.refetch()} /> : null}
           <FinanceWritePreview accounts={accounts.data ?? []} write={creationInput && !editandoId && !form.id && !converter
             && !props.salvarBloqueado && !salvando && !accounts.isError && !accounts.isPending ? escritaDaRecorrente(creationInput) : null} />
           {!editandoId && !converter ? (

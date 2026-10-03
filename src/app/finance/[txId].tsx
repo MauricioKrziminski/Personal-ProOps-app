@@ -17,6 +17,7 @@ import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { describeRRule } from '@/lib/rrule-text';
 import { paymentMethodLabel } from '@/lib/payment-method';
+import { EXPENSE_PATTERN_LABELS, EXPENSE_NECESSITY_LABELS } from '@/lib/expense-classification';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
@@ -354,6 +355,14 @@ export default function TransactionDetailScreen() {
 
   const supportContent = (
     <>
+      {tx.kind === 'expense' && !tx.pays_invoice_id ? (
+        <Section title="Classificação">
+          <Row title={tx.expense_pattern ? EXPENSE_PATTERN_LABELS[tx.expense_pattern] : 'Não informado'}
+            subtitle="Previsibilidade" chevron={false} />
+          <Row title={tx.expense_necessity ? EXPENSE_NECESSITY_LABELS[tx.expense_necessity] : 'Não informado'}
+            subtitle="Necessidade" chevron={false} />
+        </Section>
+      ) : null}
       <Section title="Como isso entrou">
         <Row title={SOURCE_LABEL[tx.source]} subtitle="Origem" icon={SOURCE_ICON[tx.source]} />
         <Row title={paymentMethodLabel(tx.payment_method)} subtitle="Forma de pagamento" icon="creditcard" />

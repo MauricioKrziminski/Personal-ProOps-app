@@ -602,6 +602,9 @@ export type Database = {
         Row: {
           color: string | null
           created_at: string
+          default_expense_necessity: string | null
+          default_expense_pattern: string | null
+          edit_revision: number
           icon: string | null
           id: string
           name: string
@@ -612,6 +615,9 @@ export type Database = {
         Insert: {
           color?: string | null
           created_at?: string
+          default_expense_necessity?: string | null
+          default_expense_pattern?: string | null
+          edit_revision?: number
           icon?: string | null
           id?: string
           name: string
@@ -622,6 +628,9 @@ export type Database = {
         Update: {
           color?: string | null
           created_at?: string
+          default_expense_necessity?: string | null
+          default_expense_pattern?: string | null
+          edit_revision?: number
           icon?: string | null
           id?: string
           name?: string
@@ -770,6 +779,12 @@ export type Database = {
           amount_cents: number | null
           debt_id: string
           due_date: string | null
+          expense_necessity: string | null
+          expense_necessity_set: boolean
+          expense_necessity_source: string | null
+          expense_pattern: string | null
+          expense_pattern_set: boolean
+          expense_pattern_source: string | null
           installment_no: number
           payment_method: string | null
           payment_method_set: boolean
@@ -778,6 +793,12 @@ export type Database = {
           amount_cents?: number | null
           debt_id: string
           due_date?: string | null
+          expense_necessity?: string | null
+          expense_necessity_set?: boolean
+          expense_necessity_source?: string | null
+          expense_pattern?: string | null
+          expense_pattern_set?: boolean
+          expense_pattern_source?: string | null
           installment_no: number
           payment_method?: string | null
           payment_method_set?: boolean
@@ -786,6 +807,12 @@ export type Database = {
           amount_cents?: number | null
           debt_id?: string
           due_date?: string | null
+          expense_necessity?: string | null
+          expense_necessity_set?: boolean
+          expense_necessity_source?: string | null
+          expense_pattern?: string | null
+          expense_pattern_set?: boolean
+          expense_pattern_source?: string | null
           installment_no?: number
           payment_method?: string | null
           payment_method_set?: boolean
@@ -808,6 +835,10 @@ export type Database = {
           created_at: string
           due_day: number | null
           edit_revision: number
+          expense_necessity: string | null
+          expense_necessity_source: string | null
+          expense_pattern: string | null
+          expense_pattern_source: string | null
           first_due_date: string | null
           id: string
           installment_cents: number | null
@@ -834,6 +865,10 @@ export type Database = {
           created_at?: string
           due_day?: number | null
           edit_revision?: number
+          expense_necessity?: string | null
+          expense_necessity_source?: string | null
+          expense_pattern?: string | null
+          expense_pattern_source?: string | null
           first_due_date?: string | null
           id?: string
           installment_cents?: number | null
@@ -860,6 +895,10 @@ export type Database = {
           created_at?: string
           due_day?: number | null
           edit_revision?: number
+          expense_necessity?: string | null
+          expense_necessity_source?: string | null
+          expense_pattern?: string | null
+          expense_pattern_source?: string | null
           first_due_date?: string | null
           id?: string
           installment_cents?: number | null
@@ -1288,6 +1327,10 @@ export type Database = {
           created_at: string
           description: string | null
           edit_revision: number
+          expense_necessity: string | null
+          expense_necessity_source: string | null
+          expense_pattern: string | null
+          expense_pattern_source: string | null
           first_occurred_at: string
           id: string
           installments: number
@@ -1304,6 +1347,10 @@ export type Database = {
           created_at?: string
           description?: string | null
           edit_revision?: number
+          expense_necessity?: string | null
+          expense_necessity_source?: string | null
+          expense_pattern?: string | null
+          expense_pattern_source?: string | null
           first_occurred_at: string
           id?: string
           installments: number
@@ -1320,6 +1367,10 @@ export type Database = {
           created_at?: string
           description?: string | null
           edit_revision?: number
+          expense_necessity?: string | null
+          expense_necessity_source?: string | null
+          expense_pattern?: string | null
+          expense_pattern_source?: string | null
           first_occurred_at?: string
           id?: string
           installments?: number
@@ -1804,6 +1855,10 @@ export type Database = {
           dtstart: string | null
           edit_revision: number
           end_date: string | null
+          expense_necessity: string | null
+          expense_necessity_source: string | null
+          expense_pattern: string | null
+          expense_pattern_source: string | null
           id: string
           kind: string
           last_error: string | null
@@ -1829,6 +1884,10 @@ export type Database = {
           dtstart?: string | null
           edit_revision?: number
           end_date?: string | null
+          expense_necessity?: string | null
+          expense_necessity_source?: string | null
+          expense_pattern?: string | null
+          expense_pattern_source?: string | null
           id?: string
           kind: string
           last_error?: string | null
@@ -1854,6 +1913,10 @@ export type Database = {
           dtstart?: string | null
           edit_revision?: number
           end_date?: string | null
+          expense_necessity?: string | null
+          expense_necessity_source?: string | null
+          expense_pattern?: string | null
+          expense_pattern_source?: string | null
           id?: string
           kind?: string
           last_error?: string | null
@@ -2068,6 +2131,10 @@ export type Database = {
           down_payment_plan_id: string | null
           due_at: string | null
           edit_revision: number
+          expense_necessity: string | null
+          expense_necessity_source: string | null
+          expense_pattern: string | null
+          expense_pattern_source: string | null
           id: string
           installment_no: number | null
           installment_plan_id: string | null
@@ -2106,6 +2173,10 @@ export type Database = {
           down_payment_plan_id?: string | null
           due_at?: string | null
           edit_revision?: number
+          expense_necessity?: string | null
+          expense_necessity_source?: string | null
+          expense_pattern?: string | null
+          expense_pattern_source?: string | null
           id?: string
           installment_no?: number | null
           installment_plan_id?: string | null
@@ -2144,6 +2215,10 @@ export type Database = {
           down_payment_plan_id?: string | null
           due_at?: string | null
           edit_revision?: number
+          expense_necessity?: string | null
+          expense_necessity_source?: string | null
+          expense_pattern?: string | null
+          expense_pattern_source?: string | null
           id?: string
           installment_no?: number | null
           installment_plan_id?: string | null
@@ -2895,6 +2970,10 @@ export type Database = {
           budgets: number
           category: string
           color: string
+          configuration_id: string
+          default_expense_necessity: string
+          default_expense_pattern: string
+          edit_revision: number
           icon: string
           uses: number
         }[]
@@ -3106,7 +3185,7 @@ export type Database = {
           p_category_antes: string
           p_limit_cents: number
           p_month?: string
-          p_month_antes: string | null
+          p_month_antes: string
           p_rollover?: boolean
         }
         Returns: string
@@ -3231,6 +3310,28 @@ export type Database = {
           status: string
         }[]
       }
+      ledger_expected_lines_classified: {
+        Args: { p_from: string; p_recurring_id?: string; p_to: string }
+        Returns: {
+          account_id: string
+          amount_cents: number
+          category: string
+          description: string
+          due_date: string
+          expense_necessity: string
+          expense_necessity_source: string
+          expense_pattern: string
+          expense_pattern_source: string
+          inferred_start: boolean
+          installment_no: number
+          installments_total: number
+          kind: string
+          origin: string
+          payment_method: string
+          ref_id: string
+          status: string
+        }[]
+      }
       ledger_expected_lines_payment: {
         Args: { p_from: string; p_recurring_id?: string; p_to: string }
         Returns: {
@@ -3244,7 +3345,7 @@ export type Database = {
           installments_total: number
           kind: string
           origin: string
-          payment_method: string | null
+          payment_method: string
           ref_id: string
           status: string
         }[]
@@ -3407,6 +3508,10 @@ export type Database = {
           status: string
         }[]
       }
+      preview_finance_write: {
+        Args: { p_args: Json; p_days?: number; p_operation: string }
+        Returns: Json
+      }
       rename_category: {
         Args: { p_from: string; p_juntar?: boolean; p_to: string }
         Returns: Json
@@ -3433,6 +3538,10 @@ export type Database = {
         Args: { p_color: string; p_icon: string; p_name: string }
         Returns: undefined
       }
+      save_category_configuration: {
+        Args: { p_input: Json; p_request_id: string }
+        Returns: Json
+      }
       save_reminder_child_scoped: {
         Args: {
           p_channel: string
@@ -3440,7 +3549,7 @@ export type Database = {
           p_expected_child_run_at: string
           p_next_run_at: string
           p_parent_id: string
-          p_recurrence: string | null
+          p_recurrence: string
           p_scope: string
           p_timezone: string
           p_title: string
@@ -3453,7 +3562,7 @@ export type Database = {
           p_expected_run_at: string
           p_id: string
           p_next_run_at: string
-          p_recurrence: string | null
+          p_recurrence: string
           p_scope: string
           p_timezone: string
           p_title: string
@@ -3462,21 +3571,17 @@ export type Database = {
       }
       save_transaction_payment: {
         Args: {
-          p_expected_revision: number | null
-          p_fee_cents: number | null
+          p_expected_revision: number
+          p_fee_cents: number
           p_input: Json
           p_request_id: string
-          p_transaction_id: string | null
+          p_transaction_id: string
         }
         Returns: Json
       }
       settle_invoice: {
         Args: { p_invoice_id: string; p_paid_at?: string }
         Returns: string
-      }
-      preview_finance_write: {
-        Args: { p_args: Json; p_days?: number; p_operation: string }
-        Returns: Json
       }
       simular: { Args: { p_leituras: Json; p_registros: Json }; Returns: Json }
       skip_recurring_occurrence: {
@@ -3594,6 +3699,18 @@ export type Database = {
         Args: { p_patch: Json; p_scope: string; p_transaction_id: string }
         Returns: number
       }
+      update_installment_scope_checked: {
+        Args: {
+          p_expected_anchor_revision: number
+          p_expected_plan_revision: number
+          p_last_day?: boolean
+          p_patch: Json
+          p_request_id: string
+          p_scope: string
+          p_transaction_id: string
+        }
+        Returns: number
+      }
       update_installment_scope_last_day: {
         Args: { p_patch: Json; p_scope: string; p_transaction_id: string }
         Returns: number
@@ -3615,7 +3732,7 @@ export type Database = {
           p_recurring_id: string
           p_request_id: string
           p_series_patch: Json
-          p_transaction_id: string | null
+          p_transaction_id: string
         }
         Returns: number
       }

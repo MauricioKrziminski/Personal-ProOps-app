@@ -20,6 +20,7 @@ export const FINANCE_KEYS = [
   ['annual-report'], ['goal-contributions'], ['search', 'transactions'],
   ['ai-month-stats'], ['month-lines'], ['month-summary'], ['month-breakdown'], ['default-account'],
   ['ledger-expected'], ['finance-write-preview'],
+  ['category-classification-defaults'],
   /*
     ⚠️ **As chaves de CICLO faltavam aqui, e elas são o número grande das duas raízes.**
     `markPaid` e `pay_invoice` não atualizavam nenhum dos dois heróis pelo caminho otimista —
