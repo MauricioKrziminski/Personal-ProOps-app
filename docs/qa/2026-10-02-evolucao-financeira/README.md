@@ -260,3 +260,18 @@ histórico. Remoção de detalhe virou Sem detalhe, sem apagar lançamentos. Lim
 fixtures/oito recibos próprios reconcilia 17 fontes e caixa com baseline independente.
 ANR F07, repintura Android e limites de cobertura/deployment permanecem explicitamente
 registrados. F10 liberado para o próximo ciclo.
+
+## F10 — prazo a partir da contribuição
+
+[Aceite e limites](f10/aceite.md), [contrato](f10/contrato.md), [banco](f10/banco.md),
+[código](f10/registro-codigo.md) e [matriz nativa](f10/nativo.md). Duas migrations só no
+staging; Por prazo e Por mês com calendário exato em centavos, gravação cruzada iOS↔Android,
+Reduzir movimento no iOS em 04/10 e limpeza das fixtures por `request_id`. F11 liberado.
+
+## F11 — reservar x transferir de verdade
+
+[Aceite e limites](f11/aceite.md) e [contrato](f11/contrato.md). Migration
+`20261004120000_goal_money_movements.sql` só no staging, revisada e corrigida antes do push.
+iOS 10/10 e Android 9/9; oráculo do banco sem resíduo e caixa idêntico. ANR F07 segue aberta.
+F12 liberado.
+

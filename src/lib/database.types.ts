@@ -1283,6 +1283,107 @@ export type Database = {
           },
         ]
       }
+      goal_money_movements: {
+        Row: {
+          account_id: string | null
+          amount_cents: number
+          contribution_id: string | null
+          created_at: string
+          created_transfer: boolean
+          edit_revision: number
+          from_account_id: string | null
+          goal_id: string
+          id: string
+          kind: string
+          occurred_on: string
+          transfer_id: string | null
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          amount_cents: number
+          contribution_id?: string | null
+          created_at?: string
+          created_transfer?: boolean
+          edit_revision?: number
+          from_account_id?: string | null
+          goal_id: string
+          id?: string
+          kind: string
+          occurred_on: string
+          transfer_id?: string | null
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          account_id?: string | null
+          amount_cents?: number
+          contribution_id?: string | null
+          created_at?: string
+          created_transfer?: boolean
+          edit_revision?: number
+          from_account_id?: string | null
+          goal_id?: string
+          id?: string
+          kind?: string
+          occurred_on?: string
+          transfer_id?: string | null
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_money_movements_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_money_movements_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: true
+            referencedRelation: "goal_contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_money_movements_from_account_id_fkey"
+            columns: ["from_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_money_movements_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_money_movements_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: true
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_money_movements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_money_movements_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       goal_plan_items: {
         Row: {
           contribution_deadline: string | null
@@ -3773,6 +3874,18 @@ export type Database = {
           p_occurred_at?: string
         }
         Returns: number
+      }
+      goal_link_candidates: {
+        Args: { p_goal_id: string; p_limit?: number }
+        Returns: Json
+      }
+      goal_money_command: {
+        Args: { p_input: Json; p_request_id: string }
+        Returns: Json
+      }
+      goal_money_state: {
+        Args: { p_before?: string; p_goal_id: string; p_limit?: number }
+        Returns: Json
       }
       goal_planning_state: {
         Args: {

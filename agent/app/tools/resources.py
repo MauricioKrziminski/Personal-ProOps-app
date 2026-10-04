@@ -843,7 +843,8 @@ async def _preparar_aporte(
             _error("Me diz o dia do aporte (ex.: 20/09). Nada foi alterado.")
         filtro, args = " and c.occurred_at = %s", [*args, dia]
     aportes = await db.fetch(
-        "select c.id, c.amount_cents, c.occurred_at, c.note from public.goal_contributions c "
+        "select c.id, c.amount_cents, c.occurred_at, c.note, exists (select 1 from public.goal_money_movements m "
+        "where m.contribution_id = c.id) as de_movimentacao from public.goal_contributions c "
         "where c.goal_id = %s and c.workspace_id = %s" + filtro
         + " order by c.occurred_at desc, c.created_at desc limit 9",
         *args,
@@ -857,6 +858,10 @@ async def _preparar_aporte(
                           for a in aportes)
         _error(f"Qual aporte da meta {meta['name']}? {lista}. Me diz o dia. Nada foi alterado.")
     a = aportes[0]
+    if a.get("de_movimentacao"):
+        # F11: o aporte nasceu de uma movimentação (separação/transferência); editá-lo soltaria os dois.
+        raise JaExiste("Esse aporte veio de uma movimentação de dinheiro; desfaça pela meta no app. "
+                       "Nada foi alterado.")
     antes = int(a["amount_cents"])
     valor = antes
     if values.get("novo_valor_do_aporte") is not None:

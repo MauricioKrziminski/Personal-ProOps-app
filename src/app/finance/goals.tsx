@@ -16,10 +16,17 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { DatePickerField } from '@/components/finance/date-picker-field';
+import { AccountPicker } from '@/components/finance/account-picker';
+import { SelectField } from '@/components/ui/select-field';
 import { GoalPlanningSummary, GoalPlanSheet, useGoalPlanEditor } from '@/components/finance/goal-planning';
 import { GoalContributionCaption } from '@/components/finance/goal-contribution-fields';
 import { useMonthRuler } from '@/components/finance/month-ruler';
 import { useGoalHorizonPlanning } from '@/hooks/use-goal-horizon';
+import { useGoalLinkCandidates, useGoalMoneyCommand, useGoalMoneyState } from '@/hooks/use-goal-money';
+import {
+  efeitoDaMovimentacao, entradaDaMovimentacao, mensagemDaMovimentacao, naturezaDaMovimentacao, validarMovimentacao,
+  type GoalMoneyDraft, type GoalMoneyMovement,
+} from '@/lib/goal-money';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
@@ -38,6 +45,7 @@ import {
   useArchiveGoal,
   useEditGoalContribution,
   useGoalContributions,
+  useAccounts,
   useGoalDeposit,
   useGoals,
   useSaveGoal,
@@ -108,6 +116,8 @@ export default function GoalsScreen() {
   const planEditor = useGoalPlanEditor(365, planRuler.view);
   const save = useSaveGoal();
   const deposit = useGoalDeposit();
+  const movimento = useGoalMoneyCommand();
+  const contas = (useAccounts().data ?? []).filter((a) => a.type !== 'credit_card');
   const editarAporte = useEditGoalContribution();
   const archive = useArchiveGoal();
 
@@ -117,6 +127,16 @@ export default function GoalsScreen() {
   const [aporteNota, setAporteNota] = useState('');
   /** Quando (26/09/2026): era sempre hoje. */
   const [aporteData, setAporteData] = useState(() => isoToBR(localISODate()));
+  /**
+   * F11: ONDE está o dinheiro. `via` troca de significado com a direção (guardar: já está na conta |
+   * transferir; retirar: liberar | transferir de volta); `conta` é onde fica separado (o DESTINO ao
+   * guardar por transferência, a ORIGEM ao retirar) e `outra` a outra ponta da transferência.
+   */
+  const [aporteDirecao, setAporteDirecao] = useState<'guardar' | 'retirar'>('guardar');
+  const [aporteVia, setAporteVia] = useState<'conta' | 'transferir'>('conta');
+  const [aporteConta, setAporteConta] = useState<string | null>(null);
+  const [aporteOutra, setAporteOutra] = useState<string | null>(null);
+  const [aporteVincular, setAporteVincular] = useState<string | null>(null);
   /**
    * O aporte do extrato em edição (26/09/2026, "tudo que se cria se edita"): era só "Desfazer",
    * que lançava um estorno ao lado. A edição abre DENTRO da folha do extrato — uma folha sobre a
@@ -133,6 +153,12 @@ export default function GoalsScreen() {
 
   // Lazy de propósito: com 8 metas na tela isso é a diferença entre 1 e 9 requisições.
   const contribuicoes = useGoalContributions(extrato?.id);
+  // Estado do dinheiro da meta aberta (folha ou extrato). Até 100 movimentações para dar natureza
+  // às linhas do extrato; aporte mais antigo aparece como aporte comum.
+  const dinheiroId = aporte?.id ?? extrato?.id;
+  const dinheiro = useGoalMoneyState(dinheiroId, 100);
+  const estadoDoDinheiro = dinheiro.data?.goal_id === dinheiroId ? dinheiro.data : undefined;
+  const candidatas = useGoalLinkCandidates(aporte?.id, aporte !== null && aporteDirecao === 'guardar' && aporteVia === 'transferir');
 
   // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
   // falha, e sem este corte a lista seguia afirmando números embaixo da faixa que acabou
@@ -160,6 +186,11 @@ export default function GoalsScreen() {
     });
 
   const abrirAporte = (g: Goal) => {
+    setAporteDirecao('guardar');
+    setAporteVia('conta');
+    setAporteConta(null);
+    setAporteOutra(null);
+    setAporteVincular(null);
     setAporteCents(0);
     setAporteNota('');
     setAporteData(isoToBR(localISODate()));
@@ -215,39 +246,69 @@ export default function GoalsScreen() {
     );
   };
 
-  /**
-   * Retirar mais do que está guardado: o banco somava o ledger com `greatest(sum, 0)` e o saldo
-   * virava 0 sem aviso — o próximo "Guardar" sumia (22/09/2026). O banco agora recusa
-   * (`20260922130000`); aqui o botão desliga antes e a dica diz até quanto dá.
-   */
-  const passaDoGuardado = aporte !== null && aporteCents > Number(aporte.saved_cents);
-
-  const lancarAporte = (sinal: 1 | -1) => {
-    if (!aporte || aporteCents <= 0) return;
-    if (sinal < 0 && passaDoGuardado) return;
-    const antes = Number(aporte.saved_cents);
-    const depois = antes + sinal * aporteCents;
-    deposit.mutate(
-      { goal: aporte, amountCents: sinal * aporteCents, note: aporteNota.trim() || undefined, occurredAt: brToISO(aporteData) },
-      {
-        onSuccess: () => {
-          const bateu = depois >= Number(aporte.target_cents) && antes < Number(aporte.target_cents);
-          toast({
-            message: bateu
-              ? `${aporte.name} bateu a meta.`
-              : sinal > 0
-                ? `Guardado em ${aporte.name}.`
-                : `Retirado de ${aporte.name}.`,
-            tone: 'success',
-          });
-          setAporte(null);
-        },
-        // o sheet FICA aberto com o valor: fechar num erro faz o usuário achar que guardou
-        onError: () =>
-          toast({ message: sinal > 0 ? 'Não deu para guardar.' : 'Não deu para retirar.', tone: 'error' }),
-      }
-    );
+  const hoje = localISODate();
+  const rascunho: GoalMoneyDraft = {
+    direcao: aporteDirecao, via: aporteVia, contaId: aporteConta, outraContaId: aporteOutra, vincularId: aporteVincular,
+    cents: aporteCents, data: isValidBRDate(aporteData) ? brToISO(aporteData) : '', nota: aporteNota,
   };
+  // Retirar mais do que está guardado (ou separado na conta) o banco recusa; aqui o botão desliga antes.
+  const validacao = aporte
+    ? validarMovimentacao(rascunho, estadoDoDinheiro, Number(aporte.saved_cents), hoje, brl)
+    : { pronto: false, motivo: null };
+  const efeito = aporte ? efeitoDaMovimentacao(estadoDoDinheiro, rascunho, hoje) : [];
+  const ficaNegativa = efeito.find((l) => l.rotulo === 'Saldo' && l.depois < 0);
+  const vinculada = aporteVia === 'transferir' && aporteDirecao === 'guardar' && aporteVincular !== null;
+
+  const mudarDirecao = (direcao: 'guardar' | 'retirar') => {
+    setAporteDirecao(direcao);
+    setAporteVia('conta');
+    setAporteConta(null);
+    setAporteOutra(null);
+    setAporteVincular(null);
+  };
+  const mudarVia = (via: 'conta' | 'transferir') => {
+    setAporteVia(via);
+    setAporteConta(null);
+    setAporteOutra(null);
+    setAporteVincular(null);
+  };
+
+  const salvarMovimentacao = () => {
+    if (!aporte || !validacao.pronto) return;
+    const antes = Number(aporte.saved_cents);
+    const sinal = aporteDirecao === 'guardar' ? 1 : -1;
+    movimento.mutate(entradaDaMovimentacao(aporte.id, rascunho), {
+      onSuccess: (r) => {
+        const depois = Number(r?.saved_cents ?? antes + sinal * aporteCents);
+        const bateu = depois >= Number(aporte.target_cents) && antes < Number(aporte.target_cents);
+        toast({
+          message: bateu ? `${aporte.name} bateu a meta.` : sinal > 0 ? `Guardado em ${aporte.name}.` : `Retirado de ${aporte.name}.`,
+          tone: 'success',
+        });
+        setAporte(null);
+      },
+      // o sheet FICA aberto com o valor: fechar num erro faz o usuário achar que guardou
+      onError: (error) => toast({
+        message: mensagemDaMovimentacao(error, sinal > 0 ? 'Não deu para guardar.' : 'Não deu para retirar.', brl), tone: 'error',
+      }),
+    });
+  };
+
+  /** Desfaz a movimentação inteira: aporte, separação e a transferência que ELA criou. */
+  const desfazerMovimentacao = (goal: Goal, m: GoalMoneyMovement) =>
+    confirmDestructive(
+      'Desfazer esta movimentação?',
+      'Desfazer',
+      () =>
+        movimento.mutate(
+          { op: 'undo', movement_id: m.id, expected_revision: m.revision },
+          {
+            onSuccess: () => toast({ message: 'Movimentação desfeita.', tone: 'success' }),
+            onError: (error) => toast({ message: mensagemDaMovimentacao(error, 'Não deu para desfazer.', brl), tone: 'error' }),
+          }
+        ),
+      `${naturezaDaMovimentacao(m)}. ${m.created_transfer ? 'A transferência criada por ela também é apagada.' : 'Nenhum lançamento é apagado.'} ${m.kind === 'release' || m.kind === 'transfer_out' ? `${goal.name} volta a ter ${brl(m.amount_cents)}.` : `${goal.name} perde ${brl(m.amount_cents)}.`}`
+    );
 
   const desfazerAporte = (goal: Goal, amountCents: number) =>
     confirmDestructive(
@@ -515,13 +576,92 @@ export default function GoalsScreen() {
 
           {aporte ? (
             <SheetScroll contentContainerStyle={styles.sheetBody}>
-              <Field
-                label="Valor"
-                hint={passaDoGuardado
-                  ? `Retira até ${formatBRL(Number(aporte.saved_cents))}`
-                  : undefined}>
-                <MoneyField valueCents={aporteCents} onChangeCents={setAporteCents} autoFocus />
-              </Field>
+              <Segmented
+                options={[
+                  { value: 'guardar', label: 'Guardar' },
+                  { value: 'retirar', label: 'Retirar' },
+                ]}
+                value={aporteDirecao}
+                onChange={mudarDirecao}
+              />
+              <Segmented
+                options={aporteDirecao === 'guardar'
+                  ? [{ value: 'conta', label: 'Já está na conta' }, { value: 'transferir', label: 'Transferir' }]
+                  : [{ value: 'conta', label: 'Liberar' }, { value: 'transferir', label: 'Transferir de volta' }]}
+                value={aporteVia}
+                onChange={mudarVia}
+              />
+
+              {vinculada ? null : (
+                <Field label="Valor">
+                  <MoneyField valueCents={aporteCents} onChangeCents={setAporteCents} autoFocus />
+                </Field>
+              )}
+
+              {aporteVia === 'conta' ? (
+                <Field label="Conta">
+                  <AccountPicker
+                    accounts={contas}
+                    value={aporteConta}
+                    onChange={setAporteConta}
+                    emptyLabel={aporteDirecao === 'retirar' ? 'Sem origem' : undefined}
+                    placeholder="Escolher a conta"
+                  />
+                </Field>
+              ) : (
+                <>
+                  {aporteDirecao === 'guardar' ? (
+                    <Field label="Transferência já lançada">
+                      <SelectField
+                        value={aporteVincular}
+                        onChange={setAporteVincular}
+                        placeholder="Escolher uma transferência"
+                        options={[
+                          { id: null, label: 'Criar uma nova', icon: 'plus' },
+                          ...(candidatas.data ?? []).map((t) => ({
+                            id: t.id,
+                            label: `${brl(t.amount_cents)} · ${t.from_name ?? 'conta removida'} para ${t.to_name ?? 'conta removida'}`,
+                            meta: isoToBR(t.occurred_on),
+                          })),
+                        ]}
+                      />
+                    </Field>
+                  ) : null}
+                  {vinculada ? null : (
+                    <>
+                      <Field label="Da conta">
+                        <AccountPicker
+                          accounts={contas}
+                          value={aporteDirecao === 'guardar' ? aporteOutra : aporteConta}
+                          onChange={aporteDirecao === 'guardar' ? setAporteOutra : setAporteConta}
+                          placeholder="Escolher a origem"
+                        />
+                      </Field>
+                      <Field label="Para a conta">
+                        <AccountPicker
+                          accounts={contas}
+                          value={aporteDirecao === 'guardar' ? aporteConta : aporteOutra}
+                          onChange={aporteDirecao === 'guardar' ? setAporteConta : setAporteOutra}
+                          placeholder="Escolher o destino"
+                        />
+                      </Field>
+                    </>
+                  )}
+                </>
+              )}
+
+              {vinculada ? null : (
+                <>
+                  <Field label="Quando">
+                    <DatePickerField
+                      value={aporteData}
+                      onChange={setAporteData}
+                      max={aporteVia === 'transferir' ? undefined : localISODate()}
+                      accessibilityLabel="Data do aporte"
+                    />
+                  </Field>
+                </>
+              )}
 
               <Field label="Nota">
                 <TextField
@@ -532,26 +672,45 @@ export default function GoalsScreen() {
                 />
               </Field>
 
-              <Field label="Quando">
-                <DatePickerField value={aporteData} onChange={setAporteData} max={localISODate()} accessibilityLabel="Data do aporte" />
-              </Field>
+              {validacao.motivo ? (
+                <ThemedText type="small" themeColor="danger" accessibilityRole="alert">
+                  {validacao.motivo}
+                </ThemedText>
+              ) : null}
+
+              {efeito.length > 0 ? (
+                <Card style={styles.efeito}>
+                  {efeito.map((linha) => (
+                    <ThemedText key={`${linha.contaId}-${linha.rotulo}`} type="small" themeColor="textSecondary">
+                      {`${linha.conta} · ${linha.rotulo}: ${brl(linha.antes)} → ${brl(linha.depois)}`}
+                    </ThemedText>
+                  ))}
+                  {ficaNegativa ? (
+                    <ThemedText type="small" themeColor="danger">
+                      {`${ficaNegativa.conta} fica com saldo negativo.`}
+                    </ThemedText>
+                  ) : null}
+                </Card>
+              ) : null}
 
               <View style={styles.acoesAporte}>
-                <Button
-                  label="Guardar"
-                  block
-                  loading={deposit.isPending}
-                  disabled={aporteCents <= 0}
-                  onPress={() => lancarAporte(1)}
-                />
-                <Button
-                  label="Retirar"
-                  variant="secondary"
-                  block
-                  loading={deposit.isPending}
-                  disabled={aporteCents <= 0 || passaDoGuardado}
-                  onPress={() => lancarAporte(-1)}
-                />
+                {aporteDirecao === 'guardar' ? (
+                  <Button
+                    label="Guardar"
+                    block
+                    loading={movimento.isPending}
+                    disabled={!validacao.pronto}
+                    onPress={salvarMovimentacao}
+                  />
+                ) : (
+                  <Button
+                    label="Retirar"
+                    block
+                    loading={movimento.isPending}
+                    disabled={!validacao.pronto}
+                    onPress={salvarMovimentacao}
+                  />
+                )}
               </View>
 
               <ThemedText type="small" themeColor="textSecondary">
@@ -632,7 +791,10 @@ export default function GoalsScreen() {
                 title={`${new Date(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)) - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })} · ${brl(grupo.total)}`}>
                 {(grupo.itens ?? []).map((c) => {
                   // Editar à direita, Apagar à esquerda; o toque longo lê a mesma lista.
-                  const acoesDoAporte: ItemAction[] = extrato
+                  const mov = estadoDoDinheiro?.movements.find((x) => x.contribution_id === c.id);
+                  const acoesDoAporte: ItemAction[] = extrato && mov
+                    ? [{ label: 'Desfazer a movimentação', curto: 'Desfazer', icon: 'arrow.uturn.backward', destructive: true, arrasto: 'esquerda', onPress: () => desfazerMovimentacao(extrato, mov) }]
+                    : extrato
                     ? [
                         { label: 'Editar', icon: 'pencil', arrasto: 'direita', onPress: () => abrirEdicaoDoAporte(c) },
                         { label: 'Apagar o aporte', curto: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => desfazerAporte(extrato, Number(c.amount_cents)) },
@@ -642,7 +804,7 @@ export default function GoalsScreen() {
                   <Deslizavel key={c.id} titulo={isoToBR(c.occurred_at)} acoes={acoesDoAporte}>
                   <Row
                     title={isoToBR(c.occurred_at)}
-                    subtitle={c.note ?? undefined}
+                    subtitle={mov ? [naturezaDaMovimentacao(mov), c.note].filter(Boolean).join(' · ') : (c.note ?? undefined)}
                     chevron={false}
                     accessibilityLabel={`${isoToBR(c.occurred_at)}, ${Number(c.amount_cents) < 0 ? 'retirada' : 'depósito'} de ${brl(Math.abs(Number(c.amount_cents)))}`}
                     onLongPress={acoesDoAporte.length ? () => showItemActions(isoToBR(c.occurred_at), acoesDoAporte) : undefined}
@@ -778,5 +940,9 @@ const styles = StyleSheet.create({
   },
   acoesAporte: {
     gap: Space.md,
+  },
+  efeito: {
+    gap: Space.xs,
+    alignItems: 'stretch',
   },
 });

@@ -189,10 +189,12 @@ Aceite no staging em 04/10/2026: [F10](../../qa/2026-10-02-evolucao-financeira/f
 
 Arquivos: metas/ledger, fontes de reserva e domínio de vínculos com transferências, hooks/RPCs/detalhes. Interface: intenção alocação/transferência ou vínculo existente → uma operação atômica e reversível.
 
-- [ ] RED: duas metas concorrentes não reservam o mesmo dinheiro; retry/vínculo não duplica.
-- [ ] Implementar ledger/alocação/transferência com locks, revisão e request id.
-- [ ] Integrar escolher efeito/origem/destino/editar/desfazer com formulário comum.
-- [ ] Provar conservation/cleanup/importação e gates nativos F11; registrar aceite.
+- [x] RED: duas metas concorrentes não reservam o mesmo dinheiro; retry/vínculo não duplica.
+- [x] Implementar ledger/alocação/transferência com locks, revisão e request id.
+- [x] Integrar escolher efeito/origem/destino/editar/desfazer com formulário comum.
+- [x] Provar conservation/cleanup/importação e gates nativos F11; registrar aceite.
+
+Aceite no staging em 04/10/2026: [F11](../../qa/2026-10-02-evolucao-financeira/f11/aceite.md). F12 liberado.
 
 ### F12 — Aporte e resgate
 

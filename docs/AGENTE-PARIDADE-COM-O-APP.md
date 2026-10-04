@@ -646,3 +646,9 @@ Contrato e evidência: `docs/qa/2026-10-02-evolucao-financeira/f02/`.
 
 Contrato e evidência: `docs/qa/2026-10-02-evolucao-financeira/f07/`. O F07 não
 promete configuração da reserva pelo WhatsApp antes da implementação/avaliação da paridade.
+
+## Metas: onde está o dinheiro — F11 (04/10/2026)
+
+| app | agente |
+|---|---|
+| Guardar/Retirar com origem: separar na conta, transferir, vincular transferência, liberar, transferir de volta e desfazer (`goal_money_command`) | Lacuna: o agente continua guardando e retirando SEM origem (`goal_deposit`), sem separação por conta e sem transferência. Paridade pendente da etapa final do plano de 22 pontos; nenhuma tool/prompt mudou no F11. |

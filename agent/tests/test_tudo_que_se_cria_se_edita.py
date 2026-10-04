@@ -113,6 +113,14 @@ def _banco_da_meta(monkeypatch, aportes, saved=10000):
 
 
 @pytest.mark.asyncio
+async def test_aporte_de_movimentacao_e_recusado_antes_do_sim(monkeypatch):
+    _banco_da_meta(monkeypatch, [{"id": "c1", "amount_cents": 10000, "occurred_at": date(2026, 9, 25),
+                                  "note": None, "de_movimentacao": True}])
+    with pytest.raises(resources.JaExiste, match="veio de uma movimentação"):
+        await resources.prepare(_ctx(), _aporte(aporte_do_dia="2026-09-25", novo_valor_do_aporte="20000"))
+
+
+@pytest.mark.asyncio
 async def test_aporte_do_dia_vira_a_correcao_com_a_frase_do_efeito(monkeypatch):
     _banco_da_meta(monkeypatch, [{"id": "c1", "amount_cents": 10000,
                                   "occurred_at": date(2026, 9, 25), "note": None}])
