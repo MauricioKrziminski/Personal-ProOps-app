@@ -1,0 +1,539 @@
+(node:91625) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ F10 DTO preserves server capacity and checks exact pure calendar, source money and cents (0.649375ms)
+✖ F10 DTO refuses outer extra (0.369583ms)
+✖ F10 DTO refuses missing horizon (0.07975ms)
+✖ F10 DTO refuses duplicate horizon (0.079917ms)
+✖ F10 DTO refuses forged goal (0.060375ms)
+✖ F10 DTO refuses result extra (0.058125ms)
+✖ F10 DTO refuses wrong date (0.0505ms)
+✖ F10 DTO refuses wrong remainder (0.04725ms)
+✖ F10 DTO refuses unsafe amount (0.066667ms)
+✖ F10 DTO refuses numeric money (0.089125ms)
+✖ F10 DTO refuses inactive source (0.0675ms)
+✖ F10 DTO refuses wrong source (0.054333ms)
+✖ F10 DTO refuses inconsistent included (0.04175ms)
+✖ F10 DTO refuses inconsistent monthly (0.039792ms)
+✖ F10 draft stores derived inactive input and transport sends only the active source without mutation (0.036167ms)
+✖ F10 exclusion clears intent on the wire and preserves the complete editor draft (0.027041ms)
+✖ F10 preview can explain zero while save cannot accept a plan without contributions (0.030375ms)
+✖ F10 source deadline changes do not overwrite the actual goal deadline (0.025209ms)
+✖ F10 syntax normalization copies closed intent independently of current goals for terminal resolution (0.036916ms)
+✖ F10 builders require the exact current goal list and allow initial-only completion (0.03475ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 0
+ℹ fail 20
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 118.416208
+
+✖ failing tests:
+
+test at src/lib/goal-horizon.test.ts:29:1
+✖ F10 DTO preserves server capacity and checks exact pure calendar, source money and cents (0.649375ms)
+  Error: F10 ainda não implementado
+      at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:30:74)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+test at src/lib/goal-horizon.test.ts:54:13
+✖ F10 DTO refuses outer extra (0.369583ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Planejamento de metas/. Input:
+  
+  'Error: F10 ainda não implementado'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: F10 ainda não implementado
+        at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+        at file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:55
+        at getActual (node:assert:580:5)
+        at strict.throws (node:assert:728:24)
+        at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1402:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+        at Test.postRun (node:internal/test_runner/test:1542:19)
+        at Test.run (node:internal/test_runner/test:1467:12),
+    expected: /Planejamento de metas/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-horizon.test.ts:54:13
+✖ F10 DTO refuses missing horizon (0.07975ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Planejamento de metas/. Input:
+  
+  'Error: F10 ainda não implementado'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: F10 ainda não implementado
+        at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+        at file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:55
+        at getActual (node:assert:580:5)
+        at strict.throws (node:assert:728:24)
+        at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1402:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+        at Test.postRun (node:internal/test_runner/test:1542:19)
+        at Test.run (node:internal/test_runner/test:1467:12),
+    expected: /Planejamento de metas/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-horizon.test.ts:54:13
+✖ F10 DTO refuses duplicate horizon (0.079917ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Planejamento de metas/. Input:
+  
+  'Error: F10 ainda não implementado'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: F10 ainda não implementado
+        at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+        at file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:55
+        at getActual (node:assert:580:5)
+        at strict.throws (node:assert:728:24)
+        at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1402:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+        at Test.postRun (node:internal/test_runner/test:1542:19)
+        at Test.run (node:internal/test_runner/test:1467:12),
+    expected: /Planejamento de metas/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-horizon.test.ts:54:13
+✖ F10 DTO refuses forged goal (0.060375ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Planejamento de metas/. Input:
+  
+  'Error: F10 ainda não implementado'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: F10 ainda não implementado
+        at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+        at file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:55
+        at getActual (node:assert:580:5)
+        at strict.throws (node:assert:728:24)
+        at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1402:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+        at Test.postRun (node:internal/test_runner/test:1542:19)
+        at Test.run (node:internal/test_runner/test:1467:12),
+    expected: /Planejamento de metas/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-horizon.test.ts:54:13
+✖ F10 DTO refuses result extra (0.058125ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Planejamento de metas/. Input:
+  
+  'Error: F10 ainda não implementado'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: F10 ainda não implementado
+        at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+        at file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:55
+        at getActual (node:assert:580:5)
+        at strict.throws (node:assert:728:24)
+        at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1402:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+        at Test.postRun (node:internal/test_runner/test:1542:19)
+        at Test.run (node:internal/test_runner/test:1467:12),
+    expected: /Planejamento de metas/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-horizon.test.ts:54:13
+✖ F10 DTO refuses wrong date (0.0505ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Planejamento de metas/. Input:
+  
+  'Error: F10 ainda não implementado'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: F10 ainda não implementado
+        at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+        at file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:55
+        at getActual (node:assert:580:5)
+        at strict.throws (node:assert:728:24)
+        at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1402:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+        at Test.postRun (node:internal/test_runner/test:1542:19)
+        at Test.run (node:internal/test_runner/test:1467:12),
+    expected: /Planejamento de metas/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-horizon.test.ts:54:13
+✖ F10 DTO refuses wrong remainder (0.04725ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Planejamento de metas/. Input:
+  
+  'Error: F10 ainda não implementado'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: F10 ainda não implementado
+        at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+        at file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:55
+        at getActual (node:assert:580:5)
+        at strict.throws (node:assert:728:24)
+        at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1402:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+        at Test.postRun (node:internal/test_runner/test:1542:19)
+        at Test.run (node:internal/test_runner/test:1467:12),
+    expected: /Planejamento de metas/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-horizon.test.ts:54:13
+✖ F10 DTO refuses unsafe amount (0.066667ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Planejamento de metas/. Input:
+  
+  'Error: F10 ainda não implementado'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: F10 ainda não implementado
+        at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+        at file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:55
+        at getActual (node:assert:580:5)
+        at strict.throws (node:assert:728:24)
+        at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1402:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+        at Test.postRun (node:internal/test_runner/test:1542:19)
+        at Test.run (node:internal/test_runner/test:1467:12),
+    expected: /Planejamento de metas/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-horizon.test.ts:54:13
+✖ F10 DTO refuses numeric money (0.089125ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Planejamento de metas/. Input:
+  
+  'Error: F10 ainda não implementado'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: F10 ainda não implementado
+        at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+        at file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:55
+        at getActual (node:assert:580:5)
+        at strict.throws (node:assert:728:24)
+        at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1402:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+        at Test.postRun (node:internal/test_runner/test:1542:19)
+        at Test.run (node:internal/test_runner/test:1467:12),
+    expected: /Planejamento de metas/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-horizon.test.ts:54:13
+✖ F10 DTO refuses inactive source (0.0675ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Planejamento de metas/. Input:
+  
+  'Error: F10 ainda não implementado'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: F10 ainda não implementado
+        at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+        at file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:55
+        at getActual (node:assert:580:5)
+        at strict.throws (node:assert:728:24)
+        at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1402:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+        at Test.postRun (node:internal/test_runner/test:1542:19)
+        at Test.run (node:internal/test_runner/test:1467:12),
+    expected: /Planejamento de metas/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-horizon.test.ts:54:13
+✖ F10 DTO refuses wrong source (0.054333ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Planejamento de metas/. Input:
+  
+  'Error: F10 ainda não implementado'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: F10 ainda não implementado
+        at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+        at file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:55
+        at getActual (node:assert:580:5)
+        at strict.throws (node:assert:728:24)
+        at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1402:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+        at Test.postRun (node:internal/test_runner/test:1542:19)
+        at Test.run (node:internal/test_runner/test:1467:12),
+    expected: /Planejamento de metas/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-horizon.test.ts:54:13
+✖ F10 DTO refuses inconsistent included (0.04175ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Planejamento de metas/. Input:
+  
+  'Error: F10 ainda não implementado'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: F10 ainda não implementado
+        at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+        at file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:55
+        at getActual (node:assert:580:5)
+        at strict.throws (node:assert:728:24)
+        at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1402:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+        at Test.postRun (node:internal/test_runner/test:1542:19)
+        at Test.run (node:internal/test_runner/test:1467:12),
+    expected: /Planejamento de metas/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-horizon.test.ts:54:13
+✖ F10 DTO refuses inconsistent monthly (0.039792ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Planejamento de metas/. Input:
+  
+  'Error: F10 ainda não implementado'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: F10 ainda não implementado
+        at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+        at file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:55
+        at getActual (node:assert:580:5)
+        at strict.throws (node:assert:728:24)
+        at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:55:42)
+        at Test.runInAsyncScope (node:async_hooks:226:14)
+        at Test.run (node:internal/test_runner/test:1402:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+        at Test.postRun (node:internal/test_runner/test:1542:19)
+        at Test.run (node:internal/test_runner/test:1467:12),
+    expected: /Planejamento de metas/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-horizon.test.ts:58:1
+✖ F10 draft stores derived inactive input and transport sends only the active source without mutation (0.036167ms)
+  Error: F10 ainda não implementado
+      at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:59:17)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at src/lib/goal-horizon.test.ts:73:1
+✖ F10 exclusion clears intent on the wire and preserves the complete editor draft (0.027041ms)
+  Error: F10 ainda não implementado
+      at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:74:17)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at src/lib/goal-horizon.test.ts:80:1
+✖ F10 preview can explain zero while save cannot accept a plan without contributions (0.030375ms)
+  Error: F10 ainda não implementado
+      at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:81:17)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at src/lib/goal-horizon.test.ts:87:1
+✖ F10 source deadline changes do not overwrite the actual goal deadline (0.025209ms)
+  Error: F10 ainda não implementado
+      at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:88:17)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at src/lib/goal-horizon.test.ts:94:1
+✖ F10 syntax normalization copies closed intent independently of current goals for terminal resolution (0.036916ms)
+  Error: F10 ainda não implementado
+      at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:95:17)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at src/lib/goal-horizon.test.ts:109:1
+✖ F10 builders require the exact current goal list and allow initial-only completion (0.03475ms)
+  Error: F10 ainda não implementado
+      at decodeGoalHorizonState (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts:13:83)
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts:110:17)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)

@@ -1,0 +1,21 @@
+appId: com.proops.personal.dev
+---
+- swipe:
+    start: 50%, 35%
+    end: 50%, 83%
+    duration: 600
+- tapOn:
+    text: Por prazo
+    index: 0
+- assertVisible: Prazo do plano para Troca do notebook, 31/03/2027
+- assertVisible: Primeiro aporte para Troca do notebook, 31/01/2027
+- assertVisible: Data do aporte inicial para Troca do notebook, 03/10/2026
+- takeScreenshot: android-deadline-ready-fields
+- swipe:
+    start: 50%, 86%
+    end: 50%, 46%
+    duration: 600
+- assertVisible: 4 contribuições · sem rendimento estimado
+- assertVisible: 'R\$.*2.200,00'
+- assertVisible: 'R\$.*2.199,99'
+- takeScreenshot: android-deadline-ready-calendar

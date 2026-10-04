@@ -1,0 +1,11 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-caption-private
+Open appproops://finance... COMPLETED
+Tap on "Ocultar valor"... COMPLETED
+Open appproops://finance/goals... COMPLETED
+Assert that "Plano oculto" is visible... COMPLETED
+Assert that ".*previsão mar/2027.*" is not visible... COMPLETED
+Assert that ".*até mar/2027.*" is not visible... COMPLETED
+Take screenshot android-caption-private-settled... COMPLETED

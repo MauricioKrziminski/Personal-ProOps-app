@@ -1,0 +1,13 @@
+import fs from 'node:fs';import assert from 'node:assert/strict';import {decodeGoalHorizonState} from '/Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.ts';
+const kind=process.argv[2];assert.ok(['ios','android'].includes(kind));const revision=kind==='ios'?1:2;
+const base='/private/tmp/proops-f10-native/';const raw=JSON.parse(fs.readFileSync(base+'plan-after-'+kind+'.json','utf8'));const state=decodeGoalHorizonState(raw.read);assert.equal(state.edit_revision,revision);
+const nb=state.horizons.find(x=>x.item.goal_id==='6e94e5b2-99bb-4654-99f2-3d23bd4520d8');
+assert.deepEqual(nb.item,{goal_id:'6e94e5b2-99bb-4654-99f2-3d23bd4520d8',included:true,mode:kind==='ios'?'monthly':'deadline',monthly_cents:kind==='ios'?220001:null,first_on:'2027-01-31',deadline_on:kind==='ios'?null:'2027-03-31',initial_cents:1,initial_on:'2026-10-03'});
+const monthly=kind==='ios'?220001:220000;const last=kind==='ios'?219997:219999;
+assert.equal(nb.result.estimated_on,'2027-03-31');assert.equal(nb.result.last_cents,last);assert.equal(nb.result.monthly_cents,monthly);assert.equal(nb.result.contribution_count,4);
+for(const [on,amount] of [['2026-10-03',250001],['2027-01-31',monthly],['2027-02-28',monthly],['2027-03-31',last]]) assert.equal(state.points.find(x=>x.day===on).planned_cents,amount);
+assert.equal(state.points.at(-1).cumulative_planned_cents,3660000);
+assert.equal(raw.sealed.length,revision);const receipt=raw.sealed.find(x=>x.result.edit_revision===revision);assert.equal(receipt.payload.operation,'save_goal_plan_v2');assert.equal(receipt.payload.input.expected_revision,revision===1?null:1);
+const before=JSON.parse(fs.readFileSync(base+'db-before.json'));const after=JSON.parse(fs.readFileSync(base+'db-after-'+kind+'.json'));
+const tables=Object.keys(before.sources).filter(x=>!['goal_plans','goal_plan_items'].includes(x));for(const table of tables)assert.equal(after.sources[table].sha256,before.sources[table].sha256,table);assert.equal(after.cash_total,before.cash_total);
+const proof={revision,sealed_receipts:revision,persisted_source:nb.item,calendar:nb.result,projected_total:3660000,unchanged_financial_tables:tables,cash_unchanged:true,request_id:receipt.request_id};fs.writeFileSync(base+kind+'-persistence-proof.json',JSON.stringify(proof,null,2));console.log(JSON.stringify({revision,source_and_calendar_exact:true,financial_tables_unchanged:tables.length,cash_unchanged:true}));

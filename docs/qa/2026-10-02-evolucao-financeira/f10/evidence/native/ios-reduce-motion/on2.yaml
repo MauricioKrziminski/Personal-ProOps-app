@@ -1,0 +1,6 @@
+appId: com.apple.Preferences
+---
+- tapOn:
+    point: '84%,18%'
+- waitForAnimationToEnd
+- takeScreenshot: ios-reduce-motion-on2

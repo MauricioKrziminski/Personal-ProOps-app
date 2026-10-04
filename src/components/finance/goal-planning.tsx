@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { DatePickerField } from '@/components/finance/date-picker-field';
+import { GoalContributionFields } from '@/components/finance/goal-contribution-fields';
 import { MonthRuler } from '@/components/finance/month-ruler';
 import { ErrorCard } from '@/components/error-card';
 import { Presenca } from '@/components/motion/presenca';
@@ -9,7 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { concealText, useBRL, useConceal } from '@/components/ui/conceal';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Field, MoneyField } from '@/components/ui/field';
+import { Field } from '@/components/ui/field';
 import { MeasuredSparkline } from '@/components/ui/measured-sparkline';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
@@ -21,21 +21,23 @@ import { TaskHeader } from '@/components/ui/task-header';
 import { VerMais } from '@/components/ui/ver-mais';
 import { useToast } from '@/components/ui/toast';
 import { Space } from '@/design/tokens';
-import { fetchGoalPlanning, useGoalPlanning, useSaveGoalPlan } from '@/hooks/use-goal-planning';
+import { useGoalPlanning } from '@/hooks/use-goal-planning';
+import { fetchGoalHorizonPlanning, useGoalHorizonPlanning, useSaveGoalHorizon } from '@/hooks/use-goal-horizon';
 import { useAosPoucos } from '@/hooks/use-aos-poucos';
-import { brToISO, isoToBR } from '@/lib/dates';
+import { isoToBR } from '@/lib/dates';
 import { GoalPlanAttemptCancelledError, goalPlanWriteError } from '@/lib/goal-plan-save';
-import { goalPlanInput, goalPlanPreview, type GoalPlanItem, type GoalPlanningDailyPoint, type GoalPlanningMonth, type GoalPlanningState } from '@/lib/goal-planning';
+import { goalHorizonDrafts, goalHorizonInput, goalHorizonPreview, type GoalHorizonItem, type GoalHorizonState } from '@/lib/goal-horizon';
+import { type GoalPlanningDailyPoint, type GoalPlanningMonth, type GoalPlanningState } from '@/lib/goal-planning';
 
 const HORIZONS = [30, 90, 180, 365, 730, 1095, 1825, 3650].map(days => ({
   id: String(days), label: days >= 365 ? `${Math.round(days / 365)} ${days === 365 ? 'ano' : 'anos'}` : `${days} dias`,
 }));
 type Scope = { ws?: string; goalId?: string };
-type Session = { snapshot: GoalPlanningState; items: GoalPlanItem[]; days: number; view: 'civil' | 'cycle'; mode: 'month' | 'day'; focus?: string };
+type Session = { snapshot: GoalHorizonState; items: GoalHorizonItem[]; days: number; view: 'civil' | 'cycle'; mode: 'month' | 'day'; focus?: string };
 
 /** The screen owns the session; responsive panels only render its launcher. */
 export function useGoalPlanEditor(days = 365, view: 'civil' | 'cycle' = 'civil', mode: 'month' | 'day' = 'month') {
-  const save = useSaveGoalPlan();
+  const save = useSaveGoalHorizon();
   const toast = useToast();
   const [visible, setVisible] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
@@ -49,26 +51,25 @@ export function useGoalPlanEditor(days = 365, view: 'civil' | 'cycle' = 'civil',
   const busy = save.isPending || Boolean(save.unconfirmedInput);
   let preview = null;
   if (session) {
-    try { preview = goalPlanPreview(session.snapshot, session.items); } catch { /* Incomplete drafts stay editable. */ }
+    try { preview = goalHorizonPreview(session.snapshot, session.items); } catch { /* Incomplete drafts stay editable. */ }
   }
-  const query = useGoalPlanning(session?.days ?? days, session?.view ?? view, session?.mode ?? mode,
+  const query = useGoalHorizonPlanning(session?.days ?? days, session?.view ?? view, session?.mode ?? mode,
     preview, Boolean(session && preview), session?.snapshot.workspace_id);
   const current = !needsReview && preview !== null && query.isSuccess && !query.isFetching && !query.isError && session
     && query.data.goals_fingerprint === session.snapshot.goals_fingerprint
     && query.data.edit_revision === session.snapshot.edit_revision ? query.data : null;
   let valid = false;
   if (session && current) {
-    try { goalPlanInput(session.snapshot, session.items); valid = true; } catch { /* A preview may explain incomplete choices. */ }
+    try { goalHorizonInput(session.snapshot, session.items); valid = true; } catch { /* A preview may explain incomplete choices. */ }
   }
   const load = (scope: Scope) => {
     if (loading.current || submitting.current || busy) return;
     requested.current = scope; loading.current = true;
     const visit = ++nonce.current;
     setVisible(true); setSession(null); setOpening(true); setError(''); setNeedsReview(false);
-    void fetchGoalPlanning(days, view, mode, null, scope.ws).then(snapshot => {
+    void fetchGoalHorizonPlanning(days, view, mode, null, scope.ws).then(snapshot => {
       if (visit !== nonce.current) return;
-      setSession({ snapshot, items: snapshot.goals.map(({ goal_id, included, monthly_cents, first_on }) =>
-        ({ goal_id, included, monthly_cents, first_on })), days, view, mode, focus: scope.goalId });
+      setSession({ snapshot, items: goalHorizonDrafts(snapshot), days, view, mode, focus: scope.goalId });
     }, failure => { if (visit === nonce.current) setError(goalPlanWriteError(failure)); })
       .finally(() => { if (visit === nonce.current) { loading.current = false; setOpening(false); } });
   };
@@ -77,7 +78,7 @@ export function useGoalPlanEditor(days = 365, view: 'civil' | 'cycle' = 'civil',
     nonce.current++; loading.current = false;
     setVisible(false); setSession(null); setOpening(false); setError(''); setNeedsReview(false);
   };
-  const update = (goalId: string, patch: Partial<Omit<GoalPlanItem, 'goal_id'>>) => {
+  const update = (goalId: string, patch: Partial<Omit<GoalHorizonItem, 'goal_id'>>) => {
     if (busy || submitting.current) return;
     setSession(old => old ? { ...old, items: old.items.map(item => item.goal_id === goalId ? { ...item, ...patch } : item) } : old);
     setError('');
@@ -90,7 +91,7 @@ export function useGoalPlanEditor(days = 365, view: 'civil' | 'cycle' = 'civil',
   const submit = (resolve = false) => {
     if (!session || submitting.current || (resolve && !save.unconfirmedInput)) return;
     let input;
-    try { input = save.unconfirmedInput ?? goalPlanInput(session.snapshot, session.items); }
+    try { input = save.unconfirmedInput ?? goalHorizonInput(session.snapshot, session.items); }
     catch (failure) { setError(goalPlanWriteError(failure)); return; }
     if (!resolve && !save.unconfirmedInput && !valid) return;
     submitting.current = true; setError('');
@@ -158,17 +159,17 @@ function PlanningResult({ state, pending, periodKey }: { state: GoalPlanningStat
       <ThemedText type="caption" themeColor="textSecondary">Linha contínua: disponível · tracejada: caixa{state.mode === 'month' ? ' · fim de cada período' : ''}</ThemedText>
     </View> : null}
     <Section title="O efeito do plano">
-      <Row title="Aportes previstos no período" trailing={<Money cents={last?.cumulative_planned_cents ?? 0} variant="ticker" />} />
-      <Row title="Já separado no caixa" subtitle="Lastro atual da reserva e das metas" trailing={<Money cents={state.reserved_cash_cents} variant="ticker" />} />
-      {last ? <Row title="Caixa previsto no fim" trailing={<Money cents={last.cash_cents} variant="ticker" />} /> : null}
-      {last ? <Row title="Disponível no fim" trailing={<Money cents={last.available_cents} variant="ticker" />} /> : null}
+      <Row inlineValue title="Aportes previstos no período" trailing={<Money cents={last?.cumulative_planned_cents ?? 0} variant="ticker" />} />
+      <Row inlineValue title="Já separado no caixa" subtitle="Lastro atual da reserva e das metas" trailing={<Money cents={state.reserved_cash_cents} variant="ticker" />} />
+      {last ? <Row inlineValue title="Caixa previsto no fim" trailing={<Money cents={last.cash_cents} variant="ticker" />} /> : null}
+      {last ? <Row inlineValue title="Disponível no fim" trailing={<Money cents={last.available_cents} variant="ticker" />} /> : null}
       <Row title="Ver períodos" chevron={false} accessibilityState={{ expanded: periodsVisible }} onPress={() => setPeriodsVisible(value => !value)} />
     </Section>
     <Presenca visivel={periodsVisible} imediata>
       <Section title="Caixa e disponível">
         {periods.visiveis.map(point => {
           const period = 'month' in point ? `${isoToBR(point.from)} – ${isoToBR(point.to)}${point.partial ? ' · parcial' : ''}` : isoToBR(point.day);
-          return <Row key={'month' in point ? point.month : point.day} title={period}
+          return <Row inlineValue key={'month' in point ? point.month : point.day} title={period}
             subtitle={`Caixa ${brl(point.cash_cents)} · aportes ${brl(point.planned_cents)}`}
             accessibilityLabel={`${period}, caixa ${brl(point.cash_cents)}, aportes ${brl(point.planned_cents)}, disponível ${brl(point.available_cents)}`}
             trailing={<Money cents={point.available_cents} variant="ticker" />} />;
@@ -187,7 +188,7 @@ export function GoalPlanningSummary({ query, editor, actionLabel = 'Simular junt
   const state = query.data;
   if (!state.goals.length) return null;
   return <View style={styles.block}><Section title="Plano de metas">
-    <Row title="Menor disponibilidade" subtitle={`${state.workspace_name} · próximos ${state.days} dias`}
+    <Row inlineValue title="Menor disponibilidade" subtitle={`${state.workspace_name} · próximos ${state.days} dias`}
       trailing={<Money cents={state.minimum_available_cents} variant="ticker" />} />
     <Row title={actionLabel} subtitle={hint ?? (state.goals.some(goal => goal.origin === 'suggested') ? 'Há sugestões iniciais: confira as metas e salve seu plano.' : 'Confira o efeito de todas as metas deste espaço.')}
       onPress={() => editor.open()} />
@@ -236,12 +237,9 @@ export function GoalPlanSheet({ editor, onViewChange }: {
               {goal.deadline ? `${goal.deadline_status === 'past' ? 'Prazo vencido' : 'Prazo'}: ${isoToBR(goal.deadline)}` : 'Sem prazo definido'}
             </ThemedText>
             <Presenca visivel={item.included} imediata style={styles.block}>
-              <Field label="Aporte por mês"><MoneyField valueCents={item.monthly_cents ?? 0} readOnly={busy} accessibilityLabel={`Aporte mensal para ${goal.name}`}
-                onChangeCents={monthly_cents => editor.update(goal.goal_id, { monthly_cents: monthly_cents > 0 ? monthly_cents : null })} /></Field>
-              <View pointerEvents={busy ? 'none' : 'auto'} accessibilityElementsHidden={busy} importantForAccessibility={busy ? 'no-hide-descendants' : 'auto'}>
-                <Field label="Primeiro aporte"><DatePickerField value={item.first_on ? isoToBR(item.first_on) : null}
-                  accessibilityLabel={`Primeiro aporte para ${goal.name}`} onChange={date => editor.update(goal.goal_id, { first_on: brToISO(date) })} /></Field>
-              </View>
+              <GoalContributionFields goal={goal} item={item} asOf={session.snapshot.as_of} busy={busy}
+                legacy={session.snapshot.horizons.find(entry => entry.item.goal_id === goal.goal_id)?.item.mode === 'legacy'}
+                onChange={patch => editor.update(goal.goal_id, patch)} />
             </Presenca>
           </View>;
         })}

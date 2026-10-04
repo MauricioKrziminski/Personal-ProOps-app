@@ -1,0 +1,16 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-private-motion
+Assert that "Previsão oculta" is visible... COMPLETED
+Assert that "Conclusão prevista" is not visible... COMPLETED
+Assert that "Calendário" is not visible... COMPLETED
+Take screenshot android-private-result... COMPLETED
+Swipe from (50%, 36%) to (50%, 86%) in 600 ms... COMPLETED
+Tap on "Por mês", Index: 0... COMPLETED
+Assert that "1.320,00" is visible... COMPLETED
+Assert that "Previsão oculta" is visible... COMPLETED
+Take screenshot android-private-monthly-input... COMPLETED
+Tap on "Por prazo", Index: 0... COMPLETED
+Assert that "Prazo do plano para Troca do notebook, 02/03/2027" is visible... COMPLETED
+Take screenshot android-reduced-motion-deadline... COMPLETED

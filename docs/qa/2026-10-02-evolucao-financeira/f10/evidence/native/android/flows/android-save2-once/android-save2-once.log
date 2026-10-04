@@ -1,0 +1,29 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-save2-once
+Swipe from (50%, 86%) to (50%, 59%) in 600 ms... COMPLETED
+Assert that "Última contribuição" is visible... COMPLETED
+Assert that "R\$.*2.199,99" is visible... COMPLETED
+Assert that "31/03/2027" is visible... COMPLETED
+Take screenshot android-deadline-final-events... COMPLETED
+Swipe from (50%, 86%) to (50%, 43%) in 600 ms... COMPLETED
+Assert that "Prazo do plano para Reserva de emergência, 03/09/2027" is visible... COMPLETED
+Assert that "Primeiro aporte para Reserva de emergência, 03/10/2026" is visible... COMPLETED
+Assert that "0,00" is visible... COMPLETED
+Take screenshot android-reserve-unchanged... COMPLETED
+Tap on "Salvar", Index: 0... COMPLETED
+Assert that "Plano de metas" is not visible... FAILED
+
+Assertion is false: "Plano de metas" is not visible
+
+Assertion '"Plano de metas" is not visible' failed. Check the UI hierarchy in debug artifacts to verify the element state and properties.
+
+Possible causes:
+- Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
+- Element may be temporarily unavailable due to loading state
+- This could be a real regression that needs to be addressed
+
+==== Debug output (logs & screenshots) ====
+
+/private/tmp/proops-f10-native/android-save2-once/.maestro/tests/2026-10-03_203832

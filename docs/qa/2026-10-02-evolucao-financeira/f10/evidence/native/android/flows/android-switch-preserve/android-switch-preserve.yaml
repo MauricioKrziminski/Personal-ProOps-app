@@ -1,0 +1,18 @@
+appId: com.proops.personal.dev
+---
+- swipe:
+    start: 50%, 36%
+    end: 50%, 84%
+    duration: 600
+- tapOn:
+    text: Por prazo
+    index: 0
+- assertVisible: 'Prazo do plano para Troca do notebook, 02/03/2027'
+- assertVisible: 'Primeiro aporte para Troca do notebook, 31/01/2027'
+- takeScreenshot: android-deadline-preserved
+- tapOn:
+    text: Por mês
+    index: 0
+- assertVisible: '2.200,01'
+- assertVisible: 'Primeiro aporte para Troca do notebook, 31/01/2027'
+- takeScreenshot: android-monthly-preserved

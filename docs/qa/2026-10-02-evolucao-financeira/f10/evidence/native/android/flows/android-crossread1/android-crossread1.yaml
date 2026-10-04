@@ -1,0 +1,14 @@
+appId: com.proops.personal.dev
+---
+- longPressOn: Troca do notebook
+- tapOn: Simular com outras metas
+- swipe:
+    start: 50%, 86%
+    end: 50%, 39%
+    duration: 600
+- takeScreenshot: android-amount-reflow-fix
+- swipe:
+    start: 50%, 86%
+    end: 50%, 49%
+    duration: 600
+- takeScreenshot: android-crossread1-fields

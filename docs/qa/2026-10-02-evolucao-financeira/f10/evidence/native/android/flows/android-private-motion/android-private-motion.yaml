@@ -1,0 +1,21 @@
+appId: com.proops.personal.dev
+---
+- assertVisible: Previsão oculta
+- assertNotVisible: Conclusão prevista
+- assertNotVisible: Calendário
+- takeScreenshot: android-private-result
+- swipe:
+    start: 50%, 36%
+    end: 50%, 86%
+    duration: 600
+- tapOn:
+    text: Por mês
+    index: 0
+- assertVisible: '1.320,00'
+- assertVisible: Previsão oculta
+- takeScreenshot: android-private-monthly-input
+- tapOn:
+    text: Por prazo
+    index: 0
+- assertVisible: Prazo do plano para Troca do notebook, 02/03/2027
+- takeScreenshot: android-reduced-motion-deadline

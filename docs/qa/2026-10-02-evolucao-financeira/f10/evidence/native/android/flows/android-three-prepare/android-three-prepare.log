@@ -1,0 +1,10 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-three-prepare
+Swipe from (50%, 38%) to (50%, 83%) in 600 ms... COMPLETED
+Tap on "Aporte mensal para Troca do notebook"... COMPLETED
+Erase 6 characters... COMPLETED
+Input text 220001... COMPLETED
+Hide Keyboard... COMPLETED
+Take screenshot android-three-input... COMPLETED

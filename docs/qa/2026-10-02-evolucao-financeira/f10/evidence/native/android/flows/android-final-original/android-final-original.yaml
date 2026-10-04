@@ -1,0 +1,5 @@
+appId: com.proops.personal.dev
+---
+- openLink: appproops://finance/goals
+- assertVisible: 'R\$.*2.400,00'
+- takeScreenshot: android-original-settings-final

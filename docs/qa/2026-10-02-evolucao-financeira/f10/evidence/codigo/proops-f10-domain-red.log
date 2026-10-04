@@ -1,0 +1,1215 @@
+(node:84881) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ monthly contributions preserve exact remaining cents with a smaller final contribution (1.69575ms)
+✖ one cent and a contribution larger than remaining finish today at exactly remaining (0.132334ms)
+✔ monthly 0 is incomplete rather than infinite (0.244625ms)
+✔ monthly null is incomplete rather than infinite (0.039542ms)
+✖ missing next date explicitly remains incomplete (0.068125ms)
+✖ reached goals need no contributions even when sources are incomplete (0.073834ms)
+✖ civil calendar 2027-01-31 + 1 months = 2027-02-28 (0.047375ms)
+✖ civil calendar 2027-01-31 + 2 months = 2027-03-31 (0.033125ms)
+✖ civil calendar 2028-01-31 + 1 months = 2028-02-29 (0.041375ms)
+✖ civil calendar 2028-01-31 + 2 months = 2028-03-31 (0.062625ms)
+✖ civil calendar 1900-01-31 + 1 months = 1900-02-28 (0.048667ms)
+✖ civil calendar 2000-01-31 + 1 months = 2000-02-29 (0.046417ms)
+✖ civil calendar 0001-01-31 + 0 months = 0001-01-31 (0.03225ms)
+✖ civil calendar 9999-11-30 + 1 months = 9999-12-30 (0.03125ms)
+✔ civil calendar 9999-12-31 + 1 months = null (0.03475ms)
+✔ civil calendar 0001-01-01 + 9007199254740991 months = null (0.019291ms)
+✖ past monthly intentions skip missed dates and preserve the original day 31 (0.05475ms)
+✖ missed initial intention is flagged and never counted as paid (0.042125ms)
+✖ initial today counts once and an equal-day monthly contribution remains distinct (0.050583ms)
+✖ full initial intention is capped and needs neither monthly amount nor first date (0.055625ms)
+✖ positive initial intention requires its own date (0.03975ms)
+✖ partial initial after effective first monthly date is incomplete (0.038333ms)
+✖ deadline mode rounds upward but preserves exact final remainder (0.039209ms)
+✖ deadline counts only slots on or before the deadline and can finish earlier (0.037792ms)
+✖ deadline today includes a contribution today (0.032333ms)
+✖ deadline missing is incomplete; passed deadline and first after deadline are unreachable (0.044416ms)
+✖ deadline initial cannot lie after the deadline even if it would cover everything (0.0375ms)
+✖ deadline initial reduces the amount used by the inverse monthly calculation (0.031958ms)
+✖ monthly horizon extends beyond ten years with no artificial cut (0.029667ms)
+✖ year overflow and immense monthly counts are explicit without allocation or precision loss (0.048167ms)
+✖ large safe cents use integer division rather than rounding intermediate doubles (0.036584ms)
+✖ runtime input rejects extra field before calculating, including reached goals (0.08075ms)
+✖ runtime input rejects missing field before calculating, including reached goals (0.03125ms)
+✖ runtime input rejects zero target before calculating, including reached goals (0.026292ms)
+✖ runtime input rejects negative saved before calculating, including reached goals (0.026ms)
+✖ runtime input rejects decimal cents before calculating, including reached goals (0.025833ms)
+✖ runtime input rejects unsafe target before calculating, including reached goals (0.033542ms)
+✖ runtime input rejects string cents before calculating, including reached goals (0.027416ms)
+✖ runtime input rejects NaN cents before calculating, including reached goals (0.026791ms)
+✖ runtime input rejects infinite cents before calculating, including reached goals (0.026583ms)
+✖ runtime input rejects negative initial before calculating, including reached goals (0.02575ms)
+✖ runtime input rejects invalid mode before calculating, including reached goals (0.025792ms)
+✖ runtime input rejects monthly opposite source before calculating, including reached goals (0.025042ms)
+✖ runtime input rejects deadline opposite source before calculating, including reached goals (0.027708ms)
+✖ runtime input rejects inactive initial date before calculating, including reached goals (0.026333ms)
+✖ runtime input rejects missing date type before calculating, including reached goals (0.025167ms)
+✖ runtime input rejects invalid day before calculating, including reached goals (0.025125ms)
+✖ runtime input rejects invalid 1900 leap before calculating, including reached goals (0.025833ms)
+✖ runtime input rejects noncivil timestamp before calculating, including reached goals (0.024709ms)
+✖ runtime input rejects year zero before calculating, including reached goals (0.024708ms)
+✖ runtime input rejects five digit year before calculating, including reached goals (0.024708ms)
+✖ runtime input rejects short date before calculating, including reached goals (0.024417ms)
+✖ runtime objects must be plain records rather than null, arrays or class instances (0.0435ms)
+✖ calendar and schedule reject invalid indexes and anchors (0.040459ms)
+✖ manual schedules conserve remaining and agree with estimated date in both directions (0.071292ms)
+✖ pure recalculation preserves the input and has no dependence on device clock or caret state (0.057875ms)
+ℹ tests 56
+ℹ suites 0
+ℹ pass 4
+ℹ fail 52
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 167.878625
+
+✖ failing tests:
+
+test at src/lib/goal-contribution.test.ts:14:1
+✖ monthly contributions preserve exact remaining cents with a smaller final contribution (1.69575ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   anchor_on: null,
+  +   contribution_count: 0,
+  +   estimated_on: null,
+  +   first_monthly_on: null,
+  +   first_offset: null,
+  -   anchor_on: '2026-10-03',
+  -   contribution_count: 4,
+  -   estimated_on: '2027-01-03',
+  -   first_monthly_on: '2026-10-03',
+  -   first_offset: 0,
+      flags: [],
+      initial_applied_cents: 0,
+  +   last_cents: 0,
+  +   monthly_cents: null,
+  +   monthly_count: 0,
+  +   reason: 'monthly_amount',
+  +   remaining_cents: 0,
+  +   status: 'incomplete'
+  -   last_cents: 1,
+  -   monthly_cents: 300,
+  -   monthly_count: 4,
+  -   reason: null,
+  -   remaining_cents: 901,
+  -   status: 'ready'
+    }
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:15:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { status: 'incomplete', reason: 'monthly_amount', remaining_cents: 0, initial_applied_cents: 0, monthly_cents: null, monthly_count: 0, contribution_count: 0, last_cents: 0, first_monthly_on: null, estimated_on: null, anchor_on: null, first_offset: null, flags: [] },
+    expected: { status: 'ready', reason: null, remaining_cents: 901, initial_applied_cents: 0, monthly_cents: 300, monthly_count: 4, contribution_count: 4, last_cents: 1, first_monthly_on: '2026-10-03', estimated_on: '2027-01-03', anchor_on: '2026-10-03', first_offset: 0, flags: [] },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:21:1
+✖ one cent and a contribution larger than remaining finish today at exactly remaining (0.132334ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'incomplete'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:24:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'incomplete',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:34:1
+✖ missing next date explicitly remains incomplete (0.068125ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'monthly_amount'
+  - 'first_date'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:36:53)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'monthly_amount',
+    expected: 'first_date',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:38:1
+✖ reached goals need no contributions even when sources are incomplete (0.073834ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'incomplete'
+  - 'reached'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:41:59)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'incomplete',
+    expected: 'reached',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:54:13
+✖ civil calendar 2027-01-31 + 1 months = 2027-02-28 (0.047375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + null
+  - '2027-02-28'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:55:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: '2027-02-28',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:54:13
+✖ civil calendar 2027-01-31 + 2 months = 2027-03-31 (0.033125ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + null
+  - '2027-03-31'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:55:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: '2027-03-31',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:54:13
+✖ civil calendar 2028-01-31 + 1 months = 2028-02-29 (0.041375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + null
+  - '2028-02-29'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:55:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: '2028-02-29',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:54:13
+✖ civil calendar 2028-01-31 + 2 months = 2028-03-31 (0.062625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + null
+  - '2028-03-31'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:55:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: '2028-03-31',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:54:13
+✖ civil calendar 1900-01-31 + 1 months = 1900-02-28 (0.048667ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + null
+  - '1900-02-28'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:55:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: '1900-02-28',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:54:13
+✖ civil calendar 2000-01-31 + 1 months = 2000-02-29 (0.046417ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + null
+  - '2000-02-29'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:55:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: '2000-02-29',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:54:13
+✖ civil calendar 0001-01-31 + 0 months = 0001-01-31 (0.03225ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + null
+  - '0001-01-31'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:55:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: '0001-01-31',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:54:13
+✖ civil calendar 9999-11-30 + 1 months = 9999-12-30 (0.03125ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + null
+  - '9999-12-30'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:55:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: '9999-12-30',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:57:1
+✖ past monthly intentions skip missed dates and preserve the original day 31 (0.05475ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  null !== 1
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:60:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:67:1
+✖ missed initial intention is flagged and never counted as paid (0.042125ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1000
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:69:57)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1000,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:73:1
+✖ initial today counts once and an equal-day monthly contribution remains distinct (0.050583ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 101
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:75:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 101,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:82:1
+✖ full initial intention is capped and needs neither monthly amount nor first date (0.055625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'incomplete'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:84:55)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'incomplete',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:91:1
+✖ positive initial intention requires its own date (0.03975ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'monthly_amount'
+  - 'initial_date'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:93:53)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'monthly_amount',
+    expected: 'initial_date',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:95:1
+✖ partial initial after effective first monthly date is incomplete (0.038333ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'monthly_amount'
+  - 'initial_after_first'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:97:53)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'monthly_amount',
+    expected: 'initial_after_first',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:101:1
+✖ deadline mode rounds upward but preserves exact final remainder (0.039209ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'incomplete'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:103:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'incomplete',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:108:1
+✖ deadline counts only slots on or before the deadline and can finish earlier (0.037792ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  null !== 1
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:110:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:116:1
+✖ deadline today includes a contribution today (0.032333ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'incomplete'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:118:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'incomplete',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:121:1
+✖ deadline missing is incomplete; passed deadline and first after deadline are unreachable (0.044416ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'monthly_amount'
+  - 'deadline'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:123:54)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'monthly_amount',
+    expected: 'deadline',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:130:1
+✖ deadline initial cannot lie after the deadline even if it would cover everything (0.0375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'monthly_amount'
+  - 'initial_after_deadline'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:133:55)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'monthly_amount',
+    expected: 'initial_after_deadline',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:136:1
+✖ deadline initial reduces the amount used by the inverse monthly calculation (0.031958ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  null !== 225
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:138:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 225,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:141:1
+✖ monthly horizon extends beyond ten years with no artificial cut (0.029667ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'incomplete'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:143:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'incomplete',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:146:1
+✖ year overflow and immense monthly counts are explicit without allocation or precision loss (0.048167ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'incomplete'
+  - 'out_of_range'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:150:57)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'incomplete',
+    expected: 'out_of_range',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:159:1
+✖ large safe cents use integer division rather than rounding intermediate doubles (0.036584ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'incomplete'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:162:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'incomplete',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects extra field before calculating, including reached goals (0.08075ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects missing field before calculating, including reached goals (0.03125ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects zero target before calculating, including reached goals (0.026292ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects negative saved before calculating, including reached goals (0.026ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects decimal cents before calculating, including reached goals (0.025833ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects unsafe target before calculating, including reached goals (0.033542ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects string cents before calculating, including reached goals (0.027416ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects NaN cents before calculating, including reached goals (0.026791ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects infinite cents before calculating, including reached goals (0.026583ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects negative initial before calculating, including reached goals (0.02575ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects invalid mode before calculating, including reached goals (0.025792ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects monthly opposite source before calculating, including reached goals (0.025042ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects deadline opposite source before calculating, including reached goals (0.027708ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects inactive initial date before calculating, including reached goals (0.026333ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects missing date type before calculating, including reached goals (0.025167ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects invalid day before calculating, including reached goals (0.025125ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects invalid 1900 leap before calculating, including reached goals (0.025833ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects noncivil timestamp before calculating, including reached goals (0.024709ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects year zero before calculating, including reached goals (0.024708ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects five digit year before calculating, including reached goals (0.024708ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:181:43
+✖ runtime input rejects short date before calculating, including reached goals (0.024417ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:184:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:187:1
+✖ runtime objects must be plain records rather than null, arrays or class instances (0.0435ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:189:55)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:191:1
+✖ calendar and schedule reject invalid indexes and anchors (0.040459ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:193:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:201:1
+✖ manual schedules conserve remaining and agree with estimated date in both directions (0.071292ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'incomplete'
+  - 'ready'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:216:57)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'incomplete',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src/lib/goal-contribution.test.ts:228:1
+✖ pure recalculation preserves the input and has no dependence on device clock or caret state (0.057875ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + null
+  - '2000-04-30'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-contribution.test.ts:231:39)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: '2000-04-30',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

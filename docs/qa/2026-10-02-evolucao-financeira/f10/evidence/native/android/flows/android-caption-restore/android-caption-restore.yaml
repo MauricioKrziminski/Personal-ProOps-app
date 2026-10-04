@@ -1,0 +1,7 @@
+appId: com.proops.personal.dev
+---
+- openLink: appproops://finance
+- tapOn: Mostrar valor
+- openLink: appproops://finance/goals
+- assertVisible: 'R\$.*2.200,00/mês · previsão mar/2027'
+- assertNotVisible: Plano oculto

@@ -1,0 +1,5 @@
+{
+  "command": "npx tsc --noEmit",
+  "exit_code": 0,
+  "stdout_bytes": 0
+}

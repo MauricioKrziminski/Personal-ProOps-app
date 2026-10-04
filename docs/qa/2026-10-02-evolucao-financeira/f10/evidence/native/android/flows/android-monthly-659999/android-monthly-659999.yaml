@@ -1,0 +1,9 @@
+appId: com.proops.personal.dev
+---
+- inputText: '659999'
+- hideKeyboard
+- tapOn: Primeiro aporte para Troca do notebook.*
+- tapOn: Próximo mês,.*
+- tapOn: Próximo mês,.*
+- tapOn: Próximo mês,.*
+- takeScreenshot: android-calendar-january

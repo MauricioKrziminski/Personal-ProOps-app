@@ -1,0 +1,11 @@
+appId: com.proops.personal.dev
+---
+- tapOn: 31/01/2027
+- swipe:
+    start: 50%, 85%
+    end: 50%, 52%
+    duration: 600
+- assertVisible: 2 contribuições · sem rendimento estimado
+- assertVisible: 28/02/2027
+- assertVisible: 'R\$.*0,01'
+- takeScreenshot: android-two-events

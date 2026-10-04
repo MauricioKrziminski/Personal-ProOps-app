@@ -1,0 +1,52 @@
+(node:94130) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon-save.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ F10 lost response retains complete source/initial/date and same identity for confirmation (2.074416ms)
+✔ F10 terminal resolution accepts only command-owned matching closed receipt (0.395541ms)
+✔ F10 refuses wrong workspace/revision/open receipt and freezes intent (0.27475ms)
+✔ F10 refuses wrong workspace/revision/open receipt and freezes intent (0.133292ms)
+✔ F10 refuses wrong workspace/revision/open receipt and freezes intent (0.147167ms)
+✔ F10 controller refuses source-inactive money before transport (0.15275ms)
+(node:94131) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-plan-save.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ goal plan double tap shares one immutable operation and correct receipt (1.342167ms)
+✔ transport loss preserves canonical array/key order and UUID until receipt (0.247625ms)
+✔ initial 22023 refusal releases the editable draft (0.173708ms)
+✔ initial 23514 refusal releases the editable draft (0.088208ms)
+✔ initial 42501 refusal releases the editable draft (0.084125ms)
+✔ initial P0001 refusal releases the editable draft (0.06ms)
+✔ initial 40001 refusal releases the editable draft (0.059083ms)
+✔ initial 40P01 refusal releases the editable draft (0.051291ms)
+✔ initial PT409 refusal releases the editable draft (0.118708ms)
+✔ after ambiguity {"code":"P0001"} cannot disprove the original commit (0.346667ms)
+✔ after ambiguity {"code":"42501"} cannot disprove the original commit (0.131834ms)
+✔ after ambiguity {"code":"22023"} cannot disprove the original commit (0.093041ms)
+✔ after ambiguity {"code":"PT409","message":"some unrelated refusal"} cannot disprove the original commit (0.048625ms)
+✔ after ambiguity {"code":"40001","message":"Plano alterado. Confira novamente"} cannot disprove the original commit (0.058875ms)
+✔ exact sealed-first PT409 Plano alterado. Confira novamente permits reopening after timeout (0.071708ms)
+✔ exact sealed-first PT409 As metas mudaram. Confira o plano novamente permits reopening after timeout (0.165208ms)
+✔ unproven receipt null stays frozen (0.281ms)
+✔ unproven receipt {"workspace_id":"22222222-2222-4222-8222-222222222222","edit_revision":8} stays frozen (0.095042ms)
+✔ unproven receipt {"workspace_id":"11111111-1111-4111-8111-111111111111","edit_revision":7} stays frozen (0.084834ms)
+✔ unproven receipt {"workspace_id":"11111111-1111-4111-8111-111111111111","edit_revision":8,"extra":true} stays frozen (0.935292ms)
+✔ unproven receipt {"workspace_id":"11111111-1111-4111-8111-111111111111","cancelled":false} stays frozen (0.065708ms)
+✔ unproven receipt {"workspace_id":"22222222-2222-4222-8222-222222222222","cancelled":true} stays frozen (0.114042ms)
+✔ unproven receipt {"workspace_id":"11111111-1111-4111-8111-111111111111","cancelled":true,"extra":true} stays frozen (0.050917ms)
+✔ terminal resolution shares in-flight promise, releases intent and rotates UUID (0.150584ms)
+✔ resolution recovers matching sealed success without writing again (0.066666ms)
+✔ PT409 from resolution does not replace a sealed success or cancellation receipt (0.121625ms)
+✔ a delayed save receives terminal cancellation without inventing success (0.057208ms)
+✔ closed malformed commands and unsafe revision never dispatch (0.19725ms)
+✔ new plan expects revision one, including explicit empty plan (0.042458ms)
+✔ write messages keep transport internals private and qualify source changes (0.222791ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 36
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 151.274417

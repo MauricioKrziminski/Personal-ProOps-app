@@ -1,0 +1,15 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-cancel-reopen
+Assert that "1 contribuição · sem rendimento estimado" is visible... COMPLETED
+Assert that "Aporte inicial cobre o restante · 03/10/2026" is visible... COMPLETED
+Tap on "Fechar"... COMPLETED
+Assert that "Há sugestões iniciais.*" is visible... COMPLETED
+Long press on "Troca do notebook"... COMPLETED
+Tap on "Simular com outras metas"... COMPLETED
+Swipe from (50%, 86%) to (50%, 36%) in 600 ms... COMPLETED
+Assert that "Prazo do plano para Troca do notebook, 02/03/2027" is visible... COMPLETED
+Assert that "Primeiro aporte para Troca do notebook, 03/10/2026" is visible... COMPLETED
+Assert that "Aporte inicial cobre o restante.*" is not visible... COMPLETED
+Take screenshot android-cancel-reopen... COMPLETED

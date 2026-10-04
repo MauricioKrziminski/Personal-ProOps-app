@@ -4,7 +4,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 
 import { SecaoDeArquivados } from '@/components/ui/secao-de-arquivados';
-import { useBRL } from '@/components/ui/conceal';
+import { useBRL, useConceal } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
 import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
@@ -17,8 +17,9 @@ import { AdaptivePanes } from '@/components/ui/adaptive-panes';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { GoalPlanningSummary, GoalPlanSheet, useGoalPlanEditor } from '@/components/finance/goal-planning';
+import { GoalContributionCaption } from '@/components/finance/goal-contribution-fields';
 import { useMonthRuler } from '@/components/finance/month-ruler';
-import { useGoalPlanning } from '@/hooks/use-goal-planning';
+import { useGoalHorizonPlanning } from '@/hooks/use-goal-horizon';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
@@ -97,12 +98,13 @@ function ErrorBand({ message, onRetry }: { message: string; onRetry: () => void 
 export default function GoalsScreen() {
   // Dinheiro no meio de frase obedece ao "esconder saldo" — `Money` não cabe em texto corrido.
   const brl = useBRL();
+  const { concealed } = useConceal();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const toast = useToast();
   const goals = useGoals();
   const planRuler = useMonthRuler('metas', 'civil');
-  const planning = useGoalPlanning(365, planRuler.view, 'month');
+  const planning = useGoalHorizonPlanning(365, planRuler.view, 'month');
   const planEditor = useGoalPlanEditor(365, planRuler.view);
   const save = useSaveGoal();
   const deposit = useGoalDeposit();
@@ -290,8 +292,8 @@ export default function GoalsScreen() {
     const falta = Math.max(0, target - saved);
     const pct = target > 0 ? Math.min(1, saved / target) : 0;
     const concluida = falta === 0;
-    const planned = !planning.isError ? planning.data?.goals.find(goal => goal.goal_id === g.id) : undefined;
-    const porMes = !concluida && planned?.included ? planned.monthly_cents : null;
+    const planned = !planning.isError && !concluida
+      ? planning.data?.horizons.find(entry => entry.item.goal_id === g.id && entry.item.included) : undefined;
 
     return (
       <Animated.View
@@ -342,11 +344,8 @@ export default function GoalsScreen() {
               ) : null}
             </ThemedText>
 
-            {porMes ? (
-              <ThemedText type="footnote" themeColor="textSecondary">
-                <Money cents={porMes} variant="footnote" tone="textSecondary" />/mês{g.deadline ? ` até ${mesDoPrazo(g.deadline)}` : ' no plano'}
-              </ThemedText>
-            ) : g.deadline && !concluida ? <ThemedText type="footnote" themeColor="textSecondary">
+            {planned ? <GoalContributionCaption entry={planned} />
+              : g.deadline && !concluida && !concealed ? <ThemedText type="footnote" themeColor="textSecondary">
               Prazo: {mesDoPrazo(g.deadline)}
             </ThemedText> : null}
 

@@ -74,6 +74,15 @@ export function createGoalPlanSaveController(
   publish?: (input: GoalPlanInput | null) => void,
   resolveAttempt?: (input: GoalPlanInput, requestId: string) => Promise<unknown>,
 ): { submit: (input: GoalPlanInput) => Promise<GoalPlanSaveResult>; resolve: () => Promise<GoalPlanSaveResult> } {
+  return createGoalPlanCommandController(send, newId, normalize, publish, resolveAttempt);
+}
+
+/** Versions share sealed attempt/receipt semantics; each owns its closed source schema. */
+export function createGoalPlanCommandController<T extends Pick<GoalPlanInput, 'workspace_id' | 'expected_revision'>>(
+  send: (input: T, requestId: string) => Promise<unknown>, newId: () => string,
+  normalize: (value: T) => T, publish?: (input: T | null) => void,
+  resolveAttempt?: (input: T, requestId: string) => Promise<unknown>,
+): { submit: (input: T) => Promise<GoalPlanSaveResult>; resolve: () => Promise<GoalPlanSaveResult> } {
   return createSealedSaveController(send, newId, {
     normalize, requestId: id, definitiveRefusal, confirmedRefusal,
     terminalRefusal: error => error instanceof GoalPlanAttemptCancelledError,

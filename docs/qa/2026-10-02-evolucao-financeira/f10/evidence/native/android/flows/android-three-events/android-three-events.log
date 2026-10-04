@@ -1,0 +1,11 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-three-events
+Swipe from (50%, 86%) to (50%, 50%) in 600 ms... COMPLETED
+Assert that "3 contribuições · sem rendimento estimado" is visible... COMPLETED
+Assert that "31/01/2027" is visible... COMPLETED
+Assert that "28/02/2027" is visible... COMPLETED
+Assert that "31/03/2027" is visible... COMPLETED
+Assert that "R\$.*2.199,98" is visible... COMPLETED
+Take screenshot android-three-events... COMPLETED

@@ -1,0 +1,14 @@
+appId: com.proops.personal.dev
+---
+- repeat:
+    times: 8
+    while:
+      notVisible: 'Claro'
+    commands:
+      - swipe:
+          start: '2%,75%'
+          end: '2%,35%'
+          duration: 800
+- tapOn: 'Claro'
+- waitForAnimationToEnd
+- takeScreenshot: ios-theme-restored-claro

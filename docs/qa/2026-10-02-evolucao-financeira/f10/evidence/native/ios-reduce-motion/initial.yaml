@@ -1,0 +1,8 @@
+appId: com.proops.personal.dev
+---
+- swipe:
+    start: '2%,85%'
+    end: '2%,45%'
+    duration: 800
+- waitForAnimationToEnd
+- takeScreenshot: rm-initial

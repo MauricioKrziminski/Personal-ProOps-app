@@ -1,0 +1,9 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-caption-restore
+Open appproops://finance... COMPLETED
+Tap on "Mostrar valor"... COMPLETED
+Open appproops://finance/goals... COMPLETED
+Assert that "R\$.*2.200,00/mês · previsão mar/2027" is visible... COMPLETED
+Assert that "Plano oculto" is not visible... COMPLETED

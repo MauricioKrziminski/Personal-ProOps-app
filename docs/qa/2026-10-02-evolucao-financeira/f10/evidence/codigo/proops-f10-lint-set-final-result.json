@@ -1,0 +1,5 @@
+{
+  "command": "EXPO_NO_DOTENV=1 npx expo lint",
+  "exit_code": 0,
+  "stdout_bytes": 0
+}

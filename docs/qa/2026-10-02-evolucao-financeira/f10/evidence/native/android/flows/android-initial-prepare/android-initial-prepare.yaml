@@ -1,0 +1,9 @@
+appId: com.proops.personal.dev
+---
+- tapOn: Aporte mensal para Troca do notebook
+- eraseText: 6
+- hideKeyboard
+- tapOn: Aporte inicial para Troca do notebook
+- inputText: '660000'
+- hideKeyboard
+- takeScreenshot: android-initial-input

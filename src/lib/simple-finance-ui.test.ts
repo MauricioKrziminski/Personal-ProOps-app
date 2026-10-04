@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { createContext, runInContext, runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import { prepararLancamento } from './lancamento-write.ts';
+import { calculateGoalContribution } from './goal-contribution.ts';
 
 import { telaPronta } from './tela-pronta.ts';
 import { ladosDoArrasto } from './arrasto.ts';
@@ -459,7 +460,28 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
           resolveAsync: mutation('resolveEmergencyReserve').mutateAsync,
           unconfirmedInput: options.reserveUnconfirmed ?? null }),
       };
-      if (name === '@/hooks/use-goal-planning') return {
+      if (name === '@/hooks/use-goal-planning' || name === '@/hooks/use-goal-horizon') {
+        const fetched = async (...args: any[]) => {
+          freshPlanningQueries.push(args);
+          const snapshot = await (options.freshPlanning ? options.freshPlanning(...args) : Promise.resolve(options.planningState ?? f08UIState()));
+          return inRealm(JSON.parse(JSON.stringify(name.endsWith('use-goal-horizon') ? f10UIState(snapshot) : snapshot)));
+        };
+        const queried = (...args: any[]) => {
+          planningQueries.push(args);
+          const state = options.planningState ?? f08UIState();
+          return inRealm({ ...query, data: name.endsWith('use-goal-horizon') ? f10UIState(state) : state,
+            isPending: Boolean(options.planningPending), isLoading: Boolean(options.planningPending),
+            isFetching: Boolean(options.planningFetching), isError: Boolean(options.planningError),
+            isSuccess: !options.planningPending && !options.planningError,
+            error: options.planningError ? new Error('scenario failed') : null,
+            refetch: async () => { refetches.push('goal-planning'); } });
+        };
+        const saving = () => ({ ...mutation('saveGoalPlan'),
+          isPending: (emCurso.saveGoalPlan ?? 0) > 0 || (emCurso.resolveGoalPlan ?? 0) > 0,
+          isResolving: (emCurso.resolveGoalPlan ?? 0) > 0,
+          resolveAsync: mutation('resolveGoalPlan').mutateAsync,
+          unconfirmedInput: options.planningUnconfirmed ? inRealm(options.planningUnconfirmed) : null });
+        return { fetchGoalHorizonPlanning: fetched, useGoalHorizonPlanning: queried, useSaveGoalHorizon: saving,
         fetchGoalPlanning: async (...args: any[]) => {
           freshPlanningQueries.push(args);
           const snapshot = await (options.freshPlanning ? options.freshPlanning(...args) : Promise.resolve(options.planningState ?? f08UIState()));
@@ -479,7 +501,10 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
           isResolving: (emCurso.resolveGoalPlan ?? 0) > 0,
           resolveAsync: mutation('resolveGoalPlan').mutateAsync,
           unconfirmedInput: options.planningUnconfirmed ? inRealm(options.planningUnconfirmed) : null }),
-      };
+      }; }
+      if (name === '@/components/finance/goal-contribution-fields') return load('src/components/finance/goal-contribution-fields.tsx');
+      if (name === '@/lib/goal-horizon') return load('src/lib/goal-horizon.ts');
+      if (name === '@/lib/goal-contribution') return load('src/lib/goal-contribution.ts');
       if (name === '@/components/finance/goal-planning') return load('src/components/finance/goal-planning.tsx');
       if (name === '@/lib/goal-planning') return load('src/lib/goal-planning.ts');
       if (name === '@/lib/goal-plan-save') {
@@ -708,7 +733,8 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
     if (node.type === 'FinanceAnalysisPanes') visit(node.props.compact);
     // `CamposDaSerie` é um grupo de campos sem hook: desenhado aqui, a tela é a que a pessoa vê.
     // Os corpos (`FormularioDaSerie`, `FormularioDaDivida`) têm hooks: eles rodam depois dos da tela, na mesma ordem a cada render.
-    if (typeof node.type === 'function' && ['Controller', 'AccountFormFields', 'CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida', 'TrashEmptyState', 'FilterBar', 'ExpenseClassificationControls', 'EmergencyReserveSection', 'EmergencyReserveSheet', 'EmergencyReserveEditor', 'GoalPlanningSummary', 'GoalPlanSheet', 'PlanningResult', 'Qualifications', ...(options.realMoney ? ['Money'] : [])].includes(node.type.name)) visit(node.type(node.props));
+    if (typeof node.type === 'function' && ['Controller', 'AccountFormFields', 'CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida', 'TrashEmptyState', 'FilterBar', 'ExpenseClassificationControls', 'EmergencyReserveSection', 'EmergencyReserveSheet', 'EmergencyReserveEditor', 'GoalPlanningSummary', 'GoalPlanSheet', 'GoalContributionCaption', 'GoalContributionFields', 'GoalContributionSummary', 'GoalContributionReady', 'GoalContributionHint', 'PlanningResult', 'Qualifications', ...(options.realMoney ? ['Money'] : [])].includes(node.type.name)) visit(node.type(node.props));
+    if (node.type === 'Field') visit(node.props.hint);
     // No celular o `AdaptivePanes` desenha o slot de uma coluna só (Pastas, Recorrentes…).
     if (node.type === 'AdaptivePanes') visit(node.props.singlePaneContent ?? node.props.main);
     visit(node.props.ListHeaderComponent);
@@ -6574,6 +6600,16 @@ const f08UIFile = 'src/components/finance/goal-planning.tsx';
 const f08Workspace = '10000000-0000-4000-8000-000000000008';
 const f08GoalA = '20000000-0000-4000-8000-000000000001';
 const f08GoalB = '20000000-0000-4000-8000-000000000002';
+function f10UIState(state: any): any {
+  if (state.horizons) return state;
+  return { ...state, horizons: state.goals.map((goal: any) => {
+    const item = { goal_id: goal.goal_id, included: goal.included, mode: 'legacy', monthly_cents: goal.monthly_cents,
+      first_on: goal.first_on, deadline_on: null, initial_cents: 0, initial_on: null };
+    return { item, result: calculateGoalContribution({ target_cents: goal.target_cents, saved_cents: goal.saved_cents,
+      as_of: state.as_of, mode: 'monthly', monthly_cents: goal.monthly_cents, first_on: goal.first_on,
+      deadline_on: null, initial_cents: 0, initial_on: null }) };
+  }) };
+}
 function f08UIState(withGoals = false): any {
   return { workspace_id: f08Workspace, workspace_name: 'F08 espaço escolhido', cycle_close_day: 20,
     as_of: '2026-10-03', days: 365, view: 'cycle', mode: 'month', edit_revision: 4, goals_fingerprint: 'a'.repeat(32),
@@ -6747,4 +6783,79 @@ test('F08 goals menu forwards the selected goal workspace instead of the default
   ui.interact(() => action.onPress());await f08Flush(ui);
   assert.equal(ui.freshPlanningQueries.at(-1)[4], f08Workspace);
   const switches = ui.nodes().filter(node => node.type === 'SwitchRow');assert.equal(switches[0].props.label, 'Meta B');
+});
+
+test('F10 editor: source mode preserves monthly/deadline drafts and sends only the chosen input', async () => {
+  const ui = f08EditorUI({ planningState: f08UIState(true) });await f08Open(ui);
+  const segmented = () => ui.nodes().find(node => node.type === 'Segmented' && node.props.options.some((option: any) => option.value === 'deadline'));
+  assert.ok(segmented(), 'The current editor must expose goal calculation modes');
+  ui.interact(() => segmented().props.onChange('monthly'));
+  const money = () => ui.nodes().find(node => node.type === 'MoneyField' && node.props.accessibilityLabel === 'Aporte mensal para Meta A');
+  ui.interact(() => money().props.onChangeCents(5000));
+  ui.interact(() => segmented().props.onChange('deadline'));
+  const deadline = ui.nodes().find(node => node.type === 'DatePickerField' && node.props.accessibilityLabel === 'Prazo do plano para Meta A');
+  assert.ok(deadline);ui.interact(() => deadline.props.onChange('31/01/2027'));
+  const preview = ui.planningQueries.at(-1)[3].items.find((item: any) => item.goal_id === f08GoalA);
+  assert.equal(preview.monthly_cents, null);assert.equal(preview.deadline_on, '2027-01-31');
+  ui.interact(() => segmented().props.onChange('monthly'));assert.equal(money().props.valueCents, 5000);
+  assert.ok(ui.nodes().some(node => node.type === 'Field' && node.props.label === 'Aporte por mês' && node.props.hint), 'The computed horizon stays beside the active source');
+  assert.ok(ui.nodes().some(node => node.props.children === 'Conclusão em 03/11/2026 · 2 contribuições'));
+  assert.equal(ui.editor().session.items[0].deadline_on, '2027-01-31');
+  assert.equal(ui.writes.length, 0);
+});
+test('F10 editor: zero explains the missing amount and cannot save; initial-only plan can complete', async () => {
+  const ui = f08EditorUI({ planningState: f08UIState(true) });await f08Open(ui);
+  ui.interact(() => ui.editor().update(f08GoalA, { mode: 'monthly', monthly_cents: 0 }));
+  assert.ok(ui.nodes().some(node => node.props.children === 'Informe quanto consegue guardar por mês.'));
+  assert.equal(ui.button('Salvar').props.disabled, true);
+  ui.interact(() => ui.editor().update(f08GoalA, { initial_cents: 9000, initial_on: '2026-10-03', first_on: null }));
+  assert.equal(ui.button('Salvar').props.disabled, false);
+  assert.ok(ui.nodes().some(node => node.props.title === 'Conclusão prevista' && node.props.trailing?.props.children === '03/10/2026'));
+  assert.ok(ui.nodes().some(node => node.props.children === '1 contribuição · sem rendimento estimado'));
+  assert.equal(ui.writes.length, 0);
+});
+test('F10 summary: civil 31 calendar and last exact cents come from current draft, conceal hides sensitive output', async () => {
+  const options = { planningState: f08UIState(true), concealed: false, realMoney: true };const ui = f08EditorUI(options);await f08Open(ui);
+  ui.interact(() => ui.editor().update(f08GoalA, { mode: 'monthly', monthly_cents: 3334, first_on: '2027-01-31', initial_cents: 0 }));
+  const rows = () => ui.nodes().filter(node => node.props.title?.includes('contribuição') || node.props.title === 'Última contribuição');
+  assert.ok(rows().some(node => node.props.subtitle === '28/02/2027'));
+  assert.ok(rows().some(node => node.props.subtitle === '31/03/2027'));
+  assert.ok(ui.nodes().some(node => (node.type === 'Money' || node.type?.name === 'Money') && node.props.cents === 2332));
+  options.concealed = true;ui.interact(() => {});
+  assert.equal(rows().length, 0);
+  const reading = ui.nodes().filter(node => node.type === 'ThemedText').map(node => String(node.props.children)).join(' ');
+  assert.doesNotMatch(reading, /31\/03\/2027|28\/02\/2027|3 contribuições/);
+});
+
+function f10CaptionReadings(ui: ReturnType<typeof screen>): string {
+  const text = (child: any): string => child == null || typeof child === 'boolean' ? ''
+    : Array.isArray(child) ? child.map(text).join('') : typeof child === 'object' ? text(child.props?.children) : String(child);
+  return ui.nodes().filter(n => n.type === 'ThemedText').map(n => text(n.props.children)).join(' ');
+}
+test('F10 cards: forecast uses the chosen calendar rather than goal deadline, and concealing removes the date', () => {
+  const state = f10UIState(f08UIState(true));
+  state.goals[0].deadline = '2027-10-03';
+  state.horizons[0].item.mode = 'monthly';
+  const goal = { id: f08GoalA, workspace_id: f08Workspace, name: 'Meta A', target_cents: 10000, saved_cents: 1000, deadline: '2027-10-03' };
+  const options = { goals: [goal], planningState: state, concealed: false, realMoney: true };
+  const ui = screen('src/app/finance/goals.tsx', options);
+  const readings = () => f10CaptionReadings(ui);
+  assert.match(readings(), /previsão jan\/2027/, 'Four contributions finish in January despite the actual goal deadline in October');
+  assert.doesNotMatch(readings(), /até out\/2027/);
+  options.concealed = true;ui.interact(() => {});
+  assert.match(readings(), /Plano oculto/);
+  assert.doesNotMatch(readings(), /jan\/2027|out\/2027/);
+});
+test('F10 cards: initial-only intent has its own forecast, and legacy mode does not promise an uncapped conclusion', () => {
+  const state = f10UIState(f08UIState(true));
+  const entry = state.horizons[0];entry.item = { ...entry.item, mode: 'monthly', monthly_cents: 0, first_on: null, initial_cents: 9000, initial_on: '2026-10-03' };
+  entry.result = calculateGoalContribution({ target_cents: 10000, saved_cents: 1000, as_of: state.as_of, mode: 'monthly', monthly_cents: 0, first_on: null, deadline_on: null, initial_cents: 9000, initial_on: '2026-10-03' });
+  state.goals[0].monthly_cents = 0;state.goals[0].first_on = null;
+  const options = { planningState: state, goals: [{ id: f08GoalA, workspace_id: f08Workspace, name: 'Meta A', target_cents: 10000, saved_cents: 1000, deadline: '2027-10-03' }], realMoney: true };
+  const ui = screen('src/app/finance/goals.tsx', options);
+  const readings = () => f10CaptionReadings(ui);
+  assert.match(readings(), /Aporte inicial.*previsão out\/2026/);
+  options.planningState = f10UIState(f08UIState(true));ui.interact(() => {});
+  assert.match(readings(), /mês no plano atual/);
+  assert.doesNotMatch(readings(), /previsão|até out\/2027/);
 });

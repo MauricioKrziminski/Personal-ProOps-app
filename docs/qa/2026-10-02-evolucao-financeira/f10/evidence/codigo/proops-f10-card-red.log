@@ -1,0 +1,55 @@
+(node:71562) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/simple-finance-ui.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ F10 cards: forecast uses the chosen calendar rather than goal deadline, and concealing removes the date (342.851334ms)
+✖ F10 cards: initial-only intent has its own forecast, and legacy mode does not promise an uncapped conclusion (159.318125ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 928.498916
+
+✖ failing tests:
+
+test at src/lib/simple-finance-ui.test.ts:6830:1
+✖ F10 cards: forecast uses the chosen calendar rather than goal deadline, and concealing removes the date (342.851334ms)
+  AssertionError [ERR_ASSERTION]: Four contributions finish in January despite the actual goal deadline in October
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/simple-finance-ui.test.ts:6838:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'R$ 10,00 de ,[object Object], em ,1, ,meta R$ 100,00 −R$ 8,43 Meta A 10,% [object Object], de, ,[object Object], R$ 10,00 R$ 100,00 [object Object],/mês, até out/2027 R$ 25,00',
+    expected: /previsão jan\/2027/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at src/lib/simple-finance-ui.test.ts:6844:1
+✖ F10 cards: initial-only intent has its own forecast, and legacy mode does not promise an uncapped conclusion (159.318125ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Aporte inicial.*previsão out\/2026/. Input:
+  
+  'R$ 10,00 de ,[object Object], em ,1, ,meta R$ 100,00 −R$ 8,43 Meta A 10,% [object Object], de, ,[object Object], R$ 10,00 R$ 100,00 Prazo: ,out/2027'
+  
+      at TestContext.<anonymous> (file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/simple-finance-ui.test.ts:6852:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'R$ 10,00 de ,[object Object], em ,1, ,meta R$ 100,00 −R$ 8,43 Meta A 10,% [object Object], de, ,[object Object], R$ 10,00 R$ 100,00 Prazo: ,out/2027',
+    expected: /Aporte inicial.*previsão out\/2026/,
+    operator: 'match',
+    diff: 'simple'
+  }

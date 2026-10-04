@@ -1,0 +1,32 @@
+(node:1189) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/goal-horizon.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ F10 DTO preserves server capacity and checks exact pure calendar, source money and cents (1.304208ms)
+✔ F10 DTO refuses outer extra (0.15575ms)
+✔ F10 DTO refuses missing horizon (0.07825ms)
+✔ F10 DTO refuses duplicate horizon (0.083542ms)
+✔ F10 DTO refuses forged goal (0.06875ms)
+✔ F10 DTO refuses result extra (0.086875ms)
+✔ F10 DTO refuses wrong date (0.085625ms)
+✔ F10 DTO refuses wrong remainder (0.063458ms)
+✔ F10 DTO refuses unsafe amount (0.067125ms)
+✔ F10 DTO refuses numeric money (0.097375ms)
+✔ F10 DTO refuses inactive source (0.070292ms)
+✔ F10 DTO refuses wrong source (0.045292ms)
+✔ F10 DTO refuses inconsistent included (0.043458ms)
+✔ F10 DTO refuses inconsistent monthly (0.044083ms)
+✔ F10 draft stores derived inactive input and transport sends only the active source without mutation (0.276333ms)
+✔ F10 exclusion clears intent on the wire and preserves the complete editor draft (0.078ms)
+✔ F10 preview can explain zero while save cannot accept a plan without contributions (0.065666ms)
+✔ F10 source deadline changes do not overwrite the actual goal deadline (0.052375ms)
+✔ F10 syntax normalization copies closed intent independently of current goals for terminal resolution (0.213875ms)
+✔ F10 builders require the exact current goal list and allow initial-only completion (0.057291ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 126.627959

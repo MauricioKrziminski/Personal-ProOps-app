@@ -1,0 +1,9 @@
+appId: com.proops.personal.dev
+---
+- back
+- tapOn: Aporte mensal para Troca do notebook
+- eraseText: 20
+- inputText: '0'
+- hideKeyboard
+- assertVisible: Informe quanto consegue guardar por mês.
+- takeScreenshot: android-zero

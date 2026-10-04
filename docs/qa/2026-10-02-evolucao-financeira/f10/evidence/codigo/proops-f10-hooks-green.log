@@ -1,0 +1,15 @@
+(node:2753) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/refresh-consistency.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ F08 hooks: one workspace RPC owns the complete horizon and previous query data is not a placeholder (60.519834ms)
+✔ F10 hooks: versioned source/initial/date participates in key and the scoped complete RPC owns capacity (45.98575ms)
+✔ F08 hooks: ambiguous outcomes do not invalidate a scenario; sealed cancellation and success do (12.157417ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 392.646

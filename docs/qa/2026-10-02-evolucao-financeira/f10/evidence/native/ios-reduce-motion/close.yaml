@@ -1,0 +1,9 @@
+appId: com.proops.personal.dev
+---
+- tapOn:
+    point: '8%,13%'
+- extendedWaitUntil:
+    notVisible: 'Salvar'
+    timeout: 10000
+- openLink: 'appproops://profile'
+- takeScreenshot: rm-after-close

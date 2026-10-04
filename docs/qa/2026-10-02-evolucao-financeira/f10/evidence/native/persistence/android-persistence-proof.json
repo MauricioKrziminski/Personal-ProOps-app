@@ -1,0 +1,51 @@
+{
+  "revision": 2,
+  "sealed_receipts": 2,
+  "persisted_source": {
+    "goal_id": "6e94e5b2-99bb-4654-99f2-3d23bd4520d8",
+    "included": true,
+    "mode": "deadline",
+    "monthly_cents": null,
+    "first_on": "2027-01-31",
+    "deadline_on": "2027-03-31",
+    "initial_cents": 1,
+    "initial_on": "2026-10-03"
+  },
+  "calendar": {
+    "status": "ready",
+    "reason": null,
+    "remaining_cents": 660000,
+    "initial_applied_cents": 1,
+    "monthly_cents": 220000,
+    "monthly_count": 3,
+    "contribution_count": 4,
+    "last_cents": 219999,
+    "first_monthly_on": "2027-01-31",
+    "estimated_on": "2027-03-31",
+    "anchor_on": "2027-01-31",
+    "first_offset": 0,
+    "flags": []
+  },
+  "projected_total": 3660000,
+  "unchanged_financial_tables": [
+    "accounts",
+    "transactions",
+    "recurring_transactions",
+    "installment_plans",
+    "debts",
+    "categorization_rules",
+    "import_items",
+    "import_batches",
+    "budgets",
+    "categories",
+    "assets",
+    "goals",
+    "goal_contributions",
+    "financial_allocations",
+    "emergency_reserves",
+    "card_invoices",
+    "subcategories"
+  ],
+  "cash_unchanged": true,
+  "request_id": "0d64b33c-0642-4d17-bb00-b540007b1c2e"
+}

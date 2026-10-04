@@ -1,0 +1,33 @@
+(node:72968) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src/lib/simple-finance-ui.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ F08 editor: fresh requested workspace opens once and closing ignores a late snapshot (102.888834ms)
+✔ F08 editor: draft and snapshot survive query updates and width changes (52.899083ms)
+✔ F08 editor: error cannot present or save a previous scenario (45.334167ms)
+✔ F08 editor: fetching cannot present or save a previous scenario (39.224792ms)
+✔ F08 editor: pending cannot present or save a previous scenario (37.422625ms)
+✔ F08 editor: revision cannot present or save a previous scenario (38.139ms)
+✔ F08 editor: fingerprint cannot present or save a previous scenario (34.038ms)
+✔ F08 editor: a confirmed CAS refusal removes the old scenario until a fresh reopening (33.881291ms)
+✔ F08 editor: retrying a transient preview error preserves the editable draft (33.655291ms)
+✔ F08 result: recalculation preserves its component and measured space without showing old financial readings (34.647583ms)
+✔ F08 result: a refused or failed scenario does not pretend to keep loading (31.442958ms)
+✔ F08 editor: actual excluded fields disappear and retoggle preserves its own monthly draft (32.851125ms)
+✔ F08 editor: an ambiguous attempt freezes editing and close; retry uses the confirmed immutable input (32.103833ms)
+✔ F08 sheet: actual workspace cycle controls the ruler, independent of default profile capability (37.241917ms)
+✔ F08 result: conceal suppresses derived numbers, pressure date, comparison chart and accessibility values (50.304708ms)
+✔ F08 goals menu forwards the selected goal workspace instead of the default summary workspace (84.766042ms)
+✔ F10 editor: source mode preserves monthly/deadline drafts and sends only the chosen input (39.610709ms)
+✔ F10 editor: zero explains the missing amount and cannot save; initial-only plan can complete (38.732834ms)
+✔ F10 summary: civil 31 calendar and last exact cents come from current draft, conceal hides sensitive output (41.603166ms)
+✔ F10 cards: forecast uses the chosen calendar rather than goal deadline, and concealing removes the date (85.239375ms)
+✔ F10 cards: initial-only intent has its own forecast, and legacy mode does not promise an uncapped conclusion (81.345333ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1325.327459

@@ -1,0 +1,26 @@
+appId: com.proops.personal.dev
+---
+- tapOn:
+    point: '92%,93%'
+- repeat:
+    times: 6
+    while:
+      notVisible: 'Por prazo'
+    commands:
+      - swipe:
+          start: '2%,80%'
+          end: '2%,40%'
+          duration: 800
+- takeScreenshot: rm-modes-visible
+- tapOn:
+    text: 'Por prazo'
+    index: 0
+- takeScreenshot: rm-deadline
+- tapOn:
+    text: 'Por mês'
+    index: 0
+- takeScreenshot: rm-monthly
+- tapOn:
+    text: 'Por prazo'
+    index: 0
+- takeScreenshot: rm-deadline-again

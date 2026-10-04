@@ -1,0 +1,12 @@
+{
+  "device": "emulator-5574",
+  "font_scale": "1.0",
+  "show_ime_with_hard_keyboard": "0",
+  "stylus_handwriting_enabled": null,
+  "night_mode": "no",
+  "app_theme": "Claro",
+  "temporary_changes": {
+    "show_ime_with_hard_keyboard": "1",
+    "stylus_handwriting_enabled": "0"
+  }
+}

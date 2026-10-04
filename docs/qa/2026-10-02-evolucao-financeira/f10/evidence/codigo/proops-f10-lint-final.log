@@ -1,0 +1,14 @@
+2026-10-03T23:18:13.788Z expo:utils:variadic Parsed arguments (variadic: [], flags: {}, extra: [])
+2026-10-03T23:18:13.821Z expo:telemetry Recording 1 event(s)
+2026-10-03T23:18:13.822Z expo:env Skipping .env files because EXPO_NO_DOTENV is defined
+2026-10-03T23:18:13.822Z expo:env Skipping .env files because EXPO_NO_DOTENV is defined
+2026-10-03T23:18:13.822Z expo:lint Ensuring ESLint is configured in /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app
+2026-10-03T23:18:13.822Z expo:lint Found ESLint config file: /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/eslint.config.js
+2026-10-03T23:18:13.822Z expo:lint Checking for legacy ESLint configuration /Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app
+2026-10-03T23:18:13.921Z expo:lint Running ESLint with args: [
+  '/Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/src',
+  '--fix=false',
+  '--cache=true',
+  '--cache-location=/Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app/.expo/cache/eslint/'
+]
+2026-10-03T23:18:17.621Z expo:telemetry:client:detached Detached flush started

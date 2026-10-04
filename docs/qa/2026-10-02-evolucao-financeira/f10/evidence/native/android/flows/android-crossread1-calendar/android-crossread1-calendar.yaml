@@ -1,0 +1,10 @@
+appId: com.proops.personal.dev
+---
+- swipe:
+    start: 50%, 86%
+    end: 50%, 48%
+    duration: 600
+- assertVisible: 4 contribuições · sem rendimento estimado
+- assertVisible: 'R\$.*2.199,97'
+- assertVisible: 31/03/2027
+- takeScreenshot: android-crossread1-calendar

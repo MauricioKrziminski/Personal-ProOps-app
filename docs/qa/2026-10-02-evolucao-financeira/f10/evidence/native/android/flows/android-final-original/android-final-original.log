@@ -1,0 +1,7 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-final-original
+Open appproops://finance/goals... COMPLETED
+Assert that "R\$.*2.400,00" is visible... COMPLETED
+Take screenshot android-original-settings-final... COMPLETED

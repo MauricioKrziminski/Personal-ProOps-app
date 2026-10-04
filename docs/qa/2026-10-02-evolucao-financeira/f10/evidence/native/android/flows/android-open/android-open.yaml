@@ -1,0 +1,5 @@
+appId: com.proops.personal.dev
+---
+- longPressOn: "Troca do notebook"
+- tapOn: "Simular com outras metas"
+- takeScreenshot: /private/tmp/proops-f10-native/android-initial-sheet

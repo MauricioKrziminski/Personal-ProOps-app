@@ -1,0 +1,36 @@
+appId: com.proops.personal.dev
+---
+- assertNotVisible: Ajuste intenções futuras de um mesmo espaço
+- assertVisible: Confira o efeito de todas as metas deste espaço.
+- longPressOn: Troca do notebook
+- tapOn: Simular com outras metas
+- swipe:
+    start: 50%, 86%
+    end: 50%, 35%
+    duration: 600
+- swipe:
+    start: 50%, 86%
+    end: 50%, 53%
+    duration: 600
+- assertVisible: Prazo do plano para Troca do notebook, 31/03/2027
+- assertVisible: Primeiro aporte para Troca do notebook, 31/01/2027
+- assertVisible: Data do aporte inicial para Troca do notebook, 03/10/2026
+- assertVisible: '0,01'
+- takeScreenshot: android-read2-persisted-fields
+- swipe:
+    start: 50%, 86%
+    end: 50%, 49%
+    duration: 600
+- assertVisible: 4 contribuições · sem rendimento estimado
+- assertVisible: 'R\$.*2.200,00'
+- takeScreenshot: android-read2-persisted-result
+- tapOn: Fechar
+- openLink: appproops://profile
+- scrollUntilVisible:
+    element:
+      text: Claro
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+- tapOn: Claro
+- takeScreenshot: android-theme-restored

@@ -1,0 +1,306 @@
+{
+  "schemaVersion": 3,
+  "mode": "baseline",
+  "baseline": {
+    "baseRef": "365890f3f5c177044dbc0210f1cbddb73ad3e767",
+    "newCount": 4,
+    "fixedCount": 4,
+    "baseTotalCount": 5
+  },
+  "reactDetected": true,
+  "version": "0.9.14",
+  "ok": true,
+  "directory": "/Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app",
+  "diff": {
+    "baseBranch": "HEAD",
+    "currentBranch": "gabriel/financas-22-melhorias",
+    "changedFileCount": 142,
+    "isCurrentChanges": false
+  },
+  "projects": [
+    {
+      "directory": "/Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app",
+      "packageRoot": "/Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app",
+      "framework": "expo",
+      "project": {
+        "rootDirectory": "/Users/gabrielalmeidadias/Documents/Empresas/ProOps/DEV/Personal-ProOps-app",
+        "projectName": "app-proops",
+        "reactVersion": "19.2.3",
+        "reactMajorVersion": 19,
+        "tailwindVersion": null,
+        "zodVersion": "^4.4.3",
+        "zodMajorVersion": 4,
+        "mobxVersion": null,
+        "mobxMajorVersion": null,
+        "hasMobxReact": false,
+        "mobxReactVersion": null,
+        "hasMobxReactLite": false,
+        "mobxReactLiteVersion": null,
+        "hasMobxStateTree": false,
+        "hasMobxReactObserver": false,
+        "zustandVersion": null,
+        "zustandMajorVersion": null,
+        "framework": "expo",
+        "hasTypeScript": true,
+        "hasReactCompiler": true,
+        "hasReactCompilerLintPlugin": false,
+        "hasTanStackQuery": true,
+        "hasI18nLibrary": false,
+        "hasRadixUi": false,
+        "hasBaseUi": false,
+        "hasReactAriaComponents": false,
+        "hasTanstackTable": false,
+        "hasTanstackVirtual": false,
+        "hasTanstackForm": false,
+        "tanstackQueryVersion": "^5.101.2",
+        "styledComponentsVersion": null,
+        "valtioVersion": null,
+        "valtioMajorVersion": null,
+        "hasRemotion": false,
+        "remotionVersion": null,
+        "remotionMajorVersion": null,
+        "hasThree": false,
+        "threeVersion": null,
+        "threeRelease": null,
+        "hasReactThreeFiber": false,
+        "reactThreeFiberVersion": null,
+        "reactThreeFiberMajorVersion": null,
+        "hasSsrDependency": false,
+        "preactVersion": null,
+        "preactMajorVersion": null,
+        "hasReactNativeWorkspace": true,
+        "nextjsVersion": null,
+        "nextjsMajorVersion": null,
+        "reactRouterVersion": null,
+        "hasReactRouterFramework": false,
+        "expoVersion": "~57.0.24",
+        "shopifyFlashListVersion": "2.0.2",
+        "shopifyFlashListMajorVersion": 2,
+        "hasReanimated": true,
+        "reanimatedVersion": "4.5.1",
+        "hasShadcnUi": false,
+        "isPreES2023Target": false,
+        "isStaticExport": false,
+        "sourceFileCount": 625
+      },
+      "diagnostics": [
+        {
+          "filePath": "src/app/finance/goals.tsx",
+          "plugin": "react-doctor",
+          "rule": "no-high-complexity-react-function",
+          "severity": "warning",
+          "title": "React function has high control-flow complexity",
+          "message": "`GoalsScreen` has cyclomatic complexity 57, cognitive complexity 62, and maximum nesting depth 3, so its React logic is hard to understand and change. Extract independent branches into components or hooks.",
+          "help": "Extract independent render branches and state logic into focused components or hooks until the control flow is easy to follow.",
+          "line": 98,
+          "column": 16,
+          "offset": 4570,
+          "length": 25786,
+          "endLine": 732,
+          "category": "Maintainability",
+          "id": "src/app/finance/goals.tsx::98:16::react-doctor/no-high-complexity-react-function::57420f004fe2595ef6dcc3bae80d2635948bf30df80a054e69b9d810d8ab4da5",
+          "normalizedFilePath": "src/app/finance/goals.tsx",
+          "tags": [
+            "react-jsx-only",
+            "test-noise"
+          ]
+        },
+        {
+          "filePath": "src/components/finance/goal-planning.tsx",
+          "plugin": "react-doctor",
+          "rule": "no-high-complexity-react-function",
+          "severity": "warning",
+          "title": "React function has high control-flow complexity",
+          "message": "`useGoalPlanEditor` has cyclomatic complexity 25, cognitive complexity 17, and maximum nesting depth 2, so its React logic is hard to understand and change. Extract independent branches into components or hooks.",
+          "help": "Extract independent render branches and state logic into focused components or hooks until the control flow is easy to follow.",
+          "line": 39,
+          "column": 8,
+          "offset": 2336,
+          "length": 4333,
+          "endLine": 112,
+          "category": "Maintainability",
+          "id": "src/components/finance/goal-planning.tsx::39:8::react-doctor/no-high-complexity-react-function::f3407082daec04fb2cfeea38a5a17b44565b51d0d18e2ff1c63cdf20994ce013",
+          "normalizedFilePath": "src/components/finance/goal-planning.tsx",
+          "tags": [
+            "react-jsx-only",
+            "test-noise"
+          ]
+        },
+        {
+          "filePath": "src/components/finance/goal-planning.tsx",
+          "plugin": "react-doctor",
+          "rule": "no-high-complexity-react-function",
+          "severity": "warning",
+          "title": "React function has high control-flow complexity",
+          "message": "`PlanningResult` has cyclomatic complexity 13, cognitive complexity 16, and maximum nesting depth 2, so its React logic is hard to understand and change. Extract independent branches into components or hooks.",
+          "help": "Extract independent render branches and state logic into focused components or hooks until the control flow is easy to follow.",
+          "line": 137,
+          "column": 1,
+          "offset": 8285,
+          "length": 3737,
+          "endLine": 181,
+          "category": "Maintainability",
+          "id": "src/components/finance/goal-planning.tsx::137:1::react-doctor/no-high-complexity-react-function::662954e3aa14d9d3c1c2cf4975b069393683b198c3f6bb8d02006192c14aa9d2",
+          "normalizedFilePath": "src/components/finance/goal-planning.tsx",
+          "tags": [
+            "react-jsx-only",
+            "test-noise"
+          ]
+        },
+        {
+          "filePath": "src/components/finance/goal-planning.tsx",
+          "plugin": "react-doctor",
+          "rule": "no-high-complexity-react-function",
+          "severity": "warning",
+          "title": "React function has high control-flow complexity",
+          "message": "`GoalPlanSheet` has cyclomatic complexity 30, cognitive complexity 36, and maximum nesting depth 3, so its React logic is hard to understand and change. Extract independent branches into components or hooks.",
+          "help": "Extract independent render branches and state logic into focused components or hooks until the control flow is easy to follow.",
+          "line": 198,
+          "column": 8,
+          "offset": 13095,
+          "length": 4443,
+          "endLine": 250,
+          "category": "Maintainability",
+          "id": "src/components/finance/goal-planning.tsx::198:8::react-doctor/no-high-complexity-react-function::5ffecfdf4592a822489617f9043eddd0dfa283982cb184843f40f99172367058",
+          "normalizedFilePath": "src/components/finance/goal-planning.tsx",
+          "tags": [
+            "react-jsx-only",
+            "test-noise"
+          ]
+        }
+      ],
+      "score": {
+        "score": 93,
+        "label": "Great",
+        "rules": {
+          "react-doctor/no-high-complexity-react-function": {
+            "priority": null,
+            "tier": "P3"
+          },
+          "react-doctor/no-giant-component": {
+            "priority": 30,
+            "tier": "P3"
+          }
+        }
+      },
+      "skippedChecks": [],
+      "analyzedFiles": [
+        "src/app/finance/goals.tsx",
+        "src/components/finance/goal-contribution-fields.tsx",
+        "src/components/finance/goal-planning.tsx",
+        "src/hooks/use-goal-horizon.ts",
+        "src/hooks/use-goal-planning.ts",
+        "src/lib/database.types.ts",
+        "src/lib/goal-contribution.test.ts",
+        "src/lib/goal-contribution.ts",
+        "src/lib/goal-horizon-save.test.ts",
+        "src/lib/goal-horizon-save.ts",
+        "src/lib/goal-horizon.test.ts",
+        "src/lib/goal-horizon.ts",
+        "src/lib/goal-plan-save.ts",
+        "src/lib/refresh-consistency.test.ts",
+        "src/lib/simple-finance-ui.test.ts"
+      ],
+      "analyzedFileCount": 15,
+      "complete": true,
+      "scannedFileCount": 15,
+      "elapsedMilliseconds": 4596.115583999999
+    }
+  ],
+  "diagnostics": [
+    {
+      "filePath": "src/app/finance/goals.tsx",
+      "plugin": "react-doctor",
+      "rule": "no-high-complexity-react-function",
+      "severity": "warning",
+      "title": "React function has high control-flow complexity",
+      "message": "`GoalsScreen` has cyclomatic complexity 57, cognitive complexity 62, and maximum nesting depth 3, so its React logic is hard to understand and change. Extract independent branches into components or hooks.",
+      "help": "Extract independent render branches and state logic into focused components or hooks until the control flow is easy to follow.",
+      "line": 98,
+      "column": 16,
+      "offset": 4570,
+      "length": 25786,
+      "endLine": 732,
+      "category": "Maintainability",
+      "id": "src/app/finance/goals.tsx::98:16::react-doctor/no-high-complexity-react-function::57420f004fe2595ef6dcc3bae80d2635948bf30df80a054e69b9d810d8ab4da5",
+      "normalizedFilePath": "src/app/finance/goals.tsx",
+      "tags": [
+        "react-jsx-only",
+        "test-noise"
+      ]
+    },
+    {
+      "filePath": "src/components/finance/goal-planning.tsx",
+      "plugin": "react-doctor",
+      "rule": "no-high-complexity-react-function",
+      "severity": "warning",
+      "title": "React function has high control-flow complexity",
+      "message": "`useGoalPlanEditor` has cyclomatic complexity 25, cognitive complexity 17, and maximum nesting depth 2, so its React logic is hard to understand and change. Extract independent branches into components or hooks.",
+      "help": "Extract independent render branches and state logic into focused components or hooks until the control flow is easy to follow.",
+      "line": 39,
+      "column": 8,
+      "offset": 2336,
+      "length": 4333,
+      "endLine": 112,
+      "category": "Maintainability",
+      "id": "src/components/finance/goal-planning.tsx::39:8::react-doctor/no-high-complexity-react-function::f3407082daec04fb2cfeea38a5a17b44565b51d0d18e2ff1c63cdf20994ce013",
+      "normalizedFilePath": "src/components/finance/goal-planning.tsx",
+      "tags": [
+        "react-jsx-only",
+        "test-noise"
+      ]
+    },
+    {
+      "filePath": "src/components/finance/goal-planning.tsx",
+      "plugin": "react-doctor",
+      "rule": "no-high-complexity-react-function",
+      "severity": "warning",
+      "title": "React function has high control-flow complexity",
+      "message": "`PlanningResult` has cyclomatic complexity 13, cognitive complexity 16, and maximum nesting depth 2, so its React logic is hard to understand and change. Extract independent branches into components or hooks.",
+      "help": "Extract independent render branches and state logic into focused components or hooks until the control flow is easy to follow.",
+      "line": 137,
+      "column": 1,
+      "offset": 8285,
+      "length": 3737,
+      "endLine": 181,
+      "category": "Maintainability",
+      "id": "src/components/finance/goal-planning.tsx::137:1::react-doctor/no-high-complexity-react-function::662954e3aa14d9d3c1c2cf4975b069393683b198c3f6bb8d02006192c14aa9d2",
+      "normalizedFilePath": "src/components/finance/goal-planning.tsx",
+      "tags": [
+        "react-jsx-only",
+        "test-noise"
+      ]
+    },
+    {
+      "filePath": "src/components/finance/goal-planning.tsx",
+      "plugin": "react-doctor",
+      "rule": "no-high-complexity-react-function",
+      "severity": "warning",
+      "title": "React function has high control-flow complexity",
+      "message": "`GoalPlanSheet` has cyclomatic complexity 30, cognitive complexity 36, and maximum nesting depth 3, so its React logic is hard to understand and change. Extract independent branches into components or hooks.",
+      "help": "Extract independent render branches and state logic into focused components or hooks until the control flow is easy to follow.",
+      "line": 198,
+      "column": 8,
+      "offset": 13095,
+      "length": 4443,
+      "endLine": 250,
+      "category": "Maintainability",
+      "id": "src/components/finance/goal-planning.tsx::198:8::react-doctor/no-high-complexity-react-function::5ffecfdf4592a822489617f9043eddd0dfa283982cb184843f40f99172367058",
+      "normalizedFilePath": "src/components/finance/goal-planning.tsx",
+      "tags": [
+        "react-jsx-only",
+        "test-noise"
+      ]
+    }
+  ],
+  "summary": {
+    "errorCount": 0,
+    "warningCount": 4,
+    "affectedFileCount": 2,
+    "totalDiagnosticCount": 4,
+    "score": 93,
+    "scoreLabel": "Great"
+  },
+  "elapsedMilliseconds": 4842.727792,
+  "error": null
+}

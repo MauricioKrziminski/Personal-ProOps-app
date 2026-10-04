@@ -1,0 +1,16 @@
+appId: com.proops.personal.dev
+---
+- assertVisible: 1 contribuição · sem rendimento estimado
+- assertVisible: Aporte inicial cobre o restante · 03/10/2026
+- tapOn: Fechar
+- assertVisible: Há sugestões iniciais.*
+- longPressOn: Troca do notebook
+- tapOn: Simular com outras metas
+- swipe:
+    start: 50%, 86%
+    end: 50%, 36%
+    duration: 600
+- assertVisible: 'Prazo do plano para Troca do notebook, 02/03/2027'
+- assertVisible: 'Primeiro aporte para Troca do notebook, 03/10/2026'
+- assertNotVisible: Aporte inicial cobre o restante.*
+- takeScreenshot: android-cancel-reopen

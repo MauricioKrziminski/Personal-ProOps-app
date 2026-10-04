@@ -1285,25 +1285,37 @@ export type Database = {
       }
       goal_plan_items: {
         Row: {
+          contribution_deadline: string | null
+          contribution_mode: string
           first_on: string | null
           goal_id: string
           included: boolean
+          initial_cents: number
+          initial_on: string | null
           monthly_cents: number | null
           user_id: string
           workspace_id: string
         }
         Insert: {
+          contribution_deadline?: string | null
+          contribution_mode?: string
           first_on?: string | null
           goal_id: string
           included: boolean
+          initial_cents?: number
+          initial_on?: string | null
           monthly_cents?: number | null
           user_id: string
           workspace_id: string
         }
         Update: {
+          contribution_deadline?: string | null
+          contribution_mode?: string
           first_on?: string | null
           goal_id?: string
           included?: boolean
+          initial_cents?: number
+          initial_on?: string | null
           monthly_cents?: number | null
           user_id?: string
           workspace_id?: string
@@ -3772,6 +3784,16 @@ export type Database = {
         }
         Returns: Json
       }
+      goal_planning_state_v2: {
+        Args: {
+          p_days: number
+          p_mode: string
+          p_preview?: Json
+          p_view: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       import_unmatched: {
         Args: { p_batch_id: string }
         Returns: {
@@ -4041,6 +4063,10 @@ export type Database = {
         Args: { p_input: Json; p_request_id: string }
         Returns: Json
       }
+      resolve_goal_plan_attempt_v2: {
+        Args: { p_input: Json; p_request_id: string }
+        Returns: Json
+      }
       resolve_subcategory_attempt: {
         Args: { p_input: Json; p_request_id: string }
         Returns: Json
@@ -4076,6 +4102,10 @@ export type Database = {
         Returns: Json
       }
       save_goal_plan: {
+        Args: { p_input: Json; p_request_id: string }
+        Returns: Json
+      }
+      save_goal_plan_v2: {
         Args: { p_input: Json; p_request_id: string }
         Returns: Json
       }

@@ -1,0 +1,18 @@
+appId: com.proops.personal.dev
+---
+- openLink: appproops://finance/goals
+- longPressOn: Troca do notebook
+- tapOn: Simular com outras metas
+- swipe:
+    start: 50%, 87%
+    end: 50%, 35%
+    duration: 600
+- takeScreenshot: android-dark-large-fields
+- swipe:
+    start: 50%, 87%
+    end: 50%, 37%
+    duration: 600
+- takeScreenshot: android-dark-large-calendar
+- tapOn: Fechar
+- openLink: appproops://finance
+- takeScreenshot: android-finance-privacy-source

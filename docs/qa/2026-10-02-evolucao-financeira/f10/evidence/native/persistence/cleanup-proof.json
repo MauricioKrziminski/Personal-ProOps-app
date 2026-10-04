@@ -1,0 +1,13 @@
+{
+  "executed": true,
+  "workspace_id": "b94c2f3e-e1f1-450e-b549-bc570b5e8b0e",
+  "request_ids": [
+    "8f67aa1a-afee-4551-9a14-64f42903f799",
+    "0d64b33c-0642-4d17-bb00-b540007b1c2e"
+  ],
+  "only_qa_plan_restored": true,
+  "financial_tables_unchanged": 17,
+  "cash_unchanged": true,
+  "generic_receipts_removed": 2,
+  "sealed_receipts_removed": 2
+}

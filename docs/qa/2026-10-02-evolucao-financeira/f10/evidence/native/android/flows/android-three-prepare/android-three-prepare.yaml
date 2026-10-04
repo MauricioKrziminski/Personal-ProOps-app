@@ -1,0 +1,11 @@
+appId: com.proops.personal.dev
+---
+- swipe:
+    start: 50%, 38%
+    end: 50%, 83%
+    duration: 600
+- tapOn: Aporte mensal para Troca do notebook
+- eraseText: 6
+- inputText: '220001'
+- hideKeyboard
+- takeScreenshot: android-three-input

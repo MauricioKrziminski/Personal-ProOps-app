@@ -1,0 +1,15 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-deadline-save-prepare
+Swipe from (50%, 35%) to (50%, 83%) in 600 ms... COMPLETED
+Tap on "Por prazo", Index: 0... COMPLETED
+Assert that "Prazo do plano para Troca do notebook, 31/03/2027" is visible... COMPLETED
+Assert that "Primeiro aporte para Troca do notebook, 31/01/2027" is visible... COMPLETED
+Assert that "Data do aporte inicial para Troca do notebook, 03/10/2026" is visible... COMPLETED
+Take screenshot android-deadline-ready-fields... COMPLETED
+Swipe from (50%, 86%) to (50%, 46%) in 600 ms... COMPLETED
+Assert that "4 contribuições · sem rendimento estimado" is visible... COMPLETED
+Assert that "R\$.*2.200,00" is visible... COMPLETED
+Assert that "R\$.*2.199,99" is visible... COMPLETED
+Take screenshot android-deadline-ready-calendar... COMPLETED

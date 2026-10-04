@@ -178,10 +178,12 @@ Aceite funcional e limites: [F09](../../qa/2026-10-02-evolucao-financeira/f09/ac
 
 Arquivos: domínio de metas, campos e ficha existentes. Interface: alvo/guardado/próximo aporte/contribuição → calendário exato e prazo; modo inverso usa a mesma regra.
 
-- [ ] RED: resto final, zero, alvo atingido e calendário31/bissexto.
-- [ ] Implementar cálculo puro e derivado sem disputa de campos/caret.
-- [ ] Comparar cronograma e simulação; conservar modo/intenção.
-- [ ] Executar gates e matriz nativa F10; registrar aceite.
+- [x] RED: resto final, zero, alvo atingido e calendário31/bissexto.
+- [x] Implementar cálculo puro e derivado sem disputa de campos/caret.
+- [x] Comparar cronograma e simulação; conservar modo/intenção.
+- [x] Executar gates e matriz nativa F10; registrar aceite.
+
+Aceite no staging em 04/10/2026: [F10](../../qa/2026-10-02-evolucao-financeira/f10/aceite.md). F11 liberado.
 
 ### F11 — Alocar ou movimentar
 

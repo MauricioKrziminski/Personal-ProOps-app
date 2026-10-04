@@ -1,0 +1,5 @@
+appId: com.proops.personal.dev
+---
+- openLink: appproops://finance/goals
+- assertVisible: 'R\$.*2.200,00/mês · previsão mar/2027'
+- takeScreenshot: android-caption-visible-settled

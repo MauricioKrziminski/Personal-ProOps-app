@@ -1,0 +1,1 @@
+{"command": "EXPO_NO_DOTENV=1 EXPO_DEBUG=1 npx expo lint", "exit": 0, "finished": "2026-10-03T20:18:17.636504-03:00"}

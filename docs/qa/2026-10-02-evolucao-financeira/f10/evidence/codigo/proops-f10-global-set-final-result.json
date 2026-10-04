@@ -1,0 +1,6 @@
+{
+  "command": "npm test",
+  "exit_code": 0,
+  "log": "/private/tmp/proops-f10-global-set-final.log",
+  "source": "final F10 after closed-schema Set validation"
+}

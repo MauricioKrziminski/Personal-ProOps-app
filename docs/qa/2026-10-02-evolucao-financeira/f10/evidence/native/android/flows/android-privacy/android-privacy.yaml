@@ -1,0 +1,19 @@
+appId: com.proops.personal.dev
+---
+- tapOn: Ocultar valor
+- openLink: appproops://finance/goals
+- longPressOn: Troca do notebook
+- tapOn: Simular com outras metas
+- swipe:
+    start: 50%, 86%
+    end: 50%, 35%
+    duration: 600
+- takeScreenshot: android-private-input
+- swipe:
+    start: 50%, 86%
+    end: 50%, 40%
+    duration: 600
+- assertVisible: Previsão da meta oculta
+- assertNotVisible: Conclusão prevista
+- assertNotVisible: Calendário
+- takeScreenshot: android-private-result

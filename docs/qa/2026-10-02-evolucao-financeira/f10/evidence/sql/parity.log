@@ -1,0 +1,6 @@
+produção : kwriuifcwyvdrxtspjiz  (Personal ProOps app)
+staging  : utkqoiigimqzeenxkxdl  (Personal ProOps app - staging)
+
+CLI linkado (destino do db push) : utkqoiigimqzeenxkxdl  → staging
+app (.env.local)                 : utkqoiigimqzeenxkxdl  → staging
+{"target": "utkqoiigimqzeenxkxdl", "unique_vectors": 320, "exact_results_equal": true, "read_only_transaction": true, "financial_writes": 0, "statuses": ["incomplete", "out_of_range", "reached", "ready"]}

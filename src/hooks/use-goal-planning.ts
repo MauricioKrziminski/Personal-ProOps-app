@@ -31,6 +31,16 @@ export function useGoalPlanning(
   days: number, view: 'civil' | 'cycle', mode: 'month' | 'day',
   preview: GoalPlanPreview | null = null, enabled = true, ws?: string,
 ) {
+  useGoalPlanningSources();
+  return useQuery({
+    queryKey: ['goal-planning', ws ?? 'default', localISODate(), days, view, mode, preview],
+    queryFn: context => fetchGoalPlanning(days, view, mode, preview, ws, context?.signal),
+    placeholderData: undefined,
+    enabled,
+  });
+}
+/** Both published read versions observe the same sources and invalidation family. */
+export function useGoalPlanningSources() {
   useRealtimeInvalidate('transactions', ['goal-planning']);
   useRealtimeInvalidate('accounts', ['goal-planning']);
   useRealtimeInvalidate('card_invoices', ['goal-planning']);
@@ -45,12 +55,6 @@ export function useGoalPlanning(
   useRealtimeInvalidate('goal_plans', ['goal-planning']);
   useRealtimeInvalidate('goal_plan_items', ['goal-planning']);
   useRealtimeInvalidate('workspaces', ['goal-planning']);
-  return useQuery({
-    queryKey: ['goal-planning', ws ?? 'default', localISODate(), days, view, mode, preview],
-    queryFn: context => fetchGoalPlanning(days, view, mode, preview, ws, context?.signal),
-    placeholderData: undefined,
-    enabled,
-  });
 }
 /** Transport ambiguity freezes the same intent until a command-owned receipt resolves it. */
 export function useSaveGoalPlan() {

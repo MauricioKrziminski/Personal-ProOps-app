@@ -1,0 +1,25 @@
+appId: com.proops.personal.dev
+---
+- swipe:
+    start: 50%, 86%
+    end: 50%, 59%
+    duration: 600
+- assertVisible: Última contribuição
+- assertVisible: 'R\$.*2.199,99'
+- assertVisible: 31/03/2027
+- takeScreenshot: android-deadline-final-events
+- swipe:
+    start: 50%, 86%
+    end: 50%, 43%
+    duration: 600
+- assertVisible: Prazo do plano para Reserva de emergência, 03/09/2027
+- assertVisible: Primeiro aporte para Reserva de emergência, 03/10/2026
+- assertVisible: '0,00'
+- takeScreenshot: android-reserve-unchanged
+- tapOn:
+    text: Salvar
+    index: 0
+- extendedWaitUntil:
+    notVisible: Plano de metas
+    timeout: 20000
+- takeScreenshot: android-saved2-once

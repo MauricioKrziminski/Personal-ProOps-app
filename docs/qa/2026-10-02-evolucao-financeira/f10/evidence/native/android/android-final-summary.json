@@ -1,0 +1,65 @@
+{
+  "device": "emulator-5574",
+  "package": "com.proops.personal.dev",
+  "screen": "1344x2992 density480",
+  "model": "sdk_gphone64_arm64",
+  "android": 16,
+  "api": 36,
+  "code_modified": false,
+  "android_save_count": 1,
+  "stage": "utkqoiigimqzeenxkxdl",
+  "passes": [
+    "mode switches preserve drafts",
+    "zero explains and disables save",
+    "calendar31Jan28Feb last1cent monthly659999",
+    "calendar31Jan28Feb31Mar last219998 monthly220001",
+    "initial660000today monthly0 one contribution",
+    "cancel/reopen inferred baseline",
+    "privacy suppresses calculated summary/hint and calendar while own input visible",
+    "darkfont1.3 and reduced-motion mode switches",
+    "iOSrevision1 crossread monthly220001 first31Jan initial1today last219997 count4",
+    "deadline31Mar prepared monthly220000 last219999 count4",
+    "one Android save2 then reopened persisted deadline31Mar first31Jan initial1today count4",
+    "reflow money fix confirmed darkfont1.3",
+    "all original preferences restored"
+  ],
+  "product_issue": {
+    "description": "Available-at-end amount shrank at font1.3",
+    "parent_fixed": true,
+    "verified_png": "screenshots/android-amount-reflow-fix.png"
+  },
+  "runner_issues": [
+    "absolute takeScreenshot rejected; relative fixed",
+    "Gboard handwriting overlay fixed with temporary IME/stylus settings then restored",
+    "eraseText20 terminated143 after value0 observed; later erase6 worked",
+    "private accessibility label not exposed: exact title Previsão oculta used",
+    "postsave notVisible Plano de metas ambiguous with background section; sheet closed and read2 confirmed without repeating save"
+  ],
+  "limits": [
+    "no physical device test",
+    "no claim F07 ANR cured",
+    "Android native UI confirms scenario source; parent owns database oracle and immutable ledger comparison"
+  ],
+  "settings_restored": "android-settings-restored-final.json",
+  "evidence_pngs": [
+    "screenshots/android-amount-reflow-fix.png",
+    "screenshots/android-cancel-reopen.png",
+    "screenshots/android-crossread1-calendar.png",
+    "screenshots/android-crossread1-fields.png",
+    "screenshots/android-dark-large-calendar.png",
+    "screenshots/android-dark-large-fields.png",
+    "screenshots/android-deadline-final-events.png",
+    "screenshots/android-deadline-preserved.png",
+    "screenshots/android-initial-input.png",
+    "screenshots/android-monthly-preserved.png",
+    "screenshots/android-original-settings-final.png",
+    "screenshots/android-private-monthly-input.png",
+    "screenshots/android-private-result.png",
+    "screenshots/android-read2-persisted-fields.png",
+    "screenshots/android-read2-persisted-result.png",
+    "screenshots/android-reserve-unchanged.png",
+    "screenshots/android-three-events.png",
+    "screenshots/android-two-events.png",
+    "screenshots/android-zero-observed.png"
+  ]
+}

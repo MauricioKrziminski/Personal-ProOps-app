@@ -1,0 +1,10 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/private/tmp/proops-maestro-state
+Running on tudo_azul_audit_20261002
+ > Flow android-crossread1
+Long press on "Troca do notebook"... COMPLETED
+Tap on "Simular com outras metas"... COMPLETED
+Swipe from (50%, 86%) to (50%, 39%) in 600 ms... COMPLETED
+Take screenshot android-amount-reflow-fix... COMPLETED
+Swipe from (50%, 86%) to (50%, 49%) in 600 ms... COMPLETED
+Take screenshot android-crossread1-fields... COMPLETED

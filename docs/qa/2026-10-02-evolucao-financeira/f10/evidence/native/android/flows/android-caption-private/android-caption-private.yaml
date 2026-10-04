@@ -1,0 +1,9 @@
+appId: com.proops.personal.dev
+---
+- openLink: appproops://finance
+- tapOn: Ocultar valor
+- openLink: appproops://finance/goals
+- assertVisible: Plano oculto
+- assertNotVisible: '.*previsão mar/2027.*'
+- assertNotVisible: '.*até mar/2027.*'
+- takeScreenshot: android-caption-private-settled

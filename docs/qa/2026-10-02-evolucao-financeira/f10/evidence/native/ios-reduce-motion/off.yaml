@@ -1,0 +1,12 @@
+appId: com.apple.Preferences
+---
+- launchApp:
+    clearState: false
+    stopApp: true
+- tapOn: 'Accessibility'
+- tapOn: 'Motion'
+- assertVisible: 'Reduce Motion'
+- tapOn:
+    point: '84%,18%'
+- waitForAnimationToEnd
+- takeScreenshot: ios-reduce-motion-restored-off

@@ -1108,6 +1108,31 @@ test('F08 hooks: one workspace RPC owns the complete horizon and previous query 
     foreign = true;await assert.rejects(query.queryFn(), /workspace|espaço|plano/i);
   } finally { client.clear(); }
 });
+
+test('F10 hooks: versioned source/initial/date participates in key and the scoped complete RPC owns capacity', async () => {
+  const client = new QueryClient();const ws = '10000000-0000-4000-8000-000000000001';
+  const calls: any[] = [];const subscriptions: string[] = [];let foreign = false;
+  const hooks = loadHooks(client, 'src/hooks/use-goal-horizon.ts', {
+    '@tanstack/react-query': { useQuery: (options: any) => options },
+    '@/hooks/use-goal-planning': { useGoalPlanningSources: () => subscriptions.push('shared-finance-sources') },
+    '@/hooks/use-items': { workspaceId: async () => ws },
+    '@/lib/supabase': { supabase: { rpc: async (name: string, args: any) => {
+      calls.push({ name, args });return { data: { state: f08ReadFixture(foreign ? '10000000-0000-4000-8000-000000000009' : ws), horizons: [] }, error: null };
+    } } },
+  });
+  try {
+    const query = hooks.useGoalHorizonPlanning(3650, 'cycle', 'month');const state = await query.queryFn();
+    assert.equal(state.workspace_id, ws);assert.equal(calls.length, 1);assert.equal(calls[0].name, 'goal_planning_state_v2');
+    assert.equal(calls[0].args.p_workspace_id, ws);assert.equal(calls[0].args.p_days, 3650);
+    assert.equal(calls[0].args.p_preview, null);assert.equal(query.placeholderData, undefined);
+    assert.equal(query.queryKey[1], 'v2');assert.ok(subscriptions.includes('shared-finance-sources'));
+    const preview = { goals_fingerprint: 'a'.repeat(32), items: [] };
+    assert.notDeepEqual(query.queryKey, hooks.useGoalHorizonPlanning(3650, 'cycle', 'month', preview).queryKey);
+    assert.notDeepEqual(query.queryKey, hooks.useGoalHorizonPlanning(3650, 'civil', 'day').queryKey);
+    assert.equal(hooks.useGoalHorizonPlanning(3650, 'cycle', 'month', null, false, ws).enabled, false);
+    foreign = true;await assert.rejects(query.queryFn(), /workspace|espaço|plano/i);
+  } finally { client.clear(); }
+});
 test('F08 hooks: ambiguous outcomes do not invalidate a scenario; sealed cancellation and success do', async () => {
   const client = new QueryClient();const calls: any[] = [];const mutations: any[] = [];
   const ws = '10000000-0000-4000-8000-000000000001';
