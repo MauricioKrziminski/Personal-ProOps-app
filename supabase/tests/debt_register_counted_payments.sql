@@ -79,13 +79,58 @@ begin
   perform public.register_counted_debt_payments(d1, conta, array[7,8]);
   if (select updated_at from public.debts where id = d1) is distinct from ts then raise exception '11: tocou a dívida sem registrar nada'; end if;
 
-  -- modo com juros, sem âncora e arquivada são recusados com frase
-  insert into public.debts (workspace_id, user_id, name, kind, calculation_mode, principal_cents,
-    remaining_cents, interest_rate_monthly, installments, installments_paid, due_day, first_due_date)
-  values (ws, u, 'teste contada juros', 'financing', 'amortized', 120000, 100000, 0.01, 12, 2, 5, current_date - 40)
-  returning id into d2;
-  begin perform public.register_counted_debt_payments(d2, conta, array[1]); raise exception 'x12';
-  exception when others then if sqlerrm = 'x12' then raise exception '12: aceitou juros'; end if; end;
+  -- modo COM JUROS (Price): 120000 a 1% em 12x, 2 pagas; a 1ª venceu há ~40 dias, a 2ª há ~10
+  declare p bigint := private.price_installment(120000, 0.01, 12); b0 bigint := 120000; b1 bigint; b2 bigint;
+    j1 bigint; j2 bigint; l2 record; t record;
+  begin
+    j1 := ceil(b0 * 0.01); b1 := b0 + j1 - p; j2 := ceil(b1 * 0.01); b2 := b1 + j2 - p;
+    insert into public.debts (workspace_id, user_id, name, kind, calculation_mode, principal_cents,
+      remaining_cents, interest_rate_monthly, installments, installments_paid, due_day, first_due_date)
+    values (ws, u, 'teste contada juros', 'financing', 'amortized', 120000, b2, 0.01, 12, 2,
+      extract(day from current_date - 10)::int, private.add_months(current_date - 10, -1))
+    returning id into d2;
+    select cleared_cents into saldo_conta_antes from public._account_balances(u) where account_id = conta;
+    n := public.register_counted_debt_payments(d2, conta, array[1,2]);
+    if n <> 2 then raise exception '12: registrou % parcelas com juros', n; end if;
+    select * into l2 from public.debts where id = d2;
+    if l2.installments_paid <> 2 or l2.remaining_cents <> b2 then
+      raise exception '12b: a dívida andou: % pagas, saldo % (era %)', l2.installments_paid, l2.remaining_cents, b2;
+    end if;
+    select * into t from public.transactions where debt_id = d2 and debt_payment_no = 1;
+    if t.amount_cents <> p or t.debt_interest_cents <> j1 or t.debt_principal_cents <> p - j1
+       or t.debt_balance_after_cents <> b1 or t.status <> 'cleared' then
+      raise exception '12c: parcela 1 % % % %', t.amount_cents, t.debt_interest_cents, t.debt_principal_cents, t.debt_balance_after_cents;
+    end if;
+    select * into t from public.transactions where debt_id = d2 and debt_payment_no = 2;
+    if t.amount_cents <> p or t.debt_interest_cents <> j2 or t.debt_balance_after_cents <> b2 then
+      raise exception '12d: parcela 2 % % %', t.amount_cents, t.debt_interest_cents, t.debt_balance_after_cents;
+    end if;
+    if (select cleared_cents from public._account_balances(u) where account_id = conta) <> saldo_conta_antes - 2 * p then
+      raise exception '12e: o saldo da conta não caiu duas vezes';
+    end if;
+    -- repetir não duplica nem mexe na dívida
+    n := public.register_counted_debt_payments(d2, conta, array[1,2]);
+    if n <> 0 or (select count(*) from public.transactions where debt_id = d2) <> 2 then raise exception '12f: duplicou'; end if;
+    -- só a 2ª, com a dívida intacta
+    delete from public.transactions where debt_id = d2 and debt_payment_no = 2;
+    delete from public.transactions where debt_id = d2 and debt_payment_no = 1;
+    update public.debts set installments_paid = 2, remaining_cents = b2 where id = d2;
+    n := public.register_counted_debt_payments(d2, conta, array[2]);
+    select * into l2 from public.debts where id = d2;
+    if n <> 1 or l2.installments_paid <> 2 or l2.remaining_cents <> b2
+       or (select debt_balance_after_cents from public.transactions where debt_id = d2) <> b2 then
+      raise exception '12g: só a 2ª';
+    end if;
+    -- parcela fora das pagas
+    begin perform public.register_counted_debt_payments(d2, conta, array[3]); raise exception 'x12h';
+    exception when others then if sqlerrm = 'x12h' then raise exception '12h: aceitou parcela não paga'; end if; end;
+    -- sem âncora: recusa com frase
+    update public.debts set first_due_date = null where id = d2;
+    begin perform public.register_counted_debt_payments(d2, conta, array[1]); raise exception 'x12i';
+    exception when others then
+      if sqlerrm = 'x12i' then raise exception '12i: aceitou sem âncora'; end if;
+      if sqlerrm not like 'Só financiamento com data%' then raise exception '12i: frase %', sqlerrm; end if; end;
+  end;
   insert into public.debts (workspace_id, user_id, name, kind, calculation_mode, principal_cents,
     remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, due_day)
   values (ws, u, 'teste contada sem ancora', 'financing', 'fixed_installments', 120000, 100000, 0, 12, 2, 10000, 5)

@@ -1456,6 +1456,26 @@ test('parcela paga que venceu no ciclo atual: pergunta se já saiu da conta e la
   assert.equal(antes.nodes().some((n: any) => n.type === 'Field' && /já saiu da conta/.test(n.props.label ?? '')), false);
 });
 
+test('financiamento COM JUROS também pergunta se a parcela paga do ciclo já saiu da conta (05/10/2026)', () => {
+  const ciclo = { de: '2026-09-01', ate: '2026-09-30', mes: '2026-09', diasAteOFim: 22 };
+  const contas = [{ id: 'cc', name: 'Itaú', type: 'checking' }];
+  const comum = { kind: 'expense', descricao: 'Carro', valorCents: 148500, contaId: 'cc', dataBR: '', categoria: null };
+  const ui = formDivida({ forecastAccounts: contas, cycle: ciclo, segurarMutacoes: true }, { comum });
+  ui.interact((nodes) => nodes.find((n) => n.type === 'SelectField' && n.props.options.some((o: any) => o.id === 'amortized')).props.onChange('amortized'));
+  ui.fill('Quanto você deve hoje', 5000000);
+  ui.fill('Valor original', 7000000);
+  ui.fill('Juros por mês', '1,99');
+  ui.fill('Parcelas que faltam', '40');
+  ui.fill('Parcelas já pagas', '8');
+  ui.fill('Próxima parcela (a 9ª)', '05/10/2026');
+  const pergunta = ui.nodes().filter((n: any) => n.type === 'Field' && /^A 8ª \(05\/09\) já saiu da conta Itaú\?/.test(n.props.label));
+  assert.equal(pergunta.length, 1);
+  const previa = JSON.parse(JSON.stringify(ui.nodes().find((n: any) => n.type === 'FinanceWritePreview').props.write));
+  assert.deepEqual(previa.args.p_ja_sairam, { accountId: 'cc', numbers: [8] });
+  ui.press('Salvar');
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.writes.at(-1).value.ja_sairam)), { accountId: 'cc', numbers: [8] });
+});
+
 test('sem conta que paga não há o que lançar: nada pergunta e o Salvar fica livre (05/10/2026)', () => {
   // Visto no iPhone: "A 8ª (05/10) já saiu da conta sua conta?" travava o Salvar de quem não tem conta.
   const ciclo = { de: '2026-09-01', ate: '2026-09-30', mes: '2026-09', diasAteOFim: 22 };

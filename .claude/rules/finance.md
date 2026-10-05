@@ -35,13 +35,16 @@
     saída de ciclo fechado) — a mesma régua de despesa atrasada. O formulário mostra a data da
     pessoa e, vencida, "Venceu em DD/MM e ainda não foi paga". Sem âncora nada mudou.
   - **Parcela paga no CICLO ATUAL vira lançamento** (`register_counted_debt_payments`,
-    `20261005191000`, parcela fixa): ao cadastrar (ou aumentar "Parcelas já pagas") o formulário
+    `20261005191000`): ao cadastrar (ou aumentar "Parcelas já pagas") o formulário
     pergunta "A 8ª (23/09) já saiu da conta X?" para cada paga cujo vencimento do contrato cai no
     ciclo do banco (`cycle_now`). Sim lança o pagamento pelo MESMO gatilho do "Paguei", ligado à
     parcela, recuando o contador para `k−1` e restaurando o par (pagas, saldo) no fim: o saldo da
     dívida não cai duas vezes, e repetir é no-op (parcela com pagamento é pulada). Não, ou ciclo
-    anterior, continua só contada. Com juros (modo amortizado) não pergunta: o saldo antes da
-    parcela não se deriva do contrato. O app pergunta a PRÓXIMA parcela e grava
+    anterior, continua só contada. **Com juros também** (`20261005230000`): o valor é a
+    parcela Price (`coalesce(installment_cents, price_installment(saldo, taxa, restantes))`, a de
+    `debt_schedule_for`; edição/estimativa declarada da k vale antes) e o saldo ANTES da k sai de
+    desfazer, da última paga para trás, a conta do gatilho (`antes + ceil(antes×taxa) − parcela =
+    depois`); o gatilho separa juros e amortização e o par (pagas, saldo) volta ao de antes. O app pergunta a PRÓXIMA parcela e grava
     `first = próxima − pagas`.
   - **Com âncora, "já pagou neste ciclo" NÃO empurra nem esconde nada** (`20260923170000`).
     O ramo do ciclo existe para a dívida sem âncora, que não sabe qual parcela foi paga; com

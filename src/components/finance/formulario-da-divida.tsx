@@ -374,7 +374,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
    * Pagas que vencem no CICLO ATUAL (o do banco) e que este salvar acrescenta: só contadas, elas
    * não saem da conta nem entram em "O que entra e sai". O formulário pergunta se já saíram.
    */
-  const temPagasNovas = form.calculationMode === 'fixed_installments' && !converter
+  const temPagasNovas = !converter
     && form.installmentsPaid > (form.id ? form.pagasOriginal : 0);
   // Sem conta que paga não há o que lançar: as pagas ficam só contadas, sem pergunta (05/10/2026).
   const perguntaPagas = temPagasNovas && Boolean(form.accountId);
@@ -568,6 +568,24 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   };
 
   const salvando = props.salvando || save.isPending || saveScoped.isPending || registrarPagas.isPending;
+  const perguntasDaConta = (<>
+  {perguntas.map((q) => {
+    const sim = respostaDe(q.no);
+    return (
+      <Field key={q.no} label={`A ${q.no}ª (${isoToBR(q.dataISO).slice(0, 5)}) já saiu da conta ${contaEscolhida?.name ?? ''}?`}>
+        <View style={styles.simNao}>
+          <Button label="Sim" size="sm" variant={sim === true ? 'primary' : 'secondary'}
+            onPress={() => setJaSaiu({ ...jaSaiu, [q.no]: true })} />
+          <Button label="Não" size="sm" variant={sim === false ? 'primary' : 'secondary'}
+            onPress={() => setJaSaiu({ ...jaSaiu, [q.no]: false })} />
+        </View>
+      </Field>
+    );
+  })}
+  {erroDasPerguntas && perguntas.length ? (
+    <ThemedText type="small" themeColor="textSecondary">{erroDasPerguntas}</ThemedText>
+  ) : null}
+</>);
   const dataDoContrato = (
     <Field label={rotuloDaData} error={faltaData ? 'Escolha a data' : undefined}>
       <DatePickerField
@@ -720,22 +738,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
               accessibilityLabel="Parcelas já pagas"
             />
           </Field>
-          {perguntas.map((q) => {
-            const sim = respostaDe(q.no);
-            return (
-              <Field key={q.no} label={`A ${q.no}ª (${isoToBR(q.dataISO).slice(0, 5)}) já saiu da conta ${contaEscolhida?.name ?? ''}?`}>
-                <View style={styles.simNao}>
-                  <Button label="Sim" size="sm" variant={sim === true ? 'primary' : 'secondary'}
-                    onPress={() => setJaSaiu({ ...jaSaiu, [q.no]: true })} />
-                  <Button label="Não" size="sm" variant={sim === false ? 'primary' : 'secondary'}
-                    onPress={() => setJaSaiu({ ...jaSaiu, [q.no]: false })} />
-                </View>
-              </Field>
-            );
-          })}
-          {erroDasPerguntas && perguntas.length ? (
-            <ThemedText type="small" themeColor="textSecondary">{erroDasPerguntas}</ThemedText>
-          ) : null}
+          {perguntasDaConta}
           {dataDoContrato}
           {vencida ? (
             <ThemedText type="small" themeColor="textSecondary">
@@ -857,6 +860,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
               accessibilityLabel="Parcelas do financiamento já pagas"
             />
           </Field>
+          {perguntasDaConta}
         </Presenca>
         <Presenca visivel={form.parcelas !== '' && form.historyConfirmed}>
           <ThemedText type="small" themeColor="textSecondary">
