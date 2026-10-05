@@ -256,6 +256,37 @@ async def _recurso(texto):
     }
 
 
+async def _recurso_cru(texto):
+    """A ação de catálogo como o MODELO a extraiu, sem rodar o `prepare` (que precisa de banco).
+
+    O lote D recusa com frase terminal (`JaExiste`) pedidos que sem banco não têm o que achar; para a
+    avaliação importa só a extração, então o `prepare` vira um Level1Error que deixa a ação no rascunho.
+    """
+    real = resources.prepare
+
+    async def captura(_ctx, _acao):
+        raise Level1Error("captura da avaliação")
+
+    resources.prepare = captura
+    try:
+        return await _recurso(texto)
+    finally:
+        resources.prepare = real
+
+
+def _lanca_ou_copia(o):
+    """O pedido que GRAVA um lançamento: favorito com lancar=true, ou duplicar criando."""
+    o = o or {}
+    if o.get("resource") == "favoritos":
+        return o.get("type") in {"resource_update", "resource_create"} and str(o.get("lancar")).lower() == "true"
+    return o.get("resource") == "duplicar" and o.get("type") in {"resource_update", "resource_create"}
+
+
+def _tem(o, campo, *trechos):
+    v = str((o or {}).get(campo, "")).lower()
+    return bool(v) and all(t in v for t in trechos)
+
+
 async def _com_retentativa(coro_fn, vezes=4):
     """503 do Lite é a API sobrecarregada, não a resposta do modelo: tenta de novo antes de contar falha."""
     for i in range(vezes):
@@ -764,6 +795,93 @@ def secoes():
         "loteC/roteamento": [
             (t, lambda o: o is None, "sem lançamento novo", lambda t=t: _atributos(t))
             for t in ["paguei a fatura do nubank no pix", "transferi 500 da nubank pra poupança"]
+        ],
+        # --- Lote D da paridade (05/10/2026) ---------------------------------------------
+        # Reserva e plano de metas são CONSULTA do cadastro (não de transações); o adversarial é
+        # tudo que se parece e é outra coisa (meta, orçamento, gasto).
+        "loteD/reserva e plano de metas": [
+            (t, lambda o: bool(o) and o.get("resource") == "reserva" and o.get("type") == "resource_list",
+             "reserva list", lambda t=t: _recurso_cru(t))
+            for t in ["minha reserva cobre quantos meses?", "quanto falta pra minha reserva de emergência?"]
+        ] + [
+            (t, lambda o: bool(o) and o.get("resource") == "plano_metas" and o.get("type") == "resource_list",
+             "plano_metas list", lambda t=t: _recurso_cru(t))
+            for t in ["cabe no meu plano de metas?", "quando o plano de metas aperta?"]
+        ] + [
+            (t, lambda o: not (o and o.get("resource") in {"reserva", "plano_metas"}), "não é reserva nem plano",
+             lambda t=t: _recurso_cru(t))
+            for t in ["quanto gastei esse mês?", "cria uma meta chamada viagem de 5000", "tirei 200 da meta viagem"]
+        ],
+        # Meta por prazo continua create_goal (finanças) com o prazo na data; por mês é campo virtual.
+        "loteD/meta por prazo e por mês": [
+            ("quero juntar 10 mil até dezembro de 2027",
+             lambda a: bool(a) and a[0].get("type") == "create_goal" and a[0].get("amount_cents") == 1000000
+             and str(a[0].get("occurred_at", "")).startswith("2027-12"), "create_goal 10000 até 2027-12",
+             lambda: _acoes("quero juntar 10 mil até dezembro de 2027")),
+        ] + [
+            (t, lambda o: bool(o) and o.get("resource") == "goals" and o.get("type") == "resource_create"
+             and str(o.get("mensal_cents")) == "50000" and str(o.get("target_cents")) == "1000000",
+             "goals create mensal=50000 alvo=1000000", lambda t=t: _recurso_cru(t))
+            for t in ["quero juntar 10 mil guardando 500 por mês", "nova meta casa de 10 mil, vou guardar 500 todo mês"]
+        ] + [
+            (t, lambda o: bool(o) and o.get("resource") == "goals" and o.get("type") in {"resource_list", "resource_update"}
+             and str(o.get("mensal_cents")) == "50000", "goals mensal=50000 (meta existente)",
+             lambda t=t: _recurso_cru(t))
+            for t in ["e se eu guardar 500 por mês na meta viagem?", "quando a meta viagem chega se eu guardar 500 por mês?"]
+        ] + [
+            (t, lambda o: not (o and o.get("mensal_cents")), "não é por mês", lambda t=t: _recurso_cru(t))
+            for t in ["guardei 500 na meta viagem", "aumenta a meta viagem para 5000", "gasto 500 por mês com mercado"]
+        ],
+        "loteD/marcos, ícone e cor": [
+            (t, lambda o: bool(o) and o.get("resource") == "goals" and o.get("type") == "resource_update"
+             and all(x in str(o.get("marcos", "")) for x in ("25", "50", "75")), "marcos 25/50/75", lambda t=t: _recurso_cru(t))
+            for t in ["põe marcos de 25%, 50% e 75% na meta viagem", "quero marcos em 25, 50 e 75 por cento da meta viagem"]
+        ] + [
+            (t, lambda o: bool(o) and o.get("resource") == "goals" and _tem(o, "icone", "avi"), "icone~avião",
+             lambda t=t: _recurso_cru(t))
+            for t in ["muda o ícone da meta viagem para avião", "coloca um avião como ícone da meta viagem"]
+        ] + [
+            (t, lambda o: bool(o) and o.get("resource") == "goals" and any(c in str(o.get("cor", "")).lower()
+                                                                        for c in ("azul", "oceano")), "cor~azul",
+             lambda t=t: _recurso_cru(t))
+            for t in ["pinta a meta viagem de azul", "muda a cor da meta viagem pra azul"]
+        ] + [
+            (t, lambda o: not (o and any(k in o for k in ("marcos", "icone", "cor"))), "sem marcos/ícone/cor",
+             lambda t=t: _recurso_cru(t))
+            for t in ["aumenta a meta viagem para 5000", "guardei 300 na meta viagem", "arquiva a meta viagem"]
+        ] + [
+            (t, lambda q: bool(q) and q.get("type") == "query_goals" and _tem(q, "search_term", "viag"),
+             "query_goals viagem", lambda t=t: _consulta(t))
+            for t in ["qual o próximo marco da viagem?", "quanto falta pro próximo marco da meta viagem?"]
+        ],
+        "loteD/favoritos e duplicar": [
+            (t, lambda o: bool(o) and o.get("resource") == "favoritos" and o.get("type") in {"resource_update", "resource_create"}
+             and str(o.get("lancar")).lower() == "true" and _tem(o, "name", n), f"favoritos lancar name~{n}",
+             lambda t=t: _recurso_cru(t))
+            for t, n in [("lança meu favorito Almoço", "almo"), ("usa o favorito academia", "academia"),
+                         ("lança o favorito café da manhã de 12 reais", "caf")]
+        ] + [
+            (t, lambda o: bool(o) and o.get("resource") == "duplicar" and _tem(o, "name", n), f"duplicar name~{n}",
+             lambda t=t: _recurso_cru(t))
+            for t, n in [("repete o lançamento do mercado de ontem", "mercado"), ("duplica a conta de luz", "luz"),
+                         ("lança de novo o aluguel", "alug")]
+        ] + [
+            (t, lambda o: bool(o) and o.get("resource") == "duplicar" and not o.get("name"), "duplicar sem nome (o último)",
+             lambda t=t: _recurso_cru(t))
+            for t in ["repete o último lançamento"]
+        ] + [
+            (t, lambda o: not _lanca_ou_copia(o), "não lança nem duplica", lambda t=t: _recurso_cru(t))
+            for t in ["apaga o favorito almoço", "salva esse lançamento como favorito", "gastei 45 no mercado",
+                      "quais são os meus favoritos?"]
+        ],
+        "loteD/roteamento": [
+            (t, lambda d: "cadastros" in d, "->cadastros", lambda t=t: _dominios(t))
+            for t in ["minha reserva cobre quantos meses?", "cabe no meu plano de metas?",
+                      "lança meu favorito Almoço", "repete o lançamento do mercado de ontem",
+                      "quero juntar 10 mil guardando 500 por mês"]
+        ] + [
+            (t, lambda d: "financas" in d and "cadastros" not in d, "->financas", lambda t=t: _dominios(t))
+            for t in ["gastei 45 no mercado", "guardei 200 na meta viagem"]
         ],
     }
 
