@@ -266,7 +266,7 @@ export function CategoriaSheet({
   );
 }
 
-function GradeDeIcones({
+export function GradeDeIcones({
   valor,
   cor,
   onPick,

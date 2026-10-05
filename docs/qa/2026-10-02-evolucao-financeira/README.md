@@ -42,7 +42,7 @@ Esses fatos e a abertura do formulário ainda não equivalem ao aceite funcional
 | F16 | Voz contextual | Aceito; limites no registro | Validado 9/9 (voz real) | Validado 8/8 (texto) |
 | F17 | Ajuda e avisos | Aceito; limites no registro | Validado | Validado |
 | F18 | Transferência recorrente | Aceito; limites no registro | Validado 6/6 | Validado 5/5 |
-| F19 | Marcos nas metas | Próximo incremento, F18 aceito | Não validado | Não validado |
+| F19 | Marcos nas metas | Aceito; limites no registro | Validado (celebração em vídeo) | Validado 6/6 |
 | F20 | Acumulação/renda futura | Aguardando F19 | Não validado | Não validado |
 | F21 | Primeiro cadastro guiado | Aguardando F20 | Não validado | Não validado |
 | F22 | Favoritos/duplicação | Aguardando F21 | Não validado | Não validado |
@@ -328,3 +328,10 @@ defeito alto e três médios, corrigidos antes do push), agente com o agendador 
 staging. Encerrar a assinatura mantém o pago e tira só o futuro em aberto; transferência
 recorrente entre contas próprias. iOS 6/6 e Android 5/5; séries de QA apagadas por ID. F19
 liberado.
+
+## F19 — marcos, ícone e cor das metas
+
+[Aceite e limites](f19/aceite.md) e [contrato](f19/contrato.md). Migration
+`20261005170000_goal_milestones.sql` (renomeada na integração, ajustes da revisão), só no
+staging. A celebração passou a tocar depois que a folha do aporte sai (conferido em vídeo).
+iOS e Android aprovados; metas de QA apagadas por ID. F20 liberado.

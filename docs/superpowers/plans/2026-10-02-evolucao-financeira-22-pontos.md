@@ -279,10 +279,12 @@ Aceite no staging em 05/10/2026: [F18](../../qa/2026-10-02-evolucao-financeira/f
 
 Arquivos: goal domain/ledger, ficha e componente de progresso. Interface: alvo/ledger/marcos → etapa derivada/evento visual idempotente.
 
-- [ ] RED: retirada/alteração de alvo recalcula e reabrir não celebra repetidamente.
-- [ ] Implementar configuração e progressão sem contagem por volume de cadastros.
-- [ ] Integrar momento visual do kit, acessibilidade e Reduce Motion.
-- [ ] Provar múltiplos marcos/concorrência e gates nativos F19; registrar aceite.
+- [x] RED: retirada/alteração de alvo recalcula e reabrir não celebra repetidamente.
+- [x] Implementar configuração e progressão sem contagem por volume de cadastros.
+- [x] Integrar momento visual do kit, acessibilidade e Reduce Motion.
+- [x] Provar múltiplos marcos/concorrência e gates nativos F19; registrar aceite.
+
+Aceite no staging em 05/10/2026: [F19](../../qa/2026-10-02-evolucao-financeira/f19/aceite.md). F20 liberado.
 
 ### F20 — Cenários de acumulação
 

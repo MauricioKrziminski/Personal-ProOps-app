@@ -21,6 +21,7 @@ import type { Database, Json } from '@/lib/database.types';
 import { dataLocalDe, localISODate, mesmoMes, monthBounds, primeiroDiaDoMes } from '@/lib/dates';
 import { avisoDeDeslize } from '@/lib/serie';
 import type { PreviaDoEncerramento } from '@/lib/encerrar-serie';
+import { diferencaDosMarcos } from '@/lib/goal-milestones';
 import type { Consulta } from '@/lib/tela-pronta';
 import type { DebtDeclaredEstimateRow, DebtPaymentRow } from '@/lib/debt-history';
 import type { ExpectedLedgerLine } from '@/lib/ledger-expected';
@@ -186,7 +187,7 @@ export type AccountBalance = Fns['account_balances']['Returns'][number];
 
 export type Goal = Pick<
   Tables['goals']['Row'],
-  'id' | 'workspace_id' | 'name' | 'target_cents' | 'saved_cents' | 'deadline' | 'archived'
+  'id' | 'workspace_id' | 'name' | 'target_cents' | 'saved_cents' | 'deadline' | 'archived' | 'icon' | 'color'
 >;
 
 export type BudgetStatus = Fns['budgets_status']['Returns'][number];
@@ -585,7 +586,7 @@ export function useGoals() {
     queryFn: async (): Promise<Goal[]> => {
       const { data, error } = await supabase
         .from('goals')
-        .select('id, workspace_id, name, target_cents, saved_cents, deadline, archived')
+        .select('id, workspace_id, name, target_cents, saved_cents, deadline, archived, icon, color')
         .eq('archived', false)
         // A mais recente primeiro (24/09/2026: "em tudo, do mais recente para o mais antigo").
         .order('created_at', { ascending: false });
@@ -3691,25 +3692,56 @@ export function useArchiveAccount() {
   });
 }
 
-/** Cria ou edita (mesma forma de useSaveTransaction: com `id` vira update). */
+/**
+ * Cria ou edita (mesma forma de useSaveTransaction: com `id` vira update). F19: grava ícone e cor
+ * e SINCRONIZA os marcos (centavos) — insere e apaga só a diferença. Os marcos acima do alvo que
+ * a pessoa não apagou ficam na lista que chega aqui e, portanto, ficam no banco.
+ */
 export function useSaveGoal() {
   const invalidate = useInvalidateFinance();
   return useMutation({
     mutationFn: async ({
       id,
+      marcos,
       ...input
     }: {
       id?: string;
       name: string;
       target_cents: number;
       deadline: string | null;
+      icon: string | null;
+      color: string | null;
+      /** Ausente = não mexer nos marcos (formulário que não os carregou). */
+      marcos?: number[];
     }) => {
+      let goalId = id;
       if (id) {
         const { error } = await supabase.from('goals').update(input).eq('id', id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('goals').insert({ ...input, user_id: await userId() });
+        const { data, error } = await supabase
+          .from('goals')
+          .insert({ ...input, user_id: await userId() })
+          .select('id')
+          .single();
         if (error) throw error;
+        goalId = data.id;
+      }
+      if (marcos) {
+        const { data: gravados, error: lerErro } = await supabase
+          .from('goal_milestones').select('amount_cents').eq('goal_id', goalId!);
+        if (lerErro) throw lerErro;
+        const { apagar, inserir } = diferencaDosMarcos(gravados.map((m) => Number(m.amount_cents)), marcos);
+        if (apagar.length) {
+          const { error } = await supabase
+            .from('goal_milestones').delete().eq('goal_id', goalId!).in('amount_cents', apagar);
+          if (error) throw error;
+        }
+        if (inserir.length) {
+          const { error } = await supabase
+            .from('goal_milestones').insert(inserir.map((amount_cents) => ({ goal_id: goalId!, amount_cents })));
+          if (error) throw error;
+        }
       }
     },
     onSuccess: invalidate,

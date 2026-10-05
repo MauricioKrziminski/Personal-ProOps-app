@@ -17,6 +17,7 @@ export function RingGauge({
   size = 56,
   stroke = 6,
   tone = 'text',
+  cor,
   track = 'backgroundElement',
   children,
   accessibilityLabel,
@@ -26,6 +27,8 @@ export function RingGauge({
   size?: number;
   stroke?: number;
   tone?: ThemeColor;
+  /** Tinta própria (cor de conteúdo do usuário, ex.: a da meta); vence `tone`. */
+  cor?: string;
   track?: ThemeColor;
   children?: ReactNode;
   accessibilityLabel?: string;
@@ -62,7 +65,7 @@ export function RingGauge({
         <Path path={arco} color={theme[track]} style="stroke" strokeWidth={stroke} />
         <Path
           path={arco}
-          color={theme[tone]}
+          color={cor ?? theme[tone]}
           style="stroke"
           strokeWidth={stroke}
           strokeCap="round"

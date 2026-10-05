@@ -1421,6 +1421,45 @@ export type Database = {
           },
         ]
       }
+      goal_milestones: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          goal_id: string
+          id: string
+          workspace_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          goal_id: string
+          id?: string
+          workspace_id?: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          goal_id?: string
+          id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_milestones_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_milestones_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       goal_money_movements: {
         Row: {
           account_id: string | null
@@ -1625,8 +1664,10 @@ export type Database = {
       goals: {
         Row: {
           archived: boolean
+          color: string | null
           created_at: string
           deadline: string | null
+          icon: string | null
           id: string
           name: string
           saved_cents: number
@@ -1637,8 +1678,10 @@ export type Database = {
         }
         Insert: {
           archived?: boolean
+          color?: string | null
           created_at?: string
           deadline?: string | null
+          icon?: string | null
           id?: string
           name: string
           saved_cents?: number
@@ -1649,8 +1692,10 @@ export type Database = {
         }
         Update: {
           archived?: boolean
+          color?: string | null
           created_at?: string
           deadline?: string | null
+          icon?: string | null
           id?: string
           name?: string
           saved_cents?: number

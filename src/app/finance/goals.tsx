@@ -21,6 +21,12 @@ import { SelectField } from '@/components/ui/select-field';
 import { GoalPlanningSummary, GoalPlanSheet, useGoalPlanEditor } from '@/components/finance/goal-planning';
 import { GoalContributionCaption } from '@/components/finance/goal-contribution-fields';
 import { useMonthRuler } from '@/components/finance/month-ruler';
+import { AnelDaMeta, AparenciaDaMeta, MarcosDaMeta, type Travessia, type UnidadeDoMarco } from '@/components/finance/goal-identity';
+import type { NoteColorName } from '@/constants/theme';
+import { useGoalMilestones } from '@/hooks/use-goal-milestones';
+import {
+  centavosDaLinha, linhasDosMarcos, recusaDosMarcos, sugestaoDeMarcos, textoDoProximoMarco, type LinhaDeMarco,
+} from '@/lib/goal-milestones';
 import { useGoalHorizonPlanning } from '@/hooks/use-goal-horizon';
 import { useGoalLinkCandidates, useGoalMoneyCommand, useGoalMoneyState } from '@/hooks/use-goal-money';
 import {
@@ -37,7 +43,6 @@ import { VerMais } from '@/components/ui/ver-mais';
 import { useAosPoucos, useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
-import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
@@ -80,9 +85,18 @@ interface FormState {
   targetCents: number;
   /** dd/mm/aaaa; vazio = sem prazo. */
   deadline: string;
+  icon: string | null;
+  color: NoteColorName | null;
+  /** F19: marcos do formulário (centavos, ou % que recalcula com o alvo). */
+  marcos: LinhaDeMarco[];
+  unidadeDoMarco: UnidadeDoMarco;
+  /** Os marcos já tinham chegado QUANDO o formulário abriu. Sem isso ele não os mostra nem os envia. */
+  marcosCarregados: boolean;
 }
 
-const FORM_VAZIO: FormState = { name: '', targetCents: 0, deadline: '' };
+const formVazio = (): FormState => ({
+  name: '', targetCents: 0, deadline: '', icon: null, color: null, marcos: sugestaoDeMarcos(), unidadeDoMarco: 'pct', marcosCarregados: true,
+});
 
 /** `2026-12-31` → `dezembro de 2026`. */
 /** `2027-09-30` → `set/2027`: curto para a linha do card caber inteira a 384dp × fonte 1,3. */
@@ -147,6 +161,11 @@ export default function GoalsScreen() {
   } | null>(null);
   const [extratoSelecionado, setExtrato] = useState<Goal | null>(null);
   const [concluidasAbertas, setConcluidasAbertas] = useState(false);
+  /** F19: o último aporte/alocação CONFIRMADO — o único gatilho de celebração de marco. */
+  const [travessia, setTravessia] = useState<Travessia | null>(null);
+  const marcosQuery = useGoalMilestones();
+  const marcosPorMeta = marcosQuery.isError ? undefined : marcosQuery.data;
+  const marcosDe = (id: string): number[] | undefined => (marcosPorMeta ? marcosPorMeta[id] ?? [] : undefined);
 
   const aporte = goals.isError ? null : (goals.data?.find((goal) => goal.id === aporteSelecionado?.id) ?? null);
   const extrato = goals.isError ? null : (goals.data?.find((goal) => goal.id === extratoSelecionado?.id) ?? null);
@@ -176,13 +195,18 @@ export default function GoalsScreen() {
   const guardado = lista.reduce((s, g) => s + Number(g.saved_cents), 0);
   const alvo = lista.reduce((s, g) => s + Number(g.target_cents), 0);
 
-  const abrirNova = () => setForm({ ...FORM_VAZIO });
+  const abrirNova = () => setForm(formVazio());
   const abrirEdicao = (g: Goal) =>
     setForm({
       id: g.id,
       name: g.name,
       targetCents: Number(g.target_cents),
       deadline: g.deadline ? isoToBR(g.deadline) : '',
+      icon: g.icon,
+      color: g.color as NoteColorName | null,
+      marcos: linhasDosMarcos(marcosDe(g.id) ?? []),
+      unidadeDoMarco: 'valor',
+      marcosCarregados: marcosDe(g.id) !== undefined,
     });
 
   const abrirAporte = (g: Goal) => {
@@ -223,7 +247,19 @@ export default function GoalsScreen() {
   };
 
   const prazoOk = form ? form.deadline === '' || isValidBRDate(form.deadline) : false;
-  const podeSalvar = Boolean(form && form.name.trim().length >= 2 && form.targetCents > 0 && prazoOk);
+  // Editando com os marcos ainda sem chegar NA ABERTURA, o formulário não os mostra NEM os envia:
+  // mandar a lista vazia apagaria os que existem (e a consulta chegar depois não muda a lista
+  // que a pessoa já está editando).
+  const marcosProntos = form?.marcosCarregados ?? false;
+  const centsDosMarcos = form ? form.marcos.map((l) => centavosDaLinha(l, form.targetCents)).filter((c) => c > 0) : [];
+  const recusaDosMarcosMsg = form && marcosProntos
+    ? recusaDosMarcos(
+        centsDosMarcos.filter((c) => !(form.id ? marcosDe(form.id) ?? [] : []).includes(c)),
+        centsDosMarcos,
+        form.targetCents,
+      )
+    : null;
+  const podeSalvar = Boolean(form && form.name.trim().length >= 2 && form.targetCents > 0 && prazoOk && !recusaDosMarcosMsg);
 
   const salvar = () => {
     if (!form || !podeSalvar) return;
@@ -233,6 +269,9 @@ export default function GoalsScreen() {
         name: form.name.trim(),
         target_cents: form.targetCents,
         deadline: form.deadline ? brToISO(form.deadline) : null,
+        icon: form.icon,
+        color: form.color,
+        marcos: marcosProntos ? centsDosMarcos : undefined,
       },
       {
         onSuccess: () => {
@@ -280,6 +319,7 @@ export default function GoalsScreen() {
     movimento.mutate(entradaDaMovimentacao(aporte.id, rascunho), {
       onSuccess: (r) => {
         const depois = Number(r?.saved_cents ?? antes + sinal * aporteCents);
+        setTravessia({ goalId: aporte.id, token: Date.now(), antes, depois });
         const bateu = depois >= Number(aporte.target_cents) && antes < Number(aporte.target_cents);
         toast({
           message: bateu ? `${aporte.name} bateu a meta.` : sinal > 0 ? `Guardado em ${aporte.name}.` : `Retirado de ${aporte.name}.`,
@@ -353,6 +393,7 @@ export default function GoalsScreen() {
     const falta = Math.max(0, target - saved);
     const pct = target > 0 ? Math.min(1, saved / target) : 0;
     const concluida = falta === 0;
+    const proximoMarco = textoDoProximoMarco(saved, target, marcosDe(g.id), brl);
     const planned = !planning.isError && !concluida
       ? planning.data?.horizons.find(entry => entry.item.goal_id === g.id && entry.item.included) : undefined;
 
@@ -371,39 +412,50 @@ export default function GoalsScreen() {
           onLongPress={() => acoes(g)}>
           <Card style={styles.meta}>
             <View style={styles.metaTopo}>
-              <View style={styles.metaTitulo}>
-                <Icon
-                  name={concluida ? 'checkmark.seal.fill' : 'target'}
-                  size="md"
-                  color={concluida ? 'success' : 'tint'}
-                />
-                <ThemedText type="default">
-                  {g.name}
+              <AnelDaMeta
+                goalId={g.id}
+                saved={saved}
+                target={target}
+                marcos={marcosDe(g.id)}
+                icon={g.icon}
+                color={g.color}
+                concluida={concluida}
+                travessia={travessia}
+                label={`${Math.round(pct * 100)} por cento`}
+              />
+              <View style={styles.metaTexto}>
+                <View style={styles.metaTitulo}>
+                  <ThemedText type="default" style={styles.metaNome}>
+                    {g.name}
+                  </ThemedText>
+                  <ThemedText
+                    type="smallBold"
+                    themeColor={concluida ? 'success' : 'textSecondary'}
+                    // Número com "%" não encolhe: com fonte grande ele partia em "0" / "%".
+                    style={[tabular, { flexShrink: 0 }]}>
+                    {Math.round(pct * 100)}%
+                  </ThemedText>
+                </View>
+
+                {/* UMA frase, com o valor dentro: em peças soltas num `flexWrap` cada uma quebrava
+                    sozinha e o `Money` encolhia para caber, desalinhando a linha (23/09/2026). */}
+                <ThemedText type="small" themeColor="textSecondary">
+                  <Money cents={saved} variant="subhead" /> de{' '}
+                  <Money cents={target} variant="subhead" tone="textSecondary" />
+                  {/* "faltam" saiu da linha: o anel e o % já dizem, e ele empurrava o valor para baixo. */}
+                  {concluida ? (
+                    <ThemedText type="small" themeColor="success">
+                      {' '}· concluída
+                    </ThemedText>
+                  ) : null}
                 </ThemedText>
+                {proximoMarco && !concealed ? (
+                  <ThemedText type="footnote" themeColor="textSecondary">
+                    {proximoMarco}
+                  </ThemedText>
+                ) : null}
               </View>
-              <ThemedText
-                type="smallBold"
-                themeColor={concluida ? 'success' : 'textSecondary'}
-                // Número com "%" não encolhe: com fonte grande ele partia em "0" / "%".
-                style={[tabular, { flexShrink: 0 }]}>
-                {Math.round(pct * 100)}%
-              </ThemedText>
             </View>
-
-            <ProgressBar value={saved} max={target} tone={concluida ? 'success' : 'tint'} />
-
-            {/* UMA frase, com o valor dentro: em peças soltas num `flexWrap` cada uma quebrava
-                sozinha e o `Money` encolhia para caber, desalinhando a linha (23/09/2026). */}
-            <ThemedText type="small" themeColor="textSecondary">
-              <Money cents={saved} variant="subhead" /> de{' '}
-              <Money cents={target} variant="subhead" tone="textSecondary" />
-              {/* "faltam" saiu da linha: a barra e o % já dizem, e ele empurrava o valor para baixo. */}
-              {concluida ? (
-                <ThemedText type="small" themeColor="success">
-                  {' '}· concluída
-                </ThemedText>
-              ) : null}
-            </ThemedText>
 
             {planned ? <GoalContributionCaption entry={planned} />
               : g.deadline && !concluida && !concealed ? <ThemedText type="footnote" themeColor="textSecondary">
@@ -886,6 +938,30 @@ export default function GoalsScreen() {
                   invalid={Boolean(form.deadline) && !prazoOk}
                 />
               </Field>
+
+              {marcosProntos ? (
+                <>
+                  <MarcosDaMeta
+                    linhas={form.marcos}
+                    targetCents={form.targetCents}
+                    unidade={form.unidadeDoMarco}
+                    onUnidade={(unidadeDoMarco) => setForm({ ...form, unidadeDoMarco })}
+                    onChange={(marcos) => setForm({ ...form, marcos })}
+                  />
+                  {recusaDosMarcosMsg ? (
+                    <ThemedText type="small" themeColor="danger" accessibilityRole="alert">
+                      {recusaDosMarcosMsg}
+                    </ThemedText>
+                  ) : null}
+                </>
+              ) : null}
+
+              <AparenciaDaMeta
+                icon={form.icon}
+                color={form.color}
+                onIcon={(icon) => setForm({ ...form, icon })}
+                onColor={(color) => setForm({ ...form, color })}
+              />
             </SheetScroll>
           ) : null}
       </Sheet>
@@ -911,13 +987,20 @@ const styles = StyleSheet.create({
   metaTopo: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Space.sm,
+    gap: Space.md,
+  },
+  metaTexto: {
+    flex: 1,
+    minWidth: 0,
+    gap: Space.xs,
   },
   metaTitulo: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: Space.sm,
+  },
+  metaNome: {
     flexShrink: 1,
   },
   valores: {

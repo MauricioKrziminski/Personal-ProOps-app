@@ -60,7 +60,7 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null } = {}) {
+function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean } = {}) {
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
@@ -186,6 +186,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
     useGoalContributions: () => ({ ...query, isSuccess: true, data: options.contributions ?? [] }),
     useEditGoalContribution: () => mutation('editGoalContribution'),
     useGoalDeposit: () => mutation('goalDeposit'),
+    useSaveGoal: () => mutation('saveGoal'),
     useDeleteImportBatch: () => mutation('deleteImportBatch'),
     useRecentTransactions: () => (options.recent ? { ...query, isSuccess: true, data: options.recent } : query),
     PLANS: [
@@ -462,6 +463,9 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
         useGoalLinkCandidates: () => ({ ...query, isSuccess: true, data: options.linkCandidates ?? [] }),
         useGoalMoneyCommand: () => mutation('goalMoney'),
       };
+      // F19: os marcos chegam prontos; a régua (etapa, % em centavos, diferença) é a DE VERDADE.
+      if (name === '@/hooks/use-goal-milestones') return { useGoalMilestones: () => options.marcosPendentes ? { ...query, isPending: true, isSuccess: false, data: undefined } : ({ ...query, isSuccess: true, data: options.milestones ?? {} }) };
+      if (name === '@/lib/goal-milestones') return load('src/lib/goal-milestones.ts');
       if (name === '@/hooks/use-spending-change') return {
         useSpendingChange: () => ({ ...query, isPending: false, isSuccess: true, data: options.spending, refetch: async () => { refetches.push('spending-change'); } }),
       };
@@ -2337,6 +2341,72 @@ test('Metas: arrasta Guardar à direita e Arquivar à esquerda', () => {
   const card = deslizaveis(ui)[0];
   assert.ok(card, 'a meta está num Deslizavel');
   assert.deepEqual(ladosDe(card), { direita: ['Guardar'], esquerda: ['Arquivar'], mais: true, pontaDireita: 'Guardar', pontaEsquerda: 'Arquivar' });
+});
+
+const metaComMarcos = { id: 'g1', name: 'Viagem', target_cents: 100000, saved_cents: 30000, deadline: null, archived: false, icon: null, color: null };
+const linhaDoMarco = (ui: any) => JSON.stringify(ui.nodes().filter((n: any) => n.type === 'ThemedText').map((n: any) => n.props.children));
+
+test('Metas: o card mostra o próximo marco e quanto falta; sem marcos, sem linha; oculto, escondida', () => {
+  const com = linhaDoMarco(screen('src/app/finance/goals.tsx', { goals: [metaComMarcos], milestones: { g1: [25000, 50000, 75000] } }));
+  assert.match(com, /Próximo marco: R\$ 500\.00 · faltam R\$ 200\.00/);
+  assert.doesNotMatch(linhaDoMarco(screen('src/app/finance/goals.tsx', { goals: [metaComMarcos] })), /marco/i, 'meta sem marcos não tem a linha');
+  assert.doesNotMatch(linhaDoMarco(screen('src/app/finance/goals.tsx', { goals: [metaComMarcos], milestones: { g1: [25000] }, concealed: true })), /marco/i, 'valores ocultos');
+  const todos = linhaDoMarco(screen('src/app/finance/goals.tsx', { goals: [{ ...metaComMarcos, saved_cents: 80000 }], milestones: { g1: [25000, 50000, 75000] } }));
+  assert.match(todos, /Faltam R\$ 200\.00 para o alvo/);
+});
+
+test('Metas: o anel recebe ícone, cor, marcos e o que falta para decidir a celebração', () => {
+  const ui = screen('src/app/finance/goals.tsx', { goals: [{ ...metaComMarcos, icon: 'airplane', color: 'oceano' }], milestones: { g1: [25000] } });
+  const anel = ui.nodes().find((n: any) => n.type === 'AnelDaMeta');
+  assert.ok(anel, 'o card desenha o anel da meta');
+  assert.equal(anel.props.icon, 'airplane');
+  assert.equal(anel.props.color, 'oceano');
+  assert.deepEqual([...anel.props.marcos], [25000]);
+  assert.equal(anel.props.travessia, null, 'abrir a tela não é uma travessia');
+});
+
+test('Metas: criar com ícone, cor e marcos grava tudo, e o % vira centavos com o alvo final', () => {
+  const ui = screen('src/app/finance/goals.tsx', { goals: [] });
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'HeaderActions').props.actions[0].onPress());
+  const marcos = () => ui.nodes().find((n: any) => n.type === 'MarcosDaMeta');
+  assert.deepEqual(JSON.parse(JSON.stringify(marcos().props.linhas.map((l: any) => l.pct))), ['25', '50', '75'], 'sugestão ao criar');
+  ui.fill('Nome', 'Viagem');
+  ui.fill('Quanto quer juntar', 100001);
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'AparenciaDaMeta').props.onIcon('airplane'));
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'AparenciaDaMeta').props.onColor('oceano'));
+  ui.interact(() => marcos().props.onChange([{ key: 'a', cents: 0, pct: '33,3' }, { key: 'b', cents: 50000, pct: null }]));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'TaskHeader').props.action.props.onPress());
+  const escrita = ui.writes.at(-1);
+  assert.equal(escrita.operation, 'saveGoal');
+  assert.deepEqual(JSON.parse(JSON.stringify(escrita.value)), {
+    name: 'Viagem', target_cents: 100001, deadline: null, icon: 'airplane', color: 'oceano', marcos: [33300, 50000],
+  });
+});
+
+test('Metas: editar com os marcos ainda sem chegar não os mostra nem os envia (não apaga os que existem)', () => {
+  const ui = screen('src/app/finance/goals.tsx', { goals: [metaComMarcos], marcosPendentes: true });
+  const card = deslizaveis(ui)[0];
+  ui.interact(() => card.props.acoes.find((a: any) => a.label === 'Editar').onPress());
+  assert.ok(!ui.nodes().some((n: any) => n.type === 'MarcosDaMeta'), 'sem marcos carregados o formulário não finge uma lista vazia');
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'TaskHeader').props.action.props.onPress());
+  const valor = ui.writes.at(-1).value;
+  assert.equal(valor.id, 'g1');
+  assert.equal(valor.marcos, undefined, 'marcos ausentes = a sincronização não mexe no banco');
+});
+
+test('Metas: marco repetido ou no alvo trava o Salvar e diz por quê', () => {
+  const ui = screen('src/app/finance/goals.tsx', { goals: [] });
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'HeaderActions').props.actions[0].onPress());
+  ui.fill('Nome', 'Viagem');
+  ui.fill('Quanto quer juntar', 100000);
+  const salvar = () => ui.nodes().find((n: any) => n.type === 'TaskHeader').props.action.props;
+  assert.equal(salvar().disabled, false);
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'MarcosDaMeta').props.onChange([{ key: 'a', cents: 25000, pct: null }, { key: 'b', cents: 0, pct: '25' }]));
+  assert.equal(salvar().disabled, true);
+  assert.match(linhaDoMarco(ui), /marco repetido/);
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'MarcosDaMeta').props.onChange([{ key: 'a', cents: 100000, pct: null }]));
+  assert.equal(salvar().disabled, true);
+  assert.match(linhaDoMarco(ui), /abaixo do alvo/);
 });
 
 test('Nota: arrasta Fixar à direita e Arquivar à esquerda (os dois até o fim); o resto no Mais', () => {

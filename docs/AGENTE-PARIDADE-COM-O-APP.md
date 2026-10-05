@@ -653,6 +653,12 @@ promete configuração da reserva pelo WhatsApp antes da implementação/avalia�
 |---|---|
 | Guardar/Retirar com origem: separar na conta, transferir, vincular transferência, liberar, transferir de volta e desfazer (`goal_money_command`) | Lacuna: o agente continua guardando e retirando SEM origem (`goal_deposit`), sem separação por conta e sem transferência. Paridade pendente da etapa final do plano de 22 pontos; nenhuma tool/prompt mudou no F11. |
 
+## Metas: marcos e identidade visual — F19 (05/10/2026)
+
+| app | agente |
+|---|---|
+| Ícone e cor da meta (`goals.icon`/`color`), marcos em valor ou % do alvo (`goal_milestones`, escrita direta com RLS por espaço) e celebração única ao atravessar um marco | Lacuna: o agente não edita marcos, ícone nem cor; a etapa é derivada do ledger (`saved_cents`) e a celebração é só do app (memória no aparelho). Meta criada pelo WhatsApp nasce sem marcos, ícone e cor. |
+
 ## Investimentos: aplicar e resgatar com origem e destino — F12 (04/10/2026)
 
 | app | agente |
