@@ -265,7 +265,7 @@ export function FormularioDoLancamento(props: Props) {
         ? editing.account_id
          : comum.contaId ?? null,
       payment_method: normalizePaymentMethod(editing ? editing.payment_method : comum.paymentMethod),
-      counterparty_account_id: editing?.counterparty_account_id ?? null,
+      counterparty_account_id: editing?.counterparty_account_id ?? (comum.kind === 'transfer' ? comum.contraId ?? null : null),
       // Receita não parcela: a hipótese de entrada abre à vista, com o total.
       installments: (!editing && comum.kind === 'expense' ? parcelas : undefined) ?? 1,
       paid_installments: '0',
@@ -304,7 +304,7 @@ export function FormularioDoLancamento(props: Props) {
   useEffect(() => {
     props.registrarComum(() => {
       const v = getValues();
-      return { kind: v.kind, descricao: v.description, valorCents: v.amount_cents, contaId: v.account_id, dataBR: v.occurred_at, categoria: v.category, ...detalheDaEscrita(v, v.kind), estabelecimento: v.merchant ?? undefined, paymentMethod: v.payment_method, expenseClassification: classification.classification };
+      return { kind: v.kind, descricao: v.description, valorCents: v.amount_cents, contaId: v.account_id, contraId: v.counterparty_account_id, dataBR: v.occurred_at, categoria: v.category, ...detalheDaEscrita(v, v.kind), estabelecimento: v.merchant ?? undefined, paymentMethod: v.payment_method, expenseClassification: classification.classification };
     });
     props.registrarEstado(() => getValues());
   });

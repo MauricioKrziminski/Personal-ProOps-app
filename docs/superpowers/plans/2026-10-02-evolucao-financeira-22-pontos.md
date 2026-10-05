@@ -264,14 +264,16 @@ Aceite no staging em 05/10/2026: [F17](../../qa/2026-10-02-evolucao-financeira/f
 
 ### F18 — Transferência recorrente
 
-- [ ] Incluir encerramento claro para assinaturas e demais séries: manter a regra encerrada consultável, conservar histórico/quitados/vencidos e limpar apenas o futuro pendente atomicamente; testar repetição e fatura parcialmente paga (pedido de 03/10).
+- [x] Incluir encerramento claro para assinaturas e demais séries: manter a regra encerrada consultável, conservar histórico/quitados/vencidos e limpar apenas o futuro pendente atomicamente; testar repetição e fatura parcialmente paga (pedido de 03/10).
 
 Arquivos: tipos comuns/série, CamposDaSerie, scheduler, projeção/ledger, materialização e escopos.
 
-- [ ] RED: origem/destino afetam conta uma vez e consolidado/renda/despesa conservam.
-- [ ] Estender contrato RRULE de dois ids e edição, sem conversão silenciosa de tipo.
-- [ ] Implementar materialização/adopção/skip/projeção e UI existente.
-- [ ] Provar cron repetido/alcances/horizonte/importação e gates nativos F18; registrar aceite.
+- [x] RED: origem/destino afetam conta uma vez e consolidado/renda/despesa conservam.
+- [x] Estender contrato RRULE de dois ids e edição, sem conversão silenciosa de tipo.
+- [x] Implementar materialização/adopção/skip/projeção e UI existente.
+- [x] Provar cron repetido/alcances/horizonte/importação e gates nativos F18; registrar aceite.
+
+Aceite no staging em 05/10/2026: [F18](../../qa/2026-10-02-evolucao-financeira/f18/aceite.md). F19 liberado.
 
 ### F19 — Marcos das metas
 

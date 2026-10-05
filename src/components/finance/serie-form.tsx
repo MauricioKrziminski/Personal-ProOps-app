@@ -21,7 +21,7 @@ import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { QuantityField } from '@/components/ui/quantity-field';
 import { SelectField } from '@/components/ui/select-field';
 import { SwitchRow } from '@/components/ui/switch-row';
-import { brToISO, localISODate } from '@/lib/dates';
+import { brToISO, isValidBRDate, localISODate } from '@/lib/dates';
 import { confirmDestructive } from '@/lib/item-actions';
 import { describeRRule } from '@/lib/rrule-text';
 import { mudaInicioDaSerie, validaSerie, type SerieForm } from '@/lib/serie';
@@ -46,9 +46,16 @@ export function CamposDaSerie({
   onUseCategoryDefaults?: () => void;
   workspaceId?: string;
 }) {
-  const { inicioOk, fimOk, tituloOk, agendaNoPassado, inicioDate } = validaSerie(form);
+  const { inicioOk, fimOk, fimEncerra, tituloOk, agendaNoPassado, inicioDate } = validaSerie(form);
   const origem = contas.find((c) => c.id === form.accountId) ?? null;
-  const erroMetodo = paymentMethodError(form.paymentMethod, origem);
+  const transferencia = form.kind === 'transfer';
+  // A transferência não tem forma de pagamento: ela só move dinheiro entre contas próprias.
+  const erroMetodo = transferencia ? null : paymentMethodError(form.paymentMethod, origem);
+  const mesmaConta = transferencia && Boolean(form.accountId) && form.accountId === form.counterpartyId;
+  // Piso do "Termina em": criando, o início; editando, o INÍCIO ORIGINAL (F18) — o fim antes do
+  // próximo vencimento é encerrar a série, não um erro.
+  const pisoDoFim = form.id && form.inicioOriginal && isValidBRDate(form.inicioOriginal)
+    ? brToISO(form.inicioOriginal) : inicioOk ? brToISO(form.inicio) : undefined;
   const editando = Boolean(form.id);
   const mudaAgenda = (parte: Partial<SerieForm>) => onChange({ ...form, ...parte, agendaMudou: editando || form.agendaMudou });
   const periodo = form.preset === 'weekly' ? 'da semana' : form.preset === 'yearly' ? 'do ano' : 'do mês';
@@ -58,16 +65,22 @@ export function CamposDaSerie({
       <Field label="Tipo">
         {/* A série grava `kind` e as futuras em aberto vão junto. O padrão do "entra como pago"
             só acompanha numa série nova. */}
+        {/* Trocar de/para transferência é conversão (`converter_registro`), nunca troca silenciosa:
+            editando, a transferência fica transferência e gasto/receita não a ganham. */}
         <SelectField
           options={[
-            { id: 'expense', label: 'Gasto', icon: 'arrow.up.right' },
-            { id: 'income', label: 'Receita', icon: 'arrow.down.left' },
+            ...(editando && !transferencia ? [] : [{ id: 'transfer', label: 'Transferência', icon: 'arrow.left.arrow.right' as const }]),
+            ...(editando && transferencia ? [] : [
+              { id: 'expense', label: 'Gasto', icon: 'arrow.up.right' as const },
+              { id: 'income', label: 'Receita', icon: 'arrow.down.left' as const },
+            ]),
           ]}
           value={form.kind}
+          disabled={editando && transferencia}
           placeholder="Escolher o tipo"
           onChange={(id) => {
             if (id === form.kind) return;
-            if (id !== 'expense' && id !== 'income') return;
+            if (id !== 'expense' && id !== 'income' && id !== 'transfer') return;
             const kind = id;
             onChange(editando ? { ...form, kind } : { ...form, kind, autoConfirm: kind !== 'income' });
           }}
@@ -84,6 +97,7 @@ export function CamposDaSerie({
       </Field>
 
       {/* A ordem do formulário de evento: título → estabelecimento → valor (frontend.md). */}
+      <Presenca visivel={!transferencia}>
       <Field label="Estabelecimento">
         <TextField
           value={form.merchant}
@@ -92,11 +106,13 @@ export function CamposDaSerie({
           accessibilityLabel="Estabelecimento"
         />
       </Field>
+      </Presenca>
 
       <Field label="Valor">
         <MoneyField valueCents={form.amountCents} onChangeCents={(amountCents) => onChange({ ...form, amountCents })} />
       </Field>
 
+      <Presenca visivel={!transferencia}>
       <Field label="Categoria">
         <CategoryPicker value={form.category} onChange={(category) => onChange({ ...form, category,
           ...(form.subcategory_id !== undefined ? { subcategory_id: subcategoryAfterParentChange(form.subcategory_id, form.category, category) } : {}),
@@ -104,6 +120,7 @@ export function CamposDaSerie({
       </Field>
       <SubcategoryField parent={form.category} value={form.subcategory_id ?? null} workspaceId={workspaceId} sessionKey={form.id ?? 'new'}
         onChange={subcategory_id => onChange({ ...form, subcategory_id })} />
+      </Presenca>
 
       <Presenca visivel={form.kind === 'expense'}>
         <ExpenseClassificationField value={normalizeExpenseClassification(form.expenseClassification)}
@@ -111,18 +128,33 @@ export function CamposDaSerie({
           onChange={(expenseClassification) => onChange({ ...form, expenseClassification })} />
       </Presenca>
 
-      <PaymentMethodField value={form.paymentMethod} onChange={(paymentMethod) => onChange({ ...form, paymentMethod })} error={!origem ? erroMetodo ?? undefined : undefined} />
+      <Presenca visivel={!transferencia}>
+        <PaymentMethodField value={form.paymentMethod} onChange={(paymentMethod) => onChange({ ...form, paymentMethod })} error={!origem ? erroMetodo ?? undefined : undefined} />
+      </Presenca>
 
-      <Field label="Conta" error={origem ? erroMetodo ?? undefined : undefined} hint={origem && erroMetodo ? `Origem selecionada: ${origem.name}` : undefined}>
+      <Field label={transferencia ? 'Da conta' : 'Conta'} error={origem ? erroMetodo ?? undefined : undefined} hint={origem && erroMetodo ? `Origem selecionada: ${origem.name}` : undefined}>
         <OriginAccountPicker
-          paymentMethod={form.paymentMethod}
-          accounts={paymentMethodAccounts(form.paymentMethod, contas)}
+          paymentMethod={transferencia ? undefined : form.paymentMethod}
+          accounts={transferencia ? contas : paymentMethodAccounts(form.paymentMethod, contas)}
           value={form.accountId}
           selectedAccount={origem}
           onChange={(accountId: string | null) => onChange({ ...form, accountId })}
-          emptyLabel="Não informar"
+          emptyLabel={transferencia ? undefined : 'Não informar'}
+          placeholder={transferencia ? 'Escolher a conta de origem' : undefined}
         />
       </Field>
+
+      {/* Logo depois da origem. O destino nunca é cartão, e a origem não se repete nele. */}
+      <Presenca visivel={transferencia}>
+        <Field label="Para a conta" error={mesmaConta ? 'Origem e destino precisam ser diferentes' : undefined}>
+          <OriginAccountPicker
+            accounts={contas.filter((c) => c.type !== 'credit_card' && c.id !== form.accountId)}
+            value={form.counterpartyId ?? null}
+            onChange={(counterpartyId: string | null) => onChange({ ...form, counterpartyId })}
+            placeholder="Escolher a conta de destino"
+          />
+        </Field>
+      </Presenca>
 
       <Presenca visivel={Boolean(form.regraPropria)}>
         {/* Regra que o app não sabe desenhar: por extenso, e trocar é um toque consciente — a
@@ -214,13 +246,16 @@ export function CamposDaSerie({
         assim 'Termina em'? Se é recorrente não termina"* (09/09/2026). Ele diz o que o vazio
         SIGNIFICA: a série sem fim é o caso normal.
       */}
-      <Field label="Termina em" error={form.fim && !fimOk ? 'Informe data válida igual ou posterior ao início' : undefined}>
+      <Field
+        label="Termina em"
+        hint={fimEncerra ? 'Antes do próximo vencimento: encerra a série e tira as cobranças futuras.' : undefined}
+        error={form.fim && !fimOk ? 'Informe data válida igual ou posterior ao início' : undefined}>
         <DatePickerField
           value={form.fim}
           onChange={(fim) => onChange({ ...form, fim })}
           placeholder="Sem fim"
           accessibilityLabel="Data em que a série termina"
-          min={inicioOk ? brToISO(form.inicio) : undefined}
+          min={pisoDoFim}
           invalid={Boolean(form.fim) && !fimOk}
         />
       </Field>
@@ -228,7 +263,7 @@ export function CamposDaSerie({
       {/* Receita e despesa não falam a mesma língua: ninguém "paga" um salário que vai receber. E o
           padrão inverte — receita nova nasce DESLIGADA (`SERIE_VAZIA` e o `20260909110000`). */}
       <SwitchRow
-        label={form.kind === 'income' ? 'Entra como recebido na data' : 'Entra como pago na data'}
+        label={form.kind === 'income' ? 'Entra como recebido na data' : transferencia ? 'Entra como feita na data' : 'Entra como pago na data'}
         value={form.autoConfirm}
         onValueChange={(autoConfirm) => onChange({ ...form, autoConfirm })}
       />

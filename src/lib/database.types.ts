@@ -2553,6 +2553,7 @@ export type Database = {
           amount_cents: number
           auto_confirm: boolean
           category: string | null
+          counterparty_account_id: string | null
           created_at: string
           currency: string
           description: string | null
@@ -2584,6 +2585,7 @@ export type Database = {
           amount_cents: number
           auto_confirm?: boolean
           category?: string | null
+          counterparty_account_id?: string | null
           created_at?: string
           currency?: string
           description?: string | null
@@ -2615,6 +2617,7 @@ export type Database = {
           amount_cents?: number
           auto_confirm?: boolean
           category?: string | null
+          counterparty_account_id?: string | null
           created_at?: string
           currency?: string
           description?: string | null
@@ -2644,6 +2647,13 @@ export type Database = {
           {
             foreignKeyName: "recurring_transactions_account_id_fkey"
             columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_transactions_counterparty_account_id_fkey"
+            columns: ["counterparty_account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]
@@ -4074,6 +4084,18 @@ export type Database = {
         Args: { p_as_of?: string; p_workspace_id?: string }
         Returns: Json
       }
+      end_recurring_series: {
+        Args: {
+          p_last_date: string
+          p_recurring_id: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
+      end_recurring_series_preview: {
+        Args: { p_last_date: string; p_recurring_id: string }
+        Returns: Json
+      }
       expected_recurring_occurrences: {
         Args: { p_from: string; p_recurring_id?: string; p_to: string }
         Returns: {
@@ -4302,6 +4324,32 @@ export type Database = {
           payment_method: string
           ref_id: string
           status: string
+        }[]
+      }
+      ledger_expected_lines_transfer: {
+        Args: { p_from: string; p_recurring_id?: string; p_to: string }
+        Returns: {
+          account_id: string
+          amount_cents: number
+          category: string
+          counterparty_account_id: string
+          description: string
+          due_date: string
+          expense_necessity: string
+          expense_necessity_source: string
+          expense_pattern: string
+          expense_pattern_source: string
+          inferred_start: boolean
+          installment_no: number
+          installments_total: number
+          kind: string
+          origin: string
+          payment_method: string
+          ref_id: string
+          status: string
+          subcategory_id: string
+          subcategory_name: string
+          workspace_id: string
         }[]
       }
       materialize_recurring_occurrence: {

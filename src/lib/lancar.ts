@@ -15,6 +15,8 @@ export type Comum = {
   descricao: string;
   valorCents: number;
   contaId: string | null;
+  /** Só na transferência: a conta de destino, que viaja entre "Uma vez" e "Recorrente". */
+  contraId?: string | null;
   dataBR: string;
   categoria: string | null;
   subcategory_id?: string | null;
@@ -52,8 +54,9 @@ export function comumDepoisDeSalvar(c: Comum): Comum {
   return { ...fica, ...(Object.hasOwn(c, 'subcategory_id') ? { subcategory_id: null } : {}), descricao: '', valorCents: 0, categoria: null };
 }
 
+/** A transferência continua transferência na série (F18): nunca vira gasto em silêncio. */
 export function comumParaSerie(c: Comum): Comum {
-  return { ...c, ...detalheDaEscrita(c, c.kind), kind: c.kind === 'transfer' ? 'expense' : c.kind };
+  return { ...c, ...detalheDaEscrita(c, c.kind), ...(c.kind === 'transfer' ? { categoria: null } : {}) };
 }
 
 export function hrefDoLancar(tipo: TipoDeLancamento, extra: Record<string, string> = {}) {

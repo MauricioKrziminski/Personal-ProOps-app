@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import type { CorpoProps } from '@/components/finance/corpo-do-lancar';
 import { ErrorCard } from '@/components/error-card';
+import { useBRL } from '@/components/ui/conceal';
 import { CamposDaSerie } from '@/components/finance/serie-form';
 import { FinanceWritePreview } from '@/components/finance/finance-write-preview';
 import { escritaDaRecorrente } from '@/lib/finance-write-input';
@@ -16,6 +17,9 @@ import { Space } from '@/design/tokens';
 import {
   useAccounts,
   useCreateRecurring,
+  useEndRecurring,
+  usePreviewEndRecurring,
+  useRecurringFirstDate,
   useRecurringTransactions,
   useSaveRecurringAll,
   useSaveRecurringSeries,
@@ -25,12 +29,14 @@ import { useRascunho } from '@/hooks/use-rascunho';
 import { newClientMessageId } from '@/lib/agent-chat';
 import { brToISO } from '@/lib/dates';
 import { askEditScope } from '@/lib/edit-scope';
+import { confirmDestructive } from '@/lib/item-actions';
+import { fraseDoEncerramento } from '@/lib/encerrar-serie';
 import { linhaDaRecorrente, detalheDaEscrita, mudancaDoDetalhe, type EntradaRecorrente } from '@/lib/escrita';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { normalizePaymentMethod, paymentMethodError } from '@/lib/payment-method';
 import { comumParaSerie } from '@/lib/lancar';
 import { estadoDaRecorrencia } from '@/lib/recurring-state';
-import { SERIE_VAZIA, serieDoRegistro, validaSerie, type SerieForm } from '@/lib/serie';
+import { SERIE_VAZIA, pisoDoInicio, serieDoRegistro, validaSerie, type SerieForm } from '@/lib/serie';
 import { useExpenseClassificationDraft } from '@/hooks/use-expense-classification';
 import { expenseClassificationFromRecord, expenseClassificationPatch } from '@/lib/expense-classification';
 
@@ -99,6 +105,9 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
   const create = useCreateRecurring();
   const editar = useSaveRecurringSeries();
   const editarTudo = useSaveRecurringAll();
+  const brl = useBRL();
+  const previaDoFim = usePreviewEndRecurring();
+  const encerrar = useEndRecurring();
   const tentativaTudo = useRef<{ key: string; id: string } | null>(null);
   const tentativaFuturo = useRef<{ key: string; id: string } | null>(null);
   /** `deHipotese`: aberta pelo "Aplicar" do "E se…?" — criar tira aquela hipótese do rascunho. */
@@ -130,7 +139,8 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
     return {
       form: {
         ...SERIE_VAZIA,
-        kind: c.kind === 'income' ? 'income' : 'expense',
+        kind: c.kind,
+        counterpartyId: c.kind === 'transfer' ? c.contraId ?? null : null,
         preset: props.preset ?? SERIE_VAZIA.preset,
         amountCents: c.valorCents,
         description: c.descricao,
@@ -144,7 +154,10 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
       },
     };
   });
-  const { form, baseline } = estado;
+  const { form: formBase, baseline } = estado;
+  // O piso do "Termina em" inclui a primeira ocorrência gravada (o calendário reescreve o `dtstart`).
+  const primeira = useRecurringFirstDate(formBase.id ?? null);
+  const form = formBase.id ? { ...formBase, inicioOriginal: pisoDoInicio(formBase.inicioOriginal, primeira.data) } : formBase;
   const setForm = (form: SerieForm) => setEstado((anterior) => ({ ...anterior, form }));
 
   const classification = useExpenseClassificationDraft(form.expenseClassification, form.category, form.kind,
@@ -152,13 +165,14 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
   const resolvedForm = { ...form, expenseClassification: classification.classification };
 
   useEffect(() => {
-    registrarComum(() => ({ kind: form.kind, descricao: form.description, valorCents: form.amountCents, contaId: form.accountId, dataBR: form.inicio, categoria: form.category, ...detalheDaEscrita(form), estabelecimento: form.merchant, paymentMethod: form.paymentMethod, expenseClassification: classification.classification }));
+    registrarComum(() => ({ kind: form.kind, descricao: form.description, valorCents: form.amountCents, contaId: form.accountId, contraId: form.counterpartyId, dataBR: form.inicio, categoria: form.category, ...detalheDaEscrita(form), estabelecimento: form.merchant, paymentMethod: form.paymentMethod, expenseClassification: classification.classification }));
     registrarEstado(() => estado);
   });
 
-  const { inicioDate, agendaNoPassado, podeSalvar: basicoPodeSalvar, rrulePrevia } = validaSerie(form);
+  const { inicioDate, agendaNoPassado, fimEncerra, podeSalvar: basicoPodeSalvar, rrulePrevia } = validaSerie(form);
+  const transferencia = form.kind === 'transfer';
 
-  const erroMetodo = paymentMethodError(form.paymentMethod, (accounts.data ?? []).find((c) => c.id === form.accountId) ?? null);
+  const erroMetodo = transferencia ? null : paymentMethodError(form.paymentMethod, (accounts.data ?? []).find((c) => c.id === form.accountId) ?? null);
   const podeSalvar = basicoPodeSalvar && !erroMetodo && classification.ready
     && (Boolean(editandoId || form.id) || !classification.isError);
 
@@ -166,17 +180,41 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
     kind: form.kind,
     amount_cents: form.amountCents,
     description: form.description.trim(),
-    merchant: form.merchant.trim() || null,
-    category: form.category,
-    ...detalheDaEscrita(form),
+    merchant: transferencia ? null : form.merchant.trim() || null,
+    category: transferencia ? null : form.category,
+    ...detalheDaEscrita(form, form.kind),
     account_id: form.accountId,
-    ...(form.paymentMethod !== undefined ? { payment_method: form.paymentMethod } : {}),
+    ...(transferencia ? { counterparty_account_id: form.counterpartyId } : {}),
+    ...(form.paymentMethod !== undefined && !transferencia ? { payment_method: form.paymentMethod } : {}),
     rrule: rrulePrevia,
     next_run_at: inicioDate.toISOString(),
     end_date: form.fim ? brToISO(form.fim) : null,
     auto_confirm: form.autoConfirm,
     ...classification.classification,
   } : null;
+
+  /**
+   * Fim antes do próximo vencimento = encerrar (F18): a prévia diz o que fica e o que sai e, na
+   * confirmação, `end_recurring_series` faz o fim e a limpeza juntos (a mesma conta do "Encerrar"
+   * da lista). Editar o fim NÃO passa pelo patch da série nesse caso.
+   */
+  const confirmarEncerramento = (lastDate: string) => {
+    previaDoFim.mutate({ id: form.id!, lastDate }, {
+      onSuccess: (previa) => confirmDestructive(
+        'Encerrar a série?',
+        'Encerrar',
+        () => encerrar.mutate({ id: form.id!, lastDate }, {
+          onSuccess: () => {
+            toast({ message: 'Série encerrada.', tone: 'success' });
+            onFechar();
+          },
+          onError: (erro) => toast({ message: financeErrorMessage(erro, 'Não deu para encerrar a série.'), tone: 'error' }),
+        }),
+        fraseDoEncerramento(previa, brl),
+      ),
+      onError: (erro) => toast({ message: financeErrorMessage(erro, 'Não deu para conferir o encerramento.'), tone: 'error' }),
+    });
+  };
 
   const salvar = (criarOutro: boolean) => {
     if (salvarBloqueadoAtual.current || !podeSalvar) return;
@@ -190,19 +228,24 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
       const antes = baseline;
       const patch: Parameters<typeof editar.mutate>[0]['patch'] = {};
       if (!antes || form.amountCents !== Number(antes.amount_cents)) patch.amount_cents = form.amountCents;
-      if (!antes || form.category !== antes.category) patch.category = form.category;
-      Object.assign(patch, mudancaDoDetalhe(antes ?? {}, form, antes?.category ?? null, form.category));
+      // Transferência: sem categoria, forma de pagamento nem classificação.
+      if (!transferencia && (!antes || form.category !== antes.category)) patch.category = form.category;
+      if (!transferencia) Object.assign(patch, mudancaDoDetalhe(antes ?? {}, form, antes?.category ?? null, form.category));
       const desc = form.description.trim();
       if (!antes || desc !== antes.description) patch.description = desc;
       if (!antes || form.accountId !== antes.account_id) patch.account_id = form.accountId;
-      if (form.paymentMethod !== undefined && (!antes || form.paymentMethod !== normalizePaymentMethod(antes.payment_method))) patch.payment_method = form.paymentMethod;
+      if (!transferencia && form.paymentMethod !== undefined && (!antes || form.paymentMethod !== normalizePaymentMethod(antes.payment_method))) patch.payment_method = form.paymentMethod;
       if (!antes || form.autoConfirm !== antes.auto_confirm) patch.auto_confirm = form.autoConfirm;
       const fim = form.fim ? brToISO(form.fim) : null;
       if (!antes || fim !== antes.end_date) patch.end_date = fim;
       const merchant = form.merchant.trim() || null;
-      if (!antes || merchant !== (antes.merchant ?? null)) patch.merchant = merchant;
-      if (!antes || form.kind !== antes.kind) patch.kind = form.kind;
-      const classificationPatch = expenseClassificationPatch(expenseClassificationFromRecord(antes), classification.classification);
+      if (!transferencia && (!antes || merchant !== (antes.merchant ?? null))) patch.merchant = merchant;
+      // Trocar de/para transferência é conversão (`converter_registro`): o patch nunca leva o tipo dela.
+      if (form.kind !== 'transfer' && antes?.kind !== 'transfer' && (!antes || form.kind !== antes.kind)) patch.kind = form.kind;
+      if (transferencia && (form.counterpartyId ?? null) !== (antes?.counterparty_account_id ?? null)) {
+        patch.counterparty_account_id = form.counterpartyId ?? null;
+      }
+      const classificationPatch = transferencia ? {} : expenseClassificationPatch(expenseClassificationFromRecord(antes), classification.classification);
       Object.assign(patch, classificationPatch);
       if (form.agendaMudou) {
         if (!inicioDate || !rrulePrevia || agendaNoPassado) return;
@@ -224,9 +267,16 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
         "Todas". O "Só esta" mexia na próxima ocorrência gravada, que ninguém abriu — uma
         ocorrência se edita pelo lançamento dela, em Lançamentos ou em "Ver ocorrências".
       */
+      // Fim que encerra: o fim e a limpeza das futuras são do `end_recurring_series`, depois do resto.
+      let encerrarDepois: (() => void) | null = null;
+      if (fimEncerra && fim && fim !== (antes?.end_date ?? null)) {
+        delete patch.end_date;
+        encerrarDepois = () => confirmarEncerramento(fim);
+      }
+      const concluir = () => (encerrarDepois ? encerrarDepois() : onFechar());
       if (Object.keys(patch).length === 0) {
-        // nada mudou: nada a perguntar
-        onFechar();
+        // nada mudou além do fim (ou nada): sem pergunta de alcance
+        concluir();
         return;
       }
       askEditScope('occurrence', async (scope) => {
@@ -247,7 +297,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
             onSuccess: () => {
               tentativaTudo.current = null;
               toast({ message: 'Série e ocorrências gravadas alteradas.', tone: 'success' });
-              onFechar();
+              concluir();
             },
             onError: (saveError) => toast({ message: financeErrorMessage(saveError, 'Não deu para alterar todas as ocorrências.'), tone: 'error' }),
           });
@@ -272,7 +322,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
                 : 'Série alterada.'),
               tone: 'success',
             });
-            onFechar();
+            concluir();
           },
           onError: (saveError) => toast({ message: financeErrorMessage(saveError, 'Não deu para alterar a série.'), tone: 'error' }),
         });
@@ -303,7 +353,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
     );
   };
 
-  const salvando = props.salvando || create.isPending || editar.isPending || editarTudo.isPending;
+  const salvando = props.salvando || create.isPending || editar.isPending || editarTudo.isPending || previaDoFim.isPending || encerrar.isPending;
 
   return (
     <>
@@ -327,7 +377,8 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
             classificationDefaults={classification.defaults}
             onUseCategoryDefaults={classification.defaults ? () => setForm({ ...form, expenseClassification: classification.adoptCategoryDefaults() }) : undefined} />
           {classification.isError ? <ErrorCard onRetry={() => void classification.refetch()} /> : null}
-          <FinanceWritePreview accounts={accounts.data ?? []} write={creationInput && !editandoId && !form.id && !converter
+          {/* A prévia de efeito ainda não conhece a transferência recorrente: ela só aparece nas outras. */}
+          <FinanceWritePreview accounts={accounts.data ?? []} write={creationInput && !transferencia && !editandoId && !form.id && !converter
             && !props.salvarBloqueado && !salvando && !accounts.isError && !accounts.isPending ? escritaDaRecorrente(creationInput) : null} />
           {!editandoId && !converter ? (
             <Button

@@ -980,7 +980,9 @@ export default function TransactionsScreen() {
                   <LinhaPrevista
                     line={line}
                     hoje={hoje}
-                    conta={line.account_id ? accountName.get(line.account_id) : undefined}
+                    conta={line.kind === 'transfer' && line.account_id && line.counterparty_account_id
+                      ? `${accountName.get(line.account_id) ?? ''} → ${accountName.get(line.counterparty_account_id) ?? ''}`
+                      : line.account_id ? accountName.get(line.account_id) : undefined}
                     acoes={previstas.acoes(line)}
                     onAbrir={() => { void previstas.abrir(line); }}
                   />

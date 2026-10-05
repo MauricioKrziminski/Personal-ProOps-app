@@ -31,12 +31,14 @@ export type EntradaParcelada = Partial<ExpenseClassification> & {
 export type EntradaRecorrente = Partial<ExpenseClassification> & {
   subcategory_id?: string | null;
   payment_method?: PaymentMethod | null;
-  kind: 'expense' | 'income';
+  kind: 'expense' | 'income' | 'transfer';
   amount_cents: number;
   description: string | null;
   merchant: string | null;
   category: string | null;
   account_id: string | null;
+  /** Só na transferência (F18): a conta de destino; as duas, diferentes, são o contrato. */
+  counterparty_account_id?: string | null;
   rrule: string;
   next_run_at: string;
   end_date: string | null;
@@ -163,6 +165,13 @@ export function argsDaParcelada(e: EntradaParcelada) {
 
 export function linhaDaRecorrente(e: EntradaRecorrente): Record<string, unknown> {
   assertPaymentMethod(e.payment_method);
+  if (e.kind === 'transfer') {
+    if (!e.account_id || !e.counterparty_account_id || e.account_id === e.counterparty_account_id)
+      throw new Error('Escolha duas contas diferentes: de onde sai e para onde vai.');
+    // Transferência: sem categoria, estabelecimento nem forma de pagamento — só move dinheiro.
+    const { payment_method: _forma, ...resto } = e;
+    return { ...resto, category: null, merchant: null, ...detalheDaEscrita(e, e.kind), ...classificacaoDaEscrita(e, e.kind), dtstart: e.next_run_at };
+  }
   // âncora da série: sem ela a hora de parede deriva a cada rodada do cron
   return { ...e, ...detalheDaEscrita(e, e.kind), ...classificacaoDaEscrita(e, e.kind), dtstart: e.next_run_at };
 }

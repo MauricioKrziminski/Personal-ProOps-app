@@ -41,8 +41,8 @@ Esses fatos e a abertura do formulário ainda não equivalem ao aceite funcional
 | F15 | Explicação de mudanças | Aceito; limites no registro | Validado 6/6 | Validado 5/5 |
 | F16 | Voz contextual | Aceito; limites no registro | Validado 9/9 (voz real) | Validado 8/8 (texto) |
 | F17 | Ajuda e avisos | Aceito; limites no registro | Validado | Validado |
-| F18 | Transferência recorrente | Próximo incremento, F17 aceito | Não validado | Não validado |
-| F19 | Marcos nas metas | Aguardando F18 | Não validado | Não validado |
+| F18 | Transferência recorrente | Aceito; limites no registro | Validado 6/6 | Validado 5/5 |
+| F19 | Marcos nas metas | Próximo incremento, F18 aceito | Não validado | Não validado |
 | F20 | Acumulação/renda futura | Aguardando F19 | Não validado | Não validado |
 | F21 | Primeiro cadastro guiado | Aguardando F20 | Não validado | Não validado |
 | F22 | Favoritos/duplicação | Aguardando F21 | Não validado | Não validado |
@@ -318,4 +318,13 @@ lançamentos de QA apagados por ID. F17 liberado.
 `20261005150000_explicacoes.sql` (janela da saúde financeira), só no staging; agente com os alvos
 `invoice`/`transaction` deployado no staging. (i) com o período real em oito indicadores, item
 inexistente com "Isto não existe mais". Suíte SQL inteira verde fora as três ambientais. F18
+liberado.
+
+## F18 — encerrar série e transferência recorrente
+
+[Aceite e limites](f18/aceite.md) e [contrato](f18/contrato.md). Migration
+`20261005160000_recurring_transfers_and_end.sql` (renomeada na integração; a revisão achou um
+defeito alto e três médios, corrigidos antes do push), agente com o agendador deployado no
+staging. Encerrar a assinatura mantém o pago e tira só o futuro em aberto; transferência
+recorrente entre contas próprias. iOS 6/6 e Android 5/5; séries de QA apagadas por ID. F19
 liberado.

@@ -126,6 +126,7 @@ async def reparar_gemeas() -> int:
           on o.workspace_id = g.workspace_id and o.recurring_id is null and o.source = 'recurring'
          and o.kind = g.kind and o.amount_cents = g.amount_cents and o.status = g.status
          and o.account_id is not distinct from g.account_id and o.occurred_at = g.occurred_at
+         and o.counterparty_account_id is not distinct from g.counterparty_account_id
          and extensions.unaccent(lower(coalesce(o.description, '')))
              = extensions.unaccent(lower(coalesce(g.description, '')))
          and o.created_at < g.created_at
@@ -174,6 +175,9 @@ async def _materialize_occurrence(rec, dia: str, ja_aconteceu: bool) -> dict:
             case when v.recurring_id is not null then v.category else r.category end as occurrence_category,
             case when v.recurring_id is not null then v.description else r.description end as occurrence_description,
             case when v.recurring_id is not null then v.account_id else r.account_id end as occurrence_account,
+            -- só a transferência tem destino; a versão sem a coluna preenchida cai na série
+            case when (case when v.recurring_id is not null then v.kind else r.kind end) = 'transfer'
+                 then coalesce(v.counterparty_account_id, r.counterparty_account_id) end as occurrence_counterparty,
             private.payment_method_at(r.id,i.day) as occurrence_method,
             private.recurring_subcategory_at(r.id,i.day) as occurrence_child
           from locked_series r cross join input i
@@ -187,6 +191,7 @@ async def _materialize_occurrence(rec, dia: str, ja_aconteceu: bool) -> dict:
           select t.id from public.transactions t join dated d on t.workspace_id=d.workspace_id
           where d.past and t.recurring_id is null and t.kind=d.occurrence_kind
             and t.amount_cents=d.occurrence_amount and t.account_id is not distinct from d.occurrence_account
+            and t.counterparty_account_id is not distinct from d.occurrence_counterparty
             and t.occurred_at=d.day
             and extensions.unaccent(lower(coalesce(t.description,'')))
                 =extensions.unaccent(lower(coalesce(d.occurrence_description,'')))
@@ -202,9 +207,9 @@ async def _materialize_occurrence(rec, dia: str, ja_aconteceu: bool) -> dict:
         ), inserted as (
           insert into public.transactions
             (user_id,workspace_id,kind,amount_cents,currency,category,description,merchant,account_id,
-             occurred_at,due_at,source,status,recurring_id,auto_confirm,payment_method,subcategory_id,subcategory_snapshot_set)
+             counterparty_account_id,occurred_at,due_at,source,status,recurring_id,auto_confirm,payment_method,subcategory_id,subcategory_snapshot_set)
           select d.user_id,d.workspace_id,d.occurrence_kind,d.occurrence_amount,d.currency,d.occurrence_category,
-            d.occurrence_description,d.merchant,d.occurrence_account,d.day,d.day,'recurring',
+            d.occurrence_description,d.merchant,d.occurrence_account,d.occurrence_counterparty,d.day,d.day,'recurring',
             case when d.past and d.auto_confirm then 'cleared' else 'pending' end,
             d.id,d.auto_confirm,d.occurrence_method,d.occurrence_child,true
           from dated d where not exists(select 1 from adopted)
@@ -266,6 +271,8 @@ async def materialize_horizon(agora, so_novas: bool = False, workspace_id=None) 
           and (r.end_date is null or r.end_date >= %s)
           and (%s::uuid is null or r.workspace_id = %s::uuid)
           and (not %s or r.materialized_until is null)
+          -- transferência antiga sem destino não gera nada: a tela pede o destino antes
+          and not (r.kind = 'transfer' and r.counterparty_account_id is null)
         order by r.materialized_until asc nulls first
         limit %s
         """,

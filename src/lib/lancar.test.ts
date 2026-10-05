@@ -62,9 +62,13 @@ test('"Salvar e criar outro" mantém tipo, conta e data, e limpa o resto', () =>
   assert.deepEqual(comumDepoisDeSalvar({ ...c, estabelecimento: 'Padaria' }), comumDepoisDeSalvar(c), 'o estabelecimento também sai');
 });
 
-test('transferência não existe na recorrente: vira gasto', () => {
-  assert.equal(comumParaSerie(c).kind, 'expense');
+test('F18: a transferência continua transferência na série, sem categoria, com o destino', () => {
+  const t = comumParaSerie({ ...c, contraId: 'poupanca' });
+  assert.equal(t.kind, 'transfer');
+  assert.equal(t.categoria, null);
+  assert.equal(t.contraId, 'poupanca');
   assert.equal(comumParaSerie({ ...c, kind: 'income' }).kind, 'income');
+  assert.equal(comumParaSerie({ ...c, kind: 'expense' }).categoria, 'moradia');
 });
 
 test('o seletor tem três opções e o link carrega o tipo', () => {

@@ -688,3 +688,9 @@ promete configuração da reserva pelo WhatsApp antes da implementação/avalia�
 | app | agente |
 |---|---|
 | "Como é calculado" (i) em saúde financeira, reserva, orçamentos, projeção e investimentos; toque no aviso de fatura/conta abre a fatura/o lançamento (alvos `invoice` e `transaction`); item apagado mostra "Isto não existe mais" | Sem equivalente por desenho: é leitura e navegação do app. O agente continua respondendo o número; o alerta no WhatsApp não muda (só o push ganhou o alvo de item). |
+
+## Recorrente: transferência entre contas e encerrar série — F18 (05/10/2026)
+
+| app | agente |
+|---|---|
+| Recorrente do tipo Transferência (origem, destino, valor, calendário e fim; editar só esta, esta e as próximas ou todas) e **Encerrar** série com prévia do que fica e do que sai (`end_recurring_series`, `end_recurring_series_preview`), mais Reabrir (tirar o fim) | Lacuna: o agente não cria série de transferência (a tool de recorrência segue só gasto/receita) nem encerra série — "cancela a assinatura" continua sendo apagar ou pausar. Paridade pendente da etapa final do plano de 22 pontos; nenhuma tool/prompt mudou no F18. |

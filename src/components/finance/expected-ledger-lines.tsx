@@ -21,7 +21,7 @@ function origemDaPrevista(line: ExpectedLedgerLine): string {
   const parcela = line.installment_no
     ? `parcela ${line.installment_no}${line.installments_total ? `/${line.installments_total}` : ''}`
     : null;
-  return line.origin === 'debt_schedule' ? (parcela ?? 'parcela do contrato') : 'recorrente';
+  return line.origin === 'debt_schedule' ? (parcela ?? 'parcela do contrato') : line.kind === 'transfer' ? 'transferência recorrente' : 'recorrente';
 }
 
 /**
@@ -131,6 +131,7 @@ export function useAcoesDaPrevista({ month, pagar }: { month: string; pagar: (tx
 export function LinhaPrevista({ line, hoje, conta, acoes, onAbrir }: {
   line: ExpectedLedgerLine;
   hoje: string;
+  /** Na transferência, "origem → destino" (montado por quem tem o nome das contas). */
   conta?: string;
   acoes: ItemAction[];
   onAbrir: () => void;
@@ -152,7 +153,7 @@ export function LinhaPrevista({ line, hoje, conta, acoes, onAbrir }: {
         subtitle={subtitulo}
         icon={aparencia.icon}
         tinta={aparencia.cor}
-        accessibilityLabel={`${line.description}, ${brl(line.amount_cents)}, ${line.kind === 'income' ? 'receita' : 'despesa'}, ${origemDaPrevista(line)}${detail ? `, ${detail}` : ''}${estado ? `, ${estado}` : ''}`}
+        accessibilityLabel={`${line.description}, ${brl(line.amount_cents)}, ${line.kind === 'income' ? 'receita' : line.kind === 'transfer' ? 'transferência' : 'despesa'}, ${origemDaPrevista(line)}${detail ? `, ${detail}` : ''}${estado ? `, ${estado}` : ''}`}
         onPress={onAbrir}
         onLongPress={() => showItemActions(line.description, acoes)}
         trailing={
@@ -160,7 +161,7 @@ export function LinhaPrevista({ line, hoje, conta, acoes, onAbrir }: {
             cents={line.kind === 'expense' ? -line.amount_cents : line.amount_cents}
             variant="ticker"
             tone={line.kind === 'income' ? 'success' : 'text'}
-            signed
+            signed={line.kind !== 'transfer'}
           />
         }
       />

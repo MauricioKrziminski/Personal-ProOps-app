@@ -27,7 +27,16 @@ export interface SerieForm {
    * toque consciente ("Substituir"). Mostrar "Mensal" para uma regra diária mentiria.
    */
   regraPropria?: string;
-  kind: 'expense' | 'income';
+  /** `transfer`: origem em `accountId`, destino em `counterpartyId` (sem categoria nem forma de pagamento). */
+  kind: 'expense' | 'income' | 'transfer';
+  /** Só na transferência: a conta para onde vai. */
+  counterpartyId?: string | null;
+  /**
+   * O início ORIGINAL da série (`dtstart`, dd/mm/aaaa) — só quando ela já existe. `inicio` é o próximo
+   * vencimento (é ele que o calendário edita); o piso de "Termina em" é este, senão uma assinatura
+   * cujo próximo vencimento é no mês seguinte não poderia ser encerrada hoje.
+   */
+  inicioOriginal?: string;
   amountCents: number;
   description: string;
   /** Opcional, como no lançamento: nem toda conta fixa tem um estabelecimento. */
@@ -74,9 +83,11 @@ export interface SerieGravada extends Partial<ExpenseClassification> {
   category: string | null;
   subcategory_id?: string | null;
   account_id: string | null;
+  counterparty_account_id?: string | null;
   payment_method?: PaymentMethod | null;
   rrule: string;
   next_run_at: string;
+  dtstart?: string | null;
   end_date: string | null;
   auto_confirm: boolean;
 }
@@ -116,7 +127,9 @@ export function regraDoApp(rrule: string): boolean {
 export function serieDoRegistro(r: SerieGravada): SerieForm {
   return {
     id: r.id,
-    kind: r.kind === 'income' ? 'income' : 'expense',
+    kind: r.kind === 'income' ? 'income' : r.kind === 'transfer' ? 'transfer' : 'expense',
+    counterpartyId: r.counterparty_account_id ?? null,
+    ...(r.dtstart ? { inicioOriginal: isoToBR(dataLocalDe(r.dtstart)) } : {}),
     amountCents: Number(r.amount_cents),
     description: r.description ?? '',
     merchant: r.merchant ?? '',
@@ -135,6 +148,18 @@ export function serieDoRegistro(r: SerieGravada): SerieForm {
   };
 }
 
+/**
+ * O início ORIGINAL de uma série (dd/mm/aaaa): o menor entre o `dtstart` — que a edição de
+ * calendário reescreve — e a primeira ocorrência já gravada. O banco usa a mesma régua (e também a
+ * primeira versão da regra) ao recusar um encerramento antes do início.
+ */
+export function pisoDoInicio(inicioOriginalBR: string | undefined, primeiraOcorrenciaISO: string | null | undefined): string | undefined {
+  if (!primeiraOcorrenciaISO) return inicioOriginalBR;
+  const primeira = isoToBR(primeiraOcorrenciaISO);
+  if (!inicioOriginalBR || !isValidBRDate(inicioOriginalBR)) return primeira;
+  return primeiraOcorrenciaISO < brToISO(inicioOriginalBR) ? primeira : inicioOriginalBR;
+}
+
 export const SERIE_VAZIA: SerieForm = {
   kind: 'expense',
   amountCents: 0,
@@ -142,6 +167,7 @@ export const SERIE_VAZIA: SerieForm = {
   merchant: '',
   category: null,
   accountId: null,
+  counterpartyId: null,
   preset: 'monthly',
   intervalo: '1',
   inicio: isoToBR(localISODate()),
@@ -153,9 +179,19 @@ export const SERIE_VAZIA: SerieForm = {
 export function validaSerie(form: SerieForm | null) {
   const inicioDate = form ? localDateTime(form.inicio, '09:00') : null;
   const inicioOk = Boolean(form && isValidBRDate(form.inicio) && inicioDate);
+  // Criando, o fim vale a partir do início; editando, a partir do INÍCIO ORIGINAL da série: o fim
+  // antes do próximo vencimento é encerramento (a limpeza das futuras é a de `end_recurring_series`).
+  const pisoDoFim = form?.id && form.inicioOriginal && isValidBRDate(form.inicioOriginal) ? form.inicioOriginal : form?.inicio;
   const fimOk = form
-    ? form.fim === '' || (isValidBRDate(form.fim) && inicioOk && brToISO(form.fim) >= brToISO(form.inicio))
+    ? form.fim === '' || (isValidBRDate(form.fim) && Boolean(pisoDoFim) && isValidBRDate(pisoDoFim ?? '')
+        && brToISO(form.fim) >= brToISO(pisoDoFim ?? ''))
     : false;
+  // Fim antes do próximo vencimento de uma série que já existe: encerra (o app avisa antes de salvar).
+  const fimEncerra = Boolean(form?.id && form.fim && isValidBRDate(form.fim) && inicioOk && fimOk
+    && brToISO(form.fim) < brToISO(form.inicio));
+  // A transferência tem origem e destino, diferentes (o destino nunca é cartão: o seletor já exclui).
+  const transferenciaOk = !form || form.kind !== 'transfer'
+    || Boolean(form.accountId && form.counterpartyId && form.accountId !== form.counterpartyId);
   /*
     ⚠️ O título ficava de FORA da guarda e a lista caía em "sem descrição" — a série nascia anônima
     e se materializava em uma linha por mês, todas sem nome (15/09/2026).
@@ -163,17 +199,17 @@ export function validaSerie(form: SerieForm | null) {
   const tituloOk = (form?.description.trim().length ?? 0) > 0;
   // Mudando o calendário de uma série, o próximo vencimento é daqui para a frente: o passado fica.
   const agendaNoPassado = Boolean(form?.id && form.agendaMudou && inicioOk && brToISO(form.inicio) < localISODate());
-  const calendarioOk = Boolean(
-    form && inicioOk && validRecurringRange(brToISO(form.inicio), form.fim ? brToISO(form.fim) : '', form.preset === 'monthly' ? form.intervalo : '1'),
-  );
-  const basico = Boolean(form && tituloOk && form.amountCents > 0 && fimOk);
+  // O fim já foi conferido em `fimOk` (piso = início, ou o início original ao editar): aqui o
+  // intervalo e o início.
+  const calendarioOk = Boolean(form && inicioOk && validRecurringRange(brToISO(form.inicio), '', form.preset === 'monthly' ? form.intervalo : '1'));
+  const basico = Boolean(form && tituloOk && form.amountCents > 0 && fimOk && transferenciaOk);
   // Editando, o calendário só pesa quando a pessoa mexeu nele (`agendaMudou`).
   const podeSalvar = form?.id
     ? basico && (!form.agendaMudou || (calendarioOk && !agendaNoPassado))
     : basico && calendarioOk;
   const rrulePrevia =
     form && inicioDate ? montaRRule(form.preset, inicioDate, Number(form.intervalo) || 1, form.ultimoDia) : null;
-  return { inicioDate, inicioOk, fimOk, tituloOk, agendaNoPassado, podeSalvar, rrulePrevia };
+  return { inicioDate, inicioOk, fimOk, fimEncerra, transferenciaOk, tituloOk, agendaNoPassado, podeSalvar, rrulePrevia };
 }
 
 /** A ocorrência aberta no formulário do lançamento. */
@@ -252,6 +288,7 @@ export function mudancasDaOcorrencia(form: SerieForm, linha: OcorrenciaDaSerie, 
 
   const regra: Partial<ExpenseClassification> & {
     kind?: 'expense' | 'income';
+    counterparty_account_id?: string | null;
     subcategory_id?: string | null;
     payment_method?: PaymentMethod | null;
     end_date?: string | null;
@@ -259,7 +296,11 @@ export function mudancasDaOcorrencia(form: SerieForm, linha: OcorrenciaDaSerie, 
     rrule?: string;
     next_run_at?: string;
   } = {};
-  if (form.kind !== serie.kind) regra.kind = form.kind;
+  // Trocar o tipo de/para transferência é conversão (`converter_registro`), nunca patch.
+  if (form.kind !== serie.kind && form.kind !== 'transfer' && serie.kind !== 'transfer') regra.kind = form.kind;
+  if (form.kind === 'transfer' && (form.counterpartyId ?? null) !== (serie.counterparty_account_id ?? null)) {
+    regra.counterparty_account_id = form.counterpartyId ?? null;
+  }
   if (linhas.payment_method !== undefined && form.paymentMethod !== normalizePaymentMethod(serie.payment_method)) regra.payment_method = form.paymentMethod;
   const fim = form.fim ? brToISO(form.fim) : null;
   if (fim !== serie.end_date) regra.end_date = fim;

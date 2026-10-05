@@ -30,6 +30,7 @@ import {
   useDeleteRecurring,
   useAccounts,
   useRecurringTransactions,
+  useSaveRecurringSeries,
   useToggleRecurring,
   type RecurringTransaction,
 } from '@/hooks/use-finance';
@@ -42,11 +43,14 @@ import { dataLocalDe, isoToBR, localISODate } from '@/lib/dates';
 import { accountSelectOptions } from '@/lib/accounts';
 import { listFiltersActive, type ListFiltersValue } from '@/lib/list-filters';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
+import { financeErrorMessage } from '@/lib/finance-form';
 import { hrefDoLancar } from '@/lib/lancar';
 import { describeRRule } from '@/lib/rrule-text';
 import { estadoDaRecorrencia } from '@/lib/recurring-state';
 import { supabase } from '@/lib/supabase';
 import { transicaoDeLayout } from '@/components/motion/transicao';
+import { useEncerrarSerie } from '@/components/finance/encerrar-serie';
+import { newClientMessageId } from '@/lib/agent-chat';
 
 /**
  * Recorrentes — "o que vai sair da minha conta todo mês sem eu fazer nada?".
@@ -116,6 +120,8 @@ export default function RecurringScreen() {
   const proximos = useRecurringUpcoming(30);
   const toggle = useToggleRecurring();
   const remove = useDeleteRecurring();
+  const encerrando = useEncerrarSerie();
+  const reabrindo = useSaveRecurringSeries();
   // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
   // falha, e sem este corte a lista seguia afirmando números embaixo da faixa que acabou
   // de dizer que não conseguiu carregar. Zerar aqui cobre lista, contadores e destaque de
@@ -194,6 +200,22 @@ export default function RecurringScreen() {
       }
     );
 
+  /** Reabrir = tirar o fim: o agendador volta a gerar o que o encerramento tirou (F18). */
+  const reabrir = (r: RecurringTransaction) =>
+    confirmDestructive(
+      r.description ? `Reabrir ${r.description}?` : 'Reabrir esta recorrência?',
+      'Reabrir',
+      () =>
+        reabrindo.mutate(
+          { id: r.id, patch: { end_date: null }, expectedRevision: Number(r.edit_revision), requestId: newClientMessageId() },
+          {
+            onSuccess: () => toast({ message: 'Série reaberta.', tone: 'success' }),
+            onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para reabrir a série.'), tone: 'error' }),
+          }
+        ),
+      'O fim sai e as cobranças futuras voltam a ser geradas.'
+    );
+
   const apagar = (r: RecurringTransaction) =>
     confirmDestructive(
       r.description ? `Apagar a recorrência ${r.description}?` : 'Apagar esta recorrência?',
@@ -213,7 +235,7 @@ export default function RecurringScreen() {
 
   /** O menu da série, UMA lista para o toque (curto e longo) e o arrasto. */
   const acoesDaSerie = (r: RecurringTransaction): ItemAction[] => {
-    const acoesDeEdicao: ItemAction[] = encerrada(r) ? [] : [
+    const acoesDeEdicao: ItemAction[] = encerrada(r) ? [{ label: 'Reabrir', icon: 'arrow.counterclockwise', onPress: () => reabrir(r) }] : [
       {
         // Até 09/09/2026 esta tela só sabia criar, pausar e apagar: corrigir o valor
         // do aluguel exigia apagar a série e refazer, perdendo o histórico.
@@ -222,6 +244,8 @@ export default function RecurringScreen() {
         onPress: () => abrirEdicao(r),
       },
       { label: r.active ? 'Pausar' : 'Retomar', icon: r.active ? 'pause' : 'play', arrasto: 'direita', desfaz: true, onPress: () => alternar(r) },
+      // Cancelar uma assinatura: fica o que já aconteceu, saem as cobranças futuras (não é Pausar nem Apagar).
+      { label: 'Encerrar', icon: 'xmark.circle', onPress: () => encerrando.abrir(r) },
     ];
     return [
       {
@@ -240,6 +264,7 @@ export default function RecurringScreen() {
 
   const cartaoSerie = (r: RecurringTransaction, index: number) => {
     const receita = r.kind === 'income';
+    const transferencia = r.kind === 'transfer';
     const cents = Number(r.amount_cents);
     const quando = describeRRule(r.rrule);
 
@@ -253,14 +278,14 @@ export default function RecurringScreen() {
         <Deslizavel titulo={r.description ?? 'Recorrência'} acoes={acoesDaSerie(r)} forma="card">
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel={`${r.description ?? 'recorrência'}, ${receita ? 'receita' : 'despesa'}, ${quando}, próximo em ${isoToBR(dataLocalDe(r.next_run_at))}${r.active ? '' : ', pausado'}`}
+          accessibilityLabel={`${r.description ?? 'recorrência'}, ${receita ? 'receita' : transferencia ? 'transferência' : 'despesa'}, ${quando}, próximo em ${isoToBR(dataLocalDe(r.next_run_at))}${r.active ? '' : ', pausado'}`}
           onPress={() => acoes(r)}
           onLongPress={() => acoes(r)}>
           <Card style={[styles.serie, r.active ? null : styles.pausada]}>
             <View style={styles.serieTopo}>
               <View style={styles.serieTitulo}>
                 <Icon
-                  name={receita ? 'arrow.down.left' : 'arrow.up.right'}
+                  name={receita ? 'arrow.down.left' : transferencia ? 'arrow.left.arrow.right' : 'arrow.up.right'}
                   size="md"
                   color={receita ? 'success' : 'textSecondary'}
                 />
@@ -512,6 +537,7 @@ export default function RecurringScreen() {
 
       {tablet ? tabletBody : compactBody}
 
+      {encerrando.folha}
     </Screen>
   );
 }

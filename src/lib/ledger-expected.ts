@@ -12,12 +12,14 @@ export interface ExpectedLedgerLine extends Partial<ExpenseClassification> {
   ref_id: string;
   due_date: string;
   amount_cents: number;
-  kind: 'expense' | 'income';
+  kind: 'expense' | 'income' | 'transfer';
   description: string;
   category: string | null;
   subcategory_id?: string | null;
   subcategory_name?: string | null;
   account_id: string | null;
+  /** Transferência recorrente: a conta de destino (a prevista aparece nas DUAS contas). */
+  counterparty_account_id?: string | null;
   payment_method?: PaymentMethod | null;
   installment_no: number | null;
   installments_total: number | null;
@@ -55,12 +57,13 @@ export function filterExpectedLines<T extends ExpectedLedgerLine>(
   const expensePatterns = normalizeExpensePatternFilters(filters.expensePatterns);
   const expenseNecessities = normalizeExpenseNecessityFilters(filters.expenseNecessities);
   return lines.filter((line) => {
-    if (filters.kind === 'transfer') return false;
     if (filters.status && line.status !== filters.status) return false;
     if (filters.kind && line.kind !== filters.kind) return false;
     if (filters.category && line.category !== filters.category) return false;
     if (filters.subcategoryId !== undefined && (line.subcategory_id ?? null) !== filters.subcategoryId) return false;
-    if (filters.accountId !== undefined && line.account_id !== filters.accountId) return false;
+    // Transferência recebida: a conta de destino também a vê (como no extrato das gravadas).
+    if (filters.accountId !== undefined && line.account_id !== filters.accountId
+      && (filters.accountId === null || line.counterparty_account_id !== filters.accountId)) return false;
     if (filters.source && (filters.source !== 'recurring' || line.origin !== 'recurring')) return false;
     if (filters.recurringId && (line.origin !== 'recurring' || line.ref_id !== filters.recurringId)) return false;
     if (filters.minCents !== undefined && line.amount_cents < filters.minCents) return false;

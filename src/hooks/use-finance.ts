@@ -20,6 +20,7 @@ import type { DownPaymentInput } from '@/lib/down-payment';
 import type { Database, Json } from '@/lib/database.types';
 import { dataLocalDe, localISODate, mesmoMes, monthBounds, primeiroDiaDoMes } from '@/lib/dates';
 import { avisoDeDeslize } from '@/lib/serie';
+import type { PreviaDoEncerramento } from '@/lib/encerrar-serie';
 import type { Consulta } from '@/lib/tela-pronta';
 import type { DebtDeclaredEstimateRow, DebtPaymentRow } from '@/lib/debt-history';
 import type { ExpectedLedgerLine } from '@/lib/ledger-expected';
@@ -200,6 +201,8 @@ export type RecurringTransaction = Pick<
   | 'category'
   | 'description'
   | 'account_id'
+  // Transferência recorrente (F18): o destino; nulo nas outras séries.
+  | 'counterparty_account_id'
   | 'rrule'
   | 'next_run_at'
   | 'active'
@@ -215,7 +218,7 @@ export type RecurringTransaction = Pick<
   // O estabelecimento da série (`20260926120000`): o "Recorrente" do lançamento o perdia.
   | 'merchant'
   | 'edit_revision'
-> & Partial<ExpenseClassification> & SubcategoryMetadata & { kind: 'expense' | 'income'; payment_method?: PaymentMethod | null; subcategory_id?: string | null; workspace_id?: string };
+> & Partial<ExpenseClassification> & SubcategoryMetadata & { kind: 'expense' | 'income' | 'transfer'; payment_method?: PaymentMethod | null; subcategory_id?: string | null; workspace_id?: string };
 
 export type MonthlyCashflow = Fns['monthly_cashflow']['Returns'][number];
 
@@ -387,7 +390,7 @@ export function useExpectedLedgerLines(from: string | undefined, to: string | un
       // A RPC aceita 62 dias. Lotes de quatro limitam carga e uma falha rejeita o período inteiro.
       for (let i = 0; i < windows.length; i += 4) {
         const batches = await Promise.all(windows.slice(i, i + 4).map(window =>
-          fetchPaged<ExpectedLedgerLine>((start, end) => supabase.rpc('ledger_expected_lines_detailed', {
+          fetchPaged<ExpectedLedgerLine>((start, end) => supabase.rpc('ledger_expected_lines_transfer', {
             p_from: window.from, p_to: window.to, p_recurring_id: recurringId ?? undefined,
           }).order('due_date').order('origin').order('ref_id').range(start, end).abortSignal(signal)),
         ));
@@ -593,7 +596,7 @@ export function useGoals() {
 }
 
 const RECURRING_COLUMNS =
-  'id, workspace_id, subcategory_id, subcategories!recurring_transactions_subcategory_id_fkey(name), expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, kind, amount_cents, currency, category, description, merchant, account_id, payment_method, rrule, next_run_at, active, run_attempts, last_error, created_at, dtstart, end_date, auto_confirm, edit_revision';
+  'id, workspace_id, subcategory_id, subcategories!recurring_transactions_subcategory_id_fkey(name), expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, kind, amount_cents, currency, category, description, merchant, account_id, counterparty_account_id, payment_method, rrule, next_run_at, active, run_attempts, last_error, created_at, dtstart, end_date, auto_confirm, edit_revision';
 
 /**
  * As categorias do espaço, mais usada primeiro: as que os lançamentos usam e as criadas no app,
@@ -3387,6 +3390,8 @@ export function useSaveRecurringSeries() {
         merchant?: string | null;
         kind?: 'expense' | 'income';
         account_id?: string | null;
+        /** Só na transferência: a conta de destino. */
+        counterparty_account_id?: string | null;
         payment_method?: PaymentMethod | null;
         auto_confirm?: boolean;
         end_date?: string | null;
@@ -3436,6 +3441,7 @@ export function useSaveRecurringAll() {
         merchant?: string | null;
         kind?: 'expense' | 'income';
         account_id?: string | null;
+        counterparty_account_id?: string | null;
         auto_confirm?: boolean;
         end_date?: string | null;
         rrule?: string;
@@ -3799,6 +3805,99 @@ export function useToggleRecurring() {
       if (error) throw error;
     },
     onSuccess: invalidate,
+  });
+}
+
+/**
+ * Encerrar uma série (F18): a prévia diz o que fica e o que sai, e o comando faz as duas coisas
+ * numa transação, idempotente pela chave da tentativa. Reabrir é editar o fim.
+ */
+export function useEndRecurringPreview(id: string | null, lastDate: string | null) {
+  return useQuery({
+    enabled: Boolean(id && lastDate),
+    queryKey: ['recurring', 'end-preview', id, lastDate],
+    // Os números dependem do que a série tem AGORA: nunca reaproveitar uma prévia velha.
+    staleTime: 0,
+    gcTime: 0,
+    queryFn: async (): Promise<PreviaDoEncerramento> => {
+      const { data, error } = await supabase.rpc('end_recurring_series_preview', {
+        p_recurring_id: id!, p_last_date: lastDate!,
+      });
+      if (error) throw error;
+      return data as unknown as PreviaDoEncerramento;
+    },
+  });
+}
+
+/** A prévia sob demanda (o editor da série confirma antes de salvar um fim que encerra). */
+export function usePreviewEndRecurring() {
+  return useMutation({
+    mutationFn: async ({ id, lastDate }: { id: string; lastDate: string }): Promise<PreviaDoEncerramento> => {
+      const { data, error } = await supabase.rpc('end_recurring_series_preview', {
+        p_recurring_id: id, p_last_date: lastDate,
+      });
+      if (error) throw error;
+      return data as unknown as PreviaDoEncerramento;
+    },
+  });
+}
+
+export function useEndRecurring() {
+  const invalidate = useInvalidateFinance();
+  const attempt = useRef<{ key: string; id: string } | null>(null);
+  return useMutation({
+    mutationFn: async ({ id, lastDate }: { id: string; lastDate: string }): Promise<PreviaDoEncerramento> => {
+      const key = JSON.stringify([id, lastDate]);
+      if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
+      const requestId = attempt.current.id;
+      const { data, error } = await supabase.rpc('end_recurring_series', {
+        p_recurring_id: id, p_last_date: lastDate, p_request_id: requestId,
+      });
+      if (error) throw error;
+      if (attempt.current?.id === requestId) attempt.current = null;
+      return data as unknown as PreviaDoEncerramento;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** A data da primeira ocorrência gravada da série: parte do piso do "Termina em" (o `dtstart` é reescrito pelo calendário). */
+export function useRecurringFirstDate(id: string | null) {
+  return useQuery({
+    enabled: Boolean(id),
+    queryKey: ['recurring', 'first-date', id],
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('occurred_at')
+        .eq('recurring_id', id!)
+        .order('occurred_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.occurred_at as string | undefined) ?? null;
+    },
+  });
+}
+
+/** As datas já geradas da série, as mais recentes primeiro: o padrão da "última cobrança" sai delas. */
+export function useRecurringOccurrenceDates(id: string | null) {
+  return useQuery({
+    enabled: Boolean(id),
+    queryKey: ['recurring', 'occurrence-dates', id],
+    staleTime: 0,
+    gcTime: 0,
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('occurred_at')
+        .eq('recurring_id', id!)
+        .lte('occurred_at', localISODate())
+        .order('occurred_at', { ascending: false })
+        .limit(12);
+      if (error) throw error;
+      return (data ?? []).map((r) => r.occurred_at as string);
+    },
   });
 }
 
