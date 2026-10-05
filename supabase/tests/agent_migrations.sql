@@ -19,6 +19,13 @@ set local timezone to 'America/Sao_Paulo';
 -- SESSÃO falha por um dia — sem nada de errado no código. Foi o que aconteceu com
 -- `draft_scenario`, `agent_migrations` e `alert_channels` em 10/09/2026 às 21h.
 
+-- Staging não é banco vazio: tira só o que este teste cria (chaves próprias dele) antes de
+-- começar. Tudo some no rollback do fim, então nada disso apaga dado de ninguém.
+delete from public.pending_actions where phone = '5551000000001';
+delete from public.user_sessions where phone = '5551000000001';
+delete from public.messages_queue where thread_id = 'T1' or phone = '5551000000001';
+delete from public.agent_routing where phone in ('5551992553295', '5511999998888');
+
 -- O MESMO upsert que `agent/app/db.py::ensure_session` executa, com uma diferença
 -- que importa saber: aqui a janela de inatividade é **6h fixas**, enquanto o
 -- db.py lê `SESSION_IDLE_HOURS` do config. Mexeu no env var, mexe aqui também.
