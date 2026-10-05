@@ -39,7 +39,8 @@ os.environ.setdefault("WHATSAPP_APP_SECRET", "sem-envio")
 from app.domain import confirm, draft  # noqa: E402
 from app.graph import nodes  # noqa: E402
 from app.services import gemini  # noqa: E402
-from app.tools import resources  # noqa: E402
+from app.tools import movimentos, resources  # noqa: E402
+from app.tools.guards import Level1Error  # noqa: E402
 
 PASTAS = ["mercado", "trabalho", "ideias"]
 WS = "20000000-0000-0000-0000-000000000001"
@@ -193,7 +194,7 @@ H_MERCADO = _hist(("user", "gastei 45 no mercado"),
 
 async def _acoes(texto, historico=()):
     msgs = [*historico, {"role": "user", "content": texto}]
-    saida = await nodes.finance_node({**BASE, "text": texto, "messages": msgs})
+    saida = await _com_retentativa(lambda: nodes.finance_node({**BASE, "text": texto, "messages": msgs}))
     return saida.get("finance_actions") or []
 
 
@@ -261,7 +262,7 @@ async def _com_retentativa(coro_fn, vezes=4):
         try:
             return await coro_fn()
         except Exception as erro:  # noqa: BLE001
-            if i == vezes - 1 or "503" not in str(erro):
+            if i == vezes - 1 or not any(m in str(erro) for m in ("503", "UNAVAILABLE", "Error calling model")):
                 raise
             await asyncio.sleep(3 * (i + 1))
 
@@ -626,11 +627,112 @@ def secoes():
             (t, lambda q: bool(q) and not q.get("payment_method"), "sem forma", lambda t=t: _consulta(t))
             for t in ["quanto gastei no cartão nubank?", "quanto gastei esse mês?", "gastos com mercado"]
         ],
+        # --- Lote B da paridade (05/10/2026) ---------------------------------------------
+        # Guardar na meta COM conta: a conta cai nos campos certos de goal_deposit (uma = separar
+        # na conta; duas = transferir). Adversarial: sem conta continua o depósito de sempre, e
+        # transferir/gastar não viram aporte.
+        "loteB/guardar na meta": [
+            (t, lambda a: bool(a) and a[0].get("type") == "goal_deposit" and bool(a[0].get("account"))
+             and not a[0].get("counterparty_account"), "goal_deposit + 1 conta", lambda t=t: _acoes(t))
+            for t in ["separei 300 da nubank pra viagem", "guardei 500 na meta viagem, tirei da conta nubank",
+                      "reservei 200 do itaú para a meta reserva"]
+        ] + [
+            (t, lambda a: bool(a) and a[0].get("type") == "goal_deposit" and bool(a[0].get("account"))
+             and bool(a[0].get("counterparty_account")), "goal_deposit + origem e destino", lambda t=t: _acoes(t))
+            for t in ["transferi 300 da corrente pra poupança e guardei na meta viagem",
+                      "passei 500 da nubank para a conta poupança que guarda a meta viagem"]
+        ] + [
+            (t, lambda a: bool(a) and a[0].get("type") == "goal_deposit" and not a[0].get("account")
+             and not a[0].get("counterparty_account"), "goal_deposit sem conta", lambda t=t: _acoes(t))
+            for t in ["guardei 200 na meta viagem", "coloquei 100 na meta reserva"]
+        ] + [
+            (t, lambda a: not any(x.get("type") == "goal_deposit" for x in a), "não é aporte", lambda t=t: _acoes(t))
+            for t in ["gastei 45 no mercado na nubank", "transferi 300 da nubank pra poupança"]
+        ],
+        # Retirar da meta é cadastro da meta (campo virtual). Adversarial: guardar e mexer no alvo
+        # da meta não são retirada.
+        "loteB/retirar da meta": [
+            (t, lambda o, v=v: bool(o) and o.get("resource") == "goals" and o.get("type") == "resource_update"
+             and str(o.get("retirar_cents")) == v, f"retirar_cents={v}", lambda t=t: _recurso(t))
+            for t, v in [("tirei 200 da meta viagem", "20000"), ("libera 300 da meta reserva", "30000"),
+                         ("retira 1.000 da meta da viagem", "100000")]
+        ] + [
+            (t, lambda o: bool(o) and o.get("resource") == "goals" and "nubank" in str(o.get("retirar_da_conta", "")).lower()
+             and str(o.get("retirar_cents")) == "15000", "retirar_da_conta=nubank", lambda t=t: _recurso(t))
+            for t in ["libera 150 da meta viagem, da conta nubank"]
+        ] + [
+            (t, lambda o: bool(o) and o.get("resource") == "goals" and "poupan" in str(o.get("retirar_para_conta", "")).lower()
+             and str(o.get("retirar_cents")) == "30000", "retirar_para_conta=poupança", lambda t=t: _recurso(t))
+            for t in ["passa 300 da meta viagem para a poupança"]
+        ] + [
+            (t, lambda o: not (o and "retirar_cents" in o), "não retira", lambda t=t: _recurso(t))
+            for t in ["guardei 200 na meta viagem", "aumenta a meta viagem para 5000", "quanto tem na meta viagem?"]
+        ],
+        # Aplicar/resgatar continua create_transfer (a conta de investimento é só uma ponta).
+        "loteB/aplicar e resgatar": [
+            (t, lambda a: bool(a) and a[0].get("type") == "create_transfer"
+             and "cdb" in str(a[0].get("counterparty_account", "")).lower(), "create_transfer -> cdb", lambda t=t: _acoes(t))
+            for t in ["apliquei 500 da nubank no CDB", "transferi 200 da nubank pra conta de investimento CDB"]
+        ] + [
+            (t, lambda a: bool(a) and a[0].get("type") == "create_transfer"
+             and "cdb" in str(a[0].get("account", "")).lower(), "create_transfer cdb ->", lambda t=t: _acoes(t))
+            for t in ["resgatei 200 do CDB pra nubank"]
+        ] + [
+            (t, lambda a: not any(x.get("type") in {"create_expense", "create_income"} for x in a),
+             "não é gasto nem receita", lambda t=t: _acoes(t))
+            for t in ["apliquei 500 da nubank no CDB", "resgatei 200 do CDB pra nubank"]
+        ],
+        # Valor atual (só patrimônio) × rendimento (receita). Adversarial: a frase distingue, e
+        # bem comum e receita comum não caem aqui.
+        "loteB/valor e rendimento": [
+            (t, lambda o, v=v: bool(o) and o.get("resource") == "accounts" and str(o.get("valor_atual_cents")) == v
+             and "rendimento_cents" not in o, f"valor_atual_cents={v}", lambda t=t: _recurso(t))
+            for t, v in [("meu CDB está valendo 10.500", "1050000"), ("o tesouro hoje vale 8 mil", "800000"),
+                         ("atualiza o CDB para 12.300", "1230000")]
+        ] + [
+            (t, lambda o, v=v: bool(o) and o.get("resource") == "accounts" and str(o.get("rendimento_cents")) == v
+             and "valor_atual_cents" not in o, f"rendimento_cents={v}", lambda t=t: _recurso(t))
+            for t, v in [("recebi 85 de rendimento do CDB", "8500"), ("o tesouro rendeu 120 reais esse mês", "12000")]
+        ] + [
+            (t, lambda o: not (o and o.get("resource") == "accounts" and ("valor_atual_cents" in o or "rendimento_cents" in o)),
+             "não é conta de investimento", lambda t=t: _recurso(t))
+            for t in ["recebi 85 de freela", "meu carro está valendo 40 mil", "o salário de 3000 caiu na nubank"]
+        ],
+        "loteB/plano percentual": [
+            (t, lambda o: bool(o) and o.get("resource") == "plano" and o.get("type") == "resource_list",
+             "plano list", lambda t=t: _recurso(t))
+            for t in ["como está meu plano de orçamento?", "o que planejei e o que gastei no plano?"]
+        ] + [
+            (t, lambda o: bool(o) and o.get("resource") == "plano" and o.get("type") == "resource_update",
+             "plano update", lambda t=t: _recurso(t))
+            for t in ["aplica o plano nos meus orçamentos", "usa o plano percentual como limite dos orçamentos"]
+        ] + [
+            (t, lambda o: bool(o) and o.get("resource") == "plano" and str(o.get("aplicar_alcance", "")).lower() == "mes",
+             "aplicar_alcance=mes", lambda t=t: _recurso(t))
+            for t in ["aplica o plano só neste mês"]
+        ] + [
+            (t, lambda o: not (o and o.get("resource") == "plano"), "não é o plano", lambda t=t: _recurso(t))
+            for t in ["cria um orçamento de 500 para mercado", "aumenta o limite de lazer para 600"]
+        ],
+        "loteB/roteamento": [
+            (t, lambda d: "cadastros" in d and "financas" not in d, "->cadastros", lambda t=t: _dominios(t))
+            for t in ["tirei 200 da meta viagem", "meu CDB está valendo 10.500", "recebi 85 de rendimento do CDB",
+                      "aplica o plano nos meus orçamentos"]
+        ] + [
+            (t, lambda d: "financas" in d and "cadastros" not in d, "->financas", lambda t=t: _dominios(t))
+            for t in ["separei 300 da nubank pra viagem", "apliquei 500 da nubank no CDB", "guardei 200 na meta viagem"]
+        ],
     }
 
 
 async def main(args):
     resources.db.fetch = _sem_banco
+
+    async def _sem_previa(*_a, **_k):
+        raise Level1Error("sem banco na avaliação")
+
+    # Sem banco a prévia do lote B não roda; o pedido para no rascunho, que é onde a extração se lê.
+    movimentos._previa = _sem_previa
 
     if args.barato:
         # ⚠️ **Modo de ITERAÇÃO, nunca de aprovação.** O gate roda no Flash

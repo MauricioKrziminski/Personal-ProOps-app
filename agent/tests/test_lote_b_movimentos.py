@@ -533,7 +533,7 @@ async def test_valor_ou_rendimento_nunca_os_dois(monkeypatch, campos, trecho):
 @pytest.mark.asyncio
 async def test_so_conta_de_investimento_tem_valor(monkeypatch):
     instala(monkeypatch, banco_do_valor(posicao(CDB, 0, 0), posicao(CDB, 0, 0)), achadas=[])
-    with pytest.raises(resources.JaExiste, match="Não achei conta de investimento"):
+    with pytest.raises(Level1Error, match="Não achei conta de investimento"):
         await resources.prepare(ctx(), acao("accounts", name="nubank", valor_atual_cents=100))
 
 

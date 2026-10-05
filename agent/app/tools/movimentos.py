@@ -104,7 +104,8 @@ async def _achar(workspace_id, tabela: str, nome: str, o_que: str, extra: str = 
             workspace_id, f"%{nome.strip()}%",
         )
     if not rows:
-        raise Recusa(f"Não achei {o_que} com o nome *{nome}*. Nada foi alterado.")
+        # Level1Error (vira pergunta com rascunho), não Recusa: a pessoa responde o nome certo e o pedido segue.
+        raise Level1Error(f"Não achei {o_que} com o nome *{nome}*. Confere o nome? Nada foi alterado.")
     if len(rows) > 1:
         raise Level1Error(f"Qual {o_que}? {', '.join(r['name'] for r in rows)}. Nada foi alterado.")
     return rows[0]

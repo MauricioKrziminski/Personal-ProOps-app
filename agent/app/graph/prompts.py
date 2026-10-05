@@ -37,6 +37,9 @@ Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
 - "financas": REGISTRAR ou CORRIGIR dinheiro — gasto, receita, transferência,
   compra parcelada, pagamento de fatura, meta, aporte, valor de bem, regra de
   categorização, e também apagar/corrigir algo já lançado. Marcar parcelas de compra JÁ CRIADAS como pagas é financas.
+  Aplicar dinheiro em investimento ("apliquei 500 no CDB") e resgatar ("resgatei 200 do CDB") é
+  financas (uma transferência), e guardar/separar dinheiro numa meta ("separei 300 da nubank pra
+  viagem") também; já ATUALIZAR o valor ou registrar o rendimento de um investimento é cadastros.
   Corrigir quantas parcelas de uma compra já foram pagas também é financas; CORRIGIR um aporte
   JÁ feito numa meta (valor, data ou nota dele) é cadastros.
   Não infira financiamento só porque o item é carro/moto: preencha financial_entity para o sistema conferir o tipo do registro.
@@ -214,7 +217,12 @@ Tipos:
   ("separei 300 da nubank pra viagem", "guardei 300 na viagem, da nubank"), account = essa conta: o dinheiro
   fica na conta e só é reservado. Se disser que MOVEU o dinheiro de uma conta para a conta da meta
   ("transferi 300 da corrente pra poupança da viagem"), account = origem e counterparty_account = destino.
-  Sem conta nenhuma, deixe account e counterparty_account vazios.
+  Sem conta nenhuma, deixe account e counterparty_account vazios. Exemplos:
+  "separei 300 da nubank pra viagem" -> UMA ação goal_deposit, target_ref="viagem", amount_cents=30000, account="nubank".
+  "guardei 500 na meta viagem, tirei da conta nubank" -> UMA ação goal_deposit, target_ref="viagem", account="nubank".
+  "transferi 300 da corrente pra poupança e guardei na meta viagem" -> UMA ação goal_deposit (NÃO create_transfer
+  mais goal_deposit), target_ref="viagem", account="corrente", counterparty_account="poupança".
+  "guardei 200 na meta viagem" -> goal_deposit sem account.
 - update_asset_value: valor novo de um bem/investimento. target_ref = nome.
 - unknown: não é registro nem correção financeira.
 
