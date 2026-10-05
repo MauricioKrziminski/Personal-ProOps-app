@@ -252,6 +252,9 @@ async def _recurso(texto):
     return {
         "resource": acao.get("resource"),
         "type": acao.get("type"),
+        # O nome do registro é `ResourceAction.name`, não um campo da lista: sem ele aqui, os casos
+        # de favorito/duplicar nunca passavam, com o modelo acertando ou não (05/10/2026).
+        **({"name": acao["name"]} if acao.get("name") else {}),
         **{c["name"]: c.get("value") for c in acao.get("fields") or []},
     }
 
