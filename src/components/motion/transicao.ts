@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { LinearTransition } from 'react-native-reanimated';
+import { LinearTransition, useReducedMotion } from 'react-native-reanimated';
 
 import { Motion } from '@/design/tokens';
 
@@ -20,11 +20,17 @@ import { Motion } from '@/design/tokens';
  * o Android fica com o comportamento da plataforma: o conteúdo se reorganiza de uma vez, sem
  * deslizar. O iOS mantém o deslize.
  *
+ * **E no iOS com Reduzir Movimento, também nenhuma** (05/10/2026): o Reanimated pula a animação
+ * e a view fica no quadro antigo, igual ao Android — em Metas o cartão ficou 87 pt acima, por cima
+ * de "Simular juntas", e o toque abria a folha da meta. `useReducedMotion` do Reanimated não é hook
+ * de verdade: devolve a constante lida na abertura do app, a MESMA que decide pular a animação.
+ *
  * Uma instância só: `LinearTransition` recriado a cada render remonta a animação.
  */
-export const transicaoDeLayout =
-  Platform.OS === 'android' ? undefined : LinearTransition.duration(Motion.duration.base);
+// eslint-disable-next-line react-hooks/rules-of-hooks -- constante do Reanimated, lida uma vez
+const semTransicao = Platform.OS === 'android' || useReducedMotion();
+
+export const transicaoDeLayout = semTransicao ? undefined : LinearTransition.duration(Motion.duration.base);
 
 /** A mesma, na duração curta — reordenar blocos de uma lista que a pessoa está lendo. */
-export const transicaoDeLayoutRapida =
-  Platform.OS === 'android' ? undefined : LinearTransition.duration(Motion.duration.fast);
+export const transicaoDeLayoutRapida = semTransicao ? undefined : LinearTransition.duration(Motion.duration.fast);

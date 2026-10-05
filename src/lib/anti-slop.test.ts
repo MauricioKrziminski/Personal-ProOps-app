@@ -1115,6 +1115,9 @@ test('LinearTransition só mora em components/motion/transicao.ts', () => {
     (f) => f !== dono && /\bLinearTransition\b/.test(stripComments(readFileSync(f, 'utf8'))),
   );
   assert.deepEqual(achados, []);
+  // No iOS com Reduzir Movimento o Reanimated pula a animação e a view também fica no quadro antigo
+  // (Metas, 05/10/2026): o ponto único desliga a transição ali também.
+  assert.match(stripComments(readFileSync(dono, 'utf8')), /Platform\.OS === 'android' \|\| useReducedMotion\(\)/);
 });
 
 /*
