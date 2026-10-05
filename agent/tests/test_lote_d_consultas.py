@@ -117,7 +117,7 @@ def estado_plano(**ov):
 def test_plano_de_metas_com_renda_e_sem_aperto_diz_que_cabe():
     f = lote_d.frase_do_plano_de_metas(estado_plano(), "2026-10-05")
     assert "Reserva: R$ 1.045,46 por mês até 03/09/2027" in f and "Notebook: R$ 1.320,00 por mês" in f
-    assert "Fora" not in f and "Cabe: o disponível não fica negativo" in f and "R$ 9.314,18" in f
+    assert "Fora" not in f and "Cabe: nos próximos 12 meses o disponível não fica negativo" in f and "R$ 9.314,18" in f
 
 
 def test_plano_de_metas_que_aperta_diz_a_data_e_o_menor_disponivel():

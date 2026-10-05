@@ -571,7 +571,10 @@ async def query_goals(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
         # não responde a pergunta). Nome que não casa continua mostrando todas.
         dito = matching.normalize(action.search_term)
         citadas = [g for g in rows if dito in matching.normalize(g["name"])]
-        rows = citadas or rows
+        if not citadas:
+            return ToolResult(f"🎯 Não achei meta com *{action.search_term}*. Você tem: "
+                              + ", ".join(g["name"] for g in rows[:8]) + ".", read_only=True)
+        rows = citadas
     if not rows:
         return ToolResult(
             "🎯 Você ainda não tem metas. Tenta \"quero juntar 3000 pra viagem até dezembro\"!",

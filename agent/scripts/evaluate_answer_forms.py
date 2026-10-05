@@ -874,6 +874,19 @@ def secoes():
             for t in ["apaga o favorito almoço", "salva esse lançamento como favorito", "gastei 45 no mercado",
                       "quais são os meus favoritos?"]
         ],
+        # A meta citada como "meta X" vence a reserva de emergência: é consulta de metas (financas_consulta).
+        "loteD/meta reserva x reserva de emergência": [
+            (t, lambda q: bool(q) and q.get("type") == "query_goals" and _tem(q, "search_term", "reserva"),
+             "query_goals reserva", lambda t=t: _consulta(t))
+            for t in ["quanto falta pra minha meta reserva?", "como está a meta reserva?"]
+        ] + [
+            (t, lambda d: "financas_consulta" in d and "cadastros" not in d, "->financas_consulta",
+             lambda t=t: _dominios(t))
+            for t in ["quanto falta pra minha meta reserva?"]
+        ] + [
+            (t, lambda o: bool(o) and o.get("resource") == "reserva", "reserva list", lambda t=t: _recurso_cru(t))
+            for t in ["minha reserva de emergência cobre quantos meses?"]
+        ],
         "loteD/roteamento": [
             (t, lambda d: "cadastros" in d, "->cadastros", lambda t=t: _dominios(t))
             for t in ["minha reserva cobre quantos meses?", "cabe no meu plano de metas?",

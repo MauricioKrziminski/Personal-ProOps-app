@@ -19,7 +19,7 @@ from app import db
 from app.domain import goal_appearance as ga
 from app.domain import matching
 from app.domain.dates import format_date_br, local_iso_date
-from app.domain.money import cents_to_brl
+from app.domain.money import cents_to_brl, parse_valor_em_centavos
 from app.tools.base import ExecContext, ToolResult
 from app.tools.guards import Level1Error, optional_date
 from app.tools.movimentos import Recusa, _brl, _previa
@@ -110,8 +110,8 @@ def frase_da_reserva(r: dict) -> str:
 
 async def ler_reserva(ctx: ExecContext) -> ToolResult:
     async def ler(tx):
-        row = await tx.fetch_one("select public.emergency_reserve_state(%s, %s::date) as s",
-                                 ctx.workspace_id, local_iso_date(ctx.timezone))
+        # sem p_as_of: o default da função já é hoje no fuso do Brasil
+        row = await tx.fetch_one("select public.emergency_reserve_state(%s) as s", ctx.workspace_id)
         return row["s"]
 
     estado = await _previa(ctx.user_id, ler)
@@ -147,16 +147,28 @@ def frase_do_plano_de_metas(s: dict, hoje: str) -> str:
     minimo = s.get("minimum_available_cents")
     if not s["income_present"]:
         # nunca "cabe" sem renda: a disponibilidade do banco não conta o que ainda vai entrar
-        avisos.append("Não dá para dizer que cabe: não há renda lançada no período, então o plano não tem de onde "
-                      "sair.")
+        avisos.append("Não dá para dizer que cabe: não há renda lançada no período (próximos 12 meses), então o "
+                      "plano não tem de onde sair.")
         if pressao:
             avisos.append(f"Só com o caixa de hoje, o plano aperta a partir de {format_date_br(pressao)} "
                           f"(menor disponível: {_brl(minimo)}).")
     elif pressao:
-        avisos.append(f"Aperta em {format_date_br(pressao)}: o disponível fica negativo (menor valor "
-                      f"{_brl(minimo)}). Não cabe sem ajustar.")
+        avisos.append(f"Aperta em {format_date_br(pressao)}: o disponível fica negativo nos próximos 12 meses "
+                      f"(menor valor {_brl(minimo)}). Não cabe sem ajustar.")
     else:
-        avisos.append(f"Cabe: o disponível não fica negativo no período (menor valor {_brl(minimo)}).")
+        sem_origem = int(s.get("unassigned_goals_cents") or 0)
+        fora = []
+        if s["incomplete_goal_ids"]:
+            fora.append("metas sem dado para calcular")
+        if s["missed_deadline_goal_ids"]:
+            fora.append("metas que não chegam no prazo")
+        if sem_origem:
+            fora.append(f"{_brl(sem_origem)} guardados em metas sem origem (não sei de qual conta saem)")
+        if fora:
+            avisos.append("Pelo que dá para calcular nos próximos 12 meses, não aperta, mas ficou fora da conta: "
+                          + "; ".join(fora) + ".")
+        else:
+            avisos.append(f"Cabe: nos próximos 12 meses o disponível não fica negativo (menor valor {_brl(minimo)}).")
     return texto + "\n" + " ".join(avisos)
 
 
@@ -264,6 +276,7 @@ async def congelar(tz: str, texto: str, acoes: list, alvos: list[dict], pular: s
 # ---------------------------------------------------------------------------
 
 CAMPOS_META = {"mensal_cents", "marcos", "icone", "cor"}
+SO_A_CONTA = "só a conta; o plano mensal não fica salvo — isso é no app"
 _LIMPAR = {"nenhum", "nenhuma", "sem", "tira", "tirar", "remove", "remover", "limpa", "limpar", "padrao", "normal"}
 MAX_MARCOS = 20
 
@@ -288,6 +301,15 @@ def _pct_texto(cents: int, alvo: int) -> str:
     return f"{d // 10}" if d % 10 == 0 else f"{d // 10},{d % 10}"
 
 
+def _reais_em_centavos(item: str) -> int | None:
+    """"R$ 2.500", "2.500,50 reais" (formato brasileiro) ou "5 mil" -> centavos; o resto é `parse_valor_em_centavos`."""
+    limpo = re.sub(r"(?i)\s*(r\$|reais|real)\s*", " ", item).strip()
+    if re.fullmatch(r"\d{1,3}(\.\d{3})*(,\d{1,2})?|\d+(,\d{1,2})?", limpo):
+        reais, _, cent = limpo.replace(".", "").partition(",")
+        return int(reais) * 100 + int((cent + "0")[:2] or 0)
+    return parse_valor_em_centavos(item)
+
+
 def ler_marcos(texto: str | None, alvo: int, atuais: list[int]) -> list[int]:
     """"25%, 50%" ou "250000; 500000" (centavos) -> marcos em centavos. Lista completa, como o formulário do
     app; se TODOS os itens começam com "+", somam aos que já existem. Recusa antes do SIM o que o banco
@@ -297,7 +319,11 @@ def ler_marcos(texto: str | None, alvo: int, atuais: list[int]) -> list[int]:
     itens = [i.strip() for i in re.split(r";|,(?!\d)|\se\s", texto) if i.strip()]
     if not itens:
         return []
-    somar = all(i.startswith("+") for i in itens)
+    com_mais = [i.startswith("+") for i in itens]
+    if any(com_mais) and not all(com_mais):
+        raise Level1Error("Misturou itens com + (acrescentar) e sem + (substituir a lista). Me diz uma coisa só: "
+                          "ou a lista inteira nova, ou só o que acrescento com +. Nada foi alterado.")
+    somar = all(com_mais)
     marcos = list(atuais) if somar else []
     for item in itens:
         item = item.lstrip("+").strip()
@@ -308,7 +334,9 @@ def ler_marcos(texto: str | None, alvo: int, atuais: list[int]) -> list[int]:
         if pct is not None:
             cents = percentual_para_centavos(pct, alvo)
         elif re.fullmatch(r"\d{1,16}", item):
-            cents = int(item)
+            cents = int(item)  # número puro são centavos, como todo *_cents do catálogo
+        elif (valor := _reais_em_centavos(item)) is not None:
+            cents = valor  # "R$ 2.500", "2500 reais", "5 mil"
         else:
             raise Level1Error(f"Não entendi o marco *{item}*. Diga em porcentagem (25%) ou em reais "
                               "(R$ 2.500). Nada foi alterado.")
@@ -373,7 +401,7 @@ async def simular_mensal(ctx: ExecContext, nome: str | None, mensal: int | None)
         if r["status"] == "ready":
             atraso = (f" Isso passa do prazo da meta ({format_date_br(prazo)})." if str(r["estimated_on"]) > prazo
                       else f" Dentro do prazo da meta ({format_date_br(prazo)}).")
-    return f"🎯 Meta *{meta['name']}*: {frase}.{atraso}"
+    return f"🎯 Meta *{meta['name']}*: {frase}.{atraso} ({SO_A_CONTA})"
 
 
 async def completar_meta(ctx: ExecContext, action_type: str, prepared: dict, values: dict, old: dict,
@@ -424,7 +452,7 @@ async def completar_meta(ctx: ExecContext, action_type: str, prepared: dict, val
     except psycopg.Error:
         frase = None
     if frase:
-        partes.append(frase)
+        partes.append(frase + (f" ({SO_A_CONTA})" if mensal else ""))
     return "; ".join(partes) or None
 
 

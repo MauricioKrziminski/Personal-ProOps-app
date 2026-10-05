@@ -68,7 +68,9 @@ Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
   "libera 300 da reserva") e ATUALIZAR o valor de uma conta de investimento ("meu CDB está valendo
   10.500") ou registrar o rendimento dela ("recebi 85 de rendimento do CDB") são cadastros. Ver ou
   aplicar o plano percentual do orçamento ("aplica o plano nos meus limites") também. PERGUNTAR da
-  reserva de emergência ("minha reserva cobre quantos meses?") e do plano de metas ("cabe no meu
+  reserva de emergência ("minha reserva cobre quantos meses?") — mas "quanto falta pra minha meta
+  reserva?" cita uma META chamada reserva e é "financas_consulta" (a meta vence a reserva de
+  emergência quando a palavra "meta" aparece) — e do plano de metas ("cabe no meu
   plano de metas?", "quando aperta?") também é cadastros (a resposta sai do cadastro, não de uma
   consulta de transações). LANÇAR um favorito ("lança meu favorito Almoço") e REPETIR um lançamento
   que já existe ("repete o lançamento do mercado de ontem", "duplica a conta de luz") também são
