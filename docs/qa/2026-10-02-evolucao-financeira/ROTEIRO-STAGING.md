@@ -68,6 +68,8 @@ cada ponto estão no `fNN/aceite.md` (ou `registro-nativo.md` em F01–F05).
 | Financiamento com parcela vencida e não paga → **Editar** → data da próxima parcela | Escolha uma data que já passou (ex.: 23/09) | O campo mantém a data escolhida e avisa "Venceu em 23/09 e ainda não foi paga"; a ficha mostra essa parcela como atrasada e as seguintes nas datas certas do contrato; o ciclo atual mostra a parcela atrasada; no ciclo que já fechou ela soma em "faltou pagar" |
 | Lançar → **Financiamento** com parcelas já pagas, a última paga dentro do ciclo atual (ex.: 8 pagas, 8ª em 23/09) | Escolha a conta que paga e responda **Sim** em "A 8ª (23/09) já saiu da conta X?" | A 8ª vira um lançamento pago naquela conta, aparece no ciclo ("o que entra e sai") como saída no dia dela e o saldo da conta cai o valor. As parcelas de ciclos anteriores ficam só contadas. Responder Não deixa como antes |
 | Carteira → um cartão que fecha no ÚLTIMO dia do mês e vence no dia 10 do mês seguinte (como o BB), antes do dia 10 | Veja "Fatura atual" | Mostra a fatura que vence no dia 10 DESTE mês (fechada, aguardando pagamento), não a próxima; o cartão que fecha no dia 3 e vence no 10 continua igual. Paga essa fatura, a atual passa a ser a seguinte |
+| Logado, feche o app, ligue o modo avião e abra depois de mais de 1 h | A abertura | Em ~12 s aparece "Sem conexão" com "Tentar de novo", nunca a tela de login; com a rede de volta, entra sem pedir senha (tocando ou sozinho). Numa rede lenta mas funcionando o aviso pode piscar e sumir sozinho quando a sessão chega: é esperado |
+| Metas → Plano de metas → "Aporte inicial" | Digite 75,00 e 1.234,56 e espere a prévia recalcular | Todos os dígitos visíveis (antes o primeiro sumia: 75,00 aparecia 5,00) |
 
 ## Pelo WhatsApp / Agente
 
