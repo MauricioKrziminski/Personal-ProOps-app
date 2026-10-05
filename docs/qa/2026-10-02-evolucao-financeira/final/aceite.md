@@ -48,22 +48,39 @@ prazo de meta (F08/F10), reserva (F07), guardar/retirar com origem (F11), aplica
 reavaliar investimento (F12/F13), plano percentual (F14), por que mudou (F15), transferência
 recorrente e encerrar série (F18), marcos (F19), favoritos e duplicar (F22).
 
+## Depois do aceite (05/10/2026, tarde)
+
+Correções do teste do Gabriel em produção, conferidas no staging nos dois sistemas
+(`evidence/correcoes-ios/`, `evidence/correcoes-android/`):
+
+- valor da linha minúsculo depois de buscar (`row.tsx`);
+- trava do app por baixo do formulário modal e das folhas (iOS: `FullWindowOverlay`; Android:
+  `Modal`, e Voltar na trava não fecha a folha por baixo);
+- financiamento: parcela vencida não desliza para o mês seguinte (fica "atrasada" na data do
+  contrato, na ficha e no ciclo; no ciclo fechado soma em "faltou pagar"); parcela paga dentro do
+  ciclo atual pergunta "já saiu da conta X?" e vira lançamento pago; a prévia "Ao salvar" mostra
+  esse débito; sem conta que paga, não pergunta;
+- abertura sem rede com token vencido mostra "Sem conexão", nunca o login, e erro de rede não faz
+  `signOut` (`evidence/sessao-offline/`);
+- Metas com Reduzir Movimento no iOS: cartão fora do lugar cobrindo "Simular juntas" (D1 do
+  `f08/evidence/ipad/`), corrigido no ponto único `transicao.ts`.
+
+Paridade do agente: lotes A–D publicados no staging (`agente-staging-00219`), cada um com revisão
+independente e os achados corrigidos; o que fica só no app está em
+`docs/AGENTE-PARIDADE-COM-O-APP.md`. Roteiro de teste: `../ROTEIRO-STAGING.md`.
+
 ## Pendências reais
 
-- `QA-ANDROID-20261003-ANR` (F07): causa em aberto.
-- F08: tablet, fonte ampliada, temas e build sem Metro não executados.
-- F01/F02: offline nativo do iOS sem execução.
-- F04: a suíte antiga de recorrência segue como falha conhecida.
-- F22: favorito com conta/categoria arquivada e editar favorito não vistos no aparelho.
-- Resíduos de QA de fases anteriores no dev@: séries "QA F02 IOS serie 20261002" e "QA F06
-  android série" seguem ativas e geram ocorrências (vistas hoje: +R$ 32,10 e +R$ 0,13). Não foram
-  apagadas porque não são desta sessão; apagar exige confirmar os IDs da fase delas.
-- **Instruções de domínio não atualizadas para F18–F22** (`.claude/rules/finance.md` e
-  `frontend.md` não citam encerrar série/transferência recorrente, marcos, acumulação, primeiro
-  cadastro nem `transaction_templates`); a regra de cada um está no contrato e no aceite.
-  Catálogo de ajuda (`explicacoes.ts`): F20–F22 não têm indicador a explicar.
-- **Comparação visual de composição** do programa (spec §8) não feita; houve conferência visual
-  por ponto nos aceites.
-- Worktrees dos agentes em `.claude/worktrees/` ficaram (os commits já estão integrados).
-- Integrar por patch com o Metro de pé deixou módulos velhos nos aparelhos (F22): o QA só vale
-  depois de `touch` nos arquivos e de provar a tela nova.
+- Avaliação com o Gemini real dos lotes A–D (`agent/scripts/evaluate_answer_forms.py --secao lote
+  --barato`, depois sem flag) e a sonda do lote C (`agent/scripts/probe_atributos_lote_c.py`): a cota
+  gratuita do staging acabou em 05/10; o pytest (dublês) está verde, o Gemini real não foi medido.
+- `QA-ANDROID-20261003-ANR` (F07): sem causa de código provada (`f07/anr-causa.md`); falta medir a
+  alternância de "ocultar valores" num build release.
+- F08 iPad em paisagem: o simulador ligado por linha de comando não gira no Xcode 27; a rotação com
+  rascunho foi conferida no Android tablet.
+- F01/F02 offline no iOS: o simulador não tem modo avião; offline conferido no Android.
+- Observação O1 do iPad (arrastar a folha para baixo fechou e descartou o rascunho): não reproduzida
+  pela leitura do código (`Modal` do RN 0.86 nasce com `modalInPresentation`); precisa de reprodução.
+- Comparação visual de composição do programa (spec §8) não feita; houve conferência por ponto.
+- Integrar por patch com o Metro de pé deixa módulos velhos nos aparelhos: o QA só vale depois de
+  `touch` nos arquivos e de provar a tela nova.

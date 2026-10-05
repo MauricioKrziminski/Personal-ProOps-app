@@ -112,3 +112,53 @@ Substituto executado (re-render com a folha aberta, rascunho digitado, lido por 
 Tema claro · `content_size large` · Ocultar valores desligado (`proops.conceal` = `0`) · Reduzir Movimento desligado
 (chave removida + notificação, app relançado) · retrato · app em Metas com layout correto. Nenhum plano, aporte ou
 movimento criado no staging (a folha "Guardar" foi aberta duas vezes por toque na área sobreposta, D1, e fechada sem gravar).
+
+## Reteste D1 — correção `dd0f8e9b` (sem transição de layout no iOS com Reduzir Movimento) — 05/10/2026
+
+**Veredito: D1 corrigido (PASSA nos 3 itens).** Mesmo iPad Pro 11" M5 (`EE942585-68F1-477A-8534-A7B10BEAA346`), staging, dev@,
+somente leitura; nada gravado (folha "Guardar" nunca abriu; folhas e formulário fechados sem salvar). Capturas `reteste-*` nesta pasta.
+
+### Prova de que o bundle é o novo
+- Metro 8081 já de pé (não reiniciado). `curl` no bundle iOS (`index.bundle?platform=ios&dev=true…`, 19.819.004 bytes) contém
+  `semTransicao` (3 ocorrências): `semTransicao = Platform.OS === 'android' || useReducedMotion()` e as duas
+  `semTransicao ? undefined : LinearTransition.duration(…)`.
+- `terminate` + `launch` antes de cada abertura. Prova no aparelho: com Reduzir Movimento ligado aparece o toast de dev
+  "Open debugger to view warnings." (aviso do Reanimated, ver D1) e com ele desligado não aparece.
+
+### 1. Reduzir Movimento LIGADO — 5 aberturas a frio em `…dev:///finance/goals` — PASSA (5/5)
+Ajuste lido de volta: `ReduceMotionEnabled = 1`; app relançado a cada abertura (plano sem cache). Medido pela árvore de acessibilidade
+depois de "Simular juntas" e "Troca do notebook" existirem + 5 s:
+
+| Abertura | "Simular juntas" (y, h) | "Troca do notebook" (y) | Sobreposição | Toque em "Simular juntas" |
+|---|---|---|---|---|
+| 1 | 338, 67 (termina 405) | **430** (antes do fix: 343) | nenhuma | abre "Plano de metas · Ajuste intenções futuras…" |
+| 2 | 338, 67 | 430 | nenhuma | abre o plano |
+| 3 | 338, 67 | 430 | nenhuma | abre o plano |
+| 4 | 338, 67 | 430 | nenhuma | abre o plano |
+| 5 | 338, 67 | 430 | nenhuma | abre o plano |
+
+"Reserva de emergência" em y=614 nas cinco. Em nenhuma abertura apareceu a folha "Guardar". Capturas:
+`reteste-rm-run{1..5}-metas.png` (layout) e `reteste-rm-run1-toque-simular-abre-plano.png`, `reteste-rm-run{2..5}-toque.png` (folha do plano).
+
+### 2. Reduzir Movimento DESLIGADO — PASSA
+Chave removida (`defaults delete`) + `notifyutil`, app relançado; o toast do Reanimated sumiu.
+- Metas certa: "Simular juntas" y=338, "Troca do notebook" y=430, "Reserva" y=615 (`reteste-rmoff-metas.png`).
+- Bloco que muda de altura 1 — seletor "Período da simulação" (folha do plano): aberto empurra "Menor disponibilidade no período" de y=505
+  para y=928; fechado volta a y=505 exatos, nada preso nem sobreposto (`reteste-rmoff-select-aberto.png`, `-select-fechado.png`).
+- Bloco que muda de altura 2 — "Ver períodos": expandido, "Reserva de emergência" vai de y=510 para y=864 e mostra a lista "Caixa e
+  disponível" + "Ver mais (9)" sem sobreposição; recolhido volta a y=510 exatos (`reteste-rmoff-periodos-aberto.png`, `-periodos-recolhido.png`).
+- Ressalva (não é falha): a gravação de vídeo (60 qps) mostra a lista já no lugar no primeiro quadro após o toque e só um
+  assentamento de ~23 pt do conteúdo logo abaixo nos quadros seguintes (`reteste-rmoff-frames-expandir*.png`). Isso é compatível com a
+  transição de layout ativa, mas NÃO prova um "deslize" completo; a prova do que foi pedido (nada fica preso) é a posição final idêntica
+  nos dois sentidos. Conferência do movimento a olho continua não executada.
+
+### 3. iPhone 17 Pro (`F0BDF23C-0286-4183-97E3-3BCC61D4267D`), Reduzir Movimento desligado — PASSA
+- Metas: "Simular juntas" y=368–453, "Troca do notebook" y=478, "Reserva" y=662; nada sobreposto (`reteste-iphone-metas.png`).
+- Formulário de lançamento (`…dev:///finance/lancar?tipo=uma`): lista de contas aberta mostra "Sem conta", CONTAS (Nubank, Poupança),
+  CARTÕES (3) e "Criar conta"/"Criar cartão" em sequência, sem sobreposição; "Data" desce de y=565 para y=1176 (depois de "Criar cartão")
+  e volta a y=565 ao fechar a lista (`reteste-iphone-lancar-conta-aberta.png`, `-conta-fechada.png`, `-conta-fechada-depois.png`).
+  Formulário fechado sem salvar.
+
+### Estado devolvido
+Reduzir Movimento desligado nos dois simuladores (iPad: chave removida + `notifyutil`, app relançado em Metas; iPhone: já estava em 0).
+Tema claro, `content_size large`, retrato. Nenhum código editado; nada gravado no staging.
