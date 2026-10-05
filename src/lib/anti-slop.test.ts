@@ -1489,6 +1489,7 @@ test('toda tela de dados tem puxar para atualizar', () => {
     'app/(tabs)/agent/index.tsx': 'compositor; o histórico tem o gesto',
     'app/finance/wallet.tsx': 'carrossel de cartões',
     'app/finance/manage.tsx': 'menu de destinos',
+    'app/finance/acumulacao.tsx': 'simulador local; só lê o patrimônio inicial',
   };
   const faltando = walk(join(SRC, 'app'))
     .filter((f) => f.endsWith('.tsx') && readFileSync(f, 'utf8').includes('<Screen'))

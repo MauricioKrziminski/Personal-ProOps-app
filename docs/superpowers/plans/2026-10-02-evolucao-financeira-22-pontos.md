@@ -290,10 +290,12 @@ Aceite no staging em 05/10/2026: [F19](../../qa/2026-10-02-evolucao-financeira/f
 
 Arquivos: novo domínio puro de acumulação e superfície de planejamento com gráficos existentes. Interface: patrimônio inicial, aporte, taxa/unidade, horizonte, inflação/retirada → cenário com premissas explícitas.
 
-- [ ] RED: taxa zero e patrimônio inicial conferem com cálculo independente.
-- [ ] Implementar fórmulas estáveis/faixas/centavos e casos negativos definidos.
-- [ ] Integrar cenários/gráfico/ajuda sem alterar livro-caixa.
-- [ ] Provar limites e gates nativos F20; registrar aceite.
+- [x] RED: taxa zero e patrimônio inicial conferem com cálculo independente.
+- [x] Implementar fórmulas estáveis/faixas/centavos e casos negativos definidos.
+- [x] Integrar cenários/gráfico/ajuda sem alterar livro-caixa.
+- [x] Provar limites e gates nativos F20; registrar aceite.
+
+Aceite no staging em 05/10/2026: [F20](../../qa/2026-10-02-evolucao-financeira/f20/aceite.md). F21 liberado.
 
 ### F21 — Ativação financeira
 

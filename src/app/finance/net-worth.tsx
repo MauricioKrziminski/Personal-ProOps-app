@@ -392,6 +392,7 @@ export default function NetWorthScreen() {
           />
         );
       })}
+      <Row title="Quanto vou acumular" icon="chart.line.uptrend.xyaxis" onPress={() => router.push('/finance/acumulacao')} />
     </Section>
   ) : null;
 

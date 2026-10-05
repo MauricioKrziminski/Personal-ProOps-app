@@ -43,8 +43,8 @@ Esses fatos e a abertura do formulário ainda não equivalem ao aceite funcional
 | F17 | Ajuda e avisos | Aceito; limites no registro | Validado | Validado |
 | F18 | Transferência recorrente | Aceito; limites no registro | Validado 6/6 | Validado 5/5 |
 | F19 | Marcos nas metas | Aceito; limites no registro | Validado (celebração em vídeo) | Validado 6/6 |
-| F20 | Acumulação/renda futura | Aguardando F19 | Não validado | Não validado |
-| F21 | Primeiro cadastro guiado | Aguardando F20 | Não validado | Não validado |
+| F20 | Acumulação/renda futura | Aceito; limites no registro | Validado 9/10 + correção | Validado 9/9 |
+| F21 | Primeiro cadastro guiado | Próximo incremento, F20 aceito | Não validado | Não validado |
 | F22 | Favoritos/duplicação | Aguardando F21 | Não validado | Não validado |
 
 ## Registro obrigatório por incremento
@@ -335,3 +335,10 @@ liberado.
 `20261005170000_goal_milestones.sql` (renomeada na integração, ajustes da revisão), só no
 staging. A celebração passou a tocar depois que a folha do aporte sai (conferido em vídeo).
 iOS e Android aprovados; metas de QA apagadas por ID. F20 liberado.
+
+## F20 — quanto vou acumular
+
+[Aceite e limites](f20/aceite.md) e [contrato](f20/contrato.md). Sem banco: a tela calcula no
+aparelho e grava só as premissas (`usePreferencia`). Valores conferidos contra cálculo à parte nos
+dois sistemas; o QA achou o texto "atinge não atinge", os campos colados na borda e a fileira de
+botões cortada na fonte grande, corrigidos e conferidos. F21 liberado.

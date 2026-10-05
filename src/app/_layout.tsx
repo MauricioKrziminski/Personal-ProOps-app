@@ -418,6 +418,7 @@ function AppTree() {
                   <Stack.Screen name="finance/debt-installment" options={{ title: 'Parcela' }} />
                   <Stack.Screen name="finance/recurring" options={{ title: 'Recorrentes' }} />
                   <Stack.Screen name="finance/forecast" options={{ title: 'Projeção' }} />
+                  <Stack.Screen name="finance/acumulacao" options={{ title: 'Quanto vou acumular' }} />
                   <Stack.Screen name="finance/reports" options={{ title: 'Relatórios' }} />
                   <Stack.Screen name="finance/why" options={{ title: 'Por que mudou?' }} />
                   <Stack.Screen name="finance/net-worth" options={{ title: 'Patrimônio' }} />
