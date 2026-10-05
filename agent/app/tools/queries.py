@@ -899,6 +899,7 @@ async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
         partes = [f"{se_esvaziou}🔁 *Suas recorrências*"]
         partes += bloco("income", "\n*Entra*")
         partes += bloco("expense", "\n*Sai*")
+        partes += bloco("transfer", "\n*Transfere*")
 
     pausadas = [r for r in linhas_sql if not r["active"]]
     if pausadas:

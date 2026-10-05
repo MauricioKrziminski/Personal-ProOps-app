@@ -10,7 +10,15 @@ determinístico escolhe a função. O modelo não tem como inventar uma chamada.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from uuid import UUID
+from uuid import UUID, uuid5
+
+# Namespace fixo das chaves de repetição (`p_request_id`) dos comandos do app que o agente chama.
+# Mesma mensagem + mesma posição da ação = mesma chave, então o retry da execução devolve o recibo.
+REQUEST_NAMESPACE = UUID("6f0c1c1e-5d1b-4f7a-9a3e-0b6d8a2f4c11")
+
+
+def request_id(source_message_id: str, action_index: int) -> UUID:
+    return uuid5(REQUEST_NAMESPACE, f"{source_message_id}:{action_index}")
 
 
 @dataclass

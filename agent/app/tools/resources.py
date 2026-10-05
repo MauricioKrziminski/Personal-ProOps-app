@@ -15,12 +15,13 @@ from uuid import UUID
 import psycopg
 
 from app import db
+from app.domain import matching
 from app.domain.dates import format_date_br, now_utc, to_instant, local_iso_date, tz
 from app.domain.money import cents_to_brl, MAX_CENTS
-from app.domain.recurrence import next_occurrence
+from app.domain.recurrence import descreve_rrule, next_occurrence
 from app.domain.categories import normalize
 from app.graph.schemas import ResourceAction, ResourceActionType as Op
-from app.tools.base import ExecContext, ToolResult, ensure_owned
+from app.tools.base import ExecContext, ToolResult, ensure_owned, request_id
 from app.tools.guards import Level1Error, clean_rrule
 
 # table, identifying column, deletion semantics, editable columns
@@ -61,7 +62,8 @@ CATALOG = {
         "recurring_transactions",
         "description",
         "active",
-        "kind amount_cents category subcategory_id description account_id rrule dtstart auto_confirm active",
+        "kind amount_cents category subcategory_id description account_id counterparty_account_id rrule dtstart "
+        "auto_confirm active encerrar_em reabrir",
     ),
     "rules": (
         "categorization_rules",
@@ -154,6 +156,9 @@ LABELS = {
     "category": "categoria",
     "payment_category": "categoria do pagamento",
     "subcategory_id": "detalhe",
+    "counterparty_account_id": "conta de destino",
+    "encerrar_em": "última cobrança",
+    "reabrir": "reabrir a série",
     "limit_cents": "limite",
     "rollover": "acumular sobra",
     "month": "mês",
@@ -212,6 +217,9 @@ COLOR_ALIASES = {
     "amarelo": "mostarda", "dourado": "mostarda", "ouro": "mostarda",
     "verde": "musgo", "verde escuro": "musgo", "verde agua": "turquesa",
 }
+# "sem detalhe" é um valor possível do detalhe de categoria, e ele é NULL.
+SEM_DETALHE = {"nenhum", "nenhuma", "sem detalhe", "sem subcategoria", "sem", "tira", "tirar",
+               "remove", "remover", "limpa", "limpar"}
 # "tira a cor" é um valor possível, e ele é NULL — não um erro de digitação.
 SEM_COR = {"sem cor", "nenhuma", "nenhum", "sem", "padrao", "normal", "tira",
            "tirar", "remove", "remover", "limpa", "limpar"}
@@ -250,7 +258,7 @@ ENUMS = {
         "receivable",
         "other",
     },
-    ("recurring", "kind"): {"expense", "income"},
+    ("recurring", "kind"): {"expense", "income", "transfer"},
     ("reminders", "channel"): {"push", "whatsapp", "both"},
     ("rules", "match_type"): {"contains", "merchant"},
     ("notes", "color"): NOTE_COLORS,
@@ -278,6 +286,7 @@ ROTULO_DE_ENUM = {
     "receivable": "valor a receber",
     "expense": "gasto",
     "income": "receita",
+    "transfer": "transferência",
     "push": "notificação no app",
     "whatsapp": "WhatsApp",
     "both": "notificação no app e WhatsApp",
@@ -286,10 +295,11 @@ ROTULO_DE_ENUM = {
 }
 
 BOOLS = {"archived", "active", "rollover", "is_liability", "auto_confirm", "pinned", "is_default",
-         "trashed", "rotativo_auto", "fatura_paga", "fatura_adiada"}
+         "trashed", "rotativo_auto", "fatura_paga", "fatura_adiada", "reabrir"}
 LINKS = {
     "account_id": "accounts",
     "payment_account_id": "accounts",
+    "counterparty_account_id": "accounts",
     "folder_id": "note_folders",
     "parent_id": "note_folders",
 }
@@ -365,10 +375,25 @@ def validate_fields(action: ResourceAction) -> dict:
             continue
         value = value.strip()
         if key == "subcategory_id":
-            try:
+            # Id existente OU o NOME do detalhe: o modelo nunca vê UUID, e quem resolve o nome
+            # contra a categoria-pai (e pergunta se não casa ou casa com duas) é o `prepare`.
+            if _parece_id(value):
                 value = str(UUID(value))
+            elif normalize(value) in SEM_DETALHE:
+                values[key] = None
+                continue
+            elif not value or len(value) > 40:
+                _error("Qual é o detalhe? Diga o nome dele (até 40 letras). Nada foi alterado.")
+        elif key == "encerrar_em":
+            # A data da ÚLTIMA cobrança. Vazio, "hoje" ou "última" = o padrão do app (a mais recente
+            # que já venceu), resolvido no `prepare`; o SIM mostra a data que valeu.
+            if normalize(value) in {"hoje", "ultima", "ultimo", "padrao", "agora"}:
+                values[key] = None
+                continue
+            try:
+                value = date.fromisoformat(value).isoformat()
             except ValueError:
-                _error("Escolha um detalhe existente desta categoria no app; não consigo usar esse identificador.")
+                _error("Me diz até quando vai a série (ex.: dezembro de 2026). Nada foi alterado.")
         elif key in BOOLS:
             if value not in {"true", "false"}:
                 _error(f"Informe sim ou não para {LABELS[key]}.")
@@ -513,6 +538,27 @@ def validate_fields(action: ResourceAction) -> dict:
         values[key] = value
     if action.type == Op.CREATE and action.name and identity not in values:
         values[identity] = action.name.strip()
+    if values.keys() & {"encerrar_em", "reabrir"}:
+        # Encerrar e reabrir uma série são o "Encerrar" e o "editar o fim" do app: um verbo por vez,
+        # só sobre série que já existe. Misturar com edição esconderia um dos efeitos do SIM.
+        if action.resource != "recurring" or action.type != Op.UPDATE:
+            _error("Encerrar ou reabrir é coisa de uma recorrência que já existe. Nada foi alterado.")
+        if len(values) != 1:
+            _error("Me diz uma coisa por vez: encerrar a série, reabrir, ou mudar outro campo. "
+                   "Nada foi alterado.")
+        if values.get("reabrir") is False:
+            _error("Para encerrar uma série, diga até quando ela vai. Nada foi alterado.")
+    if action.resource == "recurring" and action.type == Op.CREATE and values.get("kind") == "transfer":
+        # Transferência entre contas próprias não tem categoria nem detalhe: o banco guarda as duas
+        # pontas (gatilho `recurring_transfer_scope`) e a recusa de origem = destino vem no `prepare`.
+        values.pop("category", None)
+        values.pop("subcategory_id", None)
+        if not values.get("account_id") or not values.get("counterparty_account_id"):
+            _error("Para criar a transferência recorrente, informe de qual conta sai e para qual conta "
+                   "vai. Ainda não salvei nada.")
+    elif action.resource == "recurring" and values.get("counterparty_account_id") is not None \
+            and values.get("kind") != "transfer" and action.type == Op.CREATE:
+        _error("Só a transferência tem conta de destino. Ainda não salvei nada.")
     if action.resource == "folders":
         if "name" in values:
             values["name"] = normalize(values["name"])
@@ -913,6 +959,134 @@ async def _corrigir_aporte(ctx: ExecContext, proposal: dict) -> ToolResult:
     return ToolResult(f"✏️ {proposal['feito']}.", result_id=aporte["id"])
 
 
+def _n(qtd: int, um: str, varios: str) -> str:
+    return f"{qtd} {um if qtd == 1 else varios}"
+
+
+def frase_do_encerramento(p: dict) -> str:
+    """O que FICA e o que SAI, com os números do banco. Espelho de `fraseDoEncerramento`
+    (`src/lib/encerrar-serie.ts`): a mesma frase que o app mostra antes de confirmar."""
+    pagas, atrasadas = int(p["kept_paid_count"]), int(p["kept_overdue_count"])
+    saem, travadas, ainda = int(p["removed_count"]), int(p["kept_locked_count"]), int(p["kept_upcoming_count"])
+    fica = f"Ficam {_n(pagas, 'paga', 'pagas')} e {_n(atrasadas, 'atrasada', 'atrasadas')}."
+    sai = (f"Saem {_n(saem, 'cobrança futura', 'cobranças futuras')} ({cents_to_brl(int(p['removed_cents']))})."
+           if saem > 0 else "Nenhuma cobrança futura sai.")
+    trava = (f" {_n(travadas, 'cobrança fica', 'cobranças ficam')} porque a fatura "
+             f"{'dela' if travadas == 1 else 'delas'} já foi paga, adiada ou paga em parte." if travadas else "")
+    ate = (f" {_n(ainda, 'ainda vence', 'ainda vencem')} até {format_date_br(p['end_date'])}." if ainda else "")
+    return f"{fica} {sai}{trava}{ate} A série vai para Encerradas."
+
+
+async def _achar_serie(ctx: ExecContext, nome: str) -> dict:
+    """A série pelo nome (sem caixa e sem acento): igual primeiro, depois "contém". Empate pergunta."""
+    colunas = ("select id, description, kind, active, end_date, xmin::text as row_version "
+               "from public.recurring_transactions where workspace_id = %s and ")
+    rows = await db.fetch(
+        colunas + "extensions.unaccent(lower(description)) = extensions.unaccent(lower(%s)) limit 6",
+        ctx.workspace_id, nome.strip(),
+    )
+    if not rows:
+        rows = await db.fetch(
+            colunas + "extensions.unaccent(lower(description)) like extensions.unaccent(lower(%s)) "
+            "order by description limit 6",
+            ctx.workspace_id, f"%{nome.strip()}%",
+        )
+    if not rows:
+        _error(f"Não achei recorrência com o nome *{nome}*. Nada foi alterado.")
+    if len(rows) > 1:
+        _error(f"Qual delas? {', '.join(r['description'] or 'sem descrição' for r in rows)}. "
+               "Nada foi alterado.")
+    return rows[0]
+
+
+async def _preparar_fim_da_serie(ctx: ExecContext, action: ResourceAction, values: dict, prepared: dict) -> dict:
+    """"Cancela a assinatura" / "encerra o aluguel em dezembro" / "reabre a série" — o Encerrar do
+    app (F18), pelas MESMAS RPCs. A frase do SIM sai da prévia do banco, não de uma conta aqui."""
+    if not action.name:
+        _error("Qual recorrência? Me fala o nome dela. Nada foi alterado.")
+    serie = await _achar_serie(ctx, action.name)
+    nome = serie["description"] or action.name
+    prepared["values"] = {}
+    prepared["nome_serie"] = nome
+    prepared["id"] = str(serie["id"])
+    if "reabrir" in values:
+        if serie["end_date"] is None:
+            raise JaExiste(f"A série *{nome}* não está encerrada. Nada foi alterado.")
+        prepared["reabrir"] = True
+        prepared["summary"] = (
+            f"reabrir a série *{nome}*: tira o fim em {format_date_br(serie['end_date'])} e ela volta a "
+            "gerar cobranças a partir da próxima"
+        )
+        return prepared
+    hoje = local_iso_date(ctx.timezone)
+    ultima = values.get("encerrar_em")
+    if not ultima:
+        # O padrão do app (`ultimaCobrancaPadrao`): a cobrança mais recente que JÁ venceu; sem
+        # nenhuma, hoje. A data vai escrita no SIM.
+        achada = await db.fetch_one(
+            "select max(occurred_at) as d from public.transactions "
+            "where recurring_id = %s and workspace_id = %s and occurred_at <= %s::date",
+            serie["id"], ctx.workspace_id, hoje,
+        )
+        ultima = str((achada or {}).get("d") or hoje)[:10]
+    if serie["end_date"] is not None and str(serie["end_date"])[:10] == ultima:
+        raise JaExiste(f"A série *{nome}* já termina em {format_date_br(ultima)}. Nada foi alterado.")
+    try:
+        async with db.como_usuario(ctx.user_id) as tx:
+            previa = await tx.fetch_one(
+                "select public.end_recurring_series_preview(%s, %s::date) as p", serie["id"], ultima
+            )
+    except psycopg.errors.RaiseException as err:
+        motivo = (err.diag.message_primary or str(err)).strip().rstrip(".")
+        raise Level1Error(f"❌ {motivo}. Nada foi alterado.") from err
+    previa = (previa or {}).get("p")
+    if not previa:
+        _error("Não consegui conferir o que fica e o que sai. Nada foi alterado.")
+    prepared["encerrar"] = {"id": str(serie["id"]), "last_date": ultima}
+    prepared["summary"] = (
+        f"encerrar a série *{nome}* com a última cobrança em {format_date_br(ultima)}. "
+        f"{frase_do_encerramento(previa)} Dá para reabrir depois"
+    )
+    return prepared
+
+
+async def _encerrar_serie(ctx: ExecContext, proposal: dict) -> ToolResult:
+    alvo = proposal["encerrar"]
+    await ensure_owned("recurring_transactions", alvo["id"], ctx.workspace_id)
+    try:
+        async with db.como_usuario(ctx.user_id) as tx:
+            row = await tx.fetch_one(
+                "select public.end_recurring_series(%s, %s::date, %s) as r",
+                alvo["id"], alvo["last_date"], request_id(ctx.source_message_id, ctx.action_index),
+            )
+    except (psycopg.errors.RaiseException, psycopg.errors.InvalidParameterValue) as err:
+        motivo = (err.diag.message_primary or str(err)).strip().rstrip(".")
+        raise Level1Error(f"❌ {motivo}. Nada foi alterado.") from err
+    feito = (row or {}).get("r")
+    if not feito:
+        raise Level1Error("Não consegui encerrar a série. Nada foi alterado.")
+    return ToolResult(
+        f"🔚 Encerrei a série *{proposal['nome_serie']}* com a última cobrança em "
+        f"{format_date_br(alvo['last_date'])}. {frase_do_encerramento(feito)}",
+        result_id=alvo["id"],
+    )
+
+
+async def _reabrir_serie(ctx: ExecContext, proposal: dict) -> ToolResult:
+    await ensure_owned("recurring_transactions", proposal["id"], ctx.workspace_id)
+    try:
+        async with db.como_usuario(ctx.user_id) as tx:
+            await tx.fetch_one(
+                "select public.update_recurring_series(%s, '{\"end_date\": null}'::jsonb, true) as futuras",
+                proposal["id"],
+            )
+    except psycopg.errors.RaiseException as err:
+        motivo = (err.diag.message_primary or str(err)).strip().rstrip(".")
+        raise Level1Error(f"❌ {motivo}. Nada foi alterado.") from err
+    return ToolResult(f"🔁 Reabri a série *{proposal['nome_serie']}*: ela volta a gerar cobranças "
+                      "a partir da próxima.", result_id=proposal["id"])
+
+
 async def _preparar_mes(ctx: ExecContext, action: ResourceAction, prepared: dict) -> dict:
     """O mês financeiro: linha única, sem nome, e só o DONO muda.
 
@@ -1035,6 +1209,10 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
     # Corrigir um APORTE da meta: campos VIRTUAIS que viram `edit_goal_contribution`.
     if action.resource == "goals" and values.keys() & _CAMPOS_DO_APORTE:
         return await _preparar_aporte(ctx, action, values, prepared)
+    # Encerrar / reabrir uma série (F18): campos VIRTUAIS que viram `end_recurring_series`.
+    if action.resource == "recurring" and values.keys() & {"encerrar_em", "reabrir"}:
+        return await _preparar_fim_da_serie(ctx, action, values, prepared)
+    old: dict = {}
     # ⚠️ **`archived` é coluna DE VERDADE em metas, bens e dívidas** — é o
     # `deletion` delas no catálogo. Em nota e pasta o app arquiva com
     # TIMESTAMP (`archived_at`, espelhando `deleted_at`, para a tela de
@@ -1135,6 +1313,10 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         if len(rows) != 1:
             _error(_nao_achei(action, rows))
         old = rows[0]
+        if action.resource == "recurring" and action.type == Op.UPDATE and "kind" in values and (
+                values["kind"] == "transfer" or old.get("kind") == "transfer"):
+            _error("Transferência não vira gasto nem receita (e o contrário também). Para trocar o tipo "
+                   "da série, converta o registro no app. Nada foi alterado.")
         # A frase do SIM diz o nome como está no app, não como foi digitado ("carro" → "Carro").
         if action.resource not in {"notes", "folders", "budgets"} and old.get(identity):
             prepared["nome_real"] = str(old[identity])
@@ -1321,6 +1503,32 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         parent = values[parent_column] if parent_column in values else (
             old.get(parent_column) if action.type != Op.CREATE else None)
         prepared["subcategory_parent"] = parent
+        if values["subcategory_id"] is not None and not _parece_id(values["subcategory_id"]):
+            # O NOME do detalhe, resolvido na categoria-pai (F09): igual primeiro, depois "contém"
+            # (sem caixa e sem acento, como o catálogo inteiro). Sem categoria não há onde procurar;
+            # não casa ou casa com duas = pergunta, nunca escolha silenciosa.
+            if not parent:
+                _error("Para escolher o detalhe, preciso saber a categoria dele. Qual é? Nada foi alterado.")
+            dito = values["subcategory_id"]
+            filhas = await db.fetch(
+                "select id, name from public.subcategories where workspace_id = %s "
+                "and parent_key = private.fold(%s) order by name",
+                ctx.workspace_id, parent,
+            )
+            chave = matching.normalize(dito)
+            achadas = [f for f in filhas if matching.normalize(f["name"]) == chave] or [
+                f for f in filhas if chave in matching.normalize(f["name"])
+            ]
+            if len(achadas) != 1:
+                nomes = ", ".join(f["name"] for f in (achadas or filhas)[:8])
+                _error(
+                    (f"*{dito}* casa com mais de um detalhe de {parent}: {nomes}. Qual deles?"
+                     if achadas else
+                     (f"Não achei o detalhe *{dito}* em {parent}. Tenho: {nomes}. Qual é?" if filhas else
+                      f"A categoria {parent} ainda não tem detalhes cadastrados; crie no app."))
+                    + " Nada foi alterado."
+                )
+            values["subcategory_id"] = str(achadas[0]["id"])
         if values["subcategory_id"] is not None:
             details = await db.fetch(
                 "select id,name from public.subcategories where id=%s and workspace_id=%s "
@@ -1360,7 +1568,7 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                 # Citou e não existe (ou empatou): a pergunta mostra o que existe.
                 # Onde cartão é recusado logo abaixo (conta pagadora), ele não entra na lista.
                 sem_cartao = linked_table == "accounts" and (
-                    key == "payment_account_id" or action.resource == "debts")
+                    key in {"payment_account_id", "counterparty_account_id"} or action.resource == "debts")
                 nomes = [r["name"] for r in rows] or [r["label"] for r in await db.fetch(
                     f"select name as label from public.{linked_table} where workspace_id = %s"
                     + (" and not archived" if linked_table == "accounts" else "")
@@ -1373,6 +1581,8 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                     + (f"Tenho: {', '.join(nomes)}. Qual é?" if nomes else "Informe o nome exato.")
                 )
             row = rows[0]
+            if key == "counterparty_account_id" and row.get("type") == "credit_card":
+                _error("O destino da transferência não pode ser um cartão. Nada foi alterado.")
             if (key == "payment_account_id" or action.resource == "debts") and row.get(
                 "type"
             ) == "credit_card":
@@ -1381,6 +1591,20 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                 _error("Uma pasta não pode ser sua própria pasta superior.")
             values[key] = str(row["id"])
             display[key] = row["name"]
+    if action.resource == "recurring" and action.type != Op.DELETE:
+        # Origem e destino da transferência valem JUNTOS (o banco recusa depois do SIM; aqui a recusa
+        # vem antes). O gatilho `recurring_transfer_scope` continua sendo a palavra final.
+        tipo_final = values.get("kind", old.get("kind"))
+        origem = values.get("account_id", old.get("account_id"))
+        destino = values.get("counterparty_account_id", old.get("counterparty_account_id"))
+        if tipo_final == "transfer":
+            if not origem or not destino:
+                _error("Para a transferência recorrente, informe de qual conta sai e para qual conta vai. "
+                       "Nada foi alterado.")
+            if str(origem) == str(destino):
+                _error("A conta de origem e a de destino precisam ser diferentes. Nada foi alterado.")
+        elif destino:
+            _error("Só a transferência tem conta de destino. Nada foi alterado.")
     if action.resource == "folders" and values.get("parent_id"):
         ancestors = await db.fetch(
             """with recursive parents as (
@@ -1430,6 +1654,15 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                 else ""
             )
             + ", junto com as parcelas futuras (não dá para desfazer)"
+        )
+        return prepared
+    if action.resource == "recurring" and action.type == Op.CREATE and values.get("kind") == "transfer":
+        # A frase diz o EFEITO nas duas contas, não a lista de campos (F18).
+        inicio = datetime.fromisoformat(values["dtstart"]).astimezone(tz(ctx.timezone)).date()
+        prepared["summary"] = (
+            f"criar transferência de {cents_to_brl(values['amount_cents'])} {descreve_rrule(values.get('rrule'))} "
+            f"da conta {display.get('account_id', '?')} para a conta {display.get('counterparty_account_id', '?')}"
+            f" — título: {values.get('description') or action.name}; primeira em {format_date_br(inicio)}"
         )
         return prepared
     verb = {
@@ -1660,6 +1893,10 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
         return await _gravar_mes(ctx, proposal)
     if action.type == Op.ROLL:
         return await _adiar_fatura(ctx, proposal)
+    if proposal.get("encerrar"):
+        return await _encerrar_serie(ctx, proposal)
+    if proposal.get("reabrir"):
+        return await _reabrir_serie(ctx, proposal)
     if proposal.get("desfazer_fatura"):
         return await _desfazer_fatura(ctx, proposal)
     if proposal.get("aporte"):
@@ -1717,7 +1954,7 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
             condition = f"EXISTS (select 1 from public.{linked_table} linked where linked.id = %s and linked.workspace_id = %s"
             if linked_table == "accounts":
                 condition += " and not linked.archived"
-                if key == "payment_account_id" or action.resource == "debts":
+                if key in {"payment_account_id", "counterparty_account_id"} or action.resource == "debts":
                     condition += " and linked.type <> 'credit_card'"
             guards.append(condition + ")")
             link_args.extend([values[key], ctx.workspace_id])
@@ -1886,7 +2123,8 @@ async def _editar_alcance_do_limite(ctx: ExecContext, values: dict, args: list):
 
 # O que, mudando na REGRA, tem que alcançar as ocorrências já materializadas.
 # Pausar (`active`) não reescreve nada do que já existe.
-_SERIE_PROPAGA = {"amount_cents", "category", "subcategory_id", "description", "account_id", "kind"}
+_SERIE_PROPAGA = {"amount_cents", "category", "subcategory_id", "description", "account_id", "kind",
+                  "counterparty_account_id"}
 # O calendário vai pela MESMA RPC desde `20260926120000`: ela refaz as futuras em aberto. Pelo
 # UPDATE cru, o calendário velho ficava materializado por um ano ao lado do novo.
 _SERIE_CALENDARIO = {"rrule", "dtstart", "next_run_at"}
@@ -2004,4 +2242,7 @@ def prompt_catalogue() -> str:
         + "\nEm dívidas, due_day=30/31 é dia FIXO, ajustado ao último dia disponível em mês curto. "
           "Só o pedido explícito de último dia de todo mês usa due_day=-1."
         + "\nFinanciamento/dívida tem dois modos: fixed_installments (padrão) precisa só de installment_cents e installments — o total contratual das parcelas, com juros dentro; amortized precisa de principal_cents, remaining_cents e interest_rate_monthly, e só serve quando o usuário tem esses números do contrato. Nunca converta o total das parcelas em principal nem invente taxa.\nData da PRIMEIRA parcela do financiamento: first_due_date=YYYY-MM-DD quando a pessoa disser quando a primeira vence ('a primeira parcela é em dezembro', 'começo a pagar daqui a 3 meses'); o dia de vencimento sai dela.\nFinanciamento: resource_delete ARQUIVA (sai da lista, os pagamentos ficam) e desarquivar é resource_update com archived=false. Apagar DE VEZ, com os pagamentos já lançados ('exclui o financiamento por completo', 'apaga tudo do carro'), é resource_delete com trashed=true.\nConta padrão (onde cai o lançamento que não cita conta): resource_update, resource=accounts, name=nome da conta, campo is_default=true; para tirar, is_default=false. Cartão de crédito não pode ser conta padrão.\nNota na LIXEIRA: resource_delete em notes manda para a lixeira; restaurar (\"tira da lixeira\", \"recupera a nota\") é resource_update com trashed=false; apagar DE VEZ (\"esvazia\", \"apaga definitivo\") é resource_delete com trashed=true.\nORGANIZAR NOTA E PASTA (é o que o usuário faz com o dedo na tela de Notas): fixar no topo é pinned=true (\"fixa a nota do mercado\", \"deixa essa pasta no topo\"); desafixar é pinned=false. Arquivar é archived=true (\"arquiva a nota da reunião\", \"tira a pasta de projetos da tela\") e desarquivar é archived=false — arquivar NÃO é apagar: a nota continua existindo, só sai da tela inicial. Cor é color com um dos oito nomes; se a pessoa falar a cor do dia a dia (azul, verde, rosa, vermelho, amarelo, roxo, cinza), pode mandar a palavra dela que o sistema traduz, e \"tira a cor\" é color vazio. Pasta também tem icon (um dos nomes da lista, ou a palavra em português: maleta, carrinho, casa, avião…) e tags (uma palavra por tag, \"urgente, casa\"); tag acrescenta às que já existem.\n⚠️ NOTA se identifica pelo TRECHO do texto, não por um nome: name = o pedaço que a pessoa citou (\"a nota do mercado\" -> name=mercado). Se casar com mais de uma, o sistema mostra a lista e pergunta qual — nunca escolha por ela.\nMEU MÊS (o período financeiro do usuário — quando o mês dele começa e termina): resource_update, resource=mes, campo cycle_close_day = o dia em que o mês fecha (1 a 31; 29, 30 e 31 caem no último dia do mês mais curto). Para voltar ao último dia do mês ('volta pro normal', 'fecha no fim do mês'), mande cycle_close_day vazio. Serve para: 'meu mês fecha dia 10', 'quero contar do dia 15 ao dia 15', 'qual a data de corte', 'minha virada é no dia 20', 'faz o corte no dia 10', 'prefiro contar a partir do dia 6'.\nATENÇÃO — 'dia N' aparece em quase toda frase e quase nunca é o ciclo. Só é resource=mes quando a frase fala do PERÍODO em si (o mês, o ciclo, o corte, a virada, a contagem, de-quando-a-quando). Contraexemplos que NÃO são resource=mes:\n- 'meu salário cai todo dia 5', 'todo dia 15 pago a academia', 'o aluguel vence dia 10' -> resource=recurring. Isso é um EVENTO que se repete (dinheiro entrando ou saindo), não a régua do mês. A pista é que existe uma coisa (salário, aluguel, academia) acontecendo no dia.\n- 'o cartão fecha dia 7', 'cadastra o Inter que fecha dia 7' -> resource=cards com closing_day. Quem tem fatura é o CARTÃO.\n- 'me lembra dia 20', 'a reunião é dia 20' -> lembrete ou nota, não cadastro.\nNa dúvida entre mes e recurring: se dá para perguntar 'o que acontece nesse dia?' e a resposta é um valor em dinheiro, é recurring.\nADIAR A FATURA AGORA (o rotativo, uma vez): resource_roll, resource=cards, name=nome do cartão, SEM campos. É a fatura VENCIDA que a pessoa não pagou: o saldo dela vai para a próxima, com juros e IOF. Frases: 'joga a fatura do nubank pra próxima', 'adia a fatura do inter', 'não vou conseguir pagar a fatura esse mês', 'deixa a fatura do itaú pro mês que vem', 'empurra essa fatura'.\n⚠️ resource_roll (agir AGORA nesta fatura) é diferente de rotativo_auto (LIGAR a regra para as próximas). 'adia a fatura' é resource_roll; 'deixa a fatura rolar sozinha daqui pra frente' é resource_update com rotativo_auto=true.\n⚠️ Adiar NÃO é pagar nem quitar: 'paguei a fatura' sai dinheiro, 'já tinha pago a fatura' é quitação, e adiar não move dinheiro nenhum — cria dívida nova. Se a pessoa disser que pagou, nunca use resource_roll.\nCORRIGIR UM APORTE que já foi feito numa meta (o valor, a data ou a nota dele): resource_update, resource=goals, name=nome da meta, campos aporte_do_dia = o dia do aporte a corrigir em YYYY-MM-DD (ou ultimo, para o mais recente; vazio se a pessoa não disse), novo_valor_do_aporte = o valor CERTO em centavos, nova_data_do_aporte = a data certa, nova_nota_do_aporte = a nota nova. 'o aporte de ontem na viagem foi 200, não 100' -> name=viagem, aporte_do_dia=<ontem>, novo_valor_do_aporte=20000. 'corrige o último aporte da reserva para 150' -> name=reserva, aporte_do_dia=ultimo, novo_valor_do_aporte=15000. 'o aporte de dia 20 na viagem foi dia 21' -> name=viagem, aporte_do_dia=<dia 20>, nova_data_do_aporte=<dia 21>. Guardar MAIS na meta não é isto (é um aporte novo).\nDESFAZER NA FATURA (o contrário de marcar como paga e de adiar): resource_update, resource=cards, name=nome do cartão, UM campo. Desmarcar a fatura que foi marcada como paga ('desmarca a fatura do nubank como paga', 'a fatura do inter não estava paga, reabre', 'marquei a fatura de agosto como paga sem querer') -> fatura_paga=false. Desfazer o adiamento ('desfaz o adiamento da fatura do nubank', 'volta a fatura do inter que eu joguei pra próxima', 'não era pra ter adiado a fatura') -> fatura_adiada=false. Se a pessoa disser o mês da fatura, target_month=YYYY-MM-01. Marcar como paga ou adiar NÃO usa estes campos: é 'já paguei' e resource_roll.\nROTATIVO AUTOMÁTICO do cartão (a REGRA, não o ato de agora): resource_update, resource=cards, name=nome do cartão. rotativo_auto=true faz TODA fatura vencida e não paga, daqui pra frente, ir sozinha para a próxima, com juros e IOF. rotativo_rate_monthly são os juros do rotativo, do jeito que o usuário falar ('15,5%', '12,876', '1,99') — o sistema converte para fração. É a taxa de PARTIDA: assim que chegar a primeira cobrança real, o app passa a usar a que ESTE cartão cobrou. Vazio significa não estimar juros.\nOrçamento mensal existente: target_month=YYYY-MM-01; orçamento padrão: target_month=default.\nPara pagar prestação de dívida existente: resource_pay, resource=debts, name=nome da dívida, campos amount_cents, account_id (nome da conta), paid_at (YYYY-MM-DD). Não editar remaining_cents para registrar pagamento. Ao CRIAR dívida parcelada, installments_paid sai do que o usuário disse, inclusive pela posição: 'estou na 9ª parcela' são 8 pagas, 'tô na terceira' são 2, 'comecei agora' é 0, e um número solto respondendo à pergunta é a quantidade. Deixe vazio só quando a mensagem não disser nada sobre isso — o usuário confirma o cadastro inteiro antes de qualquer gravação, e é ali que ele corrige. Em dívida QUE JÁ EXISTE é o contrário: posição e data não comprovam pagamento. No modo de parcela fixa (o padrão), corrigir as pagas é resource_update só com installments_paid — o saldo sai da parcela; no modo com juros, installments_paid junto com remaining_cents, e se faltar o saldo atual pergunte. Quando a pessoa disser quando vence a PRÓXIMA parcela ('a próxima vence dia 5 de outubro'), use next_due_date; first_due_date é só a PRIMEIRA do contrato. Nunca use resource_pay para dar baixa retroativa em várias parcelas ou invente amortização a partir do valor da prestação.\nValor POR EXTENSO é valor: 'trezentos reais' é 30000 centavos, 'mil e quinhentos' é 150000, 'dois mil e quinhentos' é 250000. Áudio transcrito e resposta falada escrevem número assim o tempo todo — deixar o campo vazio porque o número veio em palavras é perder o dado que o usuário acabou de dar."
+        + "\nTRANSFERÊNCIA RECORRENTE (dinheiro que passa de uma conta para outra sozinho, todo mês/semana): resource_create, resource=recurring, name=o título, kind=transfer, amount_cents, rrule, dtstart, account_id = conta de ORIGEM e counterparty_account_id = conta de DESTINO (os dois pelo NOME; o destino nunca é cartão), sem category. 'todo dia 5 passo 500 da Nubank para a poupança' -> kind=transfer, account_id=Nubank, counterparty_account_id=poupança, rrule=FREQ=MONTHLY;BYMONTHDAY=5. Salário e aluguel NÃO são transferência (kind=income/expense). Uma transferência avulsa, de uma vez só, não é isto."
+        + "\nENCERRAR OU REABRIR UMA SÉRIE (assinatura cancelada, contrato que acabou): resource_update, resource=recurring, name=a série, UM campo. 'cancela a assinatura da netflix', 'não pago mais a academia', 'encerra o aluguel em dezembro' -> encerrar_em = a data da ÚLTIMA cobrança em YYYY-MM-DD (só o mês, 'em dezembro': o ÚLTIMO dia desse mês, porque o fim é um teto e a cobrança de dezembro ainda vale) ou VAZIO quando a pessoa não disser até quando (o sistema usa a última que já venceu). 'reabre a netflix', 'voltei a assinar' (série encerrada) -> reabrir=true. Encerrar NÃO é pausar (active=false) nem apagar (resource_delete): encerrar mantém o histórico e tira só as cobranças futuras."
+        + "\nDETALHE DA CATEGORIA (subcategoria) em recurring, rules e debts: subcategory_id é o NOME do detalhe que a pessoa disse ('feira', 'supermercado'); o sistema procura dentro da categoria e pergunta se não achar ou se houver dois parecidos. Nunca invente id; 'sem detalhe' ou vazio remove."
     )

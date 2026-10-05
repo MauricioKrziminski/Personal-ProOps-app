@@ -87,11 +87,18 @@ def test_resource_child_is_optional_but_explicit_null_is_preserved():
         ResourceField(name="subcategory_id", value=None)])) == {"subcategory_id": None}
 
 
-def test_resource_rejects_guessed_child_name_or_invalid_id():
-    for value in ("mercado", "111", ""):
-        with pytest.raises(Level1Error):
-            resources.validate_fields(ResourceAction(type="resource_update", resource="rules", name="mercado",
-                fields=[ResourceField(name="subcategory_id", value=value)]))
+def test_resource_child_accepts_name_but_not_blank():
+    """O NOME do detalhe passa a validação (o `prepare` resolve contra a categoria-pai)."""
+    def valida(value):
+        return resources.validate_fields(ResourceAction(
+            type="resource_update", resource="rules", name="mercado",
+            fields=[ResourceField(name="subcategory_id", value=value)]))
+    assert valida("feira") == {"subcategory_id": "feira"}
+    assert valida("sem detalhe") == {"subcategory_id": None}
+    with pytest.raises(Level1Error):
+        valida("")
+    with pytest.raises(Level1Error):
+        valida("x" * 41)
 
 
 @pytest.mark.asyncio
