@@ -15,6 +15,7 @@ import {
   retryPolicyFor,
 } from '@/lib/agent-chat';
 import { File } from 'expo-file-system';
+import { tokenDoRefresh } from '@/lib/session-load';
 import { supabase } from '@/lib/supabase';
 import type { FinanceDraft } from '@/lib/voice-draft';
 
@@ -167,8 +168,8 @@ export async function agentFetch<T>(
       send: (token) => chamar(caminho, init, token),
       getToken: async () => (await supabase.auth.getSession()).data.session?.access_token ?? null,
       refresh: async () => {
-        const { data, error } = await supabase.auth.refreshSession();
-        return error ? null : (data.session?.access_token ?? null);
+        // Rede caindo lança (vira o erro de rede abaixo) e não sai da conta.
+        return tokenDoRefresh(await supabase.auth.refreshSession());
       },
       signOut: async () => {
         await supabase.auth.signOut();

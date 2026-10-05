@@ -1,6 +1,8 @@
 import type { Session } from '@supabase/supabase-js';
 import {
   createContext,
+  useCallback,
+  useMemo,
   useContext,
   useEffect,
   useRef,
@@ -11,11 +13,15 @@ import {
 import { useCortina } from '@/components/motion/session-curtain';
 import { comTeto } from '@/lib/com-teto';
 import { TETO_DA_TROCA_MS, ondaDaTroca, precisaDeCortina } from '@/lib/session-gate';
+import { carregarSessao } from '@/lib/session-load';
 import { supabase } from '@/lib/supabase';
 
 interface SessaoMostrada {
   session: Session | null;
   loading: boolean;
+  /** Ainda `loading`, mas sem rede há mais que o teto: a raiz mostra "Sem conexão", não o login. */
+  semConexao?: boolean;
+  tentarDeNovo?: () => void;
 }
 
 const SessionContext = createContext<SessaoMostrada | null>(null);
@@ -75,6 +81,12 @@ export function SessionProvider({
   /** O `user.id` da sessão mostrada (ou já na fila para mostrar). `undefined` = não resolveu. */
   const mostrado = useRef<string | null | undefined>(undefined);
   const fila = useRef<Promise<void>>(Promise.resolve());
+  const [semConexao, setSemConexao] = useState(false);
+  const [tentativa, setTentativa] = useState(0);
+  const tentarDeNovo = useCallback(() => {
+    setSemConexao(false);
+    setTentativa((n) => n + 1);
+  }, []);
 
   useEffect(() => {
     let vivo = true;
@@ -114,6 +126,7 @@ export function SessionProvider({
     };
 
     const receber = (next: Session | null) => {
+      setSemConexao(false);
       const depois = next?.user.id ?? null;
       const antes = mostrado.current;
       const comCortina = precisaDeCortina(antes, depois);
@@ -129,11 +142,19 @@ export function SessionProvider({
         .catch(() => {});
     };
 
-    supabase.auth.getSession().then(({ data }) => {
-      receber(data.session);
-      if (data.session) aceitarConvites();
+    // O veredito de "sem sessão" é do `getSession` (que distingue erro de rede). Um
+    // `INITIAL_SESSION` nulo NÃO vale como saída: com rede ruim ele vem nulo e a sessão existe.
+    carregarSessao({
+      getSession: () => supabase.auth.getSession(),
+      receber: (s) => {
+        receber(s);
+        if (s) aceitarConvites();
+      },
+      semConexao: () => vivo && setSemConexao(true),
+      vivo: () => vivo,
     });
     const { data: assinatura } = supabase.auth.onAuthStateChange((event, next) => {
+      if (event === 'INITIAL_SESSION' && !next) return;
       receber(next);
       if (event === 'SIGNED_IN' && next) aceitarConvites();
     });
@@ -141,9 +162,13 @@ export function SessionProvider({
       vivo = false;
       assinatura.subscription.unsubscribe();
     };
-  }, [cortina, aoTrocarDeUsuario]);
+  }, [cortina, aoTrocarDeUsuario, tentativa]);
 
-  return <SessionContext.Provider value={estado}>{children}</SessionContext.Provider>;
+  const valor = useMemo(
+    () => ({ ...estado, semConexao, tentarDeNovo }),
+    [estado, semConexao, tentarDeNovo]
+  );
+  return <SessionContext.Provider value={valor}>{children}</SessionContext.Provider>;
 }
 
 export function useSession(): SessaoMostrada {

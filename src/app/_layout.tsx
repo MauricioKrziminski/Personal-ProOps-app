@@ -35,6 +35,7 @@ import { AppUpdateProvider } from '@/hooks/use-app-update';
 import { ThemeProvider as AppThemeProvider, useBarStyle, useScheme, useTheme } from '@/hooks/use-theme';
 import { carregarPreferencias } from '@/hooks/use-preferencia';
 import { SessionProvider, useSession } from '@/hooks/use-session';
+import { SemConexao } from '@/components/auth/sem-conexao';
 import { hasCompletedOnboarding } from '@/lib/onboarding';
 import { attachNotificationListeners, configureNotificationHandler } from '@/lib/notifications';
 
@@ -188,8 +189,9 @@ function AppTree() {
     ...(Platform.OS === 'android' ? { [simbolosAndroid.name]: simbolosAndroid.font } : {}),
   });
 
-  const { session, loading } = useSession();
-  const pronto = !loading && (fontsLoaded || !!fontError);
+  const { session, loading, semConexao, tentarDeNovo } = useSession();
+  // `semConexao` também levanta a abertura: sob a tinta ninguém lê o "Tentar de novo".
+  const pronto = (!loading || !!semConexao) && (fontsLoaded || !!fontError);
   // As preferências de tela (régua, horizonte, período) chegam à memória com a sessão, antes de
   // qualquer tela que as leia: assim a tela nasce como a pessoa deixou, sem trocar um quadro depois.
   const userId = session?.user.id;
@@ -239,7 +241,9 @@ function AppTree() {
                 quadro visível. Com erro de fonte, segue: texto na fonte do sistema é melhor que app
                 parado.
               */}
-              {loading || !(fontsLoaded || fontError) ? null : (
+              {loading && semConexao && tentarDeNovo ? (
+                <SemConexao onRetry={tentarDeNovo} />
+              ) : loading || !(fontsLoaded || fontError) ? null : (
               /*
                * `statusBarStyle` mora AQUI, e só aqui.
                *

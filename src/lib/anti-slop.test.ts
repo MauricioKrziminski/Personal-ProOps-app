@@ -1516,6 +1516,7 @@ test('nenhum horário vira dia por slice (é o dia do UTC)', () => {
 */
 const VAZIO_GRANDE_PERMITIDO: Record<string, string[]> = {
   'app/(tabs)/profile/index.tsx': ['Sem sessão'], // inalcançável atrás do portão de sessão
+  'components/auth/sem-conexao.tsx': ['Sem conexão'], // é a tela inteira, no lugar do login
   'app/catalog.tsx': ['Nada anotado ainda'], // vitrine do primitivo, só em desenvolvimento
   'app/finance/categories.tsx': ['Nenhuma categoria ainda'], // sem categoria, a lista é a tela inteira
   'app/finance/[txId].tsx': ['Isto não existe mais'],

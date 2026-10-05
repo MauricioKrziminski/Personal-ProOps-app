@@ -223,6 +223,7 @@ const MATERIAL: Record<string, MaterialName> = {
   bolt: 'bolt',
   drop: 'water_drop',
   wifi: 'wifi',
+  'wifi.slash': 'wifi_off',
   'cross.case': 'medical_services',
   tshirt: 'apparel',
   bag: 'shopping_bag',
