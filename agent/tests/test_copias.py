@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from app.domain import matching
 from app.graph.schemas import ResourceAction, ResourceField
 from app.tools import copias, resolve, resources
 from app.tools.base import ExecContext
@@ -103,9 +104,12 @@ def mundo(monkeypatch):
 
         async def fetch(sql, *a):
             if "from public.transaction_templates" in sql:
+                if " like " in sql:  # a busca pelo nome é no SQL: igual primeiro, depois "contém"
+                    dito = matching.normalize(a[1].strip("%"))
+                    return [m for m in f.modelos if dito in matching.normalize(m["name"])]
                 return f.modelos
             if "from public.subcategories" in sql:
-                return [{"id": a[0]}] if f.sub_ok else []
+                return [{"id": a[0], "name": "feira"}] if f.sub_ok else []
             raise AssertionError(sql)
 
         async def accounts(ws, *, only_cards=False):
@@ -138,7 +142,7 @@ async def test_lancar_favorito_diz_tudo_na_frase_com_a_data_de_hoje(mundo):
     assert p["summary"].startswith("lançar, hoje (")
     assert "a partir do favorito *Almoço*" in p["summary"] and "gasto de R$ 42,00 — *Almoço*" in p["summary"]
     assert "(estabelecimento Zé)" in p["summary"] and "categoria alimentação" in p["summary"]
-    assert "na conta Nubank, Pix" in p["summary"]
+    assert "na conta Nubank, no Pix · variável" in p["summary"]
     assert f.saidas == [True]  # o INSERT de prova voltou
     assert f.chamadas[-1][0].strip().startswith("set constraints") and "payment_method_compatibility" in f.chamadas[-1][0]
     insert = [c for c in f.chamadas if c[0].startswith("insert into public.transactions")][0]
@@ -154,10 +158,10 @@ async def test_executar_grava_uma_vez_e_conta_o_uso_do_favorito(mundo):
     p = await prepara_favorito(f, mundo)
     r = await resources.execute(ctx(target={"prepared": p}), acao("resource_update", "favoritos", "almoco", lancar="true"))
     assert r.message.startswith("💸 Lancei gasto de *R$ 42,00* (Almoço)") and str(r.result_id).startswith("22222222")
-    inserts = [e for e in f.escritas if e[0].startswith("insert into public.transactions")]
-    assert len(inserts) == 1 and "exists (select 1 from public.accounts" in inserts[0][0]  # conta viva no instante
-    bump = [e for e in f.escritas if "use_count = use_count + 1" in e[0]]
-    assert bump and bump[0][1] == (MODELO["id"], WS)
+    assert len(f.escritas) == 1  # o lançamento e a contagem do uso são UM statement
+    sql, args = f.escritas[0]
+    assert "insert into public.transactions" in sql and "exists (select 1 from public.accounts" in sql  # conta viva
+    assert "use_count = use_count + 1" in sql and args[-2:] == (MODELO["id"], WS)
 
 
 @pytest.mark.asyncio
