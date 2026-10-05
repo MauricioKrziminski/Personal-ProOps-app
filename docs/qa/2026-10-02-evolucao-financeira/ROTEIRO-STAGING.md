@@ -107,7 +107,7 @@ os números do banco, e só grava no **Sim**.
 | F06 | "paguei 1200 de aluguel, gasto fixo e essencial" | A pergunta mostra "· fixo · essencial"; "não essencial" nunca vira essencial; sem dizer nada, vale o padrão da categoria e a frase mostra "(padrão de <categoria>)" |
 | F09 | "gastei 80 no mercado, detalhe feira" (com o detalhe "feira" criado no app) | Grava com o detalhe; detalhe que não existe ou casa com dois pede o nome exato e lista as opções. Nunca cria detalhe novo |
 
-### Lote D (reserva, plano de metas, prazo × mês, marcos, favoritos e duplicar)
+### Lote D (reserva, plano de metas, prazo × mês, marcos, favoritos e duplicar — no staging desde `agente-staging-00219`)
 
 | # | Diga | O que deve acontecer |
 |---|---|---|
