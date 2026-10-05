@@ -20,7 +20,10 @@ confrontou cada ponto com a spec e achou a entrada real no app de todos (nenhuma
 | suíte SQL inteira (`scripts/sql-test.py`, rollback, staging) | 111/113; as duas de fora são ambientais: `agent_migrations` (banco vazio) e `expected_recurring_occurrences` (data fixa) |
 | `anon_sem_execute`, `transaction_templates` depois do último push | PASSOU |
 
-Migrations do programa só no staging, em ordem; o registro de produção continua em
+**Cliente anterior:** as migrations do programa são aditivas (colunas, tabelas e funções novas,
+argumentos com default), com uma exceção: o F17 trocou o tipo de retorno de `financial_health()`
+(drop + create), e só o app chama essa função (`f17/aceite.md`); o agente continua aceitando o
+contrato anterior. Migrations do programa só no staging, em ordem; o registro de produção continua em
 `docs/HISTORICO-DE-MIGRATIONS.md` quando houver pedido.
 
 ## Jornada nos dois sistemas (só leitura, nada gravado)
@@ -55,5 +58,12 @@ recorrente e encerrar série (F18), marcos (F19), favoritos e duplicar (F22).
 - Resíduos de QA de fases anteriores no dev@: séries "QA F02 IOS serie 20261002" e "QA F06
   android série" seguem ativas e geram ocorrências (vistas hoje: +R$ 32,10 e +R$ 0,13). Não foram
   apagadas porque não são desta sessão; apagar exige confirmar os IDs da fase delas.
+- **Instruções de domínio não atualizadas para F18–F22** (`.claude/rules/finance.md` e
+  `frontend.md` não citam encerrar série/transferência recorrente, marcos, acumulação, primeiro
+  cadastro nem `transaction_templates`); a regra de cada um está no contrato e no aceite.
+  Catálogo de ajuda (`explicacoes.ts`): F20–F22 não têm indicador a explicar.
+- **Comparação visual de composição** do programa (spec §8) não feita; houve conferência visual
+  por ponto nos aceites.
+- Worktrees dos agentes em `.claude/worktrees/` ficaram (os commits já estão integrados).
 - Integrar por patch com o Metro de pé deixou módulos velhos nos aparelhos (F22): o QA só vale
   depois de `touch` nos arquivos e de provar a tela nova.
