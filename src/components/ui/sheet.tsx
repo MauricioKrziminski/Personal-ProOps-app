@@ -178,6 +178,9 @@ export function Sheet({
   // A tela anterior pode continuar montada no Stack depois de um deep link ou logout. Um
   // Modal nativo sobrevive à troca da rota por baixo dele; o foco do navegador o esconde no
   // mesmo render, e em seguida limpamos o estado para que não reapareça ao voltar.
+  // Exceção (05/10/2026): na raiz de uma ABA, `CongelaForaDeFoco` congela a árvore ao sair dela —
+  // este efeito não roda, a folha some junto com a aba e VOLTA com o rascunho ao voltar à aba
+  // (conferido nos dois sistemas: ela não fica por cima da outra aba). Perder o digitado era pior.
   useEffect(() => {
     if (!focused && visible) onClose();
   }, [focused, visible, onClose]);
