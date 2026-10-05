@@ -45,7 +45,10 @@ import { foldCategory, mergeCategories } from '@/lib/categories-merge';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive } from '@/lib/item-actions';
 import { dueLabel, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
-import { dataLocalDe } from '@/lib/dates';
+import { dataLocalDe, isoToBR } from '@/lib/dates';
+import { paramsDaCopia, podeDuplicar } from '@/lib/duplicar';
+import { useSalvarFavorito, NOME_REPETIDO } from '@/hooks/use-favoritos';
+import { useNomeDoFavorito } from '@/components/finance/nome-do-favorito';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
@@ -120,6 +123,8 @@ export default function TransactionDetailScreen() {
   const series = useRecurringTransactions();
   const serie = (series.data ?? []).find((r) => r.id === tx?.recurring_id);
   const removePlan = useDeleteInstallmentPlan();
+  const salvarFavorito = useSalvarFavorito();
+  const nomeDoFavorito = useNomeDoFavorito();
   const save = useSaveTransaction();
   const remove = useDeleteTransaction();
   // "Paguei" confirma o valor numa folha curta (25/09/2026). Dada a baixa, volta para a lista.
@@ -153,24 +158,20 @@ export default function TransactionDetailScreen() {
     );
   };
 
+  /** O favorito nasce com o título (ou o estabelecimento) do lançamento; renomear é na tela Favoritos. */
+  const virarFavorito = () => {
+    if (!tx) return;
+    const padrao = tx.description || tx.merchant || tx.category || '';
+    nomeDoFavorito.pedir(padrao, (name) => salvarFavorito.mutate({ name, modelo: tx }, {
+      onSuccess: () => toast({ message: <><Forte>{name}</Forte> virou favorito.</>, tone: 'success' }),
+      onError: (e: any) => toast({ message: e?.code === NOME_REPETIDO ? 'Já existe um favorito com esse nome.' : 'Não deu para salvar o favorito. Tenta de novo.', tone: 'error' }),
+    }));
+  };
+
+  /** Abre o formulário pré-preenchido para hoje; a pessoa revisa e salva (uma intenção nova). */
   const duplicate = () => {
     if (!tx) return;
-    save.mutate(
-      {
-        kind: tx.kind,
-        amount_cents: tx.amount_cents,
-        category: tx.category,
-        description: tx.description,
-        account_id: tx.account_id,
-        counterparty_account_id: tx.counterparty_account_id,
-        occurred_at: localISODate(),
-        payment_method: tx.payment_method ?? null,
-      },
-      {
-        onSuccess: () => toast({ message: 'Dupliquei para hoje.', tone: 'success' }),
-        onError: () => toast({ message: 'Não deu para duplicar. Tenta de novo.', tone: 'error' }),
-      }
-    );
+    router.push(hrefDoLancar('uma', paramsDaCopia(tx, isoToBR(localISODate()), plano?.installments).params));
   };
 
   /**
@@ -516,9 +517,12 @@ export default function TransactionDetailScreen() {
             // Pagamento de dívida não duplica: a cópia seria um gasto solto, sem baixar a dívida.
             // A próxima parcela se paga no "Paguei" de Dívidas. O de FATURA também: a cópia seria
             // uma transferência para o cartão que a fatura não conta — paga-se de novo na fatura.
-            ...(tx.debt_id || tx.pays_invoice_id || tx.pix_fee_for_transaction_id
-              ? []
-              : [{ label: 'Duplicar', icon: 'plus.square.on.square' as const, onPress: duplicate }]),
+            ...(podeDuplicar(tx)
+              ? [
+                  { label: 'Duplicar', icon: 'plus.square.on.square' as const, onPress: duplicate },
+                  { label: 'Virar favorito', icon: 'star' as const, onPress: virarFavorito },
+                ]
+              : []),
             {
               label: tx.installment_plan_id ? 'Apagar só esta parcela' : 'Apagar',
               icon: 'trash',
@@ -541,6 +545,7 @@ export default function TransactionDetailScreen() {
 
       {tablet ? tabletBody : compactBody}
       {baixa.folha}
+      {nomeDoFavorito.folha}
     </Screen>
   );
 }

@@ -8,6 +8,7 @@ import { FormularioDaDivida } from '@/components/finance/formulario-da-divida';
 import { FormatoDoLancamento } from '@/components/finance/formato-do-lancamento';
 import { FormularioDaSerie } from '@/components/finance/formulario-da-serie';
 import { FormularioDoLancamento, LancamentoEditando } from '@/components/finance/formulario-do-lancamento';
+import { FavoritosDoLancamento } from '@/components/finance/favoritos-do-lancamento';
 import { Note } from '@/components/ui/note';
 import { Screen } from '@/components/ui/screen';
 import { FormularioEmTela } from '@/components/ui/sheet';
@@ -17,6 +18,9 @@ import { usePurchaseDownPayment } from '@/hooks/use-down-payment';
 import { isoToBR, localISODate } from '@/lib/dates';
 import { Space } from '@/design/tokens';
 import { financeErrorMessage } from '@/lib/finance-form';
+import { normalizeExpenseClassification } from '@/lib/expense-classification';
+import { paramsDaCopia } from '@/lib/duplicar';
+import { useUsouFavorito, type Favorito } from '@/hooks/use-favoritos';
 import { normalizePaymentMethod } from '@/lib/payment-method';
 import { detalheDaEscrita } from '@/lib/escrita';
 import type { RegistroSimulado } from '@/lib/hipotese';
@@ -42,6 +46,24 @@ const ORIGEM_DO_TIPO: Record<TipoDeLancamento, OrigemDaConversao['tipo']> = {
   financiamento: 'divida',
 };
 
+/** Os campos comuns a partir dos params da rota (abrir, duplicar, aplicar, favorito). */
+function comumDeParams(p: Record<string, string | undefined>): Comum {
+  let expenseClassification: Comum['expenseClassification'];
+  try { expenseClassification = p.classificacao ? normalizeExpenseClassification(JSON.parse(p.classificacao)) : undefined; } catch { /* param inválido: sem classificação */ }
+  return {
+    kind: p.kind === 'income' ? 'income' : p.kind === 'transfer' ? 'transfer' : 'expense',
+    descricao: p.description ?? '',
+    valorCents: Number(p.amount) > 0 ? Number(p.amount) : 0,
+    contaId: p.conta ?? p.account ?? null,
+    dataBR: p.data ?? p.start ?? isoToBR(localISODate()),
+    categoria: p.category || null,
+    ...(p.subcategory_id !== undefined ? detalheDaEscrita({ subcategory_id: p.subcategory_id || null }) : {}),
+    ...(p.merchant ? { estabelecimento: p.merchant } : {}),
+    ...(expenseClassification ? { expenseClassification } : {}),
+    ...(p.paymentMethod !== undefined ? { paymentMethod: normalizePaymentMethod(p.paymentMethod) } : {}),
+  };
+}
+
 /**
  * O formulário único (spec 2026-09-29): um seletor, três corpos, e os campos comuns viajando entre
  * eles. Editar abre no tipo do registro; trocar o tipo e salvar pergunta o alcance e converte.
@@ -54,16 +76,22 @@ export default function LancarScreen() {
   );
   const tipoOriginal = TIPOS_DE_LANCAMENTO.find((t) => t.value === p.tipo)?.value ?? 'uma';
   const [tipo, setTipo] = useState<TipoDeLancamento>(tipoOriginal);
-  const [comum, setComum] = useState<Comum>(() => ({
-    kind: p.kind === 'income' ? 'income' : 'expense',
-    descricao: p.description ?? '',
-    valorCents: Number(p.amount) > 0 ? Number(p.amount) : 0,
-    contaId: p.conta ?? p.account ?? null,
-    dataBR: p.data ?? p.start ?? isoToBR(localISODate()),
-    categoria: p.category || null,
-    ...(p.subcategory_id !== undefined ? detalheDaEscrita({ subcategory_id: p.subcategory_id || null }) : {}),
-    ...(p.paymentMethod !== undefined ? { paymentMethod: normalizePaymentMethod(p.paymentMethod) } : {}),
-  }));
+  const [comum, setComum] = useState<Comum>(() => comumDeParams(p));
+  // Transferência copiada/favorita leva a contraparte; a nota explica a cópia de uma parcela.
+  const [contraparte, setContraparte] = useState<string | null>(p.counterparty ?? null);
+  const [nota, setNota] = useState<string | null>(p.nota ?? null);
+  const usouFavorito = useUsouFavorito();
+  /** Usar um favorito só PREENCHE: remonta o corpo com os campos dele e a data de hoje. */
+  const usarFavorito = (f: Favorito) => {
+    const { params } = paramsDaCopia(f.modelo, isoToBR(localISODate()));
+    setComum(comumDeParams(params));
+    setContraparte(params.counterparty ?? null);
+    setNota(null);
+    setEstados({});
+    setFocarAoAbrir(false);
+    setGeracao((g) => g + 1);
+    usouFavorito.mutate({ id: f.id, use_count: f.use_count });
+  };
   /** O que foi digitado em cada tipo antes de a pessoa trocar para outro. */
   const [estados, setEstados] = useState<Partial<Record<TipoDeLancamento, unknown>>>({});
   /** Cada "Salvar e criar outro" é um corpo novo, limpo. */
@@ -185,7 +213,14 @@ export default function LancarScreen() {
   const perguntasDaVoz = doAplicar ? perguntasDoParam(p.perguntas) : [];
   const formato = (
     <FormatoDoLancamento value={tipo} onChange={trocar}
-      disabled={Boolean(transacao.data?.down_payment_debt_id || transacao.data?.down_payment_plan_id)} />
+      disabled={Boolean(transacao.data?.down_payment_debt_id || transacao.data?.down_payment_plan_id || p.favorito)} />
+  );
+  // F22: favoritos (só criando uma vez) e a nota da cópia de uma parcela.
+  const extrasDoTopo = (
+    <>
+      {tipo === 'uma' && !editandoId && !p.favorito ? <FavoritosDoLancamento aoUsar={usarFavorito} /> : null}
+      {nota && tipo === 'uma' ? <Note icon="plus.square.on.square">{nota}</Note> : null}
+    </>
   );
   const base = {
     topo: perguntasDaVoz.length ? (
@@ -194,8 +229,14 @@ export default function LancarScreen() {
           {perguntasDaVoz.map((q) => <Note key={q} icon="questionmark.circle">{q}</Note>)}
         </View>
         {formato}
+        {extrasDoTopo}
       </>
-    ) : formato,
+    ) : (
+      <>
+        {formato}
+        {extrasDoTopo}
+      </>
+    ),
     comum,
     registrarComum: (ler: () => Comum) => {
       if (tipoAtivo.current === tipo) lerComum.current = ler;
@@ -227,6 +268,8 @@ export default function LancarScreen() {
             key={`uma:${geracao}`}
             {...base}
             parcelas={doAplicar && p.parcelas ? Math.max(1, Number(p.parcelas) || 1) : undefined}
+            contraparte={contraparte}
+            favorito={p.favorito ? { id: p.favorito } : undefined}
           />
         ) : tipo === 'recorrente' ? (
           <FormularioDaSerie

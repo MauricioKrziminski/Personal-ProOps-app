@@ -700,3 +700,28 @@ promete configuração da reserva pelo WhatsApp antes da implementação/avalia�
 | app | agente |
 |---|---|
 | Recorrente do tipo Transferência (origem, destino, valor, calendário e fim; editar só esta, esta e as próximas ou todas) e **Encerrar** série com prévia do que fica e do que sai (`end_recurring_series`, `end_recurring_series_preview`), mais Reabrir (tirar o fim) | Lacuna: o agente não cria série de transferência (a tool de recorrência segue só gasto/receita) nem encerra série — "cancela a assinatura" continua sendo apagar ou pausar. Paridade pendente da etapa final do plano de 22 pontos; nenhuma tool/prompt mudou no F18. |
+
+## Duplicar e favoritos de lançamento — F22 (05/10/2026)
+
+| app | agente |
+|---|---|
+| Duplicar abre o formulário pré-preenchido; favoritos (`transaction_templates`) salvam, usam, renomeiam, arquivam e apagam modelos | Fora do escopo por decisão: o agente não usa favoritos nem duplica. Modelo é atalho de digitação do app; no WhatsApp a pessoa já descreve o lançamento em linguagem natural. |
+
+## Evolução financeira — pontos sem linha própria (verificação final, 05/10/2026)
+
+Os 22 pontos do plano `docs/superpowers/plans/2026-10-02-evolucao-financeira-22-pontos.md`. As
+linhas acima cobrem F02, F07, F11–F19 e F22; estas registram os outros. Nenhum mudou tool, prompt
+nem `FinanceAction` (teto de 252).
+
+| ponto | app | agente |
+|---|---|---|
+| F01 forma de pagamento | `payment_method` no formulário único (avulso, série, compra, financiamento) e no detalhe | Lacuna: o agente cria sem forma (`null`, permitido pelo contrato) e preserva a que existe ao corrigir outros campos; a ocorrência gerada pelo agendador herda a da série (`private.payment_method_at`). Escolher a forma pela conversa exigiria campo novo no schema. |
+| F03 saldo e limite no seletor | saldo da conta e limite disponível do cartão ao escolher a origem | Sem equivalente por desenho: é leitura da tela. O agente já responde saldo e limite por `query`. |
+| F04 prévia do efeito | "Ao salvar" com antes → depois (`finance_write_preview`) | Sem equivalente por desenho: no agente, a frase do SIM (HITL) é a prévia. |
+| F05 filtro por forma de pagamento | Lançamentos filtrados por forma, "Não informado" incluso | Lacuna: `query` não filtra por forma (o agente não grava forma). |
+| F06 fixo/variável e essencial | classificação por categoria, por lançamento e por alcance | O lançamento do agente herda a classificação padrão da categoria pelo banco (`zz_inherit_expense_classification`); classificar ou reclassificar pela conversa é lacuna. |
+| F08 meta no planejamento | "Cabe no plano?" e ajustar o plano da meta | Lacuna: só leitura de metas e aportes. |
+| F09 subcategorias | criar, mover, juntar e remover; detalhe no lançamento | Parcial: o lançamento do agente recebe a subcategoria da regra (`match_rule_subcategory`) e `resource_update` aceita `subcategory_id` existente em séries, regras e dívidas; criar, mover e juntar é só no app. |
+| F10 prazo pela contribuição | "Tenho um prazo" / "Posso guardar por mês" ao criar a meta | Lacuna: o agente cria a meta com alvo e data; não calcula prazo pela contribuição. |
+| F20 quanto vou acumular | simulação no aparelho, nada gravado | Sem equivalente por desenho: não é mutação; as premissas ficam no aparelho. |
+| F21 primeiro cadastro guiado | `/finance/comecar` sobre `create_account` | O cadastro já existe por `resource_create accounts`/`cards`; o roteiro em passos é da tela. |

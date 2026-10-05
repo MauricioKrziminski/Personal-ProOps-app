@@ -45,7 +45,7 @@ Esses fatos e a abertura do formulário ainda não equivalem ao aceite funcional
 | F19 | Marcos nas metas | Aceito; limites no registro | Validado (celebração em vídeo) | Validado 6/6 |
 | F20 | Acumulação/renda futura | Aceito; limites no registro | Validado 9/10 + correção | Validado 9/9 |
 | F21 | Primeiro cadastro guiado | Aceito; limites no registro | Validado 11/11 + reconferência | Validado 7/8 + reconferência |
-| F22 | Favoritos/duplicação | Próximo incremento, F21 aceito | Não validado | Não validado |
+| F22 | Favoritos/duplicação | Aceito; limites no registro | Validado 11/11 | Validado 10 + 4 não verificados |
 
 ## Registro obrigatório por incremento
 
@@ -349,3 +349,10 @@ botões cortada na fonte grande, corrigidos e conferidos. F21 liberado.
 primeiro lançamento em passos puláveis, com os mesmos campos e a mesma escrita de Contas; saldo
 sem lançamento de abertura. O QA achou o passo errado piscando ao salvar, corrigido e
 reconferido em vídeo nos dois. Usuários de QA e contas apagados por ID. F22 liberado.
+
+## F22 — duplicar e favoritos
+
+[Aceite e limites](f22/aceite.md) e [contrato](f22/contrato.md). Migration
+`20261005180000_transaction_templates.sql` (renomeada na integração), só no staging. Duplicar abre
+o formulário com a data de hoje e sem vínculo; favoritos como modelos que preenchem e nunca gravam
+sozinhos. Lançamentos e favoritos de QA apagados por ID.

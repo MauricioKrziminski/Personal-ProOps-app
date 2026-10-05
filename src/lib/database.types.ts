@@ -2987,6 +2987,60 @@ export type Database = {
           },
         ]
       }
+      transaction_templates: {
+        Row: {
+          archived: boolean
+          created_at: string
+          fields: Json
+          id: string
+          last_used_at: string | null
+          name: string
+          updated_at: string
+          use_count: number
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          archived?: boolean
+          created_at?: string
+          fields: Json
+          id?: string
+          last_used_at?: string | null
+          name: string
+          updated_at?: string
+          use_count?: number
+          user_id?: string
+          workspace_id?: string
+        }
+        Update: {
+          archived?: boolean
+          created_at?: string
+          fields?: Json
+          id?: string
+          last_used_at?: string | null
+          name?: string
+          updated_at?: string
+          use_count?: number
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_templates_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_templates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           account_id: string | null

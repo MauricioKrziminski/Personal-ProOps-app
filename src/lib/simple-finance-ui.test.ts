@@ -60,7 +60,7 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean } = {}) {
+function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean; favoritos?: any[]; favoritosArquivados?: any[] } = {}) {
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
@@ -117,6 +117,8 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
   /** As mesmas escritas de `writes`, com as opções (`onSuccess`/`onError`) — é por aqui que se chama o retorno. */
   const pedidos: { operation: string; value: any; opts: any }[] = [];
   const toasts: any[] = [];
+  /** Os pedidos de nome de favorito (a folha é dublê): o teste confirma por aqui. */
+  const nomesPedidos: { padrao: string; aoConfirmar: (nome: string) => void }[] = [];
   // O que as telas gravaram em `usePreferencia` (o rascunho do E se, por exemplo).
   const preferenciasGravadas: Record<string, any> = {};
   /** O texto de cada confirmação destrutiva (o 4º argumento de `confirmDestructive`). */
@@ -471,6 +473,14 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
         useSpendingChange: () => ({ ...query, isPending: false, isSuccess: true, data: options.spending, refetch: async () => { refetches.push('spending-change'); } }),
       };
       if (name === '@/lib/spending-change') return load('src/lib/spending-change.ts');
+      if (name === '@/hooks/use-favoritos') return {
+        NOME_REPETIDO: '23505',
+        useFavoritos: (arquivados = false) => ({ ...query, isSuccess: true, isPending: false, data: (arquivados ? options.favoritosArquivados : options.favoritos) ?? [] }),
+        useSalvarFavorito: () => mutation('salvarFavorito'),
+        useApagarFavorito: () => mutation('apagarFavorito'),
+        useUsouFavorito: () => mutation('usouFavorito'),
+      };
+      if (name === '@/components/finance/nome-do-favorito') return { useNomeDoFavorito: () => ({ pedir: (padrao: string, aoConfirmar: (n: string) => void) => nomesPedidos.push({ padrao, aoConfirmar }), folha: null }) };
       if (name === '@/hooks/use-investments') return {
         useInvestmentPositions: () => ({ ...query, isSuccess: true, data: options.investments?.positions ?? [], refetch: async () => { refetches.push('investments'); } }),
         useInvestmentMovements: (id?: string) => ({ ...query, isSuccess: true, data: id ? { pages: [{ movements: options.investments?.movements ?? [] }] } : undefined, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: async () => {} }),
@@ -651,7 +661,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
       if (name === '@/lib/account-form') return load('src/lib/account-form.ts');
       if (name === '@/components/finance/account-form') return load('src/components/finance/account-form.tsx');
-      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias' || name === '@/lib/comecar') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias' || name === '@/lib/comecar' || name === '@/lib/duplicar' || name === '@/lib/favoritos') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       // o `categorias.ts` importa o mapa de ícones por caminho relativo (roda no `node --test` puro)
       if (name === '../design/category-icons.ts') return { categoryIcon: () => 'circle' };
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
@@ -830,7 +840,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
   };
   render();
   return {
-    writes, pedidos, toasts, preferenciasGravadas, pedidosDeLimite, avisos, confirmations, actions, navigations, refetches, gates, rulerViews, transactionQueries, expectedQueries, summaryQueries, categoryDefaultsQueries,
+    writes, pedidos, toasts, nomesPedidos, inRealm, preferenciasGravadas, pedidosDeLimite, avisos, confirmations, actions, navigations, refetches, gates, rulerViews, transactionQueries, expectedQueries, summaryQueries, categoryDefaultsQueries,
     drafts: () => forecastDrafts,
     cancelledReserveAttempt: () => new reserveCancellationConstructor(),
     cancelledGoalPlanAttempt: () => new goalCancellationConstructor(),
@@ -2232,7 +2242,7 @@ test('Lançamentos: pendente arrasta Paguei à direita; efetivado arrasta Editar
   const pendente = itemLinks(screen(transacoesFile, { txStatus: 'pending' }))[0];
   assert.deepEqual(ladosDoLink(pendente), { direita: ['Paguei'], esquerda: ['Apagar'], mais: true, pontaDireita: 'Paguei', pontaEsquerda: 'Apagar' });
   const efetivado = itemLinks(screen(transacoesFile))[0];
-  assert.deepEqual(ladosDoLink(efetivado), { direita: ['Editar'], esquerda: ['Apagar'], mais: false, pontaDireita: 'Editar', pontaEsquerda: 'Apagar' });
+  assert.deepEqual(ladosDoLink(efetivado), { direita: ['Editar'], esquerda: ['Apagar'], mais: true, pontaDireita: 'Editar', pontaEsquerda: 'Apagar' });
 });
 
 test('Paguei confirma valor e baixa numa única escrita, inclusive com correção', () => {
@@ -4855,7 +4865,7 @@ test('Lançar: os formatos entram completos numa moldura comum sem fade independ
     assert.equal(envelope.props.children.type.name ?? envelope.props.children.type, corpo);
     const formulario = ui.nodes().find((n: any) => n.type === corpo);
     assert.equal(formulario.props.estiloDoConteudo, undefined, 'os campos não recebem uma segunda linha de tempo de opacidade');
-    assert.equal(formulario.props.topo.type, 'FormatoDoLancamento');
+    assert.equal([formulario.props.topo.props.children].flat()[0].type, 'FormatoDoLancamento');
     assert.equal(formulario.props.focarAoAbrir, true, 'a abertura inicial continua pronta para escrever');
     assert.equal(ui.animacoes().filter((a) => a.concluir).length, 0, 'a montagem inicial não aguarda nenhuma saída');
   }
@@ -7636,4 +7646,58 @@ test('Começar: pular não grava nada e salvar cria exatamente uma conta pela RP
   assert.equal(ui.writes[0].value.name, 'Conta do banco');
   assert.equal(ui.writes[0].value.initial_balance_cents, 12345);
   assert.equal(ui.writes[0].value.type, 'checking');
+});
+
+test('F22: duplicar uma parcela paga no cartão abre o formulário à vista, sem vínculo e sem gravar', () => {
+  const tx = {
+    id: 'p3', kind: 'expense', amount_cents: 5249, occurred_at: '2026-08-10', description: 'Fone (3/10)', merchant: 'Loja',
+    category: 'lazer', account_id: 'cartao', status: 'cleared', source: 'import', created_at: '2026-08-10T12:00:00Z',
+    recurring_id: null, installment_plan_id: 'plano', installment_no: 3, invoice_id: 'fatura', due_at: '2026-09-10',
+    debt_id: null, pays_invoice_id: null, payment_method: 'credit', edit_revision: 4,
+  };
+  const ui = screen('src/app/finance/[txId].tsx', { txs: [tx], params: { txId: 'p3' } });
+  const menu = ui.nodes().find((n: any) => n.type === 'HeaderActions')?.props.menu;
+  ui.interact(() => menu.actions.find((a: any) => a.label === 'Duplicar').onPress());
+  const destino = copia(ui.navigations.at(-1));
+  assert.equal(destino.pathname, '/finance/lancar');
+  assert.equal(destino.params.tipo, 'uma');
+  assert.equal(destino.params.description, 'Fone');
+  assert.equal(destino.params.amount, '5249');
+  assert.equal(destino.params.conta, 'cartao');
+  assert.match(destino.params.nota, /Cópia da parcela 3.* à vista/);
+  const vinculos = ['id', 'origem', 'papel', 'plano', 'fatura', 'invoice', 'recurring', 'debt', 'status', 'due_at', 'source'];
+  assert.deepEqual(Object.keys(destino.params).filter((k) => vinculos.includes(k)), [], 'nenhum parâmetro de vínculo viaja');
+  assert.ok(!JSON.stringify(destino).includes('fatura') && !JSON.stringify(destino).includes('plano'));
+  assert.equal(ui.writes.length, 0, 'duplicar só abre o formulário: quem grava é o Salvar');
+});
+
+test('F22: usar um favorito preenche o formulário de criação e não grava lançamento nenhum', () => {
+  const favorito = { id: 'f1', name: 'Café', use_count: 2, archived: false,
+    modelo: { kind: 'expense', description: 'Café', amount_cents: 1500, category: 'alimentação', account_id: 'a1', merchant: 'Padaria', payment_method: 'pix' } };
+  const ui = screen(lancarFile, { params: { tipo: 'uma' }, favoritos: [favorito] });
+  const fileira = ui.nodes().find((n: any) => n.type === 'FavoritosDoLancamento');
+  assert.ok(fileira, 'a fileira de favoritos está no topo do formulário de criação');
+  ui.interact(() => fileira.props.aoUsar(ui.inRealm(favorito)));
+  const corpo = ui.nodes().find((n: any) => n.type === 'FormularioDoLancamento');
+  assert.equal(corpo.props.comum.descricao, 'Café');
+  assert.equal(corpo.props.comum.valorCents, 1500);
+  assert.equal(corpo.props.comum.contaId, 'a1');
+  assert.equal(corpo.props.comum.estabelecimento, 'Padaria');
+  assert.match(corpo.props.comum.dataBR, /^\d{2}\/\d{2}\/\d{4}$/, 'a data é a de hoje, explícita');
+  assert.deepEqual(ui.writes.map((w: any) => w.operation), ['usouFavorito'], 'só conta o uso; nenhum lançamento é gravado');
+});
+
+test('F22: Salvar como favorito pede o nome e grava o modelo, não um lançamento', () => {
+  const ui = screen('src/components/finance/formulario-do-lancamento.tsx', { componente: 'FormularioDoLancamento',
+    props: { comum: { kind: 'expense', descricao: 'Café', valorCents: 1500, contaId: null, dataBR: '05/10/2026', categoria: 'alimentação' },
+      registrarComum() {}, registrarEstado() {}, onSalvo() {}, onFechar() {} } });
+  const botao = ui.nodes().find((n: any) => n.type === 'Button' && n.props.label === 'Salvar como favorito');
+  assert.ok(botao, 'o botão existe na criação');
+  ui.interact(() => botao.props.onPress());
+  assert.equal(ui.nomesPedidos[0]?.padrao, 'Café', 'o nome padrão é o título');
+  ui.interact(() => ui.nomesPedidos[0].aoConfirmar('Café da manhã'));
+  assert.deepEqual(ui.writes.map((w: any) => w.operation), ['salvarFavorito']);
+  assert.equal(ui.writes[0].value.name, 'Café da manhã');
+  assert.equal(ui.writes[0].value.modelo.amount_cents, 1500);
+  assert.ok(!('occurred_at' in ui.writes[0].value.modelo) && !('invoice_id' in ui.writes[0].value.modelo), 'o modelo não leva data nem vínculo');
 });

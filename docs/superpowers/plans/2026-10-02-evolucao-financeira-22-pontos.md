@@ -312,10 +312,12 @@ Aceite no staging em 05/10/2026: [F21](../../qa/2026-10-02-evolucao-financeira/f
 
 Arquivos: ações de detalhe/lista, launcher/common, domínio de template e armazenamento por workspace. Interface: projeção de campos de usuário → draft novo sem vínculos contábeis.
 
-- [ ] RED: clone não copia ids/obrigação/quitação e novo salvar tem intenção própria.
-- [ ] Implementar duplicação e template editável/arquivável com validação de origem.
-- [ ] Integrar menus/seletor sem substituir salvar/criar outro.
-- [ ] Provar dependências/duplo toque/duas cópias intencionais e gates nativos F22; registrar aceite.
+- [x] RED: clone não copia ids/obrigação/quitação e novo salvar tem intenção própria.
+- [x] Implementar duplicação e template editável/arquivável com validação de origem.
+- [x] Integrar menus/seletor sem substituir salvar/criar outro.
+- [x] Provar dependências/duplo toque/duas cópias intencionais e gates nativos F22; registrar aceite.
+
+Aceite no staging em 05/10/2026: [F22](../../qa/2026-10-02-evolucao-financeira/f22/aceite.md).
 
 ## Verificação integrada final
 

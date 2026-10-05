@@ -190,6 +190,7 @@ const MATERIAL: Record<string, MaterialName> = {
   waveform: 'graphic_eq',
   mic: 'mic',
   'stop.fill': 'stop',
+  star: 'star',
   'fork.knife': 'restaurant',
   'arrow.clockwise': 'sync',
   'arrow.counterclockwise': 'replay',

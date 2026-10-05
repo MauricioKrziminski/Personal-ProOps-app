@@ -58,7 +58,7 @@ import { subcategoryAfterParentChange } from '@/lib/subcategories';
 import { usarDica } from '@/hooks/use-dicas';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
-import { mesmoMes } from '@/lib/dates';
+import { isoToBR, mesmoMes } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive } from '@/lib/item-actions';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
@@ -71,6 +71,7 @@ import { accountLabel, accountSelectOptions, saldoDaConta } from '@/lib/accounts
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { tabletPaneWidths } from '@/design/adaptive-window';
 import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
+import { paramsDaCopia, podeDuplicar } from '@/lib/duplicar';
 import { normalizePaymentMethodFilters, parsePaymentMethodFilters, PAYMENT_METHOD_FILTER_OPTIONS, type PaymentMethodFilter } from '@/lib/payment-method-filters';
 import {
   normalizeExpensePatternFilters, normalizeExpenseNecessityFilters,
@@ -1094,6 +1095,11 @@ export default function TransactionsScreen() {
                       arrasto: tx.status === 'pending' ? undefined : ('direita' as const),
                       onPress: () => router.push(hrefDoLancamento(tx, { month })),
                     },
+                    ...(podeDuplicar(tx) ? [{
+                      label: 'Duplicar',
+                      icon: 'plus.square.on.square' as const,
+                      onPress: () => router.push(hrefDoLancar('uma', paramsDaCopia(tx, isoToBR(localISODate())).params)),
+                    }] : []),
                     { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => confirmDelete(tx) },
                   ]}>
                   {({ onLongPress }) => (

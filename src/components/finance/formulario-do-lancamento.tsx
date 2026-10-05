@@ -17,7 +17,11 @@ import { useExpenseClassificationDraft } from '@/hooks/use-expense-classificatio
 import { EXPENSE_PATTERNS, EXPENSE_NECESSITIES, CLASSIFICATION_SOURCES, expenseClassificationFromRecord, expenseClassificationPatch } from '@/lib/expense-classification';
 import type { CorpoProps } from '@/components/finance/corpo-do-lancar';
 import { Chip } from '@/components/finance/chip';
+import { Forte } from '@/components/ui/forte';
 import { Note } from '@/components/ui/note';
+import { useNomeDoFavorito } from '@/components/finance/nome-do-favorito';
+import { NOME_REPETIDO, useSalvarFavorito } from '@/hooks/use-favoritos';
+import type { Modelo } from '@/lib/favoritos';
 import { Row, Section } from '@/components/ui/row';
 import { DatePickerField } from '@/components/finance/date-picker-field';
 import { CamposDaSerie } from '@/components/finance/serie-form';
@@ -197,10 +201,14 @@ type Props = CorpoProps & {
    * ID (`deHipotese`) — a lista pode ter mudado com o formulário aberto.
    */
   parcelas?: number;
+  /** Cópia/favorito de transferência: a conta de destino que o `comum` não carrega. */
+  contraparte?: string | null;
+  /** Editando um FAVORITO (F22): os mesmos campos, e salvar atualiza o modelo — nunca um lançamento. */
+  favorito?: { id: string };
 };
 
 export function FormularioDoLancamento(props: Props) {
-  const { comum, parcelas, deHipotese } = props;
+  const { comum, parcelas, deHipotese, favorito } = props;
   // The form and its CAS baseline start together. Realtime must not replace the version being edited.
   const [{ editing, plano, jurosDoPix }] = useState(() => ({ editing: props.editing, plano: props.plano, jurosDoPix: props.jurosDoPix }));
   const insets = useSafeAreaInsets();
@@ -222,6 +230,8 @@ export function FormularioDoLancamento(props: Props) {
   const accounts = contas.data;
 
   const save = useSaveTransaction();
+  const salvarFavorito = useSalvarFavorito();
+  const nomeDoFavorito = useNomeDoFavorito();
   const salvarParcela = useSaveInstallmentOccurrence();
   const createPlan = useCreateInstallmentPlan();
   const converter = useConvertToInstallments();
@@ -265,7 +275,7 @@ export function FormularioDoLancamento(props: Props) {
         ? editing.account_id
          : comum.contaId ?? null,
       payment_method: normalizePaymentMethod(editing ? editing.payment_method : comum.paymentMethod),
-      counterparty_account_id: editing?.counterparty_account_id ?? (comum.kind === 'transfer' ? comum.contraId ?? null : null),
+      counterparty_account_id: editing?.counterparty_account_id ?? props.contraparte ?? (comum.kind === 'transfer' ? comum.contraId ?? null : null),
       // Receita não parcela: a hipótese de entrada abre à vista, com o total.
       installments: (!editing && comum.kind === 'expense' ? parcelas : undefined) ?? 1,
       paid_installments: '0',
@@ -293,6 +303,14 @@ export function FormularioDoLancamento(props: Props) {
   const subcategoryId = useWatch({ control, name: 'subcategory_id' });
   const classificationDraft = useWatch({ control, name: 'expenseClassification' });
   const classification = useExpenseClassificationDraft(classificationDraft, category, kind, Boolean(editing), editing?.workspace_id);
+  /** Os campos do formulário que um favorito guarda (só dados da pessoa, nunca data nem vínculo). */
+  const modeloAtual = (): Modelo => {
+    const v = getValues();
+    return { kind: v.kind, description: v.description, merchant: v.merchant, amount_cents: v.amount_cents,
+      category: v.category, subcategory_id: v.subcategory_id ?? null, account_id: v.account_id,
+      counterparty_account_id: v.counterparty_account_id, payment_method: v.payment_method, ...classification.classification };
+  };
+  const erroDoFavorito = (e: any) => toast({ message: e?.code === NOME_REPETIDO ? 'Já existe um favorito com esse nome.' : 'Não deu para salvar o favorito. Tenta de novo.', tone: 'error' });
   const feeCents = useWatch({ control, name: 'fee_cents' });
   const amountCents = useWatch({ control, name: 'amount_cents' });
   const installmentCount = useWatch({ control, name: 'installments' });
@@ -593,7 +611,7 @@ export function FormularioDoLancamento(props: Props) {
   const draftParsed = schema.safeParse(draftValues);
   let previewWrite: FinanceWrite | null = null;
   // Scope-sensitive edits and conversions cannot be previewed as if they created a new record.
-  if (!props.converter && !props.salvarBloqueado && !saving && !erroPagamento && !erroEntrada
+  if (!props.converter && !favorito && !props.salvarBloqueado && !saving && !erroPagamento && !erroEntrada
     && classification.ready && !contas.isPending && !contas.isError && draftParsed.success
     && !(editing?.installment_plan_id || editing?.recurring_id || editing?.debt_id
       || editing?.down_payment_debt_id || editing?.down_payment_plan_id || editing?.pix_fee_for_transaction_id)) {
@@ -613,6 +631,13 @@ export function FormularioDoLancamento(props: Props) {
     const values = { ...rawValues, expenseClassification: classification.classification };
     if (salvarBloqueadoAtual.current) return;
     if (!classification.ready || contas.isPending || contas.isError || erroPagamento || erroEntrada) return;
+    if (favorito) {
+      salvarFavorito.mutate({ id: favorito.id, modelo: modeloAtual() }, {
+        onSuccess: () => { toast({ message: 'Favorito atualizado.', tone: 'success' }); props.onSalvo(false); },
+        onError: erroDoFavorito,
+      });
+      return;
+    }
     if ((editing?.down_payment_debt_id || editing?.down_payment_plan_id) && brToISO(values.occurred_at) > localISODate()) {
       toast({ message: 'A entrada paga não pode ter data futura', tone: 'error' });
       return;
@@ -1045,7 +1070,7 @@ export function FormularioDoLancamento(props: Props) {
   return (
     <Screen scroll={false} wide={tablet}>
       <TaskHeader
-        title={editing ? 'Editar lançamento' : 'Novo lançamento'}
+        title={favorito ? 'Editar favorito' : editing ? 'Editar lançamento' : 'Novo lançamento'}
         onClose={props.onFechar}
         action={
           <Button
@@ -1571,7 +1596,19 @@ export function FormularioDoLancamento(props: Props) {
 
 
         <FinanceWritePreview write={previewWrite} accounts={accounts ?? []} />
-        {!editing && !props.converter ? (
+        {!editing && !props.converter && !favorito ? (
+          <Button
+            variant="secondary"
+            block
+            label="Salvar como favorito"
+            onPress={() => nomeDoFavorito.pedir(getValues('description') || getValues('merchant') || getValues('category') || '', (name) =>
+              salvarFavorito.mutate({ name, modelo: modeloAtual() }, {
+                onSuccess: () => toast({ message: <><Forte>{name}</Forte> virou favorito.</>, tone: 'success' }),
+                onError: erroDoFavorito,
+              }))}
+          />
+        ) : null}
+        {!editing && !props.converter && !favorito ? (
           <Button
             variant="secondary"
             block
@@ -1596,6 +1633,7 @@ export function FormularioDoLancamento(props: Props) {
         </View>
         </View>
       </KeyboardAwareScrollView>
+      {nomeDoFavorito.folha}
       <ToastDoModal />
     </Screen>
   );
