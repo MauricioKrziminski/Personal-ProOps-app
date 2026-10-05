@@ -28,12 +28,21 @@ export async function carregarSessao<S>(d: {
   const esperar = d.esperar ?? ((ms) => new Promise<void>((ok) => setTimeout(ok, ms)));
   const agora = d.agora ?? Date.now;
   const inicio = agora();
-  for (let i = 0; d.vivo(); i++) {
-    const { data, error } = await d.getSession();
-    if (!d.vivo()) return;
-    if (data.session || !ehErroDeRede(error)) return d.receber(data.session);
-    if (agora() - inicio >= (d.tetoMs ?? TETO_SEM_REDE_MS)) return d.semConexao();
-    await esperar(Math.min(1000 * 2 ** i, 4000));
+  const teto = d.tetoMs ?? TETO_SEM_REDE_MS;
+  // O próprio `getSession` retenta o refresh por dezenas de segundos antes de devolver o erro,
+  // então o teto conta do INÍCIO: passado ele sem veredito, avisa já. "Sem conexão" não é
+  // veredito (se a sessão chegar depois, `receber` apaga o aviso); storage vazio nem espera.
+  const aviso = setTimeout(() => d.vivo() && d.semConexao(), teto);
+  try {
+    for (let i = 0; d.vivo(); i++) {
+      const { data, error } = await d.getSession();
+      if (!d.vivo()) return;
+      if (data.session || !ehErroDeRede(error)) return d.receber(data.session);
+      if (agora() - inicio >= teto) return d.semConexao();
+      await esperar(Math.min(1000 * 2 ** i, 4000));
+    }
+  } finally {
+    clearTimeout(aviso);
   }
 }
 

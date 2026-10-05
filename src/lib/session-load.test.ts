@@ -43,6 +43,22 @@ test('(b) passado o teto mostra "Sem conexão", nunca receber(null); tentar de n
   assert.deepEqual(volta.ev, ['receber:sessao']);
 });
 
+test('(b2) o teto conta do início: getSession lento avisa "Sem conexão" sem esperar o erro', async () => {
+  const s = ambiente([]);
+  let avisouAntes = false;
+  await carregarSessao({
+    ...s.d,
+    tetoMs: 20,
+    getSession: async () => {
+      await new Promise((ok) => setTimeout(ok, 120));
+      avisouAntes = s.ev.includes('semConexao');
+      return { data: { session: 'S' }, error: null } as never;
+    },
+  });
+  assert.ok(avisouAntes);
+  assert.deepEqual(s.ev, ['semConexao', 'receber:sessao']);
+});
+
 test('(c) a rodada morta (desmontou, ou a sessão chegou por evento) não decide nada', async () => {
   let vivo = true;
   const s = ambiente([SEM_REDE]);
