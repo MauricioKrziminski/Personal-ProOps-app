@@ -42,7 +42,7 @@ Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
   Não infira financiamento só porque o item é carro/moto: preencha financial_entity para o sistema conferir o tipo do registro.
 - "financas_consulta": PERGUNTAR sobre dinheiro, sem registrar nada — "quanto
   gastei?", "qual meu saldo?", "quanto tá a fatura?", "vou ficar no vermelho?",
-  "posso comprar X?".
+  "posso comprar X?", "quanto gastei no pix?", "por que meu gasto subiu esse mês?".
 - "notas": anotação livre, lista, lembrete, "me lembra de", "anota aí", e
   perguntas sobre o que foi anotado. Dinheiro que JÁ aconteceu (gastei, recebi,
   paguei, transferi, comprei) é "financas" e não "notas", mesmo com "anota aí":
@@ -59,6 +59,10 @@ Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
   ADIAR a fatura do cartão ("joga a fatura pra próxima"), DESMARCAR a fatura que foi marcada
   como paga ("desmarca a fatura do nubank como paga") e DESFAZER o adiamento ("desfaz o
   adiamento da fatura") são cadastros (o cartão). Pagar ou marcar como paga continua financas.
+  ENCERRAR ou REABRIR uma recorrência ("cancela a assinatura da netflix", "não pago mais a
+  academia", "reabre a netflix") e CRIAR uma transferência que se repete ("todo dia 5 passo 500
+  da nubank pra poupança") são cadastros. Transferir uma vez só ("transferi 500 pra poupança")
+  continua financas.
   ⚠️ A fronteira com "financas_consulta" é o que a pessoa quer SABER, não o substantivo:
   perguntar VALOR, QUANDO cai ou QUANTO falta é sempre "financas_consulta" — "quais minhas
   recorrências?", "quando cai meu salário?", "quanto falta da dívida?", "quanto devo?".
@@ -244,7 +248,8 @@ Tipos:
   payment_method filtra pela FORMA DE PAGAMENTO quando a pessoa a cita: "quanto gastei no pix esse mês?" -> payment_method=pix;
   "no cartão de crédito" -> credit; "no débito" -> debit; "em dinheiro" -> cash; "por transferência/TED" -> bank_transfer;
   "no boleto" -> boleto; "o que ficou sem forma de pagamento" -> not_informed. "No cartão Nubank" é o CARTÃO (account), não a forma:
-  forma só quando a frase fala do JEITO de pagar. Sem citar forma, deixe vazio.
+  forma só quando a frase fala do JEITO de pagar. "No cartão de crédito" / "no crédito" SEM nome de cartão é a forma
+  (payment_method=credit, account VAZIO). Sem citar forma, deixe vazio.
 - query_spending_change: POR QUE o gasto mudou — "por que gastei mais esse mês?", "o que fez meu gasto subir?",
   "gastei mais ou menos que mês passado?", "onde aumentou?". Compara o gasto do período (query_from/query_to, se a pessoa citar;
   senão o mês financeiro atual) com o período anterior e mostra as categorias que mais explicam. É a pergunta da DIFERENÇA entre dois

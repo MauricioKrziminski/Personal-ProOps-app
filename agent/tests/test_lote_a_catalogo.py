@@ -88,6 +88,25 @@ async def test_transferencia_recusa_antes_do_sim(monkeypatch, mudanca, trecho):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("rrule", ["FREQ=DAILY;COUNT=1", "FREQ=WEEKLY", "FREQ=DAILY"])
+async def test_transferencia_de_uma_vez_nao_vira_serie(monkeypatch, rrule):
+    """O modelo encaixou "transferi 500..." como série com uma regra inventada (medido no Gemini)."""
+    instala_contas(monkeypatch)
+    with pytest.raises(Level1Error, match="transferi"):
+        await resources.prepare(ctx(), acao(**{**TRANSFERENCIA, "rrule": rrule}))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("rrule", ["FREQ=WEEKLY;BYDAY=MO", "FREQ=MONTHLY;BYMONTHDAY=-1",
+                                   "FREQ=MONTHLY;INTERVAL=2;BYMONTHDAY=10",
+                                   "FREQ=YEARLY;BYMONTH=12;BYMONTHDAY=25"])
+async def test_calendarios_da_serie_passam(monkeypatch, rrule):
+    instala_contas(monkeypatch)
+    p = await resources.prepare(ctx(), acao(**{**TRANSFERENCIA, "rrule": rrule}))
+    assert p["summary"].startswith("criar transferência de R$ 500,00")
+
+
+@pytest.mark.asyncio
 async def test_destino_so_existe_em_transferencia(monkeypatch):
     instala_contas(monkeypatch)
     campos = {**TRANSFERENCIA, "kind": "expense"}
