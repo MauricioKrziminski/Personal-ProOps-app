@@ -3,7 +3,7 @@ import test from 'node:test';
 import {
   debtTerm, validRecurringRange, simpleDebtValues, destinoDoSalvar, podeParcelar, temContrato, faixaDeParcelas,
   totalDigitado, totalPorParcela, parcelaDoTotal, valorExibido, digitarValor, nomeDaCompra, type Contrato,
-  ancoraDoContrato, parcelaDoTotalDoContrato, proximaDoContrato, proximaNoCronograma, vencimentoDaDividaEscolhido,
+  ancoraDoContrato, parcelaDoTotalDoContrato, proximaDoContrato, parcelasPagasNoCiclo, parcelaVencida, vencimentoDaDividaEscolhido,
   vencimentoPendenteValido, financeErrorMessage,
 } from './finance-form.ts';
 test('nome repetido de contrato ativo explica como salvar sem expor o erro SQL', () => {
@@ -237,18 +237,23 @@ test('âncora e próxima parcela fazem ida e volta, inclusive no dia 31', () => 
   assert.equal(proximaDoContrato('2027-01-31', 2, 31), '2027-03-31');
 });
 
-test('a próxima parcela que o formulário mostra é a do cronograma: nunca no passado', () => {
-  // Contrato em dia: é a do contrato.
-  assert.equal(proximaNoCronograma('2026-02-05', 9, 5, '2026-09-24'), '2026-11-05');
-  // Diminuir as pagas para 5 levaria a 6ª a 05/07 (passado); o banco a mostra na próxima
-  // ocorrência do dia 5 a partir de hoje — e o formulário também.
-  assert.equal(proximaNoCronograma('2026-02-05', 5, 5, '2026-09-24'), '2026-10-05');
-  // Hoje é o dia do vencimento: vale hoje.
-  assert.equal(proximaNoCronograma('2026-02-24', 5, 24, '2026-09-24'), '2026-09-24');
-  // Dia 31 num mês de 30: o piso é o último dia deste mês, se ainda não passou.
-  assert.equal(proximaNoCronograma('2026-01-31', 2, 31, '2026-09-24'), '2026-09-30');
-  // Carência: a do contrato está no futuro e ganha.
-  assert.equal(proximaNoCronograma('2026-12-05', 0, 5, '2026-09-24'), '2026-12-05');
+test('a próxima parcela é a do CONTRATO, mesmo vencida: não desliza para o mês seguinte', () => {
+  // Âncora 23/01, 8 pagas: a 9ª é 23/09 e, com hoje em 05/10, está vencida.
+  assert.equal(proximaDoContrato('2026-01-23', 8, 23), '2026-09-23');
+  assert.equal(parcelaVencida('2026-09-23', '2026-10-05'), '2026-09-23');
+  assert.equal(parcelaVencida('2026-10-23', '2026-10-05'), null);
+  assert.equal(parcelaVencida('2026-10-05', '2026-10-05'), null);
+  assert.equal(parcelaVencida(null, '2026-10-05'), null);
+});
+
+test('as pagas que vencem no ciclo atual são as que o formulário pergunta', () => {
+  // Carro: dia 23, âncora 23/02 (8 pagas: 23/02 ... 23/09), ciclo 11/09–10/10.
+  assert.deepEqual(parcelasPagasNoCiclo('2026-02-23', 23, 1, 8, '2026-09-11', '2026-10-10'),
+    [{ no: 8, dataISO: '2026-09-23' }]);
+  // Edição: só as que ESSA edição acrescenta (a partir da 9ª).
+  assert.deepEqual(parcelasPagasNoCiclo('2026-02-23', 23, 9, 8, '2026-09-11', '2026-10-10'), []);
+  // Ciclo anterior fica só contado.
+  assert.deepEqual(parcelasPagasNoCiclo('2026-02-23', 23, 1, 7, '2026-09-11', '2026-10-10'), []);
 });
 
 test('A dívida troca de modo sem perder o que já tem: "parcelas" troca de sentido', async () => {

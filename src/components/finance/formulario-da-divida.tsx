@@ -35,6 +35,8 @@ import { Space, tabular } from '@/design/tokens';
 import {
   DEBT_KINDS,
   useAccounts,
+  useCycle,
+  useRegistrarPagasContadas,
   useDebtPayments,
   useDebtPaymentVersions,
   useDebts,
@@ -55,7 +57,9 @@ import {
   debtTerm,
   financeErrorMessage,
   parcelaDoTotalDoContrato,
-  proximaNoCronograma,
+  parcelasPagasNoCiclo,
+  proximaDoContrato,
+  parcelaVencida,
   simpleDebtValues,
   vencimentoDaDividaEscolhido,
   type UnidadeDoValor,
@@ -253,6 +257,10 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   const accounts = useAccounts(alvo?.account_id);
   const save = useSaveDebt();
   const saveScoped = useSaveDebtContractScoped();
+  const registrarPagas = useRegistrarPagasContadas();
+  const ciclo = useCycle();
+  /** Resposta de "já saiu da conta?" por nº de parcela; sem resposta vale o padrão (Sim, com conta). */
+  const [jaSaiu, setJaSaiu] = useState<Record<number, boolean>>({});
   const [detailSession] = useState(newClientMessageId);
   const contractAttempt = useRef<{ key: string; id: string; versions: Record<string, number> } | null>(null);
   /** `deHipotese`: aberta pelo "Aplicar" do "E se…?" — criar tira aquela hipótese do rascunho. */
@@ -356,11 +364,31 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   const diaDoContrato = form.diaVencimento ? Number(form.diaVencimento) : null;
   const proximaISO =
     ancoraEfetiva && diaDoContrato
-      ? // A do CRONOGRAMA, não só a do contrato: diminuir as pagas não põe a data no passado.
-        proximaNoCronograma(ancoraEfetiva, form.installmentsPaid, diaDoContrato, localISODate())
+      ? // A do CONTRATO, mesmo vencida (05/10/2026): ela é a parcela atrasada, não vira o mês seguinte.
+        proximaDoContrato(ancoraEfetiva, form.installmentsPaid, diaDoContrato)
       : form.id
         ? (schedule.data?.[0]?.due_date ?? null)
         : null;
+  const vencida = parcelaVencida(proximaISO, localISODate());
+  /**
+   * Pagas que vencem no CICLO ATUAL (o do banco) e que este salvar acrescenta: só contadas, elas
+   * não saem da conta nem entram em "O que entra e sai". O formulário pergunta se já saíram.
+   */
+  const temPagasNovas = form.calculationMode === 'fixed_installments' && !converter
+    && form.installmentsPaid > (form.id ? form.pagasOriginal : 0);
+  const perguntas = temPagasNovas && ancoraEfetiva && diaDoContrato && ciclo.data
+    ? parcelasPagasNoCiclo(ancoraEfetiva, diaDoContrato, (form.id ? form.pagasOriginal : 0) + 1,
+        form.installmentsPaid, ciclo.data.de, ciclo.data.ate)
+    : [];
+  const respostaDe = (no: number): boolean | undefined => jaSaiu[no] ?? (form.accountId ? true : undefined);
+  const erroDasPerguntas = temPagasNovas && ciclo.isPending ? 'Conferindo o ciclo atual…'
+    : perguntas.find((q) => respostaDe(q.no) === undefined)
+      ? 'Diga se a parcela já saiu da conta.'
+      : perguntas.find((q) => respostaDe(q.no) && !form.accountId)
+        ? 'Escolha a conta que paga para lançar a parcela.' : null;
+  const jaSairam = form.accountId && perguntas.some((q) => respostaDe(q.no))
+    ? { accountId: form.accountId, numbers: perguntas.filter((q) => respostaDe(q.no)).map((q) => q.no) }
+    : undefined;
   /** Valor e prazo preenchidos e sem data: o único motivo de o Salvar estar travado — e a tela diz. */
   const faltaData = Boolean(form.parcelas) && !ancoraEfetiva && !(form.id && diaDoContrato) &&
     (form.calculationMode === 'fixed_installments' ? parcelaCents > 0 : form.remainingCents > 0);
@@ -406,7 +434,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     (form.kind !== 'financing' || (form.taxa.trim() !== '' && !!form.parcelas)) &&
     Number.isFinite(Number(form.taxa.replace(',', '.'))) && Number(form.taxa.replace(',', '.')) >= 0;
   const podeSalvar = Boolean(classification.ready && (editando || !classification.isError)
-    && nomeOk && !erroEntrada && !erroPagamento && !accounts.isError && !accounts.isPending && validDueDay && (!form.id || payments.isSuccess) && (form.calculationMode === 'fixed_installments' ? simpleValues : advancedValid));
+    && nomeOk && !erroEntrada && !erroPagamento && !accounts.isError && !accounts.isPending && validDueDay && !erroDasPerguntas && (!form.id || payments.isSuccess) && (form.calculationMode === 'fixed_installments' ? simpleValues : advancedValid));
 
   const target = podeSalvar ? {
         id: form.id,
@@ -487,8 +515,15 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
           paymentVersions: contractAttempt.current.versions, requestId: contractAttempt.current.id }, {
           onSuccess: () => {
             contractAttempt.current = null;
-            toast({ message: 'Dívida atualizada.', tone: 'success' });
-            onFechar();
+            const fim = () => {
+              toast({ message: 'Dívida atualizada.', tone: 'success' });
+              onFechar();
+            };
+            if (!jaSairam) return fim();
+            registrarPagas.mutate({ debtId: form.id!, ...jaSairam }, {
+              onSuccess: fim,
+              onError: () => toast({ message: 'Dívida atualizada, mas não deu para lançar a parcela paga. Salve de novo.', tone: 'error' }),
+            });
           },
           onError: aoFalhar,
         });
@@ -519,7 +554,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     }
     // Pela PROMESSA: aberta pelo "Aplicar" de uma hipótese, ela sai do rascunho mesmo com o corpo já
     // fechado; o que é do corpo (toast, avisar o hospedeiro), só com ele montado.
-    save.mutateAsync(target).then(
+    save.mutateAsync({ ...target, ...(jaSairam ? { ja_sairam: jaSairam } : {}) }).then(
       () => {
         if (deHipotese) tirar(deHipotese);
         if (!montado.current) return;
@@ -532,7 +567,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     );
   };
 
-  const salvando = props.salvando || save.isPending || saveScoped.isPending;
+  const salvando = props.salvando || save.isPending || saveScoped.isPending || registrarPagas.isPending;
   const dataDoContrato = (
     <Field label={rotuloDaData} error={faltaData ? 'Escolha a data' : undefined}>
       <DatePickerField
@@ -685,7 +720,29 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
               accessibilityLabel="Parcelas já pagas"
             />
           </Field>
+          {perguntas.map((q) => {
+            const sim = respostaDe(q.no);
+            const nome = contaEscolhida?.name ?? 'sua conta';
+            return (
+              <Field key={q.no} label={`A ${q.no}ª (${isoToBR(q.dataISO).slice(0, 5)}) já saiu da conta ${nome}?`}>
+                <View style={styles.simNao}>
+                  <Button label="Sim" size="sm" variant={sim === true ? 'primary' : 'secondary'}
+                    onPress={() => setJaSaiu({ ...jaSaiu, [q.no]: true })} />
+                  <Button label="Não" size="sm" variant={sim === false ? 'primary' : 'secondary'}
+                    onPress={() => setJaSaiu({ ...jaSaiu, [q.no]: false })} />
+                </View>
+              </Field>
+            );
+          })}
+          {erroDasPerguntas && perguntas.length ? (
+            <ThemedText type="small" themeColor="textSecondary">{erroDasPerguntas}</ThemedText>
+          ) : null}
           {dataDoContrato}
+          {vencida ? (
+            <ThemedText type="small" themeColor="textSecondary">
+              {`Venceu em ${isoToBR(vencida).slice(0, 5)} e ainda não foi paga. Para marcar como paga, registre o pagamento na ficha ou aumente "Parcelas já pagas".`}
+            </ThemedText>
+          ) : null}
           {/* O contrato que VAI ser gravado: com "Total a pagar" a parcela arredonda. */}
           <Presenca visivel={Boolean(simpleValues)}>
           {simpleValues ? <Card style={styles.resumo}>
@@ -827,6 +884,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
 }
 
 const styles = StyleSheet.create({
+  simNao: { flexDirection: 'row', gap: Space.sm },
   conteudo: {
     gap: Space.xl,
   },

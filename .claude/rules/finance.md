@@ -25,8 +25,23 @@
   - **`first_due_date` é a âncora do CONTRATO** (`20260923160000`): a data da parcela nº 1. A
     parcela `n` vence em `day_in_month(add_months(first_due_date, n − 1), due_day)`, e
     `private.debt_schedule_for` usa `greatest(<próxima ocorrência do dia a partir de hoje>,
-    <parcela pagas+1 do contrato>)` — a carência de 3 meses aparece, e o atrasado continua como
-    sempre. `null` é o comportamento antigo. O app pergunta a PRÓXIMA parcela e grava
+    <parcela pagas+1 do contrato>)` — a carência de 3 meses aparece. `null` é o comportamento antigo.
+    **Desde 05/10/2026 (`20261005190000`) a âncora NÃO tem piso de hoje**: o cronograma é o do
+    CONTRATO. A parcela `pagas+1` vencida e não paga fica na data dela, como ATRASADA, em vez de
+    deslizar para o próximo mês e arrastar todas as seguintes (visto: a 9ª em 23/09, editada no
+    app, voltava a 23/10 e o campo "insistia" em 23/10). Quem mostra por data (mês, lista, "O que
+    vence") a deixa no dia do contrato; quem consome CAIXA a clampa para hoje (`cash_events` e
+    `eventos_de_caixa`: `greatest(due, current_date)`, só na janela que contém hoje, nunca como
+    saída de ciclo fechado) — a mesma régua de despesa atrasada. O formulário mostra a data da
+    pessoa e, vencida, "Venceu em DD/MM e ainda não foi paga". Sem âncora nada mudou.
+  - **Parcela paga no CICLO ATUAL vira lançamento** (`register_counted_debt_payments`,
+    `20261005191000`, parcela fixa): ao cadastrar (ou aumentar "Parcelas já pagas") o formulário
+    pergunta "A 8ª (23/09) já saiu da conta X?" para cada paga cujo vencimento do contrato cai no
+    ciclo do banco (`cycle_now`). Sim lança o pagamento pelo MESMO gatilho do "Paguei", ligado à
+    parcela, recuando o contador para `k−1` e restaurando o par (pagas, saldo) no fim: o saldo da
+    dívida não cai duas vezes, e repetir é no-op (parcela com pagamento é pulada). Não, ou ciclo
+    anterior, continua só contada. Com juros (modo amortizado) não pergunta: o saldo antes da
+    parcela não se deriva do contrato. O app pergunta a PRÓXIMA parcela e grava
     `first = próxima − pagas`.
   - **Com âncora, "já pagou neste ciclo" NÃO empurra nem esconde nada** (`20260923170000`).
     O ramo do ciclo existe para a dívida sem âncora, que não sabe qual parcela foi paga; com

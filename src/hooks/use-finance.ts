@@ -2781,6 +2781,8 @@ export function useSaveDebt() {
       /** A âncora do contrato (`debts.first_due_date`) — só vai quando a tela a conhece. */
       first_due_date?: string | null;
       down_payment?: DownPaymentInput;
+      /** Pagas do ciclo atual que já saíram da conta: viram lançamento pago (sem mexer no saldo). */
+      ja_sairam?: { accountId: string; numbers: number[] };
       /**
        * O `updated_at` da dívida quando o formulário abriu (24/09/2026). Um "Paguei" pelo WhatsApp
        * com o formulário aberto muda as pagas e o saldo; sem esta trava o salvar os sobrescrevia
@@ -2788,7 +2790,7 @@ export function useSaveDebt() {
        */
       versao?: string | null;
     } & Partial<ExpenseClassification> & SubcategoryMetadata) => {
-      const { id, versao, down_payment, ...resto } = input;
+      const { id, versao, down_payment, ja_sairam, ...resto } = input;
       if (id) {
         let consulta = supabase.from('debts').update(resto).eq('id', id);
         if (versao) consulta = consulta.eq('updated_at', versao);
@@ -2799,12 +2801,32 @@ export function useSaveDebt() {
         const { args } = escritaDoFinanciamento({ ...resto, ...(down_payment ? { down_payment } : {}) });
         const key = JSON.stringify(args.p_dados);
         if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
-        const { error } = await supabase.rpc('create_purchase', {
+        const { data, error } = await supabase.rpc('create_purchase', {
           ...args, p_request_id: attempt.current.id,
         });
         if (error) throw error;
+        // Repetir é seguro: a mesma tentativa devolve o mesmo resultado e a RPC pula o já lançado.
+        const novo = (data as { ids?: string[] } | null)?.ids?.[0];
+        if (ja_sairam?.numbers.length && novo) await registrarPagasContadas(novo, ja_sairam.accountId, ja_sairam.numbers);
       }
     },
+    onSuccess: invalidate,
+  });
+}
+
+/** Lança como PAGAS (na conta) parcelas que a dívida só contava: o saldo dela não anda de novo. */
+export async function registrarPagasContadas(debtId: string, accountId: string, numbers: number[]) {
+  const { error } = await supabase.rpc('register_counted_debt_payments', {
+    p_debt_id: debtId, p_account_id: accountId, p_numbers: numbers,
+  });
+  if (error) throw error;
+}
+
+export function useRegistrarPagasContadas() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: (i: { debtId: string; accountId: string; numbers: number[] }) =>
+      registrarPagasContadas(i.debtId, i.accountId, i.numbers),
     onSuccess: invalidate,
   });
 }

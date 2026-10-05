@@ -261,6 +261,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
     useMonthBreakdown: () => ({ ...query, data: [] }),
     useSaveDebt: () => mutation('saveDebt'),
     useSaveDebtContractScoped: () => mutation('saveDebtContractScoped'),
+    useRegistrarPagasContadas: () => mutation('registrarPagasContadas'),
     useDebtPaymentVersions: () => ({ ...query, isSuccess: true, data: (options.debtPayments ?? []).map((p) => ({ ...p, edit_revision: p.edit_revision ?? 0 })) }),
     usePayDebtInstallment: () => mutation('payDebt'),
     useDeleteTransaction: () => mutation('deleteTransaction'),
@@ -1142,6 +1143,9 @@ test('paid history moves the anchor: the date asked is the NEXT one, and the fir
   ui.fill('Total de parcelas', '48');
   ui.fill('Parcelas já pagas', '8');
   ui.fill('Próxima parcela (a 9ª)', '05/10/2026');
+  // a 8ª (05/09) cai no ciclo atual: o formulário pergunta, e "Não" deixa só contada
+  assert.equal(ui.button('Salvar').props.disabled, true);
+  ui.press('Não');
   ui.press('Salvar');
   assert.equal(ui.writes[0].value.installments_paid, 8);
   assert.equal(ui.writes[0].value.remaining_cents, 5880000);
@@ -1156,6 +1160,7 @@ test('history above the contract total settles on the total instead of blocking 
   ui.fill('Total de parcelas', '48');
   ui.fill('Parcelas já pagas', '49');
   ui.fill('Próxima parcela (a 49ª)', '05/10/2026');
+  ui.press('Não');
   ui.press('Salvar');
   assert.equal(ui.writes[0].value.installments_paid, 48, 'nunca mais pagas que o contrato');
   assert.equal(ui.writes[0].value.installments, 48);
@@ -1392,13 +1397,68 @@ test('as pagas não descem abaixo da maior parcela já paga pelo app (não só d
   assert.equal(ui.writes.length, 0, 'o piso conserva o valor original e Save não escreve');
 });
 
-test('diminuir as pagas de uma dívida com âncora nunca mostra uma próxima parcela no passado', () => {
-  // Contrato com 1ª em 05/02/2026 e 9 pagas: a 10ª é 05/11. Corrigir para 5 levaria a 6ª a 05/07,
-  // que já passou — o cronograma a mostra na próxima ocorrência do dia 5 a partir de hoje (08/09).
+test('diminuir as pagas com âncora mostra a parcela do CONTRATO, vencida, e diz que venceu (05/10/2026)', () => {
+  // 1ª em 05/02/2026 e 9 pagas: a 10ª é 05/11. Corrigir para 5 leva a 6ª a 05/07, que já passou:
+  // a data é a do contrato (não desliza para o mês seguinte) e a frase diz que ela venceu.
   const ui = editarDivida({ debts: [{ ...carro, first_due_date: '2026-02-05', installments_paid: 9, remaining_cents: 147000 * 39 }] });
   ui.fill('Parcelas já pagas', '5');
   const campo = ui.nodes().find((n) => n.type === 'DatePickerField');
-  assert.equal(campo.props.value, '05/10/2026');
+  assert.equal(campo.props.value, '05/07/2026');
+  assert.ok(ui.nodes().some((n: any) => typeof n.props?.children === 'string' && n.props.children.startsWith('Venceu em 05/07 e ainda não foi paga')));
+});
+
+test('escolher uma data já vencida mantém a data e avisa que venceu (23/09 com hoje depois)', () => {
+  const ui = formDivida();
+  ui.fill('Valor', 148500);
+  ui.fill('Total de parcelas', '48');
+  ui.fill('Parcelas já pagas', '8');
+  ui.fill('Próxima parcela (a 9ª)', '05/09/2026');
+  assert.equal(ui.nodes().find((n) => n.type === 'DatePickerField').props.value, '05/09/2026', 'não troca a data da pessoa');
+  assert.ok(ui.nodes().some((n: any) => typeof n.props?.children === 'string' && n.props.children.startsWith('Venceu em 05/09 e ainda não foi paga')));
+});
+
+test('parcela paga que venceu no ciclo atual: pergunta se já saiu da conta e lança uma vez', () => {
+  const ciclo = { de: '2026-09-01', ate: '2026-09-30', mes: '2026-09', diasAteOFim: 22 };
+  const contas = [{ id: 'cc', name: 'Itaú', type: 'checking' }];
+  const comum = { kind: 'expense', descricao: 'Carro', valorCents: 148500, contaId: 'cc', dataBR: '', categoria: null };
+  const ui = formDivida({ forecastAccounts: contas, cycle: ciclo, segurarMutacoes: true }, { comum });
+  ui.fill('Total de parcelas', '48');
+  ui.fill('Parcelas já pagas', '8');
+  ui.fill('Próxima parcela (a 9ª)', '05/10/2026');
+  const pergunta = ui.nodes().filter((n: any) => n.type === 'Field' && /^A 8ª \(05\/09\) já saiu da conta Itaú\?/.test(n.props.label));
+  assert.equal(pergunta.length, 1, 'uma linha por parcela no ciclo, com a conta');
+  // com conta escolhida o padrão é Sim: Salvar liga e manda a parcela
+  ui.press('Salvar');
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.writes.at(-1).value.ja_sairam)), { accountId: 'cc', numbers: [8] });
+  // Não: continua só contada
+  const nao = formDivida({ forecastAccounts: contas, cycle: ciclo, segurarMutacoes: true }, { comum });
+  nao.fill('Total de parcelas', '48');
+  nao.fill('Parcelas já pagas', '8');
+  nao.fill('Próxima parcela (a 9ª)', '05/10/2026');
+  nao.press('Não');
+  nao.press('Salvar');
+  assert.equal(nao.writes.at(-1).value.ja_sairam, undefined);
+  // Pagas de ciclos anteriores não perguntam
+  const antes = formDivida({ forecastAccounts: contas, cycle: { ...ciclo, de: '2026-10-01', ate: '2026-10-31' }, segurarMutacoes: true }, { comum });
+  antes.fill('Total de parcelas', '48');
+  antes.fill('Parcelas já pagas', '8');
+  antes.fill('Próxima parcela (a 9ª)', '05/10/2026');
+  assert.equal(antes.nodes().some((n: any) => n.type === 'Field' && /já saiu da conta/.test(n.props.label ?? '')), false);
+});
+
+test('sem conta que paga, a pergunta bloqueia o Salvar com a frase', () => {
+  const ciclo = { de: '2026-09-01', ate: '2026-09-30', mes: '2026-09', diasAteOFim: 22 };
+  const ui = formDivida({ cycle: ciclo });
+  ui.fill('Nome', 'Carro');
+  ui.fill('Valor', 148500);
+  ui.fill('Total de parcelas', '48');
+  ui.fill('Parcelas já pagas', '8');
+  ui.fill('Próxima parcela (a 9ª)', '05/10/2026');
+  assert.equal(ui.button('Salvar').props.disabled, true);
+  ui.press('Sim');
+  assert.equal(ui.button('Salvar').props.disabled, true, 'Sim sem conta não grava');
+  ui.press('Não');
+  assert.equal(ui.button('Salvar').props.disabled, false);
 });
 
 test('tocar no dia 28 de fevereiro escolhe dia fixo, e a ação explícita preserva fim do mês', () => {

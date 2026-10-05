@@ -324,14 +324,22 @@ export function proximaDoContrato(ancoraISO: string, pagas: number, dia: number)
 }
 
 /**
- * A próxima parcela que o CRONOGRAMA vai mostrar (24/09/2026): a do contrato, nunca antes da
- * próxima ocorrência do dia a partir de hoje — o `greatest` de `private.debt_schedule_for` com
- * âncora. Mostrar só a do contrato punha uma data no passado ao diminuir as pagas, e o banco a
- * mostrava em outra.
+ * As parcelas JÁ PAGAS (só contadas) de `de` a `ate` cujo vencimento do contrato cai no ciclo
+ * `[inicio, fim]` — as que o banco ainda não tem como lançamento. As datas são as do contrato
+ * (`proximaDoContrato`); o ciclo vem do banco (`cycle_now`), nunca é recalculado aqui.
  */
-export function proximaNoCronograma(ancoraISO: string, pagas: number, dia: number, hojeISO: string): string {
-  const contrato = proximaDoContrato(ancoraISO, pagas, dia);
-  const esteMes = proximaDoContrato(hojeISO, 0, dia);
-  const piso = esteMes >= hojeISO ? esteMes : proximaDoContrato(hojeISO, 1, dia);
-  return contrato > piso ? contrato : piso;
+export function parcelasPagasNoCiclo(
+  ancoraISO: string, dia: number, de: number, ate: number, inicio: string, fim: string,
+): { no: number; dataISO: string }[] {
+  const lista: { no: number; dataISO: string }[] = [];
+  for (let no = Math.max(1, de); no <= ate; no += 1) {
+    const dataISO = proximaDoContrato(ancoraISO, no - 1, dia);
+    if (dataISO >= inicio && dataISO <= fim) lista.push({ no, dataISO });
+  }
+  return lista;
+}
+
+/** Venceu e ainda não foi paga: a parcela `pagas + 1` com data anterior a hoje (frase do formulário). */
+export function parcelaVencida(proximaISO: string | null, hojeISO: string): string | null {
+  return proximaISO && proximaISO < hojeISO ? proximaISO : null;
 }

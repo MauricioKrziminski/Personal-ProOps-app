@@ -21,7 +21,7 @@ function mount(options:{debt?:any;common?:any;guarded?:any;route?:any}={}) {
   const mutation=(operation:string)=>({isPending:false,mutate(value:any){writes.push({operation,value});},async mutateAsync(value:any){writes.push({operation,value});return 'debt';}});
   const hooks={DEBT_KINDS:[],useDebts:()=>query(options.debt?[options.debt]:[]),useAccounts:(id?:string)=>{accountQuery=id;return query([{id:'account',name:'Conta arquivada',type:'checking',archived:true}]);},
     useDebtSchedule:()=>query([]),useDebtPayments:()=>query(options.debt?[{id:'payment',debt_payment_no:1}]:[]),useDebtPaymentVersions:()=>query([{id:'payment',edit_revision:2}]),
-    useSaveDebt:()=>mutation('create'),useSaveDebtContractScoped:()=>mutation('scope'),
+    useSaveDebt:()=>mutation('create'),useSaveDebtContractScoped:()=>mutation('scope'),useRegistrarPagasContadas:()=>mutation('registrar'),useCycle:()=>({isPending:false,isError:false,data:{de:'2026-09-01',ate:'2026-09-30'}}),
     useCategoryClassificationDefaults:()=>query([{category:'crédito',default_expense_pattern:'fixed',default_expense_necessity:'essential'},
       {category:'saúde',default_expense_pattern:'variable',default_expense_necessity:'essential'}]),};
   function load(path:string):any {
