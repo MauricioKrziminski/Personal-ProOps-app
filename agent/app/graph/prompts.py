@@ -67,7 +67,10 @@ Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
   da nubank pra poupança") são cadastros. RETIRAR dinheiro de uma meta ("tirei 200 da meta viagem",
   "libera 300 da reserva") e ATUALIZAR o valor de uma conta de investimento ("meu CDB está valendo
   10.500") ou registrar o rendimento dela ("recebi 85 de rendimento do CDB") são cadastros. Ver ou
-  aplicar o plano percentual do orçamento ("aplica o plano nos meus limites") também. Transferir uma vez só ("transferi 500 pra poupança")
+  aplicar o plano percentual do orçamento ("aplica o plano nos meus limites") também. PERGUNTAR da
+  reserva de emergência ("minha reserva cobre quantos meses?") e do plano de metas ("cabe no meu
+  plano de metas?", "quando aperta?") também é cadastros (a resposta sai do cadastro, não de uma
+  consulta de transações). Transferir uma vez só ("transferi 500 pra poupança")
   continua financas.
   ⚠️ A fronteira com "financas_consulta" é o que a pessoa quer SABER, não o substantivo:
   perguntar VALOR, QUANDO cai ou QUANTO falta é sempre "financas_consulta" — "quais minhas

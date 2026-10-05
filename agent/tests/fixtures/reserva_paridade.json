@@ -1,0 +1,673 @@
+{
+ "manual_3_3": {
+  "state": {
+   "as_of": "2026-10-05",
+   "config": {
+    "base_mode": "manual",
+    "edit_revision": 1,
+    "target_months": 9,
+    "manual_monthly_cents": "120000"
+   },
+   "months": [
+    {
+     "month": "2026-07-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-08-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-09-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    }
+   ],
+   "sources": [
+    {
+     "id": "00000001-0000-4000-8000-000000000000",
+     "kind": "account",
+     "name": "Poupança",
+     "archived": false,
+     "eligible": true,
+     "valuation_date": null,
+     "allocated_cents": "400000",
+     "available_cents": "2000000",
+     "effective_cents": "400000",
+     "liquidity_confirmed": true,
+     "other_allocated_cents": "0"
+    }
+   ],
+   "workspace_id": "11111111-1111-4111-8111-111111111111",
+   "workspace_name": "Pessoal",
+   "unassigned_goals_cents": "0"
+  },
+  "summary": {
+   "baseStatus": "manual",
+   "monthlyCents": 120000,
+   "reservedCents": 400000,
+   "plannedCents": 400000,
+   "unbackedCents": 0,
+   "targetCents": 1080000,
+   "missingCents": 680000,
+   "coverageMonths": 3.3333333333333335
+  },
+  "coverage": "3,3 meses"
+ },
+ "nao_configurada": {
+  "state": {
+   "as_of": "2026-10-05",
+   "config": null,
+   "months": [
+    {
+     "month": "2026-07-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-08-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-09-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    }
+   ],
+   "sources": [
+    {
+     "id": "00000001-0000-4000-8000-000000000000",
+     "kind": "account",
+     "name": "Poupança",
+     "archived": false,
+     "eligible": true,
+     "valuation_date": null,
+     "allocated_cents": "100000",
+     "available_cents": "2000000",
+     "effective_cents": "100000",
+     "liquidity_confirmed": true,
+     "other_allocated_cents": "0"
+    }
+   ],
+   "workspace_id": "11111111-1111-4111-8111-111111111111",
+   "workspace_name": "Pessoal",
+   "unassigned_goals_cents": "0"
+  },
+  "summary": {
+   "baseStatus": "not_configured",
+   "monthlyCents": null,
+   "reservedCents": 100000,
+   "plannedCents": 100000,
+   "unbackedCents": 0,
+   "targetCents": null,
+   "missingCents": null,
+   "coverageMonths": null
+  },
+  "coverage": null
+ },
+ "sem_classificar": {
+  "state": {
+   "as_of": "2026-10-05",
+   "config": {
+    "base_mode": "observed",
+    "edit_revision": 1,
+    "target_months": 6,
+    "manual_monthly_cents": null
+   },
+   "months": [
+    {
+     "month": "2026-07-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "1000",
+     "unclassified_count": 2
+    },
+    {
+     "month": "2026-08-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "1000",
+     "unclassified_count": 2
+    },
+    {
+     "month": "2026-09-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "1000",
+     "unclassified_count": 2
+    }
+   ],
+   "sources": [
+    {
+     "id": "00000001-0000-4000-8000-000000000000",
+     "kind": "account",
+     "name": "Poupança",
+     "archived": false,
+     "eligible": true,
+     "valuation_date": null,
+     "allocated_cents": "100000",
+     "available_cents": "2000000",
+     "effective_cents": "100000",
+     "liquidity_confirmed": true,
+     "other_allocated_cents": "0"
+    }
+   ],
+   "workspace_id": "11111111-1111-4111-8111-111111111111",
+   "workspace_name": "Pessoal",
+   "unassigned_goals_cents": "0"
+  },
+  "summary": {
+   "baseStatus": "incomplete_classification",
+   "monthlyCents": null,
+   "reservedCents": 100000,
+   "plannedCents": 100000,
+   "unbackedCents": 0,
+   "targetCents": null,
+   "missingCents": null,
+   "coverageMonths": null
+  },
+  "coverage": null
+ },
+ "sem_revisao": {
+  "state": {
+   "as_of": "2026-10-05",
+   "config": {
+    "base_mode": "observed",
+    "edit_revision": 1,
+    "target_months": 6,
+    "manual_monthly_cents": null
+   },
+   "months": [
+    {
+     "month": "2026-07-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "90000",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-08-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "100000",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-09-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "110000",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    }
+   ],
+   "sources": [
+    {
+     "id": "00000001-0000-4000-8000-000000000000",
+     "kind": "account",
+     "name": "Poupança",
+     "archived": false,
+     "eligible": true,
+     "valuation_date": null,
+     "allocated_cents": "100000",
+     "available_cents": "2000000",
+     "effective_cents": "100000",
+     "liquidity_confirmed": true,
+     "other_allocated_cents": "0"
+    }
+   ],
+   "workspace_id": "11111111-1111-4111-8111-111111111111",
+   "workspace_name": "Pessoal",
+   "unassigned_goals_cents": "0"
+  },
+  "summary": {
+   "baseStatus": "unreviewed",
+   "monthlyCents": null,
+   "reservedCents": 100000,
+   "plannedCents": 100000,
+   "unbackedCents": 0,
+   "targetCents": null,
+   "missingCents": null,
+   "coverageMonths": null
+  },
+  "coverage": null
+ },
+ "observada_1_5": {
+  "state": {
+   "as_of": "2026-10-05",
+   "config": {
+    "base_mode": "observed",
+    "edit_revision": 1,
+    "target_months": 6,
+    "manual_monthly_cents": null
+   },
+   "months": [
+    {
+     "month": "2026-07-01",
+     "reviewed": true,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "90000",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-08-01",
+     "reviewed": true,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "100000",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-09-01",
+     "reviewed": true,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "110000",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    }
+   ],
+   "sources": [
+    {
+     "id": "00000001-0000-4000-8000-000000000000",
+     "kind": "account",
+     "name": "Poupança",
+     "archived": false,
+     "eligible": true,
+     "valuation_date": null,
+     "allocated_cents": "150000",
+     "available_cents": "2000000",
+     "effective_cents": "150000",
+     "liquidity_confirmed": true,
+     "other_allocated_cents": "0"
+    }
+   ],
+   "workspace_id": "11111111-1111-4111-8111-111111111111",
+   "workspace_name": "Pessoal",
+   "unassigned_goals_cents": "0"
+  },
+  "summary": {
+   "baseStatus": "observed",
+   "monthlyCents": 100000,
+   "reservedCents": 150000,
+   "plannedCents": 150000,
+   "unbackedCents": 0,
+   "targetCents": 600000,
+   "missingCents": 450000,
+   "coverageMonths": 1.5
+  },
+  "coverage": "1,5 meses"
+ },
+ "base_zero": {
+  "state": {
+   "as_of": "2026-10-05",
+   "config": {
+    "base_mode": "observed",
+    "edit_revision": 1,
+    "target_months": 6,
+    "manual_monthly_cents": null
+   },
+   "months": [
+    {
+     "month": "2026-07-01",
+     "reviewed": true,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-08-01",
+     "reviewed": true,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-09-01",
+     "reviewed": true,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    }
+   ],
+   "sources": [
+    {
+     "id": "00000001-0000-4000-8000-000000000000",
+     "kind": "account",
+     "name": "Poupança",
+     "archived": false,
+     "eligible": true,
+     "valuation_date": null,
+     "allocated_cents": "100000",
+     "available_cents": "2000000",
+     "effective_cents": "100000",
+     "liquidity_confirmed": true,
+     "other_allocated_cents": "0"
+    }
+   ],
+   "workspace_id": "11111111-1111-4111-8111-111111111111",
+   "workspace_name": "Pessoal",
+   "unassigned_goals_cents": "0"
+  },
+  "summary": {
+   "baseStatus": "zero_base",
+   "monthlyCents": null,
+   "reservedCents": 100000,
+   "plannedCents": 100000,
+   "unbackedCents": 0,
+   "targetCents": null,
+   "missingCents": null,
+   "coverageMonths": null
+  },
+  "coverage": null
+ },
+ "manual_zerada": {
+  "state": {
+   "as_of": "2026-10-05",
+   "config": {
+    "base_mode": "manual",
+    "edit_revision": 1,
+    "target_months": 9,
+    "manual_monthly_cents": "120000"
+   },
+   "months": [
+    {
+     "month": "2026-07-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-08-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-09-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    }
+   ],
+   "sources": [],
+   "workspace_id": "11111111-1111-4111-8111-111111111111",
+   "workspace_name": "Pessoal",
+   "unassigned_goals_cents": "0"
+  },
+  "summary": {
+   "baseStatus": "manual",
+   "monthlyCents": 120000,
+   "reservedCents": 0,
+   "plannedCents": 0,
+   "unbackedCents": 0,
+   "targetCents": 1080000,
+   "missingCents": 1080000,
+   "coverageMonths": 0
+  },
+  "coverage": "0 meses"
+ },
+ "deficit": {
+  "state": {
+   "as_of": "2026-10-05",
+   "config": {
+    "base_mode": "manual",
+    "edit_revision": 1,
+    "target_months": 9,
+    "manual_monthly_cents": "120000"
+   },
+   "months": [
+    {
+     "month": "2026-07-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-08-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-09-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    }
+   ],
+   "sources": [
+    {
+     "id": "00000001-0000-4000-8000-000000000000",
+     "kind": "account",
+     "name": "Poupança",
+     "archived": false,
+     "eligible": true,
+     "valuation_date": null,
+     "allocated_cents": "500000",
+     "available_cents": "300000",
+     "effective_cents": "300000",
+     "liquidity_confirmed": true,
+     "other_allocated_cents": "0"
+    }
+   ],
+   "workspace_id": "11111111-1111-4111-8111-111111111111",
+   "workspace_name": "Pessoal",
+   "unassigned_goals_cents": "0"
+  },
+  "summary": {
+   "baseStatus": "manual",
+   "monthlyCents": 120000,
+   "reservedCents": 300000,
+   "plannedCents": 500000,
+   "unbackedCents": 200000,
+   "targetCents": 1080000,
+   "missingCents": 780000,
+   "coverageMonths": 2.5
+  },
+  "coverage": "2,5 meses"
+ },
+ "um_mes": {
+  "state": {
+   "as_of": "2026-10-05",
+   "config": {
+    "base_mode": "manual",
+    "edit_revision": 1,
+    "target_months": 9,
+    "manual_monthly_cents": "120000"
+   },
+   "months": [
+    {
+     "month": "2026-07-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-08-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-09-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    }
+   ],
+   "sources": [
+    {
+     "id": "00000001-0000-4000-8000-000000000000",
+     "kind": "account",
+     "name": "Poupança",
+     "archived": false,
+     "eligible": true,
+     "valuation_date": null,
+     "allocated_cents": "120000",
+     "available_cents": "2000000",
+     "effective_cents": "120000",
+     "liquidity_confirmed": true,
+     "other_allocated_cents": "0"
+    }
+   ],
+   "workspace_id": "11111111-1111-4111-8111-111111111111",
+   "workspace_name": "Pessoal",
+   "unassigned_goals_cents": "0"
+  },
+  "summary": {
+   "baseStatus": "manual",
+   "monthlyCents": 120000,
+   "reservedCents": 120000,
+   "plannedCents": 120000,
+   "unbackedCents": 0,
+   "targetCents": 1080000,
+   "missingCents": 960000,
+   "coverageMonths": 1
+  },
+  "coverage": "1 mês"
+ },
+ "menos_de_um_decimo": {
+  "state": {
+   "as_of": "2026-10-05",
+   "config": {
+    "base_mode": "manual",
+    "edit_revision": 1,
+    "target_months": 9,
+    "manual_monthly_cents": "120000"
+   },
+   "months": [
+    {
+     "month": "2026-07-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-08-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    },
+    {
+     "month": "2026-09-01",
+     "reviewed": false,
+     "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "expense_count": 3,
+     "essential_cents": "0",
+     "unclassified_cents": "0",
+     "unclassified_count": 0
+    }
+   ],
+   "sources": [
+    {
+     "id": "00000001-0000-4000-8000-000000000000",
+     "kind": "account",
+     "name": "Poupança",
+     "archived": false,
+     "eligible": true,
+     "valuation_date": null,
+     "allocated_cents": "5000",
+     "available_cents": "2000000",
+     "effective_cents": "5000",
+     "liquidity_confirmed": true,
+     "other_allocated_cents": "0"
+    }
+   ],
+   "workspace_id": "11111111-1111-4111-8111-111111111111",
+   "workspace_name": "Pessoal",
+   "unassigned_goals_cents": "0"
+  },
+  "summary": {
+   "baseStatus": "manual",
+   "monthlyCents": 120000,
+   "reservedCents": 5000,
+   "plannedCents": 5000,
+   "unbackedCents": 0,
+   "targetCents": 1080000,
+   "missingCents": 1075000,
+   "coverageMonths": 0.041666666666666664
+  },
+  "coverage": "Menos de 0,1 mês"
+ }
+}

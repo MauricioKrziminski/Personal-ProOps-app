@@ -471,7 +471,7 @@ class ResourceField(BaseModel):
 class ResourceAction(BaseModel):
     target_month: str | None = Field(None, description="Só para LOCALIZAR: o orçamento existente (YYYY-MM-01 ou default) ou a fatura de um mês (YYYY-MM-01). Não é o novo mês.")
     type: ResourceActionType
-    resource: str = Field(description='Recurso do catálogo: accounts, cards, debts, goals, budgets, assets, recurring, rules, notes, reminders, folders, plano.')
+    resource: str = Field(description='Recurso do catálogo: accounts, cards, debts, goals, budgets, assets, recurring, rules, notes, reminders, folders, plano, reserva, plano_metas, favoritos, duplicar.')
     name: str | None = Field(None, description='Nome do novo item ou nome EXATO do item existente. Não inventar IDs.')
     # Gemini rejects the combined nested maxItems (10 actions × 20 fields).
     # Keep the safety bound in server validation without exporting maxItems.
