@@ -200,10 +200,12 @@ Aceite no staging em 04/10/2026: [F11](../../qa/2026-10-02-evolucao-financeira/f
 
 Arquivos: patrimônio/ativos, transfers e novo ledger de investimentos. Interface: posição, origem/destino, valor/data → movimento canônico + efeito na posição.
 
-- [ ] RED: resgate concorrente não excede posição; uma custódia não conta duas vezes.
-- [ ] Implementar movimento/edição/desfazer/conciliar atomicamente.
-- [ ] Integrar formulário compartilhado e histórico paginado.
-- [ ] Provar consumo/renda/caixa/patrimônio e gates nativos F12; registrar aceite.
+- [x] RED: resgate concorrente não excede posição; uma custódia não conta duas vezes.
+- [x] Implementar movimento/edição/desfazer/conciliar atomicamente.
+- [x] Integrar formulário compartilhado e histórico paginado.
+- [x] Provar consumo/renda/caixa/patrimônio e gates nativos F12; registrar aceite.
+
+Aceite no staging em 04/10/2026: [F12](../../qa/2026-10-02-evolucao-financeira/f12/aceite.md). F13 liberado.
 
 ### F13 — Resultado e valuation distintos
 

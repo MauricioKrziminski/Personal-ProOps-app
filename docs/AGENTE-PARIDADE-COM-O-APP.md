@@ -652,3 +652,9 @@ promete configuração da reserva pelo WhatsApp antes da implementação/avalia�
 | app | agente |
 |---|---|
 | Guardar/Retirar com origem: separar na conta, transferir, vincular transferência, liberar, transferir de volta e desfazer (`goal_money_command`) | Lacuna: o agente continua guardando e retirando SEM origem (`goal_deposit`), sem separação por conta e sem transferência. Paridade pendente da etapa final do plano de 22 pontos; nenhuma tool/prompt mudou no F11. |
+
+## Investimentos: aplicar e resgatar com origem e destino — F12 (04/10/2026)
+
+| app | agente |
+|---|---|
+| Aplicar, resgatar, vincular transferência já lançada, editar valor/data e desfazer movimento de uma conta de investimento (`investment_command`) | Lacuna: o agente não aplica nem resgata; uma transferência pedida por ele continua sendo uma transferência comum entre contas. Paridade pendente da etapa final do plano de 22 pontos; nenhuma tool/prompt mudou no F12. |

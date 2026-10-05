@@ -1842,6 +1842,71 @@ export type Database = {
           },
         ]
       }
+      investment_movements: {
+        Row: {
+          created_at: string
+          created_transfer: boolean
+          edit_revision: number
+          id: string
+          kind: string
+          position_account_id: string
+          transfer_id: string | null
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_transfer?: boolean
+          edit_revision?: number
+          id?: string
+          kind: string
+          position_account_id: string
+          transfer_id?: string | null
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_transfer?: boolean
+          edit_revision?: number
+          id?: string
+          kind?: string
+          position_account_id?: string
+          transfer_id?: string | null
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investment_movements_position_account_id_fkey"
+            columns: ["position_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investment_movements_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: true
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investment_movements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investment_movements_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           attempts: number
@@ -3920,6 +3985,22 @@ export type Database = {
           status: string
         }[]
       }
+      investment_command: {
+        Args: { p_input: Json; p_request_id: string }
+        Returns: Json
+      }
+      investment_link_candidates: { Args: { p_limit?: number }; Returns: Json }
+      investment_movements_page: {
+        Args: {
+          p_before_created?: string
+          p_before_id?: string
+          p_before_on?: string
+          p_limit?: number
+          p_position_account_id: string
+        }
+        Returns: Json
+      }
+      investment_positions: { Args: never; Returns: Json }
       ledger_expected_lines: {
         Args: { p_from: string; p_recurring_id?: string; p_to: string }
         Returns: {

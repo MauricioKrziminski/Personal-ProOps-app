@@ -275,3 +275,10 @@ Reduzir movimento no iOS em 04/10 e limpeza das fixtures por `request_id`. F11 l
 iOS 10/10 e Android 9/9; oráculo do banco sem resíduo e caixa idêntico. ANR F07 segue aberta.
 F12 liberado.
 
+## F12 — aporte e resgate com origem e destino
+
+[Aceite e limites](f12/aceite.md) e [contrato](f12/contrato.md). Migrations
+`20261004140000_investment_movements.sql` (revisão bloqueou e foi corrigida antes do push) e
+`20261004150000_investment_guard_p0001.sql`, só no staging. iOS 11/11 e Android 8/10; oráculo
+sem resíduo, contas de QA apagadas por ID. F13 liberado.
+

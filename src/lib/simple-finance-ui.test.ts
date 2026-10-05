@@ -59,7 +59,7 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[] } = {}) {
+function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any } = {}) {
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
@@ -457,6 +457,14 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
         useGoalLinkCandidates: () => ({ ...query, isSuccess: true, data: options.linkCandidates ?? [] }),
         useGoalMoneyCommand: () => mutation('goalMoney'),
       };
+      if (name === '@/hooks/use-investments') return {
+        useInvestmentPositions: () => ({ ...query, isSuccess: true, data: options.investments?.positions ?? [], refetch: async () => { refetches.push('investments'); } }),
+        useInvestmentMovements: (id?: string) => ({ ...query, isSuccess: true, data: id ? { pages: [{ movements: options.investments?.movements ?? [] }] } : undefined, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: async () => {} }),
+        useInvestmentLinkCandidates: () => ({ ...query, isSuccess: true, data: options.investments?.candidates ?? [] }),
+        useInvestmentCommand: () => mutation('investment'),
+      };
+      if (name === '@/components/finance/investments-section') return load('src/components/finance/investments-section.tsx');
+      if (name === '@/lib/investment') return load('src/lib/investment.ts');
       if (name === '@/hooks/use-emergency-reserve') return {
         useEmergencyReserve: () => inRealm({ ...query, data: options.reserveState, isPending: Boolean(options.reservePending), isSuccess: !options.reservePending && !options.reserveError, isError: Boolean(options.reserveError), refetch: async () => { refetches.push('emergency-reserve'); } }),
         useSaveEmergencyReserve: () => ({ ...mutation('saveEmergencyReserve'),
@@ -739,7 +747,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
     if (node.type === 'FinanceAnalysisPanes') visit(node.props.compact);
     // `CamposDaSerie` é um grupo de campos sem hook: desenhado aqui, a tela é a que a pessoa vê.
     // Os corpos (`FormularioDaSerie`, `FormularioDaDivida`) têm hooks: eles rodam depois dos da tela, na mesma ordem a cada render.
-    if (typeof node.type === 'function' && ['Controller', 'AccountFormFields', 'CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida', 'TrashEmptyState', 'FilterBar', 'ExpenseClassificationControls', 'EmergencyReserveSection', 'EmergencyReserveSheet', 'EmergencyReserveEditor', 'GoalPlanningSummary', 'GoalPlanSheet', 'GoalContributionCaption', 'GoalContributionFields', 'GoalContributionSummary', 'GoalContributionReady', 'GoalContributionHint', 'PlanningResult', 'Qualifications', ...(options.realMoney ? ['Money'] : [])].includes(node.type.name)) visit(node.type(node.props));
+    if (typeof node.type === 'function' && ['Controller', 'AccountFormFields', 'CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida', 'TrashEmptyState', 'FilterBar', 'ExpenseClassificationControls', 'EmergencyReserveSection', 'InvestmentsSection', 'EmergencyReserveSheet', 'EmergencyReserveEditor', 'GoalPlanningSummary', 'GoalPlanSheet', 'GoalContributionCaption', 'GoalContributionFields', 'GoalContributionSummary', 'GoalContributionReady', 'GoalContributionHint', 'PlanningResult', 'Qualifications', ...(options.realMoney ? ['Money'] : [])].includes(node.type.name)) visit(node.type(node.props));
     if (node.type === 'Field') visit(node.props.hint);
     // No celular o `AdaptivePanes` desenha o slot de uma coluna só (Pastas, Recorrentes…).
     if (node.type === 'AdaptivePanes') visit(node.props.singlePaneContent ?? node.props.main);
@@ -6959,4 +6967,134 @@ test('F11: o extrato mostra a natureza e só oferece Desfazer na linha de uma mo
   ui.interact(() => daMov.props.acoes[0].onPress());
   assert.deepEqual(ui.writes, [], 'confirma antes de desfazer');
   assert.equal(ui.confirmations.length, 1);
+});
+
+const f12Posicao = { account_id: 'p1', workspace_id: 'w1', name: 'Corretora', type_label: 'Conta de investimento', balance_cents: 30000, net_contributed_cents: 25000, movements_count: 2 };
+const f12Opcoes = (extra: Record<string, unknown> = {}) => ({
+  forecastAccounts: [{ id: 'a1', name: 'Nubank', type: 'checking', archived: false }, { id: 'p1', name: 'Corretora', type: 'investment', archived: false }],
+  balances: [{ account_id: 'a1', cleared_cents: 100000 }], investments: { positions: [f12Posicao] }, ...extra,
+});
+const f12Folha = (direcao: 'Aplicar' | 'Resgatar' = 'Aplicar', extra: Record<string, unknown> = {}) => {
+  const ui = screen('src/app/finance/net-worth.tsx', f12Opcoes(extra));
+  ui.press(direcao);
+  if (direcao === 'Resgatar') ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'resgatar')).props.onChange('resgatar'));
+  return ui;
+};
+// o último: a lista também tem os botões "Aplicar"/"Resgatar"; o da folha vem depois
+const f12Botao = (ui: any, label: string) => ui.nodes().filter((n: any) => n.type === 'Button' && n.props.label === label).at(-1);
+const f12Motivo = (ui: any, re: RegExp) => ui.nodes().some((n: any) => n.type === 'ThemedText' && re.test(String(n.props.children)));
+
+test('F12: sem conta de investimento a tela diz isso numa linha e leva ao cadastro', () => {
+  const ui = screen('src/app/finance/net-worth.tsx', { forecastAccounts: [{ id: 'a1', name: 'Nubank', type: 'checking', archived: false }] });
+  const vazio = ui.nodes().find((n: any) => n.type === 'EmptyState' && n.props.title === 'Nenhuma conta de investimento');
+  assert.ok(vazio);
+  assert.equal(vazio.props.action.label, 'Cadastrar conta de investimento');
+  ui.interact(() => vazio.props.action.onPress());
+  assert.deepEqual(ui.navigations.at(-1), '/finance/accounts?create=1');
+});
+
+test('F12: formulário incompleto não grava nada; o Valor abre com o foco logo depois do seletor', () => {
+  const ui = f12Folha();
+  const campos = ui.nodes().filter((n: any) => ['Segmented', 'Field'].includes(n.type)).map((n: any) => n.type === 'Field' ? n.props.label : 'Segmented');
+  assert.deepEqual(campos.slice(0, 2), ['Segmented', 'Valor']);
+  assert.equal(ui.nodes().find((n: any) => n.type === 'MoneyField').props.autoFocus, true);
+  assert.equal(f12Botao(ui, 'Aplicar').props.disabled, true);
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(1000));
+  assert.equal(f12Botao(ui, 'Aplicar').props.disabled, true, 'sem origem ainda não grava');
+  ui.interact(() => f12Botao(ui, 'Aplicar').props.onPress?.());
+  assert.deepEqual(ui.writes, []);
+});
+
+test('F12: aplicar manda contribute com a origem escolhida e mostra o efeito nas duas contas', () => {
+  const ui = f12Folha();
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(1000));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'AccountPicker').props.onChange('a1'));
+  assert.equal(f12Botao(ui, 'Aplicar').props.disabled, false);
+  assert.ok(f12Motivo(ui, /Nubank · Saldo: R\$ 1000.00 → R\$ 990.00/));
+  assert.ok(f12Motivo(ui, /Corretora · Saldo: R\$ 300.00 → R\$ 310.00/));
+  ui.interact(() => f12Botao(ui, 'Aplicar').props.onPress());
+  const w = ui.writes.at(-1);
+  assert.equal(w.operation, 'investment');
+  assert.equal(w.value.op, 'contribute');
+  assert.equal(w.value.position_account_id, 'p1');
+  assert.equal(w.value.from_account_id, 'a1');
+  assert.equal(w.value.amount_cents, '1000');
+});
+
+test('F12: origem igual à posição bloqueia o salvar com o motivo escrito', () => {
+  const ui = f12Folha();
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(1000));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'AccountPicker').props.onChange('p1'));
+  assert.equal(f12Botao(ui, 'Aplicar').props.disabled, true);
+  assert.ok(f12Motivo(ui, /Origem e destino precisam ser contas diferentes/));
+  assert.deepEqual(ui.writes, []);
+});
+
+test('F12: resgatar além do disponível bloqueia dizendo quanto há; dentro do saldo grava redeem', () => {
+  const ui = f12Folha('Resgatar');
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(30001));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'AccountPicker').props.onChange('a1'));
+  assert.equal(f12Botao(ui, 'Resgatar').props.disabled, true);
+  assert.ok(f12Motivo(ui, /Só há R\$ 300.00 disponíveis em Corretora/));
+  ui.interact(() => f12Botao(ui, 'Resgatar').props.onPress?.());
+  assert.deepEqual(ui.writes, []);
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(30000));
+  ui.interact(() => f12Botao(ui, 'Resgatar').props.onPress());
+  assert.deepEqual(copia(ui.writes.at(-1).value), { op: 'redeem', position_account_id: 'p1', to_account_id: 'a1', amount_cents: '30000', occurred_on: ui.writes.at(-1).value.occurred_on, note: null });
+});
+
+test('F12: com valores ocultos o efeito não mostra o dinheiro', () => {
+  const ui = f12Folha('Aplicar', { concealed: true });
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(1000));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'AccountPicker').props.onChange('a1'));
+  const linha = ui.nodes().find((n: any) => n.type === 'ThemedText' && /Saldo:/.test(String(n.props.children)));
+  assert.ok(linha);
+  assert.doesNotMatch(String(linha.props.children), /\d/);
+});
+
+test('F12: o histórico abre ao tocar na posição, com Editar só no que o app criou e Desfazer confirmando antes', () => {
+  const mov = (id: string, created: boolean) => ({ id, kind: 'contribution', amount_cents: 1000, occurred_on: '2026-09-01', status: 'cleared',
+    counterparty_account_id: 'a1', counterparty_name: 'Nubank', transfer_id: `t-${id}`, created_transfer: created, revision: 2, created_at: '2026-09-01T10:00:00Z', description: null });
+  const ui = screen('src/app/finance/net-worth.tsx', f12Opcoes({ investments: { positions: [f12Posicao], movements: [mov('m1', true), mov('m2', false)] } }));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Row' && n.props.title === 'Corretora').props.onPress());
+  const linhas = deslizaveis(ui).filter((d: any) => d.props.acoes.some((x: any) => x.label === 'Desfazer o movimento'));
+  assert.equal(linhas.length, 2);
+  assert.deepEqual(copia(linhas[0].props.acoes.map((x: any) => x.label)), ['Editar', 'Desfazer o movimento']);
+  assert.deepEqual(copia(linhas[1].props.acoes.map((x: any) => x.label)), ['Desfazer o movimento'], 'vinculado não edita valor nem data');
+  ui.interact(() => linhas[0].props.acoes[1].onPress());
+  assert.deepEqual(ui.writes, [], 'confirma antes de desfazer');
+  assert.equal(ui.confirmations.length, 1);
+  ui.interact(() => ui.confirmations[0]());
+  assert.deepEqual(copia(ui.writes.at(-1).value), { op: 'undo', movement_id: 'm1', expected_revision: 2 });
+});
+
+test('F12: movimento cujo lançamento foi apagado aparece como tal e só oferece Desfazer', () => {
+  const m = { id: 'm9', kind: 'redemption', amount_cents: null, occurred_on: '2026-09-01', status: null, counterparty_account_id: null,
+    counterparty_name: null, transfer_id: null, deleted: true, created_transfer: true, revision: 1, created_at: '2026-09-01T10:00:00Z', description: null };
+  const ui = screen('src/app/finance/net-worth.tsx', f12Opcoes({ investments: { positions: [f12Posicao], movements: [m] } }));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Row' && n.props.title === 'Corretora').props.onPress());
+  const linha = deslizaveis(ui).find((d: any) => d.props.acoes.some((x: any) => x.label === 'Desfazer o movimento'));
+  assert.deepEqual(copia(linha.props.acoes.map((x: any) => x.label)), ['Desfazer o movimento']);
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Row' && /Lançamento apagado/.test(String(n.props.subtitle))));
+});
+
+test('F12: editar abre a mesma folha com valor e data e manda edit com a revisão', () => {
+  const m = { id: 'm1', kind: 'contribution', amount_cents: 1000, occurred_on: '2026-09-01', status: 'cleared', counterparty_account_id: 'a1',
+    counterparty_name: 'Nubank', transfer_id: 't1', created_transfer: true, revision: 2, created_at: '2026-09-01T10:00:00Z', description: null };
+  const ui = screen('src/app/finance/net-worth.tsx', f12Opcoes({ investments: { positions: [f12Posicao], movements: [m] } }));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Row' && n.props.title === 'Corretora').props.onPress());
+  ui.interact(() => deslizaveis(ui).find((d: any) => d.props.acoes.some((x: any) => x.label === 'Editar')).props.acoes[0].onPress());
+  assert.equal(ui.nodes().some((n: any) => n.type === 'Segmented'), false, 'a direção não muda depois de criado');
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(1500));
+  ui.interact(() => f12Botao(ui, 'Salvar').props.onPress());
+  assert.deepEqual(copia(ui.writes.at(-1).value), { op: 'edit', movement_id: 'm1', amount_cents: '1500', occurred_on: '2026-09-01', expected_revision: 2 });
+});
+
+test('F12: a folha de bem lembra de registrar aportes na conta de investimento, só quando ela existe', () => {
+  const com = screen('src/app/finance/net-worth.tsx', f12Opcoes());
+  com.press('Novo bem');
+  assert.match(String(com.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Tipo').props.hint), /conta de investimento, registre aportes nela/);
+  const sem = screen('src/app/finance/net-worth.tsx', { forecastAccounts: [{ id: 'a1', name: 'Nubank', type: 'checking', archived: false }] });
+  sem.press('Novo bem');
+  assert.equal(sem.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Tipo').props.hint, undefined);
 });

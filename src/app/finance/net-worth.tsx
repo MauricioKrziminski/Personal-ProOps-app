@@ -8,6 +8,7 @@ import { Stack, router } from 'expo-router';
 
 import { monthShort } from '@/components/finance/month-picker';
 import { FinanceAnalysisPanes } from '@/components/finance/finance-analysis-panes';
+import { InvestmentsSection } from '@/components/finance/investments-section';
 import { EmergencyReserveSection, EmergencyReserveSheet, useEmergencyReserveEditor } from '@/components/finance/emergency-reserve-section';
 import { ThemedText } from '@/components/themed-text';
 import { SecaoDeArquivados } from '@/components/ui/secao-de-arquivados';
@@ -35,6 +36,7 @@ import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   ASSET_CLASSES,
   useArchiveAsset,
+  useAccounts,
   useAssets,
   useFinancialHealth,
   useNetWorth,
@@ -164,6 +166,8 @@ export default function NetWorthScreen() {
   const reserva = useEmergencyReserve();
   const reserveEditor = useEmergencyReserveEditor(reserva);
   const bens = useAssets();
+  // Dinheiro que já mora numa conta de investimento se registra nela (F12), não como bem.
+  const temContaDeInvestimento = (useAccounts().data ?? []).some((a) => a.type === 'investment');
   const save = useSaveAsset();
   const archive = useArchiveAsset();
   const [form, setForm] = useState<FormState | null>(null);
@@ -457,6 +461,7 @@ export default function NetWorthScreen() {
       {bens.isError ? (
         <ErrorBand message="Não deu para carregar seus bens." onRetry={bens.refetch} />
       ) : null}
+      <InvestmentsSection />
       {ativos.length > 0 ? <Section title="Bens">{ativos.map(linhaBem)}</Section> : null}
       {passivos.length > 0 ? <Section title="O que eu devo">{passivos.map(linhaBem)}</Section> : null}
       <Section>
@@ -573,7 +578,13 @@ export default function NetWorthScreen() {
                 de um formulário, e o mesmo desenho de uma lista de conteúdo para o que é um
                 CAMPO. `SelectField` é o caminho único dessa escolha no app.
               */}
-              <Field label="Tipo">
+              <Field
+                label="Tipo"
+                hint={
+                  temContaDeInvestimento && ['investment', 'crypto', 'equity'].includes(form.classe)
+                    ? 'Se este dinheiro está numa conta de investimento, registre aportes nela.'
+                    : undefined
+                }>
                 <SelectField
                   options={ASSET_CLASSES.map((c) => ({ id: c.value, label: c.label, icon: c.icon }))}
                   value={form.classe}
