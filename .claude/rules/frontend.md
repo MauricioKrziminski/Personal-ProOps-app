@@ -396,6 +396,89 @@ ancestral da folha. `anti-slop.test.ts` quebra se uma rolagem nascer sem a prop.
   `wm set-ignore-orientation-request true` (o Android 16 ignora a orientação em tela grande) e a
   navegação por 3 botões — e devolver tudo depois.
 
+## Evolução financeira — regras de UI (outubro/2026)
+
+As regras de domínio estão em `finance.md` → *Evolução financeira — 22 pontos*; aqui só o que é
+tela. Entradas sem rota órfã: todo ponto tem caminho a partir de Hoje, Finanças ou Patrimônio.
+
+### Formulário único (`/finance/lancar`)
+
+- **Ordem do evento com o que entrou**: tipo → título → estabelecimento → valor → categoria (+ detalhe
+  opcional, `SubcategoryField`) → **forma de pagamento** (`PaymentMethodField`, `SelectField`: o método
+  vem ANTES da origem que ele restringe) → conta/cartão → como se divide → quando → **Classificação**
+  (`ExpenseClassificationField`, dois controles separados, só em gasto) → extras. Seis meios nunca
+  viram `Segmented` (aceita 2 a 4 alternativas curtas).
+- **Origem se cria no lugar**: o `AccountPicker` tem "Criar conta/cartão" que abre os MESMOS campos
+  (`AccountFormFields`) inline, sem `Modal` dentro de `Modal`; o lançamento fica montado, cancelar
+  fecha só o cadastro e salvar o lançamento espera o cadastro acabar. Durante tentativa ambígua
+  os campos do cadastro ficam bloqueados.
+- O seletor mostra saldo ou limite numa terceira linha (consultas agregadas, nunca uma por opção);
+  falha mostra "indisponível" com recuperação e a origem continua selecionável.
+- **"Ao salvar"** (`FinanceWritePreview`) some imediatamente ao mudar o rascunho; a consulta espera
+  350 ms, cancela a anterior e **não usa `placeholderData`** (número de rascunho antigo sob valor
+  novo é mentira). Privacidade vale para números, cronograma e rótulo acessível.
+- **Duplicar abre o formulário e nunca grava**: `hrefDoLancar('uma', paramsDaCopia(...))` com a data
+  de hoje; "Duplicar" também nos menus de item das listas. Cópia de parcela avisa "vira um
+  lançamento à vista".
+- **Favoritos nunca gravam sozinhos**: a fileira (até 6) preenche o formulário e a pessoa salva. Ordem
+  do topo do formulário: perguntas da voz → seletor de formato → favoritos → nota da cópia.
+  "Salvar como favorito"/"Virar favorito" gravam o modelo; gerenciar fica em Gerenciar → Favoritos
+  (`SecaoDeArquivados`).
+- **Voz**: "Por voz" nos atalhos de `ATALHOS_DE_LANCAMENTO` (gravar, transcrição editável, "Montar
+  lançamento"); o hook de gravação é um só (`use-gravador-de-voz.ts`) compartilhado com a conversa. O
+  que a fala não disse fica VAZIO e vira nota no topo (`perguntas`); cancelar não grava.
+- Série de **transferência**: "Da conta" e logo depois "Para a conta", sem categoria nem método.
+  "Termina em" tem piso no início original e fim antes do próximo vencimento é **Encerrar**
+  (a tela diz o que fica e o que sai, com números, antes de salvar).
+
+### `Explica` — "Como é calculado"
+
+- Um primitivo só (`components/ui/explica.tsx`): botão (i) de 44pt ao lado do TÍTULO do bloco, nunca
+  legenda permanente. O texto vem de `src/lib/explicacoes.ts` (uma função por indicador, com teste),
+  a partir do payload que desenhou o número; **nenhum período ou janela escrito à mão**. Sem número,
+  o (i) some. Indicador novo com total, período ou estimativa nasce com a sua entrada no catálogo.
+
+### Telas e rotas novas
+
+- `/finance/comecar` — primeiro cadastro em passos puláveis (entradas: passo "contas" dos Primeiros
+  passos da Hoje e o estado vazio de Finanças). **A tela segura o passo durante o salvar**
+  (`onSalvando` até o `onCriada`): as contas recarregavam antes de o progresso gravar e o passo
+  efetivo piscava (resumo, ou passo 1 ainda tocável).
+- `/finance/acumulacao` — simulador local (Patrimônio → Investimentos e menu do painel); premissas em
+  `usePreferencia`, nunca banco; até 3 cenários; a curva troca quando o cálculo termina.
+- `/finance/why` — "Por que mudou?" (bloco "Onde foi o dinheiro"); tocar numa linha abre Lançamentos
+  com `from`/`to` exatos e o filtro da dimensão, e o total da lista bate com o da linha.
+  `/finance/transactions` passou a aceitar `from`/`to`, `subcategoryId` (com `none`), `paymentMethods`,
+  `expensePatterns` e `expenseNecessities`.
+- Avisos abrem o item (`invoice`, `transaction`); item ausente = "Isto não existe mais" com caminho
+  para a lista.
+
+### Metas, reserva e investimentos
+
+- Folha Guardar/Retirar: `Segmented` de 2 (**Já está na conta | Transferir**; **Liberar | Transferir
+  de volta**), origem antes do destino, efeito por conta antes de salvar e "Desfazer" no extrato.
+- **A celebração de marco toca DEPOIS que a folha sai**: no sucesso do aporte a folha ainda descia
+  por cima do anel e ninguém via. Celebra uma vez por travessia (memória por usuário no aparelho,
+  chave `meta:<goal_id>`); abrir, puxar para atualizar e Realtime não celebram. Sem som e sem push;
+  com Reduzir movimento, só halo e háptico.
+- Reserva e plano de metas vivem em `Sheet` irmão estável dos painéis adaptativos, para a troca de
+  colunas/orientação não perder rascunho nem tentativa idempotente; erro e confirmação ficam acima
+  da rolagem da folha. Tentativa ambígua oferece "Confirmar tentativa" e "Conferir e encerrar
+  tentativa" (mesma intenção).
+- Posição de investimento: valor atual, aplicado, resultado (qualidade em palavras, sem número quando
+  indisponível), recebido; as abas Valor/Rendimento/Aplicado são `Segmented` da MESMA folha.
+  Valor monetário que encolhe com fonte grande usa `encolhe={false}` no `Money`.
+- Campo de entrada da pessoa (renda-base, valor digitado) segue legível com valores ocultos; prévia,
+  distribuição e comparação mascaram.
+
+### Armadilhas de verificação (já custaram QA falso)
+
+- **Integrar por patch (`git apply`) com o Metro de pé deixa bundle velho no aparelho**: o Metro não
+  pega os arquivos escritos. Dê `touch` nos arquivos e prove a tela nova (um marcador visível) ANTES
+  de contar qualquer passo de QA.
+- Corrija o defeito, depois reconfira no MESMO aparelho: o passo errado do F21 e a celebração do F19
+  só apareceram em vídeo quadro a quadro, não em captura parada.
+
 ## Estado local
 
 - Preferir estado de servidor (Query) + `useState`. Zustand só se estado global de UI real aparecer (hoje não há nenhum) — não criar store "por via das dúvidas".

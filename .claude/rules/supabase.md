@@ -23,6 +23,12 @@ paths:
   no staging. Promover para produção é uma decisão do Gabriel, com o número da migration dito em
   voz alta — não um passo silencioso no fim de uma tarefa.
 - Migrations devem ser idempotentes onde possível (`create or replace function`, `if not exists`).
+- **Migration escrita em paralelo (worktrees) é RENOMEADA ao integrar** para um timestamp depois da
+  última já aplicada no staging; empurrar fora de ordem quebra o `db push`. Reescrever função
+  compartilhada com `create or replace` exige copiar TODAS as guardas do corpo anterior (o F04
+  apagou duas do `set_invoice`, devolvidas na `20261005110000`) e rodar a suíte SQL inteira
+  (`scripts/sql-test.py`). Escritas compostas seguem o padrão de recibo selado, `PT409` e
+  `p_request_id` de `finance.md` → *Evolução financeira — 22 pontos*.
 
 ## RLS (inegociável)
 

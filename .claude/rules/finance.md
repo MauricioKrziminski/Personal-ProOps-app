@@ -1195,3 +1195,256 @@ mesma régua de "Todos" na recorrente e de "Todas" na parcelada. No dia dela, a 
 gravadas e tem a mesma chave da linha gravada: tocar não a move nem a pisca. Parcela
 fora do cartão aceita "último dia de todo mês" (`*_last_day`), e a data da compra não é contrato:
 muda nos três alcances a partir da parcela de referência.
+
+## Evolução financeira — 22 pontos (outubro/2026)
+
+Decididos em 02/10/2026 (spec `docs/superpowers/specs/2026-10-02-evolucao-financeira-22-pontos-design.md`),
+aceitos no staging em 05/10/2026; **produção não foi tocada**. Cada tema abaixo é uma regra de
+domínio nova; o que o agente NÃO faz de cada um está em `docs/AGENTE-PARIDADE-COM-O-APP.md`.
+
+### Padrão das escritas compostas (vale para todos os temas abaixo)
+
+- **Uma intenção composta é UMA transação no servidor**, com `p_request_id uuid` (a intenção, que
+  sobrevive ao retry de rede) e, ao editar, `expected_revision`. Mesma chave + mesmo payload devolve
+  o resultado anterior; payload diferente é recusa. **Revisão velha é `PT409`** (recusa de negócio,
+  HTTP 409), nunca `40001` — o PostgREST repetiria como falha transitória. Recusa de regra é
+  `P0001`/`22023` com a frase e o caminho.
+- **Recibo selado**: `private.*_receipts` sem grant ao cliente guarda payload e resultado. O helper
+  genérico (`private.reserve_payment_request`/`finish_payment_request`) é atualizável pelo papel
+  `authenticated`, então o resultado dele NÃO prova commit. Comandos novos (reserva, plano de metas,
+  subcategoria, movimento de meta, investimento, plano de orçamento, encerrar série) selam o seu.
+- **Tentativa ambígua** (resposta perdida) congela payload e UUID até haver recibo válido.
+  `resolve_*_attempt` devolve o recibo existente ou sela o cancelamento **terminal** (uma requisição
+  atrasada recebe o cancelamento antes de qualquer efeito). SQLSTATE genérico não libera a tentativa.
+- Função pública nova: wrapper `invoker` chamando comando `definer` em `private`, `set search_path = ''`,
+  **`set timezone to 'America/Sao_Paulo'` no cabeçalho**, `revoke ... from public, anon`. Dinheiro de
+  resposta vai como **texto decimal** e o cliente valida antes de virar `number`.
+- Migration escrita em paralelo é renomeada ao integrar, para ficar DEPOIS da última já aplicada no
+  staging (várias do programa nasceram com timestamp anterior ao de uma vizinha já empurrada).
+
+### Forma de pagamento (F01) e filtro por ela (F05)
+
+- `payment_method` nullable em `transactions`, `recurring_transactions`, `installment_plans`,
+  `debts`, `debt_installment_edits` e `import_items`: `pix | credit | debit | cash | bank_transfer |
+  boleto`. **null é "Não informado" e nunca vira Pix nem crédito**; método não muda `kind`, status,
+  data nem saldo. Crédito exige cartão; os outros filtram as contas compatíveis
+  (`paymentMethodAccounts`, `src/lib/payment-method.ts`), sem apagar a conta já escolhida.
+- Gravação atômica em `save_transaction_payment` (lançamento + juros do Pix + revisão + intenção) e
+  `create_recurring_payment`; o escopo da série/parcela/dívida passa pelas RPCs `update_*` existentes.
+  **O juro do Pix liga ao pai por FK explícita** (`pix_fee_for_transaction_id`): o lookup por
+  conta/data/título associava o juro da compra errada quando duas compras caíam no mesmo dia.
+- A entrada de uma compra parcelada é movimentação independente: tem a sua conta e o seu método, não
+  herda o do financiamento. Importação e agente legados gravam null e **preservam** o valor conhecido
+  ao corrigir outro campo.
+- Filtro (F05): `paymentMethods=pix,boleto,not_informed` (`payment-method-filters.ts`). **O filtro roda
+  no servidor ANTES da paginação** (filtrar as 50 primeiras no cliente esconde o resto), a previsão
+  usa a mesma seleção (`filterExpectedLines`) e o resumo global some com qualquer recorte. Valor
+  desconhecido no link é recusado, nunca vira "Não informado".
+
+### Criar a origem no fluxo, saldo e limite no seletor, prévia (F02, F03, F04)
+
+- `create_account(p_input, p_request_id)` é a criação atômica e idempotente de conta/cartão; a tela
+  Contas e o lançamento usam os MESMOS campos (`AccountFormFields`, `src/lib/account-form.ts`). Nome
+  igual é erro controlado, nunca "adotar a existente". Perda de confirmação conserva UUID e payload.
+- O seletor mostra **Saldo no ProOps** (confirmado, sem previsto) ou **Limite disponível**
+  (`card_limit_context`, invoker sobre o cálculo canônico de `card_summary`). Saldo inicial assinado
+  no cartão, débito sem fatura e estorno sem vínculo dão `needs_review` e limite null — **nunca
+  somar o saldo bruto**, que duplica principal adiado. Zero, negativo, limite null e dado ausente são
+  quatro estados; ausência não vira zero. Insuficiência avisa e não bloqueia registro histórico.
+- Prévia "Ao salvar" = `preview_finance_write`: roda a operação REAL numa subtransação com os mesmos
+  argumentos da gravação (builders compartilhados com os hooks) e desfaz tudo antes de responder. A
+  função recusa rodar sem o isolamento configurado. Distingue saldo confirmado, caixa previsto e
+  limite. Não existe prévia de **edição por alcance**: o alcance só é escolhido ao salvar.
+- **`create or replace` apagou guardas do `set_invoice` na F04** (`20261003002625` reescreveu o
+  corpo para `private.invoice_target_for` e não repetiu "nada que decide a fatura mudou" nem
+  `proops.refazer_fatura`); só a suíte SQL INTEIRA achou, na F14 (`20261005110000` devolveu). Ao
+  reescrever função compartilhada, copie TODAS as guardas do corpo anterior e rode a suíte toda.
+
+### Classificação do gasto e subcategorias (F06, F09)
+
+- Duas dimensões independentes e opcionais, só em GASTO: `expense_pattern` (`fixed|variable`) e
+  `expense_necessity` (`essential|discretionary`), cada uma com `*_source` (`explicit|category_default`).
+  **`explicit` com valor null é a decisão de não classificar** e impede nova sugestão; quatro nulls =
+  ausência de prova. Receita, transferência, pagamento de fatura e juro do Pix não recebem.
+- É **snapshot** no registro, na série, no plano e na dívida. Mudar o padrão da categoria
+  (`default_expense_pattern`/`..._necessity`, `save_category_configuration`) vale para cadastros
+  novos; histórico só por backfill explícito com período, que respeita `explicit` e é auditado
+  (`private.category_classification_backfill_audit`). Abrir um registro antigo não preenche nada.
+  Totais, saldos e orçamento não mudam: só o recorte.
+- Subcategoria: `public.subcategories` (UUID estável por workspace, pai TEXTO normalizado com
+  `private.fold`), `subcategory_id` opcional nos registros. **Categoria continua texto livre**, sem FK
+  obrigatória; null é "Sem detalhe" e ninguém adivinha filho. Trocar o pai limpa o filho. Mover,
+  juntar e apagar (`write_subcategory`, `rename_category`/`delete_category` estendidas) são atômicos,
+  com recibo selado; apagar o filho só zera a referência. `category_detail_breakdown`: filhos +
+  "Sem detalhe" fecham o total do pai no centavo.
+- O schema `FinanceAction` do Gemini continua no teto: o agente não escolhe subcategoria nem
+  classificação por frase (só regras e propagação).
+
+### Reserva de emergência (F07)
+
+- Configuração por workspace (`emergency_reserves`) + vínculos em `financial_allocations`
+  (`purpose='reserve'|'goal'`, conta OU ativo, `liquidity_confirmed`). **Alocar não move dinheiro,
+  não cria transação nem aporte, e não aumenta caixa nem patrimônio.** Leitura:
+  `emergency_reserve_state`; escrita: `save_emergency_reserve` (CAS por `edit_revision`,
+  recibo selado) e `resolve_emergency_reserve_attempt`.
+- Lastro por fonte é proporcional: `floor(alocação × min(disponível, total alocado) / total
+  alocado)`; fonte arquivada ou sem liquidez confirmada contribui zero; **falta de lastro aparece
+  como déficit, o gasto real nunca é bloqueado**. Duas finalidades na mesma fonte disputam o mesmo teto.
+- Base manual (centavos > 0) ou observada: três meses civis completos, cada um **revisado** pela
+  pessoa com fingerprint do consumo (nova importação ou reclassificação invalida a revisão). Mês
+  revisado sem gasto vale zero; mês sem revisão é insuficiência; base total zero é insuficiente,
+  nunca "infinito" nem "0 meses". Cobertura em décimos por divisão inteira (conservadora). Metas
+  antigas sem origem exigem confirmação do valor lido (`unassigned_goals_ack_cents`).
+- A métrica antiga da saúde financeira chama-se **Caixa cobre**, não reserva.
+
+### Metas: planejamento, prazo, alocar/transferir, marcos (F08, F10, F11, F19)
+
+- **Plano conjunto (F08)**: `goal_plans` + `goal_plan_items` (intenções futuras por meta).
+  `goal_planning_state` projeta sobre `private.cash_total`/`eventos_de_caixa` do workspace (nunca a RPC
+  pública, que agrega todos os espaços). **Salvar ou simular plano não cria aporte, transação nem
+  alocação.** Disponível = caixa projetado − lastro identificado nas contas − intenções acumuladas;
+  o último aporte nunca passa do restante; sem renda ou sem origem é qualificação explícita, nunca
+  aprovação. Fingerprint velho = `PT409`. Prazo vencido não inventa mensalidade.
+- **Prazo × contribuição (F10)** (`src/lib/goal-contribution.ts`, BigInt): Por prazo (`teto(restante
+  / oportunidades)`, a última parcela menor) ou Por mês (quantidade = `teto(restante / mensal)`);
+  o dia da âncora é preservado (31/01 → fim de fev → 31/03, nunca +30 dias). Aporte inicial é
+  intenção com data, não depósito. **"Prazo do plano" é do cenário e não edita o prazo da meta.**
+  Planos F08 ficam em modo `legacy` até escolha explícita. RPCs `*_v2` (`save_goal_plan_v2`,
+  `goal_planning_state_v2`) mantêm as v1 para app antigo.
+- **Guardar/Retirar de verdade (F11)**: `goal_money_command` com `allocate` (separa na conta, nada
+  se move), `transfer_in` (cria UMA transferência real), `link_in` (vincula transferência já lançada
+  ou importada), `release`, `transfer_out` e `undo`. Estado em `goal_money_state`, candidatos em
+  `goal_link_candidates`, movimentos em `goal_money_movements`. Separação por (meta, conta) mora em
+  `financial_allocations` como SOMA das movimentações (zerou, a linha sai). **Separar não passa do
+  caixa realizado da conta** (`SALDO_INSUFICIENTE` diz quanto há livre); vincular e desfazer a
+  liberação também conferem o caixa. Uma transferência vincula a UM movimento, de meta OU de
+  investimento (gatilho nas duas tabelas). Desfazer apaga só a transferência que o movimento CRIOU
+  (`created_transfer`); a vinculada volta solta. `edit_goal_contribution` recusa aporte que pertence
+  a uma movimentação. A primeira operação recalcula `goals.saved_cents` pela soma do ledger (a
+  regra é o ledger).
+- **Marcos (F19)**: `goals.icon`, `goals.color` e `goal_milestones` (valor em centavos, único por meta,
+  menor que o alvo; percentual digitado vira centavos ao salvar). **A etapa é derivada** do ledger
+  (`marcos ≤ saved_cents`), nunca gravada: retirar devolve o marco. Alvo baixado guarda os marcos
+  acima como "Acima do alvo", sem tocar o histórico. Escrita direta com RLS (`useSaveGoal`
+  sincroniza a diferença: salvar a meta e os marcos são duas escritas).
+
+### Investimentos: aporte, resgate e resultado (F12, F13)
+
+- **A posição é a conta `type='investment'`** — não se cria ativo ligado a ela, e os bens de classe
+  investimento são posições manuais separadas (nunca o mesmo dinheiro). Aplicar/resgatar =
+  UMA transferência real (`investment_command`: `contribute|redeem|link|edit|undo`, tabela
+  `investment_movements`, leituras `investment_positions`, `investment_movements_page`,
+  `investment_link_candidates`). Não é consumo nem renda; o patrimônio não muda sem rendimento.
+- **Resgate não passa do disponível da posição na data e em toda data posterior** (resgates
+  futuros já lançados contam); vale ao editar para baixo e ao desfazer um aporte que um resgate
+  consumiu ("desfaça o resgate de DD/MM antes"). A transferência criada pelo movimento é protegida
+  por gatilho: editar ou apagar direto em Lançamentos é recusado ("edite ou desfaça pela posição").
+- **Quatro operações diferentes** (`investment_value_command`): aporte/resgate (caixa), **Atualizar
+  valor** (`investment_valuations kind='valuation'`, só patrimônio), **Rendimento recebido** (receita
+  real, categoria `rendimentos`, entra no caixa) e **Informar aplicado** (`kind='opening'`, só
+  corrige a abertura). Os números da posição saem de UMA função
+  (`private.investment_position_numbers`, lida pela tela e pelo patrimônio): valor atual = última
+  atualização por `as_of` + o que entrou/saiu depois; resultado = valor − aplicado, com qualidade
+  `conhecido | estimado | indisponível` — **indisponível nunca escreve R$ 0,00**, e não há
+  rentabilidade anualizada. `private.net_worth_now` põe a conta de investimento em Investimentos pelo
+  valor atual; `cash_total`, projeção e reserva não mudam (ganho não realizado não é caixa).
+- **Empate do mesmo dia: a ordem de REGISTRO decide** (`investment_valuations.recorded_at` contra
+  `created_at` do movimento, `20261004163000`). Só contar movimento com data DEPOIS da atualização
+  deixava "atualizei para R$ 850 e resgatei R$ 810 no mesmo dia" em R$ 850 (+347%).
+- Bens: `update_asset_value` agora grava a marcação e deixa em `current_value_cents` a de `as_of`
+  mais recente (retroativa não muda o valor atual; data futura vira hoje);
+  `delete_asset_valuation` recalcula e recusa apagar a única.
+
+### Plano percentual de orçamento (F14)
+
+- `budget_plans` (versão imutável por salvar), `budget_plan_lines`, `budget_plan_applications`;
+  comandos `budget_plan_command` (`save`/`apply`), `budget_plan_preview` (puro) e `budget_plan_state`.
+  Percentual em **pontos-base** (0..10000 por linha, soma ≤ 10000, renda-base > 0). Reais por
+  `floor(base × bp / 10000)`; os centavos de resto vão às linhas de maior resto, um por vez — a soma
+  fecha a renda quando é 100%. Categoria em uma linha só, comparada por `private.fold`.
+- **Mudar a renda depois NÃO reescreve limite aplicado**; só nova aplicação muda. `apply` usa a
+  régua de `save_budget` (padrão ou do mês), preserva `rollover`, o mês novo herda o `rollover` do
+  padrão e **recusa categoria que não existe mais no espaço**. Em "Só o mês", o "antes" é o limite
+  PADRÃO que vale (não "sem limite"). Planejado e realizado dizem o denominador. `/finance/plan` é
+  a assinatura e não é o orçamento pessoal.
+
+### Por que o gasto mudou (F15)
+
+- `spending_change(p_cur_from, p_cur_to, p_prev_from, p_prev_to, p_dimension)` com dimensão
+  `category | subcategory | payment_method | pattern | necessity`. **Uma lente só, dita na tela**:
+  gasto lançado por data, previsto incluído, sem transferência, sem pagamento de fatura e **sem o
+  principal adiado** (`rollover_of_invoice_id`) — por isso pode diferir da rosca em mês com
+  adiamento. As janelas chegam RESOLVIDAS (régua da tela); crédito/estorno não desconta. A soma das
+  contribuições, com "Sem categoria/Sem detalhe/Não informado", fecha a diferença no centavo; item
+  que mudou de categoria conta pela categoria ATUAL nos dois lados. Sem IA e sem causalidade
+  ("contribuiu para a diferença"). Anterior zero: percentual indisponível, nunca ∞.
+
+### Voz no Financeiro (F16)
+
+- `POST /internal/finance/draft` (agente, JWT do app) **só interpreta**: mesmo `finance_node` e mesmo
+  `FinanceAction` (sem campo novo), devolve `{tipo, params, perguntas, entendido}` sem ferramenta,
+  sem `pending_actions`, sem `executed_actions` e sem mensagem. O app abre `/finance/lancar`
+  pré-preenchido; **salvar é o caminho normal**. Conta/cartão só preenche quando o nome casa com UM
+  registro do espaço; ambíguo vira pergunta. **A rota passa por `conversation.check_limits` e grava
+  UMA linha em `ai_events`** — sem isso a voz era um jeito de usar a IA fora da cota do plano.
+
+### Explicações e avisos que abrem o item (F17)
+
+- O texto de "Como é calculado" sai de `src/lib/explicacoes.ts`, uma função por indicador, a partir
+  do MESMO payload que desenhou o número: período, regra e qualidade nunca são escritos à mão. Se o
+  payload não traz a base, a RPC passa a devolvê-la (coluna no FIM): `financial_health()` ganhou
+  `window_from`/`window_to` (drop + create, porque o tipo de retorno mudou; só o app a chama).
+  Sem número, sem (i).
+- Alertas ganharam os alvos `invoice` e `transaction` (`ref` uuid) nos DOIS lados do contrato
+  (`agent/app/services/push.py` `TARGETS`, `src/lib/push-routes.ts` `ALLOWED`; `push-targets-contract.test.ts` prende).
+  `invoice_due` abre a fatura e `bill_due` o lançamento; `ref` que não é uuid cai na lista de antes.
+  **Item ausente mostra "Isto não existe mais"** com o caminho para a lista, nunca skeleton infinito.
+  Canais e dedupe não mudam.
+
+### Transferência recorrente e encerrar série (F18)
+
+- `recurring_transactions.counterparty_account_id` (FK `set null`): série `transfer` exige as duas
+  contas, diferentes, do mesmo espaço, destino nunca cartão; nos outros tipos é null. A ocorrência é
+  uma `transactions kind='transfer'` normal (mexe nas duas contas uma vez, consolidado zero); projeção
+  e previstas mostram as duas pontas e saldo insuficiente na origem só AVISA. Tipo de série não troca
+  em silêncio (`converter_registro`).
+- **Encerrar não é pausar nem apagar** (`end_recurring_series(p_recurring_id, p_last_date,
+  p_request_id)` + `end_recurring_series_preview`, ambos sobre `private.series_end_scope`): tira as
+  ocorrências `pending` posteriores à data (pelo vencimento fora do cartão, pela data no cartão);
+  **ficam as pagas, as atrasadas e as de fatura paga, adiada ou paga em parte** (contadas na
+  resposta). A série continua consultável em "Encerradas", e reabrir é editar o fim. Idempotente.
+- **O piso de "Termina em" é o início ORIGINAL (`dtstart`), não o próximo vencimento** — assinatura
+  cujo próximo vencimento é no mês seguinte tem que poder encerrar hoje. Armadilhas da revisão: o
+  piso lia o `dtstart` que a edição de calendário reescreve; reabrir recriava como PAGAS as
+  cobranças do intervalo (o próximo vencimento vai para a próxima futura); encerrar tem que travar e
+  reconferir o status antes de apagar; o fim editado também passa pela regra da fatura paga em parte.
+
+### Acumulação e renda futura (F20)
+
+- Sem banco e **sem efeito em caixa, orçamento, projeção ou saúde**: `src/lib/accumulation.ts` calcula
+  no aparelho e a tela grava só as premissas (`usePreferencia`). Taxa anual → mensal equivalente
+  `(1+a)^(1/12) − 1`, nunca `a/12`; taxa zero tem fórmula própria (`P + A·n`); aporte no início ou
+  no fim; inflação deflaciona por `(1+inf_m)^n`. Domínio fechado (prazo 1..1200 meses, taxa −50%..+100%
+  a.a., valores até R$ 1 bilhão); fora dele o campo explica e o cálculo não roda. Capital necessário
+  = 12 × renda ÷ retirada. Rodapé fixo: simulação, não recomendação nem promessa de retorno.
+
+### Primeiro cadastro (F21)
+
+- Sem migration: conta, cartão e primeiro lançamento reusam `AccountFormFields`, `useCreateAccount`
+  e `/finance/lancar`. **O saldo de hoje vai em `initial_balance_cents`; nenhuma receita artificial
+  de abertura.** O progresso (`comecar:<workspace_id>`, só ids criados) mora no aparelho e o passo
+  efetivo é RECALCULADO do dado real (`passoEfetivo`, `src/lib/comecar.ts`): id apagado ou arquivado
+  sai e nada é recriado na retomada; o recibo do `useCreateAccount` impede segunda conta após rede
+  que caiu depois do salvar.
+
+### Duplicar e favoritos (F22)
+
+- Duplicar copia só dado da pessoa (`paramsDaCopia`, `src/lib/duplicar.ts`); **nunca** `id`,
+  fatura, plano, série, dívida, `pays_invoice_id`, `rollover_of_invoice_id`, juro do Pix, entrada,
+  `status`/`paid_at`/`auto_confirm`, `due_at`, anexo, `source` nem chave de requisição. Parcela vira
+  lançamento à vista no valor dela; pagamento de fatura, de dívida e juro do Pix não têm Duplicar.
+  Cada duplicação é intenção nova (data de hoje); duplo toque no Salvar é um só.
+- Favoritos = `public.transaction_templates` (por workspace, RLS de membro, nome único sem caixa
+  entre não arquivados, `fields jsonb` lido só por `decodeModelo` em `src/lib/favoritos.ts`: chave
+  desconhecida é ignorada, valor inválido zera o campo). Apagar favorito não toca lançamento; conta
+  ou categoria arquivada vem vazia com aviso.
