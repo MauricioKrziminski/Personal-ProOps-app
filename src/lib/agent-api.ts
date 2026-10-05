@@ -16,6 +16,7 @@ import {
 } from '@/lib/agent-chat';
 import { File } from 'expo-file-system';
 import { supabase } from '@/lib/supabase';
+import type { FinanceDraft } from '@/lib/voice-draft';
 
 export { appendConversationPage, prependMessagePage };
 
@@ -230,6 +231,14 @@ export async function transcribeAudio(uri: string) {
   return agentFetch<{ text: string }>('/internal/chat/transcriptions', {
     method: 'POST',
     body,
+  });
+}
+
+/** O rascunho de lançamento de uma fala: só interpreta, não grava nada (F16). */
+export function createFinanceDraft(text: string, today: string, timezone: string) {
+  return agentFetch<FinanceDraft>('/internal/finance/draft', {
+    method: 'POST',
+    body: JSON.stringify({ text, today, timezone }),
   });
 }
 

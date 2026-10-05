@@ -244,10 +244,12 @@ Aceite no staging em 05/10/2026: [F15](../../qa/2026-10-02-evolucao-financeira/f
 
 Arquivos: composer/STT/chat/agent API, parsing/draft do agente, launcher. Interface: captura → transcrição → draft revisável sem escrita → builder canônico.
 
-- [ ] RED: cancelar/parsing não escreve; ambiguidade não escolhe id.
-- [ ] Desenhar contrato compacto, testar schema com Gemini real antes de alterar classificador.
-- [ ] Implementar ponte, permissões/retomada/erro e revisão financeira.
-- [ ] Executar pytest/ruff/evaluation/HMAC sem-envio e gates nativos F16; registrar aceite.
+- [x] RED: cancelar/parsing não escreve; ambiguidade não escolhe id.
+- [x] Desenhar contrato compacto, testar schema com Gemini real antes de alterar classificador.
+- [x] Implementar ponte, permissões/retomada/erro e revisão financeira.
+- [x] Executar pytest/ruff/evaluation/HMAC sem-envio e gates nativos F16; registrar aceite.
+
+Aceite no staging em 05/10/2026: [F16](../../qa/2026-10-02-evolucao-financeira/f16/aceite.md). F17 liberado.
 
 ### F17 — Explicações verificáveis
 

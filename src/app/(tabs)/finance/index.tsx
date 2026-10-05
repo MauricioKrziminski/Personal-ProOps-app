@@ -18,6 +18,7 @@ import { useBRL } from '@/components/ui/conceal';
 import { CountUpMoney } from '@/components/ui/count-up-money';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ExtendedFab } from '@/components/ui/extended-fab';
+import { useLancarPorVoz } from '@/components/finance/lancar-por-voz';
 import { ATALHOS_DE_LANCAMENTO } from '@/lib/atalhos-de-lancamento';
 import { HeroPanel } from '@/components/ui/hero-panel';
 import { ItemLink } from '@/components/ui/item-link';
@@ -276,11 +277,14 @@ export default function FinanceScreen() {
   const abrirCiclo = (tipo: 'tudo' | 'entra' | 'sai') =>
     router.push({ pathname: '/finance/cycle', params: { month, view: regua.view, tipo } });
 
+  // "Por voz" (F16): a folha curta que grava, transcreve e abre o formulário pré-preenchido.
+  const porVoz = useLancarPorVoz();
   const lancar = () =>
     showItemActions('Lançar', [
       { ...ATALHOS_DE_LANCAMENTO.lancamento, onPress: () => router.push(hrefDoLancar('uma', { month })) },
       { ...ATALHOS_DE_LANCAMENTO.recorrente, onPress: () => router.push(hrefDoLancar('recorrente')) },
       { ...ATALHOS_DE_LANCAMENTO.financiamento, onPress: () => router.push(hrefDoLancar('financiamento')) },
+      { ...ATALHOS_DE_LANCAMENTO.voz, onPress: porVoz.abrir },
     ]);
 
   if (!pronta) {
@@ -609,7 +613,7 @@ export default function FinanceScreen() {
       wide={tablet}
       grouped
       topBar={<AppHeader title={ROTULO_DA_ABA.finance} />}
-      overlay={<ExtendedFab label="Lançar" icon="plus" onPress={lancar} />}
+      overlay={<><ExtendedFab label="Lançar" icon="plus" onPress={lancar} />{porVoz.folha}</>}
       onRefresh={() =>
         Promise.all([
           refazerPeriodo(),

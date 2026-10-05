@@ -264,7 +264,7 @@ async def finance_node(state: AgentState) -> dict:
                 "human",
                 user_turn(
                     state.get("text", ""),
-                    local_datetime_iso(state["timezone"]),
+                    state.get("agora_local") or local_datetime_iso(state["timezone"]),
                     state["timezone"],
                     tem_anexo=bool(state.get("media")),
                     history=historico,

@@ -676,3 +676,9 @@ promete configuração da reserva pelo WhatsApp antes da implementação/avalia�
 | app | agente |
 |---|---|
 | "Por que mudou?" no bloco "Para onde foi" do Financeiro (`/finance/why`, RPC `spending_change`): contribuição de cada categoria, detalhe, forma de pagamento e tipo à diferença entre dois períodos, com link para os lançamentos de cada período | Lacuna: o agente não explica variação de gasto; só lê totais por categoria (`query`). Paridade pendente da etapa final do plano de 22 pontos; nenhuma tool/prompt mudou no F15. |
+
+## Lançar por voz (F16, 05/10/2026)
+
+| app | agente |
+|---|---|
+| atalho "Por voz" dos menus Lançar: grava, transcreve, edita o texto e abre `/finance/lancar` pré-preenchido | `POST /internal/finance/draft` só interpreta (mesmo classificador, sem campo novo no schema): não executa tool, não grava `pending_actions`/`executed_actions`, não manda mensagem. Quem salva é o formulário. Não é mutação nova: nada a casar. |

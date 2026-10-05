@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import db
 from app.config import DEV_SALT, get_settings
 from app.graph import build as graph_build
-from app.routes import chat, cron, hooks, inbound, internal, worker
+from app.routes import chat, cron, finance_draft, hooks, inbound, internal, worker
 from app.services import whatsapp
 
 logging.basicConfig(
@@ -79,6 +79,7 @@ app.include_router(cron.router)
 app.include_router(hooks.router)
 app.include_router(internal.router)
 app.include_router(chat.router)
+app.include_router(finance_draft.router)
 chat.install_error_handlers(app)
 
 # CORS só para as origens ENUMERADAS. Nunca `*`: a requisição carrega o JWT no

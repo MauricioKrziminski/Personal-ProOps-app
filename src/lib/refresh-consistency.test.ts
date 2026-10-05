@@ -779,6 +779,7 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
     if (name === '@/hooks/use-agent-activity') return { useAgentActivity: () => query };
     // "Paguei" abre a confirmação do valor (25/09/2026): o que importa aqui é QUAL id ela abre.
     if (name === '@/components/finance/confirmar-baixa') return { useConfirmarBaixa: () => ({ abrir: (id: string) => writes.push([{ id }]), folha: null }) };
+    if (name === '@/components/finance/lancar-por-voz') return { useLancarPorVoz: () => ({ abrir: () => {}, folha: null }) };
     // Puros, carregados de verdade pelo mesmo motivo de `dates` e `settle-labels` (abaixo).
     if (name === '@/lib/today-sections') return todaySections;
     // `PASSO` é a janela do atrasado: pelo Proxy ele viraria a string 'PASSO' e a lista, vazia.

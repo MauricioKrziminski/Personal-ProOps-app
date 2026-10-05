@@ -8,4 +8,5 @@ export const ATALHOS_DE_LANCAMENTO = {
   lancamento: { label: 'Gasto ou receita', icon: 'dollarsign.circle' },
   recorrente: { label: 'Recorrente', icon: 'arrow.triangle.2.circlepath' },
   financiamento: { label: 'Financiamento', icon: 'building.columns' },
+  voz: { label: 'Por voz', icon: 'mic' },
 } as const;

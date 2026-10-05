@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
 import { TrocaSuave } from '@/components/motion/presenca';
 
 import { OriginCreationHost, type OriginCreationController } from '@/components/finance/origin-creation-host';
@@ -7,12 +8,14 @@ import { FormularioDaDivida } from '@/components/finance/formulario-da-divida';
 import { FormatoDoLancamento } from '@/components/finance/formato-do-lancamento';
 import { FormularioDaSerie } from '@/components/finance/formulario-da-serie';
 import { FormularioDoLancamento, LancamentoEditando } from '@/components/finance/formulario-do-lancamento';
+import { Note } from '@/components/ui/note';
 import { Screen } from '@/components/ui/screen';
 import { FormularioEmTela } from '@/components/ui/sheet';
 import { ToastDoModal, useToast } from '@/components/ui/toast';
 import { useConverterRegistro, useDebts, useInstallmentPlan, useTransaction } from '@/hooks/use-finance';
 import { usePurchaseDownPayment } from '@/hooks/use-down-payment';
 import { isoToBR, localISODate } from '@/lib/dates';
+import { Space } from '@/design/tokens';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { normalizePaymentMethod } from '@/lib/payment-method';
 import { detalheDaEscrita } from '@/lib/escrita';
@@ -30,6 +33,7 @@ import {
   type OrigemDaConversao,
   type TipoDeLancamento,
 } from '@/lib/lancar';
+import { perguntasDoParam } from '@/lib/voice-draft';
 
 /** De que tabela vem o registro aberto, quando a entrada não diz. */
 const ORIGEM_DO_TIPO: Record<TipoDeLancamento, OrigemDaConversao['tipo']> = {
@@ -177,9 +181,21 @@ export default function LancarScreen() {
 
   /** Editando: só no tipo do registro. Em outro tipo, o corpo cria — e o salvar converte. */
   const editandoAqui = tipo === tipoOriginal ? editandoId : undefined;
+  // Veio da voz (F16): o que o agente não soube vira pergunta no topo, só no primeiro corpo.
+  const perguntasDaVoz = doAplicar ? perguntasDoParam(p.perguntas) : [];
+  const formato = (
+    <FormatoDoLancamento value={tipo} onChange={trocar}
+      disabled={Boolean(transacao.data?.down_payment_debt_id || transacao.data?.down_payment_plan_id)} />
+  );
   const base = {
-    topo: <FormatoDoLancamento value={tipo} onChange={trocar}
-      disabled={Boolean(transacao.data?.down_payment_debt_id || transacao.data?.down_payment_plan_id)} />,
+    topo: perguntasDaVoz.length ? (
+      <>
+        <View style={styles.perguntas}>
+          {perguntasDaVoz.map((q) => <Note key={q} icon="questionmark.circle">{q}</Note>)}
+        </View>
+        {formato}
+      </>
+    ) : formato,
     comum,
     registrarComum: (ler: () => Comum) => {
       if (tipoAtivo.current === tipo) lerComum.current = ler;
@@ -236,3 +252,7 @@ export default function LancarScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  perguntas: { gap: Space.sm },
+});

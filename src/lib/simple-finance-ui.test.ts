@@ -592,6 +592,8 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === '@/hooks/use-voltar-quando-fechar') return load('src/hooks/use-voltar-quando-fechar.ts');
       if (name === '@/hooks/use-alertas-vistos') return load('src/hooks/use-alertas-vistos.ts');
       // O "Paguei" que confirma o valor (25/09/2026): carregado DE VERDADE, é a regra em teste.
+      // O "Por voz" (F16) grava e fala com o agente: aqui só o gancho de abrir, que navega como marca.
+      if (name === '@/components/finance/lancar-por-voz') return { useLancarPorVoz: () => ({ abrir: () => navigations.push({ porVoz: true }), folha: null }) };
       if (name === '@/components/finance/confirmar-baixa') return load('src/components/finance/confirmar-baixa.tsx');
       if (name === '@/lib/confirmar-baixa') return load('src/lib/confirmar-baixa.ts');
       if (name === '@/lib/down-payment') return load('src/lib/down-payment.ts');
@@ -636,7 +638,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
       if (name === '@/lib/account-form') return load('src/lib/account-form.ts');
       if (name === '@/components/finance/account-form') return load('src/components/finance/account-form.tsx');
-      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/categorias') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       // o `categorias.ts` importa o mapa de ícones por caminho relativo (roda no `node --test` puro)
       if (name === '../design/category-icons.ts') return { categoryIcon: () => 'circle' };
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
@@ -2100,10 +2102,10 @@ test('Financeiro: Entra e Sai abrem o ciclo filtrado pelo lado', () => {
 test('Financeiro: o FAB continua oferecendo as três formas de lançar', () => {
   const ui = screen(financeiroFile);
   const tela = ui.nodes().find((n: any) => n.type === 'Screen');
-  tela.props.overlay.props.onPress();
+  tela.props.overlay.props.children[0].props.onPress();
   assert.deepEqual(
     ui.actions.map((a) => a.label),
-    ['Gasto ou receita', 'Recorrente', 'Financiamento']
+    ['Gasto ou receita', 'Recorrente', 'Financiamento', 'Por voz']
   );
 });
 
@@ -2125,9 +2127,9 @@ test('Financeiro tablet keeps the cycle, analysis and all management actions', (
   assert.ok(canvas);
   assert.ok(ui.nodes().some((n: any) => n.type === 'Tile' && n.props.label === 'Entra'));
   assert.ok(ui.nodes().some((n: any) => n.type === 'Tile' && n.props.label === 'Sai'));
-  tela.props.overlay.props.onPress();
+  tela.props.overlay.props.children[0].props.onPress();
   assert.deepEqual(ui.actions.map((a) => a.label),
-    ['Gasto ou receita', 'Recorrente', 'Financiamento']);
+    ['Gasto ou receita', 'Recorrente', 'Financiamento', 'Por voz']);
 });
 
 test('Cartões: "Importar fatura" se alcança com o DEDO (toque longo), não só pelo leitor de tela', () => {
@@ -3410,7 +3412,7 @@ test('Hoje: "Lançar" cria lançamento, lembrete ou nota ali mesmo', () => {
   ui.interact(() => fab.props.onPress());
   // Os MESMOS tipos de lançamento das Finanças (29/09/2026, "padronize no app inteiro"), cada um
   // com o seu ícone, e o que é da Hoje: lembrete e nota.
-  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Gasto ou receita', 'Recorrente', 'Financiamento', 'Lembrete', 'Nota']);
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Gasto ou receita', 'Recorrente', 'Financiamento', 'Por voz', 'Lembrete', 'Nota']);
   assert.ok(ui.actions.every((a: any) => a.icon));
   ui.interact(() => ui.actions.find((a: any) => a.label === 'Recorrente').onPress());
   assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { pathname: '/finance/lancar', params: { tipo: 'recorrente' } }, 'o formulário único, por cima da Hoje');
@@ -3418,6 +3420,8 @@ test('Hoje: "Lançar" cria lançamento, lembrete ou nota ali mesmo', () => {
   assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { pathname: '/finance/lancar', params: { tipo: 'financiamento' } });
   ui.interact(() => ui.actions.find((a: any) => a.label === 'Gasto ou receita').onPress());
   assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { pathname: '/finance/lancar', params: { tipo: 'uma' } });
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Por voz').onPress());
+  assert.deepEqual(ui.navigations.at(-1), { porVoz: true }, 'abre a folha por voz, não uma rota');
 });
 
 /** Organizar pastas não cria (25/09/2026): renomear abre a MESMA folha de "Nova pasta". */
@@ -4503,6 +4507,16 @@ test('Lançar: abre no tipo pedido, o seletor troca o corpo e leva os campos com
   const lanc = ui.nodes().find((n: any) => n.type === 'FormularioDoLancamento');
   assert.equal(lanc.props.comum.descricao, 'Academia');
   assert.equal(lanc.props.comum.valorCents, 5000);
+});
+
+test('Lançar por voz: o formulário abre pré-preenchido e as perguntas do agente vão numa Note no topo', () => {
+  const ui = screen(lancarFile, { params: { tipo: 'uma', amount: '30000', parcelas: '3', perguntas: 'Qual cartão?\nValor total ou por parcela?' } });
+  const lanc = ui.nodes().find((n: any) => n.type === 'FormularioDoLancamento');
+  assert.equal(lanc.props.comum.valorCents, 30000);
+  assert.equal(lanc.props.parcelas, 3);
+  const notas = ui.nodes().filter((n: any) => n.type === 'Note');
+  assert.deepEqual(notas.map((n: any) => n.props.children), ['Qual cartão?', 'Valor total ou por parcela?']);
+  assert.equal(screen(lancarFile, { params: { tipo: 'uma' } }).nodes().filter((n: any) => n.type === 'Note').length, 0);
 });
 
 test('Lançar: voltar a um tipo devolve TUDO que foi digitado nele, não só os campos comuns', () => {

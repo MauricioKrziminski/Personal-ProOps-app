@@ -14,6 +14,7 @@ import { ProximoPassoCard } from '@/components/feed/proximo-passo';
 import { SetupChecklist } from '@/components/feed/setup-checklist';
 import { TodayTabletCanvas } from '@/components/feed/today-tablet-canvas';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
+import { useLancarPorVoz } from '@/components/finance/lancar-por-voz';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 import { ThemedText } from '@/components/themed-text';
 import { AppHeader, HeaderIconButton } from '@/components/ui/app-header';
@@ -153,6 +154,7 @@ export default function TodayScreen() {
   const [passosEscondidos, esconderPassos] = useBoolPref(`hoje:passos-escondidos:${session?.user?.id ?? ''}`);
   // "Paguei"/"Recebi" confirma o valor numa folha curta antes da baixa (25/09/2026).
   const baixa = useConfirmarBaixa();
+  const porVoz = useLancarPorVoz();
   /*
     A semana: o gasto de cada dia de três dias atrás até hoje, pela MESMA régua do "saiu hoje"
     (`daily_spending` = `transactions_summary` dia a dia, com teste no banco).
@@ -511,6 +513,7 @@ export default function TodayScreen() {
       overlay={
         <>
           {baixa.folha}
+          {porVoz.folha}
           {/* Criar ONDE se vê o dia (25/09/2026): a Hoje mostra lançamentos, lembretes e notas. */}
           <ExtendedFab
             label="Lançar"
@@ -521,6 +524,7 @@ export default function TodayScreen() {
                 { ...ATALHOS_DE_LANCAMENTO.lancamento, onPress: () => router.push(hrefDoLancar('uma')) },
                 { ...ATALHOS_DE_LANCAMENTO.recorrente, onPress: () => router.push(hrefDoLancar('recorrente')) },
                 { ...ATALHOS_DE_LANCAMENTO.financiamento, onPress: () => router.push(hrefDoLancar('financiamento')) },
+                { ...ATALHOS_DE_LANCAMENTO.voz, onPress: porVoz.abrir },
                 { label: 'Lembrete', icon: 'bell', onPress: () => router.push('/reminder-form') },
                 { label: 'Nota', icon: 'note.text', onPress: () => router.push('/notes/new') },
               ])

@@ -1858,7 +1858,7 @@ test('Atalhos de lançamento: os menus "Lançar" são os mesmos no app inteiro',
   }
   // a Hoje oferece os MESMOS tipos de lançamento que as Finanças
   const hoje = readFileSync(join(SRC, 'app/(tabs)/today/index.tsx'), 'utf8');
-  for (const k of ['lancamento', 'recorrente', 'financiamento']) assert.match(hoje, new RegExp(`ATALHOS_DE_LANCAMENTO\\.${k}`));
+  for (const k of ['lancamento', 'recorrente', 'financiamento', 'voz']) assert.match(hoje, new RegExp(`ATALHOS_DE_LANCAMENTO\\.${k}`));
 });
 
 test('A conversão passa pela RPC converter_registro e invalida o financeiro', () => {

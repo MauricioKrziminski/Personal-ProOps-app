@@ -39,8 +39,8 @@ Esses fatos e a abertura do formulário ainda não equivalem ao aceite funcional
 | F13 | Resultado/reavaliação | Aceito; correção do mesmo dia só no SQL | Validado 11/11 | Validado 8/8 |
 | F14 | Plano percentual | Aceito; limites no registro | Validado 9/9 | Validado 8/8 |
 | F15 | Explicação de mudanças | Aceito; limites no registro | Validado 6/6 | Validado 5/5 |
-| F16 | Voz contextual | Próximo incremento, F15 aceito | Não validado | Não validado |
-| F17 | Ajuda e avisos | Aguardando F16 | Não validado | Não validado |
+| F16 | Voz contextual | Aceito; limites no registro | Validado 9/9 (voz real) | Validado 8/8 (texto) |
+| F17 | Ajuda e avisos | Próximo incremento, F16 aceito | Não validado | Não validado |
 | F18 | Transferência recorrente | Aguardando F17 | Não validado | Não validado |
 | F19 | Marcos nas metas | Aguardando F18 | Não validado | Não validado |
 | F20 | Acumulação/renda futura | Aguardando F19 | Não validado | Não validado |
@@ -304,3 +304,10 @@ restaurados e planos de QA apagados por ID. F15 liberado.
 `20261005112000_spending_change.sql` (renomeada na integração), só no staging. iOS 6/6 e Android
 5/5, só leitura; contribuições fechando a diferença no centavo e o toque abrindo o conjunto certo.
 F16 liberado.
+
+## F16 — lançar por voz
+
+[Aceite e limites](f16/aceite.md) e [contrato](f16/contrato.md). Rota nova do agente
+`/internal/finance/draft` (só interpreta), agente deployado só no staging; sem migration. A rota
+passou a respeitar a cota do plano e a contar em `ai_events`. iOS 9/9 com voz real e Android 8/8;
+lançamentos de QA apagados por ID. F17 liberado.
