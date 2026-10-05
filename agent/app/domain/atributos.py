@@ -25,7 +25,7 @@ _BANCARIAS = ("checking", "savings", "investment")
 # O VETO da ancoragem: o modelo só vale se a frase tem a pista. Não infere nada — só recusa o que o
 # texto não sustenta ("null nunca vira pix": um pix que a frase não disse é invenção do modelo).
 _PISTAS_FORMA = {
-    "pix": ("pix",), "credit": ("credito", "cartao"), "debit": ("debito",),
+    "pix": ("pix",), "credit": ("credito",), "debit": ("debito",),
     "cash": ("dinheiro", "especie", "cash"), "bank_transfer": ("ted", "doc", "transfer"),
     "boleto": ("boleto",),
 }
@@ -79,6 +79,8 @@ def padrao_proposto(valor: str | None, texto: str) -> str | None:
 
 def necessidade_proposta(valor: str | None, texto: str) -> str | None:
     achado = NECESSIDADES.get(normalize(valor)) if valor else None
+    if achado == "essential" and any(n in normalize(texto) for n in ("nao essenc", "nem essenc", "nao e essenc")):
+        return None  # "não essencial" contém "essencial": a negação inverteria a classificação
     return achado if achado and _tem_pista(texto, _PISTAS_NECESSIDADE[achado]) else None
 
 

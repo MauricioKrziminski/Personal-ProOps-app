@@ -322,3 +322,21 @@ async def test_compra_parcelada_com_atributos_vai_por_create_purchase(monkeypatc
     assert "create_purchase('parcelada'" in sql
     dados = json.loads(args[0])
     assert dados["p_payment_method"] == "credit" and dados["p_installments"] == 3
+
+
+def test_negacao_nao_inverte_a_necessidade():
+    assert dom.necessidade_proposta("essential", "gastei 70 em roupa, não essencial") is None
+    assert dom.necessidade_proposta("discretionary", "gastei 70 em roupa, não essencial") == "discretionary"
+    assert dom.necessidade_proposta("essential", "aluguel, gasto essencial") == "essential"
+
+
+def test_cartao_sozinho_nao_sustenta_credito():
+    assert dom.forma_proposta("credit", "gastei 30 no cartão") is None
+    assert dom.forma_proposta("credit", "gastei 30 no cartão de crédito") == "credit"
+
+
+@pytest.mark.asyncio
+async def test_detalhe_que_repete_a_categoria_nao_pergunta(banco, monkeypatch):
+    leitura(monkeypatch, AtributosItem(indice=0, detalhe="mercado"))
+    alvo, _ = await congela("gastei 80 no mercado Extra", gasto())
+    assert "correction_error" not in alvo and "atributos" not in alvo

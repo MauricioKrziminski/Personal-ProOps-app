@@ -89,6 +89,10 @@ def _tipo_da_conta(acao: FinanceAction, alvo: dict, contas: dict[str, str]) -> s
     return contas.get(str((alvo.get("default_account") or {}).get("id")))
 
 
+def normalize_igual(dito: str, *outros: str | None) -> bool:
+    return any(o and matching.normalize(o) == matching.normalize(dito) for o in outros)
+
+
 async def congelar(workspace_id, texto: str, acoes: list, alvos: list[dict],
                    pular: set[int] | None = None) -> tuple[list[dict], int]:
     """Congela os atributos de cada criação em `alvos[i]["atributos"]`. Devolve (alvos, chamadas)."""
@@ -127,6 +131,8 @@ async def congelar(workspace_id, texto: str, acoes: list, alvos: list[dict],
         padrao = dom.padrao_proposto(item.expense_pattern, texto) if despesa else None
         necessidade = dom.necessidade_proposta(item.expense_necessity, texto) if despesa else None
         dito = dom.detalhe_ancorado(item.detalhe, texto)
+        if dito and normalize_igual(dito, a.category, a.description):
+            dito = None  # o modelo repetiu a categoria ou o título: isso não é um detalhe dito
         nota, erro = None, None
 
         problema = dom.erro_da_forma(forma, _tipo_da_conta(a, alvos[i], contas))
