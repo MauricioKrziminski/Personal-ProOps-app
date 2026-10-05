@@ -106,3 +106,14 @@ os números do banco, e só grava no **Sim**.
 | F01 | "gastei 30 de uber" (sem forma) | Grava SEM forma ("Não informado"), nunca chuta Pix |
 | F06 | "paguei 1200 de aluguel, gasto fixo e essencial" | A pergunta mostra "· fixo · essencial"; "não essencial" nunca vira essencial; sem dizer nada, vale o padrão da categoria e a frase mostra "(padrão de <categoria>)" |
 | F09 | "gastei 80 no mercado, detalhe feira" (com o detalhe "feira" criado no app) | Grava com o detalhe; detalhe que não existe ou casa com dois pede o nome exato e lista as opções. Nunca cria detalhe novo |
+
+### Lote D (reserva, plano de metas, prazo × mês, marcos, favoritos e duplicar)
+
+| # | Diga | O que deve acontecer |
+|---|---|---|
+| F07 | "minha reserva cobre quantos meses?" | Cobertura, meta e quanto falta (ex.: "cobre 3,3 meses"); sem base configurada ou revisada diz o que falta, nunca "0 meses". "Configura minha reserva" responde que isso é no app |
+| F08 | "cabe no meu plano de metas?" | Só diz "Cabe" com tudo calculável; senão "Pelo que dá para calcular nos próximos 12 meses, não aperta, mas ficou fora: …". Sem renda lançada: "não dá para dizer que cabe" |
+| F10 | "quero juntar 10 mil até dezembro de 2027" / "guardando 500 por mês, quando chego em 10 mil?" | Cria a meta mostrando quanto dá por mês, ou responde quando chega; avisa que o plano mensal não fica salvo (isso é no app) |
+| F19 | "coloca marcos de 25, 50 e 75% na meta Viagem" / "ícone de avião e cor azul" / "qual o próximo marco da Viagem?" | Mostra marcos antes → depois e grava no Sim; ícone ou cor fora da lista do app vira pergunta com as opções; a consulta diz o próximo marco e quanto falta. "Quanto falta pra minha meta reserva?" fala da META, não da reserva de emergência |
+| F22 | "lança meu favorito Almoço" | Pergunta com os dados do favorito e a data de hoje; grava no Sim. Favorito no crédito sem cartão pergunta o cartão; conta arquivada pergunta a conta |
+| F22 | "repete o lançamento do mercado de ontem" | Pergunta a cópia com a data de hoje (parcela vira à vista no valor dela); pagamento de fatura, de dívida e juro do Pix não duplicam |
