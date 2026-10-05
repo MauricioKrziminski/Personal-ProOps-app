@@ -410,6 +410,8 @@ def _so_cartoes(acao: dict | None) -> bool:
     """
     from app.tools.resolve import conta_e_cartao
 
+    if (acao or {}).get("so_cartoes"):  # "no crédito" / "Pix no crédito" sem cartão (lote C)
+        return True
     decidido = conta_e_cartao((acao or {}).get("type"))
     return True if decidido is None else decidido
 

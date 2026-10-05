@@ -99,8 +99,35 @@ def test_forma_so_vale_se_a_frase_sustenta(valor, texto, esperado):
 @pytest.mark.asyncio
 async def test_sem_atributo_dito_nada_e_congelado(banco, monkeypatch):
     leitura(monkeypatch, AtributosItem(indice=0, payment_method="pix"))
-    alvo, n = await congela("gastei 45 no mercado", gasto())
+    alvo, n = await congela("gastei 45 no mercado, gasto fixo", gasto())  # a frase não diz pix
     assert n == 1 and "atributos" not in alvo
+
+
+@pytest.mark.asyncio
+async def test_frase_sem_nenhuma_pista_nem_chama_o_modelo(banco, monkeypatch):
+    chamadas: list = []
+    leitura(monkeypatch, AtributosItem(indice=0, payment_method="pix"), chamadas=chamadas)
+    alvo, n = await congela("gastei 45 no mercado", gasto())
+    assert n == 0 and chamadas == [] and "atributos" not in alvo
+
+
+@pytest.mark.asyncio
+async def test_nome_de_detalhe_existente_na_frase_conta_como_pista(banco, monkeypatch):
+    chamadas: list = []
+    leitura(monkeypatch, chamadas=chamadas)
+    _, n = await congela("gastei 45 na feira", gasto())
+    assert n == 1 and len(chamadas) == 1
+
+
+@pytest.mark.asyncio
+async def test_banco_fora_do_ar_lanca_sem_atributos(banco, monkeypatch):
+    async def quebra(*_a, **_k):
+        raise ConnectionError("banco")
+
+    leitura(monkeypatch, AtributosItem(indice=0, payment_method="pix"))
+    monkeypatch.setattr(atributos.db, "accounts", quebra)
+    alvos, n = await atributos.congelar(WS, "gastei 45 no pix", [gasto()], [{}])
+    assert alvos == [{}] and n == 0
 
 
 @pytest.mark.asyncio
@@ -243,7 +270,7 @@ async def test_so_criacao_de_lancamento_chama_o_modelo(banco, monkeypatch):
     pagar = FinanceAction(type="pay_invoice", amount_cents=500, account="nubank")
     alvos, n = await atributos.congelar(WS, "paguei a fatura no pix", [transf, pagar], [{}, {}])
     assert n == 0 and chamadas == []
-    _, n = await congela("gastei 45 no mercado", gasto())
+    _, n = await congela("gastei 45 no mercado no pix", gasto())
     assert n == 1 and len(chamadas) == 1
 
 
@@ -340,3 +367,255 @@ async def test_detalhe_que_repete_a_categoria_nao_pergunta(banco, monkeypatch):
     leitura(monkeypatch, AtributosItem(indice=0, detalhe="mercado"))
     alvo, _ = await congela("gastei 80 no mercado Extra", gasto())
     assert "correction_error" not in alvo and "atributos" not in alvo
+
+
+# --- revisão independente: vetos mais estritos --------------------------------------------------
+
+
+@pytest.mark.parametrize("texto", [
+    "gastei 70 em roupa, não essencial", "gastei 70 em roupa, pouco essencial",
+    "isso nem é essencial", "gastei 70, não é um gasto essencial",
+])
+def test_essencial_negado_nunca_vira_essential_e_vira_discretionary(texto):
+    assert dom.necessidade_proposta("essential", texto) is None
+    assert dom.necessidade_proposta("discretionary", texto) == "discretionary"
+
+
+def test_discretionary_nao_se_sustenta_so_com_a_palavra_essencial():
+    assert dom.necessidade_proposta("discretionary", "aluguel, gasto essencial") is None
+    assert dom.necessidade_proposta("discretionary", "gastei 45 com roupa") is None
+    assert dom.necessidade_proposta("discretionary", "isso foi supérfluo") == "discretionary"
+
+
+@pytest.mark.parametrize("texto,valor,esperado", [
+    ("não é gasto fixo", "fixed", None), ("isso não é fixo, é variável", "fixed", None),
+    ("isso não é fixo, é variável", "variable", "variable"),
+    ("é um gasto fixo", "fixed", "fixed"),
+    ("não é variável", "variable", None),
+])
+def test_negacao_vale_para_fixo_e_variavel(texto, valor, esperado):
+    assert dom.padrao_proposto(valor, texto) == esperado
+
+
+@pytest.mark.parametrize("valor,texto,esperado", [
+    ("bank_transfer", "comprei doces por 12", None),
+    ("bank_transfer", "paguei os documentos", None),
+    ("bank_transfer", "paguei 15 por DOC", "bank_transfer"),
+    ("pix", "comprei um pixel art por 20", None),
+    ("pix", "paguei 20 no pix", "pix"),
+    ("credit", "paguei no cred do nubank", "credit"),
+    ("debit", "paguei a Débora 50", None),
+    ("debit", "paguei no deb", "debit"),
+    ("debit", "paguei no débito", "debit"),
+    ("bank_transfer", "fiz uma transferência para pagar", "bank_transfer"),
+])
+def test_pista_curta_so_casa_palavra_inteira(valor, texto, esperado):
+    assert dom.forma_proposta(valor, texto) == esperado
+
+
+@pytest.mark.asyncio
+async def test_pix_no_credito_exige_cartao_e_cria_rascunho_de_cartao(banco, monkeypatch):
+    leitura(monkeypatch, AtributosItem(indice=0, payment_method="pix"))
+    alvo, _ = await congela("gastei 200 no mercado com pix no crédito", gasto())  # padrão = corrente
+    assert "cartão" in alvo["correction_error"] and alvo["account_error"] == alvo["correction_error"]
+    assert alvo["so_cartoes"] is True
+
+
+@pytest.mark.asyncio
+async def test_pix_no_credito_com_cartao_citado_passa(banco, monkeypatch):
+    leitura(monkeypatch, AtributosItem(indice=0, payment_method="pix"))
+    alvo, _ = await congela("gastei 200 com pix no crédito do nubank", gasto(account="Nubank Cartão"),
+                            {"cited_account": {"name": "Nubank Cartão", "type": "credit_card"}})
+    assert alvo["atributos"]["payment_method"] == "pix"
+
+
+@pytest.mark.asyncio
+async def test_credito_sem_cartao_tambem_vira_rascunho_so_de_cartoes(banco, monkeypatch):
+    leitura(monkeypatch, AtributosItem(indice=0, payment_method="credit"))
+    alvo, _ = await congela("gastei 45 no crédito", gasto())
+    assert alvo["account_error"] and alvo["so_cartoes"] is True
+
+
+def test_rascunho_de_cartao_so_oferece_cartoes():
+    from app.conversation import _so_cartoes
+    assert _so_cartoes({"type": "create_expense", "so_cartoes": True}) is True
+    assert _so_cartoes({"type": "create_expense"}) is False
+
+
+@pytest.mark.asyncio
+async def test_detalhe_ambiguo_pede_o_nome_exato(banco, monkeypatch):
+    banco["filhas"] = [FEIRA, FEIRINHA]
+    leitura(monkeypatch, AtributosItem(indice=0, detalhe="fei"))
+    alvo, _ = await congela("gastei 45 no mercado, detalhe fei", gasto())
+    assert "nome exato do detalhe" in alvo["correction_error"]
+
+
+# --- grafo: resolve -> gate -> executar ------------------------------------------------------------
+
+
+def _estado(acao, **extra):
+    return {"thread_id": "t", "phone": "5551999999999", "user_id": str(uuid4()), "workspace_id": WS,
+            "timezone": "America/Sao_Paulo", "source_message_id": "wamid.1", "text": "teste", "media": None,
+            "results": [], "domains": ["financas"], "finance_actions": [acao.model_dump(mode="json")],
+            "finance_queries": [], "notes_actions": [], "confidence": 1.0, "approved": False,
+            "halted": False, **extra}
+
+
+@pytest.mark.asyncio
+async def test_resolve_node_conta_a_chamada_mas_nao_no_rascunho_completado(banco, monkeypatch):
+    from app.graph import nodes
+
+    leitura(monkeypatch, AtributosItem(indice=0, payment_method="pix"))
+    acao = gasto(account="sem conta")
+    texto = "gastei 45 no mercado no pix"
+    normal = await nodes.resolve_node(_estado(acao, text=texto))
+    assert normal["llm_calls"] == 1
+    preset = await nodes.resolve_node(_estado(acao, text=texto, preset=True))
+    assert "llm_calls" not in preset  # o clique `ds:` não conta a 2ª mensagem do plano
+    assert preset["targets"][0]["atributos"]["payment_method"] == "pix"  # mas a forma dita NÃO se perde
+
+
+@pytest.mark.asyncio
+async def test_ciclo_inteiro_resolve_frase_e_colunas_gravadas(banco, monkeypatch):
+    """resolve -> frase do SIM -> execução: o que a pessoa leu é o que vai para o INSERT."""
+    from app.graph import nodes
+
+    leitura(monkeypatch, AtributosItem(indice=0, payment_method="pix", expense_pattern="fixed", detalhe="feira"))
+    acao = gasto(account="sem conta", occurred_at="2026-10-03")
+    texto = "gastei 45 no mercado no pix, gasto fixo, detalhe feira"
+    saida = await nodes.resolve_node(_estado(acao, text=texto))
+    alvo = saida["targets"][0]
+    frase = policy.describe_for_confirmation(acao, alvo)
+    assert frase.endswith("no Pix · fixo · detalhe feira")
+
+    escritas = []
+
+    async def fetch_one(sql, *args):
+        if "insert into public.transactions" in sql:
+            escritas.append((sql, args))
+            return {"id": uuid4()}
+        return None
+
+    monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+    monkeypatch.setattr(atributos.db, "fetch_one", fetch_one)
+    ctx = ExecContext(uuid4(), uuid4(), None, "America/Sao_Paulo", texto, "wamid.1")
+    ctx.target = alvo
+    await finance.create_transaction(ctx, acao)
+    sql, args = escritas[0]
+    assert "payment_method" in sql and "expense_pattern_source" in sql and args[-1] == str(FEIRA["id"])
+    assert "pix" in args and "fixed" in args and "explicit" in args
+
+
+@pytest.mark.asyncio
+async def test_corpo_de__extrair_usa_o_papel_parse_e_o_envelope(monkeypatch):
+    """`_extrair` real (o conftest a derruba por padrão) com `gemini.llm` falso: schema, envelope, tempo."""
+    from app.services import gemini
+    from app.tools import atributos as mod
+
+    visto = {}
+
+    class Falso:
+        def with_structured_output(self, schema):
+            visto["schema"] = schema
+            return self
+
+        async def ainvoke(self, mensagens):
+            visto["mensagens"] = mensagens
+            return AtributosLote(itens=[AtributosItem(indice=0, payment_method="pix")])
+
+    def llm(papel, temperature=0.1):
+        visto["papel"], visto["temperatura"] = papel, temperature
+        return Falso()
+
+    monkeypatch.setattr(gemini, "llm", llm)
+    real = mod.__dict__["_extrair_real"]
+    lote = await real("gastei 45 no pix", ["0: gasto | mercado | categoria mercado"])
+    assert lote.itens[0].payment_method == "pix"
+    assert visto["papel"] == "parse" and visto["temperatura"] == 0 and visto["schema"] is AtributosLote
+    assert "<user_input>" in visto["mensagens"][1][1] and visto["mensagens"][0][0] == "system"
+    assert mod.TIMEOUT_S == 8
+
+
+def test_frase_mostra_a_classificacao_que_veio_do_padrao_da_categoria():
+    frase = dom.frase_dos_atributos(None, None, None, None, None, ["essencial (padrão de mercado)"])
+    assert frase == "essencial (padrão de mercado)"
+
+
+@pytest.mark.asyncio
+async def test_padrao_da_categoria_aparece_na_frase_do_sim(banco, monkeypatch):
+    async def fetch_one(sql, *args):
+        return {"default_expense_pattern": None, "default_expense_necessity": "essential"}
+
+    monkeypatch.setattr(atributos.db, "fetch_one", fetch_one)
+    leitura(monkeypatch, AtributosItem(indice=0, payment_method="pix"))
+    alvo, _ = await congela("gastei 45 no mercado no pix", gasto())
+    assert alvo["atributos"]["frase"] == "no Pix · essencial (padrão de mercado)"
+
+
+def test_detalhe_que_caiu_pela_regra_diz_que_nao_foi_gravado():
+    attrs = {"subcategory_id": "x", "subcategory_name": "feira", "subcategory_parent": "mercado"}
+    assert atributos.aviso_do_detalhe(attrs, "mercado") == ""
+    assert "feira" in atributos.aviso_do_detalhe(attrs, "saúde") and "não foi gravado" in atributos.aviso_do_detalhe(attrs, "saúde")
+
+
+@pytest.mark.asyncio
+async def test_detalhe_igual_a_categoria_vira_nota_e_nao_pergunta(banco, monkeypatch):
+    leitura(monkeypatch, AtributosItem(indice=0, payment_method="pix", detalhe="mercado"))
+    alvo, _ = await congela("gastei 80 no mercado no pix, detalhe mercado", gasto())
+    assert "correction_error" not in alvo and "ignorado" in alvo["atributos"]["frase"]
+
+
+def test_o_rascunho_guarda_a_frase_original_para_reler_a_forma():
+    from app.graph import nodes
+
+    acao = gasto()
+    r = nodes._rascunho(_estado(acao, text="gastei 45 no crédito"), [acao],
+                        [{"account_error": "qual cartão?", "so_cartoes": True}])
+    assert r["raw_text"] == "gastei 45 no crédito" and r["action"]["so_cartoes"] is True and r["slot"] == "account"
+
+
+@pytest.mark.asyncio
+async def test_grafo_real_pergunta_com_o_entendido_e_grava_o_que_foi_lido(banco, monkeypatch):
+    """Grafo real (resolve -> gate -> executar) com `_extrair` e o banco dublados."""
+    import importlib
+
+    from langgraph.checkpoint.memory import InMemorySaver
+    from langgraph.types import Command
+
+    from app.config import get_settings
+    from app.graph import build as build_mod
+    from app.graph import nodes
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://x/y")
+    get_settings.cache_clear()
+    leitura(monkeypatch, AtributosItem(indice=0, payment_method="pix", detalhe="feira"))
+
+    async def router(state):
+        return {"domains": ["financas"]}
+
+    async def nada(state):
+        return {}
+
+    gravados = []
+
+    async def executar(state, indexadas):
+        alvo = state["targets"][indexadas[0][0]]
+        gravados.append(alvo["atributos"])
+        return ["EXECUTOU"]
+
+    monkeypatch.setattr(nodes, "route", router)
+    monkeypatch.setattr(nodes, "finance_node", nada)
+    monkeypatch.setattr(nodes, "notes_node", nada)
+    monkeypatch.setattr(nodes, "_executar", executar)
+    importlib.reload(build_mod)
+    grafo = build_mod.build(InMemorySaver())
+    config = {"configurable": {"thread_id": "lote-c"}}
+    estado = await grafo.ainvoke(
+        _estado(gasto(account="sem conta"), text="gastei 45 no mercado no pix, detalhe feira"), config=config)
+    pausa = estado["__interrupt__"][0]
+    pausa = getattr(pausa, "value", pausa)
+    assert pausa["summary"].endswith("sem conta, no Pix · detalhe feira")
+    retomado = await grafo.ainvoke(Command(resume=True), config=config)
+    assert "EXECUTOU" in retomado["reply"]
+    assert gravados[0]["payment_method"] == "pix" and gravados[0]["subcategory_id"] == str(FEIRA["id"])
+    get_settings.cache_clear()

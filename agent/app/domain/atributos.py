@@ -7,6 +7,9 @@ teste de paridade), o veto por ancoragem no texto e a montagem das colunas como 
 
 from __future__ import annotations
 
+import re
+import unicodedata
+
 from app.domain.matching import normalize
 from app.domain.payment_method import forma_de_pagamento
 
@@ -25,20 +28,37 @@ _BANCARIAS = ("checking", "savings", "investment")
 # O VETO da ancoragem: o modelo só vale se a frase tem a pista. Não infere nada — só recusa o que o
 # texto não sustenta ("null nunca vira pix": um pix que a frase não disse é invenção do modelo).
 _PISTAS_FORMA = {
-    "pix": ("pix",), "credit": ("credito",), "debit": ("debito",),
+    "pix": ("pix",), "credit": ("cred",), "debit": ("debito", "deb"),
     "cash": ("dinheiro", "especie", "cash"), "bank_transfer": ("ted", "doc", "transfer"),
     "boleto": ("boleto",),
 }
-_PISTAS_PADRAO = {"fixed": ("fix",), "variable": ("variav",)}
+_PISTAS_PADRAO = {"fixed": ("fixo", "fixa"), "variable": ("variav",)}
+_RADICAL_PADRAO = {"fixed": ("fix",), "variable": ("variav",)}
 _PISTAS_NECESSIDADE = {
     "essential": ("essenc", "necessar", "obrigat"),
-    "discretionary": ("essenc", "superflu", "desnecess", "discricion", "opcional", "luxo", "dispens"),
+    "discretionary": ("superflu", "desnecess", "discricion", "opcional", "luxo", "dispens"),
 }
+# Negação junto do radical ("não é fixo", "nem é essencial", "pouco essencial"): inverte o lado.
+# Vale por ITEM da frase; com dois lançamentos na mesma frase a negação de um pode vetar o outro
+# (limite documentado — o veto erra para o lado seguro: grava menos, nunca o oposto).
+_NEGACAO = r"\b(nao|nem|pouco)\b[^,.;]{0,25}"
 
 
 def _tem_pista(texto: str, pistas: tuple[str, ...]) -> bool:
+    """Pista de até 3 letras só casa palavra INTEIRA ("doc" não é "doces"); as maiores, por prefixo."""
     palavras = normalize(texto).split()
-    return any(p.startswith(pista) or (len(pista) > 3 and pista in p) for p in palavras for pista in pistas)
+    return any(p == pista if len(pista) <= 3 else p.startswith(pista) for p in palavras for pista in pistas)
+
+
+def _negado(texto: str, radicais: tuple[str, ...]) -> bool:
+    # sem `normalize`: ele tira a pontuação, e a vírgula é o que separa "não é fixo, é variável"
+    plano = "".join(c for c in unicodedata.normalize("NFKD", texto.lower()) if not unicodedata.combining(c))
+    return any(re.search(_NEGACAO + r + r"\w*", plano) for r in radicais)
+
+
+def pix_no_credito(texto: str) -> bool:
+    """"Pix no crédito" é Pix cobrado no CARTÃO: a conta tem de ser cartão (como o "Juros do Pix" do app)."""
+    return _tem_pista(texto, ("cred",))
 
 
 def erro_da_forma(metodo: str | None, tipo_conta: str | None) -> str | None:
@@ -74,14 +94,22 @@ def forma_proposta(valor: str | None, texto: str) -> str | None:
 
 def padrao_proposto(valor: str | None, texto: str) -> str | None:
     achado = PADROES.get(normalize(valor)) if valor else None
-    return achado if achado and _tem_pista(texto, _PISTAS_PADRAO[achado]) else None
+    if not achado or _negado(texto, _RADICAL_PADRAO[achado]):
+        return None
+    return achado if _tem_pista(texto, _PISTAS_PADRAO[achado]) else None
 
 
 def necessidade_proposta(valor: str | None, texto: str) -> str | None:
+    """essential só sem negação; discretionary só com palavra própria OU "essencial" negado."""
     achado = NECESSIDADES.get(normalize(valor)) if valor else None
-    if achado == "essential" and any(n in normalize(texto) for n in ("nao essenc", "nem essenc", "nao e essenc")):
-        return None  # "não essencial" contém "essencial": a negação inverteria a classificação
-    return achado if achado and _tem_pista(texto, _PISTAS_NECESSIDADE[achado]) else None
+    if achado == "essential":
+        if _negado(texto, ("essenc", "necessar")):
+            return None
+        return achado if _tem_pista(texto, _PISTAS_NECESSIDADE["essential"]) else None
+    if achado == "discretionary":
+        return achado if (_tem_pista(texto, _PISTAS_NECESSIDADE["discretionary"])
+                          or _negado(texto, ("essenc", "necessar"))) else None
+    return None
 
 
 def detalhe_ancorado(valor: str | None, texto: str) -> str | None:
@@ -110,12 +138,18 @@ def colunas_de_classificacao(kind: str, explicita: dict, padroes: dict | None) -
     return saida
 
 
+def tem_alguma_pista(texto: str) -> bool:
+    """A frase tem ALGUMA palavra que a segunda leitura poderia usar (forma, fixo, essencial, detalhe)?"""
+    todas = [p for grupo in (_PISTAS_FORMA, _PISTAS_PADRAO, _PISTAS_NECESSIDADE) for v in grupo.values() for p in v]
+    return _tem_pista(texto, (*todas, "detalhe", "subcategoria")) or _negado(texto, ("essenc", "necessar"))
+
+
 def frase_dos_atributos(forma: str | None, padrao: str | None, necessidade: str | None,
-                        detalhe: str | None, nota: str | None = None) -> str:
+                        detalhe: str | None, nota: str | None = None, da_categoria=()) -> str:
     """O que foi entendido, na frase do SIM: "no Pix · fixo · essencial · detalhe feira"."""
     partes = [
         FRASE_DA_FORMA.get(forma),
         ROTULO_PADRAO.get(padrao), ROTULO_NECESSIDADE.get(necessidade),
-        f"detalhe {detalhe}" if detalhe else None, nota,
+        f"detalhe {detalhe}" if detalhe else None, *da_categoria, nota,
     ]
     return " · ".join(p for p in partes if p)

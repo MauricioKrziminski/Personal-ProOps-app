@@ -449,7 +449,8 @@ garantia sozinho virou responsabilidade do código:
 - **Prompt caching não é alavanca aqui e não deve ser "otimizado".** O mínimo para cache implícito
   é 4.096 tokens nos modelos 3.5/3.6/3.7 Flash; os prompts por domínio têm ~800. Medido em
   30/08/2026.
-- Router + domínio são **duas** chamadas por mensagem (a cota grátis do Flash-Lite é 500/dia).
+- Router + domínio são **duas** chamadas por mensagem — **três** no turno que cria lançamento (a
+  segunda leitura de atributos, `tools/atributos.py`, pulada quando a frase não tem pista) — e a cota grátis do Flash-Lite é 500/dia.
   Os fast-paths determinísticos — saudação, resposta SIM/NÃO, documento anexo — existem para
   devolver parte disso.
 

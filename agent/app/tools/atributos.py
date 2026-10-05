@@ -28,7 +28,7 @@ CRIAM = {
     FinanceActionType.CREATE_INCOME,
     FinanceActionType.CREATE_INSTALLMENT_PURCHASE,
 }
-TIMEOUT_S = 25
+TIMEOUT_S = 8
 
 SISTEMA = """Você extrai ATRIBUTOS de lançamentos financeiros que uma pessoa acabou de dizer em português informal.
 Você recebe a frase da pessoa e a lista numerada de lançamentos já entendidos. Devolva um item por lançamento, com o mesmo 'indice'.
@@ -69,7 +69,7 @@ async def escolher_detalhe(workspace_id, parent: str, dito: str) -> tuple[dict |
     return None, f"A categoria {parent} ainda não tem detalhes cadastrados; crie no app."
 
 
-async def _extrair(texto: str, linhas: list[str]) -> AtributosLote:
+async def _extrair_real(texto: str, linhas: list[str]) -> AtributosLote:
     from app.security import wrap_untrusted
     from app.services import gemini
 
@@ -77,6 +77,9 @@ async def _extrair(texto: str, linhas: list[str]) -> AtributosLote:
     corpo = f"Frase da pessoa:\n{texto}\n\nLançamentos já entendidos:\n" + "\n".join(linhas)
     return await asyncio.wait_for(
         modelo.ainvoke([("system", SISTEMA), ("human", wrap_untrusted("user_input", corpo))]), TIMEOUT_S)
+
+
+_extrair = _extrair_real  # o nome que os testes e a sonda trocam
 
 
 def _tipo_da_conta(acao: FinanceAction, alvo: dict, contas: dict[str, str]) -> str | None:
@@ -93,34 +96,45 @@ def normalize_igual(dito: str, *outros: str | None) -> bool:
     return any(o and matching.normalize(o) == matching.normalize(dito) for o in outros)
 
 
-async def congelar(workspace_id, texto: str, acoes: list, alvos: list[dict],
-                   pular: set[int] | None = None) -> tuple[list[dict], int]:
-    """Congela os atributos de cada criação em `alvos[i]["atributos"]`. Devolve (alvos, chamadas)."""
-    alvos = [*alvos] + [{}] * max(0, len(acoes) - len(alvos))
-    indices = [i for i, a in enumerate(acoes)
-               if isinstance(a, FinanceAction) and a.type in CRIAM
-               and i not in (pular or set()) and not alvos[i].get("correction_error")]
-    if not indices:
-        return alvos, 0
-
+async def padroes_da_categoria(workspace_id, categoria: str | None) -> dict | None:
+    """O padrão fixo/variável e essencial da categoria (`public.categories`); None se não há."""
+    if not categoria:
+        return None
     try:
-        linhas = []
-        for n, i in enumerate(indices):
-            a = acoes[i]
-            cat = guards.clean_category(a.category)
-            nomes = ", ".join(f["name"] for f in await detalhes_da_categoria(workspace_id, cat)) if cat else ""
-            tipo = {"create_expense": "gasto", "create_income": "receita"}.get(a.type.value, "compra parcelada")
-            linhas.append(f"{n}: {tipo} | {a.description or '-'} | categoria {cat or '-'}"
-                          + (f" | detalhes existentes: {nomes}" if nomes else ""))
-        lote = await _extrair(texto, linhas)
-    except Exception as err:  # noqa: BLE001 — sem atributos, nunca sem lançamento (429, timeout, 503)
-        log.warning("atributos do lançamento ignorados: %s", err)
-        return alvos, 0
+        return await db.fetch_one(
+            "select default_expense_pattern, default_expense_necessity from public.categories "
+            "where workspace_id = %s and private.fold(name) = private.fold(%s) limit 1",
+            workspace_id, categoria)
+    except Exception as err:  # noqa: BLE001 — o padrão é conveniência, não trava o lançamento
+        log.warning("padrão da categoria ignorado: %s", err)
+        return None
+
+
+PERGUNTA_CARTAO = ("🤔 Para pagar no crédito (ou Pix no crédito) eu preciso do cartão. Qual cartão? "
+                   "Ainda não registrei nada.")
+
+
+async def _congelar(workspace_id, texto, acoes, alvos, indices) -> tuple[list[dict], int]:
+    """O miolo de `congelar`; qualquer exceção sobe e vira "sem atributos" lá fora."""
+    # sem NENHUMA pista (forma, fixo/variável, essencial, "detalhe") nem nome de detalhe do espaço,
+    # a segunda leitura não tem o que achar: pula a chamada (cota e latência)
+    if not dom.tem_alguma_pista(texto):
+        nomes = await db.fetch("select name from public.subcategories where workspace_id = %s", workspace_id)
+        if not any(matching.normalize(n["name"]) in matching.normalize(texto) for n in nomes):
+            return alvos, 0
+
+    linhas = []
+    for n, i in enumerate(indices):
+        a = acoes[i]
+        cat = guards.clean_category(a.category)
+        nomes = ", ".join(f["name"] for f in await detalhes_da_categoria(workspace_id, cat)) if cat else ""
+        tipo = {"create_expense": "gasto", "create_income": "receita"}.get(a.type.value, "compra parcelada")
+        linhas.append(f"{n}: {tipo} | {a.description or '-'} | categoria {cat or '-'}"
+                      + (f" | detalhes existentes: {nomes}" if nomes else ""))
+    lote = await _extrair(texto, linhas)
     por_indice = {item.indice: item for item in lote.itens}
 
-    contas: dict[str, str] = {}
-    if any(not acoes[i].account for i in indices):
-        contas = {str(c["id"]): c["type"] for c in await db.accounts(workspace_id)}
+    contas = {str(c["id"]): c["type"] for c in await db.accounts(workspace_id)}
 
     for n, i in enumerate(indices):
         a, item = acoes[i], por_indice.get(n)
@@ -131,38 +145,77 @@ async def congelar(workspace_id, texto: str, acoes: list, alvos: list[dict],
         padrao = dom.padrao_proposto(item.expense_pattern, texto) if despesa else None
         necessidade = dom.necessidade_proposta(item.expense_necessity, texto) if despesa else None
         dito = dom.detalhe_ancorado(item.detalhe, texto)
-        if dito and normalize_igual(dito, a.category, a.description):
-            dito = None  # o modelo repetiu a categoria ou o título: isso não é um detalhe dito
-        nota, erro = None, None
+        notas: list[str] = []
+        categoria = guards.clean_category(a.category)
 
-        problema = dom.erro_da_forma(forma, _tipo_da_conta(a, alvos[i], contas))
-        if problema and forma == "credit":
-            erro = ("🤔 Para pagar no crédito eu preciso do cartão. Me manda de novo dizendo qual "
-                    "cartão. Ainda não registrei nada.")
+        if dito and normalize_igual(dito, a.category, a.description):
+            notas.append(f"detalhe *{dito}* ignorado (é o nome da categoria ou do lançamento)")
+            dito = None
+
+        erro = None
+        tipo_conta = _tipo_da_conta(a, alvos[i], contas)
+        problema = dom.erro_da_forma(forma, tipo_conta)
+        if forma == "credit" and problema or (
+                forma == "pix" and dom.pix_no_credito(texto) and tipo_conta != "credit_card"):
+            erro = PERGUNTA_CARTAO
         elif problema:
-            nota, forma = f"sem forma ({dom.FRASE_DA_FORMA[forma]} não combina com a conta)", None
+            notas.append(f"sem forma ({dom.FRASE_DA_FORMA[forma]} não combina com a conta)")
+            forma = None
 
         detalhe_id = detalhe_nome = parent = None
-        categoria = guards.clean_category(a.category)
         if dito and categoria and erro is None:
             achada, pergunta = await escolher_detalhe(workspace_id, categoria, dito)
             if pergunta:
-                erro = f"🤔 {pergunta} Ainda não registrei nada."
+                erro = (f"🤔 {pergunta} Me manda de novo o lançamento com o nome exato do detalhe. "
+                        "Ainda não registrei nada.")
             else:
                 detalhe_id, detalhe_nome, parent = str(achada["id"]), achada["name"], categoria
         elif dito:
-            log.info("detalhe dito sem categoria: ignorado")
+            notas.append(f"detalhe *{dito}* ignorado (falta a categoria)")
 
         if erro:
             alvos[i] = {**alvos[i], "correction_error": erro}
+            if erro == PERGUNTA_CARTAO:  # a pergunta precisa de RESPOSTA: rascunho de slot, só cartões
+                alvos[i].update(account_error=erro, so_cartoes=True)
             continue
-        if forma or padrao or necessidade or detalhe_id or nota:
+
+        da_categoria = []
+        if despesa and categoria:
+            padroes = await padroes_da_categoria(workspace_id, categoria) or {}
+            if not padrao and padroes.get("default_expense_pattern"):
+                da_categoria.append(f"{dom.ROTULO_PADRAO[padroes['default_expense_pattern']]} (padrão de {categoria})")
+            if not necessidade and padroes.get("default_expense_necessity"):
+                da_categoria.append(
+                    f"{dom.ROTULO_NECESSIDADE[padroes['default_expense_necessity']]} (padrão de {categoria})")
+        frase = dom.frase_dos_atributos(forma, padrao, necessidade, detalhe_nome, "; ".join(notas) or None,
+                                        da_categoria)
+        if frase or detalhe_id:
             alvos[i] = {**alvos[i], "atributos": {
                 "payment_method": forma, "expense_pattern": padrao, "expense_necessity": necessidade,
-                "subcategory_id": detalhe_id, "subcategory_parent": parent,
-                "frase": dom.frase_dos_atributos(forma, padrao, necessidade, detalhe_nome, nota),
+                "subcategory_id": detalhe_id, "subcategory_name": detalhe_nome, "subcategory_parent": parent,
+                "frase": frase,
             }}
     return alvos, 1
+
+
+async def congelar(workspace_id, texto: str, acoes: list, alvos: list[dict],
+                   pular: set[int] | None = None) -> tuple[list[dict], int]:
+    """Congela os atributos de cada criação em `alvos[i]["atributos"]`. Devolve (alvos, chamadas).
+
+    Qualquer falha (banco, 429, timeout) lança SEM atributos: o lançamento nunca depende desta leitura.
+    """
+    alvos = [*alvos] + [{}] * max(0, len(acoes) - len(alvos))
+    indices = [i for i, a in enumerate(acoes)
+               if isinstance(a, FinanceAction) and a.type in CRIAM
+               and i not in (pular or set()) and not alvos[i].get("correction_error")]
+    if not indices:
+        return alvos, 0
+    original = [dict(a) for a in alvos]
+    try:
+        return await _congelar(workspace_id, texto, acoes, alvos, indices)
+    except Exception as err:  # noqa: BLE001
+        log.warning("atributos do lançamento ignorados: %s", err)
+        return original, 0
 
 
 async def colunas(workspace_id, kind: str, categoria: str | None, attrs: dict | None) -> dict:
@@ -178,16 +231,7 @@ async def colunas(workspace_id, kind: str, categoria: str | None, attrs: dict | 
         saida["payment_method"] = attrs["payment_method"]
     if kind != "expense":
         return saida
-    padroes = None
-    if categoria:
-        try:
-            padroes = await db.fetch_one(
-                "select default_expense_pattern, default_expense_necessity from public.categories "
-                "where workspace_id = %s and private.fold(name) = private.fold(%s) limit 1",
-                workspace_id, categoria)
-        except Exception as err:  # noqa: BLE001 — o padrão é conveniência, não trava o lançamento
-            log.warning("padrão da categoria ignorado: %s", err)
-    saida.update(dom.colunas_de_classificacao(kind, attrs, padroes))
+    saida.update(dom.colunas_de_classificacao(kind, attrs, await padroes_da_categoria(workspace_id, categoria)))
     return saida
 
 
@@ -200,6 +244,10 @@ def detalhe_valido(attrs: dict | None, categoria: str | None) -> str | None:
     return None
 
 
-def sufixo_da_frase(target: dict | None) -> str:
-    frase = ((target or {}).get("atributos") or {}).get("frase")
-    return f", {frase}" if frase else ""
+def aviso_do_detalhe(attrs: dict | None, categoria: str | None) -> str:
+    """Quando a regra do usuário trocou a categoria e o detalhe dito caiu: a resposta diz."""
+    attrs = attrs or {}
+    if attrs.get("subcategory_id") and detalhe_valido(attrs, categoria) is None:
+        return (f"\nO detalhe *{attrs.get('subcategory_name') or 'dito'}* não foi gravado: "
+                f"a categoria virou *{categoria or 'sem categoria'}*.")
+    return ""

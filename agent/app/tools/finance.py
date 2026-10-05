@@ -413,7 +413,8 @@ async def create_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
         return ToolResult(
             f"{emoji} Recorrente criado: {cents_to_brl(valor)}"
             + (f" em *{categoria}*" if categoria else "")
-            + f" — próxima em {format_date_br(proxima.date())}.",
+            + f" — próxima em {format_date_br(proxima.date())}."
+            + atributos.aviso_do_detalhe(attrs, categoria),
             result_id=row["id"] if row else None,
         )
 
@@ -429,7 +430,8 @@ async def create_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     return ToolResult(
         f"{emoji} {'Gasto' if kind == 'expense' else 'Receita'} de *{cents_to_brl(valor)}*"
         + (f" em *{categoria}*" if categoria else "")
-        + f" em {format_date_br(quando)}.",
+        + f" em {format_date_br(quando)}."
+        + atributos.aviso_do_detalhe(attrs, categoria),
         result_id=row["id"] if row else None,
     )
 
@@ -537,7 +539,8 @@ async def create_installment_purchase(
     historico = f"\n{paid} parcelas iniciais pagas; {parcelas - paid} pendentes."
     return ToolResult(
         f"🧾 Parcelado: *{cents_to_brl(total)}* em {parcelas}x de "
-        f"{cents_to_brl(por_parcela)} (a última acerta os centavos).{historico}",
+        f"{cents_to_brl(por_parcela)} (a última acerta os centavos).{historico}"
+        + atributos.aviso_do_detalhe(attrs, categoria),
         result_id=row["id"] if row else None,
     )
 

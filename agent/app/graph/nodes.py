@@ -676,7 +676,7 @@ async def resolve_node(state: AgentState) -> dict:
         state["workspace_id"], state.get("text", ""), acoes, alvos, pular=set(_incompletas(state, acoes)))
 
     return {"targets": with_resources(alvos), "results": esclarecimentos,
-            "draft": _rascunho(state, acoes, alvos), **({"llm_calls": chamadas} if chamadas else {})}
+            "draft": _rascunho(state, acoes, alvos), **({"llm_calls": chamadas} if chamadas and not state.get("preset") else {})}
 
 
 def _incompletas(state: AgentState, acoes: list) -> dict[int, str]:
@@ -730,7 +730,8 @@ def _rascunho(state: AgentState, acoes: list, alvos: list[dict] | None = None) -
     for i, alvo in enumerate(alvos or []):
         if i < len(acoes) and alvo.get("account_error"):
             return {
-                "action": acoes[i].model_dump(mode="json"),
+                "action": {**acoes[i].model_dump(mode="json"),
+                           **({"so_cartoes": True} if alvo.get("so_cartoes") else {})},
                 "raw_text": state.get("text", ""),
                 "missing": alvo["account_error"],
                 "slot": "account",
