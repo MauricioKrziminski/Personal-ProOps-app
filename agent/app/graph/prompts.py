@@ -70,7 +70,10 @@ Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
   aplicar o plano percentual do orçamento ("aplica o plano nos meus limites") também. PERGUNTAR da
   reserva de emergência ("minha reserva cobre quantos meses?") e do plano de metas ("cabe no meu
   plano de metas?", "quando aperta?") também é cadastros (a resposta sai do cadastro, não de uma
-  consulta de transações). Transferir uma vez só ("transferi 500 pra poupança")
+  consulta de transações). LANÇAR um favorito ("lança meu favorito Almoço") e REPETIR um lançamento
+  que já existe ("repete o lançamento do mercado de ontem", "duplica a conta de luz") também são
+  cadastros: é cópia, não um gasto novo. Definir quanto guardar por mês numa meta, e seus marcos,
+  ícone e cor, idem. Transferir uma vez só ("transferi 500 pra poupança")
   continua financas.
   ⚠️ A fronteira com "financas_consulta" é o que a pessoa quer SABER, não o substantivo:
   perguntar VALOR, QUANDO cai ou QUANTO falta é sempre "financas_consulta" — "quais minhas
