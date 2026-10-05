@@ -89,6 +89,7 @@ const MATERIAL: Record<string, MaterialName> = {
   // A data que o extrato discorda: `event_busy` é o calendário com aviso do Material.
   'calendar.badge.exclamationmark': 'event_busy',
   cart: 'shopping_cart',
+  percent: 'percent',
   'chart.bar': 'bar_chart',
   'chart.bar.doc.horizontal': 'assessment',
   'chart.line.uptrend.xyaxis': 'trending_up',

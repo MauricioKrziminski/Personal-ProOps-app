@@ -5,6 +5,7 @@ import { Stack, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 
 import { useBRL } from '@/components/ui/conceal';
+import { BudgetPlanSheet } from '@/components/finance/budget-plan-sheet';
 import { CategoryPicker } from '@/components/finance/category-picker';
 import { SeloDaCategoria } from '@/components/finance/selo-da-categoria';
 import { useMonthRuler } from '@/components/finance/month-ruler';
@@ -149,6 +150,7 @@ export default function BudgetsScreen() {
   const month = mesEscolhido ?? mesCorrente;
   const setMonth = setMesEscolhido;
   const [form, setForm] = useState<FormState | null>(null);
+  const [planejando, setPlanejando] = useState(false);
   const [noControleAberto, setNoControleAberto] = useState(true);
 
   const status = useBudgetsStatus(month, regua.view);
@@ -615,11 +617,16 @@ export default function BudgetsScreen() {
         }}
       />
 
-      <HeaderActions actions={[{ label: 'Novo limite', icon: 'plus', onPress: () => abrirNovo() }]} />
+      <HeaderActions
+        actions={[{ label: 'Novo limite', icon: 'plus', onPress: () => abrirNovo() }]}
+        menu={{ title: 'Orçamentos', actions: [{ label: 'Planejar por percentual', icon: 'percent', onPress: () => setPlanejando(true) }] }}
+      />
 
       <PeriodBar month={month} onChangeMonth={setMonth} ruler={regua} />
 
       {tablet ? tabletBody : compactBody}
+
+      <BudgetPlanSheet visible={planejando} onClose={() => setPlanejando(false)} month={month} monthLabel={nomeDoMes(month)} view={regua.view} />
 
       <Sheet visible={form !== null} onClose={() => setForm(null)}>
 

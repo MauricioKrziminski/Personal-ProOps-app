@@ -37,8 +37,8 @@ Esses fatos e a abertura do formulário ainda não equivalem ao aceite funcional
 | F11 | Alocar/transferir | Aceito; limites no registro | Validado 10/10 | Validado 9/9 |
 | F12 | Aporte/resgate | Aceito; limites no registro | Validado 11/11 | Validado 8/10 |
 | F13 | Resultado/reavaliação | Aceito; correção do mesmo dia só no SQL | Validado 11/11 | Validado 8/8 |
-| F14 | Plano percentual | Próximo incremento, F13 aceito | Não validado | Não validado |
-| F15 | Explicação de mudanças | Aguardando F14 | Não validado | Não validado |
+| F14 | Plano percentual | Aceito; limites no registro | Validado 9/9 | Validado 8/8 |
+| F15 | Explicação de mudanças | Próximo incremento, F14 aceito | Não validado | Não validado |
 | F16 | Voz contextual | Aguardando F15 | Não validado | Não validado |
 | F17 | Ajuda e avisos | Aguardando F16 | Não validado | Não validado |
 | F18 | Transferência recorrente | Aguardando F17 | Não validado | Não validado |
@@ -289,3 +289,11 @@ sem resíduo, contas de QA apagadas por ID. F13 liberado.
 (o resgate no mesmo dia da atualização de valor não descontava, achado no Android), só no
 staging. iOS 11/11 e Android 8/8; oráculo idêntico à linha de base, contas de QA apagadas por ID.
 F14 liberado.
+
+## F14 — plano de orçamento por percentual
+
+[Aceite e limites](f14/aceite.md) e [contrato](f14/contrato.md). Migration
+`20261004170000_budget_plans.sql`, só no staging. iOS 9/9 e Android 8/8; a prévia de "Só o mês"
+passou a mostrar o limite padrão que vale no mês. A suíte SQL inteira achou uma regressão do F04
+no `set_invoice`, corrigida em `20261005110000_set_invoice_guardas_de_volta.sql`. Limites
+restaurados e planos de QA apagados por ID. F15 liberado.

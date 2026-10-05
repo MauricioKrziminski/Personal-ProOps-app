@@ -664,3 +664,9 @@ promete configuração da reserva pelo WhatsApp antes da implementação/avalia�
 | app | agente |
 |---|---|
 | Atualizar valor, informar aplicado (abertura), registrar rendimento recebido e corrigir/apagar uma atualização de uma posição (`investment_value_command`); apagar marcação de um bem (`delete_asset_valuation`) | Lacuna: o agente não atualiza o valor de uma posição nem registra rendimento. `update_asset_value` (bens) segue com a mesma assinatura e passou a respeitar a marcação de data mais recente: reavaliar com data antiga não muda o valor atual. Paridade pendente da etapa final do plano de 22 pontos; nenhuma tool/prompt mudou no F13. |
+
+## Orçamentos: planejar por percentual — F14 (04/10/2026)
+
+| app | agente |
+|---|---|
+| Planejar a renda-base por grupos e categorias em % (`budget_plan_command` save), ver os reais calculados no servidor, comparar planejado × realizado e aplicar aos limites (padrão ou do mês) com antes → depois (`apply`) | Lacuna: o agente não cria nem aplica plano percentual; continua definindo limites por `save_budget`/`edit_budget`. Paridade pendente da etapa final do plano de 22 pontos; nenhuma tool/prompt mudou no F14. |

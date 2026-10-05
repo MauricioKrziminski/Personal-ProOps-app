@@ -432,6 +432,144 @@ export type Database = {
           },
         ]
       }
+      budget_plan_applications: {
+        Row: {
+          applied_cents: number
+          before_cents: number | null
+          category: string
+          created_at: string
+          id: string
+          line_position: number
+          month: string | null
+          plan_id: string
+          scope: string
+          workspace_id: string
+        }
+        Insert: {
+          applied_cents: number
+          before_cents?: number | null
+          category: string
+          created_at?: string
+          id?: string
+          line_position: number
+          month?: string | null
+          plan_id: string
+          scope: string
+          workspace_id: string
+        }
+        Update: {
+          applied_cents?: number
+          before_cents?: number | null
+          category?: string
+          created_at?: string
+          id?: string
+          line_position?: number
+          month?: string | null
+          plan_id?: string
+          scope?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_plan_applications_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "budget_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_plan_applications_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_plan_lines: {
+        Row: {
+          category: string | null
+          group_name: string
+          plan_id: string
+          position: number
+          share_bp: number
+          workspace_id: string
+        }
+        Insert: {
+          category?: string | null
+          group_name: string
+          plan_id: string
+          position: number
+          share_bp: number
+          workspace_id: string
+        }
+        Update: {
+          category?: string | null
+          group_name?: string
+          plan_id?: string
+          position?: number
+          share_bp?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_plan_lines_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "budget_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_plan_lines_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_plans: {
+        Row: {
+          base_income_cents: number
+          created_at: string
+          id: string
+          user_id: string
+          version: number
+          workspace_id: string
+        }
+        Insert: {
+          base_income_cents: number
+          created_at?: string
+          id?: string
+          user_id: string
+          version: number
+          workspace_id: string
+        }
+        Update: {
+          base_income_cents?: number
+          created_at?: string
+          id?: string
+          user_id?: string
+          version?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_plans_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_plans_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budgets: {
         Row: {
           category: string
@@ -3619,6 +3757,15 @@ export type Database = {
       }
       anticipation_candidates: { Args: { p_pay_on?: string }; Returns: Json }
       approve_import_items: { Args: { p_item_ids: string[] }; Returns: number }
+      budget_plan_command: {
+        Args: { p_input: Json; p_request_id: string }
+        Returns: Json
+      }
+      budget_plan_preview: { Args: { p_input: Json }; Returns: Json }
+      budget_plan_state: {
+        Args: { p_month?: string; p_view?: string }
+        Returns: Json
+      }
       budgets_status: {
         Args: { p_view?: string; ref_month?: string }
         Returns: {

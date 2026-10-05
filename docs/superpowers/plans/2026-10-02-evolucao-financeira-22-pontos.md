@@ -222,10 +222,12 @@ Aceite no staging em 05/10/2026: [F13](../../qa/2026-10-02-evolucao-financeira/f
 
 Arquivos: budgets, domínio de plano pessoal e versões, SQL de aplicação aos limites. Interface: renda-base + distribuição inteira → valores em reais e resto explicado.
 
-- [ ] RED: soma/arredondamento e renda nova não alteram histórico.
-- [ ] Implementar plano/operação de aplicação e conflitos com limites atuais.
-- [ ] Integrar edição e comparação com denominadores explícitos.
-- [ ] Provar rollover/mês específico/dados inválidos e gates nativos F14; registrar aceite.
+- [x] RED: soma/arredondamento e renda nova não alteram histórico.
+- [x] Implementar plano/operação de aplicação e conflitos com limites atuais.
+- [x] Integrar edição e comparação com denominadores explícitos.
+- [x] Provar rollover/mês específico/dados inválidos e gates nativos F14; registrar aceite.
+
+Aceite no staging em 05/10/2026: [F14](../../qa/2026-10-02-evolucao-financeira/f14/aceite.md). F15 liberado.
 
 ### F15 — Explicar diferenças
 

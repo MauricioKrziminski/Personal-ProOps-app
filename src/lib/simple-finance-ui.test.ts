@@ -8,6 +8,7 @@ import { prepararLancamento } from './lancamento-write.ts';
 import { calculateGoalContribution } from './goal-contribution.ts';
 
 import { telaPronta } from './tela-pronta.ts';
+import { allocate as allocateF14 } from './budget-plan.ts';
 import { ladosDoArrasto } from './arrasto.ts';
 
 const require = createRequire(import.meta.url);
@@ -59,7 +60,7 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[] } = {}) {
+function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any } = {}) {
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
@@ -467,6 +468,13 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
         useAssetValuations: (id?: string) => ({ ...query, isSuccess: true, data: id ? (options.assetValuations ?? []) : undefined }),
         useDeleteAssetValuation: () => mutation('deleteAssetValuation'),
       };
+      if (name === '@/hooks/use-budget-plan') return {
+        useBudgetPlanState: () => ({ ...query, isSuccess: true, data: options.budgetPlan?.state, refetch: async () => { refetches.push('budget-plan'); } }),
+        useBudgetPlanPreview: (input: any) => ({ ...query, isSuccess: true, data: input && options.budgetPlan?.preview ? options.budgetPlan.preview(input) : undefined }),
+        useBudgetPlanCommand: () => mutation('budgetPlan'),
+      };
+      if (name === '@/components/finance/budget-plan-sheet') return load('src/components/finance/budget-plan-sheet.tsx');
+      if (name === '@/lib/budget-plan') return load('src/lib/budget-plan.ts');
       if (name === '@/components/finance/investments-section') return load('src/components/finance/investments-section.tsx');
       if (name === '@/lib/investment') return load('src/lib/investment.ts');
       if (name === '@/hooks/use-emergency-reserve') return {
@@ -751,7 +759,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
     if (node.type === 'FinanceAnalysisPanes') visit(node.props.compact);
     // `CamposDaSerie` é um grupo de campos sem hook: desenhado aqui, a tela é a que a pessoa vê.
     // Os corpos (`FormularioDaSerie`, `FormularioDaDivida`) têm hooks: eles rodam depois dos da tela, na mesma ordem a cada render.
-    if (typeof node.type === 'function' && ['Controller', 'AccountFormFields', 'CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida', 'TrashEmptyState', 'FilterBar', 'ExpenseClassificationControls', 'EmergencyReserveSection', 'InvestmentsSection', 'EmergencyReserveSheet', 'EmergencyReserveEditor', 'GoalPlanningSummary', 'GoalPlanSheet', 'GoalContributionCaption', 'GoalContributionFields', 'GoalContributionSummary', 'GoalContributionReady', 'GoalContributionHint', 'PlanningResult', 'Qualifications', ...(options.realMoney ? ['Money'] : [])].includes(node.type.name)) visit(node.type(node.props));
+    if (typeof node.type === 'function' && ['Controller', 'AccountFormFields', 'CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida', 'TrashEmptyState', 'FilterBar', 'ExpenseClassificationControls', 'EmergencyReserveSection', 'InvestmentsSection', 'BudgetPlanSheet', 'EmergencyReserveSheet', 'EmergencyReserveEditor', 'GoalPlanningSummary', 'GoalPlanSheet', 'GoalContributionCaption', 'GoalContributionFields', 'GoalContributionSummary', 'GoalContributionReady', 'GoalContributionHint', 'PlanningResult', 'Qualifications', ...(options.realMoney ? ['Money'] : [])].includes(node.type.name)) visit(node.type(node.props));
     if (node.type === 'Field') visit(node.props.hint);
     // No celular o `AdaptivePanes` desenha o slot de uma coluna só (Pastas, Recorrentes…).
     if (node.type === 'AdaptivePanes') visit(node.props.singlePaneContent ?? node.props.main);
@@ -7242,4 +7250,120 @@ test('F13: a folha do bem lista as marcações, apaga com confirmação e não o
   assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'deleteAssetValuation', value: 'm2' });
   const so = abre([duas[0]]);
   assert.equal(deslizaveis(so).some((d: any) => d.props.acoes.some((x: any) => x.label === 'Apagar')), false);
+});
+
+// ── F14: planejar por percentual ─────────────────────────────────────────────
+const f14Estado = (plan: any = null) => ({
+  revision: plan ? 1 : 0, month: '2026-09-01', period_start: '2026-09-01', period_end: '2026-09-30', income_cents: 500000, applications: [], plan,
+});
+const f14Plano = {
+  version: 1, base_income_cents: 1000000, total_bp: 4500, total_cents: 450000, undistributed_bp: 5500, undistributed_cents: 550000,
+  lines: [
+    { position: 0, group: 'Essenciais', category: 'moradia', share_bp: 3000, amount_cents: 300000, current_default_cents: 250000, current_month_cents: null, spent_cents: 120000 },
+    { position: 1, group: 'Essenciais', category: 'mercado', share_bp: 1500, amount_cents: 150000, current_default_cents: null, current_month_cents: null, spent_cents: 0 },
+  ],
+};
+// o "servidor" da prévia: a mesma aritmética, devolvida no formato do banco
+const f14Previa = (input: any) => {
+  const a = allocateF14(Number(input.base_income_cents), input.lines.map((l: any) => l.share_bp));
+  return { ok: true, errors: [], lines: input.lines.map((l: any, i: number) => ({ position: i, ...l, amount_cents: a.amounts[i] })),
+    total_bp: a.totalBp, total_cents: a.totalCents, undistributed_bp: a.undistributedBp, undistributed_cents: a.undistributedCents };
+};
+const f14Abrir = (plan: any = null, extra: Record<string, unknown> = {}) => {
+  const ui = screen('src/app/finance/budgets.tsx', { budgetPlan: { state: f14Estado(plan), preview: f14Previa }, ...extra });
+  const menu = ui.nodes().find((n: any) => n.type === 'HeaderActions').props.menu.actions;
+  ui.interact(() => menu.find((a: any) => a.label === 'Planejar por percentual').onPress());
+  return ui;
+};
+const f14Botao = (ui: any, label: string) => ui.nodes().filter((n: any) => n.type === 'Button' && n.props.label === label).at(-1);
+const f14Percentuais = (ui: any) => ui.nodes().filter((n: any) => n.type === 'TextField' && String(n.props.accessibilityLabel).startsWith('Percentual de'));
+const f14Seletores = (ui: any) => ui.nodes().filter((n: any) => n.type === 'CategoryPicker' || n.type?.name === 'CategoryPicker');
+const f14Texto = (ui: any, re: RegExp) => ui.nodes().some((n: any) => n.type === 'ThemedText' && re.test(String(n.props.children)));
+
+test('F14: Planejar por percentual fica no menu de Orçamentos e abre o editor com a renda-base primeiro', () => {
+  const ui = f14Abrir();
+  const campos = ui.nodes().filter((n: any) => n.type === 'Field').map((n: any) => n.props.label);
+  assert.deepEqual(campos.slice(0, 3), ['Renda-base', 'Grupo', 'Categoria']);
+  assert.ok(f14Texto(ui, /Entrou R\$ 5000.00 em .* \(lançado, inclui previsto\)/), 'o denominador dito em palavras');
+});
+
+test('F14: formulário incompleto não grava nada e o Salvar fica desligado', () => {
+  const ui = f14Abrir();
+  assert.equal(f14Botao(ui, 'Salvar plano').props.disabled, true);
+  assert.ok(f14Texto(ui, /Informe uma renda-base maior que zero/));
+  ui.interact(() => f14Botao(ui, 'Salvar plano').props.onPress());
+  assert.deepEqual(ui.writes, []);
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(100000));
+  assert.equal(f14Botao(ui, 'Salvar plano').props.disabled, true, 'sem percentuais ainda não grava');
+  assert.deepEqual(ui.writes, []);
+});
+
+test('F14: 100,01% bloqueia o salvar com o motivo escrito', () => {
+  const ui = f14Abrir();
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(100000));
+  ['50', '50', '0,01'].forEach((pct, i) => ui.interact(() => f14Percentuais(ui)[i].props.onChangeText(pct)));
+  assert.equal(f14Botao(ui, 'Salvar plano').props.disabled, true);
+  assert.ok(f14Texto(ui, /A soma dos percentuais é 100,01%: passa de 100%/));
+  ui.interact(() => f14Botao(ui, 'Salvar plano').props.onPress());
+  assert.deepEqual(ui.writes, []);
+});
+
+test('F14: a mesma categoria em duas linhas bloqueia o salvar', () => {
+  const ui = f14Abrir();
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(100000));
+  ['10', '10', '10'].forEach((pct, i) => ui.interact(() => f14Percentuais(ui)[i].props.onChangeText(pct)));
+  ui.interact(() => f14Seletores(ui)[0].props.onChange('Mercado'));
+  ui.interact(() => f14Seletores(ui)[1].props.onChange('mercado'));
+  assert.equal(f14Botao(ui, 'Salvar plano').props.disabled, true);
+  assert.ok(f14Texto(ui, /A categoria mercado aparece em mais de uma linha/));
+  assert.deepEqual(ui.writes, []);
+});
+
+test('F14: plano válido grava save com a revisão, os percentuais em pontos-base e mostra os reais do servidor', () => {
+  const ui = f14Abrir();
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(100100));
+  ['33,33', '33,33', '33,34'].forEach((pct, i) => ui.interact(() => f14Percentuais(ui)[i].props.onChangeText(pct)));
+  assert.equal(f14Botao(ui, 'Salvar plano').props.disabled, false);
+  assert.ok(f14Texto(ui, /= R\$ 333.74 por mês/), 'o centavo que sobra vai à linha de maior resto');
+  assert.ok(f14Texto(ui, /= R\$ 333.63 por mês/));
+  assert.ok(f14Texto(ui, /Distribuído 100% da renda-base: R\$ 1001.00/));
+  assert.ok(f14Texto(ui, /Não distribuído: 0% \(R\$ 0.00\)/));
+  ui.interact(() => f14Botao(ui, 'Salvar plano').props.onPress());
+  const w = ui.writes.at(-1);
+  assert.equal(w.operation, 'budgetPlan');
+  assert.equal(w.value.op, 'save');
+  assert.equal(w.value.expected_revision, 0);
+  assert.equal(w.value.base_income_cents, '100100');
+  assert.deepEqual(copia(w.value.lines.map((l: any) => l.share_bp)), [3333, 3333, 3334]);
+});
+
+test('F14: aplicar lista antes → depois por categoria, marca o conflito e só manda o que está marcado', () => {
+  const ui = f14Abrir(f14Plano);
+  ui.interact(() => f14Botao(ui, 'Aplicar aos orçamentos').props.onPress());
+  assert.ok(f14Texto(ui, /moradia: R\$ 2500.00 → R\$ 3000.00/));
+  assert.ok(f14Texto(ui, /mercado: sem limite → R\$ 1500.00/));
+  assert.ok(f14Texto(ui, /Já tem limite de R\$ 2500.00 para todo mês/), 'conflito marcado');
+  const interruptores = ui.nodes().filter((n: any) => n.type === 'SwitchRow');
+  ui.interact(() => interruptores[1].props.onValueChange(false));
+  ui.interact(() => f14Botao(ui, 'Aplicar').props.onPress());
+  assert.deepEqual(copia(ui.writes.at(-1).value), { op: 'apply', version: 1, categories: ['moradia'], scope: 'default', month: null });
+});
+
+test('F14: aplicar só no mês manda o mês e o alcance tem no máximo quatro opções', () => {
+  const ui = f14Abrir(f14Plano);
+  ui.interact(() => f14Botao(ui, 'Aplicar aos orçamentos').props.onPress());
+  const alcance = ui.nodes().find((n: any) => n.type === 'Segmented');
+  assert.ok(alcance.props.options.length <= 4);
+  ui.interact(() => alcance.props.onChange('month'));
+  ui.interact(() => f14Botao(ui, 'Aplicar').props.onPress());
+  const v = ui.writes.at(-1).value;
+  assert.equal(v.scope, 'month');
+  assert.match(v.month, /^\d{4}-\d{2}-01$/);
+});
+
+test('F14: com valores ocultos a sugestão de renda não mostra dinheiro', () => {
+  const ui = f14Abrir(null, { concealed: true });
+  const linha = ui.nodes().find((n: any) => n.type === 'ThemedText' && /Entrou/.test(String(n.props.children)));
+  assert.ok(linha);
+  assert.match(String(linha.props.children), /Entrou •{6} em /);
 });
