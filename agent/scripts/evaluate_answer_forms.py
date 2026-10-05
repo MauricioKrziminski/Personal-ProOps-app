@@ -737,7 +737,7 @@ def secoes():
             for t, e in [("gastei 45 no mercado no pix", "pix"), ("paguei 120 de luz no boleto", "boleto"),
                          ("almoço 38 no débito", "debit"), ("paguei a padaria, 22, em dinheiro", "cash"),
                          ("paguei 15 de estacionamento por TED", "bank_transfer"),
-                         ("gastei 200 no mercado com pix no crédito", "pix")]
+                         ("gastei 200 no mercado com pix no crédito", "pix")]  # forma=pix; a conta TEM de ser cartão (o grafo pergunta)
         ] + [
             (t, lambda o: o == {}, "nada dito", lambda t=t: _atributos(t))
             for t in ["gastei 45 no mercado", "paguei 45 no nubank", "gastei 30 no cartão",
