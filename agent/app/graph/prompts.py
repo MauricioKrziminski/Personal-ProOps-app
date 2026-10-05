@@ -220,7 +220,8 @@ Tipos:
   resolve o alvo e mostra as opções reais. Preencher com a palavra faz buscar
   literalmente por ela, e não acha nada.
 - undo_last: "apaga o último", "foi engano" SEM valor novo ("foi engano, era 54" é correção).
-- create_goal: meta de poupança. target_ref = nome, amount_cents = alvo.
+- create_goal: meta de poupança. target_ref = nome, amount_cents = alvo EM CENTAVOS, occurred_at = prazo (YYYY-MM-DD)
+  quando dito. "quero juntar 10 mil até dezembro de 2027" -> create_goal, amount_cents=1000000, occurred_at="2027-12-31".
 - goal_deposit: aporte numa meta existente. target_ref = nome da meta. Se disser DE QUAL CONTA o dinheiro está
   ("separei 300 da nubank pra viagem", "guardei 300 na viagem, da nubank"), account = essa conta: o dinheiro
   fica na conta e só é reservado. Se disser que MOVEU o dinheiro de uma conta para a conta da meta
@@ -230,6 +231,9 @@ Tipos:
   "guardei 500 na meta viagem, tirei da conta nubank" -> UMA ação goal_deposit, target_ref="viagem", account="nubank".
   "transferi 300 da corrente pra poupança e guardei na meta viagem" -> UMA ação goal_deposit (NÃO create_transfer
   mais goal_deposit), target_ref="viagem", account="corrente", counterparty_account="poupança".
+  O VALOR fica SEMPRE em amount_cents, também quando duas contas são citadas:
+  "passei 500 da nubank para a conta poupança que guarda a meta viagem" -> goal_deposit, target_ref="viagem",
+  amount_cents=50000, account="nubank", counterparty_account="poupança".
   "guardei 200 na meta viagem" -> goal_deposit sem account.
 - update_asset_value: valor novo de um bem/investimento. target_ref = nome.
 - unknown: não é registro nem correção financeira.
@@ -280,7 +284,8 @@ Tipos:
   senão o mês financeiro atual) com o período anterior e mostra as categorias que mais explicam. É a pergunta da DIFERENÇA entre dois
   períodos; "quanto gastei esse mês?" (um valor só) continua sendo query_transactions.
 - query_budgets: "como tá meu orçamento?".
-- query_goals: "como tão minhas metas?".
+- query_goals: "como tão minhas metas?". Meta citada pelo nome (inclusive "qual o próximo marco da viagem?",
+  "quanto falta pro próximo marco da meta viagem?") -> search_term = o nome ("viagem").
 - query_invoice: "quanto tá a fatura?", "quanto sobrou de limite no nubank".
   account = o cartão citado.
 - query_cycle: o MÊS FINANCEIRO do usuário — "qual é o meu ciclo?", "quando fecha o meu mês?",
