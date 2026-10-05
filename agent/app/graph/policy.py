@@ -687,7 +687,8 @@ def describe_for_confirmation(
             n = action.installments or 0
             cada = (f" de {cents_to_brl(action.amount_cents // n)}"
                     if n and action.amount_cents and action.amount_cents % n == 0 else "")
-            return f"registrar {valor}{nome} em {action.installments}x{cada} no cartão {action.account or 'a informar'}: {paid} parcelas iniciais pagas e {(action.installments or 0)-paid} pendentes"
+            entendido = f" ({frase})" if (frase := ((target or {}).get("atributos") or {}).get("frase")) else ""
+            return f"registrar {valor}{nome} em {action.installments}x{cada} no cartão {action.account or 'a informar'}{entendido}: {paid} parcelas iniciais pagas e {(action.installments or 0)-paid} pendentes"
         if tipo == "pay_invoice":
             # com valor a frase precisa dizer QUANTO: pagamento parcial e quitação são efeitos
             # diferentes, e confirmar "o pagamento da fatura" não distingue os dois
@@ -731,9 +732,11 @@ def describe_for_confirmation(
                      and action.description.strip().casefold() != action.category.strip().casefold()
                      else "")
         repete = f", repete {descreve_rrule(action.recurrence)}" if action.recurrence else ""
+        # o que a segunda leitura entendeu (forma, fixo/variável, essencial, detalhe — lote C)
+        entendido = f", {frase}" if (frase := ((target or {}).get("atributos") or {}).get("frase")) else ""
         if valor:
-            return f"registrar {o_que}{valor} em {alvo}{quando}{categoria}{onde}{repete}"
-        return f"registrar {alvo}{quando}{categoria}{onde}{repete}"
+            return f"registrar {o_que}{valor} em {alvo}{quando}{categoria}{onde}{entendido}{repete}"
+        return f"registrar {alvo}{quando}{categoria}{onde}{entendido}{repete}"
 
     alvo = action.search_term or action.content or "esse item"
     if tipo == "delete_note":

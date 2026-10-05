@@ -89,6 +89,15 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
 - Objeto flat, sem `anyOf`/union (o structured output do Gemini lida mal). Multi-intent continua:
   uma ação por item da mensagem, máx. 10, e o router devolve LISTA de domínios para
   "gastei 45 e me lembra do aluguel" não perder metade.
+- **Uma segunda leitura existe, e só na ESCRITA de lançamento novo** (lote C, 05/10/2026):
+  `tools/atributos.congelar`, chamada de `resolve_node`, com schema próprio `AtributosLote`
+  (forma de pagamento, fixo/variável, essencial, detalhe — todos nullable), papel `parse`
+  (Flash-Lite), UMA chamada por turno para o lote inteiro. Existe porque `FinanceAction` está no
+  teto de 252 e não ganha campo. O que o modelo propõe só vale se a frase sustenta (ancoragem em
+  `domain/atributos`: um Pix que a frase não disse é descartado), falha/429/timeout (25 s) lança
+  SEM atributos e conta em `llm_calls` só quando respondeu. Não roda em consulta, transferência,
+  pagar fatura nem correção. Sonda: `scripts/probe_atributos_lote_c.py`; seções `loteC/*` do
+  `evaluate_answer_forms.py`. Os testes não chamam o Gemini (`tests/conftest.py` derruba a leitura).
 - Sem segunda chamada de LLM para formatar resposta de consulta — a saída do WhatsApp é template
   Python puro (`cents_to_brl`). Um modelo escrevendo "você gastou aproximadamente" em cima de um
   valor exato é alucinação com custo extra.

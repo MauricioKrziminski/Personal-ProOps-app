@@ -170,6 +170,26 @@ class FinancePlan(BaseModel):
         return actions
 
 
+class AtributosItem(BaseModel):
+    """Os atributos de UM lançamento novo (lote C: forma, classificação e detalhe).
+
+    Schema próprio e pequeno, numa SEGUNDA chamada: `FinanceAction` está no teto medido de 252 e não
+    ganha campo. Tudo é texto e é validado em Python (`tools/atributos.py`); null é o valor normal.
+    """
+
+    indice: int = Field(description="O número do lançamento na lista recebida.")
+    payment_method: str | None = Field(
+        None, description="pix, credit, debit, cash, bank_transfer ou boleto — SÓ se a frase diz como pagou.")
+    expense_pattern: str | None = Field(None, description="fixed ou variable — SÓ se a frase diz fixo/variável.")
+    expense_necessity: str | None = Field(
+        None, description="essential ou discretionary — SÓ se a frase diz essencial/supérfluo.")
+    detalhe: str | None = Field(None, description="Nome do detalhe (subcategoria) que a frase cita.")
+
+
+class AtributosLote(BaseModel):
+    itens: list[AtributosItem] = Field(default_factory=list)
+
+
 class FinanceQueryType(str, Enum):
     QUERY_BALANCE = "query_balance"
     QUERY_TRANSACTIONS = "query_transactions"

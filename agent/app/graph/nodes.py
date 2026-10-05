@@ -39,7 +39,7 @@ from app.graph.schemas import (
 from app.domain.required import faltando
 from app.domain.money import cents_to_brl
 from app.graph.state import AgentState
-from app.tools import guards, movimentos, resolve
+from app.tools import atributos, guards, movimentos, resolve
 from app.services import gemini
 from app.tools.base import ExecContext
 from app.tools.finance import apply_rules
@@ -670,8 +670,13 @@ async def resolve_node(state: AgentState) -> dict:
         acoes, alvos, pular=set(_incompletas(state, acoes)),
     )
 
+    # forma de pagamento, fixo/variável, essencial e detalhe DITOS na frase (lote C): segunda leitura,
+    # que nunca bloqueia o lançamento quando falha
+    alvos, chamadas = await atributos.congelar(
+        state["workspace_id"], state.get("text", ""), acoes, alvos, pular=set(_incompletas(state, acoes)))
+
     return {"targets": with_resources(alvos), "results": esclarecimentos,
-            "draft": _rascunho(state, acoes, alvos)}
+            "draft": _rascunho(state, acoes, alvos), **({"llm_calls": chamadas} if chamadas else {})}
 
 
 def _incompletas(state: AgentState, acoes: list) -> dict[int, str]:

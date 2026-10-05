@@ -15,8 +15,7 @@ from uuid import UUID
 import psycopg
 
 from app import db
-from app.domain import matching
-from app.tools import movimentos
+from app.tools import atributos, movimentos
 from app.domain.dates import format_date_br, now_utc, to_instant, local_iso_date, tz
 from app.domain.money import cents_to_brl, MAX_CENTS
 from app.domain.recurrence import descreve_rrule, next_occurrence
@@ -1568,25 +1567,10 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             if not parent:
                 _error("Para escolher o detalhe, preciso saber a categoria dele. Qual é? Nada foi alterado.")
             dito = values["subcategory_id"]
-            filhas = await db.fetch(
-                "select id, name from public.subcategories where workspace_id = %s "
-                "and parent_key = private.fold(%s) order by name",
-                ctx.workspace_id, parent,
-            )
-            chave = matching.normalize(dito)
-            achadas = [f for f in filhas if matching.normalize(f["name"]) == chave] or [
-                f for f in filhas if chave in matching.normalize(f["name"])
-            ]
-            if len(achadas) != 1:
-                nomes = ", ".join(f["name"] for f in (achadas or filhas)[:8])
-                _error(
-                    (f"*{dito}* casa com mais de um detalhe de {parent}: {nomes}. Qual deles?"
-                     if achadas else
-                     (f"Não achei o detalhe *{dito}* em {parent}. Tenho: {nomes}. Qual é?" if filhas else
-                      f"A categoria {parent} ainda não tem detalhes cadastrados; crie no app."))
-                    + " Nada foi alterado."
-                )
-            values["subcategory_id"] = str(achadas[0]["id"])
+            achada, pergunta = await atributos.escolher_detalhe(ctx.workspace_id, parent, dito)
+            if pergunta:
+                _error(pergunta + " Nada foi alterado.")
+            values["subcategory_id"] = str(achada["id"])
         if values["subcategory_id"] is not None:
             details = await db.fetch(
                 "select id,name from public.subcategories where id=%s and workspace_id=%s "
