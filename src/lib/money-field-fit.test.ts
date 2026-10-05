@@ -143,3 +143,11 @@ test('invalid and zero geometry never produces a nonfinite font size', () => {
   assert.equal(fitMoneyFieldScale(3.12, 4, 100, 4, 3), 0);
   assert.equal(fitMoneyFieldScale(1, 200, NaN, 4, 3), 1);
 });
+
+test('a casa do odômetro assenta no estilo final escrito pelo React (o 1º dígito sumia no Android)', () => {
+  const src = readFileSync('src/components/ui/field.tsx', 'utf8');
+  const digito = src.slice(src.indexOf('function Digito('), src.indexOf('export function MoneyField'));
+  assert.match(digito, /setAssentado\(true\)/, 'passada a animação o repouso é decidido pelo React');
+  assert.match(digito, /assentado[^\n]*\? REPOUSO : entra/, 'assentada, a casa não lê mais o estilo animado');
+  assert.match(src, /REPOUSO = \{ opacity: 1, transform: \[\{ translateY: 0 \}\] \}/);
+});

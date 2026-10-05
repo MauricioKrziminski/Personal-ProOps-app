@@ -336,6 +336,7 @@ interface MoneyFieldProps {
  */
 const direcao = makeMutable(1);
 const ROLA = 0.62;
+const REPOUSO = { opacity: 1, transform: [{ translateY: 0 }] };
 
 /**
  * Uma casa do odômetro: o dígito que sai e o que entra, trocados por `transform`.
@@ -349,10 +350,12 @@ function Digito({ ch, cor, animar, fontScale }: { ch: string; cor: string; anima
   const reduzido = useReducedMotion();
   const [atual, setAtual] = useState(ch);
   const [antigo, setAntigo] = useState<string | null>(animar ? '' : null);
+  const [assentado, setAssentado] = useState(!animar);
   // Estado derivado da prop, ajustado no render (o padrão do React para "valor anterior").
   if (ch !== atual) {
     setAntigo(atual);
     setAtual(ch);
+    setAssentado(false);
   }
   const t = useSharedValue(animar && !reduzido ? 0 : 1);
   useEffect(() => {
@@ -362,6 +365,11 @@ function Digito({ ch, cor, animar, fontScale }: { ch: string; cor: string; anima
     }
     t.set(0);
     t.set(withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) }));
+    // O repouso é escrito pelo React: no Android um re-render depois da animação (a cor
+    // trocando com `readOnly`) devolvia a casa ao estilo animado já perdido — o primeiro
+    // dígito sumia. Passado o tempo, o estilo final é explícito e não depende do Reanimated.
+    const fim = setTimeout(() => setAssentado(true), 300);
+    return () => clearTimeout(fim);
   }, [atual, antigo, reduzido, t]);
 
   // Todas as casas usam a mesma escala que cabe na faixa; a rolagem anda essa altura.
@@ -388,8 +396,8 @@ function Digito({ ch, cor, animar, fontScale }: { ch: string; cor: string; anima
         Com uma terceira camada invisível só para medir, o Android desenhava as duas deslocadas —
         "0,00" dobrado logo no primeiro quadro.
       */}
-      <Animated.Text allowFontScaling={false} style={[estilo, entra]}>{atual}</Animated.Text>
-      {antigo ? (
+      <Animated.Text allowFontScaling={false} style={[estilo, assentado || reduzido ? REPOUSO : entra]}>{atual}</Animated.Text>
+      {antigo && !assentado && !reduzido ? (
         <Animated.Text allowFontScaling={false} style={[estilo, styles.sobre, sai]}>{antigo}</Animated.Text>
       ) : null}
     </View>
