@@ -334,6 +334,18 @@ export function FormularioDoLancamento(props: Props) {
     yesterday: isoToBR(localISODate(new Date(Date.now() - 86_400_000))),
   }));
 
+  /*
+    Cópia, favorito ou rascunho que traz uma conta que deixou de existir ou foi arquivada: o campo
+    fica VAZIO com o aviso (contrato do F22), em vez de guardar o id escondido — o seletor mostrava
+    "Sem conta" e o Salvar seguia travado por uma conta que a pessoa nem via (05/10/2026). Editando
+    um lançamento, a conta arquivada dele vem na lista e nada muda.
+  */
+  const [contaTrazida] = useState(() => getValues('account_id'));
+  const contaSaiu = !editing && Boolean(contaTrazida) && !contas.isPending && !contas.isError
+    && !(accounts ?? []).some((a) => a.id === contaTrazida);
+  useEffect(() => {
+    if (contaSaiu && getValues('account_id') === contaTrazida) setValue('account_id', null);
+  }, [contaSaiu, contaTrazida, getValues, setValue]);
   const account = (accounts ?? []).find((a) => a.id === accountId);
   const isCard = account?.type === 'credit_card';
   const erroPagamento = paymentMethodError(paymentMethod, account ?? null)
@@ -1306,7 +1318,8 @@ export function FormularioDoLancamento(props: Props) {
               // Sem a fileira de parcelas (sem conta ou fora de gasto), o erro dela mora aqui:
               // senão o Salvar recusava sem dizer por quê.
               error={contas.isError ? 'Não deu para carregar as contas.' : !podeParcelarAqui ? errors.installments?.message : undefined}
-              hint={erroPagamento && account ? `Conta escolhida: ${account.name}. Escolha uma conta compatível ou mude a forma de pagamento.` : undefined}>
+              hint={erroPagamento && account ? `Conta escolhida: ${account.name}. Escolha uma conta compatível ou mude a forma de pagamento.`
+                : contaSaiu && !accountId ? 'A conta original não está mais ativa: escolha outra.' : undefined}>
               {/* Afirmar "não tem conta" exige a consulta respondida: carregando, era o
                   "Cadastrar uma conta" que aparecia para quem tem contas. */}
               {contas.isPending ? (

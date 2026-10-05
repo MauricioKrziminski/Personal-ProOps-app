@@ -16,8 +16,8 @@
  * mesma onda da abertura.
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Keyboard, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -32,8 +32,9 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FullWindowOverlay } from 'react-native-screens';
 
-import { useCortinaSaindo } from '@/components/motion/session-curtain';
+import { useCortinaAberta, useCortinaSaindo } from '@/components/motion/session-curtain';
 import { WaveCurtain } from '@/components/motion/wave-curtain';
 import { ThemedText } from '@/components/themed-text';
 import { Mark } from '@/components/ui/mark';
@@ -57,8 +58,48 @@ export function LockOverlay() {
   const [montada, setMontada] = useState(locked);
   if (locked && !montada) setMontada(true);
   const aoSair = useCallback(() => setMontada(false), []);
-  if (montada) return <Cortina saindo={!locked} onSaiu={aoSair} />;
-  return velado ? <Veu /> : null;
+  const conteudo = montada ? <Cortina saindo={!locked} onSaiu={aoSair} /> : velado ? <Veu /> : null;
+  // Véu e cortina dividem UMA casca: trocar um pelo outro não fecha e reabre a janela.
+  return conteudo ? <JanelaDaTrava>{conteudo}</JanelaDaTrava> : null;
+}
+
+const TODAS_AS_ORIENTACOES = ['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right'] as const;
+
+/**
+ * Formulário modal e folha são janelas nativas ACIMA da raiz: desenhada só na raiz, a trava
+ * ficava por baixo do lançamento aberto para editar (05/10/2026, *"o modal fica por cima da tela
+ * de bloqueio do app"*). Com o app já revelado ela mesma vira janela (`Modal`; no iOS a camada da
+ * `UIWindow`), que o sistema
+ * empilha por cima de tudo que estiver aberto. Na abertura a cortina da marca cobre a tela e não
+ * há modal: ali a trava segue na raiz, por baixo da cortina (900 < 1000), como sempre foi.
+ * A escolha é feita ao montar e não muda enquanto a trava existe — trocar de casca remontaria.
+ */
+function JanelaDaTrava({ children }: { children: ReactNode }) {
+  const appRevelado = useCortinaAberta();
+  const [emJanela] = useState(appRevelado);
+  // O teclado é outra janela, acima de qualquer uma: aberto, ele digitaria no formulário escondido.
+  useEffect(() => {
+    if (emJanela) Keyboard.dismiss();
+  }, [emJanela]);
+  if (!emJanela) return <>{children}</>;
+  // No iOS o `Modal` é apresentado pelo controlador da raiz, que já está apresentando o formulário:
+  // a apresentação falha em silêncio e a trava não aparece (visto no iPhone, 05/10/2026). A
+  // `FullWindowOverlay` entra direto na `UIWindow`, acima de tudo que já foi apresentado.
+  if (Platform.OS === 'ios') {
+    return <FullWindowOverlay unstable_accessibilityContainerViewIsModal>{children}</FullWindowOverlay>;
+  }
+  return (
+    <Modal
+      visible
+      transparent
+      animationType="none"
+      presentationStyle="overFullScreen"
+      supportedOrientations={[...TODAS_AS_ORIENTACOES]}
+      // Voltar do Android não destrava: a saída é autenticar.
+      onRequestClose={() => {}}>
+      {children}
+    </Modal>
+  );
 }
 
 /**

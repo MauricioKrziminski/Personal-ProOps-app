@@ -105,13 +105,18 @@ export function Row({
   // Se duas colunas com o piso tipográfico não cabem, o extrato dá a linha inteira ao valor.
   // Largura explícita impede o ajuste de fonte durante uma medida estreita ao lado do título.
   const valorEmLinhaInteira = inlineValue && pisoDoTitulo.minWidth * 2 > larguraUtil - (icon ? styles.iconChip.width + Space.md : 0);
+  // No iPhone o texto que encolheu (`adjustsFontSizeToFit`) numa medida estreita NUNCA volta a
+  // crescer — nem com a linha mais larga, nem desligando o ajuste: o "−R$ 1.202,67" do
+  // Fundacred ficou ilegível numa busca (05/10/2026). Por isso: nada encolhe antes de a linha ser
+  // MEDIDA, e o valor remonta quando o modo ou a largura mudam, zerando a escala nativa.
+  const encolhe = larguraDaLinha > 0 && (!inlineValue || valorEmLinhaInteira);
   const valor =
     trailing || (chevron ?? !!onPress) ? (
       <View style={[styles.trailing, valorEmLinhaInteira && { width: larguraUtil }]}>
-        {trailing ? <View style={styles.valor}>
+        {trailing ? <View key={encolhe ? `e${Math.round(larguraUtil)}` : 'n'} style={styles.valor}>
           {/* Ajuste na coluna fixa, ou sobre a linha inteira reservada ao valor. O extrato
               normal quebra sem ajustar na medida transitória ao lado do título. */}
-          <DinheiroEncolhe.Provider value={!inlineValue || valorEmLinhaInteira}>{trailing}</DinheiroEncolhe.Provider>
+          <DinheiroEncolhe.Provider value={encolhe}>{trailing}</DinheiroEncolhe.Provider>
         </View> : null}
         {(chevron ?? !!onPress) ? (
           <Icon name="chevron.right" size="sm" color="textSecondary" />

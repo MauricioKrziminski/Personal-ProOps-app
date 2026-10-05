@@ -2557,6 +2557,9 @@ test('Row: extrato deixa dinheiro quebrar de linha sem herdar ajuste de fonte do
       title: 'QA F04 IOS Pix 20261002', inlineValue,
       trailing: { type: 'Money', props: { cents: -1235 } },
     } });
+    assert.equal(ui.nodes().find(n => n.type === 'DinheiroEncolhe.Provider').props.value, false, 'nada encolhe antes de a linha ser medida');
+    const row = ui.nodes().find(n => n.type === 'View' && n.props.onLayout);
+    ui.interact(() => row.props.onLayout({ nativeEvent: { layout: { width: 370 } } }));
     const context = ui.nodes().find(n => n.type === 'DinheiroEncolhe.Provider');
     assert.ok(context, 'testar a fronteira real entre Row e Money, além dos props da tela');
     assert.equal(context.props.value, !inlineValue, 'somente a coluna fixa opta pelo ajuste; o extrato usa a linha seguinte');
@@ -2569,6 +2572,8 @@ test('Row: fonte de acessibilidade reserva uma linha completa antes de ajustar d
     title: 'Extrato com valor grande', inlineValue: true, icon: 'banknote', chevron: true,
     trailing: { type: 'Money', props: { cents: -99999999999 } },
   } });
+  const row = ui.nodes().find(n => n.type === 'View' && n.props.onLayout);
+  ui.interact(() => row.props.onLayout({ nativeEvent: { layout: { width: 402 } } }));
   const context = ui.nodes().find(n => n.type === 'DinheiroEncolhe.Provider');
   assert.equal(context.props.value, true, 'o ajuste só pode ocorrer sobre a linha inteira');
   const value = ui.nodes().find(n => n.type === 'View' && n.props.style?.some?.((s: any) => typeof s?.width === 'number' && s.width > 200));
@@ -7700,4 +7705,41 @@ test('F22: Salvar como favorito pede o nome e grava o modelo, não um lançament
   assert.equal(ui.writes[0].value.name, 'Café da manhã');
   assert.equal(ui.writes[0].value.modelo.amount_cents, 1500);
   assert.ok(!('occurred_at' in ui.writes[0].value.modelo) && !('invoice_id' in ui.writes[0].value.modelo), 'o modelo não leva data nem vínculo');
+});
+
+test('Row: no iPhone o valor que encolheu numa medida estreita remonta ao mudar a largura (05/10/2026)', () => {
+  // "−R$ 1.202,67" do Fundacred ficou minúsculo numa busca: `adjustsFontSizeToFit` encolhido numa
+  // passada estreita não volta a crescer. A fronteira remonta o valor (key) quando o modo ou a
+  // largura mudam, e não encolhe nada antes da primeira medida.
+  const ui = screen('src/components/ui/row.tsx', { componente: 'Row', fontScale: 3.12, props: {
+    title: 'Fundacred', subtitle: 'contas · Nubank Conta', inlineValue: true, chevron: true,
+    trailing: { type: 'Money', props: { cents: -120267 } },
+  } });
+  const chave = () => ui.nodes().find(n => n.type === 'View' && n.props.children?.type === 'DinheiroEncolhe.Provider')?.key;
+  const valor = () => ui.nodes().find(n => n.type === 'DinheiroEncolhe.Provider').props.value;
+  assert.equal(valor(), false, 'antes da medida, sem ajuste de fonte');
+  const medir = (width: number) => {
+    const row = ui.nodes().find(n => n.type === 'View' && n.props.onLayout);
+    ui.interact(() => row.props.onLayout({ nativeEvent: { layout: { width } } }));
+  };
+  medir(120);
+  const estreita = chave();
+  assert.equal(valor(), true);
+  medir(402);
+  assert.notEqual(chave(), estreita, 'a largura nova remonta o valor e zera a escala nativa');
+});
+
+test('F22: favorito ou cópia com a conta arquivada abre com o campo vazio, o aviso e o Salvar livre (05/10/2026)', () => {
+  // QA iOS: o seletor mostrava "Sem conta" e o Salvar seguia travado pelo id escondido da conta
+  // arquivada ("Esta conta não está disponível"), até a pessoa escolher a conta de novo.
+  const ui = screen('src/components/finance/formulario-do-lancamento.tsx', { componente: 'FormularioDoLancamento', executarEfeitos: true,
+    forecastAccounts: [{ id: 'ativa', name: 'Nubank Conta', type: 'checking' }],
+    props: { comum: { kind: 'expense', descricao: 'Café', valorCents: 1500, contaId: 'arquivada', dataBR: '05/10/2026', categoria: 'alimentação' },
+      registrarComum() {}, registrarEstado() {}, onSalvo() {}, onFechar() {} } });
+  ui.interact(() => {});
+  const campo = ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Conta');
+  assert.equal(campo.props.hint, 'A conta original não está mais ativa: escolha outra.');
+  assert.equal(ui.nodes().find((n: any) => n.type === 'PaymentMethodField')?.props.error, undefined, 'a conta que saiu não vira erro escondido');
+  const salvar = ui.nodes().find((n: any) => n.type === 'Button' && n.props.label === 'Salvar');
+  assert.notEqual(salvar?.props.disabled, true, 'o Salvar não fica preso a uma conta que a pessoa não vê');
 });

@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 
 // Commit effects after stable renders; neither springs nor native layout finish automatically.
 // Component-local hooks and provider context exercise the real nested presence lifetimes.
-function montar(file: string, name: string, initial: any, config: { reduzir: boolean; ativo: boolean; fontScale?: number; width?: number; height?: number; platform?: string; focused?: boolean; insets?: { top: number; bottom: number; left: number; right: number }; lock?: any; creation?: any; preventRemove?: any; toasts?: any[]; finance?: any; conceal?: any; preview?: any; moneyCalls?: number[] } = { reduzir: false, ativo: true }) {
+function montar(file: string, name: string, initial: any, config: { reduzir: boolean; ativo: boolean; fontScale?: number; width?: number; height?: number; platform?: string; focused?: boolean; insets?: { top: number; bottom: number; left: number; right: number }; lock?: any; aberta?: boolean; teclado?: number; creation?: any; preventRemove?: any; toasts?: any[]; finance?: any; conceal?: any; preview?: any; moneyCalls?: number[] } = { reduzir: false, ativo: true }) {
   type Instance = { slots: any[]; cursor: number; mounted: boolean; restart: boolean };
   type Animation = { shared: any; done?: (ok: boolean) => void; target: number; from: number; kind: 'spring' | 'timing'; settings: any; canceled: boolean };
   const instances = new Map<string, Instance>();
@@ -148,7 +148,8 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === '@/lib/account-form') return load('src/lib/account-form.ts');
       if (id.startsWith('./') && path.startsWith('src/lib/')) return load(`src/lib/${id.slice(2)}`);
       if (id === 'react/jsx-runtime') return require(id);
-      if (id === 'react-native') return { Modal: 'Modal', ScrollView: 'ScrollView', Pressable: 'Pressable', View: 'View', TextInput: 'TextInput', useWindowDimensions: () => ({ width: config.width ?? 402, height: config.height ?? 874, fontScale: config.fontScale ?? 1 }), Platform: { OS: config.platform ?? 'android' }, StyleSheet: { create: (s: any) => s, flatten, absoluteFill: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }, hairlineWidth: 1 } };
+      if (id === 'react-native-screens') return { FullWindowOverlay: 'FullWindowOverlay' };
+      if (id === 'react-native') return { Keyboard: { dismiss() { config.teclado = (config.teclado ?? 0) + 1; } }, Modal: 'Modal', ScrollView: 'ScrollView', Pressable: 'Pressable', View: 'View', TextInput: 'TextInput', useWindowDimensions: () => ({ width: config.width ?? 402, height: config.height ?? 874, fontScale: config.fontScale ?? 1 }), Platform: { OS: config.platform ?? 'android' }, StyleSheet: { create: (s: any) => s, flatten, absoluteFill: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }, hairlineWidth: 1 } };
       if (id === 'react-native-gesture-handler') return { GestureHandlerRootView: 'GestureHandlerRootView' };
       if (id === 'react-native-keyboard-controller') return { KeyboardAwareScrollView: 'KeyboardAwareScrollView' };
       if (id === '@/design/adaptive-window') return load('src/design/adaptive-window.ts');
@@ -161,7 +162,7 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === '@/design/tokens') return tokens;
       if (id === '@/hooks/use-theme') return { useTheme: () => ({ curtain: '#0B0B0C' }), useScheme: () => 'light' };
       if (id === '@/hooks/use-lock') return { useLock: () => config.lock };
-      if (id === '@/components/motion/session-curtain') return { useCortinaSaindo: () => config.ativo };
+      if (id === '@/components/motion/session-curtain') return { useCortinaSaindo: () => config.ativo, useCortinaAberta: () => config.aberta ?? false };
       if (id === '@/components/motion/wave-curtain') return { WaveCurtain: 'WaveCurtain' };
       if (id === '@/components/ui/mark') return { Mark: 'Mark' };
       if (id === 'react-native-safe-area-context') return { useSafeAreaInsets: () => config.insets ?? { top: 0, bottom: 0, left: 0, right: 0 } };
@@ -1420,6 +1421,31 @@ test('LockOverlay rejects stale fallback timers after an interrupted reveal and 
   ui.unmount();
   animation.done?.(true); timer.fn();
   assert.equal(ui.writesAfterUnmount(), 0);
+});
+
+test('LockOverlay: com o app aberto a trava é JANELA, acima do formulário modal e das folhas (05/10/2026)', () => {
+  // "o modal fica por cima da tela de bloqueio do app": formulário modal e Sheet são janelas
+  // nativas acima da raiz, e a trava desenhada só na raiz ficava por baixo deles.
+  const lock = { locked: false, velado: true, estado: 'trancado', comoAutentica: 'a senha do celular', autenticar: async () => 'aberto' };
+  const ui = montar('src/components/ui/lock-overlay.tsx', 'LockOverlay', {}, { reduzir: false, ativo: true, aberta: true, lock });
+  const janela = () => ui.find((n) => n.type === 'Modal');
+  assert.ok(janela(), 'o véu de quando o app sai da frente já cobre o formulário aberto');
+  assert.equal(janela().props.transparent, true);
+  assert.equal(janela().props.animationType, 'none', 'cobrir não pode esperar uma animação');
+  lock.velado = false; lock.locked = true; ui.render();
+  assert.ok(janela(), 'véu e cortina dividem a mesma janela');
+  assert.ok(ui.find((n) => n.props?.accessibilityViewIsModal === true), 'a cortina está dentro dela');
+
+  const abertura = montar('src/components/ui/lock-overlay.tsx', 'LockOverlay', {}, { reduzir: false, ativo: false, aberta: false, lock: { ...lock, locked: true } });
+  assert.equal(abertura.find((n) => n.type === 'Modal'), undefined, 'na abertura do app a trava segue na raiz, por baixo da cortina da marca');
+  assert.ok(abertura.find((n) => n.props?.accessibilityViewIsModal === true));
+
+  // No iOS o Modal não sobe acima do formulário já apresentado: ali a casca é a camada da janela.
+  const config: any = { reduzir: false, ativo: true, aberta: true, platform: 'ios', lock: { ...lock, locked: true, velado: false } };
+  const ios = montar('src/components/ui/lock-overlay.tsx', 'LockOverlay', {}, config);
+  assert.equal(ios.find((n) => n.type === 'Modal'), undefined);
+  assert.ok(ios.find((n) => n.type === 'FullWindowOverlay'), 'no iOS a trava entra direto na UIWindow');
+  assert.equal(config.teclado, 1, 'o teclado aberto fecha: ele fica acima de qualquer janela');
 });
 
 test('LockOverlay fallback completes only its current reveal when a native completion is missing', () => {
