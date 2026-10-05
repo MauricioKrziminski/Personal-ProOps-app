@@ -12,6 +12,7 @@ import { InvestmentsSection } from '@/components/finance/investments-section';
 import { EmergencyReserveSection, EmergencyReserveSheet, useEmergencyReserveEditor } from '@/components/finance/emergency-reserve-section';
 import { ThemedText } from '@/components/themed-text';
 import { SecaoDeArquivados } from '@/components/ui/secao-de-arquivados';
+import { Explica } from '@/components/ui/explica';
 import { Forte } from '@/components/ui/forte';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Sheet, SheetScroll } from '@/components/ui/sheet';
@@ -55,6 +56,7 @@ import { useBRL } from '@/components/ui/conceal';
 import { formatNumberBR, isoToBR } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
+import { explicaSaude } from '@/lib/explicacoes';
 
 /**
  * Patrimônio — "estou ficando mais rico ou mais pobre?".
@@ -440,7 +442,9 @@ export default function NetWorthScreen() {
   const health = saude.isError ? (
     <ErrorBand message="Não deu para calcular sua saúde financeira." onRetry={saude.refetch} />
   ) : saude.data ? (
-    <Section title="Saúde financeira">
+    <Section
+      title="Saúde financeira"
+      trailing={<Explica indicador="Saúde financeira" explicacao={explicaSaude(saude.data)} />}>
       <Row
         title="Nota"
         trailing={

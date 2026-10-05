@@ -224,9 +224,12 @@ function fundoDoBadge(theme: ReturnType<typeof useTheme>, tone: RowBadgeTone | u
 export function Section({
   title,
   heading = 'small',
+  trailing,
   children,
 }: {
   title?: string;
+  /** Ao lado do título (o (i) `Explica`); só existe com título. */
+  trailing?: ReactNode;
   /** `block`: o cabeçalho das raízes (`BlockHeader`). `small`: o título das telas empurradas. */
   heading?: 'small' | 'block';
   children: ReactNode;
@@ -238,7 +241,14 @@ export function Section({
     <View style={styles.section}>
       {title ? (
         heading === 'block' ? (
-          <BlockHeader title={title} />
+          <BlockHeader title={title} trailing={trailing} />
+        ) : trailing ? (
+          <View style={styles.tituloComAcao}>
+            <ThemedText type="smallBold" style={styles.sectionTitle}>
+              {title}
+            </ThemedText>
+            {trailing}
+          </View>
         ) : (
           <ThemedText type="smallBold" style={styles.sectionTitle}>
             {title}
@@ -372,6 +382,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.lg,
     letterSpacing: Type.headline.letterSpacing,
   },
+  tituloComAcao: { flexDirection: 'row', alignItems: 'center', paddingRight: Space.sm },
   group: {
     borderRadius: Radius.md,
     borderCurve: 'continuous',

@@ -6,6 +6,7 @@ import { ErrorCard } from '@/components/error-card';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Explica } from '@/components/ui/explica';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useBRL, useConceal } from '@/components/ui/conceal';
 import { Money } from '@/components/ui/money';
@@ -16,6 +17,7 @@ import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { Space, tabular } from '@/design/tokens';
 import { useSpendingChange } from '@/hooks/use-spending-change';
+import { explicaMudanca } from '@/lib/explicacoes';
 import { showItemActions } from '@/lib/item-actions';
 import {
   barFraction, percentText, rowLinkParams, visibleRows,
@@ -85,12 +87,15 @@ export default function WhyScreen() {
               </View>
             </View>
             {data ? (
-              <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                {data.delta === 0 ? 'Sem diferença.' : 'Diferença '}
-                {data.delta !== 0 ? <Money cents={data.delta} variant="subhead" signed /> : null}
-                {/* o percentual entrega o tamanho da mudança: some com os valores ocultos */}
-                {data.delta === 0 ? '' : data.previous === 0 ? ` · sem gasto em ${prevLabel}` : pct && !concealed ? ` · ${pct}` : ''}
-              </ThemedText>
+              <View style={styles.deltaLinha}>
+                <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                  {data.delta === 0 ? 'Sem diferença.' : 'Diferença '}
+                  {data.delta !== 0 ? <Money cents={data.delta} variant="subhead" signed /> : null}
+                  {/* o percentual entrega o tamanho da mudança: some com os valores ocultos */}
+                  {data.delta === 0 ? '' : data.previous === 0 ? ` · sem gasto em ${prevLabel}` : pct && !concealed ? ` · ${pct}` : ''}
+                </ThemedText>
+                <Explica indicador="Por que mudou" explicacao={explicaMudanca(periods)} />
+              </View>
             ) : null}
           </Card>
 
@@ -155,6 +160,7 @@ export default function WhyScreen() {
 const styles = StyleSheet.create({
   topo: { gap: Space.sm, padding: Space.lg },
   topoLinha: { flexDirection: 'row', gap: Space.xl },
+  deltaLinha: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   metade: { flex: 1, gap: 2 },
   linha: { gap: Space.xs },
   barra: { paddingHorizontal: Space.lg, paddingBottom: Space.md },

@@ -265,9 +265,9 @@ export default function TransactionDetailScreen() {
         <Stack.Screen options={{ title: 'Lançamento' }} />
         <EmptyState
           icon="questionmark.folder"
-          title="Esse lançamento não existe mais"
-          hint="Ele pode ter sido apagado em outro aparelho."
-          action={{ label: 'Voltar', onPress: () => router.back() }}
+          title="Isto não existe mais"
+          hint="Esse lançamento pode ter sido apagado em outro aparelho."
+          action={{ label: 'Ver lançamentos', onPress: () => router.replace('/finance/transactions') }}
         />
       </Screen>
     );

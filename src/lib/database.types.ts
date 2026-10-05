@@ -4116,6 +4116,8 @@ export type Database = {
           months_of_reserve: number
           savings_rate: number
           score: number
+          window_from: string
+          window_to: string
         }[]
       }
       finish_import_batch: {

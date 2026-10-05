@@ -40,8 +40,8 @@ Esses fatos e a abertura do formulário ainda não equivalem ao aceite funcional
 | F14 | Plano percentual | Aceito; limites no registro | Validado 9/9 | Validado 8/8 |
 | F15 | Explicação de mudanças | Aceito; limites no registro | Validado 6/6 | Validado 5/5 |
 | F16 | Voz contextual | Aceito; limites no registro | Validado 9/9 (voz real) | Validado 8/8 (texto) |
-| F17 | Ajuda e avisos | Próximo incremento, F16 aceito | Não validado | Não validado |
-| F18 | Transferência recorrente | Aguardando F17 | Não validado | Não validado |
+| F17 | Ajuda e avisos | Aceito; limites no registro | Validado | Validado |
+| F18 | Transferência recorrente | Próximo incremento, F17 aceito | Não validado | Não validado |
 | F19 | Marcos nas metas | Aguardando F18 | Não validado | Não validado |
 | F20 | Acumulação/renda futura | Aguardando F19 | Não validado | Não validado |
 | F21 | Primeiro cadastro guiado | Aguardando F20 | Não validado | Não validado |
@@ -311,3 +311,11 @@ F16 liberado.
 `/internal/finance/draft` (só interpreta), agente deployado só no staging; sem migration. A rota
 passou a respeitar a cota do plano e a contar em `ai_events`. iOS 9/9 com voz real e Android 8/8;
 lançamentos de QA apagados por ID. F17 liberado.
+
+## F17 — explicações e avisos que abrem o item
+
+[Aceite e limites](f17/aceite.md) e [contrato](f17/contrato.md). Migration
+`20261005150000_explicacoes.sql` (janela da saúde financeira), só no staging; agente com os alvos
+`invoice`/`transaction` deployado no staging. (i) com o período real em oito indicadores, item
+inexistente com "Isto não existe mais". Suíte SQL inteira verde fora as três ambientais. F18
+liberado.

@@ -6,6 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useBRL } from '@/components/ui/conceal';
+import { Explica } from '@/components/ui/explica';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
 import { Sheet, SheetScroll } from '@/components/ui/sheet';
@@ -21,6 +22,7 @@ import {
   MAX_LINHAS, applyRows, draftFromPlan, formatBp, motivoDoPlano, novaLinha, novoGrupo, parseBp, planoInicial, realizedBp, toInput,
   type ApplyScope, type PlanDraft, type PlanGroupDraft, type PlanLineDraft,
 } from '@/lib/budget-plan';
+import { explicaPlano } from '@/lib/explicacoes';
 import { financeErrorMessage } from '@/lib/finance-form';
 
 /**
@@ -214,7 +216,10 @@ export function BudgetPlanSheet({ visible, onClose, month, monthLabel, view }: {
 
           {plano ? (
             <Card style={styles.grupo}>
-              <ThemedText type="headline">{`Planejado × realizado · ${monthLabel}`}</ThemedText>
+              <View style={styles.tituloComExplica}>
+                <ThemedText type="headline">{`Planejado × realizado · ${monthLabel}`}</ThemedText>
+                <Explica indicador="Planejado × realizado" explicacao={explicaPlano(dados)} />
+              </View>
               {plano.lines.reduce<string[]>((gs, l) => (gs.includes(l.group) ? gs : [...gs, l.group]), []).map((nome) => {
                 const doGrupo = plano.lines.filter((l) => l.group === nome);
                 const bp = doGrupo.reduce((s, l) => s + l.share_bp, 0);
@@ -296,6 +301,7 @@ export function BudgetPlanSheet({ visible, onClose, month, monthLabel, view }: {
 }
 
 const styles = StyleSheet.create({
+  tituloComExplica: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
   corpo: { gap: Space.xl, padding: Space.lg, paddingBottom: Space.xxxl },
   grupo: { gap: Space.md },
   linha: { gap: Space.sm },

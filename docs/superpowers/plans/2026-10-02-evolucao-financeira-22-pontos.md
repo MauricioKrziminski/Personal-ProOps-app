@@ -255,10 +255,12 @@ Aceite no staging em 05/10/2026: [F16](../../qa/2026-10-02-evolucao-financeira/f
 
 Arquivos: catálogo de ajuda, detalhes e alertas/deep links. Interface: indicador + base/período/qualidade → ajuda/ação coerente com a query exibida.
 
-- [ ] RED: texto da fórmula/período e alvo do alerta correspondem à resposta real.
-- [ ] Implementar catálogo/primitivo de ajuda e destinos com recuperação.
-- [ ] Aplicar às features entregues sem legendas permanentes em todo bloco.
-- [ ] Provar privacidade/item ausente e gates nativos F17; registrar aceite.
+- [x] RED: texto da fórmula/período e alvo do alerta correspondem à resposta real.
+- [x] Implementar catálogo/primitivo de ajuda e destinos com recuperação.
+- [x] Aplicar às features entregues sem legendas permanentes em todo bloco.
+- [x] Provar privacidade/item ausente e gates nativos F17; registrar aceite.
+
+Aceite no staging em 05/10/2026: [F17](../../qa/2026-10-02-evolucao-financeira/f17/aceite.md). F18 liberado.
 
 ### F18 — Transferência recorrente
 

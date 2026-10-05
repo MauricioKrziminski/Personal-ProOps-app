@@ -845,6 +845,14 @@ export function useCardLimitContext(enabled = true) {
  * A consulta de UMA fatura, fora do hook: a Carteira pré-carrega a fatura do cartão da frente
  * (`prefetchQuery`) para o cartão pousar na fatura já com o total, em vez de num esqueleto.
  */
+/** A fatura pedida não existe para quem pergunta (RLS inclusa): estado normal de um aviso antigo. */
+export class FaturaInexistente extends Error {
+  constructor() {
+    super('Fatura inexistente');
+    this.name = 'FaturaInexistente';
+  }
+}
+
 export function invoiceQuery(invoiceId: string) {
   return {
     queryKey: ['invoice', invoiceId] as const,
@@ -854,7 +862,7 @@ export function invoiceQuery(invoiceId: string) {
           .from('card_invoices')
           .select('id, account_id, reference_month, closing_date, due_date, status, paid_at, paid_cents, settled_manually, rolled_into_invoice_id')
           .eq('id', invoiceId)
-          .single(),
+          .maybeSingle(),
         supabase
           .from('transactions')
           .select(TRANSACTION_COLUMNS)
@@ -868,6 +876,8 @@ export function invoiceQuery(invoiceId: string) {
           .order('occurred_at', { ascending: false }),
       ]);
       if (invoiceRes.error) throw invoiceRes.error;
+      // Apagada, de outro espaço ou sem permissão: a tela mostra "Isto não existe mais".
+      if (!invoiceRes.data) throw new FaturaInexistente();
       if (txRes.error) throw txRes.error;
       if (pagamentosRes.error) throw pagamentosRes.error;
       return {
@@ -882,7 +892,12 @@ export function invoiceQuery(invoiceId: string) {
 export function useInvoice(invoiceId: string | undefined) {
   useRealtimeInvalidate('card_invoices', ['invoice']);
   useRealtimeInvalidate('transactions', ['invoice']);
-  return useQuery({ ...invoiceQuery(invoiceId ?? ''), enabled: Boolean(invoiceId) });
+  return useQuery({
+    ...invoiceQuery(invoiceId ?? ''),
+    enabled: Boolean(invoiceId),
+    // Refazer não traz de volta o que não existe.
+    retry: (n, erro) => !(erro instanceof FaturaInexistente) && n < 3,
+  });
 }
 
 /**

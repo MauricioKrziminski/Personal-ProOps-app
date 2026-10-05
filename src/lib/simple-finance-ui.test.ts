@@ -60,7 +60,7 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any } = {}) {
+function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean } = {}) {
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
@@ -348,7 +348,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
     useDesarquivar: () => mutation('desarquivar'),
     useExcluirArquivado: (tabela: string) => mutation(`excluir:${tabela}`),
     ContaComLancamentos: class extends Error {},
-    useInvoice: () => ({ ...query, data: {
+    useInvoice: () => options.invoiceMissing ? ({ ...query, isError: true, isSuccess: false, data: undefined, error: { name: 'FaturaInexistente' } }) : ({ ...query, data: {
       invoice: { id: 'invoice-1', account_id: 'card-1', status: options.invoiceStatus ?? 'closed', reference_month: '2026-08-01', closing_date: '2026-08-10', due_date: '2026-08-20', paid_at: options.invoiceStatus === 'paid' ? '2026-08-18' : null, settled_manually: Boolean(options.settledManually) },
       transactions: [{ id: 'purchase-1', kind: 'expense', amount_cents: 147000, occurred_at: '2026-08-01' }],
       pagamentos: options.pagamentos ?? [],
@@ -451,7 +451,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === 'expo-haptics') return { selectionAsync() {}, notificationAsync() {}, NotificationFeedbackType: { Success: 'success', Warning: 'warning' } };
       // `back` é navegação como qualquer outra e ENTRA na lista: é o que prende o "fechar um
       // formulário que outra tela abriu devolve para ela" (`useVoltarQuandoFechar`).
-      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, Redirect: 'Redirect', useLocalSearchParams: () => options.params ?? (file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), useFocusEffect: () => {}, useIsFocused: () => true, router: { push: (to: any) => navigations.push(to), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }), dismissAll: () => navigations.push({ dismissAll: true }), dismiss: (n?: number) => navigations.push({ dismiss: n ?? 1 }), canDismiss: () => !options.primeiraDaPilha, canGoBack: () => !options.primeiraDaPilha } };
+      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, Redirect: 'Redirect', useLocalSearchParams: () => options.params ?? (file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), useFocusEffect: () => {}, useIsFocused: () => true, router: { push: (to: any) => navigations.push(to), replace: (to: any) => navigations.push({ replace: to }), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }), dismissAll: () => navigations.push({ dismissAll: true }), dismiss: (n?: number) => navigations.push({ dismiss: n ?? 1 }), canDismiss: () => !options.primeiraDaPilha, canGoBack: () => !options.primeiraDaPilha } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
       if (name === '@/hooks/use-goal-money') return {
@@ -481,6 +481,8 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === '@/lib/budget-plan') return load('src/lib/budget-plan.ts');
       if (name === '@/components/finance/investments-section') return load('src/components/finance/investments-section.tsx');
       if (name === '@/lib/investment') return load('src/lib/investment.ts');
+      if (name === '@/lib/explicacoes') return load('src/lib/explicacoes.ts');
+      if (name === '@/lib/push-routes') return load('src/lib/push-routes.ts');
       if (name === '@/hooks/use-emergency-reserve') return {
         useEmergencyReserve: () => inRealm({ ...query, data: options.reserveState, isPending: Boolean(options.reservePending), isSuccess: !options.reservePending && !options.reserveError, isError: Boolean(options.reserveError), refetch: async () => { refetches.push('emergency-reserve'); } }),
         useSaveEmergencyReserve: () => ({ ...mutation('saveEmergencyReserve'),
@@ -7427,4 +7429,35 @@ test('F15: linhas sem mudança só aparecem em "Ver todas"', () => {
   const ui = f15Tela(f15Dados(-1, [['mercado', 'mercado', 0, 5000], ['lazer', 'lazer', 700, 700]]));
   assert.equal(f15Linhas(ui).length, 1);
   assert.ok(ui.nodes().some((n: any) => n.type === 'Button' && /Ver todas/.test(String(n.props.label))));
+});
+
+test('F17: aviso de fatura e de conta abre o ITEM; ref que não é uuid cai na lista de antes', () => {
+  const U = '6f1c2a3e-1b2c-4d5e-8f90-a1b2c3d4e5f6';
+  const alertas = [
+    { id: 'a1', workspace_id: 'w', kind: 'invoice_due', ref: U, sent_on: '2026-10-05', channel: 'push', created_at: '2026-10-05T12:00:00Z' },
+    { id: 'a2', workspace_id: 'w', kind: 'bill_due', ref: U, sent_on: '2026-10-05', channel: 'push', created_at: '2026-10-05T11:00:00Z' },
+    { id: 'a3', workspace_id: 'w', kind: 'bill_due', ref: 'texto-cru', sent_on: '2026-10-05', channel: 'push', created_at: '2026-10-05T10:00:00Z' },
+    { id: 'a4', workspace_id: 'w', kind: 'negative_forecast', ref: 'x', sent_on: '2026-10-05', channel: 'push', created_at: '2026-10-05T09:00:00Z' },
+  ];
+  const ui = screen('src/app/profile/alerts.tsx', { alerts: alertas });
+  const linhas = () => ui.nodes().filter((n: any) => n.type?.name === 'Row' || n.type === 'Row');
+  const abrir = (i: number) => ui.interact(() => linhas()[i].props.onPress());
+  abrir(0);
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/invoice/[id]', params: { id: U } });
+  abrir(1);
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/[txId]', params: { txId: U } });
+  abrir(2);
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/' }, 'ref inválido nunca vira rota montada');
+  const antes = ui.navigations.length;
+  abrir(3);
+  assert.equal(ui.navigations.length, antes, 'aviso sem item não navega');
+});
+
+test('F17: fatura que não existe mais mostra "Isto não existe mais" com o caminho para as faturas', () => {
+  const ui = screen('src/app/finance/invoice/[id].tsx', { invoiceMissing: true });
+  const vazio = ui.nodes().find((n: any) => n.type === 'EmptyState');
+  assert.equal(vazio.props.title, 'Isto não existe mais');
+  assert.equal(ui.nodes().some((n: any) => n.type === 'ErrorBand'), false, 'não é erro genérico');
+  ui.interact(() => vazio.props.action.onPress());
+  assert.deepEqual(copia(ui.navigations.at(-1)), { replace: '/finance/invoices' });
 });

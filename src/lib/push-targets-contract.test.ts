@@ -52,3 +52,11 @@ test('o `ref` só vira parâmetro de rota depois de passar por regex de mês', (
   assert.match(ts, /const MES = \/\^\\d\{4\}-\\d\{2\}\(-\\d\{2\}\)\?\$\//);
   assert.match(ts, /MES\.test\(ref\)/);
 });
+
+test('fatura e conta mapeiam para o mesmo alvo de item nos dois lados', () => {
+  // `alvoDoAlerta` (histórico do app) é a segunda cópia do kind→alvo de `target_for`.
+  assert.match(py, /kind == "invoice_due":\s+return "invoice"/);
+  assert.match(py, /kind == "bill_due":\s+return "transaction"/);
+  assert.match(ts, /kind === 'invoice_due'\) return 'invoice'/);
+  assert.match(ts, /kind === 'bill_due'\) return 'transaction'/);
+});

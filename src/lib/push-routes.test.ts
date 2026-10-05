@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { routeFor } from './push-routes.ts';
+import { alvoDoAlerta, routeFor } from './push-routes.ts';
 
 test('o fechamento abre O CICLO QUE FECHOU, não o corrente', () => {
   // `ref` é a data de FIM do ciclo — um dia do MEIO do mês. Isso só resolve para o ciclo certo
@@ -51,8 +51,28 @@ test('data ausente, vazio ou de tipo errado não navega', () => {
   assert.equal(routeFor({ target: 42 }), null);
 });
 
+const U = '6f1c2a3e-1b2c-4d5e-8f90-a1b2c3d4e5f6';
+
+test('fatura e lançamento abrem o ITEM quando o `ref` é uuid', () => {
+  assert.deepEqual(routeFor({ target: 'invoice', ref: U }), { pathname: '/finance/invoice/[id]', params: { id: U } });
+  assert.deepEqual(routeFor({ target: 'transaction', ref: U }), { pathname: '/finance/[txId]', params: { txId: U } });
+});
+
+test('item com `ref` que não é uuid cai na lista de antes', () => {
+  for (const ref of ['../../etc', '2026-09-10', '', undefined, 42]) {
+    assert.deepEqual(routeFor({ target: 'invoice', ref }), { pathname: '/finance/cards' });
+    assert.deepEqual(routeFor({ target: 'transaction', ref }), { pathname: '/' });
+  }
+});
+
+test('o histórico de alertas usa o mesmo alvo do servidor', () => {
+  assert.equal(alvoDoAlerta('invoice_due'), 'invoice');
+  assert.equal(alvoDoAlerta('bill_due'), 'transaction');
+  assert.equal(alvoDoAlerta('budget_80'), null);
+});
+
 test('os alvos que o servidor produz hoje todos resolvem', () => {
-  for (const target of ['today', 'reminders', 'budgets', 'cards', 'forecast', 'cycle']) {
+  for (const target of ['today', 'reminders', 'budgets', 'cards', 'forecast', 'cycle', 'invoice', 'transaction']) {
     assert.ok(routeFor({ target })?.pathname, `${target} não resolveu`);
   }
 });

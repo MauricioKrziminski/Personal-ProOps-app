@@ -144,6 +144,7 @@ export default function InvoiceScreen() {
   // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
   // falha, e sem este corte a tela seguia afirmando números embaixo da faixa de erro.
   // Aqui é o caso grave: junto do herói vem o botão que PAGA a fatura.
+  const inexistente = invoice.isError && (invoice.error as Error | null)?.name === 'FaturaInexistente';
   const fatura = invoice.isError ? undefined : invoice.data?.invoice;
   const compras = useMemo(
     () => (invoice.isError ? [] : (invoice.data?.transactions ?? [])),
@@ -445,7 +446,7 @@ export default function InvoiceScreen() {
         </>
       ) : null}
 
-      {invoice.isError ? (
+      {invoice.isError && !inexistente ? (
         <ErrorBand message="Não deu para carregar esta fatura." onRetry={invoice.refetch} />
       ) : null}
 
@@ -570,6 +571,20 @@ export default function InvoiceScreen() {
         ) : null}
       </View>
     ) : null;
+
+  if (inexistente) {
+    return (
+      <Screen grouped wide={tablet}>
+        <Stack.Screen options={{ title: 'Fatura' }} />
+        <EmptyState
+          icon="questionmark.folder"
+          title="Isto não existe mais"
+          hint="Essa fatura pode ter sido apagada em outro aparelho."
+          action={{ label: 'Ver faturas', onPress: () => router.replace('/finance/invoices') }}
+        />
+      </Screen>
+    );
+  }
 
   return (
     <Screen scroll={false} grouped wide={tablet}>

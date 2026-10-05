@@ -12,7 +12,9 @@ import { Deslizavel, fecharDeslizavelAberto } from '@/components/ui/deslizavel';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Money } from '@/components/ui/money';
+import { Explica } from '@/components/ui/explica';
 import { Row, Section } from '@/components/ui/row';
+import { explicaInvestimentos } from '@/lib/explicacoes';
 import { Segmented } from '@/components/ui/segmented';
 import { SelectField } from '@/components/ui/select-field';
 import { Sheet, SheetScroll } from '@/components/ui/sheet';
@@ -276,7 +278,9 @@ export function InvestmentsSection() {
         </Card>
       ) : null}
       {lista.length > 0 ? (
-        <Section title="Investimentos">
+        <Section
+          title="Investimentos"
+          trailing={<Explica indicador="Investimentos" explicacao={explicaInvestimentos(lista)} />}>
           {lista.map((p) => (
             <Deslizavel key={p.account_id} titulo={p.name} acoes={acoesDaPosicao(p)}>
               <Row

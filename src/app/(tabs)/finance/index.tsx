@@ -20,7 +20,9 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ExtendedFab } from '@/components/ui/extended-fab';
 import { useLancarPorVoz } from '@/components/finance/lancar-por-voz';
 import { ATALHOS_DE_LANCAMENTO } from '@/lib/atalhos-de-lancamento';
+import { Explica } from '@/components/ui/explica';
 import { HeroPanel } from '@/components/ui/hero-panel';
+import { explicaCiclo } from '@/lib/explicacoes';
 import { ItemLink } from '@/components/ui/item-link';
 import { LedgerRow } from '@/components/ui/ledger-row';
 import { Money } from '@/components/ui/money';
@@ -328,6 +330,9 @@ export default function FinanceScreen() {
             label={heroLoading
               ? <Skeleton width="40%" height={16} tone="hero" />
               : descricao?.label ?? 'Saldo projetado'}
+            badge={heroLoading ? undefined : (
+              <Explica indicador="Resultado do ciclo" explicacao={explicaCiclo(ciclo, { month, view: regua.view })} tom="onHeroMuted" />
+            )}
             value={heroLoading
               ? <Skeleton width="70%" height={46} tone="hero" />
               : <CountUpMoney cents={descricao?.cents ?? 0} variant="heroMoney" tone={cicloRuim ? 'onHeroDanger' : 'onHero'} />}

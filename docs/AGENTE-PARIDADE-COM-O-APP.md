@@ -682,3 +682,9 @@ promete configuração da reserva pelo WhatsApp antes da implementação/avalia�
 | app | agente |
 |---|---|
 | atalho "Por voz" dos menus Lançar: grava, transcreve, edita o texto e abre `/finance/lancar` pré-preenchido | `POST /internal/finance/draft` só interpreta (mesmo classificador, sem campo novo no schema): não executa tool, não grava `pending_actions`/`executed_actions`, não manda mensagem. Quem salva é o formulário. Não é mutação nova: nada a casar. |
+
+## Explicações e avisos que abrem o item — F17 (05/10/2026)
+
+| app | agente |
+|---|---|
+| "Como é calculado" (i) em saúde financeira, reserva, orçamentos, projeção e investimentos; toque no aviso de fatura/conta abre a fatura/o lançamento (alvos `invoice` e `transaction`); item apagado mostra "Isto não existe mais" | Sem equivalente por desenho: é leitura e navegação do app. O agente continua respondendo o número; o alerta no WhatsApp não muda (só o push ganhou o alvo de item). |

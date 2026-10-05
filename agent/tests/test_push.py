@@ -71,9 +71,34 @@ def test_target_for_mapeia_cycle_closed():
     assert push.target_for("cycle_closed") == "cycle"
     # e os que já existiam continuam onde estavam
     assert push.target_for("budget_100") == "budgets"
-    assert push.target_for("invoice_due") == "cards"
+    assert push.target_for("card_limit") == "cards"
     assert push.target_for("negative_forecast") == "forecast"
-    assert push.target_for("bill_due") == "today"
+    # F17: fatura e conta abrem o ITEM (o `ref` é o uuid)
+    assert push.target_for("invoice_due") == "invoice"
+    assert push.target_for("bill_due") == "transaction"
+
+
+@pytest.mark.asyncio
+async def test_item_com_uuid_leva_o_ref(monkeypatch):
+    enviados = _captura(monkeypatch)
+    u = "6f1c2a3e-1b2c-4d5e-8f90-a1b2c3d4e5f6"
+
+    await push.send("tok", "t", "b", "invoice", u)
+    await push.send("tok", "t", "b", "transaction", u)
+
+    assert enviados[0]["data"] == {"target": "invoice", "ref": u}
+    assert enviados[1]["data"] == {"target": "transaction", "ref": u}
+
+
+@pytest.mark.asyncio
+async def test_item_sem_uuid_cai_na_lista_de_antes(monkeypatch):
+    enviados = _captura(monkeypatch)
+
+    await push.send("tok", "t", "b", "invoice", "../x")
+    await push.send("tok", "t", "b", "transaction", None)
+
+    assert enviados[0]["data"] == {"target": "cards"}
+    assert enviados[1]["data"] == {"target": "today"}
 
 
 def test_todo_alvo_de_target_for_esta_em_targets():

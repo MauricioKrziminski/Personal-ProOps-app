@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { concealText, useBRL, useConceal } from '@/components/ui/conceal';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Explica } from '@/components/ui/explica';
+import { explicaReserva } from '@/lib/explicacoes';
 import { Field, MoneyField } from '@/components/ui/field';
 import { Money } from '@/components/ui/money';
 import { QuantityField } from '@/components/ui/quantity-field';
@@ -134,7 +136,9 @@ export function EmergencyReserveSection({ query, editor }: {
       {query.isError || !state ? <ErrorCard onRetry={() => { void query.refetch(); }} /> : summary ? (
         <View style={styles.block}>
           {state.config ? (
-            <Section title="Reserva de emergência">
+            <Section
+              title="Reserva de emergência"
+              trailing={<Explica indicador="Reserva de emergência" explicacao={explicaReserva(state, summary, brl)} />}>
               <Row title="Separado para imprevistos" subtitle={state.workspace_name}
                 accessibilityLabel={`Reserva de emergência, ${brl(summary.reservedCents)}.`}
                 trailing={<Money cents={summary.reservedCents} variant="ticker" />} />

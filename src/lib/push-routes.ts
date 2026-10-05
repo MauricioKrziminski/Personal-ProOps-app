@@ -17,7 +17,25 @@ export const ALLOWED = {
   cards: '/finance/cards',
   budgets: '/finance/budgets',
   cycle: '/finance/cycle',
+  invoice: '/finance/invoice/[id]',
+  transaction: '/finance/[txId]',
 } as const;
+
+/** Alvos de ITEM: sem uuid válido no `ref` caem na lista de antes (a mesma do servidor). */
+const LISTA_DO_ITEM = { invoice: '/finance/cards', transaction: '/' } as const;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type PushRoute =
+  | { pathname: Exclude<AllowedHref, '/finance/invoice/[id]' | '/finance/[txId]'>; params?: { month: string } }
+  | { pathname: '/finance/invoice/[id]'; params: { id: string } }
+  | { pathname: '/finance/[txId]'; params: { txId: string } };
+
+/** O alvo que o app abre para um alerta salvo (`kind` + `ref`), o mesmo que o servidor manda. */
+export function alvoDoAlerta(kind: string): Target | null {
+  if (kind === 'invoice_due') return 'invoice';
+  if (kind === 'bill_due') return 'transaction';
+  return null;
+}
 
 /**
  * ⚠️ **`transactions` saiu daqui em 14/09/2026, e `cycle` entrou.** Esta lista e a `TARGETS` de
@@ -44,7 +62,7 @@ const MES = /^\d{4}-\d{2}(-\d{2})?$/;
  * só funciona porque `primeiroDiaDoMes`/`mesmoMes` (`lib/dates.ts`) normalizam os dois formatos;
  * antes disso, `2026-09-10` abria a tela do ciclo vazia, sem erro nenhum.
  */
-export function routeFor(data: unknown): { pathname: AllowedHref; params?: { month: string } } | null {
+export function routeFor(data: unknown): PushRoute | null {
   if (!data || typeof data !== 'object') return null;
   const target = (data as { target?: unknown }).target;
   if (typeof target !== 'string') return null;
@@ -52,8 +70,15 @@ export function routeFor(data: unknown): { pathname: AllowedHref; params?: { mon
   // para o `router.push`. A allowlist continuaria impedindo rota arbitrária, mas o app crasharia
   // ao tocar na notificação.
   if (!Object.hasOwn(ALLOWED, target)) return null;
-  const pathname = ALLOWED[target as Target];
   const ref = (data as { ref?: unknown }).ref;
+  if (target === 'invoice' || target === 'transaction') {
+    // `ref` que não é uuid nunca vira rota montada com texto cru.
+    if (typeof ref !== 'string' || !UUID.test(ref)) return { pathname: LISTA_DO_ITEM[target] };
+    return target === 'invoice'
+      ? { pathname: '/finance/invoice/[id]', params: { id: ref } }
+      : { pathname: '/finance/[txId]', params: { txId: ref } };
+  }
+  const pathname = ALLOWED[target as Exclude<Target, 'invoice' | 'transaction'>];
   if (target === 'cycle' && typeof ref === 'string' && MES.test(ref)) {
     return { pathname, params: { month: ref } };
   }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { ErrorCard } from '@/components/error-card';
@@ -28,6 +28,7 @@ import {
   naoLidos,
   type AlertHistoryItem,
 } from '@/lib/alert-history';
+import { alvoDoAlerta, routeFor } from '@/lib/push-routes';
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
 import type { SymbolViewProps } from 'expo-symbols';
 
@@ -67,6 +68,12 @@ const ALERTA: Record<string, { titulo: string; icone: SymbolViewProps['name']; t
   negative_forecast: { titulo: 'Projeção no vermelho', icone: 'chart.line.downtrend.xyaxis', tom: 'danger' },
   trial_ending: { titulo: 'Teste acabando', icone: 'clock', tom: 'text' },
 };
+
+/** Fatura e conta abrem o ITEM (o mesmo `routeFor` do toque na notificação); o resto não navega. */
+function rotaDoAlerta(a: AlertHistoryItem) {
+  const target = alvoDoAlerta(a.kind);
+  return target ? routeFor({ target, ref: a.ref }) : null;
+}
 
 /** Só o orçamento tem `ref` legível; nos outros o `ref` é um UUID e não vira legenda. */
 function detalhe(a: AlertHistoryItem): string | undefined {
@@ -181,9 +188,17 @@ export default function AlertsScreen() {
                         : meta?.icone ?? 'bell'
                     }
                     tinta={a.kind.startsWith('budget_') ? aparencia(a.ref).cor : null}
-                    chevron={false}
                     accessibilityLabel={`${titulo}${lido ? '' : ', não lido'}, ${hora(a.created_at)}`}
-                    onPress={lido ? undefined : () => marcarLido(a.id)}
+                    chevron={Boolean(rotaDoAlerta(a))}
+                    onPress={
+                      lido && !rotaDoAlerta(a)
+                        ? undefined
+                        : () => {
+                            if (!lido) marcarLido(a.id);
+                            const rota = rotaDoAlerta(a);
+                            if (rota) router.push(rota);
+                          }
+                    }
                     onLongPress={() => showItemActions(titulo, acoesDoAlerta(a, titulo))}
                     trailing={
                       <View style={styles.fim}>

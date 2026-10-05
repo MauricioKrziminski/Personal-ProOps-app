@@ -7,13 +7,19 @@ como complemento ou fallback.
 
 from __future__ import annotations
 
+import re
+
 import httpx
 
 EXPO_URL = "https://exp.host/--/api/v2/push/send"
 
 # `target` é chave de uma allowlist no app (src/lib/notifications.ts), não rota
 # livre: payload externo não pode escolher para onde o app navega.
-TARGETS = ("today", "reminders", "budgets", "cards", "forecast", "cycle")
+TARGETS = ("today", "reminders", "budgets", "cards", "forecast", "cycle", "invoice", "transaction")
+
+_UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+# Alvo de ITEM sem uuid válido cai na lista de antes: o app nunca monta rota com texto cru.
+_ITEM_FALLBACK = {"invoice": "cards", "transaction": "today"}
 
 
 def target_for(kind: str) -> str:
@@ -24,6 +30,11 @@ def target_for(kind: str) -> str:
         return "cycle"
     if kind.startswith("budget"):
         return "budgets"
+    # Alvos de ITEM (o `ref` é o uuid): antes do ramo de lista, que sombrearia `invoice_due`.
+    if kind == "invoice_due":
+        return "invoice"
+    if kind == "bill_due":
+        return "transaction"
     if kind.startswith(("invoice", "card")):
         return "cards"
     # ⚠️ `startswith(("balance", "forecast"))` era ramo MORTO: o único kind de projeção é
@@ -47,6 +58,8 @@ async def send(
     """
     if target not in TARGETS:
         target = "today"
+    if target in _ITEM_FALLBACK and not _UUID.match(ref or ""):
+        target, ref = _ITEM_FALLBACK[target], None
     async with httpx.AsyncClient(timeout=15.0) as client:
         res = await client.post(
             EXPO_URL,

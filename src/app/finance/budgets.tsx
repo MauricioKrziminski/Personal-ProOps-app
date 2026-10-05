@@ -18,6 +18,7 @@ import { TaskHeader } from '@/components/ui/task-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Explica } from '@/components/ui/explica';
 import { Field, MoneyField } from '@/components/ui/field';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
@@ -45,6 +46,7 @@ import {
 } from '@/hooks/use-finance';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useRealtimeInvalidate } from '@/hooks/use-items';
+import { explicaOrcamento } from '@/lib/explicacoes';
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
 import { supabase } from '@/lib/supabase';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
@@ -467,7 +469,10 @@ export default function BudgetsScreen() {
   ) : linhas.length > 0 ? (
     <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
       <Card style={styles.hero}>
-        <HeroLabel>Ainda dá para gastar</HeroLabel>
+        <View style={styles.rotuloComExplica}>
+          <HeroLabel>Ainda dá para gastar</HeroLabel>
+          <Explica indicador="Orçamentos" explicacao={explicaOrcamento(range)} />
+        </View>
         <Money
           cents={limite - gasto}
           variant="money"
@@ -688,6 +693,7 @@ export default function BudgetsScreen() {
 }
 
 const styles = StyleSheet.create({
+  rotuloComExplica: { flexDirection: 'row', alignItems: 'center', gap: Space.xs },
   paneBody: {
     gap: Space.xl,
     minWidth: 0,

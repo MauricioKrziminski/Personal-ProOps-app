@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/finance/chip';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Explica } from '@/components/ui/explica';
 import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
@@ -43,6 +44,7 @@ import {
   useUpcomingBills,
   type Draft,
 } from '@/hooks/use-finance';
+import { explicaProjecao } from '@/lib/explicacoes';
 import { motivoDaHipotese } from '@/lib/rascunho';
 import { dataDaHipotese, faltaNaHipotese, novaHipotese, paramsDoAplicar, resumoDaHipotese, type Hipotese } from '@/lib/hipotese';
 import { ondeMuda } from '@/lib/onde-muda';
@@ -705,6 +707,10 @@ export default function ForecastScreen() {
                   ? `Você fica no vermelho em ${isoToBR(primeiroNegativo)}`
                   : `Não fica negativo nos próximos ${rotuloHorizonte(dias)}`}
               </ThemedText>
+              <Explica
+                indicador="Projeção"
+                explicacao={explicaProjecao({ de: localISODate(), ate, corteMes: corte, simulando })}
+              />
             </View>
             <View
               accessible
@@ -1063,7 +1069,7 @@ export default function ForecastScreen() {
             <ThemedText type="footnote" themeColor="textSecondary" style={styles.corte}>
               {/* O fim REAL do horizonte, e o mês que a lista esconde por estar incompleto. Era
                   "Projeção até <início do mês cortado>", que parecia o fim da projeção. */}
-              {`A projeção vai até ${isoToBR(somaDias(localISODate(), dias - 1))}; ${monthTitle(cicloCortado.mes)} está incompleto. Aumente o horizonte para ver o mês inteiro.`}
+              {`A projeção vai até ${isoToBR(ate)}; ${monthTitle(cicloCortado.mes)} está incompleto. Aumente o horizonte para ver o mês inteiro.`}
             </ThemedText>
           ) : null}
         </Section>

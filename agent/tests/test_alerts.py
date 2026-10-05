@@ -219,10 +219,11 @@ async def test_fechamento_de_ciclo_vai_com_alvo_cycle_e_leva_o_mes(monkeypatch):
 async def test_o_ref_de_todo_alerta_chega_ao_push(monkeypatch):
     """`ref` é a chave de dedupe e agora também o ponteiro do item — vale para todos os kinds."""
     _, pushes, _ = _install(
-        monkeypatch, [_alert(kind="invoice_due", ref="uuid-da-fatura", alerts_whatsapp_enabled=False)]
+        monkeypatch, [_alert(kind="invoice_due", ref="6f1c2a3e-1b2c-4d5e-8f90-a1b2c3d4e5f6", alerts_whatsapp_enabled=False)]
     )
 
     await alerts.run()
 
-    assert pushes[0][3] == "cards"
-    assert pushes[0][4] == "uuid-da-fatura"
+    # F17: a fatura abre o ITEM (alvo `invoice`); o `ref` é o uuid dela.
+    assert pushes[0][3] == "invoice"
+    assert pushes[0][4] == "6f1c2a3e-1b2c-4d5e-8f90-a1b2c3d4e5f6"
