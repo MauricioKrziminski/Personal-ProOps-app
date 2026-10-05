@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
 
+import { CongelaForaDeFoco } from '@/components/ui/congela-fora-de-foco';
+
 /**
  * Pilha da aba Perfil — **uma tela só: a raiz**.
  *
@@ -15,9 +17,11 @@ export const unstable_settings = {
 
 export default function ProfileStackLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      {/* A raiz desenha o `AppHeader` (design Stitch). */}
-      <Stack.Screen name="index" />
-    </Stack>
+    <CongelaForaDeFoco>
+      <Stack screenOptions={{ headerShown: false }}>
+        {/* A raiz desenha o `AppHeader` (design Stitch). */}
+        <Stack.Screen name="index" />
+      </Stack>
+    </CongelaForaDeFoco>
   );
 }

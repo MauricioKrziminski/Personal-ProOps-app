@@ -1903,3 +1903,15 @@ test('Toda lista que desenha o ícone da categoria desenha a cor dela (useAparen
   const semCor = arquivos.filter((f) => /categoryIcon\(/.test(readFileSync(join(SRC, f), 'utf8')));
   assert.deepEqual(semCor, [], 'use useAparencia (ícone + cor) no lugar de categoryIcon');
 });
+
+test('toda pilha de aba congela quando a aba não está em foco (ocultar valores custava ~45% em abas fora de vista)', () => {
+  const abas = join(SRC, 'app', '(tabs)');
+  const pilhas = readdirSync(abas).filter((d) => statSync(join(abas, d)).isDirectory());
+  assert.equal(pilhas.length, 5);
+  for (const aba of pilhas) {
+    const fonte = readFileSync(join(abas, aba, '_layout.tsx'), 'utf8');
+    assert.match(fonte, /<CongelaForaDeFoco>[\s\S]*<Stack[\s\S]*<\/CongelaForaDeFoco>/, `${aba}/_layout.tsx`);
+  }
+  const prim = readFileSync(join(SRC, 'components', 'ui', 'congela-fora-de-foco.tsx'), 'utf8');
+  assert.match(prim, /<Freeze freeze=\{!focada\}>/);
+});

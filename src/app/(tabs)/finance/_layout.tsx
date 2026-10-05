@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
 
+import { CongelaForaDeFoco } from '@/components/ui/congela-fora-de-foco';
+
 /**
  * Pilha da aba Financeiro — **uma tela só: a raiz**.
  *
@@ -26,9 +28,11 @@ export const unstable_settings = {
 
 export default function FinanceStackLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      {/* A raiz desenha o `AppHeader` (design Stitch): sem título de tela, sem large title. */}
-      <Stack.Screen name="index" />
-    </Stack>
+    <CongelaForaDeFoco>
+      <Stack screenOptions={{ headerShown: false }}>
+        {/* A raiz desenha o `AppHeader` (design Stitch): sem título de tela, sem large title. */}
+        <Stack.Screen name="index" />
+      </Stack>
+    </CongelaForaDeFoco>
   );
 }

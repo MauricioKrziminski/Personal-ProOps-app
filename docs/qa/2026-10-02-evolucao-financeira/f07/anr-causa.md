@@ -302,3 +302,50 @@ cinco abas, toques a 3 s). Meta razoável: abaixo de 300 ms de JS por alternânc
   Metro registrou `Android Bundled 523ms index.js` e `170ms index.js`, `/json/list` do Metro lista o alvo
   `com.proops.personal.dev (sdk_gphone64_arm64)`, e a Hoje abriu como dev@ com os valores visíveis (a máscara
   não ficou ligada). O Metro nunca foi parado.
+
+### Depois: congelar as abas fora de foco (05/10/2026)
+
+**O que entrou.** `CongelaForaDeFoco` (`src/components/ui/congela-fora-de-foco.tsx`, `react-freeze` com
+`useIsFocused`) envolve a pilha de cada uma das cinco abas. Precisa ser manual: o `NativeTabs` do iOS não
+congela nada, no Android o `TabSlot` repassa `freezeOnBlur` mas o padrão é desligado (nada chama
+`enableFreeze`), e a pilha interna de cada aba tem sempre a sua única tela "em foco". O estado, o cache do
+Query e os efeitos passivos (Realtime, timers) continuam vivos; só o render é adiado. `anti-slop.test.ts`
+prende as cinco pilhas.
+
+**Funcional (dev client, iOS iPhone 17 Pro e Android s26).** Com `console.log` temporário no render de
+Finanças: 0 renders enquanto a aba está congelada (Patrimônio por cima, ocultar alternado) e 1 ao voltar.
+Ocultar em Finanças e voltar à Hoje: valores já mascarados na primeira leitura (iOS, árvore de acessibilidade
+com `••••••`; Android, captura). Desocultar e voltar: valores à mostra. Trava do app e "Sem conexão" ficam
+fora das abas (`_layout` raiz) e não mudam.
+
+**Medição no release** (mesmo método; `emulator-5574`, JS ms por alternância = CPU da thread `mqt_v_js`
+no intervalo ÷ 20 toques a 3 s; host com `uptime` de 1 min entre 8 e 14, **mais carregado que na rodada
+anterior**, então compare só os pares da mesma rodada). A diferença entre APKs é só o `freeze={false}`:
+
+| Cenário (Patrimônio, botão temporário) | sem congelar, rodada 1 / 2 | congelando, rodada 1 / 2 |
+| --- | --- | --- |
+| 5 abas montadas | 725 / 797 ms | 648 / 503 ms |
+| só a tela (abertura direta) | 435 / 349 ms | 323 / 171 ms |
+
+Média: 761 → 575 ms (-24%) com cinco abas e 392 → 247 ms (-37%) só com a tela. Finanças (olho real do
+painel, uma rodada de cada): 594 → 548 ms com cinco abas; abertura direta 406 → 573 ms (ruído: o par não se
+repetiu). `am_anr` = 0 nas rodadas medidas. Um ANR (`FocusEvent`, 5 s) apareceu uma única vez, na PRIMEIRA
+abertura do APK recém-instalado com o host a 9,7 de carga; abrindo de novo não se repetiu.
+
+**A meta (dezenas a poucas centenas de ms) NÃO foi atingida.** O que ficou claro:
+- O custo restante é render do que está em foco: com o valor do contexto constante (só o provider +
+  `AsyncStorage` + o sincronizador de widgets) a alternância custa 95 ms (5 abas) e 36 ms (só a tela).
+- Tirar o `useBRL()` do corpo do Patrimônio **não ajudou** (681 / 262 ms contra 648 / 323): o corpo não é o
+  gargalo, são os ~17 `Money` e as seções que se assinam sozinhas. Por isso o passo 2 (mover `useBRL` para as
+  folhas) **não foi aplicado**: a medição não o justifica.
+- `adjustsFontSizeToFit` desligado no `Money` (experimento, não versionado): 509 / 218 ms, ganho pequeno.
+- O custo extra de ter cinco abas montadas (~+250-300 ms) continua mesmo com as abas congeladas e sem
+  `Money` de outra aba renderizando (conferido por contagem no dev): a causa não é render de consumidor, e
+  não foi isolada (hipóteses: heap/GC maior e layout nativo da árvore inteira).
+- Próximo passo se ainda for prioridade: perfil Hermes real do commit (não alcançável aqui; a CDP fecha
+  com 1006) para achar o que, dentro de `Money`/`Row`, custa ~15 ms por valor.
+
+**Estado final.** `com.proops.personal.anr` desinstalado, `android/app/build.gradle` restaurado (`diff`
+idêntico), o `BuildConfig` auxiliar do pacote `.anr` e o `autolinking` gerado movidos para fora (o Gradle
+regenera), `show_touches` e o `adb reverse tcp:8081` como estavam; dev client relançado no Metro da 8081
+(Android e iPhone). A instrumentação temporária de `net-worth.tsx` não foi versionada.
