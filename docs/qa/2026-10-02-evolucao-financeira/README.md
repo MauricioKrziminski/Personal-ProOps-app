@@ -33,11 +33,11 @@ Esses fatos e a abertura do formulário ainda não equivalem ao aceite funcional
 | F07 | Reserva dedicada | Aceite funcional no staging; incidente ANR aberto com disposição explícita | Persistência, temas, privacidade, fonte XL/teto, lifecycle/rotação iPad e Reduce Motion do iOS conferidos | Conta + investimento, offline/retry, terminal/CAS, matriz visual/lifecycle e APK embutido conferidos; limites no aceite |
 | F08 | Metas no planejamento | Aceito; commit local `8641fa38`, limites no registro | Matriz e persistência aprovadas | Matriz e persistência aprovadas |
 | F09 | Subcategorias | Aceito funcionalmente; contratos, corridas, gates e limpeza comprovados; limites no registro | Matriz e oráculos aprovados | Matriz, fonte ampliada/escuro e oráculos aprovados; repintura registrada |
-| F10 | Prazo pela contribuição | Próximo incremento, F09 aceito | Não validado | Não validado |
-| F11 | Alocar/transferir | Aguardando F10 | Não validado | Não validado |
-| F12 | Aporte/resgate | Aguardando F11 | Não validado | Não validado |
-| F13 | Resultado/reavaliação | Aguardando F12 | Não validado | Não validado |
-| F14 | Plano percentual | Aguardando F13 | Não validado | Não validado |
+| F10 | Prazo pela contribuição | Aceito; limites no registro | Validado | Validado |
+| F11 | Alocar/transferir | Aceito; limites no registro | Validado 10/10 | Validado 9/9 |
+| F12 | Aporte/resgate | Aceito; limites no registro | Validado 11/11 | Validado 8/10 |
+| F13 | Resultado/reavaliação | Aceito; correção do mesmo dia só no SQL | Validado 11/11 | Validado 8/8 |
+| F14 | Plano percentual | Próximo incremento, F13 aceito | Não validado | Não validado |
 | F15 | Explicação de mudanças | Aguardando F14 | Não validado | Não validado |
 | F16 | Voz contextual | Aguardando F15 | Não validado | Não validado |
 | F17 | Ajuda e avisos | Aguardando F16 | Não validado | Não validado |
@@ -282,3 +282,10 @@ F12 liberado.
 `20261004150000_investment_guard_p0001.sql`, só no staging. iOS 11/11 e Android 8/10; oráculo
 sem resíduo, contas de QA apagadas por ID. F13 liberado.
 
+## F13 — principal, resultado e reavaliação
+
+[Aceite e limites](f13/aceite.md) e [contrato](f13/contrato.md). Migrations
+`20261004160000_investment_valuations.sql` e `20261004163000_investment_same_day_movements.sql`
+(o resgate no mesmo dia da atualização de valor não descontava, achado no Android), só no
+staging. iOS 11/11 e Android 8/8; oráculo idêntico à linha de base, contas de QA apagadas por ID.
+F14 liberado.

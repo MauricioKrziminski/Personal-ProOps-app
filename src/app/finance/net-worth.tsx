@@ -25,6 +25,7 @@ import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Deslizavel } from '@/components/ui/deslizavel';
 import { SelectField } from '@/components/ui/select-field';
+import { VerMais } from '@/components/ui/ver-mais';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
@@ -44,12 +45,15 @@ import {
   useSaveAsset,
   type Asset,
 } from '@/hooks/use-finance';
+import { useAosPoucos } from '@/hooks/use-aos-poucos';
+import { useAssetValuations, useDeleteAssetValuation, type AssetValuation } from '@/hooks/use-investments';
 import { umDe, usePreferencia } from '@/hooks/use-preferencia';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useEmergencyReserve } from '@/hooks/use-emergency-reserve';
 import { useBRL } from '@/components/ui/conceal';
-import { formatNumberBR } from '@/lib/dates';
+import { formatNumberBR, isoToBR } from '@/lib/dates';
+import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 
 /**
@@ -171,6 +175,11 @@ export default function NetWorthScreen() {
   const save = useSaveAsset();
   const archive = useArchiveAsset();
   const [form, setForm] = useState<FormState | null>(null);
+  // F13 — a marcação de `as_of` mais recente é o valor atual do bem; apagar recalcula.
+  const marcacoes = useAssetValuations(form?.id);
+  const removerMarcacao = useDeleteAssetValuation();
+  const listaDeMarcacoes = marcacoes.data ?? [];
+  const marcacoesVisiveis = useAosPoucos(listaDeMarcacoes, form?.id ?? '');
 
   const hoje = patrimonio.data;
   const pontos = serie.data ?? [];
@@ -246,6 +255,21 @@ export default function NetWorthScreen() {
       }
     );
   };
+
+  const apagarMarcacao = (v: AssetValuation) =>
+    confirmaDestrutiva({
+      title: 'Apagar esta marcação?',
+      message: `${isoToBR(v.as_of)} · ${brl(v.value_cents)}. O valor atual do bem é recalculado.`,
+      confirm: 'Apagar',
+      onConfirm: () =>
+        removerMarcacao.mutate(v.id, {
+          onSuccess: (atual) => {
+            setForm((f) => (f ? { ...f, valor: atual, valorOriginal: atual } : f));
+            toast({ message: 'Marcação apagada.', tone: 'success' });
+          },
+          onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para apagar a marcação.'), tone: 'error' }),
+        }),
+    });
 
   const arquivar = (b: Asset) =>
     confirmaDestrutiva({
@@ -356,6 +380,9 @@ export default function NetWorthScreen() {
               <Money
                 cents={cents}
                 variant="ticker"
+                // A coluna de valor do `Row` encolhe o dinheiro, e no iPhone o texto encolhido numa
+                // medida estreita não volta a crescer: "Investimentos" ficava minúsculo (F13, 04/10).
+                encolhe={false}
                 tone={c.passivo && bruto > 0 ? 'danger' : 'text'}
                 signed={c.passivo && bruto > 0}
               />
@@ -607,6 +634,31 @@ export default function NetWorthScreen() {
                   autoFocus={Boolean(form.id)}
                 />
               </Field>
+
+              {form.id && listaDeMarcacoes.length > 0 ? (
+                <Section title="Marcações de valor">
+                  {marcacoesVisiveis.visiveis.map((v, i) => {
+                    const linha = (
+                      <Row
+                        title={isoToBR(v.as_of)}
+                        subtitle={i === 0 ? 'Valor atual' : undefined}
+                        chevron={false}
+                        accessibilityLabel={`${isoToBR(v.as_of)}, ${brl(v.value_cents)}${i === 0 ? ', valor atual' : ''}`}
+                        trailing={<Money cents={v.value_cents} variant="ticker" tone="text" />}
+                      />
+                    );
+                    // a única marcação não se apaga: o banco recusa e a linha nem oferece
+                    return listaDeMarcacoes.length > 1 ? (
+                      <Deslizavel key={v.id} titulo={isoToBR(v.as_of)} acoes={[{ label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => apagarMarcacao(v) }]}>
+                        {linha}
+                      </Deslizavel>
+                    ) : (
+                      <View key={v.id}>{linha}</View>
+                    );
+                  })}
+                  <VerMais restantes={marcacoesVisiveis.restantes} onPress={marcacoesVisiveis.verMais} />
+                </Section>
+              ) : null}
 
               {form.id ? (
                 <Button

@@ -658,3 +658,9 @@ promete configuração da reserva pelo WhatsApp antes da implementação/avalia�
 | app | agente |
 |---|---|
 | Aplicar, resgatar, vincular transferência já lançada, editar valor/data e desfazer movimento de uma conta de investimento (`investment_command`) | Lacuna: o agente não aplica nem resgata; uma transferência pedida por ele continua sendo uma transferência comum entre contas. Paridade pendente da etapa final do plano de 22 pontos; nenhuma tool/prompt mudou no F12. |
+
+## Investimentos: principal, resultado e reavaliação — F13 (04/10/2026)
+
+| app | agente |
+|---|---|
+| Atualizar valor, informar aplicado (abertura), registrar rendimento recebido e corrigir/apagar uma atualização de uma posição (`investment_value_command`); apagar marcação de um bem (`delete_asset_valuation`) | Lacuna: o agente não atualiza o valor de uma posição nem registra rendimento. `update_asset_value` (bens) segue com a mesma assinatura e passou a respeitar a marcação de data mais recente: reavaliar com data antiga não muda o valor atual. Paridade pendente da etapa final do plano de 22 pontos; nenhuma tool/prompt mudou no F13. |

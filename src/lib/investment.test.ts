@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   contasParaInvestir, decodeInvestmentLinkCandidates, decodeInvestmentMovements, decodeInvestmentPositions,
-  efeitoDoInvestimento, entradaDoInvestimento, mensagemDoInvestimento, naturezaDoMovimento, validarInvestimento,
-  type InvestmentDraft,
+  efeitoDoInvestimento, entradaDoInvestimento, entradaDoValor, frasesDaPosicao, mensagemDoInvestimento, naturezaDoMovimento, percentualDoResultado,
+  validarInvestimento, validarValor, type InvestmentDraft, type ValueDraft,
 } from './investment.ts';
 
 const posicoes = decodeInvestmentPositions([
@@ -92,4 +92,92 @@ test('natureza e mensagens do banco', () => {
   assert.equal(naturezaDoMovimento(apagado.movements[0]), 'Lançamento apagado');
   assert.deepEqual(apagado.next_before, { on: '2026-10-01', created: '2026-10-01T10:00:00Z', id: 'm0' });
   assert.equal(mensagemDoInvestimento(new Error('rede'), 'Não deu'), 'Não deu');
+});
+
+// ── F13: valor atual, aplicado, resultado e rendimento ────────────────────────────────────────────
+const nova = (extra: Record<string, unknown> = {}) => decodeInvestmentPositions([{
+  account_id: 'p', workspace_id: 'w', name: 'Corretora', balance_cents: '30000', net_contributed_cents: '25000', movements_count: 2,
+  value_cents: '33000', principal_cents: '30000', result_cents: '3000', result_quality: 'conhecido', received_cents: '500', last_valuation_on: '2026-10-01', opening_on: null,
+  ...extra,
+}])[0];
+
+test('F13: decodifica valor, aplicado, resultado, qualidade e recebido; resultado indisponível fica null, nunca zero', () => {
+  const p = nova();
+  assert.deepEqual([p.value_cents, p.principal_cents, p.result_cents, p.result_quality, p.received_cents, p.last_valuation_on], [33000, 30000, 3000, 'conhecido', 500, '2026-10-01']);
+  const sem = nova({ result_cents: null, result_quality: 'indisponível', last_valuation_on: null });
+  assert.equal(sem.result_cents, null);
+  assert.equal(nova({ result_cents: '-1200', result_quality: 'estimado' }).result_cents, -1200);
+  assert.throws(() => nova({ result_quality: 'otimo' }));
+  assert.equal(nova({ value_cents: undefined }).value_cents, 30000, 'sem valor do servidor, o saldo no app');
+});
+
+test('F13: frases da posição — indisponível não escreve número nem zero; estimado avisa', () => {
+  const brl = (c: number) => `R$ ${c / 100}`;
+  const sem = frasesDaPosicao(nova({ result_cents: null, result_quality: 'indisponível', last_valuation_on: null }), brl);
+  assert.equal(sem.resultado, null);
+  assert.match(sem.qualidade, /Atualize o valor para ver o resultado/);
+  assert.equal(sem.atualizado, null);
+  const ok = frasesDaPosicao(nova(), brl);
+  assert.equal(ok.resultado, 3000);
+  assert.equal(ok.atualizado, 'atualizado em 01/10');
+  assert.match(frasesDaPosicao(nova({ result_quality: 'estimado' }), brl).qualidade, /estimado/i);
+  assert.match(frasesDaPosicao(nova({ result_quality: 'conhecido' }), brl).qualidade, /aplicado informado|calculado/i);
+});
+
+test('F13: percentual simples só com resultado conhecido e aplicado positivo', () => {
+  assert.equal(percentualDoResultado(nova()), 10);
+  assert.equal(percentualDoResultado(nova({ result_cents: '-1500' })), -5);
+  assert.equal(percentualDoResultado(nova({ result_quality: 'estimado' })), null);
+  assert.equal(percentualDoResultado(nova({ principal_cents: '0' })), null);
+  assert.equal(percentualDoResultado(nova({ result_cents: null, result_quality: 'indisponível' })), null);
+});
+
+const vctx = { contas, posicoes: [nova()], hoje };
+const vbase: ValueDraft = { modo: 'valor', posicaoId: 'p', contaId: null, cents: 0, data: hoje, nota: '' };
+
+test('F13: formulário de valor incompleto não está pronto; data futura bloqueia com motivo', () => {
+  assert.deepEqual(validarValor(vbase, vctx), { pronto: false, motivo: null });
+  assert.equal(validarValor({ ...vbase, cents: 100 }, vctx).pronto, true);
+  assert.equal(validarValor({ ...vbase, cents: 100, data: '' }, vctx).pronto, false);
+  assert.equal(validarValor({ ...vbase, cents: 100, posicaoId: null }, vctx).pronto, false);
+  const futura = validarValor({ ...vbase, cents: 100, data: '2026-10-05' }, vctx);
+  assert.equal(futura.pronto, false);
+  assert.match(futura.motivo ?? '', /não pode ser futura/);
+  assert.equal(validarValor({ ...vbase, cents: 1.5 }, vctx).pronto, false);
+});
+
+test('F13: rendimento exige a conta; cai na posição ou em conta comum, nunca cartão ou outra posição', () => {
+  const r: ValueDraft = { ...vbase, modo: 'rendimento', cents: 100 };
+  assert.equal(validarValor(r, vctx).pronto, false);
+  assert.equal(validarValor({ ...r, contaId: 'p' }, vctx).pronto, true);
+  assert.equal(validarValor({ ...r, contaId: 'a' }, vctx).pronto, true);
+  assert.match(validarValor({ ...r, contaId: 'c' }, vctx).motivo ?? '', /cartão/i);
+  assert.match(validarValor({ ...r, contaId: 'q' }, vctx).motivo ?? '', /investimento/);
+  assert.equal(validarValor({ ...r, contaId: 'x' }, vctx).pronto, false, 'arquivada não serve');
+});
+
+test('F13: comandos exatos de valor, abertura, rendimento, editar e apagar', () => {
+  assert.deepEqual(entradaDoValor({ ...vbase, cents: 6000, nota: ' corretora ' }),
+    { op: 'valuation', position_account_id: 'p', value_cents: '6000', as_of: hoje, note: 'corretora' });
+  assert.deepEqual(entradaDoValor({ ...vbase, modo: 'aplicado', cents: 5000 }),
+    { op: 'opening', position_account_id: 'p', value_cents: '5000', as_of: hoje });
+  assert.deepEqual(entradaDoValor({ ...vbase, modo: 'rendimento', contaId: 'a', cents: 300 }),
+    { op: 'income', position_account_id: 'p', to_account_id: 'a', amount_cents: '300', occurred_on: hoje, note: null });
+  assert.deepEqual(entradaDoValor({ ...vbase, cents: 7000 }, { id: 'v', revision: 2 }),
+    { op: 'edit', valuation_id: 'v', value_cents: '7000', as_of: hoje, expected_revision: 2 });
+});
+
+test('F13: natureza das linhas novas do histórico e mensagens P0001', () => {
+  const lin = (extra: Record<string, unknown>) => decodeInvestmentMovements({ position_account_id: 'p', has_more: false, next_before: null, movements: [
+    { id: 'x', kind: 'valuation', nature: 'valuation', amount_cents: '6000', occurred_on: hoje, status: null, transfer_id: null, created_transfer: false, revision: 1, created_at: '2026-10-04T10:00:00Z', ...extra }] }).movements[0];
+  const v = lin({});
+  assert.equal(v.deleted, false, 'atualização de valor não tem transferência e não é "lançamento apagado"');
+  assert.equal(v.amount_cents, 6000);
+  assert.match(naturezaDoMovimento(v), /Valor informado/);
+  assert.match(naturezaDoMovimento(lin({ kind: 'opening', nature: 'opening' })), /Aplicado informado/);
+  const r = lin({ kind: 'income', nature: 'income', transfer_id: 't', counterparty_account_id: null, created_transfer: true });
+  assert.match(naturezaDoMovimento(r), /Rendimento recebido na posição/);
+  assert.match(naturezaDoMovimento(lin({ kind: 'income', nature: 'income', transfer_id: 't', counterparty_account_id: 'a', counterparty_name: 'Nubank', created_transfer: true })), /Rendimento recebido em Nubank/);
+  assert.equal(lin({ kind: 'income', nature: 'income', transfer_id: null, created_transfer: true }).deleted, true);
+  assert.equal(mensagemDoInvestimento({ code: 'P0001', message: 'Já existe uma atualização em 01/10: edite a de 01/10.' }, 'x'), 'Já existe uma atualização em 01/10: edite a de 01/10.');
 });

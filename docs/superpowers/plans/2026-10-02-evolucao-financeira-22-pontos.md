@@ -211,10 +211,12 @@ Aceite no staging em 04/10/2026: [F12](../../qa/2026-10-02-evolucao-financeira/f
 
 Arquivos: ledger F12, `update_asset_value`, valuations, composição de patrimônio. Interface: principal conhecido/variação/recebimento/correção com estado de qualidade explícito.
 
-- [ ] RED: valuation não entra no caixa; patrimônio antigo sem custo não inventa rendimento.
-- [ ] Implementar regras de cada operação e edição temporal.
-- [ ] Integrar composição/extrato/explicações, reusando ação de reavaliação.
-- [ ] Provar ganho/perda/resgate/correção e gates nativos F13; registrar aceite.
+- [x] RED: valuation não entra no caixa; patrimônio antigo sem custo não inventa rendimento.
+- [x] Implementar regras de cada operação e edição temporal.
+- [x] Integrar composição/extrato/explicações, reusando ação de reavaliação.
+- [x] Provar ganho/perda/resgate/correção e gates nativos F13; registrar aceite.
+
+Aceite no staging em 05/10/2026: [F13](../../qa/2026-10-02-evolucao-financeira/f13/aceite.md). F14 liberado.
 
 ### F14 — Plano percentual
 

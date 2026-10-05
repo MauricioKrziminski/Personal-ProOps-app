@@ -59,7 +59,7 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any } = {}) {
+function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[] } = {}) {
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
@@ -274,6 +274,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       : { ...query, isSuccess: true, data: options.debtPayments ?? [] },
     useDebtDeclaredEstimates: () => ({ ...query, isSuccess: true, data: options.declaredEstimates ?? [] }),
     pagamentosDaDivida: async () => ({ count: 0, totalCents: 0 }),
+    useAssets: () => ({ ...query, isSuccess: true, data: options.assets ?? [] }),
     useSaveAsset: () => mutation('saveAsset'),
     useArchiveAsset: () => mutation('archiveAsset'),
     useSettleInvoice: () => mutation('settleInvoice'),
@@ -462,6 +463,9 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
         useInvestmentMovements: (id?: string) => ({ ...query, isSuccess: true, data: id ? { pages: [{ movements: options.investments?.movements ?? [] }] } : undefined, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: async () => {} }),
         useInvestmentLinkCandidates: () => ({ ...query, isSuccess: true, data: options.investments?.candidates ?? [] }),
         useInvestmentCommand: () => mutation('investment'),
+        useInvestmentValueCommand: () => mutation('investment_value'),
+        useAssetValuations: (id?: string) => ({ ...query, isSuccess: true, data: id ? (options.assetValuations ?? []) : undefined }),
+        useDeleteAssetValuation: () => mutation('deleteAssetValuation'),
       };
       if (name === '@/components/finance/investments-section') return load('src/components/finance/investments-section.tsx');
       if (name === '@/lib/investment') return load('src/lib/investment.ts');
@@ -6969,7 +6973,8 @@ test('F11: o extrato mostra a natureza e só oferece Desfazer na linha de uma mo
   assert.equal(ui.confirmations.length, 1);
 });
 
-const f12Posicao = { account_id: 'p1', workspace_id: 'w1', name: 'Corretora', type_label: 'Conta de investimento', balance_cents: 30000, net_contributed_cents: 25000, movements_count: 2 };
+const f12Posicao = { account_id: 'p1', workspace_id: 'w1', name: 'Corretora', type_label: 'Conta de investimento', balance_cents: 30000, net_contributed_cents: 25000, movements_count: 2,
+  value_cents: 30000, principal_cents: 25000, result_cents: null, result_quality: 'indisponível', received_cents: 0, last_valuation_on: null, opening_on: null };
 const f12Opcoes = (extra: Record<string, unknown> = {}) => ({
   forecastAccounts: [{ id: 'a1', name: 'Nubank', type: 'checking', archived: false }, { id: 'p1', name: 'Corretora', type: 'investment', archived: false }],
   balances: [{ account_id: 'a1', cleared_cents: 100000 }], investments: { positions: [f12Posicao] }, ...extra,
@@ -7097,4 +7102,144 @@ test('F12: a folha de bem lembra de registrar aportes na conta de investimento, 
   const sem = screen('src/app/finance/net-worth.tsx', { forecastAccounts: [{ id: 'a1', name: 'Nubank', type: 'checking', archived: false }] });
   sem.press('Novo bem');
   assert.equal(sem.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Tipo').props.hint, undefined);
+});
+
+// ── F13: valor atual, aplicado, resultado e rendimento ────────────────────────────────────────────
+const f13Posicao = { ...f12Posicao, value_cents: 33000, result_cents: 3000, result_quality: 'conhecido', received_cents: 500, last_valuation_on: '2026-10-01' };
+const f13Abrir = (posicao: any = f12Posicao, extra: Record<string, unknown> = {}) => {
+  const ui = screen('src/app/finance/net-worth.tsx', f12Opcoes({ ...extra, investments: { positions: [posicao], ...(extra.investments as any) } }));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Row' && n.props.title === 'Corretora').props.onPress());
+  return ui;
+};
+const f13Linha = (ui: any, titulo: string) => ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === titulo);
+const f13Valor = (ui: any, cents: number) => ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(cents));
+
+test('F13: sem atualização de valor o resultado não tem número — só as palavras', () => {
+  const ui = f13Abrir();
+  const lista = f13Linha(ui, 'Corretora');
+  assert.match(String(lista.props.subtitle), /sem atualização de valor/);
+  assert.doesNotMatch(String(lista.props.subtitle), /Resultado/);
+  const resultado = f13Linha(ui, 'Resultado');
+  assert.equal(resultado.props.trailing, undefined, 'indisponível não escreve R$');
+  assert.match(String(resultado.props.subtitle), /Atualize o valor para ver o resultado/);
+  assert.doesNotMatch(String(resultado.props.subtitle), /R\$|\d/);
+  assert.equal(f13Linha(ui, 'Recebido'), undefined);
+});
+
+test('F13: com atualização o bloco mostra valor atual, aplicado, resultado com a qualidade, recebido e a data', () => {
+  const ui = f13Abrir(f13Posicao);
+  assert.equal(f13Linha(ui, 'Valor atual').props.trailing.props.cents, 33000);
+  assert.equal(f13Linha(ui, 'Valor atual').props.subtitle, 'atualizado em 01/10');
+  assert.equal(f13Linha(ui, 'Aplicado').props.trailing.props.cents, 25000);
+  assert.equal(f13Linha(ui, 'Resultado').props.trailing.props.cents, 3000);
+  assert.match(String(f13Linha(ui, 'Resultado').props.subtitle), /tudo que foi aplicado e resgatado/);
+  assert.equal(f13Linha(ui, 'Recebido').props.trailing.props.cents, 500);
+  assert.match(String(f13Linha(ui, 'Corretora').props.subtitle), /Resultado \+/);
+});
+
+test('F13: formulário de valor incompleto não grava; data futura bloqueia com o motivo escrito', () => {
+  const ui = f13Abrir();
+  ui.press('Atualizar valor');
+  assert.equal(f12Botao(ui, 'Atualizar valor').props.disabled, true);
+  ui.interact(() => f12Botao(ui, 'Atualizar valor').props.onPress?.());
+  assert.deepEqual(ui.writes, []);
+  f13Valor(ui, 6000);
+  assert.equal(f12Botao(ui, 'Atualizar valor').props.disabled, false);
+  const campo = ui.nodes().find((n: any) => n.type === 'DatePickerField');
+  assert.match(String(campo.props.max), /^\d{4}-\d{2}-\d{2}$/, 'o seletor não oferece o futuro');
+  const amanha = new Date(Date.now() + 2 * 86400000);
+  const br = `${String(amanha.getDate()).padStart(2, '0')}/${String(amanha.getMonth() + 1).padStart(2, '0')}/${amanha.getFullYear()}`;
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'DatePickerField').props.onChange(br));
+  assert.equal(f12Botao(ui, 'Atualizar valor').props.disabled, true);
+  assert.ok(f12Motivo(ui, /não pode ser futura/));
+  ui.interact(() => f12Botao(ui, 'Atualizar valor').props.onPress?.());
+  assert.deepEqual(ui.writes, []);
+});
+
+test('F13: atualizar valor manda valuation com a posição e o valor em centavos', () => {
+  const ui = f13Abrir();
+  ui.press('Atualizar valor');
+  f13Valor(ui, 6000);
+  ui.interact(() => f12Botao(ui, 'Atualizar valor').props.onPress());
+  const w = ui.writes.at(-1);
+  assert.equal(w.operation, 'investment_value');
+  assert.deepEqual([w.value.op, w.value.position_account_id, w.value.value_cents], ['valuation', 'p1', '6000']);
+});
+
+test('F13: rendimento pede a conta (a posição ou uma conta comum, nunca o cartão) e manda income', () => {
+  const ui = f13Abrir(f12Posicao, { forecastAccounts: [
+    { id: 'a1', name: 'Nubank', type: 'checking', archived: false }, { id: 'p1', name: 'Corretora', type: 'investment', archived: false },
+    { id: 'c1', name: 'Cartão', type: 'credit_card', archived: false }, { id: 'p2', name: 'Outra', type: 'investment', archived: false }] });
+  ui.press('Rendimento recebido');
+  assert.equal(ui.nodes().find((n: any) => n.type === 'Segmented').props.value, 'rendimento');
+  f13Valor(ui, 300);
+  assert.equal(f12Botao(ui, 'Rendimento recebido').props.disabled, true, 'sem a conta não grava');
+  const picker = ui.nodes().find((n: any) => n.type === 'AccountPicker');
+  assert.deepEqual(copia(picker.props.accounts.map((c: any) => c.id).sort()), ['a1', 'p1']);
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'AccountPicker').props.onChange('a1'));
+  ui.interact(() => f12Botao(ui, 'Rendimento recebido').props.onPress());
+  const v = ui.writes.at(-1).value;
+  assert.deepEqual([v.op, v.position_account_id, v.to_account_id, v.amount_cents], ['income', 'p1', 'a1', '300']);
+});
+
+test('F13: informar aplicado sobre uma abertura que já existe pede confirmação antes de substituir', () => {
+  const ui = f13Abrir({ ...f12Posicao, opening_on: '2026-08-15' });
+  ui.press('Informar aplicado');
+  f13Valor(ui, 20000);
+  ui.interact(() => f12Botao(ui, 'Informar aplicado').props.onPress());
+  assert.deepEqual(ui.writes, [], 'confirma antes de substituir');
+  assert.equal(ui.confirmations.length, 1);
+  ui.interact(() => ui.confirmations[0]());
+  const v = ui.writes.at(-1).value;
+  assert.deepEqual([v.op, v.value_cents], ['opening', '20000']);
+  const sem = f13Abrir();
+  sem.press('Informar aplicado');
+  f13Valor(sem, 20000);
+  sem.interact(() => f12Botao(sem, 'Informar aplicado').props.onPress());
+  assert.equal(sem.writes.at(-1).value.op, 'opening', 'sem abertura anterior grava direto');
+});
+
+test('F13: no histórico a atualização edita e apaga (confirmando); o rendimento só se desfaz', () => {
+  const base = { status: null, counterparty_account_id: null, counterparty_name: null, transfer_id: null, created_transfer: false, created_at: '2026-10-01T10:00:00Z', description: null };
+  const val = { ...base, id: 'v1', kind: 'valuation', nature: 'valuation', amount_cents: 33000, occurred_on: '2026-10-01', revision: 3 };
+  const ren = { ...base, id: 'm5', kind: 'income', nature: 'income', amount_cents: 500, occurred_on: '2026-09-30', status: 'cleared', transfer_id: 't5', created_transfer: true, revision: 1 };
+  const ui = f13Abrir(f13Posicao, { investments: { movements: [val, ren] } });
+  const rotulos = (d: any) => copia(d.props.acoes.map((x: any) => x.label));
+  const linhaVal = deslizaveis(ui).find((d: any) => d.props.acoes.some((x: any) => x.label === 'Apagar'));
+  assert.deepEqual(rotulos(linhaVal), ['Editar', 'Apagar']);
+  const linhaRen = deslizaveis(ui).find((d: any) => d.props.acoes.some((x: any) => x.label === 'Desfazer o movimento'));
+  assert.deepEqual(rotulos(linhaRen), ['Desfazer o movimento']);
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Row' && n.props.subtitle === 'Valor informado'));
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Row' && /Rendimento recebido na posição/.test(String(n.props.subtitle))));
+  ui.interact(() => linhaVal.props.acoes[1].onPress());
+  assert.deepEqual(ui.writes, [], 'confirma antes de apagar');
+  ui.interact(() => ui.confirmations[0]());
+  assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'investment_value', value: { op: 'delete', valuation_id: 'v1', expected_revision: 3 } });
+  ui.interact(() => linhaVal.props.acoes[0].onPress());
+  f13Valor(ui, 34000);
+  ui.interact(() => f12Botao(ui, 'Salvar').props.onPress());
+  assert.deepEqual(copia(ui.writes.at(-1).value), { op: 'edit', valuation_id: 'v1', value_cents: '34000', as_of: '2026-10-01', expected_revision: 3 });
+});
+
+test('F13: a folha do bem lista as marcações, apaga com confirmação e não oferece apagar a única', () => {
+  const bem = { id: 'b1', name: 'Casa', class: 'real_estate', is_liability: false, current_value_cents: 500000, acquired_at: null, archived: false };
+  const duas = [
+    { id: 'm2', value_cents: 500000, as_of: '2026-10-01', created_at: '2026-10-01T10:00:00Z' },
+    { id: 'm1', value_cents: 450000, as_of: '2026-06-01', created_at: '2026-06-01T10:00:00Z' },
+  ];
+  const abre = (marcas: any[]) => {
+    const ui = screen('src/app/finance/net-worth.tsx', { assets: [bem], assetValuations: marcas });
+    ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Row' && n.props.title === 'Casa').props.onPress());
+    return ui;
+  };
+  const ui = abre(duas);
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Section' && n.props.title === 'Marcações de valor'));
+  assert.equal(f13Linha(ui, '01/10/2026').props.subtitle, 'Valor atual');
+  const apagar = deslizaveis(ui).find((d: any) => d.props.acoes.some((x: any) => x.label === 'Apagar'));
+  ui.interact(() => apagar.props.acoes[0].onPress());
+  assert.deepEqual(ui.writes, [], 'confirma antes de apagar');
+  ui.interact(() => ui.confirmations[0]());
+  assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'deleteAssetValuation', value: 'm2' });
+  const so = abre([duas[0]]);
+  assert.equal(deslizaveis(so).some((d: any) => d.props.acoes.some((x: any) => x.label === 'Apagar')), false);
 });

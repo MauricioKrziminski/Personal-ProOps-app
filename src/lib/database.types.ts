@@ -1907,6 +1907,70 @@ export type Database = {
           },
         ]
       }
+      investment_valuations: {
+        Row: {
+          as_of: string
+          created_at: string
+          edit_revision: number
+          id: string
+          kind: string
+          note: string | null
+          position_account_id: string
+          recorded_at: string
+          user_id: string
+          value_cents: number
+          workspace_id: string
+        }
+        Insert: {
+          as_of: string
+          created_at?: string
+          edit_revision?: number
+          id?: string
+          kind: string
+          note?: string | null
+          position_account_id: string
+          recorded_at?: string
+          user_id: string
+          value_cents: number
+          workspace_id: string
+        }
+        Update: {
+          as_of?: string
+          created_at?: string
+          edit_revision?: number
+          id?: string
+          kind?: string
+          note?: string | null
+          position_account_id?: string
+          recorded_at?: string
+          user_id?: string
+          value_cents?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investment_valuations_position_account_id_fkey"
+            columns: ["position_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investment_valuations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investment_valuations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           attempts: number
@@ -3825,6 +3889,10 @@ export type Database = {
           principal_cents: number
         }[]
       }
+      delete_asset_valuation: {
+        Args: { p_valuation_id: string }
+        Returns: number
+      }
       delete_category: { Args: { p_name: string }; Returns: Json }
       delete_debt: { Args: { p_debt_id: string }; Returns: number }
       delete_installment_purchase: {
@@ -4001,6 +4069,10 @@ export type Database = {
         Returns: Json
       }
       investment_positions: { Args: never; Returns: Json }
+      investment_value_command: {
+        Args: { p_input: Json; p_request_id: string }
+        Returns: Json
+      }
       ledger_expected_lines: {
         Args: { p_from: string; p_recurring_id?: string; p_to: string }
         Returns: {
