@@ -674,3 +674,43 @@ async def test_resources_execute_despacha_o_plano_e_o_movimento(monkeypatch):
     p = await resources.prepare(ctx(), retirar)
     r = await resources.execute(ctx(target={"prepared": p}), retirar)
     assert r.message.startswith("↩️ Liberei R$ 100,00 da meta *Viagem*") and not r.read_only
+
+
+@pytest.mark.asyncio
+async def test_meta_ambigua_com_conta_pergunta_antes_da_lista(monkeypatch):
+    """Escolher a meta pela lista retoma DEPOIS da resolução: sem esta pergunta a conta se perderia."""
+    instala(monkeypatch, banco_da_meta())
+    ambigua = {"status": "ambiguous", "candidates": [{"id": "1", "label": "Viagem SP"}, {"id": "2", "label": "Viagem RJ"}]}
+    alvos = await movimentos.congelar(USER, WS, "America/Sao_Paulo", "", [guardar(account="Nubank")], [ambigua])
+    assert "Viagem SP, Viagem RJ" in alvos[0]["correction_error"] and "nome exato" in alvos[0]["correction_error"]
+    # sem conta dita, a lista segue como sempre
+    alvos = await movimentos.congelar(USER, WS, "America/Sao_Paulo", "", [guardar()], [ambigua])
+    assert "correction_error" not in alvos[0]
+
+
+@pytest.mark.asyncio
+async def test_goal_deposit_com_conta_e_sem_comando_nunca_cai_no_deposito_antigo(monkeypatch):
+    async def deposito(*a, **k):
+        raise AssertionError("o depósito antigo perderia a conta")
+
+    monkeypatch.setattr(finance.db, "fetch_one", deposito)
+    with pytest.raises(Level1Error, match="Não consegui conferir a conta"):
+        await finance.goal_deposit(ctx(target=ALVO), guardar(account="Nubank"))
+
+
+@pytest.mark.asyncio
+async def test_transferencia_para_investimento_sem_comando_nao_vira_transferencia_solta(monkeypatch):
+    async def cita(workspace_id, nome, **k):
+        return UUID(next(c["id"] for c in CONTAS if c["name"] == nome))
+
+    async def contas(workspace_id, **k):
+        return [{**c, "id": UUID(c["id"])} for c in CONTAS]
+
+    async def insere(*a, **k):
+        raise AssertionError("gravou a transferência solta")
+
+    monkeypatch.setattr(finance, "conta_citada", cita)
+    monkeypatch.setattr(finance.db, "accounts", contas)
+    monkeypatch.setattr(finance.db, "fetch_one", insere)
+    with pytest.raises(Level1Error, match="aplicação ou resgate"):
+        await finance.create_transfer(ctx(), transferir("Nubank", "CDB"))

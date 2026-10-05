@@ -236,6 +236,12 @@ async def congelar(user_id, workspace_id, tz: str, texto: str, acoes: list, alvo
 
 
 async def _congelar_guardar(user_id, workspace_id, tz, hoje, texto, a, alvo) -> dict | None:
+    if alvo.get("status") == "ambiguous" and (a.account or a.counterparty_account):
+        # Escolhida a meta pela lista, o fluxo retoma DEPOIS desta resolução e o `goal_deposit` antigo
+        # rodaria sem a conta que a pessoa disse — por isso a pergunta vem agora, com o nome exato.
+        nomes = ", ".join(c["label"] for c in alvo.get("candidates", [])[:6])
+        raise Level1Error(f"🤔 Qual meta? {nomes}. Me manda de novo com o nome exato dela, junto com a "
+                          "conta. Ainda não guardei nada.")
     if alvo.get("status") != "found" or not alvo.get("candidates"):
         return None  # sem meta resolvida quem responde é o `_sem_alvo` do registry
     valor = a.amount_cents or parse_valor_em_centavos(texto)

@@ -447,6 +447,12 @@ async def create_transfer(ctx: ExecContext, action: FinanceAction) -> ToolResult
         )
     if origem == destino:
         raise Level1Error("❌ Origem e destino são a mesma conta.")
+    if any(c["type"] == "investment" for c in await db.accounts(ctx.workspace_id)
+           if c["id"] in (origem, destino)):
+        # Aplicar/resgatar é o comando de investimento, congelado na resolução; chegar aqui sem ele
+        # gravaria uma transferência solta, fora da posição.
+        raise Level1Error("🤔 Não consegui conferir essa aplicação ou resgate. Me manda de novo. "
+                          "Ainda não registrei nada.")
 
     row = await db.fetch_one(
         """
@@ -1626,6 +1632,11 @@ async def goal_deposit(ctx: ExecContext, action: FinanceAction) -> ToolResult:
         # foram congelados na resolução (`movimentos.congelar`), o mesmo que o SIM aprovou.
         from app.tools import movimentos
         return await movimentos.executar(ctx, mov)
+    if action.account or action.counterparty_account:
+        # A conta foi dita e não há comando congelado (pendência de antes do deploy, ou a resolução não
+        # rodou): o depósito antigo a perderia em silêncio. Pede de novo em vez de adivinhar.
+        raise Level1Error("🤔 Não consegui conferir a conta desse aporte. Me manda de novo, com o nome da "
+                          "meta e da conta. Ainda não guardei nada.")
     # Só valida: o nome exibido sai do alvo congelado, logo abaixo.
     guards.require_text(action.target_ref or action.description, o_que="em qual meta")
     valor = guards.require_amount(_amount_with_fallback(ctx, action), o_que="o valor do aporte")
