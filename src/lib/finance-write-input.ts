@@ -5,11 +5,14 @@ import { argsDaParcelada, classificacaoDaEscrita, detalheDaEscrita, linhaDaRecor
 import { assertPaymentMethod } from './payment-method.ts';
 import type { ExpenseClassification } from './expense-classification.ts';
 
+/** Pagas do ciclo atual que o Salvar lança como pagamento (a prévia as simula; a gravação as lança depois). */
+export type JaSairam = { accountId: string; numbers: number[] };
+
 /** Arguments shared by the rollback preview and the real public write, without request ids. */
 export type FinanceWrite =
   | { operation: 'transaction'; args: { p_transaction_id: string | null; p_input: Json;
       p_fee_cents: number | null; p_expected_revision: number | null } }
-  | { operation: 'purchase'; args: { p_tipo: 'parcelada' | 'financiamento'; p_dados: Json } }
+  | { operation: 'purchase'; args: { p_tipo: 'parcelada' | 'financiamento'; p_dados: Json; p_ja_sairam?: JaSairam } }
   | { operation: 'recurring'; args: { p_input: Json } };
 
 export type EntradaEscritaLancamento = TransactionInput & Partial<ExpenseClassification> & {
@@ -45,9 +48,9 @@ export function escritaDaRecorrente(input: EntradaRecorrente): Extract<FinanceWr
   return { operation: 'recurring', args: { p_input: linhaDaRecorrente(input) as Json } };
 }
 
-export function escritaDoFinanciamento(input: EntradaFinanciamento): Extract<FinanceWrite, { operation: 'purchase' }> {
+export function escritaDoFinanciamento(input: EntradaFinanciamento, jaSairam?: JaSairam | null): Extract<FinanceWrite, { operation: 'purchase' }> {
   const { down_payment, ...resto } = input;
   return { operation: 'purchase', args: { p_tipo: 'financiamento', p_dados: {
     ...linhaDoFinanciamento(resto), ...(down_payment ? { down_payment } : {}),
-  } as Json } };
+  } as Json, ...(jaSairam?.numbers.length ? { p_ja_sairam: jaSairam } : {}) } };
 }

@@ -866,7 +866,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
         </>}
         </TrocaSuave>
         <FinanceWritePreview accounts={accounts.data ?? []} write={target && !editandoId && !form.id && !converter
-          && !props.salvarBloqueado && !salvando ? escritaDoFinanciamento(target) : null} />
+          && !props.salvarBloqueado && !salvando ? escritaDoFinanciamento(target, jaSairam) : null} />
         {!editandoId && !converter ? (
           <Button
             variant="secondary"

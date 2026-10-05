@@ -2798,7 +2798,9 @@ export function useSaveDebt() {
         if (error) throw error;
         if (!data?.length) throw Object.assign(new Error('A dívida mudou enquanto você editava.'), { code: 'VERSAO' });
       } else {
-        const { args } = escritaDoFinanciamento({ ...resto, ...(down_payment ? { down_payment } : {}) });
+        // O builder é o da prévia (que leva p_ja_sairam); a RPC real não o conhece e a gravação o lança depois.
+        const { p_ja_sairam: _ja, ...args } = escritaDoFinanciamento(
+          { ...resto, ...(down_payment ? { down_payment } : {}) }, ja_sairam).args;
         const key = JSON.stringify(args.p_dados);
         if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
         const { data, error } = await supabase.rpc('create_purchase', {

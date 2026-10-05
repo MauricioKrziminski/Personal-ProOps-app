@@ -1434,7 +1434,9 @@ test('parcela paga que venceu no ciclo atual: pergunta se já saiu da conta e la
   ui.fill('Próxima parcela (a 9ª)', '05/10/2026');
   const pergunta = ui.nodes().filter((n: any) => n.type === 'Field' && /^A 8ª \(05\/09\) já saiu da conta Itaú\?/.test(n.props.label));
   assert.equal(pergunta.length, 1, 'uma linha por parcela no ciclo, com a conta');
-  // com conta escolhida o padrão é Sim: Salvar liga e manda a parcela
+  // com conta escolhida o padrão é Sim: a prévia "Ao salvar" já leva a parcela (o que o Salvar lança)
+  const previa = (x: any) => JSON.parse(JSON.stringify(x.nodes().find((n: any) => n.type === 'FinanceWritePreview').props.write));
+  assert.deepEqual(previa(ui).args.p_ja_sairam, { accountId: 'cc', numbers: [8] });
   ui.press('Salvar');
   assert.deepEqual(JSON.parse(JSON.stringify(ui.writes.at(-1).value.ja_sairam)), { accountId: 'cc', numbers: [8] });
   // Não: continua só contada
@@ -1443,6 +1445,7 @@ test('parcela paga que venceu no ciclo atual: pergunta se já saiu da conta e la
   nao.fill('Parcelas já pagas', '8');
   nao.fill('Próxima parcela (a 9ª)', '05/10/2026');
   nao.press('Não');
+  assert.equal('p_ja_sairam' in previa(nao).args, false, 'Não: a prévia não simula a parcela');
   nao.press('Salvar');
   assert.equal(nao.writes.at(-1).value.ja_sairam, undefined);
   // Pagas de ciclos anteriores não perguntam
