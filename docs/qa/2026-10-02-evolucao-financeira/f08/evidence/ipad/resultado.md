@@ -162,3 +162,54 @@ Chave removida (`defaults delete`) + `notifyutil`, app relançado; o toast do Re
 ### Estado devolvido
 Reduzir Movimento desligado nos dois simuladores (iPad: chave removida + `notifyutil`, app relançado em Metas; iPhone: já estava em 0).
 Tema claro, `content_size large`, retrato. Nenhum código editado; nada gravado no staging.
+
+## Rotação (Android tablet) — 05/10/2026
+
+Substitui, no Android, o caso "Girar com a folha aberta + rascunho" que o iPad não pôde executar (o iPad segue NÃO EXECUTADO).
+Android 16 `emulator-5574` (AVD `s26`), `com.proops.personal.dev`, staging, dev@, **somente leitura**: o "Salvar" nunca foi tocado
+(Metas termina em "Há sugestões iniciais: confira as metas e salve seu plano"). HEAD `dd0f8e9b`; Metro 8081 já de pé, bundle Android
+conferido por `curl` (19.866.519 bytes; contém `Conferir e encerrar tentativa`, texto do código do F08).
+
+Tablet: `wm size 1600x2560` + `wm density 320` (1000×1600 dp), `accelerometer_rotation 0`, `wm set-ignore-orientation-request true`
+(`cmd window set-ignore-orientation-request true`), giro por `settings put system user_rotation 1|0` (ROTATION_90 ↔ ROTATION_0 lido em
+`dumpsys window displays`). Navegação por gestos (não a de 3 botões). Diálogo central dentro da área segura nos dois sentidos.
+
+| Caso | Resultado | Capturas |
+|---|---|---|
+| Rascunho `75,00` em "Aporte inicial" (Reserva de emergência): retrato → paisagem → retrato, DOIS ciclos | **PASSA** | `an-02`, `an-03`, `an-04` |
+| Ocultar valores LIGADO, rascunho `2,50` (Troca do notebook): retrato → paisagem → retrato, DOIS ciclos | **PASSA** | `an-05`..`an-09` |
+
+Critério e o que foi lido a cada giro (`uiautomator dump` + captura): a folha "Plano de metas" continua aberta (não fechou nem
+recarregou para o esqueleto), o valor digitado segue no campo (nó `text="75,00"` / `text="2,50"`), a posição de rolagem da folha
+fica a mesma, "Salvar" continua habilitado, e o resultado derivado acompanha o rascunho (Calendário "Aporte inicial R$ 75,00" /
+"Por mês R$ 1.038,64" iguais antes e depois do giro).
+
+- **Sem Ocultar** (`an-01` Metas em retrato; `an-02` retrato; `an-03` paisagem; `an-04` retrato de volta): todos os valores
+  visíveis, rascunho `75,00` nos 5 pontos de leitura (retrato, paisagem, retrato, paisagem, retrato).
+- **Com Ocultar** (chave `proops.conceal` = 1 gravada com o app parado): Metas e a folha mascaram (`••••••`, "Previsão oculta",
+  "Plano oculto", "Menor disponibilidade" oculta) e o **valor digitado `2,50` fica legível** em retrato (`an-05`, `an-08`) e
+  em paisagem (`an-06` e `an-09`, esta rolada até o campo); 5 leituras (retrato, paisagem, retrato, paisagem, retrato) com o
+  campo `2,50` e "Previsão oculta" presentes (3 ou 4 ocorrências, conforme a rolagem exibida).
+- Não foi gravado plano, aporte, alocação nem transação. As folhas foram fechadas pelo "Fechar" (✕).
+
+### Observações (não derrubam o PASSA da rotação)
+
+- **O6 — Defeito novo, fora do critério de rotação: o campo "Aporte inicial" do `GoalPlanSheet` pinta o valor SEM o primeiro dígito
+  depois que a prévia recalcula, quando o valor tem 5 caracteres** (`25,01`, `75,00`; com `2,50` não acontece). Com o teclado
+  aberto e o "Salvar" ainda cinza (prévia recalculando) o campo mostra o valor inteiro (`an-10`, `an-13`: `7,50` enquanto a última tecla
+  chega); quando o "Salvar" volta a ficar preto, o mesmo campo passa a pintar `5,00` — **com o teclado ainda aberto** (`an-14`) —, e
+  continua `5,01` depois do ✓ (`an-11`). O nó de acessibilidade segue lendo `75,00` e o resultado derivado usa `R$ 25,01` / `R$ 75,00`
+  (Calendário, "Por mês"): é pintura do campo, não o valor. O gatilho parece ser o ciclo ocupado → livre da consulta, não a perda de
+  foco. Reproduz no celular (1344×2992 @480dpi) no mesmo campo (`an-12`), logo NÃO é do tablet nem do giro. Controle: o campo Valor de
+  `/finance/lancar` com `25,01` e `250,10` fica íntegro depois do ✓. Não investigado; nenhum código editado.
+- O7 — Lentidão do emulador: a primeira captura ~8 s depois de voltar para retrato, uma vez, mostrou a folha deslocada
+  (~16 px para a direita e mais estreita) com a tela de fundo ainda em layout intermediário; com ~12 s ou numa segunda captura
+  estava centralizada como em `an-02`. Todas as demais leituras (≥ 12 s depois do giro) vieram corretas. Máquina carregada (vários
+  emuladores/simuladores em uso); não reproduzido de forma determinística.
+- O8 — A digitação por `adb input text` aplica as teclas com atraso no Gboard do emulador; os valores foram conferidos pelo
+  Calendário/árvore antes de girar.
+
+### Estado devolvido
+`wm size reset` / `wm density reset` (1344×2992 @480dpi), `user_rotation 0` + `accelerometer_rotation 1`,
+`set-ignore-orientation-request false`, Ocultar valores desligado (chave `proops.conceal` removida), app relançado em retrato
+na Hoje. Nada gravado no staging.
