@@ -4107,10 +4107,6 @@ export type Database = {
         }[]
       }
       cycle_now: { Args: { p_view?: string }; Returns: Json }
-      register_counted_debt_payments: {
-        Args: { p_account_id: string; p_debt_id: string; p_numbers: number[] }
-        Returns: number
-      }
       cycle_range: { Args: { p_month: string; p_view?: string }; Returns: Json }
       cycle_series: {
         Args: { ate: string; de: string; p_view?: string }
@@ -4616,6 +4612,10 @@ export type Database = {
       preview_finance_write: {
         Args: { p_args: Json; p_days?: number; p_operation: string }
         Returns: Json
+      }
+      register_counted_debt_payments: {
+        Args: { p_account_id: string; p_debt_id: string; p_numbers: number[] }
+        Returns: number
       }
       rename_category: {
         Args: { p_from: string; p_juntar?: boolean; p_to: string }
