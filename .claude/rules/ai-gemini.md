@@ -80,7 +80,7 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   `FinanceAction` está cheio — capacidade nova ali sai por ALVO resolvido (foi assim que quitar
   fatura sem caixa virou `mark_paid` sobre `card_invoices`) ou pelo catálogo de `ResourceAction`,
   que segue em 5×5 e aceita campo novo de graça. Ver `docs/AGENTE-PARIDADE-COM-O-APP.md`.
-- Por isso Finanças são **dois** schemas: escrita/correção (18×14, no teto de 252) e consulta (10×12). Escrita e
+- Por isso Finanças são **dois** schemas: escrita/correção (18×14, no teto de 252) e consulta (11×13 = 143, medido em 05/10/2026). Escrita e
   correção ficam juntas de propósito — separá-las obrigaria o router a decidir se "o mercado de
   ontem foi 120" é lançamento novo ou correção, e errar isso cria a duplicata que o produto
   inteiro luta para evitar.
