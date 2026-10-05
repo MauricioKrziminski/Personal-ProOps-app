@@ -9,7 +9,7 @@ set local timezone to 'America/Sao_Paulo';
 
 do $$
 declare
-  ws uuid; u uuid; conta uuid; d1 uuid; d2 uuid; l record; venc date := current_date - 12;
+  ws uuid; u uuid; conta uuid; d1 uuid; d2 uuid; d3 uuid; ok boolean; ok2 boolean; l record; venc date := current_date - 12;
   base bigint; com bigint; hoje_base bigint; hoje_com bigint; n int;
 begin
   select w.id, m.user_id into ws, u
@@ -80,6 +80,35 @@ begin
      or l.due_date <> private.day_in_month(private.add_months(venc, 1), extract(day from venc)::int) then
     raise exception 'e: primeira linha %ª em %', l.installment_no, l.due_date;
   end if;
+  -- (f) DUAS atrasadas (7 pagas: a 8ª e a 9ª vencidas): cada uma conta uma vez hoje (N x)
+  insert into public.debts (workspace_id, user_id, name, kind, calculation_mode, principal_cents,
+    remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents,
+    due_day, first_due_date, account_id)
+  values (ws, u, 'teste atrasada 3', 'financing', 'fixed_installments', 120000, 50000, 0, 12, 7,
+    10000, extract(day from venc)::int, private.add_months(venc, -8), conta)
+  returning id into d3;
+  update public.debts set archived = true where id in (d1, d3);
+  select coalesce(sum(out_cents) filter (where day = current_date),0) into hoje_base
+    from private.eventos_de_caixa(array[ws], current_date + 120) where account_id = conta;
+  update public.debts set archived = false where id = d3;
+  select coalesce(sum(out_cents) filter (where day = current_date),0) into hoje_com
+    from private.eventos_de_caixa(array[ws], current_date + 120) where account_id = conta;
+  if hoje_com - hoje_base < 20000 then raise exception 'f: duas atrasadas somaram só % hoje', hoje_com - hoje_base; end if;
+  select count(*) into n from private.cash_events(array[ws], current_date, current_date + 5)
+   where origin = 'debt_schedule' and ref_id = d3 and atrasada and day = current_date;
+  if n <> 2 then raise exception 'f: cash_events devolveu % atrasadas', n; end if;
+
+  -- (g) ciclo FECHADO: "faltou pagar" inclui a parcela vencida e `confere` não muda
+  for l in select * from private.cycle_series_for(array[ws], venc - 40, current_date, 'civil')
+           where estado = 'fechado' loop
+    update public.debts set archived = true where id = d3;
+    select faltou_pagar, confere into base, ok from private.cycle_series_for(array[ws], l.mes, l.mes, 'civil') where mes = l.mes;
+    update public.debts set archived = false where id = d3;
+    select faltou_pagar, confere into com, ok2 from private.cycle_series_for(array[ws], l.mes, l.mes, 'civil') where mes = l.mes;
+    select coalesce(sum(s.payment_cents),0) into n from private.debt_schedule_for(d3) s where s.due_date <= l.fim;
+    if com - base <> n then raise exception 'g: ciclo % faltou +% esperado +%', l.mes, com - base, n; end if;
+    if ok is distinct from ok2 then raise exception 'g: confere mudou no ciclo %', l.mes; end if;
+  end loop;
 end $$;
 
 rollback;
