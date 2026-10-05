@@ -321,8 +321,10 @@ Aceite no staging em 05/10/2026: [F22](../../qa/2026-10-02-evolucao-financeira/f
 
 ## Verificação integrada final
 
-- [ ] Confrontar os 22 aceites com a spec; todo recurso localiza-se no fluxo e tem comportamento real.
-- [ ] Executar gates globais necessários, suíte SQL financeira e isolamento; verificar cliente anterior.
-- [ ] Exercitar jornada início → pagamento → consulta → orçamento → meta/reserva → investimento → cenário → captura/duplicação em ambos os sistemas.
-- [ ] Conferir paridade app/agente, docs de domínio/ajuda e matriz de evidência.
-- [ ] Registrar resultado local/staging e artefatos concretos; publicação de produção depende de pedido próprio.
+- [x] Confrontar os 22 aceites com a spec; todo recurso localiza-se no fluxo e tem comportamento real.
+- [x] Executar gates globais necessários, suíte SQL financeira e isolamento; verificar cliente anterior.
+- [x] Exercitar jornada início → pagamento → consulta → orçamento → meta/reserva → investimento → cenário → captura/duplicação em ambos os sistemas.
+- [x] Conferir paridade app/agente, docs de domínio/ajuda e matriz de evidência.
+- [x] Registrar resultado local/staging e artefatos concretos; publicação de produção depende de pedido próprio.
+
+Concluída no staging em 05/10/2026: [verificação final](../../qa/2026-10-02-evolucao-financeira/final/aceite.md). Produção, push e tag não feitos.

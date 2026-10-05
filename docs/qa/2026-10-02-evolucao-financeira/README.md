@@ -356,3 +356,10 @@ reconferido em vídeo nos dois. Usuários de QA e contas apagados por ID. F22 li
 `20261005180000_transaction_templates.sql` (renomeada na integração), só no staging. Duplicar abre
 o formulário com a data de hoje e sem vínculo; favoritos como modelos que preenchem e nunca gravam
 sozinhos. Lançamentos e favoritos de QA apagados por ID.
+
+## Verificação integrada final
+
+[Registro](final/aceite.md). Os 22 pontos aceitos no staging; gates globais verdes (2345 app,
+1258 agente, SQL 111/113 com as duas ambientais); jornada só de leitura nos dois sistemas;
+paridade app/agente registrada para os 22, com as lacunas do agente declaradas. Produção, push e
+tag não feitos.
