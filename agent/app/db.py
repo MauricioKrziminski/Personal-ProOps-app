@@ -11,6 +11,7 @@ no schema isolado, e não em `public` (onde o PostgREST as exporia com a anon ke
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 from typing import Any, Literal
 from uuid import UUID
 
@@ -115,6 +116,42 @@ async def execute(sql: str, *args: Any) -> int:
     async with pool().connection() as conn:
         cur = await conn.execute(sql, args)
         return cur.rowcount
+
+
+class _Tx:
+    """execute/fetch presos à MESMA conexão (e transação) de `como_usuario`."""
+
+    def __init__(self, conn: Any) -> None:
+        self._conn = conn
+
+    async def fetch(self, sql: str, *args: Any) -> list[dict[str, Any]]:
+        cur = await self._conn.execute(sql, args)
+        return await cur.fetchall()
+
+    async def fetch_one(self, sql: str, *args: Any) -> dict[str, Any] | None:
+        rows = await self.fetch(sql, *args)
+        return rows[0] if rows else None
+
+    async def execute(self, sql: str, *args: Any) -> int:
+        cur = await self._conn.execute(sql, args)
+        return cur.rowcount
+
+
+@asynccontextmanager
+async def como_usuario(user_id: UUID | str):
+    """Roda RPCs do app que leem `auth.uid()` (o serviço conecta como `postgres`, onde ele é null).
+
+    O pool é autocommit, então dois `execute` soltos caem em transações diferentes: o claim
+    precisa ser LOCAL (`set_config(..., true)`) e viver na mesma transação da RPC. Ao sair do
+    bloco a transação fecha e o claim some com ela — nunca vaza para a próxima conexão do pool.
+    Quem chama passa o dono da sessão (`ctx.user_id`), nunca um id vindo do modelo.
+    """
+    async with pool().connection() as conn:
+        async with conn.transaction():
+            await conn.execute(
+                "select set_config('request.jwt.claim.sub', %s, true)", (str(user_id),)
+            )
+            yield _Tx(conn)
 
 
 # ---------------------------------------------------------------------------
