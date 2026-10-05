@@ -15,7 +15,7 @@ export type Passo = {
   id: PassoId;
   titulo: string;
   feito: boolean;
-  href: '/link-phone' | '/finance/accounts' | '/agent/new' | '/guia';
+  href: '/link-phone' | '/finance/comecar' | '/agent/new' | '/guia';
 };
 
 export function passosDeConfiguracao(i: {
@@ -26,7 +26,7 @@ export function passosDeConfiguracao(i: {
 }): Passo[] {
   return [
     { id: 'whatsapp', titulo: 'Ligar o WhatsApp', feito: Boolean(i.telefone?.trim()), href: '/link-phone' },
-    { id: 'conta', titulo: 'Cadastrar conta ou cartão', feito: i.contas > 0, href: '/finance/accounts' },
+    { id: 'conta', titulo: 'Cadastrar conta ou cartão', feito: i.contas > 0, href: '/finance/comecar' },
     { id: 'lancamento', titulo: 'Fazer o primeiro lançamento', feito: i.temLancamento, href: '/agent/new' },
     { id: 'guia', titulo: 'Conhecer o app', feito: i.abriuOGuia, href: '/guia' },
   ];

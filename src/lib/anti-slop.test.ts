@@ -1485,6 +1485,7 @@ test('toda tela de dados tem puxar para atualizar', () => {
     'app/reminder-form.tsx': 'formulário',
     'app/finance/lancar.tsx': 'formulário',
     'app/finance/down-payment.tsx': 'formulário de entrada',
+    'app/finance/comecar.tsx': 'formulário em passos',
     'app/notes/[id].tsx': 'editor: puxar competiria com a rolagem do texto',
     'app/(tabs)/agent/index.tsx': 'compositor; o histórico tem o gesto',
     'app/finance/wallet.tsx': 'carrossel de cartões',

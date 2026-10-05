@@ -44,8 +44,8 @@ Esses fatos e a abertura do formulário ainda não equivalem ao aceite funcional
 | F18 | Transferência recorrente | Aceito; limites no registro | Validado 6/6 | Validado 5/5 |
 | F19 | Marcos nas metas | Aceito; limites no registro | Validado (celebração em vídeo) | Validado 6/6 |
 | F20 | Acumulação/renda futura | Aceito; limites no registro | Validado 9/10 + correção | Validado 9/9 |
-| F21 | Primeiro cadastro guiado | Próximo incremento, F20 aceito | Não validado | Não validado |
-| F22 | Favoritos/duplicação | Aguardando F21 | Não validado | Não validado |
+| F21 | Primeiro cadastro guiado | Aceito; limites no registro | Validado 11/11 + reconferência | Validado 7/8 + reconferência |
+| F22 | Favoritos/duplicação | Próximo incremento, F21 aceito | Não validado | Não validado |
 
 ## Registro obrigatório por incremento
 
@@ -342,3 +342,10 @@ iOS e Android aprovados; metas de QA apagadas por ID. F20 liberado.
 aparelho e grava só as premissas (`usePreferencia`). Valores conferidos contra cálculo à parte nos
 dois sistemas; o QA achou o texto "atinge não atinge", os campos colados na borda e a fileira de
 botões cortada na fonte grande, corrigidos e conferidos. F21 liberado.
+
+## F21 — primeiro cadastro guiado
+
+[Aceite e limites](f21/aceite.md) e [contrato](f21/contrato.md). Sem migration. Conta, cartão e
+primeiro lançamento em passos puláveis, com os mesmos campos e a mesma escrita de Contas; saldo
+sem lançamento de abertura. O QA achou o passo errado piscando ao salvar, corrigido e
+reconferido em vídeo nos dois. Usuários de QA e contas apagados por ID. F22 liberado.

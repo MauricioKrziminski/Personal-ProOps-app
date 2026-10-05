@@ -896,6 +896,8 @@ test('mark paid rejects a zero-row write instead of reporting success', async ()
   ser uma decisão escrita, não um esquecimento.
 */
 const FORA_DE_PROPOSITO: Record<string, string> = {
+  // Só identifica o espaço padrão (chave do progresso do primeiro cadastro); nenhum lançamento o muda.
+  'default-workspace-id': 'não deriva de lançamento',
   // Histórico de alertas enviados: não deriva do ledger, tem vida própria no cron.
   'alerts-sent': 'não é derivada de lançamento',
   // As ocorrências das hipóteses do rascunho no ciclo: aritmética do rascunho, não lê lançamento.

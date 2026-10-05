@@ -3648,6 +3648,11 @@ export function useCreateAccount() {
   return { ...mutation, unconfirmedInput };
 }
 
+/** O espaço padrão de quem está logado — a chave do progresso do primeiro cadastro. */
+export function useDefaultWorkspaceId() {
+  return useQuery({ queryKey: ['default-workspace-id'], queryFn: workspaceId });
+}
+
 /** Cria ou edita (mesma forma de useSaveTransaction: com `id` vira update). */
 export function useSaveAccount() {
   const invalidate = useInvalidateFinance();

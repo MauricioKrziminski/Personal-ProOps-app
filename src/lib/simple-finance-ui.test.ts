@@ -264,6 +264,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
     useDeleteTransaction: () => mutation('deleteTransaction'),
     useSaveAccount: () => mutation('saveAccount'),
     useCreateAccount: () => ({ ...mutation('createAccount'), unconfirmedInput: null }),
+    useDefaultWorkspaceId: () => ({ ...query, isSuccess: true, data: 'ws-1' }),
     useContaTemLancamentos: () => ({ ...query, isSuccess: true, data: Boolean(options.contaTemLancamentos) }),
     useArchiveDebt: () => mutation('archiveDebt'),
     useUnarchiveDebt: () => mutation('unarchiveDebt'),
@@ -650,7 +651,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
       if (name === '@/lib/account-form') return load('src/lib/account-form.ts');
       if (name === '@/components/finance/account-form') return load('src/components/finance/account-form.tsx');
-      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias' || name === '@/lib/comecar') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       // o `categorias.ts` importa o mapa de ícones por caminho relativo (roda no `node --test` puro)
       if (name === '../design/category-icons.ts') return { categoryIcon: () => 'circle' };
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
@@ -7615,4 +7616,24 @@ test('F17: fatura que não existe mais mostra "Isto não existe mais" com o cami
   assert.equal(ui.nodes().some((n: any) => n.type === 'ErrorBand'), false, 'não é erro genérico');
   ui.interact(() => vazio.props.action.onPress());
   assert.deepEqual(copia(ui.navigations.at(-1)), { replace: '/finance/invoices' });
+});
+
+test('Começar: pular não grava nada e salvar cria exatamente uma conta pela RPC do hook', () => {
+  const doTipo = (ui: any, nome: string) => ui.nodes().find((n: any) => n.type === nome || n.type?.name === nome);
+  const pular = screen('src/app/finance/comecar.tsx', { params: {}, forecastAccounts: [] });
+  pular.interact(() => doTipo(pular, 'FormularioDeConta').props.onPular());
+  assert.equal(pular.writes.length, 0);
+  assert.deepEqual(copia(pular.navigations.at(-1)), { back: true });
+
+  const ui = screen('src/components/finance/formulario-de-conta.tsx', { componente: 'FormularioDeConta', forecastAccounts: [], props: {
+    tipo: 'checking', contas: [], payerId: null, onCriada: () => {}, onPular: () => {}, rotuloPular: 'Agora não',
+  } });
+  assert.equal(ui.button('Salvar').props.disabled, true, 'sem nome não salva');
+  ui.interact(() => { const f = doTipo(ui, 'AccountFormFields').props; f.onChange({ ...f.form, name: 'Conta do banco', saldoCents: 12345 }); });
+  ui.interact(() => { const salvar = ui.button('Salvar').props.onPress; salvar(); salvar(); });
+  assert.equal(ui.writes.length, 1, 'duplo toque é uma escrita só');
+  assert.equal(ui.writes[0].operation, 'createAccount');
+  assert.equal(ui.writes[0].value.name, 'Conta do banco');
+  assert.equal(ui.writes[0].value.initial_balance_cents, 12345);
+  assert.equal(ui.writes[0].value.type, 'checking');
 });

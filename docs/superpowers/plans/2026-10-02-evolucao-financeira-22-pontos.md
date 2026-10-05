@@ -301,10 +301,12 @@ Aceite no staging em 05/10/2026: [F20](../../qa/2026-10-02-evolucao-financeira/f
 
 Arquivos: onboarding/first steps, formulário de conta/cartão F02 e progress state. Interface: passo efetivo + ids criados → retomada idempotente.
 
-- [ ] RED: interrupção após salvar retoma sem nova entidade/receita artificial.
-- [ ] Implementar passos puláveis e usuário com cadastros preexistentes.
-- [ ] Integrar moldura/movimento/campos existentes.
-- [ ] Provar retomada/workspace/saldo inicial e gates nativos F21; registrar aceite.
+- [x] RED: interrupção após salvar retoma sem nova entidade/receita artificial.
+- [x] Implementar passos puláveis e usuário com cadastros preexistentes.
+- [x] Integrar moldura/movimento/campos existentes.
+- [x] Provar retomada/workspace/saldo inicial e gates nativos F21; registrar aceite.
+
+Aceite no staging em 05/10/2026: [F21](../../qa/2026-10-02-evolucao-financeira/f21/aceite.md). F22 liberado.
 
 ### F22 — Duplicar e favoritos
 

@@ -607,6 +607,9 @@ export default function FinanceScreen() {
         <EmptyState compacto
           title="Ainda não tem movimento"
           hint={'Manda *gastei 45 no mercado* no WhatsApp —\nou toca no + para lançar aqui'}
+          action={accounts.isSuccess && (accounts.data ?? []).length === 0
+            ? { label: 'Começar as finanças', onPress: () => router.push('/finance/comecar') }
+            : undefined}
         />
       ) : null}
     </>
