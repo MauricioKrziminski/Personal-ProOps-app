@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/icon';
 import { Radius, Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { registerAndroidSheet, showItemActions, type ItemAction } from '@/lib/item-actions';
+import { travaNaTela } from '@/lib/trava-na-tela';
 
 interface SheetState {
   title: string;
@@ -39,7 +40,9 @@ export function AndroidActionSheet() {
       animationType="slide"
       statusBarTranslucent
       navigationBarTranslucent
-      onRequestClose={close}>
+      onRequestClose={() => {
+        if (!travaNaTela()) close();
+      }}>
       {/* As bordas do sistema (barra de navegação ou de tarefas, recorte deitado) ficam livres, e no
           tablet o menu não se estica pela tela inteira: fica centrado, na largura de um menu. */}
       <View

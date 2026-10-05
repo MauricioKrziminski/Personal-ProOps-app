@@ -20,6 +20,7 @@ import { classifyWindow } from '@/design/adaptive-window';
 import { abaixoDoDialogo, tabletSheetFrame } from '@/design/adaptive-sheet';
 import { Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
+import { travaNaTela } from '@/lib/trava-na-tela';
 
 const TabletSheetContext = createContext(false);
 /**
@@ -188,7 +189,10 @@ export function Sheet({
       presentationStyle={iosTablet ? 'formSheet' : androidTabletPresentation ? 'overFullScreen' : 'pageSheet'}
       transparent={androidTablet}
       supportedOrientations={iosTablet ? ['portrait', 'landscape'] : undefined}
-      onRequestClose={onClose}>
+      // Voltar com a trava do app na tela não fecha a folha que ela cobre.
+      onRequestClose={() => {
+        if (!travaNaTela()) onClose();
+      }}>
       {/* O `Modal` é outra janela: gesto do gesture-handler (arrastar um card) precisa da raiz aqui dentro. */}
       <GestureHandlerRootView style={styles.raizDoGesto}>
         {/* Uma folha aberta de dentro do formulário em tela volta a ser folha. */}

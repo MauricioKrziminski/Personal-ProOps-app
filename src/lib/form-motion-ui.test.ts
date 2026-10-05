@@ -10,6 +10,9 @@ const require = createRequire(import.meta.url);
 
 // Commit effects after stable renders; neither springs nor native layout finish automatically.
 // Component-local hooks and provider context exercise the real nested presence lifetimes.
+let travaMarcada = false;
+const travaNaTelaMod = { marcarTravaNaTela: (v: boolean) => { travaMarcada = v; }, travaNaTela: () => travaMarcada };
+
 function montar(file: string, name: string, initial: any, config: { reduzir: boolean; ativo: boolean; fontScale?: number; width?: number; height?: number; platform?: string; focused?: boolean; insets?: { top: number; bottom: number; left: number; right: number }; lock?: any; aberta?: boolean; teclado?: number; creation?: any; preventRemove?: any; toasts?: any[]; finance?: any; conceal?: any; preview?: any; moneyCalls?: number[] } = { reduzir: false, ativo: true }) {
   type Instance = { slots: any[]; cursor: number; mounted: boolean; restart: boolean };
   type Animation = { shared: any; done?: (ok: boolean) => void; target: number; from: number; kind: 'spring' | 'timing'; settings: any; canceled: boolean };
@@ -162,6 +165,7 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === '@/design/tokens') return tokens;
       if (id === '@/hooks/use-theme') return { useTheme: () => ({ curtain: '#0B0B0C' }), useScheme: () => 'light' };
       if (id === '@/hooks/use-lock') return { useLock: () => config.lock };
+      if (id === '@/lib/trava-na-tela') return travaNaTelaMod;
       if (id === '@/components/motion/session-curtain') return { useCortinaSaindo: () => config.ativo, useCortinaAberta: () => config.aberta ?? false };
       if (id === '@/components/motion/wave-curtain') return { WaveCurtain: 'WaveCurtain' };
       if (id === '@/components/ui/mark') return { Mark: 'Mark' };
@@ -1446,6 +1450,22 @@ test('LockOverlay: com o app aberto a trava é JANELA, acima do formulário moda
   assert.equal(ios.find((n) => n.type === 'Modal'), undefined);
   assert.ok(ios.find((n) => n.type === 'FullWindowOverlay'), 'no iOS a trava entra direto na UIWindow');
   assert.equal(config.teclado, 1, 'o teclado aberto fecha: ele fica acima de qualquer janela');
+  assert.equal(travaMarcada, true, 'a trava avisa às folhas que está na tela');
+  ios.unmount();
+  assert.equal(travaMarcada, false);
+});
+
+test('Sheet: Voltar com a trava do app na tela não fecha a folha por baixo (Android, 05/10/2026)', () => {
+  let closes = 0;
+  const props = { visible: true, onClose: () => { closes++; }, children: null as any };
+  const ui = montar(sheetFile, 'Sheet', props, { reduzir: false, ativo: true, platform: 'android', focused: true });
+  const modal = () => ui.find((n) => n.type === 'Modal');
+  travaMarcada = true;
+  modal().props.onRequestClose();
+  assert.equal(closes, 0, 'a folha continua aberta debaixo da trava');
+  travaMarcada = false;
+  modal().props.onRequestClose();
+  assert.equal(closes, 1, 'sem a trava, Voltar fecha a folha como sempre');
 });
 
 test('LockOverlay fallback completes only its current reveal when a native completion is missing', () => {

@@ -41,6 +41,7 @@ import { Mark } from '@/components/ui/mark';
 import { Motion, Radius, Space } from '@/design/tokens';
 import { useLock } from '@/hooks/use-lock';
 import { useTheme } from '@/hooks/use-theme';
+import { marcarTravaNaTela } from '@/lib/trava-na-tela';
 
 type EstadoDaTrava = ReturnType<typeof useLock>['estado'];
 
@@ -59,6 +60,11 @@ export function LockOverlay() {
   if (locked && !montada) setMontada(true);
   const aoSair = useCallback(() => setMontada(false), []);
   const conteudo = montada ? <Cortina saindo={!locked} onSaiu={aoSair} /> : velado ? <Veu /> : null;
+  const cobre = conteudo !== null;
+  useEffect(() => {
+    marcarTravaNaTela(cobre);
+    return () => marcarTravaNaTela(false);
+  }, [cobre]);
   // Véu e cortina dividem UMA casca: trocar um pelo outro não fecha e reabre a janela.
   return conteudo ? <JanelaDaTrava>{conteudo}</JanelaDaTrava> : null;
 }
