@@ -26,7 +26,7 @@ from app.graph.schemas import (
     ResourceAction,
     NotesActionType,
 )
-from app.tools import finance, notes, queries, resolve
+from app.tools import finance, guards, notes, queries, resolve
 from app.tools.base import ExecContext, ToolResult, ensure_owned
 from app.tools.guards import Level1Error
 
@@ -178,15 +178,20 @@ async def execute(ctx: ExecContext, action: FinanceAction | FinanceQuery | Notes
         if not somente_leitura:
             await db.release_execution(ctx.source_message_id, ctx.action_index)
         return ToolResult(err.mensagem_usuario, read_only=True)
-    except psycopg.errors.RaiseException as err:
-        # P0001 de um TRIGGER (a fatura adiada recusando mudar o pagamento, o cartão que não vira
-        # conta): a recusa já vem escrita para a pessoa — "deu erro, tenta de novo" mandaria
-        # repetir o que não se resolve repetindo. A transação voltou inteira.
-        log.info("o banco recusou %s: %s", action.type, err.diag.message_primary)
+    except psycopg.Error as err:
+        # Recusa de PROPÓSITO do banco (P0001 de gatilho, 22023/PT422 de regra, PT409 de revisão velha):
+        # já vem escrita para a pessoa — "deu erro, tenta de novo" mandaria repetir o que não se resolve
+        # repetindo. A transação voltou inteira. Qualquer outro erro do banco é falha de verdade.
+        frase = guards.recusa_do_banco(err)
         if not somente_leitura:
             await db.release_execution(ctx.source_message_id, ctx.action_index)
-        motivo = (err.diag.message_primary or str(err)).strip().rstrip(".")
-        return ToolResult(f"❌ {motivo}. Ainda não mudei nada.", read_only=True)
+        if frase is None:
+            log.exception("ação %s falhou", action.type)
+            return ToolResult(
+                "❌ Deu erro ao processar uma parte da mensagem. Tenta de novo!", read_only=True
+            )
+        log.info("o banco recusou %s: %s", action.type, err.diag.message_primary)
+        return ToolResult(frase, read_only=True)
     except Exception:  # noqa: BLE001
         log.exception("ação %s falhou", action.type)
         if not somente_leitura:

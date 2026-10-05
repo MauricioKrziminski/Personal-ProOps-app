@@ -559,6 +559,9 @@ def describe_for_confirmation(
     """
     if isinstance(action, ResourceAction):
         return (target or {}).get("prepared", {}).get("summary", "revisar cadastro")
+    if (target or {}).get("movimento"):
+        # a frase do comando que vai rodar, com os números do banco (`tools/movimentos.py`)
+        return target["movimento"]["frase"]
     if target and target.get("candidates"):
         verbo = _VERBO.get(action.type.value, "mexer em")
         # Quitar a fatura sem caixa e pagar a fatura terminam com a mesma palavra na

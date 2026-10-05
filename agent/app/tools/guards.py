@@ -28,6 +28,34 @@ _RRULE = re.compile(
 )
 
 
+_LIVRE = re.compile(r"^SALDO_INSUFICIENTE: livre (\d+) centavos")
+_FALTAM = re.compile(r"^SALDO_INSUFICIENTE: faltam (\d+) centavos em (\S+)")
+MUDOU = ("🔄 Isso mudou enquanto eu perguntava. Me peça de novo que eu confiro "
+         "o que vale agora. Ainda não mudei nada.")
+
+
+def recusa_do_banco(err, fim: str = "Ainda não mudei nada.") -> str | None:
+    """A frase para a pessoa quando o banco RECUSA uma escrita de propósito; `None` = falha de verdade.
+
+    Recusa de regra é `P0001`/`22023`/`PT422` e já vem escrita em português. Revisão velha é `PT409`
+    (ou `40001`, a serialização): não é "tente de novo" cego, é "mudou, confira". O
+    `SALDO_INSUFICIENTE` chega com centavos crus e o app o traduz — aqui também.
+    """
+    from app.domain.money import cents_to_brl
+
+    codigo = getattr(err, "sqlstate", None)
+    if codigo in {"PT409", "40001"}:
+        return MUDOU
+    if codigo not in {"P0001", "22023", "PT422"}:
+        return None
+    motivo = (err.diag.message_primary or str(err)).strip().rstrip(".")
+    if m := _LIVRE.match(motivo):
+        motivo = f"Só há {cents_to_brl(int(m[1]))} livres nessa conta"
+    elif m := _FALTAM.match(motivo):
+        motivo = f"O resgate passa do que há na posição: faltam {cents_to_brl(int(m[1]))} em {m[2]}"
+    return f"❌ {motivo}. {fim}"
+
+
 class Level1Error(ValueError):
     """Falha de validação com mensagem pronta para o WhatsApp.
 

@@ -428,6 +428,10 @@ async def create_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
 
 
 async def create_transfer(ctx: ExecContext, action: FinanceAction) -> ToolResult:
+    if mov := (ctx.target or {}).get("movimento"):
+        # Uma ponta é conta de investimento (F12): aplicar/resgatar, como no app.
+        from app.tools import movimentos
+        return await movimentos.executar(ctx, mov)
     valor = guards.require_amount(_amount_with_fallback(ctx, action))
     quando = guards.require_date(action.occurred_at, ctx.timezone)
     origem = await conta_citada(
@@ -1617,6 +1621,11 @@ async def create_goal(ctx: ExecContext, action: FinanceAction) -> ToolResult:
 async def goal_deposit(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     """Aporte NÃO vira transação: é movimento entre contas do próprio usuário e
     lançar como despesa inflaria o gasto do mês."""
+    if mov := (ctx.target or {}).get("movimento"):
+        # Guardar COM conta (F11): separar na conta ou transferir de verdade — o comando e a frase
+        # foram congelados na resolução (`movimentos.congelar`), o mesmo que o SIM aprovou.
+        from app.tools import movimentos
+        return await movimentos.executar(ctx, mov)
     # Só valida: o nome exibido sai do alvo congelado, logo abaixo.
     guards.require_text(action.target_ref or action.description, o_que="em qual meta")
     valor = guards.require_amount(_amount_with_fallback(ctx, action), o_que="o valor do aporte")

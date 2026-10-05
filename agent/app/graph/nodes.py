@@ -39,7 +39,7 @@ from app.graph.schemas import (
 from app.domain.required import faltando
 from app.domain.money import cents_to_brl
 from app.graph.state import AgentState
-from app.tools import guards, resolve
+from app.tools import guards, movimentos, resolve
 from app.services import gemini
 from app.tools.base import ExecContext
 from app.tools.finance import apply_rules
@@ -663,6 +663,12 @@ async def resolve_node(state: AgentState) -> dict:
     # toda escrita pede SIM (21/09/2026): a frase diz qual conta recebe o que
     # o usuário não disse de onde saiu
     alvos = await resolve.conta_padrao(state["workspace_id"], acoes, alvos)
+    # guardar na meta com conta e aplicar/resgatar investimento (lote B): o comando e a frase do
+    # SIM, com os números que o banco calcula, ficam congelados no alvo
+    alvos = await movimentos.congelar(
+        state["user_id"], state["workspace_id"], state["timezone"], state.get("text", ""),
+        acoes, alvos, pular=set(_incompletas(state, acoes)),
+    )
 
     return {"targets": with_resources(alvos), "results": esclarecimentos,
             "draft": _rascunho(state, acoes, alvos)}

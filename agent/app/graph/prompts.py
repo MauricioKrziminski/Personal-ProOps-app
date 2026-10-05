@@ -61,7 +61,10 @@ Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
   adiamento da fatura") são cadastros (o cartão). Pagar ou marcar como paga continua financas.
   ENCERRAR ou REABRIR uma recorrência ("cancela a assinatura da netflix", "não pago mais a
   academia", "reabre a netflix") e CRIAR uma transferência que se repete ("todo dia 5 passo 500
-  da nubank pra poupança") são cadastros. Transferir uma vez só ("transferi 500 pra poupança")
+  da nubank pra poupança") são cadastros. RETIRAR dinheiro de uma meta ("tirei 200 da meta viagem",
+  "libera 300 da reserva") e ATUALIZAR o valor de uma conta de investimento ("meu CDB está valendo
+  10.500") ou registrar o rendimento dela ("recebi 85 de rendimento do CDB") são cadastros. Ver ou
+  aplicar o plano percentual do orçamento ("aplica o plano nos meus limites") também. Transferir uma vez só ("transferi 500 pra poupança")
   continua financas.
   ⚠️ A fronteira com "financas_consulta" é o que a pessoa quer SABER, não o substantivo:
   perguntar VALOR, QUANDO cai ou QUANTO falta é sempre "financas_consulta" — "quais minhas
@@ -99,7 +102,9 @@ Uma ação por item citado, na ordem em que aparecem, no máximo 10.
 Tipos:
 - create_expense / create_income: gasto ou dinheiro recebido, com valor.
 - create_transfer: mover dinheiro entre contas do próprio usuário.
-  account = origem, counterparty_account = destino.
+  account = origem, counterparty_account = destino. Aplicar em investimento ("apliquei 200 no CDB",
+  "transferi 200 da nubank pra conta de investimento") e resgatar ("resgatei 100 do CDB pra nubank") também
+  são create_transfer: a conta de investimento é a ponta (o sistema reconhece o tipo da conta).
 - create_installment_purchase: 2 ou mais parcelas.
   description = item/serviço comprado (ex: "comprei uma tv em 10x de 300 no nubank" -> description="tv", installments=10, amount_cents=300000, account="nubank").
   amount_cents = valor TOTAL (se o usuário disser o valor DA PARCELA, multiplique pela quantidade de parcelas).
@@ -205,7 +210,11 @@ Tipos:
   literalmente por ela, e não acha nada.
 - undo_last: "apaga o último", "foi engano" SEM valor novo ("foi engano, era 54" é correção).
 - create_goal: meta de poupança. target_ref = nome, amount_cents = alvo.
-- goal_deposit: aporte numa meta existente. target_ref = nome da meta.
+- goal_deposit: aporte numa meta existente. target_ref = nome da meta. Se disser DE QUAL CONTA o dinheiro está
+  ("separei 300 da nubank pra viagem", "guardei 300 na viagem, da nubank"), account = essa conta: o dinheiro
+  fica na conta e só é reservado. Se disser que MOVEU o dinheiro de uma conta para a conta da meta
+  ("transferi 300 da corrente pra poupança da viagem"), account = origem e counterparty_account = destino.
+  Sem conta nenhuma, deixe account e counterparty_account vazios.
 - update_asset_value: valor novo de um bem/investimento. target_ref = nome.
 - unknown: não é registro nem correção financeira.
 
