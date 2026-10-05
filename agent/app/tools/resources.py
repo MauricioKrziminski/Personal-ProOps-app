@@ -53,7 +53,8 @@ CATALOG = {
     "mes": ("workspaces", "id", None, "cycle_close_day"),
     "goals": ("goals", "name", "archived", "name target_cents deadline archived "
               "aporte_do_dia novo_valor_do_aporte nova_data_do_aporte nova_nota_do_aporte "
-              "retirar_cents retirar_da_conta retirar_para_conta retirar_data"),
+              "retirar_cents retirar_da_conta retirar_para_conta retirar_data "
+              "mensal_cents marcos icone cor"),
     "budgets": ("budgets", "category", None, "category limit_cents rollover month"),
     "assets": (
         "assets",
@@ -154,6 +155,10 @@ LABELS = {
     "fatura_adiada": "fatura adiada",
     "plano": "plano percentual",
     "reserva": "reserva de emergência",
+    "mensal_cents": "quanto guardar por mês",
+    "marcos": "marcos",
+    "icone": "ícone",
+    "cor": "cor",
     "plano_metas": "plano de metas",
     "retirar_cents": "valor a retirar",
     "retirar_da_conta": "conta onde estava separado",
@@ -484,6 +489,7 @@ def validate_fields(action: ResourceAction) -> dict:
                 in {
                     "amount_cents",
                     "target_cents",
+                    "mensal_cents",
                     "limit_cents",
                     "installment_cents",
                     "principal_cents",
@@ -1275,6 +1281,30 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             or (action.resource == "accounts" and values.keys() & movimentos.CAMPOS_VALOR) \
             or action.resource == "plano":
         return await _preparar_movimento(ctx, action, values, prepared)
+    # Lote D: prazo × mês, marcos, ícone e cor da meta (F10, F19) — campos VIRTUAIS do `goals`.
+    if action.resource == "goals" and values.keys() & lote_d.CAMPOS_META:
+        if values.keys() & (_CAMPOS_DO_APORTE | movimentos.CAMPOS_RETIRAR):
+            raise JaExiste("Me diz uma coisa por vez: o aporte ou o que muda na meta. Nada foi alterado.")
+        meta_d = {k: values.pop(k) for k in list(values) if k in lote_d.CAMPOS_META}
+        if "mensal_cents" in meta_d and (meta_d["mensal_cents"] is None or meta_d["mensal_cents"] <= 0):
+            raise JaExiste("Quanto você guarda por mês? Me diz o valor. Nada foi alterado.")
+        if action.type != Op.CREATE and "mensal_cents" in meta_d and not values and meta_d.keys() == {"mensal_cents"}:
+            # só a conta ("e se eu guardar 500 por mês?"): responde e não grava nada
+            try:
+                prepared["simulacao"] = await lote_d.simular_mensal(ctx, action.name, meta_d["mensal_cents"])
+            except Level1Error as err:
+                raise JaExiste(err.mensagem_usuario) from err
+            prepared["summary"] = "calcular quando a meta chega"
+            if action.type != Op.LIST:
+                raise JaExiste(prepared["simulacao"] + " Não alterei a meta.")
+            return prepared
+        if action.type == Op.LIST or action.type == Op.DELETE:
+            raise JaExiste("Prazo, marcos, ícone e cor se definem ao criar ou editar a meta. Nada foi alterado.")
+        if "icone" in meta_d:
+            values["icon"] = lote_d.icone_da_meta(meta_d["icone"])
+        if "cor" in meta_d:
+            values["color"] = lote_d.cor_da_meta(meta_d["cor"], COLOR_ALIASES)
+        prepared["_meta_d"] = meta_d
     # Corrigir um APORTE da meta: campos VIRTUAIS que viram `edit_goal_contribution`.
     if action.resource == "goals" and values.keys() & _CAMPOS_DO_APORTE:
         return await _preparar_aporte(ctx, action, values, prepared)
@@ -1525,7 +1555,7 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             else:
                 values = {}
             prepared["values"] = values
-        elif not values and "set_default" not in prepared:
+        elif not values and "set_default" not in prepared and "_meta_d" not in prepared:
             _error("O que você quer alterar?")
         # O tipo da conta troca livre entre corrente, poupança, dinheiro e investimento
         # (`20260926170000`); cartão é outro recurso (`cards`), e não vira conta por aqui.
@@ -1697,6 +1727,9 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             _error("Recorrência sem próximas ocorrências.")
         if action.type == Op.CREATE and action.resource == "reminders":
             values["timezone"] = ctx.timezone
+    extra_d = None
+    if action.resource == "goals" and action.type in (Op.CREATE, Op.UPDATE):
+        extra_d = await lote_d.completar_meta(ctx, action.type.value, prepared, values, old, merged, display)
     if prepared.get("purge"):
         n = prepared.get("pagamentos", 0)
         prepared["summary"] = (
@@ -1807,6 +1840,8 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         )
     if prepared.get("target_label"):
         prepared["summary"] += "; orçamento de " + prepared["target_label"]
+    if extra_d:
+        prepared["summary"] += "; " + extra_d
     if action.type == Op.DELETE and action.resource == "reminders":
         prepared["summary"] += "; registros já gerados continuam no histórico"
     if action.type == Op.DELETE and action.resource == "recurring":
@@ -1961,6 +1996,8 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
         return await _desfazer_fatura(ctx, proposal)
     if proposal.get("aporte"):
         return await _corrigir_aporte(ctx, proposal)
+    if proposal.get("simulacao"):
+        return ToolResult(proposal["simulacao"], read_only=True)
     if action.type == Op.LIST:
         rows = await db.fetch(
             f"select {identity} as label from public.{table} where workspace_id = %s"
@@ -2123,6 +2160,8 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
         )
     if "set_default" in proposal:
         await _definir_conta_padrao(ctx, proposal["id"], proposal["set_default"])
+    if proposal.get("marcos") is not None:
+        await lote_d.gravar_marcos(ctx, row["id"], proposal["marcos"])
     return ToolResult("Concluído: " + proposal["summary"] + "." + (row.get("aviso") or ""), result_id=row["id"])
 
 
@@ -2304,5 +2343,5 @@ def prompt_catalogue() -> str:
         + "\nFinanciamento/dívida tem dois modos: fixed_installments (padrão) precisa só de installment_cents e installments — o total contratual das parcelas, com juros dentro; amortized precisa de principal_cents, remaining_cents e interest_rate_monthly, e só serve quando o usuário tem esses números do contrato. Nunca converta o total das parcelas em principal nem invente taxa.\nData da PRIMEIRA parcela do financiamento: first_due_date=YYYY-MM-DD quando a pessoa disser quando a primeira vence ('a primeira parcela é em dezembro', 'começo a pagar daqui a 3 meses'); o dia de vencimento sai dela.\nFinanciamento: resource_delete ARQUIVA (sai da lista, os pagamentos ficam) e desarquivar é resource_update com archived=false. Apagar DE VEZ, com os pagamentos já lançados ('exclui o financiamento por completo', 'apaga tudo do carro'), é resource_delete com trashed=true.\nConta padrão (onde cai o lançamento que não cita conta): resource_update, resource=accounts, name=nome da conta, campo is_default=true; para tirar, is_default=false. Cartão de crédito não pode ser conta padrão.\nNota na LIXEIRA: resource_delete em notes manda para a lixeira; restaurar (\"tira da lixeira\", \"recupera a nota\") é resource_update com trashed=false; apagar DE VEZ (\"esvazia\", \"apaga definitivo\") é resource_delete com trashed=true.\nORGANIZAR NOTA E PASTA (é o que o usuário faz com o dedo na tela de Notas): fixar no topo é pinned=true (\"fixa a nota do mercado\", \"deixa essa pasta no topo\"); desafixar é pinned=false. Arquivar é archived=true (\"arquiva a nota da reunião\", \"tira a pasta de projetos da tela\") e desarquivar é archived=false — arquivar NÃO é apagar: a nota continua existindo, só sai da tela inicial. Cor é color com um dos oito nomes; se a pessoa falar a cor do dia a dia (azul, verde, rosa, vermelho, amarelo, roxo, cinza), pode mandar a palavra dela que o sistema traduz, e \"tira a cor\" é color vazio. Pasta também tem icon (um dos nomes da lista, ou a palavra em português: maleta, carrinho, casa, avião…) e tags (uma palavra por tag, \"urgente, casa\"); tag acrescenta às que já existem.\n⚠️ NOTA se identifica pelo TRECHO do texto, não por um nome: name = o pedaço que a pessoa citou (\"a nota do mercado\" -> name=mercado). Se casar com mais de uma, o sistema mostra a lista e pergunta qual — nunca escolha por ela.\nMEU MÊS (o período financeiro do usuário — quando o mês dele começa e termina): resource_update, resource=mes, campo cycle_close_day = o dia em que o mês fecha (1 a 31; 29, 30 e 31 caem no último dia do mês mais curto). Para voltar ao último dia do mês ('volta pro normal', 'fecha no fim do mês'), mande cycle_close_day vazio. Serve para: 'meu mês fecha dia 10', 'quero contar do dia 15 ao dia 15', 'qual a data de corte', 'minha virada é no dia 20', 'faz o corte no dia 10', 'prefiro contar a partir do dia 6'.\nATENÇÃO — 'dia N' aparece em quase toda frase e quase nunca é o ciclo. Só é resource=mes quando a frase fala do PERÍODO em si (o mês, o ciclo, o corte, a virada, a contagem, de-quando-a-quando). Contraexemplos que NÃO são resource=mes:\n- 'meu salário cai todo dia 5', 'todo dia 15 pago a academia', 'o aluguel vence dia 10' -> resource=recurring. Isso é um EVENTO que se repete (dinheiro entrando ou saindo), não a régua do mês. A pista é que existe uma coisa (salário, aluguel, academia) acontecendo no dia.\n- 'o cartão fecha dia 7', 'cadastra o Inter que fecha dia 7' -> resource=cards com closing_day. Quem tem fatura é o CARTÃO.\n- 'me lembra dia 20', 'a reunião é dia 20' -> lembrete ou nota, não cadastro.\nNa dúvida entre mes e recurring: se dá para perguntar 'o que acontece nesse dia?' e a resposta é um valor em dinheiro, é recurring.\nADIAR A FATURA AGORA (o rotativo, uma vez): resource_roll, resource=cards, name=nome do cartão, SEM campos. É a fatura VENCIDA que a pessoa não pagou: o saldo dela vai para a próxima, com juros e IOF. Frases: 'joga a fatura do nubank pra próxima', 'adia a fatura do inter', 'não vou conseguir pagar a fatura esse mês', 'deixa a fatura do itaú pro mês que vem', 'empurra essa fatura'.\n⚠️ resource_roll (agir AGORA nesta fatura) é diferente de rotativo_auto (LIGAR a regra para as próximas). 'adia a fatura' é resource_roll; 'deixa a fatura rolar sozinha daqui pra frente' é resource_update com rotativo_auto=true.\n⚠️ Adiar NÃO é pagar nem quitar: 'paguei a fatura' sai dinheiro, 'já tinha pago a fatura' é quitação, e adiar não move dinheiro nenhum — cria dívida nova. Se a pessoa disser que pagou, nunca use resource_roll.\nCORRIGIR UM APORTE que já foi feito numa meta (o valor, a data ou a nota dele): resource_update, resource=goals, name=nome da meta, campos aporte_do_dia = o dia do aporte a corrigir em YYYY-MM-DD (ou ultimo, para o mais recente; vazio se a pessoa não disse), novo_valor_do_aporte = o valor CERTO em centavos, nova_data_do_aporte = a data certa, nova_nota_do_aporte = a nota nova. 'o aporte de ontem na viagem foi 200, não 100' -> name=viagem, aporte_do_dia=<ontem>, novo_valor_do_aporte=20000. 'corrige o último aporte da reserva para 150' -> name=reserva, aporte_do_dia=ultimo, novo_valor_do_aporte=15000. 'o aporte de dia 20 na viagem foi dia 21' -> name=viagem, aporte_do_dia=<dia 20>, nova_data_do_aporte=<dia 21>. Guardar MAIS na meta não é isto (é um aporte novo).\nDESFAZER NA FATURA (o contrário de marcar como paga e de adiar): resource_update, resource=cards, name=nome do cartão, UM campo. Desmarcar a fatura que foi marcada como paga ('desmarca a fatura do nubank como paga', 'a fatura do inter não estava paga, reabre', 'marquei a fatura de agosto como paga sem querer') -> fatura_paga=false. Desfazer o adiamento ('desfaz o adiamento da fatura do nubank', 'volta a fatura do inter que eu joguei pra próxima', 'não era pra ter adiado a fatura') -> fatura_adiada=false. Se a pessoa disser o mês da fatura, target_month=YYYY-MM-01. Marcar como paga ou adiar NÃO usa estes campos: é 'já paguei' e resource_roll.\nROTATIVO AUTOMÁTICO do cartão (a REGRA, não o ato de agora): resource_update, resource=cards, name=nome do cartão. rotativo_auto=true faz TODA fatura vencida e não paga, daqui pra frente, ir sozinha para a próxima, com juros e IOF. rotativo_rate_monthly são os juros do rotativo, do jeito que o usuário falar ('15,5%', '12,876', '1,99') — o sistema converte para fração. É a taxa de PARTIDA: assim que chegar a primeira cobrança real, o app passa a usar a que ESTE cartão cobrou. Vazio significa não estimar juros.\nOrçamento mensal existente: target_month=YYYY-MM-01; orçamento padrão: target_month=default.\nPara pagar prestação de dívida existente: resource_pay, resource=debts, name=nome da dívida, campos amount_cents, account_id (nome da conta), paid_at (YYYY-MM-DD). Não editar remaining_cents para registrar pagamento. Ao CRIAR dívida parcelada, installments_paid sai do que o usuário disse, inclusive pela posição: 'estou na 9ª parcela' são 8 pagas, 'tô na terceira' são 2, 'comecei agora' é 0, e um número solto respondendo à pergunta é a quantidade. Deixe vazio só quando a mensagem não disser nada sobre isso — o usuário confirma o cadastro inteiro antes de qualquer gravação, e é ali que ele corrige. Em dívida QUE JÁ EXISTE é o contrário: posição e data não comprovam pagamento. No modo de parcela fixa (o padrão), corrigir as pagas é resource_update só com installments_paid — o saldo sai da parcela; no modo com juros, installments_paid junto com remaining_cents, e se faltar o saldo atual pergunte. Quando a pessoa disser quando vence a PRÓXIMA parcela ('a próxima vence dia 5 de outubro'), use next_due_date; first_due_date é só a PRIMEIRA do contrato. Nunca use resource_pay para dar baixa retroativa em várias parcelas ou invente amortização a partir do valor da prestação.\nValor POR EXTENSO é valor: 'trezentos reais' é 30000 centavos, 'mil e quinhentos' é 150000, 'dois mil e quinhentos' é 250000. Áudio transcrito e resposta falada escrevem número assim o tempo todo — deixar o campo vazio porque o número veio em palavras é perder o dado que o usuário acabou de dar."
         + "\nTRANSFERÊNCIA RECORRENTE (dinheiro que passa de uma conta para outra sozinho, todo mês/semana): resource_create, resource=recurring, name=o título, kind=transfer, amount_cents, rrule, dtstart, account_id = conta de ORIGEM e counterparty_account_id = conta de DESTINO (os dois pelo NOME; o destino nunca é cartão), sem category. 'todo dia 5 passo 500 da Nubank para a poupança' -> kind=transfer, account_id=Nubank, counterparty_account_id=poupança, rrule=FREQ=MONTHLY;BYMONTHDAY=5. Salário e aluguel NÃO são transferência (kind=income/expense). ⚠️ SÓ quando a pessoa pediu REPETIÇÃO (todo mês, toda semana, todo dia N): 'transferi 500 da nubank para a poupança' ou 'passa 200 pra reserva' (uma vez só) NÃO é série — não crie recurring nem invente rrule para encaixar."
         + "\nENCERRAR OU REABRIR UMA SÉRIE (assinatura cancelada, contrato que acabou): resource_update, resource=recurring, name=a série, UM campo. 'cancela a assinatura da netflix', 'não pago mais a academia', 'encerra o aluguel em dezembro' -> encerrar_em = a data da ÚLTIMA cobrança em YYYY-MM-DD (só o mês, 'em dezembro': o ÚLTIMO dia desse mês, porque o fim é um teto e a cobrança de dezembro ainda vale) ou VAZIO quando a pessoa não disser até quando (o sistema usa a última que já venceu). 'reabre a netflix', 'voltei a assinar' (série encerrada) -> reabrir=true. Encerrar NÃO é pausar (active=false) nem apagar (resource_delete): encerrar mantém o histórico e tira só as cobranças futuras."
-        + "\nRETIRAR DINHEIRO DE UMA META (o contrário de guardar): resource_update, resource=goals, name=a meta, retirar_cents = o valor em centavos. 'tirei 200 da meta viagem', 'libera 300 da meta reserva' -> retirar_cents. Se disser DE QUAL CONTA o dinheiro estava separado ('da conta nubank'), retirar_da_conta = o nome da conta (o dinheiro continua na conta, só volta a ficar livre). Se disser que o dinheiro VAI para outra conta ('passa 300 da meta para a poupança', 'transfere da meta pra corrente'), retirar_da_conta = conta onde estava e retirar_para_conta = a conta que recebe (aí é transferência de verdade). retirar_data só se a pessoa disser o dia. retirar_da_conta e retirar_para_conta são CONTAS: nunca ponha o nome da meta neles, e se a pessoa não citar conta, deixe-os fora. GUARDAR é outra coisa: é goal_deposit em finanças.\nINVESTIMENTO (conta de tipo investimento, ex.: CDB, Tesouro): resource_update, resource=accounts, name=a conta de investimento, UM campo. 'meu CDB está valendo 10.500', 'o tesouro hoje vale 8 mil' -> valor_atual_cents (só atualiza o valor, nenhum dinheiro se move). 'recebi 85 de rendimento do CDB', 'o CDB rendeu 85' -> rendimento_cents (é receita de verdade); rendimento_na_conta só se a pessoa disser em qual conta o rendimento caiu. data_do_valor só se disser o dia. Aplicar ou resgatar dinheiro NÃO é isto: é create_transfer.\nPLANO PERCENTUAL DO ORÇAMENTO: 'como está meu plano', 'o que planejei e o que gastei' -> resource_list, resource=plano. 'aplica o plano nos meus orçamentos', 'usa o plano como limite' -> resource_update, resource=plano, aplicar_categorias = nomes separados por vírgula ou 'todas' (vazio = todas), aplicar_alcance = 'padrao' (limite padrão, é o normal) ou 'mes' (só neste mês, 'só novembro' -> aplicar_mes=YYYY-MM-01). Montar ou editar o plano é no app.\nRESERVA DE EMERGÊNCIA E PLANO DE METAS (só consulta): 'minha reserva cobre quantos meses?', 'quanto falta pra minha reserva?' -> resource_list, resource=reserva. 'cabe no meu plano de metas?', 'quando o plano de metas aperta?' -> resource_list, resource=plano_metas. Nunca resource_create/update nesses dois: configurar é no app.\nDETALHE DA CATEGORIA (subcategoria) em recurring, rules e debts: subcategory_id é o NOME do detalhe que a pessoa disse ('feira', 'supermercado'); o sistema procura dentro da categoria e pergunta se não achar ou se houver dois parecidos. Nunca invente id; 'sem detalhe' ou vazio remove."
+        + "\nRETIRAR DINHEIRO DE UMA META (o contrário de guardar): resource_update, resource=goals, name=a meta, retirar_cents = o valor em centavos. 'tirei 200 da meta viagem', 'libera 300 da meta reserva' -> retirar_cents. Se disser DE QUAL CONTA o dinheiro estava separado ('da conta nubank'), retirar_da_conta = o nome da conta (o dinheiro continua na conta, só volta a ficar livre). Se disser que o dinheiro VAI para outra conta ('passa 300 da meta para a poupança', 'transfere da meta pra corrente'), retirar_da_conta = conta onde estava e retirar_para_conta = a conta que recebe (aí é transferência de verdade). retirar_data só se a pessoa disser o dia. retirar_da_conta e retirar_para_conta são CONTAS: nunca ponha o nome da meta neles, e se a pessoa não citar conta, deixe-os fora. GUARDAR é outra coisa: é goal_deposit em finanças.\nINVESTIMENTO (conta de tipo investimento, ex.: CDB, Tesouro): resource_update, resource=accounts, name=a conta de investimento, UM campo. 'meu CDB está valendo 10.500', 'o tesouro hoje vale 8 mil' -> valor_atual_cents (só atualiza o valor, nenhum dinheiro se move). 'recebi 85 de rendimento do CDB', 'o CDB rendeu 85' -> rendimento_cents (é receita de verdade); rendimento_na_conta só se a pessoa disser em qual conta o rendimento caiu. data_do_valor só se disser o dia. Aplicar ou resgatar dinheiro NÃO é isto: é create_transfer.\nPLANO PERCENTUAL DO ORÇAMENTO: 'como está meu plano', 'o que planejei e o que gastei' -> resource_list, resource=plano. 'aplica o plano nos meus orçamentos', 'usa o plano como limite' -> resource_update, resource=plano, aplicar_categorias = nomes separados por vírgula ou 'todas' (vazio = todas), aplicar_alcance = 'padrao' (limite padrão, é o normal) ou 'mes' (só neste mês, 'só novembro' -> aplicar_mes=YYYY-MM-01). Montar ou editar o plano é no app.\nMETA POR PRAZO OU POR MÊS, MARCOS, ÍCONE E COR: criar com prazo ('quero juntar 10 mil até dezembro de 2027') é resource_create goals com target_cents e deadline (o sistema calcula quanto dá por mês). Criar ou editar dizendo quanto guarda por mês ('quero juntar 10 mil guardando 500 por mês') usa mensal_cents (centavos) em vez de deadline (o sistema calcula quando chega). Se a meta JÁ EXISTE e a pessoa só pergunta ou diz quanto guarda por mês ('e se eu guardar 500 por mês na viagem?'): resource_list, resource=goals, name=a meta, mensal_cents. marcos (resource_update goals): lista separada por ponto e vírgula, cada item em porcentagem com % ('25%; 50%; 75%') ou em centavos ('250000'); lista completa que SUBSTITUI os atuais, ou 'nenhum' para tirar todos; para só acrescentar, cada item com + ('+90%'). icone: o nome do ícone em português ('avião', 'casa', 'carro'); cor: o nome da cor ('azul', 'verde'). Vazio ou 'padrão' remove. Nunca invente ícone: se não souber qual, deixe fora.\nRESERVA DE EMERGÊNCIA E PLANO DE METAS (só consulta): 'minha reserva cobre quantos meses?', 'quanto falta pra minha reserva?' -> resource_list, resource=reserva. 'cabe no meu plano de metas?', 'quando o plano de metas aperta?' -> resource_list, resource=plano_metas. Nunca resource_create/update nesses dois: configurar é no app.\nDETALHE DA CATEGORIA (subcategoria) em recurring, rules e debts: subcategory_id é o NOME do detalhe que a pessoa disse ('feira', 'supermercado'); o sistema procura dentro da categoria e pergunta se não achar ou se houver dois parecidos. Nunca invente id; 'sem detalhe' ou vazio remove."
     )

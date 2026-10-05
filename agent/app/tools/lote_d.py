@@ -10,13 +10,18 @@ do SIM carrega os números que ele devolveu. Nenhum campo novo no `FinanceAction
 from __future__ import annotations
 
 import json
-from datetime import date
+import re
+from decimal import Decimal
+
+import psycopg
 
 from app import db
+from app.domain import goal_appearance as ga
+from app.domain import matching
 from app.domain.dates import format_date_br, local_iso_date
 from app.domain.money import cents_to_brl
 from app.tools.base import ExecContext, ToolResult
-from app.tools.guards import Level1Error
+from app.tools.guards import Level1Error, optional_date
 from app.tools.movimentos import Recusa, _brl, _previa
 
 # ---------------------------------------------------------------------------
@@ -230,8 +235,233 @@ async def frase_de_prazo_ou_mensal(*, alvo: int, guardado: int, hoje: str, prazo
             f"({n} {'aporte' if n == 1 else 'aportes'}{cauda})")
 
 
-def _data_iso(valor: str) -> str:
+async def congelar(tz: str, texto: str, acoes: list, alvos: list[dict], pular: set[int] | None = None) -> list[dict]:
+    """"Quero juntar 10 mil até dezembro de 2027": a conta de quanto por mês fica no alvo, para a
+    frase do SIM (`policy.describe_for_confirmation`). Best-effort: sem o cálculo a meta se cria igual."""
+    from app.domain.money import parse_valor_em_centavos
+    from app.graph.schemas import FinanceActionType
+
+    alvos = [*alvos] + [{}] * max(0, len(acoes) - len(alvos))
+    for i, a in enumerate(acoes):
+        if i in (pular or set()) or getattr(a, "type", None) != FinanceActionType.CREATE_GOAL:
+            continue
+        try:
+            prazo = optional_date(a.occurred_at, tz)
+            valor = a.amount_cents or parse_valor_em_centavos(texto)
+            if not prazo or not valor:
+                continue
+            frase = await frase_de_prazo_ou_mensal(alvo=int(valor), guardado=0, hoje=local_iso_date(tz),
+                                                   prazo=str(prazo)[:10], mensal=None)
+        except (Level1Error, psycopg.Error):
+            continue
+        if frase:
+            alvos[i] = {**alvos[i], "contribuicao": frase}
+    return alvos
+
+
+# ---------------------------------------------------------------------------
+# F10 + F19 no recurso `goals`: campos VIRTUAIS (`mensal_cents`, `marcos`, `icone`, `cor`)
+# ---------------------------------------------------------------------------
+
+CAMPOS_META = {"mensal_cents", "marcos", "icone", "cor"}
+_LIMPAR = {"nenhum", "nenhuma", "sem", "tira", "tirar", "remove", "remover", "limpa", "limpar", "padrao", "normal"}
+MAX_MARCOS = 20
+
+
+def _pct_ou_none(item: str) -> Decimal | None:
+    """`lerPercentual` do app, mas deixando 100 passar: 100% é o próprio alvo e a recusa diz isso."""
+    limpo = item.strip().replace("%", "").replace(",", ".").strip()
+    if not re.fullmatch(r"\d{1,3}(\.\d)?", limpo):
+        return None
+    p = Decimal(limpo)
+    return p if 0 < p <= 100 else None
+
+
+def percentual_para_centavos(pct: Decimal, alvo: int) -> int:
+    """`percentualParaCentavos` do app: arredonda ao centavo, meio para cima."""
+    return (alvo * int(pct * 10) + 500) // 1000
+
+
+def _pct_texto(cents: int, alvo: int) -> str:
+    """`centavosParaPercentual`: uma casa, sem zero sobrando (33,3 / 25)."""
+    d = (cents * 2000 + alvo) // (alvo * 2)  # arredonda meio para cima, em décimos de ponto
+    return f"{d // 10}" if d % 10 == 0 else f"{d // 10},{d % 10}"
+
+
+def ler_marcos(texto: str | None, alvo: int, atuais: list[int]) -> list[int]:
+    """"25%, 50%" ou "250000; 500000" (centavos) -> marcos em centavos. Lista completa, como o formulário do
+    app; se TODOS os itens começam com "+", somam aos que já existem. Recusa antes do SIM o que o banco
+    recusaria depois."""
+    if texto is None or matching.normalize(texto) in _LIMPAR | {"sem marcos", "nenhum marco"}:
+        return []
+    itens = [i.strip() for i in re.split(r";|,(?!\d)|\se\s", texto) if i.strip()]
+    if not itens:
+        return []
+    somar = all(i.startswith("+") for i in itens)
+    marcos = list(atuais) if somar else []
+    for item in itens:
+        item = item.lstrip("+").strip()
+        pct = _pct_ou_none(item) if "%" in item else None
+        if "%" in item and pct is None:
+            raise Level1Error(f"Não entendi o marco *{item}*: percentual entre 0 e 100, com até uma casa "
+                              "(25%, 33,3%). Nada foi alterado.")
+        if pct is not None:
+            cents = percentual_para_centavos(pct, alvo)
+        elif re.fullmatch(r"\d{1,16}", item):
+            cents = int(item)
+        else:
+            raise Level1Error(f"Não entendi o marco *{item}*. Diga em porcentagem (25%) ou em reais "
+                              "(R$ 2.500). Nada foi alterado.")
+        if cents <= 0:
+            raise Level1Error(f"O marco *{item}* dá R$ 0,00 para essa meta. Nada foi alterado.")
+        if cents >= alvo:
+            raise Level1Error(f"O marco de {cents_to_brl(cents)} precisa ficar abaixo do alvo "
+                              f"({cents_to_brl(alvo)}); 100% é o próprio alvo. Nada foi alterado.")
+        if cents in marcos:
+            raise Level1Error("Tem marco repetido. Nada foi alterado.")
+        marcos.append(cents)
+    if len(marcos) > MAX_MARCOS:
+        raise Level1Error(f"São marcos demais (o máximo é {MAX_MARCOS}). Nada foi alterado.")
+    return sorted(marcos)
+
+
+def _lista_de_marcos(marcos: list[int], alvo: int) -> str:
+    return "; ".join(f"{_pct_texto(m, alvo)}% = {cents_to_brl(m)}" for m in marcos) or "nenhum"
+
+
+def icone_da_meta(texto: str | None) -> str | None:
+    """O ícone pelo nome em português da grade do app (ou o próprio id); fora dela, pergunta."""
+    if texto is None or matching.normalize(texto) in _LIMPAR:
+        return None
+    chave = matching.normalize(texto)
+    for icone, rotulo in ga.ROTULO_DO_ICONE.items():
+        if chave in {matching.normalize(rotulo), matching.normalize(icone)}:
+            return icone
+    nomes = ", ".join(ga.ROTULO_DO_ICONE[i] for i in ga.ICONES)
+    raise Level1Error(f"Não tenho o ícone *{texto}*. Os que o app oferece: {nomes}. Qual deles? Nada foi alterado.")
+
+
+def cor_da_meta(texto: str | None, aliases: dict[str, str]) -> str | None:
+    if texto is None or matching.normalize(texto) in _LIMPAR:
+        return None
+    chave = matching.normalize(texto)
+    cor = aliases.get(chave, chave)
+    if cor not in ga.CORES:
+        raise Level1Error(f"Não tenho a cor *{texto}*. As do app: {', '.join(ga.CORES)}. Qual delas? "
+                          "Nada foi alterado.")
+    return cor
+
+
+async def simular_mensal(ctx: ExecContext, nome: str | None, mensal: int | None) -> str:
+    """"E se eu guardar 500 por mês na Viagem?" numa meta que existe: só responde, não grava nada."""
+    from app.tools.movimentos import _achar
+
+    if not nome:
+        raise Level1Error("Qual meta? Me fala o nome dela. Nada foi alterado.")
+    if not mensal or mensal <= 0:
+        raise Level1Error("Quanto você guarda por mês? Me diz o valor. Nada foi alterado.")
+    meta = await _achar(ctx.workspace_id, "goals", nome, "meta")
+    g = await db.fetch_one(
+        "select target_cents, saved_cents, deadline from public.goals where id = %s and workspace_id = %s",
+        meta["id"], ctx.workspace_id)
+    alvo, guardado, hoje = int(g["target_cents"]), int(g["saved_cents"]), local_iso_date(ctx.timezone)
+    frase = await frase_de_prazo_ou_mensal(alvo=alvo, guardado=guardado, hoje=hoje, prazo=None, mensal=mensal)
+    atraso = ""
+    if g["deadline"]:
+        r = await contribuicao(None, alvo=alvo, guardado=guardado, hoje=hoje, mensal=mensal)
+        prazo = str(g["deadline"])[:10]
+        if r["status"] == "ready":
+            atraso = (f" Isso passa do prazo da meta ({format_date_br(prazo)})." if str(r["estimated_on"]) > prazo
+                      else f" Dentro do prazo da meta ({format_date_br(prazo)}).")
+    return f"🎯 Meta *{meta['name']}*: {frase}.{atraso}"
+
+
+async def completar_meta(ctx: ExecContext, action_type: str, prepared: dict, values: dict, old: dict,
+                         merged: dict, display: dict) -> str | None:
+    """Fim do `prepare` de uma meta (criar ou editar): marcos em centavos contra o alvo FINAL, ícone/cor
+    legíveis e a conta de prazo × mês do banco. Devolve o que se junta à frase do SIM."""
+    meta_d = prepared.pop("_meta_d", None) or {}
+    criando = action_type == "resource_create"
+    if not meta_d and not (criando or values.keys() & {"deadline", "target_cents"}):
+        return None  # arquivar ou renomear não calcula nada
+    alvo = int(merged.get("target_cents") or 0)
+    if alvo <= 0:
+        return None
+    partes = []
+    if "icone" in meta_d:
+        display["icon"] = ga.ROTULO_DO_ICONE.get(values.get("icon")) or "padrão"
+    if "cor" in meta_d:
+        display["color"] = values.get("color") or "padrão"
+    if "marcos" in meta_d:
+        atuais: list[int] = []
+        if not criando:
+            atuais = [int(m["amount_cents"]) for m in await db.fetch(
+                "select amount_cents from public.goal_milestones where goal_id = %s and workspace_id = %s "
+                "order by amount_cents", old["id"], ctx.workspace_id)]
+        novos = ler_marcos(meta_d["marcos"], alvo, atuais)
+        prepared["marcos"] = novos
+        antes = f" (antes: {_lista_de_marcos(atuais, alvo)})" if atuais else ""
+        partes.append(f"marcos: {_lista_de_marcos(novos, alvo)}{antes}")
+    hoje = local_iso_date(ctx.timezone)
+    guardado = 0 if criando else int(old.get("saved_cents") or 0)
+    prazo = merged.get("deadline")
+    prazo = str(prazo)[:10] if prazo else None
+    mensal = meta_d.get("mensal_cents")
+    mudou = criando or "deadline" in values or "target_cents" in values
     try:
-        return date.fromisoformat(str(valor)[:10]).isoformat()
-    except ValueError:
-        raise Level1Error("Me diz a data certinha (ex.: 20/12/2027). Nada foi alterado.") from None
+        if mensal:
+            frase = await frase_de_prazo_ou_mensal(alvo=alvo, guardado=guardado, hoje=hoje, prazo=None,
+                                                   mensal=int(mensal))
+            if frase and prazo:
+                r = await contribuicao(None, alvo=alvo, guardado=guardado, hoje=hoje, mensal=int(mensal))
+                if r["status"] == "ready":
+                    frase += (f"; isso passa do prazo de {format_date_br(prazo)}" if str(r["estimated_on"]) > prazo
+                              else f"; dentro do prazo de {format_date_br(prazo)}")
+        elif mudou and prazo:
+            frase = await frase_de_prazo_ou_mensal(alvo=alvo, guardado=guardado, hoje=hoje, prazo=prazo, mensal=None)
+        else:
+            frase = None
+    except psycopg.Error:
+        frase = None
+    if frase:
+        partes.append(frase)
+    return "; ".join(partes) or None
+
+
+async def gravar_marcos(ctx: ExecContext, goal_id, marcos: list[int]) -> None:
+    """O que o app faz ao salvar a meta: apaga os que saíram e insere os novos (a tabela não tem UPDATE).
+    A meta já foi conferida no UPDATE/INSERT; o espaço vai nas duas pontas por garantia."""
+    atuais = {int(m["amount_cents"]) for m in await db.fetch(
+        "select amount_cents from public.goal_milestones where goal_id = %s and workspace_id = %s",
+        goal_id, ctx.workspace_id)}
+    for m in atuais - set(marcos):
+        await db.execute(
+            "delete from public.goal_milestones where goal_id = %s and workspace_id = %s and amount_cents = %s",
+            goal_id, ctx.workspace_id, m)
+    for m in sorted(set(marcos) - atuais):
+        await db.execute(
+            "insert into public.goal_milestones (workspace_id, goal_id, amount_cents) values (%s, %s, %s) "
+            "on conflict (goal_id, amount_cents) do nothing", ctx.workspace_id, goal_id, m)
+
+
+async def linha_do_proximo_marco(workspace_id, metas: list[dict]) -> dict[str, str]:
+    """Para `query_goals`: por meta, "Próximo marco: R$ X · faltam R$ Y" (`textoDoProximoMarco` do app)."""
+    if not metas:
+        return {}
+    rows = await db.fetch(
+        "select goal_id, amount_cents from public.goal_milestones where workspace_id = %s and goal_id = any(%s) "
+        "order by amount_cents", workspace_id, [m["id"] for m in metas])
+    por_meta: dict[str, list[int]] = {}
+    for r in rows:
+        por_meta.setdefault(str(r["goal_id"]), []).append(int(r["amount_cents"]))
+    saida = {}
+    for m in metas:
+        alvo, guardado = int(m["target_cents"]), int(m["saved_cents"])
+        visiveis = [x for x in por_meta.get(str(m["id"]), []) if 0 < x < alvo]
+        if not visiveis or guardado >= alvo:
+            continue
+        proximo = next((x for x in visiveis if x > guardado), None)
+        saida[str(m["id"])] = (f"Faltam {cents_to_brl(alvo - guardado)} para o alvo" if proximo is None else
+                               f"Próximo marco: {cents_to_brl(proximo)} ({_pct_texto(proximo, alvo)}%) · "
+                               f"faltam {cents_to_brl(proximo - guardado)}")
+    return saida

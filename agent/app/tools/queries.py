@@ -33,6 +33,7 @@ from app.domain.recurrence import descreve_rrule
 from app.domain.money import cents_to_brl
 from app.graph.schemas import FinanceQuery, FinanceQueryType
 from app.jobs.scheduler import HORIZON_DAYS
+from app.tools import lote_d
 from app.tools.base import ExecContext, ToolResult
 
 KIND_EMOJI = {"expense": "💸", "income": "💰"}
@@ -558,18 +559,25 @@ async def query_budgets(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
 async def query_goals(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     rows = await db.fetch(
         """
-        select name, target_cents, saved_cents, deadline
+        select id, name, target_cents, saved_cents, deadline
         from public.goals
         where workspace_id = %s and archived = false
         order by created_at
         """,
         ctx.workspace_id,
     )
+    if action.search_term and rows:
+        # "qual o próximo marco da Viagem?": a meta citada, sem acento e sem caixa (o resto da lista
+        # não responde a pergunta). Nome que não casa continua mostrando todas.
+        dito = matching.normalize(action.search_term)
+        citadas = [g for g in rows if dito in matching.normalize(g["name"])]
+        rows = citadas or rows
     if not rows:
         return ToolResult(
             "🎯 Você ainda não tem metas. Tenta \"quero juntar 3000 pra viagem até dezembro\"!",
             read_only=True,
         )
+    marcos = await lote_d.linha_do_proximo_marco(ctx.workspace_id, rows)
     linhas = []
     for g in rows:
         alvo = int(g["target_cents"]) or 1
@@ -578,6 +586,7 @@ async def query_goals(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
         linhas.append(
             f"  • {g['name']}: {cents_to_brl(g['saved_cents'])} "
             f"de {cents_to_brl(g['target_cents'])} ({pct}%){prazo}"
+            + (f"\n      {marcos[str(g['id'])]}" if str(g["id"]) in marcos else "")
         )
     return ToolResult("🎯 Suas metas:\n" + "\n".join(linhas), read_only=True)
 

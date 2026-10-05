@@ -39,7 +39,7 @@ from app.graph.schemas import (
 from app.domain.required import faltando
 from app.domain.money import cents_to_brl
 from app.graph.state import AgentState
-from app.tools import atributos, guards, movimentos, resolve
+from app.tools import atributos, guards, lote_d, movimentos, resolve
 from app.services import gemini
 from app.tools.base import ExecContext
 from app.tools.finance import apply_rules
@@ -669,6 +669,9 @@ async def resolve_node(state: AgentState) -> dict:
         state["user_id"], state["workspace_id"], state["timezone"], state.get("text", ""),
         acoes, alvos, pular=set(_incompletas(state, acoes)),
     )
+    # meta com prazo: quanto dá por mês, calculado pelo banco, vai na frase do SIM (lote D, F10)
+    alvos = await lote_d.congelar(state["timezone"], state.get("text", ""), acoes, alvos,
+                                  pular=set(_incompletas(state, acoes)))
 
     # forma de pagamento, fixo/variável, essencial e detalhe DITOS na frase (lote C): segunda leitura,
     # que nunca bloqueia o lançamento quando falha

@@ -689,6 +689,11 @@ def describe_for_confirmation(
                     if n and action.amount_cents and action.amount_cents % n == 0 else "")
             entendido = f" ({frase})" if (frase := ((target or {}).get("atributos") or {}).get("frase")) else ""
             return f"registrar {valor}{nome} em {action.installments}x{cada} no cartão {action.account or 'a informar'}{entendido}: {paid} parcelas iniciais pagas e {(action.installments or 0)-paid} pendentes"
+        if tipo == "create_goal":
+            nome = action.target_ref or action.description or "a meta"
+            prazo = f" até {format_date_br(action.occurred_at)}" if action.occurred_at else ""
+            calculo = (target or {}).get("contribuicao")
+            return f"criar a meta *{nome}* de {valor or 'valor a informar'}{prazo}" + (f"; {calculo}" if calculo else "")
         if tipo == "pay_invoice":
             # com valor a frase precisa dizer QUANTO: pagamento parcial e quitação são efeitos
             # diferentes, e confirmar "o pagamento da fatura" não distingue os dois
