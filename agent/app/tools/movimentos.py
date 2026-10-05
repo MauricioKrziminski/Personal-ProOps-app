@@ -20,8 +20,9 @@ Quatro RPCs do app, todas `auth.uid()` + recibo selado (`p_request_id`). Aqui s�
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5
 
 import psycopg
 
@@ -30,7 +31,7 @@ from app.domain.dates import format_date_br, local_iso_date
 from app.domain.money import MAX_CENTS, cents_to_brl, parse_valor_em_centavos
 from app.graph.schemas import FinanceActionType
 from app.tools import guards
-from app.tools.base import ExecContext, ToolResult, ensure_owned, request_id
+from app.tools.base import REQUEST_NAMESPACE, ExecContext, ToolResult, ensure_owned, request_id
 from app.tools.guards import Level1Error
 
 # O nome da RPC viaja no checkpoint; só estes valem.
@@ -50,6 +51,8 @@ class _Desfaz(Exception):
 
 
 def _brl(v) -> str:
+    if not re.fullmatch(r"-?\d+", str(v)):
+        raise Recusa("❌ O banco devolveu um valor que não consigo ler. Nada foi alterado.")
     n = int(v)
     return f"-{cents_to_brl(-n)}" if n < 0 else cents_to_brl(n)
 
@@ -125,9 +128,14 @@ def _no_estado(estado: dict, account_id) -> dict:
                 {"goal_cents": "0", "cash_cents": "0", "free_cents": "0"})
 
 
-async def _posicao(tx, account_id) -> dict:
-    todas = (await tx.fetch_one("select public.investment_positions() as p"))["p"] or []
-    return next((p for p in todas if str(p["account_id"]) == str(account_id)), {})
+async def _posicao(tx, workspace_id, account_id) -> dict:
+    """A posição pelo cálculo único do app, SÓ deste espaço (o papel do serviço ignora RLS, e
+    `investment_positions()` devolveria as posições de todos os espaços do usuário)."""
+    row = await tx.fetch_one(
+        "select * from private.investment_position_numbers(array[%s]::uuid[]) where account_id = %s",
+        workspace_id, account_id,
+    )
+    return {**(row or {}), "balance_cents": (row or {}).get("ledger_cents", 0)}
 
 
 def _resultado(p: dict) -> str:
@@ -222,7 +230,7 @@ async def congelar(user_id, workspace_id, tz: str, texto: str, acoes: list, alvo
             continue
         try:
             if tipo == FinanceActionType.GOAL_DEPOSIT and (a.account or a.counterparty_account):
-                mov = await _congelar_guardar(user_id, workspace_id, tz, hoje, texto, a, alvos[i])
+                mov, alvos[i] = await _congelar_guardar(user_id, workspace_id, tz, hoje, texto, a, alvos[i])
             elif tipo == FinanceActionType.CREATE_TRANSFER:
                 mov = await _congelar_aplicar(user_id, workspace_id, tz, hoje, texto, a, alvos[i])
             else:
@@ -235,18 +243,22 @@ async def congelar(user_id, workspace_id, tz: str, texto: str, acoes: list, alvo
     return alvos
 
 
-async def _congelar_guardar(user_id, workspace_id, tz, hoje, texto, a, alvo) -> dict | None:
+async def _congelar_guardar(user_id, workspace_id, tz, hoje, texto, a, alvo) -> tuple[dict | None, dict]:
     if alvo.get("status") == "ambiguous" and (a.account or a.counterparty_account):
         # Escolhida a meta pela lista, o fluxo retoma DEPOIS desta resolução e o `goal_deposit` antigo
-        # rodaria sem a conta que a pessoa disse — por isso a pergunta vem agora, com o nome exato.
-        nomes = ", ".join(c["label"] for c in alvo.get("candidates", [])[:6])
-        raise Level1Error(f"🤔 Qual meta? {nomes}. Me manda de novo com o nome exato dela, junto com a "
-                          "conta. Ainda não guardei nada.")
+        # rodaria sem a conta dita. Nome exato (e meta não arquivada) desempata; empate de verdade
+        # vira pergunta COM as opções (`_achar`).
+        if not a.target_ref:
+            raise Level1Error("🤔 Qual meta? Me diz o nome dela. Ainda não guardei nada.")
+        escolhida = await _achar(workspace_id, "goals", a.target_ref, "meta")
+        alvo = {**alvo, "status": "found", "table": "goals",
+                "candidates": [{"id": str(escolhida["id"]), "label": escolhida["name"]}]}
     if alvo.get("status") != "found" or not alvo.get("candidates"):
-        return None  # sem meta resolvida quem responde é o `_sem_alvo` do registry
+        return None, alvo  # sem meta resolvida quem responde é o `_sem_alvo` do registry
     valor = a.amount_cents or parse_valor_em_centavos(texto)
     if not valor:
-        return None  # a falta do valor é pergunta de `faltando`, não minha
+        return None, alvo  # a falta do valor é pergunta de `faltando`, não minha
+    valor = guards.require_amount(valor, o_que="o valor")
     if not a.account:
         raise Level1Error(
             "🤔 De qual conta saiu esse dinheiro? Diga a conta onde ele está (ex.: \"guardei 300 na viagem, "
@@ -265,7 +277,7 @@ async def _congelar_guardar(user_id, workspace_id, tz, hoje, texto, a, alvo) -> 
                    "account_id": str(destino["id"]), "amount_cents": str(valor), "occurred_on": dia}
         contas[str(destino["id"])] = destino["name"]
     try:
-        return await _movimento_da_meta({"user_id": user_id, "hoje": hoje}, meta, entrada, contas)
+        return await _movimento_da_meta({"user_id": user_id, "hoje": hoje}, meta, entrada, contas), alvo
     except Recusa as err:
         raise Level1Error(err.mensagem_usuario) from err
 
@@ -293,6 +305,7 @@ async def _congelar_aplicar(user_id, workspace_id, tz, hoje, texto, a, alvo) -> 
         return None
     if not valor:
         return None
+    valor = guards.require_amount(valor, o_que="o valor")
     if origem["type"] == destino["type"]:
         raise Level1Error("❌ Entre duas contas de investimento não dá para aplicar nem resgatar: uma ponta "
                           "precisa ser uma conta comum. Ainda não registrei nada.")
@@ -305,9 +318,9 @@ async def _congelar_aplicar(user_id, workspace_id, tz, hoje, texto, a, alvo) -> 
     entrada |= {"amount_cents": str(valor), "occurred_on": dia}
 
     async def corpo(tx):
-        antes = await _posicao(tx, pos["id"])
+        antes = await _posicao(tx, workspace_id, pos["id"])
         await _comando(tx, "investment_command", entrada, uuid4())
-        return antes, await _posicao(tx, pos["id"])
+        return antes, await _posicao(tx, workspace_id, pos["id"])
 
     try:
         antes, depois = await _previa(user_id, corpo)
@@ -343,14 +356,23 @@ async def executar(ctx: ExecContext, mov: dict) -> ToolResult:
         raise Level1Error("A proposta não está pronta. Peça a operação novamente.")
     if mov.get("tabela"):
         await ensure_owned(mov["tabela"], mov["alvo_id"], ctx.workspace_id)
+    chave = request_id(ctx.source_message_id, ctx.action_index)
     async with db.como_usuario(ctx.user_id) as tx:
-        r = await _comando(tx, mov["rpc"], mov["input"], request_id(ctx.source_message_id, ctx.action_index))
+        if mov.get("workspace_id"):
+            # O plano vale para o espaço PADRÃO de quem chama: se mudou entre a pergunta e o SIM, o
+            # comando escreveria noutro espaço. Mesma transação do comando, antes dele.
+            atual = (await tx.fetch_one("select public.my_default_workspace() as w") or {}).get("w")
+            if not (str(atual) == str(mov["workspace_id"]) == str(ctx.workspace_id)):
+                raise Recusa(guards.MUDOU)
+        r = await _comando(tx, mov["rpc"], mov["input"], chave)
     texto = mov["feito"]
     if mov.get("chave") and r.get(mov["chave"]) is not None:
         texto += f" Agora: {mov['cauda']} {_brl(r[mov['chave']])}."
     if mov.get("fecho"):
         texto += " " + mov["fecho"]
-    return ToolResult(texto, result_id=UUID(str(mov["alvo_id"])) if mov.get("alvo_id") else None)
+    # o id da LINHA escrita (transferência, receita ou movimento); o plano não cria linha com id, vai a chave
+    escrito = r.get("transfer_id") or r.get("transaction_id") or r.get("movement_id") or r.get("valuation_id")
+    return ToolResult(texto, result_id=UUID(str(escrito)) if escrito else uuid5(REQUEST_NAMESPACE, f"plano:{chave}"))
 
 
 # ---------------------------------------------------------------------------
@@ -359,7 +381,7 @@ async def executar(ctx: ExecContext, mov: dict) -> ToolResult:
 
 
 def _recusar_se_misturar(values: dict, grupo: set[str], pelo_menos: str) -> None:
-    if pelo_menos not in values:
+    if values.get(pelo_menos) is None:
         raise Level1Error("Me diz o valor. Nada foi alterado.")
     if values.keys() - grupo:
         raise Level1Error("Me diz uma coisa por vez. Nada foi alterado.")
@@ -427,7 +449,7 @@ async def preparar_valor(ctx: ExecContext, values: dict, nome: str | None, prepa
     if values.keys() - CAMPOS_VALOR:
         raise Level1Error("Me diz uma coisa por vez: o valor atual da posição OU um rendimento recebido. "
                           "Nada foi alterado.")
-    if ("valor_atual_cents" in values) == ("rendimento_cents" in values):
+    if (values.get("valor_atual_cents") is not None) == (values.get("rendimento_cents") is not None):
         raise Level1Error("É o valor atual da posição (\"está valendo 10.500\") ou um rendimento que você "
                           "recebeu (\"recebi 85 de rendimento\")? Nada foi alterado.")
     if not nome:
@@ -435,13 +457,15 @@ async def preparar_valor(ctx: ExecContext, values: dict, nome: str | None, prepa
     pos = await _achar(ctx.workspace_id, "accounts", nome, "conta de investimento", extra=" and type = 'investment'")
     hoje = local_iso_date(ctx.timezone)
     dia = _data(values.get("data_do_valor"), hoje, "do valor")
-    if "valor_atual_cents" in values:
+    if values.get("valor_atual_cents") is not None:
         valor = int(values["valor_atual_cents"])
+        if not 0 <= valor <= MAX_CENTS:
+            raise Level1Error("Esse valor está fora do que eu registro. Nada foi alterado.")
         entrada = {"op": "valuation", "position_account_id": str(pos["id"]), "value_cents": str(valor), "as_of": dia}
         destino = None
     else:
         valor = int(values["rendimento_cents"])
-        if valor <= 0:
+        if not 0 < valor <= MAX_CENTS:
             raise Level1Error("O rendimento precisa ser maior que zero. Nada foi alterado.")
         destino = pos
         if values.get("rendimento_na_conta"):
@@ -450,9 +474,9 @@ async def preparar_valor(ctx: ExecContext, values: dict, nome: str | None, prepa
                    "amount_cents": str(valor), "occurred_on": dia}
 
     async def corpo(tx):
-        antes = await _posicao(tx, pos["id"])
+        antes = await _posicao(tx, ctx.workspace_id, pos["id"])
         await _comando(tx, "investment_value_command", entrada, uuid4())
-        return antes, await _posicao(tx, pos["id"])
+        return antes, await _posicao(tx, ctx.workspace_id, pos["id"])
 
     try:
         antes, depois = await _previa(ctx.user_id, corpo)
@@ -580,12 +604,12 @@ async def preparar_aplicacao_do_plano(ctx: ExecContext, values: dict, prepared: 
         de = "sem limite" if antes is None else _brl(antes)
         linhas.append(f"{item['category']} {de} → {_brl(item['applied_cents'])}")
     onde = "como limite padrão" if alcance == "padrao" else f"só em {format_date_br(estado['month'])[3:]}"
-    corpo_txt = "; ".join(linhas[:12]) + (f" e mais {len(linhas) - 12}" if len(linhas) > 12 else "")
+    corpo_txt = "; ".join(linhas)  # todas as que mudam: o SIM não aprova o que não leu
     frase = (f"aplicar o plano v{plano['version']} (renda-base {_brl(plano['base_income_cents'])}) aos limites do "
              f"orçamento, {onde}: {corpo_txt}. O acumular sobra de cada limite fica como está")
     prepared["values"] = {}
     prepared["movimento"] = {
-        "rpc": "budget_plan_command", "input": entrada, "frase": frase,
+        "rpc": "budget_plan_command", "input": entrada, "frase": frase, "workspace_id": str(ctx.workspace_id),
         "feito": f"✅ Apliquei o plano v{plano['version']} aos limites {onde}: {corpo_txt}.",
     }
     prepared["summary"] = frase

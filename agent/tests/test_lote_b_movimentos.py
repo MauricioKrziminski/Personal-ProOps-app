@@ -40,7 +40,7 @@ class Recusado(psycopg.Error):
 
     @property
     def diag(self):
-        return SimpleNamespace(message_primary=self._mensagem)
+        return SimpleNamespace(message_primary=self._mensagem, source_function="exec_stmt_raise")
 
 
 class Banco:
@@ -100,7 +100,10 @@ def instala(monkeypatch, banco, achadas=None):
     async def fetch(sql, *args):
         tabela = "accounts" if "from public.accounts" in sql else "goals"
         pool = achadas if achadas is not None else ([META] if tabela == "goals" else [CDB])
-        return [r for r in pool if args[-1].strip("%").lower() in r["name"].lower()]
+        dito = args[-1].strip("%").lower()
+        if " like " in sql:
+            return [r for r in pool if dito in r["name"].lower()]
+        return [r for r in pool if dito == r["name"].lower()]
 
     monkeypatch.setattr(movimentos.db, "fetch", fetch)
 
@@ -124,7 +127,7 @@ def banco_da_meta(saved_antes=240000, saved_depois=270000, antes=None, depois=No
         **{"goal_money_state": [antes or estado_meta(conta_no_estado(NUBANK, 0, 2930000, 2930000)),
                                 depois or estado_meta(conta_no_estado(NUBANK, 30000, 2930000, 2900000))],
            "select saved_cents": {"saved_cents": saved_antes},
-           "public.goal_money_command(": {"r": {"movement_id": "m1", "saved_cents": str(saved_depois)}}},
+           "public.goal_money_command(": {"r": {"movement_id": "33333333-3333-3333-3333-333333333333", "saved_cents": str(saved_depois)}}},
         **extra,
     )
 
@@ -149,7 +152,8 @@ def acao(resource, tipo="resource_update", name=None, **campos):
 
 class _Sinal:
     def __init__(self, codigo, msg):
-        self.sqlstate, self.diag = codigo, SimpleNamespace(message_primary=msg)
+        self.sqlstate = codigo
+        self.diag = SimpleNamespace(message_primary=msg, source_function="exec_stmt_raise")
 
 
 @pytest.mark.parametrize("codigo, msg, trecho", [
@@ -287,7 +291,7 @@ async def test_executar_roda_o_comando_aprovado_com_a_chave_da_intencao(monkeypa
     entrada, chave = banco.comando("goal_money_command")
     assert entrada == mov["input"] and chave == request_id("app:msg-1", 2)
     assert r.message == "🎯 Separei R$ 300,00 na conta Nubank para a meta *Viagem*. Agora: guardado na meta R$ 2.700,00."
-    assert r.result_id == UUID(META["id"]) and banco.saidas == [False]  # este COMMITA
+    assert r.result_id == UUID("33333333-3333-3333-3333-333333333333") and banco.saidas == [False]  # este COMMITA
 
 
 @pytest.mark.asyncio
@@ -399,14 +403,13 @@ async def test_retirar_so_em_meta_que_existe(monkeypatch):
 
 
 def posicao(conta, saldo, valor, resultado=None, qualidade="indisponível", recebido=0):
-    return {"account_id": conta["id"], "name": conta["name"], "balance_cents": str(saldo), "value_cents": str(valor),
-            "result_cents": None if resultado is None else str(resultado), "result_quality": qualidade,
-            "received_cents": str(recebido)}
+    return {"account_id": conta["id"], "name": conta["name"], "ledger_cents": saldo, "value_cents": valor,
+            "result_cents": resultado, "result_quality": qualidade, "received_cents": recebido}
 
 
 def banco_do_investimento(antes, depois, rpc="investment_command", resultado=None):
-    return Banco(**{"investment_positions": [{"p": [antes]}, {"p": [depois]}],
-                    f"public.{rpc}(": {"r": resultado or {"movement_id": "m1", "position_balance_cents": "120000"}}})
+    return Banco(**{"investment_position_numbers": [antes, depois],
+                    f"public.{rpc}(": {"r": resultado or {"movement_id": "33333333-3333-3333-3333-333333333333", "position_balance_cents": "120000"}}})
 
 
 def transferir(origem, destino, valor=20000):
@@ -482,7 +485,7 @@ async def test_executar_aplicacao_diz_o_saldo_que_o_banco_devolveu(monkeypatch):
 
 def banco_do_valor(antes, depois):
     return banco_do_investimento(antes, depois, "investment_value_command",
-                                 {"valuation_id": "v1", "position_value_cents": "1050000"})
+                                 {"valuation_id": "33333333-3333-3333-3333-333333333333", "position_value_cents": "1050000"})
 
 
 @pytest.mark.asyncio
@@ -567,6 +570,7 @@ def banco_do_plano(estado=None, aplicadas=None):
         {"category": "mercado", "before_cents": "90000", "applied_cents": "150000"},
         {"category": "lazer", "before_cents": None, "applied_cents": "62500"}]
     return Banco(**{"public.budget_plan_state(": estado or estado_do_plano(),
+                    "public.my_default_workspace(": {"w": WS},
                     "public.budget_plan_command(": {"r": {"version": 3, "scope": "default", "applied": aplicadas}}})
 
 
@@ -679,10 +683,10 @@ async def test_resources_execute_despacha_o_plano_e_o_movimento(monkeypatch):
 @pytest.mark.asyncio
 async def test_meta_ambigua_com_conta_pergunta_antes_da_lista(monkeypatch):
     """Escolher a meta pela lista retoma DEPOIS da resolução: sem esta pergunta a conta se perderia."""
-    instala(monkeypatch, banco_da_meta())
+    instala(monkeypatch, banco_da_meta(), achadas=[{"id": "1", "name": "Viagem SP"}, {"id": "2", "name": "Viagem RJ"}])
     ambigua = {"status": "ambiguous", "candidates": [{"id": "1", "label": "Viagem SP"}, {"id": "2", "label": "Viagem RJ"}]}
     alvos = await movimentos.congelar(USER, WS, "America/Sao_Paulo", "", [guardar(account="Nubank")], [ambigua])
-    assert "Viagem SP, Viagem RJ" in alvos[0]["correction_error"] and "nome exato" in alvos[0]["correction_error"]
+    assert "Viagem SP, Viagem RJ" in alvos[0]["correction_error"]
     # sem conta dita, a lista segue como sempre
     alvos = await movimentos.congelar(USER, WS, "America/Sao_Paulo", "", [guardar()], [ambigua])
     assert "correction_error" not in alvos[0]
@@ -714,3 +718,105 @@ async def test_transferencia_para_investimento_sem_comando_nao_vira_transferenci
     monkeypatch.setattr(finance.db, "fetch_one", insere)
     with pytest.raises(Level1Error, match="aplicação ou resgate"):
         await finance.create_transfer(ctx(), transferir("Nubank", "CDB"))
+
+
+def test_22023_nativo_do_postgres_nao_vaza_em_ingles():
+    nativo = _Sinal("22023", "unrecognized configuration parameter")
+    nativo.diag.source_function = "ProcessGUCArray"
+    assert guards.recusa_do_banco(nativo) is None
+
+
+@pytest.mark.asyncio
+async def test_plano_nao_escreve_se_o_espaco_padrao_mudou_antes_do_sim(monkeypatch):
+    banco = banco_do_plano()
+    instala(monkeypatch, banco)
+    p = await resources.prepare(ctx(), acao("plano"))
+    assert p["movimento"]["workspace_id"] == WS
+    banco.roteiro["public.my_default_workspace("] = [{"w": "outro-espaco"}]
+    banco.chamadas.clear()
+    with pytest.raises(movimentos.Recusa, match="mudou enquanto eu perguntava"):
+        await movimentos.executar(ctx(), p["movimento"])
+    assert not any("budget_plan_command" in c[0] for c in banco.chamadas)
+
+
+@pytest.mark.asyncio
+async def test_meta_ambigua_resolve_por_nome_exato_e_arquivada_nao_conta(monkeypatch):
+    instala(monkeypatch, banco_da_meta(), achadas=[META, {"id": "x", "name": "Viagem Europa"}])
+    ambigua = {"status": "ambiguous", "table": "goals",
+               "candidates": [{"id": META["id"], "label": "Viagem"}, {"id": "x", "label": "Viagem Europa"}]}
+    alvos = await movimentos.congelar(USER, WS, "America/Sao_Paulo", "", [guardar(account="Nubank")], [ambigua])
+    assert alvos[0]["status"] == "found" and alvos[0]["candidates"][0]["id"] == META["id"]
+    assert alvos[0]["movimento"]["input"]["goal_id"] == META["id"]
+
+
+@pytest.mark.asyncio
+async def test_meta_ambigua_de_verdade_pergunta_com_as_opcoes(monkeypatch):
+    instala(monkeypatch, banco_da_meta(), achadas=[{"id": "1", "name": "Viagem SP"}, {"id": "2", "name": "Viagem RJ"}])
+    ambigua = {"status": "ambiguous", "candidates": []}
+    a = FinanceAction(type="goal_deposit", target_ref="viagem", amount_cents=100, account="Nubank")
+    alvos = await movimentos.congelar(USER, WS, "America/Sao_Paulo", "", [a], [ambigua])
+    assert "Viagem SP, Viagem RJ" in alvos[0]["correction_error"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("res, campos", [
+    ("goals", {"retirar_cents": None}),
+    ("accounts", {"valor_atual_cents": None}),
+    ("accounts", {"rendimento_cents": None, "data_do_valor": "2026-10-01"}),
+])
+async def test_campo_com_valor_nulo_pergunta_em_vez_de_quebrar(monkeypatch, res, campos):
+    instala(monkeypatch, banco_da_retirada())
+    with pytest.raises(Level1Error, match="Me diz o valor|valor atual da posição"):
+        await resources.prepare(ctx(), acao(res, name="viagem" if res == "goals" else "cdb", **campos))
+
+
+@pytest.mark.asyncio
+async def test_valor_acima_do_teto_e_recusado_antes_do_banco(monkeypatch):
+    banco = banco_da_meta()
+    instala(monkeypatch, banco)
+    a = FinanceAction(type="goal_deposit", target_ref="viagem", amount_cents=10**12, account="Nubank")
+    alvos = await movimentos.congelar(USER, WS, "America/Sao_Paulo", "", [a], [ALVO])
+    assert "fora do que eu registro" in alvos[0]["correction_error"] and banco.chamadas == []
+    instala(monkeypatch, banco_do_investimento(posicao(CDB, 0, 0), posicao(CDB, 0, 0)))
+    alvos = await movimentos.congelar(USER, WS, "America/Sao_Paulo", "", [transferir("Nubank", "CDB", 10**12)], [{}])
+    assert "fora do que eu registro" in alvos[0]["correction_error"]
+
+
+@pytest.mark.asyncio
+async def test_posicao_le_so_o_espaco_da_conversa(monkeypatch):
+    banco = banco_do_investimento(posicao(CDB, 1, 1), posicao(CDB, 2, 2))
+    instala(monkeypatch, banco)
+    await movimentos.congelar(USER, WS, "America/Sao_Paulo", "", [transferir("Nubank", "CDB")], [{}])
+    sql, args = banco.chamadas[0]
+    assert "investment_position_numbers" in sql and args[0] == WS
+
+
+@pytest.mark.asyncio
+async def test_result_id_e_a_linha_escrita(monkeypatch):
+    banco = banco_da_meta()
+    banco.roteiro["public.goal_money_command("] = [{"r": {"movement_id": "11111111-1111-1111-1111-111111111111",
+                                                         "transfer_id": "22222222-2222-2222-2222-222222222222", "saved_cents": "1"}}]
+    instala(monkeypatch, banco)
+    mov = (await movimentos.congelar(USER, WS, "America/Sao_Paulo", "", [guardar(account="Nubank")], [ALVO]))[0]["movimento"]
+    r = await movimentos.executar(ctx(), mov)
+    assert str(r.result_id) == "22222222-2222-2222-2222-222222222222"
+    instala(monkeypatch, banco_do_plano())
+    p = await resources.prepare(ctx(), acao("plano"))
+    assert (await movimentos.executar(ctx(), p["movimento"])).result_id == movimentos.uuid5(
+        movimentos.REQUEST_NAMESPACE, f"plano:{request_id('app:msg-1', 2)}")
+
+
+def test_brl_recusa_o_que_nao_e_inteiro():
+    with pytest.raises(movimentos.Recusa):
+        movimentos._brl("12.5")
+    with pytest.raises(movimentos.Recusa):
+        movimentos._brl(None)
+
+
+@pytest.mark.asyncio
+async def test_frase_do_plano_lista_todas_as_categorias(monkeypatch):
+    aplicadas = [{"category": f"cat{i}", "before_cents": "100", "applied_cents": "200"} for i in range(15)]
+    estado = estado_do_plano()
+    instala(monkeypatch, banco_do_plano(estado, aplicadas))
+    p = await resources.prepare(ctx(), acao("plano"))
+    assert all(f"cat{i} R$ 1,00 → R$ 2,00" in p["summary"] for i in range(15)) and "e mais" not in p["summary"]

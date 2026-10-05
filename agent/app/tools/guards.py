@@ -48,6 +48,9 @@ def recusa_do_banco(err, fim: str = "Ainda não mudei nada.") -> str | None:
         return MUDOU
     if codigo not in {"P0001", "22023", "PT422"}:
         return None
+    if codigo == "22023" and getattr(err.diag, "source_function", None) != "exec_stmt_raise":
+        # 22023 NATIVO do Postgres (mensagem em inglês) não é recusa escrita por nós: só o RAISE do plpgsql é.
+        return None
     motivo = (err.diag.message_primary or str(err)).strip().rstrip(".")
     if m := _LIVRE.match(motivo):
         motivo = f"Só há {cents_to_brl(int(m[1]))} livres nessa conta"
