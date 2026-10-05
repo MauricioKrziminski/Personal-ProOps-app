@@ -97,7 +97,7 @@ os números do banco, e só grava no **Sim**.
 | F13 | "o CDB está valendo 1.050" / "o CDB rendeu 30" | Valor: só o patrimônio muda, nenhum dinheiro entra. Rendimento: vira receita de verdade (categoria rendimentos) |
 | F14 | "como está meu plano de orçamento?" e depois "aplica o plano em todas as categorias só neste mês" | Lista as linhas em % e reais; aplicar mostra cada limite antes → depois e só grava no Sim. Criar ou editar o plano continua no app |
 
-### Lote C (forma de pagamento, classificação e detalhe ao lançar pelo agente)
+### Lote C (forma de pagamento, classificação e detalhe ao lançar pelo agente — no staging desde `agente-staging-00217`)
 
 | # | Diga | O que deve acontecer |
 |---|---|---|
