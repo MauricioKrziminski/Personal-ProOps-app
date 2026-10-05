@@ -619,3 +619,59 @@ async def test_grafo_real_pergunta_com_o_entendido_e_grava_o_que_foi_lido(banco,
     assert "EXECUTOU" in retomado["reply"]
     assert gravados[0]["payment_method"] == "pix" and gravados[0]["subcategory_id"] == str(FEIRA["id"])
     get_settings.cache_clear()
+
+
+def _parcelada_com(monkeypatch, padrao_da_categoria):
+    caminhos = []
+
+    class Tx:
+        async def fetch_one(self, sql, *args):
+            caminhos.append(("create_purchase", args))
+            return {"id": uuid4()}
+
+    @asynccontextmanager
+    async def como_usuario(_uid):
+        yield Tx()
+
+    async def fetch_one(sql, *args):
+        if "public.categories" in sql:
+            return padrao_da_categoria
+        if "create_installment_plan_with_history" not in sql:
+            return None  # a consulta da regra do usuário
+        caminhos.append(("create_installment_plan_with_history", args))
+        return {"id": uuid4()}
+
+    async def conta_citada(*_a, **_k):
+        return str(CARTAO["id"])
+
+    async def nada(*_a, **_k):
+        return None
+
+    monkeypatch.setattr(finance.db, "como_usuario", como_usuario)
+    monkeypatch.setattr(finance.db, "fetch_one", fetch_one)
+    monkeypatch.setattr(atributos.db, "fetch_one", fetch_one)
+    monkeypatch.setattr(finance, "conta_citada", conta_citada)
+    monkeypatch.setattr(finance, "ensure_owned", nada)
+    ctx = ExecContext(uuid4(), uuid4(), None, "America/Sao_Paulo", "tv em 3x", "app:1")
+    acao = FinanceAction(type="create_installment_purchase", amount_cents=300000, installments=3,
+                         description="tv", category="eletrônicos", account="Nubank Cartão",
+                         already_paid_count=0, occurred_at="2026-10-05")
+    return ctx, acao, caminhos
+
+
+@pytest.mark.asyncio
+async def test_parcelada_sem_atributo_e_sem_padrao_segue_o_caminho_antigo(monkeypatch):
+    ctx, acao, caminhos = _parcelada_com(monkeypatch, None)
+    await finance.create_installment_purchase(ctx, acao)
+    assert [c[0] for c in caminhos] == ["create_installment_plan_with_history"]
+
+
+@pytest.mark.asyncio
+async def test_parcelada_sem_atributo_mas_com_padrao_da_categoria_vai_por_create_purchase(monkeypatch):
+    ctx, acao, caminhos = _parcelada_com(
+        monkeypatch, {"default_expense_pattern": "variable", "default_expense_necessity": None})
+    await finance.create_installment_purchase(ctx, acao)
+    assert [c[0] for c in caminhos] == ["create_purchase"]
+    dados = json.loads(caminhos[0][1][0])
+    assert dados["expense_pattern"] == "variable" and dados["expense_pattern_source"] == "category_default"
+    assert "p_payment_method" not in dados
