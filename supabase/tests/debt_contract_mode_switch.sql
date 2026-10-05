@@ -95,7 +95,7 @@ begin
             perform public.update_debt_contract_scoped(d,paid+1,'future',patch||'{"due_day":5}',v,'{}',req);
             assert false,'reused request must refuse';
           exception when raise_exception then
-            assert sqlerrm='Identificador da requisição reutilizado com dados diferentes';
+            assert sqlerrm='Identificador de requisição reutilizado com dados diferentes';
           end;
           begin
             perform public.update_debt_contract_scoped(d,paid+1,'future',patch,v,'{}',gen_random_uuid());

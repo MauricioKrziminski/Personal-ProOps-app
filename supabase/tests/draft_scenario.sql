@@ -69,8 +69,9 @@ begin
     raise exception '10000 em 3x devia somar 10000 nas parcelas; somou %', antes;
   end if;
 
-  -- 5. hipóteses EMPILHAM — receita e gasto convivem
-  select * into r from private.draft_effect(ambos, hoje + 30);
+  -- 5. hipóteses EMPILHAM — receita e gasto convivem. O dia é o maior entre o 30 (a receita) e o
+  -- mês seguinte (a 2ª parcela): num mês de 31 dias a 2ª parcela cai no dia 31.
+  select * into r from private.draft_effect(ambos, greatest(hoje + 30, private.add_months(hoje, 1)));
   if r.delta_cents <> 150000 - 200000 then
     raise exception 'receita+gasto no dia 30 devia dar -50000; veio %', r.delta_cents;
   end if;
