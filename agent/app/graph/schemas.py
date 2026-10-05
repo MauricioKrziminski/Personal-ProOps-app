@@ -200,7 +200,7 @@ class FinanceQueryType(str, Enum):
     # staging — não é hipótese.
     #
     # Teto MEDIDO com o Gemini real no mesmo dia (`probe_query_schema.py`):
-    # 10×14 = 140 passa e 11×13 = 143 passa. Aqui ficamos em 10×12 = 120, com folga.
+    # 10×14 = 140 passa e 11×13 = 143 passa. Hoje: 11×13 = 143 (com payment_method e query_spending_change), exatamente o ponto medido.
     QUERY_CYCLE = "query_cycle"
     # "Por que o gasto mudou" (F15): o gasto deste ciclo contra o anterior e o que mais explica a
     # diferença, sobre a RPC `spending_change`. Teto MEDIDO em 05/10/2026 com `probe_query_schema.py`:
@@ -210,7 +210,7 @@ class FinanceQueryType(str, Enum):
 
 
 class FinanceQuery(BaseModel):
-    """10 propriedades × 11 valores de enum = 110. Teto MEDIDO: **121 passa**
+    """11 propriedades × 13 valores de enum = 143 (05/10/2026). Teto MEDIDO: **143 passa**
     (`scripts/probe_scenario_schema.py`, 10/09/2026) — sobra uma propriedade.
 
     Consulta nunca escreve, então nada de `description`, `recurrence` ou dos
