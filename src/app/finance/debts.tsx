@@ -753,7 +753,7 @@ export default function DebtsScreen() {
           {/* Rótulo e valor no MESMO tamanho: em tamanhos diferentes a linha de base desalinhava. */}
           <View style={styles.proximaLinha}>
             <ThemedText type="default" themeColor="textSecondary" style={tabular}>
-              {`Próxima · ${isoToBR(proxima.due_date)}`}
+              {`${proxima.due_date < localISODate() ? 'Atrasada' : 'Próxima'} · ${isoToBR(proxima.due_date)}`}
             </ThemedText>
             <Money cents={Number(proxima.payment_cents)} variant="body" />
           </View>

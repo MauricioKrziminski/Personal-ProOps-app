@@ -1143,9 +1143,7 @@ test('paid history moves the anchor: the date asked is the NEXT one, and the fir
   ui.fill('Total de parcelas', '48');
   ui.fill('Parcelas já pagas', '8');
   ui.fill('Próxima parcela (a 9ª)', '05/10/2026');
-  // a 8ª (05/09) cai no ciclo atual: o formulário pergunta, e "Não" deixa só contada
-  assert.equal(ui.button('Salvar').props.disabled, true);
-  ui.press('Não');
+  // sem conta que paga, a 8ª (05/09) fica só contada, sem pergunta
   ui.press('Salvar');
   assert.equal(ui.writes[0].value.installments_paid, 8);
   assert.equal(ui.writes[0].value.remaining_cents, 5880000);
@@ -1160,7 +1158,6 @@ test('history above the contract total settles on the total instead of blocking 
   ui.fill('Total de parcelas', '48');
   ui.fill('Parcelas já pagas', '49');
   ui.fill('Próxima parcela (a 49ª)', '05/10/2026');
-  ui.press('Não');
   ui.press('Salvar');
   assert.equal(ui.writes[0].value.installments_paid, 48, 'nunca mais pagas que o contrato');
   assert.equal(ui.writes[0].value.installments, 48);
@@ -1318,6 +1315,16 @@ test('a ficha da dívida é uma tela: Editar no topo e o resto no "…", com as 
   assert.deepEqual(copia(cabeca.props.menu.actions.map((a: any) => a.label)), ['Arquivar', 'Apagar por completo']);
 });
 
+test('detalhe da dívida: a próxima que já venceu diz Atrasada no cartão (05/10/2026)', () => {
+  // Hoje do dublê é 08/09: a 9ª de 05/09 venceu. A ficha só dizia "Próxima · 05/09/2026".
+  const ui = screen(debtsFile, { create: false, debts: [{ ...carro, installments_paid: 8 }],
+    debtSchedule: [{ installment_no: 9, due_date: '2026-09-05', payment_cents: 147000 }], params: { id: 'd1' } });
+  assert.ok(ui.nodes().some((n: any) => n.props?.children === 'Atrasada · 05/09/2026'));
+  const emDia = screen(debtsFile, { create: false, debts: [{ ...carro, installments_paid: 8 }],
+    debtSchedule: [{ installment_no: 9, due_date: '2026-10-05', payment_cents: 147000 }], params: { id: 'd1' } });
+  assert.ok(emDia.nodes().some((n: any) => n.props?.children === 'Próxima · 05/10/2026'));
+});
+
 test('detalhe da dívida: "A seguir" começa na próxima, 20 por vez, e "Já pagas" vem da mais recente', () => {
   const futuras = Array.from({ length: 30 }, (_, i) => ({
     installment_no: 9 + i, due_date: `${2026 + Math.floor((9 + i) / 12)}-${String(((9 + i) % 12) + 1).padStart(2, '0')}-05`,
@@ -1446,19 +1453,19 @@ test('parcela paga que venceu no ciclo atual: pergunta se já saiu da conta e la
   assert.equal(antes.nodes().some((n: any) => n.type === 'Field' && /já saiu da conta/.test(n.props.label ?? '')), false);
 });
 
-test('sem conta que paga, a pergunta bloqueia o Salvar com a frase', () => {
+test('sem conta que paga não há o que lançar: nada pergunta e o Salvar fica livre (05/10/2026)', () => {
+  // Visto no iPhone: "A 8ª (05/10) já saiu da conta sua conta?" travava o Salvar de quem não tem conta.
   const ciclo = { de: '2026-09-01', ate: '2026-09-30', mes: '2026-09', diasAteOFim: 22 };
-  const ui = formDivida({ cycle: ciclo });
+  const ui = formDivida({ cycle: ciclo, segurarMutacoes: true });
   ui.fill('Nome', 'Carro');
   ui.fill('Valor', 148500);
   ui.fill('Total de parcelas', '48');
   ui.fill('Parcelas já pagas', '8');
   ui.fill('Próxima parcela (a 9ª)', '05/10/2026');
-  assert.equal(ui.button('Salvar').props.disabled, true);
-  ui.press('Sim');
-  assert.equal(ui.button('Salvar').props.disabled, true, 'Sim sem conta não grava');
-  ui.press('Não');
+  assert.equal(ui.nodes().some((n: any) => n.type === 'Field' && /já saiu da conta/.test(n.props.label ?? '')), false);
   assert.equal(ui.button('Salvar').props.disabled, false);
+  ui.press('Salvar');
+  assert.equal(ui.writes.at(-1).value.ja_sairam, undefined, 'as pagas ficam só contadas');
 });
 
 test('tocar no dia 28 de fevereiro escolhe dia fixo, e a ação explícita preserva fim do mês', () => {

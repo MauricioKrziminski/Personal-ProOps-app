@@ -376,16 +376,16 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
    */
   const temPagasNovas = form.calculationMode === 'fixed_installments' && !converter
     && form.installmentsPaid > (form.id ? form.pagasOriginal : 0);
-  const perguntas = temPagasNovas && ancoraEfetiva && diaDoContrato && ciclo.data
+  // Sem conta que paga não há o que lançar: as pagas ficam só contadas, sem pergunta (05/10/2026).
+  const perguntaPagas = temPagasNovas && Boolean(form.accountId);
+  const perguntas = perguntaPagas && ancoraEfetiva && diaDoContrato && ciclo.data
     ? parcelasPagasNoCiclo(ancoraEfetiva, diaDoContrato, (form.id ? form.pagasOriginal : 0) + 1,
         form.installmentsPaid, ciclo.data.de, ciclo.data.ate)
     : [];
   const respostaDe = (no: number): boolean | undefined => jaSaiu[no] ?? (form.accountId ? true : undefined);
-  const erroDasPerguntas = temPagasNovas && ciclo.isPending ? 'Conferindo o ciclo atual…'
+  const erroDasPerguntas = perguntaPagas && ciclo.isPending ? 'Conferindo o ciclo atual…'
     : perguntas.find((q) => respostaDe(q.no) === undefined)
-      ? 'Diga se a parcela já saiu da conta.'
-      : perguntas.find((q) => respostaDe(q.no) && !form.accountId)
-        ? 'Escolha a conta que paga para lançar a parcela.' : null;
+      ? 'Diga se a parcela já saiu da conta.' : null;
   const jaSairam = form.accountId && perguntas.some((q) => respostaDe(q.no))
     ? { accountId: form.accountId, numbers: perguntas.filter((q) => respostaDe(q.no)).map((q) => q.no) }
     : undefined;
@@ -722,9 +722,8 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
           </Field>
           {perguntas.map((q) => {
             const sim = respostaDe(q.no);
-            const nome = contaEscolhida?.name ?? 'sua conta';
             return (
-              <Field key={q.no} label={`A ${q.no}ª (${isoToBR(q.dataISO).slice(0, 5)}) já saiu da conta ${nome}?`}>
+              <Field key={q.no} label={`A ${q.no}ª (${isoToBR(q.dataISO).slice(0, 5)}) já saiu da conta ${contaEscolhida?.name ?? ''}?`}>
                 <View style={styles.simNao}>
                   <Button label="Sim" size="sm" variant={sim === true ? 'primary' : 'secondary'}
                     onPress={() => setJaSaiu({ ...jaSaiu, [q.no]: true })} />

@@ -6,7 +6,7 @@ import { Icon } from '@/components/ui/icon';
 import { Money } from '@/components/ui/money';
 import { HitTarget, Radius, Space, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
-import { isoToBR } from '@/lib/dates';
+import { isoToBR, localISODate } from '@/lib/dates';
 import type { ItemDaLinha } from '@/lib/debt-history';
 
 /** O nó do trilho mede isto; o trilho é centrado nele. */
@@ -35,6 +35,7 @@ export function DebtTimeline({
   const theme = useTheme();
   // Dinheiro dentro de frase obedece ao "esconder saldo" — `Money` é bloco e não cabe aqui.
   const brl = useBRL();
+  const hoje = localISODate();
   // As pontas do trilho: a primeira linha não tem fio acima, a última não tem abaixo.
   const primeiraDeTodas = anos[0]?.itens[0];
   const ultimaDeTodas = anos.at(-1)?.itens.at(-1);
@@ -55,9 +56,12 @@ export function DebtTimeline({
                 ? `paga em ${isoToBR(item.iso)}`
                 : item.estado === 'estimada'
                   ? `paga · por volta de ${isoToBR(item.iso)}`
-                  : proxima
-                    ? `a próxima · vence ${isoToBR(item.iso)}`
-                    : `vence ${isoToBR(item.iso)}`;
+                  : item.iso < hoje
+                    // Vencida e não paga: a data fica a do contrato, e a linha diz que atrasou (05/10/2026).
+                    ? `atrasada · venceu ${isoToBR(item.iso)}`
+                    : proxima
+                      ? `a próxima · vence ${isoToBR(item.iso)}`
+                      : `vence ${isoToBR(item.iso)}`;
             return (
               <Pressable
                 key={item.n}
