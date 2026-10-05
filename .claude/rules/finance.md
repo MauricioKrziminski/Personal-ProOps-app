@@ -619,6 +619,7 @@ compra, não a única tela que responde quanto resta.
   > fatura Nubank de 10/09 ("Período vigente: 03 AGO a 03 SET") contém as compras de 03 AGO, e o
   > OFX da de outubro (`DTSTART 20260903`) contém as de 03 SET. Migration `20260909050000`,
   > conciliação em `docs/bugs/2026-09-09-conciliacao-setembro.md`.
+- **Fatura corrente (`card_summary`) = a não paga de MENOR vencimento a partir de hoje**; sem nenhuma, a mais recente. `reference_month` é o mês do FECHAMENTO e não serve para isso: no cartão que fecha no último dia e vence dia 10 do mês seguinte, a de setembro (vence 10/10) era pulada em outubro (`20261005220000`, visto em produção). Vencida e sem pagar vai para `atrasadas`.
 - Cartão é conta comum em partida dobrada: a compra deixa o saldo do cartão negativo (dívida) e o **pagamento da fatura é `transfer`** da conta pagadora para o cartão (RPC `pay_invoice`). Pagamento de fatura **nunca** é despesa nova — o gasto já contou na compra.
 - **Pagar e quitar são efeitos diferentes e a interface tem que distinguir os dois.** `pay_invoice`
   move dinheiro (aceita valor parcial); `settle_invoice` marca a fatura como paga SEM criar
