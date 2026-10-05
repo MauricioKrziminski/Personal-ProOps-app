@@ -670,3 +670,9 @@ promete configuração da reserva pelo WhatsApp antes da implementação/avalia�
 | app | agente |
 |---|---|
 | Planejar a renda-base por grupos e categorias em % (`budget_plan_command` save), ver os reais calculados no servidor, comparar planejado × realizado e aplicar aos limites (padrão ou do mês) com antes → depois (`apply`) | Lacuna: o agente não cria nem aplica plano percentual; continua definindo limites por `save_budget`/`edit_budget`. Paridade pendente da etapa final do plano de 22 pontos; nenhuma tool/prompt mudou no F14. |
+
+## Por que o gasto mudou — F15 (04/10/2026)
+
+| app | agente |
+|---|---|
+| "Por que mudou?" no bloco "Para onde foi" do Financeiro (`/finance/why`, RPC `spending_change`): contribuição de cada categoria, detalhe, forma de pagamento e tipo à diferença entre dois períodos, com link para os lançamentos de cada período | Lacuna: o agente não explica variação de gasto; só lê totais por categoria (`query`). Paridade pendente da etapa final do plano de 22 pontos; nenhuma tool/prompt mudou no F15. |

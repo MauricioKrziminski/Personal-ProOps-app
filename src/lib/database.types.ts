@@ -4588,6 +4588,16 @@ export type Database = {
           title: string
         }[]
       }
+      spending_change: {
+        Args: {
+          p_cur_from: string
+          p_cur_to: string
+          p_dimension: string
+          p_prev_from: string
+          p_prev_to: string
+        }
+        Returns: Json
+      }
       subcategory_filter_states: { Args: never; Returns: Json }
       subcategory_state: { Args: { p_workspace_id: string }; Returns: Json }
       transactions_summary: {

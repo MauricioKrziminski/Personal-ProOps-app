@@ -25,6 +25,7 @@ import { LedgerRow } from '@/components/ui/ledger-row';
 import { Money } from '@/components/ui/money';
 import { RingGauge } from '@/components/ui/ring-gauge';
 import { Section } from '@/components/ui/row';
+import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { Dica } from '@/components/ui/dica';
 import { LegendaItem, ScrubChart } from '@/components/ui/scrub-chart';
@@ -569,6 +570,17 @@ export default function FinanceScreen() {
             onOpenCategory={(category) => openTransactions({ category })}
             onOpenAll={() => openTransactions({ kind: 'expense' })}
           />
+          {range.from && range.to && previousRange.from && previousRange.to ? (
+            <Button
+              label="Por que mudou?"
+              variant="secondary"
+              size="sm"
+              onPress={() => router.push({ pathname: '/finance/why', params: {
+                curFrom: range.from, curTo: range.to, prevFrom: previousRange.from, prevTo: previousRange.to,
+                curLabel: monthLabel(month), prevLabel: monthLabel(previousMonth),
+              } })}
+            />
+          ) : null}
         </View>
       ) : null}
 

@@ -60,7 +60,7 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any } = {}) {
+function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any } = {}) {
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
@@ -459,6 +459,10 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
         useGoalLinkCandidates: () => ({ ...query, isSuccess: true, data: options.linkCandidates ?? [] }),
         useGoalMoneyCommand: () => mutation('goalMoney'),
       };
+      if (name === '@/hooks/use-spending-change') return {
+        useSpendingChange: () => ({ ...query, isPending: false, isSuccess: true, data: options.spending, refetch: async () => { refetches.push('spending-change'); } }),
+      };
+      if (name === '@/lib/spending-change') return load('src/lib/spending-change.ts');
       if (name === '@/hooks/use-investments') return {
         useInvestmentPositions: () => ({ ...query, isSuccess: true, data: options.investments?.positions ?? [], refetch: async () => { refetches.push('investments'); } }),
         useInvestmentMovements: (id?: string) => ({ ...query, isSuccess: true, data: id ? { pages: [{ movements: options.investments?.movements ?? [] }] } : undefined, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: async () => {} }),
@@ -7366,4 +7370,47 @@ test('F14: com valores ocultos a sugestão de renda não mostra dinheiro', () =>
   const linha = ui.nodes().find((n: any) => n.type === 'ThemedText' && /Entrou/.test(String(n.props.children)));
   assert.ok(linha);
   assert.match(String(linha.props.children), /Entrou •{6} em /);
+});
+
+const f15Params = { curFrom: '2026-10-01', curTo: '2026-10-31', prevFrom: '2026-09-01', prevTo: '2026-09-30', curLabel: 'outubro', prevLabel: 'setembro' };
+const f15Dados = (previous: number, linhas: [string | null, string, number, number][]) => {
+  const rows = linhas.map(([key, label, previous, current]) => ({ key, label, previous, current, delta: current - previous }));
+  const cur = rows.reduce((s, r) => s + r.current, 0), prev = rows.reduce((s, r) => s + r.previous, 0);
+  return { current: cur, previous: previous === -1 ? prev : previous, delta: cur - prev, percentBp: prev > 0 ? Math.round((cur - prev) * 10000 / prev) : null, rows };
+};
+const f15Tela = (spending: any) => screen('src/app/finance/why.tsx', { params: f15Params, spending });
+const f15Linhas = (ui: any) => ui.nodes().filter((n: any) => n.type === 'Row' && n.props.onPress);
+
+test('F15: a soma das linhas mostradas fecha a diferença do topo, com a linha sem categoria', () => {
+  const dados = f15Dados(-1, [['lazer', 'lazer', 40000, 0], [null, 'Sem categoria', 0, 30000], ['mercado', 'mercado', 20000, 150000]]);
+  const ui = f15Tela(dados);
+  const soma = f15Linhas(ui).reduce((s: number, r: any) => s + r.props.trailing.props.cents, 0);
+  assert.equal(soma, dados.delta);
+  assert.ok(f15Linhas(ui).some((r: any) => r.props.title === 'Sem categoria'));
+  assert.deepEqual(copia(f15Linhas(ui).map((r: any) => r.props.title)), ['mercado', 'lazer', 'Sem categoria']);
+});
+
+test('F15: sem gasto no período anterior não aparece percentual', () => {
+  const ui = f15Tela(f15Dados(-1, [['mercado', 'mercado', 0, 5000]]));
+  const textos = ui.nodes().filter((n: any) => n.type === 'ThemedText').map((n: any) => JSON.stringify(n.props.children));
+  assert.ok(textos.some((x: string) => /sem gasto em setembro/.test(x)));
+  assert.ok(!textos.some((x: string) => /%/.test(x)));
+});
+
+test('F15: tocar numa linha oferece os dois períodos com as bordas exatas e o "sem X" da dimensão', () => {
+  const ui = f15Tela(f15Dados(-1, [[null, 'Sem categoria', 1000, 3000]]));
+  ui.interact(() => f15Linhas(ui)[0].props.onPress());
+  assert.deepEqual(copia(ui.actions.map((a: any) => a.label)), ['Ver em setembro', 'Ver em outubro']);
+  ui.interact(() => ui.actions[0].onPress());
+  ui.interact(() => ui.actions[1].onPress());
+  const [antes, depois] = ui.navigations.slice(-2).map((n: any) => copia(n));
+  assert.equal(antes.pathname, '/finance/transactions');
+  assert.deepEqual(antes.params, { from: '2026-09-01', to: '2026-09-30', kind: 'expense', lente: 'gasto', category: 'none' });
+  assert.deepEqual(depois.params, { from: '2026-10-01', to: '2026-10-31', kind: 'expense', lente: 'gasto', category: 'none' });
+});
+
+test('F15: linhas sem mudança só aparecem em "Ver todas"', () => {
+  const ui = f15Tela(f15Dados(-1, [['mercado', 'mercado', 0, 5000], ['lazer', 'lazer', 700, 700]]));
+  assert.equal(f15Linhas(ui).length, 1);
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Button' && /Ver todas/.test(String(n.props.label))));
 });

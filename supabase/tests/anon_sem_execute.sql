@@ -30,7 +30,7 @@ begin
     'materialize_recurring_occurrence','month_forecast_json','month_lines','month_summary','monthly_cashflow','my_default_workspace',
     'net_worth','net_worth_series','note_folder_counts','note_folders_reorder','note_tag_counts',
     'notes_reorder','pay_debt_installment','pay_invoice','payoff_strategy','plan_status','rename_category','roll_invoice',
-    'save_budget','save_category','settle_invoice','simular','skip_recurring_occurrence','spendable','spendable_path','transactions_summary','upcoming_bills',
+    'save_budget','save_category','settle_invoice','simular','skip_recurring_occurrence','spendable','spendable_path','spending_change','transactions_summary','upcoming_bills',
     'update_asset_value','update_debt_payment_due_day','update_installment_plan','update_installment_scope_last_day','update_recurring_series','update_transaction_scoped',
     'year_end_balances',
     -- não são `.rpc()`, mas a escrita de `notes` as avalia como quem escreve (coluna gerada e CHECK)

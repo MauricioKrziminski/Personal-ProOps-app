@@ -38,8 +38,8 @@ Esses fatos e a abertura do formulário ainda não equivalem ao aceite funcional
 | F12 | Aporte/resgate | Aceito; limites no registro | Validado 11/11 | Validado 8/10 |
 | F13 | Resultado/reavaliação | Aceito; correção do mesmo dia só no SQL | Validado 11/11 | Validado 8/8 |
 | F14 | Plano percentual | Aceito; limites no registro | Validado 9/9 | Validado 8/8 |
-| F15 | Explicação de mudanças | Próximo incremento, F14 aceito | Não validado | Não validado |
-| F16 | Voz contextual | Aguardando F15 | Não validado | Não validado |
+| F15 | Explicação de mudanças | Aceito; limites no registro | Validado 6/6 | Validado 5/5 |
+| F16 | Voz contextual | Próximo incremento, F15 aceito | Não validado | Não validado |
 | F17 | Ajuda e avisos | Aguardando F16 | Não validado | Não validado |
 | F18 | Transferência recorrente | Aguardando F17 | Não validado | Não validado |
 | F19 | Marcos nas metas | Aguardando F18 | Não validado | Não validado |
@@ -297,3 +297,10 @@ F14 liberado.
 passou a mostrar o limite padrão que vale no mês. A suíte SQL inteira achou uma regressão do F04
 no `set_invoice`, corrigida em `20261005110000_set_invoice_guardas_de_volta.sql`. Limites
 restaurados e planos de QA apagados por ID. F15 liberado.
+
+## F15 — por que o gasto mudou
+
+[Aceite e limites](f15/aceite.md) e [contrato](f15/contrato.md). Migration
+`20261005112000_spending_change.sql` (renomeada na integração), só no staging. iOS 6/6 e Android
+5/5, só leitura; contribuições fechando a diferença no centavo e o toque abrindo o conjunto certo.
+F16 liberado.

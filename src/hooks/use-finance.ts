@@ -24,6 +24,7 @@ import type { Consulta } from '@/lib/tela-pronta';
 import type { DebtDeclaredEstimateRow, DebtPaymentRow } from '@/lib/debt-history';
 import type { ExpectedLedgerLine } from '@/lib/ledger-expected';
 import { agentFetch } from '@/lib/agent-api';
+import { NO_CATEGORY } from '@/lib/spending-change';
 import { toIlikeTerm } from '@/lib/search';
 import { dateWindows, timestampDateBounds, type ListFiltersValue } from '@/lib/list-filters';
 import { ACCOUNT_TYPES } from '@/lib/accounts';
@@ -243,8 +244,15 @@ export interface TransactionFilters {
   from?: string;
   to?: string;
   kind?: TransactionKind;
+  /** `NO_CATEGORY` ('none') = lançamentos sem categoria. */
   category?: string;
   subcategoryId?: string | null;
+  /**
+   * Lente "gastos lançados por data" de `spending_change` (F15): fora o principal adiado de fatura
+   * e o pagamento de fatura, que a RPC também não conta. Sem isto o total da lista abriria
+   * diferente do número da linha que levou até ela.
+   */
+  lenteGasto?: boolean;
   /** Ocorrências de uma série recorrente. */
   recurringId?: string;
   /** Extrato de uma conta ou cartão. `null` = lançamentos sem conta; `undefined` = todas. */
@@ -313,7 +321,8 @@ export function useTransactions(filters: TransactionFilters) {
         .order('id', { ascending: false })
         .range(pageParam, pageParam + TRANSACTION_PAGE - 1);
       if (filters.kind) query = query.eq('kind', filters.kind);
-      if (filters.category) query = query.eq('category', filters.category);
+      if (filters.category) query = filters.category === NO_CATEGORY ? query.or('category.is.null,category.eq.') : query.eq('category', filters.category);
+      if (filters.lenteGasto) query = query.eq('kind', 'expense').is('rollover_of_invoice_id', null).is('pays_invoice_id', null);
       if (filters.subcategoryId !== undefined) query = filters.subcategoryId === null
         ? query.is('subcategory_id', null) : query.eq('subcategory_id', filters.subcategoryId);
       if (filters.minCents !== undefined) query = query.gte('amount_cents', filters.minCents);

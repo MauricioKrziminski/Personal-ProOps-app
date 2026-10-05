@@ -233,10 +233,12 @@ Aceite no staging em 05/10/2026: [F14](../../qa/2026-10-02-evolucao-financeira/f
 
 Arquivos: finance-analysis-panes, reports, agregação SQL e links de filtros. Interface: dois períodos da mesma lente → contribuições ao delta + ids/recortes investigáveis.
 
-- [ ] RED: contribuições incluindo desconhecido somam delta; percentual sem base é indisponível.
-- [ ] Implementar agregação determinística e consultas paginadas de evidência.
-- [ ] Integrar investigação progressiva/links sem uma segunda home.
-- [ ] Provar regimes/filtros/créditos e gates nativos F15; registrar aceite.
+- [x] RED: contribuições incluindo desconhecido somam delta; percentual sem base é indisponível.
+- [x] Implementar agregação determinística e consultas paginadas de evidência.
+- [x] Integrar investigação progressiva/links sem uma segunda home.
+- [x] Provar regimes/filtros/créditos e gates nativos F15; registrar aceite.
+
+Aceite no staging em 05/10/2026: [F15](../../qa/2026-10-02-evolucao-financeira/f15/aceite.md). F16 liberado.
 
 ### F16 — Voz no lançamento
 

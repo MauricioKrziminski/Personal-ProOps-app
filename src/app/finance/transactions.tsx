@@ -52,6 +52,7 @@ import {
   useAparencia,
 } from '@/hooks/use-finance';
 import { useSubcategoryFilterOptions } from '@/hooks/use-category-details';
+import { NO_CATEGORY } from '@/lib/spending-change';
 import { parseSubcategoryFilter } from '@/lib/category-detail-breakdown';
 import { subcategoryAfterParentChange } from '@/lib/subcategories';
 import { usarDica } from '@/hooks/use-dicas';
@@ -198,6 +199,12 @@ function toSeriesSections(items: Item[], hoje: string, includeYear = false): Day
   return [...aSeguir, ...anteriores];
 }
 
+/** Janela exata do link: as duas bordas ISO válidas e em ordem, senão ignora (cai no mês). */
+function janelaDoLink(from?: string, to?: string): { from?: string; to?: string } {
+  const iso = /^\d{4}-\d{2}-\d{2}$/;
+  return from && to && iso.test(from) && iso.test(to) && from <= to ? { from, to } : {};
+}
+
 export default function TransactionsScreen() {
   const theme = useTheme();
   const aparencia = useAparencia();
@@ -211,6 +218,11 @@ export default function TransactionsScreen() {
     tabletPaneWidths(Math.min(width, 1200) - Space.lg * 2).twoPane;
   const params = useLocalSearchParams<{
     month?: string;
+    /** Janela EXATA (ISO), como a tela de origem a resolveu — vale no lugar de `month`. */
+    from?: string;
+    to?: string;
+    /** `gasto` = a lente de "Por que mudou?": sem principal adiado nem pagamento de fatura. */
+    lente?: string;
     kind?: string;
     category?: string;
     recurringId?: string;
@@ -238,6 +250,7 @@ export default function TransactionsScreen() {
       : 'all'
   );
   const [status, setStatus] = useState<'all' | 'pending' | 'cleared'>('all');
+  const [lenteGasto, setLenteGasto] = useState(params.lente === 'gasto');
   const [category, setCategory] = useState<string | undefined>(params.category);
   const [accountId, setAccountId] = useState<string | undefined>(params.accountId);
   const [source, setSource] = useState<TransactionSource | undefined>(undefined);
@@ -261,7 +274,7 @@ export default function TransactionsScreen() {
   const [search, setSearch] = useState('');
   const [puxando, setPuxando] = useState(false);
   const [filtersVisible, setFiltersVisible] = useState(false);
-  const [customDates, setCustomDates] = useState<{ from?: string; to?: string }>({});
+  const [customDates, setCustomDates] = useState<{ from?: string; to?: string }>(() => janelaDoLink(params.from, params.to));
   const [minCents, setMinCents] = useState<number>();
   const [maxCents, setMaxCents] = useState<number>();
   // Busca-enquanto-digita sem uma requisição por tecla — agora ela vai ao banco.
@@ -284,11 +297,13 @@ export default function TransactionsScreen() {
    * desfaz escolha que o usuário fez na tela. `recurringId` fica de fora: é lido direto de
    * `params`, sem estado.
    */
-  const link = JSON.stringify([params.month, params.kind, params.category, params.accountId, params.paymentMethods, params.expensePatterns, params.expenseNecessities, params.subcategoryId]);
+  const link = JSON.stringify([params.from, params.to, params.lente, params.month, params.kind, params.category, params.accountId, params.paymentMethods, params.expensePatterns, params.expenseNecessities, params.subcategoryId]);
   const [linkAplicado, setLinkAplicado] = useState(link);
   if (link !== linkAplicado) {
     setLinkAplicado(link);
     if (params.month) setMesEscolhido(params.month);
+    if (params.from && params.to) setCustomDates(janelaDoLink(params.from, params.to));
+    if (params.lente !== undefined) setLenteGasto(params.lente === 'gasto');
     if (params.kind === 'expense' || params.kind === 'income' || params.kind === 'transfer') {
       setKind(params.kind);
     }
@@ -344,7 +359,7 @@ export default function TransactionsScreen() {
       : customDates.to ? `Até ${formatDateBR(customDates.to)}` : monthTitle(month);
   const periodDescription = openPeriod ? periodLabel.charAt(0).toLowerCase() + periodLabel.slice(1)
     : customPeriod ? `de ${periodLabel}` : `em ${periodLabel}`;
-  const forecastsEnabled = range.pronto && !openPeriod && !filterLinkInvalid;
+  const forecastsEnabled = range.pronto && !openPeriod && !filterLinkInvalid && !lenteGasto;
   const list = useTransactions({
     /*
       ⚠️ **As MESMAS bordas do resumo, não `month`.** O hook recortava o mês civil por conta
@@ -355,7 +370,7 @@ export default function TransactionsScreen() {
     to: range.to,
     pronto: range.pronto && !filterLinkInvalid,
     kind: kind === 'all' ? undefined : kind,
-    category, subcategoryId,
+    category, subcategoryId, lenteGasto,
     recurringId: params.recurringId,
     accountId: accountId === undefined ? undefined : accountId === NO_ACCOUNT ? null : accountId,
     status: status === 'all' ? undefined : status,
@@ -396,7 +411,7 @@ export default function TransactionsScreen() {
   // páginas continua sendo uma seção só depois do `flat()`.
   const rows = useMemo(() => list.data?.pages.flat() ?? [], [list.data]);
   // Queries desligadas podem conservar cache e erro. O modo aberto exclui também esses dados.
-  const expectedLines = useMemo(() => openPeriod || filterLinkInvalid ? [] : filterExpectedLines(expected.data ?? [], {
+  const expectedLines = useMemo(() => openPeriod || filterLinkInvalid || lenteGasto ? [] : filterExpectedLines(expected.data ?? [], {
     kind: kind === 'all' ? undefined : kind,
     status: status === 'all' ? undefined : status,
     category, subcategoryId,
@@ -405,14 +420,14 @@ export default function TransactionsScreen() {
     recurringId: params.recurringId,
     q: term,
     minCents, maxCents, paymentMethods, expensePatterns, expenseNecessities,
-  }), [openPeriod, filterLinkInvalid, expected.data, kind, status, category, subcategoryId, accountId, source, params.recurringId, term, minCents, maxCents, paymentMethods, expensePatterns, expenseNecessities]);
+  }), [openPeriod, filterLinkInvalid, lenteGasto, expected.data, kind, status, category, subcategoryId, accountId, source, params.recurringId, term, minCents, maxCents, paymentMethods, expensePatterns, expenseNecessities]);
   // Trocar de filtro durante a gravação não pode trazer uma ocorrência de outro recorte.
-  const transitoFiltrado = useMemo(() => openPeriod || filterLinkInvalid ? [] : filterExpectedLines(previstas.emTransito.filter(p =>
+  const transitoFiltrado = useMemo(() => openPeriod || filterLinkInvalid || lenteGasto ? [] : filterExpectedLines(previstas.emTransito.filter(p =>
     (!range.from || p.due_date >= range.from) && (!range.to || p.due_date <= range.to)), {
       kind: kind === 'all' ? undefined : kind, status: status === 'all' ? undefined : status,
       category, subcategoryId, accountId: accountId === undefined ? undefined : accountId === NO_ACCOUNT ? null : accountId,
       source, recurringId: params.recurringId, q: term, minCents, maxCents, paymentMethods, expensePatterns, expenseNecessities,
-    }), [openPeriod, filterLinkInvalid, previstas.emTransito, range.from, range.to, kind, status, category, subcategoryId, accountId, source, params.recurringId, term, minCents, maxCents, paymentMethods, expensePatterns, expenseNecessities]);
+    }), [openPeriod, filterLinkInvalid, lenteGasto, previstas.emTransito, range.from, range.to, kind, status, category, subcategoryId, accountId, source, params.recurringId, term, minCents, maxCents, paymentMethods, expensePatterns, expenseNecessities]);
   const previstasVisiveis = useMemo(
     () => previstasNaTela(expectedLines, transitoFiltrado, rows),
     [expectedLines, transitoFiltrado, rows]
@@ -573,7 +588,8 @@ export default function TransactionsScreen() {
     tituloDaConta,
     kind !== 'all' ? KIND_OPTIONS.find(o => o.value === kind)?.label : undefined,
     status !== 'all' ? STATUS_OPTIONS.find(o => o.value === status)?.label : undefined,
-    category,
+    category === NO_CATEGORY ? 'Sem categoria' : category,
+    lenteGasto ? 'Gastos lançados por data, sem fatura adiada' : undefined,
     subcategoryId === null ? 'Sem detalhe' : subcategoryId !== undefined ? selectedDetail ? `${selectedDetail.parent_category} · ${selectedDetail.name}` : 'Detalhe a conferir' : undefined,
     source ? SOURCE_FILTER.find(o => o.value === source)?.label : undefined,
     paymentMethods.length ? PAYMENT_METHOD_FILTER_OPTIONS.filter(o => selectedPaymentMethods.has(o.id)).map(o => o.label).join(', ') : undefined,
@@ -596,7 +612,7 @@ export default function TransactionsScreen() {
    * período inteiro em cima de uma ocorrência só, escrevendo "GASTEI EM OUTUBRO R$ 3.842,78 ·
    * 1 lançamento" sobre uma linha de R$ 88,85. É o mesmo defeito que o card acabou de perder.
    */
-  const listaRecortada = hasFilters || Boolean(params.recurringId) || filterLinkInvalid;
+  const listaRecortada = hasFilters || lenteGasto || Boolean(params.recurringId) || filterLinkInvalid;
   /*
     ⚠️ **`!anyEver.isError` junto.** Com a query falhando, `data` é undefined, `?? []` vira lista
     vazia e quem tem anos de histórico recebia "Nenhum lançamento ainda" com a dica de
@@ -610,7 +626,7 @@ export default function TransactionsScreen() {
 
   const clearFilters = () => {
     setKind('all');
-    setStatus('all');
+    setStatus('all'); setLenteGasto(false);
     setCategory(undefined); setSubcategoryId(undefined); setDetailLinkInvalid(false);
     setAccountId(undefined);
     setSource(undefined);
