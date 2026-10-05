@@ -16,6 +16,8 @@ import json
 from datetime import date
 from uuid import UUID
 
+import psycopg
+
 from app import db
 from app.domain import matching
 from app.domain.dates import (
@@ -24,6 +26,9 @@ from app.domain.dates import (
     invoice_cycle_window,
     local_iso_date,
 )
+from app.domain.payment_method import ACEITAS as ACEITAS_FORMAS
+from app.domain.payment_method import ROTULOS as ROTULOS_FORMAS
+from app.domain.payment_method import forma_de_pagamento
 from app.domain.recurrence import descreve_rrule
 from app.domain.money import cents_to_brl
 from app.graph.schemas import FinanceQuery, FinanceQueryType
@@ -226,6 +231,18 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
             account_name = acc["name"]
             account_type = acc.get("type")
 
+    # Forma de pagamento (F05): o filtro roda no SQL e viaja no blueprint, para o "ver mais" manter
+    # o recorte. Forma que não entendi NÃO vira lista sem filtro: o total sairia errado.
+    try:
+        forma = forma_de_pagamento(action.payment_method)
+    except ValueError:
+        return ToolResult(
+            f"🤔 Não conheço a forma de pagamento *{action.payment_method}*. Posso filtrar por: {ACEITAS_FORMAS}.",
+            read_only=True,
+        )
+    if forma is None and is_refinement and last_blueprint.get("payment_method"):
+        forma = last_blueprint["payment_method"]
+
     termos_projecao = [
         "projecao", "proximos", "futuros", "futuras", "proximas faturas",
         "previsao", "proximos 90 dias", "proximos 3 meses", "proximos 60 dias", "proximos 30 dias",
@@ -353,6 +370,8 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
           and (%s::uuid is null or t.account_id = %s)
           and (%s::text is null or lower(t.category) = lower(%s))
           and t.occurred_at >= %s and t.occurred_at <= %s
+          and (%s::text is null or (case when %s = 'not_informed' then t.payment_method is null
+                                          else t.payment_method = %s end))
         order by t.occurred_at desc, t.created_at desc
         limit 100
         """,
@@ -363,6 +382,9 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         category,
         de,
         ate,
+        forma,
+        forma,
+        forma,
     )
     total_items = len(rows)
 
@@ -425,6 +447,7 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         "start_date": de,
         "end_date": ate,
         "category": category,
+        "payment_method": forma,
         "include_projection": bool(include_projection) or (bool(ate) and ate > hoje),
         "limit": 5,
         "offset": total_exibidos,
@@ -442,6 +465,7 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         "account_name": account_name,
         "account_type": account_type,
         "filtro_conta": account_name,
+        "filtro_pagamento": ROTULOS_FORMAS[forma] if forma else None,
         "is_expanded_view": is_expanded_view,
         "total_geral_itens": total_items,
         "total_exibidos": total_exibidos,
@@ -1015,4 +1039,105 @@ async def query_cycle(ctx: ExecContext, query: FinanceQuery) -> ToolResult:
         f"📅 Seu mês ({c['rotulo']}) vai de {de} a {ate} — {quando}.\n{falta}",
         read_only=True,
         data={"close_day": c["close_day"], "de": de, "ate": ate, "dias": dias},
+    )
+
+
+def mes_anterior(mes: str) -> str:
+    """`2026-01` -> `2025-12`. Espelho de `shiftMonth(month, -1)` (`month-picker.tsx`): o período
+    de comparação do app é o ciclo do MÊS anterior pelo rótulo, nunca "N dias antes"."""
+    ano, m = int(mes[:4]), int(mes[5:7])
+    ano, m = (ano - 1, 12) if m == 1 else (ano, m - 1)
+    return f"{ano:04d}-{m:02d}"
+
+
+def periodo_anterior(de: date, ate: date) -> tuple[date, date]:
+    """O período equivalente imediatamente anterior a um período DITO pela pessoa.
+
+    O app só compara meses (o rótulo do mês anterior). Para uma janela dita: meses inteiros
+    ("setembro", "o trimestre") voltam o mesmo número de meses; qualquer outra janela volta o
+    mesmo número de dias, terminando na véspera. Os dois períodos saem escritos na resposta.
+    """
+    from calendar import monthrange
+    from datetime import timedelta
+
+    if de.day == 1 and ate.day == monthrange(ate.year, ate.month)[1]:
+        meses = (ate.year * 12 + ate.month) - (de.year * 12 + de.month) + 1
+        ini = date.fromisoformat(add_months(de, -meses))
+        return ini, de - timedelta(days=1)
+    fim = de - timedelta(days=1)
+    return fim - (ate - de), fim
+
+
+def _reais_com_sinal(cents: int) -> str:
+    return f"{'+' if cents > 0 else '−' if cents < 0 else ''}{cents_to_brl(abs(cents))}"
+
+
+async def query_spending_change(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
+    """"Por que meu gasto subiu?" — a conta é do banco (`spending_change`, F15); aqui só a frase.
+
+    Janela atual: a dita (`query_from`/`query_to`) ou o ciclo corrente. Anterior: o ciclo do mês
+    anterior pelo rótulo (como a tela) ou, para janela dita, o equivalente imediatamente antes.
+    A RPC resolve o espaço por `auth.uid()` e soma os espaços do usuário, como no app — por isso
+    roda `como_usuario`. Dimensão fixa em categoria: é a única que a pessoa nomeia sem ver a tela.
+    """
+    hoje = local_iso_date(ctx.timezone)
+    try:
+        dito = (
+            (date.fromisoformat(action.query_from), date.fromisoformat(action.query_to))
+            if action.query_from and action.query_to
+            else None
+        )
+    except ValueError:
+        return ToolResult("🤔 Não entendi o período. Me diz as datas (ex.: de 01/09 a 30/09).", read_only=True)
+    if dito:
+        atual, anterior = dito, periodo_anterior(*dito)
+    else:
+        c = await db.cycle(ctx.workspace_id, hoje)
+        p = await db.cycle_of_month(ctx.workspace_id, mes_anterior(c["mes"])) if c else None
+        if not c or not p:
+            return ToolResult("🤷 Não consegui ler o seu mês agora.", read_only=True)
+        atual, anterior = (c["ini"], c["fim"]), (p["ini"], p["fim"])
+
+    try:
+        async with db.como_usuario(ctx.user_id) as tx:
+            row = await tx.fetch_one(
+                "select public.spending_change(%s::date, %s::date, %s::date, %s::date, 'category') as r",
+                atual[0], atual[1], anterior[0], anterior[1],
+            )
+    except psycopg.errors.RaiseException as err:
+        motivo = (err.diag.message_primary or str(err)).strip().rstrip(".")
+        return ToolResult(f"🤷 {motivo}.", read_only=True)
+    r = (row or {}).get("r")
+    if not r:
+        return ToolResult("🤷 Não consegui comparar os períodos agora.", read_only=True)
+
+    def periodo(par) -> str:
+        return f"{format_date_br(par[0])} a {format_date_br(par[1])}"
+
+    atual_c, anterior_c, delta = int(r["current_cents"]), int(r["previous_cents"]), int(r["delta_cents"])
+    cabeca = (
+        f"📊 Seus gastos de {periodo(atual)}: *{cents_to_brl(atual_c)}*, contra "
+        f"*{cents_to_brl(anterior_c)}* em {periodo(anterior)}."
+    )
+    if anterior_c == 0 and atual_c == 0:
+        return ToolResult(f"{cabeca}\nNão houve gasto em nenhum dos dois períodos.", read_only=True)
+    if delta == 0:
+        return ToolResult(f"{cabeca}\nFicaram iguais.", read_only=True)
+    pct = r.get("percent_bp")
+    pct_txt = f" ({'+' if delta > 0 else '−'}{abs(round(int(pct) / 100))}%)" if pct is not None else (
+        " (sem gasto no período anterior)")
+    linhas = sorted(
+        (x for x in r["rows"] if int(x["delta_cents"]) != 0),
+        key=lambda x: abs(int(x["delta_cents"])), reverse=True,
+    )[:5]
+    corpo = "\n".join(
+        f"  • {x['label']}: {_reais_com_sinal(int(x['delta_cents']))} "
+        f"(de {cents_to_brl(int(x['previous_cents']))} para {cents_to_brl(int(x['current_cents']))})"
+        for x in linhas
+    )
+    return ToolResult(
+        f"{cabeca}\n{'Subiu' if delta > 0 else 'Caiu'} *{cents_to_brl(abs(delta))}*{pct_txt}. "
+        f"O que mais explica, por categoria:\n{corpo}\n"
+        "Conta o gasto lançado por data, com o previsto, sem transferências nem pagamento de fatura.",
+        read_only=True,
     )

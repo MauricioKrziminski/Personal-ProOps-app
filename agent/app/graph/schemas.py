@@ -202,6 +202,10 @@ class FinanceQueryType(str, Enum):
     # Teto MEDIDO com o Gemini real no mesmo dia (`probe_query_schema.py`):
     # 10×14 = 140 passa e 11×13 = 143 passa. Aqui ficamos em 10×12 = 120, com folga.
     QUERY_CYCLE = "query_cycle"
+    # "Por que o gasto mudou" (F15): o gasto deste ciclo contra o anterior e o que mais explica a
+    # diferença, sobre a RPC `spending_change`. Teto MEDIDO em 05/10/2026 com `probe_query_schema.py`:
+    # 11 propriedades × 13 valores = 143 (o mesmo ponto que o comentário de `query_cycle` mediu).
+    QUERY_SPENDING_CHANGE = "query_spending_change"
     UNKNOWN = "unknown"
 
 
@@ -237,6 +241,13 @@ class FinanceQuery(BaseModel):
     )
     kind: str | None = Field(
         None, description="Na simulação: 'income' se o dinheiro ENTRA, 'expense' se SAI."
+    )
+    payment_method: str | None = Field(
+        None,
+        description=(
+            "Em query_transactions, filtra pela forma de pagamento: pix, credit, debit, cash, "
+            "bank_transfer, boleto ou not_informed (lançamentos sem forma). Só quando a pessoa citar."
+        ),
     )
     mode: str | None = Field(
         None,

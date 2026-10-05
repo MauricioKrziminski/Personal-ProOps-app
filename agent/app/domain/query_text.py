@@ -24,6 +24,9 @@ def format_query_response(data: dict) -> str:
     ate = periodo.get("ate_br") or periodo.get("ate") or ""
     conta = data.get("filtro_conta")
     conta_txt = f" no *{conta}*" if conta else ""
+    forma = data.get("filtro_pagamento")
+    if forma:
+        conta_txt += f" (forma de pagamento: *{forma}*)"
 
     if not lancamentos:
         return f"📊 Nenhum lançamento encontrado{conta_txt} no período ({de} a {ate})."

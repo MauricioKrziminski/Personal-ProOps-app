@@ -1164,6 +1164,23 @@ async def drop_chat_session(session_id: UUID) -> None:
     await execute("delete from public.user_sessions where id = %s", session_id)
 
 
+async def cycle_of_month(workspace_id, mes: str) -> dict[str, Any] | None:
+    """Bordas do ciclo cujo RÓTULO é `mes` (`YYYY-MM`), pela mesma `private.cycle_bounds` de `cycle`.
+
+    É o `cycle_range(p_month)` do app, com o escopo explícito (o serviço não tem `auth.uid()`).
+    Quem compara "este ciclo" com "o anterior" pergunta pelo rótulo do anterior, nunca subtrai dias.
+    """
+    return await fetch_one(
+        """
+        select b.ini, b.fim
+        from (select private.cycle_close_day(array[%s::uuid]) as dia) c
+        cross join lateral private.cycle_bounds(c.dia, %s::date) b
+        """,
+        workspace_id,
+        f"{mes}-01",
+    )
+
+
 async def cycle(workspace_id, hoje: str) -> dict[str, Any] | None:
     """Bordas do MÊS FINANCEIRO do workspace: de quando a quando ele vai.
 

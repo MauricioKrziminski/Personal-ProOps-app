@@ -60,6 +60,7 @@ QUERY_TOOLS = {
     FinanceQueryType.QUERY_DEBTS: queries.query_debts,
     FinanceQueryType.SIMULATE_SCENARIO: queries.simulate_scenario,
     FinanceQueryType.QUERY_CYCLE: queries.query_cycle,
+    FinanceQueryType.QUERY_SPENDING_CHANGE: queries.query_spending_change,
 }
 
 NOTES_TOOLS = {

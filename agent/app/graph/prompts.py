@@ -241,6 +241,14 @@ Tipos:
 - query_transactions: "quanto gastei esse mês?", "gastos com mercado em junho", "lançamentos dos últimos 60 dias e com projeção dos próximos 90 dias", "compras futuras", "o que tenho de parcelas e lançamentos nos próximos meses".
   query_from/query_to delimitam o período completo (passado e/ou futuro); category filtra, se citada; account filtra conta ou cartão.
   IMPORTANTE: Quando o usuário pede para ver lançamentos, compras, faturas, extrato ou parcelas com projeção/futuro (ex: "últimos 60 dias com projeção dos próximos 90 dias"), use SEMPRE query_transactions (query_from no passado e query_to no futuro). NUNCA use query_forecast nesses casos, pois o usuário quer ver os lançamentos e parcelas individuais detalhados por nome.
+  payment_method filtra pela FORMA DE PAGAMENTO quando a pessoa a cita: "quanto gastei no pix esse mês?" -> payment_method=pix;
+  "no cartão de crédito" -> credit; "no débito" -> debit; "em dinheiro" -> cash; "por transferência/TED" -> bank_transfer;
+  "no boleto" -> boleto; "o que ficou sem forma de pagamento" -> not_informed. "No cartão Nubank" é o CARTÃO (account), não a forma:
+  forma só quando a frase fala do JEITO de pagar. Sem citar forma, deixe vazio.
+- query_spending_change: POR QUE o gasto mudou — "por que gastei mais esse mês?", "o que fez meu gasto subir?",
+  "gastei mais ou menos que mês passado?", "onde aumentou?". Compara o gasto do período (query_from/query_to, se a pessoa citar;
+  senão o mês financeiro atual) com o período anterior e mostra as categorias que mais explicam. É a pergunta da DIFERENÇA entre dois
+  períodos; "quanto gastei esse mês?" (um valor só) continua sendo query_transactions.
 - query_budgets: "como tá meu orçamento?".
 - query_goals: "como tão minhas metas?".
 - query_invoice: "quanto tá a fatura?", "quanto sobrou de limite no nubank".
