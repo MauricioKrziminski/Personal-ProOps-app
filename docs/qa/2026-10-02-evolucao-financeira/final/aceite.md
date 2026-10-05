@@ -81,6 +81,15 @@ independente e os achados corrigidos; o que fica só no app está em
 - F01/F02 offline no iOS: o simulador não tem modo avião; offline conferido no Android.
 - Observação O1 do iPad (arrastar a folha para baixo fechou e descartou o rascunho): não reproduzida
   pela leitura do código (`Modal` do RN 0.86 nasce com `modalInPresentation`); precisa de reprodução.
+- Travamento de ~5 min no formulário de financiamento com juros, UMA vez, no emulador Android em
+  debug com a memória no limite (`evidence/freeze-e-juros/`): não reproduziu devagar; a revisão
+  só de leitura não achou laço de render/efeito nem `while` sem fim (as funções puras rodam em
+  milissegundos). Explicação provável, não provada: rajada de animações (calendário + transições
+  do formulário) sob pressão de memória. Fecha com perfil do Hermes se aparecer em aparelho real.
+- "Ocultar valores" ficou 24–37% mais rápido com as abas congeladas (`f07/anr-causa.md`), mas
+  continua em centenas de ms no release; o resto é o render da tela em foco.
+- Agente (lotes B–D): a execução que aprova deu 285/301; as 16 falhas estão sendo corrigidas e
+  serão medidas quando a cota grátis do Gemini do staging voltar. O agente só sobe depois.
 - Comparação visual de composição do programa (spec §8) não feita; houve conferência por ponto.
 - Integrar por patch com o Metro de pé deixa módulos velhos nos aparelhos: o QA só vale depois de
   `touch` nos arquivos e de provar a tela nova.
