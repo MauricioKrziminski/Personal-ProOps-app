@@ -53,6 +53,9 @@ test('todo insert do agente escreve em coluna que existe', () => {
     for (const m of py.matchAll(/insert\s+into\s+public\.([a-z_]+)\s*\(([^)]*)\)/gi)) {
       inserts += 1;
       const tabela = m[1];
+      // Lista montada em runtime (`{', '.join(colunas)}`): o regex não a enxerga. Quem a monta tem o seu
+      // próprio teste logo abaixo (`copias.py`), que confere as colunas dela contra o mesmo schema.
+      if (m[2].includes('{')) continue;
       const escritas = m[2]
         .split(',')
         .map((c) => c.trim())
@@ -73,4 +76,18 @@ test('todo insert do agente escreve em coluna que existe', () => {
 
   assert.ok(inserts > 0, 'nenhum insert encontrado — o formato do SQL mudou e o teste ficou cego');
   assert.deepEqual(problemas, []);
+});
+
+test('as colunas que copias.py monta em runtime também existem em transactions', () => {
+  const py = readFileSync(join(RAIZ_AGENTE, 'tools', 'copias.py'), 'utf8');
+  const corpo = py.slice(py.indexOf('def _insert('), py.indexOf('async def _contas'));
+  const reais = colunasDe('transactions');
+  assert.ok(reais, 'transactions sumiu dos tipos');
+  const listas = [...corpo.matchAll(/colunas\s*(?:=|\+=)\s*\[([\s\S]*?)\]/g)].flatMap((m) =>
+    [...m[1].matchAll(/"([a-z_]+)"/g)].map((x) => x[1]),
+  );
+  // CHAVES_DE_CLASSE entra por `list(CHAVES_DE_CLASSE)`: as quatro colunas de classificação
+  const classe = ['expense_pattern', 'expense_pattern_source', 'expense_necessity', 'expense_necessity_source'];
+  assert.ok(listas.length >= 13, 'não achei a lista de colunas de _insert: o formato mudou e o teste ficou cego');
+  assert.deepEqual([...listas, ...classe].filter((c) => !reais.includes(c)), []);
 });
