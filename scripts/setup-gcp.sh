@@ -521,6 +521,9 @@ JSON
 
 criar_alertas() {
   log "Alertas e orçamento ($SERVICE)"
+  # Métricas/políticas e orçamento usam APIs que o `ativar_apis` não liga (idempotente, sem custo).
+  gcloud services enable monitoring.googleapis.com billingbudgets.googleapis.com \
+    --project "$PROJECT_ID" >/dev/null
   local base='resource.type="cloud_run_revision" AND resource.labels.service_name="'"$SERVICE"'"'
   criar_metrica "${SERVICE}-fila-parada" \
     "$base AND jsonPayload.alerta=\"fila_parada\"" "Mensagens pending há mais de 5 min"
