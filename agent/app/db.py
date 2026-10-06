@@ -1475,7 +1475,11 @@ async def transacoes_sem_vetor(modelo: str, limite: int) -> list[dict[str, Any]]
     """Lançamentos sem vetor, com texto mudado (hash) ou vetor de outro modelo — os mais novos
     primeiro. É manutenção do serviço, de todos os workspaces: o único caminho que não filtra
     por um workspace só, e ele só LÊ texto de lançamento para vetorizá-lo no mesmo workspace.
-    O texto e o hash saem do banco (`private.texto_de_busca`): uma montagem só."""
+    O texto e o hash saem do banco (`private.texto_de_busca`): uma montagem só.
+
+    # ponytail: varre e calcula md5 de TODO lançamento a cada rodada (O(n) para descobrir que nada
+    # está velho). Serve até alguns milhares de linhas; depois, um predicado de "sujo" (updated_at)
+    # ou um gatilho que apaga o vetor quando o texto muda."""
     return await fetch(
         """
         select t.id as transaction_id, t.workspace_id, x.texto, md5(x.texto) as hash
