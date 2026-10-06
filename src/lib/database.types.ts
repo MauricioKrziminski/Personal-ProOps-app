@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_aliases: {
+        Row: {
+          account_id: string
+          alias: string
+          created_at: string
+          id: string
+          workspace_id: string
+        }
+        Insert: {
+          account_id: string
+          alias: string
+          created_at?: string
+          id?: string
+          workspace_id: string
+        }
+        Update: {
+          account_id?: string
+          alias?: string
+          created_at?: string
+          id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_aliases_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_aliases_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       accounts: {
         Row: {
           archived: boolean
@@ -89,6 +128,72 @@ export type Database = {
           },
           {
             foreignKeyName: "accounts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_feedback: {
+        Row: {
+          channel: string
+          created_at: string
+          id: string
+          input_text: string
+          models: Json
+          outcome: string
+          pending_id: string | null
+          prompt_versions: Json
+          proposal: Json
+          revised_to: Json | null
+          source_message_id: string | null
+          summary: string | null
+          user_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          id?: string
+          input_text?: string
+          models?: Json
+          outcome: string
+          pending_id?: string | null
+          prompt_versions?: Json
+          proposal?: Json
+          revised_to?: Json | null
+          source_message_id?: string | null
+          summary?: string | null
+          user_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          id?: string
+          input_text?: string
+          models?: Json
+          outcome?: string
+          pending_id?: string | null
+          prompt_versions?: Json
+          proposal?: Json
+          revised_to?: Json | null
+          source_message_id?: string | null
+          summary?: string | null
+          user_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_feedback_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_feedback_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -3003,6 +3108,48 @@ export type Database = {
             foreignKeyName: "subscriptions_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transaction_embeddings: {
+        Row: {
+          content_hash: string
+          embedding: string
+          model: string
+          transaction_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          content_hash: string
+          embedding: string
+          model: string
+          transaction_id: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          content_hash?: string
+          embedding?: string
+          model?: string
+          transaction_id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_embeddings_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: true
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_embeddings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
