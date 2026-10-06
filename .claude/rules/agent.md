@@ -284,11 +284,17 @@ dois efeitos juntos. Três regras:
   `agent/app/graph/nodes.py`): as ações do par são reordenadas com os `create_*` na frente
   antes de rodar; se uma criação volta `read_only` (erro, exceção), o apagar/corrigir E as
   criações seguintes do par são PULADOS — "⚠️ Não apaguei X porque não consegui registrar Y."
-- **Retentativa sem `result_id` não conta como escrita.** A idempotência (`executed_actions`)
-  reserva ANTES de executar; se o worker morre entre a reserva e o fim da tool, a reserva fica
-  ÓRFÃ (sem `result_id`). `db.execution_result_id` (`agent/app/db.py`) distingue os dois
-  casos, e `registry.execute` só marca `ja_executada=True` quando `result_id` não é nulo — senão
-  a retentativa rodaria o apagar sozinho, sem a criação ter de fato acontecido.
+- **Reserva, escrita e carimbo são UMA transação** (`db.unidade_de_trabalho`, 06/10/2026). Antes
+  cada comando era a sua transação (pool em autocommit): morrer entre a escrita e o carimbo do
+  `result_id` deixava a reserva órfã COM a escrita feita, e o retry tratava a criação como falha
+  ("não consegui registrar Y" com Y registrado). Hoje `registry._escrever` reserva, roda a tool e
+  carimba dentro de uma unidade; falha ou tool `read_only` desfaz tudo, inclusive a vaga. O PAR de
+  substituição roda numa unidade externa (cada ação vira savepoint): criação que não escreveu, ou
+  apagar/corrigir que falhou depois dela, desfaz o par inteiro e a frase diz que nada mudou.
+  Dentro de uma unidade: **nada de rede** (WhatsApp, push, Gemini seguram lock), e `except
+  psycopg.Error` que segue em frente precisa de bloco aninhado (o erro aborta a transação). Prova
+  contra o banco real: `tests/test_unidade_de_trabalho_integracao.py`, opt-in com
+  `SQL_TEST_DATABASE_URL`.
 
 ## Na dúvida, PERGUNTA — nunca deduz
 
