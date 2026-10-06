@@ -1,6 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Path, Skia } from '@shopify/react-native-skia';
-import * as SplashScreen from 'expo-splash-screen';
+import { Path } from "@shopify/react-native-skia";
+import * as SplashScreen from "expo-splash-screen";
 import {
   createContext,
   useCallback,
@@ -10,8 +9,8 @@ import {
   useRef,
   useState,
   type ReactNode,
-} from 'react';
-import { Image, Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
+} from "react";
+import { Platform, StyleSheet, View, useWindowDimensions } from "react-native";
 import Animated, {
   Easing,
   cancelAnimation,
@@ -22,13 +21,15 @@ import Animated, {
   useSharedValue,
   withTiming,
   type SharedValue,
-} from 'react-native-reanimated';
+} from "react-native-reanimated";
 
-import { WaveCurtain } from '@/components/motion/wave-curtain';
-import { SkiaCanvas } from '@/components/ui/skia-canvas';
-import { Motion } from '@/design/tokens';
-import { progressoDaCapa } from '@/design/wave-math';
-import { useTheme } from '@/hooks/use-theme';
+import { WaveCurtain } from "@/components/motion/wave-curtain";
+import { SkiaCanvas } from "@/components/ui/skia-canvas";
+import { ThemedText } from "@/components/themed-text";
+import { markPath } from "@/design/mark-path";
+import { Motion, Space } from "@/design/tokens";
+import { progressoDaCapa } from "@/design/wave-math";
+import { useTheme } from "@/hooks/use-theme";
 import {
   esperaDaAbertura,
   esperaDaMarca,
@@ -36,44 +37,34 @@ import {
   type FaseDaCortina,
   type Onda,
   type Ponto,
-} from '@/lib/session-gate';
+} from "@/lib/session-gate";
 
-import type { CortinaApi } from './session-curtain.types';
+import type { CortinaApi } from "./session-curtain.types";
 
-// O MESMO arquivo do splash nativo (app.json): é o que faz o primeiro quadro bater.
-const MARCA_BRANCA = require('@/assets/images/brand/mark-white.png');
-
-/** Quantas aberturas ganham o show (a MESMA chave de antes: o contador de quem já usa continua). */
-const SHOWS = 5;
-const CHAVE_SHOWS = 'proops.splash.shows';
-/** Lado da marca — é o `imageWidth` do `expo-splash-screen` no app.json. Os dois PRECISAM bater. */
+/** Lado da marca (dp): a mesma caixa que o PNG do splash tinha, para ela ficar no mesmo lugar. */
 const LADO = 96;
-/** O anel do show: um pouco maior que a marca, com folga para o traço respirar. */
-const ANEL = LADO * 1.5;
 /** Abertura e logout terminam na mesma curva fixa da tela de conta. */
-const ONDA_DA_ABERTURA: Onda = { mode: 'up' };
-const TETO_DO_PNG_MS = 500;
-/** No Android a marca entra na camada; no iOS ela já está no splash nativo. */
-const ENTRA_NA_CAMADA = Platform.OS === 'android';
-/** No iOS a marca está na tela desde o splash nativo, antes deste módulo carregar. */
-const CARREGOU_EM = Date.now();
+const ONDA_DA_ABERTURA: Onda = { mode: "up" };
+/** A marca se constrói (traço + preenchimento + nome) DENTRO de `MARCA_MINIMA_MS` (900): nunca alarga a espera. */
+const CONSTRUCAO_MS = 800;
 /** Tempo máximo para manter um canvas pré-montado enquanto uma confirmação nativa está aberta. */
 const TETO_DO_PREPARO_MS = 4000;
 
-type Show = 'completa' | 'curta';
-
 const doisQuadros = () =>
-  new Promise<void>((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok())));
+  new Promise<void>((ok) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => ok())),
+  );
 const dormir = (ms: number) => new Promise<void>((ok) => setTimeout(ok, ms));
 
 const CortinaContext = createContext<CortinaApi | null>(null);
-const FaseContext = createContext<FaseDaCortina>('abertura');
+const FaseContext = createContext<FaseDaCortina>("abertura");
 const AbertaContext = createContext(false);
 const SaindoContext = createContext(false);
 
 export function useCortina(): CortinaApi {
   const cortina = useContext(CortinaContext);
-  if (!cortina) throw new Error('useCortina precisa do CortinaProvider (raiz do app)');
+  if (!cortina)
+    throw new Error("useCortina precisa do CortinaProvider (raiz do app)");
   return cortina;
 }
 
@@ -108,11 +99,11 @@ export function useCortinaSaindo(): boolean {
  *
  * | t | o quê |
  * |---|---|
- * | 0 | splash nativo: tinta `#0B0B0C` + `mark-white.png` de 96 dp |
- * | camada pintou e o PNG carregou | `hideAsync()`: o nativo sai com a camada idêntica por cima |
- * | show (5 primeiras, 1,8 s) | um anel fino se desenha em volta da marca e some |
+ * | 0 | splash nativo: SÓ a tinta `#0B0B0C` (sem marca) |
+ * | camada fez layout | `hideAsync()`: o nativo sai com a camada idêntica (tinta lisa) por cima |
+ * | camada pintou | a marca se constrói em 0,8 s: contorno se desenha, preenchimento entra, nome "ProOps" aparece; depois fica parada |
  * | pronto (fontes + sessão + trava, teto 2,5 s; 20 s com a senha pedida) | a tinta sobe com a borda em curva e libera o app; a marca sobe e some no primeiro terço |
- * | abertura curta | a marca fica ao menos 0,9 s antes da tinta subir |
+ * | sempre | a marca fica ao menos 0,9 s antes da tinta subir (a construção cabe nisso) |
  *
  * ## Por que `cobrir` espera dois quadros a mais
  *
@@ -121,37 +112,41 @@ export function useCortinaSaindo(): boolean {
  *
  * ## O hand-off com o splash nativo
  *
- * O primeiro quadro da camada é o splash: tinta lisa (o fundo da `WaveCurtain` com a cortina
- * fechada) e o MESMO PNG, no MESMO tamanho. `hideAsync()` só roda depois que a camada fez layout
- * E o PNG carregou — sem isso o nativo sairia um quadro antes da marca existir, e ela piscaria.
- * `fade: false` pelo mesmo motivo: um cross-fade do sistema por cima do nosso.
+ * O splash nativo é só tinta, e o primeiro quadro da camada também (o fundo da `WaveCurtain` com a
+ * cortina fechada): a marca nasce DEPOIS, desenhando-se, e por isso não há marca pronta para
+ * piscar. Splash sem marca é mudança NATIVA (`app.json`): entra na build 1.7.0, nunca por OTA.
+ * `hideAsync()` só roda depois que a camada fez layout. `fade: false` evita um cross-fade do
+ * sistema por cima do nosso no iOS.
  *
  * ## Reduce Motion
  *
- * Sem onda e sem show: um véu de tinta que aparece e some em 200 ms.
+ * Sem onda e sem desenho: um véu de tinta que aparece e some em 200 ms; marca e nome entram por fade.
  */
 export function CortinaProvider({ children }: { children: ReactNode }) {
   const reduzido = useReducedMotion();
   const { height: alturaDaTela } = useWindowDimensions();
   const progresso = useSharedValue(0);
-  const [fase, setFase] = useState<FaseDaCortina>('abertura');
+  const [fase, setFase] = useState<FaseDaCortina>("abertura");
   const [onda, setOnda] = useState<Onda>(ONDA_DA_ABERTURA);
-  const [show, setShow] = useState<Show | null>(null);
   const [pintada, setPintada] = useState(false);
   const [aberturaFeita, setAberturaFeita] = useState(false);
   const [camadaMontada, setCamadaMontada] = useState(false);
 
-  const pronto = useRef<{ valor: boolean; destino: 'app' | 'conta'; segurando: boolean }>({
+  const pronto = useRef<{
+    valor: boolean;
+    destino: "app" | "conta";
+    segurando: boolean;
+  }>({
     valor: false,
-    destino: 'app',
+    destino: "app",
     segurando: false,
   });
   const origem = useRef<{ ponto: Ponto; em: number } | null>(null);
   /** A cobertura iniciada pelo gesto de logout é consumida pelo evento de sessão, sem reiniciar. */
   const coberturaAtual = useRef<Promise<void> | null>(null);
   const preparo = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // No Android o splash nativo não tem a marca, então esconder não espera o PNG.
-  const splash = useRef({ layout: false, png: ENTRA_NA_CAMADA, escondido: false });
+  // O splash nativo é só a tinta (sem marca): ele sai quando a camada já fez layout.
+  const splash = useRef({ layout: false, escondido: false });
 
   const animar = useCallback(
     (alvo: number, duracao: number) =>
@@ -159,16 +154,19 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
         progresso.set(
           withTiming(
             alvo,
-            { duration: reduzido ? Motion.duration.base : duracao, easing: Easing.linear },
+            {
+              duration: reduzido ? Motion.duration.base : duracao,
+              easing: Easing.linear,
+            },
             () => {
-              'worklet';
+              "worklet";
               // Resolve também quando é cancelada: quem espera é o portão, e ele não pode travar.
               runOnJS(ok)();
-            }
-          )
+            },
+          ),
         );
       }),
-    [progresso, reduzido]
+    [progresso, reduzido],
   );
 
   const cancelarPreparo = useCallback(() => {
@@ -202,16 +200,16 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       const cobertura = (async () => {
         progresso.set(1);
         setOnda(o);
-        setFase('cobrindo');
+        setFase("cobrindo");
         // A camada pode ter acabado de montar; dois quadros bastam para layout e primeiro paint.
         await doisQuadros();
         await animar(0, Motion.curtain.duration);
-        setFase('coberta');
+        setFase("coberta");
       })();
       coberturaAtual.current = cobertura;
       return cobertura;
     },
-    [animar, cancelarPreparo, progresso]
+    [animar, cancelarPreparo, progresso],
   );
 
   const cobrirDaCapa = useCallback(async () => {
@@ -219,37 +217,37 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     coberturaAtual.current = null;
     cancelAnimation(progresso);
     progresso.set(progressoDaCapa(alturaDaTela));
-    setOnda({ mode: 'up', fromCap: true });
-    setFase('cobrindo');
+    setOnda({ mode: "up", fromCap: true });
+    setFase("cobrindo");
     // A borda parte exatamente da capa, com a marca presa à mesma curva durante a descida.
     await doisQuadros();
     await animar(0, Motion.curtain.duration);
-    setFase('coberta');
+    setFase("coberta");
   }, [alturaDaTela, animar, cancelarPreparo, progresso]);
 
   const cobrirJa = useCallback(() => {
     coberturaAtual.current = null;
     cancelAnimation(progresso);
     progresso.set(0);
-    setFase('coberta');
+    setFase("coberta");
   }, [progresso]);
 
   const descobrir = useCallback(
     async (o: Onda, duracao: number) => {
       coberturaAtual.current = null;
       setOnda(o);
-      setFase('revelando');
+      setFase("revelando");
       // O React precisa aplicar a onda nova antes de o progresso andar: nos primeiros quadros a
       // forma velha ainda estaria na tela.
       await doisQuadros();
       // A revelação da conta termina na curva da AuthCap, com a marca na mesma posição.
       // As duas metades da transição têm a mesma duração, mesmo com distâncias diferentes.
-      const alvo = o.ate === 'capa' ? progressoDaCapa(alturaDaTela) : 1;
+      const alvo = o.ate === "capa" ? progressoDaCapa(alturaDaTela) : 1;
       await animar(alvo, duracao);
-      setFase('aberta');
+      setFase("aberta");
       setCamadaMontada(false);
     },
-    [animar, alturaDaTela]
+    [animar, alturaDaTela],
   );
 
   const abrirJa = useCallback(() => {
@@ -257,7 +255,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     coberturaAtual.current = null;
     cancelAnimation(progresso);
     progresso.set(1);
-    setFase('aberta');
+    setFase("aberta");
     setCamadaMontada(false);
     setAberturaFeita(true);
   }, [cancelarPreparo, progresso]);
@@ -272,7 +270,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     return ponto;
   }, []);
 
-  const marcarPronto = useCallback((destino: 'app' | 'conta') => {
+  const marcarPronto = useCallback((destino: "app" | "conta") => {
     if (pronto.current.valor) return;
     pronto.current.valor = true;
     pronto.current.destino = destino;
@@ -284,7 +282,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
 
   const esconderSplash = useCallback(() => {
     const s = splash.current;
-    if (!s.layout || !s.png || s.escondido) return;
+    if (!s.layout || s.escondido) return;
     s.escondido = true;
     SplashScreen.hideAsync()
       .catch(() => {})
@@ -299,65 +297,43 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       da cortina, que já está desenhando — a passagem some. No iOS o nosso quadro já existe quando
       o nativo sai, e `fade: false` evita um segundo cross-fade.
     */
-    SplashScreen.setOptions({ duration: Platform.OS === 'android' ? 300 : 0, fade: false });
-    // PNG que não carrega não pode segurar o app no splash.
-    const t = setTimeout(() => {
-      splash.current.png = true;
-      esconderSplash();
-    }, TETO_DO_PNG_MS);
-    return () => clearTimeout(t);
-  }, [esconderSplash]);
-
-  useEffect(() => {
-    let vivo = true;
-    AsyncStorage.getItem(CHAVE_SHOWS)
-      .then((v) => {
-        const n = Number(v ?? 0);
-        if (vivo) setShow(n < SHOWS ? 'completa' : 'curta');
-        AsyncStorage.setItem(CHAVE_SHOWS, String(n + 1)).catch(() => {});
-      })
-      // Sem contador legível, a versão curta: errar para o lado de ser rápido.
-      .catch(() => {
-        if (vivo) setShow('curta');
-      });
-    return () => {
-      vivo = false;
-    };
+    SplashScreen.setOptions({
+      duration: Platform.OS === "android" ? 300 : 0,
+      fade: false,
+    });
   }, []);
 
   /*
-    A abertura roda UMA vez, quando a camada pintou e o contador voltou do disco. O teto conta
-    daqui: com o app pronto antes do show acabar, o show termina; com o app atrasado, o teto
+    A abertura roda UMA vez, quando a camada pintou. O teto conta daqui: com o app pronto
+    antes da construção acabar, a marca já cabe no mínimo de 0,9 s; com o app atrasado, o teto
     abre assim mesmo — tela de login atrasada é melhor que splash eterno. Com a trava pedindo a
     senha (`segurarAbertura`) o teto é longo: a marca fica enquanto o sistema pergunta e a tinta
     sobe direto no app desbloqueado.
   */
   const comecou = useRef(false);
   useEffect(() => {
-    if (!pintada || show === null || comecou.current) return;
+    if (!pintada || comecou.current) return;
     comecou.current = true;
     const desde = Date.now();
-    const marcaDesde = ENTRA_NA_CAMADA ? desde : CARREGOU_EM;
 
     void (async () => {
-      // O show é o anel se desenhando em volta da marca (`MarcaDaAbertura`); aqui só se espera.
-      if (show === 'completa' && !reduzido) await dormir(Motion.curtain.full);
       // ponytail: espera por sondagem (50 ms, só durante a abertura) — o teto muda de tamanho
       // quando a trava segura, e um laço relê isso sem timer para rearmar.
       const p = pronto.current;
-      while (!p.valor && esperaDaAbertura(desde, Date.now(), p.segurando) > 0) await dormir(50);
+      while (!p.valor && esperaDaAbertura(desde, Date.now(), p.segurando) > 0)
+        await dormir(50);
       // A marca não pode ser um lampejo: a passagem "marca → app" acontece em toda abertura
       // (também com Reduzir Movimento — ficar parada na tela não é movimento).
-      await dormir(esperaDaMarca(marcaDesde, Date.now()));
+      await dormir(esperaDaMarca(desde, Date.now()));
       // Teto estourado deixa o destino em `app`: revelar tudo é o lado seguro.
-      const capa = pronto.current.destino === 'conta';
+      const capa = pronto.current.destino === "conta";
       await descobrir(
-        capa ? { ...ONDA_DA_ABERTURA, ate: 'capa' } : ONDA_DA_ABERTURA,
-        Motion.curtain.duration
+        capa ? { ...ONDA_DA_ABERTURA, ate: "capa" } : ONDA_DA_ABERTURA,
+        Motion.curtain.duration,
       );
       setAberturaFeita(true);
     })();
-  }, [pintada, show, reduzido, descobrir]);
+  }, [pintada, descobrir]);
 
   const api = useMemo<CortinaApi>(
     () => ({
@@ -372,7 +348,18 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       marcarPronto,
       segurarAbertura,
     }),
-    [preparar, cobrir, cobrirDaCapa, cobrirJa, descobrir, abrirJa, lembrarOrigem, tomarOrigem, marcarPronto, segurarAbertura]
+    [
+      preparar,
+      cobrir,
+      cobrirDaCapa,
+      cobrirJa,
+      descobrir,
+      abrirJa,
+      lembrarOrigem,
+      tomarOrigem,
+      marcarPronto,
+      segurarAbertura,
+    ],
   );
 
   const aoLayout = useCallback(() => {
@@ -380,28 +367,23 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     esconderSplash();
   }, [esconderSplash]);
 
-  const aoPng = useCallback(() => {
-    splash.current.png = true;
-    esconderSplash();
-  }, [esconderSplash]);
-
   return (
     <CortinaContext.Provider value={api}>
       <FaseContext.Provider value={fase}>
-        <AbertaContext.Provider value={aberturaFeita && fase === 'aberta'}>
-          <SaindoContext.Provider value={fase === 'revelando' || fase === 'aberta'}>
+        <AbertaContext.Provider value={aberturaFeita && fase === "aberta"}>
+          <SaindoContext.Provider
+            value={fase === "revelando" || fase === "aberta"}
+          >
             {children}
-            {fase === 'aberta' && !camadaMontada ? null : (
+            {fase === "aberta" && !camadaMontada ? null : (
               <Camada
                 fase={fase}
                 onda={onda}
                 progresso={progresso}
                 reduzido={reduzido}
-                show={aberturaFeita ? null : show}
                 comMarca={!aberturaFeita}
                 pintada={pintada}
                 onLayout={aoLayout}
-                onPng={aoPng}
               />
             )}
           </SaindoContext.Provider>
@@ -416,21 +398,17 @@ function Camada({
   onda,
   progresso,
   reduzido,
-  show,
   comMarca,
   pintada,
   onLayout,
-  onPng,
 }: {
   fase: FaseDaCortina;
   onda: Onda;
   progresso: SharedValue<number>;
   reduzido: boolean;
-  show: Show | null;
   comMarca: boolean;
   pintada: boolean;
   onLayout: () => void;
-  onPng: () => void;
 }) {
   const theme = useTheme();
   const veu = useAnimatedStyle(() => ({ opacity: 1 - progresso.get() }));
@@ -440,17 +418,28 @@ function Camada({
       onLayout={onLayout}
       // Enquanto cobre, a camada engole o toque (ela é o alvo, e não tem responder). Revelando,
       // o app de baixo já é o destino.
-      pointerEvents={fase === 'aberta' || fase === 'revelando' ? 'none' : 'auto'}
+      pointerEvents={
+        fase === "aberta" || fase === "revelando" ? "none" : "auto"
+      }
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={styles.camada}>
+      style={styles.camada}
+    >
       {reduzido ? (
-        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: theme.curtain }, veu]} />
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: theme.curtain },
+            veu,
+          ]}
+        />
       ) : (
         <WaveCurtain
           progress={progresso}
-          fase={fase === 'cobrindo' && !onda.fromCap ? 'cobrir' : 'revelar'}
-          mode={fase === 'revelando' ? onda.revealMode ?? onda.mode : onda.mode}
+          fase={fase === "cobrindo" && !onda.fromCap ? "cobrir" : "revelar"}
+          mode={
+            fase === "revelando" ? (onda.revealMode ?? onda.mode) : onda.mode
+          }
           origin={onda.origin}
           color={theme.curtain}
           style={StyleSheet.absoluteFill}
@@ -459,9 +448,7 @@ function Camada({
       {comMarca ? (
         <MarcaDaAbertura
           progresso={progresso}
-          show={show}
           pintada={pintada}
-          onPng={onPng}
           reduzido={reduzido}
         />
       ) : null}
@@ -469,93 +456,98 @@ function Camada({
   );
 }
 
+const suave = (x: number) => {
+  "worklet";
+  const k = Math.min(1, Math.max(0, x));
+  return k * k * (3 - 2 * k);
+};
+
 /**
- * A marca no centro da abertura: o MESMO PNG do splash nativo, no mesmo tamanho. No show, um anel
- * fino se desenha em volta dela e some; na saída, ela sobe e some junto com a tinta.
+ * A marca no centro da abertura, SE CONSTRUINDO: o contorno da marca se desenha (trim do path, o
+ * mesmo `markPath` do app), o preenchimento entra por baixo dele e o nome "ProOps" aparece
+ * abaixo. É o que o splash nativo deixa de fazer — ele é só a tinta, então o primeiro quadro desta
+ * camada (nada além da tinta) é idêntico ao dele e não há flash. Na saída a marca sobe e some com
+ * a tinta.
  *
- * ## A entrada é por plataforma, e isso é MEDIDO
+ * Um relógio só (`t`, 0 → 1 em `CONSTRUCAO_MS`, dentro do mínimo da marca): depois dele a marca
+ * fica desenhada e PARADA, qualquer que seja a espera (rede, senha). Sem loop.
  *
- * No iOS o splash nativo tem a marca e a camada nasce com ela visível: os dois quadros são iguais.
- *
- * No Android isso não se consegue garantir. O `expo-splash-screen` impede o conteúdo de DESENHAR
- * enquanto o splash está na tela (um `OnPreDrawListener` que devolve `false`), então o primeiro
- * quadro da camada só existe depois de o splash sair — e o `Image` entra um instante depois.
- * Gravado em 16/09/2026: a marca nativa sumia, sobrava um quadro preto, e a nossa aparecia
- * (~250 ms de piscar). Por isso no Android o splash nativo é SÓ a tinta (`splash-vazio.png`) e a
- * marca ENTRA aqui, de propósito, quando a camada já pintou — um atraso de decodificação vira
- * atraso de uma entrada que começa invisível, e deixa de aparecer. Nas duas aberturas: a curta
- * segura a marca um mínimo (`MARCA_MINIMA_MS`) para a entrada não virar lampejo.
+ * Reduzir movimento: sem desenho progressivo, marca e nome entram por fade.
  */
 function MarcaDaAbertura({
   progresso,
-  show,
   pintada,
-  onPng,
   reduzido,
 }: {
   progresso: SharedValue<number>;
-  show: Show | null;
   pintada: boolean;
-  onPng: () => void;
   reduzido: boolean;
 }) {
   const theme = useTheme();
-  const tracado = useSharedValue(0);
-  const entrada = useSharedValue(ENTRA_NA_CAMADA ? 0 : 1);
+  const t = useSharedValue(0);
+  const caminho = useMemo(() => markPath(LADO), []);
 
   useEffect(() => {
-    if (!ENTRA_NA_CAMADA || !pintada || show === null) return;
-    entrada.set(withTiming(1, { duration: reduzido ? 0 : 360, easing: Motion.easing.out }));
-  }, [pintada, show, reduzido, entrada]);
-  /** O anel começa no topo e corre no sentido do relógio. */
-  const anel = useMemo(() => {
-    const b = Skia.PathBuilder.Make();
-    const r = ANEL / 2 - 2;
-    b.moveTo(ANEL / 2, ANEL / 2 - r);
-    b.arcToOval({ x: ANEL / 2 - r, y: ANEL / 2 - r, width: 2 * r, height: 2 * r }, -90, 359.9, false);
-    return b.detach();
-  }, []);
+    if (!pintada) return;
+    t.set(
+      withTiming(1, {
+        duration: reduzido ? Motion.duration.base : CONSTRUCAO_MS,
+        easing: Easing.linear,
+      }),
+    );
+  }, [pintada, reduzido, t]);
 
-  useEffect(() => {
-    if (show !== 'completa' || reduzido || !pintada) return;
-    // O atraso mora no relógio (ele parte de um valor negativo), não num `withDelay` — a mesma
-    // lição do `SplitReveal`: no Android o atraso na montagem podia não disparar.
-    const atraso = ENTRA_NA_CAMADA ? 0.17 : 0;
-    tracado.set(-atraso);
-    tracado.set(withTiming(1, { duration: 1200 * (1 + atraso), easing: Motion.easing.inOut }));
-  }, [show, reduzido, pintada, tracado]);
-
-  // O anel se fecha e some no último quarto — ele é um gesto, não um estado.
-  const fim = useDerivedValue(() => Math.max(0, tracado.get()));
-  const brilho = useDerivedValue(() => 1 - Math.max(0, (tracado.get() - 0.75) / 0.25));
-  const inicio = useDerivedValue(() => Math.max(0, (tracado.get() - 0.75) / 0.25));
+  // Traço 0 → 58%; o preenchimento entra de 42% a 78% e leva o contorno embora; o nome fecha.
+  const fim = useDerivedValue(() => suave(t.get() / 0.58));
+  const contorno = useDerivedValue(() =>
+    reduzido ? 0 : 1 - suave((t.get() - 0.5) / 0.28),
+  );
+  // Reduzido: o canvas fica estático (opacidade 1) e o fade é da View por fora — um valor que muda
+  // antes do primeiro quadro do Skia não repinta, e a marca não aparecia.
+  const miolo = useDerivedValue(() =>
+    reduzido ? 1 : suave((t.get() - 0.42) / 0.36),
+  );
+  const marcaStyle = useAnimatedStyle(() => ({
+    opacity: reduzido ? t.get() : 1,
+  }));
+  const nome = useDerivedValue(() =>
+    reduzido ? t.get() : suave((t.get() - 0.72) / 0.28),
+  );
+  const nomeStyle = useAnimatedStyle(() => ({
+    opacity: nome.get(),
+    transform: [{ translateY: (1 - nome.get()) * 4 }],
+  }));
 
   const sai = useAnimatedStyle(() => {
     const k = Math.min(1, progresso.get() / 0.35);
-    const e = entrada.get();
     return {
-      opacity: (1 - k) * e,
-      transform: [{ translateY: -k * 36 }, { scale: (1 - k * 0.06) * (0.92 + e * 0.08) }],
+      opacity: 1 - k,
+      transform: [{ translateY: -k * 36 }, { scale: 1 - k * 0.06 }],
     };
   });
 
   return (
     <Animated.View style={[styles.palco, sai]} pointerEvents="none">
-      <Image source={MARCA_BRANCA} onLoad={onPng} fadeDuration={0} style={styles.marca} />
-      {show === 'completa' && !reduzido ? (
-        <SkiaCanvas style={StyleSheet.absoluteFill}>
+      <Animated.View style={[styles.marca, marcaStyle]}>
+        <SkiaCanvas style={styles.marca}>
+          <Path path={caminho} color={theme.onCurtain} opacity={miolo} />
           <Path
-            path={anel}
+            path={caminho}
             style="stroke"
-            strokeWidth={1.5}
-            strokeCap="round"
-            color={theme.onCurtainMuted}
-            start={inicio}
+            strokeWidth={2}
+            strokeJoin="round"
+            color={theme.onCurtain}
+            start={0}
             end={fim}
-            opacity={brilho}
+            opacity={contorno}
           />
         </SkiaCanvas>
-      ) : null}
+      </Animated.View>
+      <Animated.View style={[styles.nome, nomeStyle]}>
+        <ThemedText type="title" themeColor="onCurtain">
+          ProOps
+        </ThemedText>
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -563,12 +555,20 @@ function MarcaDaAbertura({
 const styles = StyleSheet.create({
   camada: {
     ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     // Acima da trava (900). `elevation` é o que ordena de verdade no Android.
     zIndex: 1000,
     elevation: 1000,
   },
-  palco: { width: ANEL, height: ANEL, alignItems: 'center', justifyContent: 'center' },
+  // A marca fica no centro da tela; o nome pende ABAIXO dela sem deslocá-la.
+  palco: { width: LADO, height: LADO },
   marca: { width: LADO, height: LADO },
+  nome: {
+    position: "absolute",
+    top: LADO + Space.md,
+    left: -80,
+    right: -80,
+    alignItems: "center",
+  },
 });
