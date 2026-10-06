@@ -58,6 +58,17 @@ async def _sem_banco(sql, *a, **k):
     return [{"id": i, "name": n} for i, n in enumerate(DETALHES)] if "subcategories" in sql else []
 
 
+def _detalhe(proposto, frase, acao):
+    """A MESMA trava de `tools/atributos.congelar`: o detalhe que é o nome do lançamento ou da categoria sai."""
+    from app.tools.atributos import normalize_igual
+
+    dito = dom.detalhe_ancorado(proposto, frase)
+    if dito and (normalize_igual(dito, acao.get("category"))
+                 or (normalize_igual(dito, acao.get("description")) and not dom.detalhe_marcado(dito, frase))):
+        return None
+    return (dito or "").lower() or None
+
+
 async def rodar(frase: str):
     saida = await nodes.finance_node({**BASE, "text": frase, "messages": [{"role": "user", "content": frase}]})
     acoes = [a for a in saida.get("finance_actions") or []
@@ -67,14 +78,15 @@ async def rodar(frase: str):
     linhas = [f"{n}: {a['type']} | {a.get('description') or '-'} | categoria {a.get('category') or '-'}"
               f" | detalhes existentes: {', '.join(DETALHES)}" for n, a in enumerate(acoes)]
     lote = await atributos._extrair(frase, linhas)
-    item = next((i for i in lote.itens if i.indice == 0), None)
+    alvo = next((n for n, a in enumerate(acoes) if a["type"] != "create_income"), 0)
+    item = next((i for i in lote.itens if i.indice == alvo), None)
     if item is None:
         return {}
-    despesa = acoes[0]["type"] != "create_income"
+    despesa = acoes[alvo]["type"] != "create_income"
     achado = {"forma": dom.forma_proposta(item.payment_method, frase),
               "padrao": dom.padrao_proposto(item.expense_pattern, frase) if despesa else None,
               "nec": dom.necessidade_proposta(item.expense_necessity, frase) if despesa else None,
-              "detalhe": (dom.detalhe_ancorado(item.detalhe, frase) or "").lower() or None}
+              "detalhe": _detalhe(item.detalhe, frase, acoes[alvo])}
     return {k: v for k, v in achado.items() if v}
 
 

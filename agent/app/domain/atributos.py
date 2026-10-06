@@ -118,6 +118,15 @@ def detalhe_ancorado(valor: str | None, texto: str) -> str | None:
     return dito if dito and normalize(dito) in normalize(texto) else None
 
 
+def detalhe_marcado(dito: str, texto: str) -> bool:
+    """A pessoa ESCREVEU "detalhe X" / "subcategoria X": escolha explícita, não um palpite pelo título.
+
+    Valida estrutura (a palavra-marca seguida do nome), não infere sentido: sem a marca, o detalhe
+    igual ao título ou à categoria continua descartado ("paguei a padaria" não vira detalhe padaria).
+    """
+    return bool(re.search(rf"\b(detalhe|subcategoria)\s+{re.escape(normalize(dito))}\b", normalize(texto)))
+
+
 def colunas_de_classificacao(kind: str, explicita: dict, padroes: dict | None) -> dict:
     """As quatro colunas F06 como o app grava (`resolveExpenseClassification`).
 

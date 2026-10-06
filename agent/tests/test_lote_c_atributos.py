@@ -675,3 +675,14 @@ async def test_parcelada_sem_atributo_mas_com_padrao_da_categoria_vai_por_create
     dados = json.loads(caminhos[0][1][0])
     assert dados["expense_pattern"] == "variable" and dados["expense_pattern_source"] == "category_default"
     assert "p_payment_method" not in dados
+
+
+def test_detalhe_marcado_vale_mesmo_igual_ao_titulo():
+    """Avaliação de 05/10/2026: o parse põe "feira" no título em "gastei 80 no mercado, detalhe feira",
+    e a trava do detalhe igual ao título jogava fora o detalhe que a pessoa escreveu."""
+    from app.domain.atributos import detalhe_marcado
+
+    assert detalhe_marcado("feira", "gastei 80 no mercado, detalhe feira")
+    assert detalhe_marcado("padaria", "gastei 55 de padaria, subcategoria padaria")
+    assert not detalhe_marcado("padaria", "paguei a padaria, 22, em dinheiro")
+    assert not detalhe_marcado("feira", "gastei 80 na feira")

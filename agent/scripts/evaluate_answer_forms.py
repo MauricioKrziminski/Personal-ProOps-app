@@ -768,7 +768,7 @@ def secoes():
         # o nome do estabelecimento não é detalhe, e pagar fatura/transferir nem cria lançamento.
         "loteC/forma de pagamento": [
             (t, lambda o, e=e: o == {"forma": e}, f"forma={e}", lambda t=t: _atributos(t))
-            for t, e in [("gastei 45 no mercado no pix", "pix"), ("paguei 120 de luz no boleto", "boleto"),
+            for t, e in [("gastei 45 no mercado no pix", "pix"), ("comprei um curso de 120 no boleto", "boleto"),
                          ("almoço 38 no débito", "debit"), ("paguei a padaria, 22, em dinheiro", "cash"),
                          ("paguei 15 de estacionamento por TED", "bank_transfer"),
                          ("gastei 200 no mercado com pix no crédito", "pix")]  # forma=pix; a conta TEM de ser cartão (o grafo pergunta)
@@ -785,7 +785,7 @@ def secoes():
         ],
         "loteC/classificação": [
             (t, lambda o, e=e: o == e, str(e), lambda t=t: _atributos(t))
-            for t, e in [("paguei 120 de luz, conta fixa e essencial", {"padrao": "fixed", "nec": "essential"}),
+            for t, e in [("gastei 300 de academia, gasto fixo e essencial", {"padrao": "fixed", "nec": "essential"}),
                          ("gasto variável: 60 de uber", {"padrao": "variable"}),
                          ("gastei 70 em roupa, não essencial", {"nec": "discretionary"})]
         ] + [
@@ -795,7 +795,7 @@ def secoes():
         "loteC/detalhe": [
             (t, lambda o, e=e: o == {"detalhe": e}, f"detalhe={e}", lambda t=t: _atributos(t))
             for t, e in [("gastei 80 no mercado, detalhe feira", "feira"),
-                         ("gastei 55 de padaria, subcategoria padaria", "padaria")]
+                         ("gastei 55 na padaria, subcategoria doces", "doces")]
         ] + [
             (t, lambda o: o == {}, "sem detalhe", lambda t=t: _atributos(t))
             for t in ["gastei 80 no mercado Extra", "comprei pão por 12"]
@@ -864,13 +864,13 @@ def secoes():
             for t in ["qual o próximo marco da viagem?", "quanto falta pro próximo marco da meta viagem?"]
         ],
         "loteD/favoritos e duplicar": [
-            (t, lambda o: bool(o) and o.get("resource") == "favoritos" and o.get("type") in {"resource_update", "resource_create"}
+            (t, lambda o, n=n: bool(o) and o.get("resource") == "favoritos" and o.get("type") in {"resource_update", "resource_create"}
              and str(o.get("lancar")).lower() == "true" and _tem(o, "name", n), f"favoritos lancar name~{n}",
              lambda t=t: _recurso_cru(t))
             for t, n in [("lança meu favorito Almoço", "almo"), ("usa o favorito academia", "academia"),
                          ("lança o favorito café da manhã de 12 reais", "caf")]
         ] + [
-            (t, lambda o: bool(o) and o.get("resource") == "duplicar" and _tem(o, "name", n), f"duplicar name~{n}",
+            (t, lambda o, n=n: bool(o) and o.get("resource") == "duplicar" and _tem(o, "name", n), f"duplicar name~{n}",
              lambda t=t: _recurso_cru(t))
             for t, n in [("repete o lançamento do mercado de ontem", "mercado"), ("duplica a conta de luz", "luz"),
                          ("lança de novo o aluguel", "alug")]

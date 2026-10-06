@@ -33,7 +33,7 @@ TIMEOUT_S = 8
 SISTEMA = """Você extrai ATRIBUTOS de lançamentos financeiros que uma pessoa acabou de dizer em português informal.
 Você recebe a frase da pessoa e a lista numerada de lançamentos já entendidos. Devolva um item por lançamento, com o mesmo 'indice'.
 Cada campo é null a menos que a FRASE o diga com palavras. Nunca deduza pelo estabelecimento, pelo valor ou pelo nome da conta.
-- payment_method: como a pessoa PAGOU. pix (diz pix), credit (diz crédito, 'no crédito', cartão de crédito), debit (débito), cash (dinheiro, em espécie), bank_transfer (TED, DOC ou transferência bancária USADA PARA PAGAR a compra), boleto. 'Pix no crédito' é pix (cobrado no cartão: a forma continua pix). Só o nome de um cartão ou banco ('no nubank', 'no itaú') NÃO é forma. 'Cartão' sem dizer crédito ou débito é null. Pagar a fatura, transferir para outra conta e investir NÃO são forma de pagamento de gasto: null.
+- payment_method: como a pessoa PAGOU. pix (diz pix), credit (diz crédito, 'no crédito', cartão de crédito), debit (débito), cash (dinheiro, em espécie), bank_transfer (TED, DOC ou transferência bancária USADA PARA PAGAR a compra), boleto. 'Pix no crédito' é pix (cobrado no cartão: a forma continua pix). Só o nome de um cartão ou banco ('no nubank', 'no itaú') NÃO é forma. 'Cartão' sem dizer crédito ou débito é null. Pagar a fatura, transferir para outra conta e investir NÃO são forma de pagamento de gasto: null. Um Pix, TED ou depósito que a pessoa RECEBEU ou que é de outra pessoa ('o pix do joão caiu') não é a forma: a forma é a do GASTO ('gastei 10 de café no débito' -> debit).
 - expense_pattern: fixed só se a frase diz fixo/fixa; variable só se diz variável. Que o gasto se repete todo mês NÃO é motivo para fixed.
 - expense_necessity: essential só se a frase diz essencial/necessário/obrigatório; discretionary só se diz supérfluo, desnecessário, não essencial, dispensável.
 - detalhe: o detalhe (subcategoria) que a frase cita ('detalhe feira', 'subcategoria padaria', ou o nome exato de um dos detalhes existentes listados). O nome do estabelecimento ou da categoria NÃO é detalhe. Devolva o texto como a pessoa disse.
@@ -148,7 +148,8 @@ async def _congelar(workspace_id, texto, acoes, alvos, indices) -> tuple[list[di
         notas: list[str] = []
         categoria = guards.clean_category(a.category)
 
-        if dito and normalize_igual(dito, a.category, a.description):
+        if dito and (normalize_igual(dito, a.category)
+                     or (normalize_igual(dito, a.description) and not dom.detalhe_marcado(dito, texto))):
             notas.append(f"detalhe *{dito}* ignorado (é o nome da categoria ou do lançamento)")
             dito = None
 
