@@ -8,6 +8,7 @@ import { Stack, router, useIsFocused, useLocalSearchParams } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
+import { ButtonRow } from '@/components/ui/button-row';
 import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Card } from '@/components/ui/card';
@@ -551,24 +552,26 @@ export default function InvoiceScreen() {
           disabled={settle.isPending || pay.isPending}
           onPress={abrirPagamento}
         />
-        <Button
-          block
-          label="Marcar como paga"
-          variant="secondary"
-          loading={settle.isPending}
-          disabled={pay.isPending}
-          onPress={quitarSemCaixa}
-        />
-        {podeAdiar ? (
+        <ButtonRow>
           <Button
             block
-            label="Jogar para a próxima"
+            label="Marcar como paga"
             variant="secondary"
-            loading={roll.isPending}
-            disabled={settle.isPending || pay.isPending}
-            onPress={adiar}
+            loading={settle.isPending}
+            disabled={pay.isPending}
+            onPress={quitarSemCaixa}
           />
-        ) : null}
+          {podeAdiar ? (
+            <Button
+              block
+              label="Jogar para a próxima"
+              variant="secondary"
+              loading={roll.isPending}
+              disabled={settle.isPending || pay.isPending}
+              onPress={adiar}
+            />
+          ) : null}
+        </ButtonRow>
       </View>
     ) : null;
 

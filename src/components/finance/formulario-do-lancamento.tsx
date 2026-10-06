@@ -29,6 +29,7 @@ import { CamposDaCompra } from '@/components/finance/compra-form';
 import { DownPaymentFields } from '@/components/finance/down-payment-fields';
 import { downPaymentError } from '@/lib/down-payment';
 import { Button } from '@/components/ui/button';
+import { ButtonRow } from '@/components/ui/button-row';
 import { Card } from '@/components/ui/card';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Screen } from '@/components/ui/screen';
@@ -1610,6 +1611,7 @@ export function FormularioDoLancamento(props: Props) {
 
         <FinanceWritePreview write={previewWrite} accounts={accounts ?? []} />
         {!editing && !props.converter && !favorito ? (
+          <ButtonRow>
           <Button
             variant="secondary"
             block
@@ -1620,8 +1622,6 @@ export function FormularioDoLancamento(props: Props) {
                 onError: erroDoFavorito,
               }))}
           />
-        ) : null}
-        {!editing && !props.converter && !favorito ? (
           <Button
             variant="secondary"
             block
@@ -1629,6 +1629,7 @@ export function FormularioDoLancamento(props: Props) {
             disabled={Boolean(props.salvarBloqueado) || saving || !classification.ready || contas.isPending || contas.isError || Boolean(erroPagamento) || Boolean(erroEntrada)}
             onPress={() => onSubmit(true)}
           />
+          </ButtonRow>
         ) : null}
 
         {editing ? (
