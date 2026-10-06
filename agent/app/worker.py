@@ -21,6 +21,7 @@ import asyncio
 import base64
 import logging
 import re
+import time
 
 from app import conversation, db, logctx
 from app.config import get_settings
@@ -106,9 +107,17 @@ async def _process_thread(thread_id: str) -> dict:
     ids = [m["id"] for m in lote]
     phone = lote[-1]["phone"]
     with logctx.bind(message_id=str(lote[-1].get("wa_message_id") or "")):
+        inicio = _relogio()
         resultado = await _turno_com_prazo(lote, ids, phone, thread_id)
+        duracao = _relogio() - inicio
+        if duracao > get_settings().turno_lento_seconds:
+            log.warning("turno lento: %.1f s", duracao,
+                        extra={"alerta": "turno_lento", "duracao_s": round(duracao, 1)})
     await _agendar_o_que_chegou(thread_id)
     return resultado
+
+
+_relogio = time.monotonic  # o do SLO do turno; o teste troca este, não o do asyncio
 
 
 async def _agendar_o_que_chegou(thread_id: str) -> None:

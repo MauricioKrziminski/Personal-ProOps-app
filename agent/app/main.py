@@ -21,7 +21,7 @@ from app.graph import build as graph_build
 from app.routes import chat, cron, finance_draft, hooks, inbound, internal, worker
 from app.services import gemini, groq, telemetry, whatsapp
 
-CAMPOS_EXTRAS = ("alerta", "pendentes", "falhas", "shadow")
+CAMPOS_EXTRAS = ("alerta", "pendentes", "falhas", "shadow", "duracao_s", "custo_usd")
 
 
 class _JsonFormatter(logging.Formatter):

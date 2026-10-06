@@ -218,6 +218,18 @@ async def test_mensagem_que_chegou_durante_o_turno_ganha_o_proximo_lote_ja(monke
     assert (await worker.process_thread("T"))["claimed"] == 1
 
 
+async def test_turno_acima_do_slo_loga_alerta(monkeypatch, caplog):
+    async def run_turn(*_a, **_k):
+        return "ok"
+
+    _preparar(monkeypatch, [_msg()], run_turn=run_turn)
+    relogio = iter([100.0, 100.0 + worker.get_settings().turno_lento_seconds + 1])
+    monkeypatch.setattr(worker, "_relogio", lambda: next(relogio))
+    await worker.process_thread("T")
+    lentos = [r for r in caplog.records if getattr(r, "alerta", None) == "turno_lento"]
+    assert lentos and lentos[0].duracao_s > worker.get_settings().turno_lento_seconds
+
+
 # --- A2: borda do webhook -----------------------------------------------------
 
 

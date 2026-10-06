@@ -90,6 +90,12 @@ class Settings(BaseSettings):
     # worker devolve o lote à fila (mark_retry) em vez de o container ser morto
     # com a mensagem presa em `processing`.
     worker_turn_timeout_seconds: int = 240
+    # SLO do turno do WhatsApp: acima disto o worker loga `alerta=turno_lento`, que a métrica
+    # `<serviço>-turno-lento` (`setup-gcp.sh alertas`) conta. Um turno normal leva 3–10 s.
+    turno_lento_seconds: int = 30
+    # Teto de custo de IA nas últimas 24 h (soma de `ai_events.estimated_cost_usd`); acima, o cron
+    # loga `alerta=custo_diario`. US$ 5 ≈ 2.900 turnos de gasto a US$ 0,0017 (06/10/2026).
+    custo_diario_alerta_usd: float = 5.0
     # Origens permitidas na aba Agente, separadas por vírgula. Vazio = nenhuma
     # (o app nativo não manda Origin; isto é para o Expo web e o dev server).
     app_cors_origins: str = ""

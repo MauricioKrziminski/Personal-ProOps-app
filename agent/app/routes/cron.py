@@ -12,6 +12,7 @@ import logging
 from fastapi import APIRouter, Depends
 
 from app import db
+from app.config import get_settings
 from app.domain.dates import now_utc
 from app.jobs import alerts, checkpoints, embeddings, feedback, reminders, scheduler
 from app.routes.worker import sweep
@@ -47,7 +48,29 @@ async def checar_fila() -> dict:
     if falhas:
         log.error("falhas definitivas: %d mensagem(ns) failed na última hora", falhas,
                   extra={"alerta": "falhas_definitivas", "falhas": falhas})
-    return {"pendentes_antigas": paradas, "falhas_1h": falhas}
+    custo = await _custo_24h()
+    return {"pendentes_antigas": paradas, "falhas_1h": falhas, "custo_24h_usd": custo}
+
+
+async def _custo_24h() -> float | None:
+    """Soma do custo de IA nas últimas 24 h contra `custo_diario_alerta_usd` (o SLO de custo).
+
+    Custo `None` (modelo sem preço) não entra: é um piso, nunca um chute. Nunca derruba o cron.
+    """
+    try:
+        r = await db.fetch_one(
+            "select coalesce(sum(estimated_cost_usd), 0) as custo from public.ai_events"
+            " where created_at > now() - interval '24 hours'"
+        )
+    except Exception:  # noqa: BLE001
+        log.warning("checagem de custo falhou", exc_info=True)
+        return None
+    custo = float(r["custo"])
+    teto = get_settings().custo_diario_alerta_usd
+    if custo > teto:
+        log.error("custo de IA nas últimas 24 h: US$ %.2f (teto US$ %.2f)", custo, teto,
+                  extra={"alerta": "custo_diario", "custo_usd": round(custo, 4)})
+    return custo
 
 
 @router.post("/reminders")

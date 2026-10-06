@@ -516,6 +516,10 @@ criar_alertas() {
     "$base AND jsonPayload.alerta=\"fila_parada\"" "Mensagens pending há mais de 5 min"
   criar_metrica "${SERVICE}-falhas-definitivas" \
     "$base AND jsonPayload.alerta=\"falhas_definitivas\"" "Mensagens failed na última hora"
+  criar_metrica "${SERVICE}-turno-lento" \
+    "$base AND jsonPayload.alerta=\"turno_lento\"" "Turnos do WhatsApp acima de TURNO_LENTO_SECONDS"
+  criar_metrica "${SERVICE}-custo-diario" \
+    "$base AND jsonPayload.alerta=\"custo_diario\"" "Custo de IA em 24 h acima de CUSTO_DIARIO_ALERTA_USD"
   criar_metrica "${SERVICE}-erros-5xx" \
     'resource.type="cloud_run_revision" AND resource.labels.service_name="'"$SERVICE"'" AND httpRequest.status>=500' \
     "Respostas 5xx do serviço"
@@ -535,6 +539,8 @@ criar_alertas() {
     criar_politica "${SERVICE}-fila-parada"       "ProOps ${SERVICE}: fila parada"       "$canal"
     criar_politica "${SERVICE}-falhas-definitivas" "ProOps ${SERVICE}: falhas definitivas" "$canal"
     criar_politica "${SERVICE}-erros-5xx"         "ProOps ${SERVICE}: erros 5xx"         "$canal"
+    criar_politica "${SERVICE}-turno-lento"       "ProOps ${SERVICE}: turno lento"       "$canal"
+    criar_politica "${SERVICE}-custo-diario"      "ProOps ${SERVICE}: custo de IA"       "$canal"
   fi
 
   # Orçamento de faturamento: avisa a 50%, 90% e 100% de BUDGET_USD. Sem a conta ou o valor, pula.

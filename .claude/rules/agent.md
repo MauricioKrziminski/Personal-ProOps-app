@@ -489,6 +489,12 @@ garantia sozinho virou responsabilidade do código:
   vez.
 - **Modo sombra** `GEMINI_SHADOW_<PAPEL>`: roda outro modelo ao lado, para comparar sem trocar o de
   produção. **Langfuse** mascara e-mail, CPF, CNPJ e telefone antes de enviar.
+- **SLO com alerta** (`setup-gcp.sh alertas`, linhas `jsonPayload.alerta`): fila parada, falhas
+  definitivas, 5xx, **turno lento** (worker, acima de `TURNO_LENTO_SECONDS`, 30) e **custo de IA**
+  (cron, soma de `ai_events.estimated_cost_usd` em 24 h acima de `CUSTO_DIARIO_ALERTA_USD`, 5).
+- **Langfuse** fica no host da UE (`LANGFUSE_HOST=https://cloud.langfuse.com`); a retenção é a do
+  plano contratado lá. Nome próprio NÃO é mascarado, de propósito (`telemetry.py`): sem ele o trace
+  de uma confirmação não se depura. O elo log ↔ trace é o `thread_id` (= `session_id`).
 - **CI**: `.github/workflows/agent-ci.yml`; a avaliação usa o secret `GEMINI_API_KEY_EVAL`.
 
 ## Feedback e apelidos
