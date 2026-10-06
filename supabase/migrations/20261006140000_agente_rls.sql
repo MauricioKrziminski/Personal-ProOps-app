@@ -10,7 +10,8 @@
 --      de outro workspace; o wrapper abaixo confere a posse (`private.my_workspace_ids()`, que lê
 --      `auth.uid()`) e só então delega — o padrão interna/wrapper de `supabase.md`.
 --
--- Fica DE FORA, de propósito (o agente lê como `postgres`, na fase cognitiva, fora do trecho RLS):
+-- Fica DE FORA, de propósito (o agente lê como `postgres`, na fase cognitiva, fora do trecho RLS;
+-- conferido por grep: nenhuma tool do `registry` alcança `resolve._por_semantica`, só o `prepare`):
 -- `private.transacoes_semelhantes` / `transaction_embeddings` (tabela interna, RLS sem policy).
 -- As RPCs por usuário `public._account_balances(uid)`, `_budgets_status`, `_card_summary`,
 -- `_cash_flow_forecast`, `_forecast_with_drafts` NÃO ganham `execute`: aceitam qualquer `uid`.

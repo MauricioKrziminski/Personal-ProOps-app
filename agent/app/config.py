@@ -109,6 +109,11 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("LANGFUSE_HOST", "LANGFUSE_BASE_URL"),
     )
 
+    @field_validator("agente_rls", mode="before")
+    @classmethod
+    def _rls_vazio_e_desligado(cls, v):
+        return False if isinstance(v, str) and not re.sub(r"\s+#.*$", "", v).strip() else v
+
     @field_validator("*", mode="before")
     @classmethod
     def _sem_comentario(cls, v):

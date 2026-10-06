@@ -156,7 +156,10 @@ async def caso(nome, user, ws, montar, *, esperado_vazio=False):
     if base_ruim:
         RELATORIO.append((nome, "CASO RUIM", f"base: {base}"))
     elif _mesmo(base, rls):
-        RELATORIO.append((nome, "passa", base.get("msg", "")[:60].replace("\n", " ")))
+        msg = base.get("msg", "")
+        # base vazia = igualdade vácua: RLS e postgres "concordam" em não achar nada. Não prova isolamento.
+        fraco = any(msg.startswith(x) for x in ("🤷", "Ainda não", "🏦 Ainda não", "📊 Nenhum", "🎯 Você ainda", "⭐", "📉 Você ainda"))
+        RELATORIO.append((nome, "passa (fraco: base vazia)" if fraco else "passa", msg[:60].replace("\n", " ")))
     else:
         RELATORIO.append((nome, "FALHA", f"base={str(base)[:150]} | rls={str(rls)[:150]}"))
 
@@ -306,7 +309,7 @@ async def casos_notas(user, ws):
     await caso("create_note", user, ws, sem_alvo(lambda: nota(type="create_note", content="verif rls nota")))
     await caso("append_note", user, ws, com_alvo(
         lambda: nota(type="append_note", append_text="mais uma linha", search_term="contador"), "contador"))
-    await caso("query_notes", user, ws, sem_alvo(lambda: nota(type="query_notes", search_term="contador")), esperado_vazio=True)
+    await caso("query_notes", user, ws, sem_alvo(lambda: nota(type="query_notes", search_term="Reunião")), esperado_vazio=True)
     await caso("delete_note", user, ws, com_alvo(
         lambda: nota(type="delete_note", search_term="contador"), "contador"))
     await caso("create_reminder", user, ws, sem_alvo(lambda: nota(
@@ -495,7 +498,7 @@ async def main():
             await conn.close()
     larg = max(len(n) for n, _, _ in RELATORIO)
     for nome, estado, detalhe in RELATORIO:
-        print(f"{nome:<{larg}}  {estado:<10} {detalhe if estado not in ('passa', 'bloqueado', 'intacto') or '-v' in sys.argv else ''}")
+        print(f"{nome:<{larg}}  {estado:<10} {detalhe if not estado.startswith(('passa', 'bloqueado', 'intacto')) or '-v' in sys.argv else ''}")
     ruins = [x for x in RELATORIO if x[1] in ("FALHA", "CASO RUIM", "VAZOU", "ALTERADO")]
     print(f"\n{len(RELATORIO) - len(ruins)}/{len(RELATORIO)} ok; nada gravado (rollback)")
     sys.exit(1 if ruins or falhas else 0)
