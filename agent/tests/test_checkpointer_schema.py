@@ -61,3 +61,28 @@ def test_pool_do_grafo_e_configurado_para_isolar():
             assert "configure" in nomes, "o _graph_pool subiu sem `configure`"
             return
     raise AssertionError("não achei a criação do _graph_pool em app/db.py")
+
+
+def test_estado_do_hitl_volta_do_checkpoint_so_com_os_tipos_permitidos():
+    """O "sim" retoma o checkpoint: os enums do estado têm que voltar como enum, sem depender do
+    modo permissivo que o LangGraph vai desligar (e um tipo de fora continua barrado)."""
+    import uuid
+    from datetime import date
+    from enum import Enum
+
+    from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+
+    from app.graph import build
+    from app.graph.schemas import Domain, FinanceActionType
+
+    serde = JsonPlusSerializer(allowed_msgpack_modules=build.tipos_do_checkpoint())
+    estado = {"tipo": FinanceActionType.CREATE_EXPENSE, "dominio": Domain.FINANCAS,
+              "id": uuid.uuid4(), "dia": date(2026, 10, 6)}
+    volta = serde.loads_typed(serde.dumps_typed(estado))
+    assert volta == estado and isinstance(volta["tipo"], FinanceActionType)
+
+    class Estranho(str, Enum):
+        x = "x"
+
+    Estranho.__module__ = "fora.do.app"
+    assert type(serde.loads_typed(serde.dumps_typed({"t": Estranho.x}))["t"]) is not Estranho

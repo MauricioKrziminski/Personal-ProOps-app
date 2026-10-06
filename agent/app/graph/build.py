@@ -10,9 +10,11 @@ que, num canal assíncrono como WhatsApp, é o caso NORMAL, não a exceção.
 
 from __future__ import annotations
 
+import inspect
 import logging
 
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.graph import END, START, StateGraph
 
 from app import db
@@ -32,6 +34,7 @@ from app.graph.nodes import (
     route,
     safe_node,
 )
+from app.graph import schemas
 from app.graph.state import AgentState
 
 log = logging.getLogger(__name__)
@@ -80,10 +83,23 @@ def build(checkpointer: AsyncPostgresSaver):
     return builder.compile(checkpointer=checkpointer)
 
 
+def tipos_do_checkpoint() -> list[type]:
+    """As classes NOSSAS que o estado leva para o checkpoint (enums e modelos de `schemas`).
+
+    Sem a lista, o LangGraph desserializa qualquer tipo com aviso — e avisa que vai BLOQUEAR numa
+    versão futura (visto no E2E de 06/10/2026 com `FinanceActionType`): o "sim" de toda
+    confirmação pendente deixaria de retomar. Com a lista, só estes e os tipos seguros da
+    biblioteca (data, UUID, Decimal…) voltam do banco.
+    """
+    return [c for _, c in inspect.getmembers(schemas, inspect.isclass)
+            if c.__module__ == schemas.__name__]
+
+
 async def setup() -> None:
     """Cria as tabelas de checkpoint e compila o grafo. Chamado no lifespan."""
     global _graph, _checkpointer
-    _checkpointer = AsyncPostgresSaver(db.graph_pool())
+    _checkpointer = AsyncPostgresSaver(
+        db.graph_pool(), serde=JsonPlusSerializer(allowed_msgpack_modules=tipos_do_checkpoint()))
     await _checkpointer.setup()
     _graph = build(_checkpointer)
     log.info("grafo compilado; checkpointer pronto no schema langgraph")
