@@ -182,11 +182,13 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
     */
     const duracao = reduzido ? Motion.duration.base : Motion.curtain.duration;
     const marca = reduzido ? Motion.duration.base : CONSTRUCAO_MS;
-    const espera = marca + Motion.duration.base;
+    // O disco e a frase saem primeiro; a marca só começa quando eles já sumiram (não se sobrepõem).
+    const some = Motion.duration.exit;
+    const espera = some + marca + Motion.duration.base;
     let vigente = true;
     const concluir = () => { if (vigente) onSaiu(); };
-    painelSai.set(withTiming(1, { duration: Motion.duration.base }));
-    construcao.set(withTiming(1, { duration: marca, easing: Easing.linear }));
+    painelSai.set(withTiming(1, { duration: some }));
+    construcao.set(withDelay(some, withTiming(1, { duration: marca, easing: Easing.linear })));
     progresso.set(
       withDelay(
         espera,
