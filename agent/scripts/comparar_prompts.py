@@ -39,7 +39,7 @@ from app import db  # noqa: E402
 from app.config import get_settings  # noqa: E402
 from app.graph import exemplos, nodes, prompts, prompts_v2  # noqa: E402
 from app.services import consumo  # noqa: E402
-from scripts.eval_cache import com_paciencia  # noqa: E402
+from scripts.eval_cache import Orcamento, com_paciencia  # noqa: E402
 
 WS = "20000000-0000-0000-0000-000000000001"
 BASE = {"timezone": "America/Sao_Paulo", "workspace_id": WS, "user_id": WS, "phone": None,
@@ -175,6 +175,9 @@ async def _um_caminho(v2: bool, texto: str, historico: list[dict]) -> dict:
     return saida
 
 
+orcamento: Orcamento | None = None
+
+
 async def gemini_real(frases: list[tuple[str, list[dict]]], output: str | None) -> int:
     chamadas = len(frases) * 2 * 2
     print(f"{len(frases)} frases x 2 caminhos = ~{chamadas}-{chamadas + len(frases) * 2} chamadas ao "
@@ -190,6 +193,7 @@ async def gemini_real(frases: list[tuple[str, list[dict]]], output: str | None) 
         for texto, historico in frases:
             a = await _um_caminho(False, texto, historico)
             b = await _um_caminho(True, texto, historico)
+            orcamento.checar()
             parecidos = await exemplos.parecidos(texto, "parse")  # vetor já em cache: sem nova chamada
             igual = a["acoes"] == b["acoes"] and a["dominios"] == b["dominios"] and not (a["erro"] or b["erro"])
             divergiram += not igual
@@ -218,6 +222,8 @@ if __name__ == "__main__":
     parser.add_argument("--frases", help="arquivo com uma frase por linha (sem histórico)")
     parser.add_argument("--n", type=int, help="só as N primeiras frases")
     parser.add_argument("--output", help="grava o JSON completo aqui")
+    parser.add_argument("--teto-usd", type=float,
+                        help="para a rodada quando o gasto medido passar disto (chave paga)")
     args = parser.parse_args()
     if args.so_prompts:
         so_prompts()
@@ -226,4 +232,5 @@ if __name__ == "__main__":
         lista = [(l.strip(), []) for l in Path(args.frases).read_text().splitlines() if l.strip()]
     else:
         lista = FRASES
+    orcamento = Orcamento(args.teto_usd)
     raise SystemExit(asyncio.run(gemini_real(lista[: args.n] if args.n else lista, args.output)))

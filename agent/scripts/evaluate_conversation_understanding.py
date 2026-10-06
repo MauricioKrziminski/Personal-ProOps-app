@@ -41,7 +41,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.eval_cache import CacheDeAvaliacao, com_paciencia
+from scripts.eval_cache import CacheDeAvaliacao, Orcamento, com_paciencia
 from app.domain import confirm, draft
 from app.graph import nodes
 from app.graph.schemas import FinanceAction
@@ -463,7 +463,12 @@ CASES = [
 ]
 
 
+orcamento: Orcamento | None = None
+
+
 async def main(args):
+    global orcamento
+    orcamento = Orcamento(args.teto_usd)
     if args.prompt_v2:
         from scripts.eval_cache import ligar_prompt_v2
 
@@ -490,6 +495,7 @@ async def main(args):
             observation = None
             try:
                 observation = await com_paciencia(run)
+                orcamento.checar()
                 check(observation)
                 expected_resources = {
                     "card_complete": ("cards", "Inter"),
@@ -541,6 +547,8 @@ if __name__ == "__main__":
     parser.add_argument("--cases")
     parser.add_argument("--prompt-v2", action="store_true",
                         help="liga AGENT_PROMPT_V2 só nesta execução (cache separado do v1)")
+    parser.add_argument("--teto-usd", type=float,
+                        help="para a rodada quando o gasto medido passar disto (chave paga)")
     parser.add_argument("--sem-cache", action="store_true",
                         help="ignora e não grava o cache de resultados (agent/.eval-cache/)")
     args = parser.parse_args()

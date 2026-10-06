@@ -36,7 +36,7 @@ for linha in (RAIZ / ".env").read_text().splitlines() if (RAIZ / ".env").exists(
 os.environ.setdefault("DATABASE_URL", "postgresql://sem-banco/nesta-avaliacao")
 os.environ.setdefault("WHATSAPP_APP_SECRET", "sem-envio")
 
-from scripts.eval_cache import CacheDeAvaliacao, com_paciencia  # noqa: E402
+from scripts.eval_cache import CacheDeAvaliacao, Orcamento, com_paciencia  # noqa: E402
 from app.domain import confirm, draft  # noqa: E402
 from app.graph import nodes  # noqa: E402
 from app.services import gemini  # noqa: E402
@@ -910,7 +910,12 @@ def secoes():
     }
 
 
+orcamento: Orcamento | None = None
+
+
 async def main(args):
+    global orcamento
+    orcamento = Orcamento(args.teto_usd)
     resources.db.fetch = _sem_banco
     if args.prompt_v2:
         from scripts.eval_cache import ligar_prompt_v2
@@ -970,6 +975,7 @@ async def main(args):
             else:
                 try:
                     obtido = await com_paciencia(roda)
+                    orcamento.checar()
                     ok = bool(ok_se(obtido))
                 except Exception as erro:  # noqa: BLE001 — a avaliação registra e segue
                     obtido, ok = f"erro: {erro}", False
@@ -999,6 +1005,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--secao", help="roda só as seções cujo nome contém isto")
     parser.add_argument("--output", help="grava o JSON completo aqui")
+    parser.add_argument("--teto-usd", type=float,
+                        help="para a rodada quando o gasto medido passar disto (chave paga)")
     parser.add_argument("--sem-cache", action="store_true",
                         help="ignora e não grava o cache de resultados (agent/.eval-cache/)")
     parser.add_argument("--prompt-v2", action="store_true",

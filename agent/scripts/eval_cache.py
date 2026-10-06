@@ -127,3 +127,47 @@ async def com_paciencia(chamar, tentativas: int = 4, espera_s: float = 30.0):
                 raise
             print(f"    (Gemini ocupado: {str(erro)[:40]}… nova tentativa em {espera_s:.0f}s)", flush=True)
             await asyncio.sleep(espera_s * (tentativa + 1))
+
+
+class Orcamento:
+    """Mede o gasto de uma rodada de avaliação e para no teto (`--teto-usd`).
+
+    Toda chamada ao Gemini passa pelo coletor de `consumo`; aqui cada uma também é somada numa
+    lista da RODADA (os scripts abrem turnos por caso, e o turno sozinho perderia a soma). O resumo
+    sai no fim — inclusive quando o teto interrompe —, para a chave paga nunca rodar no escuro.
+    Modelo sem preço na tabela (`gemini.PRECOS_USD_POR_MILHAO`) é contado à parte, nunca chutado.
+    """
+
+    def __init__(self, teto_usd: float | None = None):
+        import atexit
+
+        from app.services import consumo
+
+        self.teto = teto_usd
+        self.chamadas: list[dict] = []
+        original = consumo.ConsumoDoTurno.somar
+        rodada = self
+
+        def somar(turno, chamada):
+            rodada.chamadas.append(chamada)
+            original(turno, chamada)
+
+        consumo.ConsumoDoTurno.somar = somar
+        consumo.abrir()  # sem turno aberto o coletor não registra nada
+        atexit.register(self.resumo)
+
+    def gasto(self) -> float:
+        return sum(c.get("custo_usd") or 0 for c in self.chamadas)
+
+    def checar(self) -> None:
+        if self.teto is not None and self.gasto() > self.teto:
+            raise SystemExit(f"teto de US$ {self.teto:.2f} atingido (gasto US$ {self.gasto():.4f})")
+
+    def resumo(self) -> None:
+        sem_preco = [c for c in self.chamadas if c.get("custo_usd") is None and c.get("input_tokens")]
+        entrada = sum(c.get("input_tokens") or 0 for c in self.chamadas)
+        saida = sum(c.get("output_tokens") or 0 for c in self.chamadas)
+        print(f"\nGasto da rodada: {len(self.chamadas)} chamadas, {entrada} tokens de entrada, "
+              f"{saida} de saída, US$ {self.gasto():.4f}"
+              + (f" (+{len(sem_preco)} chamadas de modelo sem preço na tabela)" if sem_preco else ""),
+              flush=True)

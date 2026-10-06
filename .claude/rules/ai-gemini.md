@@ -221,6 +221,10 @@ nenhum outro:
   06/10/2026). Se um modelo estiver sem cota, troque-o por papel com `GEMINI_MODEL_<PAPEL>` em vez
   de reexecutar a suíte inteira.
 
+  **Com chave PAGA, rode com `--teto-usd`** (`evaluate_answer_forms`, `evaluate_conversation_understanding`,
+  `comparar_prompts`; `scripts/eval_cache.Orcamento`): a rodada imprime chamadas, tokens e custo no
+  fim — inclusive quando é interrompida — e para sozinha quando o gasto medido passa do teto.
+
 - **Cache: nenhuma das duas formas vale hoje** (medido em 06/10/2026). O cache IMPLÍCITO deu 0
   `cached_tokens` em chamadas repetidas com o mesmo prefixo de ~1.875 tokens no 3.1-flash-lite. O
   EXPLÍCITO tem limite de armazenamento ZERO no nível gratuito (`429

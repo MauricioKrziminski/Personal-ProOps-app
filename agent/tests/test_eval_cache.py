@@ -69,3 +69,24 @@ def test_editar_o_banco_de_exemplos_invalida_so_o_v2(tmp_path, monkeypatch):
     assert eval_cache.hash_prompts_e_schemas() != antes_v2
     monkeypatch.setattr(get_settings(), "agent_prompt_v2", False)
     assert eval_cache.hash_prompts_e_schemas() == antes_v1
+
+
+def test_orcamento_soma_toda_chamada_e_para_no_teto(monkeypatch):
+    import atexit
+
+    import pytest
+
+    from app.services import consumo
+    from scripts.eval_cache import Orcamento
+
+    monkeypatch.setattr(consumo.ConsumoDoTurno, "somar", consumo.ConsumoDoTurno.somar)  # restaura
+    monkeypatch.setattr(atexit, "register", lambda *_a, **_k: None)
+    orc = Orcamento(teto_usd=0.01)
+    consumo.atual().somar({"custo_usd": 0.004, "input_tokens": 10})
+    consumo.abrir().somar({"custo_usd": 0.004, "input_tokens": 10})  # outro turno: a rodada soma igual
+    orc.checar()  # 0,008 < 0,01
+    consumo.atual().somar({"custo_usd": None, "input_tokens": 10})  # sem preço: não chuta
+    consumo.atual().somar({"custo_usd": 0.004, "input_tokens": 10})
+    assert orc.gasto() == pytest.approx(0.012)
+    with pytest.raises(SystemExit):
+        orc.checar()
