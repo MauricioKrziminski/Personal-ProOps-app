@@ -69,9 +69,15 @@ import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
  * os mesmos do banco (`contaNaFatura`), mas o dia em que a lista for paginada essa soma encolhe.
  */
 
-function mesLabel(iso: string): string {
+/**
+ * O título do header: "Fatura de setembro" no ano corrente, "Fatura · set/2025" fora dele. Com o
+ * "+" e o "…" ao lado, "Fatura de setembro de 2026" não cabia no Android e o título saía cortado.
+ */
+function tituloDaFatura(iso: string): string {
   const [y, m] = iso.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const data = new Date(y, m - 1, 1);
+  if (y === new Date().getFullYear()) return `Fatura de ${data.toLocaleDateString('pt-BR', { month: 'long' })}`;
+  return `Fatura · ${data.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}/${y}`;
 }
 
 /** `dd/mm/aaaa` → ISO, ou null se a data não existe no calendário. */
@@ -593,7 +599,7 @@ export default function InvoiceScreen() {
     <Screen scroll={false} grouped wide={tablet}>
       <Stack.Screen
         options={{
-          title: fatura ? `Fatura de ${mesLabel(fatura.reference_month)}` : 'Fatura',
+          title: fatura ? tituloDaFatura(fatura.reference_month) : 'Fatura',
         }}
       />
 
