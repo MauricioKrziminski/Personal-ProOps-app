@@ -110,20 +110,42 @@ jobs:
       # FIXA e envelhecem sozinhos: não é regressão, é o teste. Listados aqui com o motivo
       # (memória do projeto, 05/10/2026); qualquer OUTRA falha derruba o job.
       #   expected_recurring_occurrences, draft_scenario -> datas absolutas no teste
-      # Os que exigem banco VAZIO (income_pending, agent_migrations, app_agent_chat) passam aqui:
-      # o banco do CI nasce sem dado. Os .py/.mjs de supabase/tests precisam de driver e ficam de fora.
+      # Os que exigem banco VAZIO (income_pending, agent_migrations, app_agent_chat) rodam na 1ª fase.
+      # Os de `com_dados` pegam "o primeiro espaço com conta" do banco: rodam na 2ª, depois da
+      # semente (primeiro run num runner, 06/10/2026: era essa a falha, não o código). Os de
+      # `repeatable` conferem o isolamento (`scripts/sql-test.py --repeatable-read` local).
+      # Os .py/.mjs de supabase/tests precisam de driver e ficam de fora.
       - name: Roda supabase/tests/*.sql
         run: |
           permitidos="expected_recurring_occurrences draft_scenario"
+          com_dados="debt_due_day_semantics debt_overdue_installment debt_projection_metadata debt_register_counted_payments financiamento_maleavel parcela_fixa_com_encargo preview_counted_debt_payments"
+          repeatable="finance_write_preview subcategory_financial_preview"
           falhas=""
-          for f in supabase/tests/*.sql; do
-            nome="$(basename "$f" .sql)"
-            if psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$f" >"/tmp/$nome.log" 2>&1 </dev/null; then
+          roda() {
+            local nome="$1" opts=""
+            if [[ " $repeatable " == *" $nome "* ]]; then opts="-c default_transaction_isolation=repeatable\\ read"; fi
+            if PGOPTIONS="$opts" psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "supabase/tests/$nome.sql" >"/tmp/$nome.log" 2>&1 </dev/null; then
               echo "ok    $nome"
             elif [[ " $permitidos " == *" $nome "* ]]; then
               echo "AVISO $nome falhou (data fixa, permitido)"
             else
               echo "FALHA $nome"; tail -n 15 "/tmp/$nome.log"; falhas="$falhas $nome"
             fi
+          }
+          for f in supabase/tests/*.sql; do
+            nome="$(basename "$f" .sql)"
+            [[ " $com_dados " == *" $nome "* ]] || roda "$nome"
           done
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+          insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000c1000', 'ci-seed@example.invalid');
+          insert into public.profiles (id) values ('00000000-0000-0000-0000-0000000c1000') on conflict do nothing;
+          insert into public.workspaces (id, owner_id, name)
+            values ('00000000-0000-0000-0000-0000000c1001', '00000000-0000-0000-0000-0000000c1000', 'CI') on conflict do nothing;
+          insert into public.workspace_members (workspace_id, user_id, role)
+            values ('00000000-0000-0000-0000-0000000c1001', '00000000-0000-0000-0000-0000000c1000', 'owner') on conflict do nothing;
+          insert into public.accounts (user_id, workspace_id, name, type, initial_balance_cents)
+            select m.user_id, m.workspace_id, 'Conta CI', 'checking', 0
+            from public.workspace_members m where m.user_id = '00000000-0000-0000-0000-0000000c1000';
+          SQL
+          for nome in $com_dados; do roda "$nome"; done
           if [[ -n "$falhas" ]]; then echo "falharam:$falhas"; exit 1; fi
