@@ -143,6 +143,8 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === 'zod') return require(id);
       if (id === '@/components/ui/row') return { Row: 'Row', Section: 'Section' };
       if (id === '@/components/ui/note') return { Note: 'Note' };
+      // Fora de uma aba congelável o foco da tela vale como sempre.
+      if (id === '@/components/ui/congela-fora-de-foco') return { DentroDeAbaCongelavel: { value: false } };
       if (id === '@/components/ui/toast') return { ToastOutlet: 'ToastOutlet', useToast: () => (toast: any) => config.toasts?.push(toast) };
       if (id === '@/components/ui/button') return { Button: 'Button' };
       if (id === '@/components/ui/card') return { Card: 'Card' };

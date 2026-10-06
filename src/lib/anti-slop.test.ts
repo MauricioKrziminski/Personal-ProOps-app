@@ -1913,5 +1913,6 @@ test('toda pilha de aba congela quando a aba não está em foco (ocultar valores
     assert.match(fonte, /<CongelaForaDeFoco>[\s\S]*<Stack[\s\S]*<\/CongelaForaDeFoco>/, `${aba}/_layout.tsx`);
   }
   const prim = readFileSync(join(SRC, 'components', 'ui', 'congela-fora-de-foco.tsx'), 'utf8');
-  assert.match(prim, /<Freeze freeze=\{!focada\}>/);
+  // O congelamento chega um render DEPOIS da perda de foco (as consultas saem do cache antes).
+  assert.match(prim, /<Freeze freeze=\{!focada && saiu\}>/);
 });
