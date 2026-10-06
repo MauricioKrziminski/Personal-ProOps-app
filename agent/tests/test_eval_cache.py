@@ -90,3 +90,10 @@ def test_orcamento_soma_toda_chamada_e_para_no_teto(monkeypatch):
     assert orc.gasto() == pytest.approx(0.012)
     with pytest.raises(SystemExit):
         orc.checar()
+
+
+def test_nivel_de_raciocinio_entra_na_chave(monkeypatch):
+    monkeypatch.delenv("GEMINI_THINKING_GATE", raising=False)
+    padrao = CacheDeAvaliacao("teste_raciocinio", ativo=False)._chave("x")
+    monkeypatch.setenv("GEMINI_THINKING_GATE", "low")
+    assert CacheDeAvaliacao("teste_raciocinio", ativo=False)._chave("x") != padrao

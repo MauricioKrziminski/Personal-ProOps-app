@@ -76,6 +76,13 @@ class CacheDeAvaliacao:
         # v1 e v2 têm chaves DIFERENTES e convivem no mesmo arquivo; com a flag desligada a chave
         # é a de antes do v2 existir.
         extra = [{"prompt_v2": True}] if prompt_v2_ligado() else []
+        # `GEMINI_THINKING_<PAPEL>` muda a resposta do modelo sem mudar prompt nem modelo: sem ele
+        # na chave, medir o portão em `low` devolvia o resultado do padrão, do cache (06/10/2026).
+        from app.services import gemini
+
+        niveis = {p: n for p in gemini.MODELOS if (n := gemini.raciocinio(p))}
+        if niveis:
+            extra.append({"raciocinio": niveis})
         self._sufixo = json.dumps([hash_prompts_e_schemas(), modelos(), *extra], sort_keys=True)
         self._dados: dict = {}
         if ativo and self.arquivo.exists():

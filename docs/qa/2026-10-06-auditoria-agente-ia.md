@@ -608,7 +608,7 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
 | 10 portão no CI, cache, avaliação online, sombra | feito | ver M9; `eval_cache.py`; `avaliacao_online.py`; `GEMINI_SHADOW_<PAPEL>` |
 | 10 Batch API | decidido não | a avaliação roda numa chave gratuita (custo zero), 24 h de latência não serve de portão de PR, e o grafo pediria duas rodadas encadeadas (router → domínio) |
 | 11 fast-path do "sim" | feito | `6758d49c`; no E2E o "sim" não chamou modelo nenhum |
-| 11 raciocínio | feito (ajuste) / depende do Gemini | o Lite gasta 0 token de raciocínio; `GEMINI_THINKING_<PAPEL>` existe; baixar o gate espera a seção de segurança com o 3.7-flash, que passou o dia em 503 no gratuito |
+| 11 raciocínio | feito / decidido | o Lite gasta 0 token de raciocínio; no gate, `low` passou 70/70 com 17% menos custo, e ficou `medium` (economia de ~US$ 0,0001 por chamada não paga o risco no SIM) |
 | 11 disjuntor | feito | 3 falhas/60 s abrem 120 s |
 | 11 sonda do teto | feito | o teto de 252 caiu: 720 medido; atributos saíram da segunda chamada |
 | 11 prompt modular | feito atrás de flag | seção 18 |
