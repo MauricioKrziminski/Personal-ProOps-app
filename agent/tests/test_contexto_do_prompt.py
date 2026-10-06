@@ -67,6 +67,28 @@ async def test_contas_sao_lidas_uma_vez_por_turno(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_os_tres_nos_em_paralelo_leem_as_contas_uma_vez(monkeypatch):
+    """O fan-out do grafo: finanças, consulta e cadastros chegam juntos, antes da 1ª leitura voltar."""
+    import asyncio
+
+    chamadas = []
+
+    async def accounts(workspace_id, only_cards=False):
+        chamadas.append(1)
+        await asyncio.sleep(0.01)
+        return CONTAS
+
+    monkeypatch.setattr(db, "accounts", accounts)
+    nodes._CONTAS_DO_TURNO.clear()
+    estado = {"workspace_id": "w1", "source_message_id": "m1"}
+
+    lidas = await asyncio.gather(*(nodes._contas_do_turno(estado) for _ in range(3)))
+
+    assert lidas == [CONTAS] * 3
+    assert len(chamadas) == 1
+
+
+@pytest.mark.asyncio
 async def test_falha_ao_ler_contas_nao_derruba_o_turno(monkeypatch):
     async def accounts(workspace_id, only_cards=False):
         raise RuntimeError("sem banco")

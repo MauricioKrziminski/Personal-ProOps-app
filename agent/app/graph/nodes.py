@@ -7,6 +7,7 @@ vai para o WhatsApp é template Python sobre números que já lemos.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from langchain_core.runnables import RunnableConfig
@@ -251,7 +252,7 @@ _CAMPOS_CORRECAO = ("amount_cents", "account", "category", "description", "occur
 # As contas ativas lidas para o prompt, por (espaço, mensagem do turno): finanças, consulta e
 # cadastros rodam em paralelo no MESMO turno e leriam a mesma lista três vezes. A chave carrega a
 # mensagem, então um turno seguinte (conta criada no meio) sempre relê.
-_CONTAS_DO_TURNO: dict[tuple, list[dict]] = {}
+_CONTAS_DO_TURNO: dict[tuple, asyncio.Future] = {}
 _TETO_DE_CONTAS_NO_PROMPT = 30
 
 
@@ -262,20 +263,24 @@ async def _contas_do_turno(state: AgentState) -> list[dict]:
         return []
     # sem id de mensagem (rascunho por voz) não há "turno" para chavear: lê sempre
     chave = (str(workspace_id), state.get("source_message_id")) if state.get("source_message_id") else None
-    if chave in _CONTAS_DO_TURNO:
-        return _CONTAS_DO_TURNO[chave]
     from app import db
 
+    # Guarda o FUTURO, não o resultado: os três nós rodam no mesmo superstep e chegam aqui quase
+    # juntos — o segundo acha a leitura do primeiro ainda em voo e espera por ela.
+    leitura = _CONTAS_DO_TURNO.get(chave) if chave else None
+    if leitura is None:
+        leitura = asyncio.ensure_future(db.accounts(workspace_id))
+        if chave:
+            if len(_CONTAS_DO_TURNO) >= 64:
+                _CONTAS_DO_TURNO.pop(next(iter(_CONTAS_DO_TURNO)))
+            _CONTAS_DO_TURNO[chave] = leitura
     try:
-        linhas = (await db.accounts(workspace_id))[:_TETO_DE_CONTAS_NO_PROMPT]
+        return (await leitura)[:_TETO_DE_CONTAS_NO_PROMPT]
     except Exception:  # noqa: BLE001 — sem a lista o casamento por texto segue valendo
+        if chave:
+            _CONTAS_DO_TURNO.pop(chave, None)
         log.warning("não consegui listar as contas; o turno segue sem elas")
         return []
-    if chave:
-        if len(_CONTAS_DO_TURNO) >= 64:
-            _CONTAS_DO_TURNO.pop(next(iter(_CONTAS_DO_TURNO)))
-        _CONTAS_DO_TURNO[chave] = linhas
-    return linhas
 
 
 def _turno_humano(texto: str, midia: dict | None):
