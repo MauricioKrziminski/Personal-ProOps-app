@@ -96,6 +96,11 @@ nenhum outro:
   `ResourceAction` segue em 5×5 e aceita campo novo de graça; capacidade nova também sai por ALVO
   resolvido (foi assim que quitar fatura sem caixa virou `mark_paid`). Ver
   `docs/AGENTE-PARIDADE-COM-O-APP.md`.
+- **A ORDEM das propriedades é a ordem em que o Gemini ESCREVE** (`json_schema`, decodificação
+  restrita): passada uma chave, ele não volta a uma anterior. Campo que ANCORA o sentido de uma ação
+  vem antes dos dados dela. `target_ref` ficava depois de valor e conta: o aporte em meta, que o
+  modelo começa pela meta, saía sem valor e sem conta — **1/12 → 12/12** ao mover o campo para logo
+  depois de `type` (06/10/2026, defeito que já estava na base). Campo novo entra pensando nisso.
 - Por isso Finanças são **dois** schemas: escrita/correção (`FinanceAction`: 22 campos × 14 = 308) e consulta (`FinanceQuery`: 13 × 13 = 169, com `continua_anterior` e `mostrar`; medido em 06/10/2026). Escrita e
   correção ficam juntas de propósito — separá-las obrigaria o router a decidir se "o mercado de
   ontem foi 120" é lançamento novo ou correção, e errar isso cria a duplicata que o produto
