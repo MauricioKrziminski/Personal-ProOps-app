@@ -47,6 +47,8 @@ const LADO = 96;
 const ONDA_DA_ABERTURA: Onda = { mode: 'up' };
 /** A marca se constrói (traço + preenchimento + nome) DENTRO de `MARCA_MINIMA_MS` (900): nunca alarga a espera. */
 const CONSTRUCAO_MS = 800;
+/** O fade de saída da splash nativa no Android (`SplashScreen.setOptions`); a marca começa depois dele. */
+const SAIDA_DO_NATIVO_ANDROID_MS = 300;
 /** Tempo máximo para manter um canvas pré-montado enquanto uma confirmação nativa está aberta. */
 const TETO_DO_PREPARO_MS = 4000;
 
@@ -340,16 +342,15 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     /*
       iOS: o nosso quadro já existe quando o nativo sai (`fade: false`), então a marca começa JÁ —
       esperar a promessa era tinta parada à toa ("tem um delay para começar a animar a logo").
-      Android: o conteúdo só desenha depois do `hideAsync()` e o nativo esmaece 300 ms por cima;
-      começando no layout, o traço inteiro acontecia sob o fade e o release mostrava só o
-      preenchimento surgindo (06/10/2026). Lá a marca começa quando o nativo terminou de sair.
+      Android: o nativo esmaece `SAIDA_DO_NATIVO_ANDROID_MS` por cima (com aceleração: quase opaco
+      na primeira metade), e `hideAsync()` resolve NA HORA — só desliga o "segure a splash"
+      (`SplashScreenManager.hide`), não espera a saída. Começando antes, o traço inteiro acontecia
+      sob o fade e o release mostrava só o preenchimento surgindo (06/10/2026). Lá a marca
+      começa quando a saída que nós mesmos configuramos termina.
     */
-    if (Platform.OS !== 'android') abertura();
-    SplashScreen.hideAsync()
-      .catch(() => {})
-      .finally(() => {
-        if (Platform.OS === 'android') abertura();
-      });
+    void SplashScreen.hideAsync().catch(() => {});
+    if (Platform.OS === 'android') setTimeout(abertura, SAIDA_DO_NATIVO_ANDROID_MS);
+    else abertura();
   }, [abertura]);
 
   useEffect(() => {
@@ -361,7 +362,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       o nativo sai, e `fade: false` evita um segundo cross-fade.
     */
     SplashScreen.setOptions({
-      duration: Platform.OS === 'android' ? 300 : 0,
+      duration: Platform.OS === 'android' ? SAIDA_DO_NATIVO_ANDROID_MS : 0,
       fade: false,
     });
   }, []);
