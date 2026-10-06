@@ -78,6 +78,10 @@ nenhum outro:
   saída. `GEMINI_THINKING_<PAPEL>` (`minimal|low|medium|high`, `gemini.raciocinio`) liga o nível por
   papel; sem ela vale o padrão do modelo. **Baixar o gate só depois da seção de segurança do
   `evaluate_answer_forms.py` com a variável ligada** — é o portão do SIM.
+  Medido em 06/10/2026 (chave paga, as 70 do portão: confirmação, escolha, rascunho, segurança):
+  `medium` 70/70 por US$ 0,047; `low` 70/70 por US$ 0,039 (−27% de saída). Ficou `medium`: a
+  economia é ~US$ 0,0001 por chamada, e uma rodada não paga o risco na fronteira do SIM. O nível
+  entra na chave do cache de avaliação — sem isso, medir `low` devolvia o resultado do padrão.
 - **Valor de dinheiro tem rede de segurança determinística.** Se a ação exige `amount_cents` e a
   IA omitiu, `parse_valor_em_centavos` (`app/domain/money.py`) tira do texto cru — mas só com UM
   número plausível. Nunca chutar entre dois: pedir para reformular é melhor que gravar errado.

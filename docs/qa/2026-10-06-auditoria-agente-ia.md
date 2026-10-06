@@ -662,8 +662,10 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
 - **Compreensão de conversa** (mesmo portão nos dois lados): v1 18/22, v2 19/22. As falhas que
   sobram são as instabilidades já medidas no próprio script (~1 em 3).
 - **Seção de segurança** (`evaluate_answer_forms --secao seguran`): 21/21, com o portão no Lite.
-  A aprovação com o portão de produção (Flash) não rodou: o 3.7-flash passou o dia em 503 e esgotou
-  as 20 chamadas gratuitas; o 3.6-flash também esgotou.
+- **Portão de produção (3.7-flash, chave paga, com teto):** confirmação, escolha, rascunho e
+  segurança — **70/70**, inclusive "aham"/"claro" que o portão Lite errava. US$ 0,047 (o fast-path
+  do "sim" fez 26 casos de confirmação custarem 17 chamadas). Com `thinking_level=low`: 70/70 por
+  US$ 0,039; o padrão ficou `medium` (ver `ai-gemini.md`). Gasto total na chave paga: US$ 0,086.
 - **Formas de resposta, v1:** 282/302. Das 20 falhas: 7 timeouts com o principal fora, 2 do portão
   Lite ("aham", "claro"), 4 do critério envelhecido de "encerrar", 5 do aporte (corrigido depois) e
   2 de correção sem valor de busca. A v2 rodou até a cota diária acabar: os 53 primeiros casos
