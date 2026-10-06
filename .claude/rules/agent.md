@@ -140,7 +140,7 @@ foi assim que renomear um lançamento ficou de fora por meses.
 Onde a capacidade nova cabe, em ordem: **campo no catálogo de `ResourceAction`** (5×5, sobra
 folga, e campo virtual traduzido no `prepare` não precisa nem existir como coluna) → **alvo novo
 resolvido** para uma ação que já existe → tipo de ação novo, que hoje **não cabe** em
-`FinanceAction` (teto medido de 252/32).
+`FinanceAction` (22 campos × 14 = 308, teto medido de 720 em 06/10/2026; ver `ai-gemini.md`).
 
 ## Correção de compra parcelada, sem menu (21/09/2026)
 
@@ -198,7 +198,8 @@ Ele foi removido (`update_transaction`, `agent/app/tools/finance.py`); dar baixa
   consulta (`READ_ONLY`) e `unknown` (que o registry vira ajuda sem tocar no banco) passam direto.
   `needs_confirmation` continua devolvendo o motivo específico quando ele existe — destrutiva,
   alterar item existente, valor acima de `HITL_AMOUNT_THRESHOLD_CENTS`, compromisso futuro,
-  confiança < 0,6 — e o resto cai em **"registro novo"**.
+  confiança do ROUTER < 0,6 — e o resto cai em **"registro novo"**. Os planos de domínio não têm
+  `confidence` desde 06/10/2026: ela só trocava esse rótulo e o Lite a preenchia sem critério.
 
   O `safe_node` só roda leitura: num lote misto, nada é gravado antes da pergunta.
 
@@ -452,6 +453,11 @@ garantia sozinho virou responsabilidade do código:
   rodavam e só depois o job era marcado done, então morrer no meio duplicava lançamento. Com a
   reserva antes, a pior consequência é a ação NÃO acontecer e o usuário remandar — para dinheiro,
   isso é melhor que gravar dois lançamentos que ele não pediu.
+- **O checkpoint só desserializa os tipos do app.** O `AsyncPostgresSaver` usa
+  `JsonPlusSerializer(allowed_msgpack_modules=build.tipos_do_checkpoint())` (as classes de
+  `app/graph/schemas.py`). O modo permissivo do LangGraph avisava que vai bloquear tipo não
+  registrado, e isso quebraria a retomada do HITL. Classe nova no estado do grafo entra em
+  `tipos_do_checkpoint`.
 - **Retentativa não se mistura com mensagem nova** no mesmo lote: a chave de idempotência é o
   `wa_message_id` da última mensagem, e recompor o lote mudaria a chave.
 
@@ -462,13 +468,35 @@ garantia sozinho virou responsabilidade do código:
   obrigaria instância sempre ligada.
 - `/worker/sweep` roda junto do cron de lembretes: se o agendamento no Cloud Tasks falhar, a
   mensagem seria perdida em silêncio — que é o bug que esta arquitetura existe para matar.
-- **Prompt caching não é alavanca aqui e não deve ser "otimizado".** O mínimo para cache implícito
-  é 4.096 tokens nos modelos 3.5/3.6/3.7 Flash; os prompts por domínio têm ~800. Medido em
-  30/08/2026.
+- **Cache explícito do Gemini: decidido não construir agora** (06/10/2026, medição e break-even em
+  `ai-gemini.md`). `agent/scripts/agent_metrics.py` mostra as chamadas/dia por versão de prompt
+  contra `BREAK_EVEN_CHAMADAS_DIA`; quando uma versão passar dele, reavalie.
 - Router + domínio são **duas** chamadas por mensagem, também no turno que cria lançamento (os atributos saem do
   parse principal, sem terceira chamada) — e a cota grátis do Flash-Lite é 500/dia.
   Os fast-paths determinísticos — saudação, resposta SIM/NÃO, documento anexo — existem para
   devolver parte disso.
+
+## Operação (06/10/2026)
+
+- **Rate limit** de 120 req/min por usuário, por instância (`app/ratelimit.py`; o contador some com
+  a instância, `min_instances = 0`). **Pools**: 5 (app) e 3 (grafo) no session pooler, e por isso o
+  Cloud Run sobe com `--max-instances 4 --concurrency 10` (`setup-gcp.sh` explica a conta).
+- **Mensagem que chega DURANTE o turno** tem o claim vazio (conversa ocupada). Ao terminar, o worker
+  agenda o próximo lote (`db.tem_pendente` → `tasks.schedule_debounce`) em vez de deixá-la esperar o
+  sweep, até 1 min. Por task nova, nunca em laço no mesmo request (os 300 s do Cloud Run).
+- **O turno tem prazo de 240 s** (`worker_turn_timeout_seconds`) e volta para a fila. O claim recupera
+  `processing` com mais de 5 min; na 3ª tentativa a mensagem vira `failed` e a pessoa é avisada UMA
+  vez.
+- **Modo sombra** `GEMINI_SHADOW_<PAPEL>`: roda outro modelo ao lado, para comparar sem trocar o de
+  produção. **Langfuse** mascara e-mail, CPF, CNPJ e telefone antes de enviar.
+- **CI**: `.github/workflows/agent-ci.yml`; a avaliação usa o secret `GEMINI_API_KEY_EVAL`.
+
+## Feedback e apelidos
+
+- **`agent_feedback`** guarda o desfecho de cada ação proposta (aprovada, corrigida, recusada,
+  expirada); `private.agent_quality` e `private.ai_unit_economics` leem dele e de `ai_events`.
+- **`account_aliases`** aprende o apelido que a pessoa disse para uma conta (`dito` guarda a grafia
+  original); o app mostra e remove na edição da conta.
 
 ## Portabilidade
 

@@ -30,11 +30,17 @@ nenhum outro:
 - **Modelos FIXADOS, nunca alias `-latest`** — o alias já migrou sozinho e quebrou o parse em
   produção. Escolha de modelo aqui é **cota E risco**, não só qualidade:
 
-  | constante | modelo | por quê |
+  | papel | modelo | por quê |
   |---|---|---|
-  | `GEMINI_ROUTER` / `GEMINI_PARSE` | `gemini-3.1-flash-lite` | duas chamadas por mensagem — é o volume |
-  | `GEMINI_GATE` | `gemini-3.7-flash` | só em resposta DIGITADA, e é o portão de segurança |
-  | `GEMINI_BATCH` | `gemini-3.1-flash-lite` | extrato, lote inteiro numa chamada |
+  | `router` / `parse` | `gemini-3.1-flash-lite` | duas chamadas por mensagem — é o volume |
+  | `gate` | `gemini-3.7-flash` | só em resposta DIGITADA, e é o portão de segurança |
+  | `batch` | `gemini-3.1-flash-lite` | extrato, lote inteiro numa chamada |
+
+  **`GEMINI_ROUTER/PARSE/BATCH/GATE` (`app/services/gemini.py`) são os PAPÉIS** (`"router"`,
+  `"parse"`, `"batch"`, `"gate"`), não nomes de modelo; o nome sai de `gemini.modelo(papel)`. Antes
+  eram nomes, e três papéis com o mesmo modelo viravam `batch` no mapa reverso: `GEMINI_MODEL_PARSE`
+  e `GEMINI_MODEL_ROUTER` NÃO trocavam nada e o consumo rotulava router e parse como batch (achado
+  no E2E de 06/10/2026). Troca por ambiente: `GEMINI_MODEL_<PAPEL>`.
 
   **A divisão veio de medição, em 09/09/2026.** Entre 01 e 09/09 tudo ficou em `gemini-3.7-flash`
   (commit `bb927ea`, "upgrade"). Rodando `evaluate_answer_forms.py` inteiro no Lite: **86/94**, e
@@ -51,7 +57,7 @@ nenhum outro:
   requisições/dia no nível gratuito, e escalonamento automático estourava isso rápido; perguntar
   "confirma?" é grátis e, quando o modelo entendeu errado, é a resposta mais útil de qualquer
   forma.
-- **Modelo FORA DO AR é outra coisa: router, parse e batch têm reserva no Flash**
+- **Modelo FORA DO AR é outra coisa: router, parse e batch têm reserva no modelo do papel `gate`**
   (`gemini.structured` → `with_fallbacks`, 22/09/2026). O Lite respondeu `503 high demand` e
   `ReadTimeout` por horas, e sem reserva TODA mensagem virava "Não consegui processar". A reserva
   só roda quando a chamada FALHA — não é escalonamento por confiança, e não remover achando que
@@ -62,6 +68,16 @@ nenhum outro:
   "Montar lançamento" da voz levou 33,7 s. Lote de extrato e anexo usam `PRAZO_LONGO` (30 s); sem
   reserva (portão) continua 30 s e UMA nova tentativa (o Lite degradado levou
   15,7 s para "diga ok").
+
+  **Disjuntor** (`gemini.py`, `FALHAS_PARA_ABRIR`): 3 falhas de disponibilidade em 60 s abrem o
+  disjuntor por 120 s e o principal é pulado, indo direto à reserva. O motivo da reserva
+  (`indisponivel` | `invalida`) vai nos metadados da chamada e em `ai_events.calls[].reserva_motivo`.
+
+  **Raciocínio (`thinking_level`)**: o Lite mediu 0 token de raciocínio (06/10/2026), então router e
+  parse não têm o que baixar. O `gemini-3.7-flash` (gate) roda em `medium` por padrão, cobrado como
+  saída. `GEMINI_THINKING_<PAPEL>` (`minimal|low|medium|high`, `gemini.raciocinio`) liga o nível por
+  papel; sem ela vale o padrão do modelo. **Baixar o gate só depois da seção de segurança do
+  `evaluate_answer_forms.py` com a variável ligada** — é o portão do SIM.
 - **Valor de dinheiro tem rede de segurança determinística.** Se a ação exige `amount_cents` e a
   IA omitiu, `parse_valor_em_centavos` (`app/domain/money.py`) tira do texto cru — mas só com UM
   número plausível. Nunca chutar entre dois: pedir para reformular é melhor que gravar errado.
@@ -70,23 +86,17 @@ nenhum outro:
   `15×22 = 330` recusa; `9×22 = 198`, `15×10 = 150` e `15×7 = 105` passam. Campos INTEGER são
   inocentes — a recusa é igual com tudo STRING. `tests/test_schemas.py` quebra o build se passar.
 
-  **O teto do `FinanceAction` subiu duas vezes, sempre MEDINDO**: 238 (`probe_bounded_installments`,
-  08/09/2026) e **252 com soma 32** (`probe_rename_schema.py`, 09/09/2026, ao somar
-  `new_description`). Os outros schemas seguem em 198/31. Antes de somar campo, rode o probe — a
-  recusa é um `400 INVALID_ARGUMENT` sem detalhe, e estimar aqui já custou uma quebra em produção.
-
-  **O teto de 252 caiu em 06/10/2026**: medido no Gemini real (`gemini-3.1-flash-lite`,
+  **O antigo teto de 252 caiu em 06/10/2026**: medido no Gemini real (`gemini-3.1-flash-lite`,
   `method="json_schema"`, o do langchain-google-genai 4.3.7; o de agosto era outro método de envio)
-  passaram 24×14 = 336 (com e sem `anyOf` null), 30 e 36 propriedades sem null e 36×20 = 720. O
-  `FinanceAction` está em 22×14 = 308 (soma 36); `tests/test_schemas.py` prende o produto exato e o
-  teto medido (720). A reserva (`gemini-3.7-flash`) deve ser medida antes de crescer mais.
-
-  **(histórico) 252 era o TETO, não um degrau.** Em 09/09/2026 as duas ampliações possíveis foram medidas e
-  recusadas: 19×14 = 266 (uma propriedade a mais) e 18×15 = 270 (um valor de enum a mais).
-  `FinanceAction` está cheio — capacidade nova ali sai por ALVO resolvido (foi assim que quitar
-  fatura sem caixa virou `mark_paid` sobre `card_invoices`) ou pelo catálogo de `ResourceAction`,
-  que segue em 5×5 e aceita campo novo de graça. Ver `docs/AGENTE-PARIDADE-COM-O-APP.md`.
-- Por isso Finanças são **dois** schemas: escrita/correção (18×14, no teto de 252) e consulta (11×13 = 143, medido em 05/10/2026). Escrita e
+  passaram 24×14 = 336 (com e sem `anyOf` null), 30 e 36 propriedades sem null e 36×20 = 720.
+  `tests/test_schemas.py` prende o produto exato de cada schema e o teto medido (720). O Lite usa 0
+  tokens de raciocínio. A reserva (modelo do papel `gate`) deve ser medida antes de crescer mais.
+  Antes de somar campo, rode o probe (`probe_rename_schema.py`, `diagnose_finance_schema.py`): a
+  recusa é um `400 INVALID_ARGUMENT` sem detalhe, e estimar aqui já custou uma quebra em produção.
+  `ResourceAction` segue em 5×5 e aceita campo novo de graça; capacidade nova também sai por ALVO
+  resolvido (foi assim que quitar fatura sem caixa virou `mark_paid`). Ver
+  `docs/AGENTE-PARIDADE-COM-O-APP.md`.
+- Por isso Finanças são **dois** schemas: escrita/correção (`FinanceAction`: 22 campos × 14 = 308) e consulta (`FinanceQuery`: 13 × 13 = 169, com `continua_anterior` e `mostrar`; medido em 06/10/2026). Escrita e
   correção ficam juntas de propósito — separá-las obrigaria o router a decidir se "o mercado de
   ontem foi 120" é lançamento novo ou correção, e errar isso cria a duplicata que o produto
   inteiro luta para evitar.
@@ -180,7 +190,10 @@ nenhum outro:
   e o Langfuse bate na sexta casa decimal, então a tabela DELE serve de calculadora (só não serve
   de auditoria, pelo motivo acima): `gemini-3.1-flash-lite` US$ 0,25/1,50 por 1 M de tokens
   (in/out) = **US$ 0,000459/chamada**; `gemini-3.7-flash` US$ 0,75/3,75 = **US$ 0,002253/chamada**,
-  4,9× mais caro. Um turno completo (router + parse) custa **US$ 0,0009**.
+  4,9× mais caro. Medido no E2E de 06/10/2026, um turno de gasto
+  (router 1.939 tokens de entrada + `finance_parse` 4.521 = 6.460 de entrada, 106 de saída) custa
+  **US$ 0,001774** no Lite. O prompt v2 (`AGENT_PROMPT_V2`, padrão desligada) estima o parse de um
+  gasto simples em ~1.525 tokens contra 4.080 do v1 (`scripts/comparar_prompts.py --so-prompts`).
 
   **A execução que APROVA não cabe num dia com a chave do staging** (medido em 23/09/2026).
   Desde 21/09 o `agent/.env` usa um projeto SEM faturamento (a cota grátis vale por projeto): o
@@ -199,6 +212,19 @@ nenhum outro:
 
   Toda sonda imprime quantas chamadas vai fazer ANTES de fazer.
 
+  **No nível gratuito as avaliações tentam de novo em 503/429** (`scripts/eval_cache.com_paciencia`,
+  06/10/2026). Se um modelo estiver sem cota, troque-o por papel com `GEMINI_MODEL_<PAPEL>` em vez
+  de reexecutar a suíte inteira.
+
+- **Cache: nenhuma das duas formas vale hoje** (medido em 06/10/2026). O cache IMPLÍCITO deu 0
+  `cached_tokens` em chamadas repetidas com o mesmo prefixo de ~1.875 tokens no 3.1-flash-lite. O
+  EXPLÍCITO tem limite de armazenamento ZERO no nível gratuito (`429
+  TotalCachedContentStorageTokensPerModelFreeTier limit=0`). Break-even estimado do explícito:
+  ~107 chamadas/dia por versão de prompt (US$ 0,025/M em cache contra 0,25/M, armazenamento US$ 1/M
+  tok/h). **Decisão: não construir camada de cache explícito agora.**
+  `agent/scripts/agent_metrics.py` imprime as chamadas/dia por versão de prompt contra o
+  break-even (`BREAK_EVEN_CHAMADAS_DIA`); quando uma versão passar dele, reavalie.
+
 - **O custo NÃO está no tráfego, está nas suítes.** Em 09/09/2026 a produção tinha 29 chamadas
   em `ai_events` desde que existe, e o staging 130 — e mesmo assim 04/09 custou R$ 10. Quem gasta é
   `evaluate_answer_forms.py` (~94 chamadas por execução) mais os `probe_*`, e **nenhum deles grava
@@ -213,6 +239,10 @@ nenhum outro:
   grafo). Isso não é só auditoria: `private.plan_status_for` **conta essas linhas** para saber
   quantas mensagens de IA o workspace gastou no mês. Não gravar derruba o paywall em silêncio, e
   contar fast-path (saudação, SIM/NÃO) cobraria mensagem que não gastou token.
+  A linha tem `cached_tokens`, `reasoning_tokens`, `estimated_cost_usd`, `calls` (jsonb por
+  chamada: papel, nó, versão do prompt, modelo real, tokens, custo, reserva, `reserva_motivo`),
+  `kind` (só `turn` conta na cota) e `reserved` (reserva atômica de cota sob advisory lock; solta se
+  o turno não usou modelo). **Custo de modelo sem preço na tabela é `None`, nunca chutado.**
 - Tracing detalhado (nós, arestas, tools, tokens) vai para o **Langfuse**. **Só isso: `ai_events` não é tela.** Havia uma "Atividade da IA" listando modelo, confiança em % e as ações geradas, mais um bloco igual no detalhe do lançamento; os dois foram removidos em 30/08/2026. Nome de modelo e confiança são telemetria de quem CONSTRÓI o produto, e mostrar isso pede ao usuário que audite a IA em vez de confiar nela. O que o usuário precisa é ver o item certo e poder corrigi-lo onde ele mora — o que já existe no próprio item e no `undo_last` do WhatsApp.
 - Duas camadas, com propósitos diferentes, ambas em `conversation.check_limits` (chamada por `app/worker.py`), **antes** de
   gastar Groq/Gemini: a **hora** protege o custo contra rajada (contagem em `ai_events`); o **mês**
@@ -230,11 +260,29 @@ nenhum outro:
 - Recorrência sempre como **RRULE** (`FREQ=MONTHLY;BYMONTHDAY=5`) — mesmo formato dos reminders.
 - Dinheiro sempre `amount_cents` inteiro ("45 reais" → 4500).
 
+## Embeddings e few-shot (06/10/2026)
+
+- Modelo `gemini-embedding-2`, 768 dimensões normalizadas. **Nível gratuito: 100 requisições/min de
+  embedding, e CADA texto de um lote conta como uma.**
+- **Busca semântica de lançamento** (`resolve._por_semantica`) sobre `transaction_embeddings`
+  (preenchida por um job no cron de lembretes): `SIMILARIDADE_MINIMA = 0.64` e `FOLGA_MINIMA = 0.05`,
+  calibrados com `scripts/probe_busca_semantica.py`.
+- **Few-shot dinâmico, só com `AGENT_PROMPT_V2`**: banco sintético `app/graph/exemplos.json` (115
+  frases) com vetores PRÉ-GERADOS em `app/graph/exemplos_vetores.json` (float16 base64) por
+  `scripts/vetorizar_exemplos.py`; o teste acusa arquivo defasado. Piso `SIMILARIDADE_MINIMA = 0.62`
+  (em `app/graph/exemplos.py`), calibrado por `scripts/probe_exemplos.py`: domínio 0,640–0,972, fora
+  0,508–0,771 — as faixas se sobrepõem, e quem desvia o que não é finanças é o router. Uma chamada
+  de embedding por turno.
+- **Router por embedding: avaliado e RECUSADO.** Exemplos sintéticos decidindo roteamento é regra
+  por caso, e o router no Lite custa ~US$ 0,0005/turno — não é o centro de custo.
+
 ## Imagem e PDF (multimodal)
 
 - Foto de cupom, print de Pix e PDF de fatura entram no **mesmo nó de domínio e no mesmo schema** —
   nunca um segundo prompt só para imagem. Limite de 8MB e MIME na allowlist (`VISION_MIME` em
-  `app/worker.py`). Anexo pula o router e vai direto para finanças (é quase sempre cupom/fatura).
+  `app/worker.py`). A mídia chega ao Gemini pelo `config["configurable"]` (`CHAVE_MIDIA`) e vira
+  parte `file` base64 no turno humano; o download recusa mídia acima de 16 MiB
+  (`MidiaGrandeDemais`) com mensagem à pessoa. Anexo pula o router e vai direto para finanças (é quase sempre cupom/fatura).
 - Importação de extrato (OFX/CSV) tem prompt próprio e enxuto: `gemini.classify_statement_lines` manda o lote
   INTEIRO numa chamada e recebe um array na mesma ordem. O índice é o contrato.
 - **Regra do usuário ganha da IA**: `_match_rule` roda depois do parse (WhatsApp) e antes do Gemini
