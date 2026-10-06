@@ -63,3 +63,24 @@ def test_o_estado_guarda_so_o_tipo_e_o_config_nao_vai_ao_checkpoint():
     assert B64 not in repr(estado)
     meta = get_checkpoint_metadata({"configurable": {"thread_id": "t", CHAVE_MIDIA: MIDIA}}, {})
     assert B64 not in repr(meta)
+
+
+@pytest.mark.asyncio
+async def test_o_langgraph_injeta_o_config_no_no_de_financas(monkeypatch):
+    """O nó num grafo de verdade: o LangGraph só injeta `config` com a anotação certa."""
+    from langgraph.graph import END, START, StateGraph
+
+    from app.graph.state import AgentState
+
+    modelo = _Modelo()
+    monkeypatch.setattr(nodes.gemini, "structured", lambda *_a, **_k: modelo)
+    g = StateGraph(AgentState)
+    g.add_node("f", nodes.finance_node)
+    g.add_edge(START, "f")
+    g.add_edge("f", END)
+
+    await g.compile().ainvoke(
+        _estado(marca_da_midia(MIDIA)), config={"configurable": {CHAVE_MIDIA: MIDIA}}
+    )
+
+    assert modelo.mensagens[1].content[1]["data"] == B64

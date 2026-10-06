@@ -270,7 +270,9 @@ def _turno_humano(texto: str, midia: dict | None):
     ])
 
 
-async def finance_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
+# `config: RunnableConfig` EXATAMENTE assim: é o texto que o LangGraph reconhece para injetá-lo
+# (outra anotação o pula em silêncio, e a mídia some).
+async def finance_node(state: AgentState, config: RunnableConfig = None) -> dict:
     if state.get("preset") or state.get("halted"):
         return {}  # ações semeadas ou turno cancelado: não reextrair
 
