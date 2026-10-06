@@ -217,3 +217,17 @@ def test_catalogo_de_notas_cabe_no_prompt_sem_crescer_o_schema():
     for campo in ("pinned", "color", "archived", "tags", "icon"):
         assert campo in texto
     assert "oceano" in texto and "azul -> oceano" in texto
+
+
+def test_principal_com_reserva_tem_prazo_curto_e_sem_nova_tentativa():
+    """O Lite parado segurava 30 s antes de a reserva entrar (voz: 33,7 s no staging)."""
+    from app.graph.schemas import FinancePlan
+    from app.services import gemini
+
+    gemini._cache.clear()
+    gemini.structured(FinancePlan, gemini.GEMINI_PARSE)
+    gemini.structured(FinancePlan, gemini.GEMINI_PARSE, prazo=gemini.PRAZO_LONGO)
+    lite, flash = gemini.modelo("parse"), gemini.modelo("gate")
+    assert (lite, 0.1, gemini.PRAZO_COM_RESERVA, 0) in gemini._cache
+    assert (lite, 0.1, gemini.PRAZO_LONGO, 0) in gemini._cache
+    assert (flash, 0.1, 30, 1) in gemini._cache  # a reserva continua com prazo e nova tentativa

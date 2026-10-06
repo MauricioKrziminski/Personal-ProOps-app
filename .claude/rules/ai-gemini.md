@@ -60,8 +60,11 @@ Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **a
   só roda quando a chamada FALHA — não é escalonamento por confiança, e não remover achando que
   é. **Custo a conhecer:** durante uma queda do Lite, todo turno de produção vai para o Flash
   (4,9× o preço, conta pré-paga). O **portão não tem reserva** de propósito: a reserva natural
-  seria o Lite, medido aprovando "apaga todos". Timeout 30 s e UMA nova tentativa por modelo
-  (o Lite degradado levou 15,7 s para "diga ok").
+  seria o Lite, medido aprovando "apaga todos". **Com reserva, o principal tem 10 s e nenhuma
+  nova tentativa** (`PRAZO_COM_RESERVA`, 06/10/2026): com 30 s o Lite parado segurava a resposta e o
+  "Montar lançamento" da voz levou 33,7 s. Lote de extrato e anexo usam `PRAZO_LONGO` (30 s); sem
+  reserva (portão, segunda leitura) continua 30 s e UMA nova tentativa (o Lite degradado levou
+  15,7 s para "diga ok").
 - **Valor de dinheiro tem rede de segurança determinística.** Se a ação exige `amount_cents` e a
   IA omitiu, `parse_valor_em_centavos` (`app/domain/money.py`) tira do texto cru — mas só com UM
   número plausível. Nunca chutar entre dois: pedir para reformular é melhor que gravar errado.

@@ -256,7 +256,8 @@ async def finance_node(state: AgentState) -> dict:
         return {}  # ações semeadas ou turno cancelado: não reextrair
 
     historico = state.get("messages")[:-1] if state.get("messages") else None
-    modelo = gemini.structured(FinancePlan, gemini.GEMINI_PARSE)
+    prazo = gemini.PRAZO_LONGO if state.get("media") else gemini.PRAZO_COM_RESERVA
+    modelo = gemini.structured(FinancePlan, gemini.GEMINI_PARSE, prazo=prazo)
     plano: FinancePlan = await modelo.ainvoke(
         [
             ("system", FINANCE),

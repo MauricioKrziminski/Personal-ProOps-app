@@ -290,7 +290,7 @@ async def test_creation_model_omissions_do_not_shrink_total_or_lose_history(
     monkeypatch.setattr(
         nodes.gemini,
         "structured",
-        lambda *a: type("Model", (), {"ainvoke": AsyncMock(return_value=parsed)})(),
+        lambda *a, **_: type("Model", (), {"ainvoke": AsyncMock(return_value=parsed)})(),
     )
     result = await nodes.finance_node(
         {
