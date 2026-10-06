@@ -27,6 +27,7 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withDelay,
   withRepeat,
   withSequence,
   withTiming,
@@ -34,6 +35,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FullWindowOverlay } from 'react-native-screens';
 
+import { CONSTRUCAO_MS, MarcaSeConstruindo } from '@/components/motion/marca-se-construindo';
 import { useCortinaAberta, useCortinaSaindo } from '@/components/motion/session-curtain';
 import { WaveCurtain } from '@/components/motion/wave-curtain';
 import { ThemedText } from '@/components/themed-text';
@@ -141,6 +143,10 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
   const insets = useSafeAreaInsets();
   const reduzido = useReducedMotion();
   const progresso = useSharedValue(0);
+  /** A marca se construindo depois da senha aceita (0 → 1), antes de a tinta subir. */
+  const construcao = useSharedValue(0);
+  /** O disco e a frase saem (0 → 1) quando a senha é aceita: no lugar deles, a marca. */
+  const painelSai = useSharedValue(0);
   const cortinaSaindo = useCortinaSaindo();
 
   /*
@@ -154,7 +160,11 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
   useEffect(() => {
     if (!saindo) {
       cancelAnimation(progresso);
+      cancelAnimation(construcao);
+      cancelAnimation(painelSai);
       progresso.set(0);
+      construcao.set(0);
+      painelSai.set(0);
       return;
     }
     /*
@@ -165,28 +175,39 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
       onSaiu();
       return;
     }
+    /*
+      Senha aceita: o disco e a frase saem, a marca se constrói no centro (a mesma da abertura,
+      `MarcaSeConstruindo`) e só então a tinta sobe — pedido do dono do produto, 06/10/2026: a
+      animação da logo é da entrada e de depois da senha. Uma cadeia só na UI thread.
+    */
     const duracao = reduzido ? Motion.duration.base : Motion.curtain.duration;
+    const marca = reduzido ? Motion.duration.base : CONSTRUCAO_MS;
+    const espera = marca + Motion.duration.base;
     let vigente = true;
     const concluir = () => { if (vigente) onSaiu(); };
+    painelSai.set(withTiming(1, { duration: Motion.duration.base }));
+    construcao.set(withTiming(1, { duration: marca, easing: Easing.linear }));
     progresso.set(
-      withTiming(1, { duration: duracao, easing: Easing.linear }, (fim) => {
-        'worklet';
-        if (fim) runOnJS(concluir)();
-      })
+      withDelay(
+        espera,
+        withTiming(1, { duration: duracao, easing: Easing.linear }, (fim) => {
+          'worklet';
+          if (fim) runOnJS(concluir)();
+        })
+      )
     );
     // Se o callback da animação não vier, a trava sai do mesmo jeito: modal preso é pior que corte.
-    const teto = setTimeout(concluir, duracao + 400);
+    const teto = setTimeout(concluir, espera + duracao + 400);
     return () => {
       vigente = false;
       clearTimeout(teto);
       cancelAnimation(progresso);
+      cancelAnimation(construcao);
+      cancelAnimation(painelSai);
     };
-  }, [saindo, cortinaSaindo, reduzido, progresso, onSaiu]);
+  }, [saindo, cortinaSaindo, reduzido, progresso, construcao, painelSai, onSaiu]);
 
-  const conteudo = useAnimatedStyle(() => {
-    const k = Math.min(1, progresso.get() / 0.35);
-    return { opacity: 1 - k, transform: [{ translateY: -k * 40 }] };
-  });
+  const conteudo = useAnimatedStyle(() => ({ opacity: 1 - painelSai.get() }));
   const veu = useAnimatedStyle(() => ({ opacity: 1 - progresso.get() }));
 
   return (
@@ -238,6 +259,12 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
       </Animated.View>
 
       <View style={styles.folgaBaixa} />
+
+      {saindo && cortinaSaindo ? (
+        <View style={styles.marcaCentral} pointerEvents="none">
+          <MarcaSeConstruindo saida={progresso} t={construcao} reduzido={reduzido} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -322,6 +349,7 @@ function DiscoDaTrava({ estado, onPress }: { estado: EstadoDaTrava; onPress: () 
 }
 
 const styles = StyleSheet.create({
+  marcaCentral: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   tudo: {
     position: 'absolute',
     top: 0,

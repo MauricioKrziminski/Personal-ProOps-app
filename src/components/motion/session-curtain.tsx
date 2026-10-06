@@ -1,4 +1,3 @@
-import { Path } from '@shopify/react-native-skia';
 import * as SplashScreen from 'expo-splash-screen';
 import {
   createContext,
@@ -16,18 +15,15 @@ import Animated, {
   cancelAnimation,
   runOnJS,
   useAnimatedStyle,
-  useDerivedValue,
   useReducedMotion,
   useSharedValue,
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
 
+import { CONSTRUCAO_MS, MarcaSeConstruindo } from '@/components/motion/marca-se-construindo';
 import { WaveCurtain } from '@/components/motion/wave-curtain';
-import { SkiaCanvas } from '@/components/ui/skia-canvas';
-import { ThemedText } from '@/components/themed-text';
-import { markPath } from '@/design/mark-path';
-import { Motion, Space } from '@/design/tokens';
+import { Motion } from '@/design/tokens';
 import { progressoDaCapa } from '@/design/wave-math';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -41,15 +37,8 @@ import {
 
 import type { CortinaApi } from './session-curtain.types';
 
-/** Lado da marca (dp): a mesma caixa que o PNG do splash tinha, para ela ficar no mesmo lugar. */
-const LADO = 96;
 /** Abertura e logout terminam na mesma curva fixa da tela de conta. */
 const ONDA_DA_ABERTURA: Onda = { mode: 'up' };
-/**
- * A marca se constrói (traço + preenchimento + nome) DENTRO de `MARCA_MINIMA_MS` (1700). Era 800 ms;
- * o dono do produto pediu "mais suave, devagar, fluido" (06/10/2026) — o mínimo cresceu junto.
- */
-const CONSTRUCAO_MS = 1500;
 /** O fade de saída da splash nativa no Android (`SplashScreen.setOptions`); a marca começa depois dele. */
 const SAIDA_DO_NATIVO_ANDROID_MS = 300;
 /** Tempo máximo para manter um canvas pré-montado enquanto uma confirmação nativa está aberta. */
@@ -468,89 +457,8 @@ function Camada({
           style={StyleSheet.absoluteFill}
         />
       )}
-      {comMarca ? <MarcaDaAbertura progresso={progresso} t={construcao} reduzido={reduzido} /> : null}
+      {comMarca ? <MarcaSeConstruindo saida={progresso} t={construcao} reduzido={reduzido} /> : null}
     </View>
-  );
-}
-
-/** Smootherstep: começa e termina com velocidade E aceleração zero — sem tranco nas emendas. */
-const suave = (x: number) => {
-  'worklet';
-  const k = Math.min(1, Math.max(0, x));
-  return k * k * k * (k * (k * 6 - 15) + 10);
-};
-
-/**
- * A marca no centro da abertura, SE CONSTRUINDO: o contorno da marca se desenha (trim do path, o
- * mesmo `markPath` do app), o preenchimento entra por baixo dele e o nome "ProOps" aparece
- * abaixo. É o que o splash nativo deixa de fazer — ele é só a tinta, então o primeiro quadro desta
- * camada (nada além da tinta) é idêntico ao dele e não há flash. Na saída a marca sobe e some com
- * a tinta.
- *
- * Um relógio só (`t`, 0 → 1 em `CONSTRUCAO_MS`, dentro do mínimo da marca): depois dele a marca
- * fica desenhada e PARADA, qualquer que seja a espera (rede, senha). Sem loop.
- *
- * Reduzir movimento: sem desenho progressivo, marca e nome entram por fade.
- */
-function MarcaDaAbertura({
-  progresso,
-  t,
-  reduzido,
-}: {
-  progresso: SharedValue<number>;
-  t: SharedValue<number>;
-  reduzido: boolean;
-}) {
-  const theme = useTheme();
-  const caminho = useMemo(() => markPath(LADO), []);
-
-  // Traço 0 → 60%; o preenchimento entra de 40% a 85% e leva o contorno embora (55% → 90%);
-  // o nome fecha de 65% a 100%. As etapas se sobrepõem para a construção não ter degraus.
-  const fim = useDerivedValue(() => suave(t.get() / 0.6));
-  const contorno = useDerivedValue(() => (reduzido ? 0 : 1 - suave((t.get() - 0.55) / 0.35)));
-  // Reduzido: o canvas fica estático (opacidade 1) e o fade é da View por fora — um valor que muda
-  // antes do primeiro quadro do Skia não repinta, e a marca não aparecia.
-  const miolo = useDerivedValue(() => (reduzido ? 1 : suave((t.get() - 0.4) / 0.45)));
-  const marcaStyle = useAnimatedStyle(() => ({
-    opacity: reduzido ? t.get() : 1,
-  }));
-  const nome = useDerivedValue(() => (reduzido ? t.get() : suave((t.get() - 0.65) / 0.35)));
-  const nomeStyle = useAnimatedStyle(() => ({
-    opacity: nome.get(),
-    transform: [{ translateY: (1 - nome.get()) * 8 }],
-  }));
-
-  const sai = useAnimatedStyle(() => {
-    const k = Math.min(1, progresso.get() / 0.35);
-    return {
-      opacity: 1 - k,
-      transform: [{ translateY: -k * 36 }, { scale: 1 - k * 0.06 }],
-    };
-  });
-
-  return (
-    <Animated.View style={[styles.palco, sai]} pointerEvents="none">
-      <Animated.View style={[styles.marca, marcaStyle]}>
-        <SkiaCanvas style={styles.marca}>
-          <Path path={caminho} color={theme.onCurtain} opacity={miolo} />
-          <Path
-            path={caminho}
-            style="stroke"
-            strokeWidth={2}
-            strokeJoin="round"
-            color={theme.onCurtain}
-            start={0}
-            end={fim}
-            opacity={contorno}
-          />
-        </SkiaCanvas>
-      </Animated.View>
-      <Animated.View style={[styles.nome, nomeStyle]}>
-        <ThemedText type="title" themeColor="onCurtain">
-          ProOps
-        </ThemedText>
-      </Animated.View>
-    </Animated.View>
   );
 }
 
@@ -562,15 +470,5 @@ const styles = StyleSheet.create({
     // Acima da trava (900). `elevation` é o que ordena de verdade no Android.
     zIndex: 1000,
     elevation: 1000,
-  },
-  // A marca fica no centro da tela; o nome pende ABAIXO dela sem deslocá-la.
-  palco: { width: LADO, height: LADO },
-  marca: { width: LADO, height: LADO },
-  nome: {
-    position: 'absolute',
-    top: LADO + Space.md,
-    left: -80,
-    right: -80,
-    alignItems: 'center',
   },
 });

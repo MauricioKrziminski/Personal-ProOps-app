@@ -109,6 +109,8 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
     // Native color pulses have no completion callback; control-lifetime assertions finish separately.
     withSequence: (...steps: any[]) => steps.at(-1),
     withRepeat: (animation: any) => animation,
+    // O atraso não muda o fim nem o callback: a animação adiada termina como a direta.
+    withDelay: (_ms: number, animation: any) => animation,
     withSpring: (target: number, settings: any, done?: (ok: boolean) => void) => ({ spring: true, target, done, settings }),
     cancelAnimation: (shared: any) => { if (shared.animation) shared.animation.canceled = true; },
     runOnJS: (fn: any) => fn,
@@ -168,6 +170,7 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === '@/hooks/use-theme') return { useTheme: () => ({ curtain: '#0B0B0C' }), useScheme: () => 'light' };
       if (id === '@/hooks/use-lock') return { useLock: () => config.lock };
       if (id === '@/lib/trava-na-tela') return travaNaTelaMod;
+      if (id === '@/components/motion/marca-se-construindo') return { CONSTRUCAO_MS: 1500, MarcaSeConstruindo: () => null };
       if (id === '@/components/motion/session-curtain') return { useCortinaSaindo: () => config.ativo, useCortinaAberta: () => config.aberta ?? false };
       if (id === '@/components/motion/wave-curtain') return { WaveCurtain: 'WaveCurtain' };
       if (id === '@/components/ui/mark') return { Mark: 'Mark' };
