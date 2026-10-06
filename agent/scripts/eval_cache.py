@@ -23,12 +23,17 @@ def hash_prompts_e_schemas() -> str:
     from pydantic import BaseModel
 
     from app.domain import confirm, draft
-    from app.graph import prompts, schemas
+    from app.graph import exemplos, prompts, prompts_v2, schemas
     from app.services import gemini
     from app.tools import atributos
 
     partes: list[str] = []
-    for modulo in (prompts, confirm, draft, atributos, schemas):
+    modulos = (prompts, confirm, draft, atributos, schemas)
+    if prompt_v2_ligado():
+        # v2: os módulos de prompt e o banco de exemplos também decidem o resultado
+        modulos += (prompts_v2,)
+        partes.append("exemplos=" + exemplos.ARQUIVO.read_text(encoding="utf-8"))
+    for modulo in modulos:
         for nome, valor in sorted(vars(modulo).items()):
             if isinstance(valor, str) and len(valor) > 40 and not nome.startswith("__"):
                 partes.append(f"{modulo.__name__}.{nome}={valor}")
@@ -37,6 +42,22 @@ def hash_prompts_e_schemas() -> str:
                 partes.append(f"{modulo.__name__}.{nome}="
                               + json.dumps(valor.model_json_schema(), sort_keys=True))
     return gemini.versao_do_prompt("\n".join(partes))
+
+
+def prompt_v2_ligado() -> bool:
+    from app.graph import prompts_v2
+
+    return prompts_v2.ligado()
+
+
+def ligar_prompt_v2() -> None:
+    """`--prompt-v2`: liga a flag SÓ nesta execução (o `Settings` é cacheado: limpa e relê o env)."""
+    import os
+
+    from app.config import get_settings
+
+    os.environ["AGENT_PROMPT_V2"] = "1"
+    get_settings.cache_clear()
 
 
 def modelos() -> dict[str, str]:
@@ -51,7 +72,10 @@ class CacheDeAvaliacao:
         self.ativo = ativo
         self.arquivo = PASTA / f"{nome}.json"
         self.hits = 0
-        self._sufixo = json.dumps([hash_prompts_e_schemas(), modelos()], sort_keys=True)
+        # v1 e v2 têm chaves DIFERENTES e convivem no mesmo arquivo; com a flag desligada a chave
+        # é a de antes do v2 existir.
+        extra = [{"prompt_v2": True}] if prompt_v2_ligado() else []
+        self._sufixo = json.dumps([hash_prompts_e_schemas(), modelos(), *extra], sort_keys=True)
         self._dados: dict = {}
         if ativo and self.arquivo.exists():
             try:

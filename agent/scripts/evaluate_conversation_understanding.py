@@ -461,6 +461,10 @@ CASES = [
 
 
 async def main(args):
+    if args.prompt_v2:
+        from scripts.eval_cache import ligar_prompt_v2
+
+        ligar_prompt_v2()
     results = []
     cache = CacheDeAvaliacao("conversation_understanding", ativo=not args.sem_cache)
     selected = set(args.cases.split(",")) if args.cases else None
@@ -532,6 +536,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output")
     parser.add_argument("--cases")
+    parser.add_argument("--prompt-v2", action="store_true",
+                        help="liga AGENT_PROMPT_V2 só nesta execução (cache separado do v1)")
     parser.add_argument("--sem-cache", action="store_true",
                         help="ignora e não grava o cache de resultados (agent/.eval-cache/)")
     args = parser.parse_args()

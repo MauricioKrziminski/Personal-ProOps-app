@@ -911,6 +911,12 @@ def secoes():
 
 async def main(args):
     resources.db.fetch = _sem_banco
+    if args.prompt_v2:
+        from scripts.eval_cache import ligar_prompt_v2
+
+        ligar_prompt_v2()
+        print("⚠️  --prompt-v2: prompts v2 (módulos + exemplos por embedding) SÓ nesta execução; "
+              "o cache de resultados é separado do v1.\n")
 
     async def _sem_previa(*_a, **_k):
         raise Level1Error("sem banco na avaliação")
@@ -994,6 +1000,8 @@ if __name__ == "__main__":
     parser.add_argument("--output", help="grava o JSON completo aqui")
     parser.add_argument("--sem-cache", action="store_true",
                         help="ignora e não grava o cache de resultados (agent/.eval-cache/)")
+    parser.add_argument("--prompt-v2", action="store_true",
+                        help="liga AGENT_PROMPT_V2 só nesta execução (cache separado do v1)")
     parser.add_argument(
         "--barato", action="store_true",
         help="roda o gate no Flash-Lite (grátis até 500/dia). Para iterar, "
