@@ -66,7 +66,19 @@ def _detalhe(proposto, frase, acao):
     return (dito or "").lower() or None
 
 
+async def _detalhes_de_exemplo(_state):
+    # O parse VÊ os detalhes existentes no prompt (`nodes._detalhes_do_turno`); sem banco, a
+    # sonda entrega os mesmos `DETALHES` que a validação abaixo considera existentes.
+    return [{"parent_key": "mercado", "name": d} for d in DETALHES]
+
+
+async def _sem_contas(_state):
+    return []
+
+
 async def rodar(frase: str):
+    nodes._detalhes_do_turno = _detalhes_de_exemplo
+    nodes._contas_do_turno = _sem_contas
     saida = await nodes.finance_node({**BASE, "text": frase, "messages": [{"role": "user", "content": frase}]})
     acoes = [a for a in saida.get("finance_actions") or []
              if a.get("type") in {"create_expense", "create_income", "create_installment_purchase"}]
