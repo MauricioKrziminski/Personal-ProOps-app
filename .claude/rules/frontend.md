@@ -21,6 +21,10 @@ Expo SDK 57 (managed), código em `src/`, paths `@/*` → `src/*` e `@/assets/*`
 ## Dados (TanStack Query)
 
 - Todo acesso a dados via hooks em `src/hooks/` seguindo o padrão de `src/hooks/use-items.ts`:
+  - **`useQuery`/`useInfiniteQuery` vêm de `src/lib/consulta-em-foco.ts`, nunca do pacote**
+    (06/10/2026): fora de foco a consulta não assina o cache (`subscribed`), então realtime e
+    invalidação só a marcam velha e ela refaz ao voltar ao foco. Antes, cada evento refazia as
+    consultas de todas as telas montadas por baixo. `consulta-em-foco.test.ts` prende o import.
   - `queryKey` por recurso (ex.: `['transactions', filtros]`), `useQuery` com select tipado no supabase-js.
   - **Realtime**: usar `useRealtimeInvalidate(tabela, queryKey)` (já existe em `use-items.ts`) para invalidar quando itens chegam via WhatsApp.
   - Mutações com `useMutation` + `invalidateQueries` no `onSuccess`. Inserts/updates diretos via supabase-js — RLS own-rows protege. **Não existe Edge Function neste projeto**; o que precisa de servidor vai para o agente, por `agentFetch` (`src/lib/agent-api.ts`), que manda o JWT e deixa o servidor tirar o usuário do `sub` — nunca do corpo.

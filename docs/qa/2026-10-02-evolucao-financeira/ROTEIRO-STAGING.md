@@ -71,6 +71,18 @@ cada ponto estão no `fNN/aceite.md` (ou `registro-nativo.md` em F01–F05).
 | Logado, feche o app, ligue o modo avião e abra depois de mais de 1 h | A abertura | Em ~12 s aparece "Sem conexão" com "Tentar de novo", nunca a tela de login; com a rede de volta, entra sem pedir senha (tocando ou sozinho). Numa rede lenta mas funcionando o aviso pode piscar e sumir sozinho quando a sessão chega: é esperado |
 | Metas → Plano de metas → "Aporte inicial" | Digite 75,00 e 1.234,56 e espere a prévia recalcular | Todos os dígitos visíveis (antes o primeiro sumia: 75,00 aparecia 5,00) |
 
+## Melhorias de 06/10 (pedidas depois do teste)
+
+| Onde | O que fazer | O que deve acontecer |
+|---|---|---|
+| Abrir o app (e desbloquear) | Abra o app do zero | A marca se desenha (contorno, preenchimento) e o nome "ProOps" aparece embaixo; nada demora mais do que antes. A tela nativa só de fundo escuro vale da build 1.7.0 em diante |
+| Lançar → **Por voz** | Toque | A folha já abre gravando (o botão espera enquanto o microfone liga). Sem som, o campo "O que você falou" tem respiro e cresce com o texto |
+| Por voz → **Montar lançamento** | Fale e monte | Responde em poucos segundos; se o modelo principal da IA travar, a reserva assume em até ~10 s (antes esperava 30 s) |
+| **Perfil** | Role a tela | Conta → Plano → Finanças → Notificações → Segurança e aparência → Ajuda e app → Sair. Bloqueio é interruptor; "Depois de sair do app" e "Tema" mostram o valor e abrem o menu |
+| Formulário de lançamento / Fatura | Veja os botões secundários | "Salvar como favorito" + "Salvar e criar outro" e "Marcar como paga" + "Jogar para a próxima" ficam lado a lado; com fonte grande, um por linha |
+| Abrir um lançamento | Toque numa linha de qualquer lista | Abre na hora, com os dados da lista |
+| Hoje e Finanças | Troque de aba e volte | O topo aparece primeiro; os blocos de baixo entram no lugar. Uma aba que você não está vendo não recarrega; ao voltar, atualiza |
+
 ## Pelo WhatsApp / Agente
 
 Os recursos acima são do app. O que o agente passa a fazer pela conversa entra aqui por lotes,
