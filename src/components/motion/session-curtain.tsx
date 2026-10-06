@@ -123,9 +123,10 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   const reduzido = useReducedMotion();
   const { height: alturaDaTela } = useWindowDimensions();
   const progresso = useSharedValue(0);
+  /** O relógio da marca (0 → 1): mora aqui para o `aoLayout` o disparar sem esperar um render. */
+  const construcao = useSharedValue(0);
   const [fase, setFase] = useState<FaseDaCortina>('abertura');
   const [onda, setOnda] = useState<Onda>(ONDA_DA_ABERTURA);
-  const [pintada, setPintada] = useState(false);
   const [aberturaFeita, setAberturaFeita] = useState(false);
   const [camadaMontada, setCamadaMontada] = useState(false);
 
@@ -267,15 +268,70 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     return ponto;
   }, []);
 
+  /** Acorda a espera da abertura quando `pronto` ou o teto mudam — sem sondar a cada 50 ms. */
+  const acordar = useRef<(() => void) | null>(null);
+
   const marcarPronto = useCallback((destino: 'app' | 'conta') => {
     if (pronto.current.valor) return;
     pronto.current.valor = true;
     pronto.current.destino = destino;
+    acordar.current?.();
   }, []);
 
   const segurarAbertura = useCallback(() => {
     pronto.current.segurando = true;
+    acordar.current?.();
   }, []);
+
+  /*
+    A abertura roda UMA vez, no instante em que a camada fez layout — direto do `aoLayout`, sem
+    passar por um render do React: com o JS ocupado montando a árvore do app, `setState` + efeito
+    atrasavam o primeiro traço da marca (medido no dev: ~2 s entre o layout e o traço). O relógio da
+    marca é um valor da UI thread, e o mínimo de 0,9 s conta DESTE instante (a marca está na tela).
+    O teto conta daqui: com o app pronto antes da construção acabar, a marca já cabe no mínimo;
+    com o app atrasado, o teto abre assim mesmo — tela de login atrasada é melhor que splash
+    eterno. Com a trava pedindo a senha (`segurarAbertura`) o teto é longo: a marca fica enquanto
+    o sistema pergunta e a tinta sobe direto no app desbloqueado.
+  */
+  const comecou = useRef(false);
+  const abertura = useCallback(() => {
+    if (comecou.current) return;
+    comecou.current = true;
+    const desde = Date.now();
+    construcao.set(
+      withTiming(1, {
+        duration: reduzido ? Motion.duration.base : CONSTRUCAO_MS,
+        easing: Easing.linear,
+      }),
+    );
+
+    void (async () => {
+      const p = pronto.current;
+      // Dorme até o teto OU até alguém avisar (pronto/segurar); o teto é relido a cada volta.
+      while (!p.valor) {
+        const falta = esperaDaAbertura(desde, Date.now(), p.segurando);
+        if (falta <= 0) break;
+        await new Promise<void>((ok) => {
+          const timer = setTimeout(ok, falta);
+          acordar.current = () => {
+            clearTimeout(timer);
+            ok();
+          };
+        });
+      }
+      acordar.current = null;
+      // A marca não pode ser um lampejo: a passagem "marca → app" acontece em toda abertura
+      // (também com Reduzir Movimento — ficar parada na tela não é movimento).
+      await dormir(esperaDaMarca(desde, Date.now()));
+      // Teto estourado deixa o destino em `app`: revelar tudo é o lado seguro.
+      const capa = pronto.current.destino === 'conta';
+      await descobrir(
+        capa ? { ...ONDA_DA_ABERTURA, ate: 'capa' } : ONDA_DA_ABERTURA,
+        Motion.curtain.duration,
+      );
+      setAberturaFeita(true);
+    })();
+  }, [construcao, descobrir, reduzido]);
 
   const esconderSplash = useCallback(() => {
     const s = splash.current;
@@ -284,9 +340,9 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     // A marca começa a se desenhar JÁ, junto com a saída do nativo — esperar a promessa do
     // `hideAsync()` (no Android ela inclui o fade de 300 ms) deixava a tinta parada antes do
     // traço começar (06/10/2026, "tem um delay para ele começar a animar a logo").
-    setPintada(true);
+    abertura();
     SplashScreen.hideAsync().catch(() => {});
-  }, []);
+  }, [abertura]);
 
   useEffect(() => {
     /*
@@ -301,37 +357,6 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       fade: false,
     });
   }, []);
-
-  /*
-    A abertura roda UMA vez, quando a camada pintou. O teto conta daqui: com o app pronto
-    antes da construção acabar, a marca já cabe no mínimo de 0,9 s; com o app atrasado, o teto
-    abre assim mesmo — tela de login atrasada é melhor que splash eterno. Com a trava pedindo a
-    senha (`segurarAbertura`) o teto é longo: a marca fica enquanto o sistema pergunta e a tinta
-    sobe direto no app desbloqueado.
-  */
-  const comecou = useRef(false);
-  useEffect(() => {
-    if (!pintada || comecou.current) return;
-    comecou.current = true;
-    const desde = Date.now();
-
-    void (async () => {
-      // ponytail: espera por sondagem (50 ms, só durante a abertura) — o teto muda de tamanho
-      // quando a trava segura, e um laço relê isso sem timer para rearmar.
-      const p = pronto.current;
-      while (!p.valor && esperaDaAbertura(desde, Date.now(), p.segurando) > 0) await dormir(50);
-      // A marca não pode ser um lampejo: a passagem "marca → app" acontece em toda abertura
-      // (também com Reduzir Movimento — ficar parada na tela não é movimento).
-      await dormir(esperaDaMarca(desde, Date.now()));
-      // Teto estourado deixa o destino em `app`: revelar tudo é o lado seguro.
-      const capa = pronto.current.destino === 'conta';
-      await descobrir(
-        capa ? { ...ONDA_DA_ABERTURA, ate: 'capa' } : ONDA_DA_ABERTURA,
-        Motion.curtain.duration,
-      );
-      setAberturaFeita(true);
-    })();
-  }, [pintada, descobrir]);
 
   const api = useMemo<CortinaApi>(
     () => ({
@@ -378,7 +403,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
                 progresso={progresso}
                 reduzido={reduzido}
                 comMarca={!aberturaFeita}
-                pintada={pintada}
+                construcao={construcao}
                 onLayout={aoLayout}
               />
             )}
@@ -395,7 +420,7 @@ function Camada({
   progresso,
   reduzido,
   comMarca,
-  pintada,
+  construcao,
   onLayout,
 }: {
   fase: FaseDaCortina;
@@ -403,7 +428,7 @@ function Camada({
   progresso: SharedValue<number>;
   reduzido: boolean;
   comMarca: boolean;
-  pintada: boolean;
+  construcao: SharedValue<number>;
   onLayout: () => void;
 }) {
   const theme = useTheme();
@@ -431,7 +456,7 @@ function Camada({
           style={StyleSheet.absoluteFill}
         />
       )}
-      {comMarca ? <MarcaDaAbertura progresso={progresso} pintada={pintada} reduzido={reduzido} /> : null}
+      {comMarca ? <MarcaDaAbertura progresso={progresso} t={construcao} reduzido={reduzido} /> : null}
     </View>
   );
 }
@@ -456,26 +481,15 @@ const suave = (x: number) => {
  */
 function MarcaDaAbertura({
   progresso,
-  pintada,
+  t,
   reduzido,
 }: {
   progresso: SharedValue<number>;
-  pintada: boolean;
+  t: SharedValue<number>;
   reduzido: boolean;
 }) {
   const theme = useTheme();
-  const t = useSharedValue(0);
   const caminho = useMemo(() => markPath(LADO), []);
-
-  useEffect(() => {
-    if (!pintada) return;
-    t.set(
-      withTiming(1, {
-        duration: reduzido ? Motion.duration.base : CONSTRUCAO_MS,
-        easing: Easing.linear,
-      }),
-    );
-  }, [pintada, reduzido, t]);
 
   // Traço 0 → 58%; o preenchimento entra de 42% a 78% e leva o contorno embora; o nome fecha.
   const fim = useDerivedValue(() => suave(t.get() / 0.58));
