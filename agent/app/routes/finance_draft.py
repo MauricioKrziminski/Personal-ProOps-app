@@ -17,12 +17,14 @@ from calendar import monthrange
 from datetime import date
 from typing import Annotated, Literal
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends
 from pydantic import Field
 
 from app import conversation, db
 from app.auth import current_user
+from app.domain import atributos as dom_atributos
 from app.domain import matching
 from app.domain.dates import format_date_br
 from app.domain.money import cents_to_brl
@@ -31,21 +33,37 @@ from app.services import gemini
 from app.routes.chat import MAX_CONTENT, Corpo
 from app.routes.chat import _erro_audio as _erro
 from app.tools import finance
+from app.tools.atributos import forma_da_fala
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/internal/finance", tags=["finance"])
 
 _CRIA = {"create_expense", "create_income", "create_installment_purchase", "mark_paid"}
 # Forma de pagamento (F01): só a que a pessoa DISSE; é metadado, nunca decide receita/despesa.
-# "Pix no crédito" é o Pix pago no cartão (o formulário pede os juros do Pix).
-_FORMAS = (("debit", re.compile(r"\bd[eé]bito\b", re.I)), ("boleto", re.compile(r"\bboleto\b", re.I)))
+# Vem da MESMA segunda leitura do WhatsApp (`tools.atributos.forma_da_fala`, com o veto de
+# ancoragem) — não há regex própria aqui. "Pix no crédito" é o Pix pago no cartão (o formulário
+# pede os juros do Pix).
 # "3x de 100", "3 vezes de 100", "300 em 3x", "300 reais em 3 vezes": a unidade está DITA.
 _UNIDADE_DITA = re.compile(
     r"\d\s*(?:x|vezes|parcelas)\s*de\s|\d[\d.,]*\s*(?:reais\s*)?(?:em|parcelad\w*\s+em)\s*\d+\s*(?:x|vezes)"
     r"|\bcada\b|\btotal\b",
     re.IGNORECASE,
 )
-_PIX_NO_CREDITO = re.compile(r"\bpix\b.*\bcr[eé]dito\b|\bcr[eé]dito\b.*\bpix\b", re.IGNORECASE)
+FUSO_PADRAO = "America/Sao_Paulo"
+
+
+def _fuso_valido(nome: str) -> str:
+    """O nome canônico do fuso, ou o padrão: o texto do corpo não vai ao prompt sem ser fuso."""
+    try:
+        return ZoneInfo(nome.strip()).key
+    except (ZoneInfoNotFoundError, ValueError, OSError):
+        return FUSO_PADRAO
+
+
+def _pede_forma(a: dict) -> bool:
+    """Gasto único, sem repetição e sem parcelas: o único caso em que o rascunho leva a forma."""
+    tipo = "create_expense" if a["type"] == "mark_paid" else a["type"]
+    return tipo == "create_expense" and not a.get("recurrence")
 
 
 class PedidoDeRascunho(Corpo):
@@ -87,7 +105,9 @@ def _contas_no_texto(texto: str, contas: list[dict]) -> list[dict]:
     return achadas
 
 
-async def montar_rascunho(workspace_id, texto: str, acoes: list[dict], hoje: date) -> RascunhoOut:
+async def montar_rascunho(
+    workspace_id, texto: str, acoes: list[dict], hoje: date, forma: str | None = None
+) -> RascunhoOut:
     a = dict(acoes[0])
     perguntas: list[str] = []
     if a["type"] == "mark_paid":
@@ -135,20 +155,13 @@ async def montar_rascunho(workspace_id, texto: str, acoes: list[dict], hoje: dat
             perguntas.append("Não consegui montar essa repetição: confira a frequência.")
 
     # conta/cartão: um registro ou nada. "Pix no crédito" é compra no CARTÃO (com os juros do Pix).
-    pix = bool(_PIX_NO_CREDITO.search(texto))
+    pix = forma == "pix" and dom_atributos.pix_no_credito(texto)
     so_cartao = parcelada or pix
     if pix:
         perguntas.append("Pix no crédito: confira o cartão e os juros do Pix.")
-    if kind == "expense" and tipo == "uma" and not parcelada:
-        if pix or re.search(r"\bpix\b", texto, re.I):
-            params["paymentMethod"] = "pix"
-        elif re.search(r"\bcr[eé]dito\b", texto, re.I):
-            params["paymentMethod"] = "credit"
-            so_cartao = True
-        else:
-            for metodo, padrao in _FORMAS:
-                if padrao.search(texto):
-                    params["paymentMethod"] = metodo
+    if forma and kind == "expense" and tipo == "uma" and not parcelada:
+        params["paymentMethod"] = forma
+        so_cartao = so_cartao or forma == "credit"
     nome = a.get("account")
     if nome and not matching.sem_conta_explicita(nome):
         achada = await finance.resolve_account(workspace_id, nome, only_cards=so_cartao)
@@ -189,9 +202,11 @@ async def rascunho(body: PedidoDeRascunho, user_id: Annotated[UUID, Depends(curr
         if limite == conversation.MUITAS:
             raise _erro(429, "rate_limit", "Muitas mensagens em pouco tempo. Aguarda um pouquinho.")
         raise _erro(402, "plan_limit", limite)
+    fuso = _fuso_valido(body.timezone)
     estado = {
         "text": body.text,
-        "timezone": body.timezone,
+        "timezone": fuso,
+        "workspace_id": perfil["workspace_id"],  # as contas do espaço entram no prompt
         "messages": None,
         "agora_local": f"{body.today.isoformat()}T12:00:00",
     }
@@ -200,12 +215,15 @@ async def rascunho(body: PedidoDeRascunho, user_id: Annotated[UUID, Depends(curr
     except Exception:  # noqa: BLE001
         log.warning("Falha na interpretação do rascunho por voz")
         raise _erro(502, "draft_failed", "Não consegui entender agora. Tente de novo.") from None
+    acoes = [x for x in saida.get("finance_actions", []) if x.get("type") in _CRIA]
+    forma, chamadas = (None, 0)
+    if acoes and _pede_forma(acoes[0]):
+        forma, chamadas = await forma_da_fala(body.text, acoes[0])
     await db.record_ai_event(
         user_id=user_id, workspace_id=perfil["workspace_id"], channel="app",
         model=gemini.GEMINI_PARSE, confidence=saida.get("confidence"),
-        result={"finance_actions": saida.get("finance_actions", []), "llm_calls": 1, "draft": True},
+        result={"finance_actions": saida.get("finance_actions", []), "llm_calls": 1 + chamadas, "draft": True},
     )
-    acoes = [x for x in saida.get("finance_actions", []) if x.get("type") in _CRIA]
     if not acoes:
         raise _erro(422, "no_launch", "Não entendi um lançamento. Diga o que gastou ou recebeu.")
-    return await montar_rascunho(perfil["workspace_id"], body.text, acoes, body.today)
+    return await montar_rascunho(perfil["workspace_id"], body.text, acoes, body.today, forma)

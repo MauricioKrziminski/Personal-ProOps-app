@@ -82,6 +82,26 @@ async def _extrair_real(texto: str, linhas: list[str]) -> AtributosLote:
 _extrair = _extrair_real  # o nome que os testes e a sonda trocam
 
 
+async def forma_da_fala(texto: str, acao: dict) -> tuple[str | None, int]:
+    """A forma de pagamento de UM lançamento dito (rascunho por voz): (forma, chamadas ao modelo).
+
+    A MESMA segunda leitura do WhatsApp (`_extrair`) e o mesmo veto de ancoragem
+    (`dom.forma_proposta`): a forma que a frase não sustenta é descartada. Sem nenhuma pista na
+    frase nem chama o modelo; falha, timeout ou 429 = sem forma (nunca derruba o rascunho).
+    """
+    if not dom.tem_alguma_pista(texto):
+        return None, 0
+    cat = guards.clean_category(acao.get("category"))
+    linha = f"0: gasto | {acao.get('description') or '-'} | categoria {cat or '-'}"
+    try:
+        lote = await _extrair(texto, [linha])
+    except Exception as err:  # noqa: BLE001
+        log.warning("forma de pagamento da fala ignorada: %s", err)
+        return None, 0
+    item = next((i for i in lote.itens if i.indice == 0), None)
+    return (dom.forma_proposta(item.payment_method, texto) if item else None), 1
+
+
 def _tipo_da_conta(acao: FinanceAction, alvo: dict, contas: dict[str, str]) -> str | None:
     if acao.type == FinanceActionType.CREATE_INSTALLMENT_PURCHASE:
         return "credit_card"  # a compra parcelada só existe em cartão (`conta_citada(only_cards)`)

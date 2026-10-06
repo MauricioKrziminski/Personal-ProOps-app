@@ -265,7 +265,8 @@ async def _contas_do_turno(state: AgentState) -> list[dict]:
     workspace_id = state.get("workspace_id")
     if not workspace_id:
         return []
-    chave = (str(workspace_id), state.get("source_message_id"))
+    # sem id de mensagem (rascunho por voz) não há "turno" para chavear: lê sempre
+    chave = (str(workspace_id), state.get("source_message_id")) if state.get("source_message_id") else None
     if chave in _CONTAS_DO_TURNO:
         return _CONTAS_DO_TURNO[chave]
     from app import db
@@ -275,9 +276,10 @@ async def _contas_do_turno(state: AgentState) -> list[dict]:
     except Exception:  # noqa: BLE001 — sem a lista o casamento por texto segue valendo
         log.warning("não consegui listar as contas; o turno segue sem elas")
         return []
-    if len(_CONTAS_DO_TURNO) >= 64:
-        _CONTAS_DO_TURNO.pop(next(iter(_CONTAS_DO_TURNO)))
-    _CONTAS_DO_TURNO[chave] = linhas
+    if chave:
+        if len(_CONTAS_DO_TURNO) >= 64:
+            _CONTAS_DO_TURNO.pop(next(iter(_CONTAS_DO_TURNO)))
+        _CONTAS_DO_TURNO[chave] = linhas
     return linhas
 
 
