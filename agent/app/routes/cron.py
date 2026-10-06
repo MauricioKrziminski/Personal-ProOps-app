@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends
 
 from app import db
 from app.domain.dates import now_utc
-from app.jobs import alerts, checkpoints, reminders, scheduler
+from app.jobs import alerts, checkpoints, embeddings, reminders, scheduler
 from app.routes.worker import sweep
 from app.security import require_internal
 
@@ -69,8 +69,13 @@ async def run_reminders() -> dict:
         novas = await scheduler.materialize_horizon(now_utc(), so_novas=True)
     except Exception:  # noqa: BLE001
         novas = {"error": "materializar as novas falhou"}
+    # Vetores da busca semântica de lançamento: SELECT barato por minuto, Gemini só se houver linha.
+    try:
+        vetores = await embeddings.run()
+    except Exception:  # noqa: BLE001
+        vetores = {"error": "vetores de lançamento falharam"}
     return {"reminders": lembretes, "sweep": resgate, "recorrentes_novas": novas,
-            "fila": await checar_fila()}
+            "embeddings": vetores, "fila": await checar_fila()}
 
 
 @router.post("/finance-scheduler")

@@ -83,6 +83,10 @@ MODELOS: dict[str, str] = {
     # `domain/draft.py`). Era GEMINI_ESCALATE, definido e ligado a NADA desde que
     # o escalonamento automático saiu.
     "gate": "gemini-3.7-flash",
+    # Vetores da busca semântica de lançamento (`services/embeddings.py`). Só texto; 768
+    # dimensões normalizadas à mão. Fixado como os demais: trocar de modelo muda o espaço dos
+    # vetores, e `transaction_embeddings.model` faz o job reembedar tudo.
+    "embedding": "gemini-embedding-001",
 }
 
 log = logging.getLogger(__name__)
@@ -128,6 +132,8 @@ GEMINI_GATE = MODELOS["gate"]
 PRECOS_USD_POR_MILHAO: dict[str, tuple[float, float]] = {
     "gemini-3.1-flash-lite": (0.25, 1.50),
     "gemini-3.7-flash": (0.75, 3.75),
+    # Embedding: só entrada (US$ 0,15 / 1 M de tokens, tabela oficial lida em 06/10/2026).
+    "gemini-embedding-001": (0.15, 0.0),
 }
 
 

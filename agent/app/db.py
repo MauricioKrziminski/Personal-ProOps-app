@@ -1454,3 +1454,57 @@ async def cycle(workspace_id, hoje: str) -> dict[str, Any] | None:
         workspace_id,
         hoje,
     )
+
+
+# ---------------------------------------------------------------------------
+# busca semântica de lançamento (`public.transaction_embeddings`, migration 20261006120000)
+# ---------------------------------------------------------------------------
+
+
+async def transacoes_semelhantes(workspace_id, vetor: str, limite: int, de, ate) -> list[dict[str, Any]]:
+    """Os lançamentos do workspace mais parecidos com `vetor` (literal do pgvector), com a
+    similaridade de cosseno. O workspace é SEMPRE o do contexto — nunca um id do modelo."""
+    return await fetch(
+        "select transaction_id, similaridade "
+        "from private.transacoes_semelhantes(%s, %s::extensions.vector, %s, %s, %s)",
+        workspace_id, vetor, limite, de, ate,
+    )
+
+
+async def transacoes_sem_vetor(modelo: str, limite: int) -> list[dict[str, Any]]:
+    """Lançamentos sem vetor, com texto mudado (hash) ou vetor de outro modelo — os mais novos
+    primeiro. É manutenção do serviço, de todos os workspaces: o único caminho que não filtra
+    por um workspace só, e ele só LÊ texto de lançamento para vetorizá-lo no mesmo workspace.
+    O texto e o hash saem do banco (`private.texto_de_busca`): uma montagem só."""
+    return await fetch(
+        """
+        select t.id as transaction_id, t.workspace_id, x.texto, md5(x.texto) as hash
+        from public.transactions t
+        cross join lateral (
+          select private.texto_de_busca(t.description, t.merchant, t.category) as texto) x
+        left join public.transaction_embeddings e on e.transaction_id = t.id
+        where x.texto <> ''
+          and (e.transaction_id is null or e.content_hash <> md5(x.texto)
+               or e.model <> %s or e.workspace_id <> t.workspace_id)
+        order by t.occurred_at desc, t.created_at desc
+        limit %s
+        """,
+        modelo, limite,
+    )
+
+
+async def gravar_vetores(linhas: list[dict[str, Any]], modelo: str) -> int:
+    """Upsert dos vetores (`linhas` = transaction_id, workspace_id, hash, vetor literal)."""
+    for linha in linhas:
+        await execute(
+            """
+            insert into public.transaction_embeddings
+              (transaction_id, workspace_id, embedding, model, content_hash, updated_at)
+            values (%s, %s, %s::extensions.vector, %s, %s, now())
+            on conflict (transaction_id) do update
+              set workspace_id = excluded.workspace_id, embedding = excluded.embedding,
+                  model = excluded.model, content_hash = excluded.content_hash, updated_at = now()
+            """,
+            linha["transaction_id"], linha["workspace_id"], linha["vetor"], modelo, linha["hash"],
+        )
+    return len(linhas)

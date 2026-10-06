@@ -31,6 +31,7 @@ from app.domain.correcao_plano import (
     recusa_de_conversao,
 )
 from app.domain.reference import clean_term, wants_latest, wants_whole_plan
+from app.services import embeddings
 from app.tools import finance
 from app.tools.base import FATURA_ABERTA
 from app.tools.guards import Level1Error
@@ -302,6 +303,61 @@ async def por_texto(fonte: str, workspace_id, termo: str) -> tuple[Status, list[
     return veredito(linhas, cfg["label"], cfg["table"], cfg.get("detalhe"))
 
 
+# ⚠️ PROVISÓRIOS até `scripts/probe_busca_semantica.py` rodar com o Gemini real: chutes
+# conservadores para o cosseno do `gemini-embedding-001` (RETRIEVAL_QUERY x RETRIEVAL_DOCUMENT) a
+# 768 dimensões, onde frase curta contra documento curto costuma dar 0,5–0,8 se há relação.
+# Errar para CIMA só devolve "não achei" (o comportamento de hoje); errar para baixo oferece um
+# lançamento errado — que a pessoa ainda precisa confirmar no SIM, mas é pergunta à toa.
+SIMILARIDADE_MINIMA = 0.65
+# Diferença para o segundo colocado a partir da qual o primeiro vale sozinho (`found`). Abaixo
+# disso são vários próximos: `ambiguous`, com quem estiver a até esta distância do topo.
+FOLGA_MINIMA = 0.05
+MAX_SEMANTICOS = 5  # candidatos no empate (a lista fica curta de propósito)
+_PROFUNDIDADE_SEMANTICA = 10  # vizinhos pedidos ao banco; a janela tem ~40 e filtra depois
+
+
+async def _por_semantica(workspace_id, termo: str, janela: list[dict], action: FinanceAction) -> list[dict]:
+    """Linhas da JANELA que combinam com `termo` por sentido, ou `[]` (= "não achei").
+
+    O vetor da consulta e a busca no banco são do workspace do contexto. O resultado é
+    intersectado com as linhas da janela — as mesmas que a busca por texto usaria — e com a data
+    dita, se houver. Qualquer falha (sem vetor, 429, banco) devolve `[]`: cai no "não achei" de
+    sempre, nunca vira erro para a pessoa.
+    """
+    if not janela:
+        return []
+    try:
+        vetor = await embeddings.embed_consulta(termo)
+        if vetor is None:
+            return []
+        if action.occurred_at:
+            de = ate = action.occurred_at
+        else:
+            dias = sorted(str(t["occurred_at"]) for t in janela)
+            de, ate = dias[0], dias[-1]
+        achados = await db.transacoes_semelhantes(
+            workspace_id, embeddings.literal(vetor), _PROFUNDIDADE_SEMANTICA, de, ate
+        )
+    except Exception:  # noqa: BLE001
+        return []
+    por_id = {str(t["id"]): t for t in janela}
+    boas = sorted(
+        (
+            (float(a["similaridade"]), por_id[str(a["transaction_id"])])
+            for a in achados
+            if str(a["transaction_id"]) in por_id and float(a["similaridade"]) >= SIMILARIDADE_MINIMA
+        ),
+        key=lambda par: par[0],
+        reverse=True,
+    )
+    if not boas:
+        return []
+    if len(boas) == 1 or boas[0][0] - boas[1][0] >= FOLGA_MINIMA:
+        return [boas[0][1]]
+    topo = boas[0][0]
+    return [t for s, t in boas if topo - s < FOLGA_MINIMA][:MAX_SEMANTICOS]
+
+
 async def por_transacao(
     workspace_id, action: FinanceAction, quer_recente: bool
 ) -> tuple[Status, list[dict]]:
@@ -359,7 +415,16 @@ async def por_transacao(
             # último lançamento da nuuvem") o mesmo `filtrou=False` caía em `linhas[:1]` e
             # devolvia `found` na transação mais recente — um DELETE confirmado com uma frase
             # que nomeava outro lançamento.
-            return "none", []
+            #
+            # A ÚNICA exceção é o termo que não casa por texto mas casa por SENTIDO ("almoço" →
+            # "Restaurante Fulano"): `_por_semantica` só devolve candidatos com folga clara, e o
+            # resultado continua indo ao `interrupt()`, onde a pessoa lê o lançamento e confirma.
+            # Sem termo (antecedente, recência) a semântica nunca é consultada: este ramo só
+            # existe dentro de `if termo`.
+            semanticos = await _por_semantica(workspace_id, termo, linhas, action)
+            if not semanticos:
+                return "none", []
+            linhas, filtrou = semanticos, True
     if action.occurred_at:
         por_data = [t for t in linhas if str(t["occurred_at"]) == action.occurred_at]
         if por_data:
