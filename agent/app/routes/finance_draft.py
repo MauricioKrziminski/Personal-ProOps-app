@@ -214,6 +214,7 @@ async def rascunho(body: PedidoDeRascunho, user_id: Annotated[UUID, Depends(curr
         saida = await nodes.finance_node(estado)
     except Exception:  # noqa: BLE001
         log.warning("Falha na interpretação do rascunho por voz")
+        await conversation.soltar_reserva()  # interpretação que falhou não consome a cota
         raise _erro(502, "draft_failed", "Não consegui entender agora. Tente de novo.") from None
     acoes = [x for x in saida.get("finance_actions", []) if x.get("type") in _CRIA]
     forma, chamadas = (None, 0)

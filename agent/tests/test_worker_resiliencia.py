@@ -299,3 +299,28 @@ async def test_lembrete_com_trava_de_outra_rodada_nao_e_enviado(monkeypatch):
 
     assert await reminders.run() == {"due": 1, "sent": 0, "given_up": 0}
     assert enviados == []
+
+
+async def test_turno_sem_modelo_devolve_a_vaga_da_cota(monkeypatch):
+    """Ilegível, arquivo grande, resposta do checkpoint e erro não chamam o modelo: a vaga que o
+    `check_limits` reservou volta, senão a cota da hora fica presa por minutos."""
+    soltas: list[int] = []
+
+    async def soltar():
+        soltas.append(1)
+
+    async def nada(_lote):
+        return None
+
+    async def grande(_lote):
+        return {"text": "", "media": None, "raw_texts": [], "clicked_id": None, "grande_demais": True}
+
+    async def do_checkpoint(_s, **_k):
+        return "já respondido"
+
+    for extract, retry, recover in ((nada, 0, None), (grande, 0, None), (nada, 1, do_checkpoint)):
+        _preparar(monkeypatch, [_msg(retry)], run_turn=None, recover=recover)
+        monkeypatch.setattr(worker, "_extract_batch", extract)
+        monkeypatch.setattr(conversation, "soltar_reserva", soltar)
+        await worker.process_thread("t1")
+    assert len(soltas) == 3

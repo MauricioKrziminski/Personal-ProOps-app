@@ -7,7 +7,6 @@ tocar em lógica de negócio.
 
 from __future__ import annotations
 
-import importlib
 import json
 import logging
 import os
@@ -20,7 +19,7 @@ from app import db, logctx
 from app.config import DEV_SALT, get_settings
 from app.graph import build as graph_build
 from app.routes import chat, cron, finance_draft, hooks, inbound, internal, worker
-from app.services import groq, whatsapp
+from app.services import groq, telemetry, whatsapp
 
 class _JsonFormatter(logging.Formatter):
     """Uma linha JSON por evento, no formato que o Cloud Logging indexa (`severity`, `message`).
@@ -68,18 +67,9 @@ async def lifespan(_app: FastAPI):
 
 
 async def _fecha_telemetria() -> None:
-    """Outra frente cria `app.services.telemetry` (`shutdown()` ou `flush()`); sem ela, nada a fechar."""
+    """Esvazia o buffer do Langfuse: com scale-to-zero, o trace do último turno morreria junto."""
     try:
-        telemetry = importlib.import_module("app.services.telemetry")
-    except ImportError:
-        return
-    fn = getattr(telemetry, "shutdown", None) or getattr(telemetry, "flush", None)
-    if not fn:
-        return
-    try:
-        r = fn()
-        if hasattr(r, "__await__"):
-            await r
+        telemetry.shutdown()
     except Exception:  # noqa: BLE001 — fechar não pode impedir o resto do shutdown
         log.warning("telemetria não fechou limpo", exc_info=True)
 

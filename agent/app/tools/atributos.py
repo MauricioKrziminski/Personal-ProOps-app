@@ -73,7 +73,9 @@ async def _extrair_real(texto: str, linhas: list[str]) -> AtributosLote:
     from app.security import wrap_untrusted
     from app.services import gemini
 
-    modelo = gemini.llm("parse", temperature=0).with_structured_output(AtributosLote)
+    modelo = gemini.llm("parse", temperature=0).with_structured_output(AtributosLote).with_config(
+        metadata={"papel": "parse", "no": "atributos", "prompt_versao": gemini.versao_do_prompt(SISTEMA)}
+    )
     corpo = f"Frase da pessoa:\n{texto}\n\nLançamentos já entendidos:\n" + "\n".join(linhas)
     return await asyncio.wait_for(
         modelo.ainvoke([("system", SISTEMA), ("human", wrap_untrusted("user_input", corpo))]), TIMEOUT_S)

@@ -72,6 +72,14 @@ async def process_thread(thread_id: str) -> dict:
         return await _process_thread(thread_id)
 
 
+async def _soltar_reserva_sem_falhar() -> None:
+    """Turno que falhou não consome a cota: a retentativa reserva de novo."""
+    try:
+        await conversation.soltar_reserva()
+    except Exception:  # noqa: BLE001 — a reserva vence sozinha em minutos
+        log.warning("reserva de cota não foi solta (vence sozinha)", exc_info=True)
+
+
 FALHOU = "😕 Não consegui processar sua última mensagem. Pode mandar de novo?"
 
 
@@ -112,6 +120,7 @@ async def _turno_com_prazo(lote: list[dict], ids: list, phone: str, thread_id: s
     except Exception as err:  # noqa: BLE001
         log.exception("worker falhou (thread=%s)", thread_id)
         motivo = "prazo do turno estourou" if isinstance(err, TimeoutError) else repr(err)
+        await _soltar_reserva_sem_falhar()
         await _devolver_a_fila(ids, motivo)
         # Sem "tenta de novo" para o usuário enquanto a fila ainda vai tentar: avisar de um
         # erro que vai se resolver sozinho em 2s só gera desconfiança. Só a falha DEFINITIVA
@@ -155,6 +164,9 @@ async def _processar(lote: list[dict], ids: list, phone: str, thread_id: str) ->
         resposta = await conversation.recover_turn(
             sessao, source_message_id=lote[-1]["wa_message_id"]
         )
+        if resposta is not None:
+            # a resposta veio do checkpoint: nenhum modelo foi chamado, a vaga volta
+            await conversation.soltar_reserva()
 
     if resposta is None:
         # Lida + "digitando…" ANTES de baixar mídia e transcrever: é a parte lenta do turno, e
@@ -168,10 +180,12 @@ async def _processar(lote: list[dict], ids: list, phone: str, thread_id: str) ->
 
         conteudo = await _extract_batch(lote)
         if conteudo is None:
+            await conversation.soltar_reserva()
             await db.mark_done(ids)
             await whatsapp.try_send(phone, NAO_LI)
             return {"claimed": len(ids), "status": "ilegivel"}
         if conteudo.get("grande_demais"):
+            await conversation.soltar_reserva()
             await db.mark_done(ids)
             await whatsapp.try_send(phone, GRANDE_DEMAIS)
             return {"claimed": len(ids), "status": "grande_demais"}

@@ -107,9 +107,11 @@ def test_mascara_dado_pessoal_e_preserva_dinheiro():
         {"content": "conta 123456789012"},
     ]})
     texto = str(m)
-    for vazou in ("joao@", "123.456.789", "99874", "123e4567", "123456789012"):
+    for vazou in ("joao@", "123.456.789", "99874", "123456789012"):
         assert vazou not in texto
     assert "R$ 1.234,56" in texto and "4500" in texto
+    # UUID fica inteiro: é o id do candidato e da pendência no trace de uma confirmação
+    assert "123e4567-e89b-12d3-a456-426614174000" in texto
 
 
 def test_mascara_nunca_levanta():

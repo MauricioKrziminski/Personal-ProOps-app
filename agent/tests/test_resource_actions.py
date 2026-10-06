@@ -119,7 +119,7 @@ async def test_create_card_graph_waits_for_final_confirmation(monkeypatch):
             return ResourcePlan(actions=[action(closing_day=5, due_day=12)])
 
     monkeypatch.setattr(nodes, "route", route)
-    monkeypatch.setattr(nodes.gemini, "structured", lambda *a: Model())
+    monkeypatch.setattr(nodes.gemini, "structured", lambda *a, **kw: Model())
     monkeypatch.setattr(resources.db, "fetch", fetch)
     monkeypatch.setattr(resources.db, "fetch_one", one)
     monkeypatch.setattr(resources.db, "reserve_execution", reserve)

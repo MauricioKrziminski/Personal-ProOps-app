@@ -127,7 +127,9 @@ async def route(state: AgentState) -> dict:
                 + "\nSe a mensagem é a RESPOSTA a isso (um nome, um valor, uma data, sim ou não),"
                 " o domínio é cadastros. Só é outro domínio se ela for claramente um pedido novo."
             )
-    modelo = gemini.structured(RouterDecision, gemini.GEMINI_ROUTER)
+    modelo = gemini.structured(
+        RouterDecision, gemini.GEMINI_ROUTER, no="router", versao=gemini.versao_do_prompt(ROUTER)
+    )
     decisao: RouterDecision = await modelo.ainvoke(
         [
             ("system", ROUTER),
@@ -309,7 +311,10 @@ async def finance_node(state: AgentState, config: RunnableConfig = None) -> dict
 
     historico = state.get("messages")[:-1] if state.get("messages") else None
     prazo = gemini.PRAZO_LONGO if state.get("media") else gemini.PRAZO_COM_RESERVA
-    modelo = gemini.structured(FinancePlan, gemini.GEMINI_PARSE, prazo=prazo)
+    modelo = gemini.structured(
+        FinancePlan, gemini.GEMINI_PARSE, prazo=prazo,
+        no="finance_parse", versao=gemini.versao_do_prompt(FINANCE),
+    )
     midia = ((config or {}).get("configurable") or {}).get(CHAVE_MIDIA)
     contas = await _contas_do_turno(state)
     plano: FinancePlan = await modelo.ainvoke(
@@ -390,7 +395,10 @@ async def finance_query_node(state: AgentState) -> dict:
     """Consultas. Schema próprio (7 × 9) porque o de escrita não cabia junto —
     ver o orçamento medido em schemas.py."""
     historico = state.get("messages")[:-1] if state.get("messages") else None
-    modelo = gemini.structured(FinanceQueryPlan, gemini.GEMINI_PARSE)
+    modelo = gemini.structured(
+        FinanceQueryPlan, gemini.GEMINI_PARSE,
+        no="finance_query", versao=gemini.versao_do_prompt(FINANCE_QUERY),
+    )
     contas = await _contas_do_turno(state)
     plano: FinanceQueryPlan = await modelo.ainvoke(
         [
@@ -444,7 +452,9 @@ async def notes_node(state: AgentState) -> dict:
 
     historico = state.get("messages")[:-1] if state.get("messages") else None
     pastas = await _pastas_do_workspace(state["workspace_id"])
-    modelo = gemini.structured(NotesPlan, gemini.GEMINI_PARSE)
+    modelo = gemini.structured(
+        NotesPlan, gemini.GEMINI_PARSE, no="notes", versao=gemini.versao_do_prompt(NOTES)
+    )
     plano: NotesPlan = await modelo.ainvoke(
         [
             ("system", NOTES),
@@ -535,7 +545,9 @@ Catálogo:
         planned = [ResourceAction.model_validate(a) for a in state.get('resource_actions') or []]
         calls = 0
     else:
-        plan = await gemini.structured(ResourcePlan, gemini.GEMINI_PARSE).ainvoke([('system',prompt),('human',user)])
+        plan = await gemini.structured(
+            ResourcePlan, gemini.GEMINI_PARSE, no="cadastros", versao=gemini.versao_do_prompt(prompt)
+        ).ainvoke([('system',prompt),('human',user)])
         planned, calls = plan.actions, 1
     if Domain.NOTAS.value in (state.get('domains') or []):
         # ⚠️ **Nota e lembrete NOVOS têm um dono só: o nó de notas** (23/09/2026). Os dois

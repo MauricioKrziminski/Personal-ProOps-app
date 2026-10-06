@@ -31,17 +31,18 @@ _tentou = False
 # ---------------------------------------------------------------------------
 # máscara de dado pessoal ANTES de o texto sair para o Langfuse
 # ---------------------------------------------------------------------------
-# Só padrões ESTRUTURAIS (a forma do dado), nunca lista de palavras: e-mail, chave Pix aleatória
-# (UUID), CPF/CNPJ, telefone e sequência longa de dígitos. Valor em R$ fica — é o que se precisa
-# para depurar um turno. Nome próprio não tem estrutura e fica de fora (decisão de LGPD pendente).
+# Só padrões ESTRUTURAIS (a forma do dado), nunca lista de palavras: e-mail, CPF/CNPJ, telefone
+# e sequência longa de dígitos. Valor em R$ fica — é o que se precisa para depurar um turno.
+# UUID fica DE PROPÓSITO: é o id do candidato, da pendência (`pa:<uuid>`) e do lançamento, sem
+# ele o trace de uma confirmação não se depura; e a chave Pix aleatória, que tem a mesma forma,
+# não identifica ninguém sozinha. Nome próprio não tem forma, e reconhecê-lo seria lista de
+# palavras ou um segundo modelo por chamada — fica, e o Langfuse é configurado com retenção.
 _MASCARAS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"), "[email]"),
-    (re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"),
-     "[chave-pix]"),
     (re.compile(r"(?<!\d)\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}(?!\d)"), "[cnpj]"),
     (re.compile(r"(?<!\d)\d{3}\.?\d{3}\.?\d{3}-?\d{2}(?!\d)"), "[cpf]"),
     (re.compile(r"(?<!\d)(?:\+?55[\s-]?)?\(?\d{2}\)?[\s-]?9?\d{4}[\s-]?\d{4}(?!\d)"), "[telefone]"),
-    (re.compile(r"\d{9,}"), "[numero]"),
+    (re.compile(r"(?<![\w-])\d{9,}(?![\w-])"), "[numero]"),  # só número isolado: não corta um UUID
 ]
 
 

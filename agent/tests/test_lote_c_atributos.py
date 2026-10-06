@@ -519,6 +519,9 @@ async def test_corpo_de__extrair_usa_o_papel_parse_e_o_envelope(monkeypatch):
             visto["schema"] = schema
             return self
 
+        def with_config(self, **_kw):
+            return self
+
         async def ainvoke(self, mensagens):
             visto["mensagens"] = mensagens
             return AtributosLote(itens=[AtributosItem(indice=0, payment_method="pix")])
