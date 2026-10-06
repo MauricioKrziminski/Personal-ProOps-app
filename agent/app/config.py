@@ -86,8 +86,9 @@ class Settings(BaseSettings):
     # (o app nativo não manda Origin; isto é para o Expo web e o dev server).
     app_cors_origins: str = ""
     # Requisições por minuto, por usuário e por instância, nas rotas do app (`app/ratelimit.py`).
-    # 0 desliga.
-    rate_limit_per_minute: int = 60
+    # 0 desliga. A régua é ABUSO, não uso: a conversa aberta relê o turno a cada 3 s
+    # (`POLL_MS` em `src/hooks/use-agent-chat.ts`) = 20/min, e o resto do app soma por cima.
+    rate_limit_per_minute: int = 120
 
     # --- Langfuse ---
     langfuse_public_key: str = ""
