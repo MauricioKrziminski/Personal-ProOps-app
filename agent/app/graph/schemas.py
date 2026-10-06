@@ -126,6 +126,13 @@ class FinanceAction(BaseModel):
     """
 
     type: FinanceActionType
+    # ⚠️ A ORDEM dos campos é a ordem em que o Gemini ESCREVE (json_schema): passada uma chave, ele
+    # não volta a uma anterior. `target_ref` ficava depois de valor e conta, e o aporte em meta
+    # (que o modelo começa pela meta) saía sem valor e sem conta — 1/12 medido em 06/10/2026.
+    target_ref: str | None = Field(
+        None,
+        description="Nome da meta, do bem, ou o gatilho da regra de categorização.",
+    )
     amount_cents: int | None = Field(
         None, description="Valor em centavos inteiros. '45 reais' -> 4500."
     )
@@ -171,10 +178,6 @@ class FinanceAction(BaseModel):
     new_description: str | None = Field(
         None,
         description="Descrição CORRIGIDA do lançamento. description é BUSCA, esta é o nome novo.",
-    )
-    target_ref: str | None = Field(
-        None,
-        description="Nome da meta, do bem, ou o gatilho da regra de categorização.",
     )
     # Atributos de um lançamento NOVO (create_expense/income/installment_purchase). Texto livre,
     # validado em Python (`tools/atributos.py`, ancoragem na frase); vazio é o valor normal.

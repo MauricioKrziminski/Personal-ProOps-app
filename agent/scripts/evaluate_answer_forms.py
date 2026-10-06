@@ -608,7 +608,8 @@ def secoes():
         # verbos vizinhos não podem virar encerramento.
         "loteA/encerrar e reabrir série": [
             (t, lambda o: bool(o) and o.get("resource") == "recurring" and o.get("type") == "resource_update"
-             and "encerrar_em" in o and set(o) <= {"resource", "type", "encerrar_em"},
+             # `name` é o ALVO (a série), lido desde d9aaa929; o que não pode vir é outro campo mudado
+             and "encerrar_em" in o and set(o) <= {"resource", "type", "name", "encerrar_em"},
              "update + encerrar_em", lambda t=t: _recurso(t))
             for t in ["cancela a assinatura da netflix", "não pago mais a academia",
                       "encerra o aluguel em dezembro de 2026", "a netflix acabou, encerra a série"]
