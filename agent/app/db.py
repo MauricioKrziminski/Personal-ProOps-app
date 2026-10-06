@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from typing import Any, Literal
 from uuid import UUID
 
@@ -103,7 +104,47 @@ def graph_pool() -> AsyncConnectionPool:
     return _graph_pool
 
 
+# Conexão da UNIDADE DE TRABALHO em curso (ver `unidade_de_trabalho`). Contextvar e não
+# parâmetro: as ~130 chamadas de `db.fetch`/`fetch_one`/`execute` das tools não mudam.
+_uow: ContextVar[Any | None] = ContextVar("db_unidade_de_trabalho", default=None)
+
+
+@asynccontextmanager
+async def unidade_de_trabalho():
+    """Tudo que rodar dentro do bloco é UMA transação: commita junto ou volta junto.
+
+    O pool é autocommit, então cada `execute`/`fetch` solto é a sua própria transação — e uma
+    tool que escreve em dois passos, ou que escreve e só depois carimba o `result_id`, deixa
+    escrita parcial se o processo morre no meio. Aqui `fetch`/`fetch_one`/`execute` e o
+    `como_usuario` passam a usar a MESMA conexão (contextvar), o que também faz uma leitura
+    enxergar o que o passo anterior gravou.
+
+    Aninhada vira SAVEPOINT: erro no bloco de dentro desfaz só ele e o de fora decide. Erro que
+    escapa do bloco mais externo desfaz tudo.
+
+    ⚠️ Dentro dela um erro do Postgres aborta a transação: quem captura `psycopg.Error` e segue
+    adiante tem que fazê-lo dentro de um bloco aninhado deste mesmo gerenciador.
+    ⚠️ Nada de rede (WhatsApp, push, Gemini) dentro do bloco: seguraria locks.
+    """
+    atual = _uow.get()
+    if atual is not None:
+        async with atual.transaction():
+            yield
+        return
+    async with pool().connection() as conn:
+        async with conn.transaction():
+            marca = _uow.set(conn)
+            try:
+                yield
+            finally:
+                _uow.reset(marca)
+
+
 async def fetch(sql: str, *args: Any) -> list[dict[str, Any]]:
+    conn = _uow.get()
+    if conn is not None:
+        cur = await conn.execute(sql, args)
+        return await cur.fetchall()
     async with pool().connection() as conn:
         cur = await conn.execute(sql, args)
         return await cur.fetchall()
@@ -115,6 +156,10 @@ async def fetch_one(sql: str, *args: Any) -> dict[str, Any] | None:
 
 
 async def execute(sql: str, *args: Any) -> int:
+    conn = _uow.get()
+    if conn is not None:
+        cur = await conn.execute(sql, args)
+        return cur.rowcount
     async with pool().connection() as conn:
         cur = await conn.execute(sql, args)
         return cur.rowcount
@@ -166,6 +211,23 @@ async def como_usuario(user_id: UUID | str):
     bloco a transação fecha e o claim some com ela — nunca vaza para a próxima conexão do pool.
     Quem chama passa o dono da sessão (`ctx.user_id`), nunca um id vindo do modelo.
     """
+    dentro = _uow.get()
+    if dentro is not None:
+        # Já há transação (unidade de trabalho): o `set_config(..., true)` vale até o COMMIT dela,
+        # não até o fim deste bloco. Savepoint para a recusa daqui não matar o resto, e o claim
+        # anterior é devolvido na saída — senão vazaria para as tools seguintes da unidade.
+        linha = await (await dentro.execute(
+            "select current_setting('request.jwt.claim.sub', true) as v")).fetchone()
+        antes = (linha or {}).get("v") or ""
+        try:
+            async with dentro.transaction():
+                await dentro.execute(
+                    "select set_config('request.jwt.claim.sub', %s, true)", (str(user_id),)
+                )
+                yield _Tx(dentro)
+        finally:
+            await dentro.execute("select set_config('request.jwt.claim.sub', %s, true)", (antes,))
+        return
     async with pool().connection() as conn:
         async with conn.transaction():
             await conn.execute(

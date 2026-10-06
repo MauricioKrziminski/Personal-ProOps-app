@@ -148,8 +148,52 @@ async def execute(ctx: ExecContext, action: FinanceAction | FinanceQuery | Notes
         except Level1Error as err:
             return ToolResult(err.mensagem_usuario, read_only=True)
 
-    # Consulta pode repetir à vontade; escrita RESERVA a vaga antes de rodar.
-    if not somente_leitura:
+    # Consulta pode repetir à vontade e roda solta. Escrita é UMA unidade de trabalho:
+    # reserva da vaga + tool + carimbo do `result_id` commitam JUNTOS ou voltam juntos.
+    # Antes cada comando era a sua transação (pool autocommit): morrer entre a escrita e o
+    # carimbo deixava a reserva órfã COM a escrita feita, e o retry tratava a criação como
+    # falha. Agora a reserva órfã com escrita não existe — e, por consequência, falha da tool
+    # desfaz a própria reserva (sem `release_execution` à mão) junto com escrita parcial.
+    # A segunda execução da MESMA chave bloqueia no índice único até a primeira commitar e aí
+    # vê a linha já com o `result_id` (`on conflict do nothing` espera a transação concorrente).
+    try:
+        if somente_leitura:
+            return await tool(ctx, action)
+        return await _escrever(ctx, action, tool)
+    except _SemEscrita as sem:
+        return sem.resultado
+    except Level1Error as err:
+        # validação determinística: a mensagem já está escrita para o usuário
+        log.info("nível 1 barrou %s: %s", action.type, err)
+        return ToolResult(err.mensagem_usuario, read_only=True)
+    except psycopg.Error as err:
+        # Recusa de PROPÓSITO do banco (P0001 de gatilho, 22023/PT422 de regra, PT409 de revisão velha):
+        # já vem escrita para a pessoa — "deu erro, tenta de novo" mandaria repetir o que não se resolve
+        # repetindo. A transação voltou inteira. Qualquer outro erro do banco é falha de verdade.
+        frase = guards.recusa_do_banco(err)
+        if frase is None:
+            log.exception("ação %s falhou", action.type)
+            return ToolResult(
+                "❌ Deu erro ao processar uma parte da mensagem. Tenta de novo!", read_only=True
+            )
+        log.info("o banco recusou %s: %s", action.type, err.diag.message_primary)
+        return ToolResult(frase, read_only=True)
+    except Exception:  # noqa: BLE001
+        log.exception("ação %s falhou", action.type)
+        return ToolResult(
+            "❌ Deu erro ao processar uma parte da mensagem. Tenta de novo!", read_only=True
+        )
+
+
+class _SemEscrita(Exception):
+    """A tool não escreveu nada: desfaz a unidade (a vaga volta) e devolve o resultado dela."""
+
+    def __init__(self, resultado: ToolResult) -> None:
+        self.resultado = resultado
+
+
+async def _escrever(ctx: ExecContext, action, tool) -> ToolResult:
+    async with db.unidade_de_trabalho():
         if not await db.reserve_execution(
             ctx.source_message_id,
             ctx.action_index,
@@ -162,52 +206,19 @@ async def execute(ctx: ExecContext, action: FinanceAction | FinanceQuery | Notes
                 "ação %s já executada (%s#%s) — pulando",
                 action.type, ctx.source_message_id, ctx.action_index,
             )
-            # Só conta como "já escreveu" com `result_id` carimbado: reserva sem
-            # ele é órfã (worker morreu no meio) ou está rodando agora, e o par
-            # atômico não pode seguir para o apagar em cima disso. Não libera a
-            # vaga aqui: não dá para saber se outro worker a está usando.
+            # Só conta como "já escreveu" com `result_id` carimbado. Como a reserva e o carimbo
+            # agora commitam juntos, reserva sem ele é de ação que não devolve id (apagar,
+            # corrigir) ou de outra execução ainda em curso (que a unidade dela segura).
             # (Toda tool `create_*` devolve `result_id` quando escreve.)
             escrito = await db.execution_result_id(ctx.source_message_id, ctx.action_index)
             return ToolResult("", read_only=True, ja_executada=escrito is not None)
-
-    try:
         resultado = await tool(ctx, action)
-    except Level1Error as err:
-        # validação determinística: a mensagem já está escrita para o usuário
-        log.info("nível 1 barrou %s: %s", action.type, err)
-        if not somente_leitura:
-            await db.release_execution(ctx.source_message_id, ctx.action_index)
-        return ToolResult(err.mensagem_usuario, read_only=True)
-    except psycopg.Error as err:
-        # Recusa de PROPÓSITO do banco (P0001 de gatilho, 22023/PT422 de regra, PT409 de revisão velha):
-        # já vem escrita para a pessoa — "deu erro, tenta de novo" mandaria repetir o que não se resolve
-        # repetindo. A transação voltou inteira. Qualquer outro erro do banco é falha de verdade.
-        frase = guards.recusa_do_banco(err)
-        if not somente_leitura:
-            await db.release_execution(ctx.source_message_id, ctx.action_index)
-        if frase is None:
-            log.exception("ação %s falhou", action.type)
-            return ToolResult(
-                "❌ Deu erro ao processar uma parte da mensagem. Tenta de novo!", read_only=True
-            )
-        log.info("o banco recusou %s: %s", action.type, err.diag.message_primary)
-        return ToolResult(frase, read_only=True)
-    except Exception:  # noqa: BLE001
-        log.exception("ação %s falhou", action.type)
-        if not somente_leitura:
-            await db.release_execution(ctx.source_message_id, ctx.action_index)
-        return ToolResult(
-            "❌ Deu erro ao processar uma parte da mensagem. Tenta de novo!", read_only=True
-        )
-
-    if not somente_leitura:
         if resultado.read_only:
-            # a tool não escreveu nada (não achou, empate, pediu detalhe):
-            # devolve a vaga para o usuário poder tentar de novo
-            await db.release_execution(ctx.source_message_id, ctx.action_index)
-        else:
-            await db.confirm_execution(ctx.source_message_id, ctx.action_index, resultado.result_id)
-            if resultado.result_id:
-                ctx.created.append(str(resultado.result_id))
-
+            # a tool não escreveu nada (não achou, empate, pediu detalhe): desfaz a unidade,
+            # o que devolve a vaga para a pessoa poder tentar de novo
+            raise _SemEscrita(resultado)
+        await db.confirm_execution(ctx.source_message_id, ctx.action_index, resultado.result_id)
+    # só depois do COMMIT: dentro de uma unidade externa (o par) quem decide é ela
+    if resultado.result_id:
+        ctx.created.append(str(resultado.result_id))
     return resultado

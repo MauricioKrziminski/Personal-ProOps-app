@@ -13,6 +13,7 @@ import logging
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
 
+from app import db
 from app.domain.dates import local_datetime_iso, local_iso_date, now_utc
 from app.graph.policy import (
     describe_for_confirmation,
@@ -1278,40 +1279,102 @@ async def _executar(
     indexadas = sorted(
         indexadas, key=lambda ia: (not _cria_pasta(ia[1]), bool(par) and not _cria(ia[1]))
     )
-    criacao_falhou = None
     # I3: no par o antecedente do próximo turno é a CRIAÇÃO, não o apagado (que roda
     # por último e seria `escritos[-1]`). `ctx.created[:marca]` corta o que veio depois.
-    marca = None
-
+    # (`marca` e `falha` ficam num dict para o laço, que roda dentro da unidade, poder gravá-los.)
+    est: dict = {"marca": None, "falha": None}
+    feitos: list[tuple[int, object, object]] = []  # (índice, ação, resultado) do que já rodou
     linhas: list[str] = []
     spec_interativo: dict | None = None
     ultimo_data: dict | None = None
-    for indice, acao in indexadas:
-        if criacao_falhou is not None:
-            # nada parcial: nem o apagar, nem as criações seguintes do par
-            linhas.append(_nao_fiz(acao, alvos[indice], criacao_falhou,
-                                   hoje=local_iso_date(ctx.timezone)))
-            continue
-        ctx.action_index = indice
-        ctx.target = alvos[indice] or None
-        if isinstance(acao, FinanceAction) and acao.type in RULE_APPLIES:
-            acao = await apply_rules(ctx.workspace_id, acao)
-        resultado = await execute(ctx, acao)
-        if (par and _cria(acao) and criacao_falhou is None
-                and resultado.read_only and not resultado.ja_executada):
-            criacao_falhou = acao
-        if par and _cria(acao) and (not resultado.read_only or resultado.ja_executada):
-            # retentativa (`ja_executada`): a criação é de outra tentativa; sem o id
-            # dela aqui, `[:marca]` fica vazio e o antecedente anterior é preservado
-            marca = len(ctx.created)
-        if resultado.message:
-            linhas.append(resultado.message)
-        if resultado.interactive_spec:
-            spec_interativo = resultado.interactive_spec
-        if resultado.data:
-            ultimo_data = resultado.data
+
+    async def laco() -> None:
+        nonlocal spec_interativo, ultimo_data
+        for indice, acao in indexadas:
+            if est["falha"] is not None and est["falha"][0] == "criacao":
+                # nada parcial: nem o apagar, nem as criações seguintes do par
+                linhas.append(_nao_fiz(acao, alvos[indice], est["falha"][1],
+                                       hoje=local_iso_date(ctx.timezone)))
+                continue
+            ctx.action_index = indice
+            ctx.target = alvos[indice] or None
+            if isinstance(acao, FinanceAction) and acao.type in RULE_APPLIES:
+                acao = await apply_rules(ctx.workspace_id, acao)
+            resultado = await execute(ctx, acao)
+            feitos.append((indice, acao, resultado))
+            falhou = resultado.read_only and not resultado.ja_executada
+            if par and falhou and est["falha"] is None:
+                if _cria(acao):
+                    est["falha"] = ("criacao", acao, resultado)
+                elif not all(r.ja_executada for _, a, r in feitos if _cria(a)):
+                    # o apagar/corrigir falhou DEPOIS da criação: se todas as criações vieram de
+                    # uma retentativa (`ja_executada`) o par inteiro já tinha commitado antes,
+                    # e a reserva sem `result_id` do apagar não é falha
+                    est["falha"] = ("outra", acao, resultado)
+            if par and _cria(acao) and (not resultado.read_only or resultado.ja_executada):
+                # retentativa (`ja_executada`): a criação é de outra tentativa; sem o id
+                # dela aqui, `[:marca]` fica vazio e o antecedente anterior é preservado
+                est["marca"] = len(ctx.created)
+            if resultado.message:
+                linhas.append(resultado.message)
+            if resultado.interactive_spec:
+                spec_interativo = resultado.interactive_spec
+            if resultado.data:
+                ultimo_data = resultado.data
+
+    if not par:
+        await laco()
+    else:
+        # ⚠️ **O par é UMA transação**: a criação e o apagar/corrigir commitam juntos ou nada
+        # fica. Cada `registry.execute` dentro dela é um SAVEPOINT (reserva + escrita + carimbo).
+        # Criação que não escreveu, ou apagar/corrigir que falhou DEPOIS da criação, desfaz o par
+        # inteiro — a regra do produto é um SIM só, e "registrei o novo mas não apaguei o velho"
+        # é o lançamento duplicado que o par existe para impedir.
+        try:
+            async with db.unidade_de_trabalho():
+                await laco()
+                if est["falha"] is not None:
+                    raise _ParDesfeito
+        except _ParDesfeito:
+            ctx.created.clear()  # o que o par criou voltou com a transação
+            return _frases_do_par_desfeito(indexadas, feitos, alvos, est["falha"], ctx), None, None, []
+        except Exception:  # noqa: BLE001
+            # falha do próprio commit/conexão: nada a afirmar além de "tenta de novo". A
+            # retentativa é segura — reserva e carimbo moram na mesma transação do que escreveu.
+            log.exception("par de substituição falhou")
+            ctx.created.clear()
+            return ["❌ Deu erro ao processar essa parte da mensagem. Nada foi alterado, tenta de novo!"], None, None, []
+    marca = est["marca"]
     escritos = ctx.created[:marca] if marca is not None else ctx.created
     return linhas, spec_interativo, ultimo_data, escritos
+
+
+class _ParDesfeito(Exception):
+    """Sinal interno: desfaz a unidade de trabalho do par."""
+
+
+def _frases_do_par_desfeito(indexadas, feitos, alvos, falha, ctx) -> list[str]:
+    """O que dizer quando o par voltou inteiro: só o que é verdade DEPOIS do rollback.
+
+    A frase da ação que falhou é a da própria tool (já escrita para a pessoa); toda outra ação do
+    par — a que rodou e foi desfeita, e a que nem chegou a rodar — vira "não fiz".
+    """
+    tipo, acao_falha, res_falha = falha
+    hoje = local_iso_date(ctx.timezone)
+    rodou = {i: r for i, _, r in feitos}
+    linhas = []
+    for indice, acao in indexadas:
+        if rodou.get(indice) is res_falha:
+            if res_falha.message:
+                linhas.append(res_falha.message)
+        elif tipo == "criacao":
+            linhas.append(_nao_fiz(acao, alvos[indice], acao_falha, hoje=hoje))
+        else:
+            linhas.append(_nao_fiz(acao, alvos[indice], None, hoje=hoje,
+                                   motivo="a outra parte do pedido não deu certo"))
+    if tipo != "criacao":
+        linhas.append("↩️ Era um pedido só, então desfiz o que já tinha registrado: nada foi alterado.")
+    return linhas
 
 
 def _cria(acao) -> bool:
@@ -1330,17 +1393,19 @@ def _rotulo_novo(criacao: FinanceAction) -> str:
     return f"{nome} ({cents_to_brl(criacao.amount_cents)})" if criacao.amount_cents else nome
 
 
-def _nao_fiz(acao, alvo: dict, criacao: FinanceAction, hoje: str | None = None) -> str:
-    novo = _rotulo_novo(criacao)
+def _nao_fiz(acao, alvo: dict, criacao: FinanceAction | None, hoje: str | None = None,
+             motivo: str | None = None) -> str:
+    """`motivo` troca o "não consegui registrar <criação>" quando o que falhou NÃO foi uma criação."""
+    motivo = motivo or f"não consegui registrar {_rotulo_novo(criacao)}"
     if _cria(acao):
-        return f"⚠️ Não registrei {_rotulo_novo(acao)} porque não consegui registrar {novo}."
+        return f"⚠️ Não registrei {_rotulo_novo(acao)} porque {motivo}."
     verbo = {"delete_transaction": "apaguei", "undo_last": "apaguei",
              "update_transaction": "corrigi"}.get(acao.type.value, "mexi em")
     candidatos = (alvo or {}).get("candidates") or []
     if not candidatos:
         # a frase de confirmação já começa com verbo ("apagar o seu…")
-        return f"⚠️ Não fiz: {describe_for_confirmation(acao, alvo or None, hoje=hoje)} — porque não consegui registrar {novo}."
-    return f"⚠️ Não {verbo} {candidatos[0]['label']} porque não consegui registrar {novo}."
+        return f"⚠️ Não fiz: {describe_for_confirmation(acao, alvo or None, hoje=hoje)} — porque {motivo}."
+    return f"⚠️ Não {verbo} {candidatos[0]['label']} porque {motivo}."
 
 
 async def execute_node(state: AgentState) -> dict:

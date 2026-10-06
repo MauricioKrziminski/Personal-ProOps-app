@@ -175,23 +175,17 @@ def test_o_resto_do_banco_continua_falha_de_verdade(codigo):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("codigo, trecho", [("PT409", "mudou enquanto eu perguntava"), ("PT422", "Só há R$ 10,00")])
-async def test_registry_traduz_o_sqlstate_do_projeto(monkeypatch, codigo, trecho):
+async def test_registry_traduz_o_sqlstate_do_projeto(monkeypatch, codigo, trecho, unidade):
     async def vaga(*a, **k):
         return True
-
-    liberada = []
-
-    async def libera(*a, **k):
-        liberada.append(1)
 
     async def tool(c, a):
         raise Recusado(codigo, "A movimentação mudou" if codigo == "PT409" else "SALDO_INSUFICIENTE: livre 1000 centavos")
 
     monkeypatch.setattr(registry.db, "reserve_execution", vaga)
-    monkeypatch.setattr(registry.db, "release_execution", libera)
     monkeypatch.setattr(registry, "_tool", lambda a: tool)
     r = await registry.execute(ctx(), acao("goals", tipo="resource_update", name="x"))
-    assert trecho in r.message and r.read_only and liberada  # a vaga de idempotência volta
+    assert trecho in r.message and r.read_only and unidade.rollbacks == 1  # a unidade volta, e a vaga com ela
 
 
 # ------------------------------------------------------------------ F11: guardar na meta
