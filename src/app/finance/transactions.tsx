@@ -1,7 +1,6 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, SectionList, StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ErrorCard } from '@/components/error-card';
@@ -31,7 +30,7 @@ import { fecharDeslizavelAberto } from '@/components/ui/deslizavel';
 import { Skeleton, SkeletonChart, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
-import { Motion, Radius, Space } from '@/design/tokens';
+import { Radius, Space } from '@/design/tokens';
 import {
   NO_ACCOUNT,
   useAccountBalances,
@@ -206,9 +205,192 @@ function janelaDoLink(from?: string, to?: string): { from?: string; to?: string 
   return from && to && iso.test(from) && iso.test(to) && from <= to ? { from, to } : {};
 }
 
-export default function TransactionsScreen() {
+/**
+ * A linha de um lançamento gravado. É COMPONENTE (e `memo`) para o `SectionList` não refazer a árvore
+ * de cada linha a cada render da tela (digitar na busca, o "puxar para atualizar", a baixa de outra
+ * linha): as props são escalares e `tx` é a referência que o TanStack compartilha entre refetches,
+ * então só a linha que mudou renderiza. SEM entrada animada: lista que a pessoa está lendo não se
+ * move por estética (design §5), e a animação refazia a cada "Ver mais".
+ */
+const LinhaDoExtrato = memo(function LinhaDoExtrato({
+  tx, primeira, ultima, month, hoje, contaFiltrada, nomeDaConta, periodoLivre, onPagar, onApagar,
+}: {
+  tx: Transaction;
+  primeira: boolean;
+  ultima: boolean;
+  month: string;
+  hoje: string;
+  contaFiltrada: string | undefined;
+  nomeDaConta: string | undefined;
+  periodoLivre: boolean;
+  onPagar: (tx: Transaction) => void;
+  onApagar: (tx: Transaction) => void;
+}) {
   const theme = useTheme();
   const aparencia = useAparencia();
+  const brl = useBRL();
+  const host = [
+    styles.rowHost,
+    { backgroundColor: theme.surface },
+    primeira && styles.groupTop,
+    ultima && styles.groupBottom,
+  ];
+  /*
+    ⚠️ **"previsto" saiu da frase cinza e virou PÍLULA.** Ele vinha emendado em
+    `previsto · vence 08/10/2026 · assinaturas · Nubank · Cartão · recorrente`, com o
+    mesmo peso do nome do cartão — seis palavras cinzas em que só a primeira diz se
+    aquilo aconteceu. Quem abre o app pela primeira vez não tem como saber qual olhar.
+
+    ⚠️ **E o que ela diz sai da DATA, não do `status`** (`estadoDaLinha`, 20/09/2026).
+    Com `status === 'pending'` toda compra de cartão do mês aparecia como "previsto",
+    inclusive a de ontem — a queixa foi literal. A ação de dar baixa, logo abaixo,
+    continua sendo do `status`: o dinheiro dela ainda não saiu.
+  */
+  const estado = estadoDaLinha(tx, hoje);
+  const emAberto = tx.status === 'pending';
+  /**
+   * ⚠️ **A linha diz a data da COMPRA, nunca o vencimento da fatura** (24/09/2026,
+   * decisão do dono do produto: *"Mostre sempre a data do lançamento"*). Escrever
+   * "na fatura de 10/10" numa compra de cartão fazia o vencimento ler como a data do
+   * lançamento. A data é a do cabeçalho do dia; na parcela 2 em diante, que mora no mês
+   * em que cai, a linha acrescenta "compra em 14/09". A fatura continua no detalhe
+   * ("Entra na fatura de …"). Conta a pagar fora do cartão mantém "vence …": ali o
+   * vencimento É a data daquela conta.
+   */
+  const tituloDaLinha = tx.description || tx.merchant || tx.category || 'Sem descrição';
+  const badges = [
+    // "parcela 2" some quando o título já diz "(2/10)" — a mesma informação duas vezes.
+    tx.installment_no && !/\(\d+\/\d+\)$/.test(tituloDaLinha) ? `parcela ${tx.installment_no}` : null,
+    rotuloDaCompra(tx),
+    emAberto && tx.invoice_id === null
+      ? dueInline(tx.kind, tx.due_at ? formatDateBR(tx.due_at).slice(0, 5) : null).replace(/^previsto( · )?/, '')
+      : null,
+  ].filter(Boolean);
+  // Transferência não tem sinal na lista global — ela não é entrada nem saída do
+  // conjunto. No extrato de UMA conta ela tem: sai da conta de origem e ENTRA na de
+  // destino. Sem isso o extrato do Nubank mostrava duas saídas de R$ 900,00 sem o "−",
+  // e o extrato do cartão mostrava as mesmas duas como se também tivessem saído dele.
+  const transferenciaRecebida =
+    tx.kind === 'transfer' &&
+    contaFiltrada !== undefined &&
+    tx.counterparty_account_id === contaFiltrada;
+  const assinado =
+    tx.kind !== 'transfer' || (contaFiltrada !== undefined && tx.account_id !== null);
+  const valor =
+    tx.kind === 'expense' || (tx.kind === 'transfer' && assinado && !transferenciaRecebida)
+      ? -tx.amount_cents
+      : tx.amount_cents;
+
+  const context = [
+    tx.category,
+    tx.subcategories?.name ?? (tx.subcategory_id ? 'Detalhe a conferir' : null),
+    // O nome da conta não parte ao meio ("Nubank / Cartão"): espaço inseparável nele.
+    nomeDaConta?.replace(/ /g, '\u00A0') ?? null,
+    SOURCE_LABEL[tx.source],
+  ].filter(Boolean);
+
+  return (
+    <View style={host}>
+      <ItemLink
+        href={{ pathname: '/finance/[txId]', params: { txId: tx.id, month } }}
+        title={tx.description || tx.merchant || tx.category || 'Lançamento'}
+        /**
+         * ⚠️ **Dar baixa é AÇÃO DE ITEM, não botão na linha** (09/09/2026).
+         *
+         * A régua: *linha de lista mostra o registro e a ação mora no menu dela;
+         * card de painel mostra a decisão e a ação é o botão*. A Hoje é painel — três
+         * ou quatro coisas pedindo decisão — e continua com botão. Aqui é extrato:
+         * a maioria das linhas já está efetivada e não tem ação nenhuma.
+         *
+         * Um `<Button>` em `Row.trailing` empurrava o bloco além do `minWidth: 180`
+         * do título, o `flexWrap` jogava valor+botão para a linha de baixo, e só nas
+         * previstas — a linha previsto ficava com o dobro da altura da vizinha
+         * efetivada. Foi a queixa do dono do produto, duas vezes, e as tentativas de
+         * arrumar o `trailing` (coluna, depois linha) só trocaram a forma da quebra.
+         *
+         * `design.md §6` já dizia: *ação de item é context menu nativo*.
+         */
+        actions={[
+          ...(tx.status === 'pending'
+            ? [
+                {
+                  label: settleLabel(tx.kind),
+                  icon: 'checkmark.circle' as const,
+                  arrasto: 'direita' as const,
+                  onPress: () => onPagar(tx),
+                },
+              ]
+            : []),
+          {
+            label: 'Ver detalhe',
+            icon: 'doc.text.magnifyingglass',
+            arrasto: 'fora' as const,
+            onPress: () =>
+              router.push({ pathname: '/finance/[txId]', params: { txId: tx.id, month } }),
+          },
+          {
+            label: 'Editar',
+            icon: 'pencil',
+            // Pendente, a direita é o "Paguei"; efetivado, é o Editar.
+            arrasto: tx.status === 'pending' ? undefined : ('direita' as const),
+            onPress: () => router.push(hrefDoLancamento(tx, { month })),
+          },
+          ...(podeDuplicar(tx) ? [{
+            label: 'Duplicar',
+            icon: 'plus.square.on.square' as const,
+            onPress: () => router.push(hrefDoLancar('uma', paramsDaCopia(tx, isoToBR(localISODate())).params)),
+          }] : []),
+          { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => onApagar(tx) },
+        ]}>
+        {({ onLongPress }) => (
+          <Row
+            title={tituloDaLinha}
+            inlineValue
+            /*
+              ⚠️ `atrasado` leva `danger`. `design.md §2`: vermelho é semântica — "erro
+              e atraso" —, e é a última alavanca de cor que este app tem. Atraso em
+              cinza-neutro ao lado de um número é o estado que mais pede ação lido como
+              o que menos pede.
+            */
+            badge={
+              estado
+                ? {
+                    label: estado,
+                    tone:
+                      estado === 'atrasado' ? 'danger'
+                      : estado === 'não caiu' ? 'warning'
+                      : undefined,
+                  }
+                : undefined
+            }
+            subtitle={[...badges, ...context].join(' · ')}
+            icon={aparencia(tx.category, tx.kind).icon}
+            tinta={aparencia(tx.category, tx.kind).cor}
+            accessibilityLabel={`${tx.description || tx.merchant || tx.category || 'Lançamento'}, ${brl(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}, ${dayTitle(tx.occurred_at, periodoLivre)}${tx.subcategories?.name ? `, ${tx.subcategories.name}` : ''}${estado ? `, ${estado}` : ''}`}
+            onLongPress={onLongPress}
+            trailing={
+              <Money
+                cents={valor}
+                variant="ticker"
+                tone={tx.kind === 'income' ? 'success' : 'text'}
+                signed={assinado}
+              />
+            }
+          />
+        )}
+      </ItemLink>
+    </View>
+  );
+});
+
+/** Separador entre linhas: componente de módulo, para o `SectionList` não receber um novo a cada render. */
+function Separador() {
+  const theme = useTheme();
+  return <View style={[styles.separator, { backgroundColor: theme.separator }]} />;
+}
+
+export default function TransactionsScreen() {
+  const theme = useTheme();
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const { width, windowClass } = useAdaptiveWindow();
@@ -683,6 +865,16 @@ export default function TransactionsScreen() {
   };
 
   /*
+    Identidade ESTÁVEL para a linha memoizada (`LinhaDoExtrato`): `pay` e `confirmDelete` nascem de
+    novo a cada render, e passá-los direto desfazia o `memo` de toda linha. O ref guarda a versão
+    atual (atualizada depois do commit — o toque só acontece depois dele).
+  */
+  const acoesDaLinha = useRef({ pagar: pay, apagar: confirmDelete });
+  useEffect(() => { acoesDaLinha.current = { pagar: pay, apagar: confirmDelete }; });
+  const pagarLinha = useCallback((tx: Transaction) => acoesDaLinha.current.pagar(tx), []);
+  const apagarLinha = useCallback((tx: Transaction) => acoesDaLinha.current.apagar(tx), []);
+
+  /*
     A busca é FIXA (pedido do dono do produto, 19/09/2026): no telefone ela vai para o slot
     `search` do `Screen` — barra nativa no iOS, faixa acima da lista no Android — e o extrato rola
     por baixo dela. No iPad ela continua no painel lateral, junto dos outros filtros, que já não
@@ -975,9 +1167,7 @@ export default function TransactionsScreen() {
             if (item.prevista) {
               const line = item.prevista;
               return (
-                <Animated.View
-                  entering={FadeInDown.duration(Motion.duration.base).delay(Math.min(index * 40, Motion.stagger.cap))}
-                  style={host}>
+                <View style={host}>
                   <LinhaPrevista
                     line={line}
                     hoje={hoje}
@@ -987,164 +1177,25 @@ export default function TransactionsScreen() {
                     acoes={previstas.acoes(line)}
                     onAbrir={() => { void previstas.abrir(line); }}
                   />
-                </Animated.View>
+                </View>
               );
             }
-            const tx = item.tx;
-            /*
-              ⚠️ **"previsto" saiu da frase cinza e virou PÍLULA.** Ele vinha emendado em
-              `previsto · vence 08/10/2026 · assinaturas · Nubank · Cartão · recorrente`, com o
-              mesmo peso do nome do cartão — seis palavras cinzas em que só a primeira diz se
-              aquilo aconteceu. Quem abre o app pela primeira vez não tem como saber qual olhar.
-
-              ⚠️ **E o que ela diz sai da DATA, não do `status`** (`estadoDaLinha`, 20/09/2026).
-              Com `status === 'pending'` toda compra de cartão do mês aparecia como "previsto",
-              inclusive a de ontem — a queixa foi literal. A ação de dar baixa, logo abaixo,
-              continua sendo do `status`: o dinheiro dela ainda não saiu.
-            */
-            const estado = estadoDaLinha(tx, hoje);
-            const emAberto = tx.status === 'pending';
-            /**
-             * ⚠️ **A linha diz a data da COMPRA, nunca o vencimento da fatura** (24/09/2026,
-             * decisão do dono do produto: *"Mostre sempre a data do lançamento"*). Escrever
-             * "na fatura de 10/10" numa compra de cartão fazia o vencimento ler como a data do
-             * lançamento. A data é a do cabeçalho do dia; na parcela 2 em diante, que mora no mês
-             * em que cai, a linha acrescenta "compra em 14/09". A fatura continua no detalhe
-             * ("Entra na fatura de …"). Conta a pagar fora do cartão mantém "vence …": ali o
-             * vencimento É a data daquela conta.
-             */
-            const tituloDaLinha = tx.description || tx.merchant || tx.category || 'Sem descrição';
-            const badges = [
-              // "parcela 2" some quando o título já diz "(2/10)" — a mesma informação duas vezes.
-              tx.installment_no && !/\(\d+\/\d+\)$/.test(tituloDaLinha) ? `parcela ${tx.installment_no}` : null,
-              rotuloDaCompra(tx),
-              emAberto && tx.invoice_id === null
-                ? dueInline(tx.kind, tx.due_at ? formatDateBR(tx.due_at).slice(0, 5) : null).replace(/^previsto( · )?/, '')
-                : null,
-            ].filter(Boolean);
-            // Transferência não tem sinal na lista global — ela não é entrada nem saída do
-            // conjunto. No extrato de UMA conta ela tem: sai da conta de origem e ENTRA na de
-            // destino. Sem isso o extrato do Nubank mostrava duas saídas de R$ 900,00 sem o "−",
-            // e o extrato do cartão mostrava as mesmas duas como se também tivessem saído dele.
-            const transferenciaRecebida =
-              tx.kind === 'transfer' &&
-              contaFiltrada !== undefined &&
-              tx.counterparty_account_id === contaFiltrada;
-            const assinado =
-              tx.kind !== 'transfer' || (contaFiltrada !== undefined && tx.account_id !== null);
-            const valor =
-              tx.kind === 'expense' || (tx.kind === 'transfer' && assinado && !transferenciaRecebida)
-                ? -tx.amount_cents
-                : tx.amount_cents;
-
-            const context = [
-              tx.category,
-              tx.subcategories?.name ?? (tx.subcategory_id ? 'Detalhe a conferir' : null),
-              // O nome da conta não parte ao meio ("Nubank / Cartão"): espaço inseparável nele.
-              tx.account_id ? accountName.get(tx.account_id)?.replace(/ /g, '\u00A0') : null,
-              SOURCE_LABEL[tx.source],
-            ].filter(Boolean);
-
             return (
-              <Animated.View
-                entering={FadeInDown.duration(Motion.duration.base).delay(
-                  Math.min(index * 40, Motion.stagger.cap)
-                )}
-                style={host}>
-                <ItemLink
-                  href={{ pathname: '/finance/[txId]', params: { txId: tx.id, month } }}
-                  title={tx.description || tx.merchant || tx.category || 'Lançamento'}
-                  /**
-                   * ⚠️ **Dar baixa é AÇÃO DE ITEM, não botão na linha** (09/09/2026).
-                   *
-                   * A régua: *linha de lista mostra o registro e a ação mora no menu dela;
-                   * card de painel mostra a decisão e a ação é o botão*. A Hoje é painel — três
-                   * ou quatro coisas pedindo decisão — e continua com botão. Aqui é extrato:
-                   * a maioria das linhas já está efetivada e não tem ação nenhuma.
-                   *
-                   * Um `<Button>` em `Row.trailing` empurrava o bloco além do `minWidth: 180`
-                   * do título, o `flexWrap` jogava valor+botão para a linha de baixo, e só nas
-                   * previstas — a linha previsto ficava com o dobro da altura da vizinha
-                   * efetivada. Foi a queixa do dono do produto, duas vezes, e as tentativas de
-                   * arrumar o `trailing` (coluna, depois linha) só trocaram a forma da quebra.
-                   *
-                   * `design.md §6` já dizia: *ação de item é context menu nativo*.
-                   */
-                  actions={[
-                    ...(tx.status === 'pending'
-                      ? [
-                          {
-                            label: settleLabel(tx.kind),
-                            icon: 'checkmark.circle' as const,
-                            arrasto: 'direita' as const,
-                            onPress: () => pay(tx),
-                          },
-                        ]
-                      : []),
-                    {
-                      label: 'Ver detalhe',
-                      icon: 'doc.text.magnifyingglass',
-                      arrasto: 'fora' as const,
-                      onPress: () =>
-                        router.push({ pathname: '/finance/[txId]', params: { txId: tx.id, month } }),
-                    },
-                    {
-                      label: 'Editar',
-                      icon: 'pencil',
-                      // Pendente, a direita é o "Paguei"; efetivado, é o Editar.
-                      arrasto: tx.status === 'pending' ? undefined : ('direita' as const),
-                      onPress: () => router.push(hrefDoLancamento(tx, { month })),
-                    },
-                    ...(podeDuplicar(tx) ? [{
-                      label: 'Duplicar',
-                      icon: 'plus.square.on.square' as const,
-                      onPress: () => router.push(hrefDoLancar('uma', paramsDaCopia(tx, isoToBR(localISODate())).params)),
-                    }] : []),
-                    { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => confirmDelete(tx) },
-                  ]}>
-                  {({ onLongPress }) => (
-                    <Row
-                      title={tituloDaLinha}
-                      inlineValue
-                      /*
-                        ⚠️ `atrasado` leva `danger`. `design.md §2`: vermelho é semântica — "erro
-                        e atraso" —, e é a última alavanca de cor que este app tem. Atraso em
-                        cinza-neutro ao lado de um número é o estado que mais pede ação lido como
-                        o que menos pede.
-                      */
-                      badge={
-                        estado
-                          ? {
-                              label: estado,
-                              tone:
-                                estado === 'atrasado' ? 'danger'
-                                : estado === 'não caiu' ? 'warning'
-                                : undefined,
-                            }
-                          : undefined
-                      }
-                      subtitle={[...badges, ...context].join(' · ')}
-                      icon={aparencia(tx.category, tx.kind).icon}
-                      tinta={aparencia(tx.category, tx.kind).cor}
-                      accessibilityLabel={`${tx.description || tx.merchant || tx.category || 'Lançamento'}, ${brl(tx.amount_cents)}, ${tx.kind === 'income' ? 'receita' : tx.kind === 'expense' ? 'despesa' : 'transferência'}, ${dayTitle(tx.occurred_at, customPeriod)}${tx.subcategories?.name ? `, ${tx.subcategories.name}` : ''}${estado ? `, ${estado}` : ''}`}
-                      onLongPress={onLongPress}
-                      trailing={
-                        <Money
-                          cents={valor}
-                          variant="ticker"
-                          tone={tx.kind === 'income' ? 'success' : 'text'}
-                          signed={assinado}
-                        />
-                      }
-                    />
-                  )}
-                </ItemLink>
-              </Animated.View>
+              <LinhaDoExtrato
+                tx={item.tx}
+                primeira={index === 0}
+                ultima={index === section.data.length - 1}
+                month={month}
+                hoje={hoje}
+                contaFiltrada={contaFiltrada}
+                nomeDaConta={item.tx.account_id ? accountName.get(item.tx.account_id) : undefined}
+                periodoLivre={customPeriod}
+                onPagar={pagarLinha}
+                onApagar={apagarLinha}
+              />
             );
           }}
-          ItemSeparatorComponent={() => (
-            <View style={[styles.separator, { backgroundColor: theme.separator }]} />
-          )}
+          ItemSeparatorComponent={Separador}
         />
   );
 

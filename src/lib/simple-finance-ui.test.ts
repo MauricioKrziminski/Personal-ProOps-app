@@ -795,7 +795,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
     if (node.type === 'FinanceAnalysisPanes') visit(node.props.compact);
     // `CamposDaSerie` é um grupo de campos sem hook: desenhado aqui, a tela é a que a pessoa vê.
     // Os corpos (`FormularioDaSerie`, `FormularioDaDivida`) têm hooks: eles rodam depois dos da tela, na mesma ordem a cada render.
-    if (typeof node.type === 'function' && ['Controller', 'AccountFormFields', 'CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida', 'TrashEmptyState', 'FilterBar', 'ExpenseClassificationControls', 'EmergencyReserveSection', 'InvestmentsSection', 'BudgetPlanSheet', 'EmergencyReserveSheet', 'EmergencyReserveEditor', 'GoalPlanningSummary', 'GoalPlanSheet', 'GoalContributionCaption', 'GoalContributionFields', 'GoalContributionSummary', 'GoalContributionReady', 'GoalContributionHint', 'PlanningResult', 'Qualifications', ...(options.realMoney ? ['Money'] : [])].includes(node.type.name)) visit(node.type(node.props));
+    if (typeof node.type === 'function' && ['Controller', 'AccountFormFields', 'CamposDaSerie', 'CamposDaCompra', 'FormularioDaSerie', 'CorpoDaSerie', 'FormularioDaDivida', 'CorpoDaDivida', 'TrashEmptyState', 'LinhaDoExtrato', 'FilterBar', 'ExpenseClassificationControls', 'EmergencyReserveSection', 'InvestmentsSection', 'BudgetPlanSheet', 'EmergencyReserveSheet', 'EmergencyReserveEditor', 'GoalPlanningSummary', 'GoalPlanSheet', 'GoalContributionCaption', 'GoalContributionFields', 'GoalContributionSummary', 'GoalContributionReady', 'GoalContributionHint', 'PlanningResult', 'Qualifications', ...(options.realMoney ? ['Money'] : [])].includes(node.type.name)) visit(node.type(node.props));
     if (node.type === 'Field') visit(node.props.hint);
     // No celular o `AdaptivePanes` desenha o slot de uma coluna só (Pastas, Recorrentes…).
     if (node.type === 'AdaptivePanes') visit(node.props.singlePaneContent ?? node.props.main);
@@ -2665,6 +2665,22 @@ test('Parcelada: arrasta Editar a compra à direita e Apagar a compra inteira à
  * estreita (a troca de tema re-layouta a lista) não cresce de volta — "pc gamer (6/8)" ficou com
  * o valor minúsculo até sair da tela (medido no simulador em 23/09/2026).
  */
+test('Lançamentos: a linha é componente memoizado, sem entrada animada, com separador e ações estáveis', () => {
+  // 06/10/2026: cada linha tinha `entering={FadeInDown…delay}` (refeita a cada "Ver mais") e o
+  // `renderItem` recriava o separador e as ações a cada render da tela.
+  const fonte = readFileSync(transacoesFile, 'utf8');
+  assert.doesNotMatch(fonte, /entering=|FadeInDown/, 'lista que se lê não se move por estética (design §5)');
+  assert.match(fonte, /const LinhaDoExtrato = memo\(/);
+  assert.match(fonte, /ItemSeparatorComponent=\{Separador\}/);
+  const ui = screen(transacoesFile);
+  const linhas = ui.nodes().filter((n: any) => n.type?.name === 'LinhaDoExtrato');
+  assert.ok(linhas.length > 0, 'as linhas gravadas são o componente');
+  for (const linha of linhas) {
+    assert.equal(typeof linha.props.onPagar, 'function');
+    assert.equal(typeof linha.props.onApagar, 'function');
+  }
+});
+
 test('Lançamentos: o valor da linha não encolhe a fonte', () => {
   const [link] = itemLinks(screen(transacoesFile));
   const linha = link.props.children({ onLongPress() {} });
