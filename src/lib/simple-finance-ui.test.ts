@@ -1872,7 +1872,8 @@ test('Financeiro: o portão é a PRIMEIRA DOBRA — resumo, mês anterior e bloc
   assert.equal(telaPronta(...resumoChegando.gates.at(-1)!), true, 'o resumo buscando não segura a tela');
   const heroSemEsqueleto = resumoChegando.nodes().find((n: any) => n.type === 'HeroPanel');
   assert.ok(heroSemEsqueleto && heroSemEsqueleto.props.value.type !== 'Skeleton', 'o herói não espera o resumo');
-  assert.ok(tipos(resumoChegando).includes('SkeletonChart'), 'a rosca ganha o esqueleto PRÓPRIO, sem texto');
+  // A rosca pode não existir depois de carregar (mês sem gasto): bloco assim não desenha esqueleto (§7).
+  assert.ok(!tipos(resumoChegando).includes('SkeletonChart'), 'bloco que pode sumir não promete conteúdo');
   // E o que desenha o topo continua segurando: sem as bordas do mês corrente a tela espera.
   const bordasChegando = screen(financeiroFile, { rangePending: true });
   assert.equal(telaPronta(...bordasChegando.gates.at(-1)!), false, 'as bordas do mês exibido seguram a primeira pintura');

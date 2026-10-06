@@ -466,7 +466,7 @@ export default function FinanceScreen() {
               <ThemedText type="headline">
                 {`${accounts.data.length} ${accounts.data.length === 1 ? 'conta' : 'contas'}`}
               </ThemedText>
-            ) : undefined}
+            ) : accounts.isPending ? <Skeleton width="60%" height={20} /> : undefined}
             onPress={() => router.push('/finance/accounts')}
           />
           <Tile
@@ -477,7 +477,7 @@ export default function FinanceScreen() {
               <ThemedText type="headline">
                 {`${budgets.data.length} ${budgets.data.length === 1 ? 'limite' : 'limites'}`}
               </ThemedText>
-            ) : undefined}
+            ) : budgets.isPending ? <Skeleton width="60%" height={20} /> : undefined}
             visual={apertados.length > 0 ? (
               <RingGauge
                 value={maisApertado}
@@ -580,9 +580,6 @@ export default function FinanceScreen() {
       {/* Por DATA DA COMPRA (o herói é por data do pagamento): a pílula diz a lente. */}
       {summary.isError ? (
         <ErrorCard onRetry={() => (range.pronto ? summary.refetch() : range.refetch())} />
-      ) : summary.isPending && !range.isError ? (
-        // Chega depois do herói (as bordas semeiam o resumo): a forma da rosca, sem texto (§7).
-        <SkeletonChart />
       ) : itensDaRosca.length > 0 ? (
         <View style={styles.bloco}>
           <BlockHeader title="Para onde foi" tag="por data da compra" />
