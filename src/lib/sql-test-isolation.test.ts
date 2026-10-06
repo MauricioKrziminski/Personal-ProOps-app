@@ -44,7 +44,11 @@ function run(args: string[]) {
   const file = join(dir, 'fixture.sql');
   writeFileSync(file, 'select 42;');
   try {
-    const result = spawnSync('python3', ['-c', harness, resolve('scripts/sql-test.py'), file, ...args], { encoding: 'utf8' });
+    const result = spawnSync('python3', ['-c', harness, resolve('scripts/sql-test.py'), file, ...args], {
+      encoding: 'utf8',
+      // Sem `agent/.env` (CI): um URL de staging de mentira, o transporte é o dublê acima.
+      env: { ...process.env, SQL_TEST_DATABASE_URL: 'postgresql://teste@db.utkqoiigimqzeenxkxdl.supabase.co/postgres' },
+    });
     const eventsLine = result.stdout.split('\n').find((line) => line.startsWith('EVENTS='));
     return { ...result, events: JSON.parse(eventsLine?.slice(7) ?? '[]') as unknown[][] };
   } finally {

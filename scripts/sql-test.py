@@ -40,6 +40,7 @@ falha por um dia sem nada estar errado.
 """
 from __future__ import annotations
 
+import os
 import pathlib
 import re
 import sys
@@ -53,7 +54,11 @@ STAGING_REF = "utkqoiigimqzeenxkxdl"
 def url() -> str:
     """O DATABASE_URL do staging — `agent/.env` é o ambiente descartável (ver `agent.md`)."""
     arquivo = RAIZ / "agent/.env"
-    for linha in arquivo.read_text().splitlines():
+    # SQL_TEST_DATABASE_URL: o teste do próprio runner roda no CI, onde não existe `agent/.env`.
+    # Passa pela MESMA trava do ref.
+    linhas = [f"DATABASE_URL={os.environ['SQL_TEST_DATABASE_URL']}"] if os.environ.get(
+        "SQL_TEST_DATABASE_URL") else arquivo.read_text().splitlines()
+    for linha in linhas:
         if linha.startswith("DATABASE_URL="):
             valor = linha.split("=", 1)[1].strip().strip('"')
             if STAGING_REF not in valor:
