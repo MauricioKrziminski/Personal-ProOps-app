@@ -102,9 +102,13 @@ nenhum outro:
   `docs/AGENTE-PARIDADE-COM-O-APP.md`.
 - **A ORDEM das propriedades é a ordem em que o Gemini ESCREVE** (`json_schema`, decodificação
   restrita): passada uma chave, ele não volta a uma anterior. Campo que ANCORA o sentido de uma ação
-  vem antes dos dados dela. `target_ref` ficava depois de valor e conta: o aporte em meta, que o
-  modelo começa pela meta, saía sem valor e sem conta — **1/12 → 12/12** ao mover o campo para logo
-  depois de `type` (06/10/2026, defeito que já estava na base). Campo novo entra pensando nisso.
+  vem antes dos dados dela. Medido em 06/10/2026, 3× cada frase no 3.1-flash-lite:
+  `target_ref` depois de valor e conta tirava os dois do aporte em meta (**1/12 → 12/12**);
+  `description` depois do valor tirava o valor de BUSCA das correções (**0/6 → 6/6**); `account`
+  depois de categoria e data fazia "em 10x no nubank" virar só `payment_method=credit` (**0/6 →
+  6/6**, regressão nascida quando `payment_method` entrou no parse). Ordem atual:
+  `type → target_ref → description → amount_cents → account → …`. Campo novo entra pensando nisso,
+  e com sonda antes e depois: a mesma troca que conserta um tipo de ação pode tirar o campo de outro.
 - Por isso Finanças são **dois** schemas: escrita/correção (`FinanceAction`: 22 campos × 14 = 308) e consulta (`FinanceQuery`: 13 × 13 = 169, com `continua_anterior` e `mostrar`; medido em 06/10/2026). Escrita e
   correção ficam juntas de propósito — separá-las obrigaria o router a decidir se "o mercado de
   ontem foi 120" é lançamento novo ou correção, e errar isso cria a duplicata que o produto
