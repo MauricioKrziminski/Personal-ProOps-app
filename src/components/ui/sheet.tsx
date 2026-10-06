@@ -14,6 +14,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DentroDeAbaCongelavel } from '@/components/ui/congela-fora-de-foco';
 import { ToastOutlet } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
 import { classifyWindow } from '@/design/adaptive-window';
@@ -157,7 +158,12 @@ export function Sheet({
 }) {
   const theme = useTheme();
   const { width, height } = useWindowDimensions();
-  const focused = useIsFocused();
+  const focoDaTela = useIsFocused();
+  // Na raiz de uma aba quem esconde a folha ao sair é o `CongelaForaDeFoco`; a aba ainda renderiza
+  // UM render com o foco perdido antes de congelar (para as consultas saírem do cache), e esse
+  // render não pode fechar a folha nem apagar o rascunho dela (ver a exceção abaixo).
+  const dentroDeAba = useContext(DentroDeAbaCongelavel);
+  const focused = dentroDeAba || focoDaTela;
   const tablet = classifyWindow(width) !== 'compact';
   const modalVisible = visible && focused;
   const [presentation, setPresentation] = useState({ visible: modalVisible, tablet });
