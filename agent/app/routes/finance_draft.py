@@ -33,15 +33,14 @@ from app.services import gemini
 from app.routes.chat import MAX_CONTENT, Corpo
 from app.routes.chat import _erro_audio as _erro
 from app.tools import finance
-from app.tools.atributos import forma_da_fala
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/internal/finance", tags=["finance"])
 
 _CRIA = {"create_expense", "create_income", "create_installment_purchase", "mark_paid"}
 # Forma de pagamento (F01): só a que a pessoa DISSE; é metadado, nunca decide receita/despesa.
-# Vem da MESMA segunda leitura do WhatsApp (`tools.atributos.forma_da_fala`, com o veto de
-# ancoragem) — não há regex própria aqui. "Pix no crédito" é o Pix pago no cartão (o formulário
+# Vem do `payment_method` do parse principal (o mesmo do WhatsApp), com o veto de
+# ancoragem de `domain.atributos` — não há regex própria aqui. "Pix no crédito" é o Pix pago no cartão (o formulário
 # pede os juros do Pix).
 # "3x de 100", "3 vezes de 100", "300 em 3x", "300 reais em 3 vezes": a unidade está DITA.
 _UNIDADE_DITA = re.compile(
@@ -217,13 +216,11 @@ async def rascunho(body: PedidoDeRascunho, user_id: Annotated[UUID, Depends(curr
         await conversation.soltar_reserva()  # interpretação que falhou não consome a cota
         raise _erro(502, "draft_failed", "Não consegui entender agora. Tente de novo.") from None
     acoes = [x for x in saida.get("finance_actions", []) if x.get("type") in _CRIA]
-    forma, chamadas = (None, 0)
-    if acoes and _pede_forma(acoes[0]):
-        forma, chamadas = await forma_da_fala(body.text, acoes[0])
+    forma = dom_atributos.forma_proposta(acoes[0].get("payment_method"), body.text) if acoes and _pede_forma(acoes[0]) else None
     await db.record_ai_event(
         user_id=user_id, workspace_id=perfil["workspace_id"], channel="app",
         model=gemini.GEMINI_PARSE, confidence=saida.get("confidence"),
-        result={"finance_actions": saida.get("finance_actions", []), "llm_calls": 1 + chamadas, "draft": True},
+        result={"finance_actions": saida.get("finance_actions", []), "llm_calls": 1, "draft": True},
     )
     if not acoes:
         raise _erro(422, "no_launch", "Não entendi um lançamento. Diga o que gastou ou recebeu.")

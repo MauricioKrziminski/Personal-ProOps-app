@@ -1,6 +1,6 @@
 """Atributos de um lançamento novo pela conversa (lote C: F01 forma, F06 classificação, F09 detalhe).
 
-Puro e sem rede. O modelo propõe (segunda chamada, `tools/atributos.py`); aqui mora o que decide
+Puro e sem rede. O modelo propõe (no `FinanceAction` do parse; `tools/atributos.py` congela); aqui mora o que decide
 se a proposta vale: a compatibilidade forma x conta (espelho de `src/lib/payment-method.ts`, com
 teste de paridade), o veto por ancoragem no texto e a montagem das colunas como o app grava.
 """
@@ -145,12 +145,6 @@ def colunas_de_classificacao(kind: str, explicita: dict, padroes: dict | None) -
         elif padrao:
             saida[coluna], saida[f"{coluna}_source"] = padrao, "category_default"
     return saida
-
-
-def tem_alguma_pista(texto: str) -> bool:
-    """A frase tem ALGUMA palavra que a segunda leitura poderia usar (forma, fixo, essencial, detalhe)?"""
-    todas = [p for grupo in (_PISTAS_FORMA, _PISTAS_PADRAO, _PISTAS_NECESSIDADE) for v in grupo.values() for p in v]
-    return _tem_pista(texto, (*todas, "detalhe", "subcategoria")) or _negado(texto, ("essenc", "necessar"))
 
 
 def frase_dos_atributos(forma: str | None, padrao: str | None, necessidade: str | None,

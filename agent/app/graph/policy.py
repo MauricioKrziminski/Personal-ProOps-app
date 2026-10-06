@@ -737,7 +737,7 @@ def describe_for_confirmation(
                      and action.description.strip().casefold() != action.category.strip().casefold()
                      else "")
         repete = f", repete {descreve_rrule(action.recurrence)}" if action.recurrence else ""
-        # o que a segunda leitura entendeu (forma, fixo/variável, essencial, detalhe — lote C)
+        # o que o parse entendeu e a ancoragem validou (forma, fixo/variável, essencial, detalhe — lote C)
         entendido = f", {frase}" if (frase := ((target or {}).get("atributos") or {}).get("frase")) else ""
         if valor:
             return f"registrar {o_que}{valor} em {alvo}{quando}{categoria}{onde}{entendido}{repete}"

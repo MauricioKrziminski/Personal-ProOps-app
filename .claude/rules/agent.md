@@ -38,8 +38,8 @@ O serviço que recebe do WhatsApp, decide e escreve. Substituiu o par
   números que já lemos: um modelo escrevendo "você gastou aproximadamente" em cima de um valor
   exato é alucinação com custo extra. O nó `geral` (saudação, ajuda) também não chama modelo.
 - **Teto MEDIDO do schema: o PRODUTO propriedades × valores de enum, não cada um.** O
-  `FinanceAction` está no teto de **252** (soma 32); os outros seguem em 198/31. Passar disso
-  devolve `400 INVALID_ARGUMENT` sem detalhe. `tests/test_schemas.py` prende o limite — somar campo
+  `FinanceAction` está em **308** (22×14, soma 36; teto medido de 720 no Lite em 06/10/2026, ver
+  `ai-gemini.md`); os outros seguem em 198/31. Passar disso devolve `400 INVALID_ARGUMENT` sem detalhe. `tests/test_schemas.py` prende o limite — somar campo
   exige tirar outro, ou rodar o probe antes. Números e histórico em `ai-gemini.md`.
 
 ## Padrão de texto: valida estrutura, nunca infere sentido
@@ -449,8 +449,8 @@ garantia sozinho virou responsabilidade do código:
 - **Prompt caching não é alavanca aqui e não deve ser "otimizado".** O mínimo para cache implícito
   é 4.096 tokens nos modelos 3.5/3.6/3.7 Flash; os prompts por domínio têm ~800. Medido em
   30/08/2026.
-- Router + domínio são **duas** chamadas por mensagem — **três** no turno que cria lançamento (a
-  segunda leitura de atributos, `tools/atributos.py`, pulada quando a frase não tem pista) — e a cota grátis do Flash-Lite é 500/dia.
+- Router + domínio são **duas** chamadas por mensagem, também no turno que cria lançamento (os atributos saem do
+  parse principal, sem terceira chamada) — e a cota grátis do Flash-Lite é 500/dia.
   Os fast-paths determinísticos — saudação, resposta SIM/NÃO, documento anexo — existem para
   devolver parte disso.
 

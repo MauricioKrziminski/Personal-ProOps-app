@@ -315,7 +315,7 @@ async def _dominios(texto):
 
 
 async def _atributos(texto):
-    """Lote C: parse de finanças + a segunda leitura. None = nenhum lançamento novo."""
+    """Lote C: o parse de finanças (que já traz os 4 campos) + a ancoragem. None = nenhum lançamento novo."""
     from scripts.probe_atributos_lote_c import rodar
 
     return await _com_retentativa(lambda: rodar(texto))
@@ -764,7 +764,7 @@ def secoes():
             (t, lambda d: "financas" in d and "cadastros" not in d, "->financas", lambda t=t: _dominios(t))
             for t in ["separei 300 da nubank pra viagem", "apliquei 500 da nubank no CDB", "guardei 200 na meta viagem"]
         ],
-        # --- Lote C da paridade (05/10/2026): a SEGUNDA leitura do lançamento novo -------------
+        # --- Lote C da paridade (05/10/2026): forma, classificação e detalhe no parse do lançamento novo -------------
         # Metade adversarial em cada seção: nome de conta/cartão não é forma, "todo mês" não é fixo,
         # o nome do estabelecimento não é detalhe, e pagar fatura/transferir nem cria lançamento.
         "loteC/forma de pagamento": [
@@ -801,7 +801,7 @@ def secoes():
             (t, lambda o: o == {}, "sem detalhe", lambda t=t: _atributos(t))
             for t in ["gastei 80 no mercado Extra", "comprei pão por 12"]
         ],
-        # Pagar fatura e transferir não criam lançamento: a segunda leitura nem seria chamada.
+        # Pagar fatura e transferir não criam lançamento: nenhuma ação de criação, nada a ancorar.
         "loteC/roteamento": [
             (t, lambda o: o is None, "sem lançamento novo", lambda t=t: _atributos(t))
             for t in ["paguei a fatura do nubank no pix", "transferi 500 da nubank pra poupança"]

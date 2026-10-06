@@ -36,9 +36,19 @@ MAX_PRODUTO = 198
 # 09/09/2026: probe_rename_schema.py accepted 18 x 14 = 252 (sum 32) on
 # gemini-3.7-flash, adding new_description. Measured, never estimated: the API
 # refuses with a bare 400 INVALID_ARGUMENT and it already broke production once.
-FINANCE_PRODUTO_MEDIDO = 252
+#
+# 06/10/2026: o teto de 252 deixou de valer. Medido no Gemini real (gemini-3.1-flash-lite,
+# method="json_schema", o que o langchain-google-genai 4.3.7 usa; o de agosto era outro método de
+# envio) — passaram: 24 propriedades opcionais (anyOf null) x enum 14 = 336; 24 x 14 com
+# type:[t,null]; 30 e 36 propriedades sem null; 36 propriedades anyOf x enum 20 = 720 (soma 56).
+# O FinanceAction tem 22 x 14 = 308 (soma 36), com forma de pagamento, fixo/variável, essencial e
+# detalhe. O gemini-3.7-flash (RESERVA do `structured()`) ainda NÃO foi medido com este schema:
+# crescer além do produto exato abaixo exige medir nos DOIS modelos antes.
+FINANCE_TETO_MEDIDO = 720
+FINANCE_SOMA_TETO_MEDIDA = 56
+FINANCE_PRODUTO_ATUAL = 308
+FINANCE_SOMA_ATUAL = 36
 MAX_SOMA = 31
-FINANCE_SOMA_MEDIDA = 32
 
 MODELOS = [
     ("FinanceAction", FinanceAction, FinanceActionType),
@@ -50,13 +60,24 @@ MODELOS = [
 @pytest.mark.parametrize("nome,modelo,enum", MODELOS)
 def test_dentro_do_orcamento(nome, modelo, enum):
     props, valores = len(modelo.model_fields), len(list(enum))
-    limite = FINANCE_PRODUTO_MEDIDO if modelo is FinanceAction else MAX_PRODUTO
+    limite = FINANCE_TETO_MEDIDO if modelo is FinanceAction else MAX_PRODUTO
     assert props * valores <= limite, (
         f"{nome}: {props}×{valores}={props * valores} passa de {limite}. "
         "Tire um campo, tire um tipo do enum, ou divida o domínio."
     )
-    teto_soma = FINANCE_SOMA_MEDIDA if modelo is FinanceAction else MAX_SOMA
+    teto_soma = FINANCE_SOMA_TETO_MEDIDA if modelo is FinanceAction else MAX_SOMA
     assert props + valores <= teto_soma, f"{nome}: soma {props + valores} passa de {teto_soma}"
+
+
+def test_finance_action_no_tamanho_documentado():
+    """O produto exato é o que a reserva (3.7-flash) vai ter de aceitar: crescer exige medir de novo."""
+    props, valores = len(FinanceAction.model_fields), len(list(FinanceActionType))
+    assert (props * valores, props + valores) == (FINANCE_PRODUTO_ATUAL, FINANCE_SOMA_ATUAL)
+
+
+def test_atributos_do_lancamento_estao_no_parse_principal():
+    # a 2ª chamada (AtributosLote) deixou de existir: os quatro campos moram no FinanceAction
+    assert {"payment_method", "expense_pattern", "expense_necessity", "detalhe"} <= set(FinanceAction.model_fields)
 
 
 def test_router_e_minusculo():

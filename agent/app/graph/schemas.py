@@ -98,7 +98,7 @@ CompactInstallmentScope = Annotated[
 
 
 class FinanceAction(BaseModel):
-    """18 propriedades × 14 valores de enum = 252, o TETO medido (ver ai-gemini.md).
+    """22 propriedades × 14 valores de enum = 308 (soma 36), dentro do teto medido (ver ai-gemini.md).
 
     Escrita e correção ficam JUNTAS de propósito. Separá-las obrigaria o router a
     decidir se "o mercado de ontem foi 120" é lançamento novo ou correção — e
@@ -156,6 +156,14 @@ class FinanceAction(BaseModel):
         None,
         description="Nome da meta, do bem, ou o gatilho da regra de categorização.",
     )
+    # Atributos de um lançamento NOVO (create_expense/income/installment_purchase). Texto livre,
+    # validado em Python (`tools/atributos.py`, ancoragem na frase); vazio é o valor normal.
+    payment_method: str | None = Field(
+        None, description="pix, credit, debit, cash, bank_transfer ou boleto — SÓ se a frase diz como pagou.")
+    expense_pattern: str | None = Field(None, description="fixed ou variable — SÓ se a frase diz fixo/variável.")
+    expense_necessity: str | None = Field(
+        None, description="essential ou discretionary — SÓ se a frase diz essencial/supérfluo.")
+    detalhe: str | None = Field(None, description="Nome do detalhe (subcategoria) que a frase cita.")
 
 
 class FinancePlan(BaseModel):
@@ -168,26 +176,6 @@ class FinancePlan(BaseModel):
         if len(actions) > 10:
             raise ValueError("At most 10 financial actions per turn")
         return actions
-
-
-class AtributosItem(BaseModel):
-    """Os atributos de UM lançamento novo (lote C: forma, classificação e detalhe).
-
-    Schema próprio e pequeno, numa SEGUNDA chamada: `FinanceAction` está no teto medido de 252 e não
-    ganha campo. Tudo é texto e é validado em Python (`tools/atributos.py`); null é o valor normal.
-    """
-
-    indice: int = Field(description="O número do lançamento na lista recebida.")
-    payment_method: str | None = Field(
-        None, description="pix, credit, debit, cash, bank_transfer ou boleto — SÓ se a frase diz como pagou.")
-    expense_pattern: str | None = Field(None, description="fixed ou variable — SÓ se a frase diz fixo/variável.")
-    expense_necessity: str | None = Field(
-        None, description="essential ou discretionary — SÓ se a frase diz essencial/supérfluo.")
-    detalhe: str | None = Field(None, description="Nome do detalhe (subcategoria) que a frase cita.")
-
-
-class AtributosLote(BaseModel):
-    itens: list[AtributosItem] = Field(default_factory=list)
 
 
 class FinanceQueryType(str, Enum):

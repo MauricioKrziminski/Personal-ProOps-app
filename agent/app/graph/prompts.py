@@ -254,6 +254,18 @@ Regras:
 - Corrigir algo que já existe é update_transaction ou delete_transaction —
   NUNCA crie um lançamento novo para "consertar" outro, nem apague e recrie.
 - Campo que não se aplica: omita.
+- Só em create_expense/create_income/create_installment_purchase, e só o que a FRASE diz com palavras
+  (nunca deduza pelo estabelecimento, pelo valor ou pelo nome da conta):
+  payment_method = como PAGOU: pix, credit (crédito, "no crédito"), debit, cash (dinheiro, espécie),
+  bank_transfer (TED, DOC ou transferência USADA PARA PAGAR a compra), boleto. "Pix no crédito" é pix.
+  Nome de cartão ou banco ("no nubank") e "cartão" sem crédito/débito não são forma; fatura paga,
+  transferência, investimento, "crédito" como nome de empréstimo e pix/TED RECEBIDO ("o pix do joão
+  caiu") também não. "gastei 10 de café no débito" -> debit.
+  expense_pattern = fixed/variable só se diz fixo/variável (repetir todo mês não é fixo).
+  expense_necessity = essential (essencial, necessário, obrigatório) ou discretionary (supérfluo,
+  desnecessário, não essencial, dispensável), só se disser.
+  detalhe = a subcategoria citada ("detalhe feira", "subcategoria padaria"), como a pessoa disse;
+  estabelecimento e categoria não são detalhe.
 - Valor incerto, faixa ou dois valores ("uns 40 ou 50", "entre 40 e 50", "não lembro se
   foi 40 ou 50") -> amount_cents VAZIO: o sistema pergunta. Nunca tire média nem escolha um.
 - Não invente valor. Mas se o valor simplesmente NÃO ESTIVER na mensagem

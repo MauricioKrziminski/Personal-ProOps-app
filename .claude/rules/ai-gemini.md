@@ -60,7 +60,7 @@ nenhum outro:
   seria o Lite, medido aprovando "apaga todos". **Com reserva, o principal tem 10 s e nenhuma
   nova tentativa** (`PRAZO_COM_RESERVA`, 06/10/2026): com 30 s o Lite parado segurava a resposta e o
   "Montar lançamento" da voz levou 33,7 s. Lote de extrato e anexo usam `PRAZO_LONGO` (30 s); sem
-  reserva (portão, segunda leitura) continua 30 s e UMA nova tentativa (o Lite degradado levou
+  reserva (portão) continua 30 s e UMA nova tentativa (o Lite degradado levou
   15,7 s para "diga ok").
 - **Valor de dinheiro tem rede de segurança determinística.** Se a ação exige `amount_cents` e a
   IA omitiu, `parse_valor_em_centavos` (`app/domain/money.py`) tira do texto cru — mas só com UM
@@ -75,7 +75,13 @@ nenhum outro:
   `new_description`). Os outros schemas seguem em 198/31. Antes de somar campo, rode o probe — a
   recusa é um `400 INVALID_ARGUMENT` sem detalhe, e estimar aqui já custou uma quebra em produção.
 
-  **252 é o TETO, não um degrau.** Em 09/09/2026 as duas ampliações possíveis foram medidas e
+  **O teto de 252 caiu em 06/10/2026**: medido no Gemini real (`gemini-3.1-flash-lite`,
+  `method="json_schema"`, o do langchain-google-genai 4.3.7; o de agosto era outro método de envio)
+  passaram 24×14 = 336 (com e sem `anyOf` null), 30 e 36 propriedades sem null e 36×20 = 720. O
+  `FinanceAction` está em 22×14 = 308 (soma 36); `tests/test_schemas.py` prende o produto exato e o
+  teto medido (720). A reserva (`gemini-3.7-flash`) deve ser medida antes de crescer mais.
+
+  **(histórico) 252 era o TETO, não um degrau.** Em 09/09/2026 as duas ampliações possíveis foram medidas e
   recusadas: 19×14 = 266 (uma propriedade a mais) e 18×15 = 270 (um valor de enum a mais).
   `FinanceAction` está cheio — capacidade nova ali sai por ALVO resolvido (foi assim que quitar
   fatura sem caixa virou `mark_paid` sobre `card_invoices`) ou pelo catálogo de `ResourceAction`,
@@ -89,15 +95,15 @@ nenhum outro:
 - Objeto flat, sem `anyOf`/union (o structured output do Gemini lida mal). Multi-intent continua:
   uma ação por item da mensagem, máx. 10, e o router devolve LISTA de domínios para
   "gastei 45 e me lembra do aluguel" não perder metade.
-- **Uma segunda leitura existe, e só na ESCRITA de lançamento novo** (lote C, 05/10/2026):
-  `tools/atributos.congelar`, chamada de `resolve_node`, com schema próprio `AtributosLote`
-  (forma de pagamento, fixo/variável, essencial, detalhe — todos nullable), papel `parse`
-  (Flash-Lite), UMA chamada por turno para o lote inteiro. Existe porque `FinanceAction` está no
-  teto de 252 e não ganha campo. O que o modelo propõe só vale se a frase sustenta (ancoragem em
-  `domain/atributos`: um Pix que a frase não disse é descartado), falha/429/timeout (25 s) lança
-  SEM atributos e conta em `llm_calls` só quando respondeu. Não roda em consulta, transferência,
-  pagar fatura nem correção. Sonda: `scripts/probe_atributos_lote_c.py`; seções `loteC/*` do
-  `evaluate_answer_forms.py`. Os testes não chamam o Gemini (`tests/conftest.py` derruba a leitura).
+- **Forma de pagamento, fixo/variável, essencial e detalhe saem do PARSE PRINCIPAL** (06/10/2026):
+  quatro campos opcionais do `FinanceAction` (`payment_method`, `expense_pattern`,
+  `expense_necessity`, `detalhe`), validados e congelados em `tools/atributos.congelar` (chamada de
+  `resolve_node`, sem modelo). Eram uma segunda chamada (`AtributosLote`) só porque o schema não
+  cabia mais campo. O que o modelo propõe só vale se a frase sustenta (ancoragem em
+  `domain/atributos`: um Pix que a frase não disse é descartado; detalhe sem "detalhe X" só vale com
+  o nome exato de um existente); falha do banco lança SEM atributos. Não roda em consulta,
+  transferência, pagar fatura nem correção. Sonda: `scripts/probe_atributos_lote_c.py`; seções
+  `loteC/*` do `evaluate_answer_forms.py`.
 - Sem segunda chamada de LLM para formatar resposta de consulta — a saída do WhatsApp é template
   Python puro (`cents_to_brl`). Um modelo escrevendo "você gastou aproximadamente" em cima de um
   valor exato é alucinação com custo extra.

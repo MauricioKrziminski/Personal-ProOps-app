@@ -12,8 +12,7 @@ from app.graph import nodes
 from app.routes import chat as chat_routes
 from app.routes import finance_draft
 from app.services import whatsapp
-from app.graph.schemas import AtributosItem, AtributosLote
-from app.tools import atributos, registry
+from app.tools import registry
 
 USER = UUID("11111111-1111-1111-1111-111111111111")
 WS = uuid4()
@@ -71,18 +70,6 @@ def mundo(monkeypatch):
         monkeypatch.setattr(nodes, "finance_node", finance_node)
 
     return type("M", (), {"modelo": staticmethod(modelo), "contas": contas, "visto": visto})
-
-
-def _leitura(monkeypatch, forma):
-    """A segunda leitura (a mesma do WhatsApp) devolvendo `forma` para o lançamento 0."""
-    chamadas = []
-
-    async def extrair(_texto, _linhas):
-        chamadas.append(1)
-        return AtributosLote(itens=[AtributosItem(indice=0, payment_method=forma)])
-
-    monkeypatch.setattr(atributos, "_extrair", extrair)
-    return chamadas
 
 
 def _cliente(autenticado=True):
@@ -204,8 +191,8 @@ def test_recorrente_mensal_resolve_o_proximo_dia(mundo):
 
 
 def test_pix_no_credito_pergunta_o_cartao(mundo, monkeypatch):
-    _leitura(monkeypatch, "pix")
-    mundo.modelo([{"type": "create_expense", "amount_cents": 12000, "description": "luz"}])
+    mundo.modelo([{"type": "create_expense", "amount_cents": 12000, "description": "luz",
+                   "payment_method": "pix"}])
     j = _pede("paguei 120 de luz no pix no crédito").json()
     assert any("Pix no crédito" in q for q in j["perguntas"])
     assert any("Qual cartão" in q for q in j["perguntas"])
@@ -236,28 +223,27 @@ def test_paguei_vira_gasto_novo_com_pergunta(mundo):
 
 
 def test_forma_de_pagamento_so_a_dita(mundo, monkeypatch):
-    mundo.modelo([{"type": "create_expense", "amount_cents": 4500, "description": "mercado"}])
-    chamadas = _leitura(monkeypatch, "debit")
-    # sem pista na frase nem chama o modelo
+    mundo.modelo([{"type": "create_expense", "amount_cents": 4500, "description": "mercado",
+                   "payment_method": "debit"}])
+    # o modelo propôs débito, a frase não diz: vetado
     assert "paymentMethod" not in _pede("gastei 45 no mercado").json()["params"]
-    assert chamadas == []
     assert _pede("gastei 45 no mercado no débito").json()["params"]["paymentMethod"] == "debit"
-    # a segunda leitura conta como chamada de IA no `ai_events`
-    assert mundo.visto["auditoria"][-1]["result"]["llm_calls"] == 2
+    # a forma vem do parse principal: uma chamada de IA só no `ai_events`
+    assert mundo.visto["auditoria"][-1]["result"]["llm_calls"] == 1
 
 
 def test_credito_consignado_nao_vira_forma_nem_exige_cartao(mundo, monkeypatch):
     # quem lê o sentido é o modelo (aqui: "não é forma de pagamento"), não a palavra "crédito"
     mundo.modelo([{"type": "create_expense", "amount_cents": 50000, "description": "consignado"}])
-    _leitura(monkeypatch, None)
     j = _pede("paguei 500 do crédito consignado").json()
     assert "paymentMethod" not in j["params"]
     assert not any("Qual cartão" in q for q in j["perguntas"])
 
 
 def test_forma_proposta_sem_pista_na_frase_e_vetada(mundo, monkeypatch):
-    mundo.modelo([{"type": "create_expense", "amount_cents": 4500, "description": "mercado"}])
-    _leitura(monkeypatch, "pix")  # o modelo inventa; a frase não diz pix (mas tem outra pista)
+    # o modelo inventa pix; a frase não diz pix (mas tem outra pista)
+    mundo.modelo([{"type": "create_expense", "amount_cents": 4500, "description": "mercado",
+                   "payment_method": "pix"}])
     j = _pede("gastei 45 no mercado em dinheiro").json()
     assert "paymentMethod" not in j["params"]
 

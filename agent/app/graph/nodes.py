@@ -745,13 +745,13 @@ async def resolve_node(state: AgentState) -> dict:
     alvos = await lote_d.congelar(state["timezone"], state.get("text", ""), acoes, alvos,
                                   pular=set(_incompletas(state, acoes)))
 
-    # forma de pagamento, fixo/variável, essencial e detalhe DITOS na frase (lote C): segunda leitura,
-    # que nunca bloqueia o lançamento quando falha
-    alvos, chamadas = await atributos.congelar(
+    # forma de pagamento, fixo/variável, essencial e detalhe que o parse propôs (lote C): só valem se a
+    # frase os sustenta; falhar nunca bloqueia o lançamento
+    alvos = await atributos.congelar(
         state["workspace_id"], state.get("text", ""), acoes, alvos, pular=set(_incompletas(state, acoes)))
 
     return {"targets": with_resources(alvos), "results": esclarecimentos,
-            "draft": _rascunho(state, acoes, alvos), **({"llm_calls": chamadas} if chamadas and not state.get("preset") else {})}
+            "draft": _rascunho(state, acoes, alvos)}
 
 
 def _incompletas(state: AgentState, acoes: list) -> dict[int, str]:
