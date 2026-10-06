@@ -7,14 +7,47 @@ aqui. O Scheduler autentica com OIDC — não há segredo para vazar.
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends
 
+from app import db
 from app.domain.dates import now_utc
 from app.jobs import alerts, checkpoints, reminders, scheduler
 from app.routes.worker import sweep
 from app.security import require_internal
 
+log = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/cron", tags=["cron"], dependencies=[Depends(require_internal)])
+
+
+async def checar_fila() -> dict:
+    """Checagem barata da fila, logo depois do sweep: o log com `severity: ERROR` e `alerta` é o
+    que as métricas do Cloud Logging (`setup-gcp.sh alertas`) contam. Nunca derruba o cron."""
+    try:
+        r = await db.fetch_one(
+            """
+            select count(*) filter (where status = 'pending'
+                                    and created_at < now() - interval '5 minutes') as paradas,
+                   count(*) filter (where status = 'failed'
+                                    and coalesce(claimed_at, created_at) > now() - interval '1 hour')
+                     as falhas
+            from public.messages_queue
+            where status in ('pending', 'failed')
+            """
+        )
+    except Exception:  # noqa: BLE001 — alarme que falha não pode derrubar o sweep
+        log.warning("checagem da fila falhou", exc_info=True)
+        return {"error": "checagem da fila falhou"}
+    paradas, falhas = int(r["paradas"]), int(r["falhas"])
+    if paradas:
+        log.error("fila parada: %d mensagem(ns) pending há mais de 5 min", paradas,
+                  extra={"alerta": "fila_parada", "pendentes": paradas})
+    if falhas:
+        log.error("falhas definitivas: %d mensagem(ns) failed na última hora", falhas,
+                  extra={"alerta": "falhas_definitivas", "falhas": falhas})
+    return {"pendentes_antigas": paradas, "falhas_1h": falhas}
 
 
 @router.post("/reminders")
@@ -36,7 +69,8 @@ async def run_reminders() -> dict:
         novas = await scheduler.materialize_horizon(now_utc(), so_novas=True)
     except Exception:  # noqa: BLE001
         novas = {"error": "materializar as novas falhou"}
-    return {"reminders": lembretes, "sweep": resgate, "recorrentes_novas": novas}
+    return {"reminders": lembretes, "sweep": resgate, "recorrentes_novas": novas,
+            "fila": await checar_fila()}
 
 
 @router.post("/finance-scheduler")

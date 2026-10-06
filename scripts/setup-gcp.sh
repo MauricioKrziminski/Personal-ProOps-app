@@ -10,6 +10,8 @@
 #   ./scripts/setup-gcp.sh deploy       # só o deploy do Cloud Run
 #   ./scripts/setup-gcp.sh staging      # serviço/fila/segredos de STAGING (sem crons)
 #   ./scripts/setup-gcp.sh secrets      # só (re)grava os segredos
+#   ./scripts/setup-gcp.sh alertas      # métricas de log, políticas (ALERT_EMAIL) e orçamento
+#                                       # (BILLING_ACCOUNT + BUDGET_USD); sem as variáveis, pula
 #
 set -euo pipefail
 
@@ -462,6 +464,97 @@ criar_cron() {
 }
 
 # ---------------------------------------------------------------------------
+# 8. alertas e orçamento
+# ---------------------------------------------------------------------------
+# Métrica baseada em log: cria ou atualiza (idempotente).
+criar_metrica() {
+  local nome="$1" filtro="$2" desc="$3" cmd=create
+  gcloud logging metrics describe "$nome" --project "$PROJECT_ID" &>/dev/null && cmd=update
+  gcloud logging metrics "$cmd" "$nome" --project "$PROJECT_ID" \
+    --description "$desc" --log-filter "$filtro" --quiet >/dev/null
+  printf '  ✓ métrica %s\n' "$nome"
+}
+
+# Política: dispara quando a métrica passa de zero numa janela de 5 min. Não recria se o
+# nome de exibição já existe (descrever por filtro, porque o ID da política é gerado).
+criar_politica() {
+  local metrica="$1" titulo="$2" canal="$3"
+  if gcloud alpha monitoring policies list --project "$PROJECT_ID" \
+       --filter "displayName=\"$titulo\"" --format='value(name)' 2>/dev/null | grep -q .; then
+    skip "política '$titulo' já existe"
+    return
+  fi
+  local arq
+  arq="$(mktemp)"
+  cat >"$arq" <<JSON
+{
+  "displayName": "$titulo",
+  "combiner": "OR",
+  "notificationChannels": ["$canal"],
+  "conditions": [{
+    "displayName": "$titulo",
+    "conditionThreshold": {
+      "filter": "metric.type=\"logging.googleapis.com/user/$metrica\" AND resource.type=\"cloud_run_revision\"",
+      "comparison": "COMPARISON_GT",
+      "thresholdValue": 0,
+      "duration": "0s",
+      "aggregations": [{"alignmentPeriod": "300s", "perSeriesAligner": "ALIGN_SUM"}]
+    }
+  }]
+}
+JSON
+  gcloud alpha monitoring policies create --project "$PROJECT_ID" \
+    --policy-from-file "$arq" --quiet >/dev/null
+  rm -f "$arq"
+  ok "política '$titulo'"
+}
+
+criar_alertas() {
+  log "Alertas e orçamento ($SERVICE)"
+  local base='resource.type="cloud_run_revision" AND resource.labels.service_name="'"$SERVICE"'"'
+  criar_metrica "${SERVICE}-fila-parada" \
+    "$base AND jsonPayload.alerta=\"fila_parada\"" "Mensagens pending há mais de 5 min"
+  criar_metrica "${SERVICE}-falhas-definitivas" \
+    "$base AND jsonPayload.alerta=\"falhas_definitivas\"" "Mensagens failed na última hora"
+  criar_metrica "${SERVICE}-erros-5xx" \
+    'resource.type="cloud_run_revision" AND resource.labels.service_name="'"$SERVICE"'" AND httpRequest.status>=500' \
+    "Respostas 5xx do serviço"
+
+  # Sem e-mail não há canal, e não se inventa um: o passo é pulado.
+  if [[ -z "${ALERT_EMAIL:-}" ]]; then
+    warn "ALERT_EMAIL ausente — métricas criadas, políticas de alerta PULADAS"
+  else
+    local canal
+    canal="$(gcloud alpha monitoring channels list --project "$PROJECT_ID" \
+      --filter "type=email AND labels.email_address=$ALERT_EMAIL" --format='value(name)' | head -1)"
+    if [[ -z "$canal" ]]; then
+      canal="$(gcloud alpha monitoring channels create --project "$PROJECT_ID" \
+        --display-name "ProOps alertas" --type email \
+        --channel-labels "email_address=$ALERT_EMAIL" --format='value(name)')"
+    fi
+    criar_politica "${SERVICE}-fila-parada"       "ProOps ${SERVICE}: fila parada"       "$canal"
+    criar_politica "${SERVICE}-falhas-definitivas" "ProOps ${SERVICE}: falhas definitivas" "$canal"
+    criar_politica "${SERVICE}-erros-5xx"         "ProOps ${SERVICE}: erros 5xx"         "$canal"
+  fi
+
+  # Orçamento de faturamento: avisa a 50%, 90% e 100% de BUDGET_USD. Sem a conta ou o valor, pula.
+  if [[ -z "${BILLING_ACCOUNT:-}" || -z "${BUDGET_USD:-}" ]]; then
+    warn "BILLING_ACCOUNT/BUDGET_USD ausentes — orçamento de faturamento PULADO"
+  elif gcloud billing budgets list --billing-account "$BILLING_ACCOUNT" \
+         --filter "displayName=ProOps $PROJECT_ID" --format='value(name)' 2>/dev/null | grep -q .; then
+    skip "orçamento 'ProOps $PROJECT_ID' já existe"
+  else
+    gcloud billing budgets create --billing-account "$BILLING_ACCOUNT" \
+      --display-name "ProOps $PROJECT_ID" \
+      --filter-projects "projects/$PROJECT_ID" \
+      --budget-amount "${BUDGET_USD}USD" \
+      --threshold-rule percent=0.5 --threshold-rule percent=0.9 --threshold-rule percent=1.0 \
+      --quiet >/dev/null
+    ok "orçamento de ${BUDGET_USD} USD (50/90/100%)"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 main() {
   case "${1:-tudo}" in
     deploy)  criar_projeto; deploy; criar_crons ;;
@@ -471,6 +564,7 @@ main() {
     # repontaria os crons de PRODUÇÃO para a URL de staging, em silêncio.
     staging) criar_projeto; gravar_segredos; criar_fila; deploy ;;
     preflight) preflight ;;
+    alertas) criar_projeto; criar_alertas ;;
     build-iam) criar_projeto; permitir_build ;;
     sa) criar_projeto; criar_sa ;;
     secrets) criar_projeto; gravar_segredos ;;
@@ -486,7 +580,7 @@ main() {
       criar_crons
       log "Pronto. Aponte o webhook da Meta para a URL acima."
       ;;
-    *) echo "uso: $0 [tudo|deploy|staging|secrets|preflight|build-iam|sa]" >&2; exit 1 ;;
+    *) echo "uso: $0 [tudo|deploy|staging|secrets|preflight|build-iam|sa|alertas]" >&2; exit 1 ;;
   esac
 }
 # ── Trava de produção ──────────────────────────────────────────────────────
@@ -503,7 +597,7 @@ prod_gate() {
   # de STAGING nos segredos de PRODUÇÃO, sem prompt. Gate por subcomando é mais
   # estrito e é uma linha a menos.
   case "$cmd" in
-    tudo|deploy|secrets|sa|build-iam) ;;   # escrevem em produção
+    tudo|deploy|secrets|sa|build-iam|alertas) ;;   # escrevem em produção
     *) return 0 ;;                         # staging, preflight: passam direto
   esac
 
