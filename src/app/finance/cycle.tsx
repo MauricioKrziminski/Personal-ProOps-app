@@ -290,11 +290,15 @@ function Conta({
   forte?: boolean;
 }) {
   return (
+    // Rótulo e valor lado a lado quando cabem; com fonte grande o valor desce inteiro para a linha
+    // de baixo. Encolhendo o rótulo, ele partia no meio da palavra ("Com/ecei", "So/bro/u").
     <View style={styles.contaLinha}>
-      <ThemedText type={forte ? 'smallBold' : 'small'} themeColor={forte ? 'text' : 'textSecondary'}>
+      <ThemedText type={forte ? 'smallBold' : 'small'} themeColor={forte ? 'text' : 'textSecondary'} style={styles.contaRotulo}>
         {rotulo}
       </ThemedText>
-      <Money cents={cents} variant={forte ? 'ticker' : 'footnote'} tone={tone} signed />
+      <View style={styles.contaValor}>
+        <Money cents={cents} variant={forte ? 'ticker' : 'footnote'} tone={tone} signed />
+      </View>
     </View>
   );
 }
@@ -424,10 +428,13 @@ const styles = StyleSheet.create({
   conta: { gap: Space.xs, paddingTop: Space.sm },
   contaLinha: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: Space.sm,
+    columnGap: Space.sm,
   },
+  contaRotulo: { flexShrink: 0, maxWidth: '100%' },
+  contaValor: { marginLeft: 'auto' },
 });
 
 const SEM_ADIANTAMENTOS: Draft[] = [];
