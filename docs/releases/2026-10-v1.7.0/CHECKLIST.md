@@ -2,7 +2,7 @@
 
 Branch `gabriel/financas-22-melhorias`. Nada disto foi feito: produção, merge na `main`, push e
 tag são do Gabriel. Conferido em leitura em 05/10/2026: produção está em `20261001194502` e tem
-**42 migrations pendentes** (`20261002134032` … `20261005220000`), nenhuma só no remoto.
+**43 migrations pendentes** (`20261002134032` … `20261005230000`), nenhuma só no remoto.
 
 Versão: `1.6.3 → 1.7.0` (MINOR: funcionalidade nova e RPCs novas; sem quebra — as migrations são
 aditivas e o agente continua aceitando o contrato anterior). **Tem mudança nativa**: a splash do
@@ -22,7 +22,7 @@ pronta e a redesenharia. A 1.7.0 fecha o OTA para a 1.6.x.
    `cd agent && .venv/bin/ruff check app --select F,E9 && .venv/bin/pytest` — verdes em 05/10.
 2. Migrations (Gabriel):
    ```sh
-   npx supabase migration list --project-ref kwriuifcwyvdrxtspjiz   # confere as 42
+   npx supabase migration list --project-ref kwriuifcwyvdrxtspjiz   # confere as 43
    PROOPS_PROD_OK=1 npx supabase db push --project-ref kwriuifcwyvdrxtspjiz
    ```
    Depois: `supabase/tests/anon_sem_execute.sql` e o registro em `docs/HISTORICO-DE-MIGRATIONS.md`
@@ -36,9 +36,9 @@ pronta e a redesenharia. A 1.7.0 fecha o OTA para a 1.6.x.
 
 ## Rascunho para `docs/HISTORICO-DE-MIGRATIONS.md`
 
-> **Produção e staging ALINHADOS em `20261005220000`** — promoção autorizada pelo Gabriel em
-> DD/MM/2026 para a v1.7.0 (programa de 22 pontos + correções de 05/10). Dry run mostrou as 42
-> migrations `20261002134032` … `20261005220000`; aplicadas com `--project-ref
+> **Produção e staging ALINHADOS em `20261005230000`** — promoção autorizada pelo Gabriel em
+> DD/MM/2026 para a v1.7.0 (programa de 22 pontos + correções de 05/10). Dry run mostrou as 43
+> migrations `20261002134032` … `20261005230000`; aplicadas com `--project-ref
 > kwriuifcwyvdrxtspjiz`, sem seed e sem trocar o link local de staging. Conferência posterior:
 > versões presentes nos dois bancos; `anon_sem_execute.sql` passou. Evidências:
 > `docs/qa/2026-10-02-evolucao-financeira/` e `docs/releases/2026-10-v1.7.0/`.

@@ -3,6 +3,15 @@
 Registro, não regra: o que está em cada banco HOJE se confere na fonte (`CLAUDE.md`, *Banco e
 fila*). Entradas movidas do `CLAUDE.md` em 26/09/2026, na ordem em que estavam lá.
 
+**Produção e staging ALINHADOS em `20261005230000`** — promoção autorizada pelo Gabriel em
+06/10/2026 para a v1.7.0 (programa de 22 pontos + correções de 05/10). `migration list` mostrou
+as 43 migrations `20261002134032` … `20261005230000`, nenhuma só no remoto; aplicadas pelo
+próprio Gabriel com `PROOPS_PROD_OK=1` e `--project-ref`, sem seed e sem trocar o link local de
+staging. Conferência posterior em leitura: as três versões mais novas em `schema_migrations` são
+`20261005230000`, `20261005220000` e `20261005210000`; `anon_sem_execute.sql` passou (transação
+com rollback). Evidências: `docs/qa/2026-10-02-evolucao-financeira/` e
+`docs/releases/2026-10-v1.7.0/`.
+
 **Só no STAGING: `20261002134032_payment_methods.sql`** — aplicada em 02/10/2026 no projeto
 `utkqoiigimqzeenxkxdl`, após `supabase-target.sh` e dry run com somente essa migration,
 sem roles ou seeds. F01 adiciona método de pagamento independente de conta/status, revisões e
