@@ -6,6 +6,7 @@ import type { SymbolViewProps } from 'expo-symbols';
 import { AccountFormFields } from '@/components/finance/account-form';
 import { accountFormFromAccount, accountFormErrors, accountFormPayload, accountFormErrorMessage, emptyAccountForm, type AccountFormState } from '@/lib/account-form';
 
+import { ApelidosDaConta } from '@/components/finance/apelidos-da-conta';
 import { SecaoDeArquivados } from '@/components/ui/secao-de-arquivados';
 import { useBRL } from '@/components/ui/conceal';
 import { ThemedText } from '@/components/themed-text';
@@ -555,6 +556,8 @@ export default function AccountsScreen() {
           {form ? (
             <SheetScroll contentContainerStyle={styles.sheetBody}>
               <AccountFormFields form={form} onChange={setForm} accounts={accounts.data ?? []} hasTransactions={temLancamentos} disabled={fieldsLocked} />
+
+              {form.id ? <ApelidosDaConta accountId={form.id} /> : null}
 
               {creationError || (form.id ? save.isError : createAccount.isError) ? (
                 <ThemedText type="small" themeColor="danger" style={styles.bandText}>
