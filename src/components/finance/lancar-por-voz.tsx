@@ -15,7 +15,7 @@ import { localISODate } from '@/lib/dates';
 import { hrefDoRascunho } from '@/lib/voice-draft';
 import { useTheme } from '@/hooks/use-theme';
 
-type Fase = 'parado' | 'gravando' | 'transcrevendo' | 'montando';
+type Fase = 'parado' | 'iniciando' | 'gravando' | 'transcrevendo' | 'montando';
 
 /** dB do medidor (-160..0) → 0..1. Abaixo de -55 é silêncio (a mesma régua de `audioPossuiSinal`). */
 const nivelDe = (db: number | undefined) => (typeof db === 'number' ? Math.max(0, Math.min(1, (db + 55) / 55)) : 0);
@@ -48,8 +48,8 @@ function NivelDaGravacao({ nivel }: { nivel: number }) {
 
 function FolhaPorVoz({ onClose }: { onClose: () => void }) {
   const gravador = useGravadorDeVoz();
-  const [fase, setFase] = useState<Fase>('parado');
-  const faseAtual = useRef<Fase>('parado');
+  const [fase, setFase] = useState<Fase>('iniciando');
+  const faseAtual = useRef<Fase>('iniciando');
   const [texto, setTexto] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [semMicrofone, setSemMicrofone] = useState(false);
@@ -72,11 +72,24 @@ function FolhaPorVoz({ onClose }: { onClose: () => void }) {
     Keyboard.dismiss();
     setErro(null);
     setSemMicrofone(false);
+    // Permissão e preparo do microfone levam ~1 s: o botão espera em vez de oferecer "Gravar".
+    mudar('iniciando');
     const inicio = await gravador.iniciar();
+    if (inicio !== 'gravando') mudar('parado');
     if (inicio === 'negada') return setSemMicrofone(true);
     if (inicio === 'falhou') return setErro('Não consegui iniciar a gravação.');
     mudar('gravando');
   };
+
+  // Tocar em "Por voz" já é o pedido de gravar: a folha abre ouvindo. A ref segura o StrictMode,
+  // que monta duas vezes em desenvolvimento.
+  const abriuGravando = useRef(false);
+  useEffect(() => {
+    if (abriuGravando.current) return;
+    abriuGravando.current = true;
+    void gravar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só na abertura da folha
+  }, []);
 
   const parar = async () => {
     mudar('transcrevendo');
@@ -111,7 +124,7 @@ function FolhaPorVoz({ onClose }: { onClose: () => void }) {
   };
 
   const gravando = fase === 'gravando';
-  const ocupado = fase === 'transcrevendo' || fase === 'montando';
+  const ocupado = fase === 'iniciando' || fase === 'transcrevendo' || fase === 'montando';
   return (
     <Sheet visible onClose={onClose}>
       <TaskHeader title="Lançar por voz" onClose={onClose} />
@@ -121,7 +134,7 @@ function FolhaPorVoz({ onClose }: { onClose: () => void }) {
           label={gravando ? 'Parar' : texto ? 'Gravar de novo' : 'Gravar'}
           icon={gravando ? 'stop.fill' : 'mic'}
           variant={texto && !gravando ? 'secondary' : 'primary'}
-          loading={fase === 'transcrevendo'}
+          loading={fase === 'iniciando' || fase === 'transcrevendo'}
           disabled={ocupado}
           onPress={gravando ? parar : gravar}
           block

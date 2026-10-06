@@ -268,7 +268,14 @@ export const TextField = forwardRef<TextInput, TextInputProps & { invalid?: bool
           desfocar();
           if (ativo) onBlur?.(e);
         }}
-        style={[styles.input, { color: theme.text, height: altura, minHeight: altura }, input]}
+        style={[
+          styles.input,
+          { color: theme.text, height: altura, minHeight: altura },
+          // Multilinha cresce com o texto: altura livre, respiro em cima e embaixo e o texto no topo.
+          // Com a altura e o padding zero da linha única, o cursor encostava na borda.
+          rest.multiline ? [styles.inputMultilinha, { minHeight: altura * 2 }] : null,
+          input,
+        ]}
         placeholder={Platform.OS === 'ios' ? marcador : placeholder}
         {...rest}
         {...soltaOArrasto}
@@ -593,6 +600,12 @@ const styles = StyleSheet.create({
     // O baseline nativo do UITextField fica abaixo do centro geométrico da caixa. O mesmo ajuste
     // vale para o texto digitado e para o placeholder, sem mexer na área de toque.
     transform: [{ translateY: Platform.OS === 'ios' ? -2 : 0 }],
+  },
+  inputMultilinha: {
+    height: undefined,
+    paddingVertical: Space.md,
+    textAlignVertical: 'top',
+    transform: [],
   },
   valor: {
     flexDirection: 'row',
