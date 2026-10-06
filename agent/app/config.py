@@ -18,7 +18,11 @@ class Settings(BaseSettings):
     # exige de verdade é `db.open_pools()`, com mensagem própria.
     database_url: str = ""
     db_pool_min: int = 1
-    db_pool_max: int = 4
+    # Dimensionados junto com o `--concurrency` do Cloud Run (setup-gcp.sh): um turno
+    # segura 1 conexão de dados e 1 do checkpointer por vez, então concorrência
+    # maior que o pool só enfileira (PoolTimeout vira retry e paga o LLM de novo).
+    db_pool_max: int = 10
+    db_graph_pool_max: int = 6
     # Vazio = deixa o psycopg decidir (session pooler / conexão direta).
     # "0" desliga prepared statements, obrigatório atrás do transaction pooler.
     db_prepare_threshold: str = ""
@@ -70,6 +74,10 @@ class Settings(BaseSettings):
     # Quanto tempo um turno do app segura a conversa. Vencido, outro turno pode
     # tomar — senão um container que morre no meio prende a conversa para sempre.
     app_turn_lease_seconds: int = 300
+    # Prazo de um turno do WhatsApp. Abaixo dos 300 s do Cloud Run: estourando, o
+    # worker devolve o lote à fila (mark_retry) em vez de o container ser morto
+    # com a mensagem presa em `processing`.
+    worker_turn_timeout_seconds: int = 240
     # Origens permitidas na aba Agente, separadas por vírgula. Vazio = nenhuma
     # (o app nativo não manda Origin; isto é para o Expo web e o dev server).
     app_cors_origins: str = ""

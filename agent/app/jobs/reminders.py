@@ -78,50 +78,42 @@ async def run() -> dict:
 
     enviados = desistidos = 0
     for lembrete in vencidos:
-        fuso = lembrete["timezone"] or DEFAULT_TIMEZONE
-        regra = _fixed_day_for_implicit_monthly(
-            lembrete["recurrence"], lembrete["next_run_at"], fuso
-        )
-        try:
-            delivered_channels: list[str] = []
-            skipped = (
-                lembrete["skip_run_at"] is not None
-                and lembrete["skip_run_at"] == lembrete["next_run_at"]
+        # Reivindica ANTES de entregar: duas rodadas que se sobrepõem (cron lento,
+        # retry do Scheduler) pegavam o mesmo lembrete e mandavam o template pago
+        # duas vezes. A trava é de sessão e morre com a conexão; se o container cai
+        # entre entregar e avançar, a próxima rodada reenvia: preferimos o envio
+        # repetido a lembrete perdido (at-least-once).
+        chave = f"lembrete:{lembrete['id']}:{lembrete['next_run_at']}"
+        async with db.trava_de_sessao(chave) as livre:
+            if not livre:
+                continue
+            # a rodada anterior pode ter terminado entre o select e a trava
+            ainda = await db.fetch_one(
+                "select 1 from public.reminders"
+                " where id = %s and next_run_at = %s and active = true",
+                lembrete["id"], lembrete["next_run_at"],
             )
-            if not skipped:
-                delivered_channels = await _entregar(lembrete) or []
-            proxima = next_occurrence(
-                regra, agora, fuso, lembrete["next_run_at"]
+            if not ainda:
+                continue
+            fuso = lembrete["timezone"] or DEFAULT_TIMEZONE
+            regra = _fixed_day_for_implicit_monthly(
+                lembrete["recurrence"], lembrete["next_run_at"], fuso
             )
-            await db.execute(
-                """
-                select public.finish_reminder_occurrence(
-                    %s, %s, %s, %s, %s, 'sent', null, %s, %s
+            try:
+                delivered_channels: list[str] = []
+                skipped = (
+                    lembrete["skip_run_at"] is not None
+                    and lembrete["skip_run_at"] == lembrete["next_run_at"]
                 )
-                """,
-                lembrete["id"],
-                lembrete["next_run_at"],
-                lembrete["recurrence"],
-                proxima,
-                regra,
-                delivered_channels,
-                lembrete["title"],
-            )
-            if not skipped:
-                enviados += 1
-        except Exception as err:  # noqa: BLE001
-            tentativas = (lembrete["send_attempts"] or 0) + 1
-            desistir = tentativas >= MAX_SEND_ATTEMPTS
-            proxima = (
-                next_occurrence(regra, agora, fuso, lembrete["next_run_at"])
-                if desistir
-                else None
-            )
-            if desistir:
+                if not skipped:
+                    delivered_channels = await _entregar(lembrete) or []
+                proxima = next_occurrence(
+                    regra, agora, fuso, lembrete["next_run_at"]
+                )
                 await db.execute(
                     """
                     select public.finish_reminder_occurrence(
-                        %s, %s, %s, %s, %s, 'given_up', %s
+                        %s, %s, %s, %s, %s, 'sent', null, %s, %s
                     )
                     """,
                     lembrete["id"],
@@ -129,25 +121,50 @@ async def run() -> dict:
                     lembrete["recurrence"],
                     proxima,
                     regra,
-                    repr(err)[:2000],
+                    delivered_channels,
+                    lembrete["title"],
                 )
-            else:
-                await db.execute(
-                    """
-                    update public.reminders
-                    set send_attempts = %s, last_error = %s, updated_at = now()
-                    where id = %s and next_run_at = %s
-                      and recurrence is not distinct from %s and active = true
-                    """,
-                    tentativas,
-                    repr(err)[:2000],
-                    lembrete["id"],
-                    lembrete["next_run_at"],
-                    lembrete["recurrence"],
+                if not skipped:
+                    enviados += 1
+            except Exception as err:  # noqa: BLE001
+                tentativas = (lembrete["send_attempts"] or 0) + 1
+                desistir = tentativas >= MAX_SEND_ATTEMPTS
+                proxima = (
+                    next_occurrence(regra, agora, fuso, lembrete["next_run_at"])
+                    if desistir
+                    else None
                 )
-            if desistir:
-                desistidos += 1
-            log.warning("lembrete %s (tentativa %s): %s", lembrete["id"], tentativas, err)
+                if desistir:
+                    await db.execute(
+                        """
+                        select public.finish_reminder_occurrence(
+                            %s, %s, %s, %s, %s, 'given_up', %s
+                        )
+                        """,
+                        lembrete["id"],
+                        lembrete["next_run_at"],
+                        lembrete["recurrence"],
+                        proxima,
+                        regra,
+                        repr(err)[:2000],
+                    )
+                else:
+                    await db.execute(
+                        """
+                        update public.reminders
+                        set send_attempts = %s, last_error = %s, updated_at = now()
+                        where id = %s and next_run_at = %s
+                          and recurrence is not distinct from %s and active = true
+                        """,
+                        tentativas,
+                        repr(err)[:2000],
+                        lembrete["id"],
+                        lembrete["next_run_at"],
+                        lembrete["recurrence"],
+                    )
+                if desistir:
+                    desistidos += 1
+                log.warning("lembrete %s (tentativa %s): %s", lembrete["id"], tentativas, err)
 
     return {"due": len(vencidos), "sent": enviados, "given_up": desistidos}
 

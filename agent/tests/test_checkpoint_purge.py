@@ -84,5 +84,5 @@ def test_o_sql_dos_vivos_reproduz_effective_thread_id():
 def test_pendente_de_hitl_esta_na_clausula():
     """A trava mora no SQL, não na confiança de que "nunca vai acontecer"."""
     assert "public.pending_actions" in checkpoints._MORTOS
-    assert "p.status = 'pending'" in checkpoints._MORTOS
+    assert "p.status = 'awaiting'" in checkpoints._MORTOS
     assert "not exists" in checkpoints._MORTOS

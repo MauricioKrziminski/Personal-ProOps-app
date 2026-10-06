@@ -141,11 +141,44 @@ begin
   select count(*) into n from public.claim_thread_batch('T1');
   assert n = 0, format('thread ocupada deveria devolver 0, veio %s', n);
 
-  -- passados 5 minutos o worker é dado como morto e a conversa volta a ser livre
+  -- passados 5 minutos o worker é dado como morto e a conversa volta a ser livre.
+  -- As 3 linhas presas são RECUPERADAS (retentativa, retry_count 1) e vêm sozinhas:
+  -- a t.4, nova, espera o próximo ciclo (retentativa não se mistura com mensagem nova).
   update public.messages_queue set claimed_at = now() - interval '6 minutes'
     where thread_id = 'T1' and status = 'processing';
   select count(*) into n from public.claim_thread_batch('T1');
-  assert n = 1, format('órfão deveria liberar 1, veio %s', n);
+  assert n = 3, format('as 3 presas deveriam voltar como retentativa, veio %s', n);
+  select count(*) into n from public.messages_queue
+    where thread_id = 'T1' and status = 'processing' and retry_count = 1;
+  assert n = 3, format('recuperada deveria somar retry_count (1), veio %s', n);
+  select count(*) into n from public.messages_queue
+    where wa_message_id = 't.4' and status = 'pending' and retry_count = 0;
+  assert n = 1, 'a mensagem nova não pode entrar no lote da retentativa';
+end $$;
+
+do $$
+declare n int; v_erro text;
+begin
+  -- processing RECENTE continua travando a conversa (a recuperação só age em > 5 min)
+  update public.messages_queue set status = 'done' where thread_id = 'T1';
+  insert into public.messages_queue (wa_message_id, thread_id, phone, message_type, payload, status, claimed_at)
+  values ('t.r1','T1','5551000000001','text','{}'::jsonb,'processing', now() - interval '1 minute'),
+         ('t.r2','T1','5551000000001','text','{}'::jsonb,'pending', null);
+  select count(*) into n from public.claim_thread_batch('T1');
+  assert n = 0, format('processing recente deveria travar, veio %s', n);
+  select count(*) into n from public.messages_queue
+    where wa_message_id = 't.r1' and status = 'processing' and retry_count = 0;
+  assert n = 1, 'processing recente não pode ser tocado pela recuperação';
+
+  -- linha presa com 2 tentativas gastas: a recuperação é a 3ª e estoura o teto -> failed
+  update public.messages_queue set status = 'done' where thread_id = 'T1';
+  insert into public.messages_queue (wa_message_id, thread_id, phone, message_type, payload, status, claimed_at, retry_count)
+  values ('t.f1','T1','5551000000001','text','{}'::jsonb,'processing', now() - interval '6 minutes', 2);
+  select count(*) into n from public.claim_thread_batch('T1');
+  assert n = 0, format('linha no teto não pode voltar ao lote, veio %s', n);
+  select last_error into v_erro from public.messages_queue
+    where wa_message_id = 't.f1' and status = 'failed' and retry_count = 3;
+  assert v_erro like '%preso%', format('estourou o teto: deveria virar failed com motivo, last_error=%s', v_erro);
 end $$;
 
 do $$

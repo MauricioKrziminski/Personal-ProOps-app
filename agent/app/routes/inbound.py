@@ -8,6 +8,7 @@ vira tempestade.
 
 from __future__ import annotations
 
+import hmac
 import logging
 
 from fastapi import APIRouter, Request, Response
@@ -25,9 +26,13 @@ router = APIRouter(tags=["whatsapp"])
 async def verify(request: Request) -> Response:
     """Verificação do webhook, feita uma vez no painel da Meta."""
     params = request.query_params
+    # bytes + tempo constante: str não-ASCII faria compare_digest levantar TypeError
+    esperado = get_settings().whatsapp_verify_token.encode()
+    recebido = (params.get("hub.verify_token") or "").encode()
     if (
         params.get("hub.mode") == "subscribe"
-        and params.get("hub.verify_token") == get_settings().whatsapp_verify_token
+        and bool(esperado)
+        and hmac.compare_digest(recebido, esperado)
     ):
         return Response(content=params.get("hub.challenge", ""), status_code=200)
     return Response(content="forbidden", status_code=403)
@@ -41,6 +46,7 @@ async def inbound(request: Request) -> Response:
 
     # thread_id -> nome da task de debounce anterior (para cancelar)
     threads: dict[str, str | None] = {}
+    enqueue_falhou = False
     try:
         import orjson
 
@@ -56,13 +62,21 @@ async def inbound(request: Request) -> Response:
                     # um insert só: idempotência de entrada e enfileiramento na
                     # MESMA operação (no fluxo antigo eram dois inserts sem
                     # transação, e a falha do segundo sumia com a mensagem)
-                    novo = await db.enqueue(
-                        wa_message_id=wa_id,
-                        thread_id=thread,
-                        phone=phone,
-                        message_type=mensagem.get("type"),
-                        payload=mensagem,
-                    )
+                    try:
+                        novo = await db.enqueue(
+                            wa_message_id=wa_id,
+                            thread_id=thread,
+                            phone=phone,
+                            message_type=mensagem.get("type"),
+                            payload=mensagem,
+                        )
+                    except Exception:  # noqa: BLE001
+                        # Única falha que merece 5xx: sem a linha na fila a mensagem
+                        # só existe na Meta, e é o reenvio dela que a salva. O
+                        # dedupe por wa_message_id torna esse reenvio seguro.
+                        log.exception("webhook: enqueue falhou (wa_id=%s)", wa_id)
+                        enqueue_falhou = True
+                        continue
                     if novo:
                         # ensure_session já devolve a linha com o nome da task
                         # anterior: uma ida ao banco, não duas (o alvo aqui é
@@ -70,8 +84,8 @@ async def inbound(request: Request) -> Response:
                         sessao = await db.ensure_session(phone, thread)
                         threads[thread] = sessao.get("debounce_task_name")
     except Exception:  # noqa: BLE001
-        # NUNCA propagar erro interno para a Meta: 5xx dispara retry storm.
-        # A mensagem já pode estar na fila; o cron/próxima task recupera.
+        # Daqui para baixo a linha já está na fila (ou o corpo é lixo): 5xx
+        # dispararia retry storm sem ganho. O cron/próxima task recupera.
         log.exception("webhook: falha ao enfileirar")
 
     for thread, task_anterior in threads.items():
@@ -87,4 +101,6 @@ async def inbound(request: Request) -> Response:
             # minuto é processada mesmo sem a task
             log.exception("debounce falhou (thread=%s) — o sweep recupera", thread)
 
+    if enqueue_falhou:
+        return Response(content="enqueue failed", status_code=503)
     return Response(content="ok", status_code=200)

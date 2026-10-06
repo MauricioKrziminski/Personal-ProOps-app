@@ -66,7 +66,7 @@ _MORTOS = f"""
     where k.thread_id not in ({_VIVOS})
       and not exists (
         select 1 from public.pending_actions p
-        where p.thread_id = k.thread_id and p.status = 'pending'
+        where p.thread_id = k.thread_id and p.status = 'awaiting'
       )
     limit %s
 """

@@ -332,9 +332,11 @@ deploy() {
   # CADA rota carrega a própria autenticação — HMAC no webhook, OIDC verificado
   # em /worker e /cron, standardwebhooks no OTP. Ver agent/app/security.py.
   #
-  # --concurrency 80: o trabalho é I/O (Postgres, Gemini, Graph API) e o event
-  # loop do asyncio aguenta bem. Menos que isso multiplicaria container (e
-  # conexão de banco) à toa; muito mais estrangularia o pool de 4 conexões.
+  # --concurrency 10: o trabalho é I/O e o event loop aguentaria mais, mas cada
+  # turno segura conexão do pool de dados (DB_POOL_MAX=10) e do checkpointer
+  # (DB_GRAPH_POOL_MAX=6) por vários segundos. Com 80, o pool esgotava, o
+  # PoolTimeout virava retry e a chamada ao LLM era paga de novo. 10 por instância
+  # cabe nos pools; a vazão vem do --max-instances.
   #
   # --min-instances 0 é o scale-to-zero pedido. Ele só é possível porque o
   # debounce mora no Cloud Tasks e não em timer de memória.
@@ -372,7 +374,7 @@ deploy() {
     --allow-unauthenticated \
     --min-instances 0 \
     --max-instances 10 \
-    --concurrency 80 \
+    --concurrency 10 \
     --cpu 1 --memory 1Gi \
     --timeout 300 \
     --quiet \

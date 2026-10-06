@@ -29,7 +29,8 @@ async def process_thread(body: ThreadRequest) -> dict:
         return await worker.process_thread(body.thread_id)
     except Exception as err:  # noqa: BLE001
         log.exception("process_thread falhou")
-        raise HTTPException(status_code=500, detail=str(err)) from err
+        # o detalhe fica no log: a exceção crua carrega SQL e às vezes a URL do banco
+        raise HTTPException(status_code=500, detail="falha ao processar a conversa") from err
 
 
 @router.post("/sweep")

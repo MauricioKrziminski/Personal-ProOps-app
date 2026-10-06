@@ -24,9 +24,7 @@ from app.config import get_settings
 log = logging.getLogger(__name__)
 
 _pool: AsyncConnectionPool | None = None
-_graphlog = logging.getLogger(__name__)
-
-_pool: AsyncConnectionPool | None = None
+_graph_pool: AsyncConnectionPool | None = None
 
 
 def _kwargs() -> dict[str, Any]:
@@ -69,14 +67,18 @@ async def open_pools() -> None:
         min_size=settings.db_pool_min,
         max_size=settings.db_pool_max,
         kwargs=_kwargs(),
+        # Com min_instances=0 a conexão fica horas parada e o pooler a derruba:
+        # sem o check, a primeira query depois da ociosidade pega conexão morta.
+        check=AsyncConnectionPool.check_connection,
         open=False,
     )
     _graph_pool = AsyncConnectionPool(
         settings.database_url,
         min_size=1,
-        max_size=2,
+        max_size=settings.db_graph_pool_max,
         kwargs=_kwargs(),
         configure=_isolar_checkpointer,
+        check=AsyncConnectionPool.check_connection,
         open=False,
     )
     await _pool.open()
@@ -135,6 +137,24 @@ class _Tx:
     async def execute(self, sql: str, *args: Any) -> int:
         cur = await self._conn.execute(sql, args)
         return cur.rowcount
+
+
+@asynccontextmanager
+async def trava_de_sessao(chave: str):
+    """Trava consultiva de SESSÃO (não de transação) presa a uma conexão do pool.
+
+    Devolve True se esta chamada ficou com a trava e False se outra execução já a
+    tem — nesse caso quem chama pula o trabalho. A trava morre com a conexão, então
+    um container que cai no meio não deixa o trabalho preso para sempre.
+    """
+    async with pool().connection() as conn:
+        cur = await conn.execute("select pg_try_advisory_lock(hashtext(%s)) as ok", (chave,))
+        ok = bool((await cur.fetchone())["ok"])
+        try:
+            yield ok
+        finally:
+            if ok:
+                await conn.execute("select pg_advisory_unlock(hashtext(%s))", (chave,))
 
 
 @asynccontextmanager
@@ -364,6 +384,9 @@ async def mark_retry(ids: list[UUID], error: str) -> list[dict[str, Any]]:
             status = case when retry_count + 1 >= 3 then 'failed' else 'pending' end,
             claimed_at = null
         where id = any(%s)
+          -- só o que ainda está em andamento: um timeout que pega o envio, depois
+          -- do mark_done, não pode ressuscitar mensagem já respondida
+          and status = 'processing'
         returning id, status, retry_count
         """,
         error,

@@ -17,11 +17,13 @@ Ordem das etapas, e o motivo de cada uma estar onde está:
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import logging
 import re
 
 from app import conversation, db
+from app.config import get_settings
 from app.security import sanitize_untrusted
 from app.services import groq, whatsapp
 
@@ -40,6 +42,28 @@ NAO_LI = "🙈 Não consegui ler isso. Mando bem com texto, áudio, foto de cupo
 MUITAS = conversation.MUITAS
 
 
+# Tarefas de devolução à fila em andamento: o loop só guarda referência fraca, e uma
+# tarefa sem dono pode ser coletada no meio do UPDATE.
+_devolvendo: set[asyncio.Task] = set()
+
+
+async def _devolver_a_fila(ids: list, motivo: str) -> list[dict]:
+    """`mark_retry` que sobrevive ao cancelamento do turno.
+
+    Cancelamento e timeout são exatamente os casos em que a mensagem ficaria
+    presa em `processing`; um `await` direto seria cancelado junto com o turno e
+    não gravaria nada. A tarefa roda desacoplada (shield): se formos cancelados
+    de novo enquanto esperamos, ela termina sozinha.
+    """
+    tarefa = asyncio.ensure_future(db.mark_retry(ids, motivo))
+    _devolvendo.add(tarefa)
+    tarefa.add_done_callback(_devolvendo.discard)
+    try:
+        return await asyncio.shield(tarefa)
+    except asyncio.CancelledError:
+        return []
+
+
 async def process_thread(thread_id: str) -> dict:
     lote = await db.claim_batch(thread_id)
     if not lote:
@@ -51,24 +75,62 @@ async def process_thread(thread_id: str) -> dict:
     phone = lote[-1]["phone"]
 
     try:
-        sessao = await db.ensure_session(phone, thread_id)
-        if not sessao.get("user_id"):
-            await db.mark_done(ids)
-            await whatsapp.try_send(phone, SEM_CONTA)
-            return {"claimed": len(ids), "status": "sem_conta"}
-        if not sessao.get("workspace_id"):
-            await db.mark_done(ids)
-            await whatsapp.try_send(phone, SEM_WORKSPACE)
-            return {"claimed": len(ids), "status": "sem_workspace"}
+        # Prazo do turno: abaixo dos 300 s do Cloud Run. Sem ele, um lote com
+        # áudios e chamadas lentas passava do limite, o container era morto e a
+        # mensagem ficava em `processing` sem resposta.
+        async with asyncio.timeout(get_settings().worker_turn_timeout_seconds):
+            return await _processar(lote, ids, phone, thread_id)
 
-        # limites ANTES de gastar Groq/Gemini: anti-flood por hora e cota do plano
-        # por mês. Sem isto o paywall do WhatsApp simplesmente não existe.
-        barrado = await conversation.check_limits(sessao)
-        if barrado:
-            await db.mark_done(ids)
-            await whatsapp.try_send(phone, barrado)
-            return {"claimed": len(ids), "status": "limite"}
+    except Exception as err:  # noqa: BLE001
+        log.exception("worker falhou (thread=%s)", thread_id)
+        motivo = "prazo do turno estourou" if isinstance(err, TimeoutError) else repr(err)
+        estados = await _devolver_a_fila(ids, motivo)
+        # Sem "tenta de novo" para o usuário: a fila ainda vai tentar, e avisar de
+        # um erro que vai se resolver sozinho em 2s só gera desconfiança.
+        if any(e["status"] == "failed" for e in estados):
+            await whatsapp.try_send(
+                phone, "😕 Não consegui processar sua última mensagem. Pode mandar de novo?"
+            )
+        raise
+    except BaseException:
+        # CancelledError (cliente do Cloud Tasks desistiu, shutdown do container):
+        # devolve o lote antes de propagar, senão ele espera 5 minutos para ser
+        # recuperado pelo claim.
+        log.warning("worker cancelado (thread=%s)", thread_id)
+        await _devolver_a_fila(ids, "turno cancelado")
+        raise
 
+
+async def _processar(lote: list[dict], ids: list, phone: str, thread_id: str) -> dict:
+    sessao = await db.ensure_session(phone, thread_id)
+    if not sessao.get("user_id"):
+        await db.mark_done(ids)
+        await whatsapp.try_send(phone, SEM_CONTA)
+        return {"claimed": len(ids), "status": "sem_conta"}
+    if not sessao.get("workspace_id"):
+        await db.mark_done(ids)
+        await whatsapp.try_send(phone, SEM_WORKSPACE)
+        return {"claimed": len(ids), "status": "sem_workspace"}
+
+    # limites ANTES de gastar Groq/Gemini: anti-flood por hora e cota do plano
+    # por mês. Sem isto o paywall do WhatsApp simplesmente não existe.
+    barrado = await conversation.check_limits(sessao)
+    if barrado:
+        await db.mark_done(ids)
+        await whatsapp.try_send(phone, barrado)
+        return {"claimed": len(ids), "status": "limite"}
+
+    # Retentativa: o turno anterior pode ter rodado (e escrito) antes de morrer.
+    # Refazer router+parse (temperatura 0,1) pode propor ações em outra ordem, e aí
+    # o `action_index` da idempotência não casa e o lançamento duplica. O
+    # checkpoint sabe o que aconteceu — é o mesmo caminho da aba Agente do app.
+    resposta = None
+    if any((m.get("retry_count") or 0) > 0 for m in lote):
+        resposta = await conversation.recover_turn(
+            sessao, source_message_id=lote[-1]["wa_message_id"]
+        )
+
+    if resposta is None:
         conteudo = await _extract_batch(lote)
         if conteudo is None:
             await db.mark_done(ids)
@@ -83,26 +145,15 @@ async def process_thread(thread_id: str) -> dict:
 
         resposta = await _run_graph(sessao, lote, conteudo)
 
-        # done ANTES do envio: a fonte da verdade já está salva
-        await db.mark_done(ids)
-        if isinstance(resposta, dict):
-            # pergunta interativa; o `mark_done` acima continua vindo ANTES do
-            # envio, que é a ordem que impede reprocessar por falha de envio
-            await whatsapp.try_send_interactive(phone, resposta)
-        elif resposta:
-            await whatsapp.try_send(phone, resposta)
-        return {"claimed": len(ids), "status": "ok"}
-
-    except Exception as err:  # noqa: BLE001
-        log.exception("worker falhou (thread=%s)", thread_id)
-        estados = await db.mark_retry(ids, repr(err))
-        # Sem "tenta de novo" para o usuário: a fila ainda vai tentar, e avisar de
-        # um erro que vai se resolver sozinho em 2s só gera desconfiança.
-        if any(e["status"] == "failed" for e in estados):
-            await whatsapp.try_send(
-                phone, "😕 Não consegui processar sua última mensagem. Pode mandar de novo?"
-            )
-        raise
+    # done ANTES do envio: a fonte da verdade já está salva
+    await db.mark_done(ids)
+    if isinstance(resposta, dict):
+        # pergunta interativa; o `mark_done` acima continua vindo ANTES do
+        # envio, que é a ordem que impede reprocessar por falha de envio
+        await whatsapp.try_send_interactive(phone, resposta)
+    elif resposta:
+        await whatsapp.try_send(phone, resposta)
+    return {"claimed": len(ids), "status": "ok"}
 
 
 # ---------------------------------------------------------------------------
