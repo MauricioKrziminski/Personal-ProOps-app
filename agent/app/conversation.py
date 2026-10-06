@@ -25,6 +25,7 @@ from app import db
 from app.config import get_settings
 from app.domain import confirm, draft, matching
 from app.domain.money import cents_to_brl
+from app.graph.state import CHAVE_MIDIA, marca_da_midia
 from app.security import effective_thread_id
 from app.services import gemini, telemetry
 
@@ -124,7 +125,7 @@ def _estado_base(
         "timezone": sessao["timezone"] or "America/Sao_Paulo",
         "source_message_id": source_message_id,
         "text": conteudo.get("text", ""),
-        "media": conteudo.get("media"),
+        "media": marca_da_midia(conteudo.get("media")),
         "raw_texts": conteudo.get("raw_texts") or [conteudo.get("text", "")],
         "clicked_id": conteudo.get("clicked_id") or "",
         # O histórico chega JÁ CORTADO pela borda; o turno atual entra no fim.
@@ -180,7 +181,10 @@ async def run_turn(
 
     # o epoch já foi resolvido (e girado, se era o caso) no ensure_session
     thread = effective_thread_id(sessao["thread_id"], sessao["session_epoch"])
-    config = {"configurable": {"thread_id": thread}, "callbacks": telemetry.callbacks()}
+    config = {
+        "configurable": {"thread_id": thread, CHAVE_MIDIA: conteudo.get("media")},
+        "callbacks": telemetry.callbacks(),
+    }
 
     # Quantas vezes o modelo foi chamado FORA do grafo neste turno. Os fast-paths
     # que classificam texto (rascunho, SIM/NÃO digitado) gastam token e retornam

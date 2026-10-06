@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
 
 from app.domain.dates import local_datetime_iso, local_iso_date, now_utc
@@ -38,7 +39,7 @@ from app.graph.schemas import (
 )
 from app.domain.required import faltando
 from app.domain.money import cents_to_brl
-from app.graph.state import AgentState
+from app.graph.state import CHAVE_MIDIA, AgentState
 from app.tools import atributos, guards, lote_d, movimentos, resolve
 from app.services import gemini
 from app.tools.base import ExecContext
@@ -251,18 +252,36 @@ _CARTAO_GENERICO = {"cartão", "cartao", "crédito", "credito"}
 _CAMPOS_CORRECAO = ("amount_cents", "account", "category", "description", "occurred_at")
 
 
-async def finance_node(state: AgentState) -> dict:
+def _turno_humano(texto: str, midia: dict | None):
+    """A mensagem humana: texto, e o anexo como parte de mídia quando os bytes chegaram.
+
+    Foto de cupom e PDF de fatura entram como bloco `file` base64 (o formato que o
+    `langchain-google-genai` converte em `inline_data`, serve a imagem e ao PDF). Sem os bytes
+    — retomada, ou canal que não os levou — segue só o texto, que já diz que há anexo.
+    """
+    if not midia or not midia.get("data_b64"):
+        return ("human", texto)
+    from langchain_core.messages import HumanMessage
+
+    return HumanMessage(content=[
+        {"type": "text", "text": texto},
+        {"type": "file", "source_type": "base64", "data": midia["data_b64"],
+         "mime_type": midia.get("mime_type") or "application/octet-stream"},
+    ])
+
+
+async def finance_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
     if state.get("preset") or state.get("halted"):
         return {}  # ações semeadas ou turno cancelado: não reextrair
 
     historico = state.get("messages")[:-1] if state.get("messages") else None
     prazo = gemini.PRAZO_LONGO if state.get("media") else gemini.PRAZO_COM_RESERVA
     modelo = gemini.structured(FinancePlan, gemini.GEMINI_PARSE, prazo=prazo)
+    midia = ((config or {}).get("configurable") or {}).get(CHAVE_MIDIA)
     plano: FinancePlan = await modelo.ainvoke(
         [
             ("system", FINANCE),
-            (
-                "human",
+            _turno_humano(
                 user_turn(
                     state.get("text", ""),
                     state.get("agora_local") or local_datetime_iso(state["timezone"]),
@@ -271,6 +290,7 @@ async def finance_node(state: AgentState) -> dict:
                     history=historico,
                     corrigindo=state.get("corrigindo") or "",
                 ),
+                midia,
             ),
         ]
     )

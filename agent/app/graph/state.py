@@ -66,6 +66,18 @@ def _resource_draft(antigo, novo):
     return antigo or [] if novo is None else novo
 
 
+# Chave de `config["configurable"]` que leva a mídia do turno ao nó de finanças.
+# O checkpointer grava o ESTADO a cada passo e só copia para os metadados do checkpoint os
+# valores str/int/float/bool do `configurable` (`get_checkpoint_metadata`): um dict com o
+# base64 (até ~10 MB) fica de fora, e o estado guarda só a marca de que há anexo.
+CHAVE_MIDIA = "midia_do_turno"
+
+
+def marca_da_midia(media: dict | None) -> dict | None:
+    """O que o ESTADO guarda de um anexo: o tipo, nunca os bytes."""
+    return {"mime_type": media.get("mime_type") or ""} if media else None
+
+
 class AgentState(TypedDict, total=False):
     # identidade
     thread_id: str
@@ -80,7 +92,7 @@ class AgentState(TypedDict, total=False):
     source_message_id: str      # chave de idempotência do turno: id da Meta
                                 # (última do lote) ou `app:<uuid do cliente>`
     text: str                   # texto já sanitizado, pronto para o envelope
-    media: dict[str, str] | None  # {mime_type, data_b64}
+    media: dict[str, str] | None  # só {mime_type}: os bytes vão em config (CHAVE_MIDIA)
     raw_texts: list[str]
     clicked_id: str             # id do botão interativo clicado (ex: qpage:...)
 
