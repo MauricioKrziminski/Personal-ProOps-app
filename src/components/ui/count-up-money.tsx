@@ -88,7 +88,9 @@ export function CountUpMoney({
   }
 
   return (
-    <View accessible accessibilityLabel={formatBRL(cents)}>
+    // Sem `accessible`: no Android ele torna a View focável, e na abertura fria por link (nada
+    // focado) o sistema a foca e desenha o realce de foco — um retângulo escuro sobre o valor.
+    <View focusable={false} accessibilityLabel={formatBRL(cents)}>
       <AnimatedInput
         editable={false}
         pointerEvents="none"
