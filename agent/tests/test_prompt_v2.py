@@ -159,6 +159,17 @@ async def test_ligado_router_fora_do_vocabulario_monta_todos(monkeypatch):
     assert all(t in sistema for t in ("Metas:", "Fatura do cartão:", "create_transfer: account = origem"))
 
 
+@pytest.mark.asyncio
+async def test_pedido_refeito_antes_do_sim_monta_todos_os_modulos(monkeypatch):
+    """O router lê "na verdade…" como `alterar`, mas é um registro NOVO: faltaria o módulo parcelado."""
+    cap = _instalar(monkeypatch, v2=True)
+    await nodes.finance_node({**ESTADO, "text": "Na verdade eu comprei em 2x no cartão",
+                              "subintents": ["alterar"], "corrigindo": "Registrar gasto de R$ 104,99"})
+    sistema = cap.chamadas[0]["mensagens"][0][1]
+    assert "create_installment_purchase (2 ou mais parcelas)" in sistema
+    assert sistema == prompts_v2.finance([])
+
+
 # --- montagem dos módulos ------------------------------------------------------------------
 
 

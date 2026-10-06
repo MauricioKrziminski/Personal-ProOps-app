@@ -339,8 +339,11 @@ async def finance_node(state: AgentState, config: RunnableConfig = None) -> dict
     historico = state.get("messages")[:-1] if state.get("messages") else None
     prazo = gemini.PRAZO_LONGO if state.get("media") else gemini.PRAZO_COM_RESERVA
     v2 = prompts_v2.ligado()
+    # Pedido refeito ANTES do SIM (`corrigindo`): o router lê "na verdade…" como correção, mas a
+    # frase é um registro NOVO — monta TODOS os módulos, senão falta o parcelado (total × parcela).
+    subs = [] if state.get("corrigindo") else state.get("subintents")
     sistema = (
-        prompts_v2.finance(state.get("subintents"), tem_anexo=bool(state.get("media")))
+        prompts_v2.finance(subs, tem_anexo=bool(state.get("media")))
         if v2 else FINANCE
     )
     modelo = gemini.structured(
