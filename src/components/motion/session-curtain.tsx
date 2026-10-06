@@ -273,9 +273,15 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const segurarAbertura = useCallback(() => {
+    if (!pronto.current.segurando) {
+      // O sistema vai pedir a senha: a marca em construção se recolhe, e volta a se construir
+      // quando a senha for aceita (ver `abertura`).
+      cancelAnimation(construcao);
+      construcao.set(withTiming(0, { duration: Motion.duration.base }));
+    }
     pronto.current.segurando = true;
     acordar.current?.();
-  }, []);
+  }, [construcao]);
 
   /*
     A abertura roda UMA vez, no instante em que a camada fez layout — direto do `aoLayout`, sem
@@ -288,16 +294,21 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     o sistema pergunta e a tinta sobe direto no app desbloqueado.
   */
   const comecou = useRef(false);
-  const abertura = useCallback(() => {
-    if (comecou.current) return;
-    comecou.current = true;
-    const desde = Date.now();
+  const construir = useCallback(() => {
+    construcao.set(0);
     construcao.set(
       withTiming(1, {
         duration: reduzido ? Motion.duration.base : CONSTRUCAO_MS,
         easing: Easing.linear,
       }),
     );
+  }, [construcao, reduzido]);
+
+  const abertura = useCallback(() => {
+    if (comecou.current) return;
+    comecou.current = true;
+    let desde = Date.now();
+    construir();
 
     void (async () => {
       const p = pronto.current;
@@ -314,6 +325,16 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
         });
       }
       acordar.current = null;
+      /*
+        Com a trava, a marca se constrói DEPOIS da senha (06/10/2026, "a animação da logo vai ser
+        na entrada e depois de inserir a senha"): o prompt do sistema cobre a tela — no Android o
+        PIN é outra Activity, e a construção acabava escondida atrás dele. `segurarAbertura`
+        recolheu a marca; aqui ela se constrói de novo e o mínimo conta deste instante.
+      */
+      if (p.segurando && p.valor) {
+        construir();
+        desde = Date.now();
+      }
       // A marca não pode ser um lampejo: a passagem "marca → app" acontece em toda abertura
       // (também com Reduzir Movimento — ficar parada na tela não é movimento).
       await dormir(esperaDaMarca(desde, Date.now()));
@@ -325,7 +346,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       );
       setAberturaFeita(true);
     })();
-  }, [construcao, descobrir, reduzido]);
+  }, [construir, descobrir]);
 
   const esconderSplash = useCallback(() => {
     const s = splash.current;

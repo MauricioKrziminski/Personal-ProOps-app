@@ -210,6 +210,9 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
   }, [saindo, cortinaSaindo, reduzido, progresso, construcao, painelSai, onSaiu]);
 
   const conteudo = useAnimatedStyle(() => ({ opacity: 1 - painelSai.get() }));
+  // Senha aceita: disco e frase ficam em "Confirmando…" enquanto saem — o estado já voltou a
+  // `trancado`, e o painel escrevia "Toque para usar…" de novo durante a saída.
+  const visivel: EstadoDaTrava = saindo ? 'autenticando' : estado;
   const veu = useAnimatedStyle(() => ({ opacity: 1 - progresso.get() }));
 
   return (
@@ -244,7 +247,7 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
 
       {/* Terço ótico: 2 em cima, 3 embaixo — o centro geométrico lê baixo demais. */}
       <Animated.View style={[styles.centro, conteudo]}>
-        <DiscoDaTrava estado={estado} onPress={() => void autenticar()} />
+        <DiscoDaTrava estado={visivel} onPress={() => void autenticar()} />
         <Animated.View
           entering={FadeIn.delay(140).duration(Motion.duration.slow)}
           style={styles.dizeres}>
@@ -252,9 +255,9 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
             App bloqueado
           </ThemedText>
           {/* `key={estado}`: a troca de frase é um corte com fade, não texto mudando sob o olho. */}
-          <Animated.View key={estado} entering={FadeIn.duration(Motion.duration.base)}>
+          <Animated.View key={visivel} entering={FadeIn.duration(Motion.duration.base)}>
             <ThemedText type="small" themeColor="onCurtainMuted" style={styles.centrado}>
-              {FRASES[estado](comoAutentica)}
+              {FRASES[visivel](comoAutentica)}
             </ThemedText>
           </Animated.View>
         </Animated.View>
