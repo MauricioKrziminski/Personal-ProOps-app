@@ -211,7 +211,7 @@ def _fakes_de_conta(monkeypatch):
     async def accounts(workspace_id, *, only_cards=False):
         return CONTAS
 
-    async def salvar(workspace_id, account_id, alias):
+    async def salvar(workspace_id, account_id, alias, dito=None):
         gravados.append((workspace_id, account_id, alias))
 
     monkeypatch.setattr(conversation.db, "accounts", accounts)
@@ -276,10 +276,11 @@ async def test_save_account_alias_confere_a_conta_contra_o_workspace(monkeypatch
         return 1
 
     monkeypatch.setattr(db, "execute", execute)
-    await db.save_account_alias("ws-1", "acc-1", "roxinho")
+    await db.save_account_alias("ws-1", "acc-1", "cartao da familia", dito=" Cartão da Família ")
     sql, args = visto[0]
     assert "a.workspace_id = %s" in sql and "on conflict (workspace_id, alias)" in sql
-    assert args == ("roxinho", "acc-1", "ws-1")
+    # a chave é a forma normalizada; `dito` (só exibição) guarda como a pessoa escreveu
+    assert args == ("cartao da familia", "Cartão da Família", "acc-1", "ws-1")
 
 
 def test_export_mascara_dado_pessoal_e_so_leva_par_com_resposta_certa():

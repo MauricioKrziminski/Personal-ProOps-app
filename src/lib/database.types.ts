@@ -19,6 +19,7 @@ export type Database = {
           account_id: string
           alias: string
           created_at: string
+          dito: string | null
           id: string
           workspace_id: string
         }
@@ -26,6 +27,7 @@ export type Database = {
           account_id: string
           alias: string
           created_at?: string
+          dito?: string | null
           id?: string
           workspace_id: string
         }
@@ -33,6 +35,7 @@ export type Database = {
           account_id?: string
           alias?: string
           created_at?: string
+          dito?: string | null
           id?: string
           workspace_id?: string
         }

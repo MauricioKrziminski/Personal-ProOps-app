@@ -30,7 +30,7 @@ export function ApelidosDaConta({ accountId }: { accountId: string }) {
   return (
     <Section title="Apelidos que o agente aprendeu">
       {itens.map((item) => {
-        const nome = apelidoParaExibir(item.alias);
+        const nome = apelidoParaExibir(item.dito ?? item.alias);
         return (
           <Row
             key={item.id}

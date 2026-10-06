@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase';
 export interface ApelidoDaConta {
   id: string;
   alias: string;
+  /** Como a pessoa escreveu (só exibição); nulo nos aprendidos antes de existir. */
+  dito: string | null;
   created_at: string;
 }
 
@@ -19,7 +21,7 @@ export function useApelidosDaConta(accountId: string | null | undefined) {
     queryFn: async (): Promise<ApelidoDaConta[]> => {
       const { data, error } = await supabase
         .from('account_aliases')
-        .select('id, alias, created_at')
+        .select('id, alias, dito, created_at')
         .eq('account_id', accountId as string)
         .order('alias');
       if (error) throw error;

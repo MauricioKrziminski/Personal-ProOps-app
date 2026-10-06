@@ -1558,15 +1558,19 @@ async def record_feedback(
         log.warning("agent_feedback não gravado (%s)", outcome, exc_info=True)
 
 
-async def save_account_alias(workspace_id: Any, account_id: Any, alias: str) -> None:
-    """Grava `alias` (já normalizado) para a conta. A conta é conferida contra o WORKSPACE no
+async def save_account_alias(
+    workspace_id: Any, account_id: Any, alias: str, dito: str | None = None
+) -> None:
+    """Grava `alias` (já normalizado, a chave de casamento) para a conta, com `dito` — o apelido
+    como a pessoa escreveu, só para exibir no app. A conta é conferida contra o WORKSPACE no
     próprio insert (o serviço ignora RLS); o ensinamento mais recente do mesmo apelido vence."""
     await execute(
         """
-        insert into public.account_aliases (workspace_id, account_id, alias)
-        select a.workspace_id, a.id, %s from public.accounts a
+        insert into public.account_aliases (workspace_id, account_id, alias, dito)
+        select a.workspace_id, a.id, %s, %s from public.accounts a
         where a.id = %s and a.workspace_id = %s
-        on conflict (workspace_id, alias) do update set account_id = excluded.account_id
+        on conflict (workspace_id, alias) do update
+          set account_id = excluded.account_id, dito = excluded.dito
         """,
-        alias, account_id, workspace_id,
+        alias, (dito or "").strip() or None, account_id, workspace_id,
     )

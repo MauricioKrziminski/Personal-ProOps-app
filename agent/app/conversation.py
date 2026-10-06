@@ -136,11 +136,10 @@ async def _aprender_apelido(sessao: dict, rascunho: dict, conta: dict) -> None:
     contra a lista do workspace) ou do nome digitado que casou com UMA. Best-effort.
     """
     try:
-        alias = matching.alias_para_aprender(
-            (rascunho.get("action") or {}).get("account"), conta.get("name")
-        )
+        citado = (rascunho.get("action") or {}).get("account")
+        alias = matching.alias_para_aprender(citado, conta.get("name"))
         if alias:
-            await db.save_account_alias(sessao["workspace_id"], conta["id"], alias)
+            await db.save_account_alias(sessao["workspace_id"], conta["id"], alias, dito=citado)
     except Exception:  # noqa: BLE001
         log.warning("apelido de conta não gravado", exc_info=True)
 
