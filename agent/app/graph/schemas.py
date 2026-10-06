@@ -230,8 +230,10 @@ class FinanceQueryType(str, Enum):
 
 
 class FinanceQuery(BaseModel):
-    """11 propriedades × 13 valores de enum = 143 (05/10/2026). Teto MEDIDO: **143 passa**
-    (`scripts/probe_scenario_schema.py`, 10/09/2026) — sobra uma propriedade.
+    """13 propriedades × 13 valores de enum = 169 (06/10/2026). Era 11×13 = 143, o ponto medido
+    (`scripts/probe_scenario_schema.py`, 10/09/2026); `continua_anterior` e `mostrar` levam a 169,
+    abaixo do teto de 198 dos outros schemas — **rode `probe_query_schema.py` com o Gemini real
+    antes de subir de novo**.
 
     Consulta nunca escreve, então nada de `description`, `recurrence` ou dos
     campos `new_*`: eles não teriam significado aqui. `search_term` é a exceção
@@ -275,6 +277,23 @@ class FinanceQuery(BaseModel):
             "Na simulação, o que o valor significa: 'total' quando é um valor único "
             "repartido em parcelas (3000 em 6x = 500 por mês, seis vezes); 'monthly' "
             "quando é um valor que se repete todo mês (1500 por mês, sempre)."
+        ),
+    )
+    continua_anterior: bool | None = Field(
+        None,
+        description=(
+            "Em query_transactions: true quando a pergunta CONTINUA ou REFINA a consulta de "
+            "lançamentos anterior da conversa e deve herdar o que ela não repetir (conta, "
+            "período, categoria): 'ver mais', 'mostra todos', 'e só as parcelas?', 'e no outro "
+            "cartão?'. Pergunta NOVA ('e no total esse mês?') é false ou omitido."
+        ),
+    )
+    mostrar: str | None = Field(
+        None,
+        description=(
+            "Em query_transactions: 'mais' = a PRÓXIMA página da lista anterior ('ver mais'); "
+            "'tudo' = a lista completa, sem cortar ('mostra todos', 'lista completa'). "
+            "Omitido quando a pessoa só pergunta."
         ),
     )
 

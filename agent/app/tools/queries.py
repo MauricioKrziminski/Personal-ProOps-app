@@ -126,44 +126,32 @@ async def query_balance(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
 
 
 async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
-    """Consulta lançamentos com blueprint completo, State Cache Locking e Button Sentry."""
+    """Consulta lançamentos com blueprint completo, State Cache Locking e Button Sentry.
+
+    **Quem entende a frase é o modelo** (auditoria de 06/10/2026, C2): "continua a consulta
+    anterior", "próxima página", "lista completa", o período e a conta vêm como CAMPOS de
+    `FinanceQuery` (`continua_anterior`, `mostrar`, `query_from/to`, `account`). Este código só
+    valida e executa — antes, listas de substring ("mais", "mes", "fatura", "30 dias") passavam
+    por cima do que o modelo entendeu e faziam "quanto gastei no total esse mês?" herdar o
+    Nubank da pergunta anterior. O único texto que ainda se lê é o payload `qpage:` do nosso botão.
+    """
     hoje = local_iso_date(ctx.timezone)
     account_id = None
     account_name = None
     account_type = None
-    category = action.category
     achados = []
 
     last_query = ctx.last_query_data or {}
     last_blueprint = last_query.get("blueprint") or {}
-    has_last_query = bool(
-        last_query
-        and (
-            last_query.get("account_id")
-            or last_blueprint.get("account_id")
-            or last_query.get("periodo")
-            or last_blueprint.get("start_date")
-        )
-    )
-    texto_norm = matching.normalize(ctx.texto)
     clicked_id = getattr(ctx, "clicked_id", None) or ""
 
     is_qpage = clicked_id.startswith("qpage:")
-    is_pagination_text = any(
-        t in texto_norm
-        for t in [
-            "ver mais",
-            "mais lancamentos",
-            "proxima pagina",
-            "pagina seguinte",
-            "mostrar mais",
-            "mais compras",
-            "proximos lancamentos",
-            "proximas compras",
-            "outras compras",
-            "mais gastos",
-            "outros gastos",
-        ]
+    mostrar = (action.mostrar or "").strip().lower()
+    is_pagination = is_qpage or mostrar == "mais"
+    is_all_items = mostrar == "tudo"
+    # Herdar exige o modelo ter dito que continua (ou o clique de página) E haver o que herdar.
+    is_refinement = (bool(action.continua_anterior) or is_pagination) and bool(
+        last_blueprint or last_query
     )
 
     offset = 0
@@ -173,55 +161,35 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
             offset = int(partes[2])
         elif last_blueprint.get("offset"):
             offset = int(last_blueprint["offset"])
-    elif is_pagination_text and last_blueprint.get("offset"):
+    elif mostrar == "mais" and last_blueprint.get("offset"):
         offset = int(last_blueprint["offset"])
 
-    termos_ano_todo = [
-        "ano todo", "do ano", "desde o inicio", "historico completo",
-        "de 1 ano", "12 meses", "ano passado", "todo o ano",
-    ]
-    is_explicit_broad_history = any(t in texto_norm for t in termos_ano_todo)
-    is_all_items = any(
-        t in texto_norm
-        for t in [
-            "todos", "todas", "tudo", "resto", "outras", "completa", "completo",
-            "todas as compras", "mostrar tudo",
-        ]
-    )
-    is_today_explicit = any(
-        t in texto_norm for t in ["hoje", "de hoje", "agora", "neste dia", "nesse dia"]
-    )
-
-    # 1. State Cache Locking e Herança de Blueprint
-    is_refinement = False
-    if is_qpage or is_pagination_text:
-        is_refinement = True
-    elif has_last_query:
-        last_acc_norm = matching.normalize(
-            last_blueprint.get("account_name") or last_query.get("account_name") or ""
+    # 1. Herança do blueprint: a conta anterior só vale quando a pergunta continua E não citou
+    # outra ("e no outro cartão?" cita, e então a conta nova é resolvida abaixo).
+    category = action.category
+    herda_conta = False
+    if is_refinement:
+        # citar de novo a MESMA conta da consulta anterior não é trocar de conta
+        anterior_nome = matching.normalize(
+            last_blueprint.get("account_name") or last_query.get("account_name")
         )
-        termos_continuacao = [
-            "todos", "todas", "tudo", "resto", "mais", "parcelas",
-            "mes", "meses", "outras", "detalha", "completo", "fatura",
-            "expandir", "continua", "continuacao", "anteriores", "proximos",
-        ]
-        if (
-            not action.account
-            or (action.account and matching.normalize(action.account) in last_acc_norm)
-            or any(w in texto_norm for w in termos_continuacao)
-        ):
-            is_refinement = True
+        herda_conta = (
+            is_pagination
+            or not action.account
+            or (bool(anterior_nome) and matching.normalize(action.account) in anterior_nome)
+        )
+        if herda_conta:
+            ref_acc_id = last_blueprint.get("account_id") or last_query.get("account_id")
+            account_id = UUID(str(ref_acc_id)) if ref_acc_id else None
+            account_name = last_blueprint.get("account_name") or last_query.get("account_name")
+            account_type = last_blueprint.get("account_type") or last_query.get("account_type")
+        anterior = last_blueprint.get("category")
+        category = (anterior or action.category) if is_pagination else (action.category or anterior)
 
-    if is_refinement and (last_blueprint or last_query):
-        ref_acc_id = last_blueprint.get("account_id") or last_query.get("account_id")
-        account_id = UUID(str(ref_acc_id)) if ref_acc_id else None
-        account_name = last_blueprint.get("account_name") or last_query.get("account_name")
-        account_type = last_blueprint.get("account_type") or last_query.get("account_type")
-        category = last_blueprint.get("category") or action.category
-
-    # 2. Resolução normal de conta se não for refinamento
-    if not is_refinement and action.account:
-        inferred_type = matching.infer_account_type(f"{ctx.texto} {action.account or ''}")
+    # 2. Conta citada nesta pergunta (o modelo devolve o nome; o código valida e casa)
+    if action.account and not herda_conta:
+        # só o NOME citado: a frase inteira trazia "parcela", "pix", "limite" e mudava o tipo
+        inferred_type = matching.infer_account_type(action.account)
         linhas = await db.accounts(ctx.workspace_id)
         achados = matching.match_accounts(
             action.account, linhas, account_type=inferred_type
@@ -244,57 +212,17 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
     if forma is None and is_refinement and last_blueprint.get("payment_method"):
         forma = last_blueprint["payment_method"]
 
-    termos_projecao = [
-        "projecao", "proximos", "futuros", "futuras", "proximas faturas",
-        "previsao", "proximos 90 dias", "proximos 3 meses", "proximos 60 dias", "proximos 30 dias",
-    ]
-    is_projection_requested = (
-        any(t in texto_norm for t in termos_projecao)
-        or bool(last_blueprint.get("include_projection"))
-        or (bool(action.query_to) and action.query_to > hoje)
+    # 3. Janela: página preserva a anterior; senão vale o que o modelo pôs em query_from/query_to;
+    # senão, continuação herda a anterior; senão o padrão do caso (ciclo / fatura).
+    ultimo = (
+        last_blueprint.get("start_date") or (last_query.get("periodo") or {}).get("de"),
+        last_blueprint.get("end_date") or (last_query.get("periodo") or {}).get("ate"),
     )
-
-    # 3. Resolução da Janela Temporal com Blueprint
+    herda_janela = is_refinement and bool(ultimo[0] and ultimo[1])
     include_projection = False
-    if is_explicit_broad_history:
-        de = add_months(hoje, -12)
-        ate = hoje
-    elif is_projection_requested and not (is_qpage or is_pagination_text or (is_all_items and not any(t in texto_norm for t in termos_projecao))):
-        # Pedido de projeção futura explícito (ex: "últimos 60 dias e projeção dos próximos 90 dias", "próximos 90 dias", etc.)
-        if action.query_from:
-            de = action.query_from
-        elif any(t in texto_norm for t in ["ultimos 180 dias", "ultimos 6 meses", "180 dias", "6 meses"]):
-            de = add_months(hoje, -6)
-        elif any(t in texto_norm for t in ["ultimos 60 dias", "ultimos 2 meses", "60 dias", "2 meses"]):
-            de = add_months(hoje, -2)
-        elif any(t in texto_norm for t in ["ultimos 30 dias", "ultimos 1 mes", "30 dias", "1 mes", "mes passado"]):
-            de = add_months(hoje, -1)
-        elif any(t in texto_norm for t in ["ultimos 90 dias", "ultimos 3 meses", "90 dias", "3 meses", "passados", "ultimos"]):
-            de = add_months(hoje, -3)
-        else:
-            de = hoje
-
-        if action.query_to and action.query_to > hoje:
-            ate = action.query_to
-        elif any(t in texto_norm for t in ["proximos 180 dias", "proximos 6 meses", "180 dias", "6 meses"]):
-            ate = add_months(hoje, 6)
-        elif any(t in texto_norm for t in ["proximos 60 dias", "proximos 2 meses", "60 dias", "2 meses"]):
-            ate = add_months(hoje, 2)
-        elif any(t in texto_norm for t in ["proximos 30 dias", "proximos 1 mes", "30 dias", "1 mes", "proximo mes"]):
-            ate = add_months(hoje, 1)
-        else:
-            ate = add_months(hoje, 3)
-        include_projection = True
-    elif (is_qpage or is_pagination_text) and (last_blueprint or last_query.get("periodo")):
-        # Paginando: PRESERVA rigorosamente a janela do blueprint original (incluindo projeção futura)
-        de = last_blueprint.get("start_date") or (last_query.get("periodo") or {}).get("de")
-        ate = last_blueprint.get("end_date") or (last_query.get("periodo") or {}).get("ate")
-        include_projection = bool(last_blueprint.get("include_projection", False)) or (bool(ate) and ate > hoje)
-    elif is_refinement and is_all_items and (last_blueprint or last_query.get("periodo")):
-        # Expansão de itens sobre o MESMO período
-        de = last_blueprint.get("start_date") or (last_query.get("periodo") or {}).get("de")
-        ate = last_blueprint.get("end_date") or (last_query.get("periodo") or {}).get("ate")
-        include_projection = bool(last_blueprint.get("include_projection", False)) or (bool(ate) and ate > hoje)
+    if is_pagination and herda_janela:
+        de, ate = ultimo
+        include_projection = bool(last_blueprint.get("include_projection", False)) or ate > hoje
     elif action.query_from and action.query_to:
         de = action.query_from
         ate = action.query_to
@@ -304,14 +232,12 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
         ate = hoje
     elif action.query_to:
         ate = action.query_to
-        de = add_months(ate, -1)
+        # só o fim, no futuro: projeção a partir de hoje; no passado, o mês que termina nele
+        de = hoje if ate > hoje else add_months(ate, -1)
         include_projection = ate > hoje
-    elif is_today_explicit:
-        de = hoje
-        ate = hoje
-    elif is_all_items and not has_last_query:
-        de = add_months(hoje, -12)
-        ate = hoje
+    elif herda_janela:
+        de, ate = ultimo
+        include_projection = bool(last_blueprint.get("include_projection", False)) or ate > hoje
     else:
         # Sem datas explícitas
         if account_type == "credit_card":
@@ -343,16 +269,7 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
             de = c["ini"].isoformat() if c else add_months(hoje, -1)
             ate = hoje
 
-    is_explicit_full_request = (
-        is_refinement and is_all_items
-    ) or any(
-        t in texto_norm
-        for t in [
-            "quero ver as", "ver todas", "mostra todas", "me mostre todas",
-            "me mostre todos", "mostra todos", "mostrar tudo", "mostrar todas",
-            "lista completa", "todas as compras", "detalha todas",
-        ]
-    )
+    is_explicit_full_request = is_all_items
 
     # 4. Busca registros no banco (com limite de segurança de 100 itens)
     rows = await db.fetch(

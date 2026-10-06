@@ -79,7 +79,13 @@ class TestSmartWindows:
         monkeypatch.setattr(db, "accounts", accounts)
         monkeypatch.setattr(db, "fetch", fetch)
 
-        action = FinanceQuery(type=FinanceQueryType.QUERY_TRANSACTIONS)
+        # o MODELO resolve o período ("o ano todo") em datas; o código só as usa
+        action = FinanceQuery(
+            type=FinanceQueryType.QUERY_TRANSACTIONS,
+            query_from=add_months(hoje, -12),
+            query_to=hoje,
+            mostrar="tudo",
+        )
         ctx = _ctx("mostre todos os meus lançamentos")
 
         await queries.query_transactions(ctx, action)
@@ -105,7 +111,9 @@ class TestSmartWindows:
         monkeypatch.setattr(db, "accounts", accounts)
         monkeypatch.setattr(db, "fetch", fetch)
 
-        action = FinanceQuery(type=FinanceQueryType.QUERY_TRANSACTIONS)
+        action = FinanceQuery(
+            type=FinanceQueryType.QUERY_TRANSACTIONS, query_from=hoje, query_to=hoje
+        )
         ctx = _ctx("gastos de hoje")
 
         await queries.query_transactions(ctx, action)

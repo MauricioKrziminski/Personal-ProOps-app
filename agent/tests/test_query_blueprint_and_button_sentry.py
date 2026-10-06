@@ -5,6 +5,7 @@ from uuid import UUID
 import pytest
 
 from app import db
+from app.domain.dates import add_months, local_iso_date
 from app.graph.schemas import FinanceQuery, FinanceQueryType
 from app.tools import queries
 from app.tools.base import ExecContext
@@ -324,7 +325,7 @@ class TestQueryBlueprintAndButtonSentry:
         action = FinanceQuery(
             type=FinanceQueryType.QUERY_TRANSACTIONS,
             query_from="2026-06-03",
-            query_to="2026-09-01",
+            query_to=add_months(local_iso_date("America/Sao_Paulo"), 3),
         )
         res = await queries.query_transactions(ctx, action)
 
@@ -332,9 +333,10 @@ class TestQueryBlueprintAndButtonSentry:
         _, params = queries_feitas[0]
         # params: (workspace_id, account_id, account_id, category, category, de, ate)
         assert params[5] == "2026-06-03"
-        assert params[6] > "2026-09-01"  # Data futura expandida (ex: 2026-11-30 ou 2026-12-01)
+        hoje = local_iso_date("America/Sao_Paulo")
+        assert params[6] > hoje  # o fim futuro que o MODELO pôs em query_to vale como veio
         assert res.data["blueprint"]["include_projection"] is True
-        assert res.data["blueprint"]["end_date"] > "2026-09-01"
+        assert res.data["blueprint"]["end_date"] > hoje
 
     @pytest.mark.asyncio
     async def test_multiplas_acoes_query_transactions_e_forecast_preservam_spec_de_botoes(self, monkeypatch):
@@ -463,6 +465,7 @@ class TestQueryBlueprintAndButtonSentry:
             type=FinanceQueryType.QUERY_TRANSACTIONS,
             account="nubank",
             query_from="2026-07-03",
+            query_to=add_months(local_iso_date("America/Sao_Paulo"), 3),
         )
         res = await queries.query_transactions(ctx, action)
 
@@ -470,7 +473,7 @@ class TestQueryBlueprintAndButtonSentry:
         _, params = queries_feitas[0]
         # params: (workspace_id, account_id, account_id, category, category, de, ate)
         assert params[5] == "2026-07-03"  # 60 dias atrás
-        assert params[6] > "2026-09-01"   # 90 dias no futuro (ex: 2026-11-30 ou 2026-12-01)
+        assert params[6] > local_iso_date("America/Sao_Paulo")  # o fim futuro que o modelo pôs
         assert res.data["blueprint"]["include_projection"] is True
         assert res.data["total_geral_itens"] == 11
         assert res.data["total_exibidos"] == 3

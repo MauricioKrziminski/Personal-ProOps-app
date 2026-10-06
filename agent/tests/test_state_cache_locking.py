@@ -75,7 +75,13 @@ class TestStateCacheLocking:
             },
         )
 
-        action = FinanceQuery(type=FinanceQueryType.QUERY_TRANSACTIONS, account="nubank")
+        # o modelo disse que "me mostre todos" CONTINUA a consulta anterior
+        action = FinanceQuery(
+            type=FinanceQueryType.QUERY_TRANSACTIONS,
+            account="nubank",
+            continua_anterior=True,
+            mostrar="tudo",
+        )
         res = await queries.query_transactions(ctx, action)
 
         # Verifica que a query no Postgres usou CARD_ID exato e o período da fatura

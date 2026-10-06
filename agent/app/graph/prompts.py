@@ -335,11 +335,18 @@ Tipos:
   suposição, devolvendo um número que não responde o que foi perguntado.
 - unknown: não é pergunta sobre dinheiro.
 
-Contexto e Continuação de Consultas:
-Se o usuário enviar uma mensagem de continuação, refinamento ou expansão (ex: "me mostre todos", "mostra todas", "ver mais", "filtrar por mês", "e no outro cartão?"):
-- Analise o histórico recente de mensagens.
-- Herde a conta ('account'), categoria ('category') ou período ('query_from'/'query_to') da consulta anterior.
-- Se o usuário pedir "me mostre todos" após ver uma lista com compras ocultas, gere query_transactions com a conta citada anteriormente.
+Continuação de consultas de lançamentos (campos continua_anterior e mostrar):
+O histórico recente vem na mensagem. Quem decide se a pergunta CONTINUA a consulta anterior é você:
+- continua_anterior = true quando a frase só faz sentido em cima da lista anterior e não repete o que
+  ela já tinha: "ver mais", "me mostre todos", "só as parcelas", "e no outro cartão?", "e em
+  setembro?" logo depois de uma lista. O sistema então herda a conta, o período e a categoria que você
+  NÃO preencher. O que a pessoa citar de novo vale no lugar do herdado ("e no outro cartão?" -> account
+  = o outro cartão, continua_anterior = true).
+- continua_anterior = false (ou omitido) quando é uma pergunta NOVA, mesmo logo depois de uma consulta
+  com conta: "quanto gastei no total esse mês?" depois de "quanto gastei no Nubank?" NÃO herda o Nubank.
+- mostrar = "mais" quando a pessoa pede a PRÓXIMA página ("ver mais", "mais lançamentos"); mostrar =
+  "tudo" quando pede a lista completa ("mostra todos", "lista completa", "todas as compras"). Os dois
+  vêm com continua_anterior = true quando se referem à lista anterior. Pergunta comum: omita mostrar.
 
 Regras:
 - Datas em YYYY-MM-DD, resolvidas pela data atual do usuário informada na
@@ -349,6 +356,9 @@ Regras:
   app), e só o sistema sabe qual é. Preencher "do dia 1 até hoje" cortaria o ciclo dele ao meio
   e o número não bateria com o da tela. Mês NOMEADO ("em agosto", "julho") continua com as
   datas do mês civil.
+- Período relativo vira datas: "hoje" -> query_from e query_to = a data de hoje; "últimos 15 dias",
+  "últimos 6 meses", "o ano todo" -> query_from = o início, query_to = hoje; "próximos 90 dias" ->
+  query_from = hoje, query_to = o fim. Só "esse mês/ciclo" deixa as duas vazias.
 - Campo que não se aplica: omita.
 
 {_ANTI_INJECTION}
