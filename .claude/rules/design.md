@@ -598,7 +598,9 @@ dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
 1,5 s na UI thread (*"mais suave, devagar, fluido"*) — o contorno de `markPath` por trim, o
 preenchimento entrando e o nome "ProOps" subindo em fade, com as etapas sobrepostas e curva
 smootherstep — e depois PARADA, sem loop. Cabe dentro do `MARCA_MINIMA_MS` (1,7 s). Só na
-ABERTURA e depois de destravar; login, saída e troca de conta são só a cortina, sem marca. No
+ABERTURA e depois de destravar (voltando ao app com a trava: o disco e a frase saem, a marca se
+constrói, a tinta sobe); na abertura com trava ela se constrói UMA vez, e o PIN é pedido sobre ela.
+Login, saída e troca de conta são só a cortina, sem marca. No
 Android ela começa quando o fade da splash nativa (300 ms) termina — antes, o traço acontecia
 escondido sob ele. Com Reduzir movimento, marca e nome só em fade.
 
