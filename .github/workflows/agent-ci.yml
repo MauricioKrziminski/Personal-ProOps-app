@@ -173,7 +173,8 @@ jobs:
       # Sem `--barato`: é a execução que APROVA (gate no modelo do portão). Ver ai-gemini.md sobre a
       # cota: o gate manda ~40 chamadas, e com chave sem faturamento isso passa de 20/dia.
       - if: steps.toca.outputs.sim == 'true' && env.GEMINI_API_KEY != ''
-        run: python scripts/evaluate_answer_forms.py --output eval.json
+        # Teto de gasto: com chave PAGA no secret, uma rodada inteira mediu ~US$ 0,35 (06/10/2026).
+        run: python scripts/evaluate_answer_forms.py --teto-usd 0.50 --output eval.json
       # A de compreensão prende a continuação de consulta e o histórico (C2/A9 da auditoria).
       - if: steps.toca.outputs.sim == 'true' && env.GEMINI_API_KEY != ''
-        run: python scripts/evaluate_conversation_understanding.py --output eval-conversa.json
+        run: python scripts/evaluate_conversation_understanding.py --teto-usd 0.20 --output eval-conversa.json
