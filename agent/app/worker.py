@@ -25,7 +25,7 @@ import re
 from app import conversation, db, logctx
 from app.config import get_settings
 from app.security import sanitize_untrusted
-from app.services import groq, whatsapp
+from app.services import groq, tasks, whatsapp
 
 log = logging.getLogger(__name__)
 
@@ -106,7 +106,21 @@ async def _process_thread(thread_id: str) -> dict:
     ids = [m["id"] for m in lote]
     phone = lote[-1]["phone"]
     with logctx.bind(message_id=str(lote[-1].get("wa_message_id") or "")):
-        return await _turno_com_prazo(lote, ids, phone, thread_id)
+        resultado = await _turno_com_prazo(lote, ids, phone, thread_id)
+    await _agendar_o_que_chegou(thread_id)
+    return resultado
+
+
+async def _agendar_o_que_chegou(thread_id: str) -> None:
+    """Mensagem que chegou DURANTE o turno teve o claim vazio (conversa ocupada) e esperaria o
+    sweep — até 1 minuto, no caso comum de "gastei 45" seguido de "e 30 no uber". Agenda o
+    próximo lote já, por uma task nova: rodar em laço aqui somaria turnos no mesmo request e
+    passaria dos 300 s do Cloud Run. Falhar só devolve ao sweep."""
+    try:
+        if await db.tem_pendente(thread_id):
+            await tasks.schedule_debounce(thread_id)
+    except Exception:  # noqa: BLE001
+        log.warning("próximo lote não agendado; o sweep pega (thread=%s)", thread_id, exc_info=True)
 
 
 async def _turno_com_prazo(lote: list[dict], ids: list, phone: str, thread_id: str) -> dict:

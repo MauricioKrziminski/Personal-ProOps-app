@@ -68,7 +68,11 @@ def _preparar(monkeypatch, lote, *, run_turn, recover=None):
     async def sem_falha(_t):
         return None
 
+    async def nada_pendente(_t):
+        return False
+
     monkeypatch.setattr(worker.db, "falhas_a_avisar", sem_falha)
+    monkeypatch.setattr(worker.db, "tem_pendente", nada_pendente)
     monkeypatch.setattr(worker.whatsapp, "try_send", sem_envio)
     monkeypatch.setattr(worker.whatsapp, "try_mark_read", sem_envio)
     monkeypatch.setattr(worker, "_extract_batch", extract)
@@ -175,6 +179,43 @@ async def test_primeira_tentativa_nao_consulta_o_checkpoint(monkeypatch):
 
     _preparar(monkeypatch, [_msg(retry=0)], run_turn=run_turn, recover=recover)
     await worker.process_thread("T")
+
+
+async def test_mensagem_que_chegou_durante_o_turno_ganha_o_proximo_lote_ja(monkeypatch):
+    """Sem isto ela esperava o sweep (até 1 min): o claim dela saiu vazio com a conversa ocupada."""
+    async def run_turn(*_a, **_k):
+        return "ok"
+
+    _preparar(monkeypatch, [_msg()], run_turn=run_turn)
+    agendados: list[str] = []
+
+    async def pendente(_t):
+        return True
+
+    async def agenda(t):
+        agendados.append(t)
+
+    monkeypatch.setattr(worker.db, "tem_pendente", pendente)
+    monkeypatch.setattr(worker.tasks, "schedule_debounce", agenda)
+    await worker.process_thread("T")
+    assert agendados == ["T"]
+
+    # nada pendente: nenhuma task; falha ao agendar: o turno não cai (o sweep pega)
+    agendados.clear()
+
+    async def nada(_t):
+        return False
+
+    monkeypatch.setattr(worker.db, "tem_pendente", nada)
+    await worker.process_thread("T")
+    assert agendados == []
+
+    async def quebra(_t):
+        raise RuntimeError("tasks fora")
+
+    monkeypatch.setattr(worker.db, "tem_pendente", pendente)
+    monkeypatch.setattr(worker.tasks, "schedule_debounce", quebra)
+    assert (await worker.process_thread("T"))["claimed"] == 1
 
 
 # --- A2: borda do webhook -----------------------------------------------------

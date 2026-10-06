@@ -477,6 +477,16 @@ async def claim_batch(thread_id: str) -> list[dict[str, Any]]:
     )
 
 
+async def tem_pendente(thread_id: str) -> bool:
+    """Há mensagem nova esperando nesta conversa (chegou enquanto o turno rodava)?"""
+    linha = await fetch_one(
+        "select exists (select 1 from public.messages_queue"
+        " where thread_id = %s and status = 'pending' and retry_count = 0) as tem",
+        thread_id,
+    )
+    return bool(linha and linha["tem"])
+
+
 async def falhas_a_avisar(thread_id: str) -> str | None:
     """Marca como avisadas as mensagens da thread que viraram `failed`; devolve o telefone, se havia.
 
