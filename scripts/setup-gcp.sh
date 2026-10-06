@@ -11,7 +11,7 @@
 #   ./scripts/setup-gcp.sh staging      # serviço/fila/segredos de STAGING (sem crons)
 #   ./scripts/setup-gcp.sh secrets      # só (re)grava os segredos
 #   ./scripts/setup-gcp.sh alertas      # métricas de log, políticas (ALERT_EMAIL) e orçamento
-#                                       # (BILLING_ACCOUNT + BUDGET_USD); sem as variáveis, pula
+#                                       # (BILLING_ACCOUNT + BUDGET_AMOUNT, na moeda da conta); sem as variáveis, pula
 #
 set -euo pipefail
 
@@ -543,7 +543,7 @@ criar_alertas() {
   else
     local canal
     canal="$(gcloud alpha monitoring channels list --project "$PROJECT_ID" \
-      --filter "type=email AND labels.email_address=$ALERT_EMAIL" --format='value(name)' | head -1)"
+      --filter "type=\"email\" AND labels.email_address=\"$ALERT_EMAIL\"" --format='value(name)' | head -1)"
     if [[ -z "$canal" ]]; then
       canal="$(gcloud alpha monitoring channels create --project "$PROJECT_ID" \
         --display-name "ProOps alertas" --type email \
@@ -556,20 +556,23 @@ criar_alertas() {
     criar_politica "${SERVICE}-custo-diario"      "ProOps ${SERVICE}: custo de IA"       "$canal"
   fi
 
-  # Orçamento de faturamento: avisa a 50%, 90% e 100% de BUDGET_USD. Sem a conta ou o valor, pula.
-  if [[ -z "${BILLING_ACCOUNT:-}" || -z "${BUDGET_USD:-}" ]]; then
-    warn "BILLING_ACCOUNT/BUDGET_USD ausentes — orçamento de faturamento PULADO"
+  # Orçamento de faturamento: avisa a 50%, 90% e 100% de BUDGET_AMOUNT. Sem a conta ou o valor, pula.
+  # O valor vai na MOEDA DA CONTA (BRL aqui): outra moeda volta INVALID_ARGUMENT sem detalhe.
+  if [[ -z "${BILLING_ACCOUNT:-}" || -z "${BUDGET_AMOUNT:-}" ]]; then
+    warn "BILLING_ACCOUNT/BUDGET_AMOUNT ausentes — orçamento de faturamento PULADO"
   elif gcloud billing budgets list --billing-account "$BILLING_ACCOUNT" \
-         --filter "displayName=ProOps $PROJECT_ID" --format='value(name)' 2>/dev/null | grep -q .; then
+         --filter "displayName=\"ProOps $PROJECT_ID\"" --format='value(name)' 2>/dev/null | grep -q .; then
     skip "orçamento 'ProOps $PROJECT_ID' já existe"
   else
+    local moeda
+    moeda="$(gcloud billing accounts describe "$BILLING_ACCOUNT" --format='value(currencyCode)')"
     gcloud billing budgets create --billing-account "$BILLING_ACCOUNT" \
       --display-name "ProOps $PROJECT_ID" \
       --filter-projects "projects/$PROJECT_ID" \
-      --budget-amount "${BUDGET_USD}USD" \
+      --budget-amount "${BUDGET_AMOUNT}${moeda}" \
       --threshold-rule percent=0.5 --threshold-rule percent=0.9 --threshold-rule percent=1.0 \
       --quiet >/dev/null
-    ok "orçamento de ${BUDGET_USD} USD (50/90/100%)"
+    ok "orçamento de ${BUDGET_AMOUNT} ${moeda} (50/90/100%)"
   fi
 }
 

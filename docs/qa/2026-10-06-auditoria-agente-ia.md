@@ -684,7 +684,7 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
 
 ## 20. O que depende de você
 
-- **Alertas e orçamento:** `ALERT_EMAIL`, `BILLING_ACCOUNT` e `BUDGET_USD` para
+- **Alertas e orçamento:** `ALERT_EMAIL`, `BILLING_ACCOUNT` e `BUDGET_AMOUNT` (na moeda da conta de faturamento, BRL) para
   `./scripts/setup-gcp.sh alertas`.
 - **Secret `GEMINI_API_KEY_EVAL`** no GitHub, para o portão de avaliação do CI rodar. E um `push`
   para ver o job `sql` verde uma vez num runner (ele segue não-bloqueante até isso).
