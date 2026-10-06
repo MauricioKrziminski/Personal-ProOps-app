@@ -3,7 +3,16 @@
 Registro, não regra: o que está em cada banco HOJE se confere na fonte (`CLAUDE.md`, *Banco e
 fila*). Entradas movidas do `CLAUDE.md` em 26/09/2026, na ordem em que estavam lá.
 
-**Produção e staging ALINHADOS em `20261005230000`** — promoção autorizada pelo Gabriel em
+**Produção e staging ALINHADOS em `20261006160000`** — as 6 da auditoria do agente
+(`docs/qa/2026-10-06-auditoria-agente-ia.md`): `20261006100000_claim_recupera_processing`,
+`110000_ai_events_uso`, `120000_transacao_embeddings`, `130000_agent_feedback`,
+`150000_apelido_como_foi_dito` e `160000_agente_rls`. `migration list --project-ref` mostrou
+exatamente essas 6 pendentes; aplicadas pelo Gabriel em 06/10/2026 com `PROOPS_PROD_OK=1` e
+`--project-ref`. Na ordem migrations → agente: logo depois, o deploy `agente-00103-ccs` com
+`AGENTE_RLS=true` e `AGENT_PROMPT_V2=true` (a mesma configuração do staging), conferido com
+health 200, `/cron/reminders` 200 e nenhum erro no log da revisão.
+
+**Antes, ALINHADOS em `20261005230000`** — promoção autorizada pelo Gabriel em
 06/10/2026 para a v1.7.0 — publicada como v1.7.1: a tag v1.7.0 parou no teste do CI, sem build (programa de 22 pontos + correções de 05/10). `migration list` mostrou
 as 43 migrations `20261002134032` … `20261005230000`, nenhuma só no remoto; aplicadas pelo
 próprio Gabriel com `PROOPS_PROD_OK=1` e `--project-ref`, sem seed e sem trocar o link local de
