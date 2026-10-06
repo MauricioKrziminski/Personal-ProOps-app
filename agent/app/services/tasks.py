@@ -22,6 +22,9 @@ from app.domain.dates import now_utc
 log = logging.getLogger(__name__)
 
 _client = None
+# O webhook tem de responder à Meta em < 5 s. O cliente é assíncrono (não bloqueia o loop),
+# mas sem prazo explícito uma chamada pendurada seguraria a resposta.
+_TIMEOUT = 3.0
 
 
 def _tasks_client():
@@ -38,7 +41,7 @@ async def cancel(task_name: str | None) -> None:
     if not task_name or get_settings().debounce_backend != "cloud_tasks":
         return
     try:
-        await _tasks_client().delete_task(request={"name": task_name})
+        await _tasks_client().delete_task(request={"name": task_name}, timeout=_TIMEOUT)
     except Exception as err:  # noqa: BLE001
         log.debug("delete_task ignorado (%s): %s", task_name, err)
 
@@ -81,7 +84,9 @@ async def schedule_debounce(thread_id: str) -> str | None:
             },
         },
     }
-    criada = await client.create_task(request={"parent": parent, "task": task})
+    criada = await client.create_task(
+        request={"parent": parent, "task": task}, timeout=_TIMEOUT
+    )
     return criada.name
 
 

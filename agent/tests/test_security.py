@@ -114,6 +114,8 @@ def _oidc_com_claims(monkeypatch, claims: dict):
     fake = types.ModuleType("google.oauth2.id_token")
     fake.verify_oauth2_token = lambda *a, **k: claims  # noqa: ARG005
     monkeypatch.setitem(sys.modules, "google.oauth2.id_token", fake)
+    # `from google.oauth2 import id_token` lê o atributo do pacote quando ele já foi importado
+    monkeypatch.setattr("google.oauth2.id_token", fake, raising=False)
 
     transport = types.ModuleType("google.auth.transport.requests")
     transport.Request = lambda *a, **k: None  # noqa: ARG005

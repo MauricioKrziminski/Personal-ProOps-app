@@ -6,7 +6,9 @@ por mensagem no Cloud Run custa handshake TLS a cada envio.
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 
 import httpx
 
@@ -32,6 +34,18 @@ async def close_client() -> None:
     if _client is not None:
         await _client.aclose()
         _client = None
+
+
+def _erro_meta(res: httpx.Response) -> str:
+    """Resumo do erro da Meta SEM o corpo: ele pode trazer telefone e conteúdo da mensagem.
+
+    Só status HTTP e os códigos de `error` (`code`, `error_subcode`).
+    """
+    try:
+        err = (res.json() or {}).get("error") or {}
+    except Exception:  # noqa: BLE001 — corpo não-JSON
+        err = {}
+    return f"{res.status_code} code={err.get('code')} subcode={err.get('error_subcode')}"
 
 
 async def _graph_post(payload: dict) -> httpx.Response:
@@ -69,7 +83,7 @@ async def _graph_post(payload: dict) -> httpx.Response:
         if res.status_code >= 500:
             break
     assert res is not None
-    raise RuntimeError(f"WhatsApp send falhou ({res.status_code}): {res.text}")
+    raise RuntimeError(f"WhatsApp send falhou ({_erro_meta(res)})")
 
 
 async def send_text(to: str, body: str) -> None:
@@ -96,6 +110,32 @@ async def mark_as_read(wa_message_id: str) -> None:
             "messaging_product": "whatsapp",
             "status": "read",
             "message_id": wa_message_id,
+        },
+    )
+
+
+async def mark_read_typing(wa_message_id: str) -> None:
+    """Marca como lida E mostra "digitando…" (`typing_indicator` junto do `status: read`).
+
+    ⚠️ DESLIGADO por padrão (env `WHATSAPP_TYPING_INDICATOR=true`). PRECISA SER CONFERIDO na
+    documentação da Meta antes de ligar: o formato do campo `typing_indicator` e a versão mínima
+    da Graph API não foram verificados — `GRAPH_BASE` está na v21.0 e pode ser preciso subir.
+    Desligado, cai no `mark_as_read` de sempre.
+    """
+    if os.getenv("WHATSAPP_TYPING_INDICATOR", "").strip().lower() != "true":
+        await mark_as_read(wa_message_id)
+        return
+    settings = get_settings()
+    if not settings.whatsapp_token or not settings.whatsapp_phone_number_id or not wa_message_id:
+        return
+    await client().post(
+        f"{GRAPH_BASE}/{settings.whatsapp_phone_number_id}/messages",
+        headers={"Authorization": f"Bearer {settings.whatsapp_token}"},
+        json={
+            "messaging_product": "whatsapp",
+            "status": "read",
+            "message_id": wa_message_id,
+            "typing_indicator": {"type": "text"},
         },
     )
 
@@ -253,7 +293,8 @@ async def try_send_interactive(to: str, spec: dict) -> None:
             await send_buttons(to, spec["body"], spec["buttons"])
         return
     except Exception as err:  # noqa: BLE001
-        log.error("envio interativo falhou (spec=%s): %s", spec, err, exc_info=True)
+        # sem o `spec` no log: traz nomes e valores da pessoa
+        log.error("envio interativo falhou (ui=%s): %s", spec.get("ui", "buttons"), err)
     await try_send(to, spec.get("text") or spec.get("body", ""))
 
 
@@ -319,18 +360,59 @@ async def try_send(to: str, body: str) -> bool:
         return False
 
 
-async def download_media(media_id: str) -> tuple[bytes, str]:
-    """Baixa mídia recebida. Devolve (bytes, mime_type)."""
+class MidiaGrandeDemais(Exception):
+    """A mídia passa do teto de bytes. O chamador decide o que dizer à pessoa."""
+
+
+MEDIA_MAX_BYTES = 16 * 1024 * 1024  # áudio do WhatsApp raramente passa de poucos MB
+_TENTATIVAS = 3  # 1 + 2 novas: baixar mídia é idempotente (enviar mensagem NÃO é)
+_BACKOFF = 0.5
+
+
+async def _get_com_retentativa(url: str, headers: dict, max_bytes: int | None) -> httpx.Response:
+    """GET com até `_TENTATIVAS`, só em conexão/timeout/5xx/429. Teto de bytes se `max_bytes`."""
+    for tentativa in range(_TENTATIVAS):
+        ultima = tentativa == _TENTATIVAS - 1
+        try:
+            async with client().stream("GET", url, headers=headers) as res:
+                transitorio = res.status_code == 429 or res.status_code >= 500
+                if res.status_code >= 400 and (ultima or not transitorio):
+                    raise RuntimeError(f"Media GET falhou ({res.status_code})")
+                if res.status_code < 400:
+                    declarado = int(res.headers.get("content-length") or 0)
+                    if max_bytes and declarado > max_bytes:
+                        raise MidiaGrandeDemais(f"{declarado} bytes > {max_bytes}")
+                    corpo = bytearray()
+                    async for pedaco in res.aiter_bytes():
+                        corpo += pedaco
+                        if max_bytes and len(corpo) > max_bytes:
+                            raise MidiaGrandeDemais(f"> {max_bytes} bytes")
+                    return httpx.Response(
+                        res.status_code, headers=res.headers, content=bytes(corpo)
+                    )
+        except httpx.TransportError:  # inclui timeout
+            if ultima:
+                raise
+        await asyncio.sleep(_BACKOFF * (tentativa + 1))
+    raise AssertionError("inalcançável")
+
+
+async def download_media(
+    media_id: str, max_bytes: int = MEDIA_MAX_BYTES
+) -> tuple[bytes, str]:
+    """Baixa mídia recebida. Devolve (bytes, mime_type).
+
+    Acima de `max_bytes` levanta `MidiaGrandeDemais` (antes de baixar tudo, quando a Meta
+    informa o tamanho). Retenta erro transitório — baixar é idempotente.
+    """
     settings = get_settings()
     headers = {"Authorization": f"Bearer {settings.whatsapp_token}"}
 
-    meta = await client().get(f"{GRAPH_BASE}/{media_id}", headers=headers)
-    if meta.status_code >= 400:
-        raise RuntimeError(f"Media metadata falhou ({meta.status_code})")
+    meta = await _get_com_retentativa(f"{GRAPH_BASE}/{media_id}", headers, None)
     info = meta.json()
+    if max_bytes and int(info.get("file_size") or 0) > max_bytes:
+        raise MidiaGrandeDemais(f"{info['file_size']} bytes > {max_bytes}")
 
-    arquivo = await client().get(info["url"], headers=headers)
-    if arquivo.status_code >= 400:
-        raise RuntimeError(f"Media download falhou ({arquivo.status_code})")
+    arquivo = await _get_com_retentativa(info["url"], headers, max_bytes)
     mime = info.get("mime_type") or arquivo.headers.get("content-type", "application/octet-stream")
     return arquivo.content, mime

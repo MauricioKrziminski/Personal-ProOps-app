@@ -7,22 +7,50 @@ tocar em lógica de negócio.
 
 from __future__ import annotations
 
+import importlib
+import json
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app import db
+from app import db, logctx
 from app.config import DEV_SALT, get_settings
 from app.graph import build as graph_build
 from app.routes import chat, cron, finance_draft, hooks, inbound, internal, worker
-from app.services import whatsapp
+from app.services import groq, whatsapp
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(levelname)s %(name)s %(message)s",  # Cloud Logging parseia isto
-)
+class _JsonFormatter(logging.Formatter):
+    """Uma linha JSON por evento, no formato que o Cloud Logging indexa (`severity`, `message`).
+
+    Os níveis do stdlib (DEBUG, INFO, WARNING, ERROR, CRITICAL) são nomes válidos de severity.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        entrada = {
+            "severity": record.levelname,
+            "message": record.getMessage(),
+            "logger": record.name,
+            **logctx.atuais(),
+        }
+        if record.exc_info:
+            entrada["exception"] = self.formatException(record.exc_info)
+        return json.dumps(entrada, ensure_ascii=False, default=str)
+
+
+def _configura_logs() -> None:
+    """JSON no Cloud Run (`K_SERVICE` presente); texto legível no laptop."""
+    handler = logging.StreamHandler()
+    if os.getenv("K_SERVICE"):
+        handler.setFormatter(_JsonFormatter())
+    else:
+        handler.setFormatter(logging.Formatter("%(levelname)s %(name)s %(message)s"))
+    logging.basicConfig(level=logging.INFO, handlers=[handler], force=True)
+
+
+_configura_logs()
 log = logging.getLogger(__name__)
 
 
@@ -34,7 +62,26 @@ async def lifespan(_app: FastAPI):
     log.info("pronto")
     yield
     await whatsapp.close_client()
+    await groq.close_client()
+    await _fecha_telemetria()
     await db.close_pools()
+
+
+async def _fecha_telemetria() -> None:
+    """Outra frente cria `app.services.telemetry` (`shutdown()` ou `flush()`); sem ela, nada a fechar."""
+    try:
+        telemetry = importlib.import_module("app.services.telemetry")
+    except ImportError:
+        return
+    fn = getattr(telemetry, "shutdown", None) or getattr(telemetry, "flush", None)
+    if not fn:
+        return
+    try:
+        r = fn()
+        if hasattr(r, "__await__"):
+            await r
+    except Exception:  # noqa: BLE001 — fechar não pode impedir o resto do shutdown
+        log.warning("telemetria não fechou limpo", exc_info=True)
 
 
 def _checa_producao() -> None:
@@ -44,7 +91,9 @@ def _checa_producao() -> None:
     que gera bug que ninguém acha.
     """
     s = get_settings()
-    if s.debounce_backend != "cloud_tasks":
+    # Produção = backend de fila real OU rodando no Cloud Run (`K_SERVICE`). Olhar só o backend
+    # deixava passar um deploy com DEBOUNCE_BACKEND=inline sem NENHUMA checagem.
+    if s.debounce_backend != "cloud_tasks" and not os.getenv("K_SERVICE"):
         return  # dev local: DEBOUNCE_BACKEND=inline
     # Valida FORMA, não só presença. Presença sozinha já foi enganada uma vez:
     # um comentário de .env virou valor, o campo ficou "não vazio" e esta função
@@ -55,6 +104,10 @@ def _checa_producao() -> None:
             ("THREAD_SALT", s.thread_salt != DEV_SALT and len(s.thread_salt) >= 32),
             ("WORKER_URL", s.worker_url.startswith("https://") and "/worker/" in s.worker_url),
             ("GCP_PROJECT", bool(s.gcp_project) and " " not in s.gcp_project),
+            ("GEMINI_API_KEY", bool(s.gemini_api_key)),
+            ("WHATSAPP_TOKEN", bool(s.whatsapp_token)),
+            # sem ele a rota recusa TODA mensagem (HMAC) e a Meta reentrega em loop
+            ("WHATSAPP_APP_SECRET", bool(s.whatsapp_app_secret)),
             ("TASKS_SA_EMAIL", "@" in s.tasks_sa_email and s.tasks_sa_email.endswith(".iam.gserviceaccount.com")),
         )
         if not ok

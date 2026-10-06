@@ -19,6 +19,9 @@ PROD = {
     "TASKS_SA_EMAIL": "agente-runner@proj.iam.gserviceaccount.com",
     "OIDC_AUDIENCE": "https://agente-x.run.app",
     "DATABASE_URL": "postgresql://x/y",
+    "GEMINI_API_KEY": "g",
+    "WHATSAPP_TOKEN": "t",
+    "WHATSAPP_APP_SECRET": "s",
 }
 
 

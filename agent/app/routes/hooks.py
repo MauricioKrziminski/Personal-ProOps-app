@@ -45,11 +45,11 @@ async def otp(request: Request) -> JSONResponse:
 
         await whatsapp.send_auth_code(telefone, codigo, settings.wa_otp_template)
         return JSONResponse({}, status_code=200)
-    except Exception as err:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         log.exception("hook de OTP falhou")
         # erro estruturado para o Supabase conseguir mostrar
         return JSONResponse(
-            {"error": {"http_code": 500, "message": str(err)}}, status_code=500
+            {"error": {"http_code": 500, "message": "falha ao enviar o código"}}, status_code=500
         )
 
 

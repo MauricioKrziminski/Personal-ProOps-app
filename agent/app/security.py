@@ -8,6 +8,7 @@ E as rotas internas (/worker, /cron), que exigem OIDC do Cloud Tasks/Scheduler,
 com fallback para segredo compartilhado quando isso rodar num VPS.
 """
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -24,6 +25,15 @@ from app.domain.phone import canonical
 # --------------------------------------------------------------------------
 
 
+def _igual(a: str, b: str) -> bool:
+    """Comparação em tempo constante sobre BYTES.
+
+    `hmac.compare_digest` com `str` não-ASCII levanta TypeError — um header hostil virava 500
+    em vez de 401. Em bytes qualquer valor é só "diferente".
+    """
+    return hmac.compare_digest(a.encode(), b.encode())
+
+
 def verify_meta_signature(raw_body: bytes, signature_header: str | None) -> bool:
     """X-Hub-Signature-256 = "sha256=<hmac do corpo cru com o app secret>"."""
     secret = get_settings().whatsapp_app_secret
@@ -32,7 +42,7 @@ def verify_meta_signature(raw_body: bytes, signature_header: str | None) -> bool
     expected = "sha256=" + hmac.new(
         secret.encode(), raw_body, hashlib.sha256
     ).hexdigest()
-    return hmac.compare_digest(expected, signature_header)
+    return _igual(expected, signature_header)
 
 
 def verify_standardwebhooks(
@@ -62,7 +72,7 @@ def verify_standardwebhooks(
 
     for part in signature_header.split(" "):
         _, _, value = part.partition(",")
-        if value and hmac.compare_digest(expected, value):
+        if value and _igual(expected, value):
             return True
     return False
 
@@ -70,12 +80,48 @@ def verify_standardwebhooks(
 def verify_shared_secret(header_value: str | None, expected: str) -> bool:
     if not expected or not header_value:
         return False
-    return hmac.compare_digest(header_value, expected)
+    return _igual(header_value, expected)
 
 
 # --------------------------------------------------------------------------
 # rotas internas: OIDC (Cloud Tasks / Cloud Scheduler) ou segredo compartilhado
 # --------------------------------------------------------------------------
+
+
+_CERTS_TTL = 3600.0  # ponytail: TTL fixo de 1 h; ler Cache-Control se a rotação do Google apertar
+_certs_cache: dict[str, tuple[float, object]] = {}
+
+
+class _RespostaEmCache:
+    """Resposta mínima no formato que `google.auth.transport.Request` devolve."""
+
+    def __init__(self, status: int, data: bytes):
+        self.status = status
+        self.data = data
+        self.headers: dict = {}
+
+
+def _request_com_cache():
+    """`Request` do google-auth que guarda os certificados (só 200) por `_CERTS_TTL`.
+
+    A lib busca os certificados por HTTP a CADA verificação; sem isto, todo /worker e /cron
+    pagava uma ida ao googleapis. O parâmetro `request` é API pública de `verify_oauth2_token`.
+    """
+    from google.auth.transport import requests as ga_requests
+
+    real = ga_requests.Request()
+
+    def request(url, method="GET", *args, **kwargs):
+        hit = _certs_cache.get(url)
+        if hit and time.monotonic() - hit[0] < _CERTS_TTL:
+            return hit[1]
+        res = real(url, method, *args, **kwargs)
+        if res.status == 200:
+            res = _RespostaEmCache(res.status, res.data)
+            _certs_cache[url] = (time.monotonic(), res)
+        return res
+
+    return request
 
 
 def _verify_oidc(token: str, audience: str, caller_email: str) -> bool:
@@ -95,11 +141,10 @@ def _verify_oidc(token: str, audience: str, caller_email: str) -> bool:
     cobre os dois chamadores: o Scheduler usa a MESMA SA que o Tasks (`setup-gcp.sh`).
     """
     # import tardio: num VPS sem GCP essas libs podem nem estar configuradas
-    from google.auth.transport import requests as ga_requests
     from google.oauth2 import id_token
 
     try:
-        claims = id_token.verify_oauth2_token(token, ga_requests.Request(), audience)
+        claims = id_token.verify_oauth2_token(token, _request_com_cache(), audience)
     except Exception:  # noqa: BLE001 — token inválido é 401, não 500
         return False
 
@@ -107,7 +152,7 @@ def _verify_oidc(token: str, audience: str, caller_email: str) -> bool:
     # verificada de uma service account serve aqui.
     if not claims.get("email_verified"):
         return False
-    return hmac.compare_digest(str(claims.get("email", "")), caller_email)
+    return _igual(str(claims.get("email", "")), caller_email)
 
 
 async def require_internal(request: Request) -> None:
@@ -123,8 +168,12 @@ async def require_internal(request: Request) -> None:
     # `tasks_sa_email` vazio desliga o ramo OIDC por inteiro em vez de aceitar qualquer um —
     # num VPS sem GCP o caminho é o segredo compartilhado, logo abaixo.
     if auth.startswith("Bearer ") and settings.oidc_audience and settings.tasks_sa_email:
-        if _verify_oidc(
-            auth.removeprefix("Bearer "), settings.oidc_audience, settings.tasks_sa_email
+        # em thread: a verificação é síncrona e pode buscar certificados por HTTP
+        if await asyncio.to_thread(
+            _verify_oidc,
+            auth.removeprefix("Bearer "),
+            settings.oidc_audience,
+            settings.tasks_sa_email,
         ):
             return
 
