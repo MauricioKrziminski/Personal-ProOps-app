@@ -574,5 +574,15 @@
   "frase": "quanto gastei no total esse mês?",
   "saida": "query_transactions continua_anterior=false (não herda o Nubank)",
   "antes": "quanto gastei no Nubank?"
+ },
+ {
+  "grupo": "parse",
+  "frase": "caiu o salário de 3.800",
+  "saida": "create_income amount_cents=380000 description=salário"
+ },
+ {
+  "grupo": "parse",
+  "frase": "entrou 250 de reembolso no inter",
+  "saida": "create_income amount_cents=25000 description=reembolso account=inter"
  }
 ]

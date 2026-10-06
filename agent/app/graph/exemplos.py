@@ -19,20 +19,29 @@ como "Exemplos parecidos".
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
+import struct
 import time
 from pathlib import Path
 
 from app.services import embeddings
+from app.services.gemini import modelo
 
 log = logging.getLogger(__name__)
 
 ARQUIVO = Path(__file__).with_name("exemplos.json")
+# Vetores do banco gerados UMA vez (`scripts/vetorizar_exemplos.py`), versionados junto do json:
+# vetorizar 113 frases no runtime custava 113 requisições a cada cold start (`min_instances=0`) e
+# nunca montava no nível gratuito (100/min por modelo). `test_prompt_v2` acusa o arquivo defasado.
+ARQUIVO_VETORES = Path(__file__).with_name("exemplos_vetores.json")
 K = 4
-# ⚠️ PROVISÓRIO: não calibrado com o Gemini real (frase × frase). Só corta o que não se parece com
-# nada; `scripts/comparar_prompts.py` imprime os exemplos escolhidos para conferir antes de ligar.
-SIMILARIDADE_MINIMA = 0.5
+# Calibrado em 06/10/2026 (`scripts/probe_exemplos.py`, gemini-embedding-2): finanças escritas de
+# outro jeito tiveram top-1 de 0,640 a 0,972; frases de fora (saudação, nota, lembrete, conversa)
+# de 0,508 a 0,771. As faixas SE SOBREPÕEM — o piso não separa domínio, e não precisa: frase de fora
+# não chega aos nós de finanças (o router desvia antes). Ele só corta o que nem parece finanças.
+SIMILARIDADE_MINIMA = 0.62
 RETENTAR_APOS_S = 300.0
 GRUPOS = ("parse", "consulta")
 
@@ -49,6 +58,29 @@ def carregar() -> list[dict]:
         if e.get("grupo") not in GRUPOS or not e.get("frase") or not e.get("saida"):
             raise ValueError(f"exemplo inválido em exemplos.json: {e!r}")
     return brutos
+
+
+def codificar(vetor: list[float]) -> str:
+    """float16 em base64: 1/4 do float32 em texto, e o cosseno não sente a diferença."""
+    return base64.b64encode(struct.pack(f"<{len(vetor)}e", *vetor)).decode()
+
+
+def decodificar(texto: str) -> list[float] | None:
+    bruto = base64.b64decode(texto)
+    return embeddings.normalizar(list(struct.unpack(f"<{len(bruto) // 2}e", bruto)))
+
+
+def vetores_gravados() -> dict[str, list[float]]:
+    """Frase → vetor do arquivo, só se ele é do modelo em uso (espaços de modelos não se comparam)."""
+    try:
+        dados = json.loads(ARQUIVO_VETORES.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    if dados.get("modelo") != modelo("embedding"):
+        log.warning("exemplos_vetores.json é de %s; revetorizando no runtime", dados.get("modelo"))
+        return {}
+    gravados = {f: decodificar(t) for f, t in dados.get("vetores", {}).items()}
+    return {f: v for f, v in gravados.items() if v is not None}
 
 
 def formatar(exemplos: list[dict]) -> str:
@@ -91,11 +123,15 @@ async def _montar_indice() -> list[tuple[dict, list[float]]]:
         if _indice is not None:  # outro nó montou enquanto esperávamos
             return _indice
         exemplos = carregar()
-        vetores = await embeddings.embed_documentos([e["frase"] for e in exemplos])
-        if vetores is None:
-            _falhou_em = time.monotonic()
-            return []
-        _indice = list(zip(exemplos, vetores, strict=True))
+        gravados = vetores_gravados()
+        faltam = [e["frase"] for e in exemplos if e["frase"] not in gravados]
+        if faltam:  # arquivo defasado: vetoriza só o que falta
+            novos = await embeddings.embed_documentos(faltam)
+            if novos is None:
+                _falhou_em = time.monotonic()
+                return []
+            gravados = {**gravados, **dict(zip(faltam, novos, strict=True))}
+        _indice = [(e, gravados[e["frase"]]) for e in exemplos]
         _falhou_em = None
         return _indice
 

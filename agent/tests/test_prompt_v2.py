@@ -305,7 +305,9 @@ class _EmbeddingsFake:
 
 
 @pytest.fixture
-def indice_zerado(monkeypatch):
+def indice_zerado(monkeypatch, tmp_path):
+    # sem o arquivo de vetores: o índice vem do embedding de mentira (os testes de busca dependem dele)
+    monkeypatch.setattr(exemplos, "ARQUIVO_VETORES", tmp_path / "nao_existe.json")
     monkeypatch.setattr(exemplos, "_indice", None)
     monkeypatch.setattr(exemplos, "_falhou_em", None)
     monkeypatch.setattr(exemplos, "_trava", None)
@@ -363,3 +365,22 @@ async def test_no_ligado_os_exemplos_entram_no_turno_humano_do_parse(monkeypatch
     humano = cap.chamadas[0]["mensagens"][1][1]
     assert "Exemplos parecidos" in humano
     assert humano.index("Exemplos parecidos") < humano.index("<user_input>")
+
+
+def test_arquivo_de_vetores_em_dia_com_o_banco_e_o_modelo():
+    """Mexeu em `exemplos.json` ou no modelo de embedding: rode `scripts/vetorizar_exemplos.py`."""
+    gravados = exemplos.vetores_gravados()  # vazio se o modelo do arquivo não é o em uso
+    faltam = [e["frase"] for e in exemplos.carregar() if e["frase"] not in gravados]
+    assert not faltam, f"exemplos_vetores.json defasado: {faltam[:3]}"
+    assert all(len(v) == embeddings.DIMENSOES for v in gravados.values())
+
+
+@pytest.mark.asyncio
+async def test_com_o_arquivo_o_indice_nao_chama_o_embedding(monkeypatch):
+    monkeypatch.setattr(exemplos, "_indice", None)
+    monkeypatch.setattr(exemplos, "_falhou_em", None)
+    monkeypatch.setattr(exemplos, "_trava", None)
+    fake = _EmbeddingsFake()
+    monkeypatch.setattr(embeddings, "_embeddings", lambda: fake)
+    indice = await exemplos._montar_indice()
+    assert len(indice) == len(exemplos.carregar()) and fake.documentos == 0
