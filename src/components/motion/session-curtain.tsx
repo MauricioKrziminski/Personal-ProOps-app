@@ -97,7 +97,7 @@ export function useCortinaSaindo(): boolean {
  * | t | o quê |
  * |---|---|
  * | 0 | splash nativo: SÓ a tinta `#0B0B0C` (sem marca) |
- * | camada fez layout | `hideAsync()`: o nativo sai com a camada idêntica (tinta lisa) por cima, e a marca já começa |
+ * | camada fez layout | `hideAsync()`: o nativo sai com a camada idêntica (tinta lisa) por cima; a marca começa já no iOS e, no Android, quando o fade do nativo (300 ms) termina |
  * | a partir daí | a marca se constrói em 0,8 s: contorno se desenha, preenchimento entra, nome "ProOps" aparece; depois fica parada |
  * | pronto (fontes + sessão + trava, teto 2,5 s; 20 s com a senha pedida) | a tinta sobe com a borda em curva e libera o app; a marca sobe e some no primeiro terço |
  * | sempre | a marca fica ao menos 0,9 s antes da tinta subir (a construção cabe nisso) |
@@ -337,11 +337,19 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     const s = splash.current;
     if (!s.layout || s.escondido) return;
     s.escondido = true;
-    // A marca começa a se desenhar JÁ, junto com a saída do nativo — esperar a promessa do
-    // `hideAsync()` (no Android ela inclui o fade de 300 ms) deixava a tinta parada antes do
-    // traço começar (06/10/2026, "tem um delay para ele começar a animar a logo").
-    abertura();
-    SplashScreen.hideAsync().catch(() => {});
+    /*
+      iOS: o nosso quadro já existe quando o nativo sai (`fade: false`), então a marca começa JÁ —
+      esperar a promessa era tinta parada à toa ("tem um delay para começar a animar a logo").
+      Android: o conteúdo só desenha depois do `hideAsync()` e o nativo esmaece 300 ms por cima;
+      começando no layout, o traço inteiro acontecia sob o fade e o release mostrava só o
+      preenchimento surgindo (06/10/2026). Lá a marca começa quando o nativo terminou de sair.
+    */
+    if (Platform.OS !== 'android') abertura();
+    SplashScreen.hideAsync()
+      .catch(() => {})
+      .finally(() => {
+        if (Platform.OS === 'android') abertura();
+      });
   }, [abertura]);
 
   useEffect(() => {
