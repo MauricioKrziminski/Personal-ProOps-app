@@ -830,5 +830,7 @@ async def test_roteador_sabe_que_a_mensagem_responde_a_pergunta_do_cadastro(monk
                             "fields": [], "_pergunta": "Qual conta foi usada para pagar a prestação?"}],
     })
     humano = recebido[0][1][1]
-    assert "Você perguntou ao usuário: Qual conta foi usada para pagar a prestação?" in humano
+    assert "Você perguntou ao usuário" in humano
+    # a pergunta cita nomes de registros: vai DENTRO de um envelope (auditoria A9)
+    assert "<pergunta_anterior>\nQual conta foi usada para pagar a prestação?\n</pergunta_anterior>" in humano
     assert "cadastros" in humano

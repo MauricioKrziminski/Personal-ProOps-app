@@ -332,7 +332,7 @@ async def test_a_pergunta_chega_ao_modelo_no_turno_seguinte(monkeypatch):
                  "fields": [], "_pergunta": "Informe dia de fechamento."}]
     await nodes.resource_node(_no_state("dia 7", pendente))
     humano = capturado[0][-1][1]
-    assert "Você perguntou ao usuário: Informe dia de fechamento." in humano
+    assert "<pergunta_anterior>\nInforme dia de fechamento.\n</pergunta_anterior>" in humano
     assert "RESPOSTA" in humano
     # "Qual fatura? junho/2026, maio/2026" respondido com "a de junho" voltava sem mês: o mês
     # mora em `target_month`, não em `fields`, e o turno da resposta tem que dizer isso.

@@ -72,7 +72,8 @@ def test_user_turn_injeta_bloco_de_historico():
         timezone="America/Sao_Paulo",
         history=history,
     )
-    assert "Histórico recente de mensagens anteriores da conversa:" in texto
-    assert "Usuário: lançamentos do nubank" in texto
-    assert "Assistente: 💳 Lançamentos - Nubank Cartão" in texto
+    assert "Histórico recente de mensagens anteriores da conversa" in texto
+    # cada fala no seu envelope, e a tag diz quem falou (auditoria A9)
+    assert "<historico_usuario>\nlançamentos do nubank\n</historico_usuario>" in texto
+    assert "<historico_assistente>\n💳 Lançamentos - Nubank Cartão" in texto
     assert "<user_input>\nme mostre todos\n</user_input>" in texto
