@@ -796,8 +796,8 @@ async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
         """,
         ctx.workspace_id,
         alvo,
-        f"%{alvo}%",
-        f"%{alvo}%",
+        matching.like_contem(alvo),
+        matching.like_contem(alvo),
     )
     # Filtro que não acha nada cai na lista inteira, com o aviso. "Não achei" sobre uma série
     # que existe foi o defeito que criou este tool; repetir isso por causa de uma palavra
@@ -895,7 +895,7 @@ async def query_debts(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
         order by remaining_cents desc
         limit 20
     """
-    rows = await db.fetch(SQL, ctx.workspace_id, alvo, f"%{alvo}%")
+    rows = await db.fetch(SQL, ctx.workspace_id, alvo, matching.like_contem(alvo))
     aviso = ""
     if alvo and not rows:
         aviso = f"Não achei dívida com *{alvo}*. Estas são todas:\n"

@@ -294,7 +294,7 @@ async def por_texto(fonte: str, workspace_id, termo: str) -> tuple[Status, list[
     # Termo ausente casa tudo (`%%`), e não a string "None". É o que faz
     # "paguei a fatura" (sem citar cartão) virar a lista de faturas em aberto
     # em vez de uma busca literal que não acha nada.
-    like = f"%{termo or ''}%"
+    like = matching.like_contem(termo)
     args = (workspace_id, like, like, MOSTRAR) if cfg.get("dois_termos") else (
         workspace_id, like, MOSTRAR
     )

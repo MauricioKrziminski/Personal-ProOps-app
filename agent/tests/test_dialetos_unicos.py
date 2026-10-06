@@ -33,3 +33,8 @@ def test_ultimo_dia_nao_pega_o_resto(dito):
 def test_as_parcelas_no_ultimo_dia_usam_a_mesma_funcao():
     acao = FinanceAction(type=FinanceActionType.UPDATE_TRANSACTION, recurrence="FREQ=MONTHLY;BYMONTHDAY=-1")
     assert ultimo_dia_das_parcelas(acao)
+
+
+def test_like_escapa_curingas_do_termo():
+    assert matching.like_contem("50%_x\\") == "%50\\%\\_x\\\\%"
+    assert matching.like_contem(None) == "%%"

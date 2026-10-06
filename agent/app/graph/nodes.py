@@ -37,6 +37,7 @@ from app.graph.schemas import (
     RouterDecision,
     ResourceAction, ResourceActionType, ResourcePlan,
 )
+from app.domain import matching
 from app.domain.required import faltando
 from app.domain.money import cents_to_brl
 from app.graph.state import CHAVE_MIDIA, AgentState
@@ -186,13 +187,7 @@ async def route(state: AgentState) -> dict:
         # um, roteia; se não existe nenhum, segue o que o router disse.
         from app import db
 
-        reference = (
-            "%"
-            + decisao.financial_entity.replace("\\", "\\\\")
-            .replace("%", "\\%")
-            .replace("_", "\\_")
-            + "%"
-        )
+        reference = matching.like_contem(decisao.financial_entity)
         plans = await db.fetch(
             "select id from public.installment_plans where workspace_id=%s and description ilike %s",
             state["workspace_id"],

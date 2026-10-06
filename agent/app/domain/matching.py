@@ -46,6 +46,15 @@ def normalize(texto: str | None) -> str:
     return _NAO_ALFANUM.sub(" ", sem_acento.lower()).strip()
 
 
+def like_contem(termo: str | None) -> str:
+    """`%termo%` para `ilike`, com `\\`, `%` e `_` do termo escapados.
+
+    Sem isto, "50%" ou "conta_x" viram curinga e a busca acha o que a pessoa não citou.
+    """
+    limpo = (termo or "").replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{limpo}%"
+
+
 def sem_conta_explicita(texto: str | None) -> bool:
     """O usuário dispensou a conta, em vez de omitir o campo para usar a padrão."""
     return normalize(texto) in {"sem conta", "nenhuma conta", "sem nenhuma conta"}
