@@ -186,9 +186,11 @@ class FinanceAction(BaseModel):
     detalhe: str | None = Field(None, description="Nome do detalhe (subcategoria) que a frase cita.")
 
 
+# Os planos de domínio NÃO têm `confidence` (06/10/2026): toda escrita já pede SIM, então ela só
+# trocava o rótulo do motivo, e nenhum prompt a descrevia — o Lite a preenchia sem critério. A
+# confiança que decide algo é a do router (`policy.dominio_incerto`).
 class FinancePlan(BaseModel):
     actions: list[FinanceAction] = Field(default_factory=list)
-    confidence: float = 1.0
 
     @field_validator("actions")
     @classmethod
@@ -308,7 +310,6 @@ class FinanceQuery(BaseModel):
 
 class FinanceQueryPlan(BaseModel):
     actions: list[FinanceQuery] = Field(default_factory=list, max_length=10)
-    confidence: float = 1.0
 
 
 class NotesActionType(str, Enum):
@@ -338,7 +339,6 @@ class NotesAction(BaseModel):
 
 class NotesPlan(BaseModel):
     actions: list[NotesAction] = Field(default_factory=list, max_length=10)
-    confidence: float = 1.0
 
 
 # Ações que apagam ou alteram dado de forma difícil de desfazer.
@@ -514,7 +514,6 @@ class ResourceAction(BaseModel):
 
 class ResourcePlan(BaseModel):
     actions: list[ResourceAction] = Field(default_factory=list, max_length=10)
-    confidence: float = 1.0
 
 
 READ_ONLY.add(ResourceActionType.LIST)

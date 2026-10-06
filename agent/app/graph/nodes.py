@@ -424,7 +424,6 @@ async def finance_node(state: AgentState, config: RunnableConfig = None) -> dict
                 a.account = guards.extract_account_fallback(texto_orig)
     return {
         "finance_actions": [a.model_dump() for a in acoes],
-        "confidence": min(state.get("confidence", 1.0), plano.confidence),
         "llm_calls": 1,
     }
 
@@ -464,7 +463,6 @@ async def finance_query_node(state: AgentState) -> dict:
     acoes = [a for a in plano.actions if a.type.value != "unknown"]
     return {
         "finance_queries": [a.model_dump() for a in acoes],
-        "confidence": min(state.get("confidence", 1.0), plano.confidence),
         "llm_calls": 1,
     }
 
@@ -519,7 +517,6 @@ async def notes_node(state: AgentState) -> dict:
     acoes = [a for a in plano.actions if a.type.value != "unknown"]
     return {
         "notes_actions": [a.model_dump() for a in acoes],
-        "confidence": min(state.get("confidence", 1.0), plano.confidence),
         "llm_calls": 1,
     }
 
