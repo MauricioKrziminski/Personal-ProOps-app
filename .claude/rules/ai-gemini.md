@@ -188,7 +188,8 @@ nenhum outro:
   | quando | comando |
   |---|---|
   | iterando em prompt | `evaluate_answer_forms.py --secao <x> --barato` (gate no Lite, de graça) |
-  | a execução que APROVA | `evaluate_answer_forms.py`, sem flag, **uma vez** |
+  | a execução que APROVA a parte | `evaluate_answer_forms.py --secao <x>`, sem `--barato` |
+  | mudança que alcança todas as seções | `evaluate_answer_forms.py`, sem flag, **uma vez** (régua em `workflow.md`, passo 4) |
   | sonda de turno inteiro | `probe_pergunta_ou_supoe.py` — já é toda Lite |
 
   **NEM `ai_events` NEM o Langfuse enxergam as suítes — só a fatura enxerga** (medido em

@@ -587,7 +587,7 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
 | M6 dialetos de "sem conta"/"último dia" | feito | `6385b754`: `matching.sem_conta_explicita` e `ultimo_dia_do_mes` |
 | M7 corrida na cota | feito | reserva sob advisory lock; sem linha de plano vale o limite mais restrito |
 | M8 lembretes sem `skip locked` | decidido | `trava_de_sessao` + nova conferência antes de entregar dá a mesma garantia; entrega at-least-once escrita no código |
-| M9 sem CI | feito | `28a3370a`, `363a59a9`: ruff, pytest, tsc, lint, npm test, SQL e avaliação (dispara em todo `graph/`, `gemini.py`, portão e rascunho; roda formas de resposta E compreensão de conversa) |
+| M9 sem CI | feito | `28a3370a`, `363a59a9`: ruff, pytest, tsc, lint, npm test, SQL. A avaliação com Gemini real saiu do CI por decisão do dono do produto (06/10/2026): roda local, só a seção da parte mexida, e inteira só quando a mudança alcança todas (`workflow.md`, passo 4) |
 | M10 prompt remendado | feito | prompt v2 (`AGENT_PROMPT_V2`) aprovado e ligado no staging (seção 19) |
 | M11 funções gigantes | decidido | dividir quando mexer, como o próprio relatório pede |
 | BAIXO (10 itens) | feito | bytes no `compare_digest`, `verify_token` em tempo constante, OTP sem `str(err)`, corpo da Meta fora do log, fuso validado, teto de 16 MiB no áudio, `like_contem`, máscara no Langfuse, `_checa_producao`, logs JSON |
@@ -605,7 +605,7 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
 | 8.3 exemplos dinâmicos | feito atrás de flag | 115 exemplos sintéticos, vetores pré-gerados (o índice em runtime estourava as 100 req/min do gratuito e refazia 113 embeddings por cold start), piso 0,62 calibrado |
 | 8.4 memória de preferências | feito (apelido) / decidido (categoria) | `account_aliases` aprende e o app mostra/remove; preferência de categoria continua EXPLÍCITA (`set_rule`): aprender regra de uma correção seria regra implícita que a pessoa não pediu |
 | 9 ciclo de dados | feito | `agent_feedback`, `agent_quality`, `export_dataset.py` |
-| 10 portão no CI, cache, avaliação online, sombra | feito | ver M9; `eval_cache.py`; `avaliacao_online.py`; `GEMINI_SHADOW_<PAPEL>` |
+| 10 portão de avaliação, cache, avaliação online, sombra | feito | portão local por parte (ver M9); `eval_cache.py`; `avaliacao_online.py`; `GEMINI_SHADOW_<PAPEL>` |
 | 10 Batch API | decidido não | a avaliação roda numa chave gratuita (custo zero), 24 h de latência não serve de portão de PR, e o grafo pediria duas rodadas encadeadas (router → domínio) |
 | 11 fast-path do "sim" | feito | `6758d49c`; no E2E o "sim" não chamou modelo nenhum |
 | 11 raciocínio | feito / decidido | o Lite gasta 0 token de raciocínio; no gate, `low` passou 70/70 com 17% menos custo, e ficou `medium` (economia de ~US$ 0,0001 por chamada não paga o risco no SIM) |
@@ -684,8 +684,8 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
 
 ## 20. O que depende de você
 
-- **Secret `GEMINI_API_KEY_EVAL`** no GitHub, para o portão de avaliação do CI rodar. E um `push`
-  para ver o job `sql` verde uma vez num runner (ele segue não-bloqueante até isso).
+- Um `push` para ver o job `sql` do CI verde uma vez num runner (ele segue não-bloqueante até
+  isso).
 - **Produção**, na ordem migrations → agente → app: as migrations `20261006100000` a
   `20261006160000` (o `db push` com `--project-ref` de produção e `PROOPS_PROD_OK=1`, como manda
   o `CLAUDE.md`) e depois o deploy do agente. `AGENTE_RLS` em produção só depois de alguns dias

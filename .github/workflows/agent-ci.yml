@@ -2,6 +2,8 @@ name: CI
 
 # O portão de `.claude/rules/workflow.md` ("Antes de commitar"), rodando no push para a main e em PR.
 # Os filtros de caminho valem para o workflow inteiro; o que roda em cada job está em cada job.
+# A avaliação com Gemini REAL não roda aqui, de propósito: ela é por PARTE mexida, local
+# (`.claude/rules/workflow.md`, passo 4).
 
 on:
   push:
@@ -125,56 +127,3 @@ jobs:
             fi
           done
           if [[ -n "$falhas" ]]; then echo "falharam:$falhas"; exit 1; fi
-
-  avaliacao:
-    # Gemini REAL: só no PR que toca o grafo (prompts v1/v2, schemas, nós, exemplos), o portão, o
-    # rascunho, os atributos ou a escolha de modelo (`services/gemini.py`).
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    env:
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY_EVAL }}
-    defaults:
-      run:
-        working-directory: agent
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Este PR mexe no que a avaliação mede?
-        id: toca
-        working-directory: .
-        run: |
-          if git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" \
-            | grep -qE '^agent/app/(graph/[^/]+\.(py|json)|domain/(confirm|draft|atributos|installment_scope)\.py|tools/atributos\.py|services/gemini\.py)$'; then
-            echo "sim=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Nenhum prompt/schema/portão/rascunho/atributos mudou: avaliação pulada."
-          fi
-      - name: Sem a chave, avisa e sai verde
-        if: steps.toca.outputs.sim == 'true' && env.GEMINI_API_KEY == ''
-        run: |
-          echo "::warning::secret GEMINI_API_KEY_EVAL ausente (PR de fork ou nao configurado) - avaliacao do Gemini pulada."
-      - if: steps.toca.outputs.sim == 'true' && env.GEMINI_API_KEY != ''
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: agent/requirements.txt
-      # O cache de resultados (caso + hash de prompts/schemas + modelos) sobrevive entre runs: só o
-      # que o PR mudou chama o modelo. Quem falhou nunca entra nele.
-      - if: steps.toca.outputs.sim == 'true' && env.GEMINI_API_KEY != ''
-        uses: actions/cache@v4
-        with:
-          path: agent/.eval-cache
-          key: eval-${{ github.sha }}
-          restore-keys: eval-
-      - if: steps.toca.outputs.sim == 'true' && env.GEMINI_API_KEY != ''
-        run: pip install -r requirements.txt
-      # Sem `--barato`: é a execução que APROVA (gate no modelo do portão). Ver ai-gemini.md sobre a
-      # cota: o gate manda ~40 chamadas, e com chave sem faturamento isso passa de 20/dia.
-      - if: steps.toca.outputs.sim == 'true' && env.GEMINI_API_KEY != ''
-        # Teto de gasto: com chave PAGA no secret, uma rodada inteira mediu ~US$ 0,35 (06/10/2026).
-        run: python scripts/evaluate_answer_forms.py --teto-usd 0.50 --output eval.json
-      # A de compreensão prende a continuação de consulta e o histórico (C2/A9 da auditoria).
-      - if: steps.toca.outputs.sim == 'true' && env.GEMINI_API_KEY != ''
-        run: python scripts/evaluate_conversation_understanding.py --teto-usd 0.20 --output eval-conversa.json

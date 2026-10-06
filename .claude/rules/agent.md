@@ -125,7 +125,8 @@ costura — campo de cadastro, escolha de item, sim/não, slot de rascunho — e
 conjunto adversarial que **não pode aprovar nada**. O pytest usa dublês, e dublê
 sempre concorda: só esta suíte responde se a pessoa pode escrever do jeito dela.
 
-**Mexeu em prompt, schema de classificador ou catálogo → roda ela.** As duas metades
+**Mexeu em prompt, schema de classificador ou catálogo → roda a seção da parte mexida**
+(a régua de quando é a suíte inteira está em `workflow.md`, passo 4). As duas metades
 têm que passar: regressão em "aceitar" é o agente ficando surdo; regressão em
 "recusar" apaga dado do usuário.
 
@@ -495,7 +496,8 @@ garantia sozinho virou responsabilidade do código:
 - **Langfuse** fica no host da UE (`LANGFUSE_HOST=https://cloud.langfuse.com`); a retenção é a do
   plano contratado lá. Nome próprio NÃO é mascarado, de propósito (`telemetry.py`): sem ele o trace
   de uma confirmação não se depura. O elo log ↔ trace é o `thread_id` (= `session_id`).
-- **CI**: `.github/workflows/agent-ci.yml`; a avaliação usa o secret `GEMINI_API_KEY_EVAL`.
+- **CI**: `.github/workflows/agent-ci.yml` roda `ruff`, `pytest` e a suíte SQL. A avaliação com
+  Gemini real fica FORA dele, por decisão (06/10/2026): roda local, por parte (`workflow.md`, passo 4).
 
 ## Feedback e apelidos
 
