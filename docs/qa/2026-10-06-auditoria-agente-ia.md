@@ -635,6 +635,18 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
   há cron, para sempre.
 - **Deploy apagava flag ligada à mão** (`fbe20b76`): `--set-env-vars` substitui tudo.
 - **Índice de exemplos inviável no gratuito** (`c7c83cf8`) — ver 8.3.
+- **O aporte em meta perdia valor e conta** (`aee680ec`), defeito que já estava na base: com
+  `json_schema` o Gemini escreve as chaves NA ORDEM do schema e não volta. Ele começa o aporte pela
+  meta (`target_ref`), que vinha depois de valor e conta. Movido para logo após `type`: **1/12 →
+  12/12**. A mesma armadilha tira o valor de BUSCA das correções ("o mercado foi 120, não 100":
+  0/6); pôr `description` antes do valor acertou 3/3 no primeiro caso, mas a cota acabou antes de
+  medir as criações — que é o caminho de maior volume — e a troca NÃO foi feita sem medição.
+- **Três critérios de avaliação tinham envelhecido**, e pareciam regressão: "encerrar série"
+  passou a receber o `name` do alvo (`d9aaa929`) e recusava qualquer chave a mais; o SIM
+  condicionado ("Sim, mas muda para 24 parcelas") passou a REVISAR a proposta, e o caso só aceitava
+  segurar; `agent_quality` é global e o teste somava o feedback real do dia. Conferido contra o
+  código de ANTES da auditoria (worktree em `0ee72152`): base 9/9, atual 5/9 pelo critério velho,
+  9/9 pelo certo.
 
 ## 19. Medições com o Gemini real
 
@@ -644,3 +656,28 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
   (212.600 → 144.576). Extração: o v2 acertou onde o v1 errou em 6 frases (lembrete virando
   gasto, `query_forecast` proibido, conta perdida, cama 8×200, dois roteamentos); oscilação de
   roteamento consulta↔cadastros aparece NOS DOIS (rodadas repetidas trocam o resultado).
+- **Compreensão de conversa** (mesmo portão nos dois lados): v1 18/22, v2 19/22. As falhas que
+  sobram são as instabilidades já medidas no próprio script (~1 em 3).
+- **Seção de segurança** (`evaluate_answer_forms --secao seguran`): 21/21, com o portão no Lite.
+  A aprovação com o portão de produção (Flash) não rodou: o 3.7-flash passou o dia em 503 e esgotou
+  as 20 chamadas gratuitas; o 3.6-flash também esgotou.
+- **Formas de resposta, v1:** 282/302. Das 20 falhas: 7 timeouts com o principal fora, 2 do portão
+  Lite ("aham", "claro"), 4 do critério envelhecido de "encerrar", 5 do aporte (corrigido depois) e
+  2 de correção sem valor de busca. A v2 rodou até a cota diária acabar: os 53 primeiros casos
+  bateram com a v1; o resto ficou contaminado (portão sem cota).
+- **Por isso o `AGENT_PROMPT_V2` continua DESLIGADO.** Tudo o que foi medido aponta a favor
+  (−32% de tokens, melhor em 6 extrações, igual em roteamento e segurança), mas a suíte oficial
+  inteira não coube na cota gratuita do dia. Um job ficou agendado para rodar ao zerar a cota
+  (ordem dos campos + suíte inteira com `--prompt-v2`).
+
+## 20. O que depende de você
+
+- **Alertas e orçamento:** `ALERT_EMAIL`, `BILLING_ACCOUNT` e `BUDGET_USD` para
+  `./scripts/setup-gcp.sh alertas`.
+- **Secret `GEMINI_API_KEY_EVAL`** no GitHub, para o portão de avaliação do CI rodar. E um `push`
+  para ver o job `sql` verde uma vez num runner (ele segue não-bloqueante até isso).
+- **Produção**, na ordem migrations → agente → app: as migrations `20261006100000` a
+  `20261006160000` (o `db push` com `--project-ref` de produção e `PROOPS_PROD_OK=1`, como manda
+  o `CLAUDE.md`) e depois o deploy do agente. `AGENTE_RLS` em produção só depois de alguns dias
+  dele ligado no staging.
+- **Ligar o prompt v2**, quando a suíte inteira aprovar.
