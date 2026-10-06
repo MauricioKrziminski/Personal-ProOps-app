@@ -119,7 +119,7 @@ jobs:
         run: |
           permitidos="expected_recurring_occurrences draft_scenario"
           com_dados="debt_due_day_semantics debt_overdue_installment debt_projection_metadata debt_register_counted_payments financiamento_maleavel parcela_fixa_com_encargo preview_counted_debt_payments"
-          repeatable="finance_write_preview subcategory_financial_preview"
+          repeatable="finance_write_preview subcategory_financial_preview preview_counted_debt_payments"
           falhas=""
           roda() {
             local nome="$1" opts=""
