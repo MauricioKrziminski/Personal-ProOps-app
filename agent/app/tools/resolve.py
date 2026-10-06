@@ -303,12 +303,14 @@ async def por_texto(fonte: str, workspace_id, termo: str) -> tuple[Status, list[
     return veredito(linhas, cfg["label"], cfg["table"], cfg.get("detalhe"))
 
 
-# ⚠️ PROVISÓRIOS até `scripts/probe_busca_semantica.py` rodar com o Gemini real: chutes
-# conservadores para o cosseno do `gemini-embedding-001` (RETRIEVAL_QUERY x RETRIEVAL_DOCUMENT) a
-# 768 dimensões, onde frase curta contra documento curto costuma dar 0,5–0,8 se há relação.
-# Errar para CIMA só devolve "não achei" (o comportamento de hoje); errar para baixo oferece um
-# lançamento errado — que a pessoa ainda precisa confirmar no SIM, mas é pergunta à toa.
-SIMILARIDADE_MINIMA = 0.65
+# Calibrados com `scripts/probe_busca_semantica.py` no Gemini real (06/10/2026, `gemini-embedding-2`,
+# 768 dimensões, 12 consultas contra 9 lançamentos): as consultas SEM lançamento correspondente
+# chegaram a 0,582 no topo, e o único casamento errado ("compras do mês" → Aluguel) deu 0,611; os
+# acertos ficaram entre 0,65 e 0,81. 0,64 deixa os dois casos ruins em "não achei" e os acertos
+# como `found` ou lista curta. Errar para CIMA só devolve "não achei" (o comportamento de antes);
+# errar para baixo oferece um lançamento errado, que a pessoa ainda precisa recusar no SIM.
+# Trocou o modelo de embedding? Rode a sonda de novo: o cosseno não se compara entre modelos.
+SIMILARIDADE_MINIMA = 0.64
 # Diferença para o segundo colocado a partir da qual o primeiro vale sozinho (`found`). Abaixo
 # disso são vários próximos: `ambiguous`, com quem estiver a até esta distância do topo.
 FOLGA_MINIMA = 0.05

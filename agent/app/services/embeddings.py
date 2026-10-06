@@ -4,12 +4,14 @@ Duas portas, as duas com a MESMA garantia: **falhar nunca é erro para quem cham
 429 do nível gratuito (os limites do embedding não são documentados), prazo estourado, resposta
 fora de forma — tudo devolve `None`, e quem chama cai no comportamento lexical de sempre.
 
-`gemini-embedding-001` devolve 3072 dimensões por padrão; abaixo disso a doc manda normalizar à
-mão (só a de 3072 vem normalizada). Usamos `DIMENSOES = 768` e a norma unitária é feita aqui — é
-ela que faz `1 - (a <=> b)` do pgvector ser um cosseno comparável entre chamadas.
+Modelo: `gemini-embedding-2` (06/10/2026). O `gemini-embedding-001` respondeu 429 no nível
+gratuito do staging enquanto o 2 respondia; o 2 também é o de preço público no gratuito. Usamos
+`DIMENSOES = 768` (truncamento MRL) e a norma unitária é refeita aqui de qualquer forma — é ela que
+faz `1 - (a <=> b)` do pgvector ser um cosseno comparável entre chamadas. Os espaços dos dois
+modelos NÃO se comparam: o job revetoriza o que foi gravado com outro modelo (`e.model <> %s`).
 
-`task_type`: documento é `RETRIEVAL_DOCUMENT`, consulta é `RETRIEVAL_QUERY`. O par é assimétrico
-de propósito — o modelo otimiza a consulta curta ("almoço") contra o documento longo.
+`task_type` (documento `RETRIEVAL_DOCUMENT`, consulta `RETRIEVAL_QUERY`) continua indo: o 2 aceita
+o campo sem erro, e o par assimétrico é o que a doc do 001 recomendava.
 """
 
 from __future__ import annotations
