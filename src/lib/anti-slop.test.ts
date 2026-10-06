@@ -1913,6 +1913,7 @@ test('toda pilha de aba congela quando a aba não está em foco (ocultar valores
     assert.match(fonte, /<CongelaForaDeFoco>[\s\S]*<Stack[\s\S]*<\/CongelaForaDeFoco>/, `${aba}/_layout.tsx`);
   }
   const prim = readFileSync(join(SRC, 'components', 'ui', 'congela-fora-de-foco.tsx'), 'utf8');
-  // O congelamento chega um render DEPOIS da perda de foco (as consultas saem do cache antes).
-  assert.match(prim, /<Freeze freeze=\{!focada && saiu\}>/);
+  // O congelamento chega um render DEPOIS da perda de foco (as consultas saem do cache antes), por
+  // estado num timeout: `useDeferredValue` suspendia em render de transição e matava a rolagem no iOS.
+  assert.match(prim, /<Freeze freeze=\{!focada && congelar\}>/);
 });

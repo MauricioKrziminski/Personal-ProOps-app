@@ -1,5 +1,5 @@
 import { useIsFocused } from 'expo-router';
-import { createContext, useDeferredValue } from 'react';
+import { createContext, useEffect, useState } from 'react';
 import { Freeze } from 'react-freeze';
 
 /** Verdadeiro dentro da raiz de uma aba: quem esconde o que está nela, ao sair, é o `Freeze`. */
@@ -21,16 +21,29 @@ export const DentroDeAbaCongelavel = createContext(false);
  * a árvore ANTES de os filhos renderizarem, então uma aba que congelasse no mesmo render em que
  * perde o foco nunca veria `useIsFocused() === false` — e as consultas dela (`consulta-em-foco.ts`)
  * ficariam assinadas, refazendo a cada evento de realtime com a aba escondida. Esse render a mais
- * deixa cada consulta sair do cache; só então a aba congela. Voltar é imediato: a aba descongela
+ * (um timeout, não `useDeferredValue` — ver abaixo) deixa cada consulta sair do cache; só então a
+ * aba congela. Voltar é imediato: a aba descongela
  * no mesmo render em que ganha o foco.
  */
 export function CongelaForaDeFoco({ children }: { children: React.ReactNode }) {
   const focada = useIsFocused();
-  // O valor adiado chega num render DEPOIS do urgente: ao perder o foco ele ainda diz "não saiu".
-  const saiu = useDeferredValue(!focada);
+  /*
+    O render a mais vem de um estado comum num timeout, NÃO de `useDeferredValue`: suspender
+    (`Freeze`) dentro de um render de transição deixava a rolagem de TODAS as outras abas morta no
+    iOS — tocava, não rolava (06/10/2026, medido: sem o adiamento, Perfil e Finanças rolam).
+  */
+  const [congelar, setCongelar] = useState(false);
+  useEffect(() => {
+    if (focada) return;
+    const t = setTimeout(() => setCongelar(true), 0);
+    return () => {
+      clearTimeout(t);
+      setCongelar(false);
+    };
+  }, [focada]);
   return (
     <DentroDeAbaCongelavel.Provider value>
-      <Freeze freeze={!focada && saiu}>{children}</Freeze>
+      <Freeze freeze={!focada && congelar}>{children}</Freeze>
     </DentroDeAbaCongelavel.Provider>
   );
 }

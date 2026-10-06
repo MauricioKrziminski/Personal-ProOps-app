@@ -4,12 +4,12 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 
 /**
- * Roda `CongelaForaDeFoco` de verdade com um `react` mínimo (valor adiado à mão) e devolve o
+ * Roda `CongelaForaDeFoco` de verdade com um `react` mínimo (estado, efeito e timeout à mão) e devolve o
  * que o componente pediu ao `Freeze` a cada render.
  */
 function montar() {
   const slots: any[] = [];
-  let adiados: (() => void)[] = [];
+  let efeitos: (() => void)[] = [];
   let cursor = 0;
   let focada = true;
   let precisaRenderizar = true;
@@ -20,34 +20,37 @@ function montar() {
       if (!(i in slots)) slots[i] = inicial;
       return [slots[i], (v: boolean) => { if (slots[i] !== v) { slots[i] = v; precisaRenderizar = true; } }];
     },
-    // Como o React: o render urgente enxerga o valor ANTERIOR; o novo chega num render seguinte.
-    useDeferredValue: (valor: boolean) => {
+    // Efeito com deps; o `setTimeout(0)` do componente roda no fim do `assentar`, depois do render.
+    useEffect: (fn: () => any, deps: any[]) => {
       const i = cursor++;
-      if (!(i in slots)) slots[i] = valor;
-      const visto = slots[i];
-      if (visto !== valor) adiados.push(() => { slots[i] = valor; precisaRenderizar = true; });
-      return visto;
+      const antigo = slots[i];
+      if (antigo && antigo.deps[0] === deps[0]) return;
+      efeitos.push(() => { antigo?.limpa?.(); slots[i] = { deps, limpa: fn() }; });
     },
   };
   const module = { exports: {} as any };
   const code = ts.transpileModule(readFileSync('src/components/ui/congela-fora-de-foco.tsx', 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
-  new Function('require', 'module', 'exports', code)((nome: string) => {
+  const timeouts: (() => void)[] = [];
+  const setTimeoutFalso = (f: () => void) => { timeouts.push(f); return timeouts.length; };
+  const clearTimeoutFalso = (id: number) => { timeouts[id - 1] = () => {}; };
+  new Function('require', 'module', 'exports', 'setTimeout', 'clearTimeout', code)((nome: string) => {
     if (nome === 'react') return react;
     if (nome === 'expo-router') return { useIsFocused: () => focada };
     if (nome === 'react-freeze') return { Freeze: 'Freeze' };
     if (nome === 'react/jsx-runtime') return { jsx: (type: any, props: any) => ({ type, props }), jsxs: (type: any, props: any) => ({ type, props }) };
     throw new Error(nome);
-  }, module, module.exports);
+  }, module, module.exports, setTimeoutFalso, clearTimeoutFalso);
   const historico: boolean[] = [];
-  /** Renderiza até assentar (o valor adiado pede outro render). */
+  /** Renderiza até assentar (o timeout do componente pede outro render). */
   const assentar = () => {
-    for (let n = 0; n < 5 && precisaRenderizar; n++) {
-      precisaRenderizar = false; cursor = 0; adiados = [];
+    for (let n = 0; n < 5 && (precisaRenderizar || timeouts.length); n++) {
+      precisaRenderizar = false; cursor = 0; efeitos = [];
       const arvore = module.exports.CongelaForaDeFoco({ children: 'filho' });
       historico.push(arvore.props.children.props.freeze);
-      for (const aplicar of adiados) aplicar();
+      for (const rodar of efeitos) rodar();
+      for (const t of timeouts.splice(0)) t();
     }
   };
   return {
@@ -67,7 +70,7 @@ test('aba que perde o foco renderiza UM render sem congelar (as consultas saem d
   assert.deepEqual(aba.historico, [false, true], 'perdeu o foco: um render ainda descongelado, depois congela');
 });
 
-test('voltar ao foco descongela no MESMO render, sem esperar o valor adiado', () => {
+test('voltar ao foco descongela no MESMO render, sem esperar o timeout', () => {
   const aba = montar();
   aba.assentar();
   aba.mudarFoco(false);
