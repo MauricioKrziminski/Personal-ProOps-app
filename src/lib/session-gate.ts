@@ -50,9 +50,9 @@ export const TETO_DA_TRAVA_MS = 20000;
 /**
  * O mínimo que a marca fica na tela antes de a tinta subir, na abertura curta. Sem isso, num
  * aparelho rápido, a marca era um lampejo — e o pedido é que a passagem "logo → app" sempre
- * aconteça (17/09/2026).
+ * aconteça (17/09/2026). Cabe a construção da marca (1,5 s, `session-curtain.tsx`) e um respiro.
  */
-export const MARCA_MINIMA_MS = 900;
+export const MARCA_MINIMA_MS = 1700;
 
 /** Quanto a abertura ainda espera por "pronto", dado desde quando espera e se a trava segura. */
 export function esperaDaAbertura(desde: number, agora: number, segurando: boolean): number {

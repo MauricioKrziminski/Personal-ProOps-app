@@ -589,16 +589,18 @@ Olhando só a cortina, com a trava ligada a cascata tocava inteira por baixo del
   só existe durante a troca.
 
 **A abertura passa pela marca em TODA abertura, com senha ou sem** (pedido do dono do produto,
-17/09/2026). A marca fica no mínimo 0,9 s (`MARCA_MINIMA_MS`) — no Android ela entra também na
+17/09/2026). A marca fica no mínimo 1,7 s (`MARCA_MINIMA_MS`; era 0,9 s até a construção ficar mais lenta) — no Android ela entra também na
 abertura curta. Com a trava ligada, `segurarAbertura()` estica o teto para 20 s: o sistema pede a
 senha sobre a marca e, confirmada, a tinta sobe DIRETO no app (a trava some por baixo, sem a onda
 dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
 
 **A marca se DESENHA na abertura** (06/10/2026, pedido do dono do produto): um relógio só de
-800 ms na UI thread — o contorno de `markPath` por trim, o preenchimento entrando e o nome
-"ProOps" em fade — e depois PARADA, sem loop. Cabe dentro do `MARCA_MINIMA_MS`: a animação nunca
-alonga a espera (o "show" de 1,8 s das cinco primeiras aberturas e o anel saíram por isso). Com
-Reduzir movimento, marca e nome só em fade. A trava usa a mesma cortina.
+1,5 s na UI thread (*"mais suave, devagar, fluido"*) — o contorno de `markPath` por trim, o
+preenchimento entrando e o nome "ProOps" subindo em fade, com as etapas sobrepostas e curva
+smootherstep — e depois PARADA, sem loop. Cabe dentro do `MARCA_MINIMA_MS` (1,7 s). Só na
+ABERTURA e depois de destravar; login, saída e troca de conta são só a cortina, sem marca. No
+Android ela começa quando o fade da splash nativa (300 ms) termina — antes, o traço acontecia
+escondido sob ele. Com Reduzir movimento, marca e nome só em fade.
 
 **O carrossel e o voo da Carteira** são momento raro (delight declarado): mola `voo` e
 `carrossel`, giro 3D só no meio da troca, e com Reduce Motion não há voo nem giro.

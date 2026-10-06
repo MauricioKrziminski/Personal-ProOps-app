@@ -45,8 +45,11 @@ import type { CortinaApi } from './session-curtain.types';
 const LADO = 96;
 /** Abertura e logout terminam na mesma curva fixa da tela de conta. */
 const ONDA_DA_ABERTURA: Onda = { mode: 'up' };
-/** A marca se constrói (traço + preenchimento + nome) DENTRO de `MARCA_MINIMA_MS` (900): nunca alarga a espera. */
-const CONSTRUCAO_MS = 800;
+/**
+ * A marca se constrói (traço + preenchimento + nome) DENTRO de `MARCA_MINIMA_MS` (1700). Era 800 ms;
+ * o dono do produto pediu "mais suave, devagar, fluido" (06/10/2026) — o mínimo cresceu junto.
+ */
+const CONSTRUCAO_MS = 1500;
 /** O fade de saída da splash nativa no Android (`SplashScreen.setOptions`); a marca começa depois dele. */
 const SAIDA_DO_NATIVO_ANDROID_MS = 300;
 /** Tempo máximo para manter um canvas pré-montado enquanto uma confirmação nativa está aberta. */
@@ -100,9 +103,9 @@ export function useCortinaSaindo(): boolean {
  * |---|---|
  * | 0 | splash nativo: SÓ a tinta `#0B0B0C` (sem marca) |
  * | camada fez layout | `hideAsync()`: o nativo sai com a camada idêntica (tinta lisa) por cima; a marca começa já no iOS e, no Android, quando o fade do nativo (300 ms) termina |
- * | a partir daí | a marca se constrói em 0,8 s: contorno se desenha, preenchimento entra, nome "ProOps" aparece; depois fica parada |
+ * | a partir daí | a marca se constrói em 1,5 s: contorno se desenha, preenchimento entra, nome "ProOps" aparece; depois fica parada |
  * | pronto (fontes + sessão + trava, teto 2,5 s; 20 s com a senha pedida) | a tinta sobe com a borda em curva e libera o app; a marca sobe e some no primeiro terço |
- * | sempre | a marca fica ao menos 0,9 s antes da tinta subir (a construção cabe nisso) |
+ * | sempre | a marca fica ao menos 1,7 s antes da tinta subir (a construção de 1,5 s cabe nisso) |
  *
  * ## Por que `cobrir` espera dois quadros a mais
  *
@@ -289,7 +292,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     A abertura roda UMA vez, no instante em que a camada fez layout — direto do `aoLayout`, sem
     passar por um render do React: com o JS ocupado montando a árvore do app, `setState` + efeito
     atrasavam o primeiro traço da marca (medido no dev: ~2 s entre o layout e o traço). O relógio da
-    marca é um valor da UI thread, e o mínimo de 0,9 s conta DESTE instante (a marca está na tela).
+    marca é um valor da UI thread, e o mínimo de 1,7 s conta DESTE instante (a marca está na tela).
     O teto conta daqui: com o app pronto antes da construção acabar, a marca já cabe no mínimo;
     com o app atrasado, o teto abre assim mesmo — tela de login atrasada é melhor que splash
     eterno. Com a trava pedindo a senha (`segurarAbertura`) o teto é longo: a marca fica enquanto
@@ -470,10 +473,11 @@ function Camada({
   );
 }
 
+/** Smootherstep: começa e termina com velocidade E aceleração zero — sem tranco nas emendas. */
 const suave = (x: number) => {
   'worklet';
   const k = Math.min(1, Math.max(0, x));
-  return k * k * (3 - 2 * k);
+  return k * k * k * (k * (k * 6 - 15) + 10);
 };
 
 /**
@@ -500,19 +504,20 @@ function MarcaDaAbertura({
   const theme = useTheme();
   const caminho = useMemo(() => markPath(LADO), []);
 
-  // Traço 0 → 58%; o preenchimento entra de 42% a 78% e leva o contorno embora; o nome fecha.
-  const fim = useDerivedValue(() => suave(t.get() / 0.58));
-  const contorno = useDerivedValue(() => (reduzido ? 0 : 1 - suave((t.get() - 0.5) / 0.28)));
+  // Traço 0 → 60%; o preenchimento entra de 40% a 85% e leva o contorno embora (55% → 90%);
+  // o nome fecha de 65% a 100%. As etapas se sobrepõem para a construção não ter degraus.
+  const fim = useDerivedValue(() => suave(t.get() / 0.6));
+  const contorno = useDerivedValue(() => (reduzido ? 0 : 1 - suave((t.get() - 0.55) / 0.35)));
   // Reduzido: o canvas fica estático (opacidade 1) e o fade é da View por fora — um valor que muda
   // antes do primeiro quadro do Skia não repinta, e a marca não aparecia.
-  const miolo = useDerivedValue(() => (reduzido ? 1 : suave((t.get() - 0.42) / 0.36)));
+  const miolo = useDerivedValue(() => (reduzido ? 1 : suave((t.get() - 0.4) / 0.45)));
   const marcaStyle = useAnimatedStyle(() => ({
     opacity: reduzido ? t.get() : 1,
   }));
-  const nome = useDerivedValue(() => (reduzido ? t.get() : suave((t.get() - 0.72) / 0.28)));
+  const nome = useDerivedValue(() => (reduzido ? t.get() : suave((t.get() - 0.65) / 0.35)));
   const nomeStyle = useAnimatedStyle(() => ({
     opacity: nome.get(),
-    transform: [{ translateY: (1 - nome.get()) * 4 }],
+    transform: [{ translateY: (1 - nome.get()) * 8 }],
   }));
 
   const sai = useAnimatedStyle(() => {
