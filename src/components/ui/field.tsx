@@ -60,6 +60,12 @@ interface FieldProps {
   /** Texto nosso pode marcar o nome de um botão ou exemplo com `*assim*`; dado vai em `<Forte>`. */
   error?: React.ReactNode;
   hint?: React.ReactNode;
+  /**
+   * O formulário não salva sem este campo (06/10/2026, *"o usuário só descobre quando clica em
+   * salvar"*). A régua é o GUARDA do salvar (zod, `podeSalvar`), não o `NOT NULL`: campo com
+   * default não é obrigatório, e o condicional recebe a MESMA condição que o guarda usa.
+   */
+  obrigatorio?: boolean;
   children: React.ReactNode;
 }
 
@@ -75,7 +81,7 @@ interface FieldProps {
  * que é o campo" de "explicação sobre o campo". A distinção anda em DOIS eixos, porque um só não
  * sobrevive a 1,3×: **peso** (500 → 400) e **cor** (`text` → `textSecondary`).
  */
-export function Field({ label, labelAccessory, labelGap = Space.sm, error, hint, children }: FieldProps) {
+export function Field({ label, labelAccessory, labelGap = Space.sm, error, hint, obrigatorio, children }: FieldProps) {
   const foco = useSharedValue(0);
   const [alturaDoRotulo, setAlturaDoRotulo] = useState(0);
   const [alturaDaLinha, setAlturaDaLinha] = useState(0);
@@ -84,7 +90,11 @@ export function Field({ label, labelAccessory, labelGap = Space.sm, error, hint,
   const rotulo = (
     <MudancaSuave valor={typeof label === 'string' ? label : undefined} style={labelAccessory ? styles.textoDoRotulo : undefined}>
       <ThemedText type="footnote" style={styles.rotulo}
-        onLayout={labelAccessory ? (event) => setAlturaDoRotulo(event.nativeEvent.layout.height) : undefined}>{label}</ThemedText>
+        accessibilityLabel={obrigatorio && typeof label === 'string' ? `${label}, obrigatório` : undefined}
+        onLayout={labelAccessory ? (event) => setAlturaDoRotulo(event.nativeEvent.layout.height) : undefined}>
+        {/* Cinza, não vermelho: num formulário inteiro de obrigatórios o vermelho leria como erro. */}
+        {obrigatorio ? <>{label}<ThemedText type="footnote" themeColor="textSecondary"> *</ThemedText></> : label}
+      </ThemedText>
     </MudancaSuave>
   );
 
@@ -334,6 +344,12 @@ interface MoneyFieldProps {
   readOnly?: boolean;
   /** Quando o campo tem unidade (cada parcela × total), o leitor de tela precisa dizê-la. */
   accessibilityLabel?: string;
+  /**
+   * O lado do dinheiro, NO número (06/10/2026): entrada é `+ R$` em verde (a semântica de dinheiro
+   * que entra), saída é `− R$` na tinta. Uma hipótese nova herdava "Entra" e ninguém via — o
+   * seletor fica em cima, e o olho está no valor. Sem `sinal` (transferência), nada muda.
+   */
+  sinal?: 'entra' | 'sai';
 }
 
 /**
@@ -438,6 +454,7 @@ export function MoneyField({
   invalid,
   readOnly,
   accessibilityLabel = 'Valor em reais',
+  sinal,
 }: MoneyFieldProps) {
   const theme = useTheme();
   const ativo = usePresencaAtiva();
@@ -476,7 +493,7 @@ export function MoneyField({
   }, [focado, reduzido, piscar]);
   const cursor = useAnimatedStyle(() => ({ opacity: piscar.get() }));
 
-  const cor = readOnly ? theme.textSecondary : theme.text;
+  const cor = readOnly ? theme.textSecondary : sinal === 'entra' ? theme.success : theme.text;
   const { fontScale } = useWindowDimensions();
   const [largura, setLargura] = useState(0);
   const [medidas, setMedidas] = useState<Record<string, Record<string, number>>>({});
@@ -512,8 +529,8 @@ export function MoneyField({
             });
           }}>{ch}</Text>)}
       </View>
-      <ThemedText themeColor="textSecondary" style={[Type.title2, styles.moeda]}>
-        R$
+      <ThemedText themeColor={sinal === 'entra' && !readOnly ? 'success' : 'textSecondary'} style={[Type.title2, styles.moeda]}>
+        {sinal === 'entra' ? '+ R$' : sinal === 'sai' ? '− R$' : 'R$'}
       </ThemedText>
       <View style={[styles.digitos, { height: alturaDoValor, opacity: largura > 0 && escalaDoValor > 0 ? 1 : 0 }]} pointerEvents="none"
         onLayout={({ nativeEvent: { layout } }) => {
@@ -554,7 +571,7 @@ export function MoneyField({
         caretHidden={Platform.OS !== 'ios'}
         selectionColor={Platform.OS === 'ios' ? 'transparent' : undefined}
         contextMenuHidden
-        accessibilityLabel={accessibilityLabel}
+        accessibilityLabel={sinal ? `${accessibilityLabel}, ${sinal === 'entra' ? 'entrada' : 'saída'}` : accessibilityLabel}
         // Na cor da própria caixa: o Android ignora `color: 'transparent'` num input.
         style={[styles.captura, { color: theme.surface }]}
       />

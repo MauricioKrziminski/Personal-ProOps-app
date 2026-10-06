@@ -175,7 +175,7 @@ export default function SignupScreen() {
             control={control}
             name="name"
             render={({ field }) => (
-              <Field label="Nome" error={errors.name?.message}>
+              <Field label="Nome" obrigatorio error={errors.name?.message}>
                 <TextField
                   value={field.value}
                   onChangeText={field.onChange}
@@ -197,7 +197,7 @@ export default function SignupScreen() {
             control={control}
             name="email"
             render={({ field }) => (
-              <Field label="E-mail" error={errors.email?.message ?? error ?? undefined}>
+              <Field label="E-mail" obrigatorio error={errors.email?.message ?? error ?? undefined}>
                 <TextField
                   ref={emailRef}
                   value={field.value}
@@ -221,7 +221,7 @@ export default function SignupScreen() {
             control={control}
             name="password"
             render={({ field }) => (
-              <Field label="Senha" error={errors.password?.message} hint="Pelo menos 8 caracteres">
+              <Field label="Senha" obrigatorio error={errors.password?.message} hint="Pelo menos 8 caracteres">
                 <TextField
                   ref={passwordRef}
                   value={field.value}
@@ -243,7 +243,7 @@ export default function SignupScreen() {
             control={control}
             name="confirm"
             render={({ field }) => (
-              <Field label="Repita a senha" error={errors.confirm?.message}>
+              <Field label="Repita a senha" obrigatorio error={errors.confirm?.message}>
                 <TextField
                   ref={confirmRef}
                   value={field.value}
@@ -273,7 +273,7 @@ export default function SignupScreen() {
             </ThemedText>
           </View>
 
-          <Field label="Código" error={error ?? undefined}>
+          <Field label="Código" obrigatorio error={error ?? undefined}>
             <OtpInput
               value={code}
               onChange={(next) => {

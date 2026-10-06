@@ -651,7 +651,7 @@ export default function BudgetsScreen() {
 
           {form ? (
             <SheetScroll contentContainerStyle={styles.sheetBody}>
-              <Field label="Categoria">
+              <Field label="Categoria" obrigatorio>
                 {/* O mesmo seletor do lançamento (25/09/2026), criando e editando (26/09/2026). */}
                 <CategoryPicker value={form.category} onChange={(category) => setForm({ ...form, category })} />
               </Field>
@@ -673,7 +673,7 @@ export default function BudgetsScreen() {
                 />
               </Field>
 
-              <Field label="Limite">
+              <Field label="Limite" obrigatorio>
                 <MoneyField
                   valueCents={form.limitCents}
                   onChangeCents={(limitCents) => setForm({ ...form, limitCents })}

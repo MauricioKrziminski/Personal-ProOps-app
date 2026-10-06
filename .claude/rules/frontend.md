@@ -78,6 +78,14 @@ card de erro e a recuperação.
     parcela". Vindo depois, a tela se remonta debaixo do dedo.
   - Campo longo (uma lista de contas) não parte um grupo curto ao meio.
   O lançamento era o fora-da-curva: descrição e estabelecimento ficavam no FIM, depois da data.
+- **Campo obrigatório se vê ANTES de salvar** (06/10/2026, *"o usuário só descobre quando clica
+  em salvar"*): `Field obrigatorio` desenha um ` *` cinza no rótulo (e ", obrigatório" no leitor
+  de tela). A régua é o GUARDA do salvar (zod, `podeSalvar`, `disabled`), nunca o `NOT NULL`;
+  campo com default válido (data de hoje, seletor) não leva; o condicional recebe a MESMA
+  condição do guarda. Campo novo que bloqueia o salvar nasce com a prop.
+- **O lado do dinheiro fica à vista** (06/10/2026, hipótese criada como "Entra" sem a pessoa ver):
+  o Tipo é `Segmented` no topo (lançamento, série, hipótese) e o `MoneyField` repete o lado no
+  número — `sinal="entra"` é `+ R$` verde, `"sai"` é `− R$` na tinta; transferência sem sinal.
 - Decimal em texto (percentual, taxa, meses) só por `formatNumberBR` — vírgula, nunca ponto.
   Havia três cópias disso e uma tela sem nenhuma, escrevendo `90.4%` ao lado de `90,4%`.
 

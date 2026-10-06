@@ -175,7 +175,7 @@ export default function PlanScreen() {
     <>
       {isLoading && !isError ? <Skeleton height={120} radius={Radius.md} /> : (
         <View style={styles.bloco}>
-          <Field label="Convidar alguém" hint="Vê e lança tudo no mesmo financeiro">
+          <Field label="Convidar alguém" obrigatorio hint="Vê e lança tudo no mesmo financeiro">
             <TextField value={telefone} onChangeText={setTelefone} placeholder="(51) 99999-8888" keyboardType="phone-pad" autoComplete="tel" />
           </Field>
           <Button label={convidar.isPending ? 'Convidando…' : 'Convidar'} icon="person.badge.plus" loading={convidar.isPending} disabled={!podeConvidar} onPress={() => convidar.mutate({ phone: telefone, role: 'member' }, { onSuccess: () => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); setTelefone(''); toast({ message: 'Convite enviado.', tone: 'success' }); }, onError: () => toast({ message: 'Não deu para convidar. Confira se o número já não tem convite.', tone: 'error' }) })} block />

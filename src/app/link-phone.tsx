@@ -179,7 +179,7 @@ export default function LinkPhoneScreen() {
             </ThemedText>
           </View>
 
-          <Field label="Número com DDD" error={error ?? undefined} hint={phoneHint}>
+          <Field label="Número com DDD" obrigatorio error={error ?? undefined} hint={phoneHint}>
             <PhoneField
               value={phone}
               onChange={(text) => {
@@ -215,7 +215,7 @@ export default function LinkPhoneScreen() {
             </ThemedText>
           </View>
 
-          <Field label="Código" error={error ?? undefined}>
+          <Field label="Código" obrigatorio error={error ?? undefined}>
             <OtpInput
               value={code}
               onChange={(next) => {

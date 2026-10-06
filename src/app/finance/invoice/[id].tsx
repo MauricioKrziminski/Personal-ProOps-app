@@ -758,7 +758,7 @@ export default function InvoiceScreen() {
 
           <SheetScroll contentContainerStyle={styles.sheetBody}>
             <Field
-              label="Valor"
+              label="Valor" obrigatorio
               error={valorCents > falta ? `Falta ${formatBRL(falta)} nesta fatura.` : undefined}
               hint={parcial ? `Você já pagou ${formatBRL(jaPago)}.` : undefined}>
               {/* Superfície de DECISÃO: este é o valor que a pessoa está confirmando pagar, e
@@ -792,7 +792,7 @@ export default function InvoiceScreen() {
                 }}
               />
             ) : (
-              <Field label="Pagar com">
+              <Field label="Pagar com" obrigatorio>
                 <AccountPicker financialContext
                   accounts={pagadoras}
                   value={payerId}

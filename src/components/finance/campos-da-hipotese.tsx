@@ -3,7 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { AccountPicker, type PickableAccount } from '@/components/finance/account-picker';
 import { Calendar } from '@/components/finance/calendar';
 import { Presenca } from '@/components/motion/presenca';
-import { Field, MoneyField } from '@/components/ui/field';
+import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { Note } from '@/components/ui/note';
 import { QuantityField } from '@/components/ui/quantity-field';
 import { Segmented } from '@/components/ui/segmented';
@@ -67,6 +67,16 @@ export function CamposDaHipotese({
         />
       </Field>
 
+      <Field label="Título" hint="Vai para o lançamento ao aplicar.">
+        <TextField
+          value={h.titulo ?? ''}
+          onChangeText={(titulo) => set({ titulo })}
+          placeholder="Ex.: Viagem de férias"
+          accessibilityLabel="Título da hipótese"
+          maxLength={80}
+        />
+      </Field>
+
       <Field label="Como">
         <SelectField
           options={formas}
@@ -79,8 +89,9 @@ export function CamposDaHipotese({
         />
       </Field>
 
-      <Field label={h.forma === 'parcelado' ? 'Valor total' : h.forma === 'financiamento' ? 'Valor da parcela' : h.forma === 'repete' ? 'Valor de cada vez' : 'Valor'}>
-        <MoneyField valueCents={h.valor_cents} onChangeCents={(valor_cents) => set({ valor_cents })} />
+      <Field label={h.forma === 'parcelado' ? 'Valor total' : h.forma === 'financiamento' ? 'Valor da parcela' : h.forma === 'repete' ? 'Valor de cada vez' : 'Valor'} obrigatorio>
+        <MoneyField valueCents={h.valor_cents} onChangeCents={(valor_cents) => set({ valor_cents })}
+          sinal={h.kind === 'income' ? 'entra' : 'sai'} />
       </Field>
 
       <Presenca visivel={h.forma === 'parcelado' || h.forma === 'financiamento'}>
@@ -101,7 +112,7 @@ export function CamposDaHipotese({
         </Field>
       </Presenca>
 
-      <Field label={h.forma === 'financiamento' ? 'Conta que paga' : 'Conta ou cartão'}>
+      <Field label={h.forma === 'financiamento' ? 'Conta que paga' : 'Conta ou cartão'} obrigatorio={contaObrigatoria}>
         <AccountPicker financialContext
           accounts={opcoesDeConta}
           value={h.conta}

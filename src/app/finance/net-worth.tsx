@@ -584,7 +584,7 @@ export default function NetWorthScreen() {
 
           {form ? (
             <SheetScroll contentContainerStyle={styles.sheetBody}>
-              <Field label="Nome">
+              <Field label="Nome" obrigatorio>
                 <TextField
                   value={form.name}
                   onChangeText={(name) => setForm({ ...form, name })}
@@ -626,7 +626,7 @@ export default function NetWorthScreen() {
               </Field>
 
               <Field
-                label="Valor atual"
+                label="Valor atual" obrigatorio
                 error={nomeOk && !valorOk ? 'Informe quanto vale hoje' : undefined}
                 hint={
                   form.id

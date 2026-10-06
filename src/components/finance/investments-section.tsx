@@ -379,11 +379,11 @@ export function InvestmentsSection() {
                 onChange={mudarModo}
               />
             )}
-            <Field label={MODOS_DE_VALOR[vd.modo].campo}>
+            <Field label={MODOS_DE_VALOR[vd.modo].campo} obrigatorio>
               <MoneyField valueCents={vd.cents} onChangeCents={(cents) => mudarValor({ cents })} autoFocus />
             </Field>
             {editandoValor || lista.length < 2 ? null : (
-              <Field label="Investimento">
+              <Field label="Investimento" obrigatorio>
                 <SelectField
                   value={vd.posicaoId}
                   onChange={(id) => mudarValor({ posicaoId: id, contaId: null })}
@@ -393,7 +393,7 @@ export function InvestmentsSection() {
               </Field>
             )}
             {vd.modo === 'rendimento' ? (
-              <Field label="Em que conta caiu">
+              <Field label="Em que conta caiu" obrigatorio>
                 <AccountPicker accounts={destinos} value={vd.contaId} onChange={(id) => mudarValor({ contaId: id })} placeholder="Escolher a conta" />
               </Field>
             ) : null}
@@ -433,13 +433,13 @@ export function InvestmentsSection() {
             )}
 
             {vinculada ? null : (
-              <Field label="Valor">
+              <Field label="Valor" obrigatorio>
                 <MoneyField valueCents={draft.cents} onChangeCents={(cents) => mudar({ cents })} autoFocus />
               </Field>
             )}
 
             {editando || lista.length < 2 ? null : (
-              <Field label="Investimento">
+              <Field label="Investimento" obrigatorio>
                 <SelectField
                   value={draft.posicaoId}
                   onChange={(id) => mudar({ posicaoId: id, vincularId: null })}
@@ -469,7 +469,7 @@ export function InvestmentsSection() {
 
             {vinculada ? null : (
               <>
-                <Field label={rotuloOutra}>
+                <Field label={rotuloOutra} obrigatorio>
                   <AccountPicker
                     accounts={contas}
                     value={draft.contaId}

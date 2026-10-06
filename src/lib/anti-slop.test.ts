@@ -1882,7 +1882,7 @@ test('A conversão passa pela RPC converter_registro e invalida o financeiro', (
 test('O lançamento é um corpo do formulário único: seletor no topo, criar outro no fim, e converte', () => {
   const f = readFileSync(join(SRC, 'components/finance/formulario-do-lancamento.tsx'), 'utf8');
   assert.match(f, /export function FormularioDoLancamento\(/);
-  assert.ok(f.indexOf('{props.topo}') > 0 && f.indexOf('{props.topo}') < f.indexOf('options={KINDS}'), 'o seletor vem antes do tipo');
+  assert.ok(f.indexOf('{props.topo}') > 0 && f.indexOf('{props.topo}') < f.indexOf('options={ABAS_DO_TIPO}'), 'o seletor vem antes do tipo');
   assert.match(f, /label="Salvar e criar outro"/);
   assert.match(f, /props\.converter\(/);
   assert.match(f, /props\.registrarComum\(/);

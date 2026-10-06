@@ -201,6 +201,7 @@ export function LoginScreen() {
 
           <Field
             label="Número com DDD"
+            obrigatorio
             error={error ?? undefined}
             hint={
               isSupabaseConfigured
@@ -236,7 +237,7 @@ export function LoginScreen() {
             </ThemedText>
           </View>
 
-          <Field label="Código" error={error ?? undefined}>
+          <Field label="Código" obrigatorio error={error ?? undefined}>
             <OtpInput
               value={code}
               onChange={(next) => {

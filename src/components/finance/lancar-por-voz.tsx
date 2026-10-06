@@ -148,7 +148,7 @@ function FolhaPorVoz({ onClose }: { onClose: () => void }) {
         {erro ? <Note icon="exclamationmark.triangle" tone="danger">{erro}</Note> : null}
         {!gravando && (texto || erro || fase === 'montando') ? (
           <>
-            <Field label="O que você falou">
+            <Field label="O que você falou" obrigatorio>
               <TextField
                 value={texto}
                 onChangeText={setTexto}

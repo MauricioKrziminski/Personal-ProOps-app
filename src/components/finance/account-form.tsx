@@ -43,7 +43,7 @@ export function AccountFormFields({
   const podeNegativo = form.type === 'checking';
   return (
     <View style={styles.fields}>
-      <Field label="Nome">
+      <Field label="Nome" obrigatorio>
         <TextField
           value={form.name}
           onChangeText={(name) => change({ ...form, name })}
@@ -119,6 +119,7 @@ export function AccountFormFields({
               <View style={styles.diaCampo}>
                 <Field
                   label="Fecha dia"
+                  obrigatorio
                   error={form.closingDay && !accountDayValid(form.closingDay) ? 'De 1 a 31' : undefined}
                   // Editando: as faturas abertas se refazem com os dias novos (`20260926170000`);
                   // a dica vale para os dois dias e para a chave logo abaixo, e aparece UMA vez.
@@ -137,6 +138,7 @@ export function AccountFormFields({
               <View style={styles.diaCampo}>
                 <Field
                   label="Vence dia"
+                  obrigatorio
                   error={form.dueDay && !accountDayValid(form.dueDay) ? 'De 1 a 31' : undefined}>
                   <TextField
                     editable={!disabled}

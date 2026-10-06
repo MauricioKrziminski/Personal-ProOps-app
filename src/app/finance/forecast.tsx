@@ -778,7 +778,10 @@ export default function ForecastScreen() {
         {hipoteses.map((h) => {
           const falta = faltaNaHipotese(h);
           const erro = falta ? undefined : errosDaSimulacao.find((e) => e.indice === completas.indexOf(h));
-          const titulo = resumoDaHipotese(h, brl, nomeDaConta);
+          const resumo = resumoDaHipotese(h, brl, nomeDaConta);
+          // Com nome, o nome é o título e o resumo desce para a linha de baixo.
+          const nome = h.titulo?.trim();
+          const titulo = nome || resumo;
           // Incompleta (a v1 parcelada sem conta) não aplica: o formulário ficaria sem a conta.
           const aviso = falta ?? (erro ? `Não dá para aplicar: ${motivoDaHipotese(erro)}` : undefined);
           const acoes: ItemAction[] = [
@@ -791,11 +794,11 @@ export default function ForecastScreen() {
             <Deslizavel key={h.id} titulo={titulo} acoes={acoes}>
               <Row
                 title={titulo}
-                subtitle={aviso}
+                subtitle={nome ? (aviso ? `${resumo}\n${aviso}` : resumo) : aviso}
                 destructive={Boolean(aviso)}
                 onPress={() => editarHipotese(h)}
                 onLongPress={() => showItemActions(titulo, acoes)}
-                accessibilityLabel={`Hipótese: ${titulo}${aviso ? `. ${aviso}` : ''}`}
+                accessibilityLabel={`Hipótese: ${titulo}${nome ? `. ${resumo}` : ''}${aviso ? `. ${aviso}` : ''}`}
               />
             </Deslizavel>
           );

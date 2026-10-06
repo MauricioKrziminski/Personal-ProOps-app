@@ -232,7 +232,7 @@ export default function LinkEmailScreen() {
             control={control}
             name="email"
             render={({ field }) => (
-              <Field label="E-mail" error={errors.email?.message ?? error ?? undefined}>
+              <Field label="E-mail" obrigatorio error={errors.email?.message ?? error ?? undefined}>
                 <TextField
                   value={field.value}
                   onChangeText={(texto: string) => {
@@ -259,7 +259,7 @@ export default function LinkEmailScreen() {
             control={control}
             name="password"
             render={({ field }) => (
-              <Field label="Senha" error={errors.password?.message} hint="Pelo menos 8 caracteres">
+              <Field label="Senha" obrigatorio error={errors.password?.message} hint="Pelo menos 8 caracteres">
                 <TextField
                   ref={passwordRef}
                   value={field.value}
@@ -281,7 +281,7 @@ export default function LinkEmailScreen() {
             control={control}
             name="confirm"
             render={({ field }) => (
-              <Field label="Repita a senha" error={errors.confirm?.message}>
+              <Field label="Repita a senha" obrigatorio error={errors.confirm?.message}>
                 <TextField
                   ref={confirmRef}
                   value={field.value}
@@ -315,7 +315,7 @@ export default function LinkEmailScreen() {
             </ThemedText>
           </View>
 
-          <Field label="Código" error={error ?? undefined}>
+          <Field label="Código" obrigatorio error={error ?? undefined}>
             <OtpInput
               value={code}
               onChange={(next) => {

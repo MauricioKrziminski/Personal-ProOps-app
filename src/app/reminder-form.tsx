@@ -552,7 +552,7 @@ function ReminderForm({
           control={control}
           name="title"
           render={({ field }) => (
-            <Field label="Título" error={errors.title?.message}>
+            <Field label="Título" obrigatorio error={errors.title?.message}>
               <TextField
                 value={field.value}
                 onChangeText={field.onChange}

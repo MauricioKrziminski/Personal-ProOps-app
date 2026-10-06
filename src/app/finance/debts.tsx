@@ -625,7 +625,7 @@ export default function DebtsScreen() {
             <SheetScroll contentContainerStyle={styles.sheetBody}>
               {/* Superfície de DECISÃO: o valor que a pessoa confere agora não se esconde. */}
               <Field
-                label="Quanto você pagou"
+                label="Quanto você pagou" obrigatorio
                 hint={
                   !podeMudarContrato || !naParcelaFixa
                     ? undefined

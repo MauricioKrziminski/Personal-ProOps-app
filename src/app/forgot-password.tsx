@@ -229,7 +229,7 @@ export default function ForgotPasswordScreen() {
           <View style={styles.copy}>
             <ThemedText type="title">Recuperar senha</ThemedText>
           </View>
-          <Field label="E-mail" error={error ?? undefined}>
+          <Field label="E-mail" obrigatorio error={error ?? undefined}>
             <TextField
               value={email}
               onChangeText={(v) => {
@@ -260,7 +260,7 @@ export default function ForgotPasswordScreen() {
               Mandamos um código de 6 dígitos para {email.trim()}.
             </ThemedText>
           </View>
-          <Field label="Código" error={error ?? undefined}>
+          <Field label="Código" obrigatorio error={error ?? undefined}>
             <OtpInput
               value={code}
               onChange={(next) => {
@@ -293,7 +293,7 @@ export default function ForgotPasswordScreen() {
           </View>
           {/* A recusa do servidor é sempre da senha escolhida (igual à antiga, fraca, vazada) ou
               da rede, então mora neste campo — sem ela a tela só vibrava. */}
-          <Field label="Senha nova" hint={`Pelo menos ${MIN_PASSWORD} caracteres`} error={error ?? undefined}>
+          <Field label="Senha nova" obrigatorio hint={`Pelo menos ${MIN_PASSWORD} caracteres`} error={error ?? undefined}>
             <TextField
               value={password}
               onChangeText={(v) => {
@@ -312,6 +312,7 @@ export default function ForgotPasswordScreen() {
           </Field>
           <Field
             label="Repita a senha"
+            obrigatorio
             error={confirm.length > 0 && password !== confirm ? 'As senhas não batem' : undefined}>
             <TextField
               ref={confirmRef}

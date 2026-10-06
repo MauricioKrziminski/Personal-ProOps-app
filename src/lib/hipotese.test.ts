@@ -109,3 +109,16 @@ test('F09 hipótese leva pai/detalhe à simulação e ao aplicar com ausência l
     assert.equal(paramsDoAplicar({ ...h, subcategory_id: null }).params.subcategory_id, '');
   }
 });
+
+test('o título opcional vai para o formulário no Aplicar e nunca para o registro simulado', () => {
+  const comNome: Hipotese = { ...base, titulo: '  Viagem  ' };
+  assert.equal(paramsDoAplicar(comNome).params.description, 'Viagem');
+  assert.equal(paramsDoAplicar({ ...comNome, forma: 'repete' }).params.description, 'Viagem');
+  assert.equal(paramsDoAplicar({ ...comNome, forma: 'financiamento', parcelas: 12 }).params.description, 'Viagem');
+  // Vazio ou ausente (rascunho de antes do campo) não manda nada.
+  assert.equal('description' in paramsDoAplicar({ ...base, titulo: '   ' }).params, false);
+  assert.equal('description' in paramsDoAplicar(base).params, false);
+  // Dois financiamentos com o mesmo nome dariam 23505: o simulado mantém o nome gerado.
+  const f: Hipotese = { ...comNome, forma: 'financiamento', parcelas: 12, conta: 'c2' };
+  assert.notEqual(registroDaHipotese(f, 0)!.dados.name, 'Viagem');
+});

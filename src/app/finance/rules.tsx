@@ -327,7 +327,7 @@ export default function RulesScreen() {
             keyboardShouldPersistTaps="handled"
           >
             <Field
-              label="Quando o lançamento contiver"
+              label="Quando o lançamento contiver" obrigatorio
               error={erroSalvar ?? undefined}
             >
               <TextField
@@ -343,7 +343,7 @@ export default function RulesScreen() {
               />
             </Field>
 
-            <Field label="Categorizar como" error={!detailWorkspace && rascunho?.id
+            <Field label="Categorizar como" obrigatorio error={!detailWorkspace && rascunho?.id
               ? 'Não consegui conferir o espaço desta regra. Reabra a lista para tentar novamente.'
               : !rascunho?.id && defaultDetails.isError ? 'Não consegui consultar os detalhes. Tente novamente.' : undefined}>
               <CategoryPicker

@@ -95,6 +95,7 @@ export function useConfirmarBaixa({ aoConcluir }: { aoConcluir?: (id: string) =>
         <SheetScroll contentContainerStyle={styles.corpo}>
           <Field
             label={receita ? 'Quanto entrou' : 'Quanto saiu'}
+            obrigatorio
             hint={pago !== previsto ? `Previsto: ${formatBRL(previsto)}` : undefined}>
             <MoneyField valueCents={pago} onChangeCents={setValor} />
           </Field>

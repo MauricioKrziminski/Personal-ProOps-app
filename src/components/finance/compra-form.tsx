@@ -57,7 +57,7 @@ export function CamposDaCompra({
   return (
     <>
       <PurchaseDownPayment type="parcelada" parentId={form.id} installmentsCents={form.totalCents} />
-      <Field label="Título" error={tituloOk ? undefined : 'Escreva um título para esta compra'}>
+      <Field label="Título" obrigatorio error={tituloOk ? undefined : 'Escreva um título para esta compra'}>
         <TextField
           value={form.description}
           onChangeText={(description) => onChange({ ...form, description })}
@@ -78,6 +78,7 @@ export function CamposDaCompra({
 
       <Field
         label="Valor"
+        obrigatorio
         error={totalOk ? undefined : recusaDoValor()}
         hint={
           form.unidade === 'parcela'
@@ -110,7 +111,7 @@ export function CamposDaCompra({
 
       <PaymentMethodField value={form.paymentMethod} onChange={(paymentMethod) => onChange({ ...form, paymentMethod })} error={!origem ? erroMetodo ?? undefined : undefined} />
 
-      <Field label="Conta" error={origem && erroMetodo ? erroMetodo : contaOk ? undefined : 'Escolha a conta desta compra'} hint={origem && erroMetodo ? `Origem selecionada: ${origem.name}${motivo ? `. ${motivo}` : ''}` : dataLivre ? undefined : motivo}>
+      <Field label="Conta" obrigatorio={Boolean(form.original.accountId)} error={origem && erroMetodo ? erroMetodo : contaOk ? undefined : 'Escolha a conta desta compra'} hint={origem && erroMetodo ? `Origem selecionada: ${origem.name}${motivo ? `. ${motivo}` : ''}` : dataLivre ? undefined : motivo}>
         {dataLivre ? (
           <OriginAccountPicker
             paymentMethod={form.paymentMethod}

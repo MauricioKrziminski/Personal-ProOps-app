@@ -201,7 +201,7 @@ export function CategoriaSheet({
       <SheetScroll contentContainerStyle={styles.corpo} keyboardShouldPersistTaps="handled">
         <View style={styles.fields} pointerEvents={salvarCategoria.isPending ? 'none' : 'auto'}>
         <Field
-          label="Nome"
+          label="Nome" obrigatorio
           hint={
             jaExiste
               ? <>Essa categoria já existe: você está editando <Forte>{jaExiste.category}</Forte>.</>
@@ -247,11 +247,11 @@ export function CategoriaSheet({
                 }} />
               </Field>
               <Presenca visivel={aplicaHistorico} imediata style={styles.fields}>
-                <Field label="De" error={!campos.de ? 'Escolha o início do período.' : !periodo && campos.ate ? 'Confira as datas do período.' : undefined}>
+                <Field label="De" obrigatorio error={!campos.de ? 'Escolha o início do período.' : !periodo && campos.ate ? 'Confira as datas do período.' : undefined}>
                   <DatePickerField value={campos.de || null} onChange={(de) => setCampos((c) => ({ ...c, de }))}
                     accessibilityLabel="Início do período histórico" invalid={!campos.de} />
                 </Field>
-                <Field label="Até" error={!campos.ate ? 'Escolha o fim do período.' : !periodo && campos.de ? 'O fim não pode ser antes do início.' : undefined}>
+                <Field label="Até" obrigatorio error={!campos.ate ? 'Escolha o fim do período.' : !periodo && campos.de ? 'O fim não pode ser antes do início.' : undefined}>
                   <DatePickerField value={campos.ate || null} onChange={(ate) => setCampos((c) => ({ ...c, ate }))}
                     accessibilityLabel="Fim do período histórico" invalid={!campos.ate || Boolean(campos.de && !periodo)} />
                 </Field>

@@ -86,6 +86,7 @@ export function EmailLoginScreen() {
 
         <Field
           label="E-mail"
+          obrigatorio
           hint={
             isSupabaseConfigured
               ? undefined
@@ -109,7 +110,7 @@ export function EmailLoginScreen() {
           />
         </Field>
 
-        <Field label="Senha" error={error ?? undefined}>
+        <Field label="Senha" obrigatorio error={error ?? undefined}>
           <TextField
             ref={passwordRef}
             value={password}

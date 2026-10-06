@@ -645,13 +645,13 @@ export default function GoalsScreen() {
               />
 
               {vinculada ? null : (
-                <Field label="Valor">
+                <Field label="Valor" obrigatorio>
                   <MoneyField valueCents={aporteCents} onChangeCents={setAporteCents} autoFocus />
                 </Field>
               )}
 
               {aporteVia === 'conta' ? (
-                <Field label="Conta">
+                <Field label="Conta" obrigatorio={aporteDirecao === 'guardar'}>
                   <AccountPicker
                     accounts={contas}
                     value={aporteConta}
@@ -681,7 +681,7 @@ export default function GoalsScreen() {
                   ) : null}
                   {vinculada ? null : (
                     <>
-                      <Field label="Da conta">
+                      <Field label="Da conta" obrigatorio>
                         <AccountPicker
                           accounts={contas}
                           value={aporteDirecao === 'guardar' ? aporteOutra : aporteConta}
@@ -689,7 +689,7 @@ export default function GoalsScreen() {
                           placeholder="Escolher a origem"
                         />
                       </Field>
-                      <Field label="Para a conta">
+                      <Field label="Para a conta" obrigatorio>
                         <AccountPicker
                           accounts={contas}
                           value={aporteDirecao === 'guardar' ? aporteConta : aporteOutra}
@@ -803,7 +803,7 @@ export default function GoalsScreen() {
                   onChange={(tipo) => setAporteEmEdicao({ ...aporteEmEdicao, tipo })}
                 />
               </Field>
-              <Field label="Valor">
+              <Field label="Valor" obrigatorio>
                 <MoneyField valueCents={aporteEmEdicao.cents} onChangeCents={(cents) => setAporteEmEdicao({ ...aporteEmEdicao, cents })} />
               </Field>
               <Field label="Nota">
@@ -910,7 +910,7 @@ export default function GoalsScreen() {
 
           {form ? (
             <SheetScroll contentContainerStyle={styles.sheetBody}>
-              <Field label="Nome">
+              <Field label="Nome" obrigatorio>
                 <TextField
                   value={form.name}
                   onChangeText={(name) => setForm({ ...form, name })}
@@ -919,7 +919,7 @@ export default function GoalsScreen() {
                 />
               </Field>
 
-              <Field label="Quanto quer juntar">
+              <Field label="Quanto quer juntar" obrigatorio>
                 <MoneyField
                   valueCents={form.targetCents}
                   onChangeCents={(targetCents) => setForm({ ...form, targetCents })}

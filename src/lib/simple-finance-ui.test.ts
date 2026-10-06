@@ -4663,13 +4663,13 @@ test('Campos da série: Tipo mantém o padrão de confirmação da criação e o
       category: null, accountId: null, preset: 'monthly', intervalo: '1', inicio: '06/10/2026', fim: '', autoConfirm: true },
       contas: [], onChange: (form: any) => { props.form = form; } };
     const ui = screen('src/components/finance/serie-form.tsx', { componente: 'CamposDaSerie', props });
-    const tipo = () => ui.nodes().find((n: any) => n.type === 'SelectField' && n.props.options.some((o: any) => o.id === 'income'));
+    // Abas à vista (06/10/2026): o lado do dinheiro não fica escondido numa lista fechada.
+    const tipo = () => ui.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'income'));
     ui.interact(() => tipo().props.onChange('income'));
     assert.equal(props.form.kind, 'income');
     assert.equal(props.form.autoConfirm, Boolean(id), 'editar preserva a escolha; criar acompanha o tipo');
     ui.interact(() => tipo().props.onChange('expense'));
     assert.equal(props.form.autoConfirm, true);
-    assert.equal(ui.nodes().some((n: any) => n.type === 'Segmented'), false);
   }
 });
 
@@ -4693,7 +4693,7 @@ test('Campos da série: Repete preserva campos e marca apenas a agenda que foi a
   assert.ok(ui.nodes().some((n: any) => n.type === 'Button' && n.props.label === 'Substituir'));
 });
 
-test('Campos da série: fechar Tipo pela opção atual preserva a confirmação escolhida na criação', () => {
+test('Campos da série: tocar no Tipo atual preserva a confirmação escolhida na criação', () => {
   for (const kind of ['expense', 'income']) {
     const mudancas: any[] = [];
     const form = { kind, description: 'Aluguel', merchant: '', amountCents: 1000, category: null,
@@ -4701,12 +4701,9 @@ test('Campos da série: fechar Tipo pela opção atual preserva a confirmação 
     const campos = screen('src/components/finance/serie-form.tsx', {
       componente: 'CamposDaSerie', props: { form, contas: [], onChange: (novo: any) => mudancas.push(novo) },
     });
-    const tipo = campos.nodes().find((n: any) => n.type === 'SelectField' && n.props.options.some((o: any) => o.id === 'income'));
-    const seletor = screen('src/components/ui/select-field.tsx', { componente: 'SelectField', props: tipo.props });
-    seletor.interact((nodes) => nodes.find((n: any) => n.props.accessibilityRole === 'button').props.onPress());
-    seletor.interact((nodes) => nodes.find((n: any) => n.props.accessibilityRole === 'radio' && n.props.accessibilityState.selected).props.onPress());
-    assert.equal(seletor.nodes().some((n: any) => n.props.accessibilityRole === 'radio'), false, 'a lista fecha');
-    assert.equal(mudancas.length, 0, 'fechar não redefine o padrão de confirmação');
+    const tipo = campos.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.value === 'income'));
+    campos.interact(() => tipo.props.onChange(kind));
+    assert.equal(mudancas.length, 0, 'a aba atual não redefine o padrão de confirmação');
     assert.equal(form.autoConfirm, kind === 'income');
   }
 });

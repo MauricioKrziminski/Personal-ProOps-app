@@ -139,7 +139,7 @@ export function BudgetPlanSheet({ visible, onClose, month, monthLabel, view }: {
         </SheetScroll>
       ) : modo === 'plano' ? (
         <SheetScroll keyboardShouldPersistTaps="handled" contentContainerStyle={styles.corpo}>
-          <Field label="Renda-base">
+          <Field label="Renda-base" obrigatorio>
             <MoneyField valueCents={draft.baseCents} onChangeCents={(baseCents) => mudar((d) => ({ ...d, baseCents }))} autoFocus={!plano} />
           </Field>
           {renda > 0 ? (
@@ -155,7 +155,7 @@ export function BudgetPlanSheet({ visible, onClose, month, monthLabel, view }: {
 
           {draft.groups.map((g, gi) => (
             <Card key={g.key} style={styles.grupo}>
-              <Field label="Grupo">
+              <Field label="Grupo" obrigatorio>
                 <TextField value={g.name} onChangeText={(name) => mudarGrupo(g.key, (x) => ({ ...x, name }))} placeholder="Ex.: Essenciais" returnKeyType="done" />
               </Field>
               {g.lines.map((l, li) => {
@@ -168,7 +168,7 @@ export function BudgetPlanSheet({ visible, onClose, month, monthLabel, view }: {
                     {l.category === null ? (
                       <ThemedText type="footnote" themeColor="textSecondary">Sem categoria: aparece no plano e não vira orçamento.</ThemedText>
                     ) : null}
-                    <Field label="Percentual da renda (%)">
+                    <Field label="Percentual da renda (%)" obrigatorio>
                       <TextField
                         value={l.pct}
                         onChangeText={(pct) => mudarLinha(g.key, l.key, { pct })}
@@ -262,7 +262,7 @@ export function BudgetPlanSheet({ visible, onClose, month, monthLabel, view }: {
               onChange={setAlcance}
             />
           </Field>
-          <Field label="Categorias">
+          <Field label="Categorias" obrigatorio>
             <View style={styles.linha}>
               {categoriasDoPlano.map((c) => (
                 <SwitchRow

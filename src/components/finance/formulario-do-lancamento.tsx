@@ -41,7 +41,6 @@ import { argsDaParcelada, dadosDoLancamento, detalheDaEscrita, mudancaDoDetalhe 
 import { prepararLancamento, type LancamentoPreparado } from '@/lib/lancamento-write';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { Segmented } from '@/components/ui/segmented';
-import { SelectField, type SelectOption } from '@/components/ui/select-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ToastDoModal, useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
@@ -69,7 +68,6 @@ import {
   useSaveRecurringOne,
   type InstallmentPlanSummary,
   type Transaction,
-  type TransactionKind,
 } from '@/hooks/use-finance';
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
 import { mudaInicioDaSerie, mudancasDaOcorrencia, serieDaOcorrencia, validaSerie, type SerieForm } from '@/lib/serie';
@@ -110,11 +108,11 @@ import { askEditScope } from '@/lib/edit-scope';
  * antes de montar — com cache frio o modal de EDIÇÃO virava modal de CRIAÇÃO em silêncio.
  */
 
-const KINDS = [
-  { id: 'expense', label: 'Gasto', icon: 'arrow.up.right' },
-  { id: 'income', label: 'Receita', icon: 'arrow.down.left' },
-  { id: 'transfer', label: 'Transferência', icon: 'arrow.left.arrow.right' },
-] as const satisfies readonly (SelectOption & { id: TransactionKind })[];
+const ABAS_DO_TIPO = [
+  { value: 'expense', label: 'Gasto' },
+  { value: 'income', label: 'Receita' },
+  { value: 'transfer', label: 'Transferência' },
+] as const;
 
 const schema = z
   .object({
@@ -1193,10 +1191,11 @@ export function FormularioDoLancamento(props: Props) {
             name="kind"
             render={({ field }) => (
               <Field label="Tipo">
-                <SelectField
-                  options={KINDS}
+                {/* Abas, não lista (06/10/2026): o lado do dinheiro tem que estar À VISTA o tempo
+                    todo — numa lista fechada ele passava despercebido. O valor repete o sinal. */}
+                <Segmented
+                  options={ABAS_DO_TIPO}
                   value={field.value}
-                  placeholder="Escolher o tipo"
                   onChange={(next) => {
                     if (next === field.value) return;
                     if (next !== 'expense' && next !== 'income' && next !== 'transfer') return;
@@ -1228,7 +1227,7 @@ export function FormularioDoLancamento(props: Props) {
           control={control}
           name="description"
           render={({ field }) => (
-            <Field label="Título" error={errors.description?.message}>
+            <Field label="Título" obrigatorio error={errors.description?.message}>
               <TextField
                 value={field.value}
                 onChangeText={field.onChange}
@@ -1262,6 +1261,7 @@ export function FormularioDoLancamento(props: Props) {
             render={({ field }) => (
               <Field
                 label="Valor"
+                obrigatorio
                 error={errors.amount_cents?.message ?? correcaoDaDivida.erro ?? undefined}
                 // O valor muda mesmo com a parcela paga na fatura (28/09/2026): o banco mantém a
                 // fatura honesta (`valor_corrigido_na_fatura`). Só a data fica presa a ela.
@@ -1270,6 +1270,7 @@ export function FormularioDoLancamento(props: Props) {
                   valueCents={field.value}
                   onChangeCents={field.onChange}
                   invalid={!!errors.amount_cents || !!correcaoDaDivida.erro}
+                  sinal={kind === 'income' ? 'entra' : kind === 'expense' ? 'sai' : undefined}
                 />
               </Field>
             )}
@@ -1316,6 +1317,7 @@ export function FormularioDoLancamento(props: Props) {
           render={({ field }) => (
             <Field
               label={kind === 'transfer' ? 'Da conta' : 'Conta'}
+              obrigatorio={kind === 'transfer' || paymentMethod === 'credit'}
               // Sem a fileira de parcelas (sem conta ou fora de gasto), o erro dela mora aqui:
               // senão o Salvar recusava sem dizer por quê.
               error={contas.isError ? 'Não deu para carregar as contas.' : !podeParcelarAqui ? errors.installments?.message : undefined}
@@ -1361,7 +1363,7 @@ export function FormularioDoLancamento(props: Props) {
               control={control}
               name="counterparty_account_id"
               render={({ field }) => (
-                <Field label="Para a conta" error={errors.counterparty_account_id?.message}>
+                <Field label="Para a conta" obrigatorio error={errors.counterparty_account_id?.message}>
                   <OriginAccountPicker
                     accounts={accounts ?? []}
                     value={field.value ?? null}
@@ -1573,6 +1575,7 @@ export function FormularioDoLancamento(props: Props) {
                       render={({ field }) => (
                         <Field
                           label={dueFieldLabel(kind)}
+                          obrigatorio={!naCompra}
                           hint={naCompra ? 'Opcional: a data da parcela já está no cronograma.' : undefined}
                           error={errors.due_at?.message}>
                           <DatePickerField

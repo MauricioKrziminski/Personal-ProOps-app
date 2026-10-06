@@ -35,13 +35,13 @@ export function DownPaymentFields({ enabled, onEnabled, value, onChange, account
     {showToggle ? <SwitchRow label="Paguei uma entrada" value={enabled} onValueChange={onEnabled} /> : null}
     <Presenca visivel={enabled} preparar imediata>
       <View style={{ gap: Space.lg, paddingTop: showToggle ? Space.lg : 0 }}>
-      <Field label="Entrada" error={erroValor}>
+      <Field label="Entrada" obrigatorio error={erroValor}>
         <MoneyField valueCents={value.amountCents} onChangeCents={(amountCents) => onChange({ ...value, amountCents })}
           onBlur={() => setRevisado((r) => ({ ...r, amount: true }))}
           accessibilityLabel="Valor da entrada" invalid={Boolean(erroValor)} />
       </Field>
       <PaymentMethodField value={value.paymentMethod} onChange={(paymentMethod) => onChange({ ...value, paymentMethod })} error={!origem ? erroMetodo ?? undefined : undefined} />
-      <Field label="Conta da entrada" error={origem && erroMetodo ? erroMetodo : revisado.account && !value.accountId ? 'Escolha a conta da entrada' : undefined} hint={origem && erroMetodo ? `Origem selecionada: ${origem.name}` : undefined}>
+      <Field label="Conta da entrada" obrigatorio error={origem && erroMetodo ? erroMetodo : revisado.account && !value.accountId ? 'Escolha a conta da entrada' : undefined} hint={origem && erroMetodo ? `Origem selecionada: ${origem.name}` : undefined}>
         <OriginAccountPicker paymentMethod={value.paymentMethod} accounts={paymentMethodAccounts(value.paymentMethod, accounts)} value={value.accountId} selectedAccount={origem} onChange={(accountId) => {
           setRevisado((r) => ({ ...r, account: true })); onChange({ ...value, accountId });
         }}

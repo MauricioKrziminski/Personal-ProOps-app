@@ -205,6 +205,7 @@ export default function MembersScreen() {
           <View style={styles.bloco}>
             <Field
               label="Convidar alguém"
+              obrigatorio
               hint="Vê e lança tudo no mesmo financeiro"
             >
               <TextField

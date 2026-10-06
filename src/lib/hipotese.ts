@@ -16,6 +16,12 @@ export type Repete = 'weekly' | 'monthly' | 'yearly';
  */
 export type Hipotese = {
   id: string;
+  /**
+   * Nome opcional que a pessoa dá para reconhecer a hipótese (06/10/2026). Vai para o Título do
+   * formulário no "Aplicar"; NUNCA para o registro simulado — `debts.name` é único no espaço, e
+   * duas hipóteses "Carro" fariam a simulação voltar 23505. Rascunho antigo não tem o campo.
+   */
+  titulo?: string | null;
   kind: 'income' | 'expense';
   forma: Forma;
   /** Parcelado: o total da compra. Financiamento: o valor da parcela. Resto: o valor. */
@@ -149,7 +155,8 @@ export function paramsDoAplicar(h: Hipotese): ReturnType<typeof hrefDoLancar> {
   const data = isoToBR(dataDaHipotese(h));
   const payment: Record<string, string> = { ...(h.paymentMethod !== undefined ? { paymentMethod: h.paymentMethod ?? '' } : {}),
     ...(h.category !== undefined ? { category: h.category ?? '' } : {}),
-    ...(Object.hasOwn(h, 'subcategory_id') ? { subcategory_id: detalheDaEscrita(h).subcategory_id ?? '' } : {}) };
+    ...(Object.hasOwn(h, 'subcategory_id') ? { subcategory_id: detalheDaEscrita(h).subcategory_id ?? '' } : {}),
+    ...(h.titulo?.trim() ? { description: h.titulo.trim() } : {}) };
   if (h.forma === 'repete') {
     return hrefDoLancar('recorrente', { ...payment, deHipotese: h.id, kind: h.kind, amount: String(h.valor_cents), start: data, ...(h.conta ? { account: h.conta } : {}), repete: h.repete });
   }

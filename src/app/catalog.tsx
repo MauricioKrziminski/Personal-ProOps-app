@@ -281,7 +281,7 @@ export default function CatalogScreen() {
           <Field label="Nome da conta" error={<>Já existe uma conta chamada <Forte>Nubank</Forte>.</>}>
             <TextField placeholder="Nubank" defaultValue="Nubank" invalid />
           </Field>
-          <Field label="Valor">
+          <Field label="Valor" obrigatorio>
             <MoneyField valueCents={valor} onChangeCents={setValor} />
           </Field>
         </View>

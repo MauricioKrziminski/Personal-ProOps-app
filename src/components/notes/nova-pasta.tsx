@@ -193,7 +193,7 @@ export function NovaPastaSheet({
         action={<Button label={pasta ? 'Salvar' : 'Criar'} size="sm" loading={salvando} onPress={() => void criar()} />}
       />
       <SheetScroll contentContainerStyle={styles.corpo}>
-        <Field label="Nome" error={erro ?? undefined}>
+        <Field label="Nome" obrigatorio error={erro ?? undefined}>
           <TextField
             value={nome}
             onChangeText={(texto) => {

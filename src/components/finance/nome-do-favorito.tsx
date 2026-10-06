@@ -28,7 +28,7 @@ export function useNomeDoFavorito() {
         action={<Button label="Salvar" size="sm" disabled={!limpo} onPress={() => { const p = pedido; fechar(); p?.aoConfirmar(limpo); }} />}
       />
       <SheetScroll contentContainerStyle={styles.corpo}>
-        <Field label="Nome">
+        <Field label="Nome" obrigatorio>
           <TextField value={nome} onChangeText={setNome} maxLength={60} autoFocus accessibilityLabel="Nome do favorito" placeholder="Ex.: Café da manhã" />
         </Field>
       </SheetScroll>

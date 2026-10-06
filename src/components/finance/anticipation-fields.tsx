@@ -74,7 +74,7 @@ export function AdiantarCampos(p: Props) {
 
   return (
     <>
-      <Field label="O que adiantar">
+      <Field label="O que adiantar" obrigatorio>
         {p.consulta.isPending ? (
           <Skeleton height={56} />
         ) : p.consulta.isError ? (

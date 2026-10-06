@@ -238,7 +238,7 @@ export function EmergencyReserveEditor({ snapshot, draft, onChange }: {
           onChange={value => { if (value === 'manual' || value === 'observed') onChange({ ...draft, baseMode: value }); }} />
       </Field>
       <Presenca visivel={draft.baseMode === 'manual'} imediata>
-        <Field label="Essenciais por mês" hint="Quanto precisa para suas necessidades essenciais. Você pode ajustar depois."
+        <Field label="Essenciais por mês" obrigatorio hint="Quanto precisa para suas necessidades essenciais. Você pode ajustar depois."
           error={draft.manualMonthlyCents <= 0 ? 'Informe um valor maior que zero.' : undefined}>
           <MoneyField valueCents={draft.manualMonthlyCents} onChangeCents={manualMonthlyCents => onChange({ ...draft, manualMonthlyCents })}
             accessibilityLabel="Essenciais por mês" />
@@ -267,7 +267,7 @@ export function EmergencyReserveEditor({ snapshot, draft, onChange }: {
         return (
           <Card key={sourceKey(allocation)} style={styles.editor}>
             <ThemedText type="smallBold">{source?.name ?? 'Fonte indisponível'}</ThemedText>
-            <Field label={`Separar em ${source?.name ?? 'fonte indisponível'}`} hint={`Disponível sem outra alocação identificada: ${brl(available)}`}
+            <Field label={`Separar em ${source?.name ?? 'fonte indisponível'}`} obrigatorio hint={`Disponível sem outra alocação identificada: ${brl(available)}`}
               error={!source?.eligible || source.archived ? 'Esta fonte está indisponível. Retire o vínculo.'
                 : allocation.amountCents <= 0 ? 'Informe um valor maior que zero.' : allocation.amountCents > available ? 'O valor ultrapassa o saldo disponível.' : undefined}>
               <MoneyField valueCents={allocation.amountCents} onChangeCents={amountCents => updateAllocation(index, { amountCents })}

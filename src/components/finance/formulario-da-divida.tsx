@@ -587,7 +587,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   ) : null}
 </>);
   const dataDoContrato = (
-    <Field label={rotuloDaData} error={faltaData ? 'Escolha a data' : undefined}>
+    <Field label={rotuloDaData} obrigatorio={Boolean(form.parcelas)} error={faltaData ? 'Escolha a data' : undefined}>
       <DatePickerField
         value={proximaISO ? isoToBR(proximaISO) : null}
         onChange={(br) => escolherData(br)}
@@ -635,7 +635,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
           recolhida no fim do "Parcela fixa", e o nome caía em "Financiamento 2". O nome
           abre o formulário e é obrigatório; a conta é opcional.
         */}
-        <Field label="Nome" error={faltaNome ? 'Dê um nome' : undefined}>
+        <Field label="Nome" obrigatorio error={faltaNome ? 'Dê um nome' : undefined}>
           <TextField
             value={form.name}
             onChangeText={(name) => setForm({ ...form, name })}
@@ -701,7 +701,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
           accounts={accounts.data ?? []} error={erroEntrada} /> : null}
         <TrocaSuave estado={form.calculationMode} style={styles.conteudo}>
         {form.calculationMode === 'fixed_installments' ? <>
-          <Field label="Valor" hint={form.id ? 'Valor das parcelas; a entrada aparece separadamente acima' : entradaAtiva && form.unidade === 'total' ? 'Inclui a entrada; só o restante será parcelado' : undefined}>
+          <Field label="Valor" obrigatorio hint={form.id ? 'Valor das parcelas; a entrada aparece separadamente acima' : entradaAtiva && form.unidade === 'total' ? 'Inclui a entrada; só o restante será parcelado' : undefined}>
             <Segmented options={UNIDADES_DA_DIVIDA} value={form.unidade} onChange={mudarUnidade} />
             <MoneyField
               valueCents={form.valorCents}
@@ -709,7 +709,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
               accessibilityLabel={form.unidade === 'total' ? 'Total a pagar, em reais' : 'Valor de cada parcela, em reais'}
             />
           </Field>
-          <Field label="Total de parcelas">
+          <Field label="Total de parcelas" obrigatorio>
             {/*
               Texto, não `QuantityField`: o prazo do contrato não tem valor padrão honesto, e
               o passo a passo nasceria num "1" que salva um contrato que ninguém disse. Menor
@@ -762,7 +762,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
           </Presenca>
         </> : <>
 
-        <Field label="Quanto você deve hoje">
+        <Field label="Quanto você deve hoje" obrigatorio>
           <MoneyField
             valueCents={form.remainingCents}
             onChangeCents={(remainingCents) => setForm({ ...form, remainingCents })}
@@ -778,7 +778,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
           />
         </Field>
 
-        <Field label="Juros por mês">
+        <Field label="Juros por mês" obrigatorio={form.kind === 'financing'}>
           <View>
             <TextField
               value={form.taxa}
@@ -824,7 +824,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
         <Field label="Valor da parcela" hint="Em branco, sai dos juros e das parcelas">
           <MoneyField valueCents={form.installmentCents} onChangeCents={(installmentCents) => setForm({ ...form, installmentCents })} />
         </Field>
-        <Field label="Parcelas que faltam">
+        <Field label="Parcelas que faltam" obrigatorio={form.kind === 'financing'}>
           <TextField
             value={form.parcelas}
             onChangeText={(v) =>

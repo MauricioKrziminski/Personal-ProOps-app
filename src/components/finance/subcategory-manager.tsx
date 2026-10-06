@@ -157,13 +157,13 @@ export function SubcategoryManager({ visible, parent, workspaceId, onClose }: {
       </> : null}
       <Presenca visivel={!!draft}>
         {draft ? <View style={styles.group}>
-          <Field label="Nome" hint="De 1 a 40 caracteres" error={validName > 40 ? 'Use até 40 caracteres.' : undefined}><TextField accessibilityLabel="Nome do detalhe" value={draft.name}
+          <Field label="Nome" obrigatorio hint="De 1 a 40 caracteres" error={validName > 40 ? 'Use até 40 caracteres.' : undefined}><TextField accessibilityLabel="Nome do detalhe" value={draft.name}
             editable={Boolean(canEdit)} autoCapitalize="none" onChangeText={name => change({ name })} /></Field>
           <Field label="Categoria"><SelectField value={draft.parent} selectedOption={{ id: draft.parent, label: draft.parent }} disabled={!canEdit}
             options={Array.from(parentNames.values(), label => ({ id: label, label }))}
             onChange={value => { if (value) change({ parent: value, newParent: false }); }}
             actions={[{ id: 'new-parent', label: 'Outra categoria', disabled: !canEdit, onPress: () => change({ newParent: true }) }]} /></Field>
-          {draft.newParent ? <Field label="Outra categoria"><TextField accessibilityLabel="Outra categoria" value={draft.parent}
+          {draft.newParent ? <Field label="Outra categoria" obrigatorio><TextField accessibilityLabel="Outra categoria" value={draft.parent}
             editable={Boolean(canEdit)} autoCapitalize="none" onChangeText={value => change({ parent: value })} /></Field> : null}
           {moving ? <ThemedText type="small" themeColor="textSecondary">Mover atualiza a categoria dos registros vinculados, pagos e pendentes, e seus históricos. As leituras de orçamento passam para o novo pai; nenhum dinheiro é transferido.</ThemedText> : null}
           {collision ? <ThemedText type="small" themeColor="warning">{draft.snapshot

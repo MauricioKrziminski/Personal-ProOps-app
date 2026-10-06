@@ -19,6 +19,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Field, MoneyField, TextField } from '@/components/ui/field';
 import { QuantityField } from '@/components/ui/quantity-field';
+import { Segmented } from '@/components/ui/segmented';
 import { SelectField } from '@/components/ui/select-field';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { brToISO, isValidBRDate, localISODate } from '@/lib/dates';
@@ -27,6 +28,9 @@ import { describeRRule } from '@/lib/rrule-text';
 import { mudaInicioDaSerie, validaSerie, type SerieForm } from '@/lib/serie';
 import { ExpenseClassificationField } from '@/components/finance/expense-classification-field';
 import { normalizeExpenseClassification, type ExpenseClassificationDefaults } from '@/lib/expense-classification';
+
+const TIPOS_EDITANDO = [{ value: 'expense', label: 'Gasto' }, { value: 'income', label: 'Receita' }] as const;
+const TIPOS_CRIANDO = [...TIPOS_EDITANDO, { value: 'transfer', label: 'Transferência' }] as const;
 
 export function CamposDaSerie({
   form,
@@ -67,27 +71,28 @@ export function CamposDaSerie({
             só acompanha numa série nova. */}
         {/* Trocar de/para transferência é conversão (`converter_registro`), nunca troca silenciosa:
             editando, a transferência fica transferência e gasto/receita não a ganham. */}
-        <SelectField
-          options={[
-            ...(editando && !transferencia ? [] : [{ id: 'transfer', label: 'Transferência', icon: 'arrow.left.arrow.right' as const }]),
-            ...(editando && transferencia ? [] : [
-              { id: 'expense', label: 'Gasto', icon: 'arrow.up.right' as const },
-              { id: 'income', label: 'Receita', icon: 'arrow.down.left' as const },
-            ]),
-          ]}
-          value={form.kind}
-          disabled={editando && transferencia}
-          placeholder="Escolher o tipo"
-          onChange={(id) => {
-            if (id === form.kind) return;
-            if (id !== 'expense' && id !== 'income' && id !== 'transfer') return;
-            const kind = id;
-            onChange(editando ? { ...form, kind } : { ...form, kind, autoConfirm: kind !== 'income' });
-          }}
-        />
+        {/* Abas à vista (06/10/2026), como no lançamento; a transferência editada não troca. */}
+        {editando && transferencia ? (
+          <SelectField
+            options={[{ id: 'transfer', label: 'Transferência', icon: 'arrow.left.arrow.right' as const }]}
+            value={form.kind}
+            disabled
+            placeholder="Escolher o tipo"
+            onChange={() => {}}
+          />
+        ) : (
+          <Segmented
+            options={editando ? TIPOS_EDITANDO : TIPOS_CRIANDO}
+            value={form.kind}
+            onChange={(kind) => {
+              if (kind === form.kind) return;
+              onChange(editando ? { ...form, kind } : { ...form, kind, autoConfirm: kind !== 'income' });
+            }}
+          />
+        )}
       </Field>
 
-      <Field label="Título" error={form.description.length > 0 && !tituloOk ? 'Escreva um título' : undefined}>
+      <Field label="Título" obrigatorio error={form.description.length > 0 && !tituloOk ? 'Escreva um título' : undefined}>
         <TextField
           value={form.description}
           onChangeText={(description) => onChange({ ...form, description })}
@@ -108,8 +113,9 @@ export function CamposDaSerie({
       </Field>
       </Presenca>
 
-      <Field label="Valor">
-        <MoneyField valueCents={form.amountCents} onChangeCents={(amountCents) => onChange({ ...form, amountCents })} />
+      <Field label="Valor" obrigatorio>
+        <MoneyField valueCents={form.amountCents} onChangeCents={(amountCents) => onChange({ ...form, amountCents })}
+          sinal={form.kind === 'income' ? 'entra' : form.kind === 'expense' ? 'sai' : undefined} />
       </Field>
 
       <Presenca visivel={!transferencia}>
@@ -132,7 +138,7 @@ export function CamposDaSerie({
         <PaymentMethodField value={form.paymentMethod} onChange={(paymentMethod) => onChange({ ...form, paymentMethod })} error={!origem ? erroMetodo ?? undefined : undefined} />
       </Presenca>
 
-      <Field label={transferencia ? 'Da conta' : 'Conta'} error={origem ? erroMetodo ?? undefined : undefined} hint={origem && erroMetodo ? `Origem selecionada: ${origem.name}` : undefined}>
+      <Field label={transferencia ? 'Da conta' : 'Conta'} obrigatorio={transferencia || form.paymentMethod === 'credit'} error={origem ? erroMetodo ?? undefined : undefined} hint={origem && erroMetodo ? `Origem selecionada: ${origem.name}` : undefined}>
         <OriginAccountPicker
           paymentMethod={transferencia ? undefined : form.paymentMethod}
           accounts={transferencia ? contas : paymentMethodAccounts(form.paymentMethod, contas)}
@@ -146,7 +152,7 @@ export function CamposDaSerie({
 
       {/* Logo depois da origem. O destino nunca é cartão, e a origem não se repete nele. */}
       <Presenca visivel={transferencia}>
-        <Field label="Para a conta" error={mesmaConta ? 'Origem e destino precisam ser diferentes' : undefined}>
+        <Field label="Para a conta" obrigatorio error={mesmaConta ? 'Origem e destino precisam ser diferentes' : undefined}>
           <OriginAccountPicker
             accounts={contas.filter((c) => c.type !== 'credit_card' && c.id !== form.accountId)}
             value={form.counterpartyId ?? null}
@@ -213,6 +219,7 @@ export function CamposDaSerie({
       <Field
         // Editando, a data é o próximo vencimento; o calendário tem uma ação própria de fim do mês.
         label={editando ? rotuloDaData : 'Começa em'}
+        obrigatorio={!editando}
         hint={
           editando
             ? form.agendaMudou ? `Refaz as em aberto ${periodo} desta data em diante` : undefined
