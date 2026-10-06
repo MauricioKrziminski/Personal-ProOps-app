@@ -288,7 +288,7 @@ class _ComReserva(RunnableWithFallbacks):
             input, {**cfg, "metadata": {**meta, "reserva": True}}, **kwargs)
 
 
-def structured(
+def _structured(
     schema: type[T], model: str = GEMINI_PARSE, *, prazo: float = PRAZO_COM_RESERVA,
     no: str | None = None, versao: str | None = None,
 ):
@@ -329,6 +329,104 @@ def structured(
         chave=modelo(papel),
         metadados=meta,
     )
+
+
+# ---------------------------------------------------------------------------
+# modo sombra: trocar de modelo com tráfego real, sem efeito para o usuário
+# ---------------------------------------------------------------------------
+# `GEMINI_SHADOW_<PAPEL>=<modelo>` (desligado por padrão): depois que a chamada principal de
+# `structured()` responde, a MESMA entrada vai ao modelo sombra numa tarefa em segundo plano, e a
+# diferença entre as duas saídas vira o log `shadow_diff`. Nunca atrasa nem muda a resposta, erro
+# do sombra só loga, e o uso dele NÃO passa pelo coletor de tokens (cliente sem callbacks, sem o
+# `config` do turno): não entra na cota do usuário nem em `ai_events`. O custo vai só no log.
+# ATENÇÃO: dobra as chamadas ao Gemini do papel (e a cota grátis junto).
+_sombras_vivas: set[asyncio.Task] = set()
+_clientes_sombra: dict[str, ChatGoogleGenerativeAI] = {}
+
+
+def modelo_sombra(papel: str) -> str | None:
+    """O modelo sombra do papel (`GEMINI_SHADOW_<PAPEL>`), ou None se desligado ou igual ao atual."""
+    nome = os.environ.get(f"GEMINI_SHADOW_{papel.upper()}", "").strip()
+    return nome if nome and nome != modelo(papel) else None
+
+
+def avisar_sombras() -> None:
+    """WARNING no boot por papel com sombra ligada — ela dobra as chamadas."""
+    for papel in MODELOS:
+        if (nome := modelo_sombra(papel)):
+            log.warning("MODO SOMBRA ligado no papel %s: %s roda em paralelo a %s — dobra as "
+                        "chamadas ao Gemini (e a cota) deste papel", papel, nome, modelo(papel))
+
+
+def campos_divergentes(a: Any, b: Any, caminho: str = "") -> list[str]:
+    """Caminhos (`actions[0].amount_cents`) onde dois valores estruturados diferem."""
+    if isinstance(a, BaseModel):
+        a = a.model_dump()
+    if isinstance(b, BaseModel):
+        b = b.model_dump()
+    if isinstance(a, dict) and isinstance(b, dict):
+        return [c for k in sorted(set(a) | set(b))
+                for c in campos_divergentes(a.get(k), b.get(k), f"{caminho}.{k}".lstrip("."))]
+    if isinstance(a, list) and isinstance(b, list):
+        return [c for i in range(max(len(a), len(b)))
+                for c in campos_divergentes(a[i] if i < len(a) else None,
+                                            b[i] if i < len(b) else None, f"{caminho}[{i}]")]
+    return [] if a == b else [caminho or "."]
+
+
+async def _rodar_sombra(schema, papel: str, no: str | None, nome: str, entrada: Any,
+                        principal: Any) -> None:
+    try:
+        if nome not in _clientes_sombra:
+            _clientes_sombra[nome] = ChatGoogleGenerativeAI(
+                model=nome, temperature=0.1, google_api_key=get_settings().gemini_api_key,
+                max_retries=0, timeout=PRAZO_LONGO)
+        # include_raw: o uso de tokens vem na própria resposta, sem coletor.
+        r = await _clientes_sombra[nome].with_structured_output(schema, include_raw=True).ainvoke(entrada)
+        uso = getattr(r["raw"], "usage_metadata", None) or {}
+        custo = custo_usd(nome, uso.get("input_tokens", 0), uso.get("output_tokens", 0))
+        if r.get("parsed") is None:
+            campos = ["<sombra não devolveu o schema>"]
+        else:
+            campos = campos_divergentes(principal, r["parsed"])
+        log.info("shadow_diff", extra={"shadow": {
+            "papel": papel, "no": no, "modelo_principal": modelo(papel), "modelo_sombra": nome,
+            "divergiu": bool(campos), "campos": campos,
+            "tokens_entrada": uso.get("input_tokens"), "tokens_saida": uso.get("output_tokens"),
+            "custo_usd": custo}})
+    except Exception as erro:  # noqa: BLE001 — a sombra nunca afeta o turno
+        log.warning("shadow_diff falhou (%s) papel=%s no=%s sombra=%s",
+                    type(erro).__name__, papel, no, nome)
+
+
+class _ComSombra:
+    """Embrulha o runnable de `structured()`; só o `ainvoke` é usado pelo código."""
+
+    def __init__(self, principal: Any, schema, papel: str, no: str | None, nome: str):
+        self._principal, self._schema, self._papel, self._no, self._nome = (
+            principal, schema, papel, no, nome)
+
+    def __getattr__(self, atributo: str) -> Any:
+        return getattr(self._principal, atributo)
+
+    async def ainvoke(self, input: Any, config: RunnableConfig | None = None, **kwargs: Any) -> Any:  # noqa: A002
+        resposta = await self._principal.ainvoke(input, config, **kwargs)
+        tarefa = asyncio.create_task(_rodar_sombra(
+            self._schema, self._papel, self._no, self._nome, input, resposta))
+        _sombras_vivas.add(tarefa)
+        tarefa.add_done_callback(_sombras_vivas.discard)
+        return resposta
+
+
+def structured(
+    schema: type[T], model: str = GEMINI_PARSE, *, prazo: float = PRAZO_COM_RESERVA,
+    no: str | None = None, versao: str | None = None,
+):
+    """`_structured` (saída estruturada, reserva, disjuntor) + modo sombra, se ligado."""
+    principal = _structured(schema, model, prazo=prazo, no=no, versao=versao)
+    papel = model if model in MODELOS else _PAPEL_POR_NOME.get(model, "parse")
+    nome = modelo_sombra(papel)
+    return _ComSombra(principal, schema, papel, no, nome) if nome else principal
 
 
 NATUREZAS = (
