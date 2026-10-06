@@ -8,19 +8,11 @@ Versão: `1.6.3 → 1.7.0` (MINOR: funcionalidade nova e RPCs novas; sem quebra 
 aditivas e o agente continua aceitando o contrato anterior). Sem mudança nativa: a 1.7.0 fecha o
 OTA para a 1.6.x e sai como build nova pela tag.
 
-## Duas decisões antes
+## Decisões tomadas
 
-1. **Chave do Gemini para a avaliação.** `workflow.md` §4 exige a execução que APROVA de
-   `agent/scripts/evaluate_answer_forms.py` (Gemini real, sem `--barato`) quando prompt, schema
-   de classificador ou catálogo mudam — e os lotes A–D da paridade mudaram os três. Ela precisa de
-   ~40 chamadas ao Flash e a cota grátis do staging é 20/dia (e acabou hoje). Caminho: ligar
-   faturamento no projeto do Gemini do staging (centavos) ou indicar outra chave.
-2. **Agente agora ou depois.**
-   - (a) Agente da branch inteira (paridade A–D) — só depois da avaliação aprovar.
-   - (b) Agente de `269f168d` (as 22 melhorias sem a paridade: tem a rota da voz F16 e os alvos de
-     push F17 que o app novo usa). Antes da paridade o prompt/catálogo mudou pouco (a descrição do
-     campo `value` do `ResourceAction` e o catálogo de metas/subcategoria), então o risco é menor;
-     a paridade sobe numa segunda vez, depois da avaliação.
+1. **Avaliação no Gemini real**: feita com a chave de produção, uma execução completa e depois só
+   as seções corrigidas (ver `docs/qa/2026-10-02-evolucao-financeira/final/aceite.md`).
+2. **Agente**: o da branch inteira (paridade A–D), já no staging como `agente-staging-00221`.
 
 ## Ordem (migrations → agente → app)
 
@@ -33,8 +25,7 @@ OTA para a 1.6.x e sai como build nova pela tag.
    ```
    Depois: `supabase/tests/anon_sem_execute.sql` e o registro em `docs/HISTORICO-DE-MIGRATIONS.md`
    (rascunho abaixo).
-3. Agente (decisão 2): `./scripts/setup-gcp.sh deploy` (pede `PRODUCAO`), na conta gcloud do
-   projeto; para (b), a partir de um checkout em `269f168d`.
+3. Agente: `./scripts/setup-gcp.sh deploy` (pede `PRODUCAO`), na conta gcloud do projeto.
 4. App: na `main` (merge da branch), `app.json` `expo.version` = `1.7.0`, commit `chore: v1.7.0`,
    `git push origin main`, tag leve `v1.7.0` no commit, `git push origin v1.7.0`
    (`publish-android-release.yml` faz o APK, ~10 min).

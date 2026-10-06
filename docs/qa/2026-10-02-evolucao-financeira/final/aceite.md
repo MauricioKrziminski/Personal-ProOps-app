@@ -65,15 +65,18 @@ Correções do teste do Gabriel em produção, conferidas no staging nos dois si
 - Metas com Reduzir Movimento no iOS: cartão fora do lugar cobrindo "Simular juntas" (D1 do
   `f08/evidence/ipad/`), corrigido no ponto único `transicao.ts`.
 
-Paridade do agente: lotes A–D publicados no staging (`agente-staging-00219`), cada um com revisão
+Paridade do agente: lotes A–D publicados no staging (`agente-staging-00221`), cada um com revisão
 independente e os achados corrigidos; o que fica só no app está em
 `docs/AGENTE-PARIDADE-COM-O-APP.md`. Roteiro de teste: `../ROTEIRO-STAGING.md`.
 
+Avaliação no Gemini real (chave com faturamento, autorizada pelo Gabriel): a execução completa deu
+290/302; as falhas eram três defeitos do próprio script (o `name` fora do resultado, um `lambda` que
+fechava sobre a variável do laço, a sonda olhando a receita em vez do gasto) e um do agente (o
+detalhe marcado igual ao título era descartado). Corrigidos, as seções que tinham falhado foram
+refeitas sozinhas: lote B 44/44, forma de pagamento 11/11, detalhe 4/4, favoritos e duplicar 11/11.
+
 ## Pendências reais
 
-- Avaliação com o Gemini real dos lotes A–D (`agent/scripts/evaluate_answer_forms.py --secao lote
-  --barato`, depois sem flag) e a sonda do lote C (`agent/scripts/probe_atributos_lote_c.py`): a cota
-  gratuita do staging acabou em 05/10; o pytest (dublês) está verde, o Gemini real não foi medido.
 - `QA-ANDROID-20261003-ANR` (F07): sem causa de código provada (`f07/anr-causa.md`); falta medir a
   alternância de "ocultar valores" num build release.
 - F08 iPad em paisagem: o simulador ligado por linha de comando não gira no Xcode 27; a rotação com
@@ -88,8 +91,6 @@ independente e os achados corrigidos; o que fica só no app está em
   do formulário) sob pressão de memória. Fecha com perfil do Hermes se aparecer em aparelho real.
 - "Ocultar valores" ficou 24–37% mais rápido com as abas congeladas (`f07/anr-causa.md`), mas
   continua em centenas de ms no release; o resto é o render da tela em foco.
-- Agente (lotes B–D): a execução que aprova deu 285/301; as 16 falhas estão sendo corrigidas e
-  serão medidas quando a cota grátis do Gemini do staging voltar. O agente só sobe depois.
 - Comparação visual de composição do programa (spec §8) não feita; houve conferência por ponto.
 - Integrar por patch com o Metro de pé deixa módulos velhos nos aparelhos: o QA só vale depois de
   `touch` nos arquivos e de provar a tela nova.

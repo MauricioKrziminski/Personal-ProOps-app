@@ -76,7 +76,8 @@ cada ponto estão no `fNN/aceite.md` (ou `registro-nativo.md` em F01–F05).
 Os recursos acima são do app. O que o agente passa a fazer pela conversa entra aqui por lotes,
 conforme cada um é publicado no staging (ver `docs/AGENTE-PARIDADE-COM-O-APP.md`). Teste pela aba
 **Agente** do app (staging) ou pelo WhatsApp do número de staging. Toda escrita pergunta antes, com
-os números do banco, e só grava no **Sim**.
+os números do banco, e só grava no **Sim**. Revisão atual: `agente-staging-00221` (lotes A–D com
+as correções da avaliação no Gemini real).
 
 ### Lote A (no staging desde a revisão `agente-staging-00213`)
 
