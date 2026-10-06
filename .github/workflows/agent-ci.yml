@@ -78,10 +78,7 @@ jobs:
 
   sql:
     runs-on: ubuntu-latest
-    # ponytail: NÃO foi provado num runner — escrito a partir de docs/AMBIENTES.md e da memória do
-    # projeto, sem rodar o CI. Enquanto ninguém vir este job verde uma vez, ele não derruba o PR.
-    # Para torná-lo bloqueante: ver o primeiro run, ajustar o que faltar e tirar a linha abaixo.
-    continue-on-error: true
+    # Verde num runner pela primeira vez em 06/10/2026 (run de f43a0d68): desde então, bloqueia.
     env:
       DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     steps:

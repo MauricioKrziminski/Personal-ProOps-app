@@ -684,11 +684,6 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
 
 ## 20. O que depende de você
 
-- Um `push` para ver o job `sql` do CI verde uma vez num runner (ele segue não-bloqueante até
-  isso).
-- **Produção**, na ordem migrations → agente → app: as migrations `20261006100000` a
-  `20261006160000` (o `db push` com `--project-ref` de produção e `PROOPS_PROD_OK=1`, como manda
-  o `CLAUDE.md`) e depois o deploy do agente. `AGENTE_RLS` em produção só depois de alguns dias
-  dele ligado no staging.
-- **Ligar o prompt v2 em produção** (`AGENT_PROMPT_V2=true` no deploy): aprovado nas medições;
-  sugestão de alguns dias de uso no staging antes.
+Nada. Em 06/10/2026: as 6 migrations e o agente (`agente-00103-ccs`, com `AGENTE_RLS` e
+`AGENT_PROMPT_V2` ligados) subiram para produção, conferidos com duas mensagens reais no WhatsApp;
+a suíte SQL passou inteira num runner do GitHub e virou bloqueante; alertas e orçamento estão no GCP.
