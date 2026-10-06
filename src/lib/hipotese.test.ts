@@ -4,14 +4,16 @@ import { test } from 'node:test';
 import { dataDaHipotese, faltaNaHipotese, pendenciaDoAplicar, paramsDoAplicar, registroDaHipotese, resumoDaHipotese, type Hipotese } from './hipotese.ts';
 import { isoToBR, localISODate } from './dates.ts';
 
-const base: Hipotese = { id: 'h1', kind: 'expense', forma: 'uma', valor_cents: 10000, parcelas: 2, repete: 'monthly', conta: 'c1', data: '2026-10-05' };
+// Data futura FIXA (uma segunda, dia 5): a hipótese nunca começa antes de hoje, e uma data de hoje
+// virava outra no dia seguinte — o teste quebrou na virada de 05 para 06/10/2026.
+const base: Hipotese = { id: 'h1', kind: 'expense', forma: 'uma', valor_cents: 10000, parcelas: 2, repete: 'monthly', conta: 'c1', data: '2037-10-05' };
 const brl = (c: number) => `R$ ${(c / 100).toFixed(2)}`;
 const nome = (id: string) => ({ c1: 'Nubank Cartão', c2: 'Itaú' } as Record<string, string>)[id] ?? null;
 
 test('uma vez vira lançamento pendente com o título Hipótese', () => {
   const r = registroDaHipotese(base)!;
   assert.equal(r.tipo, 'lancamento');
-  assert.deepEqual((r.dados.linhas as unknown[])[0], { kind: 'expense', amount_cents: 10000, category: null, description: 'Hipótese', merchant: null, account_id: 'c1', counterparty_account_id: null, occurred_at: '2026-10-05', status: 'pending', due_at: null, auto_confirm: false, source: 'app' });
+  assert.deepEqual((r.dados.linhas as unknown[])[0], { kind: 'expense', amount_cents: 10000, category: null, description: 'Hipótese', merchant: null, account_id: 'c1', counterparty_account_id: null, occurred_at: '2037-10-05', status: 'pending', due_at: null, auto_confirm: false, source: 'app' });
 });
 
 test('parcelado vira a compra parcelada com 0 pagas; sem conta é incompleto', () => {
@@ -58,18 +60,18 @@ test('o que falta: valor, conta no parcelado e no financiamento, parcelas', () =
 });
 
 test('a linha diz forma, conta e data', () => {
-  assert.equal(resumoDaHipotese({ ...base, forma: 'parcelado', valor_cents: 300000, parcelas: 10 }, brl, nome), 'Sai R$ 3000.00 em 10× · Nubank Cartão · a partir de 05/10/2026');
-  assert.equal(resumoDaHipotese({ ...base, kind: 'income', forma: 'repete', repete: 'monthly', conta: null }, brl, nome), 'Entra R$ 100.00 todo mês · sem conta (só a visão geral) · a partir de 05/10/2026');
-  assert.equal(resumoDaHipotese({ ...base, forma: 'financiamento', parcelas: 48, conta: 'c2' }, brl, nome), 'Financiamento de 48× R$ 100.00 · Itaú · 1ª em 05/10/2026');
-  assert.equal(resumoDaHipotese({ ...base, conta: 'sumiu' }, brl, nome), 'Sai R$ 100.00 · conta que não existe mais · em 05/10/2026');
+  assert.equal(resumoDaHipotese({ ...base, forma: 'parcelado', valor_cents: 300000, parcelas: 10 }, brl, nome), 'Sai R$ 3000.00 em 10× · Nubank Cartão · a partir de 05/10/2037');
+  assert.equal(resumoDaHipotese({ ...base, kind: 'income', forma: 'repete', repete: 'monthly', conta: null }, brl, nome), 'Entra R$ 100.00 todo mês · sem conta (só a visão geral) · a partir de 05/10/2037');
+  assert.equal(resumoDaHipotese({ ...base, forma: 'financiamento', parcelas: 48, conta: 'c2' }, brl, nome), 'Financiamento de 48× R$ 100.00 · Itaú · 1ª em 05/10/2037');
+  assert.equal(resumoDaHipotese({ ...base, conta: 'sumiu' }, brl, nome), 'Sai R$ 100.00 · conta que não existe mais · em 05/10/2037');
 });
 
 test('aplicar abre o formulário certo, com tudo', () => {
-  assert.deepEqual(paramsDoAplicar(base), { pathname: '/finance/lancar', params: { tipo: 'uma', deHipotese: 'h1', kind: 'expense', amount: '10000', data: '05/10/2026', parcelas: '1', conta: 'c1' } });
+  assert.deepEqual(paramsDoAplicar(base), { pathname: '/finance/lancar', params: { tipo: 'uma', deHipotese: 'h1', kind: 'expense', amount: '10000', data: '05/10/2037', parcelas: '1', conta: 'c1' } });
   assert.equal(paramsDoAplicar({ ...base, forma: 'parcelado', parcelas: 10 }).params.parcelas, '10');
-  assert.deepEqual(paramsDoAplicar({ ...base, forma: 'repete', repete: 'weekly' }), { pathname: '/finance/lancar', params: { tipo: 'recorrente', deHipotese: 'h1', kind: 'expense', amount: '10000', start: '05/10/2026', account: 'c1', repete: 'weekly' } });
-  assert.deepEqual(paramsDoAplicar({ ...base, forma: 'financiamento', parcelas: 48 }), { pathname: '/finance/lancar', params: { tipo: 'financiamento', deHipotese: 'h1', parcela: '10000', parcelas: '48', conta: 'c1', data: '05/10/2026' } });
-  assert.deepEqual(paramsDoAplicar({ ...base, conta: null }).params, { tipo: 'uma', deHipotese: 'h1', kind: 'expense', amount: '10000', data: '05/10/2026', parcelas: '1' });
+  assert.deepEqual(paramsDoAplicar({ ...base, forma: 'repete', repete: 'weekly' }), { pathname: '/finance/lancar', params: { tipo: 'recorrente', deHipotese: 'h1', kind: 'expense', amount: '10000', start: '05/10/2037', account: 'c1', repete: 'weekly' } });
+  assert.deepEqual(paramsDoAplicar({ ...base, forma: 'financiamento', parcelas: 48 }), { pathname: '/finance/lancar', params: { tipo: 'financiamento', deHipotese: 'h1', parcela: '10000', parcelas: '48', conta: 'c1', data: '05/10/2037' } });
+  assert.deepEqual(paramsDoAplicar({ ...base, conta: null }).params, { tipo: 'uma', deHipotese: 'h1', kind: 'expense', amount: '10000', data: '05/10/2037', parcelas: '1' });
 });
 
 test('hipótese com data que já passou vale a partir de HOJE: na simulação, na linha e no Aplicar (revisão final)', () => {
