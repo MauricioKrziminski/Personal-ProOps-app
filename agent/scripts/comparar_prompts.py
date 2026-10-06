@@ -39,6 +39,7 @@ from app import db  # noqa: E402
 from app.config import get_settings  # noqa: E402
 from app.graph import exemplos, nodes, prompts, prompts_v2  # noqa: E402
 from app.services import consumo  # noqa: E402
+from scripts.eval_cache import com_paciencia  # noqa: E402
 
 WS = "20000000-0000-0000-0000-000000000001"
 BASE = {"timezone": "America/Sao_Paulo", "workspace_id": WS, "user_id": WS, "phone": None,
@@ -150,17 +151,22 @@ async def _um_caminho(v2: bool, texto: str, historico: list[dict]) -> dict:
     estado = {**BASE, "text": texto,
               "messages": [*historico, {"role": "user", "content": texto}], "subintents": []}
     saida: dict = {"erro": None, "dominios": [], "subintents": [], "acoes": []}
-    try:
-        roteado = await nodes.route(estado)
-        estado.update(roteado)
+    async def rodar() -> None:
+        saida.update(dominios=[], subintents=[], acoes=[])
+        local = dict(estado)
+        roteado = await nodes.route(local)
+        local.update(roteado)
         saida["dominios"] = list(roteado.get("domains") or [])
         saida["subintents"] = list(roteado.get("subintents") or [])
         if "financas" in saida["dominios"]:
-            r = await nodes.finance_node(estado)
+            r = await nodes.finance_node(local)
             saida["acoes"] += [_resumo(a) for a in r.get("finance_actions") or []]
         if "financas_consulta" in saida["dominios"]:
-            r = await nodes.finance_query_node(estado)
+            r = await nodes.finance_query_node(local)
             saida["acoes"] += [_resumo(a) for a in r.get("finance_queries") or []]
+
+    try:
+        await com_paciencia(rodar)
     except Exception as erro:  # noqa: BLE001 — a comparação registra e segue
         saida["erro"] = f"{type(erro).__name__}: {erro}"[:200]
     saida["tokens"] = {c["no"]: c["input_tokens"] for c in uso.chamadas if c.get("input_tokens")}

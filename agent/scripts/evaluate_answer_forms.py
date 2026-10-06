@@ -36,7 +36,7 @@ for linha in (RAIZ / ".env").read_text().splitlines() if (RAIZ / ".env").exists(
 os.environ.setdefault("DATABASE_URL", "postgresql://sem-banco/nesta-avaliacao")
 os.environ.setdefault("WHATSAPP_APP_SECRET", "sem-envio")
 
-from scripts.eval_cache import CacheDeAvaliacao  # noqa: E402
+from scripts.eval_cache import CacheDeAvaliacao, com_paciencia  # noqa: E402
 from app.domain import confirm, draft  # noqa: E402
 from app.graph import nodes  # noqa: E402
 from app.services import gemini  # noqa: E402
@@ -968,7 +968,7 @@ async def main(args):
                 obtido, ok = guardado["obtido"], True
             else:
                 try:
-                    obtido = await roda()
+                    obtido = await com_paciencia(roda)
                     ok = bool(ok_se(obtido))
                 except Exception as erro:  # noqa: BLE001 — a avaliação registra e segue
                     obtido, ok = f"erro: {erro}", False

@@ -12,6 +12,7 @@ Arquivos em `agent/.eval-cache/` (ignorado pelo git).
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -107,3 +108,22 @@ class CacheDeAvaliacao:
         # antigo quando passa de 5000 (prompt velho não se acumula para sempre).
         dados = dict(list(self._dados.items())[-5000:])
         self.arquivo.write_text(json.dumps(dados, ensure_ascii=False, indent=1, default=str))
+
+
+TRANSITORIOS = ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "DEADLINE")
+
+
+async def com_paciencia(chamar, tentativas: int = 4, espera_s: float = 30.0):
+    """Roda `chamar()` de novo quando o Gemini do nível gratuito está ocupado (503/429).
+
+    Sem isso um pico de demanda vira "falhou" e a suíte mede a fila do Google, não o prompt.
+    Só nos SCRIPTS: no app a reserva e a fila já cuidam disso.
+    """
+    for tentativa in range(tentativas):
+        try:
+            return await chamar()
+        except Exception as erro:  # noqa: BLE001
+            if tentativa == tentativas - 1 or not any(t in str(erro) for t in TRANSITORIOS):
+                raise
+            print(f"    (Gemini ocupado: {str(erro)[:40]}… nova tentativa em {espera_s:.0f}s)", flush=True)
+            await asyncio.sleep(espera_s * (tentativa + 1))

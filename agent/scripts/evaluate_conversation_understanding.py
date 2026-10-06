@@ -40,7 +40,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.eval_cache import CacheDeAvaliacao
+from scripts.eval_cache import CacheDeAvaliacao, com_paciencia
 from app.domain import confirm, draft
 from app.graph import nodes
 from app.graph.schemas import FinanceAction
@@ -486,7 +486,7 @@ async def main(args):
                 continue
             observation = None
             try:
-                observation = await run()
+                observation = await com_paciencia(run)
                 check(observation)
                 expected_resources = {
                     "card_complete": ("cards", "Inter"),
