@@ -48,11 +48,12 @@ import os
 import time
 from typing import Any, Literal, TypeVar
 
+from langchain_core.exceptions import OutputParserException
 from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.config import ensure_config
 from langchain_core.runnables.fallbacks import RunnableWithFallbacks
 from langchain_google_genai import ChatGoogleGenerativeAI
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from app.config import get_settings
 from app.services import telemetry
@@ -238,6 +239,22 @@ def _indisponivel(erro: BaseException) -> bool:
     return False
 
 
+def _saida_invalida(erro: BaseException) -> bool:
+    """O principal RESPONDEU, mas o texto não virou o schema (parse/validação do Pydantic)?
+
+    É a falha OBJETIVA que justifica uma segunda chamada na reserva: não é queda do modelo (não
+    abre o disjuntor) nem baixa confiança (`ai-gemini.md` proíbe escalar por confiança) — a saída
+    simplesmente não é um objeto válido. Segue a cadeia de causas, como `_indisponivel`.
+    """
+    visto: set[int] = set()
+    while erro is not None and id(erro) not in visto:
+        visto.add(id(erro))
+        if isinstance(erro, (ValidationError, OutputParserException)):
+            return True
+        erro = erro.__cause__ or erro.__context__
+    return False
+
+
 def _principal_aberto(chave: str) -> bool:
     """True = pular o principal agora. Vencida a pausa, vira meio aberto (uma falha reabre)."""
     ate = _aberto_ate.get(chave)
@@ -279,19 +296,29 @@ class _ComReserva(RunnableWithFallbacks):
     async def ainvoke(self, input: Any, config: RunnableConfig | None = None, **kwargs: Any) -> Any:  # noqa: A002
         cfg = ensure_config(config)
         meta = {**(cfg.get("metadata") or {}), **self.metadados}
+        motivo = "indisponivel"
         if not _principal_aberto(self.chave):
             try:
                 resposta = await self.runnable.ainvoke(
                     input, {**cfg, "metadata": meta}, **kwargs)
-                _registrar_sucesso(self.chave)
-                return resposta
+                if resposta is not None:
+                    _registrar_sucesso(self.chave)
+                    return resposta
+                # saída vazia (sem objeto): é saída inválida, não resposta
+                motivo = "invalida"
             except Exception as erro:  # noqa: BLE001 — qualquer falha cai na reserva, como antes
                 if _indisponivel(erro):
                     _registrar_falha(self.chave)
-                log.warning("principal %s falhou (%s): reserva assume", self.chave,
-                            type(erro).__name__)
+                elif _saida_invalida(erro):
+                    motivo = "invalida"
+                log.warning("principal %s falhou (%s, motivo=%s): reserva assume", self.chave,
+                            type(erro).__name__, motivo)
+        # `reserva_motivo` vai nos metadados da chamada da reserva (Langfuse e `ColetorDeUso`):
+        # a chamada do principal que respondeu E a da reserva são contadas pelo coletor, cada uma
+        # com os próprios tokens — a cascata por saída inválida não precisa de contagem à parte.
         return await self.fallbacks[0].ainvoke(
-            input, {**cfg, "metadata": {**meta, "reserva": True}}, **kwargs)
+            input, {**cfg, "metadata": {**meta, "reserva": True, "reserva_motivo": motivo}},
+            **kwargs)
 
 
 def _structured(
@@ -313,6 +340,11 @@ def _structured(
     só quando falha, então o custo normal não muda. Não é escalonamento por confiança
     (`ai-gemini.md` proíbe): é o modelo estar fora do ar. Com o Lite fora do ar de vez, o
     disjuntor (`_ComReserva`) pula o principal por um tempo em vez de pagar o prazo a cada chamada.
+
+    **Saída INVÁLIDA também vai à reserva** (06/10/2026): o principal respondeu, mas o texto não
+    validou no Pydantic (`_saida_invalida`) — a mesma chamada vai UMA vez ao modelo do portão, sem
+    abrir o disjuntor. É falha objetiva, não confiança. A chamada do principal que respondeu e a da
+    reserva são contadas pelo coletor de tokens; o motivo vai em `reserva_motivo` nos metadados.
 
     O PORTÃO não tem reserva para aprovação: a reserva natural seria o Lite, que já foi medido
     aprovando "apaga todos". O interpretador de respostas pode tentar uma leitura separada
