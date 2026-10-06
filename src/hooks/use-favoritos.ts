@@ -1,4 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@/lib/consulta-em-foco';
 
 import { useRealtimeInvalidate } from '@/hooks/use-items';
 import { encodeModelo, decodeModelo, type Modelo } from '@/lib/favoritos';

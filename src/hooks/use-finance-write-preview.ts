@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from '@/lib/consulta-em-foco';
 import { usePresencaAtiva } from '@/components/motion/presenca';
 import { useDebounced } from '@/hooks/use-debounced';
 import { useRealtimeInvalidate } from '@/hooks/use-items';

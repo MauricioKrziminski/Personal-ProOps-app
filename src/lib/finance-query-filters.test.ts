@@ -63,6 +63,7 @@ function harness(respond: (request: Request) => Reply | Promise<Reply> = () => (
       module, exports: module.exports, Date, Map, WeakMap, Set,
       require: (name: string) => {
         if (name === 'react') return { useEffect: () => {}, useCallback: (fn: unknown) => fn, useRef: (value: unknown) => ({ current: value }) };
+        if (name === 'expo-router') return { useIsFocused: () => true };
         if (name === '@tanstack/react-query') return {
           useQueryClient: () => ({}), useQuery: (query: Query) => query, useInfiniteQuery: (query: Query) => query,
           keepPreviousData: (data: unknown) => data,

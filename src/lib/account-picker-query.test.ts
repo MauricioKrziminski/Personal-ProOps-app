@@ -16,6 +16,7 @@ function queries() {
     }).outputText;
     runInNewContext(code, { module, exports: module.exports, setTimeout, clearTimeout,
       require: (id: string) => {
+        if (id === 'expo-router') return { useIsFocused: () => true };
         if (id === '@tanstack/react-query') return { ...require(id), useQuery: (options: any) => options };
         if (id === '@/hooks/use-items') return { useRealtimeInvalidate() {} };
         if (id === '@/lib/agent-api') return {};

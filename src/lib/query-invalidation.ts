@@ -70,7 +70,12 @@ export function createNativeQueryFocusHandler(client: QueryClient, initialState:
     focusManager.setFocused(state === 'active');
     // An initial/duplicate active event is not a resume. Query mounts own the initial fetch.
     // Native automatic window-focus refetch is disabled, so only this request owns recovery.
-    if (resumed) return client.refetchQueries({ type: 'active' }, { cancelRefetch: true });
+    if (resumed) {
+      // Telas fora de foco não assinam o cache (`consulta-em-foco.ts`): ficam só marcadas velhas,
+      // sem refazer agora, e refazem ao voltar ao foco — o realtime perdido na suspensão vale para elas também.
+      void client.invalidateQueries({ type: 'inactive', refetchType: 'none' });
+      return client.refetchQueries({ type: 'active' }, { cancelRefetch: true });
+    }
     return Promise.resolve();
   };
 }

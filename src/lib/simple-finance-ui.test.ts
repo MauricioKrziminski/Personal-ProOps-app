@@ -663,6 +663,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
         }),
       };
       // Orçamentos consulta direto (a lista de linhas): o mesmo resultado inerte dos hooks.
+      if (name === '@/lib/consulta-em-foco') return { useQuery: () => query };
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
       if (name === '@/lib/account-form') return load('src/lib/account-form.ts');
       if (name === '@/components/finance/account-form') return load('src/components/finance/account-form.tsx');

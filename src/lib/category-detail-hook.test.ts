@@ -14,6 +14,8 @@ function mount(data:unknown){
   if(name==='@/lib/category-detail-breakdown')return {decodeCategoryDetailBreakdown,decodeSubcategoryFilterStates};
   if(name==='@/lib/supabase')return {supabase:{rpc:(name:string,args:unknown)=>{calls.push({name,args});return request;}}};
   if(name==='@/hooks/use-items')return {useRealtimeInvalidate:(...args:any[])=>realtime.push(args)};
+  if(name==='expo-router')return {useIsFocused:()=>true};
+  if(name==='@/lib/consulta-em-foco')return {useQuery:(options:any)=>{queries.push(options);return options;}};
   if(name==='@tanstack/react-query')return {useQuery:(options:any)=>{queries.push(options);return options;}};
   throw new Error(name);
  },module,module.exports);

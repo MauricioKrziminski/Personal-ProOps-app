@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from '@/lib/consulta-em-foco';
 import { useEffect, useState } from 'react';
 
 import { useAccounts } from '@/hooks/use-finance';

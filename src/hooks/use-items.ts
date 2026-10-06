@@ -1,5 +1,6 @@
 import { scheduleRealtimeFinanceRefresh, invalidateKeys } from '@/lib/query-invalidation';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@/lib/consulta-em-foco';
 import { useEffect } from 'react';
 
 import { localISODate } from '@/lib/dates';

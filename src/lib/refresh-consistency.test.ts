@@ -33,6 +33,7 @@ function loadHooks(client: QueryClient, entry = 'src/hooks/use-finance.ts', depe
     const evaluate = runInContext(`(function(require, module, exports) { ${code}\n})`, context);
     evaluate((name: string) => {
       if (name in dependencies) return dependencies[name];
+      if (name === 'expo-router') return { useIsFocused: () => true };
       if (name === '@tanstack/react-query') return { ...require(name), useQueryClient: () => client,
         useMutation: (options: any) => ({ ...options, mutationFn: (input: unknown) => options.mutationFn(copyInput(input)) }) };
       if (name === 'react') return { useCallback: (fn: unknown) => fn, useRef: (value: unknown) => ({ current: value }) };

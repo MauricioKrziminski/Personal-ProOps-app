@@ -39,6 +39,7 @@ function harness() {
     runInNewContext(code, { module, exports: module.exports, Date, Map, WeakMap, Set,
       require: (name: string) => {
         if (name === 'react') return { useEffect: () => {} };
+        if (name === 'expo-router') return { useIsFocused: () => true };
         if (name === '@tanstack/react-query') return { useQueryClient: () => ({}), useInfiniteQuery: (query: Query) => query };
         if (name === '@/lib/supabase') return { supabase };
         if (name.startsWith('@/')) return load(`src/${name.slice(2)}.ts`);

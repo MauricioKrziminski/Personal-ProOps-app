@@ -25,6 +25,7 @@ function harness(rpc: (name: string, args: any) => Promise<any>) {
         useRef: (value: unknown) => { const index = cursor++; return slots[index] ??= { current: value }; },
         useState: (value: unknown) => { const index = cursor++; if (!(index in slots)) slots[index] = typeof value === 'function' ? value() : value; return [slots[index], (next: unknown) => { slots[index] = next; }]; },
       };
+      if (name === 'expo-router') return { useIsFocused: () => true };
       if (name === '@tanstack/react-query') return { ...require(name), useQueryClient: () => client, useMutation: (options: unknown) => options };
       if (name === '@/lib/agent-chat') return { newClientMessageId: () => `request-${++sequence}` };
       if (name === '@/lib/agent-api') return {};

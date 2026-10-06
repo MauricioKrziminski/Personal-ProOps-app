@@ -1,4 +1,5 @@
 import { useQueries } from '@tanstack/react-query';
+import { useIsFocused } from 'expo-router';
 
 import { toIlikeTerm, toTsQuery } from '@/lib/search';
 import { supabase } from '@/lib/supabase';
@@ -52,7 +53,11 @@ export function useGlobalSearch(q: string, limite = LIMIT) {
   const term = q.trim();
   const enabled = term.length >= MIN;
 
+  // Coberta por um resultado aberto, a busca não refaz (`consulta-em-foco.ts`).
+  const emFoco = useIsFocused();
+
   const [notes, transactions, reminders] = useQueries({
+    subscribed: emFoco,
     queries: [
       {
         queryKey: ['search', 'notes', term, limite],

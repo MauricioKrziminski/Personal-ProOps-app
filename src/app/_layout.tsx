@@ -72,7 +72,9 @@ const queryClient = new QueryClient({
     queries: {
       // Antes não havia opção default nenhuma: cada foco/mount podia refazer todas as RPCs.
       staleTime: 30_000,
-      gcTime: 5 * 60_000,
+      // Telas fora de foco não assinam o cache (`consulta-em-foco.ts`) e o dado delas só fica no
+      // cache sem observer: com 5 min a aba esquecida voltava a um esqueleto em vez do dado velho.
+      gcTime: 30 * 60_000,
       retry: 1,
       refetchOnWindowFocus: Platform.OS === 'web',
     },

@@ -7,13 +7,8 @@
  * "chegou resposta" é o retorno da própria mutation.
  */
 
-import {
-  infiniteQueryOptions,
-  useInfiniteQuery,
-  useMutation,
-  useQueryClient,
-  type InfiniteData,
-} from '@tanstack/react-query';
+import { infiniteQueryOptions, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@/lib/consulta-em-foco';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invalidateAgentData, invalidateKeys } from '@/lib/query-invalidation';

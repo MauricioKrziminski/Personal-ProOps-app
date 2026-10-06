@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from '@/lib/consulta-em-foco';
 
 import { useBRL } from '@/components/ui/conceal';
 import { BudgetPlanSheet } from '@/components/finance/budget-plan-sheet';

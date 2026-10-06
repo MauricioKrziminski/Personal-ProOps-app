@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@/lib/consulta-em-foco';
 
 import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
 import { newClientMessageId } from '@/lib/agent-chat';

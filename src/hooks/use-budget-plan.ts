@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation } from '@tanstack/react-query';
+import { useQuery } from '@/lib/consulta-em-foco';
 
 import { useInvalidateFinance, type CycleView } from '@/hooks/use-finance';
 import { newClientMessageId } from '@/lib/agent-chat';

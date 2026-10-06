@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from '@/lib/consulta-em-foco';
 import { Stack, router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from '@/lib/consulta-em-foco';
 import { useRealtimeInvalidate } from '@/hooks/use-items';
 import { decodeCategoryDetailBreakdown, decodeSubcategoryFilterStates } from '@/lib/category-detail-breakdown';
 import { supabase } from '@/lib/supabase';

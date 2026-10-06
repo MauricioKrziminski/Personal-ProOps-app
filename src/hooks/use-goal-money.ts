@@ -1,5 +1,6 @@
 import { useRef } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
+import { useQuery } from '@/lib/consulta-em-foco';
 
 import { useRealtimeInvalidate } from '@/hooks/use-items';
 import { useInvalidateFinance } from '@/hooks/use-finance';

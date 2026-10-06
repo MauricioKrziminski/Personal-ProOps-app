@@ -11,7 +11,8 @@ import { normalizeExpensePatternFilters, normalizeExpenseNecessityFilters, expen
 import type { CategoryConfigurationInput, CategoryConfigurationResult } from '@/lib/category-configuration';
 import { invalidateFinance, invalidateKeys } from '@/lib/query-invalidation';
 import type { Natureza } from '@/lib/import-preview';
-import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@/lib/consulta-em-foco';
 
 import type { ProjecaoMensal } from '@/lib/forecast-months';
 import { supabase } from '@/lib/supabase';

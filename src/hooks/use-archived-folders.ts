@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from '@/lib/consulta-em-foco';
 
 import { supabase } from '@/lib/supabase';
 import type { NoteColorName } from '@/constants/theme';

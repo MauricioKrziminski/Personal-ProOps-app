@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@/lib/consulta-em-foco';
 
 import { useGoalPlanningSources } from '@/hooks/use-goal-planning';
 import { workspaceId } from '@/hooks/use-items';

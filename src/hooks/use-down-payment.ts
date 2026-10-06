@@ -1,5 +1,6 @@
 import { useRef } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@/lib/consulta-em-foco';
 import { supabase } from '@/lib/supabase';
 import { newClientMessageId } from '@/lib/agent-chat';
 import { invalidateFinance } from '@/lib/query-invalidation';

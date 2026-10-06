@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from '@/lib/consulta-em-foco';
 
 import { useRealtimeInvalidate } from '@/hooks/use-items';
 import type { LinhaDaAtividade } from '@/lib/activity-feed';

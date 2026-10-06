@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@/lib/consulta-em-foco';
 
 import { ensureAndroidChannel, notifications } from '@/lib/push-module';
 import { supabase } from '@/lib/supabase';

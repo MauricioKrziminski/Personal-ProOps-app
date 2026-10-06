@@ -1,10 +1,6 @@
 import { invalidateKeys } from '@/lib/query-invalidation';
-import {
-  useInfiniteQuery,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@/lib/consulta-em-foco';
 
 import type { NoteColorName } from '@/constants/theme';
 import { useRealtimeInvalidate } from '@/hooks/use-items';
