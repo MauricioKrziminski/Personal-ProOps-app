@@ -473,7 +473,7 @@ async def main():
         await conn.execute("select 1")  # abre a transação real: tudo daqui é savepoint
         marca = db._uow.set(conn)
         if not sem_migration:
-            sql = (AGENT.parent / "supabase/migrations/20261006140000_agente_rls.sql").read_text()
+            sql = (AGENT.parent / "supabase/migrations/20261006160000_agente_rls.sql").read_text()
             await conn.execute(sql)
         r = await db.fetch_one("select id from auth.users where email=%s", DEV_EMAIL)
         user = r["id"]

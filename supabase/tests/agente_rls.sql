@@ -3,7 +3,7 @@
 --
 --     agent/.venv/bin/python scripts/sql-test.py supabase/tests/agente_rls.sql
 --
--- (a migration `20261006140000` tem que estar aplicada, ou vir antes deste arquivo no mesmo script)
+-- (a migration `20261006160000` tem que estar aplicada, ou vir antes deste arquivo no mesmo script)
 \set ON_ERROR_STOP on
 begin;
 do $$
