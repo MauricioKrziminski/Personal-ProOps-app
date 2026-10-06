@@ -1,4 +1,5 @@
 import { createNativeQueryFocusHandler } from '@/lib/query-invalidation';
+import { medirConsultas } from '@/lib/medir-consultas';
 import { useEffect } from 'react';
 import { MartianMono_400Regular } from '@expo-google-fonts/martian-mono';
 import {
@@ -77,6 +78,8 @@ const queryClient = new QueryClient({
     },
   },
 });
+// Só loga com `EXPO_PUBLIC_MEDIR_CONSULTAS=1` em __DEV__; fora disso não assina nada.
+medirConsultas(queryClient);
 
 
 /**
