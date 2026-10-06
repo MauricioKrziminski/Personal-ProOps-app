@@ -25,6 +25,8 @@ from app.graph.policy import (
     par_de_substituicao,
     plano_inteiro,
 )
+from app.graph import exemplos as exemplos_dinamicos
+from app.graph import prompts_v2
 from app.graph.prompts import FINANCE, FINANCE_QUERY, NOTES, ROUTER, user_turn
 from app.graph.schemas import (
     RULE_APPLIES,
@@ -37,6 +39,7 @@ from app.graph.schemas import (
     NotesAction,
     NotesPlan,
     RouterDecision,
+    RouterDecisionV2,
     ResourceAction, ResourceActionType, ResourcePlan,
 )
 from app.domain import matching
@@ -128,12 +131,17 @@ async def route(state: AgentState) -> dict:
                 + "\nSe a mensagem é a RESPOSTA a isso (um nome, um valor, uma data, sim ou não),"
                 " o domínio é cadastros. Só é outro domínio se ela for claramente um pedido novo."
             )
+    # AGENT_PROMPT_V2 (desligado por padrão): router com sub-intenções e texto consolidado. Desligado,
+    # o schema e o texto enviados são os de sempre, byte a byte (`tests/test_prompt_v2.py`).
+    v2 = prompts_v2.ligado()
+    sistema_router = prompts_v2.ROUTER_V2 if v2 else ROUTER
     modelo = gemini.structured(
-        RouterDecision, gemini.GEMINI_ROUTER, no="router", versao=gemini.versao_do_prompt(ROUTER)
+        RouterDecisionV2 if v2 else RouterDecision, gemini.GEMINI_ROUTER, no="router",
+        versao=gemini.versao_do_prompt(sistema_router),
     )
     decisao: RouterDecision = await modelo.ainvoke(
         [
-            ("system", ROUTER),
+            ("system", sistema_router),
             (
                 "human",
                 user_turn(
@@ -148,6 +156,10 @@ async def route(state: AgentState) -> dict:
     )
     dominios = [d.value for d in decisao.domains] or [Domain.GERAL.value]
     ret = {"domains": dominios, "confidence": decisao.confidence, "llm_calls": 1}
+    if v2:
+        # [] = montar todos os módulos (ausente ou fora do vocabulário: nunca perder regra)
+        ret["subintents"] = prompts_v2.normalizar_subintents(
+            getattr(decisao, "finance_subintents", None))
     # ⚠️ **A escolha parcelamento × dívida só existe para ESCRITA** (09/09/2026).
     #
     # Ela pergunta "qual deles você quer alterar?" e REESCREVE `domains` para um domínio de
@@ -326,16 +338,24 @@ async def finance_node(state: AgentState, config: RunnableConfig = None) -> dict
 
     historico = state.get("messages")[:-1] if state.get("messages") else None
     prazo = gemini.PRAZO_LONGO if state.get("media") else gemini.PRAZO_COM_RESERVA
+    v2 = prompts_v2.ligado()
+    sistema = (
+        prompts_v2.finance(state.get("subintents"), tem_anexo=bool(state.get("media")))
+        if v2 else FINANCE
+    )
     modelo = gemini.structured(
         FinancePlan, gemini.GEMINI_PARSE, prazo=prazo,
-        no="finance_parse", versao=gemini.versao_do_prompt(FINANCE),
+        no="finance_parse", versao=gemini.versao_do_prompt(sistema),
     )
     midia = ((config or {}).get("configurable") or {}).get(CHAVE_MIDIA)
     contas = await _contas_do_turno(state)
     detalhes = await _detalhes_do_turno(state)
+    exemplos = ""
+    if v2 and not state.get("media"):
+        exemplos = await exemplos_dinamicos.parecidos(state.get("text", ""), "parse")
     plano: FinancePlan = await modelo.ainvoke(
         [
-            ("system", FINANCE),
+            ("system", sistema),
             _turno_humano(
                 user_turn(
                     state.get("text", ""),
@@ -346,6 +366,7 @@ async def finance_node(state: AgentState, config: RunnableConfig = None) -> dict
                     corrigindo=state.get("corrigindo") or "",
                     contas=contas,
                     detalhes=detalhes,
+                    exemplos=exemplos,
                 ),
                 midia,
             ),
@@ -412,14 +433,17 @@ async def finance_query_node(state: AgentState) -> dict:
     """Consultas. Schema próprio (7 × 9) porque o de escrita não cabia junto —
     ver o orçamento medido em schemas.py."""
     historico = state.get("messages")[:-1] if state.get("messages") else None
+    v2 = prompts_v2.ligado()
+    sistema = prompts_v2.finance_query(tem_historico=bool(historico)) if v2 else FINANCE_QUERY
     modelo = gemini.structured(
         FinanceQueryPlan, gemini.GEMINI_PARSE,
-        no="finance_query", versao=gemini.versao_do_prompt(FINANCE_QUERY),
+        no="finance_query", versao=gemini.versao_do_prompt(sistema),
     )
     contas = await _contas_do_turno(state)
+    exemplos = await exemplos_dinamicos.parecidos(state.get("text", ""), "consulta") if v2 else ""
     plano: FinanceQueryPlan = await modelo.ainvoke(
         [
-            ("system", FINANCE_QUERY),
+            ("system", sistema),
             (
                 "human",
                 user_turn(
@@ -429,6 +453,7 @@ async def finance_query_node(state: AgentState) -> dict:
                     history=historico,
                     corrigindo=state.get("corrigindo") or "",
                     contas=contas,
+                    exemplos=exemplos,
                 ),
             ),
         ]

@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     # --- IA ---
     gemini_api_key: str = ""
     groq_api_key: str = ""
+    # Prompts v2 (módulos por sub-intenção + exemplos por recuperação). DESLIGADO por padrão: só
+    # liga depois da avaliação com o Gemini real (`scripts/comparar_prompts.py`). Desligado, os
+    # prompts e os schemas enviados ao modelo são byte a byte os de antes (`tests/test_prompt_v2.py`).
+    agent_prompt_v2: bool = False
 
     # --- Cloud Tasks ---
     gcp_project: str = ""

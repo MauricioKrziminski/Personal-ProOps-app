@@ -82,8 +82,8 @@ def _registrar(no: str, textos: int) -> None:
     })
 
 
-async def embed_consulta(texto: str) -> list[float] | None:
-    """Vetor da frase que a pessoa disse, ou `None` se algo falhou."""
+async def embed_consulta(texto: str, *, no: str = "busca_semantica") -> list[float] | None:
+    """Vetor da frase que a pessoa disse, ou `None` se algo falhou. `no` rotula a chamada no consumo."""
     texto = (texto or "").strip()
     if not texto:
         return None
@@ -96,7 +96,7 @@ async def embed_consulta(texto: str) -> list[float] | None:
         log.warning("embedding da consulta falhou — busca só por texto", exc_info=True)
         return None
     if vetor is not None:
-        _registrar("busca_semantica", 1)
+        _registrar(no, 1)
     return vetor
 
 

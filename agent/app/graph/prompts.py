@@ -484,6 +484,7 @@ def user_turn(
     corrigindo: str = "",
     contas: list[dict] | None = None,
     detalhes: list[dict] | None = None,
+    exemplos: str = "",
 ) -> str:
     """Monta o turno do usuário: contexto confiável FORA do envelope, texto DENTRO."""
     from app.security import wrap_untrusted
@@ -567,6 +568,9 @@ def user_turn(
             "correção de lançamento existente.\n"
             + wrap_untrusted("pending_proposal", corrigindo)
         )
+    if exemplos:
+        # Texto NOSSO (banco sintético de `exemplos.json`, só com AGENT_PROMPT_V2), fora do envelope.
+        partes.append(exemplos)
     partes.append(wrap_untrusted("user_input", texto))
     if tem_anexo:
         partes.append(

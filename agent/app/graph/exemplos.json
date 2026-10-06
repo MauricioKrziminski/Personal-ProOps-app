@@ -1,0 +1,578 @@
+[
+ {
+  "grupo": "parse",
+  "frase": "gastei 45 no mercado",
+  "saida": "create_expense amount_cents=4500 category=mercado"
+ },
+ {
+  "grupo": "parse",
+  "frase": "uber de 23 reais pra casa",
+  "saida": "create_expense amount_cents=2300 category=transporte description=uber"
+ },
+ {
+  "grupo": "parse",
+  "frase": "recebi 500 de freela",
+  "saida": "create_income amount_cents=50000 description=freela"
+ },
+ {
+  "grupo": "parse",
+  "frase": "paguei 120 na farmacia ontem",
+  "saida": "create_expense amount_cents=12000 category=saúde description=farmacia occurred_at=(data de ontem)"
+ },
+ {
+  "grupo": "parse",
+  "frase": "anota aí que eu gastei 80 no restaurante",
+  "saida": "create_expense amount_cents=8000 category=lazer description=restaurante"
+ },
+ {
+  "grupo": "parse",
+  "frase": "gastei 10 de café no débito",
+  "saida": "create_expense amount_cents=1000 description=café payment_method=debit"
+ },
+ {
+  "grupo": "parse",
+  "frase": "gastei 45 no mercado no pix",
+  "saida": "create_expense amount_cents=4500 category=mercado payment_method=pix"
+ },
+ {
+  "grupo": "parse",
+  "frase": "comprei um curso de 120 no boleto",
+  "saida": "create_expense amount_cents=12000 category=educação payment_method=boleto"
+ },
+ {
+  "grupo": "parse",
+  "frase": "paguei a padaria, 22, em dinheiro",
+  "saida": "create_expense amount_cents=2200 description=padaria payment_method=cash"
+ },
+ {
+  "grupo": "parse",
+  "frase": "paguei 15 de estacionamento por TED",
+  "saida": "create_expense amount_cents=1500 description=estacionamento payment_method=bank_transfer"
+ },
+ {
+  "grupo": "parse",
+  "frase": "gastei 200 no mercado com pix no crédito",
+  "saida": "create_expense amount_cents=20000 category=mercado payment_method=pix"
+ },
+ {
+  "grupo": "parse",
+  "frase": "gastei 300 de academia, gasto fixo e essencial",
+  "saida": "create_expense amount_cents=30000 description=academia expense_pattern=fixed expense_necessity=essential"
+ },
+ {
+  "grupo": "parse",
+  "frase": "gasto variável: 60 de uber",
+  "saida": "create_expense amount_cents=6000 description=uber expense_pattern=variable"
+ },
+ {
+  "grupo": "parse",
+  "frase": "gastei 70 em roupa, não essencial",
+  "saida": "create_expense amount_cents=7000 description=roupa expense_necessity=discretionary"
+ },
+ {
+  "grupo": "parse",
+  "frase": "gastei 80 no mercado, detalhe feira",
+  "saida": "create_expense amount_cents=8000 category=mercado detalhe=feira"
+ },
+ {
+  "grupo": "parse",
+  "frase": "gastei 55 na padaria, subcategoria doces",
+  "saida": "create_expense amount_cents=5500 description=padaria detalhe=doces"
+ },
+ {
+  "grupo": "parse",
+  "frase": "o pix do joão caiu, gastei 10 de café no débito",
+  "saida": "create_expense amount_cents=1000 description=café payment_method=debit"
+ },
+ {
+  "grupo": "parse",
+  "frase": "gastei 104,99 no nubank cartão",
+  "saida": "create_expense amount_cents=10499 account='nubank cartão'"
+ },
+ {
+  "grupo": "parse",
+  "frase": "gastei uns 40 ou 50 no mercado",
+  "saida": "create_expense category=mercado (amount_cents vazio: valor incerto)"
+ },
+ {
+  "grupo": "parse",
+  "frase": "gastei 30 no almoço e recebi 800 do freela",
+  "saida": "duas ações: create_expense amount_cents=3000 description=almoço; create_income amount_cents=80000 description=freela"
+ },
+ {
+  "grupo": "parse",
+  "frase": "gastei 45 no mercado e me lembra do aluguel",
+  "saida": "só create_expense amount_cents=4500 category=mercado (o lembrete é de outro domínio)"
+ },
+ {
+  "grupo": "parse",
+  "frase": "comprei um mac em 12x",
+  "saida": "create_installment_purchase description=mac installments=12 (amount_cents vazio: o sistema pergunta o preço)"
+ },
+ {
+  "grupo": "parse",
+  "frase": "comprei uma tv em 10x de 300 no nubank",
+  "saida": "create_installment_purchase description=tv installments=10 amount_cents=300000 account=nubank"
+ },
+ {
+  "grupo": "parse",
+  "frase": "comprei uma bike em 10x de 120 no inter",
+  "saida": "create_installment_purchase description=bike installments=10 amount_cents=120000 account=inter"
+ },
+ {
+  "grupo": "parse",
+  "frase": "um sofá de três mil reais em doze vezes",
+  "saida": "create_installment_purchase description=sofá installments=12 amount_cents=300000"
+ },
+ {
+  "grupo": "parse",
+  "frase": "tô na 3ª de 8 da cama, 200 cada",
+  "saida": "create_installment_purchase description=cama installments=8 amount_cents=160000 current_installment=3"
+ },
+ {
+  "grupo": "parse",
+  "frase": "já paguei 2 parcelas de 10 do notebook de 4200",
+  "saida": "create_installment_purchase description=notebook installments=10 amount_cents=420000 already_paid_count=2 current_installment=3"
+ },
+ {
+  "grupo": "parse",
+  "frase": "comprei uma geladeira em maio em 6x de 500, tô na 4ª",
+  "saida": "create_installment_purchase description=geladeira installments=6 amount_cents=300000 occurred_at=(data em maio) (current_installment vazio)"
+ },
+ {
+  "grupo": "parse",
+  "frase": "parcelei o notebook em 6 vezes, 4200 no inter",
+  "saida": "create_installment_purchase description=notebook installments=6 amount_cents=420000 account=inter"
+ },
+ {
+  "grupo": "parse",
+  "frase": "transferi 500 da nubank pra poupança",
+  "saida": "create_transfer amount_cents=50000 account=nubank counterparty_account=poupança"
+ },
+ {
+  "grupo": "parse",
+  "frase": "apliquei 200 no CDB",
+  "saida": "create_transfer amount_cents=20000 counterparty_account=CDB"
+ },
+ {
+  "grupo": "parse",
+  "frase": "resgatei 100 do CDB pra nubank",
+  "saida": "create_transfer amount_cents=10000 account=CDB counterparty_account=nubank"
+ },
+ {
+  "grupo": "parse",
+  "frase": "paguei a fatura do nubank pelo inter",
+  "saida": "pay_invoice account=nubank counterparty_account=inter"
+ },
+ {
+  "grupo": "parse",
+  "frase": "paguei 800 da fatura do nubank saindo do itaú",
+  "saida": "pay_invoice amount_cents=80000 account=nubank counterparty_account=itaú"
+ },
+ {
+  "grupo": "parse",
+  "frase": "paguei a fatura do nubank",
+  "saida": "pay_invoice account=nubank (counterparty_account vazio)"
+ },
+ {
+  "grupo": "parse",
+  "frase": "marca a fatura do nubank como paga",
+  "saida": "mark_paid description=nubank"
+ },
+ {
+  "grupo": "parse",
+  "frase": "a fatura do inter eu já tinha pago antes de usar o app",
+  "saida": "mark_paid description=inter"
+ },
+ {
+  "grupo": "parse",
+  "frase": "paguei a luz",
+  "saida": "mark_paid description=luz"
+ },
+ {
+  "grupo": "parse",
+  "frase": "paguei a luz, foi 230",
+  "saida": "mark_paid description=luz new_amount_cents=23000"
+ },
+ {
+  "grupo": "parse",
+  "frase": "paguei a 3ª parcela da tv",
+  "saida": "mark_paid description=tv installment_scope=range:3:3"
+ },
+ {
+  "grupo": "parse",
+  "frase": "Todas as 8 anteriores do carro, marque como pagas",
+  "saida": "mark_paid description=carro installment_scope=first:8"
+ },
+ {
+  "grupo": "parse",
+  "frase": "as últimas 2 parcelas do sofá, marque como pagas",
+  "saida": "mark_paid description=sofá installment_scope=last:2"
+ },
+ {
+  "grupo": "parse",
+  "frase": "da 3ª até a 8ª da moto já estão pagas",
+  "saida": "mark_paid description=moto installment_scope=range:3:8"
+ },
+ {
+  "grupo": "parse",
+  "frase": "as parcelas da tv até agosto de 2026 já foram pagas",
+  "saida": "mark_paid description=tv installment_scope=dates::2026-08-31"
+ },
+ {
+  "grupo": "parse",
+  "frase": "edite a moto pois já paguei 10",
+  "saida": "mark_paid description=moto installment_scope=first:10"
+ },
+ {
+  "grupo": "parse",
+  "frase": "marque as anteriores da moto como pagas",
+  "saida": "mark_paid description=moto installment_scope=unclear"
+ },
+ {
+  "grupo": "parse",
+  "frase": "na verdade foi 50",
+  "saida": "update_transaction new_amount_cents=5000 (busca vazia: o alvo é o da conversa)",
+  "antes": "gastei 45 no mercado"
+ },
+ {
+  "grupo": "parse",
+  "frase": "errei, era 54",
+  "saida": "update_transaction new_amount_cents=5400 (busca vazia)",
+  "antes": "gastei 45 no mercado"
+ },
+ {
+  "grupo": "parse",
+  "frase": "foi engano, era 54",
+  "saida": "update_transaction new_amount_cents=5400 (correção, não undo_last)",
+  "antes": "gastei 45 no mercado"
+ },
+ {
+  "grupo": "parse",
+  "frase": "aliás, foi 60",
+  "saida": "update_transaction new_amount_cents=6000 (busca vazia)",
+  "antes": "gastei 45 no mercado"
+ },
+ {
+  "grupo": "parse",
+  "frase": "o mercado foi 120, não 100",
+  "saida": "update_transaction amount_cents=10000 description=mercado new_amount_cents=12000"
+ },
+ {
+  "grupo": "parse",
+  "frase": "na verdade foi no Nubank",
+  "saida": "update_transaction new_account=Nubank (busca vazia)",
+  "antes": "gastei 45 no mercado"
+ },
+ {
+  "grupo": "parse",
+  "frase": "Muda o último gasto para 54 na conta Nubank",
+  "saida": "update_transaction new_amount_cents=5400 new_account='conta Nubank'"
+ },
+ {
+  "grupo": "parse",
+  "frase": "Tira a conta desse gasto",
+  "saida": "update_transaction new_account='sem conta'"
+ },
+ {
+  "grupo": "parse",
+  "frase": "Renomeia o mercado de ontem para Mercado do Zé",
+  "saida": "update_transaction description=mercado new_description='Mercado do Zé'"
+ },
+ {
+  "grupo": "parse",
+  "frase": "Na verdade eu comprei em 2x no cartão",
+  "saida": "UMA update_transaction installments=2 (new_account vazio; nunca delete + create)",
+  "antes": "Comprei wardogs por 104,99"
+ },
+ {
+  "grupo": "parse",
+  "frase": "muda a 3ª parcela da TV para 300",
+  "saida": "update_transaction description=TV current_installment=3 new_amount_cents=30000"
+ },
+ {
+  "grupo": "parse",
+  "frase": "na verdade só paguei 2 parcelas da tv",
+  "saida": "update_transaction description=tv already_paid_count=2"
+ },
+ {
+  "grupo": "parse",
+  "frase": "nenhuma parcela do sofá foi paga ainda",
+  "saida": "update_transaction description=sofá already_paid_count=0"
+ },
+ {
+  "grupo": "parse",
+  "frase": "desparcela a compra da tv",
+  "saida": "update_transaction description=tv installments=1"
+ },
+ {
+  "grupo": "parse",
+  "frase": "a tv foi à vista, não parcelada",
+  "saida": "update_transaction description=tv installments=1"
+ },
+ {
+  "grupo": "parse",
+  "frase": "a tv na verdade foi em 12x",
+  "saida": "update_transaction description=tv installments=12"
+ },
+ {
+  "grupo": "parse",
+  "frase": "a primeira parcela da tv é dia 10/10",
+  "saida": "update_transaction description=tv new_occurred_at=2026-10-10"
+ },
+ {
+  "grupo": "parse",
+  "frase": "passa as parcelas da geladeira para o último dia de cada mês",
+  "saida": "update_transaction description=geladeira recurrence='FREQ=MONTHLY;BYMONTHDAY=-1'"
+ },
+ {
+  "grupo": "parse",
+  "frase": "apaga a compra da tv",
+  "saida": "delete_transaction description=tv"
+ },
+ {
+  "grupo": "parse",
+  "frase": "remove o lançamento nuuvem",
+  "saida": "delete_transaction description=nuuvem (sem valor)"
+ },
+ {
+  "grupo": "parse",
+  "frase": "apaga o último",
+  "saida": "undo_last"
+ },
+ {
+  "grupo": "parse",
+  "frase": "apaga esse lançamento",
+  "saida": "delete_transaction (campos de busca vazios: o alvo é o da conversa)",
+  "antes": "gastei 20 no café"
+ },
+ {
+  "grupo": "parse",
+  "frase": "quero juntar 10 mil até dezembro de 2027",
+  "saida": "create_goal amount_cents=1000000 occurred_at=2027-12-31"
+ },
+ {
+  "grupo": "parse",
+  "frase": "separei 300 da nubank pra viagem",
+  "saida": "goal_deposit target_ref=viagem amount_cents=30000 account=nubank"
+ },
+ {
+  "grupo": "parse",
+  "frase": "transferi 300 da corrente pra poupança e guardei na meta viagem",
+  "saida": "UMA goal_deposit target_ref=viagem amount_cents=30000 account=corrente counterparty_account=poupança"
+ },
+ {
+  "grupo": "parse",
+  "frase": "guardei 200 na meta viagem",
+  "saida": "goal_deposit target_ref=viagem amount_cents=20000 (sem conta)"
+ },
+ {
+  "grupo": "parse",
+  "frase": "sempre que eu falar uber, põe em transporte",
+  "saida": "set_rule target_ref=uber category=transporte"
+ },
+ {
+  "grupo": "parse",
+  "frase": "meu apartamento agora vale 450 mil",
+  "saida": "update_asset_value target_ref=apartamento amount_cents=45000000"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quanto tenho?",
+  "saida": "query_balance"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quanto gastei esse mês?",
+  "saida": "query_transactions (query_from e query_to vazios)"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quanto gastei com mercado em junho",
+  "saida": "query_transactions category=mercado query_from=(1º de junho) query_to=(30 de junho)"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "lançamentos dos últimos 60 dias e com projeção dos próximos 90 dias",
+  "saida": "query_transactions query_from=(hoje - 60 dias) query_to=(hoje + 90 dias)"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "o que tenho de parcelas nos próximos meses",
+  "saida": "query_transactions query_from=(hoje) query_to=(fim do período)"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quanto gastei no pix esse mês?",
+  "saida": "query_transactions payment_method=pix"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quanto gastei no débito?",
+  "saida": "query_transactions payment_method=debit"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "meus gastos no boleto",
+  "saida": "query_transactions payment_method=boleto"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quanto gastei no cartão de crédito?",
+  "saida": "query_transactions payment_method=credit (account vazio)"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "o que ficou sem forma de pagamento?",
+  "saida": "query_transactions payment_method=not_informed"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quanto gastei no cartão Nubank?",
+  "saida": "query_transactions account=Nubank (sem payment_method)"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "por que gastei mais esse mês?",
+  "saida": "query_spending_change"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "gastei mais ou menos que mês passado?",
+  "saida": "query_spending_change"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "como tá meu orçamento?",
+  "saida": "query_budgets"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "como tão minhas metas?",
+  "saida": "query_goals"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quanto falta pro próximo marco da meta viagem?",
+  "saida": "query_goals search_term=viagem"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quanto falta pra minha meta reserva?",
+  "saida": "query_goals search_term=reserva"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quanto tá a fatura do nubank?",
+  "saida": "query_invoice account=nubank"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quanto sobrou de limite no nubank",
+  "saida": "query_invoice account=nubank"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quando fecha a fatura do nubank?",
+  "saida": "query_invoice account=nubank"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "qual o ciclo do nubank?",
+  "saida": "query_invoice account=nubank"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "qual é o meu ciclo?",
+  "saida": "query_cycle"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quando fecha o meu mês?",
+  "saida": "query_cycle"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quanto vai sobrar de dinheiro na conta no fim do mês?",
+  "saida": "query_forecast"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "vou ficar no vermelho?",
+  "saida": "query_forecast"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "qual meu patrimônio?",
+  "saida": "query_net_worth"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quais contas vencem essa semana?",
+  "saida": "duas ações: query_transactions query_from=(hoje) query_to=(fim da semana); query_invoice"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quando cai meu salário?",
+  "saida": "query_recurring search_term=salário"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quais minhas recorrências?",
+  "saida": "query_recurring (search_term vazio)"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quanto falta da dívida?",
+  "saida": "query_debts (search_term vazio)"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quanto falta do carro?",
+  "saida": "query_debts search_term=carro"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "posso comprar um celular de 3000 em 10x?",
+  "saida": "simulate_scenario amount_cents=300000 installments=10 kind=expense mode=total"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "e se eu receber 1500 por mês?",
+  "saida": "simulate_scenario amount_cents=150000 kind=income mode=monthly"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "e se eu receber 1500 e gastar 3000 em 6x?",
+  "saida": "duas ações: simulate_scenario amount_cents=150000 kind=income mode=monthly; simulate_scenario amount_cents=300000 kind=expense mode=total installments=6"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "e se eu gastar 2000 em janeiro?",
+  "saida": "simulate_scenario amount_cents=200000 kind=expense mode=total installments=1 query_from=(1º de janeiro)"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "ver mais",
+  "saida": "query_transactions continua_anterior=true mostrar=mais",
+  "antes": "(lista de lançamentos de um período)"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "me mostre todos",
+  "saida": "query_transactions continua_anterior=true mostrar=tudo",
+  "antes": "(lista de lançamentos de um período)"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "e no outro cartão?",
+  "saida": "query_transactions account=(o outro cartão) continua_anterior=true",
+  "antes": "quanto gastei no Nubank?"
+ },
+ {
+  "grupo": "consulta",
+  "frase": "quanto gastei no total esse mês?",
+  "saida": "query_transactions continua_anterior=false (não herda o Nubank)",
+  "antes": "quanto gastei no Nubank?"
+ }
+]

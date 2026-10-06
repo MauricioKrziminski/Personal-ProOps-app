@@ -114,6 +114,8 @@ class AgentState(TypedDict, total=False):
     # roteamento
     domain_options: Annotated[list[dict], _replace]
     domains: Annotated[list[str], _replace]
+    # sub-intenções de finanças que o router v2 devolveu (`AGENT_PROMPT_V2`); [] = montar todos
+    subintents: Annotated[list[str], _replace]
     confidence: float
     # chamadas de modelo desta execução. Aditivo porque o fan-out (finanças e
     # notas em paralelo) soma as duas. É o que alimenta `ai_events`, e `ai_events`

@@ -37,6 +37,26 @@ class RouterDecision(BaseModel):
     confidence: float = Field(description="0..1 sobre a mensagem inteira.")
 
 
+class RouterDecisionV2(RouterDecision):
+    """O router com sub-intenções de finanças (`AGENT_PROMPT_V2`). Subclasse, não campo novo em
+    `RouterDecision`: com a flag desligada o schema enviado ao Gemini continua o de antes.
+
+    `list[str]`, não enum: o router já tem um enum (`Domain`) e o segundo derruba a chamada
+    (`test_um_enum_por_schema`). O vocabulário vai na descrição e é validado em código
+    (`prompts_v2.normalizar_subintents`): fora dele, monta-se TODOS os módulos."""
+
+    finance_subintents: list[str] | None = Field(
+        None,
+        description=(
+            "Só se 'financas' está em domains; senão null. O que a mensagem faz com dinheiro, "
+            "uma ou mais de: criar (gasto/receita novo), transferencia (entre contas, aplicar/resgatar), "
+            "parcelado (compra nova em parcelas), fatura (pagar/quitar fatura de cartão), "
+            "baixa (pagou conta ou parcelas já previstas), alterar (corrigir, apagar ou desfazer algo "
+            "já lançado, inclusive reparcelar), meta (criar meta ou guardar nela). Outro: null."
+        ),
+    )
+
+
 class FinanceActionType(str, Enum):
     """Só ESCRITA e CORREÇÃO. Consulta tem enum próprio (ver FinanceQueryType)."""
 

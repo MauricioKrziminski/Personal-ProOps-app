@@ -230,6 +230,7 @@ def _estado_base(
         "results": [],
         "domains": [],
         "domain_options": [],
+        "subintents": [],
         "finance_actions": [],
         "finance_queries": [],
         "notes_actions": [],
