@@ -21,7 +21,7 @@ from uuid import UUID
 import jwt
 from fastapi import HTTPException, Request
 
-from app import db
+from app import db, ratelimit
 from app.config import get_settings
 
 log = logging.getLogger(__name__)
@@ -78,7 +78,9 @@ async def current_user(request: Request) -> UUID:
         log.warning("não consegui verificar o JWT: %s", err)
         raise HTTPException(status_code=401, detail="não foi possível validar o token") from err
 
-    return UUID(payload["sub"])
+    user_id = UUID(payload["sub"])
+    ratelimit.checar(user_id)
+    return user_id
 
 
 async def ensure_member(user_id: UUID, workspace_id: UUID) -> None:

@@ -85,6 +85,9 @@ class Settings(BaseSettings):
     # Origens permitidas na aba Agente, separadas por vírgula. Vazio = nenhuma
     # (o app nativo não manda Origin; isto é para o Expo web e o dev server).
     app_cors_origins: str = ""
+    # Requisições por minuto, por usuário e por instância, nas rotas do app (`app/ratelimit.py`).
+    # 0 desliga.
+    rate_limit_per_minute: int = 60
 
     # --- Langfuse ---
     langfuse_public_key: str = ""
