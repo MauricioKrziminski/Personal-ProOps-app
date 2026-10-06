@@ -10,7 +10,7 @@ Siga `.claude/rules/supabase.md` à risca:
 1. Nome: `supabase/migrations/<AAAAMMDDHHMMSS>_slug.sql`, com o carimbo depois do da última migration da pasta. Nunca editar migration existente.
 2. Conteúdo obrigatório conforme o caso:
    - Tabela nova → `enable row level security` + `workspace_id` com a policy de workspace (copiar de `transactions`, ver `supabase.md` → RLS); tabela de infra → RLS sem policies. Índices para os padrões de consulta. FKs com `on delete` explícito.
-   - Função `security definer` → `set search_path = public` + `revoke execute from public, anon, authenticated`.
+   - Função `security definer` → `set search_path = ''` (nomes qualificados com o schema) + `revoke execute from public, anon, authenticated` (comando em `private` chamado por wrapper invoker: `grant execute` de volta só a `authenticated`).
    - Toda função nova em `public` → `revoke execute ... from public, anon` (o PUBLIC do padrão do Postgres reabre função nova; `supabase/tests/anon_sem_execute.sql` acusa).
    - Função que usa `current_date` → `set timezone to 'America/Sao_Paulo'` no cabeçalho, nunca por `alter` depois (`finance.md`).
    - Agregação → padrão duplo `_interna(uid)` + wrapper invoker.

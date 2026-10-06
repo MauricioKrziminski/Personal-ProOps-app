@@ -65,7 +65,7 @@ Cada agregação existe como par interna + wrapper:
 1. **Interna** `_nome(uid uuid, ...)` — recebe o user_id resolvido do telefone e expande para os workspaces dele com `public._workspace_ids(uid)` — `security definer set search_path = public`, com `revoke execute ... from public, anon, authenticated`. É a que o **serviço Python** chama, passando o user_id resolvido. O wrapper `security invoker` depende de `auth.uid()`, que é null lá — chamá-lo do agente devolveria vazio, em silêncio.
 2. **Wrapper** `nome(...)` — `security invoker` com a **query inline** filtrando `workspace_id in (select private.my_workspace_ids())`, sob RLS. É o que o app usa via `supabase.rpc()`. O wrapper NÃO pode chamar a interna: EXECUTE é checado contra o role do chamador (authenticated), que foi revogado da interna — chamaria permission denied. A pequena duplicação da query é intencional.
 
-Funções `security definer` sempre com `set search_path = public` e revoke explícito (padrão do `0002_security_hardening.sql`).
+Funções `security definer` sempre com `search_path` fixo — `''` nas novas (`finance.md` → *Padrão das escritas compostas*), `public` nas antigas — e revoke explícito (padrão do `0002_security_hardening.sql`).
 
 ## Edge Functions — NÃO EXISTEM MAIS (09/09/2026)
 

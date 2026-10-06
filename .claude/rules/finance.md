@@ -682,11 +682,6 @@ compra, não a única tela que responde quanto resta.
   saía escrita **"Tudo (2x) — compra parcelada"**. É a mesma régua da linha (`description ??
   merchant`).
 
-  **Esta linha já afirmou que o app fazia igual, e ele NÃO fazia.** `useInstallmentPlans`
-  era `plan.merchant || plan.description` — invertido —, então uma compra com os dois
-  preenchidos aparecia com um nome em Parceladas e outro na fatura. Corrigido em 15/09/2026
-  junto com o reparcelamento: **`description || merchant` nos dois lados.**
-
   **A busca do agente tinha que acompanhar.** `resolve.por_transacao` casava só `description`
   e `category`, enquanto a busca do app (`use-finance.ts`) sempre casou os três — com o nome
   passando a existir em `merchant`, o agente responderia "não achei nada com «nuuvem»" para uma
@@ -807,13 +802,9 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
 - **Horizonte da projeção: até 10 anos, e o teto num lugar só** (`20260910235500`).
   `private.clamp_forecast_days` — piso 1, teto 3650, default 90.
 
-  > **Era 1095 (3 anos) por algumas horas em 10/09/2026.** O argumento para o teto baixo era
-  > "a regra envelhece, projetar longe é fingir precisão" — e estava errado: PocketSmith
-  > projeta 30 anos de saldo diário e o Monarch faz multi-ano. A resposta da indústria à
-  > decadência da regra é dar ALAVANCA ao usuário, não encurtar o alcance, e a alavanca já
-  > existe aqui: é o "E se…?". O que realmente impedia era CUSTO — com `draft_effect` sendo
-  > chamada por dia, 3 anos com rascunho custava 1.769 ms e 10 anos passaria de 6 s. Depois da
-  > `20260910234500`, 10 anos com duas hipóteses custa **68 ms**.
+  **"A regra envelhece" não é motivo para baixar o teto**: PocketSmith projeta 30 anos e o
+  Monarch faz multi-ano; a alavanca contra a regra velha é o "E se…?". Custo também não: 10 anos
+  com duas hipóteses custa **68 ms** (`20260910234500`).
 
   **A leitura do app passa por `forecast_json`, não pelas RPCs `setof`.** O PostgREST corta
   a resposta em **1000 linhas** e o corte é MUDO: a série chega menor, o app soma "entra/sai" e
@@ -1076,7 +1067,6 @@ patrimônio. `roll_invoice` é a terceira (`20260911040000`).
   12.499/2025) — e ela acerta a ordem de grandeza, **não o centavo**. Medido contra a cobrança
   real do Nubank em agosto/2026: sobre R$ 333,72 a fórmula dá R$ 2,12 e o emissor cobrou
   R$ 2,13. A diferença é contagem de dias e arredondamento do banco, que não são públicos.
-  Este arquivo já afirmou "IOF é exato" — era afirmação forte demais e foi corrigida.
 - **A taxa de juros NÃO fica num campo** (`20260911060000`). O dono do produto barrou o desenho
   antes de ir para produção: *"esse valor pode mudar também à medida que o tempo passa, por isso
   não queria deixar fixo"*. E os números dele provam: a cobrança real foi **12,876%**, não os

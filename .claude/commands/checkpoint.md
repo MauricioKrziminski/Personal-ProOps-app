@@ -38,7 +38,7 @@ agent/.venv/bin/python scripts/checkpoint.py list
    ```
    PROOPS_PROD_OK=1 agent/.venv/bin/python scripts/checkpoint.py restore <pasta> --prod
    ```
-   ⚠️ Você não consegue rodar isso — o classificador de permissão recusa escrita em produção.
+   Não rode isso você: restaurar produção apaga os dados reais, e quem executa é o Gabriel.
    **Entregue a linha para ele colar com `! ` na frente.**
 5. Depois de ele rodar, confirme lendo o banco: contagem de `transactions`, `accounts` e o saldo
    das contas correntes.

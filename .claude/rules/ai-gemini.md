@@ -21,15 +21,12 @@ nenhum outro:
 | O que exige confirmação | `app/graph/policy.py` |
 | Execução das ações | `app/tools/` |
 
-Os equivalentes em Deno (`_shared/gemini.ts`, `process-jobs/index.ts`) foram **apagados** em
-09/09/2026. Ver `.claude/rules/agent.md`.
-
 ## Regras de chamada
 
 - **Sempre saída estruturada** (`with_structured_output` com modelo Pydantic) — nunca parsear texto
   livre do modelo. É o schema que segura a saída, não a temperatura.
-- `temperature: 0.1` continua no código mas o **Flash-Lite 3.5 a IGNORA** ("uses fixed sampling
-  defaults", medido em 30/08/2026). Não gaste tempo ajustando temperatura neste modelo.
+- `temperature: 0.1` está no código (`tests/test_schemas.py` confere). A medição de que o Lite a
+  ignora foi no 3.5, que não está em uso: remeça no modelo da tabela antes de mexer nela.
 - **Modelos FIXADOS, nunca alias `-latest`** — o alias já migrou sozinho e quebrou o parse em
   produção. Escolha de modelo aqui é **cota E risco**, não só qualidade:
 

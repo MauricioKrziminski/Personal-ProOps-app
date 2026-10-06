@@ -38,8 +38,8 @@ import { useTheme } from '@/hooks/use-theme';
  * Custo aceito: no iOS essas três perdem a palavra "Cancelar" e a pílula de vidro do
  * `Stack.Toolbar` no "Salvar". É o que "uma chrome só" significa — os 18 sheets já eram assim.
  *
- * ⚠️ **Tela EMPURRADA não usa isto.** Lá o header é do navegador, com `<Stack.Title>` e large
- * title (`design.md` §8), e o `ScrollView` precisa ser a raiz para o título colapsar.
+ * ⚠️ **Tela EMPURRADA não usa isto.** Lá o header é do navegador, com título compacto e fixo
+ * (`design.md` §8), e o `ScrollView` precisa ser a raiz dela.
  *
  * ## O respiro do topo mora aqui
  *

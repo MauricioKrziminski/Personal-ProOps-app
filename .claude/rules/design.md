@@ -29,10 +29,10 @@ e onde ele decide o que fazer com isso.*
   botões secundários e navegação de mês. A pedido do dono do produto em 18/09/2026, esses
   controles compartilham `GlassBackdrop` quando a API nativa está disponível. iOS antigo e Android
   continuam com seus materiais próprios.
-- **Mais um único destaque por tela** — o bloco que responde a pergunta principal daquela tela
+- **No máximo um destaque por tela** — o bloco que responde a pergunta principal daquela tela
   (sobra do mês, patrimônio líquido, total da fatura, progresso da meta).
 
-**O destaque das telas principais é `HeroPanel`, não glass** (29/08/2026). Vidro precisa de algo
+**Onde a tela tem destaque, ele é `HeroPanel`, não glass** (29/08/2026; a Hoje não tem, ver abaixo). Vidro precisa de algo
 atrás para refratar; sobre o fundo chapado do app ele virava um retângulo cinza com um número
 dentro — a causa concreta do diagnóstico "corretas e sem graça". Vidro ficou só na chrome. A
 contagem não mudou: **um destaque por tela**.
@@ -828,7 +828,7 @@ que "voltar" faz depois.
   "Cancelar" e a pílula de vidro do `Stack.Toolbar` no "Salvar" nelas.
   `anti-slop.test.ts` quebra o build se `headerLeft` voltar (allowlist ZERO).
 
-  **Tela EMPURRADA continua com o header do navegador** e `<Stack.Title>` — **título compacto e
+  **Tela EMPURRADA continua com o header do navegador** (título por `options` do `Stack.Screen`) — **título compacto e
   FIXO, sem large title** — e o `ScrollView` continua precisando ser a raiz dela.
 
   **O header não desce com a tela, e no iOS 26 ele é translúcido desde o primeiro quadro**
@@ -872,7 +872,7 @@ que "voltar" faz depois.
   O avatar leva o ícone de pessoa, não iniciais. `profiles.display_name` existe desde a `0050`, mas
   é ANULÁVEL — quem entrou por Phone OTP não tem nome —, e um avatar que às vezes é letra e às
   vezes é ícone muda de forma conforme o cadastro. Um desenho só, para todo mundo.
-  **Tela EMPURRADA continua com `<Stack.Title>`** — lá o título e o "voltar" são a
+  **Tela EMPURRADA continua com o header do navegador** — lá o título e o "voltar" são a
   informação. Barra desenhada à mão dentro do `ScrollView` continua proibida: o `AppHeader` fica
   FORA dele.
 

@@ -12,7 +12,8 @@ contra ele, não contra o seu gosto.
 
 Checklist de auditoria:
 
-1. **Superfície**: conteúdo opaco (`Card`); o destaque da tela é **UM** `HeroPanel`, não vidro.
+1. **Superfície**: conteúdo opaco (`Card`); no máximo **UM** destaque de conteúdo, e `HeroPanel` só onde
+   `design.md` o prevê (a Hoje não tem), nunca vidro.
    Vidro só na chrome e nos controles interativos do iOS (`GlassBackdrop`, nunca
    `GlassView`/`BlurView` cru). Dois destaques de conteúdo na mesma tela é ❌.
 2. **Tokens**: zero hex hardcoded (tudo via `useTheme()`), zero `fontSize` solto (tudo via
@@ -34,15 +35,15 @@ Checklist de auditoria:
    falha visível** (toast + rollback) — delete, toggle, arquivar e pagar inclusive. Confirmação
    destrutiva por `confirmDestructive`; ação de item por `ItemLink`/`showItemActions` (context
    menu no iOS, opções no Android), nunca `Alert` cru na tela.
-7. **Navegação**: tela empurrada com `<Stack.Title>` compacto (sem `headerLargeTitle`), raiz de
+7. **Navegação**: tela empurrada com o header do navegador e título compacto (sem `headerLargeTitle`), raiz de
    aba com `AppHeader`, busca no slot `search` do `<Screen>`, presentation coerente com o significado (modal / formSheet / action
    sheet). Barra de header desenhada à mão dentro do `ScrollView` é ❌.
 8. **Dinheiro e datas**: valores em centavos via `formatBRL`/`MoneyField`, com
    `fontVariant: ['tabular-nums']`. Datas via `formatDateBR`. Qualquer `parseFloat` em dinheiro
    é reprovação.
 9. **Dados**: hook TanStack no padrão do projeto (queryKey, realtime quando a tabela recebe itens
-   do WhatsApp, mutação com invalidate). Lista que cresce usa `FlashList`, não `ScrollView` +
-   `.map()`.
+   do WhatsApp, mutação com invalidate). Lista longa segue `frontend.md` → *Aos poucos*
+   (`VerMais`/`useAosPoucos`, ou `useInfiniteQuery` quando cresce sem fim), nunca teto fixo em silêncio.
 10. **Texto e a11y**: pt-BR informal, um rótulo por intenção, alvos ≥ 44pt,
     `accessibilityLabel` em botão só-ícone, Dynamic Type XL sem quebrar layout.
 11. **Contagem anti-slop** (§10 da regra): 1 accent, 1 família de cinza, 0 raio fora da escala,

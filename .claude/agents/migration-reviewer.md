@@ -11,7 +11,7 @@ Verifique, nesta ordem de severidade:
 **Bloqueia aplicação:**
 1. Tabela nova sem `enable row level security`.
 2. Tabela de dado sem `workspace_id` e a policy de workspace (`workspace_id in (select private.my_workspace_ids())`, a de `transactions`) — exceto as tabelas de infra intencionalmente sem policy (a lista está em `supabase.md` → RLS).
-3. Função `security definer` sem `set search_path = public` ou sem `revoke execute from public, anon, authenticated`; função nova em `public` sem `revoke execute ... from public, anon`.
+3. Função `security definer` sem `set search_path` fixo (`''` nas novas, com nomes qualificados; `public` nas antigas) ou sem `revoke execute from public, anon, authenticated` (o comando em `private` do padrão de `finance.md` devolve o `execute` só a `authenticated`, para o wrapper invoker); função nova em `public` sem `revoke execute ... from public, anon`.
 4. Quebra de contrato: drop/alter de tabela, coluna ou RPC que o agente (`agent/`) ou um hook do app (`src/hooks/`) ainda referencia — grep pelos nomes antes de aprovar.
 5. Dinheiro como float/numeric — deve ser `amount_cents bigint` (check > 0).
 6. Segredo/JWT/URL hardcoded no SQL.

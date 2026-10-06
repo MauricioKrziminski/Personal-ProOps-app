@@ -107,7 +107,7 @@ inferir o que a pessoa quis dizer PORQUE ela vê o efeito e aprova antes da escr
 Afrouxar um lado sem o outro é o que transforma "entendeu bem" em "apagou errado".
 
 **Duas cópias do mesmo defeito saíram em 21/09/2026: regex generalizando conta e nome
-a partir de qualquer palavra.** `extract_account_fallback` (`agent/app/tools/guards.py:148`, único
+a partir de qualquer palavra.** `extract_account_fallback` (`agent/app/tools/guards.py`, único
 chamador em `nodes.py`) tinha um ramo genérico `no|na|pelo <palavra>` que virava conta: "Na
 verdade eu comprei em 2x no cartão" inferia o cartão *verdade*, "paguei na hora" virava *hora*.
 Hoje ele só aceita a ESTRUTURA `no|na|pelo|pela|com o|com a cartão [de crédito/débito] [do|da]
@@ -286,7 +286,7 @@ dois efeitos juntos. Três regras:
   criações seguintes do par são PULADOS — "⚠️ Não apaguei X porque não consegui registrar Y."
 - **Retentativa sem `result_id` não conta como escrita.** A idempotência (`executed_actions`)
   reserva ANTES de executar; se o worker morre entre a reserva e o fim da tool, a reserva fica
-  ÓRFÃ (sem `result_id`). `db.execution_result_id` (`agent/app/db.py:454`) distingue os dois
+  ÓRFÃ (sem `result_id`). `db.execution_result_id` (`agent/app/db.py`) distingue os dois
   casos, e `registry.execute` só marca `ja_executada=True` quando `result_id` não é nulo — senão
   a retentativa rodaria o apagar sozinho, sem a criação ter de fato acontecido.
 

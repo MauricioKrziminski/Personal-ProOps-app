@@ -77,7 +77,6 @@ card de erro e a recuperação.
     "Categoria" por "Para a conta"; "Parcelas" troca o rótulo de "Data" por "Data da primeira
     parcela". Vindo depois, a tela se remonta debaixo do dedo.
   - Campo longo (uma lista de contas) não parte um grupo curto ao meio.
-  O lançamento era o fora-da-curva: descrição e estabelecimento ficavam no FIM, depois da data.
 - **Campo obrigatório se vê ANTES de salvar** (06/10/2026, *"o usuário só descobre quando clica
   em salvar"*): `Field obrigatorio` desenha um ` *` cinza no rótulo (e ", obrigatório" no leitor
   de tela). A régua é o GUARDA do salvar (zod, `podeSalvar`, `disabled`), nunca o `NOT NULL`;
@@ -137,7 +136,7 @@ inteiro de uma vez.
   "Ver mais", com `keepPreviousData`). **Teto fixo em silêncio (`limit(100)`) é defeito**: o 101º
   some da tela sem aviso. Total e agregado (soma do mês, "Comprometido") contam a lista INTEIRA,
   nunca só o que está visível.
-- Um rótulo: **"Ver mais"** (com a contagem quando se sabe). Era "Carregar mais" na lixeira.
+- Um rótulo: **"Ver mais"** (com a contagem quando se sabe).
 
 ### Quantidade é campo ABERTO, nunca lista de atalhos (22/09/2026)
 
@@ -254,11 +253,10 @@ parcelas já foram pagas?"). São modos diferentes do mesmo cadastro, não conce
   (§7b). O rótulo diz o que o campo É.
 - **Substantivo, não pergunta**, quando existe um rótulo-substantivo para o mesmo dado em outra
   tela. Pergunta continua onde ela É a escolha da tela ("É bem ou dívida?") — ali não há
-  duplicata para unificar. (O "Acontece uma vez ou todo mês?" do "E se…" virou "Frequência" na
-  limpeza de texto de 23/09/2026.)
+  duplicata para unificar.
 - `"Quanto você pagou"` (a tela de PAGAR, nos dois modos de dívida desde 25/09/2026) continua
   diferente de `"Valor da parcela"` (o cadastro) **de propósito**: um é quanto está saindo agora,
-  o outro é o contrato. (Era "Valor desta parcela", só leitura na parcela fixa.)
+  o outro é o contrato.
 
 ## Plataforma — a decisão mora no primitivo, nunca na tela
 
