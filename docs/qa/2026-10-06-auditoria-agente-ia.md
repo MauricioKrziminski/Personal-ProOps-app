@@ -588,7 +588,7 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
 | M7 corrida na cota | feito | reserva sob advisory lock; sem linha de plano vale o limite mais restrito |
 | M8 lembretes sem `skip locked` | decidido | `trava_de_sessao` + nova conferência antes de entregar dá a mesma garantia; entrega at-least-once escrita no código |
 | M9 sem CI | feito | `28a3370a`, `363a59a9`: ruff, pytest, tsc, lint, npm test, SQL e avaliação (dispara em todo `graph/`, `gemini.py`, portão e rascunho; roda formas de resposta E compreensão de conversa) |
-| M10 prompt remendado | feito atrás de flag | prompt v2 (`AGENT_PROMPT_V2`); a decisão de ligar está na seção 18 |
+| M10 prompt remendado | feito | prompt v2 (`AGENT_PROMPT_V2`) aprovado e ligado no staging (seção 19) |
 | M11 funções gigantes | decidido | dividir quando mexer, como o próprio relatório pede |
 | BAIXO (10 itens) | feito | bytes no `compare_digest`, `verify_token` em tempo constante, OTP sem `str(err)`, corpo da Meta fora do log, fuso validado, teto de 16 MiB no áudio, `like_contem`, máscara no Langfuse, `_checa_producao`, logs JSON |
 | BAIXO `confidence` dos planos | feito | `72e5bc55`: saiu dos 4 planos de domínio (só trocava o rótulo do motivo); a do router fica |
@@ -670,12 +670,17 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
   Lite ("aham", "claro"), 4 do critério envelhecido de "encerrar", 5 do aporte (corrigido depois) e
   2 de correção sem valor de busca. A v2 rodou até a cota diária acabar: os 53 primeiros casos
   bateram com a v1; o resto ficou contaminado (portão sem cota).
-- **Por isso o `AGENT_PROMPT_V2` continua DESLIGADO.** Tudo o que foi medido aponta a favor
-  (−32% de tokens, melhor em 6 extrações, igual em roteamento e segurança), mas a suíte oficial
-  inteira não coube na cota gratuita do dia. Um job ficou agendado para rodar ao zerar a cota:
-  a sonda de ordem dos campos (correções e 6 criações de alto volume, nas duas ordens), a suíte
-  inteira **v1 primeiro** — é ela que confirma o `target_ref` movido, que está em `main` e só foi
-  medido nas seções afetadas (aporte 9/9, encerrar 9/9) — e depois a v2.
+- **Rodada final na chave paga (com `--teto-usd`), no schema final:** formas de resposta **v1
+  300/302** (US$ 0,35) e **v2 300/302** (US$ 0,34). As falhas que sobram oscilam ("em dinheiro"
+  passou 2/3 repetido; "aplica o plano só neste mês" é do nó de cadastros, que o v2 não toca).
+- **Ordem dos campos, sonda 3× cada:** correções e criações de alto volume 19/30 → **29/30**;
+  parcelado "no nubank" 0/6 → **6/6** (regressão da própria auditoria: `payment_method` no parse
+  passou a ocupar o lugar da conta); aporte 12/12. Ordem final em `d74b8c25`.
+- **`AGENT_PROMPT_V2` ligado no STAGING** (revisão `00229`, junto com `AGENTE_RLS`): empate na
+  suíte oficial, 19×18 na compreensão de conversa, melhor em 6 extrações, portão 70/70 e −32% de
+  tokens de router+parse quando o router dá as sub-intenções (na suíte quase não aparece: o
+  avaliador chama o nó sem o router, e sem sub-intenção o v2 monta todos os módulos).
+- **Gasto total na chave paga em 06/10/2026: ~US$ 0,98.**
 
 ## 20. O que depende de você
 
@@ -687,4 +692,5 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
   `20261006160000` (o `db push` com `--project-ref` de produção e `PROOPS_PROD_OK=1`, como manda
   o `CLAUDE.md`) e depois o deploy do agente. `AGENTE_RLS` em produção só depois de alguns dias
   dele ligado no staging.
-- **Ligar o prompt v2**, quando a suíte inteira aprovar.
+- **Ligar o prompt v2 em produção** (`AGENT_PROMPT_V2=true` no deploy): aprovado nas medições;
+  sugestão de alguns dias de uso no staging antes.
