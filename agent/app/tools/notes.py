@@ -27,6 +27,7 @@ from app.graph.schemas import NotesAction
 from app.tools import guards
 from app.tools.base import ExecContext, ToolResult
 from app.tools.guards import Level1Error
+from app.domain import matching
 
 log = logging.getLogger(__name__)
 
@@ -248,7 +249,7 @@ async def query_reminders(ctx: ExecContext, action: NotesAction) -> ToolResult:
     args: list = [ctx.workspace_id]
     if termo:
         sql.append("and extensions.unaccent(title) ilike extensions.unaccent(%s)")
-        args.append(f"%{termo}%")
+        args.append(matching.like_contem(termo))
     if action.query_from:
         sql.append("and next_run_at >= %s")
         args.append(to_instant(action.query_from, ctx.timezone))

@@ -310,7 +310,7 @@ async def _modelos(ws, nome: str | None = None) -> list[dict]:
             "where workspace_id = %s and not archived "
             "and extensions.unaccent(lower(name)) like extensions.unaccent(lower(%s)) "
             "order by (extensions.unaccent(lower(name)) = extensions.unaccent(lower(%s))) desc, use_count desc, name "
-            "limit 9", ws, f"%{nome.strip()}%", nome.strip())
+            "limit 9", ws, matching.like_contem(nome.strip()), nome.strip())
     return await db.fetch(
         "select id, name, fields, use_count from public.transaction_templates "
         "where workspace_id = %s and not archived order by use_count desc, name limit %s", ws, LISTAR_ATE + 1)

@@ -24,6 +24,7 @@ from app.domain.matching import ultimo_dia_do_mes
 from app.graph.schemas import ResourceAction, ResourceActionType as Op
 from app.tools.base import ExecContext, ToolResult, ensure_owned, request_id
 from app.tools.guards import Level1Error, clean_rrule
+from app.domain import matching
 
 # table, identifying column, deletion semantics, editable columns
 CATALOG = {
@@ -776,7 +777,7 @@ async def _preparar_adiamento(ctx: ExecContext, action: ResourceAction, prepared
         """,
         local_iso_date(ctx.timezone),
         ctx.workspace_id,
-        f"%{action.name}%",
+        matching.like_contem(action.name),
     )
     if not fatura:
         _error("Não achei fatura em aberto nesse cartão.")
@@ -853,7 +854,7 @@ async def _preparar_desfazer_fatura(
         limit 9
         """,
         local_iso_date(ctx.timezone), ctx.workspace_id, "paid" if paga else "rolled",
-        f"%{action.name.strip()}%", mes, mes,
+        matching.like_contem(action.name.strip()), mes, mes,
     )
     estado = "paga" if paga else "adiada"
     if not faturas:
@@ -921,7 +922,7 @@ async def _preparar_aporte(
     metas = await db.fetch(
         "select id, name, saved_cents from public.goals where workspace_id = %s "
         "and extensions.unaccent(lower(name)) like extensions.unaccent(lower(%s)) order by name",
-        ctx.workspace_id, f"%{action.name.strip()}%",
+        ctx.workspace_id, matching.like_contem(action.name.strip()),
     )
     if not metas:
         raise JaExiste(f"Não achei meta com o nome *{action.name}*. Nada foi alterado.")
@@ -1037,7 +1038,7 @@ async def _achar_serie(ctx: ExecContext, nome: str) -> dict:
         rows = await db.fetch(
             colunas + "extensions.unaccent(lower(description)) like extensions.unaccent(lower(%s)) "
             "order by description limit 6",
-            ctx.workspace_id, f"%{nome.strip()}%",
+            ctx.workspace_id, matching.like_contem(nome.strip()),
         )
     if not rows:
         _error(f"Não achei recorrência com o nome *{nome}*. Nada foi alterado.")
@@ -1248,7 +1249,7 @@ async def _notas_parecidas(ctx: ExecContext, termo: str, lixeira) -> list[dict]:
         + _where("notes", lixeira)
         + " order by updated_at desc limit 6",
         ctx.workspace_id,
-        f"%{termo}%",
+        matching.like_contem(termo),
     )
 
 

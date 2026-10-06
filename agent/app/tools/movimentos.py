@@ -33,6 +33,7 @@ from app.graph.schemas import FinanceActionType
 from app.tools import guards
 from app.tools.base import REQUEST_NAMESPACE, ExecContext, ToolResult, ensure_owned, request_id
 from app.tools.guards import Level1Error
+from app.domain import matching
 
 # O nome da RPC viaja no checkpoint; só estes valem.
 RPCS = {"goal_money_command", "investment_command", "investment_value_command", "budget_plan_command"}
@@ -104,7 +105,7 @@ async def _achar(workspace_id, tabela: str, nome: str, o_que: str, extra: str = 
     if not rows:
         rows = await db.fetch(
             base + "extensions.unaccent(lower(name)) like extensions.unaccent(lower(%s)) order by name limit 6",
-            workspace_id, f"%{nome.strip()}%",
+            workspace_id, matching.like_contem(nome.strip()),
         )
     if not rows:
         # Level1Error (vira pergunta com rascunho), não Recusa: a pessoa responde o nome certo e o pedido segue.
