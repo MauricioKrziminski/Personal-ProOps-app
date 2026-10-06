@@ -110,7 +110,7 @@ async def main() -> int:
         print(f"{VERMELHO}GEMINI_API_KEY não definida.{FIM}")
         return 1
 
-    print(f"modelo: {gemini.GEMINI_PARSE}")
+    print(f"modelo: {gemini.modelo(gemini.GEMINI_PARSE)}")
     print(f"real:   {len(CAMPOS)} propriedades, enum de {len(TIPOS)} valores, "
           f"{len(INTEIROS)} INTEGER ({', '.join(INTEIROS)})\n")
 

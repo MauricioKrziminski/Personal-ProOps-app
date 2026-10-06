@@ -98,7 +98,7 @@ async def rodar(texto: str) -> FinanceQueryType | None:
 
 
 async def main() -> int:
-    print(f"modelo: {gemini.GEMINI_PARSE}\n")
+    print(f"modelo: {gemini.modelo(gemini.GEMINI_PARSE)}\n")
     falhas = 0
     for texto, esperado in CASOS:
         veio = await rodar(texto)

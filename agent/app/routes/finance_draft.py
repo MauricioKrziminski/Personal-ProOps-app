@@ -219,7 +219,7 @@ async def rascunho(body: PedidoDeRascunho, user_id: Annotated[UUID, Depends(curr
     forma = dom_atributos.forma_proposta(acoes[0].get("payment_method"), body.text) if acoes and _pede_forma(acoes[0]) else None
     await db.record_ai_event(
         user_id=user_id, workspace_id=perfil["workspace_id"], channel="app",
-        model=gemini.GEMINI_PARSE, confidence=saida.get("confidence"),
+        model=gemini.modelo(gemini.GEMINI_PARSE), confidence=saida.get("confidence"),
         result={"finance_actions": saida.get("finance_actions", []), "llm_calls": 1, "draft": True},
     )
     if not acoes:

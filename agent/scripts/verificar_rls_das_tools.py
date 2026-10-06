@@ -26,7 +26,6 @@ Ordem real da produção, preservada: reserva de `executed_actions` (postgres) �
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import pathlib
 import subprocess

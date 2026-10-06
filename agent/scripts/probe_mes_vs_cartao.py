@@ -117,7 +117,7 @@ async def rodar(texto: str):
 
 
 async def main() -> int:
-    print(f"modelo: {gemini.GEMINI_PARSE}\n")
+    print(f"modelo: {gemini.modelo(gemini.GEMINI_PARSE)}\n")
     falhas = 0
     for texto, esperado, campo in CASOS:
         recurso, campos, erro, tipo = await rodar(texto)

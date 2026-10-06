@@ -168,7 +168,7 @@ async def main() -> int:
         print("é o único jeito de saber se o schema passa. Exporte a chave e rode de novo.")
         return 1
 
-    print(f"modelo: {gemini.GEMINI_PARSE}")
+    print(f"modelo: {gemini.modelo(gemini.GEMINI_PARSE)}")
     # Sequencial de propósito. Com `gather` os quatro cabeçalhos saíam juntos e
     # os resultados chegavam fora de ordem — num diagnóstico, ler o resultado de
     # um schema debaixo do cabeçalho de outro é pior do que esperar 40 segundos.

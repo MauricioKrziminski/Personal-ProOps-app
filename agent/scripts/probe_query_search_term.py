@@ -69,7 +69,7 @@ async def main() -> int:
         print(f"{VERMELHO}GEMINI_API_KEY não definida.{FIM}")
         return 1
 
-    print(f"modelo: {gemini.GEMINI_PARSE}\n")
+    print(f"modelo: {gemini.modelo(gemini.GEMINI_PARSE)}\n")
     falhas = 0
     for msg, tipo_esperado, trechos in CASOS:
         plano = await gemini.structured(FinanceQueryPlan, gemini.GEMINI_PARSE).ainvoke(

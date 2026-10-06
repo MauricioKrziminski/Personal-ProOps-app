@@ -82,7 +82,7 @@ async def main() -> int:
     if not os.getenv("GEMINI_API_KEY"):
         print(f"{VERMELHO}GEMINI_API_KEY não definida.{FIM}")
         return 1
-    print(f"modelo: {gemini.GEMINI_PARSE}\n")
+    print(f"modelo: {gemini.modelo(gemini.GEMINI_PARSE)}\n")
     ok = [await um(*c) for c in CASOS]
     print(f"\n{'-' * 70}\n{sum(ok)}/{len(ok)}")
     return 0 if all(ok) else 1

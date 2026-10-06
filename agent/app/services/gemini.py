@@ -119,12 +119,14 @@ def modelo(papel: str) -> str:
     return trocado
 
 
-# Apelidos para quem chama por nome. Eles DERIVAM da tabela — não são uma segunda
-# fonte. Passar a string continua funcionando porque `llm()` volta dela ao papel.
-GEMINI_ROUTER = MODELOS["router"]
-GEMINI_PARSE = MODELOS["parse"]
-GEMINI_BATCH = MODELOS["batch"]
-GEMINI_GATE = MODELOS["gate"]
+# Os PAPÉIS, para quem chama `llm`/`structured`. O nome do modelo sai sempre de `modelo(papel)`.
+# Eram os NOMES dos modelos, e três papéis com o mesmo modelo viravam um só no mapa de volta
+# (o último, "batch"): `GEMINI_MODEL_PARSE` não trocava o parse e o detalhe do turno rotulava
+# router e parse como "batch" (visto no E2E de 06/10/2026).
+GEMINI_ROUTER = "router"
+GEMINI_PARSE = "parse"
+GEMINI_BATCH = "batch"
+GEMINI_GATE = "gate"
 
 # US$ por 1 M de tokens (entrada, saída) — a tabela oficial de `ai-gemini.md`, conferida em
 # 15/09/2026. Modelo que não está aqui tem custo `None`: custo chutado é pior que custo ausente.
@@ -159,10 +161,6 @@ def versao_do_prompt(texto: str) -> str:
     return hashlib.sha256(texto.encode("utf-8")).hexdigest()[:8]
 
 
-# nome do modelo -> papel, para quem passa a constante em vez do papel.
-_PAPEL_POR_NOME = {nome: papel for papel, nome in MODELOS.items()}
-
-
 _cache: dict[tuple[str, float, float, int], ChatGoogleGenerativeAI] = {}
 
 T = TypeVar("T", bound=BaseModel)
@@ -178,11 +176,11 @@ def llm(
 ) -> ChatGoogleGenerativeAI:
     """Cliente por (modelo, temperatura). Reusar evita reconstruir o transporte.
 
-    `model` pode ser o PAPEL ("gate") ou o nome do modelo — os dois passam por
-    `modelo()`, que é o único lugar que decide. Sem argumento, o papel é `parse`.
+    `model` é o PAPEL ("gate", `GEMINI_PARSE`…): `modelo()` é o único lugar que decide o nome
+    (papel desconhecido levanta). Sem argumento, o papel é `parse`.
     """
     settings = get_settings()
-    papel = model if model in MODELOS else _PAPEL_POR_NOME.get(model or "", "parse")
+    papel = model or GEMINI_PARSE
     nome_modelo = modelo(papel)
     chave = (nome_modelo, temperature, timeout, max_retries)
     if chave not in _cache:
@@ -350,7 +348,7 @@ def _structured(
     aprovando "apaga todos". O interpretador de respostas pode tentar uma leitura separada
     SOMENTE de revisão quando o portão falha; nunca confirma ou executa uma ação por ela.
     """
-    papel = model if model in MODELOS else _PAPEL_POR_NOME.get(model, "parse")
+    papel = model
     reserva = modelo("gate")
     meta = {"papel": papel, "no": no, "prompt_versao": versao}
     if papel == "gate" or modelo(papel) == reserva:
@@ -363,7 +361,7 @@ def _structured(
     principal = llm(papel, timeout=prazo, max_retries=0).with_structured_output(schema)
     return _ComReserva(
         runnable=principal,
-        fallbacks=[llm(reserva).with_structured_output(schema)],
+        fallbacks=[llm(GEMINI_GATE).with_structured_output(schema)],
         chave=modelo(papel),
         metadados=meta,
     )
@@ -462,7 +460,7 @@ def structured(
 ):
     """`_structured` (saída estruturada, reserva, disjuntor) + modo sombra, se ligado."""
     principal = _structured(schema, model, prazo=prazo, no=no, versao=versao)
-    papel = model if model in MODELOS else _PAPEL_POR_NOME.get(model, "parse")
+    papel = model
     nome = modelo_sombra(papel)
     return _ComSombra(principal, schema, papel, no, nome) if nome else principal
 

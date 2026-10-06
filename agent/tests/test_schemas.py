@@ -148,10 +148,10 @@ def test_os_modelos_de_producao_sao_os_documentados():
     """
     from app.services import gemini
 
-    assert gemini.GEMINI_ROUTER == "gemini-3.1-flash-lite"
-    assert gemini.GEMINI_PARSE == "gemini-3.1-flash-lite"
-    assert gemini.GEMINI_BATCH == "gemini-3.1-flash-lite"
-    assert gemini.GEMINI_GATE == "gemini-3.7-flash"
+    assert gemini.MODELOS[gemini.GEMINI_ROUTER] == "gemini-3.1-flash-lite"
+    assert gemini.MODELOS[gemini.GEMINI_PARSE] == "gemini-3.1-flash-lite"
+    assert gemini.MODELOS[gemini.GEMINI_BATCH] == "gemini-3.1-flash-lite"
+    assert gemini.MODELOS[gemini.GEMINI_GATE] == "gemini-3.7-flash"
 
 
 def test_sem_variavel_de_ambiente_o_modelo_nao_muda(monkeypatch):

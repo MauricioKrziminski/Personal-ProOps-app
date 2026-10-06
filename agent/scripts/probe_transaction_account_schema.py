@@ -28,7 +28,7 @@ async def main():
     assert action.new_amount_cents == 5400
     assert action.new_account and 'nubank' in action.new_account.lower()
     assert not action.account, 'current/search account must not carry the correction'
-    print(f'PASS model={gemini.GEMINI_PARSE}, properties={len(FinanceAction.model_fields)}')
+    print(f'PASS model={gemini.modelo(gemini.GEMINI_PARSE)}, properties={len(FinanceAction.model_fields)}')
     print(response.model_dump_json())
 
 

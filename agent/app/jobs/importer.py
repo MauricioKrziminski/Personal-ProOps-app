@@ -24,7 +24,7 @@ from app.domain.reconcile import (
 )
 from app.domain.statement import ParsedLine, ofx_tipo, parse_csv, parse_ofx
 from app.services.gemini import (
-    GEMINI_BATCH, classify_statement_lines, judge_statement_pairs,
+    GEMINI_BATCH, classify_statement_lines, judge_statement_pairs, modelo,
 )
 
 log = logging.getLogger(__name__)
@@ -106,7 +106,7 @@ async def run(
         await conversation.soltar_reserva()
         raise
     await db.record_ai_event(
-        user_id=user_id, workspace_id=workspace_id, channel="app", model=GEMINI_BATCH,
+        user_id=user_id, workspace_id=workspace_id, channel="app", model=modelo(GEMINI_BATCH),
         confidence=None, result={"import": True, "items": resultado["items"]}, kind="import",
     )
     return resultado

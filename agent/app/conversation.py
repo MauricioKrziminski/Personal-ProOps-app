@@ -1041,7 +1041,7 @@ async def _audit(sessao: dict, estado: dict, uso: dict | None = None) -> None:
         user_id=sessao["user_id"],
         workspace_id=sessao["workspace_id"],
         channel=sessao.get("channel") or "whatsapp",
-        model=gemini.GEMINI_PARSE,
+        model=gemini.modelo(gemini.GEMINI_PARSE),
         confidence=estado.get("confidence"),
         result={
             "domains": estado.get("domains", []),

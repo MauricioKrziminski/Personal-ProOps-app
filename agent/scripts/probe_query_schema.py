@@ -94,7 +94,7 @@ async def main() -> int:
     fq = [t.value for t in FinanceQueryType]
     na = [t.value for t in NotesActionType]
     nfq, nna = len(FinanceQuery.model_fields), len(NotesAction.model_fields)
-    print(f"modelo: {gemini.GEMINI_PARSE}")
+    print(f"modelo: {gemini.modelo(gemini.GEMINI_PARSE)}")
     print(f"hoje: FinanceQuery {nfq}×{len(fq)}={nfq * len(fq)} · NotesAction {nna}×{len(na)}={nna * len(na)}\n")
 
     ok: dict[str, bool] = {}
