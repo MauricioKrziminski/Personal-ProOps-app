@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends
 
 from app import db
 from app.domain.dates import now_utc
-from app.jobs import alerts, checkpoints, embeddings, reminders, scheduler
+from app.jobs import alerts, checkpoints, embeddings, feedback, reminders, scheduler
 from app.routes.worker import sweep
 from app.security import require_internal
 
@@ -105,4 +105,9 @@ async def run_alerts() -> dict:
         limpeza = await checkpoints.run()
     except Exception:  # noqa: BLE001
         limpeza = {"error": "expurgo de checkpoints falhou"}
-    return {"alerts": avisos, "checkpoints": limpeza}
+    # retenção de 180 dias do ciclo de dados; mesma regra: falhar aqui nunca derruba o alerta
+    try:
+        rotulos = await feedback.run()
+    except Exception:  # noqa: BLE001
+        rotulos = {"error": "expurgo de agent_feedback falhou"}
+    return {"alerts": avisos, "checkpoints": limpeza, "feedback": rotulos}

@@ -85,6 +85,29 @@ def _sem_palavras_de_tipo(termo: str | None) -> str:
     return " ".join(p for p in normalize(termo).split() if p not in _PALAVRAS_DE_TIPO)
 
 
+_MAX_PALAVRAS_DE_APELIDO = 4
+_ARTIGOS = {"o", "a", "os", "as", "meu", "minha"}
+
+
+def alias_para_aprender(citado: str | None, nome_da_conta: str | None) -> str | None:
+    """O apelido a gravar quando a pessoa citou `citado` e escolheu a conta `nome_da_conta`.
+
+    `None` quando não é apelido: vazio ou só palavra de tipo ("cartão", "conta" — a mesma régua do
+    casador), igual ao nome da conta, pedaço do nome (era casamento por texto, não apelido:
+    gravá-lo faria "nubank" deixar de perguntar entre "Nubank Conta" e "Nubank Cartão") ou frase
+    inteira. O retorno já é a forma normalizada que a tabela exige.
+    """
+    alias = _sem_palavras_de_tipo(citado)
+    while alias.split(" ", 1)[0] in _ARTIGOS and " " in alias:  # "o roxinho" e "roxinho" são um só
+        alias = alias.split(" ", 1)[1]
+    nome = normalize(nome_da_conta)
+    if not alias or not nome or len(alias.split()) > _MAX_PALAVRAS_DE_APELIDO:
+        return None
+    if alias == nome or f" {alias} " in f" {nome} ":
+        return None
+    return alias
+
+
 def infer_account_type(texto: str | None) -> str | None:
     """Infere o subtipo de conta (credit_card vs checking) a partir de modificadores na frase."""
     if not texto:
@@ -162,6 +185,12 @@ def match_accounts(
     exatos = [l for l in linhas if normalize(l.get(key)) == alvo]
     if exatos:
         return exatos
+
+    # Apelido que a própria pessoa ensinou (`account_aliases`) vale como nome exato. Vem DEPOIS do
+    # nome: se existe uma conta chamada exatamente assim, é essa que ela disse.
+    apelidadas = [l for l in linhas if alvo in (l.get("apelidos") or ())]
+    if apelidadas:
+        return apelidadas
 
     parciais = []
     for linha in linhas:

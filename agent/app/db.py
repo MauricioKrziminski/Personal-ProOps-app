@@ -924,7 +924,13 @@ async def accounts(workspace_id, *, only_cards: bool = False) -> list[dict[str, 
     # como injeção entra, mesmo quando hoje a variável é um bool nosso
     return await fetch(
         """
-        select id, name, type, closing_day, due_day, credit_limit_cents from public.accounts
+        select id, name, type, closing_day, due_day, credit_limit_cents,
+               -- apelidos aprendidos da conversa (`account_aliases`): `matching.match_accounts` os
+               -- casa como nome exato e o prompt os mostra ao lado do nome
+               coalesce((select array_agg(al.alias order by al.alias)
+                           from public.account_aliases al where al.account_id = accounts.id),
+                        '{}') as apelidos
+        from public.accounts
         where workspace_id = %s and archived = false
           and (%s = false or type = 'credit_card')
         order by name
@@ -1512,3 +1518,55 @@ async def gravar_vetores(linhas: list[dict[str, Any]], modelo: str) -> int:
             linha["transaction_id"], linha["workspace_id"], linha["vetor"], modelo, linha["hash"],
         )
     return len(linhas)
+
+
+# ---------------------------------------------------------------------------
+# ciclo de dados (`agent_feedback`) e apelidos de conta (`account_aliases`)
+# ---------------------------------------------------------------------------
+
+
+async def record_feedback(
+    pendente: dict[str, Any], outcome: str, revised_to: dict[str, Any] | None = None
+) -> None:
+    """Rótulo de um HITL resolvido. Best-effort: gravar nunca derruba o turno.
+
+    Tudo vem da própria pendência: `conversation._resposta_do_estado` guarda em
+    `action['feedback']` o texto, a proposta e as versões NO MOMENTO DA PERGUNTA (é o único instante
+    em que o turno que propôs ainda está à mão). Pendência sem essa chave (anterior ao deploy) não
+    gera linha. `pending_id` é único: contar a mesma pergunta duas vezes é impossível.
+    """
+    try:
+        fb = (pendente.get("action") or {}).get("feedback")
+        if not fb or not pendente.get("workspace_id"):
+            return
+        await execute(
+            """
+            insert into public.agent_feedback
+              (pending_id, workspace_id, user_id, channel, source_message_id, input_text, proposal,
+               summary, outcome, revised_to, prompt_versions, models)
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            on conflict (pending_id) do nothing
+            """,
+            pendente["id"], pendente["workspace_id"], pendente.get("user_id"),
+            fb.get("channel") or "whatsapp", fb.get("source_message_id"),
+            fb.get("input_text") or "", Jsonb(fb.get("proposal") or []),
+            pendente.get("summary"), outcome,
+            Jsonb(revised_to) if revised_to is not None else None,
+            Jsonb(fb.get("prompt_versions") or {}), Jsonb(fb.get("models") or {}),
+        )
+    except Exception:  # noqa: BLE001
+        log.warning("agent_feedback não gravado (%s)", outcome, exc_info=True)
+
+
+async def save_account_alias(workspace_id: Any, account_id: Any, alias: str) -> None:
+    """Grava `alias` (já normalizado) para a conta. A conta é conferida contra o WORKSPACE no
+    próprio insert (o serviço ignora RLS); o ensinamento mais recente do mesmo apelido vence."""
+    await execute(
+        """
+        insert into public.account_aliases (workspace_id, account_id, alias)
+        select a.workspace_id, a.id, %s from public.accounts a
+        where a.id = %s and a.workspace_id = %s
+        on conflict (workspace_id, alias) do update set account_id = excluded.account_id
+        """,
+        alias, account_id, workspace_id,
+    )

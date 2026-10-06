@@ -467,6 +467,10 @@ def linha_de_conta(conta: dict) -> str:
     partes = [" ".join(str(conta.get("name") or "").split()), _TIPO_DA_CONTA.get(conta.get("type"), str(conta.get("type") or ""))]
     if conta.get("type") == "credit_card" and conta.get("closing_day"):
         partes.append(f"fecha dia {conta['closing_day']}")
+    if conta.get("apelidos"):
+        # apelidos que a própria pessoa já usou para esta conta (ensinados em conversa); o nome
+        # que o modelo devolve continua sendo o EXATO da primeira coluna
+        partes.append("também chamada: " + ", ".join(str(a) for a in conta["apelidos"][:5]))
     return " | ".join(partes)
 
 

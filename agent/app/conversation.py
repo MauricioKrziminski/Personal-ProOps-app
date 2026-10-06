@@ -26,7 +26,7 @@ from app.config import get_settings
 from app.domain import confirm, draft, matching
 from app.domain.money import cents_to_brl
 from app.graph.state import CHAVE_MIDIA, marca_da_midia
-from app.security import effective_thread_id
+from app.security import effective_thread_id, sanitize_untrusted
 from app.services import consumo, gemini, telemetry
 
 log = logging.getLogger(__name__)
@@ -80,6 +80,69 @@ async def soltar_reserva() -> None:
     reserva_id = consumo.consumir_reserva()
     if reserva_id:
         await db.liberar_reserva(reserva_id)
+
+
+def _rotulo_da_pergunta(sessao: dict, estado: dict) -> dict | None:
+    """O que `agent_feedback` precisa saber, guardado em `pending_actions.action['feedback']`.
+
+    Gravado NA PERGUNTA, não na resposta: é o único instante em que o turno que PROPÔS ainda está
+    à mão (texto, ações, versões de prompt e modelos de cada nó). Quem resolve a pendência só vê o
+    clique. Nunca levanta: o rótulo é best-effort e não pode impedir a pergunta de sair.
+    """
+    try:
+        import json
+
+        from app.security import sanitize_untrusted
+
+        acoes = [a for chave in ("finance_actions", "notes_actions", "resource_actions")
+                 for a in (estado.get(chave) or [])]
+        chamadas = (consumo.atual().totais()["chamadas"]) if consumo.atual() else []
+        rotulo = {
+            "channel": _canal(sessao),
+            "source_message_id": estado.get("source_message_id"),
+            "input_text": sanitize_untrusted(estado.get("text")),
+            "proposal": acoes,
+            "prompt_versions": {c["no"]: c["versao_prompt"] for c in chamadas
+                                if c.get("no") and c.get("versao_prompt")},
+            "models": {c["no"]: c["modelo"] for c in chamadas if c.get("no") and c.get("modelo")},
+        }
+        return json.loads(json.dumps(rotulo, default=str, ensure_ascii=False))
+    except Exception:  # noqa: BLE001
+        log.warning("rótulo da pergunta não montado", exc_info=True)
+        return None
+
+
+def _proposta(estado: dict) -> list:
+    """As ações que o grafo propôs neste estado (para `revised_to`)."""
+    import json
+
+    acoes = [a for chave in ("finance_actions", "notes_actions", "resource_actions")
+             for a in (estado.get(chave) or [])]
+    return json.loads(json.dumps(acoes, default=str, ensure_ascii=False))
+
+
+async def _rotular(pendente: dict, outcome: str, revised_to: dict | None = None) -> None:
+    """`db.record_feedback` blindado: o rótulo nunca derruba o turno (nem o que montá-lo levantar)."""
+    try:
+        await db.record_feedback(pendente, outcome, revised_to)
+    except Exception:  # noqa: BLE001
+        log.warning("agent_feedback não gravado (%s)", outcome, exc_info=True)
+
+
+async def _aprender_apelido(sessao: dict, rascunho: dict, conta: dict) -> None:
+    """A pessoa citou um nome que não casou e ESCOLHEU a conta na pergunta: grava o apelido.
+
+    O texto citado é o que ficou no rascunho (`action.account`); a conta vem do clique (já conferida
+    contra a lista do workspace) ou do nome digitado que casou com UMA. Best-effort.
+    """
+    try:
+        alias = matching.alias_para_aprender(
+            (rascunho.get("action") or {}).get("account"), conta.get("name")
+        )
+        if alias:
+            await db.save_account_alias(sessao["workspace_id"], conta["id"], alias)
+    except Exception:  # noqa: BLE001
+        log.warning("apelido de conta não gravado", exc_info=True)
 
 
 def _canal(sessao: dict) -> str:
@@ -266,6 +329,7 @@ async def _run_turn(
         )
 
     revisao = isinstance(decisao, dict) and decisao.get("revise")
+    revisada = None
     if revisao:
         # A pessoa corrigiu a proposta que ainda NÃO foi executada ("comprei em 2x no
         # cartão"). Refazer o pedido com a correção é o único jeito de ela valer: o
@@ -280,6 +344,7 @@ async def _run_turn(
             # correção sozinha não diz o que registrar — mantém a proposta
             return await _fechar(sessao, uso, confirm.MANTIDA)
         await db.resolve_pending(pendente["id"], "expired")
+        revisada = pendente  # o feedback `revised` sai no fim, com a proposta nova junto
         correcao = conteudo.get("text", "")
         conteudo = {**conteudo, "text": f"{original}\n{correcao}",
                     "raw_texts": [original, correcao],
@@ -291,6 +356,7 @@ async def _run_turn(
             # não foi sim, não, nem escolha: a intenção mudou. Cancela a pergunta
             # e trata como mensagem nova — insistir prenderia a conversa.
             await db.resolve_pending(pendente["id"], "expired")
+            await _rotular(pendente, "expired")
         else:
             cadastro = str((pendente.get("action") or {}).get("action_type", "")).startswith("resource_")
             # O id CONGELADO vem de `pending_actions`, não de uma busca nova: é o
@@ -319,9 +385,9 @@ async def _run_turn(
             # Tem que vir ANTES de `_resposta_do_estado`: o índice parcial da
             # 0055 aceita UMA pendência aberta por sessão, e a pergunta seguinte
             # do resume colidiria com esta.
-            await db.resolve_pending(
-                pendente["id"], "approved" if decisao.get("approved") else "rejected"
-            )
+            desfecho = "approved" if decisao.get("approved") else "rejected"
+            await db.resolve_pending(pendente["id"], desfecho)
+            await _rotular(pendente, desfecho)
             if not cadastro:
                 await db.delete_draft(sessao["id"])
             # SÓ o que este turno gastou. O estado que volta do checkpoint ainda
@@ -435,6 +501,13 @@ async def _run_turn(
         estado = await graph().ainvoke(estado_inicial, config=config)
 
     await _audit(sessao, estado, uso)
+    if revisada:
+        # a pessoa corrigiu antes do SIM: a proposta velha é o erro, a nova é o rótulo certo
+        await _rotular(
+            revisada, "revised",
+            {"correction_text": sanitize_untrusted((conteudo.get("raw_texts") or [""])[-1]),
+             "proposal": _proposta(estado)},
+        )
     return await _resposta_do_estado(sessao, estado, thread)
 
 
@@ -594,6 +667,7 @@ async def _cartao_do_rascunho(
                 draft_id, contas, f"🤔 Ess{'e cartão' if so_cartoes else 'a conta'} não é seu. Qual deles?",
                 so_cartoes=so_cartoes,
             )
+        await _aprender_apelido(sessao, rascunho, escolhido)
         return {**decidido, "account": escolhido["name"]}, None
 
     nome = draft.nome_de_cartao(decidido.get("account"))
@@ -601,6 +675,7 @@ async def _cartao_do_rascunho(
         nome, contas, account_type="credit_card" if so_cartoes else None
     )
     if len(achados) == 1:
+        await _aprender_apelido(sessao, rascunho, achados[0])
         return {**decidido, "account": achados[0]["name"]}, None
     if achados:
         # Empate NUNCA vira escolha nossa: lançar no cartão errado é pior que uma
@@ -831,6 +906,8 @@ async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | 
                 "kind": pausa.get("kind"),
                 "purpose": pausa.get("purpose"),
                 "candidates": candidatos,
+                # o rótulo do ciclo de dados nasce aqui (ver `_rotulo_da_pergunta`)
+                **({"feedback": rotulo} if (rotulo := _rotulo_da_pergunta(sessao, estado)) else {}),
             },
             summary=pausa["summary"],
         )
