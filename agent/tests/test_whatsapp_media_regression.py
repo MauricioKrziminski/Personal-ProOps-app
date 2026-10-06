@@ -36,7 +36,7 @@ async def test_audio_baixa_transcreve_e_entrega_texto(monkeypatch):
     baixados: list[str] = []
     transcritos: list[bytes] = []
 
-    async def download(media_id):
+    async def download(media_id, **_kw):
         baixados.append(media_id)
         return b"\x00\x01ogg", "audio/ogg"
 
@@ -61,7 +61,7 @@ async def test_audio_baixa_transcreve_e_entrega_texto(monkeypatch):
 async def test_audio_sanitiza_a_transcricao(monkeypatch):
     """A transcrição é conteúdo do usuário: ela não pode fechar o envelope."""
 
-    async def download(media_id):
+    async def download(media_id, **_kw):
         return b"x", "audio/ogg"
 
     async def transcribe(audio):
@@ -78,7 +78,7 @@ async def test_audio_sanitiza_a_transcricao(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_imagem_valida_continua_em_base64(monkeypatch):
-    async def download(media_id):
+    async def download(media_id, **_kw):
         return b"\x89PNGfake", "image/png"
 
     monkeypatch.setattr(worker.whatsapp, "download_media", download)
@@ -95,7 +95,7 @@ async def test_imagem_valida_continua_em_base64(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_pdf_sem_legenda_ganha_instrucao_padrao(monkeypatch):
-    async def download(media_id):
+    async def download(media_id, **_kw):
         return b"%PDF-fake", "application/pdf"
 
     monkeypatch.setattr(worker.whatsapp, "download_media", download)
@@ -111,7 +111,7 @@ async def test_pdf_sem_legenda_ganha_instrucao_padrao(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_mime_fora_da_allowlist_e_recusado(monkeypatch):
-    async def download(media_id):
+    async def download(media_id, **_kw):
         return b"MZ", "application/x-msdownload"
 
     monkeypatch.setattr(worker.whatsapp, "download_media", download)
@@ -125,7 +125,7 @@ async def test_mime_fora_da_allowlist_e_recusado(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_anexo_acima_de_8mb_e_recusado(monkeypatch):
-    async def download(media_id):
+    async def download(media_id, **_kw):
         return b"\x00" * (worker.MAX_MEDIA_BYTES + 1), "image/png"
 
     monkeypatch.setattr(worker.whatsapp, "download_media", download)
@@ -164,7 +164,7 @@ async def test_audio_percorre_o_worker_inteiro_ate_o_motor(monkeypatch):
     vistos: list[dict] = []
     lote = _lote({"type": "audio", "audio": {"id": "media-9"}})
 
-    async def download(media_id):
+    async def download(media_id, **_kw):
         return b"\x00ogg", "audio/ogg"
 
     async def transcribe(audio):
@@ -224,3 +224,25 @@ async def test_audio_percorre_o_worker_inteiro_ate_o_motor(monkeypatch):
     assert vistos[0]["channel"] == "whatsapp"
     assert vistos[0]["source"] == "wamid.1", "a chave de idempotência é o id da Meta"
     assert ordem == ["done", "send"], "envio antes do done reprocessaria a mensagem"
+
+
+@pytest.mark.asyncio
+async def test_arquivo_grande_demais_vira_aviso_e_nao_nao_li(monkeypatch):
+    """Acima do teto o download para cedo; sem mais nada no lote, a resposta diz o porquê."""
+    from app.services import whatsapp
+
+    async def download(media_id, **_kw):
+        raise whatsapp.MidiaGrandeDemais("grande")
+
+    monkeypatch.setattr(worker.whatsapp, "download_media", download)
+    out = await worker._extract_batch(
+        _lote({"type": "image", "image": {"id": "img1", "mime_type": "image/jpeg"}})
+    )
+    assert out["grande_demais"] is True and out["media"] is None and out["text"] == ""
+
+    texto = await worker._extract_batch(
+        _lote({"type": "image", "image": {"id": "img1", "mime_type": "image/jpeg"}})
+        + [{"id": 2, "wa_message_id": "wamid.2", "phone": "5551999999999",
+            "payload": {"type": "text", "text": {"body": "gastei 30 no mercado"}}}]
+    )
+    assert texto["text"] == "gastei 30 no mercado" and not texto.get("grande_demais")

@@ -18,11 +18,15 @@ class Settings(BaseSettings):
     # exige de verdade é `db.open_pools()`, com mensagem própria.
     database_url: str = ""
     db_pool_min: int = 1
-    # Dimensionados junto com o `--concurrency` do Cloud Run (setup-gcp.sh): um turno
-    # segura 1 conexão de dados e 1 do checkpointer por vez, então concorrência
-    # maior que o pool só enfileira (PoolTimeout vira retry e paga o LLM de novo).
-    db_pool_max: int = 10
-    db_graph_pool_max: int = 6
+    # Dimensionados junto com o `--concurrency` e o `--max-instances` do Cloud Run
+    # (setup-gcp.sh). Duas forças puxam em sentidos opostos: pool pequeno demais enfileira
+    # (PoolTimeout vira retry e paga o LLM de novo); pool grande demais estoura o pooler do
+    # Supabase em modo SESSÃO (porta 5432), em que cada conexão do cliente segura uma do
+    # servidor e o teto do plano é baixo. O turno passa a maior parte do tempo esperando o
+    # Gemini, sem conexão nenhuma, então 5+3 atende os 10 turnos por instância, e 4 instâncias
+    # dão no máximo 32 conexões.
+    db_pool_max: int = 5
+    db_graph_pool_max: int = 3
     # Vazio = deixa o psycopg decidir (session pooler / conexão direta).
     # "0" desliga prepared statements, obrigatório atrás do transaction pooler.
     db_prepare_threshold: str = ""

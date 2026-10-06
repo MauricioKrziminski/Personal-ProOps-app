@@ -165,7 +165,7 @@ async def test_download_media_erro_4xx_nao_retenta(monkeypatch):
     assert len(n) == 1
 
 
-def test_typing_desligado_por_padrao(monkeypatch):
+def test_lida_mostra_digitando_e_desliga_por_env(monkeypatch):
     corpos = []
 
     def handler(req):
@@ -176,12 +176,13 @@ def test_typing_desligado_por_padrao(monkeypatch):
     monkeypatch.setenv("WHATSAPP_PHONE_NUMBER_ID", "1")
     get_settings.cache_clear()
     monkeypatch.delenv("WHATSAPP_TYPING_INDICATOR", raising=False)
-    asyncio.run(whatsapp.mark_read_typing("wamid"))
-    assert "typing_indicator" not in corpos[0]
-    monkeypatch.setenv("WHATSAPP_TYPING_INDICATOR", "true")
+    asyncio.run(whatsapp.mark_as_read("wamid"))
+    assert corpos[0]["typing_indicator"] == {"type": "text"}
+    assert corpos[0]["status"] == "read"
+    monkeypatch.setenv("WHATSAPP_TYPING_INDICATOR", "false")
     _cliente(monkeypatch, handler)
-    asyncio.run(whatsapp.mark_read_typing("wamid"))
-    assert corpos[1]["typing_indicator"] == {"type": "text"}
+    asyncio.run(whatsapp.mark_as_read("wamid"))
+    assert "typing_indicator" not in corpos[1]
 
 
 # ---------------------------------------------------------------- Groq

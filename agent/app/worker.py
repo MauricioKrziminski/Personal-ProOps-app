@@ -22,7 +22,7 @@ import base64
 import logging
 import re
 
-from app import conversation, db
+from app import conversation, db, logctx
 from app.config import get_settings
 from app.security import sanitize_untrusted
 from app.services import groq, whatsapp
@@ -40,6 +40,7 @@ SEM_CONTA = (
 SEM_WORKSPACE = "😕 Sua conta ainda não tem um espaço criado. Abre o app uma vez e me chama de novo!"
 NAO_LI = "🙈 Não consegui ler isso. Mando bem com texto, áudio, foto de cupom e PDF de fatura (até 8MB)."
 MUITAS = conversation.MUITAS
+GRANDE_DEMAIS = "📦 Esse arquivo é grande demais para eu ler. Manda uma foto ou um PDF menor (até 8 MB)."
 
 
 # Tarefas de devolução à fila em andamento: o loop só guarda referência fraca, e uma
@@ -65,7 +66,30 @@ async def _devolver_a_fila(ids: list, motivo: str) -> list[dict]:
 
 
 async def process_thread(thread_id: str) -> dict:
+    # Todo log do turno sai com a conversa: no Cloud Logging, filtrar por `thread_id` mostra o
+    # turno inteiro (fila, grafo, envio) em vez de linhas soltas de várias conversas.
+    with logctx.bind(thread_id=thread_id):
+        return await _process_thread(thread_id)
+
+
+FALHOU = "😕 Não consegui processar sua última mensagem. Pode mandar de novo?"
+
+
+async def _avisar_falhas(thread_id: str) -> None:
+    """Avisa UMA vez a falha definitiva — a do `mark_retry` e a do claim que recupera presa."""
+    try:
+        phone = await db.falhas_a_avisar(thread_id)
+        if phone:
+            await whatsapp.try_send(phone, FALHOU)
+    except Exception:  # noqa: BLE001 — aviso é best-effort; não derruba o turno
+        log.exception("aviso de falha não saiu (thread=%s)", thread_id)
+
+
+async def _process_thread(thread_id: str) -> dict:
     lote = await db.claim_batch(thread_id)
+    # O claim pode ter estourado o teto de uma mensagem presa: ela vira `failed` sem passar
+    # pelo `except` deste worker.
+    await _avisar_falhas(thread_id)
     if not lote:
         # ou outro worker está com a conversa, ou a task chegou depois de tudo
         # processado. Nos dois casos o certo é sair sem fazer nada.
@@ -73,7 +97,11 @@ async def process_thread(thread_id: str) -> dict:
 
     ids = [m["id"] for m in lote]
     phone = lote[-1]["phone"]
+    with logctx.bind(message_id=str(lote[-1].get("wa_message_id") or "")):
+        return await _turno_com_prazo(lote, ids, phone, thread_id)
 
+
+async def _turno_com_prazo(lote: list[dict], ids: list, phone: str, thread_id: str) -> dict:
     try:
         # Prazo do turno: abaixo dos 300 s do Cloud Run. Sem ele, um lote com
         # áudios e chamadas lentas passava do limite, o container era morto e a
@@ -84,13 +112,11 @@ async def process_thread(thread_id: str) -> dict:
     except Exception as err:  # noqa: BLE001
         log.exception("worker falhou (thread=%s)", thread_id)
         motivo = "prazo do turno estourou" if isinstance(err, TimeoutError) else repr(err)
-        estados = await _devolver_a_fila(ids, motivo)
-        # Sem "tenta de novo" para o usuário: a fila ainda vai tentar, e avisar de
-        # um erro que vai se resolver sozinho em 2s só gera desconfiança.
-        if any(e["status"] == "failed" for e in estados):
-            await whatsapp.try_send(
-                phone, "😕 Não consegui processar sua última mensagem. Pode mandar de novo?"
-            )
+        await _devolver_a_fila(ids, motivo)
+        # Sem "tenta de novo" para o usuário enquanto a fila ainda vai tentar: avisar de um
+        # erro que vai se resolver sozinho em 2s só gera desconfiança. Só a falha DEFINITIVA
+        # avisa, e pelo mesmo caminho da que nasce no claim.
+        await _avisar_falhas(thread_id)
         raise
     except BaseException:
         # CancelledError (cliente do Cloud Tasks desistiu, shutdown do container):
@@ -131,17 +157,24 @@ async def _processar(lote: list[dict], ids: list, phone: str, thread_id: str) ->
         )
 
     if resposta is None:
+        # Lida + "digitando…" ANTES de baixar mídia e transcrever: é a parte lenta do turno, e
+        # é nela que a pessoa precisa ver que foi entendida. Só a ÚLTIMA: marcar uma mensagem
+        # como lida marca as anteriores da conversa, e uma chamada por item custava até 20 s
+        # cada, em série.
+        ultima = lote[-1]
+        wa_mid = (ultima.get("payload") or {}).get("id") or ultima.get("wa_message_id")
+        if wa_mid:
+            await whatsapp.try_mark_read(str(wa_mid))
+
         conteudo = await _extract_batch(lote)
         if conteudo is None:
             await db.mark_done(ids)
             await whatsapp.try_send(phone, NAO_LI)
             return {"claimed": len(ids), "status": "ilegivel"}
-
-        # Feedback visual instantâneo: marca mensagens como lidas na Meta
-        for m in lote:
-            wa_mid = (m.get("payload") or {}).get("id") or m.get("wa_message_id")
-            if wa_mid:
-                await whatsapp.try_mark_read(str(wa_mid))
+        if conteudo.get("grande_demais"):
+            await db.mark_done(ids)
+            await whatsapp.try_send(phone, GRANDE_DEMAIS)
+            return {"claimed": len(ids), "status": "grande_demais"}
 
         resposta = await _run_graph(sessao, lote, conteudo)
 
@@ -171,6 +204,7 @@ async def _extract_batch(lote: list[dict]) -> dict | None:
     textos: list[str] = []
     media: dict[str, str] | None = None
     clicked_id: str | None = None
+    grande_demais = False
 
     for item in lote:
         mensagem = item["payload"]
@@ -201,7 +235,11 @@ async def _extract_batch(lote: list[dict]) -> dict | None:
         elif tipo == "audio":
             media_id = (mensagem.get("audio") or {}).get("id")
             if media_id:
-                audio, _ = await whatsapp.download_media(media_id)
+                try:
+                    audio, _ = await whatsapp.download_media(media_id)
+                except whatsapp.MidiaGrandeDemais:
+                    grande_demais = True
+                    continue
                 transcrito = await groq.transcribe(audio)
                 if transcrito:
                     textos.append(transcrito)
@@ -210,7 +248,11 @@ async def _extract_batch(lote: list[dict]) -> dict | None:
             anexo = mensagem.get(tipo) or {}
             if not anexo.get("id"):
                 continue
-            conteudo, mime = await whatsapp.download_media(anexo["id"])
+            try:
+                conteudo, mime = await whatsapp.download_media(anexo["id"], max_bytes=MAX_MEDIA_BYTES)
+            except whatsapp.MidiaGrandeDemais:
+                grande_demais = True
+                continue
             mime = anexo.get("mime_type") or mime
             if not VISION_MIME.match(mime) or len(conteudo) > MAX_MEDIA_BYTES:
                 continue
@@ -219,6 +261,9 @@ async def _extract_batch(lote: list[dict]) -> dict | None:
                 textos.append(anexo["caption"])
 
     if not textos and media is None:
+        if grande_demais:
+            return {"text": "", "media": None, "raw_texts": [], "clicked_id": clicked_id,
+                    "grande_demais": True}
         return None
 
     texto = sanitize_untrusted("\n".join(textos))

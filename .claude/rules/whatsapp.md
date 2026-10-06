@@ -6,7 +6,7 @@ paths:
 # WhatsApp — Meta Cloud API oficial
 
 **Decisão imutável: só a Meta Cloud API oficial. Nunca Baileys ou qualquer cliente não-oficial.**
-Graph API v21.0, helpers em `agent/app/services/whatsapp.py` (`send_text`, `send_template`,
+Graph API v25.0, helpers em `agent/app/services/whatsapp.py` (`send_text`, `send_template`,
 `send_auth_code`, `download_media`, `try_send`) e assinatura em `agent/app/security.py`.
 
 ## Webhook (`POST /whatsapp-inbound`)
@@ -18,7 +18,14 @@ Graph API v21.0, helpers em `agent/app/services/whatsapp.py` (`send_text`, `send
   sobre o corpo CRU, antes de qualquer parse. Assinatura inválida = 401.
 - **Dedupe** por `messages_queue.wa_message_id` unique, no MESMO insert que enfileira. Eram dois
   inserts sem transação, e a falha do segundo fazia a mensagem sumir para sempre.
-- Nunca propagar erro interno para a Meta (evita retry storm) — logar e responder 200.
+- Nunca propagar erro interno para a Meta (evita retry storm) — logar e responder 200. **A única
+  exceção é o `enqueue` falhar** (06/10/2026): aí a mensagem NÃO está na fila, e 200 a perderia
+  para sempre. A resposta é 503, a Meta reenvia, e o dedupe por `wa_message_id` torna o reenvio
+  seguro. Falha DEPOIS do enqueue (sessão, agendamento) continua 200: o sweep recupera.
+- **Lida + "digitando…" num POST só** (`mark_as_read`, `typing_indicator`), feito ANTES de baixar
+  mídia e transcrever — é a parte lenta do turno. Some quando a resposta sai ou em 25 s.
+  `WHATSAPP_TYPING_INDICATOR=false` desliga. Graph API na **v25.0** (a v21.0 expira em
+  21/01/2027).
 - **Debounce de 3s pelo Cloud Tasks**, nunca timer em memória: mensagens picotadas viram UM lote e
   UMA resposta, e o container continua podendo dormir.
 

@@ -12,6 +12,16 @@
 -- com `retry_count > 0`, cai na regra existente de que retentativa não se mistura
 -- com mensagem nova. Corpo copiado da 0040; só o bloco "recupera" é novo.
 
+-- Quem estoura o teto DENTRO do claim não passa pelo `except` do worker, que era o único lugar
+-- que avisava a pessoa ("Não consegui processar…"). O aviso agora sai de UMA consulta que o
+-- worker faz depois de todo claim, e a coluna garante que ele sai uma vez só por mensagem. As
+-- falhas antigas nascem avisadas: sem isso, o primeiro turno depois do deploy mandaria um aviso
+-- por cada falha do histórico.
+alter table public.messages_queue add column if not exists failed_notified_at timestamptz;
+update public.messages_queue
+set failed_notified_at = coalesce(processed_at, claimed_at, created_at)
+where status = 'failed' and failed_notified_at is null;
+
 create or replace function public.claim_thread_batch(p_thread_id text)
 returns setof public.messages_queue
 language plpgsql

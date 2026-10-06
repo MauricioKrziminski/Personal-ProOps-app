@@ -359,6 +359,24 @@ async def claim_batch(thread_id: str) -> list[dict[str, Any]]:
     )
 
 
+async def falhas_a_avisar(thread_id: str) -> str | None:
+    """Marca como avisadas as mensagens da thread que viraram `failed`; devolve o telefone, se havia.
+
+    Um UPDATE só: dois workers não avisam a mesma falha, e a falha vinda do claim (que recupera
+    `processing` preso) e a do `mark_retry` passam pelo mesmo aviso.
+    """
+    linhas = await fetch(
+        """
+        update public.messages_queue
+        set failed_notified_at = now()
+        where thread_id = %s and status = 'failed' and failed_notified_at is null
+        returning phone
+        """,
+        thread_id,
+    )
+    return linhas[-1]["phone"] if linhas else None
+
+
 async def mark_done(ids: list[UUID]) -> None:
     await execute(
         """

@@ -17,7 +17,10 @@ from app.domain.phone import candidates
 
 log = logging.getLogger(__name__)
 
-GRAPH_BASE = "https://graph.facebook.com/v21.0"
+# v25.0: a v21.0 expira em 21/01/2027 (changelog de versões da Graph API). Entre a v21 e a v25 o
+# changelog do WhatsApp só muda o webhook de STATUS (sem o objeto `conversation` desde a v24), que
+# este serviço não lê.
+GRAPH_BASE = "https://graph.facebook.com/v25.0"
 
 _client: httpx.AsyncClient | None = None
 
@@ -99,44 +102,23 @@ async def send_text(to: str, body: str) -> None:
 
 
 async def mark_as_read(wa_message_id: str) -> None:
-    """Marca mensagem como lida na Graph API (feedback visual instantâneo)."""
-    settings = get_settings()
-    if not settings.whatsapp_token or not settings.whatsapp_phone_number_id or not wa_message_id:
-        return
-    await client().post(
-        f"{GRAPH_BASE}/{settings.whatsapp_phone_number_id}/messages",
-        headers={"Authorization": f"Bearer {settings.whatsapp_token}"},
-        json={
-            "messaging_product": "whatsapp",
-            "status": "read",
-            "message_id": wa_message_id,
-        },
-    )
+    """Marca como lida e mostra "digitando…" enquanto o turno roda.
 
-
-async def mark_read_typing(wa_message_id: str) -> None:
-    """Marca como lida E mostra "digitando…" (`typing_indicator` junto do `status: read`).
-
-    ⚠️ DESLIGADO por padrão (env `WHATSAPP_TYPING_INDICATOR=true`). PRECISA SER CONFERIDO na
-    documentação da Meta antes de ligar: o formato do campo `typing_indicator` e a versão mínima
-    da Graph API não foram verificados — `GRAPH_BASE` está na v21.0 e pode ser preciso subir.
-    Desligado, cai no `mark_as_read` de sempre.
+    O `typing_indicator` vai no MESMO POST do `status: read` e some quando a resposta sai ou
+    em 25 s (developers.facebook.com/docs/whatsapp/cloud-api/typing-indicators). O turno leva
+    de 2 a 10 s, então a pessoa vê que foi entendida em vez de um silêncio.
+    `WHATSAPP_TYPING_INDICATOR=false` volta ao "lida" puro.
     """
-    if os.getenv("WHATSAPP_TYPING_INDICATOR", "").strip().lower() != "true":
-        await mark_as_read(wa_message_id)
-        return
     settings = get_settings()
     if not settings.whatsapp_token or not settings.whatsapp_phone_number_id or not wa_message_id:
         return
+    corpo = {"messaging_product": "whatsapp", "status": "read", "message_id": wa_message_id}
+    if os.getenv("WHATSAPP_TYPING_INDICATOR", "true").strip().lower() != "false":
+        corpo["typing_indicator"] = {"type": "text"}
     await client().post(
         f"{GRAPH_BASE}/{settings.whatsapp_phone_number_id}/messages",
         headers={"Authorization": f"Bearer {settings.whatsapp_token}"},
-        json={
-            "messaging_product": "whatsapp",
-            "status": "read",
-            "message_id": wa_message_id,
-            "typing_indicator": {"type": "text"},
-        },
+        json=corpo,
     )
 
 

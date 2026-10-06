@@ -64,6 +64,11 @@ def _preparar(monkeypatch, lote, *, run_turn, recover=None):
     monkeypatch.setattr(worker.db, "ensure_session", ensure_session)
     monkeypatch.setattr(worker.db, "mark_retry", mark_retry)
     monkeypatch.setattr(worker.db, "mark_done", mark_done)
+
+    async def sem_falha(_t):
+        return None
+
+    monkeypatch.setattr(worker.db, "falhas_a_avisar", sem_falha)
     monkeypatch.setattr(worker.whatsapp, "try_send", sem_envio)
     monkeypatch.setattr(worker.whatsapp, "try_mark_read", sem_envio)
     monkeypatch.setattr(worker, "_extract_batch", extract)
@@ -73,6 +78,26 @@ def _preparar(monkeypatch, lote, *, run_turn, recover=None):
     if recover is not None:
         monkeypatch.setattr(conversation, "recover_turn", recover)
     return devolvidos
+
+
+async def test_falha_definitiva_do_claim_avisa_uma_vez(monkeypatch):
+    """A mensagem presa que estoura o teto vira `failed` DENTRO do claim: o lote volta vazio e,
+    mesmo assim, a pessoa é avisada — e uma vez só (a consulta marca como avisada)."""
+    _preparar(monkeypatch, [], run_turn=None)
+    enviados: list[tuple] = []
+    falhas = ["5551"]
+
+    async def falhas_a_avisar(_t):
+        return falhas.pop() if falhas else None
+
+    async def envia(phone, texto):
+        enviados.append((phone, texto))
+
+    monkeypatch.setattr(worker.db, "falhas_a_avisar", falhas_a_avisar)
+    monkeypatch.setattr(worker.whatsapp, "try_send", envia)
+    assert await worker.process_thread("t1") == {"claimed": 0}
+    assert await worker.process_thread("t1") == {"claimed": 0}
+    assert enviados == [("5551", worker.FALHOU)]
 
 
 def _msg(retry=0):

@@ -333,10 +333,14 @@ deploy() {
   # em /worker e /cron, standardwebhooks no OTP. Ver agent/app/security.py.
   #
   # --concurrency 10: o trabalho é I/O e o event loop aguentaria mais, mas cada
-  # turno segura conexão do pool de dados (DB_POOL_MAX=10) e do checkpointer
-  # (DB_GRAPH_POOL_MAX=6) por vários segundos. Com 80, o pool esgotava, o
-  # PoolTimeout virava retry e a chamada ao LLM era paga de novo. 10 por instância
-  # cabe nos pools; a vazão vem do --max-instances.
+  # turno disputa o pool de dados (DB_POOL_MAX=5) e o do checkpointer
+  # (DB_GRAPH_POOL_MAX=3). Com 80, o pool esgotava, o PoolTimeout virava retry e a
+  # chamada ao LLM era paga de novo.
+  #
+  # --max-instances 4: o banco é o pooler do Supabase em modo SESSÃO, em que cada
+  # conexão aberta aqui segura uma do servidor. 4 × (5+3) = 32 no pior caso; 10
+  # instâncias dariam 80 e estourariam o teto do plano antes de faltar vazão
+  # (40 turnos simultâneos é muito mais do que o produto tem).
   #
   # --min-instances 0 é o scale-to-zero pedido. Ele só é possível porque o
   # debounce mora no Cloud Tasks e não em timer de memória.
@@ -373,7 +377,7 @@ deploy() {
     --service-account "$SA_EMAIL" \
     --allow-unauthenticated \
     --min-instances 0 \
-    --max-instances 10 \
+    --max-instances 4 \
     --concurrency 10 \
     --cpu 1 --memory 1Gi \
     --timeout 300 \
