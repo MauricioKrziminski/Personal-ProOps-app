@@ -51,6 +51,24 @@ def sem_conta_explicita(texto: str | None) -> bool:
     return normalize(texto) in {"sem conta", "nenhuma conta", "sem nenhuma conta"}
 
 
+_ULTIMO_DIA_PALAVRAS = {
+    "ultimo", "ultimo dia", "ultimo dia do mes", "fim do mes", "fim de mes", "final do mes",
+}
+_ULTIMO_DIA_RRULE = re.compile(r"BYMONTHDAY=-1(;|$)", re.IGNORECASE)
+
+
+def ultimo_dia_do_mes(valor: str | None) -> bool:
+    """"Último dia do mês", do jeito que chegar: a palavra do usuário ou a RRULE `BYMONTHDAY=-1`.
+
+    UMA régua para todos os caminhos (dia de fechamento do mês, vencimento de dívida, parcelas da
+    compra): antes cada um tinha o seu conjunto de grafias e um aceitava o que o outro recusava.
+    Estrutura e vocabulário fechado — quem decide que a pessoa pediu fim de mês é o modelo.
+    """
+    if not valor:
+        return False
+    return normalize(valor) in _ULTIMO_DIA_PALAVRAS or bool(_ULTIMO_DIA_RRULE.search(valor))
+
+
 _PALAVRAS_DE_TIPO = {"cartao", "cartoes", "credito", "debito", "conta", "corrente", "de", "do", "da"}
 
 

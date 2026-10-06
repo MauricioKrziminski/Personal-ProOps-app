@@ -404,15 +404,26 @@ async def test_existing_debt_paid_count_requires_explicit_remaining_baseline(mon
         await resources.prepare(ctx, action)
 
 
-def test_numeric_bound_precedes_model_date_scope():
+def test_model_scope_precedes_the_text():
+    """M4: o escopo do modelo manda; "até a 3 de agosto" é data, não `first:3`."""
     from app.domain.installment_scope import scope_from_text
     from app.graph.schemas import InstallmentScope
 
-    scope = scope_from_text(
-        "as primeiras 8 do carro",
-        InstallmentScope(mode="dates", through_date="2099-01-01"),
-    )
-    assert scope.mode == "first" and scope.count == 8
+    dates = InstallmentScope(mode="dates", through_date="2026-08-03")
+    assert scope_from_text("paguei até a 3 de agosto", dates) is dates
+    first = InstallmentScope(mode="first", count=8)
+    assert scope_from_text("as primeiras 5 do carro", first) is first
+
+
+def test_text_is_the_safety_net_when_the_model_omits_or_says_all():
+    from app.domain.installment_scope import scope_from_text
+    from app.graph.schemas import InstallmentScope
+
+    omitted = scope_from_text("as primeiras 8 do carro", None)
+    assert omitted.mode == "first" and omitted.count == 8
+    # número explícito vence um `all` acidental
+    accidental_all = scope_from_text("as primeiras 8 do carro", InstallmentScope(mode="all"))
+    assert accidental_all.mode == "first" and accidental_all.count == 8
 
 
 @pytest.mark.asyncio

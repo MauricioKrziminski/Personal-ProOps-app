@@ -838,7 +838,7 @@ async def for_actions(
         elif (acao.type == FinanceActionType.UPDATE_TRANSACTION and acao.new_account
               and not e_conversao(acao)):
             name = acao.new_account
-            if matching.normalize(name) in {"sem conta", "nenhuma conta"}:
+            if matching.sem_conta_explicita(name):
                 resolved["new_account"] = {"id": None, "name": "Sem conta"}
             else:
                 accounts = await db.accounts(workspace_id)
@@ -870,7 +870,7 @@ async def _opcoes_de_conta(workspace_id, nome: str) -> dict:
     o nome citado numa correção da compra inteira: `{"new_account_opcoes": [...]}`, ou
     `{"correction_error": ...}` quando nenhuma casa. Mais de uma NÃO é erro aqui: se a
     compra já está numa delas, é descrição (`policy.conta_nova_do_plano`)."""
-    if matching.normalize(nome) in {"sem conta", "nenhuma conta"}:
+    if matching.sem_conta_explicita(nome):
         # a RPC recusa zerar a conta de uma compra que tem conta (o cartão viraria despesa solta)
         return {"correction_error": "Uma compra parcelada precisa de uma conta. Diga qual." + NADA}
     contas = await db.accounts(workspace_id)

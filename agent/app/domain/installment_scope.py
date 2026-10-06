@@ -10,12 +10,16 @@ from app.graph.schemas import InstallmentScope
 def scope_from_text(
     text: str, parsed: InstallmentScope | None = None
 ) -> InstallmentScope | None:
+    # O escopo que o MODELO leu manda ("paguei até a 3 de agosto" é `dates`, não `first:3`). O texto
+    # só entra quando ele OMITIU, ficou em dúvida ou disse `all` — essa é a rede de segurança de
+    # dinheiro, exceção declarada: número explícito na frase vence um `all` acidental.
+    if parsed and parsed.mode not in ("all", "unclear"):
+        return parsed
     text = "".join(
         c
         for c in unicodedata.normalize("NFD", text.lower())
         if not unicodedata.combining(c)
     )
-    # Explicit numbers outrank a model's accidental `all`.
     patterns = [
         (
             r"(?:primeiras?\s+(\d+)|(\d+)\s+(?:parcelas?\s+)?(?:anteriores|primeiras))",
@@ -46,8 +50,6 @@ def scope_from_text(
     )
     if span:
         return InstallmentScope(mode="range", start=int(span[1]), end=int(span[2]))
-    if parsed and parsed.mode != "all":
-        return parsed
     if re.search(r"\b(anteriores|primeiras|ultimas|ate|entre)\b", text) or re.search(
         r"\d+\s+parcelas?", text
     ):

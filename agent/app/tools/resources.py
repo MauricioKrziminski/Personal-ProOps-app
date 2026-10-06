@@ -20,6 +20,7 @@ from app.domain.dates import format_date_br, now_utc, to_instant, local_iso_date
 from app.domain.money import cents_to_brl, MAX_CENTS
 from app.domain.recurrence import descreve_rrule, next_occurrence
 from app.domain.categories import normalize
+from app.domain.matching import ultimo_dia_do_mes
 from app.graph.schemas import ResourceAction, ResourceActionType as Op
 from app.tools.base import ExecContext, ToolResult, ensure_owned, request_id
 from app.tools.guards import Level1Error, clean_rrule
@@ -452,8 +453,7 @@ def validate_fields(action: ResourceAction) -> dict:
             # dois casos. Medido: "muda meu ciclo", sem dia nenhum, virava
             # *"⚠️ Confirma seu mês volta a fechar no último dia do mês?"*. O
             # agente escolhia o valor e pedia para confirmar a escolha DELE.
-            if normalize(value) in {"ultimo", "ultimo dia", "ultimo dia do mes",
-                                    "fim do mes", "final do mes", "padrao", "normal"}:
+            if ultimo_dia_do_mes(value) or normalize(value) in {"padrao", "normal"}:
                 values[key] = None
                 # Marca que o `None` VEIO DE UMA PALAVRA. `_preparar_mes` a
                 # consome e remove — ela nunca chega ao UPDATE.
@@ -476,10 +476,7 @@ def validate_fields(action: ResourceAction) -> dict:
             "installments_paid",
             "priority",
         }:
-            if key == "due_day" and action.resource == "debts" and normalize(value) in {
-                "ultimo", "último", "ultimo dia", "último dia", "ultimo dia do mes",
-                "último dia do mês", "fim do mes", "fim do mês", "final do mes", "final do mês"
-            }:
+            if key == "due_day" and action.resource == "debts" and ultimo_dia_do_mes(value):
                 values[key] = -1
                 continue
             try:
