@@ -5,8 +5,10 @@ tag são do Gabriel. Conferido em leitura em 05/10/2026: produção está em `20
 **42 migrations pendentes** (`20261002134032` … `20261005220000`), nenhuma só no remoto.
 
 Versão: `1.6.3 → 1.7.0` (MINOR: funcionalidade nova e RPCs novas; sem quebra — as migrations são
-aditivas e o agente continua aceitando o contrato anterior). Sem mudança nativa: a 1.7.0 fecha o
-OTA para a 1.6.x e sai como build nova pela tag.
+aditivas e o agente continua aceitando o contrato anterior). **Tem mudança nativa**: a splash do
+`app.json` passou a ser só a tinta (a marca se desenha na cortina, 06/10/2026). Este JS sai SÓ
+como build nova pela tag — nunca por `publish-android-ota.yml` para a 1.6.x, que mostraria a marca
+pronta e a redesenharia. A 1.7.0 fecha o OTA para a 1.6.x.
 
 ## Decisões tomadas
 
