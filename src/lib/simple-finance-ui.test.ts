@@ -183,6 +183,10 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
     useImportBatches: (limite?: number) => { pedidosDeLimite.push(['batches', limite]); return { ...query, isSuccess: true, data: options.batches ?? [] }; },
     useAlertsSent: (limite?: number) => { pedidosDeLimite.push(['alerts', limite]); return { ...query, isSuccess: true, data: options.alerts ?? [] }; },
     useInstallmentPlans: () => ({ ...query, isSuccess: true, data: options.plans ?? [] }),
+    // Os três vizinhos enxutos do detalhe: desligados (sem o vínculo) ficam `idle` e pendentes, como no TanStack.
+    useInstallmentPlanResumo: (id?: string | null) => id ? ({ ...query, isSuccess: true, data: (options.plans ?? []).find((p: any) => p.id === id) ?? null, refetch: async () => { refetches.push('plan'); } }) : ({ ...query, isPending: true, fetchStatus: 'idle', data: undefined }),
+    useRecurringSerie: (id?: string | null) => id ? ({ ...query, isSuccess: true, data: (options.recurring ?? []).find((r: any) => r.id === id) ?? null, refetch: async () => { refetches.push('serie-do-lancamento'); } }) : ({ ...query, isPending: true, fetchStatus: 'idle', data: undefined }),
+    useInvoiceHead: (id?: string) => id ? ({ ...query, isSuccess: true, data: { reference_month: '2026-08-01', due_date: '2026-08-20' }, refetch: async () => { refetches.push('invoice-head'); } }) : ({ ...query, isPending: true, fetchStatus: 'idle', data: undefined }),
     useUpdateInstallmentPlan: () => mutation('updateInstallmentPlan'),
     useInstallmentPlan: (id?: string) => ({ ...query, isPending: Boolean(options.plansPending), isSuccess: !options.plansPending && !options.plansError, isError: Boolean(options.plansError), refetch: async () => { refetches.push('plan'); }, data: (options.plans ?? []).find((p: any) => p.id === id) ?? null }),
     useGoalContributions: () => ({ ...query, isSuccess: true, data: options.contributions ?? [] }),
@@ -7832,4 +7836,23 @@ test('F22: favorito ou cópia com a conta arquivada abre com o campo vazio, o av
   assert.equal(ui.nodes().find((n: any) => n.type === 'PaymentMethodField')?.props.error, undefined, 'a conta que saiu não vira erro escondido');
   const salvar = ui.nodes().find((n: any) => n.type === 'Button' && n.props.label === 'Salvar');
   assert.notEqual(salvar?.props.disabled, true, 'o Salvar não fica preso a uma conta que a pessoa não vê');
+});
+
+test('detalhe do lançamento: sem fatura, compra nem série as consultas desligadas não prendem o esqueleto', () => {
+  const ui = screen('src/app/finance/[txId].tsx', { params: { txId: 'tx-1' } });
+  assert.ok(ui.nodes().find((n: any) => n.type === 'HeaderActions'), 'o detalhe abre, sem esqueleto à espera das três');
+  assert.ok(!ui.nodes().some((n: any) => n.type === 'Skeleton'));
+  // Puxar para atualizar refaz só o item: não há fatura, compra nem série para refazer.
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'Screen').props.onRefresh());
+  assert.deepEqual(ui.refetches, ['transaction']);
+});
+
+test('detalhe do lançamento: fatura e série enxutas desenham o "Faz parte de" e entram no refresh', () => {
+  const tx = { id: 'tx-9', kind: 'expense', amount_cents: 4500, occurred_at: '2026-09-15', description: 'Assinatura', category: 'lazer', account_id: null, status: 'cleared', source: 'app', created_at: '2026-09-15T12:00:00Z', recurring_id: 's1', installment_plan_id: null, invoice_id: 'inv-1', debt_id: null };
+  const ui = screen('src/app/finance/[txId].tsx', { txs: [tx], params: { txId: 'tx-9' }, recurring: [{ id: 's1', rrule: 'FREQ=MONTHLY', amount_cents: 4500 }] });
+  const rows = ui.nodes().filter((n: any) => n.type === 'Row').map((n: any) => n.props.title);
+  assert.ok(rows.some((t: string) => /^Fatura de /.test(t)), 'fatura pelo cabeçalho enxuto');
+  assert.ok(rows.some((t: string) => /^Repete /.test(t)), 'série pelo id');
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'Screen').props.onRefresh());
+  assert.deepEqual(ui.refetches.sort(), ['invoice-head', 'serie-do-lancamento', 'transaction']);
 });

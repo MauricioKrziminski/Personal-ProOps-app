@@ -30,10 +30,10 @@ import {
   useAparencia,
   useCategoriesUsed,
   useDeleteTransaction,
-  useInvoice,
+  useInvoiceHead,
   useDeleteInstallmentPlan,
-  useInstallmentPlan,
-  useRecurringTransactions,
+  useInstallmentPlanResumo,
+  useRecurringSerie,
   useSaveTransaction,
   useTransaction,
   type Transaction,
@@ -116,12 +116,13 @@ export default function TransactionDetailScreen() {
   // escondiam as que ele usa ("roupa", "eletrônicos") justamente onde ele ia trocá-las.
   const categoriasUsadas = useCategoriesUsed();
   const aparencia = useAparencia();
-  const invoice = useInvoice(tx?.invoice_id ?? undefined);
-  // A compra DESTA parcela, pelo id — procurá-la na lista de todas era carregar todas para achar uma.
-  const plans = useInstallmentPlan(tx?.installment_plan_id);
+  // Só o que o detalhe desenha de cada vizinho, cada um pelo id e numa ida: a fatura (mês e
+  // vencimento), a compra desta parcela e a série. Cada uma só liga se o lançamento tem o vínculo.
+  const invoice = useInvoiceHead(tx?.invoice_id ?? undefined);
+  const plans = useInstallmentPlanResumo(tx?.installment_plan_id);
   const plano = plans.data ?? undefined;
-  const series = useRecurringTransactions();
-  const serie = (series.data ?? []).find((r) => r.id === tx?.recurring_id);
+  const series = useRecurringSerie(tx?.recurring_id);
+  const serie = series.data ?? undefined;
   const removePlan = useDeleteInstallmentPlan();
   const salvarFavorito = useSalvarFavorito();
   const nomeDoFavorito = useNomeDoFavorito();
@@ -129,7 +130,13 @@ export default function TransactionDetailScreen() {
   const remove = useDeleteTransaction();
   // "Paguei" confirma o valor numa folha curta (25/09/2026). Dada a baixa, volta para a lista.
   const baixa = useConfirmarBaixa({ aoConcluir: () => router.back() });
-  const refresh = () => Promise.all([list.refetch(), accounts.refetch(), tx?.invoice_id ? invoice.refetch() : Promise.resolve(), plans.refetch()]);
+  // `refetch` ignora `enabled`: só refaz o que o lançamento realmente tem.
+  const refresh = () => Promise.all([
+    list.refetch(),
+    tx?.invoice_id ? invoice.refetch() : null,
+    tx?.installment_plan_id ? plans.refetch() : null,
+    tx?.recurring_id ? series.refetch() : null,
+  ]);
 
   const accountLabel = tx?.account_id
     ? ((accounts.data ?? []).find((a) => a.id === tx.account_id)?.name ?? null)
@@ -226,12 +233,13 @@ export default function TransactionDetailScreen() {
   };
 
   /*
-    O PORTÃO DA TELA (Fase 5) — 5 consultas e UM portão, que era a pior proporção das telas
-    empurradas: o valor e a descrição apareciam e, depois, o nome da conta, a fatura em que a
-    compra caiu e a série da recorrência entravam um a um por cima.
+    O PORTÃO DA TELA (Fase 5) — um portão para não entrarem em pipoca o nome da conta, a fatura em
+    que a compra caiu e a série da recorrência. Ele continua, mas é RÁPIDO: o item nasce da lista
+    em cache (sem ida), e fatura, compra e série são consultas enxutas por id que partem juntas,
+    uma ida cada. O custo aceito: sem a linha na lista, o item ainda precede as três (cascata).
 
-    ⚠️ **`invoice` nasce desligada** quando o lançamento não é de cartão (`enabled:
-    Boolean(invoiceId)`), e é justamente por isso que `telaPronta` lê `fetchStatus`: sem isso,
+    ⚠️ **`invoice`, `plans` e `series` nascem desligadas** quando o lançamento não tem o vínculo
+    (`enabled: Boolean(id)`), e é justamente por isso que `telaPronta` lê `fetchStatus`: sem isso,
     todo lançamento em dinheiro ficaria no skeleton para sempre.
   */
   const pronta = useTelaPronta(list, accounts, invoice, plans, series);
@@ -394,11 +402,11 @@ export default function TransactionDetailScreen() {
             <Row
               title={
                 invoice.data
-                  ? `Fatura de ${monthTitle(invoice.data.invoice.reference_month.slice(0, 7))}`
+                  ? `Fatura de ${monthTitle(invoice.data.reference_month.slice(0, 7))}`
                   : 'Fatura do cartão'
               }
               subtitle={
-                invoice.data ? `vence ${formatDateBR(invoice.data.invoice.due_date)}` : 'Ver fatura'
+                invoice.data ? `vence ${formatDateBR(invoice.data.due_date)}` : 'Ver fatura'
               }
               icon="creditcard"
               accessibilityLabel="Ver a fatura em que essa compra caiu"

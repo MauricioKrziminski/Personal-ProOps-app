@@ -30,6 +30,7 @@ import { NO_CATEGORY } from '@/lib/spending-change';
 import { toIlikeTerm } from '@/lib/search';
 import { dateWindows, timestampDateBounds, type ListFiltersValue } from '@/lib/list-filters';
 import { ACCOUNT_TYPES } from '@/lib/accounts';
+import { acharLinhaNoCache } from '@/lib/linha-do-cache';
 import { adiantaveisNoMes, type Adiantavel, type EscolhaDeAdiantamento } from '@/lib/anticipation';
 import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
 import { filtroDoEstado } from '@/lib/data-da-compra';
@@ -734,6 +735,24 @@ export function useRecurringTransactions() {
   });
 }
 
+/** UMA série, pelo id, só com o que o detalhe do lançamento desenha (regra e valor). */
+export function useRecurringSerie(id: string | null | undefined) {
+  useRealtimeInvalidate('recurring_transactions', ['recurring']);
+  return useQuery({
+    queryKey: ['recurring', 'serie', id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('recurring_transactions')
+        .select('rrule, amount_cents')
+        .eq('id', id!)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useBudgets() {
   useRealtimeInvalidate('budgets', ['budgets']);
   return useQuery({
@@ -757,9 +776,25 @@ export function useBudgets() {
  * de CRIAÇÃO em silêncio, gerando um lançamento duplicado.
  */
 export function useTransaction(id: string | undefined) {
+  const client = useQueryClient();
+  /*
+    Nasce da lista, se a linha já veio por ela: tocar num lançamento da Hoje, do Financeiro ou de
+    Lançamentos abria o detalhe do zero, com a linha a um toque de distância na memória. A
+    semente leva a data de atualização da lista, então o `staleTime` decide o refetch — e o que a
+    lista não traz (o join `debts`) faz `acharLinhaNoCache` recusar a semente.
+  */
+  const semente = () => {
+    if (!id) return undefined;
+    const cache = client.getQueryCache();
+    const entradas = [...cache.findAll({ queryKey: ['transactions', 'list'] }), ...cache.findAll({ queryKey: ['transactions', 'recent'] })]
+      .map((q) => ({ data: q.state.data, updatedAt: q.state.dataUpdatedAt, invalidada: q.state.isInvalidated }));
+    return acharLinhaNoCache<Transaction>(entradas, id);
+  };
   return useQuery({
     queryKey: ['transactions', 'item', id],
     enabled: !!id,
+    initialData: () => semente()?.linha,
+    initialDataUpdatedAt: () => semente()?.updatedAt,
     queryFn: async (): Promise<Transaction | null> => {
       // `maybeSingle`, não `single`: linha apagada é um estado NORMAL desta tela
       // (o usuário acabou de apagar e o realtime invalidou antes do `back()`).
@@ -891,6 +926,35 @@ export function invoiceQuery(invoiceId: string) {
       };
     },
   };
+}
+
+/**
+ * Só o cabeçalho da fatura (mês e vencimento) — o que o detalhe do lançamento desenha. `useInvoice`
+ * traz as compras e os pagamentos inteiros, e para dizer "Fatura de agosto" isso era baixar a fatura
+ * toda. Se a fatura completa já está em cache, dela nasce.
+ */
+export function useInvoiceHead(invoiceId: string | undefined) {
+  const client = useQueryClient();
+  const daFatura = () => client.getQueryState<{ invoice: CardInvoice }>(['invoice', invoiceId ?? '']);
+  useRealtimeInvalidate('card_invoices', ['invoice']);
+  return useQuery({
+    queryKey: ['invoice', 'head', invoiceId],
+    enabled: Boolean(invoiceId),
+    initialData: () => {
+      const i = daFatura()?.data?.invoice;
+      return i ? { reference_month: i.reference_month, due_date: i.due_date } : undefined;
+    },
+    initialDataUpdatedAt: () => daFatura()?.dataUpdatedAt,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('card_invoices')
+        .select('reference_month, due_date')
+        .eq('id', invoiceId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
 }
 
 export function useInvoice(invoiceId: string | undefined) {
@@ -4179,6 +4243,28 @@ export function useInstallmentPlan(id: string | null | undefined) {
     queryKey: ['installments', 'plan', id],
     enabled: !!id,
     queryFn: async () => (await buscarPlanos(id!))[0] ?? null,
+  });
+}
+
+/**
+ * O resumo da compra de uma parcela, numa ida só — o detalhe do lançamento. `useInstallmentPlan`
+ * calcula pago, travadas e próxima (parcelas + faturas fechadas: três consultas em série), e o
+ * detalhe só escreve "Parcela N de M", o total e a data da compra.
+ */
+export function useInstallmentPlanResumo(id: string | null | undefined) {
+  useRealtimeInvalidate('installment_plans', ['installments']);
+  return useQuery({
+    queryKey: ['installments', 'resumo', id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('installment_plans')
+        .select('description, merchant, total_cents, installments, first_occurred_at')
+        .eq('id', id!)
+        .maybeSingle();
+      if (error) throw error;
+      return data && { ...data, title: data.description || data.merchant || 'Compra parcelada' };
+    },
   });
 }
 

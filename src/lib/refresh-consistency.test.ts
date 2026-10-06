@@ -1185,3 +1185,20 @@ test('F08 fresh editor read preserves explicit workspace, draft and cancellation
     offline = true;await assert.rejects(hooks.fetchGoalPlanning(3650, 'cycle', 'month', null, ws), /read failed/);
   } finally { client.clear(); }
 });
+
+test('detalhe do lançamento: o item nasce da lista em cache, e pagamento de dívida não', () => {
+  const client = new QueryClient();
+  const linha = { id: 'a', amount_cents: 100 };
+  client.setQueryData(['transactions', 'list', {}], { pages: [[linha]], pageParams: [0] });
+  client.setQueryData(['transactions', 'recent', '5', '2026-10-05'], [{ id: 'd', debt_id: 'x' }]);
+  const hooks = loadHooks(client, 'src/hooks/use-finance.ts', {
+    '@tanstack/react-query': { useQuery: (options: any) => options, useQueryClient: () => client },
+    '@/hooks/use-items': { useRealtimeInvalidate: () => undefined },
+  });
+  const item = hooks.useTransaction('a');
+  assert.equal(item.initialData().id, 'a');
+  assert.equal(item.initialDataUpdatedAt(), client.getQueryState(['transactions', 'list', {}])!.dataUpdatedAt);
+  assert.equal(hooks.useTransaction('d').initialData(), undefined, 'o join debts só vem do detalhe');
+  client.invalidateQueries({ queryKey: ['transactions'], refetchType: 'none' });
+  assert.equal(hooks.useTransaction('a').initialData(), undefined, 'lista invalidada não semeia');
+});
