@@ -92,7 +92,11 @@ export function MarcaSeConstruindo({
         </SkiaCanvas>
       </Animated.View>
       <Animated.View style={[styles.nome, nomeStyle]}>
-        <ThemedText type="title" themeColor="onCurtain">
+        {/* ⚠️ Largura do PALCO, nunca a do texto (06/10/2026, "ProOp" no iPhone): a cortina
+            abre antes de a fonte carregar, o texto era medido na substituta (mais estreita) e
+            desenhado na Plus Jakarta — a caixa ficava curta e o "s" sumia. Esticado e
+            centralizado, a caixa não depende dessa medida. */}
+        <ThemedText type="title" themeColor="onCurtain" style={styles.nomeTexto}>
           ProOps
         </ThemedText>
       </Animated.View>
@@ -109,6 +113,7 @@ const styles = StyleSheet.create({
     top: LADO + Space.md,
     left: -80,
     right: -80,
-    alignItems: 'center',
+    alignItems: 'stretch',
   },
+  nomeTexto: { textAlign: 'center' },
 });
