@@ -37,6 +37,24 @@ async def detalhes_da_categoria(workspace_id, parent: str) -> list[dict]:
     )
 
 
+async def detalhes_do_espaco(workspace_id) -> list[dict]:
+    """Os detalhes (subcategorias) do espaço, por categoria-pai, para o prompt do parse.
+
+    Era a segunda leitura que via esta lista; com os atributos no parse principal, sem ela "gastei
+    45 na feira" só acertava o detalhe "feira" se o modelo adivinhasse o nome.
+    """
+    return await db.fetch(
+        "select parent_key, name from public.subcategories where workspace_id = %s "
+        "order by parent_key, name limit %s",
+        workspace_id, TETO_DE_DETALHES_NO_PROMPT,
+    )
+
+
+# Teto da lista no prompt: o espaço com mais detalhes do staging tem bem menos; acima disso a
+# lista custa token em toda mensagem de gasto e o casamento no código (`escolher_detalhe`) segue.
+TETO_DE_DETALHES_NO_PROMPT = 80
+
+
 async def escolher_detalhe(workspace_id, parent: str, dito: str) -> tuple[dict | None, str | None]:
     """O detalhe pelo NOME dentro da categoria-pai: igual primeiro, depois "contém".
 

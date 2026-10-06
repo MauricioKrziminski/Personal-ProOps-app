@@ -121,3 +121,18 @@ async def test_o_no_de_consulta_manda_as_contas_ao_modelo(monkeypatch):
     })
 
     assert "Nubank Cartão | cartão de crédito | fecha dia 3" in recebido[0][1][1]
+
+
+def test_detalhes_existentes_vao_ao_parse_envelopados_por_categoria():
+    """Sem a lista, o detalhe "feira" só saía se o modelo adivinhasse o nome; o código só aceita o
+    nome exato de um existente quando a pessoa não escreveu "detalhe X"."""
+    turno = user_turn(
+        "gastei 45 na feira", "2026-10-06T14:00:00-03:00", "America/Sao_Paulo",
+        detalhes=[{"parent_key": "mercado", "name": "feira"}, {"parent_key": "mercado", "name": "padaria"},
+                  {"parent_key": "transporte", "name": "uber"}],
+    )
+    assert "<details>" in turno and "</details>" in turno
+    corpo = turno.split("<details>")[1].split("</details>")[0]
+    assert "mercado: feira, padaria" in corpo and "transporte: uber" in corpo
+    # o dado vem ANTES do texto da pessoa e fora do envelope dela
+    assert turno.index("<details>") < turno.index("<user_input>")

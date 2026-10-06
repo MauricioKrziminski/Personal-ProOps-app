@@ -285,6 +285,20 @@ async def _contas_do_turno(state: AgentState) -> list[dict]:
         return []
 
 
+async def _detalhes_do_turno(state: AgentState) -> list[dict]:
+    """Detalhes do espaço para o parse de finanças, ou `[]` — contexto opcional nunca derruba o turno."""
+    workspace_id = state.get("workspace_id")
+    if not workspace_id:
+        return []
+    from app.tools import atributos
+
+    try:
+        return await atributos.detalhes_do_espaco(workspace_id)
+    except Exception:  # noqa: BLE001 — sem a lista o detalhe só sai com "detalhe X" dito
+        log.warning("não consegui listar os detalhes; o parse segue sem eles")
+        return []
+
+
 def _turno_humano(texto: str, midia: dict | None):
     """A mensagem humana: texto, e o anexo como parte de mídia quando os bytes chegaram.
 
@@ -317,6 +331,7 @@ async def finance_node(state: AgentState, config: RunnableConfig = None) -> dict
     )
     midia = ((config or {}).get("configurable") or {}).get(CHAVE_MIDIA)
     contas = await _contas_do_turno(state)
+    detalhes = await _detalhes_do_turno(state)
     plano: FinancePlan = await modelo.ainvoke(
         [
             ("system", FINANCE),
@@ -329,6 +344,7 @@ async def finance_node(state: AgentState, config: RunnableConfig = None) -> dict
                     history=historico,
                     corrigindo=state.get("corrigindo") or "",
                     contas=contas,
+                    detalhes=detalhes,
                 ),
                 midia,
             ),
