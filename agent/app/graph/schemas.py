@@ -127,19 +127,25 @@ class FinanceAction(BaseModel):
 
     type: FinanceActionType
     # ⚠️ A ORDEM dos campos é a ordem em que o Gemini ESCREVE (json_schema): passada uma chave, ele
-    # não volta a uma anterior. `target_ref` ficava depois de valor e conta, e o aporte em meta
-    # (que o modelo começa pela meta) saía sem valor e sem conta — 1/12 medido em 06/10/2026.
+    # não volta a uma anterior. Medido em 06/10/2026 (3.1-flash-lite, 3× cada frase):
+    # - `target_ref` depois de valor e conta: o aporte em meta (que começa pela meta) saía sem os
+    #   dois — 1/12; primeiro: 12/12.
+    # - `description` depois do valor: a correção (que começa pelo que procura) perdia o valor de
+    #   BUSCA ("o mercado foi 120, não 100") — 0/6; antes do valor: 6/6.
+    # - `account` depois de categoria e data: "em 10x no nubank" virava só `payment_method=credit`
+    #   — 0/6; logo depois do valor: 6/6. Criações de alto volume: 19/30 → 29/30 no conjunto.
     target_ref: str | None = Field(
         None,
         description="Nome da meta, do bem, ou o gatilho da regra de categorização.",
     )
+    description: str | None = Field(None, description="Do que se trata.")
     amount_cents: int | None = Field(
         None, description="Valor em centavos inteiros. '45 reais' -> 4500."
     )
+    account: str | None = Field(
+        None, description="Nome da conta ou cartão citado ('no nubank' -> nubank), também quando há forma de pagamento.")
     category: str | None = Field(None, description="Categoria curta e minúscula.")
-    description: str | None = Field(None, description="Do que se trata.")
     occurred_at: str | None = Field(None, description="Data do lançamento, YYYY-MM-DD.")
-    account: str | None = Field(None, description="Nome da conta ou cartão citado.")
     counterparty_account: str | None = Field(
         None, description="Conta destino (transferência, pagamento de fatura)."
     )
@@ -182,7 +188,7 @@ class FinanceAction(BaseModel):
     # Atributos de um lançamento NOVO (create_expense/income/installment_purchase). Texto livre,
     # validado em Python (`tools/atributos.py`, ancoragem na frase); vazio é o valor normal.
     payment_method: str | None = Field(
-        None, description="pix, credit, debit, cash, bank_transfer ou boleto — SÓ se a frase diz como pagou.")
+        None, description="pix, credit, debit, cash, bank_transfer ou boleto — SÓ se a frase diz como pagou. Nunca substitui account.")
     expense_pattern: str | None = Field(None, description="fixed ou variable — SÓ se a frase diz fixo/variável.")
     expense_necessity: str | None = Field(
         None, description="essential ou discretionary — SÓ se a frase diz essencial/supérfluo.")
