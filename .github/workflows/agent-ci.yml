@@ -1,0 +1,175 @@
+name: CI
+
+# O portão de `.claude/rules/workflow.md` ("Antes de commitar"), rodando no push para a main e em PR.
+# Os filtros de caminho valem para o workflow inteiro; o que roda em cada job está em cada job.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "agent/**"
+      - "src/**"
+      - "assets/**"
+      - "plugins/**"
+      - "supabase/**"
+      - "package.json"
+      - "package-lock.json"
+      - "app.json"
+      - "tsconfig.json"
+      - ".github/workflows/agent-ci.yml"
+  pull_request:
+    paths:
+      - "agent/**"
+      - "src/**"
+      - "assets/**"
+      - "plugins/**"
+      - "supabase/**"
+      - "package.json"
+      - "package-lock.json"
+      - "app.json"
+      - "tsconfig.json"
+      - ".github/workflows/agent-ci.yml"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  agente:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            agent/requirements.txt
+            agent/requirements-dev.txt
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: ruff check app --select F,E9
+      # Sem rede e sem banco: os nós que falam com o mundo são dublês. `tests/conftest.py` não
+      # exige env; a chave é falsa só para os clientes do Gemini poderem ser construídos.
+      - run: pytest -q
+        env:
+          GEMINI_API_KEY: fake
+
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # a mesma de publish-android-release.yml
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx expo lint
+      # `npm test` sai diferente de zero quando algo falha — é o código de saída que vale.
+      - run: npm test
+
+  sql:
+    runs-on: ubuntu-latest
+    # ponytail: NÃO foi provado num runner — escrito a partir de docs/AMBIENTES.md e da memória do
+    # projeto, sem rodar o CI. Enquanto ninguém vir este job verde uma vez, ele não derruba o PR.
+    # Para torná-lo bloqueante: ver o primeiro run, ajustar o que faltar e tirar a linha abaixo.
+    continue-on-error: true
+    env:
+      DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      # `supabase start` aplica as migrations e para na 0008, que exige dois segredos no Vault
+      # (`docs/AMBIENTES.md`). Então: sobe a pilha com a pasta de migrations VAZIA, semeia o
+      # Vault e só então aplica tudo com `migration up`. Sem studio e sem o que não é banco/auth.
+      - name: Sobe o Supabase local sem migrations
+        run: |
+          mv supabase/migrations /tmp/migrations
+          mkdir supabase/migrations
+          supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit,postgres-meta
+          rmdir supabase/migrations
+          mv /tmp/migrations supabase/migrations
+      - name: Semeia o Vault (exigência da 0008)
+        run: |
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -c "create extension if not exists supabase_vault with schema vault;" \
+            -c "select vault.create_secret('http://127.0.0.1:54321', 'project_url');" \
+            -c "select vault.create_secret('local-anon-key', 'anon_key');"
+      - name: Aplica as migrations
+        run: supabase migration up --local
+      # Cada teste é uma transação que volta (`begin; ... rollback;`), mas alguns dependem de data
+      # FIXA e envelhecem sozinhos: não é regressão, é o teste. Listados aqui com o motivo
+      # (memória do projeto, 05/10/2026); qualquer OUTRA falha derruba o job.
+      #   expected_recurring_occurrences, draft_scenario -> datas absolutas no teste
+      # Os que exigem banco VAZIO (income_pending, agent_migrations, app_agent_chat) passam aqui:
+      # o banco do CI nasce sem dado. Os .py/.mjs de supabase/tests precisam de driver e ficam de fora.
+      - name: Roda supabase/tests/*.sql
+        run: |
+          permitidos="expected_recurring_occurrences draft_scenario"
+          falhas=""
+          for f in supabase/tests/*.sql; do
+            nome="$(basename "$f" .sql)"
+            if psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$f" >"/tmp/$nome.log" 2>&1 </dev/null; then
+              echo "ok    $nome"
+            elif [[ " $permitidos " == *" $nome "* ]]; then
+              echo "AVISO $nome falhou (data fixa, permitido)"
+            else
+              echo "FALHA $nome"; tail -n 15 "/tmp/$nome.log"; falhas="$falhas $nome"
+            fi
+          done
+          if [[ -n "$falhas" ]]; then echo "falharam:$falhas"; exit 1; fi
+
+  avaliacao:
+    # Gemini REAL: só no PR que toca prompt, schema, portão, rascunho ou atributos.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY_EVAL }}
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Este PR mexe no que a avaliação mede?
+        id: toca
+        working-directory: .
+        run: |
+          if git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" \
+            | grep -qE '^agent/app/(graph/(prompts|schemas)\.py|domain/(confirm|draft)\.py|tools/atributos\.py)$'; then
+            echo "sim=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Nenhum prompt/schema/portão/rascunho/atributos mudou: avaliação pulada."
+          fi
+      - name: Sem a chave, avisa e sai verde
+        if: steps.toca.outputs.sim == 'true' && env.GEMINI_API_KEY == ''
+        run: |
+          echo "::warning::secret GEMINI_API_KEY_EVAL ausente (PR de fork ou nao configurado) - avaliacao do Gemini pulada."
+      - if: steps.toca.outputs.sim == 'true' && env.GEMINI_API_KEY != ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: agent/requirements.txt
+      # O cache de resultados (caso + hash de prompts/schemas + modelos) sobrevive entre runs: só o
+      # que o PR mudou chama o modelo. Quem falhou nunca entra nele.
+      - if: steps.toca.outputs.sim == 'true' && env.GEMINI_API_KEY != ''
+        uses: actions/cache@v4
+        with:
+          path: agent/.eval-cache
+          key: eval-${{ github.sha }}
+          restore-keys: eval-
+      - if: steps.toca.outputs.sim == 'true' && env.GEMINI_API_KEY != ''
+        run: pip install -r requirements.txt
+      # Sem `--barato`: é a execução que APROVA (gate no modelo do portão). Ver ai-gemini.md sobre a
+      # cota: o gate manda ~40 chamadas, e com chave sem faturamento isso passa de 20/dia.
+      - if: steps.toca.outputs.sim == 'true' && env.GEMINI_API_KEY != ''
+        run: python scripts/evaluate_answer_forms.py --output eval.json
