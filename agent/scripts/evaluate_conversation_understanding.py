@@ -40,6 +40,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from scripts.eval_cache import CacheDeAvaliacao
 from app.domain import confirm, draft
 from app.graph import nodes
 from app.graph.schemas import FinanceAction
@@ -461,6 +462,7 @@ CASES = [
 
 async def main(args):
     results = []
+    cache = CacheDeAvaliacao("conversation_understanding", ativo=not args.sem_cache)
     selected = set(args.cases.split(",")) if args.cases else None
     with (
         patch.object(db, "fetch", side_effect=reads),
@@ -470,6 +472,13 @@ async def main(args):
     ):
         for name, run, check in CASES:
             if selected and name not in selected:
+                continue
+            guardado = cache.get(name)
+            if guardado is not None:
+                result = {"id": name, "pass": True, "observation": guardado["observation"],
+                          "cache": True}
+                results.append(result)
+                print(json.dumps(result, ensure_ascii=False, default=str), flush=True)
                 continue
             observation = None
             try:
@@ -489,6 +498,7 @@ async def main(args):
                     eq(extracted["resource"], expected_resource)
                     eq(extracted["name"].casefold(), expected_name.casefold())
                 result = {"id": name, "pass": True, "observation": observation}
+                cache.put(name, {"observation": observation})
             except Exception as error:  # noqa: BLE001 — evaluation records failures and continues
                 result = {
                     "id": name,
@@ -498,7 +508,9 @@ async def main(args):
                 }
             results.append(result)
             print(json.dumps(result, ensure_ascii=False, default=str), flush=True)
+    cache.salvar()
     summary = {
+        "do_cache": cache.hits,
         "cases": len(results),
         "passed": sum(r["pass"] for r in results),
         "failed": [r["id"] for r in results if not r["pass"]],
@@ -520,5 +532,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output")
     parser.add_argument("--cases")
+    parser.add_argument("--sem-cache", action="store_true",
+                        help="ignora e não grava o cache de resultados (agent/.eval-cache/)")
     args = parser.parse_args()
     raise SystemExit(asyncio.run(main(args)))

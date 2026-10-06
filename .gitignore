@@ -70,3 +70,6 @@ docs/verification/
 
 # estado temporário do servidor de perguntas da skill impeccable
 .impeccable/questions/
+
+# Cache de resultados das suítes de avaliação (agent/scripts/eval_cache.py)
+agent/.eval-cache/

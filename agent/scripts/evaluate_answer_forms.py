@@ -36,6 +36,7 @@ for linha in (RAIZ / ".env").read_text().splitlines() if (RAIZ / ".env").exists(
 os.environ.setdefault("DATABASE_URL", "postgresql://sem-banco/nesta-avaliacao")
 os.environ.setdefault("WHATSAPP_APP_SECRET", "sem-envio")
 
+from scripts.eval_cache import CacheDeAvaliacao  # noqa: E402
 from app.domain import confirm, draft  # noqa: E402
 from app.graph import nodes  # noqa: E402
 from app.services import gemini  # noqa: E402
@@ -934,11 +935,20 @@ async def main(args):
             "aprova mudança.\n"
         )
 
+    cache = CacheDeAvaliacao("answer_forms", ativo=not args.sem_cache)
+    # Id do caso = seção + texto + o que se espera (o mesmo texto aparece em seções diferentes).
+    def _id(secao, texto, rotulo):
+        return f"{secao}|{texto}|{rotulo}"
+
     total = sum(
         len(casos) for secao, casos in secoes().items()
         if not args.secao or args.secao in secao
     )
-    print(f"{total} chamadas ao Gemini nesta execução.\n")
+    em_cache = sum(
+        cache.tem(_id(secao, t, r)) for secao, casos in secoes().items()
+        if not args.secao or args.secao in secao for t, _o, r, _f in casos
+    )
+    print(f"{total - em_cache} chamadas ao Gemini nesta execução ({em_cache} casos virão do cache).\n")
 
     resultados, falhas = [], []
     for secao, casos in secoes().items():
@@ -946,24 +956,33 @@ async def main(args):
             continue
         print(f"\n### {secao}")
         for texto, ok_se, rotulo, roda in casos:
-            try:
-                obtido = await roda()
-                ok = bool(ok_se(obtido))
-            except Exception as erro:  # noqa: BLE001 — a avaliação registra e segue
-                obtido, ok = f"erro: {erro}", False
+            caso = _id(secao, texto, rotulo)
+            guardado = cache.get(caso)
+            if guardado is not None:
+                obtido, ok = guardado["obtido"], True
+            else:
+                try:
+                    obtido = await roda()
+                    ok = bool(ok_se(obtido))
+                except Exception as erro:  # noqa: BLE001 — a avaliação registra e segue
+                    obtido, ok = f"erro: {erro}", False
+                if ok:
+                    cache.put(caso, {"obtido": repr(obtido)})
             resultados.append({"secao": secao, "texto": texto, "esperado": rotulo,
-                               "obtido": repr(obtido), "pass": ok})
+                               "obtido": obtido if guardado is not None else repr(obtido),
+                               "pass": ok, "cache": guardado is not None})
             if not ok:
                 falhas.append(f"{secao}: {texto!r}")
             print(f"{'ok  ' if ok else 'X   '} {texto!r:52} {rotulo:16}"
                   f"{'' if ok else repr(obtido)[:50]}")
+    cache.salvar()
     resumo = {"casos": len(resultados), "passaram": sum(r["pass"] for r in resultados),
-              "falhas": falhas}
+              "falhas": falhas, "do_cache": cache.hits}
     if args.output:
         Path(args.output).write_text(
             json.dumps({**resumo, "resultados": resultados}, ensure_ascii=False, indent=2)
         )
-    print(f"\n{resumo['passaram']}/{resumo['casos']}")
+    print(f"\n{resumo['passaram']}/{resumo['casos']} ({cache.hits} do cache)")
     if falhas:
         print("falharam: " + "; ".join(falhas))
     return 1 if falhas else 0
@@ -973,6 +992,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--secao", help="roda só as seções cujo nome contém isto")
     parser.add_argument("--output", help="grava o JSON completo aqui")
+    parser.add_argument("--sem-cache", action="store_true",
+                        help="ignora e não grava o cache de resultados (agent/.eval-cache/)")
     parser.add_argument(
         "--barato", action="store_true",
         help="roda o gate no Flash-Lite (grátis até 500/dia). Para iterar, "
