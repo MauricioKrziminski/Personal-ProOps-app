@@ -648,7 +648,8 @@ export default function TransactionsScreen() {
 
   const accounts = useAccounts(undefined, true);
   const categories = useCategoriesUsed();
-  const saldos = useAccountBalances();
+  // Só o extrato de UMA conta mostra saldo: sem conta filtrada não há por que ir ao banco.
+  const saldos = useAccountBalances(accountId !== undefined && accountId !== NO_ACCOUNT);
   // O saldo respeita o "esconder valores" (`useBRL`), como na tela Contas.
   const brl = useBRL();
   const { concealed } = useConceal();
@@ -733,7 +734,8 @@ export default function TransactionsScreen() {
 
   /** Título da tela quando ela está filtrada por conta — não é o rótulo de uma conta. */
   // "Ver ocorrências" de uma recorrente: a série inteira, com o nome dela no título.
-  const series = useRecurringTransactions();
+  // Só "Ver ocorrências" precisa do NOME da série: a lista inteira de séries não é lida na abertura comum.
+  const series = useRecurringTransactions(Boolean(params.recurringId));
   const nomeDaSerie = params.recurringId
     ? (series.data?.find((r) => r.id === params.recurringId)?.description ?? 'Ocorrências')
     : undefined;

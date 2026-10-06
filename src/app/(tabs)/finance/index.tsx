@@ -128,7 +128,10 @@ export default function FinanceScreen() {
   const [heroPaneWidth, setHeroPaneWidth] = useState(0);
   const daysLeft = cycle.data?.diasAteOFim ?? daysToMonthEnd();
 
-  const forecast = useCashFlowForecast(daysLeft);
+  // `daysLeft` só é o definitivo com a resposta de `cycle_now`; antes dela é o palpite do mês civil,
+  // e buscar com ele era uma projeção jogada fora (a chave muda) nos dias em que o ciclo não é o mês civil.
+  const cicloEmCaminho = cycle.isPending && cycle.fetchStatus === 'fetching';
+  const forecast = useCashFlowForecast(daysLeft, !cicloEmCaminho);
   const summary = useTransactionsSummary(range.from, range.to, range.pronto);
   const previous = useTransactionsSummary(previousRange.from, previousRange.to, previousRange.pronto);
   const budgets = useBudgetsStatus(month, regua.view);

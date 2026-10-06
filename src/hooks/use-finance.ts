@@ -722,9 +722,10 @@ export function useApagarCategoria() {
 }
 
 /** Séries recorrentes — criadas por WhatsApp, materializadas pelo cron do send-reminders. */
-export function useRecurringTransactions() {
+export function useRecurringTransactions(enabled = true) {
   useRealtimeInvalidate('recurring_transactions', ['recurring']);
   return useQuery({
+    enabled,
     queryKey: ['recurring'],
     queryFn: async (): Promise<RecurringTransaction[]> => {
       return fetchPaged<RecurringTransaction>((from, to) => supabase.from('recurring_transactions')
