@@ -630,7 +630,10 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
   consumo rotulava tudo como batch. Achado no E2E. Consequência honesta: a sonda de atributos
   "18/21 no 3.5-flash-lite" do início do dia rodou no 3.1-flash-lite.
 - **O checkpoint ia parar de desserializar** (`35cd69aa`). O LangGraph avisava que vai bloquear
-  tipo não registrado (`FinanceActionType`); toda confirmação pendente deixaria de retomar.
+  tipo não registrado (`FinanceActionType`); toda confirmação pendente deixaria de retomar. O
+  allowlist foi conferido contra **5.233 blobs reais do staging** (checkpoints e writes de todos os
+  caminhos já exercitados): nenhum tipo barrado. Os testes de grafo também rodam com ele
+  (`273b9893`), mas os dublês deles quase não põem enum no estado — a prova é a dos blobs.
 - **Mensagem durante o turno esperava o sweep** (`0bc0d8f6`), até 1 min — e no staging, onde não
   há cron, para sempre.
 - **Deploy apagava flag ligada à mão** (`fbe20b76`): `--set-env-vars` substitui tudo.
@@ -667,8 +670,10 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
   bateram com a v1; o resto ficou contaminado (portão sem cota).
 - **Por isso o `AGENT_PROMPT_V2` continua DESLIGADO.** Tudo o que foi medido aponta a favor
   (−32% de tokens, melhor em 6 extrações, igual em roteamento e segurança), mas a suíte oficial
-  inteira não coube na cota gratuita do dia. Um job ficou agendado para rodar ao zerar a cota
-  (ordem dos campos + suíte inteira com `--prompt-v2`).
+  inteira não coube na cota gratuita do dia. Um job ficou agendado para rodar ao zerar a cota:
+  a sonda de ordem dos campos (correções e 6 criações de alto volume, nas duas ordens), a suíte
+  inteira **v1 primeiro** — é ela que confirma o `target_ref` movido, que está em `main` e só foi
+  medido nas seções afetadas (aporte 9/9, encerrar 9/9) — e depois a v2.
 
 ## 20. O que depende de você
 
