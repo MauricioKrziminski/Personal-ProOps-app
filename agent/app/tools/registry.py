@@ -16,6 +16,7 @@ import logging
 import psycopg
 
 from app import db
+from app.config import get_settings
 from app.graph.schemas import (
     READ_ONLY,
     FinanceAction,
@@ -158,7 +159,7 @@ async def execute(ctx: ExecContext, action: FinanceAction | FinanceQuery | Notes
     # vê a linha já com o `result_id` (`on conflict do nothing` espera a transação concorrente).
     try:
         if somente_leitura:
-            return await tool(ctx, action)
+            return await _ler(ctx, action, tool)
         return await _escrever(ctx, action, tool)
     except _SemEscrita as sem:
         return sem.resultado
@@ -192,6 +193,15 @@ class _SemEscrita(Exception):
         self.resultado = resultado
 
 
+async def _ler(ctx: ExecContext, action, tool) -> ToolResult:
+    """Consulta: solta como sempre; com `AGENTE_RLS`, numa unidade só de leitura sob `authenticated`."""
+    if not get_settings().agente_rls:
+        return await tool(ctx, action)
+    async with db.unidade_de_trabalho():
+        async with db.sob_rls(ctx.user_id):
+            return await tool(ctx, action)
+
+
 async def _escrever(ctx: ExecContext, action, tool) -> ToolResult:
     async with db.unidade_de_trabalho():
         if not await db.reserve_execution(
@@ -212,7 +222,12 @@ async def _escrever(ctx: ExecContext, action, tool) -> ToolResult:
             # (Toda tool `create_*` devolve `result_id` quando escreve.)
             escrito = await db.execution_result_id(ctx.source_message_id, ctx.action_index)
             return ToolResult("", read_only=True, ja_executada=escrito is not None)
-        resultado = await tool(ctx, action)
+        if get_settings().agente_rls:
+            # reserva e carimbo são tabela interna do agente (postgres); só a TOOL vai sob RLS
+            async with db.sob_rls(ctx.user_id):
+                resultado = await tool(ctx, action)
+        else:
+            resultado = await tool(ctx, action)
         if resultado.read_only:
             # a tool não escreveu nada (não achou, empate, pediu detalhe): desfaz a unidade,
             # o que devolve a vaga para a pessoa poder tentar de novo

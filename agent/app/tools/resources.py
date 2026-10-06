@@ -1850,7 +1850,7 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             shown = "sim" if value else "não"
         rotulo = LABELS.get(key, key)
         if key == "initial_balance_cents" and action.type == Op.UPDATE:
-            # Na conta que já existe, o número dito é o saldo de HOJE (ver `_SALDO_ATUAL`).
+            # Na conta que já existe, o número dito é o saldo de HOJE (ver `_saldo_atual`).
             rotulo = "saldo atual"
         details.append(
             f"{rotulo}: {shown if shown is not None else 'não informado'}"
@@ -2164,7 +2164,7 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
             row = await _editar_alcance_do_limite(ctx, values, args)
         else:
             sets = [
-                _SALDO_ATUAL
+                _saldo_atual()
                 if key == "initial_balance_cents" and action.resource == "accounts" and action.type == Op.UPDATE
                 else f"{key} = %s"
                 for key in values
@@ -2173,7 +2173,7 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
                 p
                 for key, value in values.items()
                 for p in (
-                    (value, ctx.user_id)
+                    ((value,) if db.rls_ativo() else (value, ctx.user_id))
                     if key == "initial_balance_cents" and action.resource == "accounts" and action.type == Op.UPDATE
                     else (value,)
                 )
@@ -2204,11 +2204,14 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
 # (`inicialParaOSaldo`, `lib/accounts.ts`). O banco guarda o inicial; o atual é derivado, então o
 # inicial anda pela diferença entre o dito e o que a lista mostra: confirmado na conta de
 # dinheiro, total no cartão (`saldoDaConta`). Dentro do UPDATE, sem janela entre ler e gravar.
-_SALDO_ATUAL = (
-    "initial_balance_cents = initial_balance_cents + %s - coalesce(("
-    "select case when b.type = 'credit_card' then b.balance_cents else b.cleared_cents end "
-    "from public._account_balances(%s) b where b.account_id = accounts.id), initial_balance_cents)"
-)
+def _saldo_atual() -> str:
+    # sob RLS o wrapper (`auth.uid()`); fora, a interna com o `uid` explícito (`db.por_usuario`)
+    de = "public.account_balances()" if db.rls_ativo() else "public._account_balances(%s)"
+    return (
+        "initial_balance_cents = initial_balance_cents + %s - coalesce(("
+        "select case when b.type = 'credit_card' then b.balance_cents else b.cleared_cents end "
+        f"from {de} b where b.account_id = accounts.id), initial_balance_cents)"
+    )
 
 
 async def _editar_alcance_do_limite(ctx: ExecContext, values: dict, args: list):

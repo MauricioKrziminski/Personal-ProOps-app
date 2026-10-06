@@ -331,8 +331,11 @@ async def _subcategory_from_rule(workspace_id, action: FinanceAction, category: 
     text = " ".join(p for p in (action.description, action.category) if p)
     if not text or not category:
         return None
+    # Sob RLS (`AGENTE_RLS`) a versão que confere a posse via `auth.uid()`: a interna chama
+    # `public._match_rule`, que aceita qualquer workspace e não tem `execute` para `authenticated`.
+    funcao = "match_rule_subcategory_do_membro" if db.rls_ativo() else "match_rule_subcategory"
     rule = await db.fetch_one(
-        "select subcategory_id from private.match_rule_subcategory(%s,%s) "
+        f"select subcategory_id from private.{funcao}(%s,%s) "  # noqa: S608 — nome fixo acima
         "where private.fold(category)=private.fold(%s)", workspace_id, text, category,
     )
     return (rule or {}).get("subcategory_id")

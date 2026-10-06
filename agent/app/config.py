@@ -74,6 +74,10 @@ class Settings(BaseSettings):
     # (chave assimétrica), e verificar com HS256 rejeitaria todo token.
     supabase_url: str = ""
 
+    # RLS como segunda camada: ligada, a TOOL roda sob `authenticated` com as claims do dono da
+    # conversa (`db.sob_rls`), como o PostgREST faz com o app. Desligada = comportamento antigo.
+    agente_rls: bool = False
+
     # --- regras ---
     hitl_amount_threshold_cents: int = 100_000
     max_parses_per_hour: int = 60

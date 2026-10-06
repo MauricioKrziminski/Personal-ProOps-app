@@ -61,7 +61,7 @@ async def query_balance(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     Cartão fica FORA do dinheiro e aparece como dívida, exatamente como na tela — e ali o número
     certo é `balance_cents`, porque parcela futura de cartão é dívida já assumida.
     """
-    rows = await db.fetch("select * from public._account_balances(%s)", ctx.user_id)
+    rows = await db.fetch(*db.por_usuario("account_balances", ctx.user_id))
     if not rows:
         return ToolResult("💼 Você ainda não tem contas nem lançamentos.", read_only=True)
 
@@ -452,11 +452,7 @@ async def query_transactions(ctx: ExecContext, action: FinanceQuery) -> ToolResu
 
 
 async def query_budgets(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
-    rows = await db.fetch(
-        "select * from public._budgets_status(%s, %s)",
-        ctx.user_id,
-        local_iso_date(ctx.timezone),
-    )
+    rows = await db.fetch(*db.por_usuario("budgets_status", ctx.user_id, local_iso_date(ctx.timezone)))
     if not rows:
         return ToolResult(
             "📉 Você ainda não definiu orçamentos. Cria na aba Finanças do app!", read_only=True
@@ -512,7 +508,7 @@ async def query_goals(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
 
 
 async def query_invoice(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
-    rows = await db.fetch("select * from public._card_summary(%s)", ctx.user_id)
+    rows = await db.fetch(*db.por_usuario("card_summary", ctx.user_id))
     if action.account:
         # mesmo casamento da execução e da validação do rascunho: "itau" tem que
         # achar "Itaú" aqui também, senão a consulta de fatura responde "não
@@ -558,9 +554,7 @@ async def query_forecast(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
             dias = int(c["dias_ate_o_fim"])
             ate_o_ciclo = c
 
-    rows = await db.fetch(
-        "select * from public._cash_flow_forecast(%s, %s)", ctx.user_id, dias
-    )
+    rows = await db.fetch(*db.por_usuario("cash_flow_forecast", ctx.user_id, dias))
     if not rows:
         return ToolResult("🔮 Ainda não tenho dados suficientes para projetar.", read_only=True)
 
@@ -733,12 +727,8 @@ async def simulate_scenario(ctx: ExecContext, action: FinanceQuery) -> ToolResul
     rascunhos = [_rascunho(a, hoje) for _, a in irmas]
     dias = _janela(rascunhos, action, hoje)
 
-    rows = await db.fetch(
-        "select * from public._forecast_with_drafts(%s, %s, %s::jsonb)",
-        ctx.user_id,
-        dias,
-        json.dumps(rascunhos),
-    )
+    sql, *args = db.por_usuario("forecast_with_drafts", ctx.user_id, dias, json.dumps(rascunhos))
+    rows = await db.fetch(sql.replace("%s)", "%s::jsonb)"), *args)
     if not rows:
         return ToolResult("🤔 Não consegui simular agora. Tenta de novo?", read_only=True)
 

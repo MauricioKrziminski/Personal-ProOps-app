@@ -425,6 +425,16 @@ garantia sozinho virou responsabilidade do código:
   antiga lia `user_id`/`workspace_id` do corpo do POST: qualquer autenticado importava para o
   workspace de outro. Não repetir.
 - Nome de tabela nunca vem do modelo — só de allowlist literal.
+- **`AGENTE_RLS=true` é a segunda camada** (desligada por padrão): a TOOL roda sob `authenticated`
+  com as claims do `ctx.user_id` (`db.sob_rls`, dentro da unidade de trabalho), e as policies do
+  app passam a valer. Reserva e carimbo de `executed_actions` ficam como `postgres`; `ensure_owned`
+  e os filtros continuam. Resolução de alvo, `apply_rules`, limite de cartão e busca semântica
+  rodam na fase cognitiva, fora do trecho. **RPC interna `_nome(uid, ...)` nunca ganha `execute`
+  para `authenticated`** (aceita qualquer `uid`): sob RLS a tool chama o wrapper (`db.por_usuario`),
+  e função `private` definer que aceita workspace por argumento ganha wrapper que confere
+  `private.my_workspace_ids()` (`match_rule_subcategory_do_membro`). Prova:
+  `agent/scripts/verificar_rls_das_tools.py` (staging, tudo revertido) e `supabase/tests/agente_rls.sql`;
+  tool nova entra como caso no script.
 
 ## Concorrência e idempotência
 

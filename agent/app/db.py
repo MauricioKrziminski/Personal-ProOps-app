@@ -10,6 +10,7 @@ no schema isolado, e não em `public` (onde o PostgREST as exporia com a anon ke
 
 from __future__ import annotations
 
+import json
 import logging
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
@@ -107,6 +108,26 @@ def graph_pool() -> AsyncConnectionPool:
 # Conexão da UNIDADE DE TRABALHO em curso (ver `unidade_de_trabalho`). Contextvar e não
 # parâmetro: as ~130 chamadas de `db.fetch`/`fetch_one`/`execute` das tools não mudam.
 _uow: ContextVar[Any | None] = ContextVar("db_unidade_de_trabalho", default=None)
+# True enquanto o bloco de `sob_rls` roda: o SQL das tools escolhe, nas RPCs por usuário, o wrapper
+# (`auth.uid()`) em vez da interna (`_nome(uid, ...)`, sem `execute` para `authenticated`).
+_rls: ContextVar[bool] = ContextVar("db_sob_rls", default=False)
+
+
+def rls_ativo() -> bool:
+    return _rls.get()
+
+
+def por_usuario(nome: str, user_id: Any, *args: Any) -> tuple[Any, ...]:
+    """`(sql, *args)` do `select * from` de uma RPC que o app chama pelo wrapper e o agente pela interna.
+
+    Sob RLS: `public.<nome>(args)` (invoker, `auth.uid()` = dono). Fora dela: `public._<nome>(uid, args)`
+    (definer, o `uid` explícito). Mesmo contrato de colunas — conferido por `verificar_rls_das_tools.py`.
+    Nunca conceder `execute` da interna a `authenticated`: ela aceita QUALQUER `uid`.
+    """
+    marcas = ", ".join(["%s"] * len(args))
+    if _rls.get():
+        return (f"select * from public.{nome}({marcas})", *args)
+    return (f"select * from public._{nome}(%s{', ' if marcas else ''}{marcas})", user_id, *args)
 
 
 @asynccontextmanager
@@ -138,6 +159,41 @@ async def unidade_de_trabalho():
                 yield
             finally:
                 _uow.reset(marca)
+
+
+@asynccontextmanager
+async def sob_rls(user_id: UUID | str):
+    """Roda o bloco como `authenticated`, com `auth.uid()` = `user_id`: as policies do app passam a valer.
+
+    É o que o PostgREST faz. Só existe dentro de uma unidade de trabalho: `set local` fora de
+    transação (pool autocommit) não faz nada e o SQL seguinte rodaria como `postgres` sem erro
+    nenhum — por isso recusa em voz alta. O papel e as claims morrem com a transação; no caminho
+    feliz voltamos a `postgres` aqui mesmo (reserva e carimbo de `executed_actions` são do agente).
+
+    ⚠️ Sem `finally`: com a transação abortada o `reset role` falharia e mascararia o erro real; a
+    saída por exceção desfaz a transação (e o `set local` com ela).
+    ⚠️ Chamadas internas do agente (`draft_actions`, `ai_events`...) ficam FORA do bloco.
+    """
+    conn = _uow.get()
+    if conn is None:
+        raise RuntimeError("sob_rls exige unidade_de_trabalho (set local não vale em autocommit)")
+    uid = str(user_id)
+    claims = json.dumps({"sub": uid, "role": "authenticated"})
+    await conn.execute("set local role authenticated")
+    await conn.execute(
+        "select set_config('request.jwt.claim.sub', %s, true), "
+        "set_config('request.jwt.claims', %s, true)", (uid, claims),
+    )
+    marca = _rls.set(True)
+    try:
+        yield
+    finally:
+        _rls.reset(marca)
+    await conn.execute("reset role")
+    await conn.execute(
+        "select set_config('request.jwt.claim.sub', '', true), "
+        "set_config('request.jwt.claims', '', true)"
+    )
 
 
 async def fetch(sql: str, *args: Any) -> list[dict[str, Any]]:
