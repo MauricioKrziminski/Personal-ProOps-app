@@ -594,6 +594,12 @@ abertura curta. Com a trava ligada, `segurarAbertura()` estica o teto para 20 s:
 senha sobre a marca e, confirmada, a tinta sobe DIRETO no app (a trava some por baixo, sem a onda
 dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
 
+**A marca se DESENHA na abertura** (06/10/2026, pedido do dono do produto): um relógio só de
+800 ms na UI thread — o contorno de `markPath` por trim, o preenchimento entrando e o nome
+"ProOps" em fade — e depois PARADA, sem loop. Cabe dentro do `MARCA_MINIMA_MS`: a animação nunca
+alonga a espera (o "show" de 1,8 s das cinco primeiras aberturas e o anel saíram por isso). Com
+Reduzir movimento, marca e nome só em fade. A trava usa a mesma cortina.
+
 **O carrossel e o voo da Carteira** são momento raro (delight declarado): mola `voo` e
 `carrossel`, giro 3D só no meio da troca, e com Reduce Motion não há voo nem giro.
 
@@ -1017,8 +1023,10 @@ dentro do app.
 
 Splash e overlay animado usam **o mesmo par cor de fundo + variante da marca** (`app.json` →
 plugin `expo-splash-screen` e `src/components/motion/session-curtain.tsx`), senão aparece um
-flash de cor errada na transição. Desde 16/09/2026 o par é tinta `#0B0B0C` + `mark-white.png`
-nos DOIS temas, e a cortina desenha o mesmo PNG no mesmo `imageWidth`.
+flash de cor errada na transição. Desde 06/10/2026 a splash nativa é SÓ a tinta `#0B0B0C`
+(`splash-vazio.png`, transparente, nos dois temas) e a marca nasce desenhando-se na cortina: uma
+splash com a marca pronta faria ela aparecer, sumir e se redesenhar. É mudança NATIVA — vale da
+build 1.7.0 em diante; binário anterior ainda mostra a marca pronta antes do desenho.
 
 ## 10. Contagem anti-slop (mecânica, antes de dar qualquer tela como pronta)
 
@@ -1055,8 +1063,8 @@ as coisas se comunicam:
 - **Barra de progresso separa dado de estado**: `tone="data"` (cinza) para comparação —
   categoria, proporção; `tint` para estado que o usuário resolve — orçamento, meta. Barra de dado
   em preto sólido domina a lista e come o valor que estava do lado.
-- **A forma da marca** aparece no `AppHeader`, na abertura (o mesmo PNG do splash, com um anel
-  que se desenha em volta), na capa das telas de conta e na trava — geometria em
+- **A forma da marca** aparece no `AppHeader`, na abertura (o traço da marca se desenhando, com o
+  nome), na capa das telas de conta e na trava — geometria em
   `src/design/mark-path.ts`, componente em `src/components/ui/mark.tsx`. O carregamento do botão
   é o `DotsLoader` (a pílula encolhe e dois pontos trocam de lugar), e o estado vazio usa um
   símbolo do sistema num selo redondo.
