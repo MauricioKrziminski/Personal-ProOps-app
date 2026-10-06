@@ -44,8 +44,19 @@ const SAIDA_DO_NATIVO_ANDROID_MS = 300;
 /** Tempo máximo para manter um canvas pré-montado enquanto uma confirmação nativa está aberta. */
 const TETO_DO_PREPARO_MS = 4000;
 
+/*
+  ⚠️ **Toda espera da cortina tem prazo** (06/10/2026, iPhone: depois da senha a marca ficava
+  pronta e a tinta não subia nunca — só matando o app). Quadro e callback de animação podem não vir
+  com o app fora do primeiro plano (o prompt de senha do sistema), e a abertura esperava os dois
+  sem saída. A trava (`lock-overlay.tsx`) já tinha o seu prazo; a cortina da raiz não tinha.
+*/
 const doisQuadros = () =>
-  new Promise<void>((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok())));
+  new Promise<void>((ok) => {
+    const prazo = setTimeout(ok, 120);
+    requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(prazo); ok(); }));
+  });
+/** Folga além da duração antes de a cortina assumir que o callback da animação não vem. */
+const FOLGA_DA_ANIMACAO_MS = 600;
 const dormir = (ms: number) => new Promise<void>((ok) => setTimeout(ok, ms));
 
 const CortinaContext = createContext<CortinaApi | null>(null);
@@ -143,17 +154,25 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   const animar = useCallback(
     (alvo: number, duracao: number) =>
       new Promise<void>((ok) => {
+        const ms = reduzido ? Motion.duration.base : duracao;
+        // Sem o callback (quadros parados), a cortina vai direto ao fim: tela presa é pior que corte.
+        const prazo = setTimeout(() => {
+          cancelAnimation(progresso);
+          progresso.set(alvo);
+          ok();
+        }, ms + FOLGA_DA_ANIMACAO_MS);
+        const terminou = () => {
+          clearTimeout(prazo);
+          ok();
+        };
         progresso.set(
           withTiming(
             alvo,
-            {
-              duration: reduzido ? Motion.duration.base : duracao,
-              easing: Easing.linear,
-            },
+            { duration: ms, easing: Easing.linear },
             () => {
               'worklet';
               // Resolve também quando é cancelada: quem espera é o portão, e ele não pode travar.
-              runOnJS(ok)();
+              runOnJS(terminou)();
             },
           ),
         );

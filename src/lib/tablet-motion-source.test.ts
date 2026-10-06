@@ -72,3 +72,20 @@ test('auth cap recomputes its matching curve after a tablet resize and the form 
   assert.match(cap, /useDerivedValue\(\(\) => progressoDaCapa\(height\)/);
   assert.match(screen, /maxWidth:\s*\d+/);
 });
+
+test('a cortina da raiz nunca fica presa: toda espera de quadro ou animação tem prazo', () => {
+  const cortina = readFileSync('src/components/motion/session-curtain.tsx', 'utf8');
+  const animar = cortina.slice(cortina.indexOf('const animar = useCallback'), cortina.indexOf('const cancelarPreparo'));
+  assert.match(animar, /setTimeout\(\(\) => \{\s*cancelAnimation\(progresso\);\s*progresso\.set\(alvo\);\s*ok\(\);/,
+    'sem o callback, a cortina vai direto ao fim');
+  const quadros = cortina.slice(cortina.indexOf('const doisQuadros'), cortina.indexOf('const FOLGA_DA_ANIMACAO_MS'));
+  assert.match(quadros, /setTimeout\(ok,/, 'quadro que não vem não segura a cortina');
+});
+
+test('a abertura segura a marca pela trava sem esperar as fontes', () => {
+  const layout = readFileSync('src/app/_layout.tsx', 'utf8');
+  const aviso = layout.slice(layout.indexOf('function AvisoDaAbertura'), layout.indexOf('function AppTree'));
+  assert.match(aviso, /if \(carregando\) return;/);
+  assert.doesNotMatch(aviso, /if \(!pronto \|\| carregando\) return;/);
+  assert.match(aviso, /cortina\.segurarAbertura\(\);\s*else if \(pronto\) cortina\.marcarPronto/);
+});

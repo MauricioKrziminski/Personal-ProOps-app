@@ -135,9 +135,15 @@ function AvisoDaAbertura({ pronto, temSessao }: { pronto: boolean; temSessao: bo
   const cortina = useCortina();
   const { carregando, locked, estado } = useLock();
   useEffect(() => {
-    if (!pronto || carregando) return;
+    if (carregando) return;
+    /*
+      ⚠️ **Segurar NÃO espera as fontes** (06/10/2026). A trava pede a senha assim que sessão e
+      preferência chegam; as fontes, na primeira abertura depois de instalar, chegavam depois do
+      teto curto (2,5 s) — e a tinta tentava subir por baixo do prompt do sistema, onde a
+      animação não anda. Só REVELAR depende de tudo pronto.
+    */
     if (temSessao && locked && estado !== 'falhou') cortina.segurarAbertura();
-    else cortina.marcarPronto(temSessao ? 'app' : 'conta');
+    else if (pronto) cortina.marcarPronto(temSessao ? 'app' : 'conta');
   }, [pronto, carregando, temSessao, locked, estado, cortina]);
   return null;
 }
