@@ -1,5 +1,5 @@
-import { Path } from "@shopify/react-native-skia";
-import * as SplashScreen from "expo-splash-screen";
+import { Path } from '@shopify/react-native-skia';
+import * as SplashScreen from 'expo-splash-screen';
 import {
   createContext,
   useCallback,
@@ -9,8 +9,8 @@ import {
   useRef,
   useState,
   type ReactNode,
-} from "react";
-import { Platform, StyleSheet, View, useWindowDimensions } from "react-native";
+} from 'react';
+import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -21,15 +21,15 @@ import Animated, {
   useSharedValue,
   withTiming,
   type SharedValue,
-} from "react-native-reanimated";
+} from 'react-native-reanimated';
 
-import { WaveCurtain } from "@/components/motion/wave-curtain";
-import { SkiaCanvas } from "@/components/ui/skia-canvas";
-import { ThemedText } from "@/components/themed-text";
-import { markPath } from "@/design/mark-path";
-import { Motion, Space } from "@/design/tokens";
-import { progressoDaCapa } from "@/design/wave-math";
-import { useTheme } from "@/hooks/use-theme";
+import { WaveCurtain } from '@/components/motion/wave-curtain';
+import { SkiaCanvas } from '@/components/ui/skia-canvas';
+import { ThemedText } from '@/components/themed-text';
+import { markPath } from '@/design/mark-path';
+import { Motion, Space } from '@/design/tokens';
+import { progressoDaCapa } from '@/design/wave-math';
+import { useTheme } from '@/hooks/use-theme';
 import {
   esperaDaAbertura,
   esperaDaMarca,
@@ -37,34 +37,31 @@ import {
   type FaseDaCortina,
   type Onda,
   type Ponto,
-} from "@/lib/session-gate";
+} from '@/lib/session-gate';
 
-import type { CortinaApi } from "./session-curtain.types";
+import type { CortinaApi } from './session-curtain.types';
 
 /** Lado da marca (dp): a mesma caixa que o PNG do splash tinha, para ela ficar no mesmo lugar. */
 const LADO = 96;
 /** Abertura e logout terminam na mesma curva fixa da tela de conta. */
-const ONDA_DA_ABERTURA: Onda = { mode: "up" };
+const ONDA_DA_ABERTURA: Onda = { mode: 'up' };
 /** A marca se constrói (traço + preenchimento + nome) DENTRO de `MARCA_MINIMA_MS` (900): nunca alarga a espera. */
 const CONSTRUCAO_MS = 800;
 /** Tempo máximo para manter um canvas pré-montado enquanto uma confirmação nativa está aberta. */
 const TETO_DO_PREPARO_MS = 4000;
 
 const doisQuadros = () =>
-  new Promise<void>((ok) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => ok())),
-  );
+  new Promise<void>((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok())));
 const dormir = (ms: number) => new Promise<void>((ok) => setTimeout(ok, ms));
 
 const CortinaContext = createContext<CortinaApi | null>(null);
-const FaseContext = createContext<FaseDaCortina>("abertura");
+const FaseContext = createContext<FaseDaCortina>('abertura');
 const AbertaContext = createContext(false);
 const SaindoContext = createContext(false);
 
 export function useCortina(): CortinaApi {
   const cortina = useContext(CortinaContext);
-  if (!cortina)
-    throw new Error("useCortina precisa do CortinaProvider (raiz do app)");
+  if (!cortina) throw new Error('useCortina precisa do CortinaProvider (raiz do app)');
   return cortina;
 }
 
@@ -126,7 +123,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   const reduzido = useReducedMotion();
   const { height: alturaDaTela } = useWindowDimensions();
   const progresso = useSharedValue(0);
-  const [fase, setFase] = useState<FaseDaCortina>("abertura");
+  const [fase, setFase] = useState<FaseDaCortina>('abertura');
   const [onda, setOnda] = useState<Onda>(ONDA_DA_ABERTURA);
   const [pintada, setPintada] = useState(false);
   const [aberturaFeita, setAberturaFeita] = useState(false);
@@ -134,11 +131,11 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
 
   const pronto = useRef<{
     valor: boolean;
-    destino: "app" | "conta";
+    destino: 'app' | 'conta';
     segurando: boolean;
   }>({
     valor: false,
-    destino: "app",
+    destino: 'app',
     segurando: false,
   });
   const origem = useRef<{ ponto: Ponto; em: number } | null>(null);
@@ -159,7 +156,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
               easing: Easing.linear,
             },
             () => {
-              "worklet";
+              'worklet';
               // Resolve também quando é cancelada: quem espera é o portão, e ele não pode travar.
               runOnJS(ok)();
             },
@@ -200,11 +197,11 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       const cobertura = (async () => {
         progresso.set(1);
         setOnda(o);
-        setFase("cobrindo");
+        setFase('cobrindo');
         // A camada pode ter acabado de montar; dois quadros bastam para layout e primeiro paint.
         await doisQuadros();
         await animar(0, Motion.curtain.duration);
-        setFase("coberta");
+        setFase('coberta');
       })();
       coberturaAtual.current = cobertura;
       return cobertura;
@@ -217,34 +214,34 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     coberturaAtual.current = null;
     cancelAnimation(progresso);
     progresso.set(progressoDaCapa(alturaDaTela));
-    setOnda({ mode: "up", fromCap: true });
-    setFase("cobrindo");
+    setOnda({ mode: 'up', fromCap: true });
+    setFase('cobrindo');
     // A borda parte exatamente da capa, com a marca presa à mesma curva durante a descida.
     await doisQuadros();
     await animar(0, Motion.curtain.duration);
-    setFase("coberta");
+    setFase('coberta');
   }, [alturaDaTela, animar, cancelarPreparo, progresso]);
 
   const cobrirJa = useCallback(() => {
     coberturaAtual.current = null;
     cancelAnimation(progresso);
     progresso.set(0);
-    setFase("coberta");
+    setFase('coberta');
   }, [progresso]);
 
   const descobrir = useCallback(
     async (o: Onda, duracao: number) => {
       coberturaAtual.current = null;
       setOnda(o);
-      setFase("revelando");
+      setFase('revelando');
       // O React precisa aplicar a onda nova antes de o progresso andar: nos primeiros quadros a
       // forma velha ainda estaria na tela.
       await doisQuadros();
       // A revelação da conta termina na curva da AuthCap, com a marca na mesma posição.
       // As duas metades da transição têm a mesma duração, mesmo com distâncias diferentes.
-      const alvo = o.ate === "capa" ? progressoDaCapa(alturaDaTela) : 1;
+      const alvo = o.ate === 'capa' ? progressoDaCapa(alturaDaTela) : 1;
       await animar(alvo, duracao);
-      setFase("aberta");
+      setFase('aberta');
       setCamadaMontada(false);
     },
     [animar, alturaDaTela],
@@ -255,7 +252,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     coberturaAtual.current = null;
     cancelAnimation(progresso);
     progresso.set(1);
-    setFase("aberta");
+    setFase('aberta');
     setCamadaMontada(false);
     setAberturaFeita(true);
   }, [cancelarPreparo, progresso]);
@@ -270,7 +267,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     return ponto;
   }, []);
 
-  const marcarPronto = useCallback((destino: "app" | "conta") => {
+  const marcarPronto = useCallback((destino: 'app' | 'conta') => {
     if (pronto.current.valor) return;
     pronto.current.valor = true;
     pronto.current.destino = destino;
@@ -298,7 +295,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       o nativo sai, e `fade: false` evita um segundo cross-fade.
     */
     SplashScreen.setOptions({
-      duration: Platform.OS === "android" ? 300 : 0,
+      duration: Platform.OS === 'android' ? 300 : 0,
       fade: false,
     });
   }, []);
@@ -320,15 +317,14 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       // ponytail: espera por sondagem (50 ms, só durante a abertura) — o teto muda de tamanho
       // quando a trava segura, e um laço relê isso sem timer para rearmar.
       const p = pronto.current;
-      while (!p.valor && esperaDaAbertura(desde, Date.now(), p.segurando) > 0)
-        await dormir(50);
+      while (!p.valor && esperaDaAbertura(desde, Date.now(), p.segurando) > 0) await dormir(50);
       // A marca não pode ser um lampejo: a passagem "marca → app" acontece em toda abertura
       // (também com Reduzir Movimento — ficar parada na tela não é movimento).
       await dormir(esperaDaMarca(desde, Date.now()));
       // Teto estourado deixa o destino em `app`: revelar tudo é o lado seguro.
-      const capa = pronto.current.destino === "conta";
+      const capa = pronto.current.destino === 'conta';
       await descobrir(
-        capa ? { ...ONDA_DA_ABERTURA, ate: "capa" } : ONDA_DA_ABERTURA,
+        capa ? { ...ONDA_DA_ABERTURA, ate: 'capa' } : ONDA_DA_ABERTURA,
         Motion.curtain.duration,
       );
       setAberturaFeita(true);
@@ -370,12 +366,10 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   return (
     <CortinaContext.Provider value={api}>
       <FaseContext.Provider value={fase}>
-        <AbertaContext.Provider value={aberturaFeita && fase === "aberta"}>
-          <SaindoContext.Provider
-            value={fase === "revelando" || fase === "aberta"}
-          >
+        <AbertaContext.Provider value={aberturaFeita && fase === 'aberta'}>
+          <SaindoContext.Provider value={fase === 'revelando' || fase === 'aberta'}>
             {children}
-            {fase === "aberta" && !camadaMontada ? null : (
+            {fase === 'aberta' && !camadaMontada ? null : (
               <Camada
                 fase={fase}
                 onda={onda}
@@ -418,46 +412,30 @@ function Camada({
       onLayout={onLayout}
       // Enquanto cobre, a camada engole o toque (ela é o alvo, e não tem responder). Revelando,
       // o app de baixo já é o destino.
-      pointerEvents={
-        fase === "aberta" || fase === "revelando" ? "none" : "auto"
-      }
+      pointerEvents={fase === 'aberta' || fase === 'revelando' ? 'none' : 'auto'}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={styles.camada}
     >
       {reduzido ? (
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: theme.curtain },
-            veu,
-          ]}
-        />
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: theme.curtain }, veu]} />
       ) : (
         <WaveCurtain
           progress={progresso}
-          fase={fase === "cobrindo" && !onda.fromCap ? "cobrir" : "revelar"}
-          mode={
-            fase === "revelando" ? (onda.revealMode ?? onda.mode) : onda.mode
-          }
+          fase={fase === 'cobrindo' && !onda.fromCap ? 'cobrir' : 'revelar'}
+          mode={fase === 'revelando' ? (onda.revealMode ?? onda.mode) : onda.mode}
           origin={onda.origin}
           color={theme.curtain}
           style={StyleSheet.absoluteFill}
         />
       )}
-      {comMarca ? (
-        <MarcaDaAbertura
-          progresso={progresso}
-          pintada={pintada}
-          reduzido={reduzido}
-        />
-      ) : null}
+      {comMarca ? <MarcaDaAbertura progresso={progresso} pintada={pintada} reduzido={reduzido} /> : null}
     </View>
   );
 }
 
 const suave = (x: number) => {
-  "worklet";
+  'worklet';
   const k = Math.min(1, Math.max(0, x));
   return k * k * (3 - 2 * k);
 };
@@ -499,20 +477,14 @@ function MarcaDaAbertura({
 
   // Traço 0 → 58%; o preenchimento entra de 42% a 78% e leva o contorno embora; o nome fecha.
   const fim = useDerivedValue(() => suave(t.get() / 0.58));
-  const contorno = useDerivedValue(() =>
-    reduzido ? 0 : 1 - suave((t.get() - 0.5) / 0.28),
-  );
+  const contorno = useDerivedValue(() => (reduzido ? 0 : 1 - suave((t.get() - 0.5) / 0.28)));
   // Reduzido: o canvas fica estático (opacidade 1) e o fade é da View por fora — um valor que muda
   // antes do primeiro quadro do Skia não repinta, e a marca não aparecia.
-  const miolo = useDerivedValue(() =>
-    reduzido ? 1 : suave((t.get() - 0.42) / 0.36),
-  );
+  const miolo = useDerivedValue(() => (reduzido ? 1 : suave((t.get() - 0.42) / 0.36)));
   const marcaStyle = useAnimatedStyle(() => ({
     opacity: reduzido ? t.get() : 1,
   }));
-  const nome = useDerivedValue(() =>
-    reduzido ? t.get() : suave((t.get() - 0.72) / 0.28),
-  );
+  const nome = useDerivedValue(() => (reduzido ? t.get() : suave((t.get() - 0.72) / 0.28)));
   const nomeStyle = useAnimatedStyle(() => ({
     opacity: nome.get(),
     transform: [{ translateY: (1 - nome.get()) * 4 }],
@@ -555,8 +527,8 @@ function MarcaDaAbertura({
 const styles = StyleSheet.create({
   camada: {
     ...StyleSheet.absoluteFill,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     // Acima da trava (900). `elevation` é o que ordena de verdade no Android.
     zIndex: 1000,
     elevation: 1000,
@@ -565,10 +537,10 @@ const styles = StyleSheet.create({
   palco: { width: LADO, height: LADO },
   marca: { width: LADO, height: LADO },
   nome: {
-    position: "absolute",
+    position: 'absolute',
     top: LADO + Space.md,
     left: -80,
     right: -80,
-    alignItems: "center",
+    alignItems: 'center',
   },
 });
