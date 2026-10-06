@@ -17,6 +17,21 @@ def _sem_rede_no_embedding(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _sem_rede_no_embedding(monkeypatch):
+    """O cliente de embedding da busca semântica nunca sobe de verdade: falha como um 429, que é o
+    caminho "sem semântica, cai no lexical". Teste que o quer troca `embeddings._embeddings`."""
+    from app.services import embeddings
+
+    class _SemRede:
+        async def aembed_query(self, *_a, **_k):
+            raise RuntimeError("sem rede nos testes")
+
+        aembed_documents = aembed_query
+
+    monkeypatch.setattr(embeddings, "_embeddings", lambda: _SemRede())
+
+
+@pytest.fixture(autouse=True)
 def _trava_de_lembrete_livre(monkeypatch):
     """Sem banco nos testes: a trava consultiva de lembrete sempre é obtida."""
     from contextlib import asynccontextmanager
