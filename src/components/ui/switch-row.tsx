@@ -24,8 +24,6 @@ export function SwitchRow({
   onValueChange: (value: boolean) => void;
   disabled?: boolean;
 }) {
-  const ativo = usePresencaAtiva();
-  const theme = useTheme();
   return (
     <View style={styles.linha}>
       <MudancaSuave valor={label} style={styles.texto}>
@@ -33,15 +31,34 @@ export function SwitchRow({
         {label}
       </ThemedText>
       </MudancaSuave>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        disabled={disabled || !ativo}
-        accessibilityLabel={label}
-        trackColor={Platform.OS === 'android' ? { false: theme.textSecondary, true: theme.tint } : undefined}
-        thumbColor={Platform.OS === 'android' ? (value ? theme.onTint : theme.surface) : undefined}
-      />
+      <Interruptor value={value} onValueChange={onValueChange} disabled={disabled} accessibilityLabel={label} />
     </View>
+  );
+}
+
+/** O `Switch` com as cores do app no Android — o mesmo do `SwitchRow`, para linhas de lista (`Row trailing`). */
+export function Interruptor({
+  value,
+  onValueChange,
+  disabled,
+  accessibilityLabel,
+}: {
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+  disabled?: boolean;
+  accessibilityLabel: string;
+}) {
+  const ativo = usePresencaAtiva();
+  const theme = useTheme();
+  return (
+    <Switch
+      value={value}
+      onValueChange={onValueChange}
+      disabled={disabled || !ativo}
+      accessibilityLabel={accessibilityLabel}
+      trackColor={Platform.OS === 'android' ? { false: theme.textSecondary, true: theme.tint } : undefined}
+      thumbColor={Platform.OS === 'android' ? (value ? theme.onTint : theme.surface) : undefined}
+    />
   );
 }
 

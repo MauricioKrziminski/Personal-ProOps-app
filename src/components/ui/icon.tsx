@@ -177,6 +177,8 @@ const MATERIAL: Record<string, MaterialName> = {
   storefront: 'storefront',
   'sun.max': 'light_mode',
   'sun.max.fill': 'light_mode',
+  'circle.lefthalf.filled': 'contrast',
+  timer: 'timer',
   tablecells: 'table_chart',
   tag: 'label',
   target: 'flag',

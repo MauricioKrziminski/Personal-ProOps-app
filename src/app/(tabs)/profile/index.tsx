@@ -12,8 +12,7 @@ import { AppHeader } from '@/components/ui/app-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
-import { Segmented } from '@/components/ui/segmented';
-import { LockSection } from '@/components/profile/lock-section';
+import { LockRows } from '@/components/profile/lock-section';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonHero, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -38,12 +37,18 @@ import { formatDateBR } from '@/hooks/use-items';
 import { isoToBR } from '@/lib/dates';
 import { useProfile, useUpdateProfile } from '@/hooks/use-profile';
 import { useSession } from '@/hooks/use-session';
-import { useTheme, useThemeMode } from '@/hooks/use-theme';
-import { confirmDestructive } from '@/lib/item-actions';
+import { useTheme, useThemeMode, type ThemeMode } from '@/hooks/use-theme';
+import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { ondaDaTroca } from '@/lib/session-gate';
 import { appUpdateAction, appUpdateSubtitle, type AppUpdateState } from '@/lib/app-update';
 import { supabase, supabaseUrl } from '@/lib/supabase';
 import { telefoneLegivel } from '@/lib/phone-br';
+
+const TEMAS: { value: ThemeMode; label: string }[] = [
+  { value: 'system', label: 'Sistema' },
+  { value: 'light', label: 'Claro' },
+  { value: 'dark', label: 'Escuro' },
+];
 
 const APP_UPDATE_ICON: Partial<
   Record<AppUpdateState['status'], Parameters<typeof Icon>[0]['name']>
@@ -116,30 +121,23 @@ export default function ProfileScreen() {
     confirmDestructive('Sair da conta?', 'Sair', doIt);
   };
 
-  const aparencia = (
-    <Section heading="block" title="Aparência">
-      <View style={styles.temaRow}>
-        {/* Sem subtítulo: o segmentado ao lado já diz qual tema vale. */}
-        <View style={styles.temaText}>
-          <ThemedText type="default">Tema</ThemedText>
-        </View>
-        <View style={styles.temaControl}>
-          <Segmented
-            value={mode}
-            onChange={setMode}
-            options={[
-              { value: 'system', label: 'Sistema' },
-              { value: 'light', label: 'Claro' },
-              { value: 'dark', label: 'Escuro' },
-            ]}
-          />
-        </View>
-      </View>
+  // Bloqueio e tema são ajustes do APARELHO, não da conta: uma seção só.
+  const rotuloDoTema = TEMAS.find((t) => t.value === mode)?.label ?? 'Sistema';
+  const segurancaEAparencia = (
+    <Section heading="block" title="Segurança e aparência">
+      <LockRows />
+      <Row
+        title="Tema"
+        icon="circle.lefthalf.filled"
+        chevron={false}
+        trailing={<ThemedText type="default" themeColor="textSecondary">{rotuloDoTema}</ThemedText>}
+        accessibilityLabel={`Tema: ${rotuloDoTema}`}
+        onPress={() =>
+          showItemActions('Tema', TEMAS.map((t) => ({ label: t.label, selected: t.value === mode, onPress: () => setMode(t.value) })))
+        }
+      />
     </Section>
   );
-
-  // A trava fica junto de Aparência: é configuração do APARELHO, não da conta — igual ao tema.
-  const bloqueio = <LockSection />;
 
   /**
    * Onde o mês FINANCEIRO fecha.
@@ -209,7 +207,7 @@ export default function ProfileScreen() {
   const rotuloCiclo = diaAtual == null ? 'Pago as contas até o último dia do mês' : `Pago as contas até o dia ${diaAtual}`;
 
   const cicloConfig = (
-    <Section heading="block" title="Meu mês">
+    <>
       <Row
         title={rotuloCiclo}
         subtitle={
@@ -248,7 +246,7 @@ export default function ProfileScreen() {
         O que é global é o DIA, que está na linha acima. O controle `Mês | Ciclo` vive em
         `MonthRuler` e cada tela de período carrega o seu.
       */}
-    </Section>
+    </>
   );
 
   /*
@@ -397,20 +395,7 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/*
-        **Conta é a PRIMEIRA seção**, logo abaixo do cartão de identidade (07/09/2026). Ela estava
-        em quarto lugar, depois de Notificações — quem abria o Perfil para conferir "com que
-        e-mail eu entrei" passava por dois blocos antes de chegar nisso.
-
-        A ordem inteira da tela virou a convenção de quem faz isso há mais tempo — WhatsApp abre
-        em *Conta*; o app de Ajustes do iOS põe o cartão de identidade e as linhas da conta no
-        topo; Revolut e Nubank vão de perfil → plano → notificações. A régua que a literatura de
-        UX repete é a mesma: o que é mais usado e mais identitário vem primeiro, e o número de
-        seções de topo fica em quatro ou cinco.
-
-        Dentro da seção a ordem é **Nome → e-mail → WhatsApp**: é a ordem em que uma pessoa diz
-        quem é, e vai do que ela escolheu para o que confirma o vínculo.
-      */}
+      {/* Ordem: identidade → Conta → Plano → Finanças → Notificações → Segurança e aparência → Ajuda e app → Sair. */}
       <Section heading="block" title="Conta">
         <Row
           title="Nome"
@@ -495,37 +480,23 @@ export default function ProfileScreen() {
 
   const settings = (
     <>
+      <Section heading="block" title="Finanças">
+        {cicloConfig}
+        <Row title="Categorias" subtitle="Ícone, cor, renomear e juntar" icon="tag" onPress={() => router.push('/finance/categories')} />
+        <Row title="Regras" subtitle="Categoria automática por palavra" icon="wand.and.stars" onPress={() => router.push('/finance/rules')} />
+        <Row title="Importar extrato" icon="square.and.arrow.down" onPress={() => router.push('/import')} />
+        <Row title="Importações" icon="clock.arrow.circlepath" onPress={() => router.push('/import-history')} />
+      </Section>
 
-      {/*
-        Notificações tem UM lugar: depois de Conta e Plano, antes de Dados.
-        Antes ela era renderizada em duas posições diferentes conforme o push estivesse ligado ou
-        não — o bloco "subia" quando desligado. Um bloco que muda de lugar conforme o estado
-        obriga a pessoa a procurá-lo, e a promoção rendia pouco: aqui ele já é a segunda seção de
-        cinco. O alerta de push desligado é a LINHA, não a posição dela.
-      */}
       <AlertPreferencesSection
         key={notificationRefreshKey}
         userId={userId}
         hasVerifiedPhone={!!phone}
       />
 
-      <Section heading="block" title="Ajuda">
-        <Row title="Como usar o ProOps" icon="questionmark.circle" onPress={() => router.push('/guia')} />
-      </Section>
+      {segurancaEAparencia}
 
-      <Section heading="block" title="Dados">
-        <Row title="Lixeira de notas" icon="trash" onPress={() => router.push('/notes/trash')} />
-        <Row title="Regras" subtitle="Categoria automática por palavra" icon="wand.and.stars" onPress={() => router.push('/finance/rules')} />
-        <Row title="Categorias" subtitle="Ícone, cor, renomear e juntar" icon="tag" onPress={() => router.push('/finance/categories')} />
-        <Row title="Importar extrato" icon="square.and.arrow.down" onPress={() => router.push('/import')} />
-        <Row title="Importações" icon="clock.arrow.circlepath" onPress={() => router.push('/import-history')} />
-      </Section>
-
-      {aparencia}
-      {bloqueio}
-      {cicloConfig}
-
-      <AppUpdateSection />
+      <AppAndHelp />
 
       <Section>
         <Row
@@ -619,27 +590,28 @@ export default function ProfileScreen() {
   );
 }
 
-/** Só esta linha renderiza de novo a cada percentual; o Perfil inteiro fica fora desse ciclo. */
-function AppUpdateSection() {
+/** Ajuda + atualização. Só a linha de atualização renderiza a cada percentual; o Perfil fica fora do ciclo. */
+function AppAndHelp() {
   const appUpdate = useAppUpdate();
-  if (appUpdate.state.status === 'unsupported') return null;
-
   const action = appUpdateAction(appUpdate.state);
   return (
-    <Section heading="block" title="App">
-      <Row
-        title="Atualização do app"
-        subtitle={appUpdateSubtitle(appUpdate.state, appUpdate.installedVersionName)}
-        icon={APP_UPDATE_ICON[appUpdate.state.status] ?? 'arrow.down.circle'}
-        chevron={false}
-        onPress={
-          action
-            ? () => {
-                void appUpdate.runNextStep();
-              }
-            : undefined
-        }
-      />
+    <Section heading="block" title="Ajuda e app">
+      <Row title="Como usar o ProOps" icon="questionmark.circle" onPress={() => router.push('/guia')} />
+      {appUpdate.state.status === 'unsupported' ? null : (
+        <Row
+          title="Atualização do app"
+          subtitle={appUpdateSubtitle(appUpdate.state, appUpdate.installedVersionName)}
+          icon={APP_UPDATE_ICON[appUpdate.state.status] ?? 'arrow.down.circle'}
+          chevron={false}
+          onPress={
+            action
+              ? () => {
+                  void appUpdate.runNextStep();
+                }
+              : undefined
+          }
+        />
+      )}
     </Section>
   );
 }
@@ -695,27 +667,6 @@ const styles = StyleSheet.create({
     paddingBottom: Space.md,
     gap: Space.md,
   },
-  /*
-    `flexWrap`: com fonte grande o rótulo + os três segmentos não cabem na mesma linha, e apertar
-    o controle partia "Sistema" em "Sistem/a" dentro da célula. Aqui quem cede é o LAYOUT — o
-    segmentado desce inteiro para a linha de baixo (`minWidth` no controle é o gatilho).
-    O `flexShrink: 0` no texto é o que faz o `flexWrap` valer: o Yoga prefere ENCOLHER a quebrar.
-  */
-  temaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: Space.md,
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.md,
-  },
-  temaText: { flexShrink: 0, maxWidth: '100%' },
-  /** Largura fixa: com `flex` o segmentado encolhia até o rótulo "Sistema" truncar. */
-  /* Sem `width` fixa: com fonte grande "Sistema" não cabia em 200 e quebrava no meio da palavra.
-     `minWidth` é o gatilho da quebra da linha acima; `flexGrow` faz o controle ocupar a linha
-     inteira quando ele desce. */
-  temaControl: { flexGrow: 1, minWidth: 240 },
   shrink: { flex: 1, minWidth: 0 },
   idCard: {
     gap: Space.lg,

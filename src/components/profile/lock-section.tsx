@@ -12,123 +12,91 @@
 
 import { StyleSheet, View } from 'react-native';
 
-import { Presenca } from '@/components/motion/presenca';
-import { ThemedText } from '@/components/themed-text';
 import { Note } from '@/components/ui/note';
-import { Section } from '@/components/ui/row';
-import { Segmented } from '@/components/ui/segmented';
+import { Row } from '@/components/ui/row';
+import { Interruptor } from '@/components/ui/switch-row';
+import { ThemedText } from '@/components/themed-text';
 import { useToast } from '@/components/ui/toast';
 import { Space } from '@/design/tokens';
 import { useLock } from '@/hooks/use-lock';
-import { useTheme } from '@/hooks/use-theme';
-import type { LockDelay, LockMode } from '@/lib/lock-policy';
+import { showItemActions } from '@/lib/item-actions';
+import type { LockDelay } from '@/lib/lock-policy';
 
-const MODOS = [
-  { value: 'off', label: 'Não' },
-  { value: 'on', label: 'Sim' },
-] as const;
+const ESPERAS: { value: LockDelay; label: string }[] = [
+  { value: 0, label: 'Na hora' },
+  { value: 30, label: '30 s' },
+  { value: 60, label: '1 min' },
+];
 
-const ESPERAS = [
-  { value: '0', label: 'Na hora' },
-  { value: '30', label: '30s' },
-  { value: '60', label: '1 min' },
-] as const;
-
-export function LockSection() {
-  const theme = useTheme();
+/**
+ * As linhas do bloqueio, sem `Section`: quem embute escolhe o título (Perfil → Segurança e aparência).
+ * Ligar é sim/não, então é interruptor; a espera é uma escolha curta, então é linha com o valor à
+ * direita que abre o menu nativo — dois segmentados empilhados liam como formulário, não ajuste.
+ */
+export function LockRows() {
   const { mode, delaySeconds, disponivel, comoAutentica, configurar, definirEspera } = useLock();
   const toast = useToast();
+  const ligado = mode !== 'off';
 
-  const escolher = async (novo: string) => {
+  const escolher = async (ligar: boolean) => {
     /*
       ⚠️ **Sem o try/catch isto falha em SILÊNCIO.** Uma exceção no `AsyncStorage` deixaria o
-      segmentado voltando sozinho para a posição anterior, sem toast e sem log — a pessoa toca e
+      interruptor voltando sozinho para a posição anterior, sem toast e sem log — a pessoa toca e
       não acontece nada. `design.md` §6: "mutation que falha precisa aparecer".
     */
     try {
-      await configurar(novo as LockMode);
+      await configurar(ligar ? 'on' : 'off');
     } catch (e) {
       console.error('[lock] configurar falhou', e);
       toast({ message: 'Não deu para mudar o bloqueio.', tone: 'error' });
       return;
     }
-    toast({ message: novo === 'off' ? 'Bloqueio desligado.' : 'Bloqueio ligado.', tone: 'success' });
+    toast({ message: ligar ? 'Bloqueio ligado.' : 'Bloqueio desligado.', tone: 'success' });
   };
 
-  return (
-    <Section heading="block" title="Bloqueio">
+  /*
+    Sem bloqueio de tela no celular o interruptor nem aparece: ligado, ele trancaria o app num
+    prompt que nunca abre — e não existe senha nossa para servir de saída.
+  */
+  if (!disponivel) {
+    return (
       <View>
-      <View style={styles.linha}>
-        <View style={styles.texto}>
-          <ThemedText type="default">Pedir para desbloquear ao abrir</ThemedText>
-          {/* Desligado não ganha palavra: o segmentado ao lado já diz "Não". */}
-          <Presenca visivel={!disponivel || mode !== 'off'}>
-            <ThemedText type="footnote" themeColor="textSecondary">
-              {disponivel ? comoAutentica : 'indisponível'}
-            </ThemedText>
-          </Presenca>
-        </View>
-        {/*
-          Sem bloqueio de tela no celular o controle nem aparece: ligado, ele trancaria o app num
-          prompt que nunca abre — e não existe senha nossa para servir de saída.
-        */}
-        {disponivel ? (
-          <View style={styles.controle}>
-            <Segmented value={mode} onChange={(v: LockMode) => void escolher(v)} options={MODOS} />
-          </View>
-        ) : null}
-      </View>
-
-      {!disponivel ? (
-        <>
-        <View style={[styles.separador, { backgroundColor: theme.separator }]} />
+        <Row title="Pedir para desbloquear ao abrir" subtitle="Indisponível" icon="lock" />
         <View style={styles.aviso}>
-          <Note icon="exclamationmark.triangle">
-            Ative o bloqueio de tela do celular
-          </Note>
+          <Note icon="exclamationmark.triangle">Ative o bloqueio de tela do celular</Note>
         </View>
-        </>
-      ) : null}
-
-      <Presenca visivel={disponivel && mode !== 'off'}>
-        <View style={[styles.separador, { backgroundColor: theme.separator }]} />
-        <View style={styles.linha}>
-          <View style={styles.texto}>
-            <ThemedText type="default">Depois de sair do app</ThemedText>
-          </View>
-          <View style={styles.controle}>
-            <Segmented
-              value={String(delaySeconds)}
-              onChange={(v) => void definirEspera(Number(v) as LockDelay)}
-              options={ESPERAS}
-            />
-          </View>
-        </View>
-      </Presenca>
       </View>
-    </Section>
+    );
+  }
+
+  const espera = ESPERAS.find((e) => e.value === delaySeconds) ?? ESPERAS[0];
+  return (
+    <>
+      <Row
+        title="Pedir para desbloquear ao abrir"
+        subtitle={ligado ? comoAutentica : undefined}
+        icon="lock"
+        trailing={<Interruptor value={ligado} onValueChange={(v) => void escolher(v)} accessibilityLabel="Pedir para desbloquear ao abrir" />}
+      />
+      {ligado ? (
+        <Row
+          title="Depois de sair do app"
+          icon="timer"
+          chevron={false}
+          trailing={<ThemedText type="default" themeColor="textSecondary">{espera.label}</ThemedText>}
+          accessibilityLabel={`Depois de sair do app: ${espera.label}`}
+          onPress={() =>
+            showItemActions(
+              'Pedir de novo depois de sair',
+              ESPERAS.map((e) => ({ label: e.label, selected: e.value === delaySeconds, onPress: () => void definirEspera(e.value) }))
+            )
+          }
+        />
+      ) : null}
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  separador: { height: StyleSheet.hairlineWidth, marginLeft: Space.lg },
-  /*
-    Copiado do `temaRow` do Perfil, e cada propriedade tem motivo — a primeira versão daqui usava
-    `flex: 1` no texto e o rótulo ERA ESPREMIDO ATÉ SUMIR, deixando o segmentado sozinho numa
-    caixa alta e vazia. `flexShrink: 0` é o que faz o `flexWrap` valer (o Yoga prefere encolher a
-    quebrar), e o `minWidth` no controle é o gatilho da quebra: com fonte grande o segmentado
-    desce para a linha de baixo inteiro, em vez de truncar o rótulo.
-  */
-  linha: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: Space.md,
-    paddingHorizontal: Space.lg,
-    paddingVertical: Space.md,
-  },
-  texto: { flexShrink: 0, maxWidth: '100%', gap: Space.half },
-  controle: { flexGrow: 1, minWidth: 240 },
   aviso: { paddingHorizontal: Space.lg, paddingBottom: Space.md },
 });
