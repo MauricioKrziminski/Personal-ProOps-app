@@ -345,8 +345,8 @@ interface MoneyFieldProps {
   /** Quando o campo tem unidade (cada parcela × total), o leitor de tela precisa dizê-la. */
   accessibilityLabel?: string;
   /**
-   * O lado do dinheiro, NO número (06/10/2026): entrada é `+ R$` em verde (a semântica de dinheiro
-   * que entra), saída é `− R$` na tinta. Uma hipótese nova herdava "Entra" e ninguém via — o
+   * O lado do dinheiro, NO número (06/10/2026): entrada é `+ R$` em verde, saída é `− R$` em
+   * vermelho (pedido do dono do produto). Uma hipótese nova herdava "Entra" e ninguém via — o
    * seletor fica em cima, e o olho está no valor. Sem `sinal` (transferência), nada muda.
    */
   sinal?: 'entra' | 'sai';
@@ -493,7 +493,7 @@ export function MoneyField({
   }, [focado, reduzido, piscar]);
   const cursor = useAnimatedStyle(() => ({ opacity: piscar.get() }));
 
-  const cor = readOnly ? theme.textSecondary : sinal === 'entra' ? theme.success : theme.text;
+  const cor = readOnly ? theme.textSecondary : sinal === 'entra' ? theme.success : sinal === 'sai' ? theme.danger : theme.text;
   const { fontScale } = useWindowDimensions();
   const [largura, setLargura] = useState(0);
   const [medidas, setMedidas] = useState<Record<string, Record<string, number>>>({});
@@ -529,7 +529,7 @@ export function MoneyField({
             });
           }}>{ch}</Text>)}
       </View>
-      <ThemedText themeColor={sinal === 'entra' && !readOnly ? 'success' : 'textSecondary'} style={[Type.title2, styles.moeda]}>
+      <ThemedText themeColor={readOnly || !sinal ? 'textSecondary' : sinal === 'entra' ? 'success' : 'danger'} style={[Type.title2, styles.moeda]}>
         {sinal === 'entra' ? '+ R$' : sinal === 'sai' ? '− R$' : 'R$'}
       </ThemedText>
       <View style={[styles.digitos, { height: alturaDoValor, opacity: largura > 0 && escalaDoValor > 0 ? 1 : 0 }]} pointerEvents="none"

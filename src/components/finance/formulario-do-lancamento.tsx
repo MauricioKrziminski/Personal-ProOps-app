@@ -160,6 +160,12 @@ const schema = z
     message: 'Parcelamento precisa de uma conta/cartão e só vale para gastos',
     path: ['installments'],
   })
+  // O banco recusa transferência sem origem (check de `transactions`); sem isto o Salvar falhava
+  // na gravação, depois de a pessoa já ter apertado (06/10/2026).
+  .refine((data) => data.kind !== 'transfer' || !!data.account_id, {
+    message: 'Escolha a conta de origem',
+    path: ['account_id'],
+  })
   .refine((data) => data.kind !== 'transfer' || !!data.counterparty_account_id, {
     message: 'Escolha a conta de destino',
     path: ['counterparty_account_id'],
@@ -1317,10 +1323,10 @@ export function FormularioDoLancamento(props: Props) {
           render={({ field }) => (
             <Field
               label={kind === 'transfer' ? 'Da conta' : 'Conta'}
-              obrigatorio={kind === 'transfer' || paymentMethod === 'credit'}
+              obrigatorio={kind === 'transfer' || paymentMethod === 'credit' || installmentCount > 1}
               // Sem a fileira de parcelas (sem conta ou fora de gasto), o erro dela mora aqui:
               // senão o Salvar recusava sem dizer por quê.
-              error={contas.isError ? 'Não deu para carregar as contas.' : !podeParcelarAqui ? errors.installments?.message : undefined}
+              error={contas.isError ? 'Não deu para carregar as contas.' : errors.account_id?.message ?? (!podeParcelarAqui ? errors.installments?.message : undefined)}
               hint={erroPagamento && account ? `Conta escolhida: ${account.name}. Escolha uma conta compatível ou mude a forma de pagamento.`
                 : contaSaiu && !accountId ? 'A conta original não está mais ativa: escolha outra.' : undefined}>
               {/* Afirmar "não tem conta" exige a consulta respondida: carregando, era o

@@ -29,6 +29,11 @@ const REPETE = [
   { value: 'yearly', label: 'Todo ano' },
 ] as const satisfies readonly { value: Repete; label: string }[];
 
+/** Troca o lado; a forma que o outro lado não tem volta a "Uma vez" — nunca uma receita "parcelada". */
+export function comOLado(h: Hipotese, kind: Hipotese['kind']): Hipotese {
+  return { ...h, kind, forma: (kind === 'income' ? FORMAS_ENTRA : FORMAS_SAI).some((f) => f.id === h.forma) ? h.forma : 'uma' };
+}
+
 /**
  * Os campos da hipótese do "E se…?" (spec 2026-09-29, §2): o que o detalhe por conta precisa
  * para estar CERTO, e nada mais — título, categoria e o resto ficam para o formulário completo do
@@ -39,12 +44,15 @@ export function CamposDaHipotese({
   onChange,
   contas,
   max,
+  semTipo,
 }: {
   valor: Hipotese;
   onChange: (h: Hipotese) => void;
   contas: readonly PickableAccount[];
   /** O último dia que a projeção alcança (ISO). */
   max: string;
+  /** Quem chama já mostra o lado no seu próprio seletor (Sai | Entra | Adiantar): sem um segundo. */
+  semTipo?: boolean;
 }) {
   const formas = h.kind === 'income' ? FORMAS_ENTRA : FORMAS_SAI;
   const set = (parcial: Partial<Hipotese>) => onChange({ ...h, ...parcial });
@@ -54,18 +62,16 @@ export function CamposDaHipotese({
 
   return (
     <View style={styles.campos}>
-      <Field label="Tipo">
+      {semTipo ? null : <Field label="Tipo">
         <Segmented
           options={[
             { value: 'expense', label: 'Sai' },
             { value: 'income', label: 'Entra' },
           ]}
           value={h.kind}
-          onChange={(kind) =>
-            // A forma que o outro lado não tem volta a "Uma vez" — nunca uma receita "parcelada".
-            set({ kind, forma: (kind === 'income' ? FORMAS_ENTRA : FORMAS_SAI).some((f) => f.id === h.forma) ? h.forma : 'uma' })}
+          onChange={(kind) => onChange(comOLado(h, kind))}
         />
-      </Field>
+      </Field>}
 
       <Field label="Título" hint="Vai para o lançamento ao aplicar.">
         <TextField

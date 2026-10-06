@@ -48,7 +48,7 @@ import { explicaProjecao } from '@/lib/explicacoes';
 import { motivoDaHipotese } from '@/lib/rascunho';
 import { dataDaHipotese, faltaNaHipotese, novaHipotese, paramsDoAplicar, resumoDaHipotese, type Hipotese } from '@/lib/hipotese';
 import { ondeMuda } from '@/lib/onde-muda';
-import { CamposDaHipotese } from '@/components/finance/campos-da-hipotese';
+import { CamposDaHipotese, comOLado } from '@/components/finance/campos-da-hipotese';
 import { OndeMuda } from '@/components/finance/onde-muda';
 import { Note } from '@/components/ui/note';
 import { useRascunho } from '@/hooks/use-rascunho';
@@ -1186,15 +1186,22 @@ export default function ForecastScreen() {
         />
 
         <SheetScroll contentContainerStyle={styles.sheetCorpo}>
-          {/* Editando, o tipo é o da linha aberta: trocar viraria outra hipótese no lugar dela. */}
+          {/* Editando, o tipo é o da linha aberta: trocar viraria outra hipótese no lugar dela.
+              Um seletor só (06/10/2026): eram dois seguidos — "Entrada ou saída | Adiantar" e,
+              logo abaixo, "Sai | Entra". O lado e o adiantar são a mesma escolha. */}
           {editando ? null : (
             <Segmented
               options={[
-                { value: 'hipotese', label: 'Entrada ou saída' },
-                { value: 'adiantar', label: 'Adiantar parcelas' },
+                { value: 'expense', label: 'Sai' },
+                { value: 'income', label: 'Entra' },
+                { value: 'adiantar', label: 'Adiantar' },
               ]}
-              value={tipoDaFolha}
-              onChange={(v) => setTipoDaFolha(v)}
+              value={tipoDaFolha === 'adiantar' ? 'adiantar' : hipotese.kind}
+              onChange={(v) => {
+                if (v === 'adiantar') return setTipoDaFolha('adiantar');
+                setTipoDaFolha('hipotese');
+                setHipotese((h) => comOLado(h, v));
+              }}
             />
           )}
 
@@ -1234,6 +1241,7 @@ export default function ForecastScreen() {
               onChange={setHipotese}
               contas={accounts.data ?? []}
               max={somaDias(localISODate(), 3650)}
+              semTipo={!editando}
             />
           )}
 

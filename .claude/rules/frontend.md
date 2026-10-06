@@ -85,7 +85,8 @@ card de erro e a recuperação.
   condição do guarda. Campo novo que bloqueia o salvar nasce com a prop.
 - **O lado do dinheiro fica à vista** (06/10/2026, hipótese criada como "Entra" sem a pessoa ver):
   o Tipo é `Segmented` no topo (lançamento, série, hipótese) e o `MoneyField` repete o lado no
-  número — `sinal="entra"` é `+ R$` verde, `"sai"` é `− R$` na tinta; transferência sem sinal.
+  número — `sinal="entra"` é `+ R$` verde, `"sai"` é `− R$` vermelho (pedido do dono do produto,
+  exceção declarada ao "vermelho é erro"); transferência sem sinal.
 - Decimal em texto (percentual, taxa, meses) só por `formatNumberBR` — vírgula, nunca ponto.
   Havia três cópias disso e uma tela sem nenhuma, escrevendo `90.4%` ao lado de `90,4%`.
 
@@ -467,8 +468,12 @@ tela. Entradas sem rota órfã: todo ponto tem caminho a partir de Hoje, Finanç
 
 ### Metas, reserva e investimentos
 
-- Folha Guardar/Retirar: `Segmented` de 2 (**Já está na conta | Transferir**; **Liberar | Transferir
-  de volta**), origem antes do destino, efeito por conta antes de salvar e "Desfazer" no extrato.
+- Folha Guardar/Retirar: `Segmented` Guardar | Retirar e, abaixo, a chave "Transferir de outra
+  conta" / "Transferir de volta" (desligada = já está na conta / liberar), origem antes do destino,
+  efeito por conta antes de salvar e "Desfazer" no extrato.
+- **Nunca dois seletores de abas seguidos** (06/10/2026, *"dois tabnav seguido um do outro"*): ou
+  viram UM (`Sai | Entra | Adiantar` no "E se…?"), ou o segundo vira chave, lista (`SelectField`)
+  ou campo rotulado. Botões do mesmo nível vão em `ButtonRow`.
 - **A celebração de marco toca DEPOIS que a folha sai**: no sucesso do aporte a folha ainda descia
   por cima do anel e ninguém via. Celebra uma vez por travessia (memória por usuário no aparelho,
   chave `meta:<goal_id>`); abrir, puxar para atualizar e Realtime não celebram. Sem som e sem push;

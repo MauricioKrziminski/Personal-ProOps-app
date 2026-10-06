@@ -7258,7 +7258,7 @@ test('F11: separar na conta manda allocate com a conta escolhida e mostra o efei
 
 test('F11: Transferir mostra origem e destino, origem primeiro', () => {
   const ui = f11Folha();
-  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Segmented' && n.props.options.some((o: any) => o.label === 'Transferir')).props.onChange('transferir'));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'SwitchRow' && n.props.label === 'Transferir de outra conta').props.onValueChange(true));
   const rotulos = ui.nodes().filter((n: any) => n.type === 'Field').map((n: any) => n.props.label);
   assert.ok(rotulos.indexOf('Da conta') >= 0 && rotulos.indexOf('Da conta') < rotulos.indexOf('Para a conta'));
   assert.equal(ui.nodes().filter((n: any) => n.type === 'AccountPicker').length, 2);
@@ -7266,7 +7266,7 @@ test('F11: Transferir mostra origem e destino, origem primeiro', () => {
 
 test('F11: origem igual ao destino bloqueia o salvar com o motivo escrito', () => {
   const ui = f11Folha();
-  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Segmented' && n.props.options.some((o: any) => o.label === 'Transferir')).props.onChange('transferir'));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'SwitchRow' && n.props.label === 'Transferir de outra conta').props.onValueChange(true));
   ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'MoneyField').props.onChangeCents(1000));
   const [origem, destino] = ui.nodes().filter((n: any) => n.type === 'AccountPicker');
   ui.interact(() => origem.props.onChange('a1'));

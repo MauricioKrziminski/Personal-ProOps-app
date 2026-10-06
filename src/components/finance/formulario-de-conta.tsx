@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { AccountFormFields } from '@/components/finance/account-form';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
+import { ButtonRow } from '@/components/ui/button-row';
 import { useToast } from '@/components/ui/toast';
 import { Space } from '@/design/tokens';
 import { useCreateAccount, type Account } from '@/hooks/use-finance';
@@ -75,8 +76,10 @@ export function FormularioDeConta({
         disabled={travado}
       />
       {aviso ? <ThemedText type="footnote" themeColor="danger">{aviso}</ThemedText> : null}
-      <Button label="Salvar" loading={criar.isPending} disabled={!valido} onPress={salvar} />
-      <Button label={rotuloPular} variant="secondary" onPress={onPular} />
+      <ButtonRow>
+        <Button label="Salvar" block loading={criar.isPending} disabled={!valido} onPress={salvar} />
+        <Button label={rotuloPular} variant="secondary" block onPress={onPular} />
+      </ButtonRow>
     </View>
   );
 }

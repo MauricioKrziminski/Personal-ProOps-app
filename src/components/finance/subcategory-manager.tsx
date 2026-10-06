@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Presenca } from '@/components/motion/presenca';
 import { Button } from '@/components/ui/button';
+import { ButtonRow } from '@/components/ui/button-row';
 import { Field, TextField } from '@/components/ui/field';
 import { Row, Section } from '@/components/ui/row';
 import { SearchField } from '@/components/ui/search-field';
@@ -139,8 +140,10 @@ export function SubcategoryManager({ visible, parent, workspaceId, onClose }: {
       {issue ? <ThemedText type="small" themeColor="danger" accessibilityRole="alert" accessibilityLiveRegion="polite">{issue}</ThemedText> : null}
       {write.unconfirmedInput ? <View style={styles.group}>
         <ThemedText type="small">Confira esta tentativa antes de ajustar ou fechar. Os mesmos valores serão mantidos.</ThemedText>
-        <Button label="Tentar novamente" variant="secondary" disabled={write.isPending} loading={write.isPending} onPress={() => retry()} />
-        <Button label="Conferir tentativa" variant="secondary" disabled={write.isPending} onPress={() => retry(true)} />
+        <ButtonRow>
+          <Button label="Tentar novamente" variant="secondary" block disabled={write.isPending} loading={write.isPending} onPress={() => retry()} />
+          <Button label="Conferir tentativa" variant="secondary" block disabled={write.isPending} onPress={() => retry(true)} />
+        </ButtonRow>
       </View> : null}
       {query.isPending ? <ThemedText type="small" themeColor="textSecondary">Carregando detalhes…</ThemedText> : null}
       {query.isError || (!query.isPending && !catalog) ? <View style={styles.group}>
@@ -152,8 +155,10 @@ export function SubcategoryManager({ visible, parent, workspaceId, onClose }: {
         {page.visiveis.length ? <Section>{page.visiveis.map(item => <Row key={item.id} title={item.name}
           subtitle={`${item.uses} registros`} chevron={false} onPress={() => open(item)} />)}</Section>
           : <ThemedText type="small" themeColor="textSecondary">{search ? 'Nenhum detalhe encontrado.' : 'Esta categoria ainda não tem detalhes.'}</ThemedText>}
-        {page.restantes ? <Button label="Ver mais detalhes" variant="secondary" onPress={page.verMais} /> : null}
-        <Button label="Novo detalhe" variant="secondary" disabled={blocked} onPress={() => open(null)} />
+        <ButtonRow>
+          {page.restantes ? <Button label="Ver mais detalhes" variant="secondary" block onPress={page.verMais} /> : null}
+          <Button label="Novo detalhe" variant="secondary" block disabled={blocked} onPress={() => open(null)} />
+        </ButtonRow>
       </> : null}
       <Presenca visivel={!!draft}>
         {draft ? <View style={styles.group}>
@@ -177,8 +182,10 @@ export function SubcategoryManager({ visible, parent, workspaceId, onClose }: {
             }} />
           </View> : null}
           <Button label={collision ? 'Juntar detalhes' : 'Salvar detalhe'} disabled={!valid || (!!collision && !draft.snapshot)} loading={write.isPending} onPress={save} />
-          {draft.snapshot ? <Button label="Remover detalhe" variant="secondary" tone="danger" disabled={!canEdit} onPress={remove} /> : null}
-          <Button label="Voltar aos detalhes" variant="ghost" disabled={blocked} onPress={() => { if (sameVisit() && !active.current.blocked) setDraft(null); }} />
+          <ButtonRow>
+            {draft.snapshot ? <Button label="Remover detalhe" variant="secondary" tone="danger" block disabled={!canEdit} onPress={remove} /> : null}
+            <Button label="Voltar aos detalhes" variant="ghost" block disabled={blocked} onPress={() => { if (sameVisit() && !active.current.blocked) setDraft(null); }} />
+          </ButtonRow>
         </View> : null}
       </Presenca>
     </SheetScroll>

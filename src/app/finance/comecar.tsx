@@ -6,6 +6,7 @@ import { TrocaSuave } from '@/components/motion/presenca';
 import { FormularioDeConta } from '@/components/finance/formulario-de-conta';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
+import { ButtonRow } from '@/components/ui/button-row';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
@@ -119,23 +120,28 @@ export default function ComecarScreen() {
     ) : passo === 3 ? (
       <View style={styles.bloco}>
         <ThemedText type="small" themeColor="textSecondary">Quer lançar o primeiro gasto ou entrada?</ThemedText>
-        <Button
-          label="Lançar agora"
-          onPress={() => {
-            ir(4);
-            lancar();
-          }}
-        />
-        <Button label="Pular" variant="secondary" onPress={() => ir(4)} />
+        <ButtonRow>
+          <Button
+            label="Lançar agora"
+            block
+            onPress={() => {
+              ir(4);
+              lancar();
+            }}
+          />
+          <Button label="Pular" variant="secondary" block onPress={() => ir(4)} />
+        </ButtonRow>
       </View>
     ) : (
       <View style={styles.bloco}>
         <Resumo itens={ef.jaTinhaContas ? todas : criadas} titulo={ef.jaTinhaContas ? 'Suas contas' : 'Criado'} />
         <Button label="Abrir Finanças" onPress={() => router.replace('/finance')} />
-        {!ef.cartaoId && !todas.some((c) => c.type === 'credit_card') ? (
-          <Button label="Adicionar cartão" variant="secondary" onPress={() => gravar({ passo: 2, contaIds: ef.contaIds })} />
-        ) : null}
-        <Button label="Lançar" variant="secondary" onPress={lancar} />
+        <ButtonRow>
+          {!ef.cartaoId && !todas.some((c) => c.type === 'credit_card') ? (
+            <Button label="Adicionar cartão" variant="secondary" block onPress={() => gravar({ passo: 2, contaIds: ef.contaIds })} />
+          ) : null}
+          <Button label="Lançar" variant="secondary" block onPress={lancar} />
+        </ButtonRow>
       </View>
     )
   );

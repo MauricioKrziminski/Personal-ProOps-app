@@ -58,6 +58,7 @@ import {
   type GoalContribution,
 } from '@/hooks/use-finance';
 import { Segmented } from '@/components/ui/segmented';
+import { SwitchRow } from '@/components/ui/switch-row';
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate, mesCurto } from '@/lib/dates';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { financeErrorMessage } from '@/lib/finance-form';
@@ -636,12 +637,12 @@ export default function GoalsScreen() {
                 value={aporteDirecao}
                 onChange={mudarDirecao}
               />
-              <Segmented
-                options={aporteDirecao === 'guardar'
-                  ? [{ value: 'conta', label: 'Já está na conta' }, { value: 'transferir', label: 'Transferir' }]
-                  : [{ value: 'conta', label: 'Liberar' }, { value: 'transferir', label: 'Transferir de volta' }]}
-                value={aporteVia}
-                onChange={mudarVia}
+              {/* Chave, não um segundo seletor de abas logo abaixo do primeiro (06/10/2026):
+                  desligada, o dinheiro já está na conta (ou é só liberado); ligada, ele se move. */}
+              <SwitchRow
+                label={aporteDirecao === 'guardar' ? 'Transferir de outra conta' : 'Transferir de volta para uma conta'}
+                value={aporteVia === 'transferir'}
+                onValueChange={(ligada) => mudarVia(ligada ? 'transferir' : 'conta')}
               />
 
               {vinculada ? null : (

@@ -12,7 +12,9 @@ import { useBRL, useConceal } from '@/components/ui/conceal';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
+import { Field } from '@/components/ui/field';
 import { Segmented } from '@/components/ui/segmented';
+import { SelectField } from '@/components/ui/select-field';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { Space, tabular } from '@/design/tokens';
@@ -107,12 +109,16 @@ export default function WhyScreen() {
             value={grupo}
             onChange={(v) => { setGrupo(v); setTodas(false); }}
           />
+          {/* Lista, não um segundo seletor de abas colado no primeiro (06/10/2026). */}
           {grupo === 'type' ? (
-            <Segmented<Tipo>
-              options={[{ value: 'pattern', label: 'Fixo ou variável' }, { value: 'necessity', label: 'Essencial ou não' }]}
-              value={tipo}
-              onChange={(v) => { setTipo(v); setTodas(false); }}
-            />
+            <Field label="Classificar por">
+              <SelectField
+                options={[{ id: 'pattern', label: 'Fixo ou variável' }, { id: 'necessity', label: 'Essencial ou não' }]}
+                value={tipo}
+                placeholder="Escolher"
+                onChange={(v) => { if (v === 'pattern' || v === 'necessity') { setTipo(v); setTodas(false); } }}
+              />
+            </Field>
           ) : null}
 
           {q.isError ? <ErrorCard onRetry={() => q.refetch()} /> : null}

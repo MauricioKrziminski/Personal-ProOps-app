@@ -93,11 +93,15 @@ export default function Acumulacao() {
         value={modo}
         onChange={setModo}
       />
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm }}>
-        {cenarios.map((_, i) => (
-          <Chip key={i} label={`Cenário ${i + 1}`} selected={i === sel} onPress={() => setSel(i)} />
-        ))}
-      </View>
+      {/* Rotulado: sem o rótulo, a fileira de cenários colava no seletor acima como um segundo
+          par de abas (06/10/2026). */}
+      <Field label="Cenário">
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm }}>
+          {cenarios.map((_, i) => (
+            <Chip key={i} label={`Cenário ${i + 1}`} selected={i === sel} onPress={() => setSel(i)} />
+          ))}
+        </View>
+      </Field>
 
       <View style={{ gap: Space.md }}>
         {modo === 'acumular' ? (
