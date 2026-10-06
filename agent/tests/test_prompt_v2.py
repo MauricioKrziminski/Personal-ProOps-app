@@ -101,8 +101,8 @@ def _instalar(monkeypatch, v2: bool, router_sub=None):
         RouterDecision: RouterDecision(domains=["financas"], confidence=0.9),
         RouterDecisionV2: RouterDecisionV2(domains=["financas"], confidence=0.9,
                                            finance_subintents=router_sub),
-        FinancePlan: FinancePlan(actions=[], confidence=0.9),
-        FinanceQueryPlan: FinanceQueryPlan(actions=[], confidence=0.9),
+        FinancePlan: FinancePlan(actions=[]),
+        FinanceQueryPlan: FinanceQueryPlan(actions=[]),
     })
     monkeypatch.setattr(nodes.gemini, "structured", cap)
     return cap

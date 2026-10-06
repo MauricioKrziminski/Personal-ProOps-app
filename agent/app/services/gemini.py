@@ -161,7 +161,7 @@ def versao_do_prompt(texto: str) -> str:
     return hashlib.sha256(texto.encode("utf-8")).hexdigest()[:8]
 
 
-_cache: dict[tuple[str, float, float, int], ChatGoogleGenerativeAI] = {}
+_cache: dict[tuple[str, float, float, int, str | None], ChatGoogleGenerativeAI] = {}
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -169,6 +169,25 @@ T = TypeVar("T", bound=BaseModel)
 # o que é grande (lote de extrato, anexo).
 PRAZO_COM_RESERVA = 10
 PRAZO_LONGO = 30
+
+
+NIVEIS_DE_RACIOCINIO = ("minimal", "low", "medium", "high")
+
+
+def raciocinio(papel: str) -> str | None:
+    """`thinking_level` do papel — só com `GEMINI_THINKING_<PAPEL>` definido; sem ela, o padrão do MODELO.
+
+    Medido em 06/10/2026: o Lite gasta 0 token de raciocínio, então router e parse não têm o que
+    baixar. O gate (3.7-flash) roda em `medium` por padrão, cobrado como saída. Baixar o gate SÓ
+    depois da seção de segurança do `evaluate_answer_forms.py` com a variável ligada — é o portão
+    do SIM. Valor fora da lista levanta: um typo não pode virar o padrão em silêncio.
+    """
+    nivel = os.environ.get(f"GEMINI_THINKING_{papel.upper()}", "").strip().lower()
+    if not nivel:
+        return None
+    if nivel not in NIVEIS_DE_RACIOCINIO:
+        raise ValueError(f"GEMINI_THINKING_{papel.upper()}={nivel!r} (aceito: {NIVEIS_DE_RACIOCINIO})")
+    return nivel
 
 
 def llm(
@@ -182,10 +201,12 @@ def llm(
     settings = get_settings()
     papel = model or GEMINI_PARSE
     nome_modelo = modelo(papel)
-    chave = (nome_modelo, temperature, timeout, max_retries)
+    nivel = raciocinio(papel)
+    chave = (nome_modelo, temperature, timeout, max_retries, nivel)
     if chave not in _cache:
         _cache[chave] = ChatGoogleGenerativeAI(
             model=nome_modelo,
+            **({"thinking_level": nivel} if nivel else {}),
             temperature=temperature,
             google_api_key=settings.gemini_api_key,
             # Sem reserva (o portão, a segunda leitura) vale esperar: o Lite DEGRADADO responde

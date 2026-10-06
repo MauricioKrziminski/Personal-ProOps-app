@@ -28,8 +28,8 @@ async def test_um_caminho_nos_dois_modos(monkeypatch):
         RouterDecision: RouterDecision(domains=["financas"], confidence=0.9),
         RouterDecisionV2: RouterDecisionV2(domains=["financas"], confidence=0.9,
                                            finance_subintents=["criar"]),
-        FinancePlan: FinancePlan(actions=[acao], confidence=0.9),
-        FinanceQueryPlan: FinanceQueryPlan(actions=[], confidence=0.9),
+        FinancePlan: FinancePlan(actions=[acao]),
+        FinanceQueryPlan: FinanceQueryPlan(actions=[]),
     }
 
     def structured(schema, *_a, **_k):

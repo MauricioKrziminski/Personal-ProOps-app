@@ -1,5 +1,6 @@
 """A reserva de disponibilidade: o Lite fora do ar cai no modelo do portão; o portão não cai."""
 
+import pytest
 from langchain_core.runnables.fallbacks import RunnableWithFallbacks
 from pydantic import BaseModel
 
@@ -28,3 +29,17 @@ def test_portao_nao_tem_reserva():
     # a reserva natural do portão seria o Lite, que já aprovou "apaga todos"
     assert not isinstance(gemini.structured(_S, gemini.GEMINI_GATE), RunnableWithFallbacks)
     assert not isinstance(gemini.structured(_S, "gate"), RunnableWithFallbacks)
+
+
+def test_raciocinio_por_papel_so_com_a_variavel(monkeypatch):
+    monkeypatch.delenv("GEMINI_THINKING_GATE", raising=False)
+    assert gemini.raciocinio("gate") is None
+    assert gemini.llm("gate").reasoning_effort is None  # o padrão do modelo
+
+    monkeypatch.setenv("GEMINI_THINKING_GATE", "low")
+    assert gemini.llm("gate").reasoning_effort == "low"
+    assert gemini.llm("parse").reasoning_effort is None  # só o papel da variável
+
+    monkeypatch.setenv("GEMINI_THINKING_GATE", "baixo")
+    with pytest.raises(ValueError):
+        gemini.raciocinio("gate")

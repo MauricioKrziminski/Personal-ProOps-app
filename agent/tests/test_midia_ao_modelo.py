@@ -22,7 +22,7 @@ class _Modelo:
 
     async def ainvoke(self, mensagens):
         self.mensagens = mensagens
-        return FinancePlan(actions=[], confidence=1.0)
+        return FinancePlan(actions=[])
 
 
 def _estado(media):

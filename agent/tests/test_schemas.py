@@ -249,6 +249,6 @@ def test_principal_com_reserva_tem_prazo_curto_e_sem_nova_tentativa():
     gemini.structured(FinancePlan, gemini.GEMINI_PARSE)
     gemini.structured(FinancePlan, gemini.GEMINI_PARSE, prazo=gemini.PRAZO_LONGO)
     lite, flash = gemini.modelo("parse"), gemini.modelo("gate")
-    assert (lite, 0.1, gemini.PRAZO_COM_RESERVA, 0) in gemini._cache
-    assert (lite, 0.1, gemini.PRAZO_LONGO, 0) in gemini._cache
-    assert (flash, 0.1, 30, 1) in gemini._cache  # a reserva continua com prazo e nova tentativa
+    assert (lite, 0.1, gemini.PRAZO_COM_RESERVA, 0, None) in gemini._cache
+    assert (lite, 0.1, gemini.PRAZO_LONGO, 0, None) in gemini._cache
+    assert (flash, 0.1, 30, 1, None) in gemini._cache  # a reserva continua com prazo e nova tentativa
