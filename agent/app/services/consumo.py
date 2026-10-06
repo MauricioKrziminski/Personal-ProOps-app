@@ -109,6 +109,7 @@ def _chamada(response: Any, meta: dict) -> dict[str, Any]:
         "no": meta.get("no"),
         "versao_prompt": meta.get("prompt_versao"),
         "reserva": bool(meta.get("reserva")),
+        "reserva_motivo": meta.get("reserva_motivo"),
         "modelo": modelo,
         "input_tokens": entrada,
         "output_tokens": saida,

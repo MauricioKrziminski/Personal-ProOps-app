@@ -52,7 +52,7 @@ def test_coletor_soma_tokens_modelo_real_e_custo_exato():
     _chamar(consumo.coletor, "a", _resposta("gemini-3.1-flash-lite", 1000, 200, 100, 50),
             papel="parse", no="finance_parse", prompt_versao="abc123")
     _chamar(consumo.coletor, "b", _resposta("gemini-3.7-flash", 2000, 100),
-            papel="parse", reserva=True)
+            papel="parse", reserva=True, reserva_motivo="invalida")
     t = turno.totais()
     assert (t["input_tokens"], t["output_tokens"], t["cached_tokens"], t["reasoning_tokens"]) == (
         3000, 300, 100, 50)
@@ -63,6 +63,8 @@ def test_coletor_soma_tokens_modelo_real_e_custo_exato():
     assert primeira["versao_prompt"] == "abc123" and primeira["reserva"] is False
     # o modelo REAL da reserva, não o do papel
     assert segunda["modelo"] == "gemini-3.7-flash" and segunda["reserva"] is True
+    # por que a reserva assumiu chega ao `ai_events.calls` (saída inválida ≠ indisponível)
+    assert segunda["reserva_motivo"] == "invalida" and primeira["reserva_motivo"] is None
 
 
 def test_modelo_sem_preco_nao_inventa_custo():
