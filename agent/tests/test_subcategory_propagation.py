@@ -37,6 +37,12 @@ async def test_import_suggestion_inherits_detail_only_from_user_rule(monkeypatch
     monkeypatch.setattr(importer.db, "fetch", fetch)
     monkeypatch.setattr(importer.db, "execute", execute)
     monkeypatch.setattr(importer, "classify_statement_lines", classify)
+
+    async def sem_limite(*a, **k):
+        return None
+
+    monkeypatch.setattr(importer.conversation, "check_limits", sem_limite)
+    monkeypatch.setattr(importer.db, "record_ai_event", sem_limite)
     await importer.run(user_id=uuid4(), workspace_id=uuid4(), account_id=uuid4(),
                        content="Data,Descrição,Valor\n03/10/2026,Mercado,-12.50\n", source="csv")
     inserted = [(sql, args) for sql, args in writes if "insert into public.import_items" in sql]

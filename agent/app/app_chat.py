@@ -244,6 +244,8 @@ async def _execute_turn(
             # O turno anterior pode ter rodado inteiro e morrido ao gravar. O
             # checkpoint sabe; o banco de mensagens não.
             resposta = await conversation.recover_turn(sessao, source_message_id=origem)
+            if resposta is not None:
+                await conversation.soltar_reserva()  # o turno já tinha rodado: nada a gastar
 
         if resposta is None:
             resposta = await conversation.run_turn(
@@ -263,6 +265,7 @@ async def _execute_turn(
         # A exceção crua carrega SQL e às vezes a URL do banco. O que chega ao
         # cliente é um código da nossa lista, e o resto vai para o log.
         log.exception("turno do app falhou (session=%s)", session_id)
+        await conversation.soltar_reserva()
         await repo.fail_chat_turn(
             session_id=session_id, user_message_id=mensagem["id"], error_code="internal"
         )

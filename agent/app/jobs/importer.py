@@ -17,13 +17,15 @@ from collections import Counter
 from datetime import date, timedelta
 from uuid import UUID
 
-from app import db
+from app import conversation, db
 from app.domain.matching import normalize
 from app.domain.reconcile import (
     Existente, Item, conciliar, natureza_estrutural, pares_para_julgar, parse_parcela,
 )
 from app.domain.statement import ParsedLine, ofx_tipo, parse_csv, parse_ofx
-from app.services.gemini import classify_statement_lines, judge_statement_pairs
+from app.services.gemini import (
+    GEMINI_BATCH, classify_statement_lines, judge_statement_pairs,
+)
 
 log = logging.getLogger(__name__)
 
@@ -77,6 +79,40 @@ def impressao_digital(linhas: list[ParsedLine]) -> list[str | None]:
 
 
 async def run(
+    *,
+    user_id: UUID,
+    workspace_id: UUID,
+    content: str,
+    source: str,
+    filename: str | None = None,
+    account_id: UUID | None = None,
+) -> dict:
+    """A prévia do extrato, sob a cota de IA (`check_limits`, kind `import`).
+
+    ⚠️ As duas chamadas de lote ao Gemini rodavam sem limite horário e sem `ai_events`. Agora a
+    rajada por hora vale (a importação NÃO consome a cota MENSAL de mensagens: ela é recurso do
+    plano Pro, controlado por `can_import`) e cada importação deixa uma linha com os tokens.
+    """
+    sessao = {"user_id": user_id, "workspace_id": workspace_id, "channel": "app"}
+    barrado = await conversation.check_limits(sessao, kind="import")
+    if barrado:
+        raise ImportError_(barrado, status=429)
+    try:
+        resultado = await _importar(
+            user_id=user_id, workspace_id=workspace_id, content=content, source=source,
+            filename=filename, account_id=account_id,
+        )
+    except BaseException:
+        await conversation.soltar_reserva()
+        raise
+    await db.record_ai_event(
+        user_id=user_id, workspace_id=workspace_id, channel="app", model=GEMINI_BATCH,
+        confidence=None, result={"import": True, "items": resultado["items"]}, kind="import",
+    )
+    return resultado
+
+
+async def _importar(
     *,
     user_id: UUID,
     workspace_id: UUID,

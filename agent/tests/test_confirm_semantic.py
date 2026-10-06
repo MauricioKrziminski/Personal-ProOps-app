@@ -103,7 +103,7 @@ async def test_classificar_de_confirmacao_monta_a_chamada_de_verdade(monkeypatch
 
     falso = _ModeloFalso("approve")
     modelos: list[str | None] = []
-    monkeypatch.setattr(gemini, "structured", lambda schema, model=None: (modelos.append(model), falso)[1])
+    monkeypatch.setattr(gemini, "structured", lambda schema, model=None, **_: (modelos.append(model), falso)[1])
 
     # ⚠️ Sentinelas, não frases naturais: "manda bala" é um EXEMPLO literal dentro do system
     # prompt estático, então procurá-la lá daria falso positivo para sempre.
@@ -142,7 +142,7 @@ async def test_classificar_de_rascunho_monta_a_chamada_de_verdade(monkeypatch):
 
     falso = _ModeloFalso("answer")
     modelos: list[str | None] = []
-    monkeypatch.setattr(gemini, "structured", lambda schema, model=None: (modelos.append(model), falso)[1])
+    monkeypatch.setattr(gemini, "structured", lambda schema, model=None, **_: (modelos.append(model), falso)[1])
 
     assert (await draft._classificar("foi 5000", "qual o valor?")).decision == "answer"
     assert "<user_input>" in falso.mensagens[1][1]
@@ -159,7 +159,7 @@ async def test_classificar_de_rascunho_extrai_na_MESMA_chamada(monkeypatch):
 
     falso = _ModeloFalso("answer", extracted_value="nubank")
     modelos: list[str | None] = []
-    monkeypatch.setattr(gemini, "structured", lambda schema, model=None: (modelos.append(model), falso)[1])
+    monkeypatch.setattr(gemini, "structured", lambda schema, model=None, **_: (modelos.append(model), falso)[1])
 
     decisao = await draft._classificar(
         "acabei de criar um pelo app, chama nubank cartao", "qual cartão?"

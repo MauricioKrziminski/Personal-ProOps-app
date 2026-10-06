@@ -42,7 +42,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app import app_chat
+from app import app_chat, conversation, db
 from app.auth import current_user
 from app.services import groq
 
@@ -377,13 +377,30 @@ async def transcrever_audio(user_id: Usuario, file: ArquivoAudio) -> Transcricao
     if not audio or not _formato_audio_valido(extensao, audio):
         raise _erro_audio(422, "invalid_audio", "O arquivo de áudio está vazio ou inválido.")
 
+    # ⚠️ O Groq é pago e esta rota aceitava 20 MB sem cota nenhuma nem linha em `ai_events`. Passa
+    # pelo MESMO `check_limits`, como `transcription`: vale o limite por HORA (rajada), mas não o
+    # mensal do plano — o áudio vira um turno depois, e contar os dois cobraria a mesma mensagem
+    # duas vezes.
+    perfil = await db.chat_profile(user_id)
+    if not perfil or not perfil.get("workspace_id"):
+        raise _erro_audio(404, "no_workspace", "Não achei o seu espaço.")
+    sessao = {"user_id": user_id, "workspace_id": perfil["workspace_id"], "channel": "app"}
+    if await conversation.check_limits(sessao, kind="transcription"):
+        raise _erro_audio(429, "rate_limit", "Muitas mensagens em pouco tempo. Aguarda um pouquinho.")
     try:
         # Nome controlado pelo servidor: o nome do cliente nunca chega ao Groq.
         texto = (await groq.transcribe(audio, filename=f"audio{extensao}")).strip()
     except Exception:  # noqa: BLE001
         # Nunca expor resposta, corpo ou segredo do provedor.
         log.warning("Falha na transcrição de áudio do app")
+        await conversation.soltar_reserva()  # não respondeu: não gasta a vaga
         raise _erro_audio(502, "transcription_failed", "Não consegui transcrever o áudio.") from None
+    # o Groq cobra por áudio, não por token: a linha leva o modelo e os bytes, sem custo estimado
+    await db.record_ai_event(
+        user_id=user_id, workspace_id=perfil["workspace_id"], channel="app", model=groq.MODEL,
+        confidence=None, result={"transcription": True, "bytes": len(audio)},
+        kind="transcription", uso={},
+    )
     if not texto or not any(char.isalnum() for char in texto):
         raise _erro_audio(422, "empty_transcription", "Não encontrei fala nesse áudio.")
     if len(texto) > MAX_CONTENT:

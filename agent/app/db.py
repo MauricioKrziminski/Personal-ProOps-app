@@ -610,6 +610,100 @@ async def plan_status(workspace_id: UUID) -> dict[str, Any] | None:
     return await fetch_one("select * from public._plan_status(%s)", workspace_id)
 
 
+# Quanto tempo uma reserva sem dono (processo morto no meio do turno) segue contando. Um turno
+# não passa dos 300 s do Cloud Run; depois disso a linha é lixo e o próximo `reservar_cota` do
+# workspace a apaga.
+RESERVA_VENCE_EM_MIN = 6
+
+
+async def reservar_cota(
+    *, user_id: UUID, workspace_id: UUID, channel: str, max_por_hora: int, kind: str = "turn",
+) -> dict[str, Any]:
+    """Checa a cota E reserva a vaga, atomicamente.
+
+    `check_limits` só contava `ai_events`, e a linha nascia DEPOIS do turno: N conversas em
+    paralelo passavam juntas pela mesma contagem. Aqui, sob `pg_advisory_xact_lock` do workspace
+    e numa transação só: apaga reserva vencida, confere a hora (por usuário) e o mês (por
+    workspace, só `kind = 'turn'`) e, se couber, insere a linha-reserva. O fim do turno a completa
+    (`record_ai_event`) ou a apaga (`liberar_reserva`).
+
+    Devolve `{"barrado": None | "hora" | "mes", "plano": {...} | None, "reserva_id": str | None}`.
+    Só `kind = 'turn'` confere o mês: transcrição e importação só respondem à rajada por hora.
+    """
+    async with pool().connection() as conn:
+        async with conn.transaction():
+            await conn.execute(
+                "select pg_advisory_xact_lock(hashtextextended(%s, 0))", (str(workspace_id),))
+            await conn.execute(
+                """
+                delete from public.ai_events
+                where workspace_id = %s and reserved
+                  and created_at < now() - make_interval(mins => %s)
+                """,
+                (workspace_id, RESERVA_VENCE_EM_MIN),
+            )
+            cur = await conn.execute(
+                """
+                select count(*)::int as n from public.ai_events
+                where user_id = %s and created_at >= now() - interval '1 hour'
+                """,
+                (user_id,),
+            )
+            if (await cur.fetchone())["n"] >= max_por_hora:
+                return {"barrado": "hora", "plano": None, "reserva_id": None}
+
+            plano = None
+            if kind == "turn":
+                cur = await conn.execute("select * from public._plan_status(%s)", (workspace_id,))
+                plano = await cur.fetchone()
+                if plano is None:
+                    # Workspace sem linha de plano: antes valia "sem limite mensal" (fail-open).
+                    # Agora vale o limite do plano MAIS RESTRITO, e o log diz que é fallback.
+                    cur = await conn.execute(
+                        """
+                        select min(l.max_ai_messages_month)::int as limite
+                        from unnest(array['free', 'pro', 'family']) as p(plano),
+                             lateral private.plan_limits(p.plano) as l
+                        """
+                    )
+                    limite = (await cur.fetchone())["limite"]
+                    cur = await conn.execute(
+                        """
+                        select count(*)::int as n from public.ai_events
+                        where workspace_id = %s and kind = 'turn'
+                          and created_at >= date_trunc('month', now())
+                        """,
+                        (workspace_id,),
+                    )
+                    plano = {"plan": "free", "ai_messages_month": (await cur.fetchone())["n"],
+                             "max_ai_messages_month": limite}
+                    log.warning("workspace %s sem linha em plan_status: aplicando o limite mais "
+                                "restrito (%s/mês)", workspace_id, limite)
+                if plano["ai_messages_month"] >= plano["max_ai_messages_month"]:
+                    return {"barrado": "mes", "plano": plano, "reserva_id": None}
+
+            cur = await conn.execute(
+                """
+                insert into public.ai_events
+                  (user_id, workspace_id, channel, model, kind, reserved, result)
+                values (%s, %s, %s, 'reserva', %s, true, '{}'::jsonb)
+                returning id
+                """,
+                (user_id, workspace_id, channel, kind),
+            )
+            return {"barrado": None, "plano": plano, "reserva_id": str((await cur.fetchone())["id"])}
+
+
+async def liberar_reserva(reserva_id: str | None) -> None:
+    """Apaga a reserva de um turno que NÃO chamou o modelo (fast-path não consome cota)."""
+    if not reserva_id:
+        return
+    try:
+        await execute("delete from public.ai_events where id = %s and reserved", reserva_id)
+    except Exception:  # noqa: BLE001 — a reserva vencida some sozinha no próximo `reservar_cota`
+        log.warning("reserva de cota não liberada", exc_info=True)
+
+
 async def record_ai_event(
     *,
     user_id: UUID,
@@ -619,16 +713,53 @@ async def record_ai_event(
     confidence: float | None,
     result: dict[str, Any],
     created_transaction_ids: list[str] | None = None,
+    uso: dict[str, Any] | None = None,
+    kind: str = "turn",
+    reserva_id: str | None = None,
 ) -> None:
     """Auditoria do parse. Best-effort: falhar aqui não pode desfazer o que já foi
-    gravado — mas é logado, porque silêncio aqui vira cobrança errada no fim do mês."""
+    gravado — mas é logado, porque silêncio aqui vira cobrança errada no fim do mês.
+
+    `uso` = os totais do turno (`consumo.ConsumoDoTurno.totais()`); sem ele vale o turno corrente
+    do contexto. Se `check_limits` deixou uma RESERVA no contexto, é ela que é completada (UPDATE)
+    em vez de inserir uma segunda linha — o turno conta UMA vez.
+    """
+    from app.services import consumo
+
+    if uso is None and (atual := consumo.atual()) is not None:
+        uso = atual.totais()
+    uso = uso or {}
+    if reserva_id is None:
+        reserva_id = consumo.consumir_reserva()
+    colunas = (
+        uso.get("input_tokens"), uso.get("output_tokens"), uso.get("cached_tokens"),
+        uso.get("reasoning_tokens"), uso.get("custo_usd"),
+        Jsonb(uso["chamadas"]) if uso.get("chamadas") else None,
+    )
     try:
+        if reserva_id:
+            n = await execute(
+                """
+                update public.ai_events set
+                  user_id = %s, workspace_id = %s, channel = %s, model = %s, confidence = %s,
+                  result = %s, created_transaction_ids = %s, input_tokens = %s,
+                  output_tokens = %s, cached_tokens = %s, reasoning_tokens = %s,
+                  estimated_cost_usd = %s, calls = %s, kind = %s, reserved = false
+                where id = %s and reserved
+                """,
+                user_id, workspace_id, channel, model, confidence, Jsonb(result),
+                created_transaction_ids or [], *colunas, kind, reserva_id,
+            )
+            if n:
+                return
+            # reserva vencida e apagada no meio do turno: cai no insert, o turno ainda conta
         await execute(
             """
             insert into public.ai_events
               (user_id, workspace_id, channel, model, confidence, result,
-               created_transaction_ids)
-            values (%s, %s, %s, %s, %s, %s, %s)
+               created_transaction_ids, input_tokens, output_tokens, cached_tokens,
+               reasoning_tokens, estimated_cost_usd, calls, kind)
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             user_id,
             workspace_id,
@@ -637,6 +768,8 @@ async def record_ai_event(
             confidence,
             Jsonb(result),
             created_transaction_ids or [],
+            *colunas,
+            kind,
         )
     except Exception:  # noqa: BLE001
         log.exception("ai_events não gravado — a cota do mês vai contar a menos")

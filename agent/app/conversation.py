@@ -27,7 +27,7 @@ from app.domain import confirm, draft, matching
 from app.domain.money import cents_to_brl
 from app.graph.state import CHAVE_MIDIA, marca_da_midia
 from app.security import effective_thread_id
-from app.services import gemini, telemetry
+from app.services import consumo, gemini, telemetry
 
 log = logging.getLogger(__name__)
 
@@ -75,27 +75,51 @@ def trim_prompt_history(messages: list[dict], channel: str) -> list[dict]:
     return escolhidas
 
 
-async def check_limits(sessao: dict) -> str | None:
-    """Mensagem de recusa, ou None para seguir.
+async def soltar_reserva() -> None:
+    """Devolve a vaga reservada por `check_limits` quando o turno não vai gastar o modelo."""
+    reserva_id = consumo.consumir_reserva()
+    if reserva_id:
+        await db.liberar_reserva(reserva_id)
+
+
+def _canal(sessao: dict) -> str:
+    return sessao.get("channel") or "whatsapp"
+
+
+async def check_limits(sessao: dict, *, kind: str = "turn") -> str | None:
+    """Mensagem de recusa, ou None para seguir — e, seguindo, a vaga fica RESERVADA.
 
     Duas camadas, com propósitos diferentes: a hora protege o CUSTO contra rajada
     (um script maluco, um grupo colando mensagens); o mês é o PRODUTO — o limite
     do plano. O número do plano vive em `private.plan_limits`, num lugar só:
     espalhar isso pelo código é como o produto acaba cobrando de um jeito e
     entregando de outro.
+
+    ⚠️ **Checar e reservar são UM passo** (`db.reservar_cota`, sob lock do workspace): a linha de
+    `ai_events` só nascia depois do turno, e N conversas paralelas passavam juntas pela mesma
+    contagem. A reserva é completada com o uso real em `db.record_ai_event` ou apagada em
+    `_audit` quando o turno não chamou o modelo — fast-path não consome cota.
+
+    `kind` = `turn` (mensagem de IA do plano: hora E mês) · `transcription` · `import` (só a hora:
+    um áudio vira turno depois, e a importação é recurso do plano Pro, não "mensagem").
     """
     settings = get_settings()
-
-    if await db.ai_events_last_hour(sessao["user_id"]) >= settings.max_parses_per_hour:
+    r = await db.reservar_cota(
+        user_id=sessao["user_id"], workspace_id=sessao["workspace_id"], channel=_canal(sessao),
+        max_por_hora=settings.max_parses_per_hour, kind=kind,
+    )
+    if r["barrado"] == "hora":
         return MUITAS
-
-    plano = await db.plan_status(sessao["workspace_id"])
-    if plano and plano["ai_messages_month"] >= plano["max_ai_messages_month"]:
+    if r["barrado"] == "mes":
+        plano = r["plano"]
         return (
             f"📊 Você usou as {plano['max_ai_messages_month']} mensagens do plano "
             f"{plano['plan']} este mês. No app dá para subir de plano e continuar "
             "agora mesmo — seus dados continuam todos aí."
         )
+    # a partir daqui tudo que o modelo gastar neste contexto é deste turno
+    consumo.abrir()
+    consumo.guardar_reserva(r["reserva_id"])
     return None
 
 
@@ -172,6 +196,28 @@ async def run_turn(
     prompt_history: list[dict] | None = None,
 ) -> str | dict:
     """Um turno inteiro, do limite de cota à resposta pronta.
+
+    O trace e a contagem de tokens abrem aqui, em volta de TUDO: o portão de SIM/NÃO e o rascunho
+    chamam o modelo antes do grafo, e sem este envelope saíam sem sessão no Langfuse e fora de
+    `ai_events`.
+    """
+    consumo.abrir()
+    thread = effective_thread_id(sessao["thread_id"], sessao["session_epoch"])
+    with telemetry.trace(thread_id=thread, user_id=sessao.get("user_id"), channel=_canal(sessao)):
+        return await _run_turn(
+            sessao, source_message_id=source_message_id, conteudo=conteudo,
+            prompt_history=prompt_history,
+        )
+
+
+async def _run_turn(
+    sessao: dict,
+    *,
+    source_message_id: str,
+    conteudo: dict,
+    prompt_history: list[dict] | None = None,
+) -> str | dict:
+    """O corpo de `run_turn`.
 
     `conteudo` é `{text, media, raw_texts, clicked_id}` — o app só preenche
     `text`. `prompt_history` já vem CORTADO pela borda (`trim_prompt_history`):
@@ -254,7 +300,7 @@ async def run_turn(
             # retomar exige o thread EXATO em que o interrupt() aconteceu — é o
             # que está gravado no pendente, não o recalculado agora
             retomada = {**config, "configurable": {"thread_id": pendente["thread_id"]}}
-            with telemetry.trace(thread_id=pendente["thread_id"], user_id=sessao["user_id"]):
+            with telemetry.trace(thread_id=pendente["thread_id"], user_id=sessao["user_id"], channel=_canal(sessao)):
                 estado = await graph().ainvoke(entrada, config=retomada)
             # A pendência só é consumida DEPOIS que o resume terminou. Resolvida
             # antes, um resume que caísse no meio (402, banco, container) deixava
@@ -385,7 +431,7 @@ async def run_turn(
     )
     if cadastro_incompleto:
         estado_inicial.update(domains=["cadastros"], preset=True)
-    with telemetry.trace(thread_id=thread, user_id=sessao["user_id"]):
+    with telemetry.trace(thread_id=thread, user_id=sessao["user_id"], channel=_canal(sessao)):
         estado = await graph().ainvoke(estado_inicial, config=config)
 
     await _audit(sessao, estado, uso)
@@ -475,7 +521,7 @@ async def _financiamento_do_rascunho(
         domains=["cadastros"],
         preset=True,
     )
-    with telemetry.trace(thread_id=thread, user_id=sessao["user_id"]):
+    with telemetry.trace(thread_id=thread, user_id=sessao["user_id"], channel=_canal(sessao)):
         estado = await graph().ainvoke(estado_inicial, config=config)
     await db.delete_draft(sessao["id"])
     await _audit(sessao, estado, uso)
@@ -907,8 +953,14 @@ async def _audit(sessao: dict, estado: dict, uso: dict | None = None) -> None:
     """
     total = (estado.get("llm_calls") or 0) + ((uso or {}).get("llm_calls") or 0)
     if not total:
+        # turno sem modelo (clique, saudação, anexo direto): a vaga reservada volta
+        await soltar_reserva()
         return
+    medido = consumo.atual()
     await db.record_ai_event(
+        # tokens, custo e o detalhe por chamada — INCLUSIVE as de fora do grafo (portão,
+        # rascunho), que o coletor soma no mesmo contexto do turno
+        uso=medido.totais() if medido else None,
         user_id=sessao["user_id"],
         workspace_id=sessao["workspace_id"],
         channel=sessao.get("channel") or "whatsapp",
@@ -944,7 +996,7 @@ async def _rodar_com_acoes(
     estado_inicial["finance_actions"] = acoes
     estado_inicial["domains"] = ["financas"]
     estado_inicial["preset"] = True
-    with telemetry.trace(thread_id=thread, user_id=sessao["user_id"]):
+    with telemetry.trace(thread_id=thread, user_id=sessao["user_id"], channel=_canal(sessao)):
         estado = await graph().ainvoke(estado_inicial, config=config)
     await _audit(sessao, estado, uso)
     return await _resposta_do_estado(sessao, estado, thread)

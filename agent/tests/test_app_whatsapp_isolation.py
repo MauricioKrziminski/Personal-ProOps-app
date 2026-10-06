@@ -110,6 +110,14 @@ class DbFalso:
     async def plan_status(self, workspace_id):
         return self.plano
 
+    async def reservar_cota(self, *, max_por_hora, kind="turn", **_):
+        """O mesmo veredito do banco (hora e mês), sem lock nem linha."""
+        if self.na_hora >= max_por_hora:
+            return {"barrado": "hora", "plano": None, "reserva_id": None}
+        if kind == "turn" and self.plano["ai_messages_month"] >= self.plano["max_ai_messages_month"]:
+            return {"barrado": "mes", "plano": self.plano, "reserva_id": None}
+        return {"barrado": None, "plano": self.plano, "reserva_id": None}
+
     def canais(self) -> list[str]:
         return [e["channel"] for e in self.eventos]
 

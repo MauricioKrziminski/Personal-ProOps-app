@@ -24,6 +24,21 @@ def _config(monkeypatch):
     get_settings.cache_clear()
 
 
+@pytest.fixture(autouse=True)
+def _cota_e_auditoria(monkeypatch):
+    """A cota e o `ai_events` da transcrição têm teste próprio (`test_consumo_de_ia.py`)."""
+    async def perfil(user_id):
+        return {"id": user_id, "workspace_id": UUID("22222222-2222-2222-2222-222222222222")}
+
+    async def livre(*a, **k):
+        return None
+
+    monkeypatch.setattr(chat_routes.db, "chat_profile", perfil)
+    monkeypatch.setattr(chat_routes.db, "record_ai_event", livre)
+    monkeypatch.setattr(chat_routes.conversation, "check_limits", livre)
+    monkeypatch.setattr(chat_routes.conversation, "soltar_reserva", livre)
+
+
 def _cliente(authenticated=True):
     app = FastAPI()
     app.include_router(chat_routes.router)
