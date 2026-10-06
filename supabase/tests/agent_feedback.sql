@@ -52,22 +52,25 @@ begin
   end;
 
   -- ===== agent_quality =====
-  select * into r from private.agent_quality(current_date - 1, current_date + 1)
+  -- A métrica é GLOBAL (todos os espaços): na janela de hoje entra o feedback real do staging
+  -- (06/10/2026, um E2E fez o total ir de 6 a 8). As linhas do teste vão para um dia só delas.
+  update public.agent_feedback set created_at = '2001-01-15 12:00' where workspace_id = wa;
+  select * into r from private.agent_quality('2001-01-14', '2001-01-16')
    where dimensao = 'geral';
   assert r.total = 6, format('geral: total esperado 6, veio %s', r.total);
   assert r.aprovadas = 3 and r.corrigidas = 1 and r.recusadas = 1 and r.expiradas = 1,
     'geral: contagem por desfecho';
   assert r.taxa_aprovacao = 0.5, format('taxa de aprovação esperada 0.5, veio %s', r.taxa_aprovacao);
 
-  select * into r from private.agent_quality(current_date - 1, current_date + 1)
+  select * into r from private.agent_quality('2001-01-14', '2001-01-16')
    where dimensao = 'tipo_acao' and chave = 'delete_transaction';
   assert r.total = 1 and r.recusadas = 1, 'por tipo de ação';
 
-  select * into r from private.agent_quality(current_date - 1, current_date + 1)
+  select * into r from private.agent_quality('2001-01-14', '2001-01-16')
    where dimensao = 'versao_prompt' and chave = 'finance=v2';
   assert r.total = 3 and r.corrigidas = 1, format('por versão de prompt: total %s', r.total);
 
-  select count(*) into n from private.agent_quality(current_date - 30, current_date - 20);
+  select count(*) into n from private.agent_quality('2001-02-01', '2001-02-10');
   assert n = 0, 'período sem feedback devolve vazio';
 
   -- ===== expire_pending_actions grava o feedback `expired` (e só dos que têm `feedback`) =====
