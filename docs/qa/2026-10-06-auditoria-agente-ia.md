@@ -599,7 +599,7 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
 |---|---|---|
 | 7.1 tokens e custo por chamada | feito | `ai_events`: tokens, cache, raciocínio, custo, `calls` por chamada com papel, nó, versão do prompt, modelo real, `reserva_motivo` |
 | 7.2 Langfuse em tudo + versão do prompt | feito | `versao_do_prompt` em toda chamada |
-| 7.3 unit economics + orçamento | feito | `private.ai_unit_economics`, `scripts/agent_metrics.py`, orçamento em `setup-gcp.sh alertas` (os valores dependem de você) |
+| 7.3 unit economics + orçamento | feito | `private.ai_unit_economics`, `scripts/agent_metrics.py`, orçamento em `setup-gcp.sh alertas`: R$ 50/mês no projeto do agente, aviso a 50/90/100% |
 | 8.1 contas no prompt | feito | `b8f8e1e2` |
 | 8.2 busca semântica | feito | `gemini-embedding-2`, pgvector, piso 0,64 calibrado |
 | 8.3 exemplos dinâmicos | feito atrás de flag | 115 exemplos sintéticos, vetores pré-gerados (o índice em runtime estourava as 100 req/min do gratuito e refazia 113 embeddings por cold start), piso 0,62 calibrado |
@@ -616,7 +616,7 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
 | 11 cascata por falha objetiva | feito | `922839bb`: saída inválida vai à reserva com motivo |
 | 11 router por embedding | decidido não | exemplos decidindo rota é regra por caso; o router custa ~US$ 0,0005 |
 | 12 orçamento de tempo | feito | C3 |
-| 12 SLO com alerta | feito | fila parada, falhas, 5xx, turno lento (> 30 s) e custo de IA em 24 h (> US$ 5) — métricas e políticas em `setup-gcp.sh alertas` |
+| 12 SLO com alerta | feito | fila parada, falhas, 5xx, turno lento (> 30 s) e custo de IA em 24 h (> US$ 5) — métricas e políticas em `setup-gcp.sh alertas`, criadas em 06/10/2026 com e-mail para o canal "ProOps alertas" |
 | 12 logs com correlação | feito | `thread_id`/`message_id` em JSON; o elo com o Langfuse é o `thread_id` (= `session_id`); o `trace_id` que ninguém preenchia saiu |
 | 12 "digitando…" | feito | Graph v25.0, no mesmo POST da lida |
 | 13 RLS como segunda camada | feito atrás de flag | `AGENTE_RLS`; 59/59 no staging (negativos bloqueados); ligado no staging no deploy de 06/10 |
@@ -684,8 +684,6 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
 
 ## 20. O que depende de você
 
-- **Alertas e orçamento:** `ALERT_EMAIL`, `BILLING_ACCOUNT` e `BUDGET_AMOUNT` (na moeda da conta de faturamento, BRL) para
-  `./scripts/setup-gcp.sh alertas`.
 - **Secret `GEMINI_API_KEY_EVAL`** no GitHub, para o portão de avaliação do CI rodar. E um `push`
   para ver o job `sql` verde uma vez num runner (ele segue não-bloqueante até isso).
 - **Produção**, na ordem migrations → agente → app: as migrations `20261006100000` a
