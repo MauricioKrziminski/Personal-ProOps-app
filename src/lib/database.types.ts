@@ -119,46 +119,64 @@ export type Database = {
       }
       ai_events: {
         Row: {
+          cached_tokens: number | null
+          calls: Json | null
           channel: string
           confidence: number | null
           created_at: string
           created_transaction_ids: string[] | null
           error: string | null
+          estimated_cost_usd: number | null
           id: string
           input_tokens: number | null
+          kind: string
           message_raw_id: string | null
           model: string
           output_tokens: number | null
+          reasoning_tokens: number | null
+          reserved: boolean
           result: Json | null
           user_id: string | null
           workspace_id: string | null
         }
         Insert: {
+          cached_tokens?: number | null
+          calls?: Json | null
           channel: string
           confidence?: number | null
           created_at?: string
           created_transaction_ids?: string[] | null
           error?: string | null
+          estimated_cost_usd?: number | null
           id?: string
           input_tokens?: number | null
+          kind?: string
           message_raw_id?: string | null
           model: string
           output_tokens?: number | null
+          reasoning_tokens?: number | null
+          reserved?: boolean
           result?: Json | null
           user_id?: string | null
           workspace_id?: string | null
         }
         Update: {
+          cached_tokens?: number | null
+          calls?: Json | null
           channel?: string
           confidence?: number | null
           created_at?: string
           created_transaction_ids?: string[] | null
           error?: string | null
+          estimated_cost_usd?: number | null
           id?: string
           input_tokens?: number | null
+          kind?: string
           message_raw_id?: string | null
           model?: string
           output_tokens?: number | null
+          reasoning_tokens?: number | null
+          reserved?: boolean
           result?: Json | null
           user_id?: string | null
           workspace_id?: string | null
@@ -2195,6 +2213,7 @@ export type Database = {
           batch_id: string | null
           claimed_at: string | null
           created_at: string
+          failed_notified_at: string | null
           id: string
           last_error: string | null
           message_type: string | null
@@ -2212,6 +2231,7 @@ export type Database = {
           batch_id?: string | null
           claimed_at?: string | null
           created_at?: string
+          failed_notified_at?: string | null
           id?: string
           last_error?: string | null
           message_type?: string | null
@@ -2229,6 +2249,7 @@ export type Database = {
           batch_id?: string | null
           claimed_at?: string | null
           created_at?: string
+          failed_notified_at?: string | null
           id?: string
           last_error?: string | null
           message_type?: string | null
@@ -3980,6 +4001,7 @@ export type Database = {
           batch_id: string | null
           claimed_at: string | null
           created_at: string
+          failed_notified_at: string | null
           id: string
           last_error: string | null
           message_type: string | null
