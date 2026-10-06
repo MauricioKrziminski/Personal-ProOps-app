@@ -60,7 +60,7 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean; favoritos?: any[]; favoritosArquivados?: any[] } = {}) {
+function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; notesPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; resumoErro?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean; favoritos?: any[]; favoritosArquivados?: any[] } = {}) {
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
@@ -319,6 +319,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
     useTransactionsSummary: (from?: string, to?: string, pronto = true) => {
       summaryQueries.push({ from, to, pronto });
       return !pronto ? { ...query, isPending: true, fetchStatus: 'idle', data: undefined,
+        refetch: async () => { refetches.push('summary'); } } : options.resumoErro ? { ...query, isError: true, isSuccess: false, data: undefined,
         refetch: async () => { refetches.push('summary'); } } : options.resumoPendente ? { ...query, isPending: true, isLoading: true, isSuccess: false, fetchStatus: 'fetching', data: undefined } : ({
       ...query,
       isSuccess: true,
@@ -686,7 +687,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === '@/hooks/use-notes') return new Proxy({
         useNoteTags: () => ({ ...query, isSuccess: true, data: options.noteTags ?? [] }),
         useNoteFolders: () => ({ ...query, isSuccess: true, data: options.folders ?? [] }),
-        useNotesList: () => options.notesError ? { ...query, isError: true, data: undefined, refetch: async () => { refetches.push('notas'); } } : ({ ...query, isSuccess: true, data: { pages: [options.notes ?? []] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }),
+        useNotesList: () => options.notesPending ? { ...query, isPending: true, isLoading: true, isSuccess: false, fetchStatus: 'fetching', data: undefined } : options.notesError ? { ...query, isError: true, data: undefined, refetch: async () => { refetches.push('notas'); } } : ({ ...query, isSuccess: true, data: { pages: [options.notes ?? []] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }),
         folderTree: (lista: any[]) => lista.map((f) => ({ ...f, depth: 0 })),
         useArchivedCount: () => ({ ...query, isSuccess: true, data: options.arquivadas ?? 0 }),
       } as Record<string, any>, { get: (target, key) => key in target ? target[key as string] : () => mutation(String(key)) });
@@ -1862,13 +1863,30 @@ test('trocando de mês, com as bordas ainda chegando, o herói espera em vez de 
   assert.ok(!t.includes('ErrorCard'), 'buscando não é falha');
 });
 
-test('Financeiro segura a primeira pintura enquanto as bordas do mês ANTERIOR chegam', () => {
-  // `previous` só liga com `previousRange.pronto`, e desligado ele não segura o portão. Sem o
-  // `previousRange` na lista, a tela abria com o mês atual e o "vs agosto" chegava depois.
-  const buscandoAnterior = screen(financeiroFile, { rangePendingMonths: ['2026-08'] });
-  assert.equal(telaPronta(...buscandoAnterior.gates.at(-1)!), false, 'o range anterior buscando segura a tela');
+test('Financeiro: o portão é a PRIMEIRA DOBRA — resumo, mês anterior e blocos de baixo não seguram a tela', () => {
+  // 06/10/2026: o portão esperava 14 consultas, e a mais lenta decidia a primeira pintura. O herói
+  // lê ciclo, bordas, série e curva; o resumo por categoria e o mês anterior são da rosca (abaixo).
+  const anteriorChegando = screen(financeiroFile, { rangePendingMonths: ['2026-08'] });
+  assert.equal(telaPronta(...anteriorChegando.gates.at(-1)!), true, 'o range do mês anterior não segura a tela');
+  const resumoChegando = screen(financeiroFile, { resumoPendente: true });
+  assert.equal(telaPronta(...resumoChegando.gates.at(-1)!), true, 'o resumo buscando não segura a tela');
+  const heroSemEsqueleto = resumoChegando.nodes().find((n: any) => n.type === 'HeroPanel');
+  assert.ok(heroSemEsqueleto && heroSemEsqueleto.props.value.type !== 'Skeleton', 'o herói não espera o resumo');
+  assert.ok(tipos(resumoChegando).includes('SkeletonChart'), 'a rosca ganha o esqueleto PRÓPRIO, sem texto');
+  // E o que desenha o topo continua segurando: sem as bordas do mês corrente a tela espera.
+  const bordasChegando = screen(financeiroFile, { rangePending: true });
+  assert.equal(telaPronta(...bordasChegando.gates.at(-1)!), false, 'as bordas do mês exibido seguram a primeira pintura');
   const tudoPronto = screen(financeiroFile);
-  assert.equal(telaPronta(...tudoPronto.gates.at(-1)!), true, 'sem este, o de cima não distinguiria nada');
+  assert.equal(telaPronta(...tudoPronto.gates.at(-1)!), true, 'sem este, os de cima não distinguiriam nada');
+});
+
+test('Financeiro: o resumo falhando mostra o erro no BLOCO dele; o herói segue de pé', () => {
+  const ui = screen(financeiroFile, { resumoErro: true });
+  assert.ok(ui.nodes().some((n: any) => n.type === 'HeroPanel'), 'o herói não depende do resumo');
+  const erro = ui.nodes().find((n: any) => n.type === 'ErrorCard');
+  assert.ok(erro, 'cada seção tem o seu erro (§7)');
+  erro.props.onRetry();
+  assert.ok(ui.refetches.includes('summary'), 'o "Tentar de novo" refaz o resumo');
 });
 
 test('Financeiro com o período resolvido não mostra falha nem esqueleto no herói', () => {
@@ -1882,6 +1900,15 @@ const hojeFile = 'src/app/(tabs)/today/index.tsx';
 const copia = (v: unknown) => JSON.parse(JSON.stringify(v));
 const agendaItem = (ui: ReturnType<typeof screen>, title?: string) =>
   ui.nodes().find((n: any) => n.type === 'AgendaItem' && (!title || n.props.title === title));
+
+test('Hoje: o portão é a primeira dobra — as notas (último bloco) chegando não seguram a tela', () => {
+  const ui = screen(hojeFile, { notesPending: true });
+  assert.equal(telaPronta(...ui.gates.at(-1)!), true, 'notas e pastas não entram no portão');
+  assert.ok(ui.nodes().some((n: any) => n.type === 'SemanaDoDia'), 'o topo já está na tela');
+  assert.ok(!ui.nodes().some((n: any) => n.type === 'NotasDaHoje'), 'o bloco de notas espera, sem inventar conteúdo');
+  const falha = screen(hojeFile, { notesError: true });
+  assert.ok(falha.nodes().some((n: any) => n.type === 'ErrorCard'), 'a falha das notas aparece no bloco delas');
+});
 
 test('Hoje: o atrasado aparece no Seu dia e o botão dá baixa no lançamento certo, depois de confirmar o valor', () => {
   const ui = screen(hojeFile, {

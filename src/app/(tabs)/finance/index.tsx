@@ -225,22 +225,25 @@ export default function FinanceScreen() {
   const meses = (cashflow.data ?? []).filter((m) => m.month.slice(0, 7) <= mesAtual);
 
   /*
-    O PORTÃO DA TELA — as bordas entram como CONSULTA (`range`), e os DOIS ranges entram: sem o
-    anterior, o "vs setembro" chegaria depois da primeira pintura. Ver `tela-pronta.ts`.
+    O PORTÃO DA TELA é a PRIMEIRA DOBRA (06/10/2026): o herói (ciclo, bordas, série, curva) e a
+    pilha de cartões, que muda a altura de tudo que vem abaixo. As bordas entram como CONSULTA
+    (`range`), nunca como booleano. O resto — resumo e comparação, orçamentos, contas, dívidas,
+    tendência, últimos lançamentos, falas — chega depois, cada bloco com o seu esqueleto ou o seu
+    erro (design §7), em vez de a tela inteira esperar a mais lenta de 14. O "vs mês anterior" do
+    herói sai da MESMA `cycle_series` (os dois meses numa chamada), então o range anterior não
+    segura nada. Ver `tela-pronta.ts`.
   */
-  const pronta = useTelaPronta(
-    forecast, summary, previous, budgets, accounts, debts, cards, cashflow, recent, serie,
-    cycle, range, previousRange, atividade,
-  );
+  const pronta = useTelaPronta(cycle, range, serie, forecast, cards);
 
   const cicloFalhou = cycle.isError && !cycle.data;
   const bordasChegando = !range.pronto && !range.isError;
   // `serie` entra: é dela que sai o número do herói (`descricao`) — sem ela, a troca de mês
   // pintava "Saldo projetado · R$ 0,00" até o `cycle_series` chegar.
-  const heroLoading = bordasChegando || serie.isLoading || summary.isLoading || (isCurrent && forecast.isLoading);
+  const heroLoading = bordasChegando || serie.isLoading || (isCurrent && forecast.isLoading);
   // A série falhando sem dado nenhum é erro do herói: sem ela o número seria um "R$ 0,00" inventado.
   const serieFalhou = serie.isError && !serie.data;
-  const heroError = cicloFalhou || serieFalhou || range.isError || summary.isError || (isCurrent && forecast.isError);
+  // O resumo por categoria NÃO entra: o herói não lê nada dele, e a falha dele aparece no bloco dele.
+  const heroError = cicloFalhou || serieFalhou || range.isError || (isCurrent && forecast.isError);
   const isEmpty =
     summary.isSuccess && recent.isSuccess && (summary.data ?? []).length === 0 && (recent.data ?? []).length === 0;
 
@@ -572,7 +575,12 @@ export default function FinanceScreen() {
   const breakdownBlock = (
     <>
       {/* Por DATA DA COMPRA (o herói é por data do pagamento): a pílula diz a lente. */}
-      {summary.isError ? null : itensDaRosca.length > 0 ? (
+      {summary.isError ? (
+        <ErrorCard onRetry={() => (range.pronto ? summary.refetch() : range.refetch())} />
+      ) : summary.isPending && !range.isError ? (
+        // Chega depois do herói (as bordas semeiam o resumo): a forma da rosca, sem texto (§7).
+        <SkeletonChart />
+      ) : itensDaRosca.length > 0 ? (
         <View style={styles.bloco}>
           <BlockHeader title="Para onde foi" tag="por data da compra" />
           <SpendingDonut

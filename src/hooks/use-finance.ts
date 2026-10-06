@@ -2394,12 +2394,23 @@ export interface Cycle {
 
 export function useCycle(view?: CycleView) {
   useRealtimeInvalidate('workspaces', ['cycle']);
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: ['cycle', view ?? ''],
     queryFn: async (): Promise<Cycle> => {
       const { data, error } = await supabase.rpc('cycle_now', { p_view: view ?? undefined });
       if (error) throw error;
-      return data as unknown as Cycle;
+      const ciclo = data as unknown as Cycle;
+      /*
+        `cycle_now` já traz as bordas do ciclo corrente (`de`/`ate`, do MESMO `cycle_bounds` que
+        `cycle_range` usa): é a resposta do banco para `cycle_range(mes)` do mês corrente. Semeá-la
+        evita a segunda ida ao banco na abertura (resumo e comparação só começavam depois dela).
+        Não é aritmética nova no app — só o reaproveitamento de uma resposta que o banco já deu.
+      */
+      if (ciclo?.mes && ciclo.de && ciclo.ate) {
+        queryClient.setQueryData(['cycle-range', ciclo.mes, view ?? ''], { de: ciclo.de, ate: ciclo.ate });
+      }
+      return ciclo;
     },
     /**
      * ⚠️ **Cache curto DE PROPÓSITO: o ciclo vira sozinho, e o cache não podia segurar isso.**
@@ -2455,9 +2466,10 @@ export function useCycleMonth(view?: CycleView): string {
  * usuário abriu. Enquanto a resposta não chega, o mês civil é o palpite — e é o valor certo
  * para quem não mexeu na configuração.
  */
-export function useCycleRange(month: string, view?: CycleView) {
+export function useCycleRange(month: string, view?: CycleView, enabled = true) {
   useRealtimeInvalidate('workspaces', ['cycle-range']);
   return useQuery({
+    enabled,
     queryKey: ['cycle-range', month, view ?? ''],
     queryFn: async (): Promise<{ de: string; ate: string }> => {
       const { data, error } = await supabase.rpc('cycle_range', { p_month: primeiroDiaDoMes(month), p_view: view ?? undefined });
@@ -2513,13 +2525,21 @@ export interface MonthRange extends Consulta {
  * `useTransactionsSummary` recebem `pronto` e só ligam com ele.
  */
 export function useMonthRange(month: string, view?: CycleView): MonthRange {
-  const ciclo = useCycleRange(month, view);
+  /*
+    Espera a PRIMEIRA resposta de `cycle_now`: ela semeia as bordas do ciclo corrente (ver
+    `useCycle`) e, antes dela, o `month` é só o palpite civil — buscar com ele era uma ida ao banco
+    jogada fora nos dias em que o ciclo não é o mês civil. Com o ciclo falhando, busca como antes.
+  */
+  const corrente = useCycle(view);
+  const esperaOCiclo = corrente.isPending && corrente.fetchStatus === 'fetching';
+  const ciclo = useCycleRange(month, view, !esperaOCiclo);
   const bordas = ciclo.data ? { from: ciclo.data.de, to: ciclo.data.ate } : monthBounds(month);
   return {
     ...bordas,
     pronto: Boolean(ciclo.data),
     isPending: ciclo.isPending,
-    fetchStatus: ciclo.fetchStatus,
+    // Esperando o ciclo, ALGUÉM vai buscar: o portão da tela (`telaPronta`) não pode ler "ninguém".
+    fetchStatus: esperaOCiclo && !ciclo.data ? 'fetching' : ciclo.fetchStatus,
     isError: ciclo.isError && !ciclo.data,
     refetch: ciclo.refetch,
   };

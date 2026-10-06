@@ -222,11 +222,14 @@ export default function TodayScreen() {
   const falhasDaSemana = [gastos, ...falhasDosProximos].filter((c) => c.isError);
 
   /*
-    O PORTÃO DA TELA: a Hoje abre inteira ou não abre. `profile` pode nascer desligada e mesmo
-    assim entra — `telaPronta` lê `fetchStatus`.
+    O PORTÃO DA TELA é a PRIMEIRA DOBRA (06/10/2026): o que desenha o topo — a saudação, os
+    Primeiros passos/Próximo passo (que EMPURRAM tudo se chegarem depois), a semana, o Seu dia e o
+    card do dinheiro. As notas e as pastas (último bloco) ficam de fora: chegam depois, no lugar
+    delas, com o erro no próprio bloco. `profile` pode nascer desligada e mesmo assim entra —
+    `telaPronta` lê `fetchStatus`.
   */
   const pronta = useTelaPronta(
-    cycle, profile, gasto, bills, noCartao, reminders, budgets, saldos, gastos, notas, pastas,
+    cycle, profile, gasto, bills, noCartao, reminders, budgets, saldos, gastos,
     ...setup.consultas, ...proximo.consultas,
   );
 

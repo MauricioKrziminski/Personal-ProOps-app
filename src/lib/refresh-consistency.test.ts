@@ -1203,3 +1203,34 @@ test('detalhe do lançamento: o item nasce da lista em cache, e pagamento de dí
   client.invalidateQueries({ queryKey: ['transactions'], refetchType: 'none' });
   assert.equal(hooks.useTransaction('a').initialData(), undefined, 'lista invalidada não semeia');
 });
+
+test('cycle_now semeia as bordas do ciclo corrente, e o range espera a primeira resposta dele', async () => {
+  const client = new QueryClient();
+  const ciclo = { mes: '2026-10', de: '2026-09-11', ate: '2026-10-10', closeDay: 10, view: 'cycle', diasAteOFim: 5 };
+  let cicloEstado: any = { isPending: true, fetchStatus: 'fetching', data: undefined };
+  const consultas: any[] = [];
+  const hooks = loadHooks(client, 'src/hooks/use-finance.ts', {
+    '@/lib/consulta-em-foco': { useQuery: (options: any) => {
+      consultas.push(options);
+      if (options.queryKey[0] === 'cycle') return { ...cicloEstado, queryFn: options.queryFn };
+      return { isPending: true, isError: false, data: undefined, fetchStatus: options.enabled === false ? 'idle' : 'fetching', refetch: async () => {} };
+    } },
+    '@/hooks/use-items': { useRealtimeInvalidate: () => undefined },
+    '@/lib/supabase': { supabase: { rpc: async () => ({ data: ciclo, error: null }) } },
+  });
+  // Antes da resposta do ciclo, `month` é só palpite: o range não busca, mas o portão não lê "ninguém".
+  const esperando = hooks.useMonthRange('2026-10', 'cycle');
+  assert.equal(consultas.at(-1).enabled, false, 'o range espera o ciclo');
+  assert.equal(esperando.fetchStatus, 'fetching');
+  assert.equal(esperando.pronto, false);
+  // A resposta do ciclo já é a resposta de `cycle_range(mes)` do mês corrente.
+  const { queryFn } = hooks.useCycle('cycle');
+  await queryFn();
+  assert.deepEqual({ ...(client.getQueryData(['cycle-range', '2026-10', 'cycle']) as object) }, { de: '2026-09-11', ate: '2026-10-10' });
+  // Ciclo falhou: o range busca sozinho, como antes.
+  cicloEstado = { isPending: false, fetchStatus: 'idle', data: undefined };
+  const semCiclo = hooks.useMonthRange('2026-10', 'cycle');
+  assert.equal(consultas.at(-1).enabled, true);
+  assert.equal(semCiclo.fetchStatus, 'fetching');
+  client.clear();
+});
