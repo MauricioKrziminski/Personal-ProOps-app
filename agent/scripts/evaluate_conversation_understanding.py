@@ -15,6 +15,7 @@ padrão vale para o próximo que aparecer: **três dos quatro não eram defeito 
 | `ambiguous_previous` | media a CAMADA ERRADA: olhava o `installment_scope` cru do modelo, que chuta `all` em ~1 de 3 execuções. Quem decide o escopo de uma baixa é `scope_from_text`, que roda por cima e força `unclear` ao ver "anteriores" sem número. O caso passou a checar o escopo FINAL, que é o que o produto usa. |
 | `account_followup` | instabilidade real do modelo com valor por extenso ("trezentos reais"): ~1 falha em 3. O catálogo passou a ensinar que valor por extenso é valor — **mas isso NÃO foi medido depois**, e a evidência que existe ainda é ~2/3. Se reaparecer, meça antes de assumir que a linha do catálogo resolveu. |
 | `financing_missing_contract` | instabilidade de roteamento, ~1 em 3. |
+| `pending_condition` | (06/10/2026) o TESTE envelheceu: "Sim, mas muda para 24 parcelas" passou a voltar `revise` (a proposta é refeita com a mudança, nada aprovado), que é melhor que só segurar. O caso aceita as duas saídas seguras e continua recusando aprovação. |
 
 ⚠️ **Uma linha de prompt "óbvia" piorou tudo, e só a medição mostrou.** Para estabilizar o
 roteamento foi adicionada ao ROUTER uma explicação separando "TENHO um financiamento" (contrato
@@ -418,7 +419,9 @@ CASES = [
     (
         "pending_condition",
         lambda: pending("Sim, mas muda para 24 parcelas"),
-        lambda r: eq((r or {}).get("keep_pending"), True),
+        # SIM condicionado nunca aprova; segurar OU revisar a proposta são as duas saídas certas
+        lambda r: eq((not (r or {}).get("approved"))
+                     and bool((r or {}).get("keep_pending") or (r or {}).get("revise")), True),
     ),
     (
         "pending_change_card",
