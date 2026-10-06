@@ -2701,7 +2701,8 @@ test('Row: extrato deixa dinheiro quebrar de linha sem herdar ajuste de fonte do
     ui.interact(() => row.props.onLayout({ nativeEvent: { layout: { width: 370 } } }));
     const context = ui.nodes().find(n => n.type === 'DinheiroEncolhe.Provider');
     assert.ok(context, 'testar a fronteira real entre Row e Money, além dos props da tela');
-    assert.equal(context.props.value, !inlineValue, 'somente a coluna fixa opta pelo ajuste; o extrato usa a linha seguinte');
+    // Nenhum dos dois encolhe numa linha comum: a coluna medida estreita deixava o valor minúsculo no iPhone.
+    assert.equal(context.props.value, false, 'o ajuste só existe sobre a linha inteira reservada ao valor');
     assert.equal(ui.nodes().find(n => n.type === 'Money').props.cents, -1235);
   }
 });

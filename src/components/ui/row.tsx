@@ -109,11 +109,14 @@ export function Row({
   // crescer — nem com a linha mais larga, nem desligando o ajuste: o "−R$ 1.202,67" do
   // Fundacred ficou ilegível numa busca (05/10/2026). Por isso: nada encolhe antes de a linha ser
   // MEDIDA, e o valor remonta quando o modo ou a largura mudam, zerando a escala nativa.
-  const encolhe = larguraDaLinha > 0 && (!inlineValue || valorEmLinhaInteira);
+  // Só a linha de extrato com o valor em linha inteira encolhe (largura explícita). Na coluna ao
+  // lado do título o valor NÃO encolhe: a coluna é medida estreita num primeiro passe e o iPhone
+  // deixava "R$ 550,00" minúsculo para sempre no Detalhe do ciclo (06/10/2026).
+  const encolhe = larguraDaLinha > 0 && valorEmLinhaInteira;
   const valor =
     trailing || (chevron ?? !!onPress) ? (
       <View style={[styles.trailing, valorEmLinhaInteira && { width: larguraUtil }]}>
-        {trailing ? <View key={encolhe ? `e${Math.round(larguraUtil)}` : 'n'} style={styles.valor}>
+        {trailing ? <View key={encolhe ? `e${Math.round(larguraUtil)}` : 'n'} style={encolhe ? styles.valor : styles.valorRigido}>
           {/* Ajuste na coluna fixa, ou sobre a linha inteira reservada ao valor. O extrato
               normal quebra sem ajustar na medida transitória ao lado do título. */}
           <DinheiroEncolhe.Provider value={encolhe}>{trailing}</DinheiroEncolhe.Provider>
@@ -369,6 +372,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   valor: { flexShrink: 1, minWidth: 0 },
+  valorRigido: { flexShrink: 0 },
   /** O chip do ícone é um círculo suave, como nas listas dos vídeos de referência. */
   iconChip: {
     width: 38,
