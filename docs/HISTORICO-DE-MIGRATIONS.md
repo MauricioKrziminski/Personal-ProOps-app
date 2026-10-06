@@ -4,7 +4,7 @@ Registro, não regra: o que está em cada banco HOJE se confere na fonte (`CLAUD
 fila*). Entradas movidas do `CLAUDE.md` em 26/09/2026, na ordem em que estavam lá.
 
 **Produção e staging ALINHADOS em `20261005230000`** — promoção autorizada pelo Gabriel em
-06/10/2026 para a v1.7.0 (programa de 22 pontos + correções de 05/10). `migration list` mostrou
+06/10/2026 para a v1.7.0 — publicada como v1.7.1: a tag v1.7.0 parou no teste do CI, sem build (programa de 22 pontos + correções de 05/10). `migration list` mostrou
 as 43 migrations `20261002134032` … `20261005230000`, nenhuma só no remoto; aplicadas pelo
 próprio Gabriel com `PROOPS_PROD_OK=1` e `--project-ref`, sem seed e sem trocar o link local de
 staging. Conferência posterior em leitura: as três versões mais novas em `schema_migrations` são
