@@ -63,7 +63,7 @@ def test_pool_do_grafo_e_configurado_para_isolar():
     raise AssertionError("não achei a criação do _graph_pool em app/db.py")
 
 
-def test_estado_do_hitl_volta_do_checkpoint_so_com_os_tipos_permitidos():
+def test_estado_do_hitl_volta_do_checkpoint_so_com_os_tipos_permitidos(_checkpoint_estrito):
     """O "sim" retoma o checkpoint: os enums do estado têm que voltar como enum, sem depender do
     modo permissivo que o LangGraph vai desligar (e um tipo de fora continua barrado)."""
     import uuid
@@ -86,3 +86,4 @@ def test_estado_do_hitl_volta_do_checkpoint_so_com_os_tipos_permitidos():
 
     Estranho.__module__ = "fora.do.app"
     assert type(serde.loads_typed(serde.dumps_typed({"t": Estranho.x}))["t"]) is not Estranho
+    _checkpoint_estrito.clear()  # o bloqueio acima é o esperado

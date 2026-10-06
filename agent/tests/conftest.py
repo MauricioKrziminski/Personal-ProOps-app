@@ -61,3 +61,36 @@ def unidade(monkeypatch):
     falsa = UnidadeFalsa()
     monkeypatch.setattr(db, "unidade_de_trabalho", falsa)
     return falsa
+
+
+@pytest.fixture(autouse=True)
+def _checkpoint_estrito(monkeypatch):
+    """Todo `InMemorySaver` dos testes usa o allowlist de PRODUÇÃO (`build.tipos_do_checkpoint`).
+
+    Os testes de HITL, cadastros, notas e conversa passam o estado pelo checkpoint e o retomam; com
+    isto, um tipo novo no estado que o allowlist não conhece vira falha aqui — em produção ele
+    voltaria do banco como texto cru, e o "sim" retomaria um estado diferente do que foi salvo.
+    """
+    from langgraph.checkpoint.memory import InMemorySaver
+    from langgraph.checkpoint.serde import jsonplus
+
+    from app.graph import build
+
+    barrados: list[dict] = []
+    emitir = jsonplus.emit_serde_event
+
+    def registra(evento):
+        if evento.get("kind") in ("msgpack_blocked", "msgpack_unregistered_allowed"):
+            barrados.append(evento)
+        return emitir(evento)
+
+    monkeypatch.setattr(jsonplus, "emit_serde_event", registra)
+    iniciar = InMemorySaver.__init__
+
+    def iniciar_estrito(self, *, serde=None, **kw):
+        estrito = jsonplus.JsonPlusSerializer(allowed_msgpack_modules=build.tipos_do_checkpoint())
+        iniciar(self, serde=serde or estrito, **kw)
+
+    monkeypatch.setattr(InMemorySaver, "__init__", iniciar_estrito)
+    yield barrados  # o teste que barra um tipo DE PROPÓSITO limpa a lista
+    assert not barrados, f"tipo fora do allowlist do checkpoint: {barrados}"
