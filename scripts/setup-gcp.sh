@@ -373,6 +373,16 @@ deploy() {
   url_prevista="https://${SERVICE}-${numero}.${REGION}.run.app"
   printf '  URL prevista: %s\n' "$url_prevista"
 
+  # Flags do agente (`agent/.env.example`) vêm do SHELL de quem roda o deploy, ex.:
+  # `AGENTE_RLS=true ./scripts/setup-gcp.sh staging`. `--set-env-vars` SUBSTITUI todas as
+  # variáveis: uma flag ligada à mão no console sumiria no deploy seguinte, em silêncio.
+  local flags="" v
+  for v in AGENTE_RLS AGENT_PROMPT_V2 GEMINI_THINKING_GATE GEMINI_SHADOW_PARSE \
+           TURNO_LENTO_SECONDS CUSTO_DIARIO_ALERTA_USD WHATSAPP_TYPING_INDICATOR; do
+    if [[ -n "${!v:-}" ]]; then flags+=",${v}=${!v}"; fi
+  done
+  if [[ -n "$flags" ]]; then printf '  flags: %s\n' "${flags#,}"; fi
+
   gcloud run deploy "$SERVICE" \
     --source agent \
     --project "$PROJECT_ID" --region "$REGION" \
@@ -385,7 +395,7 @@ deploy() {
     --timeout 300 \
     --quiet \
     --set-secrets "$secrets" \
-    --set-env-vars "GCP_PROJECT=${PROJECT_ID},GCP_LOCATION=${REGION},TASKS_QUEUE=${QUEUE},TASKS_SA_EMAIL=${SA_EMAIL},DEBOUNCE_BACKEND=cloud_tasks,DEBOUNCE_SECONDS=3,WORKER_URL=${url_prevista}/worker/process-thread,OIDC_AUDIENCE=${url_prevista},SUPABASE_URL=${supabase_url},WA_ALERT_TEMPLATE=${wa_alert_template}"
+    --set-env-vars "GCP_PROJECT=${PROJECT_ID},GCP_LOCATION=${REGION},TASKS_QUEUE=${QUEUE},TASKS_SA_EMAIL=${SA_EMAIL},DEBOUNCE_BACKEND=cloud_tasks,DEBOUNCE_SECONDS=3,WORKER_URL=${url_prevista}/worker/process-thread,OIDC_AUDIENCE=${url_prevista},SUPABASE_URL=${supabase_url},WA_ALERT_TEMPLATE=${wa_alert_template}${flags}"
 
   URL="$(gcloud run services describe "$SERVICE" --project "$PROJECT_ID" \
           --region "$REGION" --format='value(status.url)')"
