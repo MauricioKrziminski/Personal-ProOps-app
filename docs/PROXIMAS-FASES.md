@@ -1169,6 +1169,11 @@ Nenhum bloco pode aparecer enquanto outro ainda mostra skeleton.
 
 ### 💰 A conta fechada, e a proposta de preço (14/09/2026)
 
+> ⚠️ **Superada em 07/10/2026 por [`CUSTOS-E-PRECOS.md`](CUSTOS-E-PRECOS.md).** Desde 01/10/2026 a
+> Meta cobra a resposta do bot dentro da janela de 24h (US$ 0,0068 por mensagem no Brasil), e o
+> `pro` de R$ 19,90 com 1.000 turnos pelo WhatsApp passou a custar R$ 75/mês no teto. A seção
+> abaixo fica como histórico.
+
 > **Isto é RECOMENDAÇÃO, não decisão.** Preço e limites são do dono do produto; o que está abaixo
 > é a aritmética com os números medidos, para a decisão não ser chute.
 
