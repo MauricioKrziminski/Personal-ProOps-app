@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { alcancesDoApagar, alvoDoLancamento, fraseDoEstrago, lerPrevia, textoDoApagado } from './apagar-com-alcance.ts';
+import { alvoDoLancamento, ehContrato, escolhasDoApagar, kindDoApagar, fraseDoEstrago, lerPrevia, textoDoApagado } from './apagar-com-alcance.ts';
 
 const brl = (c: number) => `R$ ${(c / 100).toFixed(2).replace('.', ',')}`;
 
@@ -40,8 +40,36 @@ test('o alvo sai do vínculo do lançamento; avulso não pergunta', () => {
   assert.equal(alvoDoLancamento({ id: 't' }, 'Mercado'), null);
 });
 
-test('o banco recusa dívida+futuras e lembrete+futuras: a pergunta não oferece', () => {
-  assert.deepEqual(alcancesDoApagar('debt'), ['all']);
-  assert.deepEqual(alcancesDoApagar('reminder'), ['one', 'all']);
-  assert.equal(alcancesDoApagar('occurrence'), undefined);
+test('a pergunta deriva kind, contrato e alcances do TIPO (o banco recusa dívida/lembrete + futuras)', () => {
+  const esc = (t: Parameters<typeof escolhasDoApagar>[0]) => escolhasDoApagar(t).map((c) => c.scope);
+  assert.deepEqual(esc('debt'), ['all']);
+  assert.deepEqual(esc('reminder'), ['one', 'all']);
+  assert.deepEqual(esc('recurring'), ['future', 'all']);
+  assert.deepEqual(esc('plan'), ['future', 'all']);
+  for (const t of ['occurrence', 'installment', 'debt_payment'] as const) assert.deepEqual(esc(t), ['one', 'future', 'all']);
+});
+
+test('kindDoApagar e ehContrato', () => {
+  assert.equal(kindDoApagar('plan'), 'installment');
+  assert.equal(kindDoApagar('installment'), 'installment');
+  assert.equal(kindDoApagar('debt'), 'payment');
+  assert.equal(kindDoApagar('debt_payment'), 'payment');
+  assert.equal(kindDoApagar('reminder'), 'reminder');
+  assert.equal(kindDoApagar('recurring'), 'occurrence');
+  assert.deepEqual((['recurring', 'plan', 'debt', 'occurrence', 'installment', 'debt_payment', 'reminder'] as const).filter(ehContrato), ['recurring', 'plan', 'debt']);
+});
+
+test('a confirmação diz vira à vista e apaga contrato, mesmo sem paga', () => {
+  const base = { apagadas: 2, pagas_apagadas: 0, soma_pagas_cents: '0', contas: [], desde: null };
+  assert.equal(fraseDoEstrago(lerPrevia({ ...base, apaga_contrato: false, vira_avista: true }), brl), 'A compra fica com uma parcela só e vira um lançamento à vista.');
+  assert.equal(fraseDoEstrago(lerPrevia({ ...base, apaga_contrato: true }), brl), 'A compra inteira sai, com a entrada.');
+  const tudo = fraseDoEstrago(lerPrevia({ ...base, pagas_apagadas: 1, soma_pagas_cents: '1000', apaga_contrato: true }), brl);
+  assert.equal(tudo, 'Isso apaga 1 lançamento já pago (R$ 10,00). A compra inteira sai, com a entrada.');
+  assert.equal(textoDoApagado(lerPrevia({ ...base, apaga_contrato: true })), 'Apagado por completo.');
+});
+
+test('a prévia recusa apagadas negativo ou fracionário', () => {
+  const ok = { pagas_apagadas: 0, soma_pagas_cents: '0', contas: [], desde: null, apaga_contrato: false };
+  assert.throws(() => lerPrevia({ ...ok, apagadas: -1 }));
+  assert.throws(() => lerPrevia({ ...ok, apagadas: 1.5 }));
 });

@@ -1,4 +1,4 @@
-import type { EditScope, EditScopeKind } from './edit-scope-model';
+import { deleteScopeChoices, type EditScope, type EditScopeKind } from './edit-scope-model.ts';
 
 export type TipoDoApagar = 'occurrence' | 'installment' | 'debt_payment' | 'recurring' | 'plan' | 'debt' | 'reminder';
 export type AlvoDoApagar = { tipo: TipoDoApagar; id: string; nome: string; ancora?: string };
@@ -21,10 +21,15 @@ export function kindDoApagar(tipo: TipoDoApagar): EditScopeKind {
 }
 
 /** O que o banco recusa não é oferecido: dívida (contrato) só "Todas"; lembrete só "Só esta"/"Todas". */
-export function alcancesDoApagar(tipo: TipoDoApagar): EditScope[] | undefined {
+function alcancesDoApagar(tipo: TipoDoApagar): EditScope[] | undefined {
   if (tipo === 'debt') return ['all'];
   if (tipo === 'reminder') return ['one', 'all'];
   return undefined;
+}
+
+/** As escolhas da pergunta, derivadas só do TIPO: quem pergunta não monta kind/contrato/alcances. */
+export function escolhasDoApagar(tipo: TipoDoApagar) {
+  return deleteScopeChoices(kindDoApagar(tipo), { contrato: ehContrato(tipo), alcances: alcancesDoApagar(tipo) });
 }
 
 /** O dinheiro chega como texto decimal (padrão das escritas compostas) e é conferido antes de virar número. */
@@ -44,17 +49,22 @@ export function lerPrevia(json: unknown): PreviaDoApagar {
 
 const lista = (nomes: string[]) => (nomes.length > 1 ? `${nomes.slice(0, -1).join(', ')} e ${nomes.at(-1)}` : nomes[0] ?? '');
 
-/** A segunda confirmação só existe quando o alcance leva coisa PAGA; sem isso, a pergunta já confirmou. */
+/** Segunda confirmação: só existe quando algo pago, a compra à vista ou o contrato inteiro está em jogo. */
 export function fraseDoEstrago(p: PreviaDoApagar, brl: (cents: number) => string): string | null {
-  if (p.pagas === 0) return null;
-  const n = p.pagas === 1 ? '1 lançamento já pago' : `${p.pagas} lançamentos já pagos`;
-  const contas = p.contas.length === 0 ? '' : p.contas.length === 1 ? ` e muda o saldo da ${p.contas[0]}` : ` e muda o saldo das contas ${lista(p.contas)}`;
-  const desde = p.desde ? ` e o histórico desde ${MESES[Number(p.desde.slice(5, 7)) - 1]} de ${p.desde.slice(0, 4)}` : '';
-  return `Isso apaga ${n} (${brl(p.somaPagasCents)})${contas}${desde}.`;
+  const partes: string[] = [];
+  if (p.pagas > 0) {
+    const n = p.pagas === 1 ? '1 lançamento já pago' : `${p.pagas} lançamentos já pagos`;
+    const contas = p.contas.length === 0 ? '' : p.contas.length === 1 ? ` e muda o saldo da ${p.contas[0]}` : ` e muda o saldo das contas ${lista(p.contas)}`;
+    const desde = p.desde ? ` e o histórico desde ${MESES[Number(p.desde.slice(5, 7)) - 1]} de ${p.desde.slice(0, 4)}` : '';
+    partes.push(`Isso apaga ${n} (${brl(p.somaPagasCents)})${contas}${desde}.`);
+  }
+  if (p.viraAvista) partes.push('A compra fica com uma parcela só e vira um lançamento à vista.');
+  if (p.apagaContrato) partes.push('A compra inteira sai, com a entrada.');
+  return partes.length ? partes.join(' ') : null;
 }
 
 export function textoDoApagado(p: PreviaDoApagar): string {
-  if (p.apagaContrato && p.apagadas === 0) return 'Apagado por completo.';
+  if (p.apagaContrato) return 'Apagado por completo.';
   return p.apagadas === 1 ? '1 lançamento apagado.' : `${p.apagadas} lançamentos apagados.`;
 }
 

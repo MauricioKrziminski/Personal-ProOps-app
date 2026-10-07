@@ -1,5 +1,6 @@
 import { showItemActions } from './item-actions';
-import { deleteScopeChoices, editScopeChoices, type EditScope, type EditScopeKind } from './edit-scope-model';
+import { editScopeChoices, type EditScope, type EditScopeKind } from './edit-scope-model';
+import { escolhasDoApagar, type TipoDoApagar } from './apagar-com-alcance';
 
 /**
  * A escolha acontece no Salvar; cancelar não chama nenhuma mutação. `contrato`: a pessoa editou a
@@ -18,14 +19,10 @@ export function askEditScope(
   );
 }
 
-/** A pergunta do Apagar: os rótulos do editar, título "Apagar"; cancelar não chama nada. */
-export function askDeleteScope(
-  kind: EditScopeKind,
-  onSelect: (scope: EditScope) => void,
-  opcoes?: { contrato?: boolean; alcances?: EditScope[] },
-) {
+/** A pergunta do Apagar: o TIPO decide kind, contrato e alcances (`apagar-com-alcance.ts`); cancelar não chama nada. */
+export function askDeleteScope(tipo: TipoDoApagar, onSelect: (scope: EditScope) => void) {
   showItemActions(
     'Apagar',
-    deleteScopeChoices(kind, opcoes).map(({ scope, label }) => ({ label, destructive: true, onPress: () => onSelect(scope) })),
+    escolhasDoApagar(tipo).map(({ scope, label }) => ({ label, destructive: true, onPress: () => onSelect(scope) })),
   );
 }
