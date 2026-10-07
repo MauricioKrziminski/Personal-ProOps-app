@@ -213,7 +213,7 @@ export default function RemindersScreen() {
         onPress={() => void fetchNextPage()}
       />
 
-      {!isLoading && !isError && reminders.length === 0 ? (
+      {!isLoading && !isError && reminders.length === 0 && !lembretesDeConta.data?.length ? (
         <EmptyState
           icon="bell"
           title={filtered ? 'Nenhum lembrete com esses filtros' : 'Nenhum lembrete ainda'}

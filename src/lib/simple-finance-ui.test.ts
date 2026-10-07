@@ -7991,3 +7991,12 @@ test('Lembretes: a seção Contas lista cada conta lembrada e abre a edição', 
   assert.deepEqual(copia(ui.navigations.at(-1)),
     { pathname: '/reminder-form', params: { conta: `debt_id:${ID}`, nome: 'Carro' } });
 });
+
+test('Lembretes: só com lembrete de conta, mostra Contas e não o vazio', () => {
+  const ID = '11111111-1111-1111-1111-111111111111';
+  const ui = screen('src/app/reminders.tsx', { reminders: [], billReminders: [
+    { alvo: { debt_id: ID }, title: 'Carro', channel: 'push', avisos: [{ days_before: 1, at_time: '09:00' }], next_due: '2026-10-10' },
+  ] });
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Section' && n.props.title === 'Contas'));
+  assert.ok(!ui.nodes().some((n: any) => n.type === 'EmptyState'));
+});
