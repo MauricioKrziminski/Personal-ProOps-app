@@ -88,6 +88,8 @@ import {
   dueFieldLabel,
 } from '@/lib/settle-labels';
 import { confirmDestructive } from '@/lib/item-actions';
+import { useApagarComAlcance } from '@/hooks/use-apagar-com-alcance';
+import { alvoDoLancamento } from '@/lib/apagar-com-alcance';
 import { correcaoDoPagamento } from '@/lib/confirmar-baixa';
 import { OriginAccountPicker } from '@/components/finance/origin-creation-host';
 import { FinanceWritePreview } from '@/components/finance/finance-write-preview';
@@ -241,6 +243,7 @@ export function FormularioDoLancamento(props: Props) {
   const createPlan = useCreateInstallmentPlan();
   const converter = useConvertToInstallments();
   const remove = useDeleteTransaction();
+  const { apagar } = useApagarComAlcance(() => props.onFechar());
 
   /*
     ⚠️ **Na ocorrência de uma SÉRIE a data É o vencimento** (26/09/2026). O agendador grava
@@ -1068,6 +1071,8 @@ export function FormularioDoLancamento(props: Props) {
 
   const onDelete = () => {
     if (!editing) return;
+    const alvo = alvoDoLancamento(editing, editing.description || editing.merchant || editing.category || 'Lançamento');
+    if (alvo) return apagar(alvo);
     const what = `${formatBRL(editing.amount_cents)}${editing.category ? ` em ${editing.category}` : ''}`;
     confirmDestructive(
       'Apagar este lançamento?',

@@ -50,6 +50,8 @@ import { formatNumberBR } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { passoDaVolta, type Volta } from '@/lib/reabrir-ao-voltar';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { useApagarComAlcance } from '@/hooks/use-apagar-com-alcance';
+import { alvoDoLancamento } from '@/lib/apagar-com-alcance';
 import { useBillReminderFor } from '@/hooks/use-bill-reminders';
 import { hrefDoLembrete, resumoDosAvisos } from '@/lib/lembrete-de-conta';
 import { estadoDaLinha } from '@/lib/settle-labels';
@@ -142,6 +144,7 @@ export default function InvoiceScreen() {
   const unsettle = useUnsettleInvoice();
   const unroll = useUnrollInvoice();
   const remove = useDeleteTransaction();
+  const { apagar: apagarComAlcance } = useApagarComAlcance();
 
   const [pagando, setPagando] = useState(false);
   const [puxando, setPuxando] = useState(false);
@@ -368,7 +371,9 @@ export default function InvoiceScreen() {
     );
   };
 
-  const apagar = (tx: Transaction) =>
+  const apagar = (tx: Transaction) => {
+    const alvo = alvoDoLancamento(tx, tx.description || tx.merchant || tx.category || 'Lançamento');
+    if (alvo) return apagarComAlcance(alvo);
     confirmaDestrutiva({
       title: 'Apagar esta compra?',
       message: `${tx.description ?? 'Sem descrição'} · ${formatBRL(tx.amount_cents)}`,
@@ -379,6 +384,7 @@ export default function InvoiceScreen() {
           onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para apagar a compra.'), tone: 'error' }),
         }),
     });
+  };
 
   /**
    * Quitar SEM movimentar dinheiro.

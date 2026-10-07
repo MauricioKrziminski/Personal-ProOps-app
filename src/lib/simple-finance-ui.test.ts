@@ -679,7 +679,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
       if (name === '@/lib/account-form') return load('src/lib/account-form.ts');
       if (name === '@/components/finance/account-form') return load('src/components/finance/account-form.tsx');
-      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias' || name === '@/lib/comecar' || name === '@/lib/duplicar' || name === '@/lib/favoritos') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias' || name === '@/lib/comecar' || name === '@/lib/duplicar' || name === '@/lib/favoritos' || name === '@/lib/apagar-com-alcance') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       // o `categorias.ts` importa o mapa de ícones por caminho relativo (roda no `node --test` puro)
       if (name === '../design/category-icons.ts') return { categoryIcon: () => 'circle' };
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
@@ -3559,27 +3559,6 @@ test('Orçamentos: a categoria do limite é o seletor de categorias, com as do u
  * Apagar que o BANCO recusa diz o motivo (25/09/2026, em produção): o pagamento do financiamento
  * não apagava e o aviso era só "Não deu para apagar. Tenta de novo." — tentar de novo falhava sempre.
  */
-test('Apagar lançamento: a recusa do banco aparece com a frase dele, a falha de rede segue genérica', () => {
-  const tx = {
-    id: 'pg-1', kind: 'expense', amount_cents: 10000, occurred_at: '2026-09-15', description: 'Parcela Carro',
-    category: 'dívidas', account_id: null, status: 'cleared', source: 'app', created_at: '2026-09-15T12:00:00Z',
-    recurring_id: null, installment_plan_id: null, invoice_id: null,
-    debt_id: 'd1', debt_payment_no: 2, debt_principal_cents: 10000, debt_balance_after_cents: 0,
-    debts: { name: 'Carro', kind: 'financing', calculation_mode: 'fixed_installments', installments: 12 },
-  };
-  for (const [erro, esperado] of [
-    [{ code: 'P0001', message: 'Apague primeiro o pagamento mais recente desta dívida' }, 'Apague primeiro o pagamento mais recente desta dívida'],
-    [{ code: 'PGRST301', message: 'JWT expired' }, 'Não deu para apagar. Tenta de novo.'],
-  ] as const) {
-    const ui = screen('src/app/finance/[txId].tsx', { txs: [tx], params: { txId: 'pg-1' } });
-    const menu = ui.nodes().find((n: any) => n.type === 'HeaderActions').props.menu;
-    ui.interact(() => menu.actions.find((a: any) => a.label === 'Apagar').onPress());
-    ui.interact(() => ui.confirmations.at(-1)());
-    ui.interact(() => ui.pedidos.at(-1).opts.onError(Object.assign(new Error(erro.message), erro)));
-    assert.equal(ui.toasts.at(-1)?.message, esperado);
-  }
-});
-
 /**
  * Toda parcela da dívida abre (25/09/2026, *"se eu clicar em qualquer uma dessas parcelas, tem que
  * abrir os detalhes dela… e as pagas também, na tela que eu posso editar, deletar"*): a paga com
@@ -8055,4 +8034,25 @@ test('Lembretes: só com lembrete de conta, mostra Contas e não o vazio', () =>
   ] });
   assert.ok(ui.nodes().some((n: any) => n.type === 'Section' && n.props.title === 'Contas'));
   assert.ok(!ui.nodes().some((n: any) => n.type === 'EmptyState'));
+});
+
+test('Apagar: ocorrência, parcela e pagamento perguntam o alcance; avulso confirma como antes', () => {
+  const base = { kind: 'expense', status: 'pending', amount_cents: 500, description: 'Conta', category: 'x', account_id: 'a',
+    counterparty_account_id: null, occurred_at: '2026-10-02', created_at: '2026-10-02T12:00:00Z', invoice_id: null,
+    installment_plan_id: null, recurring_id: null, debt_id: null, pays_invoice_id: null, pix_fee_for_transaction_id: null };
+  const apagarDe = (extra: object) => {
+    const ui = screen('src/app/finance/[txId].tsx', { txs: [{ id: 't', ...base, ...extra }], params: { txId: 't' } });
+    const acoes = ui.nodes().find((n: any) => n.type === 'HeaderActions').props.menu.actions;
+    assert.equal(acoes.filter((a: any) => a.label.startsWith('Apagar')).length, 1, 'um "Apagar" só no menu');
+    ui.interact(() => acoes.find((a: any) => a.label === 'Apagar').onPress());
+    return ui;
+  };
+  for (const [extra, tipo] of [[{ recurring_id: 's' }, 'occurrence'], [{ installment_plan_id: 'p', installment_no: 2 }, 'installment'], [{ debt_id: 'd' }, 'debt_payment']] as const) {
+    const ui = apagarDe(extra);
+    assert.deepEqual({ ...ui.writes.find((w: any) => w.operation === 'apagarComAlcance')?.value }, { tipo, id: 't', nome: 'Conta' }, tipo);
+    assert.equal(ui.confirmations.length, 0, 'a pergunta é do hook, sem confirmação avulsa');
+  }
+  const avulso = apagarDe({});
+  assert.ok(!avulso.writes.some((w: any) => w.operation === 'apagarComAlcance'), 'avulso não pergunta alcance');
+  assert.equal(avulso.confirmations.length, 1, 'avulso confirma');
 });

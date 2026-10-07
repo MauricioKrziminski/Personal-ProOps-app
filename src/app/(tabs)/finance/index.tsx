@@ -67,6 +67,8 @@ import { describeCycle, describeRealizado } from '@/lib/cycle-label';
 import { isoToBR, mesmoMes } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { useApagarComAlcance } from '@/hooks/use-apagar-com-alcance';
+import { alvoDoLancamento } from '@/lib/apagar-com-alcance';
 import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
 
 /**
@@ -143,6 +145,7 @@ export default function FinanceScreen() {
   const recent = useRecentTransactions(5);
   const atividade = useAgentActivity(6);
   const remove = useDeleteTransaction();
+  const { apagar } = useApagarComAlcance();
 
   /** Memoizado: um array novo a cada render remontava a carteira inteira. */
   const cartoesDaCarteira = useMemo<StackedCard[]>(() => (cards.data ?? []).map(cartaoDaPilha), [cards.data]);
@@ -262,6 +265,8 @@ export default function FinanceScreen() {
     ]);
 
   const confirmDelete = (tx: Transaction) => {
+    const alvo = alvoDoLancamento(tx, tx.description || tx.merchant || tx.category || 'Lançamento');
+    if (alvo) return apagar(alvo);
     const what = `${formatBRL(tx.amount_cents)}${tx.category ? ` em ${tx.category}` : ''}`;
     confirmDestructive(
       'Apagar este lançamento?',

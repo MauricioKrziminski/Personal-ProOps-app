@@ -60,6 +60,8 @@ import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { isoToBR, mesmoMes } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive } from '@/lib/item-actions';
+import { useApagarComAlcance } from '@/hooks/use-apagar-com-alcance';
+import { alvoDoLancamento } from '@/lib/apagar-com-alcance';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
 import { dueInline, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
 import { filterExpectedLines, mesclarPrevistas, previstasNaTela, type ItemDoExtrato } from '@/lib/ledger-expected';
@@ -656,6 +658,7 @@ export default function TransactionsScreen() {
   // Um item basta para separar "nunca teve nada" de "este mês não teve nada".
   const anyEver = useRecentTransactions(1);
   const remove = useDeleteTransaction();
+  const { apagar } = useApagarComAlcance();
 
   const accountName = useMemo(() => {
     const map = new Map<string, string>();
@@ -853,6 +856,8 @@ export default function TransactionsScreen() {
 
   /** Destrutivo = action sheet nativo. `onLongPress` + `Alert` é proibido nesta tela. */
   const confirmDelete = (tx: Transaction) => {
+    const alvo = alvoDoLancamento(tx, tx.description || tx.merchant || tx.category || 'Lançamento');
+    if (alvo) return apagar(alvo);
     const what = `${formatBRL(tx.amount_cents)}${tx.category ? ` em ${tx.category}` : ''}`;
     confirmDestructive(
       'Apagar este lançamento?',

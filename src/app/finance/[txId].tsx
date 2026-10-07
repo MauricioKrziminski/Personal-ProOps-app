@@ -31,13 +31,14 @@ import {
   useCategoriesUsed,
   useDeleteTransaction,
   useInvoiceHead,
-  useDeleteInstallmentPlan,
   useInstallmentPlanResumo,
   useRecurringSerie,
   useSaveTransaction,
   useTransaction,
   type Transaction,
 } from '@/hooks/use-finance';
+import { useApagarComAlcance } from '@/hooks/use-apagar-com-alcance';
+import { alvoDoLancamento } from '@/lib/apagar-com-alcance';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { detalheDoPagamento } from '@/lib/confirmar-baixa';
@@ -125,7 +126,6 @@ export default function TransactionDetailScreen() {
   const plano = plans.data ?? undefined;
   const series = useRecurringSerie(tx?.recurring_id);
   const serie = series.data ?? undefined;
-  const removePlan = useDeleteInstallmentPlan();
   // Lembrete de conta: o do alvo "só esta" OU o da série/compra. Hooks antes de qualquer return.
   const alvosLembrete = tx ? alvosDoAberto({ tipo: 'lancamento', tx }) : null;
   const lembreteSo = useBillReminderFor(alvosLembrete?.so ?? null);
@@ -135,6 +135,8 @@ export default function TransactionDetailScreen() {
   const nomeDoFavorito = useNomeDoFavorito();
   const save = useSaveTransaction();
   const remove = useDeleteTransaction();
+  // Voltar só no sucesso do hook: depois do desmonte o callback da mutação não dispara.
+  const { apagar } = useApagarComAlcance(() => router.back());
   // "Paguei" confirma o valor numa folha curta (25/09/2026). Dada a baixa, volta para a lista.
   const baixa = useConfirmarBaixa({ aoConcluir: () => router.back() });
   // `refetch` ignora `enabled`: só refaz o que o lançamento realmente tem.
@@ -186,37 +188,6 @@ export default function TransactionDetailScreen() {
   const duplicate = () => {
     if (!tx) return;
     router.push(hrefDoLancar('uma', paramsDaCopia(tx, isoToBR(localISODate()), plano?.installments).params));
-  };
-
-  /**
-   * Apagar a compra parcelada INTEIRA.
-   *
-   * Cancelar uma compra em 12x significava apagar doze lançamentos um por um,
-   * navegando doze meses. Aqui é um `delete` no plano e o cascade leva as
-   * parcelas.
-   *
-   * Não existe "Desfazer" — o cascade não volta —, então a confirmação nomeia o
-   * estrago inteiro: quantas parcelas e quanto dinheiro.
-   */
-  const confirmDeletePlan = () => {
-    if (!tx?.installment_plan_id) return;
-    const planId = tx.installment_plan_id;
-    const quantas = plano?.installments ?? tx.installment_no ?? 0;
-    const nome = plano?.title ?? tx.description ?? 'esta compra';
-    confirmDestructive(
-      'Apagar a compra parcelada inteira?',
-      'Apagar tudo',
-      () =>
-        removePlan.mutate(planId, {
-          onSuccess: () => {
-            router.back();
-            toast({ message: <>Apaguei <Forte>{nome}</Forte> e as parcelas.</>, tone: 'success' });
-          },
-          onError: (error) =>
-            toast({ message: financeErrorMessage(error, 'Não deu para apagar a compra. Tenta de novo.'), tone: 'error' }),
-        }),
-      `Some ${quantas > 0 ? `${quantas} parcelas` : 'todas as parcelas'}${plano ? `, ${formatBRL(plano.total_cents)} no total` : ''} — de todos os meses. Isso não volta.`,
-    );
   };
 
   /** Apagar é action sheet nativo, e a mensagem diz o que some. */
@@ -554,21 +525,15 @@ export default function TransactionDetailScreen() {
                 }]
               : []),
             {
-              label: tx.installment_plan_id ? 'Apagar só esta parcela' : 'Apagar',
+              label: 'Apagar',
               icon: 'trash',
               destructive: true,
-              onPress: confirmDelete,
+              onPress: () => {
+                const alvo = alvoDoLancamento(tx, title);
+                if (alvo) apagar(alvo);
+                else confirmDelete();
+              },
             },
-            ...(tx.installment_plan_id
-              ? [
-                  {
-                    label: 'Apagar a compra inteira',
-                    icon: 'trash' as const,
-                    destructive: true,
-                    onPress: confirmDeletePlan,
-                  },
-                ]
-              : []),
           ],
         }}
       />
