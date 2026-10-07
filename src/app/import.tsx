@@ -62,6 +62,7 @@ import {
   type Grupo,
 } from '@/lib/import-preview';
 import { AccountPicker } from '@/components/finance/account-picker';
+import { financeErrorMessage } from '@/lib/finance-form';
 import { VerMais } from '@/components/ui/ver-mais';
 import { useAosPoucos, useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
 import { transicaoDeLayoutRapida } from '@/components/motion/transicao';
@@ -720,8 +721,8 @@ export default function ImportScreen() {
                                 void sobrando.refetch();
                                 toast({ message: 'Lançamento apagado.', tone: 'success' });
                               },
-                              onError: () =>
-                                toast({ message: 'Não deu para apagar.', tone: 'error' }),
+                              onError: (error) =>
+                                toast({ message: financeErrorMessage(error, 'Não deu para apagar.'), tone: 'error' }),
                             }),
                           'Ele some do financeiro. O arquivo não o trouxe, mas isso não prova que ele não existiu.'
                         ),
