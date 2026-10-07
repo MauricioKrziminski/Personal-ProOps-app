@@ -13,10 +13,10 @@ test('a prévia lê o dinheiro como TEXTO e recusa formato estranho', () => {
 });
 
 test('sem paga não há segunda confirmação; com paga a frase diz quanto, de onde e desde quando', () => {
-  assert.equal(fraseDoEstrago(lerPrevia({ apagadas: 3, pagas_apagadas: 0, soma_pagas_cents: '0', contas: [], desde: null, apaga_contrato: false }), brl), null);
-  const frase = fraseDoEstrago(lerPrevia({ apagadas: 8, pagas_apagadas: 8, soma_pagas_cents: '959000', contas: ['Nubank'], desde: '2026-05-10', apaga_contrato: false }), brl);
+  assert.equal(fraseDoEstrago(lerPrevia({ apagadas: 3, pagas_apagadas: 0, soma_pagas_cents: '0', contas: [], desde: null, apaga_contrato: false }), brl, 'plan'), null);
+  const frase = fraseDoEstrago(lerPrevia({ apagadas: 8, pagas_apagadas: 8, soma_pagas_cents: '959000', contas: ['Nubank'], desde: '2026-05-10', apaga_contrato: false }), brl, 'plan');
   assert.equal(frase, 'Isso apaga 8 lançamentos já pagos (R$ 9590,00) e muda o saldo da Nubank e o histórico desde maio de 2026.');
-  const duas = fraseDoEstrago(lerPrevia({ apagadas: 2, pagas_apagadas: 1, soma_pagas_cents: '1000', contas: ['BB', 'Itaú'], desde: '2026-09-01', apaga_contrato: false }), brl);
+  const duas = fraseDoEstrago(lerPrevia({ apagadas: 2, pagas_apagadas: 1, soma_pagas_cents: '1000', contas: ['BB', 'Itaú'], desde: '2026-09-01', apaga_contrato: false }), brl, 'plan');
   assert.equal(duas, 'Isso apaga 1 lançamento já pago (R$ 10,00) e muda o saldo das contas BB e Itaú e o histórico desde setembro de 2026.');
 });
 
@@ -61,11 +61,20 @@ test('kindDoApagar e ehContrato', () => {
 
 test('a confirmação diz vira à vista e apaga contrato, mesmo sem paga', () => {
   const base = { apagadas: 2, pagas_apagadas: 0, soma_pagas_cents: '0', contas: [], desde: null };
-  assert.equal(fraseDoEstrago(lerPrevia({ ...base, apaga_contrato: false, vira_avista: true }), brl), 'A compra fica com uma parcela só e vira um lançamento à vista.');
-  assert.equal(fraseDoEstrago(lerPrevia({ ...base, apaga_contrato: true }), brl), 'A compra inteira sai, com a entrada.');
-  const tudo = fraseDoEstrago(lerPrevia({ ...base, pagas_apagadas: 1, soma_pagas_cents: '1000', apaga_contrato: true }), brl);
-  assert.equal(tudo, 'Isso apaga 1 lançamento já pago (R$ 10,00). A compra inteira sai, com a entrada.');
+  assert.equal(fraseDoEstrago(lerPrevia({ ...base, apaga_contrato: false, vira_avista: true }), brl, 'plan'), 'A compra fica com uma parcela só e vira um lançamento à vista.');
+  assert.equal(fraseDoEstrago(lerPrevia({ ...base, apaga_contrato: true }), brl, 'plan'), 'A compra inteira sai.');
+  const tudo = fraseDoEstrago(lerPrevia({ ...base, pagas_apagadas: 1, soma_pagas_cents: '1000', apaga_contrato: true }), brl, 'plan');
+  assert.equal(tudo, 'Isso apaga 1 lançamento já pago (R$ 10,00). A compra inteira sai.');
   assert.equal(textoDoApagado(lerPrevia({ ...base, apaga_contrato: true })), 'Apagado por completo.');
+});
+
+test('a frase do contrato depende do tipo', () => {
+  const p = lerPrevia({ apagadas: 2, pagas_apagadas: 0, soma_pagas_cents: '0', contas: [], desde: null, apaga_contrato: true, vira_avista: true });
+  assert.equal(fraseDoEstrago(p, brl, 'debt'), 'O financiamento inteiro sai, com os pagamentos.');
+  assert.equal(fraseDoEstrago(p, brl, 'debt_payment'), 'O financiamento inteiro sai, com os pagamentos.');
+  assert.equal(fraseDoEstrago(p, brl, 'recurring'), 'A série inteira sai.');
+  assert.equal(fraseDoEstrago(p, brl, 'occurrence'), 'A série inteira sai.');
+  assert.equal(fraseDoEstrago(p, brl, 'installment'), 'A compra fica com uma parcela só e vira um lançamento à vista. A compra inteira sai.');
 });
 
 test('a prévia recusa apagadas negativo ou fracionário', () => {

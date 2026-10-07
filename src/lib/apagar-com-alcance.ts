@@ -50,7 +50,7 @@ export function lerPrevia(json: unknown): PreviaDoApagar {
 const lista = (nomes: string[]) => (nomes.length > 1 ? `${nomes.slice(0, -1).join(', ')} e ${nomes.at(-1)}` : nomes[0] ?? '');
 
 /** Segunda confirmação: só existe quando algo pago, a compra à vista ou o contrato inteiro está em jogo. */
-export function fraseDoEstrago(p: PreviaDoApagar, brl: (cents: number) => string): string | null {
+export function fraseDoEstrago(p: PreviaDoApagar, brl: (cents: number) => string, tipo: TipoDoApagar): string | null {
   const partes: string[] = [];
   if (p.pagas > 0) {
     const n = p.pagas === 1 ? '1 lançamento já pago' : `${p.pagas} lançamentos já pagos`;
@@ -58,8 +58,9 @@ export function fraseDoEstrago(p: PreviaDoApagar, brl: (cents: number) => string
     const desde = p.desde ? ` e o histórico desde ${MESES[Number(p.desde.slice(5, 7)) - 1]} de ${p.desde.slice(0, 4)}` : '';
     partes.push(`Isso apaga ${n} (${brl(p.somaPagasCents)})${contas}${desde}.`);
   }
-  if (p.viraAvista) partes.push('A compra fica com uma parcela só e vira um lançamento à vista.');
-  if (p.apagaContrato) partes.push('A compra inteira sai, com a entrada.');
+  const compra = tipo === 'installment' || tipo === 'plan';
+  if (compra && p.viraAvista) partes.push('A compra fica com uma parcela só e vira um lançamento à vista.');
+  if (p.apagaContrato) partes.push(compra ? 'A compra inteira sai.' : tipo === 'debt' || tipo === 'debt_payment' ? 'O financiamento inteiro sai, com os pagamentos.' : 'A série inteira sai.');
   return partes.length ? partes.join(' ') : null;
 }
 
