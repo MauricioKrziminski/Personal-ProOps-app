@@ -34,3 +34,10 @@ export function rotuloDaPausa(
   if (hoje < de) return `Pausa de ${isoToBR(de).slice(0, 5)} a ${isoToBR(ultimo).slice(0, 5)}`;
   return null;
 }
+
+/** Filtro de estado dos lembretes para o PostgREST (`.or()`): em período de pausa conta como pausado. `hoje` é o dia local. */
+export function filtroDeEstadoDoLembrete(status: 'active' | 'paused', hoje: string): string {
+  return status === 'paused'
+    ? `active.eq.false,and(paused_from.lte.${hoje},paused_until.gt.${hoje})`
+    : `and(active.eq.true,or(paused_from.is.null,paused_until.is.null,paused_from.gt.${hoje},paused_until.lte.${hoje}))`;
+}

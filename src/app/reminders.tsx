@@ -54,6 +54,7 @@ export default function RemindersScreen() {
   const channel = filters.selections?.channel;
   const { data, isLoading, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } = useReminders({
     from: filters.from, to: filters.to, q: filters.q,
+    ...(status === 'active' || status === 'paused' ? { status, hoje: localISODate() } : {}),
     channel: channel === 'push' || channel === 'whatsapp' || channel === 'both' ? channel : undefined,
   });
   const lembretesDeConta = useBillReminders();
@@ -69,9 +70,7 @@ export default function RemindersScreen() {
 
   // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
   // falha, e sem este corte a tela seguia afirmando números embaixo da faixa de erro.
-  // O estado filtra aqui, não no servidor: dentro do período de uma pausa o lembrete conta como pausado.
-  const reminders = isError ? [] : (data?.pages.flat() ?? []).filter((r) => (!r.parent_reminder_id || r.active)
-    && (!status || (status === 'active') === (r.active && !noPeriodo(r))));
+  const reminders = isError ? [] : (data?.pages.flat() ?? []).filter((r) => (!r.parent_reminder_id || r.active));
   const active = reminders.filter((r) => r.active && !noPeriodo(r));
   const paused = reminders.filter((r) => !r.active || noPeriodo(r));
 

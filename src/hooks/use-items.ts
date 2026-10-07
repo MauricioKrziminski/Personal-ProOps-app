@@ -4,7 +4,7 @@ import { useInfiniteQuery, useQuery } from '@/lib/consulta-em-foco';
 import { useEffect } from 'react';
 
 import { localISODate } from '@/lib/dates';
-import { foraDaPausa } from '@/lib/pausa';
+import { filtroDeEstadoDoLembrete, foraDaPausa } from '@/lib/pausa';
 import { timestampDateBounds } from '@/lib/list-filters';
 import { toIlikeTerm } from '@/lib/search';
 import { supabase } from '@/lib/supabase';
@@ -88,6 +88,9 @@ const REMINDERS_PAGE = 20;
 export interface ReminderFilters {
   q?: string;
   active?: boolean;
+  /** Estado da lista; com `hoje` (dia local). Em período de pausa conta como pausado. */
+  status?: 'active' | 'paused';
+  hoje?: string;
   channel?: Reminder['channel'];
   from?: string;
   to?: string;
@@ -112,6 +115,7 @@ export function useReminders(filters: ReminderFilters = {}) {
       if (bounds.from) query = query.gte('next_run_at', bounds.from);
       if (bounds.before) query = query.lt('next_run_at', bounds.before);
       if (filters.active !== undefined) query = query.eq('active', filters.active);
+      if (filters.status && filters.hoje) query = query.or(filtroDeEstadoDoLembrete(filters.status, filters.hoje));
       if (filters.channel) query = query.eq('channel', filters.channel);
       const term = toIlikeTerm(filters.q ?? '');
       if (term) query = query.ilike('title', `%${term}%`);

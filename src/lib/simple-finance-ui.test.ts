@@ -8,6 +8,7 @@ import { prepararLancamento } from './lancamento-write.ts';
 import { calculateGoalContribution } from './goal-contribution.ts';
 
 import { telaPronta } from './tela-pronta.ts';
+import { filtroDeEstadoDoLembrete } from './pausa.ts';
 import { allocate as allocateF14 } from './budget-plan.ts';
 import { ladosDoArrasto } from './arrasto.ts';
 
@@ -644,7 +645,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       // O da dívida (Task 5): de verdade só em Dívidas, pelo mesmo motivo.
       if (name === '@/components/finance/formulario-da-divida' && file.endsWith('finance/debts.tsx')) return load('src/components/finance/formulario-da-divida.tsx');
       if (name === '@/hooks/use-down-payment') return { usePurchaseDownPayment: (_type: string, parentId?: string) => ({ ...query, isPending: Boolean(parentId && options.downPaymentPending), isSuccess: !options.downPaymentPending && !options.downPaymentError, isError: Boolean(options.downPaymentError), data: parentId ? options.downPayment ?? null : undefined, refetch: async () => { refetches.push('down-payment'); } }) };
-      if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: options.datasReais ? load('src/lib/dates.ts').formatDateBR : () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useReminders: () => ({ ...query, isSuccess: true, data: { pages: [options.reminders ?? []], pageParams: [0] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }), useReminder: () => ({ ...query, data: undefined, isLoading: false }), useToggleReminder: () => mutation('toggleReminder'), useDeleteReminder: () => mutation('deleteReminder'), useSaveReminder: () => mutation('saveReminder') };
+      if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: options.datasReais ? load('src/lib/dates.ts').formatDateBR : () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useReminders: (f: any = {}) => ({ ...query, isSuccess: true, data: { pages: [(options.reminders ?? []).filter((r: any) => { if (!f.status) return true; const em = r.active && load('src/lib/pausa.ts').emPausa(f.hoje, r.paused_from ?? null, r.paused_until ?? null); return (f.status === 'active') === (r.active && !em); })], pageParams: [0] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }), useReminder: () => ({ ...query, data: undefined, isLoading: false }), useToggleReminder: () => mutation('toggleReminder'), useDeleteReminder: () => mutation('deleteReminder'), useSaveReminder: () => mutation('saveReminder') };
       if (name === '@/lib/pausa') return load('src/lib/pausa.ts');
       if (name === '@/components/finance/pausa-sheet') return load('src/components/finance/pausa-sheet.tsx');
       if (name === '@/hooks/use-pausas') return {
@@ -5662,6 +5663,12 @@ test('Pausar…: pausa marcada para depois se cancela (série e lembrete); lembr
   assert.equal(ui3.nodes().some((n: any) => n.type === 'Section'), false, 'em pausa não é "Ativo"');
   ui3.interact(() => ui3.nodes().find((n: any) => n.type === 'ListFilters').props.onApply({ selections: { status: 'paused' } }));
   assert.ok(ui3.nodes().some((n: any) => n.type === 'Section' && n.props.title === 'Pausados'));
+});
+
+test('Pausar…: o filtro de estado do lembrete vai ao servidor, em PostgREST', () => {
+  assert.equal(filtroDeEstadoDoLembrete('paused', '2026-10-07'), 'active.eq.false,and(paused_from.lte.2026-10-07,paused_until.gt.2026-10-07)');
+  assert.equal(filtroDeEstadoDoLembrete('active', '2026-10-07'),
+    'and(active.eq.true,or(paused_from.is.null,paused_until.is.null,paused_from.gt.2026-10-07,paused_until.lte.2026-10-07))');
 });
 
 test('Pausar…: lembrete dentro do período vai para Pausados e "Retomar agora" limpa os dois campos', () => {
