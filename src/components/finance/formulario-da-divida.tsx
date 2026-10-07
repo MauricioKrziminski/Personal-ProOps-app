@@ -364,7 +364,10 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
    */
   const ancoraEfetiva = form.ancora ?? null;
   // A carência desloca as datas do cronograma: o campo mostra a data deslocada e a âncora salva não a leva junto.
-  const carencias = useDebtPauses(form.id ?? null).data ?? [];
+  const consultaCarencias = useDebtPauses(form.id ?? null);
+  const carencias = consultaCarencias.data ?? [];
+  // Sem saber as carências o deslocamento é desconhecido: nada de data, pergunta ou Salvar sobre palpite.
+  const carenciasOk = !form.id || consultaCarencias.isSuccess;
   const deslocamento = deslocamentoDaCarencia(carencias, form.installmentsPaid + 1);
   const diaDoContrato = form.diaVencimento ? Number(form.diaVencimento) : null;
   const proximaISO =
@@ -383,7 +386,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     && form.installmentsPaid > (form.id ? form.pagasOriginal : 0);
   // Sem conta que paga não há o que lançar: as pagas ficam só contadas, sem pergunta (05/10/2026).
   const perguntaPagas = temPagasNovas && Boolean(form.accountId);
-  const perguntas = perguntaPagas && ancoraEfetiva && diaDoContrato && ciclo.data
+  const perguntas = perguntaPagas && carenciasOk && ancoraEfetiva && diaDoContrato && ciclo.data
     ? parcelasPagasNoCiclo(ancoraEfetiva, diaDoContrato, (form.id ? form.pagasOriginal : 0) + 1,
         form.installmentsPaid, ciclo.data.de, ciclo.data.ate, carencias)
     : [];
@@ -399,6 +402,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     (form.calculationMode === 'fixed_installments' ? parcelaCents > 0 : form.remainingCents > 0);
   const rotuloDaData = form.installmentsPaid === 0 ? 'Primeira parcela' : `Próxima parcela (a ${form.installmentsPaid + 1}ª)`;
   const escolherData = (br: string, ultimo = false) => {
+    if (!carenciasOk) return;
     const iso = brToISO(br);
     const escolhido = vencimentoDaDividaEscolhido(iso, form.installmentsPaid + deslocamento, ultimo);
     setForm({ ...form, ancora: escolhido.ancora, diaVencimento: String(escolhido.dia) });
@@ -439,7 +443,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     (form.kind !== 'financing' || (form.taxa.trim() !== '' && !!form.parcelas)) &&
     Number.isFinite(Number(form.taxa.replace(',', '.'))) && Number(form.taxa.replace(',', '.')) >= 0;
   const podeSalvar = Boolean(classification.ready && (editando || !classification.isError)
-    && nomeOk && !erroEntrada && !erroPagamento && !accounts.isError && !accounts.isPending && validDueDay && !erroDasPerguntas && (!form.id || payments.isSuccess) && (form.calculationMode === 'fixed_installments' ? simpleValues : advancedValid));
+    && nomeOk && !erroEntrada && !erroPagamento && !accounts.isError && !accounts.isPending && validDueDay && !erroDasPerguntas && (!form.id || payments.isSuccess) && carenciasOk && (form.calculationMode === 'fixed_installments' ? simpleValues : advancedValid));
 
   const target = podeSalvar ? {
         id: form.id,
@@ -634,6 +638,9 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
             message="Não deu para carregar os pagamentos desta dívida."
             onRetry={payments.refetch}
           />
+        ) : null}
+        {form.id && consultaCarencias.isError ? (
+          <ErrorBand message="Não deu para carregar a carência desta dívida." onRetry={() => void consultaCarencias.refetch()} />
         ) : null}
         {/*
           Nome e conta NO TOPO (23/09/2026, pedido do dono do produto): eram uma linha

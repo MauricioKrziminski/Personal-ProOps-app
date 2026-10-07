@@ -31,7 +31,7 @@ export function CarenciaSheet({ visivel, onClose, divida }: { visivel: boolean; 
   const [meses, setMeses] = useState(1);
   const pausar = useDebtPause();
   const previa = useDebtPausePreview(visivel ? divida.id : null, de, meses);
-  const p = previa.data && !previa.isFetching ? previa.data : null;
+  const p = previa.data && !previa.isFetching && !previa.isError ? previa.data : null;
   const pendente = pausar.isPending;
   const pronto = Boolean(p) && !pendente;
 
@@ -64,7 +64,7 @@ export function CarenciaSheet({ visivel, onClose, divida }: { visivel: boolean; 
           {comJuros ? (
             <ThemedText type="default" style={styles.fixo}>{`${proximaEmAberto}ª`}</ThemedText>
           ) : (
-            <QuantityField value={de} min={proximaEmAberto} max={divida.installments ?? 600} onChange={setDe}
+            <QuantityField value={de} min={proximaEmAberto} max={divida.installments ?? undefined} onChange={setDe}
               accessibilityLabel="Parcela em que a carência começa" />
           )}
         </Field>

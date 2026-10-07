@@ -61,7 +61,7 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; notesPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; resumoErro?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean; favoritos?: any[]; favoritosArquivados?: any[]; billReminders?: any[]; billRemindersPending?: boolean; pausaPrevia?: any; pausaBuscando?: boolean; carencias?: any[]; carenciaPrevia?: any; carenciaBuscando?: boolean } = {}) {
+function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; notesPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; resumoErro?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean; favoritos?: any[]; favoritosArquivados?: any[]; billReminders?: any[]; billRemindersPending?: boolean; pausaPrevia?: any; pausaBuscando?: boolean; carencias?: any[]; carenciaPrevia?: any; carenciaBuscando?: boolean; carenciasPendentes?: boolean; carenciasErro?: boolean; carenciaErro?: boolean } = {}) {
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
@@ -655,10 +655,10 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
         usePauseRecurring: () => mutation('pauseRecurring'),
         useResumeRecurring: () => mutation('resumeRecurring'),
         usePauseReminder: () => mutation('pauseReminder'),
-        useDebtPausePreview: (id: string | null, de: number | null, meses: number | null) => { previasDeCarencia.push([id, de, meses]); return { ...query, data: id ? options.carenciaPrevia : undefined, isFetching: Boolean(options.carenciaBuscando), isError: false }; },
+        useDebtPausePreview: (id: string | null, de: number | null, meses: number | null) => { previasDeCarencia.push([id, de, meses]); return { ...query, data: id ? options.carenciaPrevia : undefined, isFetching: Boolean(options.carenciaBuscando), isError: Boolean(options.carenciaErro), error: { code: 'P0001', message: 'Já houve pagamento.' } }; },
         useDebtPause: () => mutation('debtPause'),
         useUndoDebtPause: () => mutation('undoDebtPause'),
-        useDebtPauses: () => ({ ...query, data: options.carencias ?? [] }),
+        useDebtPauses: () => ({ ...query, data: options.carenciasPendentes || options.carenciasErro ? undefined : (options.carencias ?? []), isSuccess: !options.carenciasPendentes && !options.carenciasErro, isError: Boolean(options.carenciasErro), isPending: Boolean(options.carenciasPendentes), refetch: async () => { refetches.push('carencias'); } }),
       };
       if (name === '@/lib/lembrete-de-conta') return load('src/lib/lembrete-de-conta.ts');
       if (name === '@/hooks/use-bill-reminders') return {
@@ -8335,6 +8335,7 @@ test('Carência: com juros mostra parcela e saldo e a parcela inicial fica fixa;
   const textos = ui.nodes().filter((n: any) => n.type === 'ThemedText').map((n: any) => String(n.props.children));
   assert.ok(textos.some((t: string) => /^Parcela: R\$ 1470\.00 → R\$ 1562\.40$/.test(t)), textos.join('|'));
   assert.ok(textos.some((t: string) => /^Saldo:/.test(t)));
+  assert.equal(ui.writes.length, 0, 'abrir a folha não grava');
   ui.interact(() => botaoConfirmar(ui).props.onPress());
   assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'debtPause', value: { debtId: 'd1', fromNo: 9, months: 1 } });
 });
@@ -8373,4 +8374,38 @@ test('Dívidas: com principal menor que o restante (capitalizou) a barra do card
   const ui = screen(debtsFile, { debts: [{ ...carro, principal_cents: 100000, remaining_cents: 150000 }] });
   const barra = ui.nodes().find((n: any) => n.type === 'ProgressBar');
   assert.equal(barra.props.value, 0);
+});
+
+test('Carência (fix): sem saber as carências o Salvar do formulário espera; erro mostra a faixa com retry', () => {
+  const salvar = (ui: any) => ui.button('Salvar');
+  const base = { debts: [carro] };
+  assert.equal(salvar(editarDivida({ ...base, carenciasPendentes: true })).props.disabled, true, 'carregando bloqueia');
+  const erro = editarDivida({ ...base, carenciasErro: true });
+  assert.equal(salvar(erro).props.disabled, true, 'erro bloqueia');
+  const faixa = erro.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'ErrorBand' && /carência/.test(String(n.props.message)));
+  assert.ok(faixa, 'faixa de erro');
+  erro.interact(() => faixa.props.onRetry());
+  assert.ok(erro.refetches.includes('carencias'));
+  assert.equal(salvar(editarDivida(base)).props.disabled, false, 'sucesso libera');
+});
+
+test('Carência (fix): a ficha com falha ao carregar as carências mostra erro com retry', () => {
+  const ui = screen(debtsFile, { create: false, debts: [carro], params: { id: 'd1' }, carenciasErro: true });
+  const faixa = ui.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'ErrorBand' && /carência/.test(String(n.props.message)));
+  assert.ok(faixa);
+});
+
+test('Carência (fix): prévia com erro bloqueia o Confirmar e mostra o erro; nada grava antes', () => {
+  const ui = carenciaSheet(carro, { carenciaPrevia: previaFixa, carenciaErro: true });
+  assert.equal(ui.writes.length, 0);
+  assert.equal(botaoConfirmar(ui).props.disabled, true);
+  assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText' && n.props.children === 'Já houve pagamento.'));
+});
+
+test('Carência (fix): sem parcela em aberto o menu não oferece a pausa; sem total o campo usa o máximo natural', () => {
+  const feita = { ...carro, installments_paid: 48 };
+  const ui = screen(debtsFile, { create: false, debts: [feita], params: { id: 'd1' } });
+  assert.ok(!ui.nodes().find((n: any) => n.type === 'HeaderActions').props.menu.actions.some((a: any) => a.label === 'Pausar pagamentos…'));
+  const sem = carenciaSheet({ ...carro, installments: null }, { carenciaPrevia: previaFixa });
+  assert.equal(qtd(sem, 'Parcela em que a carência começa').props.max, undefined);
 });

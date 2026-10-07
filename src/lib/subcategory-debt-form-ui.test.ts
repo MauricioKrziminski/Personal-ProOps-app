@@ -37,7 +37,7 @@ function mount(options:{debt?:any;common?:any;guarded?:any;route?:any}={}) {
       if(name==='react-native')return {View:'View',StyleSheet:{create:(v:any)=>v}};
       if(name==='@/hooks/use-finance')return hooks;
       if(name==='@/hooks/use-items')return {localISODate:()=> '2026-10-03'};
-      if(name==='@/hooks/use-pausas')return {useDebtPauses:()=>({data:[]})};
+      if(name==='@/hooks/use-pausas')return {useDebtPauses:()=>({data:[],isSuccess:true})};
       if(name==='@/hooks/use-rascunho')return {useRascunho:()=>({tirar:()=>{}})};
       if(name==='@/lib/agent-chat')return {newClientMessageId:()=> '30000000-0000-4000-8000-000000000001'};
       if(name==='@/lib/edit-scope')return {askEditScope:(_kind:any,fn:any)=>scopes.push(fn)};

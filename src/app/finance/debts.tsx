@@ -361,7 +361,7 @@ export default function DebtsScreen() {
     ...(noDetalhe ? [] : [{ label: 'Ver as parcelas', onPress: () => abrirFicha(d) }]),
     { label: lembreteDa(d) ? 'Editar lembrete' : 'Lembrar', icon: 'bell' as const,
       onPress: () => router.push(hrefDoLembrete({ tipo: 'divida', debtId: d.id }, d.name)) },
-    ...(Number(d.remaining_cents) <= 0 ? [] : [{ label: 'Pausar pagamentos…', onPress: () => setCarenciaId(d.id) }]),
+    ...(Number(d.remaining_cents) <= 0 || (d.installments != null && d.installments_paid + 1 > d.installments) ? [] : [{ label: 'Pausar pagamentos…', icon: 'pause' as const, onPress: () => setCarenciaId(d.id) }]),
     { label: 'Editar', onPress: () => abrirEdicao(d) },
     { label: 'Arquivar', icon: 'archivebox', arrasto: 'esquerda', desfaz: true, onPress: () => arquivar(d) },
     { label: 'Apagar por completo', icon: 'trash', destructive: true, onPress: () => void excluir(d) },
@@ -705,6 +705,9 @@ export default function DebtsScreen() {
           <Row icon="bell" title={resumoDosAvisos(lembreteDa(detalhe)!.avisos)}
             onPress={() => router.push(hrefDoLembrete({ tipo: 'divida', debtId: detalhe.id }, detalhe.name))} />
         </Section>
+      ) : null}
+      {detalhe && carencias.isError ? (
+        <ErrorBand message="Não deu para carregar as carências." onRetry={() => void carencias.refetch()} />
       ) : null}
       {detalhe && (carencias.data ?? []).length > 0 ? (
         <Section>
