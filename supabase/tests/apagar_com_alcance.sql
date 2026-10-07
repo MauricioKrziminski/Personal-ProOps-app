@@ -15,7 +15,7 @@ declare
   hoje date := (now() at time zone 'America/Sao_Paulo')::date;
   conta uuid; serie uuid; t_pago uuid; t_atrasada uuid; t_ancora uuid; t_depois uuid; t_longe uuid; cartao uuid; t_pai uuid; t_fee uuid;
   r jsonb; n int; chave uuid := gen_random_uuid(); cfg text[];
-  plano uuid; p1 uuid; p2 uuid; p3 uuid; p4 uuid; soma bigint; k int;
+  plano uuid; p1 uuid; p2 uuid; p3 uuid; p4 uuid; soma bigint; k int; ent uuid; q1 uuid; q2 uuid; q3 uuid; q4 uuid;
 begin
   select id into ws from public.workspaces where owner_id = u;
   select id into ws_outro from public.workspaces where owner_id = outro;
@@ -243,6 +243,120 @@ begin
   reset role;
   assert not exists (select 1 from public.installment_plans where id = plano), 'todas: o plano sai';
   assert not exists (select 1 from public.transactions where id in (p1, p2)), 'todas: as parcelas saem';
+  set local role authenticated;
+
+  -- ── Fix round 1: renumerar, fatura travada, entrada, âncora do contrato ──
+  -- "Só esta" na 2ª de 4: sobram 1,2,3 com rótulo (k/3); renomear a compra depois mantém as 3
+  reset role;
+  insert into public.installment_plans (workspace_id, user_id, account_id, total_cents, installments, first_occurred_at, description)
+  values (ws, u, conta, 12000, 4, hoje - 30, 'Mesa BB') returning id into plano;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, installment_plan_id, installment_no)
+  select ws, u, 'expense', 3000, 'Mesa BB (' || i || '/4)', hoje - 30 + 30 * (i - 1), case when i = 1 then 'cleared' else 'pending' end, conta, plano, i
+  from generate_series(1, 4) i;
+  set local role authenticated;
+  r := public.delete_scoped_preview('installment', (select id from public.transactions where installment_plan_id = plano and installment_no = 2), 'one');
+  assert (r->>'apagadas')::int = 1 and (r->>'vira_avista')::boolean = false and (r->>'apaga_contrato')::boolean = false, format('prévia: %s', r);
+  reset role;
+  assert (select count(*) from public.transactions where installment_plan_id = plano) = 4, 'a prévia não escreve';
+  set local role authenticated;
+  r := public.delete_scoped('installment', (select id from public.transactions where installment_plan_id = plano and installment_no = 2), 'one', gen_random_uuid());
+  reset role;
+  assert (select array_agg(installment_no order by installment_no) from public.transactions where installment_plan_id = plano) = array[1,2,3], 'renumera 1..3';
+  assert (select array_agg(description order by installment_no) from public.transactions where installment_plan_id = plano)
+         = array['Mesa BB (1/3)', 'Mesa BB (2/3)', 'Mesa BB (3/3)'], 'rótulos (k/3)';
+  assert (select total_cents = 9000 and installments = 3 and first_occurred_at = hoje - 30 from public.installment_plans where id = plano), 'total e 1ª data';
+  set local role authenticated;
+  perform public.update_installment_plan(plano, 9000, 3, hoje - 30, 'Mesa CC', null, null, conta, null);
+  reset role;
+  assert (select count(*) = 3 and array_agg(installment_no order by installment_no) = array[1,2,3]
+          from public.transactions where installment_plan_id = plano), 'renomear mantém as 3 parcelas';
+  set local role authenticated;
+
+  -- "Só esta" na 1ª: a 2ª vira a primeira e o plano passa a começar na data dela
+  reset role;
+  r := null;
+  set local role authenticated;
+  r := public.delete_scoped('installment', (select id from public.transactions where installment_plan_id = plano and installment_no = 1), 'one', gen_random_uuid());
+  reset role;
+  assert (select first_occurred_at from public.installment_plans where id = plano) = hoje + 30, 'first_occurred_at = a nova 1ª';
+  assert (select array_agg(installment_no order by installment_no) from public.transactions where installment_plan_id = plano) = array[1,2], 'renumera 1..2';
+  delete from public.installment_plans where id = plano;
+
+  -- parcela TRAVADA (fatura paga) fica onde está ao renumerar, e a compra segue editável
+  insert into public.installment_plans (workspace_id, user_id, account_id, total_cents, installments, first_occurred_at, description)
+  values (ws, u, cartao, 8000, 4, hoje - 70, 'Sofá BB') returning id into plano;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, installment_plan_id, installment_no)
+  values (ws, u, 'expense', 2000, 'Sofá BB (1/4)', hoje - 70, 'pending', cartao, plano, 1) returning id into q1;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, installment_plan_id, installment_no)
+  values (ws, u, 'expense', 2000, 'Sofá BB (2/4)', hoje - 40, 'pending', cartao, plano, 2) returning id into q2;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, installment_plan_id, installment_no)
+  values (ws, u, 'expense', 2000, 'Sofá BB (3/4)', hoje + 20, 'pending', cartao, plano, 3) returning id into q3;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, installment_plan_id, installment_no)
+  values (ws, u, 'expense', 2000, 'Sofá BB (4/4)', hoje + 50, 'pending', cartao, plano, 4) returning id into q4;
+  update public.card_invoices set status = 'paid' where id = (select invoice_id from public.transactions where id = q1);
+  set local role authenticated;
+  -- recusa: a travada pela parcela e pelo contrato inteiro
+  begin
+    perform public.delete_scoped('installment', q1, 'one', gen_random_uuid());
+    n := -3;
+  exception when others then
+    assert sqlstate = 'P0001', format('travada (parcela): %s %s', sqlstate, sqlerrm);
+  end;
+  assert n <> -3, 'parcela em fatura paga devia recusar';
+  begin
+    perform public.delete_scoped('plan', plano, 'all', gen_random_uuid());
+    n := -4;
+  exception when others then
+    assert sqlstate = 'P0001', format('travada (plano): %s %s', sqlstate, sqlerrm);
+  end;
+  assert n <> -4, 'compra com parcela em fatura paga devia recusar';
+  -- apagar uma em aberto renumera sem tirar a travada da fatura
+  reset role;
+  select invoice_id into ent from public.transactions where id = q1;
+  set local role authenticated;
+  r := public.delete_scoped('installment', q3, 'one', gen_random_uuid());
+  reset role;
+  assert (select invoice_id = ent and occurred_at = hoje - 70 and installment_no = 1 and description = 'Sofá BB (1/3)'
+          from public.transactions where id = q1), 'a travada continua na fatura, com data e número';
+  assert (select array_agg(installment_no order by installment_no) from public.transactions where installment_plan_id = plano) = array[1,2,3], 'renumera com travada';
+  set local role authenticated;
+  perform public.update_installment_plan(plano, 6000, 3, hoje - 70, 'Sofá CC', null, null, cartao, null);
+  reset role;
+  assert (select count(*) = 3 from public.transactions where installment_plan_id = plano), 'compra com travada segue editável';
+  delete from public.transactions where installment_plan_id = plano;
+  delete from public.installment_plans where id = plano;
+
+  -- "Esta e as próximas" pelo contrato ancora na primeira EM ABERTO (a 1ª paga fica): sobra 1 = à vista
+  insert into public.installment_plans (workspace_id, user_id, account_id, total_cents, installments, first_occurred_at, description)
+  values (ws, u, conta, 9000, 3, hoje - 30, 'Cama BB') returning id into plano;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, installment_plan_id, installment_no)
+  select ws, u, 'expense', 3000, 'Cama BB (' || i || '/3)', hoje - 30 + 30 * (i - 1), case when i = 1 then 'cleared' else 'pending' end, conta, plano, i
+  from generate_series(1, 3) i;
+  -- entrada já paga, ligada ao plano
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, down_payment_plan_id)
+  values (ws, u, 'expense', 1000, 'Entrada Cama BB', hoje - 30, 'cleared', conta, plano) returning id into ent;
+  set local role authenticated;
+  r := public.delete_scoped_preview('plan', plano, 'future');
+  assert (r->>'apagadas')::int = 2 and (r->>'vira_avista')::boolean, format('contrato, a partir da primeira em aberto: %s', r);
+  r := public.delete_scoped('plan', plano, 'future', gen_random_uuid());
+  reset role;
+  assert not exists (select 1 from public.installment_plans where id = plano), 'sobrou uma: o plano sai';
+  assert (select installment_plan_id is null and description = 'Cama BB' from public.transactions where installment_plan_id is null and description = 'Cama BB' and occurred_at = hoje - 30), 'a 1ª virou à vista';
+  assert exists (select 1 from public.transactions where id = ent and down_payment_plan_id is null), 'a entrada fica (avulsa)';
+
+  -- não sobra parcela nenhuma: é a compra inteira e a entrada entra na prévia e sai junto
+  insert into public.installment_plans (workspace_id, user_id, account_id, total_cents, installments, first_occurred_at, description)
+  values (ws, u, conta, 4000, 2, hoje + 5, 'Rack BB') returning id into plano;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, installment_plan_id, installment_no)
+  values (ws, u, 'expense', 2000, 'Rack BB (2/2)', hoje + 5, 'pending', conta, plano, 2) returning id into q1;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, down_payment_plan_id)
+  values (ws, u, 'expense', 500, 'Entrada Rack BB', hoje - 1, 'cleared', conta, plano) returning id into ent;
+  set local role authenticated;
+  r := public.delete_scoped_preview('installment', q1, 'one');
+  assert (r->>'apagadas')::int = 2 and (r->'apaga_contrato')::boolean, format('0 sobrando = contrato com entrada: %s', r);
+  r := public.delete_scoped('installment', q1, 'one', gen_random_uuid());
+  reset role;
+  assert not exists (select 1 from public.transactions where id in (q1, ent)) and not exists (select 1 from public.installment_plans where id = plano), 'compra e entrada saem';
   set local role authenticated;
 
   -- BLOCOS DAS PRÓXIMAS TAREFAS ENTRAM AQUI
