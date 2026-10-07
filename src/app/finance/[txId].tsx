@@ -380,8 +380,10 @@ export default function TransactionDetailScreen() {
         </Section>
       ) : null}
       {lembrete ? (
-        <Row icon="bell" title={resumoDosAvisos(lembrete.avisos)}
-          onPress={() => router.push(hrefDoLembrete({ tipo: 'lancamento', tx }, title))} />
+        <Section>
+          <Row icon="bell" title={resumoDosAvisos(lembrete.avisos)}
+            onPress={() => router.push(hrefDoLembrete({ tipo: 'lancamento', tx }, title))} />
+        </Section>
       ) : null}
       <Section title="Como isso entrou">
         <Row title={SOURCE_LABEL[tx.source]} subtitle="Origem" icon={SOURCE_ICON[tx.source]} />

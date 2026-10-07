@@ -552,8 +552,10 @@ export default function InvoiceScreen() {
         </Animated.View>
       ) : null}
       {lembreteDaFatura && fatura ? (
-        <Row icon="bell" title={resumoDosAvisos(lembreteDaFatura.avisos)}
-          onPress={() => router.push(hrefDoLembrete({ tipo: 'fatura', invoiceId: fatura.id }, `Fatura ${nomeDoCartao}`))} />
+        <Section>
+          <Row icon="bell" title={resumoDosAvisos(lembreteDaFatura.avisos)}
+            onPress={() => router.push(hrefDoLembrete({ tipo: 'fatura', invoiceId: fatura.id }, `Fatura ${nomeDoCartao}`))} />
+        </Section>
       ) : null}
     </View>
   );

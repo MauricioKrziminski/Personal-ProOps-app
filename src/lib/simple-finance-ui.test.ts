@@ -1283,6 +1283,16 @@ test('Lançamento: sem "Lembrar" em pagamento de dívida, de fatura e juro do Pi
   }
 });
 
+test('Lançamento à vista no cartão: "Lembrar da fatura" aponta para a fatura', () => {
+  const tx = { id: 't', kind: 'expense', status: 'cleared', amount_cents: 500, description: 'Compra', category: 'x', account_id: 'a',
+    counterparty_account_id: null, occurred_at: '2026-10-02', created_at: '2026-10-02T12:00:00Z', invoice_id: 'f1',
+    installment_plan_id: null, recurring_id: null, debt_id: null, pays_invoice_id: null, pix_fee_for_transaction_id: null };
+  const ui = screen('src/app/finance/[txId].tsx', { txs: [tx], params: { txId: 't' } });
+  const acao = ui.nodes().find((n: any) => n.type === 'HeaderActions').props.menu.actions.find((a: any) => a.label === 'Lembrar da fatura');
+  ui.interact(() => acao.onPress());
+  assert.equal(copia(ui.navigations.at(-1)).params.conta, 'invoice_id:f1');
+});
+
 test('archived debts have a place to come back from', () => {
   const ui = screen(debtsFile, { create: false, debts: [carro], archivedDebts: [{ ...carro, id: 'd2', name: 'Moto', archived: true }] });
   const linha = ui.nodes().find((n) => n.type === 'Row' && n.props.title === 'Arquivadas · 1');

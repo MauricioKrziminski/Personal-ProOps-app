@@ -717,8 +717,10 @@ export default function DebtsScreen() {
   const fichaConteudo = (
     <>
       {detalhe && lembreteDa(detalhe) ? (
-        <Row icon="bell" title={resumoDosAvisos(lembreteDa(detalhe)!.avisos)}
-          onPress={() => router.push(hrefDoLembrete({ tipo: 'divida', debtId: detalhe.id }, detalhe.name))} />
+        <Section>
+          <Row icon="bell" title={resumoDosAvisos(lembreteDa(detalhe)!.avisos)}
+            onPress={() => router.push(hrefDoLembrete({ tipo: 'divida', debtId: detalhe.id }, detalhe.name))} />
+        </Section>
       ) : null}
       {detalhe ? <PurchaseDownPayment type="financiamento" parentId={detalhe.id}
         installmentsCents={detalhe.calculation_mode === 'fixed_installments' ? Number(detalhe.principal_cents) : undefined} /> : null}
