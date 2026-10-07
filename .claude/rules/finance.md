@@ -1077,6 +1077,33 @@ só `one`/`all`.
   espaço passa (testado em `apagar_fix_final.sql`). Apagar um MEMBRO de espaço compartilhado com compra
   numa fatura do dono paga em parte é recusado (o espaço e a fatura ficam) — não testado, decisão pendente.
 
+## Pausa com prazo e carência (07/10/2026)
+
+- **Pausa é o período `[paused_from, paused_until)`: começa inclusivo, termina EXCLUSIVO**, a mesma régua em
+  `private.em_pausa` (SQL), `recurrence.em_pausa` (Python) e `emPausa` (`src/lib/pausa.ts`). Sem
+  `paused_until` não há pausa com prazo; **"sem prazo" é `active=false`**, o pausar de sempre. O dia de
+  "hoje" é o LOCAL (série: `dataLocalDe(next_run_at)`), nunca o do UTC. Quem lista série ou lembrete
+  (app, `query_recurring`, `query_reminders`) trata hoje dentro do período como pausada e **não mostra
+  "próximo" com data dentro dela**.
+- **Pausar a série apaga só as linhas em aberto do período** (`pending`, fora de fatura paga, adiada ou
+  paga em parte) e **não as marca como "apagada não volta"** (`recurring_moved_occurrences`): o agendador
+  e a projeção só pulam a data enquanto ela está na pausa, e retomar a devolve. **Pausar e retomar zeram
+  `materialized_until`**, para o agendador regerar o que a pausa liberou. Agente antigo ignora as colunas e
+  re-materializa: por isso a ordem de deploy é migrations, agente (revisão servindo), app.
+- **Carência de dívida** (`debt_pauses`: parcela de início absoluta + meses): o deslocamento de uma parcela
+  `n` é a SOMA dos `months` das carências com `from_installment_no <= n`, em número ABSOLUTO de parcela. Uma
+  função só o sabe (`private.debt_pause_shift`) e quatro lugares o aplicam: `debt_schedule_for`,
+  `debt_projected_due_date` (inclusive o ramo das já pagas), o formulário do app
+  (`deslocamentoDaCarencia`) e o agente ("a próxima vence" desconta o deslocamento da próxima ao cravar a
+  âncora). A data editada à mão (`debt_installment_edits`) não é deslocada. Duas carências somam; não há
+  regra de sobreposição (a carência é um ponto antes da parcela k, não um intervalo de parcelas).
+- **Com juros**: começa na próxima em aberto; o saldo capitaliza mês a mês com `ceil` (a regra do
+  `debt_schedule_for`) e a parcela Price é recalculada com as MESMAS parcelas restantes (sem número de
+  parcelas só capitaliza). Parcela fixa só anda as datas.
+- **Desfazer é LIFO**: só a carência mais recente (`seq`), recusado se houve pagamento depois ou se a dívida
+  mudou (saldo, parcela ou âncora). Sem `first_due_date` a âncora é **cravada** na carência (a data deixa de
+  deslizar com o hoje) e devolvida a null no desfazer. Prévia = escrita real numa subtransação que volta.
+
 ## Rotativo — a fatura vencida que vai para a próxima
 
 O usuário só tinha duas saídas para uma fatura que não pagou: deixá-la atrasada para sempre ou
