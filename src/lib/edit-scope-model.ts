@@ -35,3 +35,11 @@ export function editScopeChoices(
     { scope: 'all', label: all },
   ];
 }
+
+/** Apagar pergunta o MESMO alcance do editar; `alcances` corta o que o tipo não oferece (lembrete, dívida). */
+export function deleteScopeChoices(
+  kind: EditScopeKind, opcoes: { contrato?: boolean; alcances?: EditScope[] } = {},
+): readonly { scope: EditScope; label: string }[] {
+  const todas = editScopeChoices(kind, { contrato: opcoes.contrato });
+  return opcoes.alcances ? todas.filter((c) => opcoes.alcances!.includes(c.scope)) : todas;
+}
