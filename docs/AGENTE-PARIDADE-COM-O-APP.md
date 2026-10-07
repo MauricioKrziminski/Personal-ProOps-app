@@ -159,6 +159,13 @@ próximas / Todas" (pelo contrato: "Das próximas em diante / Todas"; a dívida 
 são renumeradas. O agente segue como antes (apaga a série inteira, a compra ou a dívida): "apaga o
 aluguel daqui pra frente" é lacuna declarada.
 
+**Pausar com prazo e carência** (`pause_recurring`, `resume_recurring`, `debt_pause`, 07/10/2026).
+No app: "Pausar…" na recorrente (período [de, até), as ocorrências em aberto do período saem e
+voltam no fim), no lembrete que repete (`paused_from/paused_until`) e "Pausar pagamentos…" no
+financiamento (empurra o cronograma; com juros, capitaliza e recalcula a parcela). O agente NÃO
+pausa com prazo nem dá carência — lacuna declarada; "pausa a academia" continua sendo a pausa sem
+prazo (`active = false`).
+
 **`useCancelSubscription` — decisão do dono do produto, não omissão.** A regra do domínio diz que
 cancelamento é uma chamada sem formulário, porque dificultar cancelamento é a queixa nº 1 contra
 os concorrentes. Pelo mesmo argumento, "cancela minha assinatura" pelo WhatsApp seria o caminho
