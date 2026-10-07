@@ -5542,6 +5542,15 @@ test('Pausar…: o menu da série abre a folha no próximo vencimento, ao lado d
   assert.equal(ui.writes.length, 0, 'abrir a folha não grava');
 });
 
+test('Pausar…: próximo vencimento dentro da pausa não aparece como "próximo"', () => {
+  const { proxima, serie } = pausaSerie();
+  const depois = dia(new Date(proxima.getFullYear(), proxima.getMonth() + 2, 15));
+  const texto = (s: any) => ui0(s).nodes().filter((n: any) => n.type === 'ThemedText').map((n: any) => [].concat(n.props.children).join('')).join('|');
+  const ui0 = (s: any) => screen('src/app/finance/recurring.tsx', { recurring: [s] });
+  assert.match(texto(serie), /próximo /, 'sem pausa mostra o próximo');
+  assert.doesNotMatch(texto({ ...serie, paused_from: dia(proxima), paused_until: depois }), /próximo /, 'o próximo está pausado');
+});
+
 test('Pausar…: a frase conta as datas que saem, não só as linhas já gravadas', () => {
   // Série ainda não materializada: nenhuma linha gravada (removed_count 0), mas a data da regra sai.
   const ui = pausaSheet(alvoSerie, '2026-11-05', { pausaPrevia: { dates: ['2026-11-05'], removed_count: 0, cents: 12000, until: '2026-11-12' } });

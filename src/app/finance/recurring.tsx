@@ -329,7 +329,10 @@ export default function RecurringScreen() {
               </Pressable>
             </View>
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              {quando} · próximo {isoToBR(dataLocalDe(r.next_run_at)).slice(0, 5)}
+              {quando}
+              {/* O próximo vencimento dentro da pausa não acontece: o rótulo da pausa diz quando volta. */}
+              {emPausa(dataLocalDe(r.next_run_at), r.paused_from ?? null, r.paused_until ?? null)
+                ? '' : ` · próximo ${isoToBR(dataLocalDe(r.next_run_at)).slice(0, 5)}`}
               {r.category ? ` · ${r.category}` : ''}
               {r.active ? (rotuloDaPausa(r, hoje) ? ` · ${rotuloDaPausa(r, hoje)}` : '') : ' · pausada'}
             </ThemedText>
