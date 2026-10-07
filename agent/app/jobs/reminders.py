@@ -16,8 +16,8 @@ from datetime import datetime
 
 from app import db
 from app.config import get_settings
-from app.domain.dates import now_utc, tz
-from app.domain.recurrence import next_occurrence
+from app.domain.dates import local_iso_date, now_utc, tz
+from app.domain.recurrence import em_pausa, next_occurrence
 from app.services import push, whatsapp
 
 log = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ async def run() -> dict:
     vencidos = await db.fetch(
         """
         select r.id, r.user_id, r.title, r.recurrence, r.channel, r.next_run_at,
-               r.skip_run_at, r.parent_reminder_id,
+               r.skip_run_at, r.parent_reminder_id, r.paused_from, r.paused_until,
                r.timezone, r.send_attempts, p.phone, p.expo_push_token,
                p.alerts_whatsapp_enabled
         from public.reminders r
@@ -104,6 +104,10 @@ async def run() -> dict:
                 skipped = (
                     lembrete["skip_run_at"] is not None
                     and lembrete["skip_run_at"] == lembrete["next_run_at"]
+                ) or em_pausa(
+                    local_iso_date(fuso, lembrete["next_run_at"]),
+                    lembrete.get("paused_from"),
+                    lembrete.get("paused_until"),
                 )
                 if not skipped:
                     delivered_channels = await _entregar(lembrete) or []

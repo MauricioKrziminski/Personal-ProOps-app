@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime
+from datetime import date, datetime
 
 from dateutil.rrule import rrulestr
 
@@ -133,3 +133,11 @@ def descreve_rrule(rrule: str | None) -> str:
             return f"{base}, no dia {_lista_pt(dias)}" if intervalo > 1 else f"todo dia {_lista_pt(dias)}"
 
     return base
+
+
+def em_pausa(dia, de, ate) -> bool:
+    """A mesma régua de `private.em_pausa` (SQL) e `emPausa` (app): período [de, até)."""
+    if de is None or ate is None:
+        return False
+    d = dia if isinstance(dia, date) else date.fromisoformat(dia)
+    return de <= d < ate

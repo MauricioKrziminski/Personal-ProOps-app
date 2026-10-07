@@ -21,7 +21,7 @@ from psycopg.errors import UniqueViolation
 
 from app import db
 from app.domain.dates import local_iso_date, now_utc
-from app.domain.recurrence import next_occurrence
+from app.domain.recurrence import em_pausa, next_occurrence
 
 log = logging.getLogger(__name__)
 
@@ -268,7 +268,7 @@ async def materialize_horizon(agora, so_novas: bool = False, workspace_id=None) 
         select r.id, r.user_id, r.workspace_id, r.kind, r.amount_cents, r.currency,
                r.category, r.description, r.merchant, r.account_id, r.rrule, r.next_run_at,
                r.dtstart, r.end_date, r.auto_confirm, r.materialized_until, r.edit_revision,
-               p.timezone
+               r.paused_from, r.paused_until, p.timezone
         from public.recurring_transactions r
         left join public.profiles p on p.id = r.user_id
         where r.active = true
@@ -321,7 +321,7 @@ async def materialize_horizon(agora, so_novas: bool = False, workspace_id=None) 
                 dia = local_iso_date(fuso, occ)
                 if rec["end_date"] and dia > rec["end_date"].isoformat():
                     break
-                if dia in suprimidas:
+                if dia in suprimidas or em_pausa(dia, rec.get("paused_from"), rec.get("paused_until")):
                     cursor = occ
                     ultima = occ
                     geradas += 1
