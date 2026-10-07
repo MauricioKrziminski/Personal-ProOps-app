@@ -141,13 +141,18 @@ async def reparar_gemeas() -> int:
             continue
         vistas.update({par["solta"], par["gerada"]})
         # Primeiro sai a gerada: o unique `(recurring_id, occurred_at)` recusaria a adoção antes.
-        await db.execute(
-            "delete from public.transactions where id = %s and recurring_id is not null", par["gerada"]
-        )
-        await db.execute(
-            "update public.transactions set recurring_id = %s where id = %s and recurring_id is null",
-            par["recurring_id"], par["solta"],
-        )
+        # Um par recusado (ex.: fatura paga em parte) não impede o reparo dos seguintes.
+        try:
+            await db.execute(
+                "delete from public.transactions where id = %s and recurring_id is not null", par["gerada"]
+            )
+            await db.execute(
+                "update public.transactions set recurring_id = %s where id = %s and recurring_id is null",
+                par["recurring_id"], par["solta"],
+            )
+        except Exception:  # noqa: BLE001
+            log.exception("cron: par de gêmeas recusado, segue para o próximo")
+            continue
         reparados += 1
     return reparados
 

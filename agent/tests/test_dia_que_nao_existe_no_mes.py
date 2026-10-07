@@ -243,3 +243,22 @@ async def test_baixa_grava_as_ocorrencias_antes_de_procurar_e_falha_nao_derruba(
     assert pedidos == [(True, "w1")], "a falha é engolida: o turno segue como antes"
     await nodes._ocorrencias_gravadas("w1", [FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=100)])
     assert pedidos == [(True, "w1")], "criar gasto não procura ocorrência"
+
+
+@pytest.mark.asyncio
+async def test_reparo_segue_quando_um_par_e_recusado(monkeypatch):
+    from app.jobs import scheduler
+
+    async def fetch(sql, *args):
+        return [
+            {"gerada": "g1", "solta": "s1", "recurring_id": "r"},
+            {"gerada": "g2", "solta": "s2", "recurring_id": "r"},
+        ]
+
+    async def execute(sql, *args):
+        if args and args[0] == "g1":
+            raise RuntimeError("fatura paga em parte")
+
+    monkeypatch.setattr(scheduler.db, "fetch", fetch)
+    monkeypatch.setattr(scheduler.db, "execute", execute)
+    assert await scheduler.reparar_gemeas() == 1
