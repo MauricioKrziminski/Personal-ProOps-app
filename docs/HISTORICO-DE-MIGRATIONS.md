@@ -308,3 +308,5 @@ Sobem juntas (`100400`/`100500` são o gatilho que impede o apagar comum de deix
 
 **Pausar com prazo e carência** — `20261009120000` (pausa da série) e `20261009120100` (carência da dívida): staging 07/10/2026, produção pendente.
 Sobem juntas, depois das de `20261008…`.
+
+**Carência, correções** — `20261009120200`: staging 07/10/2026, produção pendente. Sobe junto de `20261009120000` e `20261009120100`.

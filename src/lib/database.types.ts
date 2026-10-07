@@ -1244,36 +1244,51 @@ export type Database = {
       }
       debt_pauses: {
         Row: {
+          balance_after_cents: number | null
           balance_before_cents: number
           created_at: string
           created_by: string
           debt_id: string
+          first_due_after: string | null
+          first_due_before: string | null
+          first_due_set: boolean
           from_installment_no: number
           id: string
+          installment_after_cents: number | null
           installment_before_cents: number | null
           installments_paid_at: number
           months: number
           workspace_id: string
         }
         Insert: {
+          balance_after_cents?: number | null
           balance_before_cents: number
           created_at?: string
           created_by?: string
           debt_id: string
+          first_due_after?: string | null
+          first_due_before?: string | null
+          first_due_set?: boolean
           from_installment_no: number
           id?: string
+          installment_after_cents?: number | null
           installment_before_cents?: number | null
           installments_paid_at: number
           months: number
           workspace_id: string
         }
         Update: {
+          balance_after_cents?: number | null
           balance_before_cents?: number
           created_at?: string
           created_by?: string
           debt_id?: string
+          first_due_after?: string | null
+          first_due_before?: string | null
+          first_due_set?: boolean
           from_installment_no?: number
           id?: string
+          installment_after_cents?: number | null
           installment_before_cents?: number | null
           installments_paid_at?: number
           months?: number
