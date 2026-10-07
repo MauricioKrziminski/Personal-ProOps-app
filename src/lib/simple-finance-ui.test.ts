@@ -7977,3 +7977,17 @@ test('Lembrete de conta: sem nenhum aviso o Salvar não grava e diz por quê', (
   assert.equal(ui.writes.filter((w: any) => w.operation === 'saveBillReminder').length, 0);
   assert.ok(ui.nodes().some((n: any) => n.type === 'Field' && n.props.error === 'Adicione pelo menos um aviso'));
 });
+
+test('Lembretes: a seção Contas lista cada conta lembrada e abre a edição', () => {
+  const ID = '11111111-1111-1111-1111-111111111111';
+  const ui = screen('src/app/reminders.tsx', { billReminders: [
+    { alvo: { debt_id: ID }, title: 'Carro', channel: 'push', avisos: [{ days_before: 1, at_time: '09:00' }], next_due: '2026-10-10' },
+    { alvo: { transaction_id: ID }, title: 'Aluguel', channel: 'push', avisos: [{ days_before: 0, at_time: '09:00' }], next_due: null },
+  ] });
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Section' && n.props.title === 'Contas'));
+  const linha = (t: string) => ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === t);
+  assert.ok(linha('Aluguel').props.subtitle.includes('sem próximo vencimento'));
+  ui.interact(() => linha('Carro').props.onPress());
+  assert.deepEqual(copia(ui.navigations.at(-1)),
+    { pathname: '/reminder-form', params: { conta: `debt_id:${ID}`, nome: 'Carro' } });
+});

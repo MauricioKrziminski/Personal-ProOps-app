@@ -16,6 +16,7 @@ import { SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Space } from '@/design/tokens';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { useBillReminders } from '@/hooks/use-bill-reminders';
 import {
   formatDateBR,
   useDeleteReminder,
@@ -25,6 +26,7 @@ import {
 } from '@/hooks/use-items';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { describeRRule } from '@/lib/rrule-text';
+import { alvoComoParam, resumoDosAvisos } from '@/lib/lembrete-de-conta';
 import { listFiltersActive, type ListFiltersValue } from '@/lib/list-filters';
 
 const filterSelects: readonly FilterSelect[] = [
@@ -51,6 +53,7 @@ export default function RemindersScreen() {
     active: status ? status === 'active' : undefined,
     channel: channel === 'push' || channel === 'whatsapp' || channel === 'both' ? channel : undefined,
   });
+  const lembretesDeConta = useBillReminders();
   const toggle = useToggleReminder();
   const remove = useDeleteReminder();
   const toast = useToast();
@@ -187,6 +190,21 @@ export default function RemindersScreen() {
       ) : (
         list
       )}
+
+      {lembretesDeConta.isError ? <ErrorCard onRetry={() => lembretesDeConta.refetch()} /> : null}
+      {!lembretesDeConta.isError && lembretesDeConta.data?.length ? (
+        <Section title="Contas">
+          {lembretesDeConta.data.map((c) => (
+            <Row
+              key={alvoComoParam(c.alvo)}
+              icon="bell"
+              title={c.title}
+              subtitle={[resumoDosAvisos(c.avisos), c.next_due ? `vence ${formatDateBR(c.next_due)}` : 'sem próximo vencimento'].join(' · ')}
+              onPress={() => router.push({ pathname: '/reminder-form', params: { conta: alvoComoParam(c.alvo), nome: c.title } })}
+            />
+          ))}
+        </Section>
+      ) : null}
 
       {/* Fora dos painéis: continua acessível no tablet com ativos e pausados lado a lado. */}
       <VerMais
