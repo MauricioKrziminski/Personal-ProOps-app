@@ -16,7 +16,7 @@ declare
   conta uuid; serie uuid; t_pago uuid; t_atrasada uuid; t_ancora uuid; t_depois uuid; t_longe uuid; cartao uuid; t_pai uuid; t_fee uuid;
   r jsonb; n int; chave uuid := gen_random_uuid(); cfg text[];
   plano uuid; p1 uuid; p2 uuid; p3 uuid; p4 uuid; soma bigint; k int; ent uuid; q1 uuid; q2 uuid; q3 uuid; q4 uuid;
-  lem uuid; filho uuid; fatura uuid; compra uuid;
+  lem uuid; filho uuid; fatura uuid; compra uuid; fatura2 uuid; fatura3 uuid; serie2 uuid; ocor uuid; extra uuid; pix uuid; pixfee uuid;
   d uuid; pg1 uuid; pg2 uuid; pg3 uuid; restante bigint;
 begin
   select id into ws from public.workspaces where owner_id = u;
@@ -466,7 +466,7 @@ begin
     perform public.delete_scoped('reminder', lem, 'one', gen_random_uuid());
     n := -1;
   exception when others then
-    assert sqlerrm = 'Esse registro não existe mais', format('alheio: %s %s', sqlstate, sqlerrm);
+    assert sqlstate = 'P0001' and sqlerrm = 'Esse registro não existe mais', format('alheio: %s %s', sqlstate, sqlerrm);
   end;
   assert n <> -1, 'lembrete alheio devia ser recusado';
   set local role authenticated;
@@ -487,6 +487,63 @@ begin
     assert sqlstate = 'P0001' and sqlerrm like 'A fatura de % já tem pagamento:%', format('fatura parcial: %s %s', sqlstate, sqlerrm);
   end;
   assert n <> -1, 'apagar a compra devia ser recusado';
+
+  -- fix round 1: a isenção é só para quem sai junto com o dono; gatilho e cascade de filho não escapam
+  reset role;
+  -- (4) controle positivo: apagar o que mantém "o que falta" >= 0 passa
+  insert into public.card_invoices (workspace_id, user_id, account_id, reference_month, closing_date, due_date, paid_cents)
+  values (ws, u, cartao, date '2031-04-01', hoje - 5, hoje + 2, 5000) returning id into fatura2;
+  insert into public.recurring_transactions (workspace_id, user_id, kind, amount_cents, description, rrule, dtstart, next_run_at, account_id)
+  values (ws, u, 'expense', 6000, 'Streaming AA', 'FREQ=MONTHLY', now(), now() + interval '30 days', cartao) returning id into serie2;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, invoice_id, recurring_id)
+  values (ws, u, 'expense', 6000, 'Streaming AA', hoje + 1, 'pending', cartao, fatura2, serie2) returning id into ocor;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, invoice_id)
+  values (ws, u, 'expense', 3000, 'Extra AA', hoje + 1, 'pending', cartao, fatura2) returning id into extra;
+  update public.transactions set invoice_id = fatura2 where id in (ocor, extra);
+  set local role authenticated;
+  delete from public.transactions where id = extra;
+  reset role;
+  assert not exists (select 1 from public.transactions where id = extra), 'controle positivo: apagar o que cabe passa';
+  -- (1) apagar a série leva a ocorrência pendente por gatilho: recusado
+  set local role authenticated;
+  n := 0;
+  begin
+    delete from public.recurring_transactions where id = serie2;
+    n := -1;
+  exception when others then
+    assert sqlstate = 'P0001' and sqlerrm like 'A fatura de % já tem pagamento: sem este lançamento%', format('série: %s %s', sqlstate, sqlerrm);
+  end;
+  assert n <> -1, 'apagar a série devia ser recusado';
+  -- (2) apagar o pai do Pix no crédito: o juro (cascade) derrubaria a fatura
+  reset role;
+  insert into public.card_invoices (workspace_id, user_id, account_id, reference_month, closing_date, due_date, paid_cents)
+  values (ws, u, cartao, date '2031-05-01', hoje - 5, hoje + 2, 5000) returning id into fatura3;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, invoice_id)
+  values (ws, u, 'expense', 300, 'Pix AA', hoje - 1, 'pending', cartao, fatura3) returning id into pix;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, invoice_id, pix_fee_for_transaction_id)
+  values (ws, u, 'expense', 5000, 'Juros Pix AA', hoje - 1, 'pending', cartao, fatura3, pix) returning id into pixfee;
+  update public.transactions set invoice_id = fatura3 where id in (pix, pixfee);
+  set local role authenticated;
+  n := 0;
+  begin
+    delete from public.transactions where id = pix;
+    n := -1;
+  exception when others then
+    assert sqlstate = 'P0001' and sqlerrm like 'A fatura de % já tem pagamento:%', format('pix: %s %s', sqlstate, sqlerrm);
+  end;
+  assert n <> -1, 'apagar o pai do Pix devia ser recusado';
+  -- (3) apagar o espaço com essas linhas continua funcionando (cascade)
+  reset role;
+  insert into public.accounts (workspace_id, user_id, name, type, closing_day, due_day)
+  values (ws_outro, outro, 'Cartão Alheio AA', 'credit_card', 3, 10) returning id into cartao;
+  insert into public.card_invoices (workspace_id, user_id, account_id, reference_month, closing_date, due_date, paid_cents)
+  values (ws_outro, outro, cartao, date '2031-03-01', hoje - 5, hoje + 2, 5000) returning id into fatura;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, invoice_id)
+  values (ws_outro, outro, 'expense', 6000, 'Compra Alheia AA', hoje - 10, 'pending', cartao, fatura) returning id into compra;
+  update public.transactions set invoice_id = fatura where id = compra;
+  delete from public.workspaces where id = ws_outro;
+  assert not exists (select 1 from public.transactions where id = compra), 'apagar o espaço leva as linhas';
+  set local role authenticated;
 
   -- BLOCOS DAS PRÓXIMAS TAREFAS ENTRAM AQUI
   reset role;
