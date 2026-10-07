@@ -218,6 +218,8 @@ export type RecurringTransaction = Pick<
   | 'dtstart'
   | 'end_date'
   | 'auto_confirm'
+  | 'paused_from'
+  | 'paused_until'
   // O estabelecimento da série (`20260926120000`): o "Recorrente" do lançamento o perdia.
   | 'merchant'
   | 'edit_revision'
@@ -599,7 +601,7 @@ export function useGoals() {
 }
 
 const RECURRING_COLUMNS =
-  'id, workspace_id, subcategory_id, subcategories!recurring_transactions_subcategory_id_fkey(name), expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, kind, amount_cents, currency, category, description, merchant, account_id, counterparty_account_id, payment_method, rrule, next_run_at, active, run_attempts, last_error, created_at, dtstart, end_date, auto_confirm, edit_revision';
+  'id, workspace_id, subcategory_id, subcategories!recurring_transactions_subcategory_id_fkey(name), expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, kind, amount_cents, currency, category, description, merchant, account_id, counterparty_account_id, payment_method, rrule, next_run_at, active, run_attempts, last_error, created_at, dtstart, end_date, auto_confirm, paused_from, paused_until, edit_revision';
 
 /**
  * As categorias do espaço, mais usada primeiro: as que os lançamentos usam e as criadas no app,

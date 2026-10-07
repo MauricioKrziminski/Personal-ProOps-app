@@ -4,6 +4,7 @@ import { useInfiniteQuery, useQuery } from '@/lib/consulta-em-foco';
 import { useEffect } from 'react';
 
 import { localISODate } from '@/lib/dates';
+import { foraDaPausa } from '@/lib/pausa';
 import { timestampDateBounds } from '@/lib/list-filters';
 import { toIlikeTerm } from '@/lib/search';
 import { supabase } from '@/lib/supabase';
@@ -27,6 +28,8 @@ export interface Reminder {
   send_attempts?: number;
   last_error?: string | null;
   skip_run_at?: string | null;
+  paused_from?: string | null;
+  paused_until?: string | null;
   parent_reminder_id?: string | null;
   original_run_at?: string | null;
 }
@@ -99,7 +102,7 @@ export function useReminders(filters: ReminderFilters = {}) {
     queryFn: async ({ pageParam }): Promise<Reminder[]> => {
       let query = supabase
         .from('reminders')
-        .select('id, title, recurrence, next_run_at, channel, active, skip_run_at, parent_reminder_id, original_run_at')
+        .select('id, title, recurrence, next_run_at, channel, active, skip_run_at, parent_reminder_id, original_run_at, paused_from, paused_until')
         .or('parent_reminder_id.is.null,active.eq.true')
         // pausados também vêm: sem eles não haveria como retomar pelo app
         .order('active', { ascending: false })
@@ -260,13 +263,13 @@ export function useTodayReminders() {
       const end = new Date(`${today}T23:59:59`);
       const { data, error } = await supabase
         .from('reminders')
-        .select('id, title, recurrence, next_run_at, channel, active, skip_run_at, parent_reminder_id, original_run_at')
+        .select('id, title, recurrence, next_run_at, channel, active, skip_run_at, parent_reminder_id, original_run_at, paused_from, paused_until')
         .eq('active', true)
         .lte('next_run_at', end.toISOString())
         .order('next_run_at')
         .limit(20);
       if (error) throw error;
-      return (data as Reminder[]).filter((r) => r.skip_run_at !== r.next_run_at);
+      return (data as Reminder[]).filter((r) => r.skip_run_at !== r.next_run_at && foraDaPausa(r, today));
     },
   });
 }
@@ -284,7 +287,7 @@ export function useNoteReminder(noteId: string | null | undefined) {
     queryFn: async (): Promise<Reminder | null> => {
       const { data, error } = await supabase
         .from('reminders')
-        .select('id, title, recurrence, next_run_at, channel, active, skip_run_at, parent_reminder_id, original_run_at')
+        .select('id, title, recurrence, next_run_at, channel, active, skip_run_at, parent_reminder_id, original_run_at, paused_from, paused_until')
         .eq('note_id', noteId!)
         .maybeSingle();
       if (error) throw error;

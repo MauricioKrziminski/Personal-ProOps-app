@@ -37,6 +37,7 @@ import {
   useTransaction,
   type Transaction,
 } from '@/hooks/use-finance';
+import { usePausa } from '@/components/finance/pausa-sheet';
 import { useApagarComAlcance } from '@/hooks/use-apagar-com-alcance';
 import { alvoDoLancamento } from '@/lib/apagar-com-alcance';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
@@ -137,6 +138,7 @@ export default function TransactionDetailScreen() {
   const remove = useDeleteTransaction();
   // Voltar só no sucesso do hook: depois do desmonte o callback da mutação não dispara.
   const { apagar } = useApagarComAlcance(() => router.back());
+  const pausando = usePausa();
   // "Paguei" confirma o valor numa folha curta (25/09/2026). Dada a baixa, volta para a lista.
   const baixa = useConfirmarBaixa({ aoConcluir: () => router.back() });
   // `refetch` ignora `enabled`: só refaz o que o lançamento realmente tem.
@@ -524,6 +526,10 @@ export default function TransactionDetailScreen() {
                   onPress: () => router.push(hrefDoLembrete({ tipo: 'lancamento', tx }, title)),
                 }]
               : []),
+            ...(tx.recurring_id
+              ? [{ label: 'Pausar…', icon: 'pause' as const,
+                  onPress: () => pausando.abrir({ tipo: 'recurring', id: tx.recurring_id!, titulo: title }, tx.occurred_at) }]
+              : []),
             {
               label: 'Apagar',
               icon: 'trash',
@@ -540,6 +546,7 @@ export default function TransactionDetailScreen() {
 
       {tablet ? tabletBody : compactBody}
       {baixa.folha}
+      {pausando.folha}
       {nomeDoFavorito.folha}
     </Screen>
   );

@@ -60,7 +60,7 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; notesPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; resumoErro?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean; favoritos?: any[]; favoritosArquivados?: any[]; billReminders?: any[]; billRemindersPending?: boolean } = {}) {
+function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; notesPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; resumoErro?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean; favoritos?: any[]; favoritosArquivados?: any[]; billReminders?: any[]; billRemindersPending?: boolean; pausaPrevia?: any } = {}) {
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
@@ -117,6 +117,8 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
   /** As mesmas escritas de `writes`, com as opções (`onSuccess`/`onError`) — é por aqui que se chama o retorno. */
   const pedidos: { operation: string; value: any; opts: any }[] = [];
   const toasts: any[] = [];
+  /** Com que id, início e fim (exclusivo) a folha "Pausar…" pediu a prévia. */
+  const previasDePausa: [string | null, string | null, string | null][] = [];
   /** Os pedidos de nome de favorito (a folha é dublê): o teste confirma por aqui. */
   const nomesPedidos: { padrao: string; aoConfirmar: (nome: string) => void }[] = [];
   // O que as telas gravaram em `usePreferencia` (o rascunho do E se, por exemplo).
@@ -643,6 +645,14 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === '@/components/finance/formulario-da-divida' && file.endsWith('finance/debts.tsx')) return load('src/components/finance/formulario-da-divida.tsx');
       if (name === '@/hooks/use-down-payment') return { usePurchaseDownPayment: (_type: string, parentId?: string) => ({ ...query, isPending: Boolean(parentId && options.downPaymentPending), isSuccess: !options.downPaymentPending && !options.downPaymentError, isError: Boolean(options.downPaymentError), data: parentId ? options.downPayment ?? null : undefined, refetch: async () => { refetches.push('down-payment'); } }) };
       if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: options.datasReais ? load('src/lib/dates.ts').formatDateBR : () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useReminders: () => ({ ...query, isSuccess: true, data: { pages: [options.reminders ?? []], pageParams: [0] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }), useReminder: () => ({ ...query, data: undefined, isLoading: false }), useToggleReminder: () => mutation('toggleReminder'), useDeleteReminder: () => mutation('deleteReminder'), useSaveReminder: () => mutation('saveReminder') };
+      if (name === '@/lib/pausa') return load('src/lib/pausa.ts');
+      if (name === '@/components/finance/pausa-sheet') return load('src/components/finance/pausa-sheet.tsx');
+      if (name === '@/hooks/use-pausas') return {
+        usePauseRecurringPreview: (id: string | null, from: string | null, until: string | null) => { previasDePausa.push([id, from, until]); return { ...query, data: id ? options.pausaPrevia : undefined, isFetching: false, isError: false }; },
+        usePauseRecurring: () => mutation('pauseRecurring'),
+        useResumeRecurring: () => mutation('resumeRecurring'),
+        usePauseReminder: () => mutation('pauseReminder'),
+      };
       if (name === '@/lib/lembrete-de-conta') return load('src/lib/lembrete-de-conta.ts');
       if (name === '@/hooks/use-bill-reminders') return {
         useBillReminders: () => ({ ...query, data: options.billReminders ?? [], isPending: Boolean(options.billRemindersPending), isSuccess: !options.billRemindersPending, isError: false }),
@@ -864,7 +874,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
   };
   render();
   return {
-    writes, pedidos, toasts, nomesPedidos, inRealm, preferenciasGravadas, pedidosDeLimite, avisos, confirmations, actions, navigations, refetches, gates, rulerViews, transactionQueries, expectedQueries, summaryQueries, categoryDefaultsQueries,
+    writes, pedidos, toasts, previasDePausa, nomesPedidos, inRealm, preferenciasGravadas, pedidosDeLimite, avisos, confirmations, actions, navigations, refetches, gates, rulerViews, transactionQueries, expectedQueries, summaryQueries, categoryDefaultsQueries,
     drafts: () => forecastDrafts,
     cancelledReserveAttempt: () => new reserveCancellationConstructor(),
     cancelledGoalPlanAttempt: () => new goalCancellationConstructor(),
@@ -5494,6 +5504,128 @@ test('F18: "Encerrar" abre a folha da série ativa; a encerrada oferece "Reabrir
   const reabrir = deslizaveis(ui2)[0].props.acoes.find((a: any) => a.label === 'Reabrir');
   assert.ok(reabrir, 'a encerrada se reabre');
   assert.equal(deslizaveis(ui2)[0].props.acoes.some((a: any) => a.label === 'Encerrar' || a.label === 'Editar'), false);
+});
+
+const dia = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const pausaSerie = () => {
+  const hoje = new fixtureDate();
+  const proxima = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 15, 12);
+  const serie = { id: 'rec-1', description: 'ChatGPT', kind: 'expense', amount_cents: 12000, rrule: 'FREQ=MONTHLY;BYMONTHDAY=15',
+    dtstart: '2026-01-15', next_run_at: proxima.toISOString(), active: true, account_id: null, category: null, edit_revision: 4,
+    paused_from: null, paused_until: null };
+  return { hoje, proxima, serie };
+};
+const abrirPausa = (ui: any) => ui.interact(() => deslizaveis(ui)[0].props.acoes.find((a: any) => a.label === 'Pausar…').onPress());
+const folhaDePausa = (ui: any) => ui.nodes().find((n: any) => n.type?.name === 'PausaSheet');
+/** A folha sozinha: o harness não desce em componente aninhado, então ela se renderiza direto. */
+const pausaSheet = (alvo: any, inicioPadrao: string, opts: Parameters<typeof screen>[1] = {}) =>
+  screen('src/components/finance/pausa-sheet.tsx', { componente: 'PausaSheet', ...opts, props: { visivel: true, onClose: () => {}, alvo, inicioPadrao } });
+const botaoPausar = (ui: any) => ui.nodes().find((n: any) => n.type === 'TaskHeader').props.action;
+const trocaModo = (ui: any, modo: string) => ui.interact(() => ui.nodes().find((n: any) => n.type === 'Segmented').props.onChange(modo));
+const alvoSerie = { tipo: 'recurring', id: 'rec-1', titulo: 'ChatGPT' };
+
+test('Pausar…: o menu da série abre a folha no próximo vencimento, ao lado do Pausar sem prazo', () => {
+  const { proxima, serie } = pausaSerie();
+  const ui = screen('src/app/finance/recurring.tsx', { recurring: [serie] });
+  assert.ok(deslizaveis(ui)[0].props.acoes.some((a: any) => a.label === 'Pausar'), 'o Pausar sem prazo continua');
+  abrirPausa(ui);
+  const folha = folhaDePausa(ui);
+  assert.equal(folha.props.inicioPadrao, dia(proxima));
+  assert.deepEqual(copia(folha.props.alvo), { tipo: 'recurring', id: 'rec-1', titulo: 'ChatGPT' });
+});
+
+test('Pausar…: a prévia vem do banco e "Pausar" manda o período', () => {
+  const { proxima } = pausaSerie();
+  const ui = pausaSheet(alvoSerie, dia(proxima), { pausaPrevia: { dates: [dia(proxima)], removed_count: 1, cents: 12000, until: '' } });
+  assert.equal(ui.nodes().find((n: any) => n.type === 'DatePickerField' && n.props.accessibilityLabel === 'Início da pausa').props.value,
+    dia(proxima).split('-').reverse().join('/'));
+  trocaModo(ui, 'meses');
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'QuantityField').props.onChange(2));
+  const dois = new Date(proxima.getFullYear(), proxima.getMonth() + 2, proxima.getDate());
+  assert.deepEqual(copia(ui.previasDePausa.at(-1)), ['rec-1', dia(proxima), dia(dois)]);
+  const frase = ui.nodes().find((n: any) => n.type === 'ThemedText' && /^Saem 1 cobrança/.test(String(n.props.children)));
+  assert.ok(frase, 'a frase da prévia aparece');
+  assert.match(String(frase.props.children), /R\$ 120\.00/);
+  ui.interact(() => botaoPausar(ui).props.onPress());
+  assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'pauseRecurring', value: { id: 'rec-1', from: dia(proxima), until: dia(dois) } });
+});
+
+test('Pausar…: sem prévia a frase some e o botão espera; "Até uma data" exige a data', () => {
+  const ui = pausaSheet(alvoSerie, '2026-11-15');
+  assert.equal(botaoPausar(ui).props.disabled, true, 'sem prévia não grava');
+  assert.equal(ui.nodes().some((n: any) => n.type === 'ThemedText' && /^Saem|^Nenhuma/.test(String(n.props.children))), false);
+  trocaModo(ui, 'ate');
+  assert.equal(botaoPausar(ui).props.disabled, true);
+  assert.ok(ui.nodes().find((n: any) => n.type === 'Field' && n.props.label === 'Até').props.error, 'a razão aparece no campo');
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'DatePickerField' && n.props.accessibilityLabel === 'Último dia da pausa').props.onChange('20/11/2026'));
+  assert.deepEqual(copia(ui.previasDePausa.at(-1)), ['rec-1', '2026-11-15', '2026-11-21'], 'a data escolhida é o último dia pausado');
+});
+
+test('Pausar…: "Sem prazo" é o Pausar de sempre (active = false), sem o comando de prazo', () => {
+  const ui = pausaSheet(alvoSerie, '2026-11-15');
+  trocaModo(ui, 'sem_prazo');
+  ui.interact(() => botaoPausar(ui).props.onPress());
+  assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'toggleRecurring', value: { id: 'rec-1', active: false } });
+  assert.equal(ui.writes.some((w: any) => w.operation === 'pauseRecurring'), false);
+});
+
+test('Pausar…: série dentro do período fica em Pausadas com "Pausada até" e "Retomar agora" a retoma', () => {
+  const { hoje, serie } = pausaSerie();
+  const ontem = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 1);
+  const fim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 10);
+  const ui = screen('src/app/finance/recurring.tsx', { recurring: [{ ...serie, paused_from: dia(ontem), paused_until: dia(fim) }] });
+  assert.ok(ui.nodes().some((n: any) => n.type === 'SectionHead' && n.props.title === 'Pausadas'));
+  const ultimo = dia(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 9)).split('-').reverse().join('/');
+  assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText' && String(n.props.children).includes(`Pausada até ${ultimo}`)));
+  const acoes = deslizaveis(ui)[0].props.acoes;
+  assert.equal(acoes.some((a: any) => a.label === 'Pausar…' || a.label === 'Pausar'), false);
+  ui.interact(() => acoes.find((a: any) => a.label === 'Retomar agora').onPress());
+  assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'resumeRecurring', value: { id: 'rec-1' } });
+});
+
+test('Pausar…: a ocorrência de uma série pausa a partir da própria data; o avulso não tem', () => {
+  const base = { kind: 'expense', status: 'pending', amount_cents: 500, description: 'Conta', category: 'x', account_id: 'a',
+    counterparty_account_id: null, occurred_at: '2026-10-15', created_at: '2026-10-02T12:00:00Z', invoice_id: null,
+    installment_plan_id: null, debt_id: null, pays_invoice_id: null, pix_fee_for_transaction_id: null };
+  const menu = (extra: object) => {
+    const ui = screen('src/app/finance/[txId].tsx', { txs: [{ id: 't', ...base, recurring_id: null, ...extra }], params: { txId: 't' } });
+    return { ui, acoes: ui.nodes().find((n: any) => n.type === 'HeaderActions').props.menu.actions };
+  };
+  assert.equal(menu({}).acoes.some((a: any) => a.label === 'Pausar…'), false);
+  const { ui, acoes } = menu({ recurring_id: 'rec-1' });
+  ui.interact(() => acoes.find((a: any) => a.label === 'Pausar…').onPress());
+  assert.equal(folhaDePausa(ui).props.inicioPadrao, '2026-10-15');
+  assert.equal(folhaDePausa(ui).props.alvo.id, 'rec-1');
+});
+
+test('Pausar…: lembrete que repete abre a folha; sem repetição só o Pausar de hoje', () => {
+  const lembrete = { id: 'r1', title: 'Aluguel', active: true, next_run_at: '2026-10-05T12:00:00Z', recurrence: 'FREQ=MONTHLY' };
+  const ui = screen('src/app/reminders.tsx', { reminders: [lembrete, { ...lembrete, id: 'r2', recurrence: null }] });
+  const [repete, unico] = deslizaveis(ui);
+  assert.equal(unico.props.acoes.some((a: any) => a.label === 'Pausar…'), false);
+  assert.ok(unico.props.acoes.some((a: any) => a.label === 'Pausar'));
+  ui.interact(() => repete.props.acoes.find((a: any) => a.label === 'Pausar…').onPress());
+  assert.deepEqual(copia(folhaDePausa(ui).props.alvo), { tipo: 'reminder', id: 'r1', titulo: 'Aluguel' });
+});
+
+test('Pausar…: lembrete grava o período, com a frase local (sem prévia do banco)', () => {
+  const ui = pausaSheet({ tipo: 'reminder', id: 'r1', titulo: 'Aluguel' }, '2026-10-05');
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'QuantityField').props.onChange(10));
+  const frase = ui.nodes().find((n: any) => n.type === 'ThemedText' && /^Não toca de/.test(String(n.props.children)));
+  assert.equal(String(frase.props.children), 'Não toca de 05/10 a 14/10.');
+  ui.interact(() => botaoPausar(ui).props.onPress());
+  assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'pauseReminder', value: { id: 'r1', from: '2026-10-05', until: '2026-10-15' } });
+});
+
+test('Pausar…: lembrete dentro do período vai para Pausados e "Retomar agora" limpa os dois campos', () => {
+  const hoje = new fixtureDate();
+  const lembrete = { id: 'r1', title: 'Aluguel', active: true, next_run_at: '2026-10-05T12:00:00Z', recurrence: 'FREQ=MONTHLY',
+    paused_from: dia(hoje), paused_until: dia(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 3)) };
+  const ui = screen('src/app/reminders.tsx', { reminders: [lembrete] });
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Section' && n.props.title === 'Pausados'));
+  assert.equal(ui.nodes().some((n: any) => n.type === 'Section' && n.props.title === 'Ativos'), false);
+  ui.interact(() => deslizaveis(ui)[0].props.acoes.find((a: any) => a.label === 'Retomar agora').onPress());
+  assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'pauseReminder', value: { id: 'r1', from: null, until: null } });
 });
 
 test('Recorrente encerrada não anuncia próxima cobrança, nem oferece editar ou retomar', () => {

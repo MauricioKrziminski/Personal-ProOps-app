@@ -49,6 +49,9 @@ import { financeErrorMessage } from '@/lib/finance-form';
 import { hrefDoLancar } from '@/lib/lancar';
 import { describeRRule } from '@/lib/rrule-text';
 import { estadoDaRecorrencia } from '@/lib/recurring-state';
+import { emPausa, rotuloDaPausa } from '@/lib/pausa';
+import { usePausa } from '@/components/finance/pausa-sheet';
+import { useResumeRecurring } from '@/hooks/use-pausas';
 import { supabase } from '@/lib/supabase';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 import { useEncerrarSerie } from '@/components/finance/encerrar-serie';
@@ -125,6 +128,8 @@ export default function RecurringScreen() {
   const toggle = useToggleRecurring();
   const apagarComAlcance = useApagarComAlcance();
   const encerrando = useEncerrarSerie();
+  const pausando = usePausa();
+  const retomando = useResumeRecurring();
   const reabrindo = useSaveRecurringSeries();
   // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
   // falha, e sem este corte a lista seguia afirmando números embaixo da faixa que acabou
@@ -189,8 +194,16 @@ export default function RecurringScreen() {
   const abrirNova = () => router.push(hrefDoLancar('recorrente'));
   const abrirEdicao = (r: RecurringTransaction) => router.push(hrefDoLancar('recorrente', { id: r.id, origem: 'serie' }));
 
+  /** Dentro do período de uma pausa com prazo (`active` segue true): é o mesmo grupo das pausadas. */
+  const noPeriodo = (r: RecurringTransaction) => r.active && emPausa(hoje, r.paused_from ?? null, r.paused_until ?? null);
+
   const alternar = (r: RecurringTransaction) =>
-    toggle.mutate(
+    noPeriodo(r)
+      ? retomando.mutate({ id: r.id }, {
+          onSuccess: () => toast({ message: 'Série retomada.', tone: 'success' }),
+          onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para retomar a série.'), tone: 'error' }),
+        })
+      : toggle.mutate(
       { id: r.id, active: !r.active },
       {
         onSuccess: () =>
@@ -239,7 +252,13 @@ export default function RecurringScreen() {
         ? [{ label: lembreteDaSerie(r) ? 'Editar lembrete' : 'Lembrar', icon: 'bell' as const,
             onPress: () => router.push(hrefDoLembrete({ tipo: 'serie', recurringId: r.id }, r.description ?? 'Recorrente')) }]
         : []),
-      { label: r.active ? 'Pausar' : 'Retomar', icon: r.active ? 'pause' : 'play', arrasto: 'direita', desfaz: true, onPress: () => alternar(r) },
+      noPeriodo(r)
+        ? { label: 'Retomar agora', icon: 'play', arrasto: 'direita', onPress: () => alternar(r) }
+        : { label: r.active ? 'Pausar' : 'Retomar', icon: r.active ? 'pause' : 'play', arrasto: 'direita', desfaz: true, onPress: () => alternar(r) },
+      ...(r.active && !noPeriodo(r)
+        ? [{ label: 'Pausar…', icon: 'pause' as const,
+            onPress: () => pausando.abrir({ tipo: 'recurring', id: r.id, titulo: r.description ?? 'recorrência' }, dataLocalDe(r.next_run_at)) }]
+        : []),
       // Cancelar uma assinatura: fica o que já aconteceu, saem as cobranças futuras (não é Pausar nem Apagar).
       { label: 'Encerrar', icon: 'xmark.circle', onPress: () => encerrando.abrir(r) },
     ];
@@ -274,10 +293,10 @@ export default function RecurringScreen() {
         <Deslizavel titulo={r.description ?? 'Recorrência'} acoes={acoesDaSerie(r)} forma="card">
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel={`${r.description ?? 'recorrência'}, ${receita ? 'receita' : transferencia ? 'transferência' : 'despesa'}, ${quando}, próximo em ${isoToBR(dataLocalDe(r.next_run_at))}${r.active ? '' : ', pausado'}`}
+          accessibilityLabel={`${r.description ?? 'recorrência'}, ${receita ? 'receita' : transferencia ? 'transferência' : 'despesa'}, ${quando}, próximo em ${isoToBR(dataLocalDe(r.next_run_at))}${r.active && !noPeriodo(r) ? '' : ', pausado'}`}
           onPress={() => acoes(r)}
           onLongPress={() => acoes(r)}>
-          <Card style={[styles.serie, r.active ? null : styles.pausada]}>
+          <Card style={[styles.serie, r.active && !noPeriodo(r) ? null : styles.pausada]}>
             <View style={styles.serieTopo}>
               <View style={styles.serieTitulo}>
                 <Icon
@@ -295,17 +314,17 @@ export default function RecurringScreen() {
               {/* ação primária da tela: um toque, alvo próprio de 44pt */}
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`${r.active ? 'Pausar' : 'Retomar'} ${r.description ?? 'recorrência'}`}
+                accessibilityLabel={`${r.active && !noPeriodo(r) ? 'Pausar' : 'Retomar'} ${r.description ?? 'recorrência'}`}
                 hitSlop={12}
                 onPress={() => alternar(r)}
                 style={styles.alternar}>
-                <Icon name={r.active ? 'pause.circle' : 'play.circle'} size="lg" color="tint" />
+                <Icon name={r.active && !noPeriodo(r) ? 'pause.circle' : 'play.circle'} size="lg" color="tint" />
               </Pressable>
             </View>
             <ThemedText type="small" themeColor="textSecondary" style={tabular}>
               {quando} · próximo {isoToBR(dataLocalDe(r.next_run_at)).slice(0, 5)}
               {r.category ? ` · ${r.category}` : ''}
-              {r.active ? '' : ' · pausada'}
+              {r.active ? (rotuloDaPausa(r, hoje) ? ` · ${rotuloDaPausa(r, hoje)}` : '') : ' · pausada'}
             </ThemedText>
           </Card>
         </PressableScale>
@@ -386,7 +405,7 @@ export default function RecurringScreen() {
                 </ThemedText>
                 <View style={styles.acoesErro}>
                   <Button
-                    label={r.active ? 'Pausar' : 'Retomar'}
+                    label={r.active && !noPeriodo(r) ? 'Pausar' : 'Retomar'}
                     size="sm"
                     variant="secondary"
                     onPress={() => alternar(r)}
@@ -534,6 +553,7 @@ export default function RecurringScreen() {
       {tablet ? tabletBody : compactBody}
 
       {encerrando.folha}
+      {pausando.folha}
     </Screen>
   );
 }

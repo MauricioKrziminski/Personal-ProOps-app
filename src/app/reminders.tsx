@@ -25,6 +25,10 @@ import {
   type Reminder,
 } from '@/hooks/use-items';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
+import { emPausa, rotuloDaPausa } from '@/lib/pausa';
+import { usePausa } from '@/components/finance/pausa-sheet';
+import { usePauseReminder } from '@/hooks/use-pausas';
+import { dataLocalDe, localISODate } from '@/lib/dates';
 import { describeRRule } from '@/lib/rrule-text';
 import { alvoComoParam, resumoDosAvisos } from '@/lib/lembrete-de-conta';
 import { listFiltersActive, type ListFiltersValue } from '@/lib/list-filters';
@@ -55,14 +59,20 @@ export default function RemindersScreen() {
   });
   const lembretesDeConta = useBillReminders();
   const toggle = useToggleReminder();
+  const pausando = usePausa();
+  const retomando = usePauseReminder();
+  const hoje = localISODate();
+  /** Dentro do período de uma pausa com prazo (`active` segue true): é o grupo dos pausados. */
+  const rotulo = (r: Reminder) => rotuloDaPausa({ active: true, paused_from: r.paused_from ?? null, paused_until: r.paused_until ?? null }, hoje);
+  const noPeriodo = (r: Reminder) => r.active && emPausa(hoje, r.paused_from ?? null, r.paused_until ?? null);
   const remove = useDeleteReminder();
   const toast = useToast();
 
   // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
   // falha, e sem este corte a tela seguia afirmando números embaixo da faixa de erro.
   const reminders = isError ? [] : (data?.pages.flat() ?? []).filter((r) => !r.parent_reminder_id || r.active);
-  const active = reminders.filter((r) => r.active);
-  const paused = reminders.filter((r) => !r.active);
+  const active = reminders.filter((r) => r.active && !noPeriodo(r));
+  const paused = reminders.filter((r) => !r.active || noPeriodo(r));
 
   /** O menu do lembrete, declarado UMA vez: o toque longo e o arrasto leem a mesma lista. */
   const acoesDoLembrete = (r: Reminder): ItemAction[] => {
@@ -90,15 +100,27 @@ export default function RemindersScreen() {
         r.title,
       );
 
+    const retomarAgora = () =>
+      retomando.mutate({ id: r.id, from: null, until: null }, {
+        onSuccess: () => toast({ message: 'Lembrete retomado.', tone: 'success' }),
+        onError: () => toast({ message: 'Não deu para retomar o lembrete.', tone: 'error' }),
+      });
+
     return [
       { label: 'Editar', arrasto: 'fora', onPress: () => router.push(`/reminder-form?id=${r.id}`) },
-      {
-        label: r.active ? 'Pausar' : 'Retomar',
-        icon: r.active ? 'pause' : 'play',
-        arrasto: 'direita',
-        desfaz: true,
-        onPress: () => alternar(!r.active),
-      },
+      noPeriodo(r)
+        ? { label: 'Retomar agora', icon: 'play', arrasto: 'direita', onPress: retomarAgora }
+        : {
+            label: r.active ? 'Pausar' : 'Retomar',
+            icon: r.active ? 'pause' : 'play',
+            arrasto: 'direita',
+            desfaz: true,
+            onPress: () => alternar(!r.active),
+          },
+      ...(r.active && !noPeriodo(r) && r.recurrence
+        ? [{ label: 'Pausar…', icon: 'pause' as const,
+            onPress: () => pausando.abrir({ tipo: 'reminder', id: r.id, titulo: r.title }, dataLocalDe(r.next_run_at)) }]
+        : []),
       { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: onDelete },
     ];
   };
@@ -113,11 +135,11 @@ export default function RemindersScreen() {
             : r.skip_run_at === r.next_run_at
             ? `${describeRRule(r.recurrence)} · próxima após a ocorrência editada`
             : r.recurrence
-            ? `${describeRRule(r.recurrence)} · próximo ${formatDateBR(r.next_run_at)}`
+            ? `${describeRRule(r.recurrence)} · próximo ${formatDateBR(r.next_run_at)}${r.active && rotulo(r) ? ` · ${rotulo(r)}` : ''}`
             : formatDateBR(r.next_run_at)
         }
-        icon={r.active ? 'bell' : 'bell.slash'}
-        accessibilityLabel={`${r.title}, ${r.active ? 'ativo' : 'pausado'}`}
+        icon={r.active && !noPeriodo(r) ? 'bell' : 'bell.slash'}
+        accessibilityLabel={`${r.title}, ${r.active && !noPeriodo(r) ? 'ativo' : 'pausado'}`}
         onPress={() => router.push(`/reminder-form?id=${r.id}`)}
         onLongPress={() => showItemActions(r.title, acoesDoLembrete(r))}
       />
@@ -221,6 +243,7 @@ export default function RemindersScreen() {
           action={filtered ? { label: 'Limpar filtros', onPress: () => setFilters({}) } : { label: 'Novo lembrete', onPress: () => router.push('/reminder-form') }}
         />
       ) : null}
+      {pausando.folha}
       <ListFilters visible={filtering} value={filters} onClose={() => setFiltering(false)} onApply={setFilters}
         dateLabels={{ from: 'Próxima execução a partir de', to: 'Próxima execução até' }} selects={filterSelects} />
     </Screen>
