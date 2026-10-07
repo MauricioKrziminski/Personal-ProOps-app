@@ -46,7 +46,7 @@ de 72h de quem chega por anúncio Click-to-WhatsApp continua grátis, e só se p
 | Cloud Scheduler (3 jobs) | R$ 0,91 | R$ 0,25 | ~R$ 1,80 |
 | Cloud Storage (fontes do `--source`) | R$ 0,26 | R$ 0,11 | ~R$ 0,50 |
 | Cloud Run (CPU + memória) | R$ 2,05 | R$ 0,88 | ~R$ 4 — **hoje 100% coberto pela camada grátis** |
-| **total fixo do GCP** | | | **~R$ 17/mês** sem camada grátis |
+| **total fixo do GCP** | | | **~R$ 20/mês** sem camada grátis (medido 25–30/09: R$ 19,06 bruto, R$ 14,80 líquido) |
 
 - **A camada grátis é por CONTA de faturamento**, e essa conta tem outros projetos. Não conte com
   ela: a tabela acima já está sem.
@@ -208,38 +208,49 @@ RevenueCat 1% acima de US$ 2.500. **Não inclui o contador nem o domínio e o e-
 valores, que são seus, ao fixo e divida por R$ 11,52 (a contribuição por assinante) para ter o
 novo ponto de equilíbrio.
 
-## 6b. Resultado total do mês com a infra atual e US$ 200/mês da Anthropic
+## 6b. Resultado total do mês no PIOR caso (07/10/2026)
 
-Decisão do dono do produto (07/10/2026): **taxa de publicação nas lojas (Apple US$ 99/ano, Google
-US$ 25) fica fora desta conta**; a comissão por venda (15%) continua, porque sai de cada
-assinatura. A Anthropic dá **US$ 200 por mês** de crédito (≈ R$ 1.240), então a IA não custa nada
-até lá: cobre ~1.900 assinantes no uso típico e ~330 com todos no limite. A troca do Gemini espera
-a carência de 7 dias da chave.
+Regra do dono do produto: **só o plano mais barato e o pior caso em tudo**, e taxa de publicação
+das lojas fora da conta. Todo assinante é **Pro anual** (R$ 239,90 = R$ 19,99/mês, a menor receita
+por pessoa) e **gasta o limite inteiro todo mês**: 400 turnos de IA, 150 respostas e 30 avisos
+pelo WhatsApp. Loja 15%, imposto 15,5%, dólar a R$ 6,20, nenhuma camada grátis do GCP, Cloud Run
+a US$ 0,0004 por turno.
 
-Fixo: **o GCP de hoje, R$ 17/mês** (Supabase, Langfuse e Expo nos planos grátis). Sobe para o
-Supabase Pro (R$ 155) a partir de 100 assinantes — premissa pessimista; o gatilho real é o que vier
-primeiro entre backup, 5 GB de egress, 200 conexões de Realtime e 500 MB —, Expo Starter a 1.000 e
-RevenueCat 1% acima de US$ 2.500.
+| por assinante/mês | R$ |
+|---|---|
+| preço | 19,99 |
+| − loja − imposto | − 6,10 |
+| **líquido** | **13,89** |
+| WhatsApp (150 respostas + 30 avisos) | − 7,59 |
+| Cloud Run + áudio | − 1,49 |
+| IA (Haiku, 400 turnos) | − 3,24 → **R$ 0 enquanto couber nos US$ 200/mês da Anthropic** |
+| **sobra** | **4,82 com os créditos · 1,57 depois deles** |
 
-Resultado em R$: receita − loja 15% − imposto 15,5% − WhatsApp, Cloud Run e áudio − IA além dos
-créditos − fixo. Primeiro valor: uso típico. Depois da barra: todos no limite.
+Fixo: **GCP R$ 20** (fatura de 25–30/09, sem camada grátis); Supabase Pro (R$ 155) a partir de 100
+assinantes; Expo Starter acima de 1.000; RevenueCat 1% acima de US$ 2.500. Langfuse com amostragem
+(sem ela, o Hobby estoura com ~15 assinantes no limite e o Core custa R$ 180).
 
-| assinantes | receita bruta | fixo | **resultado do mês** |
-|---|---|---|---|
-| 1 | 26 | 17 | −5 / −8 |
-| **2** | 52 | 17 | **+7 / 0 — empata aqui** |
-| 5 | 130 | 17 | +44 / +26 |
-| 10 | 259 | 17 | +105 / +68 |
-| 20 | 519 | 17 | +226 / +154 |
-| 50 | 1.296 | 17 | +591 / +410 |
-| 100 | 2.593 | 172 | +1.044 / +681 |
-| 300 | 7.778 | 172 | +3.476 / +2.387 |
-| 500 | 12.964 | 172 | +5.909 / +3.468 |
-| 1.000 | 25.927 | 549 | +11.613 / +5.492 |
+| assinantes | receita bruta | fixo | IA paga | **resultado do mês** |
+|---|---|---|---|---|
+| 1 | 20 | 20 | 0 | −15 |
+| 3 | 60 | 20 | 0 | −6 |
+| **5** | 100 | 20 | 0 | **+4 — empata aqui** |
+| 10 | 200 | 20 | 0 | +28 |
+| 20 | 400 | 20 | 0 | +76 |
+| 50 | 1.000 | 20 | 0 | +221 |
+| 100 | 1.999 | 175 | 0 | +307 |
+| 300 | 5.998 | 175 | 0 | +1.270 |
+| 500 | 9.996 | 175 | 382 | +1.852 |
+| 1.000 | 19.992 | 375 | 2.004 | +2.439 |
 
-Mistura: 60% Pro mensal, 30% Pro anual e 10% Família. Os cortes de GCP (segredos num só, retenção
-de imagens, um job no Scheduler) baixam o fixo para ~R$ 10 e fazem 1 assinante empatar.
-Trial que não converte custa até R$ 2,45 cada, fora desta tabela.
+Os créditos cobrem a IA de até ~380 assinantes no limite. **Depois disso a sobra cai para ~R$ 1,57
+por assinante (8% do preço)**, que é o ponto fraco do pior caso. Duas coisas pioram isso:
+- **Apple fora do Small Business Program** (21% + 5% em vez de 15%): o líquido cai para R$ 11,69 e,
+  depois dos créditos, **cada assinante dá prejuízo de R$ 0,63**. A inscrição é obrigatória.
+- Trial que não converte: até R$ 2,45 cada.
+
+Os R$ 249,00/ano que estão em `IN-APP-PURCHASE.md` acrescentam R$ 0,53 por assinante. Um teto de
+120 respostas pelo WhatsApp acrescenta R$ 1,27.
 
 ## 7. API não oficial do WhatsApp (Baileys, Evolution, Z-API)
 
