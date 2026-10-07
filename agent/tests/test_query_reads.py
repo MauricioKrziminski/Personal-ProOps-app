@@ -13,7 +13,7 @@ lendo o código — só medindo com um instante que cruza a meia-noite.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -470,3 +470,37 @@ def test_listar_lembretes_e_leitura_pura():
 
     assert NotesActionType.QUERY_REMINDERS in READ_ONLY
     assert NotesActionType.DELETE_REMINDER not in READ_ONLY
+
+
+class TestPausaComPrazo:
+    """Pausa com prazo [paused_from, paused_until) é pausada, e a "próxima" não aparece dentro dela."""
+
+    @pytest.mark.asyncio
+    async def test_recorrente_em_pausa_vai_para_pausadas_sem_proxima(self, monkeypatch):
+        hoje = datetime.now(UTC).date()
+        async def fetch(query, *args):
+            return [{
+                "category": None, "rrule": "FREQ=MONTHLY;BYMONTHDAY=5", "kind": "expense",
+                "next_run_at": datetime(2026, 11, 5, 15, 0, tzinfo=UTC), "end_date": None,
+                "amount_cents": 300, "description": "Academia", "active": True,
+                "paused_from": hoje - timedelta(days=1), "paused_until": hoje + timedelta(days=30),
+            }]
+
+        monkeypatch.setattr(db, "fetch", fetch)
+        r = await queries.query_recurring(ctx(), FinanceQuery(type=FinanceQueryType.QUERY_RECURRING))
+        assert "Pausadas: Academia (até" in r.message
+        assert "próxima em" not in r.message
+
+    @pytest.mark.asyncio
+    async def test_lembrete_com_data_dentro_da_pausa_nao_e_listado(self, monkeypatch):
+        hoje = datetime.now(UTC).date()
+        async def fetch(query, *args):
+            return [{
+                "title": "Pagar aluguel", "recurrence": None, "channel": "push",
+                "next_run_at": datetime.now(UTC) + timedelta(days=3),
+                "paused_from": hoje, "paused_until": hoje + timedelta(days=10),
+            }]
+
+        monkeypatch.setattr(db, "fetch", fetch)
+        r = await notes.query_reminders(ctx(), NotesAction(type=NotesActionType.QUERY_REMINDERS))
+        assert "Pagar aluguel" not in r.message

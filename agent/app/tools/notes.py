@@ -22,7 +22,7 @@ from app.domain.dates import (
     now_utc,
     to_instant,
 )
-from app.domain.recurrence import descreve_rrule, next_occurrence
+from app.domain.recurrence import descreve_rrule, em_pausa, next_occurrence
 from app.graph.schemas import NotesAction
 from app.tools import guards
 from app.tools.base import ExecContext, ToolResult
@@ -241,7 +241,7 @@ async def query_reminders(ctx: ExecContext, action: NotesAction) -> ToolResult:
 
     sql = [
         """
-        select title, next_run_at, recurrence, channel
+        select title, next_run_at, recurrence, channel, paused_from, paused_until
         from public.reminders
         where workspace_id = %s and active = true
         """
@@ -259,6 +259,13 @@ async def query_reminders(ctx: ExecContext, action: NotesAction) -> ToolResult:
     sql.append("order by next_run_at limit 10")
 
     rows = await db.fetch(" ".join(sql), *args)
+    # Lembrete em pausa com prazo não é "próximo": nem hoje dentro da pausa, nem a data dentro dela.
+    hoje_local = local_iso_date(ctx.timezone)
+    rows = [
+        r for r in rows
+        if not em_pausa(hoje_local, r.get("paused_from"), r.get("paused_until"))
+        and not em_pausa(local_iso_date(ctx.timezone, r["next_run_at"]), r.get("paused_from"), r.get("paused_until"))
+    ]
     if not rows:
         alvo = f' com "{termo}"' if termo else ""
         return ToolResult(

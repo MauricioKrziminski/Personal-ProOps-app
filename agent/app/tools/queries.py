@@ -29,7 +29,7 @@ from app.domain.dates import (
 from app.domain.payment_method import ACEITAS as ACEITAS_FORMAS
 from app.domain.payment_method import ROTULOS as ROTULOS_FORMAS
 from app.domain.payment_method import forma_de_pagamento
-from app.domain.recurrence import descreve_rrule
+from app.domain.recurrence import descreve_rrule, em_pausa
 from app.domain.money import cents_to_brl
 from app.graph.schemas import FinanceQuery, FinanceQueryType
 from app.jobs.scheduler import HORIZON_DAYS
@@ -777,7 +777,7 @@ async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     alvo = (action.search_term or "").strip()
     linhas_sql = await db.fetch(
         """
-        select kind, amount_cents, description, category, rrule, next_run_at, end_date, active
+        select kind, amount_cents, description, category, rrule, next_run_at, end_date, active, paused_from, paused_until
         from public.recurring_transactions
         where workspace_id = %s
           and (%s = '' or extensions.unaccent(description) ilike extensions.unaccent(%s) or extensions.unaccent(category) ilike extensions.unaccent(%s))
@@ -801,7 +801,7 @@ async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
         alvo = ""
         linhas_sql = await db.fetch(
             """
-            select kind, amount_cents, description, category, rrule, next_run_at, end_date, active
+            select kind, amount_cents, description, category, rrule, next_run_at, end_date, active, paused_from, paused_until
             from public.recurring_transactions
             where workspace_id = %s
             order by active desc, next_run_at, kind
@@ -816,6 +816,12 @@ async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
             read_only=True,
         )
 
+    hoje = local_iso_date(ctx.timezone)
+
+    def ativa(r) -> bool:
+        # Pausa com prazo: hoje em [paused_from, paused_until) conta como pausada (mesma régua do SQL).
+        return bool(r["active"]) and not em_pausa(hoje, r.get("paused_from"), r.get("paused_until"))
+
     def linha(r) -> str:
         nome = r["description"] or r["category"] or "sem descrição"
         quando = descreve_rrule(r["rrule"])
@@ -827,7 +833,7 @@ async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
         )
 
     def bloco(kind: str, titulo: str) -> list[str]:
-        itens = [r for r in linhas_sql if r["kind"] == kind and r["active"]]
+        itens = [r for r in linhas_sql if r["kind"] == kind and ativa(r)]
         if not itens:
             return []
         return [titulo] + [linha(r) for r in itens]
@@ -836,7 +842,7 @@ async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     # achados são do mesmo lado. Sem filtro, os dois blocos são o que organiza a lista longa.
     if alvo:
         partes = [f"🔁 *{alvo.capitalize()}*"]
-        for r in [x for x in linhas_sql if x["active"]]:
+        for r in [x for x in linhas_sql if ativa(x)]:
             partes.append(linha(r))
     else:
         partes = [f"{se_esvaziou}🔁 *Suas recorrências*"]
@@ -844,9 +850,14 @@ async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
         partes += bloco("expense", "\n*Sai*")
         partes += bloco("transfer", "\n*Transfere*")
 
-    pausadas = [r for r in linhas_sql if not r["active"]]
+    pausadas = [r for r in linhas_sql if not ativa(r)]
     if pausadas:
-        nomes = ", ".join((r["description"] or r["category"] or "sem descrição") for r in pausadas[:5])
+        def nome_pausada(r) -> str:
+            nome = r["description"] or r["category"] or "sem descrição"
+            ate = r.get("paused_until")
+            return f"{nome} (até {format_date_br(ate)})" if r["active"] and ate else nome
+
+        nomes = ", ".join(nome_pausada(r) for r in pausadas[:5])
         partes.append(f"\n⏸️ Pausadas: {nomes}")
 
     if len(partes) == 1:
