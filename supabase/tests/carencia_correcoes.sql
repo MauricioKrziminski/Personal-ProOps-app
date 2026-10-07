@@ -76,3 +76,29 @@ begin
   exception when sqlstate '22023' then assert sqlerrm like '%não existe%', sqlerrm; end;
 end $$;
 rollback;
+
+-- I2 (revisão final): a data de parcela JÁ PAGA também leva o deslocamento da carência
+begin;
+do $$
+declare
+  u uuid := '00000000-0000-0000-0000-0000000cb011';
+  w uuid := '00000000-0000-0000-0000-0000000cb012';
+  f uuid := gen_random_uuid();
+  a date := (date_trunc('month', current_date) - interval '3 month')::date + 22;
+begin
+  insert into auth.users(id,email) values (u,'cb11@example.invalid');
+  insert into public.profiles(id) values (u) on conflict do nothing;
+  insert into public.workspaces(id,owner_id,name) values (w,u,'Pagas');
+  insert into public.workspace_members(workspace_id,user_id,role) values (w,u,'owner');
+  insert into public.debts(id,workspace_id,user_id,name,kind,calculation_mode,principal_cents,
+    remaining_cents,interest_rate_monthly,installments,installments_paid,installment_cents,due_day,first_due_date)
+  values (f,w,u,'Pagas','financing','fixed_installments',100000,80000,0,10,2,10000,23,a);
+  perform set_config('request.jwt.claim.sub', u::text, true);
+  perform public.debt_pause(f, 3, 3, gen_random_uuid());
+  update public.debts set installments_paid = 4, remaining_cents = 60000 where id = f;  -- 3ª e 4ª passam a pagas
+  assert private.debt_projected_due_date(f, 4) = private.day_in_month(private.add_months(a, 3 + 3), 23),
+    'parcela paga leva o deslocamento da carência';
+  assert private.debt_projected_due_date(f, 2) = private.day_in_month(private.add_months(a, 1), 23),
+    'parcela antes da carência não anda';
+end $$;
+rollback;

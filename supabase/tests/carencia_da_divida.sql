@@ -75,9 +75,12 @@ begin
   begin perform public.debt_pause(fixa, 2, 1, gen_random_uuid()); assert false;
   exception when sqlstate 'P0001' then
     assert sqlerrm like '%já paga%', sqlerrm; end;          -- começa numa parcela paga
-  begin perform public.debt_pause(fixa, 4, 1, gen_random_uuid()); assert false;
-  exception when sqlstate 'P0001' then
-    assert sqlerrm like '%outra carência%', sqlerrm; end;   -- sobreposta à da etapa 1 (3ª a 5ª)
+  -- uma segunda carência, de parcela posterior, é aceita e os deslocamentos somam (4 meses na 4ª)
+  select min(due_date) into d0 from public.debt_schedule(fixa);
+  perform public.debt_pause(fixa, 4, 1, gen_random_uuid());
+  select min(due_date) into d1 from public.debt_schedule(fixa);
+  assert d1 = private.add_months(d0, 1), 'a segunda carência soma 1 mês';
+  assert private.debt_pause_shift(fixa, 4) = 4, 'deslocamentos somam (3 + 1)';
   begin perform public.debt_pause(juros, 3, 1, gen_random_uuid()); assert false;
   exception when sqlstate 'P0001' then
     assert sqlerrm like '%próxima parcela%', sqlerrm; end;  -- com juros só a partir da próxima

@@ -312,3 +312,6 @@ Sobem juntas, depois das de `20261008…`.
 **Carência, correções** — `20261009120200`: staging 07/10/2026, produção pendente. Sobe junto de `20261009120000` e `20261009120100`.
 
 **Carência, ordem e âncora** — `20261009120300`: staging 07/10/2026, produção pendente. Sobe junto de `20261009120000`, `120100` e `120200`.
+
+**Carência, revisão final** — `20261009120400`: staging 07/10/2026, produção pendente. Sobe junto de `20261009120000`, `120100`, `120200` e `120300`.
+Ordem de deploy em produção: migrations, depois o agente (confirmar a revisão nova do Cloud Run servindo) e só então a tag do app. Agente antigo re-materializa as linhas pausadas; agente novo antes das migrations quebra o agendador e o cron de lembretes, que selecionam as colunas novas.
