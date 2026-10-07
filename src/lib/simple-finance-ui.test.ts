@@ -8052,7 +8052,9 @@ test('Apagar: ocorrência, parcela e pagamento perguntam o alcance; avulso confi
     assert.deepEqual({ ...ui.writes.find((w: any) => w.operation === 'apagarComAlcance')?.value }, { tipo, id: 't', nome: 'Conta' }, tipo);
     assert.equal(ui.confirmations.length, 0, 'a pergunta é do hook, sem confirmação avulsa');
   }
-  const avulso = apagarDe({});
-  assert.ok(!avulso.writes.some((w: any) => w.operation === 'apagarComAlcance'), 'avulso não pergunta alcance');
-  assert.equal(avulso.confirmations.length, 1, 'avulso confirma');
+  for (const extra of [{}, { pix_fee_for_transaction_id: 'x' }, { pays_invoice_id: 'f' }]) {
+    const avulso = apagarDe(extra);
+    assert.ok(!avulso.writes.some((w: any) => w.operation === 'apagarComAlcance'), 'avulso não pergunta alcance');
+    assert.equal(avulso.confirmations.length, 1, 'avulso confirma');
+  }
 });
