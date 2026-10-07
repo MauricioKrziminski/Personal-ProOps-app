@@ -146,6 +146,12 @@ mercado amanhã" gera um lembrete solto, com o título que a pessoa disse. Lacun
 vínculo pede resolver QUAL nota (alvo em `notes`) dentro de uma ação de lembrete, e `NotesAction`
 não tem campo para isso; o custo é a nota não mostrar o lembrete criado pelo WhatsApp.
 
+**Lembrete de CONTA** (`bill_reminders`, `save_bill_reminder`, 07/10/2026). "Lembrar" no lançamento,
+na dívida, na fatura, na série e na compra grava avisos (dias antes + hora + canal) que o cron de
+1 minuto entrega pelo vencimento ATUAL. O agente NÃO cria nem edita esse lembrete: "me lembra da
+parcela do carro 2 dias antes" vira lembrete solto (`create_reminder`). Lacuna declarada — pede
+resolver o registro-alvo dentro de uma ação de lembrete.
+
 **`useCancelSubscription` — decisão do dono do produto, não omissão.** A regra do domínio diz que
 cancelamento é uma chamada sem formulário, porque dificultar cancelamento é a queixa nº 1 contra
 os concorrentes. Pelo mesmo argumento, "cancela minha assinatura" pelo WhatsApp seria o caminho
