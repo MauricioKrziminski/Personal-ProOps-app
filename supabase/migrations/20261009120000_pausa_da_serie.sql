@@ -15,7 +15,7 @@ alter table public.reminders
 -- UM predicado para "esta data esta pausada". O agente (recurrence.py `em_pausa`) e o app
 -- (src/lib/pausa.ts `emPausa`) repetem a MESMA regua: fim exclusivo.
 create or replace function private.em_pausa(p_dia date, p_de date, p_ate date)
-returns boolean language sql immutable set search_path = '' as $$
+returns boolean language sql immutable as $$
   select p_de is not null and p_dia >= p_de and p_dia < p_ate
 $$;
 revoke execute on function private.em_pausa(date, date, date) from public, anon;
@@ -136,6 +136,9 @@ begin
   if uid is null then
     raise exception using errcode = '42501', message = 'Autenticação obrigatória';
   end if;
+  if p_op not in ('pause', 'resume') then
+    raise exception using errcode = '22023', message = 'Operação inválida';
+  end if;
   if p_op = 'pause' and (p_from is null or p_until is null or p_until <= p_from) then
     raise exception using errcode = '22023', message = 'O fim da pausa precisa ser depois do início';
   end if;
@@ -169,7 +172,8 @@ begin
     update public.recurring_transactions x set
       paused_from = case when x.paused_from >= current_date then null else x.paused_from end,
       paused_until = case when x.paused_from is null or x.paused_from >= current_date then null
-                          else greatest(current_date, x.paused_from + 1) end,
+                          when x.paused_until <= current_date then x.paused_until
+                          else current_date end,
       materialized_until = null
     where x.id = r.id;
     result := jsonb_build_object('resumed', true);
@@ -194,6 +198,8 @@ begin
         and not exists (select 1 from public.transactions t
                         where t.recurring_id = r.id and t.workspace_id = r.workspace_id
                           and t.occurred_at = d.due_date)
+        and not exists (select 1 from private.recurring_moved_occurrences m
+                        where m.recurring_id = r.id and m.original_date = d.due_date)
     ), linhas as (
       select case when t.invoice_id is null then coalesce(t.due_at, t.occurred_at) else t.occurred_at end as due_date
       from public.transactions t where t.id = any(coalesce(ids, '{}'))

@@ -104,6 +104,28 @@ begin
     'ficam a paga, a travada e a atrasada; sai só m3';
   assert not exists(select 1 from public.transactions where recurring_id=r and occurred_at=m3), 'm3 saiu';
 
+  -- 7b) data pulada ("Só esta") dentro do período não entra em dates nem em cents
+  delete from public.transactions where recurring_id=r;
+  perform public.resume_recurring(r, gen_random_uuid());
+  insert into private.recurring_moved_occurrences(recurring_id, workspace_id, original_date) values (r, w, m2);
+  prev := public.pause_recurring_preview(r, m1, m3 + 1);
+  assert not (prev->'dates') @> to_jsonb(m2::text), 'data pulada fora de dates: '||prev;
+  assert (prev->'dates') @> to_jsonb(m1::text) and (prev->'dates') @> to_jsonb(m3::text), 'as outras ficam: '||prev;
+  assert (prev->>'cents')::bigint = 24000, 'cents sem a pulada: '||prev;
+
+  -- 7c) retomar: pausa em curso termina hoje; pausa já vencida não é alargada
+  update public.recurring_transactions set paused_from = hoje - 10, paused_until = hoje + 10 where id=r;
+  perform public.resume_recurring(r, gen_random_uuid());
+  assert (select paused_from from public.recurring_transactions where id=r) = hoje - 10
+     and (select paused_until from public.recurring_transactions where id=r) = hoje, 'em curso termina hoje';
+  update public.recurring_transactions set paused_from = hoje - 10, paused_until = hoje - 3 where id=r;
+  perform public.resume_recurring(r, gen_random_uuid());
+  assert (select paused_until from public.recurring_transactions where id=r) = hoje - 3, 'vencida não alarga';
+  begin
+    perform private.pause_recurring('x', r, null, null, gen_random_uuid(), true);
+    assert false, 'operação inválida deveria falhar';
+  exception when sqlstate '22023' then null; end;
+
   -- 8) outro espaço não pausa
   perform set_config('request.jwt.claim.sub', outro::text, true);
   begin
