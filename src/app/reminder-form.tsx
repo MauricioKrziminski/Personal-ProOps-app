@@ -32,6 +32,7 @@ import { MaxContentWidth } from '@/constants/theme';
 import { Elevation, Motion, Radius, Space, Type, tabular } from '@/design/tokens';
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { useApagarComAlcance } from '@/hooks/use-apagar-com-alcance';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import {
   useDeleteReminder,
@@ -324,7 +325,7 @@ export default function ReminderFormScreen() {
   );
 }
 
-function ReminderForm({
+export function ReminderForm({
   editing,
   fallbackTitle,
   noteId,
@@ -344,6 +345,7 @@ function ReminderForm({
   const save = useSaveReminder();
   const toggle = useToggleReminder();
   const remove = useDeleteReminder();
+  const { apagar } = useApagarComAlcance(() => router.back());
 
   // Ler o relógio a cada render é impuro (React Compiler) e o modal é efêmero.
   const [now] = useState(() => {
@@ -484,6 +486,11 @@ function ReminderForm({
 
   const onDelete = () => {
     if (!editing) return;
+    // Aberto como ocorrência de uma série: pergunta "Só esta | Todas". Pela lista (contrato) ou único, confirma.
+    if (editing.recurrence && (editing.parent_reminder_id || umaOcorrenciaAberta)) {
+      apagar({ tipo: 'reminder', id: editing.id, nome: editing.title });
+      return;
+    }
     confirmDestructive(
       'Apagar este lembrete?',
       'Apagar',

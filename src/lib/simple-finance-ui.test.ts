@@ -424,7 +424,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
         },
         useWatch: ({ control, name }: any) => name === undefined ? control.values : control.values[name],
         Controller: function Controller({ control, name, render }: any) {
-          return render({ field: { value: control.values[name], onChange: (value: any) => { control.values[name] = value; } } });
+          return render({ field: { value: control.values[name], onChange: (value: any) => { control.values[name] = value; } }, fieldState: {} });
         },
       };
 
@@ -642,7 +642,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       // O da dívida (Task 5): de verdade só em Dívidas, pelo mesmo motivo.
       if (name === '@/components/finance/formulario-da-divida' && file.endsWith('finance/debts.tsx')) return load('src/components/finance/formulario-da-divida.tsx');
       if (name === '@/hooks/use-down-payment') return { usePurchaseDownPayment: (_type: string, parentId?: string) => ({ ...query, isPending: Boolean(parentId && options.downPaymentPending), isSuccess: !options.downPaymentPending && !options.downPaymentError, isError: Boolean(options.downPaymentError), data: parentId ? options.downPayment ?? null : undefined, refetch: async () => { refetches.push('down-payment'); } }) };
-      if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: options.datasReais ? load('src/lib/dates.ts').formatDateBR : () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useReminders: () => ({ ...query, isSuccess: true, data: { pages: [options.reminders ?? []], pageParams: [0] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }), useReminder: () => ({ ...query, data: undefined, isLoading: false }), useToggleReminder: () => mutation('toggleReminder'), useDeleteReminder: () => mutation('deleteReminder') };
+      if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: options.datasReais ? load('src/lib/dates.ts').formatDateBR : () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useReminders: () => ({ ...query, isSuccess: true, data: { pages: [options.reminders ?? []], pageParams: [0] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }), useReminder: () => ({ ...query, data: undefined, isLoading: false }), useToggleReminder: () => mutation('toggleReminder'), useDeleteReminder: () => mutation('deleteReminder'), useSaveReminder: () => mutation('saveReminder') };
       if (name === '@/lib/lembrete-de-conta') return load('src/lib/lembrete-de-conta.ts');
       if (name === '@/hooks/use-bill-reminders') return {
         useBillReminders: () => ({ ...query, data: options.billReminders ?? [], isPending: Boolean(options.billRemindersPending), isSuccess: !options.billRemindersPending, isError: false }),
@@ -8089,4 +8089,19 @@ test('Prevista: "Só esta" pula a data; "Todas" apaga a série pela âncora', ()
   const todas = apagar('Todas');
   assert.deepEqual({ ...todas.writes.find((w: any) => w.operation === 'apagarComAlcance')?.value },
     { tipo: 'recurring', id: 'rec-1', nome: 'Academia', ancora: '2026-10-15', alcance: 'all' });
+});
+
+test('Lembrete aberto como ocorrência: Apagar pergunta o alcance; pela lista, confirma como antes', () => {
+  const lembrete = { id: 'r1', title: 'Remédio', active: true, next_run_at: '2026-10-05T12:00:00Z', recurrence: { freq: 'DAILY' }, parent_reminder_id: null };
+  const apagar = (umaOcorrenciaAberta: boolean) => {
+    const ui = screen('src/app/reminder-form.tsx', { componente: 'ReminderForm', props: { editing: lembrete, umaOcorrenciaAberta, tablet: false } });
+    ui.interact(() => ui.button('Apagar').props.onPress());
+    return ui;
+  };
+  const ocorrencia = apagar(true);
+  assert.deepEqual({ ...ocorrencia.writes.find((w: any) => w.operation === 'apagarComAlcance')?.value }, { tipo: 'reminder', id: 'r1', nome: 'Remédio' });
+  assert.equal(ocorrencia.confirmations.length, 0);
+  const lista = apagar(false);
+  assert.ok(!lista.writes.some((w: any) => w.operation === 'apagarComAlcance'));
+  assert.equal(lista.confirmations.length, 1);
 });
