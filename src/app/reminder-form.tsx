@@ -11,6 +11,7 @@ import { z } from 'zod';
 
 import { Calendar } from '@/components/finance/calendar';
 import { Chip } from '@/components/finance/chip';
+import { BillReminderForm } from '@/components/reminders/bill-reminder-form';
 import { ThemedText } from '@/components/themed-text';
 import { Forte } from '@/components/ui/forte';
 import { Button } from '@/components/ui/button';
@@ -260,8 +261,11 @@ export default function ReminderFormScreen() {
   // `title` e `noteId` chegam do menu "Criar lembrete" da nota: o título pré-preenche, e o
   // `noteId` vincula — é ele que faz a nota passar a oferecer "Editar lembrete".
   /** `ocorrencia=1`: aberto pela Hoje, no disparo de hoje — é UMA ocorrência, não a série. */
-  const params = useLocalSearchParams<{ id?: string; title?: string; noteId?: string; ocorrencia?: string }>();
-  const query = useReminder(params.id);
+  const params = useLocalSearchParams<{ id?: string; title?: string; noteId?: string; ocorrencia?: string; conta?: string; todas?: string; nome?: string }>();
+  const query = useReminder(params.conta ? undefined : params.id);
+
+  // Modo CONTA: o lembrete mora num registro financeiro, e quem manda na data é o vencimento.
+  if (params.conta) return <BillReminderForm conta={params.conta} todas={params.todas} nome={params.nome ?? 'Conta'} />;
 
   if (params.id && query.isLoading) {
     return (
