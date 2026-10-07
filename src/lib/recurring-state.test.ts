@@ -37,3 +37,9 @@ test('data pura da próxima mantém o dia local e timestamp inválido não inven
   assert.equal(estadoDaRecorrencia({ ...serie, end_date: '2026-12-21', next_run_at: '2026-12-22' }, '2026-09-30'), 'encerrada');
   assert.equal(estadoDaRecorrencia({ ...serie, end_date: '2026-12-21', next_run_at: 'inválida' }, '2026-09-30'), 'ativa');
 });
+test('pausa com prazo: dentro do período é pausada, no futuro segue ativa', () => {
+  const p = { ...serie, paused_from: '2026-11-05', paused_until: '2027-01-05' };
+  assert.equal(estadoDaRecorrencia(p, '2026-12-01'), 'pausada');
+  assert.equal(estadoDaRecorrencia(p, '2026-10-01'), 'ativa');
+  assert.equal(estadoDaRecorrencia(p, '2027-01-05'), 'ativa');
+});
