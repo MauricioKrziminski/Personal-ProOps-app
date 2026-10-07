@@ -1073,8 +1073,9 @@ só `one`/`all`.
   lembrete): a FK não garante.
 - **O gatilho BEFORE DELETE `apagar_nao_derruba_fatura` vale para QUALQUER caminho de apagar** (app, agente,
   gatilho, cascade de juros do Pix): impede o total de uma fatura aberta e paga em parte ficar abaixo do
-  pago. Fica de fora só quem sai junto com o dono (fatura, conta ou espaço já apagados); apagar o usuário
-  passa (testado em `apagar_fix_final.sql`).
+  pago. Fica de fora só quem sai junto com o dono (fatura, conta ou espaço já apagados); apagar o DONO do
+  espaço passa (testado em `apagar_fix_final.sql`). Apagar um MEMBRO de espaço compartilhado com compra
+  numa fatura do dono paga em parte é recusado (o espaço e a fatura ficam) — não testado, decisão pendente.
 
 ## Rotativo — a fatura vencida que vai para a próxima
 
