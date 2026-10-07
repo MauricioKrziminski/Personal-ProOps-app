@@ -1252,7 +1252,35 @@ test('unchanged debt Save closes without asking and without writing', () => {
 test('long press on an active debt offers the full set, including delete for good', () => {
   const ui = screen(debtsFile, { debts: [carro] });
   ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onLongPress());
-  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Pagar parcela', 'Ver as parcelas', 'Editar', 'Arquivar', 'Apagar por completo']);
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Pagar parcela', 'Ver as parcelas', 'Lembrar', 'Editar', 'Arquivar', 'Apagar por completo']);
+});
+
+test('Dívida: o menu oferece "Lembrar" e abre o formulário em modo conta', () => {
+  const ui = screen(debtsFile, { debts: [carro] });
+  ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onLongPress());
+  ui.interact(() => ui.actions.find((a: any) => a.label === 'Lembrar').onPress());
+  assert.deepEqual(copia(ui.navigations.at(-1)),
+    { pathname: '/reminder-form', params: { conta: `debt_id:${carro.id}`, nome: carro.name } });
+});
+
+test('Dívida com lembrete: a ação vira "Editar lembrete"', () => {
+  const ui = screen(debtsFile, { debts: [carro], billReminders: [{ alvo: { debt_id: carro.id }, title: carro.name, channel: 'push', avisos: [{ days_before: 0, at_time: '09:00' }], next_due: null }] });
+  ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onLongPress());
+  assert.ok(ui.actions.some((a: any) => a.label === 'Editar lembrete'));
+});
+
+test('Lançamento: sem "Lembrar" em pagamento de dívida, de fatura e juro do Pix; com ele no pendente', () => {
+  const base = { kind: 'expense', status: 'pending', amount_cents: 500, description: 'Conta', category: 'x', account_id: 'a',
+    counterparty_account_id: null, occurred_at: '2026-10-02', created_at: '2026-10-02T12:00:00Z', invoice_id: null,
+    installment_plan_id: null, recurring_id: null, debt_id: null, pays_invoice_id: null, pix_fee_for_transaction_id: null };
+  const rotulos = (extra: object) => {
+    const ui = screen('src/app/finance/[txId].tsx', { txs: [{ id: 't', ...base, ...extra }], params: { txId: 't' } });
+    return ui.nodes().find((n: any) => n.type === 'HeaderActions').props.menu.actions.map((a: any) => a.label);
+  };
+  assert.ok(rotulos({}).includes('Lembrar'));
+  for (const extra of [{ debt_id: 'd' }, { pays_invoice_id: 'f' }, { pix_fee_for_transaction_id: 'p' }]) {
+    assert.ok(!rotulos(extra).some((l: string) => l.startsWith('Lembrar') || l === 'Editar lembrete'), JSON.stringify(extra));
+  }
 });
 
 test('archived debts have a place to come back from', () => {
@@ -1325,7 +1353,7 @@ test('a ficha da dívida é uma tela: Editar no topo e o resto no "…", com as 
   const cabeca = ui.nodes().find((n: any) => n.type === 'HeaderActions');
   assert.deepEqual(copia(cabeca.props.actions.map((a: any) => a.label)), ['Editar']);
   // na ficha "Ver as parcelas" sai: é o que já se está vendo
-  assert.deepEqual(copia(cabeca.props.menu.actions.map((a: any) => a.label)), ['Arquivar', 'Apagar por completo']);
+  assert.deepEqual(copia(cabeca.props.menu.actions.map((a: any) => a.label)), ['Lembrar', 'Arquivar', 'Apagar por completo']);
 });
 
 test('detalhe da dívida: a próxima que já venceu diz Atrasada no cartão (05/10/2026)', () => {

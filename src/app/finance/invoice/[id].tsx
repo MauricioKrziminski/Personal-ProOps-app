@@ -50,6 +50,8 @@ import { formatNumberBR } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { passoDaVolta, type Volta } from '@/lib/reabrir-ao-voltar';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
+import { useBillReminderFor } from '@/hooks/use-bill-reminders';
+import { hrefDoLembrete, resumoDosAvisos } from '@/lib/lembrete-de-conta';
 import { estadoDaLinha } from '@/lib/settle-labels';
 import { STATUS_DA_FATURA, contaNaFatura } from '@/lib/card-status';
 import { accountLabel } from '@/lib/accounts';
@@ -166,6 +168,7 @@ export default function InvoiceScreen() {
     cartao?.name ??
     (resumoDosCartoes.data ?? []).find((c) => c.account_id === fatura?.account_id)?.name ??
     '';
+  const lembreteDaFatura = useBillReminderFor(fatura ? { invoice_id: fatura.id } : null);
   // o pagamento é transferência: só entram contas que guardam dinheiro, nunca o próprio cartão
   const pagadoras = (accounts.data ?? []).filter(
     (a) => a.type !== 'credit_card' && a.id !== fatura?.account_id
@@ -548,6 +551,10 @@ export default function InvoiceScreen() {
           <Dica id="fatura-cartao" tela="fatura" />
         </Animated.View>
       ) : null}
+      {lembreteDaFatura && fatura ? (
+        <Row icon="bell" title={resumoDosAvisos(lembreteDaFatura.avisos)}
+          onPress={() => router.push(hrefDoLembrete({ tipo: 'fatura', invoiceId: fatura.id }, `Fatura ${nomeDoCartao}`))} />
+      ) : null}
     </View>
   );
 
@@ -659,6 +666,8 @@ export default function InvoiceScreen() {
                     icon: 'square.and.arrow.down',
                     onPress: () => router.push({ pathname: '/import', params: { conta: fatura.account_id } }),
                   },
+                  { label: lembreteDaFatura ? 'Editar lembrete' : 'Lembrar', icon: 'bell' as const,
+                    onPress: () => router.push(hrefDoLembrete({ tipo: 'fatura', invoiceId: fatura.id }, `Fatura ${nomeDoCartao}`)) },
                   ...(pagamentos.length > 0
                     ? [{ label: pagamentos.length === 1 ? 'Ver o pagamento' : 'Ver os pagamentos', icon: 'arrow.left.arrow.right' as const, onPress: verPagamentos }]
                     : []),

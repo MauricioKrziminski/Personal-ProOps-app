@@ -131,7 +131,7 @@ export function BillReminderForm({ conta, todas, nome }: { conta: string; todas?
             <Segmented options={CANAIS} value={canalAtual} onChange={setCanal} />
           </Field>
           {semWhatsApp ? (
-            <Button label="Ligar no Perfil" variant="secondary" size="sm" onPress={() => router.push('/profile')} />
+            <Button label="Ligar no Perfil" variant="secondary" size="sm" onPress={() => router.push('/profile/alerts')} />
           ) : null}
         </Card>
         {existente ? (

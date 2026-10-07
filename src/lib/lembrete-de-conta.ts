@@ -61,16 +61,26 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CHAVES = ['transaction_id', 'recurring_id', 'installment_plan_id', 'debt_id', 'invoice_id'] as const;
 
 export function alvoComoParam(a: Alvo): string {
-  const [chave, id] = Object.entries(a)[0] as [string, string];
+  const chave = CHAVES.find((k) => k in a)!;
+  const id = (a as Record<string, string>)[chave];
   return 'debt_installment_no' in a && a.debt_installment_no ? `${chave}:${id}:${a.debt_installment_no}` : `${chave}:${id}`;
 }
 
-/** O parâmetro vem da rota: só chave conhecida e uuid viram alvo. */
+/** O parâmetro vem da rota: só chave conhecida, uuid e forma canônica viram alvo. */
 export function alvoDoParam(s: string): Alvo | null {
-  const [chave, id, n] = s.split(':');
+  const partes = s.split(':');
+  const [chave, id, n] = partes;
   if (!(CHAVES as readonly string[]).includes(chave) || !UUID.test(id ?? '')) return null;
-  if (chave === 'debt_id' && n) return Number.isInteger(Number(n)) && Number(n) > 0 ? { debt_id: id, debt_installment_no: Number(n) } : null;
-  return { [chave]: id } as Alvo;
+  if (chave === 'debt_id' && partes.length === 3) return /^\d{1,4}$/.test(n) && Number(n) > 0 ? { debt_id: id, debt_installment_no: Number(n) } : null;
+  return partes.length === 2 ? ({ [chave]: id } as Alvo) : null;
+}
+
+export function hrefDoLembrete(aberto: Aberto, nome: string) {
+  const { so, todas } = alvosDoAberto(aberto);
+  return {
+    pathname: '/reminder-form' as const,
+    params: { conta: alvoComoParam(so), ...(todas ? { todas: alvoComoParam(todas) } : {}), nome },
+  };
 }
 
 /** Mesma chave do alvo dos dois lados (overview do banco × o que a tela abriu). */

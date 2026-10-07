@@ -61,6 +61,8 @@ import { paidInstallments, porAno, secoesDaLinha, type ItemDaLinha } from '@/lib
 import { lerAoVoltar } from '@/lib/volta-da-parcela';
 import { financeErrorMessage, simpleDebtValues } from '@/lib/finance-form';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
+import { useBillReminders } from '@/hooks/use-bill-reminders';
+import { hrefDoLembrete, mesmoAlvo, resumoDosAvisos } from '@/lib/lembrete-de-conta';
 import { hrefDoLancar } from '@/lib/lancar';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { ErrorBand, taxaLabel } from '@/components/finance/formulario-da-divida';
@@ -90,6 +92,8 @@ export default function DebtsScreen() {
   const tablet = windowClass !== 'compact';
   const params = useLocalSearchParams<Record<string, string>>();
   const toast = useToast();
+  const lembretes = useBillReminders();
+  const lembreteDa = (d: Debt) => lembretes.data?.find((l) => mesmoAlvo(l.alvo, { debt_id: d.id }));
   const debts = useDebts();
   const [estrategia, setEstrategia] = usePreferencia<'avalanche' | 'snowball'>('dividas:estrategia', 'avalanche', umDe(['avalanche', 'snowball']));
   const payoff = usePayoffStrategy(estrategia);
@@ -373,6 +377,8 @@ export default function DebtsScreen() {
       : [{ label: 'Pagar parcela', curto: 'Pagar', icon: 'banknote' as const, arrasto: 'direita' as const, onPress: () => abrirPagamento(d) }]),
     // No detalhe já se está vendo as parcelas: a ação sai, o resto é a MESMA lista.
     ...(noDetalhe ? [] : [{ label: 'Ver as parcelas', onPress: () => abrirFicha(d) }]),
+    { label: lembreteDa(d) ? 'Editar lembrete' : 'Lembrar', icon: 'bell' as const,
+      onPress: () => router.push(hrefDoLembrete({ tipo: 'divida', debtId: d.id }, d.name)) },
     { label: 'Editar', onPress: () => abrirEdicao(d) },
     { label: 'Arquivar', icon: 'archivebox', arrasto: 'esquerda', desfaz: true, onPress: () => arquivar(d) },
     { label: 'Apagar por completo', icon: 'trash', destructive: true, onPress: () => void excluir(d) },
@@ -710,6 +716,10 @@ export default function DebtsScreen() {
   /** A ficha de UMA dívida — o que era a folha "Amortização", agora a tela dela. */
   const fichaConteudo = (
     <>
+      {detalhe && lembreteDa(detalhe) ? (
+        <Row icon="bell" title={resumoDosAvisos(lembreteDa(detalhe)!.avisos)}
+          onPress={() => router.push(hrefDoLembrete({ tipo: 'divida', debtId: detalhe.id }, detalhe.name))} />
+      ) : null}
       {detalhe ? <PurchaseDownPayment type="financiamento" parentId={detalhe.id}
         installmentsCents={detalhe.calculation_mode === 'fixed_installments' ? Number(detalhe.principal_cents) : undefined} /> : null}
       {schedule.isLoading ? (

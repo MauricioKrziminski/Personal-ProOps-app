@@ -48,6 +48,8 @@ import { CamposDaCompra } from '@/components/finance/compra-form';
 import { estadoDaLinha } from '@/lib/settle-labels';
 import { useToast } from '@/components/ui/toast';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
+import { useBillReminders } from '@/hooks/use-bill-reminders';
+import { hrefDoLembrete, mesmoAlvo } from '@/lib/lembrete-de-conta';
 import { useTheme } from '@/hooks/use-theme';
 import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
 import { nextPendingInstallment } from '@/lib/installment-progress';
@@ -106,6 +108,8 @@ export default function InstallmentsScreen() {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const toast = useToast();
+  const lembretes = useBillReminders();
+  const lembreteDaCompra = (p: InstallmentPlanSummary) => lembretes.data?.find((l) => mesmoAlvo(l.alvo, { installment_plan_id: p.id }));
   const plans = useInstallmentPlans();
   const removePlan = useDeleteInstallmentPlan();
   const accounts = useAccounts();
@@ -255,6 +259,8 @@ export default function InstallmentsScreen() {
     const ordenadas = [...plano.parcels].sort((a, b) => (a.installment_no ?? 0) - (b.installment_no ?? 0));
     const primeira = ordenadas[0];
     return [
+      { label: lembreteDaCompra(plano) ? 'Editar lembrete' : 'Lembrar', icon: 'bell',
+        onPress: () => router.push(hrefDoLembrete({ tipo: 'compra', planId: plano.id }, plano.title)) },
       {
         /**
          * ⚠️ **"Editar" aqui edita a COMPRA, não uma parcela** (15/09/2026).

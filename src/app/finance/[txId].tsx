@@ -52,6 +52,8 @@ import { useNomeDoFavorito } from '@/components/finance/nome-do-favorito';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
+import { useBillReminderFor } from '@/hooks/use-bill-reminders';
+import { alvosDoAberto, hrefDoLembrete, resumoDosAvisos } from '@/lib/lembrete-de-conta';
 
 /**
  * Lançamento (detalhe) — a tela que faltava.
@@ -124,6 +126,11 @@ export default function TransactionDetailScreen() {
   const series = useRecurringSerie(tx?.recurring_id);
   const serie = series.data ?? undefined;
   const removePlan = useDeleteInstallmentPlan();
+  // Lembrete de conta: o do alvo "só esta" OU o da série/compra. Hooks antes de qualquer return.
+  const alvosLembrete = tx ? alvosDoAberto({ tipo: 'lancamento', tx }) : null;
+  const lembreteSo = useBillReminderFor(alvosLembrete?.so ?? null);
+  const lembreteTodas = useBillReminderFor(alvosLembrete?.todas ?? null);
+  const lembrete = lembreteSo ?? lembreteTodas;
   const salvarFavorito = useSalvarFavorito();
   const nomeDoFavorito = useNomeDoFavorito();
   const save = useSaveTransaction();
@@ -372,6 +379,10 @@ export default function TransactionDetailScreen() {
             subtitle="Necessidade" chevron={false} />
         </Section>
       ) : null}
+      {lembrete ? (
+        <Row icon="bell" title={resumoDosAvisos(lembrete.avisos)}
+          onPress={() => router.push(hrefDoLembrete({ tipo: 'lancamento', tx }, title))} />
+      ) : null}
       <Section title="Como isso entrou">
         <Row title={SOURCE_LABEL[tx.source]} subtitle="Origem" icon={SOURCE_ICON[tx.source]} />
         <Row title={paymentMethodLabel(tx.payment_method)} subtitle="Forma de pagamento" icon="creditcard" />
@@ -530,6 +541,15 @@ export default function TransactionDetailScreen() {
                   { label: 'Duplicar', icon: 'plus.square.on.square' as const, onPress: duplicate },
                   { label: 'Virar favorito', icon: 'star' as const, onPress: virarFavorito },
                 ]
+              : []),
+            // Pagamento de dívida, de fatura e juro do Pix não são conta a vencer.
+            ...(!tx.debt_id && !tx.pays_invoice_id && !tx.pix_fee_for_transaction_id &&
+                (tx.status === 'pending' || tx.recurring_id || tx.installment_plan_id || tx.invoice_id)
+              ? [{
+                  label: lembrete ? 'Editar lembrete' : tx.invoice_id && !tx.recurring_id && !tx.installment_plan_id ? 'Lembrar da fatura' : 'Lembrar',
+                  icon: 'bell' as const,
+                  onPress: () => router.push(hrefDoLembrete({ tipo: 'lancamento', tx }, title)),
+                }]
               : []),
             {
               label: tx.installment_plan_id ? 'Apagar só esta parcela' : 'Apagar',

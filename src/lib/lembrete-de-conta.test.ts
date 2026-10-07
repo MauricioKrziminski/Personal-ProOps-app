@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { alvoComoParam, alvoDoParam, alvosDoAberto, resumoDosAvisos, rotuloDoAviso } from './lembrete-de-conta.ts';
+import { hrefDoLembrete, alvoComoParam, alvoDoParam, alvosDoAberto, resumoDosAvisos, rotuloDoAviso } from './lembrete-de-conta.ts';
 
 const tx = (o: Partial<{ recurring_id: string; installment_plan_id: string; invoice_id: string }> = {}) =>
   ({ id: 't1', recurring_id: null, installment_plan_id: null, invoice_id: null, status: 'pending', ...o });
@@ -35,4 +35,21 @@ test('o alvo vai e volta pela rota, e lixo não vira alvo', () => {
   }
   assert.equal(alvoDoParam('transaction_id:nao-uuid'), null);
   assert.equal(alvoDoParam('user_id:' + id), null);
+});
+
+test('o alvo é canônico: sem sobra, parcela só 1 a 4 dígitos positivos', () => {
+  const id = '11111111-1111-1111-1111-111111111111';
+  assert.equal(alvoDoParam(`transaction_id:${id}:9`), null);
+  assert.equal(alvoDoParam(`debt_id:${id}:9:9`), null);
+  for (const n of ['0', '1e2', '-1', '1.5', '12345', ' 9', '']) assert.equal(alvoDoParam(`debt_id:${id}:${n}`), null, n);
+  assert.deepEqual(alvoDoParam(`debt_id:${id}:12`), { debt_id: id, debt_installment_no: 12 });
+  // a chave sai da lista, não da ordem do objeto
+  assert.equal(alvoComoParam({ debt_installment_no: 3, debt_id: id } as never), `debt_id:${id}:3`);
+});
+
+test('o link do lembrete leva o alvo e, havendo série, a alternativa', () => {
+  assert.deepEqual(hrefDoLembrete({ tipo: 'lancamento', tx: tx({ recurring_id: 'r1' }) }, 'Academia'),
+    { pathname: '/reminder-form', params: { conta: 'transaction_id:t1', todas: 'recurring_id:r1', nome: 'Academia' } });
+  assert.deepEqual(hrefDoLembrete({ tipo: 'fatura', invoiceId: 'f1' }, 'Fatura Nubank'),
+    { pathname: '/reminder-form', params: { conta: 'invoice_id:f1', nome: 'Fatura Nubank' } });
 });

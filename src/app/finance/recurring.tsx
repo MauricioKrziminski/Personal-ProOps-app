@@ -43,6 +43,8 @@ import { dataLocalDe, isoToBR, localISODate } from '@/lib/dates';
 import { accountSelectOptions } from '@/lib/accounts';
 import { listFiltersActive, type ListFiltersValue } from '@/lib/list-filters';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
+import { useBillReminders } from '@/hooks/use-bill-reminders';
+import { hrefDoLembrete, mesmoAlvo } from '@/lib/lembrete-de-conta';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { hrefDoLancar } from '@/lib/lancar';
 import { describeRRule } from '@/lib/rrule-text';
@@ -115,6 +117,8 @@ export default function RecurringScreen() {
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const toast = useToast();
+  const lembretes = useBillReminders();
+  const lembreteDaSerie = (r: RecurringTransaction) => lembretes.data?.find((l) => mesmoAlvo(l.alvo, { recurring_id: r.id }));
   const series = useRecurringTransactions();
   const accounts = useAccounts(undefined, true);
   const proximos = useRecurringUpcoming(30);
@@ -243,6 +247,8 @@ export default function RecurringScreen() {
         icon: 'pencil',
         onPress: () => abrirEdicao(r),
       },
+      { label: lembreteDaSerie(r) ? 'Editar lembrete' : 'Lembrar', icon: 'bell',
+        onPress: () => router.push(hrefDoLembrete({ tipo: 'serie', recurringId: r.id }, r.description ?? 'Recorrente')) },
       { label: r.active ? 'Pausar' : 'Retomar', icon: r.active ? 'pause' : 'play', arrasto: 'direita', desfaz: true, onPress: () => alternar(r) },
       // Cancelar uma assinatura: fica o que já aconteceu, saem as cobranças futuras (não é Pausar nem Apagar).
       { label: 'Encerrar', icon: 'xmark.circle', onPress: () => encerrando.abrir(r) },
