@@ -16,6 +16,7 @@ declare
   conta uuid; serie uuid; t_pago uuid; t_atrasada uuid; t_ancora uuid; t_depois uuid; t_longe uuid; cartao uuid; t_pai uuid; t_fee uuid;
   r jsonb; n int; chave uuid := gen_random_uuid(); cfg text[];
   plano uuid; p1 uuid; p2 uuid; p3 uuid; p4 uuid; soma bigint; k int; ent uuid; q1 uuid; q2 uuid; q3 uuid; q4 uuid;
+  d uuid; pg1 uuid; pg2 uuid; pg3 uuid; restante bigint;
 begin
   select id into ws from public.workspaces where owner_id = u;
   select id into ws_outro from public.workspaces where owner_id = outro;
@@ -357,6 +358,42 @@ begin
   r := public.delete_scoped('installment', q1, 'one', gen_random_uuid());
   reset role;
   assert not exists (select 1 from public.transactions where id in (q1, ent)) and not exists (select 1 from public.installment_plans where id = plano), 'compra e entrada saem';
+  set local role authenticated;
+
+  -- ── Task 3: financiamento de parcela fixa, 6x de 100,00, três pagas ──
+  reset role;
+  insert into public.debts(workspace_id, user_id, name, kind, calculation_mode, principal_cents,
+    remaining_cents, interest_rate_monthly, installments, installments_paid, installment_cents, due_day, first_due_date, account_id)
+  values (ws, u, 'Moto AA', 'financing', 'fixed_installments', 60000, 60000, 0, 6, 0, 10000, 10, hoje - 80, conta)
+  returning id into d;
+  perform public.pay_debt_installment(d, 10000, conta, hoje - 80);
+  perform public.pay_debt_installment(d, 10000, conta, hoje - 50);
+  perform public.pay_debt_installment(d, 10000, conta, hoje - 20);
+  select id into pg1 from public.transactions where debt_id = d and debt_payment_no = 1;
+  select id into pg2 from public.transactions where debt_id = d and debt_payment_no = 2;
+  set local role authenticated;
+
+  -- "Este e os próximos" a partir do 2º: saem o 3º e o 2º (do mais recente para trás); o saldo volta
+  r := public.delete_scoped_preview('debt_payment', pg2, 'future');
+  assert (r->>'apagadas')::int = 2 and (r->>'pagas_apagadas')::int = 2 and r->>'soma_pagas_cents' = '20000',
+    format('prévia pagamentos: %s', r);
+  reset role;
+  assert (select count(*) from public.transactions where debt_id = d) = 3
+     and (select remaining_cents from public.debts where id = d) = 30000, 'a prévia não escreve';
+  set local role authenticated;
+  r := public.delete_scoped('debt_payment', pg2, 'future', gen_random_uuid());
+  reset role;
+  select remaining_cents into restante from public.debts where id = d;
+  assert restante = 50000, format('o saldo volta a 50000, veio %s', restante);
+  assert (select installments_paid from public.debts where id = d) = 1, 'volta a 1 paga';
+  assert (select count(*) from public.transactions where debt_id = d) = 1, 'fica só o 1º pagamento';
+  set local role authenticated;
+
+  -- "Todos" = a dívida inteira com os pagamentos
+  r := public.delete_scoped('debt_payment', pg1, 'all', gen_random_uuid());
+  assert (r->>'apaga_contrato')::boolean, format('todos apaga o contrato: %s', r);
+  reset role;
+  assert not exists (select 1 from public.debts where id = d), 'a dívida sai';
   set local role authenticated;
 
   -- BLOCOS DAS PRÓXIMAS TAREFAS ENTRAM AQUI
