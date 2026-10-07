@@ -247,8 +247,11 @@ export default function RecurringScreen() {
         icon: 'pencil',
         onPress: () => abrirEdicao(r),
       },
-      { label: lembreteDaSerie(r) ? 'Editar lembrete' : 'Lembrar', icon: 'bell',
-        onPress: () => router.push(hrefDoLembrete({ tipo: 'serie', recurringId: r.id }, r.description ?? 'Recorrente')) },
+      // Conta a pagar: receita e transferência não têm lembrete (spec §7).
+      ...(r.kind === 'expense'
+        ? [{ label: lembreteDaSerie(r) ? 'Editar lembrete' : 'Lembrar', icon: 'bell' as const,
+            onPress: () => router.push(hrefDoLembrete({ tipo: 'serie', recurringId: r.id }, r.description ?? 'Recorrente')) }]
+        : []),
       { label: r.active ? 'Pausar' : 'Retomar', icon: r.active ? 'pause' : 'play', arrasto: 'direita', desfaz: true, onPress: () => alternar(r) },
       // Cancelar uma assinatura: fica o que já aconteceu, saem as cobranças futuras (não é Pausar nem Apagar).
       { label: 'Encerrar', icon: 'xmark.circle', onPress: () => encerrando.abrir(r) },

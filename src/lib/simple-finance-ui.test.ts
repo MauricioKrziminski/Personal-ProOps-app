@@ -60,7 +60,7 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; notesPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; resumoErro?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean; favoritos?: any[]; favoritosArquivados?: any[]; billReminders?: any[] } = {}) {
+function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; notesPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; resumoErro?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean; favoritos?: any[]; favoritosArquivados?: any[]; billReminders?: any[]; billRemindersPending?: boolean } = {}) {
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
@@ -639,8 +639,8 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === '@/hooks/use-items') return { localISODate: () => '2026-09-08', formatDateBR: options.datasReais ? load('src/lib/dates.ts').formatDateBR : () => '08/09/2026', formatBRL: load('src/lib/dates.ts').formatBRL, useRealtimeInvalidate: () => {}, useTodayReminders: () => ({ ...query, isSuccess: true, data: options.reminders ?? [] }), useReminders: () => ({ ...query, isSuccess: true, data: { pages: [options.reminders ?? []], pageParams: [0] }, hasNextPage: Boolean(options.maisPaginas), isFetchingNextPage: false, fetchNextPage: () => { refetches.push('proxima-pagina'); } }), useReminder: () => ({ ...query, data: undefined, isLoading: false }), useToggleReminder: () => mutation('toggleReminder'), useDeleteReminder: () => mutation('deleteReminder') };
       if (name === '@/lib/lembrete-de-conta') return load('src/lib/lembrete-de-conta.ts');
       if (name === '@/hooks/use-bill-reminders') return {
-        useBillReminders: () => ({ ...query, data: options.billReminders ?? [], isPending: false, isError: false }),
-        useBillReminderFor: () => (options.billReminders ?? [])[0],
+        useBillReminders: () => ({ ...query, data: options.billReminders ?? [], isPending: Boolean(options.billRemindersPending), isSuccess: !options.billRemindersPending, isError: false }),
+        useBillReminderFor: (alvo: any) => alvo ? (options.billReminders ?? []).find((l: any) => load('src/lib/lembrete-de-conta.ts').mesmoAlvo(l.alvo, alvo)) : undefined,
         useSaveBillReminder: () => mutation('saveBillReminder'),
       };
       if (name === '@/hooks/use-push') return { useAlertPreferences: () => ({ ...query, data: { push: true, whatsapp: true } }) };
@@ -7968,6 +7968,58 @@ test('Lembrete de conta: "Só esta | Todas as próximas" só aparece quando há 
   com.interact((nodes: any[]) => nodes.find((n) => n.type === 'Segmented' && n.props.value === 'so').props.onChange('todas'));
   com.press('Salvar');
   assert.deepEqual(copia(com.writes.at(-1)?.value.alvo), { recurring_id: LEMBRETE_ID });
+});
+
+test('Lembrete de conta: ocorrência de série com lembrete da série abre em "Todas" com os avisos salvos', () => {
+  const com = screen('src/components/reminders/bill-reminder-form.tsx', { componente: 'BillReminderForm',
+    props: { conta: `transaction_id:${LEMBRETE_ID}`, todas: `recurring_id:${LEMBRETE_ID}`, nome: 'Academia' },
+    billReminders: [{ alvo: { recurring_id: LEMBRETE_ID }, title: 'Academia', channel: 'push', avisos: [{ days_before: 3, at_time: '08:00' }], next_due: null }] });
+  assert.equal(com.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.length === 2).props.value, 'todas');
+  assert.ok(com.nodes().some((n: any) => n.type === 'Button' && n.props.label === 'Remover lembrete'));
+  com.press('Salvar');
+  assert.deepEqual(copia(com.writes.at(-1)?.value), { alvo: { recurring_id: LEMBRETE_ID }, avisos: [{ days_before: 3, at_time: '08:00' }], channel: 'push' });
+});
+
+test('Lembrete de conta: Salvar espera os lembretes carregarem (não troca o conjunto pelo padrão)', () => {
+  const ui = screen('src/components/reminders/bill-reminder-form.tsx', { componente: 'BillReminderForm', billRemindersPending: true,
+    props: { conta: `transaction_id:${LEMBRETE_ID}`, nome: 'Aluguel' } });
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Button' && n.props.label === 'Salvar' && n.props.disabled));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Button' && n.props.label === 'Salvar').props.onPress());
+  assert.equal(ui.writes.filter((w: any) => w.operation === 'saveBillReminder').length, 0);
+});
+
+test('Recorrentes: "Lembrar" só em série de despesa', () => {
+  const serie = (kind: string) => ({ id: 'rec-1', description: 'Algo', kind, amount_cents: 12000, rrule: 'FREQ=MONTHLY;BYMONTHDAY=15', dtstart: '2026-01-15', next_run_at: '2026-10-15T12:00:00Z', active: true, account_id: null, category: 'x' });
+  const acoes = (kind: string) => {
+    const ui = screen('src/app/finance/recurring.tsx', { recurring: [serie(kind)] });
+    ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onLongPress());
+    return ui.actions.map((a: any) => a.label);
+  };
+  assert.ok(acoes('expense').includes('Lembrar'));
+  assert.ok(!acoes('income').includes('Lembrar'));
+});
+
+test('Lembrete de conta: alvos de toque têm 44pt e o rótulo concorda com 1 dia', () => {
+  const ui = lembreteDeConta({ conta: `transaction_id:${LEMBRETE_ID}`, nome: 'Aluguel' });
+  const alvos = ui.nodes().filter((n: any) => n.props?.accessibilityLabel === 'Tirar aviso' || String(n.props?.accessibilityLabel).startsWith('Hora'));
+  assert.equal(alvos.length, 2);
+  for (const n of alvos) assert.ok(JSON.stringify(n.props.style).includes('"minHeight":44'), JSON.stringify(n.props.style));
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'QuantityField').props.onChange(1));
+  assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText' && n.props.children === 'dia antes'));
+});
+
+test('Lançamento: "Lembrar" só em despesa (receita e transferência ficam fora)', () => {
+  const base = { kind: 'expense', status: 'pending', amount_cents: 500, description: 'Conta', category: 'x', account_id: 'a',
+    counterparty_account_id: null, occurred_at: '2026-10-02', created_at: '2026-10-02T12:00:00Z', invoice_id: null,
+    installment_plan_id: null, recurring_id: null, debt_id: null, pays_invoice_id: null, pix_fee_for_transaction_id: null };
+  const rotulos = (extra: object) => {
+    const ui = screen('src/app/finance/[txId].tsx', { txs: [{ id: 't', ...base, ...extra }], params: { txId: 't' } });
+    return ui.nodes().find((n: any) => n.type === 'HeaderActions').props.menu.actions.map((a: any) => a.label);
+  };
+  assert.ok(rotulos({}).includes('Lembrar'));
+  for (const extra of [{ kind: 'income' }, { kind: 'transfer', counterparty_account_id: 'b' }]) {
+    assert.ok(!rotulos(extra).some((l: string) => l.startsWith('Lembrar')), JSON.stringify(extra));
+  }
 });
 
 test('Lembrete de conta: sem nenhum aviso o Salvar não grava e diz por quê', () => {

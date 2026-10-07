@@ -545,7 +545,7 @@ export default function TransactionDetailScreen() {
                 ]
               : []),
             // Pagamento de dívida, de fatura e juro do Pix não são conta a vencer.
-            ...(!tx.debt_id && !tx.pays_invoice_id && !tx.pix_fee_for_transaction_id &&
+            ...(tx.kind === 'expense' && !tx.debt_id && !tx.pays_invoice_id && !tx.pix_fee_for_transaction_id &&
                 (tx.status === 'pending' || tx.recurring_id || tx.installment_plan_id || tx.invoice_id)
               ? [{
                   label: lembrete ? 'Editar lembrete' : tx.invoice_id && !tx.recurring_id && !tx.installment_plan_id ? 'Lembrar da fatura' : 'Lembrar',

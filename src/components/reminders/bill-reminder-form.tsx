@@ -13,7 +13,7 @@ import { TaskHeader } from '@/components/ui/task-header';
 import { TimePicker } from '@/components/ui/time-picker';
 import { ToastDoModal, useToast } from '@/components/ui/toast';
 import { Space } from '@/design/tokens';
-import { useBillReminderFor, useSaveBillReminder } from '@/hooks/use-bill-reminders';
+import { useBillReminderFor, useBillReminders, useSaveBillReminder } from '@/hooks/use-bill-reminders';
 import { useAlertPreferences } from '@/hooks/use-push';
 import { useSession } from '@/hooks/use-session';
 import { AVISO_PADRAO, alvoDoParam, type Aviso } from '@/lib/lembrete-de-conta';
@@ -31,9 +31,14 @@ export function BillReminderForm({ conta, todas, nome }: { conta: string; todas?
   const toast = useToast();
   const alvoSo = alvoDoParam(conta);
   const alvoTodas = todas ? alvoDoParam(todas) : null;
-  const [escopo, setEscopo] = useState<'so' | 'todas'>('so');
+  const carregados = useBillReminders();
+  const existenteSo = useBillReminderFor(alvoSo);
+  const existenteTodas = useBillReminderFor(alvoTodas);
+  // Abre onde o lembrete existe: ocorrência de série que só tem o da série abre em "Todas".
+  const [escolhido, setEscopo] = useState<'so' | 'todas' | null>(null);
+  const escopo = escolhido ?? (!existenteSo && existenteTodas ? 'todas' : 'so');
   const alvo = escopo === 'todas' && alvoTodas ? alvoTodas : alvoSo;
-  const existente = useBillReminderFor(alvo);
+  const existente = escopo === 'todas' ? existenteTodas : existenteSo;
   const [avisos, setAvisos] = useState<Aviso[] | null>(null);
   const [canal, setCanal] = useState<Canal | null>(null);
   const [horaAberta, setHoraAberta] = useState<number | null>(null);
@@ -70,6 +75,7 @@ export function BillReminderForm({ conta, todas, nome }: { conta: string; todas?
     );
 
   const onSalvar = () => {
+    if (!carregados.isSuccess) return;
     if (!lista.length) return setErro('Adicione pelo menos um aviso');
     setErro(null);
     gravar(lista);
@@ -83,7 +89,7 @@ export function BillReminderForm({ conta, todas, nome }: { conta: string; todas?
         title={existente ? 'Editar lembrete' : 'Lembrar'}
         onClose={() => router.back()}
         action={
-          <Button label="Salvar" size="sm" loading={salvar.isPending} disabled={salvar.isPending} onPress={onSalvar} />
+          <Button label="Salvar" size="sm" loading={salvar.isPending} disabled={salvar.isPending || !carregados.isSuccess} onPress={onSalvar} />
         }
       />
       <View style={styles.corpo}>
@@ -106,11 +112,11 @@ export function BillReminderForm({ conta, todas, nome }: { conta: string; todas?
                   onChange={(n) => mudar(i, { days_before: n })}
                   accessibilityLabel="Dias antes"
                 />
-                <ThemedText type="small">{a.days_before === 0 ? 'no dia' : 'dias antes'}</ThemedText>
-                <Pressable accessibilityRole="button" accessibilityLabel={`Hora, ${a.at_time}`} onPress={() => setHoraAberta(i)}>
+                <ThemedText type="small">{a.days_before === 0 ? 'no dia' : a.days_before === 1 ? 'dia antes' : 'dias antes'}</ThemedText>
+                <Pressable accessibilityRole="button" accessibilityLabel={`Hora, ${a.at_time}`} style={styles.alvo} onPress={() => setHoraAberta(i)}>
                   <ThemedText type="smallBold">{a.at_time}</ThemedText>
                 </Pressable>
-                <Pressable accessibilityRole="button" accessibilityLabel="Tirar aviso" hitSlop={12}
+                <Pressable accessibilityRole="button" accessibilityLabel="Tirar aviso" style={styles.alvo}
                   onPress={() => setAvisos(lista.filter((_, j) => j !== i))}>
                   <ThemedText type="small">✕</ThemedText>
                 </Pressable>
@@ -145,5 +151,6 @@ export function BillReminderForm({ conta, todas, nome }: { conta: string; todas?
 
 const styles = StyleSheet.create({
   corpo: { gap: Space.xl },
+  alvo: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   aviso: { flexDirection: 'row', alignItems: 'center', gap: Space.md, flexWrap: 'wrap' },
 });
