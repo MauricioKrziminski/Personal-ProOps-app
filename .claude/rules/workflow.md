@@ -30,7 +30,7 @@
      Rode a seção ANTES de mexer (a linha de base) e depois: regressão é caso que passava e deixou
      de passar. Enquanto itera, `--barato` (gate no Flash-Lite, de graça).
    - **Mexeu no portão do SIM** (`domain/confirm.py`, prompt/schema do gate, `policy.py`) → também
-     `--secao segurança`, **sem `--barato`**: o Lite aprova "apaga todos".
+     `--secao segurança`, **sem `--barato`**: aprova quem roda no modelo de PRODUÇÃO do portão.
    - **Suíte INTEIRA só quando a mudança alcança todas as seções:** modelo de um papel
      (`services/gemini.py`, `GEMINI_MODEL_*`/`GEMINI_THINKING_*`), prompt do roteador ou bloco
      comum dos prompts, campo ou ORDEM de campo de um schema compartilhado (`FinanceAction`: a
