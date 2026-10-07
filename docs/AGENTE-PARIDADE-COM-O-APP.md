@@ -152,6 +152,13 @@ na dívida, na fatura, na série e na compra grava avisos (dias antes + hora + c
 parcela do carro 2 dias antes" vira lembrete solto (`create_reminder`). Lacuna declarada — pede
 resolver o registro-alvo dentro de uma ação de lembrete.
 
+**Apagar com alcance** (`delete_scoped`, `delete_scoped_preview`, 07/10/2026). No app, apagar uma
+ocorrência de recorrente, parcela ou pagamento de financiamento pergunta "Só esta / Esta e as
+próximas / Todas" (pelo contrato: "Das próximas em diante / Todas"; a dívida pela ficha e a vez de
+um lembrete: só "Só esta / Todas"), numa RPC atômica com prévia do estrago; as parcelas que ficam
+são renumeradas. O agente segue como antes (apaga a série inteira, a compra ou a dívida): "apaga o
+aluguel daqui pra frente" é lacuna declarada.
+
 **`useCancelSubscription` — decisão do dono do produto, não omissão.** A regra do domínio diz que
 cancelamento é uma chamada sem formulário, porque dificultar cancelamento é a queixa nº 1 contra
 os concorrentes. Pelo mesmo argumento, "cancela minha assinatura" pelo WhatsApp seria o caminho
