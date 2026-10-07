@@ -154,8 +154,8 @@ resolver o registro-alvo dentro de uma ação de lembrete.
 
 **Apagar com alcance** (`delete_scoped`, `delete_scoped_preview`, 07/10/2026). No app, apagar uma
 ocorrência de recorrente, parcela ou pagamento de financiamento pergunta "Só esta / Esta e as
-próximas / Todas" (pelo contrato: "Das próximas em diante / Todas"; a dívida pela ficha e a vez de
-um lembrete: só "Só esta / Todas"), numa RPC atômica com prévia do estrago; as parcelas que ficam
+próximas / Todas" (pelo contrato: "Das próximas em diante / Todas"; a dívida pela ficha: só
+"Todas"; a vez de um lembrete: "Só esta / Todas"), numa RPC atômica com prévia do estrago; as parcelas que ficam
 são renumeradas. O agente segue como antes (apaga a série inteira, a compra ou a dívida): "apaga o
 aluguel daqui pra frente" é lacuna declarada.
 
