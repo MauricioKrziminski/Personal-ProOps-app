@@ -2,6 +2,8 @@
 -- transaction, so seed updated_at explicitly to model an entry saved earlier.
 \set ON_ERROR_STOP on
 begin;
+-- `current_date` daqui tem de ser o dia de Brasília, o das funções (o CI roda em UTC).
+set local timezone to 'America/Sao_Paulo';
 do $$
 declare
   u uuid := '00000000-0000-0000-0000-00000000e3a1';

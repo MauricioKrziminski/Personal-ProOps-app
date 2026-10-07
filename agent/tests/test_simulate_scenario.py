@@ -23,10 +23,13 @@ import pytest
 from app import db
 from app.graph.schemas import FinanceQuery, FinanceQueryType
 from app.tools import queries
+from app.domain.dates import local_iso_date
 from app.tools.base import ExecContext
 
 WS, USER = uuid4(), uuid4()
-HOJE = date.today()
+# O hoje do USUÁRIO, como o código calcula: `date.today()` é o da máquina, e no CI (UTC) ele
+# vira amanhã das 21h à meia-noite de Brasília.
+HOJE = date.fromisoformat(local_iso_date("America/Sao_Paulo"))
 
 
 def ctx(siblings=None, indice=0) -> ExecContext:

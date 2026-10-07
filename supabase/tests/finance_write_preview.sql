@@ -2,6 +2,8 @@
 -- Run with scripts/sql-test.py <file> --repeatable-read (the runner always rolls back).
 \set ON_ERROR_STOP on
 begin;
+-- `current_date` daqui tem de ser o dia de Brasília, o das funções (o CI roda em UTC).
+set local timezone to 'America/Sao_Paulo';
 do $$ begin
   assert to_regprocedure('public.preview_finance_write(text,jsonb,integer)') is not null,
     'F04 requires preview_finance_write: the real write must be previewable without persistence';
