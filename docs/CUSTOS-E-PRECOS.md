@@ -208,6 +208,41 @@ RevenueCat 1% acima de US$ 2.500. **Não inclui o contador nem o domínio e o e-
 valores, que são seus, ao fixo e divida por R$ 11,52 (a contribuição por assinante) para ter o
 novo ponto de equilíbrio.
 
+## 6b. Começo enxuto: lucro desde o 1º assinante
+
+Pagando tudo desde o dia 1 (Supabase Pro + Apple + GCP = R$ 223/mês), o resultado só fica
+positivo com ~20 assinantes no uso típico e ~47 no limite. Quase todo esse fixo é **antecipado**,
+e dá para adiar sem risco ao dado:
+
+| corte | economia/mês | condição |
+|---|---|---|
+| **Supabase Free** em vez de Pro | R$ 155 | backup diário próprio (`pg_dump` agendado para um bucket, ~R$ 0,50). O Free não pausa porque o cron bate no banco todo minuto; o banco usa 28 MB de 500 MB. Subir para o Pro com ~50 assinantes ou 300 MB |
+| **lançar só no Android** | R$ 51 | Google custa US$ 25 uma vez. iOS entra quando a receita pagar a anuidade |
+| **segredos num só** (um JSON por ambiente) | ~R$ 6,50 | o Secret Manager cobra por versão acima de 6; hoje são 24 |
+| **retenção no Artifact Registry** + **um job no Scheduler** | ~R$ 5 | últimas 10 imagens; o cron de 1 min dispara os de hora e de dia |
+| **Langfuse com amostragem** | evita R$ 180 | 10% dos traces cabem no Hobby até milhares de usuários |
+
+Fixo resultante: **~R$ 10/mês** só Android, **~R$ 61/mês** com iOS.
+
+**Resultado TOTAL do mês** (receita − loja − imposto 15,5% − custo variável − fixo), em R$, por
+número de assinantes. Primeiro valor: uso típico. Depois da barra: todos no limite.
+
+| assinantes | tudo pago (fixo 223) | enxuto + iOS (fixo 61) | **enxuto só Android (fixo 10)** |
+|---|---|---|---|
+| 1 | −212 / −218 | −50 / −56 | **+2 / −5** |
+| 3 | −189 / −209 | −26 / −47 | **+25 / +4** |
+| 5 | −166 / −199 | −3 / −37 | **+48 / +14** |
+| 10 | −108 / −175 | +54 / −13 | **+105 / +38** |
+| 20 | +7 / −127 | +169 / +35 | **+220 / +86** |
+| 50 | +353 / +17 | +515 / +179 | **+566 / +230** |
+| 100 | +929 / +257 | +1.091 / +419 | **+1.142 / +470** |
+| **empata em** | 20 / 47 | 6 / 13 | **1 / 3** |
+
+Base: R$ 11,52 de margem por assinante no uso típico e R$ 4,80 no limite, com a mistura de 60% Pro
+mensal, 30% Pro anual e 10% Família. Enquanto durarem, os créditos da Claude somam mais
+~R$ 0,64 por assinante, a IA do uso típico.
+Trial que não converte custa até R$ 2,45 cada — é custo de aquisição, fora desta tabela.
+
 ## 7. API não oficial do WhatsApp (Baileys, Evolution, Z-API)
 
 **Não recomendo.** O custo por mensagem some (Evolution é open source, gateways cobram ~R$ 99/mês
@@ -260,7 +295,8 @@ modelo usa zero.
    Number não serve para lançar) e, quando der, cobrança em BRL.
 2. **Chave paga do Gemini fora das suítes de avaliação** (o vazamento de 21/09 e 05–07/10).
 3. **Retenção no Artifact Registry** (últimas 10 imagens) e limpeza dos segredos sem uso.
-4. **Supabase Pro antes do primeiro assinante pago**: o Free não tem backup, e o dado é financeiro.
+4. **Supabase Free + backup diário próprio** até ~50 assinantes (§6b); Pro depois. Sem o backup
+   próprio, nada de assinante pago no Free: o dado é financeiro.
 5. **Limite de respostas pelo WhatsApp** em `private.plan_limits` + `plan_status_for`, contado
    em cada envio ao telefone (não em `ai_events`), com o "continue pelo app" uma vez por dia e
    silêncio depois. É código e migration, a fazer quando o preço for decidido.
