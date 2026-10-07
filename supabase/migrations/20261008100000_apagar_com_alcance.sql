@@ -17,16 +17,20 @@ revoke all on private.delete_scoped_receipts from public, anon, authenticated, s
 -- O que a confirmação precisa dizer: quantas, quantas pagas, quanto, de quais contas, desde quando.
 create or replace function private.resumo_do_apagar(p_ids uuid[])
 returns jsonb language sql stable set search_path = '' as $$
+  -- os juros do Pix saem junto da compra (on delete cascade) e entram na conta
+  with t as (
+    select x.* from public.transactions x
+     where x.id = any(p_ids) or x.pix_fee_for_transaction_id = any(p_ids))
   select jsonb_build_object(
     'apagadas', count(*),
     'pagas_apagadas', count(*) filter (where t.status = 'cleared'),
     'soma_pagas_cents', (coalesce(sum(t.amount_cents) filter (where t.status = 'cleared'), 0))::text,
     'contas', coalesce((select jsonb_agg(distinct a.name order by a.name)
-                          from public.transactions x join public.accounts a on a.id = x.account_id
-                         where x.id = any(p_ids) and x.status = 'cleared'), '[]'::jsonb),
+                          from t x join public.accounts a on a.id = x.account_id
+                         where x.status = 'cleared'), '[]'::jsonb),
     'desde', min(t.occurred_at) filter (where t.status = 'cleared'),
     'apaga_contrato', false)
-  from public.transactions t where t.id = any(p_ids)
+  from t
 $$;
 revoke execute on function private.resumo_do_apagar(uuid[]) from public, anon, authenticated;
 
@@ -62,14 +66,25 @@ begin
       raise exception using errcode = '22023', message = 'Este lançamento não é de uma série';
     end if;
     select * into r from public.recurring_transactions x where x.id = ancora.recurring_id;
-    dia := case when ancora.invoice_id is null then coalesce(ancora.due_at, ancora.occurred_at) else ancora.occurred_at end;
   else
     select * into r from public.recurring_transactions x where x.id = p_id;
-    dia := coalesce(p_anchor, (r.next_run_at at time zone 'America/Sao_Paulo')::date);
   end if;
   if p_apply then
     perform 1 from public.recurring_transactions x where x.id = r.id for update;
     perform 1 from public.transactions t where t.recurring_id = r.id and t.workspace_id = p_ws order by t.id for update;
+    -- relê depois do travamento: outra transação pode ter movido a âncora ou a data
+    select * into r from public.recurring_transactions x where x.id = r.id;
+    if p_tipo = 'occurrence' then
+      select * into ancora from public.transactions t where t.id = p_id and t.workspace_id = p_ws;
+      if ancora.id is null then
+        raise exception using errcode = 'P0001', message = 'Esse registro não existe mais';
+      end if;
+    end if;
+  end if;
+  if p_tipo = 'occurrence' then
+    dia := case when ancora.invoice_id is null then coalesce(ancora.due_at, ancora.occurred_at) else ancora.occurred_at end;
+  else
+    dia := coalesce(p_anchor, (r.next_run_at at time zone 'America/Sao_Paulo')::date);
   end if;
   -- o início original, como end_recurring_series: dtstart é reescrito a cada edição de calendário
   inicio := least((coalesce(r.dtstart, r.next_run_at) at time zone 'America/Sao_Paulo')::date,
@@ -103,7 +118,8 @@ begin
     delete from public.recurring_transactions x where x.id = r.id;     -- as marcas saem no cascade
   else
     -- O UPDATE vem antes do DELETE (marca_serie_editada), como em end_recurring_series.
-    update public.recurring_transactions x set end_date = dia - 1 where x.id = r.id;
+    -- só encolhe: série já encerrada com next_run_at depois do fim não pode ser reaberta
+    update public.recurring_transactions x set end_date = least(coalesce(x.end_date, dia - 1), dia - 1) where x.id = r.id;
     delete from public.transactions t where t.id = any(ids);
   end if;
   return res;

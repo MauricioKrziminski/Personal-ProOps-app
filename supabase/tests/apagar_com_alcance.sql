@@ -13,7 +13,7 @@ declare
   outro constant uuid := '00000000-0000-0000-0000-0000000da002';
   ws uuid; ws_outro uuid;
   hoje date := (now() at time zone 'America/Sao_Paulo')::date;
-  conta uuid; serie uuid; t_pago uuid; t_atrasada uuid; t_ancora uuid; t_depois uuid; t_longe uuid;
+  conta uuid; serie uuid; t_pago uuid; t_atrasada uuid; t_ancora uuid; t_depois uuid; t_longe uuid; cartao uuid; t_pai uuid; t_fee uuid;
   r jsonb; n int; chave uuid := gen_random_uuid(); cfg text[];
 begin
   select id into ws from public.workspaces where owner_id = u;
@@ -125,6 +125,7 @@ begin
   r := public.delete_scoped('occurrence', t_ancora, 'future', gen_random_uuid());
   reset role;
   assert not exists (select 1 from public.recurring_transactions where id = serie), 'a partir da primeira = a série inteira';
+  assert not exists (select 1 from public.transactions where id = t_ancora), 'a ocorrência sai junto';
   set local role authenticated;
 
   -- dívida pelo contrato só oferece "todas"
@@ -132,9 +133,62 @@ begin
     perform public.delete_scoped_preview('debt', gen_random_uuid(), 'future');
     n := -1;
   exception when others then
-    assert sqlstate = '22023', format('debt future: %s %s', sqlstate, sqlerrm);
+    assert sqlstate = '22023' and sqlerrm = 'Pelo contrato da dívida só existe "todas"', format('debt future: %s %s', sqlstate, sqlerrm);
   end;
   assert n <> -1, 'debt + future devia ser recusado';
+
+  -- 8) série JÁ encerrada: "das próximas em diante" nunca reabre (end_date só encolhe)
+  reset role;
+  insert into public.recurring_transactions (workspace_id, user_id, kind, amount_cents, description, rrule, dtstart, next_run_at, end_date, account_id)
+  values (ws, u, 'expense', 3000, 'Encerrada AA', 'FREQ=MONTHLY;BYMONTHDAY=7',
+          ((hoje - 60) + time '09:00') at time zone 'America/Sao_Paulo',
+          ((hoje + 30) + time '09:00') at time zone 'America/Sao_Paulo', hoje - 20, conta)
+  returning id into serie;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, recurring_id)
+  values (ws, u, 'expense', 3000, 'Encerrada AA', hoje - 30, 'pending', conta, serie);
+  set local role authenticated;
+  r := public.delete_scoped('recurring', serie, 'future', gen_random_uuid());
+  reset role;
+  assert (select end_date from public.recurring_transactions where id = serie) = hoje - 20, 'end_date não pode crescer';
+  assert (select count(*) from public.transactions where recurring_id = serie) = 1, 'a ocorrência anterior à âncora fica';
+  set local role authenticated;
+
+  -- 9) juros do Pix saem com a compra e entram na conta; fatura paga ou paga em parte recusa tudo
+  reset role;
+  insert into public.accounts (workspace_id, user_id, name, type, closing_day, due_day) values (ws, u, 'Cartão AA', 'credit_card', 10, 20) returning id into cartao;
+  insert into public.recurring_transactions (workspace_id, user_id, kind, amount_cents, description, rrule, dtstart, next_run_at, account_id)
+  values (ws, u, 'expense', 8000, 'Cartão série AA', 'FREQ=MONTHLY;BYMONTHDAY=3',
+          ((hoje - 5) + time '09:00') at time zone 'America/Sao_Paulo',
+          ((hoje + 25) + time '09:00') at time zone 'America/Sao_Paulo', cartao)
+  returning id into serie;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, recurring_id)
+  values (ws, u, 'expense', 8000, 'Cartão série AA', hoje - 5, 'cleared', cartao, serie) returning id into t_pai;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, pix_fee_for_transaction_id)
+  values (ws, u, 'expense', 250, 'Juro Pix AA', hoje - 5, 'cleared', cartao, t_pai) returning id into t_fee;
+  set local role authenticated;
+  r := public.delete_scoped_preview('recurring', serie, 'all');
+  assert (r->>'apagadas')::int = 2 and (r->>'pagas_apagadas')::int = 2 and r->>'soma_pagas_cents' = '8250', format('juro do Pix na prévia: %s', r);
+  reset role;
+  update public.card_invoices set status = 'paid' where id = (select invoice_id from public.transactions where id = t_pai);
+  set local role authenticated;
+  begin
+    perform public.delete_scoped('recurring', serie, 'all', gen_random_uuid());
+    n := -1;
+  exception when others then
+    assert sqlstate = 'P0001' and sqlerrm = 'Há lançamento numa fatura paga, adiada ou paga em parte. Desfaça o pagamento da fatura antes.', format('fatura paga: %s %s', sqlstate, sqlerrm);
+  end;
+  assert n <> -1, 'fatura paga devia recusar';
+  reset role;
+  assert exists (select 1 from public.recurring_transactions where id = serie) and exists (select 1 from public.transactions where id in (t_pai, t_fee)), 'nada mudou';
+  update public.card_invoices set status = 'open', paid_cents = 100 where id = (select invoice_id from public.transactions where id = t_pai);
+  set local role authenticated;
+  begin
+    perform public.delete_scoped('occurrence', t_pai, 'one', gen_random_uuid());
+    n := -2;
+  exception when others then
+    assert sqlstate = 'P0001', format('paga em parte: %s %s', sqlstate, sqlerrm);
+  end;
+  assert n <> -2, 'fatura paga em parte devia recusar';
 
   -- BLOCOS DAS PRÓXIMAS TAREFAS ENTRAM AQUI
   reset role;
