@@ -276,6 +276,8 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
     useArchiveDebt: () => mutation('archiveDebt'),
     useUnarchiveDebt: () => mutation('unarchiveDebt'),
     useDeleteDebt: () => mutation('deleteDebt'),
+    useSkipOccurrence: () => mutation('skipOccurrence'),
+    useMaterializeOccurrence: () => mutation('materializeOccurrence'),
     useArchivedDebts: () => ({ ...query, data: options.archivedDebts ?? [] }),
     useDebtSchedule: () => ({ ...query, data: options.debtSchedule ?? [] }),
     usePayoffStrategy: () => ({ ...query, data: options.payoff ?? [] }),
@@ -760,7 +762,11 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
         },
       };
       if (name === '@/lib/item-actions') return { confirmDestructive: (_title: string, _label: string, callback: () => void, mensagem?: string) => { confirmations.push(callback); avisos.push(mensagem ?? ''); }, showItemActions: (_title: string, entries: any[]) => actions.push(...entries) };
-      if (name === '@/lib/edit-scope') return { askEditScope: (_kind: string, onSelect: (scope: string) => void, _msg?: string, opcoes?: { contrato?: boolean }) => actions.push(
+      if (name === '@/lib/edit-scope') return { askDeleteScope: (_tipo: string, onSelect: (scope: string) => void) => actions.push(
+        { label: 'Só esta', onPress: () => onSelect('one') },
+        { label: 'Esta e as próximas', onPress: () => onSelect('future') },
+        { label: 'Todas', onPress: () => onSelect('all') },
+      ), askEditScope: (_kind: string, onSelect: (scope: string) => void, _msg?: string, opcoes?: { contrato?: boolean }) => actions.push(
         // editando o contrato não há "esta" (28/09/2026)
         ...(opcoes?.contrato ? [] : [{ label: 'Só esta parcela', onPress: () => onSelect('one') }]),
         { label: 'Esta e próximas', onPress: () => onSelect('future') },
@@ -1345,17 +1351,6 @@ test('salvar a edição manda a versão que foi aberta, e a dívida que mudou no
 test('without archived debts there is no empty "Arquivadas" row', () => {
   const ui = screen(debtsFile, { debts: [carro] });
   assert.equal(ui.nodes().some((n) => n.type === 'Row' && String(n.props.title).startsWith('Arquivadas')), false);
-});
-
-test('delete for good asks with the consequence first, then deletes', async () => {
-  const ui = screen(debtsFile, { create: false, debts: [carro] });
-  ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onLongPress());
-  ui.interact(() => ui.actions.find((a: any) => a.label === 'Apagar por completo').onPress());
-  await new Promise((r) => setTimeout(r, 0));
-  assert.equal(ui.writes.some((w: any) => w.operation === 'deleteDebt'), false, 'nada sai antes do SIM');
-  assert.equal(ui.confirmations.length, 1);
-  ui.interact(() => ui.confirmations[0]());
-  assert.deepEqual(ui.writes.at(-1), { operation: 'deleteDebt', value: 'd1' });
 });
 
 test('a ficha da dívida é uma tela: Editar no topo e o resto no "…", com as ações do toque longo', () => {
@@ -8057,4 +8052,41 @@ test('Apagar: ocorrência, parcela e pagamento perguntam o alcance; avulso confi
     assert.ok(!avulso.writes.some((w: any) => w.operation === 'apagarComAlcance'), 'avulso não pergunta alcance');
     assert.equal(avulso.confirmations.length, 1, 'avulso confirma');
   }
+});
+
+test('Apagar pelo contrato: Recorrentes, Parceladas e Dívidas perguntam o alcance no hook', () => {
+  const abrirApagar = (ui: any) => {
+    ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.onLongPress).props.onLongPress());
+    ui.interact(() => ui.actions.find((a: any) => a.label === 'Apagar' || a.label === 'Apagar por completo' || a.label === 'Apagar a compra inteira').onPress());
+    return { ...ui.writes.find((w: any) => w.operation === 'apagarComAlcance')?.value };
+  };
+  const serie = screen('src/app/finance/recurring.tsx', { recurring: [{ id: 'rec-1', description: 'Academia', kind: 'expense', amount_cents: 12000, rrule: 'FREQ=MONTHLY;BYMONTHDAY=15', dtstart: '2026-01-15', next_run_at: '2026-10-15T12:00:00Z', active: true, account_id: null, category: 'saúde' }] });
+  assert.deepEqual(abrirApagar(serie), { tipo: 'recurring', id: 'rec-1', nome: 'Academia' });
+  assert.equal(serie.confirmations.length, 0);
+  const parcelas = [1, 2, 3].map((n) => ({ id: `t${n}`, installment_no: n, amount_cents: 30000, occurred_at: `2026-0${6 + n}-10`, status: n === 1 ? 'cleared' : 'pending', invoice_id: null }));
+  const compra = screen('src/app/finance/installments.tsx', {
+    plans: [{ id: 'p1', title: 'tv', description: 'tv', merchant: null, category: 'casa', account_id: null, total_cents: 90000, installments: 3, installment_cents: 30000, first_occurred_at: '2026-07-10', active: true, paid: 1, remaining_cents: 60000, locked: 1, locked_cents: 30000, locked_paid: 1, parcels: parcelas }],
+  });
+  const plano = abrirApagar(compra);
+  assert.equal(plano.tipo, 'plan');
+  assert.equal(plano.id, 'p1');
+  const divida = abrirApagar(screen(debtsFile, { debts: [carro] }));
+  assert.equal(divida.tipo, 'debt');
+  assert.equal(divida.id, carro.id);
+});
+
+test('Prevista: "Só esta" pula a data; "Todas" apaga a série pela âncora', () => {
+  const linha = { origin: 'recurring', ref_id: 'rec-1', due_date: '2026-10-15', description: 'Academia', amount_cents: 12000, kind: 'expense', status: 'pending' };
+  const apagar = (escolha: string) => {
+    const ui = screen('src/components/finance/expected-ledger-lines.tsx', { hook: 'useAcoesDaPrevista', hookArgs: [{ month: '2026-10', pagar() {} }] });
+    ui.interact(() => ui.editor().acoes(linha).find((a: any) => a.label === 'Apagar').onPress());
+    ui.interact(() => ui.actions.find((a: any) => a.label === escolha).onPress());
+    return ui;
+  };
+  const so = apagar('Só esta');
+  assert.ok(so.writes.some((w: any) => w.operation === 'skipOccurrence'));
+  assert.ok(!so.writes.some((w: any) => w.operation === 'apagarComAlcance'));
+  const todas = apagar('Todas');
+  assert.deepEqual({ ...todas.writes.find((w: any) => w.operation === 'apagarComAlcance')?.value },
+    { tipo: 'recurring', id: 'rec-1', nome: 'Academia', ancora: '2026-10-15', alcance: 'all' });
 });

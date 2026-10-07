@@ -27,7 +27,6 @@ import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
-  useDeleteRecurring,
   useAccounts,
   useRecurringTransactions,
   useSaveRecurringSeries,
@@ -42,6 +41,7 @@ import { semAcento } from '@/lib/text';
 import { dataLocalDe, isoToBR, localISODate } from '@/lib/dates';
 import { accountSelectOptions } from '@/lib/accounts';
 import { listFiltersActive, type ListFiltersValue } from '@/lib/list-filters';
+import { useApagarComAlcance } from '@/hooks/use-apagar-com-alcance';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { useBillReminders } from '@/hooks/use-bill-reminders';
 import { hrefDoLembrete, mesmoAlvo } from '@/lib/lembrete-de-conta';
@@ -123,7 +123,7 @@ export default function RecurringScreen() {
   const accounts = useAccounts(undefined, true);
   const proximos = useRecurringUpcoming(30);
   const toggle = useToggleRecurring();
-  const remove = useDeleteRecurring();
+  const apagarComAlcance = useApagarComAlcance();
   const encerrando = useEncerrarSerie();
   const reabrindo = useSaveRecurringSeries();
   // `isError` e não só `data`: o TanStack GUARDA o resultado anterior quando o refetch
@@ -220,22 +220,9 @@ export default function RecurringScreen() {
       'O fim sai e as cobranças futuras voltam a ser geradas.'
     );
 
+  // O hook pergunta o alcance, confere o estrago no banco e confirma antes de apagar.
   const apagar = (r: RecurringTransaction) =>
-    confirmDestructive(
-      r.description ? `Apagar a recorrência ${r.description}?` : 'Apagar esta recorrência?',
-      'Apagar',
-      () =>
-        remove.mutate(r.id, {
-          onSuccess: () => toast({ message: 'Recorrência apagada.', tone: 'success' }),
-          onError: () => toast({ message: 'Não deu para apagar a série.', tone: 'error' }),
-        }),
-      // O trigger `recurring_drop_future` (20260909090000) leva junto as ocorrências futuras
-      // ainda em aberto. O que fica é histórico e conta atrasada — nenhum dos dois some
-      // porque a série parou de existir.
-      encerrada(r)
-        ? 'O histórico e o que está atrasado ficam.'
-        : 'As ocorrências futuras saem da projeção junto. O histórico e o que está atrasado ficam. Para só parar de gerar, pause a série.'
-    );
+    apagarComAlcance.apagar({ tipo: 'recurring', id: r.id, nome: r.description ?? 'recorrência' });
 
   /** O menu da série, UMA lista para o toque (curto e longo) e o arrasto. */
   const acoesDaSerie = (r: RecurringTransaction): ItemAction[] => {

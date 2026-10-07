@@ -15,7 +15,6 @@ import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { monthLabel, monthShort, shiftMonth } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
-import { Forte } from '@/components/ui/forte';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { HeaderActions } from '@/components/ui/header-actions';
@@ -32,7 +31,6 @@ import { BarTrack, ProgressBar } from '@/components/ui/sparkline';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   useAccounts,
-  useDeleteInstallmentPlan,
   useInstallmentPlans,
   useSaveInstallmentOccurrence,
   useUpdateInstallmentPlan,
@@ -47,6 +45,7 @@ import { askEditScope } from '@/lib/edit-scope';
 import { CamposDaCompra } from '@/components/finance/compra-form';
 import { estadoDaLinha } from '@/lib/settle-labels';
 import { useToast } from '@/components/ui/toast';
+import { useApagarComAlcance } from '@/hooks/use-apagar-com-alcance';
 import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
 import { useBillReminders } from '@/hooks/use-bill-reminders';
 import { hrefDoLembrete, mesmoAlvo } from '@/lib/lembrete-de-conta';
@@ -111,7 +110,7 @@ export default function InstallmentsScreen() {
   const lembretes = useBillReminders();
   const lembreteDaCompra = (p: InstallmentPlanSummary) => lembretes.data?.find((l) => mesmoAlvo(l.alvo, { installment_plan_id: p.id }));
   const plans = useInstallmentPlans();
-  const removePlan = useDeleteInstallmentPlan();
+  const apagarComAlcance = useApagarComAlcance();
   const accounts = useAccounts();
   const accountsForFilters = useAccounts(undefined, true);
   const [aberto, setAberto] = useState<string | null>(null);
@@ -320,19 +319,8 @@ export default function InstallmentsScreen() {
    *
    * Sem "Desfazer" (o cascade não volta), então a confirmação nomeia o estrago.
    */
-  const apagarPlano = (plano: InstallmentPlanSummary) => {
-    confirmDestructive(
-      'Apagar a compra parcelada inteira?',
-      'Apagar tudo',
-      () =>
-        removePlan.mutate(plano.id, {
-          onSuccess: () => toast({ message: <>Apaguei <Forte>{plano.title}</Forte> e as parcelas.</>, tone: 'success' }),
-          onError: (error) =>
-            toast({ message: financeErrorMessage(error, 'Não deu para apagar a compra. Tenta de novo.'), tone: 'error' }),
-        }),
-      `Some as ${plano.installments} parcelas de ${plano.title}, ${formatBRL(plano.total_cents)} no total — de todos os meses. Isso não volta.`,
-    );
-  };
+  const apagarPlano = (plano: InstallmentPlanSummary) =>
+    apagarComAlcance.apagar({ tipo: 'plan', id: plano.id, nome: plano.title });
 
   /**
    * Abrir o editor vindo de outra tela (`/finance/installments?edit=<plano>`).

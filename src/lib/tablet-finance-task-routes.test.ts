@@ -25,12 +25,12 @@ test('task list routes keep compact content and expose measured tablet workspace
 test('task surfaces preserve their mutation and navigation contracts', () => {
   const installments = readRoute('installments');
   assert.match(installments, /useUpdateInstallmentPlan\(\)/);
-  assert.match(installments, /useDeleteInstallmentPlan\(\)/);
+  assert.match(installments, /useApagarComAlcance\(\)/);
   assert.match(installments, /label="Salvar"/);
   assert.match(installments, /confirmDestructive/);
 
   const recurring = readRoute('recurring');
-  assert.match(recurring, /useDeleteRecurring\(\)/);
+  assert.match(recurring, /useApagarComAlcance\(\)/);
   // criar e editar abrem o formulário único; o corpo da série é quem grava
   assert.match(recurring, /router\.push\(hrefDoLancar\('recorrente'/);
   const serie = readFileSync('src/components/finance/formulario-da-serie.tsx', 'utf8');

@@ -7,10 +7,12 @@ import { useBRL } from '@/components/ui/conceal';
 import { Money } from '@/components/ui/money';
 import { Row } from '@/components/ui/row';
 import { useToast } from '@/components/ui/toast';
+import { useApagarComAlcance } from '@/hooks/use-apagar-com-alcance';
+import { askDeleteScope } from '@/lib/edit-scope';
 import { useAparencia, useDebts, useMaterializeOccurrence, useSkipOccurrence } from '@/hooks/use-finance';
 import { formatBRL } from '@/hooks/use-items';
 import { financeErrorMessage } from '@/lib/finance-form';
-import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
+import { showItemActions, type ItemAction } from '@/lib/item-actions';
 import { estadoDaPrevista, type ExpectedLedgerLine } from '@/lib/ledger-expected';
 import { settleLabel } from '@/lib/settle-labels';
 import { aoVoltarParaDivida } from '@/lib/volta-da-parcela';
@@ -35,6 +37,7 @@ function origemDaPrevista(line: ExpectedLedgerLine): string {
 export function useAcoesDaPrevista({ month, pagar }: { month: string; pagar: (txId: string) => void }) {
   const materializar = useMaterializeOccurrence();
   const pular = useSkipOccurrence();
+  const { apagarNoAlcance } = useApagarComAlcance();
   const debts = useDebts();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -91,15 +94,17 @@ export function useAcoesDaPrevista({ month, pagar }: { month: string; pagar: (tx
         },
         {
           label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda',
-          onPress: () => confirmDestructive(
-            'Apagar esta ocorrência?',
-            'Apagar',
-            () => pular.mutate({ recurringId: line.ref_id, date: line.due_date }, {
-              onSuccess: () => toast({ message: `Apaguei ${formatBRL(line.amount_cents)} de ${line.description}.`, tone: 'success' }),
-              onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para apagar. Tenta de novo.'), tone: 'error' }),
-            }),
-            'Só esta. As outras da recorrente continuam.',
-          ),
+          // Só existe na regra, sem id de lançamento: a pergunta de alcance é daqui.
+          onPress: () => askDeleteScope('occurrence', (alcance) => {
+            if (alcance === 'one') {
+              pular.mutate({ recurringId: line.ref_id, date: line.due_date }, {
+                onSuccess: () => toast({ message: `Apaguei ${formatBRL(line.amount_cents)} de ${line.description}.`, tone: 'success' }),
+                onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para apagar. Tenta de novo.'), tone: 'error' }),
+              });
+              return;
+            }
+            void apagarNoAlcance({ tipo: 'recurring', id: line.ref_id, nome: line.description, ancora: line.due_date }, alcance);
+          }),
         },
       ];
     }

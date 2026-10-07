@@ -37,12 +37,10 @@ import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   DEBT_KINDS,
   useAccounts,
-  pagamentosDaDivida,
   useArchiveDebt,
   useArchivedDebts,
   useDebtDeclaredEstimates,
   useDebtPayments,
-  useDeleteDebt,
   useDebtSchedule,
   useDebts,
   usePayDebtInstallment,
@@ -60,7 +58,8 @@ import { semAcento } from '@/lib/text';
 import { paidInstallments, porAno, secoesDaLinha, type ItemDaLinha } from '@/lib/debt-history';
 import { lerAoVoltar } from '@/lib/volta-da-parcela';
 import { financeErrorMessage, simpleDebtValues } from '@/lib/finance-form';
-import { confirmDestructive, showItemActions, type ItemAction } from '@/lib/item-actions';
+import { useApagarComAlcance } from '@/hooks/use-apagar-com-alcance';
+import { showItemActions, type ItemAction } from '@/lib/item-actions';
 import { useBillReminders } from '@/hooks/use-bill-reminders';
 import { hrefDoLembrete, mesmoAlvo, resumoDosAvisos } from '@/lib/lembrete-de-conta';
 import { hrefDoLancar } from '@/lib/lancar';
@@ -114,7 +113,7 @@ export default function DebtsScreen() {
   const save = useSaveDebt();
   const archive = useArchiveDebt();
   const unarchive = useUnarchiveDebt();
-  const excluirDivida = useDeleteDebt();
+  const apagarComAlcance = useApagarComAlcance(() => { if (fichaId) router.back(); });
   const arquivadas = useArchivedDebts();
   const [verArquivadas, setVerArquivadas] = useState(false);
   const [filtersVisible, setFiltersVisible] = useState(false);
@@ -339,31 +338,8 @@ export default function DebtsScreen() {
    * futuras da projeção. A confirmação diz a consequência CONTADA — quantos pagamentos e quanto
    * volta ao saldo —, porque é isso que muda o passado da pessoa.
    */
-  const excluir = async (d: Debt) => {
-    let consequencia = 'Apaga a dívida e as parcelas futuras da projeção. Não dá para desfazer.';
-    try {
-      const { count, totalCents } = await pagamentosDaDivida(d.id);
-      if (count > 0) {
-        consequencia = `Apaga a dívida, ${count === 1 ? 'o pagamento já lançado' : `os ${count} pagamentos já lançados`} (${brl(totalCents)}, que ${count === 1 ? 'volta' : 'voltam'} ao saldo das contas) e as parcelas futuras da projeção. Não dá para desfazer.`;
-      }
-    } catch {
-      /* Sem a contagem, a frase genérica ainda diz o que some. */
-    }
-    confirmDestructive(
-      `Apagar a dívida ${d.name} por completo?`,
-      'Apagar',
-      () =>
-        excluirDivida.mutate(d.id, {
-          onSuccess: () => {
-            if (fichaId === d.id) router.back();
-            toast({ message: <>Excluí <Forte>{d.name}</Forte>.</>, tone: 'success' });
-          },
-          onError: (error) =>
-            toast({ message: financeErrorMessage(error, `Não deu para apagar ${d.name}.`), tone: 'error' }),
-        }),
-      consequencia
-    );
-  };
+  const excluir = (d: Debt) =>
+    apagarComAlcance.apagar({ tipo: 'debt', id: d.id, nome: d.name });
 
   /** Uma lista só de ações: o toque longo e o "…" do detalhe leem daqui. */
   /**

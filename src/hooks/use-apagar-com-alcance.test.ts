@@ -123,3 +123,19 @@ test('Apagar: a recusa do banco aparece com a frase dele; falha de rede segue ge
     assert.equal(b.sucessos.length, 0);
   }
 });
+
+test('apagarNoAlcance: sem pergunta; a confirmação vem antes da escrita e cancelar não escreve', async () => {
+  const m = montar({ previa: { ...PREVIA, pagas_apagadas: 1, soma_pagas_cents: '500' } });
+  void m.hook.apagarNoAlcance(ALVO, 'all');
+  await m.solta();
+  assert.equal(m.perguntas.length, 0, 'o alcance já veio da tela');
+  assert.deepEqual(m.chamadas, ['delete_scoped_preview']);
+  assert.equal(m.confirmacoes.length, 1);
+  m.confirmacoes[0]();
+  await m.solta();
+  assert.deepEqual(m.chamadas, ['delete_scoped_preview', 'delete_scoped']);
+  const cancelado = montar({ previa: { ...PREVIA, pagas_apagadas: 1, soma_pagas_cents: '500' } });
+  void cancelado.hook.apagarNoAlcance(ALVO, 'future');
+  await cancelado.solta();
+  assert.ok(!cancelado.chamadas.includes('delete_scoped'));
+});
