@@ -297,3 +297,6 @@ de telefone e push token de todos os workspaces, alcançável com a anon key e s
 `private.debt_paid_in_cycle` com `revoke`, e a segunda devolve o `execute`; só a primeira
 derruba a Hoje e a Projeção com `42501 permission denied`, porque `debt_schedule_for` é
 `security invoker` e a chamada aninhada usa o privilégio do `authenticated`.
+
+**Lembrete de conta** — `20261007120000` e `20261007120100`: staging 07/10/2026, produção pendente.
+Sobem juntas (a segunda faz o lembrete próprio substituir o aviso automático).

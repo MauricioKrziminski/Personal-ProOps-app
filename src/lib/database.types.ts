@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       account_aliases: {
@@ -513,6 +538,97 @@ export type Database = {
           },
           {
             foreignKeyName: "assets_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bill_reminders: {
+        Row: {
+          at_time: string
+          channel: string
+          created_at: string
+          days_before: number
+          debt_id: string | null
+          debt_installment_no: number | null
+          id: string
+          installment_plan_id: string | null
+          invoice_id: string | null
+          recurring_id: string | null
+          transaction_id: string | null
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          at_time: string
+          channel?: string
+          created_at?: string
+          days_before: number
+          debt_id?: string | null
+          debt_installment_no?: number | null
+          id?: string
+          installment_plan_id?: string | null
+          invoice_id?: string | null
+          recurring_id?: string | null
+          transaction_id?: string | null
+          user_id?: string
+          workspace_id?: string
+        }
+        Update: {
+          at_time?: string
+          channel?: string
+          created_at?: string
+          days_before?: number
+          debt_id?: string | null
+          debt_installment_no?: number | null
+          id?: string
+          installment_plan_id?: string | null
+          invoice_id?: string | null
+          recurring_id?: string | null
+          transaction_id?: string | null
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_reminders_debt_id_fkey"
+            columns: ["debt_id"]
+            isOneToOne: false
+            referencedRelation: "debts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_reminders_installment_plan_id_fkey"
+            columns: ["installment_plan_id"]
+            isOneToOne: false
+            referencedRelation: "installment_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_reminders_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "card_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_reminders_recurring_id_fkey"
+            columns: ["recurring_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_reminders_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_reminders_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -3724,6 +3840,25 @@ export type Database = {
         }
         Returns: string
       }
+      _bill_reminders_due: {
+        Args: never
+        Returns: {
+          alerts_whatsapp_enabled: boolean
+          amount_cents: number
+          attempts: number
+          bill_reminder_id: string
+          channel: string
+          days_before: number
+          due_date: string
+          expo_push_token: string
+          phone: string
+          ref: string
+          target: string
+          title: string
+          user_id: string
+          workspace_id: string
+        }[]
+      }
       _budgets_status: {
         Args: { p_view?: string; ref_month?: string; uid: string }
         Returns: {
@@ -4037,6 +4172,16 @@ export type Database = {
       }
       anticipation_candidates: { Args: { p_pay_on?: string }; Returns: Json }
       approve_import_items: { Args: { p_item_ids: string[] }; Returns: number }
+      bill_reminders_overview: {
+        Args: never
+        Returns: {
+          alvo: Json
+          avisos: Json
+          channel: string
+          next_due: string
+          title: string
+        }[]
+      }
       budget_plan_command: {
         Args: { p_input: Json; p_request_id: string }
         Returns: Json
@@ -4818,6 +4963,10 @@ export type Database = {
         Returns: Json
       }
       routes_to_python: { Args: { p_phone: string }; Returns: boolean }
+      save_bill_reminder: {
+        Args: { p_alvo: Json; p_avisos: Json; p_channel: string }
+        Returns: number
+      }
       save_budget: {
         Args: {
           p_category: string
@@ -5219,6 +5368,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

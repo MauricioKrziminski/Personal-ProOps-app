@@ -54,17 +54,23 @@ begin
   set local role authenticated;
   begin
     perform public.save_bill_reminder(jsonb_build_object('transaction_id', tx_outro), '[{"days_before":0,"at_time":"09:00"}]', 'push');
-    assert false, 'alvo de outro espaço devia ser recusado';
+    n := -1;
   exception when others then
-    assert sqlerrm not like 'alvo de outro espaço devia%', sqlerrm;
+    assert sqlerrm = 'Esse registro não existe mais' and sqlstate = 'P0001', format('outro espaço: %s / %s', sqlstate, sqlerrm);
   end;
-  -- dias fora de 0..30 é recusado
+  assert n <> -1, 'alvo de outro espaço devia ser recusado';
+  -- dias fora de 0..30 é recusado pelo check
   begin
     perform public.save_bill_reminder(jsonb_build_object('transaction_id', tx), '[{"days_before":31,"at_time":"09:00"}]', 'push');
-    assert false, 'days_before 31 devia ser recusado';
+    n := -1;
   exception when others then
-    assert sqlerrm not like 'days_before 31 devia%', sqlerrm;
+    assert sqlstate = '23514' and sqlerrm like '%bill_reminders_days_before_check%', format('days_before 31: %s / %s', sqlstate, sqlerrm);
   end;
+  assert n <> -1, 'days_before 31 devia ser recusado';
+  -- avisos repetidos em p_avisos colapsam em um
+  n := public.save_bill_reminder(jsonb_build_object('transaction_id', tx),
+         '[{"days_before":1,"at_time":"00:00"},{"days_before":1,"at_time":"00:00"},{"days_before":0,"at_time":"09:00"}]', 'push');
+  assert n = 2, format('duplicados devem colapsar, veio %s', n);
   reset role;
 
   -- quem recebe é quem criou
@@ -151,6 +157,28 @@ begin
   delete from public.transactions where id = tx2;
   select count(*) into n from public.bill_reminders where transaction_id = tx2;
   assert n = 0, 'apagar o registro devia apagar o lembrete';
+
+  -- 8) o aviso automático deixa de mandar o que tem lembrete próprio
+  update public.profiles set alerts_push_enabled = true where id = u;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id)
+  values (ws, u, 'expense', 7000, 'Água BL', hoje, 'pending', conta) returning id into tx2;
+  select count(*) into n from public._alerts_to_send() a where a.kind = 'bill_due' and a.ref = tx2::text;
+  assert n = 1, 'sem lembrete, o automático avisa';
+  insert into public.bill_reminders (workspace_id, user_id, transaction_id, days_before, at_time, channel)
+  values (ws, u, tx2, 0, '09:00', 'push');
+  select count(*) into n from public._alerts_to_send() a where a.kind = 'bill_due' and a.ref = tx2::text;
+  assert n = 0, 'com lembrete próprio, o automático cala';
+  -- fatura: coberta por uma ocorrência dentro dela (a série2 tem lembrete "todas")
+  update public.card_invoices set status = 'open', due_date = hoje + 2 where id = fatura;
+  select count(*) into n from public._alerts_to_send() a where a.kind = 'invoice_due' and a.ref = fatura::text;
+  assert n = 0, 'fatura com compra coberta não recebe o automático';
+  delete from public.bill_reminders where recurring_id = serie2;
+  select count(*) into n from public._alerts_to_send() a where a.kind = 'invoice_due' and a.ref = fatura::text;
+  assert n = 1, 'sem lembrete, a fatura recebe o automático';
+  insert into public.bill_reminders (workspace_id, user_id, invoice_id, days_before, at_time, channel)
+  values (ws, u, fatura, 0, '09:00', 'push');
+  select count(*) into n from public._alerts_to_send() a where a.kind = 'invoice_due' and a.ref = fatura::text;
+  assert n = 0, 'lembrete na própria fatura cala o automático';
 
   -- 7) RLS: o outro usuário não lê
   perform set_config('request.jwt.claim.sub', outro::text, true);
