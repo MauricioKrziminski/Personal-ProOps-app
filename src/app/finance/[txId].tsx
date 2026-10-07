@@ -530,7 +530,7 @@ export default function TransactionDetailScreen() {
             // Só com a série carregada, ativa e fora de uma pausa (a mesma régua de Recorrentes).
             // O início é a data que o banco usa para decidir o que sai: o vencimento, fora do cartão.
             ...(tx.recurring_id && serie?.active && !emPausa(localISODate(), serie.paused_from ?? null, serie.paused_until ?? null)
-              ? [{ label: 'Pausar…', icon: 'pause' as const,
+              ? [{ label: 'Pausar por um tempo…', icon: 'pause' as const,
                   onPress: () => pausando.abrir({ tipo: 'recurring', id: tx.recurring_id!, titulo: title },
                     tx.invoice_id ? tx.occurred_at : (tx.due_at ?? tx.occurred_at)) }]
               : []),

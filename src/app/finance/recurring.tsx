@@ -263,7 +263,7 @@ export default function RecurringScreen() {
         ? { label: 'Retomar agora', icon: 'play', arrasto: 'direita', onPress: () => alternar(r) }
         : { label: r.active ? 'Pausar' : 'Retomar', icon: r.active ? 'pause' : 'play', arrasto: 'direita', desfaz: true, onPress: () => alternar(r) },
       ...(r.active && !noPeriodo(r)
-        ? [{ label: 'Pausar…', icon: 'pause' as const,
+        ? [{ label: 'Pausar por um tempo…', icon: 'pause' as const,
             onPress: () => pausando.abrir({ tipo: 'recurring', id: r.id, titulo: r.description ?? 'recorrência' }, dataLocalDe(r.next_run_at)) }]
         : []),
       // Cancelar uma assinatura: fica o que já aconteceu, saem as cobranças futuras (não é Pausar nem Apagar).

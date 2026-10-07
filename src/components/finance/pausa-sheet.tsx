@@ -81,9 +81,10 @@ export function PausaSheet({ visivel, onClose, alvo, inicioPadrao }: {
   const dates = previa.data?.dates ?? [];
   const frase = serie
     ? previa.data && !previa.isFetching
-      ? previa.data.removed_count === 0
+      // `dates` é tudo que sai (gravado ou só da regra); `removed_count` conta só as linhas já gravadas.
+      ? dates.length === 0
         ? 'Nenhuma cobrança sai.'
-        : `Saem ${previa.data.removed_count} ${previa.data.removed_count === 1 ? 'cobrança' : 'cobranças'} (${brl(previa.data.cents)}): ${dates.slice(0, 6).map(dm).join(', ')}${dates.length > 6 ? ` e mais ${dates.length - 6}` : ''}.`
+        : `Saem ${dates.length} ${dates.length === 1 ? 'cobrança' : 'cobranças'} (${brl(previa.data.cents)}): ${dates.slice(0, 6).map(dm).join(', ')}${dates.length > 6 ? ` e mais ${dates.length - 6}` : ''}.${fim ? ` Volta em ${isoToBR(fim)}.` : ''}`
       : null
     : inicio && fim ? `Não toca de ${dm(inicio)} a ${dm(somaDias(fim, -1))}.` : null;
 

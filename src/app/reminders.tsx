@@ -121,7 +121,7 @@ export default function RemindersScreen() {
         ? [{ label: 'Cancelar pausa', icon: 'play' as const, onPress: retomarAgora }]
         : []),
       ...(r.active && !noPeriodo(r) && r.recurrence
-        ? [{ label: 'Pausar…', icon: 'pause' as const,
+        ? [{ label: 'Pausar por um tempo…', icon: 'pause' as const,
             onPress: () => pausando.abrir({ tipo: 'reminder', id: r.id, titulo: r.title }, dataLocalDe(r.next_run_at)) }]
         : []),
       { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: onDelete },

@@ -5522,7 +5522,7 @@ const pausaSerie = () => {
     paused_from: null, paused_until: null };
   return { hoje, proxima, serie };
 };
-const abrirPausa = (ui: any) => ui.interact(() => deslizaveis(ui)[0].props.acoes.find((a: any) => a.label === 'Pausar…').onPress());
+const abrirPausa = (ui: any) => ui.interact(() => deslizaveis(ui)[0].props.acoes.find((a: any) => a.label === 'Pausar por um tempo…').onPress());
 const folhaDePausa = (ui: any) => ui.nodes().find((n: any) => n.type?.name === 'PausaSheet');
 /** A folha sozinha: o harness não desce em componente aninhado, então ela se renderiza direto. */
 const pausaSheet = (alvo: any, inicioPadrao: string, opts: Parameters<typeof screen>[1] = {}) =>
@@ -5540,6 +5540,14 @@ test('Pausar…: o menu da série abre a folha no próximo vencimento, ao lado d
   assert.equal(folha.props.inicioPadrao, dia(proxima));
   assert.deepEqual(copia(folha.props.alvo), { tipo: 'recurring', id: 'rec-1', titulo: 'ChatGPT' });
   assert.equal(ui.writes.length, 0, 'abrir a folha não grava');
+});
+
+test('Pausar…: a frase conta as datas que saem, não só as linhas já gravadas', () => {
+  // Série ainda não materializada: nenhuma linha gravada (removed_count 0), mas a data da regra sai.
+  const ui = pausaSheet(alvoSerie, '2026-11-05', { pausaPrevia: { dates: ['2026-11-05'], removed_count: 0, cents: 12000, until: '2026-11-12' } });
+  const frase = ui.nodes().find((n: any) => n.type === 'ThemedText' && /^Saem 1 cobrança/.test(String(n.props.children)));
+  assert.ok(frase, 'a data da regra entra na frase');
+  assert.match(String(frase.props.children), /05\/11/);
 });
 
 test('Pausar…: a prévia vem do banco e "Pausar" manda o período', () => {
@@ -5586,7 +5594,7 @@ test('Pausar…: série dentro do período fica em Pausadas com "Pausada até" e
   const ultimo = dia(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 9)).split('-').reverse().join('/');
   assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText' && String(n.props.children).includes(`Pausada até ${ultimo}`)));
   const acoes = deslizaveis(ui)[0].props.acoes;
-  assert.equal(acoes.some((a: any) => a.label === 'Pausar…' || a.label === 'Pausar'), false);
+  assert.equal(acoes.some((a: any) => a.label === 'Pausar por um tempo…' || a.label === 'Pausar'), false);
   ui.interact(() => acoes.find((a: any) => a.label === 'Retomar agora').onPress());
   assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'resumeRecurring', value: { id: 'rec-1' } });
 });
@@ -5600,17 +5608,17 @@ test('Pausar…: a ocorrência pausa a partir do VENCIMENTO (no cartão, da data
     const ui = screen('src/app/finance/[txId].tsx', { recurring, txs: [{ id: 't', ...base, recurring_id: null, ...extra }], params: { txId: 't' } });
     return { ui, acoes: ui.nodes().find((n: any) => n.type === 'HeaderActions').props.menu.actions };
   };
-  assert.equal(menu({}).acoes.some((a: any) => a.label === 'Pausar…'), false, 'avulso não tem');
+  assert.equal(menu({}).acoes.some((a: any) => a.label === 'Pausar por um tempo…'), false, 'avulso não tem');
   const { ui, acoes } = menu({ recurring_id: 'rec-1' });
-  ui.interact(() => acoes.find((a: any) => a.label === 'Pausar…').onPress());
+  ui.interact(() => acoes.find((a: any) => a.label === 'Pausar por um tempo…').onPress());
   assert.equal(folhaDePausa(ui).props.inicioPadrao, '2026-10-20');
   assert.equal(folhaDePausa(ui).props.alvo.id, 'rec-1');
   assert.equal(ui.writes.length, 0, 'abrir a folha não grava');
   const cartao = menu({ recurring_id: 'rec-1', invoice_id: 'f1' });
-  cartao.ui.interact(() => cartao.acoes.find((a: any) => a.label === 'Pausar…').onPress());
+  cartao.ui.interact(() => cartao.acoes.find((a: any) => a.label === 'Pausar por um tempo…').onPress());
   assert.equal(folhaDePausa(cartao.ui).props.inicioPadrao, '2026-10-15');
   for (const serie of [[], [{ ...ativa, active: false }], [{ ...ativa, paused_from: '2026-09-01', paused_until: '2099-01-01' }]]) {
-    assert.equal(menu({ recurring_id: 'rec-1' }, serie).acoes.some((a: any) => a.label === 'Pausar…'), false);
+    assert.equal(menu({ recurring_id: 'rec-1' }, serie).acoes.some((a: any) => a.label === 'Pausar por um tempo…'), false);
   }
 });
 
@@ -5618,9 +5626,9 @@ test('Pausar…: lembrete que repete abre a folha; sem repetição só o Pausar 
   const lembrete = { id: 'r1', title: 'Aluguel', active: true, next_run_at: '2026-10-05T12:00:00Z', recurrence: 'FREQ=MONTHLY' };
   const ui = screen('src/app/reminders.tsx', { reminders: [lembrete, { ...lembrete, id: 'r2', recurrence: null }] });
   const [repete, unico] = deslizaveis(ui);
-  assert.equal(unico.props.acoes.some((a: any) => a.label === 'Pausar…'), false);
+  assert.equal(unico.props.acoes.some((a: any) => a.label === 'Pausar por um tempo…'), false);
   assert.ok(unico.props.acoes.some((a: any) => a.label === 'Pausar'));
-  ui.interact(() => repete.props.acoes.find((a: any) => a.label === 'Pausar…').onPress());
+  ui.interact(() => repete.props.acoes.find((a: any) => a.label === 'Pausar por um tempo…').onPress());
   assert.deepEqual(copia(folhaDePausa(ui).props.alvo), { tipo: 'reminder', id: 'r1', titulo: 'Aluguel' });
   assert.equal(ui.writes.length, 0, 'abrir a folha não grava');
 });
