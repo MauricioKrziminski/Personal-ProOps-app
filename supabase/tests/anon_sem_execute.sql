@@ -29,7 +29,7 @@ begin
     'finish_import_batch','forecast_json','goal_deposit','goal_link_candidates','goal_money_command','goal_money_state','import_unmatched','investment_command','investment_link_candidates','investment_movements_page','investment_positions','investment_value_command','ledger_expected_lines_transfer','month_breakdown',
     'materialize_recurring_occurrence','month_forecast_json','month_lines','month_summary','monthly_cashflow','my_default_workspace',
     'net_worth','net_worth_series','note_folder_counts','note_folders_reorder','note_tag_counts',
-    'notes_reorder','pay_debt_installment','pay_invoice','payoff_strategy','plan_status','rename_category','roll_invoice',
+    'notes_reorder','pay_debt_installment','pay_invoice','payoff_strategy','pause_recurring','pause_recurring_preview','plan_status','rename_category','resume_recurring','roll_invoice',
     'save_bill_reminder','save_budget','save_category','settle_invoice','simular','skip_recurring_occurrence','spendable','spendable_path','spending_change','transactions_summary','upcoming_bills',
     'update_asset_value','update_debt_payment_due_day','update_installment_plan','update_installment_scope_last_day','update_recurring_series','update_transaction_scoped',
     'year_end_balances',
