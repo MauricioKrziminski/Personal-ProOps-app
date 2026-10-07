@@ -15,6 +15,7 @@ declare
   hoje date := (now() at time zone 'America/Sao_Paulo')::date;
   conta uuid; serie uuid; t_pago uuid; t_atrasada uuid; t_ancora uuid; t_depois uuid; t_longe uuid; cartao uuid; t_pai uuid; t_fee uuid;
   r jsonb; n int; chave uuid := gen_random_uuid(); cfg text[];
+  plano uuid; p1 uuid; p2 uuid; p3 uuid; p4 uuid; soma bigint; k int;
 begin
   select id into ws from public.workspaces where owner_id = u;
   select id into ws_outro from public.workspaces where owner_id = outro;
@@ -189,6 +190,60 @@ begin
     assert sqlstate = 'P0001', format('paga em parte: %s %s', sqlstate, sqlerrm);
   end;
   assert n <> -2, 'fatura paga em parte devia recusar';
+
+  -- ── Task 2: compra parcelada (conta corrente, 4x de 25,00; a 1ª paga) ──
+  reset role;
+  insert into public.installment_plans (workspace_id, user_id, account_id, total_cents, installments, first_occurred_at, description)
+  values (ws, u, conta, 10000, 4, hoje - 30, 'Fone AA') returning id into plano;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, installment_plan_id, installment_no)
+  values (ws, u, 'expense', 2500, 'Fone AA (1/4)', hoje - 30, 'cleared', conta, plano, 1) returning id into p1;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, installment_plan_id, installment_no)
+  values (ws, u, 'expense', 2500, 'Fone AA (2/4)', hoje, 'pending', conta, plano, 2) returning id into p2;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, installment_plan_id, installment_no)
+  values (ws, u, 'expense', 2500, 'Fone AA (3/4)', hoje + 30, 'pending', conta, plano, 3) returning id into p3;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, installment_plan_id, installment_no)
+  values (ws, u, 'expense', 2500, 'Fone AA (4/4)', hoje + 60, 'pending', conta, plano, 4) returning id into p4;
+  set local role authenticated;
+
+  -- "Só esta" na 4ª: o total vira a soma das que ficam
+  r := public.delete_scoped('installment', p4, 'one', gen_random_uuid());
+  reset role;
+  select total_cents, installments into soma, k from public.installment_plans where id = plano;
+  assert soma = 7500 and k = 3, format('só esta: total %s, parcelas %s', soma, k);
+  set local role authenticated;
+
+  -- "Esta e as próximas" na 3ª: sobram 1ª e 2ª, total 5000
+  r := public.delete_scoped('installment', p3, 'future', gen_random_uuid());
+  reset role;
+  select total_cents, installments into soma, k from public.installment_plans where id = plano;
+  assert soma = 5000 and k = 2, format('futuras: total %s, parcelas %s', soma, k);
+  set local role authenticated;
+
+  -- sobrar UMA: a 2ª sai e a 1ª vira lançamento à vista; o plano some
+  r := public.delete_scoped('installment', p2, 'one', gen_random_uuid());
+  reset role;
+  assert not exists (select 1 from public.installment_plans where id = plano), 'sobrando uma, o plano sai';
+  assert (select installment_plan_id is null and installment_no is null and description = 'Fone AA'
+          from public.transactions where id = p1), 'a sobrevivente vira lançamento à vista com o nome da compra';
+  set local role authenticated;
+
+  -- "Esta e as próximas" pela 1ª = a compra inteira (com a paga)
+  reset role;
+  insert into public.installment_plans (workspace_id, user_id, account_id, total_cents, installments, first_occurred_at, description)
+  values (ws, u, conta, 6000, 2, hoje - 30, 'Tênis AA') returning id into plano;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, installment_plan_id, installment_no)
+  values (ws, u, 'expense', 3000, 'Tênis AA (1/2)', hoje - 30, 'cleared', conta, plano, 1) returning id into p1;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, installment_plan_id, installment_no)
+  values (ws, u, 'expense', 3000, 'Tênis AA (2/2)', hoje + 30, 'pending', conta, plano, 2) returning id into p2;
+  set local role authenticated;
+  r := public.delete_scoped_preview('installment', p1, 'future');
+  assert (r->>'apagadas')::int = 2 and (r->>'pagas_apagadas')::int = 1 and (r->>'apaga_contrato')::boolean,
+    format('a partir da 1ª: %s', r);
+  r := public.delete_scoped('plan', plano, 'all', gen_random_uuid());
+  reset role;
+  assert not exists (select 1 from public.installment_plans where id = plano), 'todas: o plano sai';
+  assert not exists (select 1 from public.transactions where id in (p1, p2)), 'todas: as parcelas saem';
+  set local role authenticated;
 
   -- BLOCOS DAS PRÓXIMAS TAREFAS ENTRAM AQUI
   reset role;
