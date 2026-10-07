@@ -5688,6 +5688,14 @@ test('Pausar…: pausa marcada para depois se cancela (série e lembrete); lembr
   assert.ok(ui3.nodes().some((n: any) => n.type === 'Section' && n.props.title === 'Pausados'));
 });
 
+test('Pausar…: lembrete cujo próximo cai dentro da pausa não mostra "próximo"', () => {
+  const l = { id: 'r1', title: 'Aluguel', active: true, next_run_at: '2026-10-05T12:00:00Z', recurrence: 'FREQ=MONTHLY',
+    paused_from: '2026-10-01', paused_until: '2026-10-20' };
+  const sub = (r: any) => screen('src/app/reminders.tsx', { reminders: [r] }).nodes().find((n: any) => n.type === 'Row').props.subtitle;
+  assert.match(sub({ ...l, paused_from: null, paused_until: null }), /próximo /, 'sem pausa mostra o próximo');
+  assert.doesNotMatch(sub(l), /próximo /, 'o próximo está pausado');
+});
+
 test('Pausar…: o filtro de estado do lembrete vai ao servidor, em PostgREST', () => {
   assert.equal(filtroDeEstadoDoLembrete('paused', '2026-10-07'), 'active.eq.false,and(paused_from.lte.2026-10-07,paused_until.gt.2026-10-07)');
   assert.equal(filtroDeEstadoDoLembrete('active', '2026-10-07'),

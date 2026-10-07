@@ -138,7 +138,7 @@ export default function RemindersScreen() {
             : r.skip_run_at === r.next_run_at
             ? `${describeRRule(r.recurrence)} · próxima após a ocorrência editada${r.active && rotulo(r) ? ` · ${rotulo(r)}` : ''}`
             : r.recurrence
-            ? `${describeRRule(r.recurrence)} · próximo ${formatDateBR(r.next_run_at)}${r.active && rotulo(r) ? ` · ${rotulo(r)}` : ''}`
+            ? `${describeRRule(r.recurrence)}${emPausa(dataLocalDe(r.next_run_at), r.paused_from ?? null, r.paused_until ?? null) ? '' : ` · próximo ${formatDateBR(r.next_run_at)}`}${r.active && rotulo(r) ? ` · ${rotulo(r)}` : ''}`
             : formatDateBR(r.next_run_at)
         }
         icon={r.active && !noPeriodo(r) ? 'bell' : 'bell.slash'}
