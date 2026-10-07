@@ -35,8 +35,14 @@ for linha in (RAIZ / ".env").read_text().splitlines() if (RAIZ / ".env").exists(
         os.environ.setdefault(chave, valor.strip().strip('"'))
 os.environ.setdefault("DATABASE_URL", "postgresql://sem-banco/nesta-avaliacao")
 os.environ.setdefault("WHATSAPP_APP_SECRET", "sem-envio")
+if "--langfuse" not in sys.argv:
+    # Sem a flag, nada da avaliação vai ao Langfuse: o projeto é o MESMO da produção, e cada
+    # chamada virava um trace solto no meio do tráfego real (06/10/2026).
+    os.environ["LANGFUSE_PUBLIC_KEY"] = ""
 
-from scripts.eval_cache import CacheDeAvaliacao, Orcamento, com_paciencia  # noqa: E402
+from scripts.eval_cache import (  # noqa: E402
+    CacheDeAvaliacao, Orcamento, checar_validade, cliente_langfuse, com_paciencia, rodar_experimento,
+)
 from app.domain import confirm, draft  # noqa: E402
 from app.graph import nodes  # noqa: E402
 from app.services import gemini  # noqa: E402
@@ -915,6 +921,8 @@ orcamento: Orcamento | None = None
 
 async def main(args):
     global orcamento
+    if args.langfuse:
+        cliente_langfuse()  # sem chaves sai com 2 ANTES de rodar qualquer coisa
     orcamento = Orcamento(args.teto_usd)
     resources.db.fetch = _sem_banco
     if args.prompt_v2:
@@ -963,31 +971,55 @@ async def main(args):
     print(f"{total - em_cache} chamadas ao Gemini nesta execução ({em_cache} casos virão do cache).\n")
 
     resultados, falhas = [], []
-    for secao, casos in secoes().items():
-        if args.secao and args.secao not in secao:
-            continue
-        print(f"\n### {secao}")
-        for texto, ok_se, rotulo, roda in casos:
-            caso = _id(secao, texto, rotulo)
-            guardado = cache.get(caso)
-            if guardado is not None:
-                obtido, ok = guardado["obtido"], True
-            else:
-                try:
-                    obtido = await com_paciencia(roda)
-                    orcamento.checar()
-                    ok = bool(ok_se(obtido))
-                except Exception as erro:  # noqa: BLE001 — a avaliação registra e segue
-                    obtido, ok = f"erro: {erro}", False
-                if ok:
-                    cache.put(caso, {"obtido": repr(obtido)})
-            resultados.append({"secao": secao, "texto": texto, "esperado": rotulo,
-                               "obtido": obtido if guardado is not None else repr(obtido),
-                               "pass": ok, "cache": guardado is not None})
-            if not ok:
-                falhas.append(f"{secao}: {texto!r}")
-            print(f"{'ok  ' if ok else 'X   '} {texto!r:52} {rotulo:16}"
-                  f"{'' if ok else repr(obtido)[:50]}")
+    lista = [(secao, *c) for secao, casos in secoes().items()
+             if not args.secao or args.secao in secao for c in casos]
+
+    async def avaliar(secao, texto, ok_se, rotulo, roda) -> dict:
+        """UM caso, para o laço simples e para a tarefa do Experiment: mesma regra nos dois."""
+        caso = _id(secao, texto, rotulo)
+        guardado = cache.get(caso)
+        if guardado is not None:
+            return {"obtido": guardado["obtido"], "ok": True, "do_cache": True}
+        try:
+            obtido = await com_paciencia(roda)
+            orcamento.checar()
+            ok = bool(ok_se(obtido))
+        except Exception as erro:  # noqa: BLE001 — a avaliação registra e segue
+            obtido, ok = f"erro: {erro}", False
+        if ok:
+            cache.put(caso, {"obtido": repr(obtido)})
+        return {"obtido": repr(obtido), "ok": ok, "do_cache": False}
+
+    async def processar(secao, texto, ok_se, rotulo, roda) -> dict:
+        r = await avaliar(secao, texto, ok_se, rotulo, roda)
+        resultados.append({"secao": secao, "texto": texto, "esperado": rotulo,
+                           "obtido": r["obtido"], "pass": r["ok"], "cache": r["do_cache"]})
+        if not r["ok"]:
+            falhas.append(f"{secao}: {texto!r}")
+        print(f"{'ok  ' if r['ok'] else 'X   '} {texto!r:52} {rotulo:16}"
+              f"{'' if r['ok'] else r['obtido'][:50]}", flush=True)
+        return r
+
+    if args.langfuse:
+        por_caso = {_id(s_, t, r_): (s_, t, o, r_, f) for s_, t, o, r_, f in lista}
+
+        async def tarefa(caso):
+            return await processar(*por_caso[caso])
+
+        itens = [{"caso": _id(s_, t, r_), "input": {"secao": s_, "texto": t, "esperado": r_},
+                  "esperado": r_, "secao": s_} for s_, t, _o, r_, _f in lista]
+        try:
+            rodar_experimento(dataset="eval/formas-de-resposta", itens=itens, tarefa=tarefa,
+                              filtro=args.secao, v2=args.prompt_v2)
+        finally:
+            cache.salvar()
+    else:
+        secao_atual = None
+        for item in lista:
+            if item[0] != secao_atual:
+                secao_atual = item[0]
+                print(f"\n### {secao_atual}")
+            await processar(*item)
     cache.salvar()
     resumo = {"casos": len(resultados), "passaram": sum(r["pass"] for r in resultados),
               "falhas": falhas, "do_cache": cache.hits}
@@ -998,6 +1030,8 @@ async def main(args):
     print(f"\n{resumo['passaram']}/{resumo['casos']} ({cache.hits} do cache)")
     if falhas:
         print("falharam: " + "; ".join(falhas))
+    if not checar_validade(len(resultados) - cache.hits, orcamento):
+        return 3
     return 1 if falhas else 0
 
 
@@ -1011,6 +1045,8 @@ if __name__ == "__main__":
                         help="ignora e não grava o cache de resultados (agent/.eval-cache/)")
     parser.add_argument("--prompt-v2", action="store_true",
                         help="liga AGENT_PROMPT_V2 só nesta execução (cache separado do v1)")
+    parser.add_argument("--langfuse", action="store_true",
+                        help="registra a rodada como Experiment no Dataset eval/formas-de-resposta")
     parser.add_argument(
         "--barato", action="store_true",
         help="roda o gate no Flash-Lite (grátis até 500/dia). Para iterar, "

@@ -36,12 +36,19 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.eval_cache import CacheDeAvaliacao, Orcamento, com_paciencia
+if "--langfuse" not in sys.argv:
+    # Sem a flag, nada da avaliação vai ao Langfuse: o projeto é o MESMO da produção, e cada
+    # chamada virava um trace solto no meio do tráfego real (06/10/2026).
+    os.environ["LANGFUSE_PUBLIC_KEY"] = ""
+from scripts.eval_cache import (
+    CacheDeAvaliacao, Orcamento, checar_validade, cliente_langfuse, com_paciencia, rodar_experimento,
+)
 from app.domain import confirm, draft
 from app.graph import nodes
 from app.graph.schemas import FinanceAction
@@ -468,6 +475,8 @@ orcamento: Orcamento | None = None
 
 async def main(args):
     global orcamento
+    if args.langfuse:
+        cliente_langfuse()  # sem chaves sai com 2 ANTES de rodar qualquer coisa
     orcamento = Orcamento(args.teto_usd)
     if args.prompt_v2:
         from scripts.eval_cache import ligar_prompt_v2
@@ -482,16 +491,15 @@ async def main(args):
         patch.object(db, "execute", side_effect=prohibited),
         patch.object(db, "open_pools", side_effect=prohibited),
     ):
-        for name, run, check in CASES:
-            if selected and name not in selected:
-                continue
+        lista = [c for c in CASES if not selected or c[0] in selected]
+        por_nome = {c[0]: c for c in lista}
+
+        async def avaliar(name, run, check) -> dict:
+            """UM caso, para o laço simples e para a tarefa do Experiment: mesma regra nos dois."""
             guardado = cache.get(name)
             if guardado is not None:
-                result = {"id": name, "pass": True, "observation": guardado["observation"],
-                          "cache": True}
-                results.append(result)
-                print(json.dumps(result, ensure_ascii=False, default=str), flush=True)
-                continue
+                return {"id": name, "pass": True, "observation": guardado["observation"],
+                        "cache": True}
             observation = None
             try:
                 observation = await com_paciencia(run)
@@ -510,17 +518,34 @@ async def main(args):
                     eq(extracted["type"], "resource_create")
                     eq(extracted["resource"], expected_resource)
                     eq(extracted["name"].casefold(), expected_name.casefold())
-                result = {"id": name, "pass": True, "observation": observation}
                 cache.put(name, {"observation": observation})
+                return {"id": name, "pass": True, "observation": observation}
             except Exception as error:  # noqa: BLE001 — evaluation records failures and continues
-                result = {
-                    "id": name,
-                    "pass": False,
-                    "error": str(error),
-                    "observation": locals().get("observation"),
-                }
+                return {"id": name, "pass": False, "error": str(error), "observation": observation}
+
+        async def processar(name, run, check) -> dict:
+            result = await avaliar(name, run, check)
             results.append(result)
             print(json.dumps(result, ensure_ascii=False, default=str), flush=True)
+            return result
+
+        if args.langfuse:
+            async def tarefa(name):
+                r = await processar(*por_nome[name])
+                return {"obtido": r.get("error") or repr(r["observation"]), "ok": r["pass"],
+                        "do_cache": bool(r.get("cache"))}
+
+            try:
+                rodar_experimento(
+                    dataset="eval/compreensao-de-conversa", tarefa=tarefa, v2=args.prompt_v2,
+                    filtro=args.cases,
+                    itens=[{"caso": n, "input": {"caso": n}, "esperado": "passa", "secao": "conversa"}
+                           for n in por_nome])
+            finally:
+                cache.salvar()
+        else:
+            for c in lista:
+                await processar(*c)
     cache.salvar()
     summary = {
         "do_cache": cache.hits,
@@ -538,6 +563,8 @@ async def main(args):
             {k: v for k, v in summary.items() if k != "results"}, ensure_ascii=False
         )
     )
+    if not checar_validade(len(results) - cache.hits, orcamento):
+        return 3
     return 0 if not summary["failed"] else 1
 
 
@@ -551,5 +578,7 @@ if __name__ == "__main__":
                         help="para a rodada quando o gasto medido passar disto (chave paga)")
     parser.add_argument("--sem-cache", action="store_true",
                         help="ignora e não grava o cache de resultados (agent/.eval-cache/)")
+    parser.add_argument("--langfuse", action="store_true",
+                        help="registra a rodada como Experiment no Dataset eval/compreensao-de-conversa")
     args = parser.parse_args()
     raise SystemExit(asyncio.run(main(args)))

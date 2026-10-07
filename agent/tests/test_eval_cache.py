@@ -97,3 +97,23 @@ def test_nivel_de_raciocinio_entra_na_chave(monkeypatch):
     padrao = CacheDeAvaliacao("teste_raciocinio", ativo=False)._chave("x")
     monkeypatch.setenv("GEMINI_THINKING_GATE", "low")
     assert CacheDeAvaliacao("teste_raciocinio", ativo=False)._chave("x") != padrao
+
+
+def test_rodada_invalida_so_quando_rodou_caso_e_nenhuma_chamada_concluiu():
+    assert eval_cache.rodada_invalida(sem_cache=5, chamadas=0)
+    assert not eval_cache.rodada_invalida(sem_cache=5, chamadas=1)
+    assert not eval_cache.rodada_invalida(sem_cache=0, chamadas=0)  # tudo veio do cache
+
+
+def test_id_do_item_e_estavel_e_separa_datasets():
+    a = eval_cache.id_do_item("eval/x", "sec|texto|rotulo")
+    assert a == eval_cache.id_do_item("eval/x", "sec|texto|rotulo") and len(a) == 16
+    assert a != eval_cache.id_do_item("eval/y", "sec|texto|rotulo")
+
+
+def test_nome_da_corrida_carrega_o_que_distingue_a_rodada():
+    nome = eval_cache.nome_da_corrida(agora="2026-10-06 12:00", v2=True, gate="gemini-x",
+                                      raciocinio={"gate": "low"}, filtro="aprovar", sha="abc123")
+    assert nome == "2026-10-06 12:00 | v2 | gate=gemini-x | think-gate=low | filtro=aprovar | abc123"
+    assert "v1" in eval_cache.nome_da_corrida(agora="t", v2=False, gate="g", raciocinio={},
+                                              filtro=None, sha="?")

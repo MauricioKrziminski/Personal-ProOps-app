@@ -178,3 +178,129 @@ class Orcamento:
               f"{saida} de saída, US$ {self.gasto():.4f}"
               + (f" (+{len(sem_preco)} chamadas de modelo sem preço na tabela)" if sem_preco else ""),
               flush=True)
+
+
+# ---------------------------------------------------------------------------
+# validade da rodada e Langfuse Experiments (opt-in: `--langfuse`)
+# ---------------------------------------------------------------------------
+
+
+def rodada_invalida(sem_cache: int, chamadas: int) -> bool:
+    """Caso que rodou de verdade e NENHUMA chamada ao modelo concluiu = a rodada não mediu nada.
+
+    Cota esgotada (429) é engolida dentro dos classificadores do app e vira `None`, que a seção de
+    segurança lê como "não aprovou" = passou. Vale para a rodada inteira, não por caso: há caso que
+    legitimamente não chama o modelo ("sim", "ok").
+    """
+    return sem_cache > 0 and chamadas == 0
+
+
+def checar_validade(sem_cache: int, orcamento: Orcamento) -> bool:
+    if not rodada_invalida(sem_cache, len(orcamento.chamadas)):
+        return True
+    print("\n!!! nenhuma chamada ao modelo concluída — cota/erro; resultado NÃO vale", flush=True)
+    return False
+
+
+def id_do_item(dataset: str, caso: str) -> str:
+    """Id estável do item no Langfuse: reenviar o mesmo caso atualiza, nunca duplica."""
+    import hashlib
+
+    return hashlib.sha256(f"{dataset}|{caso}".encode()).hexdigest()[:16]
+
+
+def sha_curto() -> str:
+    import subprocess
+
+    try:
+        return subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=RAIZ, check=True,
+                              capture_output=True, text=True, timeout=5).stdout.strip() or "?"
+    except Exception:  # noqa: BLE001 — sem git não impede a avaliação
+        return "?"
+
+
+def nome_da_corrida(*, agora: str, v2: bool, gate: str, raciocinio: dict[str, str],
+                    filtro: str | None, sha: str) -> str:
+    """O nome carrega o que distingue uma rodada da outra na tela de comparação do Langfuse."""
+    partes = [agora, "v2" if v2 else "v1", f"gate={gate}"]
+    partes += [f"think-{p}={n}" for p, n in sorted(raciocinio.items())]
+    if filtro:
+        partes.append(f"filtro={filtro}")
+    partes.append(sha)
+    return " | ".join(partes)
+
+
+def cliente_langfuse() -> object:
+    """O MESMO cliente do app (com a máscara de dado pessoal); sem chaves, sai com 2 antes de rodar."""
+    from app.config import get_settings
+    from app.services import telemetry
+
+    s = get_settings()
+    if not (s.langfuse_public_key and s.langfuse_secret_key) or telemetry.handler() is None:
+        print("--langfuse pede LANGFUSE_PUBLIC_KEY e LANGFUSE_SECRET_KEY (agent/.env).", flush=True)
+        raise SystemExit(2)
+    from langfuse import get_client
+
+    return get_client()
+
+
+def rodar_experimento(*, dataset: str, itens: list[dict], tarefa, filtro: str | None, v2: bool) -> None:
+    """Registra a rodada como Experiment sobre o Dataset `dataset` (projeto compartilhado com produção).
+
+    `itens`: [{"caso": id do caso, "input": ..., "esperado": rótulo, "secao": ...}]. `tarefa(caso)` é
+    async e devolve {"obtido": str, "ok": bool, "do_cache": bool}. Concorrência 1: o harness é
+    sequencial (5 RPM do Flash gratuito). Sai com SystemExit do teto de gasto só depois do flush.
+    """
+    from datetime import datetime
+
+    from langfuse import Evaluation
+
+    from app.services import gemini
+
+    cliente = cliente_langfuse()
+    ids = {id_do_item(dataset, i["caso"]): i["caso"] for i in itens}
+    parou: list[BaseException] = []
+    try:
+        try:
+            cliente.get_dataset(dataset)
+        except Exception:  # noqa: BLE001 — não existe ainda
+            cliente.create_dataset(name=dataset, description="Casos das suítes de avaliação do Gemini")
+        for i in itens:
+            cliente.create_dataset_item(dataset_name=dataset, id=id_do_item(dataset, i["caso"]),
+                                        input=i["input"],
+                                        expected_output=i["esperado"], metadata={"secao": i["secao"]})
+        alvo = cliente.get_dataset(dataset)
+        alvo.items = [i for i in alvo.items if i.id in ids]
+
+        niveis = {p: n for p in gemini.MODELOS if (n := gemini.raciocinio(p))}
+        meta = {"prompt": "v2" if v2 else "v1", "gate": gemini.modelo("gate"), "raciocinio": niveis,
+                "filtro": filtro or "", "git": sha_curto(), "modelos": modelos()}
+        nome = nome_da_corrida(agora=datetime.now().strftime("%Y-%m-%d %H:%M"), v2=v2,
+                               gate=meta["gate"], raciocinio=niveis, filtro=filtro, sha=meta["git"])
+
+        async def task(*, item, **_):
+            if parou:
+                raise RuntimeError("teto de gasto atingido")
+            try:
+                return await tarefa(ids[item.id])
+            except SystemExit as fim:  # a thread do SDK só captura Exception
+                parou.append(fim)
+                raise RuntimeError(str(fim)) from fim
+
+        def passou(*, output, **_):
+            return [
+                Evaluation(name="passou", value=bool(output["ok"]), data_type="BOOLEAN",
+                           comment=str(output["obtido"])[:300]),
+                Evaluation(name="do_cache", value=bool(output["do_cache"]), data_type="BOOLEAN"),
+            ]
+
+        resultado = alvo.run_experiment(
+            name=dataset, run_name=nome, description=f"{dataset} — {nome}", task=task,
+            evaluators=[passou], max_concurrency=1, metadata=meta)
+        print(f"\nLangfuse: {nome}", flush=True)
+        if resultado.dataset_run_url:
+            print(f"Langfuse: {resultado.dataset_run_url}", flush=True)
+    finally:
+        cliente.flush()
+    if parou:
+        raise parou[0]
