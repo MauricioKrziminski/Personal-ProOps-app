@@ -72,6 +72,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "node --test",
+    "studio": "cd agent && .venv-studio/bin/langgraph dev --no-reload",
     "postinstall": "node -e \"if (require('expo-router/package.json').version !== '57.0.22') throw new Error('expo-router patch requires 57.0.22; revalidate or remove the patch before upgrading')\" && patch-package --error-on-fail"
   },
   "private": true

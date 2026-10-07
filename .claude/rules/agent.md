@@ -501,9 +501,10 @@ garantia sozinho virou responsabilidade do código:
   `dev@proops.local`, cria a sessão de chat e monta o estado com `conversation._estado_base`), e
   roda uma mensagem fase a fase. Venv própria (`.venv-studio`, receita no topo de
   `requirements-studio.txt`: o `langgraph-api` rebaixaria `grpcio`/`protobuf` da produção e não tem
-  wheel de `jsonschema-rs` para o 3.14). Subir: `cd agent && .venv-studio/bin/langgraph dev
-  --no-browser --no-reload` e abrir `https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024`
-  no Chrome (conta grátis do LangSmith só para abrir a tela; no Safari, `--tunnel`). Entrada
+  wheel de `jsonschema-rs` para o 3.14). Subir: **`npm run studio`** (na raiz; liga o servidor e abre
+  `https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024` no navegador — a tela é só a
+  janela, sem o servidor ela diz `Failed to fetch`). Chrome; conta grátis do LangSmith só para abrir
+  a tela; no Safari, `--tunnel`. Entrada
   `{"texto": "..."}`. Recusa subir com `DATABASE_URL` de produção, e `LANGSMITH_TRACING=false` é
   forçado: nada sai do Mac. O `confirm.decide` mora FORA do grafo, então o SIM se digita como
   resume: `true` aprova, `false` recusa, `{"approved": true, "candidate_id": "<id>"}` escolhe.
