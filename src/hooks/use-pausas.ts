@@ -16,10 +16,14 @@ export type PreviaDaCarencia = {
   with_interest: boolean;
 };
 
-export type PausaDaDivida = { id: string; from_installment_no: number; months: number; created_at: string };
+export type PausaDaDivida = { id: string; seq: number; from_installment_no: number; months: number; created_at: string };
 
 /** Dinheiro do jsonb chega como centavos inteiros; texto decimal também é aceito. */
-const cents = (v: unknown) => Math.round(Number(v ?? 0));
+export const cents = (v: unknown) => {
+  const n = Math.round(Number(v ?? 0));
+  if (!Number.isFinite(n)) throw new Error('Valor em centavos inválido');
+  return n;
+};
 
 /** Mesma chave enquanto a intenção não muda: o retry de rede reaproveita o UUID (molde `useEndRecurring`). */
 function useTentativa() {
@@ -45,6 +49,7 @@ export function usePauseRecurringPreview(id: string | null, from: string | null,
         p_recurring_id: id!, p_from: from!, p_until: until!,
       });
       if (error) throw error;
+      if (!data) throw new Error('Prévia vazia');
       const d = data as unknown as PreviaDaPausa;
       return { ...d, dates: d.dates ?? [], cents: cents(d.cents) };
     },
@@ -107,7 +112,7 @@ const prevCarencia = (r: unknown): PreviaDaCarencia => {
 export function useDebtPausePreview(debtId: string | null, fromNo: number | null, months: number | null) {
   return useQuery({
     enabled: Boolean(debtId && fromNo && months),
-    queryKey: ['debts', 'pause-preview', debtId, fromNo, months],
+    queryKey: ['debt-pause-preview', debtId, fromNo, months],
     staleTime: 0,
     gcTime: 0,
     queryFn: async (): Promise<PreviaDaCarencia> => {
@@ -115,6 +120,7 @@ export function useDebtPausePreview(debtId: string | null, fromNo: number | null
         p_debt_id: debtId!, p_from_installment_no: fromNo!, p_months: months!,
       });
       if (error) throw error;
+      if (!data) throw new Error('Prévia vazia');
       return prevCarencia(data);
     },
   });
@@ -159,9 +165,9 @@ export function useDebtPauses(debtId: string | null) {
     queryFn: async (): Promise<PausaDaDivida[]> => {
       const { data, error } = await supabase
         .from('debt_pauses')
-        .select('id, from_installment_no, months, created_at')
+        .select('id, seq, from_installment_no, months, created_at')
         .eq('debt_id', debtId!)
-        .order('from_installment_no', { ascending: false });
+        .order('seq', { ascending: false });
       if (error) throw error;
       return data ?? [];
     },

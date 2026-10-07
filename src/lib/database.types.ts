@@ -1258,6 +1258,7 @@ export type Database = {
           installment_before_cents: number | null
           installments_paid_at: number
           months: number
+          seq: number
           workspace_id: string
         }
         Insert: {
@@ -1275,6 +1276,7 @@ export type Database = {
           installment_before_cents?: number | null
           installments_paid_at: number
           months: number
+          seq?: never
           workspace_id: string
         }
         Update: {
@@ -1292,6 +1294,7 @@ export type Database = {
           installment_before_cents?: number | null
           installments_paid_at?: number
           months?: number
+          seq?: never
           workspace_id?: string
         }
         Relationships: [
@@ -5506,9 +5509,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },

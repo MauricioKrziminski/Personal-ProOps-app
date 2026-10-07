@@ -33,7 +33,7 @@ export interface Reminder {
 
 const financialTables = new Set([
   'transactions', 'accounts', 'card_invoices', 'installment_plans', 'budgets',
-  'recurring_transactions', 'debts', 'goals', 'goal_contributions', 'assets',
+  'recurring_transactions', 'debts', 'debt_pauses', 'goals', 'goal_contributions', 'assets',
 ]);
 let nextSubscriptionId = 0;
 const subscriptions = new WeakMap<QueryClient, Map<string, {

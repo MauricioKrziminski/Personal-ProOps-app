@@ -14,7 +14,7 @@ export const FINANCE_KEYS = [
     `use-finance.ts` — era a terceira vez que uma chave nova ficava de fora (ver o bloco do CICLO
     abaixo e a nota de `budgets-status` em `finance.md`).
   */
-  ['upcoming-bills'], ['upcoming-card-charges'], ['debts'], ['debt-schedule'],
+  ['upcoming-bills'], ['upcoming-card-charges'], ['debts'], ['debt-schedule'], ['debt-pauses'],
   ['debt-payments'], ['debt-payment-versions'], ['debt-declared-estimates'], ['payoff'], ['assets'],
   ['net-worth'], ['net-worth-series'], ['cash-history'], ['financial-health'],
   ['annual-report'], ['goal-contributions'], ['goal-milestones'], ['search', 'transactions'],
