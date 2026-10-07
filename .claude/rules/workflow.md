@@ -38,6 +38,9 @@
      (`AGENT_PROMPT_V2`). Uma vez, no fim, sem flag.
    - Caso que não mudou sai do cache (`agent/.eval-cache`, chave = caso + hash de prompts, schemas
      e modelos): repetir a seção custa só o que mudou. Com chave paga, sempre `--teto-usd`.
+   - Para VER a rodada (caso a caso, comparada com a anterior, com custo): `--langfuse`. Ela vira
+     um experimento no Langfuse (`ai-gemini.md`). Saída 3 = a rodada não chamou o modelo (cota):
+     o resultado não vale, mesmo que diga "passou".
 
    O pytest usa dublês e dublê sempre concorda: essa suíte é a única que diz se a pessoa pode
    responder do jeito dela, e a seção de segurança é a que impede que "interpretar melhor" vire

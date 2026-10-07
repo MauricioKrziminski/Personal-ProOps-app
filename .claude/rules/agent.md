@@ -496,6 +496,19 @@ garantia sozinho virou responsabilidade do código:
 - **Langfuse** fica no host da UE (`LANGFUSE_HOST=https://cloud.langfuse.com`); a retenção é a do
   plano contratado lá. Nome próprio NÃO é mascarado, de propósito (`telemetry.py`): sem ele o trace
   de uma confirmação não se depura. O elo log ↔ trace é o `thread_id` (= `session_id`).
+- **LangGraph Studio** (só desenvolvimento, `app/graph/studio.py` + `langgraph.json`): desenha o
+  grafo de produção, INALTERADO, como subgrafo de um nó `sessao` que faz o papel da borda (acha o
+  `dev@proops.local`, cria a sessão de chat e monta o estado com `conversation._estado_base`), e
+  roda uma mensagem fase a fase. Venv própria (`.venv-studio`, receita no topo de
+  `requirements-studio.txt`: o `langgraph-api` rebaixaria `grpcio`/`protobuf` da produção e não tem
+  wheel de `jsonschema-rs` para o 3.14). Subir: `cd agent && .venv-studio/bin/langgraph dev
+  --no-browser --no-reload` e abrir `https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024`
+  no Chrome (conta grátis do LangSmith só para abrir a tela; no Safari, `--tunnel`). Entrada
+  `{"texto": "..."}`. Recusa subir com `DATABASE_URL` de produção, e `LANGSMITH_TRACING=false` é
+  forçado: nada sai do Mac. O `confirm.decide` mora FORA do grafo, então o SIM se digita como
+  resume: `true` aprova, `false` recusa, `{"approved": true, "candidate_id": "<id>"}` escolhe.
+  **Aprovar grava de verdade no staging.** O servidor lê o `agent/.env` POR CIMA do ambiente:
+  trocar a chave do Gemini exige um `--config` sem `env`.
 - **CI**: `.github/workflows/agent-ci.yml` roda `ruff`, `pytest` e a suíte SQL. A avaliação com
   Gemini real fica FORA dele, por decisão (06/10/2026): roda local, por parte (`workflow.md`, passo 4).
 

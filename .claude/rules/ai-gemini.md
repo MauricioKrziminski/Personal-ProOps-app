@@ -200,6 +200,19 @@ nenhum outro:
   gasto é como a conta some. Custo real: console de faturamento da conta `01ED4C-C3849B-0169D7`
   (Relatórios, por serviço e SKU) ou o export para o BigQuery.
 
+  **Desde 06/10/2026 as suítes chegam ao Langfuse SÓ com `--langfuse`**, e chegam como
+  EXPERIMENTO: cada rodada vira um *dataset run* sobre `eval/formas-de-resposta` ou
+  `eval/compreensao-de-conversa`, com `passou`/`do_cache` por caso e as chamadas ao Gemini
+  penduradas no caso (custo por rodada na comparação). O nome da rodada diz prompt, modelo do
+  gate, raciocínio, filtro e commit. Sem a flag o harness ZERA `LANGFUSE_PUBLIC_KEY`: o projeto do
+  Langfuse é o mesmo da produção, e antes disso cada chamada da avaliação virava trace solto no
+  meio do tráfego real. Os `probe_*` continuam fora — a fatura segue sendo a fonte do custo.
+
+  **Rodada sem nenhuma chamada ao modelo concluída não vale e sai com código 3**
+  (`eval_cache.rodada_invalida`). Cota esgotada (429) é engolida dentro dos classificadores e vira
+  `None`, que a seção de segurança lê como "não aprovou" = passou: em 06/10/2026 uma rodada assim
+  mostrou "18/18" sem ter falado com o Gemini uma vez.
+
   📏 **Unidade oficial, conferida em 15/09/2026** contra `ai.google.dev/gemini-api/docs/pricing` —
   e o Langfuse bate na sexta casa decimal, então a tabela DELE serve de calculadora (só não serve
   de auditoria, pelo motivo acima): `gemini-3.1-flash-lite` US$ 0,25/1,50 por 1 M de tokens
