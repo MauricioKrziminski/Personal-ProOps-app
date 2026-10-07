@@ -37,6 +37,7 @@ import {
   useTransaction,
   type Transaction,
 } from '@/hooks/use-finance';
+import { emPausa } from '@/lib/pausa';
 import { usePausa } from '@/components/finance/pausa-sheet';
 import { useApagarComAlcance } from '@/hooks/use-apagar-com-alcance';
 import { alvoDoLancamento } from '@/lib/apagar-com-alcance';
@@ -526,9 +527,12 @@ export default function TransactionDetailScreen() {
                   onPress: () => router.push(hrefDoLembrete({ tipo: 'lancamento', tx }, title)),
                 }]
               : []),
-            ...(tx.recurring_id
+            // Só com a série carregada, ativa e fora de uma pausa (a mesma régua de Recorrentes).
+            // O início é a data que o banco usa para decidir o que sai: o vencimento, fora do cartão.
+            ...(tx.recurring_id && serie?.active && !emPausa(localISODate(), serie.paused_from ?? null, serie.paused_until ?? null)
               ? [{ label: 'Pausar…', icon: 'pause' as const,
-                  onPress: () => pausando.abrir({ tipo: 'recurring', id: tx.recurring_id!, titulo: title }, tx.occurred_at) }]
+                  onPress: () => pausando.abrir({ tipo: 'recurring', id: tx.recurring_id!, titulo: title },
+                    tx.invoice_id ? tx.occurred_at : (tx.due_at ?? tx.occurred_at)) }]
               : []),
             {
               label: 'Apagar',

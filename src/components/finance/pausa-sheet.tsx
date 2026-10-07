@@ -58,11 +58,17 @@ export function PausaSheet({ visivel, onClose, alvo, inicioPadrao }: {
   const semPrazo = modo === 'sem_prazo';
   const previa = usePauseRecurringPreview(serie && visivel && !semPrazo ? alvo.id : null, inicio, fim);
 
-  const motivo = !inicioOk ? 'Data inválida'
+  const motivo = semPrazo ? undefined : !inicioOk ? 'Data inválida'
     : modo === 'ate' && !ateOk ? (ateBR ? 'Escolha uma data a partir do início' : 'Escolha até quando') : undefined;
   const pendente = pausarSerie.isPending || toggleSerie.isPending || pausarLembrete.isPending || toggleLembrete.isPending;
   const pronto = !motivo && (semPrazo || !serie || Boolean(previa.data && !previa.isFetching));
 
+  // Fechar no meio do envio perderia o aviso de erro (o retorno da mutação some com a folha).
+  const fechar = () => { if (!pendente) onClose(); };
+  const trocarModo = (novo: ModoDaPausa) => {
+    if ((novo === 'dias' || novo === 'meses') && novo !== modo) setN(novo === 'dias' ? 7 : 1);
+    setModo(novo);
+  };
   const feito = (message: string) => () => { onClose(); toast({ message, tone: 'success' }); };
   const falhou = (error: unknown) => toast({ message: financeErrorMessage(error, 'Não deu para pausar. Tenta de novo.'), tone: 'error' });
   const confirmar = () => {
@@ -82,17 +88,19 @@ export function PausaSheet({ visivel, onClose, alvo, inicioPadrao }: {
     : inicio && fim ? `Não toca de ${dm(inicio)} a ${dm(somaDias(fim, -1))}.` : null;
 
   return (
-    <Sheet visible={visivel} onClose={onClose}>
+    <Sheet visible={visivel} onClose={fechar}>
       <TaskHeader
         title={`Pausar ${alvo.titulo}`}
-        onClose={onClose}
+        onClose={fechar}
         action={<Button label="Pausar" size="sm" loading={pendente} disabled={!pronto || pendente} onPress={confirmar} />}
       />
       <SheetScroll contentContainerStyle={styles.corpo}>
-        <Field label="A partir de" error={!inicioOk ? 'Data inválida' : undefined}>
-          <DatePickerField value={inicioBR} onChange={setInicioBR} accessibilityLabel="Início da pausa" invalid={!inicioOk} />
-        </Field>
-        <Segmented options={MODOS} value={modo} onChange={setModo} />
+        {semPrazo ? null : (
+          <Field label="A partir de" error={!inicioOk ? 'Data inválida' : undefined}>
+            <DatePickerField value={inicioBR} onChange={setInicioBR} accessibilityLabel="Início da pausa" invalid={!inicioOk} />
+          </Field>
+        )}
+        <Segmented options={MODOS} value={modo} onChange={trocarModo} />
         {modo === 'dias' || modo === 'meses' ? (
           <Field label={modo === 'dias' ? 'Quantos dias' : 'Quantos meses'}>
             <QuantityField value={n} min={1} max={modo === 'dias' ? 365 : 24} onChange={setN}

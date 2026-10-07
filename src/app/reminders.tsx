@@ -54,7 +54,6 @@ export default function RemindersScreen() {
   const channel = filters.selections?.channel;
   const { data, isLoading, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } = useReminders({
     from: filters.from, to: filters.to, q: filters.q,
-    active: status ? status === 'active' : undefined,
     channel: channel === 'push' || channel === 'whatsapp' || channel === 'both' ? channel : undefined,
   });
   const lembretesDeConta = useBillReminders();
@@ -70,7 +69,9 @@ export default function RemindersScreen() {
 
   // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
   // falha, e sem este corte a tela seguia afirmando números embaixo da faixa de erro.
-  const reminders = isError ? [] : (data?.pages.flat() ?? []).filter((r) => !r.parent_reminder_id || r.active);
+  // O estado filtra aqui, não no servidor: dentro do período de uma pausa o lembrete conta como pausado.
+  const reminders = isError ? [] : (data?.pages.flat() ?? []).filter((r) => (!r.parent_reminder_id || r.active)
+    && (!status || (status === 'active') === (r.active && !noPeriodo(r))));
   const active = reminders.filter((r) => r.active && !noPeriodo(r));
   const paused = reminders.filter((r) => !r.active || noPeriodo(r));
 
@@ -117,6 +118,9 @@ export default function RemindersScreen() {
             desfaz: true,
             onPress: () => alternar(!r.active),
           },
+      ...(r.active && r.paused_from && r.paused_until && hoje < r.paused_from
+        ? [{ label: 'Cancelar pausa', icon: 'play' as const, onPress: retomarAgora }]
+        : []),
       ...(r.active && !noPeriodo(r) && r.recurrence
         ? [{ label: 'Pausar…', icon: 'pause' as const,
             onPress: () => pausando.abrir({ tipo: 'reminder', id: r.id, titulo: r.title }, dataLocalDe(r.next_run_at)) }]
@@ -133,7 +137,7 @@ export default function RemindersScreen() {
           r.parent_reminder_id
             ? `Ocorrência editada · ${formatDateBR(r.next_run_at)}`
             : r.skip_run_at === r.next_run_at
-            ? `${describeRRule(r.recurrence)} · próxima após a ocorrência editada`
+            ? `${describeRRule(r.recurrence)} · próxima após a ocorrência editada${r.active && rotulo(r) ? ` · ${rotulo(r)}` : ''}`
             : r.recurrence
             ? `${describeRRule(r.recurrence)} · próximo ${formatDateBR(r.next_run_at)}${r.active && rotulo(r) ? ` · ${rotulo(r)}` : ''}`
             : formatDateBR(r.next_run_at)

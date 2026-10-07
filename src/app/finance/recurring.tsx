@@ -197,12 +197,15 @@ export default function RecurringScreen() {
   /** Dentro do período de uma pausa com prazo (`active` segue true): é o mesmo grupo das pausadas. */
   const noPeriodo = (r: RecurringTransaction) => r.active && emPausa(hoje, r.paused_from ?? null, r.paused_until ?? null);
 
+  const alternarPeriodo = (r: RecurringTransaction) =>
+    retomando.mutate({ id: r.id }, {
+      onSuccess: () => toast({ message: 'Série retomada.', tone: 'success' }),
+      onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para retomar a série.'), tone: 'error' }),
+    });
+
   const alternar = (r: RecurringTransaction) =>
     noPeriodo(r)
-      ? retomando.mutate({ id: r.id }, {
-          onSuccess: () => toast({ message: 'Série retomada.', tone: 'success' }),
-          onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para retomar a série.'), tone: 'error' }),
-        })
+      ? alternarPeriodo(r)
       : toggle.mutate(
       { id: r.id, active: !r.active },
       {
@@ -251,6 +254,10 @@ export default function RecurringScreen() {
       ...(r.kind === 'expense'
         ? [{ label: lembreteDaSerie(r) ? 'Editar lembrete' : 'Lembrar', icon: 'bell' as const,
             onPress: () => router.push(hrefDoLembrete({ tipo: 'serie', recurringId: r.id }, r.description ?? 'Recorrente')) }]
+        : []),
+      // Pausa marcada para depois: ainda não começou, e se cancela como se retoma.
+      ...(r.active && r.paused_from && r.paused_until && hoje < r.paused_from
+        ? [{ label: 'Cancelar pausa', icon: 'play' as const, onPress: () => alternarPeriodo(r) }]
         : []),
       noPeriodo(r)
         ? { label: 'Retomar agora', icon: 'play', arrasto: 'direita', onPress: () => alternar(r) }

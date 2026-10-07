@@ -748,7 +748,7 @@ export function useRecurringSerie(id: string | null | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('recurring_transactions')
-        .select('rrule, amount_cents')
+        .select('rrule, amount_cents, active, paused_from, paused_until')
         .eq('id', id!)
         .maybeSingle();
       if (error) throw error;
