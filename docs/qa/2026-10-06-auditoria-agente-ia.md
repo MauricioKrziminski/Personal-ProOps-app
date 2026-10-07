@@ -687,3 +687,25 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
 Nada. Em 06/10/2026: as 6 migrations e o agente (`agente-00103-ccs`, com `AGENTE_RLS` e
 `AGENT_PROMPT_V2` ligados) subiram para produção, conferidos com duas mensagens reais no WhatsApp;
 a suíte SQL passou inteira num runner do GitHub e virou bloqueante; alertas e orçamento estão no GCP.
+
+## 21. Ferramentas em volta do agente (06/10/2026, depois da subida)
+
+Pedido do dono do produto: ver os testes, controlar as fases e baixar custo. Avaliados e recusados
+com motivo: **Jev** (TypeSafe — modelo que só escolhe; versão 0.01, por convite, fraco em português
+e em conteúdo adversarial, que é o que o portão julga) e **Mastra** (TypeScript: seria reescrever o
+agente, contra a decisão Python + LangGraph). Feitos, todos sem conta nova a pagar:
+
+| o quê | onde | verificado |
+|---|---|---|
+| Testes como experimentos no Langfuse (`--langfuse`) | `scripts/eval_cache.rodar_experimento`, datasets `eval/formas-de-resposta` e `eval/compreensao-de-conversa` | rodadas reais com `passou`/`do_cache` por caso e as chamadas penduradas no caso; segurança no Lite (US$ 0,003) e no Flash (US$ 0,021) lado a lado |
+| Rodada sem chamada ao modelo não vale (saída 3) | `eval_cache.rodada_invalida` | pegou a rodada com cota esgotada que dizia "18/18" |
+| Testes fora do Langfuse de produção sem a flag | `evaluate_*.py` zeram `LANGFUSE_PUBLIC_KEY` | `telemetry.handler()` = None |
+| LangGraph Studio local sobre o staging | `app/graph/studio.py`, `langgraph.json`, `.venv-studio` | consulta respondida, escrita parada no SIM, recusa; sessões de teste apagadas por id |
+| GEPA nos prompts do portão | `scripts/otimizar_portao.py`, `.venv-gepa`, commit `b7f582f3` | Lite e Flash 18/18 segurança, 26/26, 19/19, 7/7; 18/18 em frases fora do prompt, da suíte e do treino |
+| Sombra do Lite no portão | `GEMINI_SHADOW_GATE` no deploy | ligada no staging (`agente-staging-00231-v4c`) |
+
+Gasto pago desta rodada: ~US$ 0,45 (GEPA ~0,14; medições e aceitação o resto).
+
+**Decisão pendente do dono do produto:** subir os prompts novos para produção (melhoram também o
+Flash) e, depois de um período de sombra, trocar o modelo do portão para o Lite (~7× mais barato
+por confirmação digitada).
