@@ -1,12 +1,14 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field } from '@/components/ui/field';
 import { QuantityField } from '@/components/ui/quantity-field';
+import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { Segmented } from '@/components/ui/segmented';
 import { TaskHeader } from '@/components/ui/task-header';
@@ -16,7 +18,7 @@ import { Space } from '@/design/tokens';
 import { useBillReminderFor, useBillReminders, useSaveBillReminder } from '@/hooks/use-bill-reminders';
 import { useAlertPreferences } from '@/hooks/use-push';
 import { useSession } from '@/hooks/use-session';
-import { AVISO_PADRAO, alvoDoParam, type Aviso } from '@/lib/lembrete-de-conta';
+import { AVISO_PADRAO, alvoDoParam, quandoDoAviso, type Aviso } from '@/lib/lembrete-de-conta';
 
 const CANAIS = [
   { value: 'push', label: 'Push' },
@@ -41,15 +43,19 @@ export function BillReminderForm({ conta, todas, nome }: { conta: string; todas?
   const existente = escopo === 'todas' ? existenteTodas : existenteSo;
   const [avisos, setAvisos] = useState<Aviso[] | null>(null);
   const [canal, setCanal] = useState<Canal | null>(null);
-  const [horaAberta, setHoraAberta] = useState<number | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
+  const [aberto, setAberto] = useState<{ i: number; parte: 'dias' | 'hora' } | null>(null);
   const salvar = useSaveBillReminder();
   const { session } = useSession();
   const prefs = useAlertPreferences(session?.user.id);
 
-  const lista = avisos ?? existente?.avisos ?? [AVISO_PADRAO];
+  // Nunca vazio: o lembrete sem aviso se tira em "Remover lembrete", e só se tira um aviso havendo outro.
+  const lista = avisos ?? (existente?.avisos.length ? existente.avisos : [AVISO_PADRAO]);
   const canalAtual = canal ?? existente?.channel ?? 'push';
   const mudar = (i: number, parte: Partial<Aviso>) => setAvisos(lista.map((a, j) => (j === i ? { ...a, ...parte } : a)));
+  const alternar = (i: number, parte: 'dias' | 'hora') => {
+    Haptics.selectionAsync();
+    setAberto((atual) => (atual?.i === i && atual.parte === parte ? null : { i, parte }));
+  };
 
   if (!alvo) {
     return (
@@ -76,8 +82,6 @@ export function BillReminderForm({ conta, todas, nome }: { conta: string; todas?
 
   const onSalvar = () => {
     if (!carregados.isSuccess) return;
-    if (!lista.length) return setErro('Adicione pelo menos um aviso');
-    setErro(null);
     gravar(lista);
   };
 
@@ -98,39 +102,41 @@ export function BillReminderForm({ conta, todas, nome }: { conta: string; todas?
           <Segmented
             options={[{ value: 'so', label: 'Só esta' }, { value: 'todas', label: 'Todas as próximas' }]}
             value={escopo}
-            onChange={(v) => { setEscopo(v); setAvisos(null); setCanal(null); setErro(null); }}
+            onChange={(v) => { setEscopo(v); setAvisos(null); setCanal(null); setAberto(null); }}
           />
         ) : null}
-        <Card>
-          <Field label="Avisar" error={erro ?? undefined}>
-            {lista.map((a, i) => (
-              <View key={i} style={styles.aviso}>
-                <QuantityField
-                  value={a.days_before}
-                  min={0}
-                  max={30}
-                  onChange={(n) => mudar(i, { days_before: n })}
-                  accessibilityLabel="Dias antes"
-                />
-                <ThemedText type="small">{a.days_before === 0 ? 'no dia' : a.days_before === 1 ? 'dia antes' : 'dias antes'}</ThemedText>
-                <Pressable accessibilityRole="button" accessibilityLabel={`Hora, ${a.at_time}`} style={styles.alvo} onPress={() => setHoraAberta(i)}>
-                  <ThemedText type="smallBold">{a.at_time}</ThemedText>
-                </Pressable>
-                <Pressable accessibilityRole="button" accessibilityLabel="Tirar aviso" style={styles.alvo}
-                  onPress={() => setAvisos(lista.filter((_, j) => j !== i))}>
-                  <ThemedText type="small">✕</ThemedText>
-                </Pressable>
-              </View>
-            ))}
-            <Button label="Adicionar aviso" variant="secondary" size="sm"
-              onPress={() => { setErro(null); setAvisos([...lista, AVISO_PADRAO]); }} />
-          </Field>
-          {horaAberta !== null ? (
-            <TimePicker value={lista[horaAberta]?.at_time ?? AVISO_PADRAO.at_time}
-              onChange={(h) => mudar(horaAberta, { at_time: h })}
-              onClose={() => setHoraAberta(null)} />
-          ) : null}
-        </Card>
+        {/* Cada aviso é um grupo de duas linhas (Quando, Hora) com o valor à direita; o controle abre no
+            lugar, como o "Quando" do lembrete comum. */}
+        {lista.map((a, i) => {
+          const quando = quandoDoAviso(a.days_before);
+          const vale = (parte: 'dias' | 'hora') => aberto?.i === i && aberto.parte === parte;
+          return (
+            <Section key={i} title={lista.length > 1 ? `Aviso ${i + 1}` : 'Aviso'}>
+              <Row icon="calendar" title="Quando" chevron={false} onPress={() => alternar(i, 'dias')}
+                accessibilityLabel={`Quando: ${quando}`} accessibilityState={{ expanded: vale('dias') }}
+                trailing={<ThemedText type="smallBold">{quando.charAt(0).toUpperCase() + quando.slice(1)}</ThemedText>} />
+              {vale('dias') ? (
+                <View style={styles.painel}>
+                  <QuantityField value={a.days_before} min={0} max={30}
+                    onChange={(n) => mudar(i, { days_before: n })} accessibilityLabel="Dias antes do vencimento" />
+                </View>
+              ) : null}
+              <Row icon="clock" title="Hora" chevron={false} onPress={() => alternar(i, 'hora')}
+                accessibilityLabel={`Hora: ${a.at_time}`} accessibilityState={{ expanded: vale('hora') }}
+                trailing={<ThemedText type="smallBold">{a.at_time}</ThemedText>} />
+              {vale('hora') ? (
+                <TimePicker value={a.at_time} onChange={(h) => mudar(i, { at_time: h })}
+                  onClose={() => setAberto(null)} inlineStyle={styles.painel} />
+              ) : null}
+              {lista.length > 1 ? (
+                <Row icon="trash" title="Tirar este aviso" destructive chevron={false}
+                  onPress={() => { setAberto(null); setAvisos(lista.filter((_, j) => j !== i)); }} />
+              ) : null}
+            </Section>
+          );
+        })}
+        <Button label="Adicionar aviso" variant="secondary"
+          onPress={() => { setAberto(null); setAvisos([...lista, AVISO_PADRAO]); }} />
         <Card>
           <Field label="Onde avisar"
             hint={semWhatsApp ? 'O WhatsApp está desligado no Perfil: não vai por lá.' : undefined}>
@@ -151,6 +157,5 @@ export function BillReminderForm({ conta, todas, nome }: { conta: string; todas?
 
 const styles = StyleSheet.create({
   corpo: { gap: Space.xl },
-  alvo: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  aviso: { flexDirection: 'row', alignItems: 'center', gap: Space.md, flexWrap: 'wrap' },
+  painel: { paddingHorizontal: Space.lg, paddingVertical: Space.md },
 });

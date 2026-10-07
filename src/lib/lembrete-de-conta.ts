@@ -50,9 +50,11 @@ const hora = (hhmm: string) => {
   return m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`;
 };
 
+/** "no dia" | "1 dia antes" | "N dias antes" — a mesma frase no resumo e no formulário. */
+export const quandoDoAviso = (dias: number) => (dias === 0 ? 'no dia' : dias === 1 ? '1 dia antes' : `${dias} dias antes`);
+
 export function rotuloDoAviso(a: Aviso): string {
-  const quando = a.days_before === 0 ? 'no dia' : a.days_before === 1 ? '1 dia antes' : `${a.days_before} dias antes`;
-  return `${quando} às ${hora(a.at_time)}`;
+  return `${quandoDoAviso(a.days_before)} às ${hora(a.at_time)}`;
 }
 
 export const resumoDosAvisos = (avisos: Aviso[]) => avisos.map(rotuloDoAviso).join(' · ');

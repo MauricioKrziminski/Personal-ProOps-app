@@ -8194,13 +8194,22 @@ test('Recorrentes: "Lembrar" só em série de despesa', () => {
   assert.ok(!acoes('income').includes('Lembrar'));
 });
 
-test('Lembrete de conta: alvos de toque têm 44pt e o rótulo concorda com 1 dia', () => {
+test('Lembrete de conta: cada aviso é Quando + Hora em linhas, e o campo abre no lugar', () => {
   const ui = lembreteDeConta({ conta: `transaction_id:${LEMBRETE_ID}`, nome: 'Aluguel' });
-  const alvos = ui.nodes().filter((n: any) => n.props?.accessibilityLabel === 'Tirar aviso' || String(n.props?.accessibilityLabel).startsWith('Hora'));
-  assert.equal(alvos.length, 2);
-  for (const n of alvos) assert.ok(JSON.stringify(n.props.style).includes('"minHeight":44'), JSON.stringify(n.props.style));
+  const linha = (titulo: string) => ui.nodes().find((n: any) => n.type === 'Row' && n.props.title === titulo);
+  const valor = (titulo: string) => linha(titulo).props.trailing.props.children;
+  assert.equal(valor('Quando'), 'No dia');
+  assert.equal(valor('Hora'), '09:00');
+  assert.equal(ui.nodes().some((n: any) => n.type === 'QuantityField'), false, 'fechado: só o valor');
+  assert.equal(ui.nodes().some((n: any) => n.type === 'Row' && n.props.title === 'Tirar este aviso'), false, 'um aviso só não se tira');
+  ui.interact(() => linha('Quando').props.onPress());
   ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'QuantityField').props.onChange(1));
-  assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText' && n.props.children === 'dia antes'));
+  assert.equal(valor('Quando'), '1 dia antes');
+  ui.press('Adicionar aviso');
+  assert.equal(ui.nodes().filter((n: any) => n.type === 'Row' && n.props.title === 'Tirar este aviso').length, 2);
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Row' && n.props.title === 'Tirar este aviso').props.onPress());
+  ui.press('Salvar');
+  assert.deepEqual(copia(ui.writes.at(-1)?.value.avisos), [{ days_before: 0, at_time: '09:00' }]);
 });
 
 test('Lançamento: "Lembrar" só em despesa (receita e transferência ficam fora)', () => {
@@ -8215,14 +8224,6 @@ test('Lançamento: "Lembrar" só em despesa (receita e transferência ficam fora
   for (const extra of [{ kind: 'income' }, { kind: 'transfer', counterparty_account_id: 'b' }]) {
     assert.ok(!rotulos(extra).some((l: string) => l.startsWith('Lembrar')), JSON.stringify(extra));
   }
-});
-
-test('Lembrete de conta: sem nenhum aviso o Salvar não grava e diz por quê', () => {
-  const ui = lembreteDeConta({ conta: `transaction_id:${LEMBRETE_ID}`, nome: 'Aluguel' });
-  ui.interact((nodes: any[]) => nodes.find((n) => n.props?.accessibilityLabel === 'Tirar aviso').props.onPress());
-  ui.press('Salvar');
-  assert.equal(ui.writes.filter((w: any) => w.operation === 'saveBillReminder').length, 0);
-  assert.ok(ui.nodes().some((n: any) => n.type === 'Field' && n.props.error === 'Adicione pelo menos um aviso'));
 });
 
 test('Lembretes: a seção Contas lista cada conta lembrada e abre a edição', () => {
