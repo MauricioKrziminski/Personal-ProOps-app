@@ -16,6 +16,7 @@ declare
   conta uuid; serie uuid; t_pago uuid; t_atrasada uuid; t_ancora uuid; t_depois uuid; t_longe uuid; cartao uuid; t_pai uuid; t_fee uuid;
   r jsonb; n int; chave uuid := gen_random_uuid(); cfg text[];
   plano uuid; p1 uuid; p2 uuid; p3 uuid; p4 uuid; soma bigint; k int; ent uuid; q1 uuid; q2 uuid; q3 uuid; q4 uuid;
+  lem uuid; filho uuid;
   d uuid; pg1 uuid; pg2 uuid; pg3 uuid; restante bigint;
 begin
   select id into ws from public.workspaces where owner_id = u;
@@ -394,6 +395,42 @@ begin
   assert (r->>'apaga_contrato')::boolean, format('todos apaga o contrato: %s', r);
   reset role;
   assert not exists (select 1 from public.debts where id = d), 'a dívida sai';
+  set local role authenticated;
+
+  -- ── Task 4: lembrete que repete ──
+  reset role;
+  insert into public.reminders (user_id, workspace_id, title, recurrence, next_run_at, timezone, channel, active, source)
+  values (u, ws, 'Remédio AA', 'FREQ=DAILY', now() + interval '1 hour', 'America/Sao_Paulo', 'push', true, 'app')
+  returning id into lem;
+  set local role authenticated;
+  r := public.delete_scoped_preview('reminder', lem, 'one');
+  reset role;
+  assert (select skip_run_at is null from public.reminders where id = lem), 'a prévia não escreve';
+  set local role authenticated;
+  r := public.delete_scoped('reminder', lem, 'one', gen_random_uuid());
+  reset role;
+  assert (select skip_run_at = next_run_at from public.reminders where id = lem), 'só esta pula a próxima vez';
+  update public.reminders set skip_run_at = null where id = lem;
+  insert into public.reminders (user_id, workspace_id, title, next_run_at, timezone, channel, active, source, parent_reminder_id, original_run_at)
+  select u, ws, 'Remédio AA (antes)', next_run_at - interval '30 minutes', 'America/Sao_Paulo', 'push', true, 'app', id, next_run_at
+    from public.reminders where id = lem returning id into filho;
+  update public.reminders set skip_run_at = next_run_at where id = lem;
+  set local role authenticated;
+  r := public.delete_scoped('reminder', filho, 'one', gen_random_uuid());
+  reset role;
+  assert not exists (select 1 from public.reminders where id = filho), 'o filho sai';
+  assert (select skip_run_at = next_run_at from public.reminders where id = lem), 'a vez continua pulada';
+  set local role authenticated;
+  begin
+    perform public.delete_scoped_preview('reminder', lem, 'future');
+    n := -1;
+  exception when others then
+    assert sqlstate = '22023', format('lembrete future: %s %s', sqlstate, sqlerrm);
+  end;
+  assert n <> -1, 'future em lembrete devia ser recusado';
+  r := public.delete_scoped('reminder', lem, 'all', gen_random_uuid());
+  reset role;
+  assert not exists (select 1 from public.reminders where id = lem), 'todas apaga o lembrete';
   set local role authenticated;
 
   -- BLOCOS DAS PRÓXIMAS TAREFAS ENTRAM AQUI
