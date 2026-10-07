@@ -25,7 +25,7 @@ begin
     'accept_pending_invites','account_balances','accounts_horizon','agent_activity','annual_by_category','annual_summary',
     'anticipation_candidates','approve_import_items','bill_reminders_overview','budget_plan_command','budget_plan_preview','budget_plan_state','budgets_status','cancel_subscription','card_summary','cards_horizon',
     'categories_used','convert_transaction_to_installments','converter_registro','create_installment_plan_last_day','create_installment_plan_with_history',
-    'cycle_lines','cycle_now','cycle_range','cycle_series','daily_spending','debt_schedule','delete_category','delete_scoped','delete_scoped_preview','delete_asset_valuation','delete_debt','end_recurring_series','end_recurring_series_preview','financial_health',
+    'cycle_lines','cycle_now','cycle_range','cycle_series','daily_spending','debt_schedule','debt_pause','debt_pause_preview','undo_debt_pause','delete_category','delete_scoped','delete_scoped_preview','delete_asset_valuation','delete_debt','end_recurring_series','end_recurring_series_preview','financial_health',
     'finish_import_batch','forecast_json','goal_deposit','goal_link_candidates','goal_money_command','goal_money_state','import_unmatched','investment_command','investment_link_candidates','investment_movements_page','investment_positions','investment_value_command','ledger_expected_lines_transfer','month_breakdown',
     'materialize_recurring_occurrence','month_forecast_json','month_lines','month_summary','monthly_cashflow','my_default_workspace',
     'net_worth','net_worth_series','note_folder_counts','note_folders_reorder','note_tag_counts',

@@ -1242,6 +1242,60 @@ export type Database = {
           },
         ]
       }
+      debt_pauses: {
+        Row: {
+          balance_before_cents: number
+          created_at: string
+          created_by: string
+          debt_id: string
+          from_installment_no: number
+          id: string
+          installment_before_cents: number | null
+          installments_paid_at: number
+          months: number
+          workspace_id: string
+        }
+        Insert: {
+          balance_before_cents: number
+          created_at?: string
+          created_by?: string
+          debt_id: string
+          from_installment_no: number
+          id?: string
+          installment_before_cents?: number | null
+          installments_paid_at: number
+          months: number
+          workspace_id: string
+        }
+        Update: {
+          balance_before_cents?: number
+          created_at?: string
+          created_by?: string
+          debt_id?: string
+          from_installment_no?: number
+          id?: string
+          installment_before_cents?: number | null
+          installments_paid_at?: number
+          months?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debt_pauses_debt_id_fkey"
+            columns: ["debt_id"]
+            isOneToOne: false
+            referencedRelation: "debts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "debt_pauses_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       debts: {
         Row: {
           account_id: string | null
@@ -2860,6 +2914,8 @@ export type Database = {
           materialized_until: string | null
           merchant: string | null
           next_run_at: string
+          paused_from: string | null
+          paused_until: string | null
           payment_method: string | null
           rrule: string
           run_attempts: number
@@ -2892,6 +2948,8 @@ export type Database = {
           materialized_until?: string | null
           merchant?: string | null
           next_run_at: string
+          paused_from?: string | null
+          paused_until?: string | null
           payment_method?: string | null
           rrule: string
           run_attempts?: number
@@ -2924,6 +2982,8 @@ export type Database = {
           materialized_until?: string | null
           merchant?: string | null
           next_run_at?: string
+          paused_from?: string | null
+          paused_until?: string | null
           payment_method?: string | null
           rrule?: string
           run_attempts?: number
@@ -2996,6 +3056,8 @@ export type Database = {
           occurrence_outcome: string | null
           original_run_at: string | null
           parent_reminder_id: string | null
+          paused_from: string | null
+          paused_until: string | null
           processed_at: string | null
           recurrence: string | null
           send_attempts: number
@@ -3020,6 +3082,8 @@ export type Database = {
           occurrence_outcome?: string | null
           original_run_at?: string | null
           parent_reminder_id?: string | null
+          paused_from?: string | null
+          paused_until?: string | null
           processed_at?: string | null
           recurrence?: string | null
           send_attempts?: number
@@ -3044,6 +3108,8 @@ export type Database = {
           occurrence_outcome?: string | null
           original_run_at?: string | null
           parent_reminder_id?: string | null
+          paused_from?: string | null
+          paused_until?: string | null
           processed_at?: string | null
           recurrence?: string | null
           send_attempts?: number
@@ -4451,6 +4517,23 @@ export type Database = {
           income_cents: number
         }[]
       }
+      debt_pause: {
+        Args: {
+          p_debt_id: string
+          p_from_installment_no: number
+          p_months: number
+          p_request_id: string
+        }
+        Returns: Json
+      }
+      debt_pause_preview: {
+        Args: {
+          p_debt_id: string
+          p_from_installment_no: number
+          p_months: number
+        }
+        Returns: Json
+      }
       debt_schedule: {
         Args: { p_debt_id: string }
         Returns: {
@@ -4898,6 +4981,19 @@ export type Database = {
       note_tags_of: { Args: { txt: string }; Returns: string[] }
       note_tags_valid: { Args: { p_tags: string[] }; Returns: boolean }
       notes_reorder: { Args: { p_ids: string[] }; Returns: undefined }
+      pause_recurring: {
+        Args: {
+          p_from: string
+          p_recurring_id: string
+          p_request_id: string
+          p_until: string
+        }
+        Returns: Json
+      }
+      pause_recurring_preview: {
+        Args: { p_from: string; p_recurring_id: string; p_until: string }
+        Returns: Json
+      }
       pay_debt_installment: {
         Args: {
           p_account_id?: string
@@ -4971,6 +5067,10 @@ export type Database = {
       }
       resolve_subcategory_attempt: {
         Args: { p_input: Json; p_request_id: string }
+        Returns: Json
+      }
+      resume_recurring: {
+        Args: { p_recurring_id: string; p_request_id: string }
         Returns: Json
       }
       roll_invoice: {
@@ -5102,6 +5202,10 @@ export type Database = {
           total_cents: number
           tx_count: number
         }[]
+      }
+      undo_debt_pause: {
+        Args: { p_pause_id: string; p_request_id: string }
+        Returns: Json
       }
       unroll_invoice: { Args: { p_invoice_id: string }; Returns: string }
       unsettle_invoice: { Args: { p_invoice_id: string }; Returns: string }

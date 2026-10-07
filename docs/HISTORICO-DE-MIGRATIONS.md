@@ -305,3 +305,6 @@ Sobem juntas (a segunda faz o lembrete próprio substituir o aviso automático).
 Sobem juntas (`100400`/`100500` são o gatilho que impede o apagar comum de deixar fatura paga em parte abaixo do pago).
 
 **Apagar com alcance, revisão final** — `20261008100600`: staging 07/10/2026, produção pendente. Sobe junto das seis de `20261008100000` a `20261008100500` (espaço do pai na série e no lembrete; "Esta e as próximas" leva a paga depois da âncora).
+
+**Pausar com prazo e carência** — `20261009120000` (pausa da série) e `20261009120100` (carência da dívida): staging 07/10/2026, produção pendente.
+Sobem juntas, depois das de `20261008…`.
