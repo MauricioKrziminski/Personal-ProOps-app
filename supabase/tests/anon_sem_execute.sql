@@ -23,14 +23,14 @@ begin
   select string_agg(nome, ', ') into faltando
   from unnest(array[
     'accept_pending_invites','account_balances','accounts_horizon','agent_activity','annual_by_category','annual_summary',
-    'anticipation_candidates','approve_import_items','budget_plan_command','budget_plan_preview','budget_plan_state','budgets_status','cancel_subscription','card_summary','cards_horizon',
+    'anticipation_candidates','approve_import_items','bill_reminders_overview','budget_plan_command','budget_plan_preview','budget_plan_state','budgets_status','cancel_subscription','card_summary','cards_horizon',
     'categories_used','convert_transaction_to_installments','converter_registro','create_installment_plan_last_day','create_installment_plan_with_history',
     'cycle_lines','cycle_now','cycle_range','cycle_series','daily_spending','debt_schedule','delete_category','delete_asset_valuation','delete_debt','end_recurring_series','end_recurring_series_preview','financial_health',
     'finish_import_batch','forecast_json','goal_deposit','goal_link_candidates','goal_money_command','goal_money_state','import_unmatched','investment_command','investment_link_candidates','investment_movements_page','investment_positions','investment_value_command','ledger_expected_lines_transfer','month_breakdown',
     'materialize_recurring_occurrence','month_forecast_json','month_lines','month_summary','monthly_cashflow','my_default_workspace',
     'net_worth','net_worth_series','note_folder_counts','note_folders_reorder','note_tag_counts',
     'notes_reorder','pay_debt_installment','pay_invoice','payoff_strategy','plan_status','rename_category','roll_invoice',
-    'save_budget','save_category','settle_invoice','simular','skip_recurring_occurrence','spendable','spendable_path','spending_change','transactions_summary','upcoming_bills',
+    'save_bill_reminder','save_budget','save_category','settle_invoice','simular','skip_recurring_occurrence','spendable','spendable_path','spending_change','transactions_summary','upcoming_bills',
     'update_asset_value','update_debt_payment_due_day','update_installment_plan','update_installment_scope_last_day','update_recurring_series','update_transaction_scoped',
     'year_end_balances',
     -- não são `.rpc()`, mas a escrita de `notes` as avalia como quem escreve (coluna gerada e CHECK)
