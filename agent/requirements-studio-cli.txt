@@ -1,0 +1,3 @@
+langgraph-api==0.15.2
+langgraph-runtime-inmem==0.35.2
+langgraph-cli==0.4.32

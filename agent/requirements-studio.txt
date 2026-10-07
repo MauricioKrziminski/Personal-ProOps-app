@@ -1,0 +1,36 @@
+# LangGraph Studio local — venv SEPARADA (.venv-studio), nunca a de produção, fora da imagem Docker.
+#   python3 -m venv .venv-studio
+#   .venv-studio/bin/pip install -r requirements.txt -r requirements-studio.txt
+#   .venv-studio/bin/pip install --no-deps -r requirements-studio-cli.txt
+# Dois passos porque langgraph-api exige jsonschema-rs<0.45, que não tem wheel para Python 3.14
+# (compilar exige Rust); a 0.58.6 tem wheel abi3. Rever quando o langgraph-api afrouxar o teto.
+click
+python-dotenv
+blockbuster==1.5.28
+cloudpickle==3.1.2
+croniter==6.2.4
+forbiddenfruit==0.1.4
+grpcio==1.81.1
+grpcio-health-checking==1.81.1
+grpcio-tools==1.81.1
+jsonschema-rs==0.58.6
+opentelemetry-exporter-prometheus==0.63b1
+pathspec==1.1.1
+prometheus_client==0.26.0
+protobuf==6.33.6
+sse-starlette==3.5.0
+structlog==25.5.0
+truststore==0.10.4
+cryptography
+httptools
+langsmith[otel]
+pyjwt
+starlette
+uuid-utils
+uvicorn
+uvloop
+watchfiles
+websockets
+zstandard
+orjson
+tenacity

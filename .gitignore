@@ -56,6 +56,9 @@ deno.lock
 
 # serviço Python (agente)
 agent/.venv/
+agent/.venv-studio/
+agent/.venv-gepa/
+agent/.langgraph_api/
 agent/.env
 agent/__pycache__/
 agent/**/__pycache__/
