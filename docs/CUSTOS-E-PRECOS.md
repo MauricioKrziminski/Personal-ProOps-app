@@ -78,7 +78,7 @@ de 72h de quem chega por anúncio Click-to-WhatsApp continua grátis, e só se p
 | número de WhatsApp próprio (chip/linha) e verificação do negócio na Meta | a linha é sua; a verificação não tem taxa |
 | GCP fixo | ~R$ 17/mês |
 | contador (CNPJ no Simples) | o seu número — fora do modelo |
-| **total para começar** | **~R$ 770 na entrada + ~R$ 225/mês**, mais o contador |
+| **total para começar** | **~R$ 770 na entrada (Google + 1º ano da Apple) + ~R$ 172/mês** (Supabase + GCP), mais o contador |
 
 ## 3. Preço unitário de cada fornecedor (lido em 07/10/2026)
 
