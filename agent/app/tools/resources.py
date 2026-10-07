@@ -1487,6 +1487,7 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                 values["principal_cents"] = contrato["principal_cents"]
                 values["remaining_cents"] = contrato["remaining_cents"]
             prepared["_pagas_atuais"] = int(old.get("installments_paid") or 0)
+            prepared["_debt_id"] = old.get("id")
             if action.type == Op.UPDATE and "installments_paid" in values:
                 # O piso é a MAIOR parcela já paga, não só a contagem (o mesmo do app): com um
                 # "Paguei" lançado como a 5ª, 4 pagas deixariam a 5ª paga aparecendo como futura.
@@ -1621,10 +1622,21 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
     # "A próxima vence 05/10" com 8 pagas: a âncora é a 1ª do contrato (05/02). Gravar a próxima
     # como primeira tiraria 8 meses da projeção (revisão final, 23/09/2026).
     pagas_atuais = prepared.pop("_pagas_atuais", 0)
+    debt_id = prepared.pop("_debt_id", None)
     if action.resource == "debts" and values.get("next_due_date"):
         proxima = date.fromisoformat(values.pop("next_due_date"))
         pagas = int(values.get("installments_paid", pagas_atuais) or 0)
-        values["first_due_date"] = _meses_antes(proxima, pagas).isoformat()
+        # A data dita já inclui a carência: a âncora do contrato não (mesma regra de
+        # `private.debt_pause_shift` e de `deslocamentoDaCarencia` no app).
+        desloca = 0
+        if debt_id:
+            r = await db.fetch(
+                "select coalesce(sum(months), 0)::int as n from public.debt_pauses "
+                "where debt_id = %s and workspace_id = %s and from_installment_no <= %s",
+                debt_id, ctx.workspace_id, pagas + 1,
+            )
+            desloca = int((r[0].get("n") if r else 0) or 0)
+        values["first_due_date"] = _meses_antes(proxima, pagas + desloca).isoformat()
         prepared["proxima_label"] = format_date_br(proxima)
     display = {}
     if "subcategory_id" in values:

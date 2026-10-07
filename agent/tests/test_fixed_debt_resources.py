@@ -505,3 +505,26 @@ def test_trocar_o_modo_da_divida_deriva_o_contrato_fixo():
     para_juros = {"calculation_mode": "amortized"}
     _converter_modo_da_divida(para_juros, {**old, "calculation_mode": "fixed_installments"})
     assert para_juros == {"calculation_mode": "amortized"}
+
+
+@pytest.mark.asyncio
+async def test_next_due_date_desconta_a_carencia_da_proxima(monkeypatch):
+    """Com 3 meses de carência antes da 9ª, "a próxima vence 05/10" tem a âncora 3 meses
+    mais cedo — senão `debt_schedule_for` soma o deslocamento outra vez."""
+    async def fetch(sql, *args):
+        if "public.debt_pauses" in sql:
+            assert "workspace_id" in sql and args[2] == 9  # pagas + 1, número absoluto
+            return [{"n": 3}]
+        if "public.debts" in sql:
+            return [{
+                "id": "debt", "row_version": "3", "name": "Carro", "account_id": "bank",
+                "principal_cents": 7056000, "remaining_cents": 5880000, "archived": False,
+                "installments": 48, "installments_paid": 8, "installment_cents": 147000,
+                "interest_rate_monthly": 0, "calculation_mode": "fixed_installments",
+            }]
+        return [{"id": "bank", "name": "Conta corrente", "type": "checking"}]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    ctx = ExecContext("user", "workspace", None, "America/Sao_Paulo", "carro", "app:1")
+    proposal = await resources.prepare(ctx, action("resource_update", next_due_date="2026-10-05"))
+    assert proposal["values"]["first_due_date"] == "2025-11-05"  # 05/02/2026 menos 3 meses
