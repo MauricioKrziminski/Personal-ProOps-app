@@ -29,13 +29,18 @@ def turno(canal: str, modelo: str = "haiku", pior: bool = True) -> float:
     return c
 
 
+# O limite do WhatsApp conta RESPOSTAS ENVIADAS, não turnos: é a unidade que a Meta cobra, e
+# inclui o que não vira turno de IA (clique no SIM, saudação, "limite acabou").
+TIPICO_TURNOS, TIPICO_RESPOSTAS_WA = 150, 108   # 90 turnos pelo WhatsApp × 1,2 resposta
+
+
 def uso_real() -> float:
-    """Usuário típico: 150 turnos/mês, 90 deles pelo WhatsApp, 4 templates (OTP, avisos)."""
-    return 60 * turno("app", pior=False) + 90 * turno("wa", pior=False) + 4 * WA
+    """Usuário típico: 150 turnos/mês, 108 respostas pelo WhatsApp, 4 templates (OTP, avisos)."""
+    return TIPICO_TURNOS * turno("app", pior=False) + (TIPICO_RESPOSTAS_WA + 4) * WA
 
 
-def plano(nome, mensal, anual, total, wa, templates, membros_ativos=1.0):
-    teto = (total - wa) * turno("app") + wa * turno("wa") + templates * WA
+def plano(nome, mensal, anual, total, respostas_wa, templates, membros_ativos=1.0):
+    teto = total * turno("app") + (respostas_wa + templates) * WA
     real = membros_ativos * uso_real()
     for imposto in (0.06, 0.155):
         for rotulo, preco in (("mensal", mensal), ("anual", anual / 12)):
@@ -51,9 +56,9 @@ if __name__ == "__main__":
         print(f"turno {canal}: pior R$ {turno(canal):.4f} · real R$ {turno(canal, pior=False):.4f}")
     print(f"IA/turno haiku pior {ia('haiku', True):.4f} real {ia('haiku', False):.4f}"
           f" | gemini pior {ia('gemini', True):.4f} real {ia('gemini', False):.4f}")
-    plano("pro", 24.90, 239.90, total=400, wa=100, templates=30)
-    plano("familia", 49.90, 479.90, total=1000, wa=200, templates=60, membros_ativos=2.5)
-    print(f"trial de 7 dias no teto (60 turnos, 25 no WhatsApp): R$ {35 * turno('app') + 25 * turno('wa') + 3 * WA:.2f}")
+    plano("pro", 24.90, 239.90, total=400, respostas_wa=150, templates=30)
+    plano("familia", 49.90, 479.90, total=1000, respostas_wa=300, templates=60, membros_ativos=2.5)
+    print(f"trial de 7 dias no teto (60 turnos, 40 respostas no WhatsApp): R$ {60 * turno('app') + 43 * WA:.2f}")
     print(f"créditos Claude US$ 200 = turnos de IA: pior {200 * FX / ia('haiku', True):,.0f} · real {200 * FX / ia('haiku', False):,.0f}")
 
     # escala: imposto 15,5%, mix 60% pro mensal / 30% pro anual / 10% família mensal, uso real

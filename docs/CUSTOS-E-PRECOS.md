@@ -68,6 +68,18 @@ de 72h de quem chega por anúncio Click-to-WhatsApp continua grátis, e só se p
   Para lançar falta: número próprio, verificação do negócio e **forma de pagamento na WABA**, sem a
   qual a resposta (agora cobrada) deixa de ser entregue.
 
+### Para lançar (uma vez, ou fixo antes do primeiro assinante)
+
+| item | custo |
+|---|---|
+| Google Play, conta de desenvolvedor | US$ 25, uma vez (~R$ 155) |
+| Apple Developer Program | US$ 99/ano (~R$ 615) |
+| Supabase Pro, a partir do 1º assinante pago | US$ 25/mês (~R$ 155) |
+| número de WhatsApp próprio (chip/linha) e verificação do negócio na Meta | a linha é sua; a verificação não tem taxa |
+| GCP fixo | ~R$ 17/mês |
+| contador (CNPJ no Simples) | o seu número — fora do modelo |
+| **total para começar** | **~R$ 770 na entrada + ~R$ 225/mês**, mais o contador |
+
 ## 3. Preço unitário de cada fornecedor (lido em 07/10/2026)
 
 | fornecedor | preço | fonte |
@@ -97,7 +109,7 @@ grátis, 1,5 resposta entregue por turno de WhatsApp (a pergunta do SIM e o resu
 |---|---|---|
 | usuário típico | 150 (90 pelo WhatsApp) + 4 templates | **R$ 5,65** |
 | família ativa (2,5 pessoas) | 375 | R$ 14,13 |
-| trial de 7 dias no teto | 60 (25 pelo WhatsApp) | R$ 2,34 |
+| trial de 7 dias no teto | 60 (40 respostas no WhatsApp) | R$ 2,45 |
 
 Template proativo (OTP, lembrete, aviso) custa o mesmo R$ 0,042. Push é grátis e continua sendo o
 padrão.
@@ -132,28 +144,35 @@ padrão.
 
 ## 6. Limites e preço recomendados
 
-**O limite passa a ter dois números: turnos de IA no total e quantos deles pelo WhatsApp.** A
-separação já existe no dado (`ai_events.channel`, devolvida por `plan_status_for`). Não é uma
-quarta dimensão de produto: é o mesmo limite de IA, separado pelo canal que tem custo.
+**O limite passa a ter dois números: turnos de IA no total e RESPOSTAS ENVIADAS pelo WhatsApp.**
+Não é uma quarta dimensão de produto: é o limite de IA de sempre mais o canal que tem custo.
 
-**Estourou o WhatsApp, o agente continua no app.** A resposta no WhatsApp vira "seu limite do mês
-pelo WhatsApp acabou — continue pelo app" com o link, e o chat do app segue até o total. Assim o
-teto de WhatsApp pode ser baixo sem trancar ninguém.
+**O do WhatsApp conta resposta enviada, não turno de IA**, porque é a unidade que a Meta cobra. O
+que não vira turno também é cobrado: o resultado do clique no SIM, a saudação, `SEM_CONTA`,
+`NAO_LI`, `GRANDE_DEMAIS` e a própria mensagem de limite. Contando turno (`ai_events`), quem
+estourou o teto continuaria gerando uma resposta paga a cada mensagem. A contagem é de cada envio
+ao telefone (`try_send`/`try_send_interactive`), e com ela o fator de 1,2 a 1,5 resposta por
+turno deixa de ser premissa: o medidor mede o custo.
+
+**Estourou o WhatsApp, o agente continua no app.** O WhatsApp manda **uma vez por dia** "seu
+limite do mês pelo WhatsApp acabou — continue pelo app" com o link, e depois para de responder
+por ali até virar o mês. O chat do app segue até o total. Assim o teto de WhatsApp pode ser baixo
+sem trancar ninguém.
 
 | | sem assinatura | **Pro** | **Família** |
 |---|---|---|---|
 | preço | — | **R$ 24,90/mês · R$ 239,90/ano** | **R$ 49,90/mês · R$ 479,90/ano** |
 | membros | 1 | 1 | 5 |
 | turnos de IA/mês (app + WhatsApp) | 0 | **400** | **1.000** |
-| …dos quais pelo WhatsApp | 0 | **100** (~3/dia) | **200** |
+| respostas pelo WhatsApp/mês | 0 | **150** (~3 conversas/dia) | **300** |
 | avisos e lembretes pelo WhatsApp | 0 | 1 por dia | 2 por dia |
 | importar extrato | não | sim | sim |
 | ver e exportar o próprio dado | sim | sim | sim |
-| trial de 7 dias | — | 60 turnos, 25 pelo WhatsApp | igual |
+| trial de 7 dias | — | 60 turnos, 40 respostas no WhatsApp | igual |
 
 O `docs/IN-APP-PURCHASE.md` já registra o Pro em R$ 24,90/R$ 249,00 e a Família em
-R$ 39,90/R$ 399,00. A conta mantém os R$ 24,90 do Pro. Os R$ 39,90 da Família não fecham com 200
-turnos de WhatsApp: a margem no teto fica negativa. Os R$ 19,90 de 14/09 também não fecham.
+R$ 39,90/R$ 399,00. A conta mantém os R$ 24,90 do Pro. Os R$ 39,90 da Família não fecham com 300
+respostas no WhatsApp: a margem no teto fica negativa. Os R$ 19,90 de 14/09 também não fecham.
 
 ### Margem (loja 15%; imposto de 6% a 15,5%)
 
@@ -165,8 +184,13 @@ turnos de WhatsApp: a margem no teto fica negativa. Os R$ 19,90 de 14/09 também
 | Família anual | 27,79 – 31,59 | 25,77 | **7% – 18%** | 49% – 55% |
 
 **Nenhum plano fica negativo nem com todos os tetos estourados e o imposto mais caro.** O anual
-da Família é o mais apertado: se o contador fechar no Anexo V, baixe o WhatsApp dela para 180 ou
-suba o anual.
+da Família é o mais apertado: se o contador fechar no Anexo V, baixe o WhatsApp dela para 270
+respostas ou suba o anual.
+
+⚠️ **O "uso real" fica perto do teto do WhatsApp, não longe dele.** O usuário típico do modelo
+manda ~108 respostas pelo WhatsApp num teto de 150 (72%), e a família típica ~270 num teto de 300.
+Para quem usa o produto pelo WhatsApp, a margem esperada está mais perto da coluna do TETO do que
+da do uso real. A coluna do uso real vale para quem divide o uso com o chat do app.
 
 ### Escala (uso real, imposto 15,5%, mix 60% Pro mensal · 30% Pro anual · 10% Família)
 
@@ -214,8 +238,9 @@ por número), mas:
 5. **Telegram como canal extra** (API oficial e grátis por mensagem) para quem quiser — menos
    gente usa no Brasil, então é complemento, não troca.
 
-Upside não contado: blogs citam **1.000 mensagens de service grátis por número por mês**. A
-página da Meta não confirma, então o modelo usa zero.
+Upside não contado: **1.000 mensagens de service grátis por número por mês**, citadas de forma
+consistente por provedores (BSPs), inclusive brasileiros. A página da Meta não confirma, então o
+modelo usa zero.
 
 ## 8. Riscos e o que não está confirmado
 
@@ -236,8 +261,9 @@ página da Meta não confirma, então o modelo usa zero.
 2. **Chave paga do Gemini fora das suítes de avaliação** (o vazamento de 21/09 e 05–07/10).
 3. **Retenção no Artifact Registry** (últimas 10 imagens) e limpeza dos segredos sem uso.
 4. **Supabase Pro antes do primeiro assinante pago**: o Free não tem backup, e o dado é financeiro.
-5. **Limite por canal** em `private.plan_limits` + `plan_status_for` + `check_limits`, com a
-   mensagem "continue pelo app" — é código e migration, a fazer quando o preço for decidido.
+5. **Limite de respostas pelo WhatsApp** em `private.plan_limits` + `plan_status_for`, contado
+   em cada envio ao telefone (não em `ai_events`), com o "continue pelo app" uma vez por dia e
+   silêncio depois. É código e migration, a fazer quando o preço for decidido.
 6. **Teto diário de templates de WhatsApp** por usuário (lembretes e avisos).
 7. **Migração para o Claude Haiku 5.5** (§5), com a suíte de avaliação inteira.
 8. **Preço na loja**: App Store Connect e Play Console, com os valores da §6. Nenhum preço entra
