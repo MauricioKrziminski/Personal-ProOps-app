@@ -180,6 +180,39 @@ begin
   select count(*) into n from public._alerts_to_send() a where a.kind = 'invoice_due' and a.ref = fatura::text;
   assert n = 0, 'lembrete na própria fatura cala o automático';
 
+  -- 9) salvar de novo NÃO re-dispara o aviso já enviado hoje (alvo: fatura)
+  delete from public.bill_reminders where invoice_id = fatura;
+  perform set_config('request.jwt.claim.sub', u::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', u, 'role', 'authenticated')::text, true);
+  set local role authenticated;
+  perform public.save_bill_reminder(jsonb_build_object('invoice_id', fatura), '[{"days_before":2,"at_time":"00:00"}]', 'push');
+  reset role;
+  select count(*) into n from public._bill_reminders_due() d where d.ref = fatura;
+  assert n = 1, format('fatura: aviso devia tocar, veio %s', n);
+  insert into private.bill_reminder_sends (bill_reminder_id, due_date, sent_at)
+  select id, hoje + 2, now() from public.bill_reminders where invoice_id = fatura;
+  set local role authenticated;
+  perform public.save_bill_reminder(jsonb_build_object('invoice_id', fatura), '[{"days_before":2,"at_time":"00:00"}]', 'both');
+  perform public.save_bill_reminder(jsonb_build_object('invoice_id', fatura),
+    '[{"days_before":2,"at_time":"00:00"},{"days_before":30,"at_time":"09:00"}]', 'both');
+  reset role;
+  select count(*) into n from public._bill_reminders_due() d where d.ref = fatura;
+  assert n = 0, format('salvar de novo não pode re-disparar o enviado, veio %s', n);
+  assert (select count(*) from public.bill_reminders where invoice_id = fatura) = 2, 'devia ter 2 avisos';
+  assert (select bool_and(channel = 'both') from public.bill_reminders where invoice_id = fatura), 'canal devia atualizar';
+  set local role authenticated;
+  perform public.save_bill_reminder(jsonb_build_object('invoice_id', fatura), '[{"days_before":30,"at_time":"09:00"}]', 'both');
+  reset role;
+  assert (select count(*) from public.bill_reminders where invoice_id = fatura) = 1, 'removido sai';
+
+  -- 10) financiamento sem nº de parcelas não vira título nulo
+  update public.debts set installments = null, installment_cents = 10000 where id = divida;
+  delete from public.bill_reminders where debt_id = divida;
+  insert into public.bill_reminders (workspace_id, user_id, debt_id, days_before, at_time, channel)
+  values (ws, u, divida, 0, '00:00', 'push');
+  select count(*) into n from private.bill_reminder_dues(array[ws]) d where d.ref = divida and d.title is null;
+  assert n = 0, 'título da parcela não pode ser nulo';
+
   -- 7) RLS: o outro usuário não lê
   perform set_config('request.jwt.claim.sub', outro::text, true);
   perform set_config('request.jwt.claims', json_build_object('sub', outro, 'role', 'authenticated')::text, true);
