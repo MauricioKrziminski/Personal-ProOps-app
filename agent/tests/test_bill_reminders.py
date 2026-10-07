@@ -19,15 +19,16 @@ def test_texto_no_dia_amanha_e_em_n_dias():
 
 
 class _Banco:
-    def __init__(self, linhas):
+    def __init__(self, linhas, estado=None):
         self.linhas = linhas
+        self.estado = estado if estado is not None else {"sent_at": None, "attempts": 0}
         self.execs: list[tuple] = []
 
     async def fetch(self, sql, *args):
         return self.linhas if "_bill_reminders_due" in sql else []
 
     async def fetch_one(self, sql, *args):
-        return {"sent_at": None, "attempts": 0}
+        return self.estado
 
     async def execute(self, sql, *args):
         self.execs.append((" ".join(sql.split()), args))
@@ -94,3 +95,38 @@ async def test_divida_vai_com_alvo_debt(monkeypatch, ambiente):
         monkeypatch.setattr(bill_reminders.db, nome, getattr(banco, nome))
     await bill_reminders.run()
     assert ambiente["push"][0][2] == "debt"
+
+
+def _instala(monkeypatch, banco):
+    for nome in ("fetch", "fetch_one", "execute"):
+        monkeypatch.setattr(bill_reminders.db, nome, getattr(banco, nome))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("estado", [
+    {"sent_at": "2026-10-07T09:00", "attempts": 0},
+    {"sent_at": None, "attempts": reminders.MAX_SEND_ATTEMPTS},
+])
+async def test_ja_enviado_ou_sem_tentativas_nao_manda_nada(monkeypatch, ambiente, estado):
+    _instala(monkeypatch, _Banco([_linha(channel="both", alerts_whatsapp_enabled=True)], estado))
+    out = await bill_reminders.run()
+    assert out == {"due": 1, "sent": 0, "failed": 0}
+    assert ambiente == {"push": [], "whatsapp": []}
+
+
+@pytest.mark.asyncio
+async def test_canal_whatsapp_manda_o_template_uma_vez(monkeypatch, ambiente):
+    _instala(monkeypatch, _Banco([_linha(channel="whatsapp", alerts_whatsapp_enabled=True)]))
+    out = await bill_reminders.run()
+    assert out["sent"] == 1
+    assert ambiente["push"] == []
+    assert ambiente["whatsapp"] == ["Aluguel vence amanhã · R$ 1.500,00"]
+
+
+@pytest.mark.asyncio
+async def test_push_sem_token_cai_no_whatsapp_uma_vez(monkeypatch, ambiente):
+    _instala(monkeypatch, _Banco([_linha(expo_push_token=None, alerts_whatsapp_enabled=True)]))
+    out = await bill_reminders.run()
+    assert out["sent"] == 1
+    assert ambiente["push"] == []
+    assert ambiente["whatsapp"] == ["Aluguel vence amanhã · R$ 1.500,00"]

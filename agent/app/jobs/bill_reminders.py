@@ -51,6 +51,8 @@ async def run() -> dict:
             if not estado or estado["sent_at"] is not None or estado["attempts"] >= reminders.MAX_SEND_ATTEMPTS:
                 continue
             corpo = texto(linha["title"], linha["amount_cents"], linha["due_date"], hoje)
+            # at-least-once: se a entrega passa e o update de sent_at falha, o próximo minuto reenvia,
+            # limitado por MAX_SEND_ATTEMPTS.
             try:
                 await reminders._entregar({**linha, "title": corpo}, alvo=linha["target"], ref=str(linha["ref"]))
                 await db.execute(
