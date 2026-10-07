@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends
 from app import db
 from app.config import get_settings
 from app.domain.dates import now_utc
-from app.jobs import alerts, checkpoints, embeddings, feedback, reminders, scheduler
+from app.jobs import alerts, bill_reminders, checkpoints, embeddings, feedback, reminders, scheduler
 from app.routes.worker import sweep
 from app.security import require_internal
 
@@ -83,6 +83,11 @@ async def run_reminders() -> dict:
     rede, e de graça: este cron já acorda o container todo minuto.
     """
     lembretes = await reminders.run()
+    # Lembrete de conta: falha aqui não derruba os lembretes nem o sweep.
+    try:
+        contas = await bill_reminders.run()
+    except Exception:  # noqa: BLE001
+        contas = {"error": "lembretes de conta falharam"}
     try:
         resgate = await sweep()
     except Exception:  # noqa: BLE001
@@ -97,7 +102,7 @@ async def run_reminders() -> dict:
         vetores = await embeddings.run()
     except Exception:  # noqa: BLE001
         vetores = {"error": "vetores de lançamento falharam"}
-    return {"reminders": lembretes, "sweep": resgate, "recorrentes_novas": novas,
+    return {"reminders": lembretes, "contas": contas, "sweep": resgate, "recorrentes_novas": novas,
             "embeddings": vetores, "fila": await checar_fila()}
 
 

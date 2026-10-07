@@ -169,7 +169,9 @@ async def run() -> dict:
     return {"due": len(vencidos), "sent": enviados, "given_up": desistidos}
 
 
-async def _entregar(lembrete: dict) -> list[str]:
+async def _entregar(
+    lembrete: dict, titulo: str = "⏰ Lembrete", alvo: str = "reminders", ref: str | None = None
+) -> list[str]:
     """Tenta os canais pedidos. Push que falha não anula o WhatsApp.
 
     ⚠️ **O WhatsApp obedece ao portão do Perfil** (`profiles.alerts_whatsapp_enabled`, default
@@ -194,7 +196,10 @@ async def _entregar(lembrete: dict) -> list[str]:
 
     if quer_push and lembrete["expo_push_token"]:
         try:
-            await push.send(lembrete["expo_push_token"], "⏰ Lembrete", lembrete["title"], "reminders")
+            if ref:
+                await push.send(lembrete["expo_push_token"], titulo, lembrete["title"], alvo, ref=ref)
+            else:
+                await push.send(lembrete["expo_push_token"], titulo, lembrete["title"], alvo)
             delivered_channels.append("push")
         except Exception as err:  # noqa: BLE001
             falhas.append(f"push: {err}")
