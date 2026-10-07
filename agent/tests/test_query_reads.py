@@ -492,6 +492,23 @@ class TestPausaComPrazo:
         assert "próxima em" not in r.message
 
     @pytest.mark.asyncio
+    async def test_pausa_futura_nao_mostra_proxima_dentro_dela(self, monkeypatch):
+        # Hoje fora da pausa, mas o próximo vencimento cai nela: a série segue ativa e diz quando volta.
+        async def fetch(query, *args):
+            return [{
+                "category": None, "rrule": "FREQ=MONTHLY;BYMONTHDAY=5", "kind": "expense",
+                "next_run_at": datetime(2030, 11, 5, 15, 0, tzinfo=UTC), "end_date": None,
+                "amount_cents": 300, "description": "Academia", "active": True,
+                "paused_from": datetime(2030, 11, 5).date(), "paused_until": datetime(2031, 1, 5).date(),
+            }]
+
+        monkeypatch.setattr(db, "fetch", fetch)
+        r = await queries.query_recurring(ctx(), FinanceQuery(type=FinanceQueryType.QUERY_RECURRING))
+        assert "Academia" in r.message
+        assert "próxima em 05/11" not in r.message
+        assert "pausada até 04/01/2031" in r.message
+
+    @pytest.mark.asyncio
     async def test_lembrete_com_data_dentro_da_pausa_nao_e_listado(self, monkeypatch):
         hoje = datetime.now(UTC).date()
         async def fetch(query, *args):

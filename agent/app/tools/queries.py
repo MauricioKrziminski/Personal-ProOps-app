@@ -825,12 +825,15 @@ async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     def linha(r) -> str:
         nome = r["description"] or r["category"] or "sem descrição"
         quando = descreve_rrule(r["rrule"])
-        proxima = format_date_br(local_iso_date(ctx.timezone, r["next_run_at"]))
+        prox_iso = local_iso_date(ctx.timezone, r["next_run_at"])
         ate = f" · até {format_date_br(r['end_date'])}" if r["end_date"] else ""
-        return (
-            f"  • {nome}: {cents_to_brl(r['amount_cents'])} — {quando} · "
-            f"próxima em {proxima}{ate}"
-        )
+        # Pausa marcada para depois que cobre o próximo vencimento: ele não acontece; diz quando volta.
+        if em_pausa(prox_iso, r.get("paused_from"), r.get("paused_until")):
+            ultimo = date.fromordinal(r["paused_until"].toordinal() - 1)
+            quando_volta = f"pausada até {format_date_br(ultimo)}"
+        else:
+            quando_volta = f"próxima em {format_date_br(prox_iso)}"
+        return f"  • {nome}: {cents_to_brl(r['amount_cents'])} — {quando} · {quando_volta}{ate}"
 
     def bloco(kind: str, titulo: str) -> list[str]:
         itens = [r for r in linhas_sql if r["kind"] == kind and ativa(r)]
