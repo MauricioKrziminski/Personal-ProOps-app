@@ -25,6 +25,7 @@ test('o toast conta o que saiu', () => {
   assert.equal(textoDoApagado(p(1)), '1 lançamento apagado.');
   assert.equal(textoDoApagado(p(5)), '5 lançamentos apagados.');
   assert.equal(textoDoApagado(p(0, true)), 'Apagado por completo.');
+  assert.equal(textoDoApagado(p(0)), 'Nada para apagar daqui em diante.');
 });
 
 test('vira_avista e apaga_contrato chegam à prévia', () => {
@@ -74,6 +75,7 @@ test('a frase do contrato depende do tipo', () => {
   assert.equal(fraseDoEstrago(p, brl, 'debt_payment'), 'O financiamento inteiro sai, com os pagamentos.');
   assert.equal(fraseDoEstrago(p, brl, 'recurring'), 'A série inteira sai.');
   assert.equal(fraseDoEstrago(p, brl, 'occurrence'), 'A série inteira sai.');
+  assert.equal(fraseDoEstrago(p, brl, 'reminder'), 'O lembrete inteiro sai.');
   assert.equal(fraseDoEstrago(p, brl, 'installment'), 'A compra fica com uma parcela só e vira um lançamento à vista. A compra inteira sai.');
 });
 

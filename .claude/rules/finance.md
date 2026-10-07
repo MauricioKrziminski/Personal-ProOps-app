@@ -1055,6 +1055,27 @@ PADRÃO de quem chama, e converter ligaria uma linha do espaço A a uma série d
 `supabase/tests/converter_registro.sql` prende os alcances e as recusas. O agente não converte
 (`docs/AGENTE-PARIDADE-COM-O-APP.md`).
 
+## Apagar com alcance (`delete_scoped`, 07/10/2026)
+
+Um comando para todo "Apagar" de série, compra, dívida e lembrete: `delete_scoped_preview` (prévia, nada
+escreve) e `delete_scoped` (recibo por `p_request_id`) chamam a MESMA `private.delete_scoped` — a
+confirmação e o efeito não podem discordar. Tipos: `occurrence`/`recurring` (série), `installment`/`plan`
+(compra), `debt_payment`/`debt` (dívida), `reminder`. Alcance: `one` (só esta), `future` (esta e as
+próximas), `all` (todas); contrato (`recurring`/`plan`/`debt`) não tem `one`, dívida só tem `all`, lembrete
+só `one`/`all`.
+
+- **"Esta e as próximas" apaga TUDO dali em diante, paga inclusive**; pagas e atrasadas ANTES da âncora
+  ficam e a série termina na véspera. Aberta na primeira, vira "Todas".
+- **"Todas" apaga também as pagas**, depois da confirmação do estrago (`fraseDoEstrago`: quantas pagas,
+  quanto, de quais contas, desde quando). A prévia conta o que a escrita apagaria.
+- **Linha em fatura paga, adiada ou paga em parte recusa** ("Desfaça o pagamento da fatura antes").
+- O pai (`recurring_id`, `parent_reminder_id`) só vale se for do MESMO espaço (e do mesmo usuário, no
+  lembrete): a FK não garante.
+- **O gatilho BEFORE DELETE `apagar_nao_derruba_fatura` vale para QUALQUER caminho de apagar** (app, agente,
+  gatilho, cascade de juros do Pix): impede o total de uma fatura aberta e paga em parte ficar abaixo do
+  pago. Fica de fora só quem sai junto com o dono (fatura, conta ou espaço já apagados); apagar o usuário
+  passa (testado em `apagar_fix_final.sql`).
+
 ## Rotativo — a fatura vencida que vai para a próxima
 
 O usuário só tinha duas saídas para uma fatura que não pagou: deixá-la atrasada para sempre ou

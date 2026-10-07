@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { useToast } from '@/components/ui/toast';
@@ -22,6 +22,9 @@ export function useApagarComAlcance(aoApagar?: (p: PreviaDoApagar) => void) {
   const toast = useToast();
   // A intenção (alvo + alcance) mantém o mesmo request id entre tentativas, até dar certo.
   const tentativa = useRef<{ key: string; id: string } | null>(null);
+  // sair da tela encerra a intenção: o "só esta" de um lembrete tem sempre a mesma chave, e dias depois
+  // um id velho devolveria o recibo antigo em vez de pular a vez nova
+  useEffect(() => () => { tentativa.current = null; }, []);
   const escrita = useMutation({
     mutationFn: async ({ alvo, alcance }: { alvo: AlvoDoApagar; alcance: EditScope }) => {
       const key = JSON.stringify([alvo.tipo, alvo.id, alcance, alvo.ancora ?? null]);
@@ -36,7 +39,7 @@ export function useApagarComAlcance(aoApagar?: (p: PreviaDoApagar) => void) {
     },
     onSuccess: () => {
       invalidateFinance(qc);
-      invalidateKeys(qc, [['reminders'], ['search', 'reminders']]);
+      invalidateKeys(qc, [['reminders'], ['bill-reminders'], ['search', 'reminders']]);
     },
   });
 

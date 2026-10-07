@@ -60,12 +60,13 @@ export function fraseDoEstrago(p: PreviaDoApagar, brl: (cents: number) => string
   }
   const compra = tipo === 'installment' || tipo === 'plan';
   if (compra && p.viraAvista) partes.push('A compra fica com uma parcela só e vira um lançamento à vista.');
-  if (p.apagaContrato) partes.push(compra ? 'A compra inteira sai.' : tipo === 'debt' || tipo === 'debt_payment' ? 'O financiamento inteiro sai, com os pagamentos.' : 'A série inteira sai.');
+  if (p.apagaContrato) partes.push(compra ? 'A compra inteira sai.' : tipo === 'debt' || tipo === 'debt_payment' ? 'O financiamento inteiro sai, com os pagamentos.' : tipo === 'reminder' ? 'O lembrete inteiro sai.' : 'A série inteira sai.');
   return partes.length ? partes.join(' ') : null;
 }
 
 export function textoDoApagado(p: PreviaDoApagar): string {
   if (p.apagaContrato) return 'Apagado por completo.';
+  if (p.apagadas === 0) return 'Nada para apagar daqui em diante.';
   return p.apagadas === 1 ? '1 lançamento apagado.' : `${p.apagadas} lançamentos apagados.`;
 }
 

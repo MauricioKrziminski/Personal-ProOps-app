@@ -29,7 +29,7 @@ function montar({ previa = PREVIA, previaErro, escritaErro }: { previa?: any; pr
   const perguntas: ((alcance: string) => void)[] = [];
   const sucessos: any[] = [];
   const fakes = {
-    react: { useRef: (v: any) => ({ current: v }) },
+    react: { useRef: (v: any) => ({ current: v }), useEffect: () => {} },
     '@tanstack/react-query': {
       useQueryClient: () => ({}),
       useMutation: ({ mutationFn, onSuccess }: any) => ({

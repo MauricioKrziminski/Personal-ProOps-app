@@ -303,3 +303,5 @@ Sobem juntas (a segunda faz o lembrete próprio substituir o aviso automático).
 
 **Apagar com alcance** — `20261008100000`, `20261008100100`, `20261008100200`, `20261008100300`, `20261008100400` e `20261008100500`: staging 07/10/2026, produção pendente.
 Sobem juntas (`100400`/`100500` são o gatilho que impede o apagar comum de deixar fatura paga em parte abaixo do pago).
+
+**Apagar com alcance, revisão final** — `20261008100600`: staging 07/10/2026, produção pendente. Sobe junto das seis de `20261008100000` a `20261008100500` (espaço do pai na série e no lembrete; "Esta e as próximas" leva a paga depois da âncora).
