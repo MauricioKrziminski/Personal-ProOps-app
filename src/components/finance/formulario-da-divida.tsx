@@ -32,6 +32,8 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useToast } from '@/components/ui/toast';
 import { Space, tabular } from '@/design/tokens';
+import { useDebtPauses } from '@/hooks/use-pausas';
+import { deslocamentoDaCarencia } from '@/lib/carencia';
 import {
   DEBT_KINDS,
   useAccounts,
@@ -361,11 +363,14 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
    * MOSTRA a próxima do cronograma, e só grava âncora quando a pessoa toca na data.
    */
   const ancoraEfetiva = form.ancora ?? null;
+  // A carência desloca as datas do cronograma: o campo mostra a data deslocada e a âncora salva não a leva junto.
+  const carencias = useDebtPauses(form.id ?? null).data ?? [];
+  const deslocamento = deslocamentoDaCarencia(carencias, form.installmentsPaid + 1);
   const diaDoContrato = form.diaVencimento ? Number(form.diaVencimento) : null;
   const proximaISO =
     ancoraEfetiva && diaDoContrato
       ? // A do CONTRATO, mesmo vencida (05/10/2026): ela é a parcela atrasada, não vira o mês seguinte.
-        proximaDoContrato(ancoraEfetiva, form.installmentsPaid, diaDoContrato)
+        proximaDoContrato(ancoraEfetiva, form.installmentsPaid + deslocamento, diaDoContrato)
       : form.id
         ? (schedule.data?.[0]?.due_date ?? null)
         : null;
@@ -380,7 +385,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   const perguntaPagas = temPagasNovas && Boolean(form.accountId);
   const perguntas = perguntaPagas && ancoraEfetiva && diaDoContrato && ciclo.data
     ? parcelasPagasNoCiclo(ancoraEfetiva, diaDoContrato, (form.id ? form.pagasOriginal : 0) + 1,
-        form.installmentsPaid, ciclo.data.de, ciclo.data.ate)
+        form.installmentsPaid, ciclo.data.de, ciclo.data.ate, carencias)
     : [];
   const respostaDe = (no: number): boolean | undefined => jaSaiu[no] ?? (form.accountId ? true : undefined);
   const erroDasPerguntas = perguntaPagas && ciclo.isPending ? 'Conferindo o ciclo atual…'
@@ -395,7 +400,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   const rotuloDaData = form.installmentsPaid === 0 ? 'Primeira parcela' : `Próxima parcela (a ${form.installmentsPaid + 1}ª)`;
   const escolherData = (br: string, ultimo = false) => {
     const iso = brToISO(br);
-    const escolhido = vencimentoDaDividaEscolhido(iso, form.installmentsPaid, ultimo);
+    const escolhido = vencimentoDaDividaEscolhido(iso, form.installmentsPaid + deslocamento, ultimo);
     setForm({ ...form, ancora: escolhido.ancora, diaVencimento: String(escolhido.dia) });
   };
   const mudarPagas = (n: number) => {

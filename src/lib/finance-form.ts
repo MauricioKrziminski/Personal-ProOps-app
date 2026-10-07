@@ -1,5 +1,6 @@
 import { addMonthsISO } from './debt-history.ts';
 import { isValidBRDate } from './dates.ts';
+import { deslocamentoDaCarencia } from './carencia.ts';
 
 /** A data da parcela já ocupa o cronograma; outras contas pendentes exigem vencimento. */
 export function vencimentoPendenteValido(
@@ -330,10 +331,11 @@ export function proximaDoContrato(ancoraISO: string, pagas: number, dia: number)
  */
 export function parcelasPagasNoCiclo(
   ancoraISO: string, dia: number, de: number, ate: number, inicio: string, fim: string,
+  carencias: readonly { from_installment_no: number; months: number }[] = [],
 ): { no: number; dataISO: string }[] {
   const lista: { no: number; dataISO: string }[] = [];
   for (let no = Math.max(1, de); no <= ate; no += 1) {
-    const dataISO = proximaDoContrato(ancoraISO, no - 1, dia);
+    const dataISO = proximaDoContrato(ancoraISO, no - 1 + deslocamentoDaCarencia(carencias, no), dia);
     if (dataISO >= inicio && dataISO <= fim) lista.push({ no, dataISO });
   }
   return lista;

@@ -65,6 +65,8 @@ import { hrefDoLembrete, mesmoAlvo, resumoDosAvisos } from '@/lib/lembrete-de-co
 import { hrefDoLancar } from '@/lib/lancar';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { ErrorBand, taxaLabel } from '@/components/finance/formulario-da-divida';
+import { CarenciaSheet } from '@/components/finance/carencia-sheet';
+import { useDebtPauses, useUndoDebtPause } from '@/hooks/use-pausas';
 import { DebtTimeline } from '@/components/finance/debt-timeline';
 import { RingGauge } from '@/components/ui/ring-gauge';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
@@ -132,6 +134,10 @@ export default function DebtsScreen() {
   const [pagandoId, setPagandoId] = useState<string | null>(null);
   const detalhe = fichaId ? (debts.data?.find((debt) => debt.id === fichaId) ?? null) : null;
   const pagando = debts.data?.find((debt) => debt.id === pagandoId) ?? null;
+  const [carenciaId, setCarenciaId] = useState<string | null>(null);
+  const carenciando = debts.data?.find((debt) => debt.id === carenciaId) ?? null;
+  const carencias = useDebtPauses(detalhe?.id ?? null);
+  const desfazerCarencia = useUndoDebtPause();
   const abrirFicha = (d: Debt) => router.push({ pathname: '/finance/debts', params: { id: d.id } });
   const setPagando = (debt: Debt | null) => setPagandoId(debt?.id ?? null);
   const [pagoCents, setPagoCents] = useState(0);
@@ -355,6 +361,7 @@ export default function DebtsScreen() {
     ...(noDetalhe ? [] : [{ label: 'Ver as parcelas', onPress: () => abrirFicha(d) }]),
     { label: lembreteDa(d) ? 'Editar lembrete' : 'Lembrar', icon: 'bell' as const,
       onPress: () => router.push(hrefDoLembrete({ tipo: 'divida', debtId: d.id }, d.name)) },
+    ...(Number(d.remaining_cents) <= 0 ? [] : [{ label: 'Pausar pagamentos…', onPress: () => setCarenciaId(d.id) }]),
     { label: 'Editar', onPress: () => abrirEdicao(d) },
     { label: 'Arquivar', icon: 'archivebox', arrasto: 'esquerda', desfaz: true, onPress: () => arquivar(d) },
     { label: 'Apagar por completo', icon: 'trash', destructive: true, onPress: () => void excluir(d) },
@@ -596,6 +603,7 @@ export default function DebtsScreen() {
   // A folha de pagar: por cima da lista E da ficha.
   const folhas = (
     <>
+      {carenciando ? <CarenciaSheet visivel onClose={() => setCarenciaId(null)} divida={carenciando} /> : null}
       {/* Pagar parcela — sheet com a conta explicada ANTES de confirmar. */}
       <Sheet visible={pagando !== null} onClose={() => setPagando(null)}>
           <TaskHeader
@@ -696,6 +704,22 @@ export default function DebtsScreen() {
         <Section>
           <Row icon="bell" title={resumoDosAvisos(lembreteDa(detalhe)!.avisos)}
             onPress={() => router.push(hrefDoLembrete({ tipo: 'divida', debtId: detalhe.id }, detalhe.name))} />
+        </Section>
+      ) : null}
+      {detalhe && (carencias.data ?? []).length > 0 ? (
+        <Section>
+          {(carencias.data ?? []).map((c, i) => (
+            <Row key={c.id} icon="calendar"
+              title={`Carência de ${c.months} ${c.months === 1 ? 'mês' : 'meses'} a partir da ${c.from_installment_no}ª`}
+              // Desfazer é do último pedido (o banco desfaz em ordem): só a primeira da lista, a mais recente.
+              trailing={i === 0 ? (
+                <Button label="Desfazer" size="sm" variant="secondary" loading={desfazerCarencia.isPending} disabled={desfazerCarencia.isPending}
+                  onPress={() => desfazerCarencia.mutate({ pauseId: c.id }, {
+                    onSuccess: () => toast({ message: 'Carência desfeita.', tone: 'success' }),
+                    onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para desfazer a carência.'), tone: 'error' }),
+                  })} />
+              ) : undefined} />
+          ))}
         </Section>
       ) : null}
       {detalhe ? <PurchaseDownPayment type="financiamento" parentId={detalhe.id}
