@@ -1,5 +1,6 @@
-import { Children, Fragment, useState, type ReactNode } from 'react';
+import { Children, Fragment, useEffect, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions, type AccessibilityState } from 'react-native';
+import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import type { SymbolViewProps } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
@@ -68,6 +69,11 @@ interface RowProps {
    * valor desce para baixo dele quando não cabe.
    */
   inlineValue?: boolean;
+  /**
+   * A linha que a pessoa tocou em OUTRA tela (a compra da Hoje que abre a fatura): o fundo de
+   * "pressionada" acende e some devagar quando volta a `false`. Quem controla o tempo é a tela.
+   */
+  destacado?: boolean;
 }
 
 /**
@@ -91,8 +97,12 @@ export function Row({
   accessibilityLabel,
   indent = 0,
   inlineValue = false,
+  destacado = false,
 }: RowProps) {
   const theme = useTheme();
+  // O brilho só monta na linha que já foi destacada: as outras não pagam animação nenhuma.
+  const [brilhou, setBrilhou] = useState(destacado);
+  if (destacado && !brilhou) setBrilhou(true);
   const scheme = useScheme();
   const tintaCheia = tinta && !destructive ? noteInk(tinta, scheme) : null;
   const disco = tintaCheia
@@ -135,6 +145,7 @@ export function Row({
         { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
         indent > 0 && { paddingLeft: Space.lg + indent * Space.lg },
       ]}>
+      {brilhou ? <Brilho aceso={destacado} cor={theme.backgroundSelected} /> : null}
       {/*
         O ícone mora num CHIP redondo, como no desenho: um glifo solto ao lado do texto flutua e
         as linhas perdem a coluna da esquerda. O chip dá a âncora e o alvo visual.
@@ -209,6 +220,17 @@ export function Row({
       {({ pressed }) => content(pressed)}
     </Pressable>
   );
+}
+
+/** Fundo de "pressionada" que some devagar quando `aceso` vira `false` (de uma vez, sem movimento). */
+function Brilho({ aceso, cor }: { aceso: boolean; cor: string }) {
+  const reduzido = useReducedMotion();
+  const opacidade = useSharedValue(aceso ? 1 : 0);
+  useEffect(() => {
+    opacidade.value = aceso ? 1 : reduzido ? 0 : withTiming(0, { duration: 700 });
+  }, [aceso, reduzido, opacidade]);
+  const estilo = useAnimatedStyle(() => ({ opacity: opacidade.value }));
+  return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: cor }, estilo]} />;
 }
 
 /**

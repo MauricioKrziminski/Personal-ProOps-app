@@ -260,7 +260,8 @@ export default function TodayScreen() {
    */
   const abrirItem = (i: ItemDaAgenda) => () => {
     if (i.kind === 'card' && i.faturaId) {
-      router.push({ pathname: '/finance/invoice/[id]', params: { id: i.faturaId } });
+      // `foco`: a fatura abre inteira, rolada até esta compra e com ela acesa.
+      router.push({ pathname: '/finance/invoice/[id]', params: { id: i.faturaId, foco: i.ref_id } });
     } else if (i.kind === 'invoice') {
       router.push({ pathname: '/finance/invoice/[id]', params: { id: i.ref_id } });
     } else if (i.kind === 'debt') {

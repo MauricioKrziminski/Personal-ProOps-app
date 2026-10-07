@@ -1962,7 +1962,8 @@ test('Hoje: compra que vai cair no cartão aparece nos próximos dias e abre a f
   assert.equal(item.props.cartao, 'Nubank');
   assert.equal(item.props.action, undefined, 'nos próximos dias a linha só abre — "Ver fatura" em toda compra era ruído');
   item.props.onPress();
-  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/invoice/[id]', params: { id: 'f-9' } });
+  // `foco` leva a compra: a fatura abre inteira, rolada até ela e com ela acesa.
+  assert.deepEqual(copia(ui.navigations.at(-1)), { pathname: '/finance/invoice/[id]', params: { id: 'f-9', foco: 'c-1' } });
 });
 
 test('Hoje: usuário novo vê os Primeiros passos', () => {

@@ -128,7 +128,7 @@ export default function InvoiceScreen() {
   const toast = useToast();
   const aparencia = useAparencia();
   const insets = useSafeAreaInsets();
-  const { id, via, acao } = useLocalSearchParams<{ id: string; via?: string; acao?: string }>();
+  const { id, via, acao, foco } = useLocalSearchParams<{ id: string; via?: string; acao?: string; foco?: string }>();
   const { width, fontScale } = useWindowDimensions();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
@@ -302,6 +302,30 @@ export default function InvoiceScreen() {
     pagamentoPedido.current = false;
     abrirPagamento();
   });
+
+  // Veio de uma compra tocada na Hoje (`foco`): rola até o dia dela e acende a linha por uns
+  // segundos, uma vez só — sem filtrar nada. Atualizar ou voltar à tela não repete.
+  const listaRef = useRef<FlatList<(typeof dias)[number]>>(null);
+  const focoPendente = useRef(foco);
+  const [destacada, setDestacada] = useState<string | null>(null);
+  // Os timers só caem ao sair da tela: um refetch no meio não pode cancelar o foco já consumido.
+  const timersDoFoco = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => timersDoFoco.current.forEach(clearTimeout), []);
+  useEffect(() => {
+    const alvo = focoPendente.current;
+    if (!alvo || !fatura) return;
+    const index = dias.findIndex((d) => d.itens.some((t) => t.id === alvo));
+    if (index < 0) return;
+    focoPendente.current = undefined;
+    // Espera o cabeçalho trocar o esqueleto pelo cartão: a altura dele muda o ponto de chegada.
+    timersDoFoco.current.push(
+      setTimeout(() => {
+        listaRef.current?.scrollToIndex({ index, viewPosition: 0.3 });
+        setDestacada(alvo);
+      }, 350),
+      setTimeout(() => setDestacada(null), 350 + 2500)
+    );
+  }, [dias, fatura]);
 
   // "Cadastrar conta" de dentro do pagamento (25/09/2026): a folha fecha para a tela da conta abrir
   // — o `Sheet` não sobrevive a perder o foco — e REABRE quando a fatura volta ao foco, já com a
@@ -658,6 +682,12 @@ export default function InvoiceScreen() {
       />
 
       <FlatList keyboardShouldPersistTaps="handled"
+        ref={listaRef}
+        // O dia ainda não foi medido (fora da janela desenhada): chega perto pela média e tenta de novo.
+        onScrollToIndexFailed={({ index, averageItemLength }) => {
+          listaRef.current?.scrollToOffset({ offset: averageItemLength * index, animated: false });
+          setTimeout(() => listaRef.current?.scrollToIndex({ index, viewPosition: 0.3 }), 100);
+        }}
         // Rolar fecha o card arrastado que estiver aberto (Deslizavel).
         onScrollBeginDrag={fecharDeslizavelAberto}
         alwaysBounceVertical
@@ -732,6 +762,7 @@ export default function InvoiceScreen() {
                           .join(' · ')}
                         accessibilityLabel={`${tx.description ?? 'Sem descrição'}, ${brl(tx.amount_cents)}${prevista ? ', parcela prevista' : ''}`}
                         onLongPress={onLongPress}
+                        destacado={destacada === tx.id}
                         trailing={
                           <Money
                             cents={tx.amount_cents}
