@@ -487,7 +487,7 @@ export function ReminderForm({
   const onDelete = () => {
     if (!editing) return;
     // Aberto como ocorrência de uma série: pergunta "Só esta | Todas". Pela lista (contrato) ou único, confirma.
-    if (editing.recurrence && (editing.parent_reminder_id || umaOcorrenciaAberta)) {
+    if (editing.parent_reminder_id || (editing.recurrence && umaOcorrenciaAberta)) {
       apagar({ tipo: 'reminder', id: editing.id, nome: editing.title });
       return;
     }
