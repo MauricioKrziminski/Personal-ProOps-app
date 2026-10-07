@@ -58,6 +58,12 @@ test('fatura e lançamento abrem o ITEM quando o `ref` é uuid', () => {
   assert.deepEqual(routeFor({ target: 'transaction', ref: U }), { pathname: '/finance/[txId]', params: { txId: U } });
 });
 
+test('push de dívida abre a ficha; ref que não é uuid cai na lista', () => {
+  const id = '11111111-1111-1111-1111-111111111111';
+  assert.deepEqual(routeFor({ target: 'debt', ref: id }), { pathname: '/finance/debts', params: { id } });
+  assert.deepEqual(routeFor({ target: 'debt', ref: 'x' }), { pathname: '/finance/debts' });
+});
+
 test('item com `ref` que não é uuid cai na lista de antes', () => {
   for (const ref of ['../../etc', '2026-09-10', '', undefined, 42]) {
     assert.deepEqual(routeFor({ target: 'invoice', ref }), { pathname: '/finance/cards' });
@@ -72,7 +78,7 @@ test('o histórico de alertas usa o mesmo alvo do servidor', () => {
 });
 
 test('os alvos que o servidor produz hoje todos resolvem', () => {
-  for (const target of ['today', 'reminders', 'budgets', 'cards', 'forecast', 'cycle', 'invoice', 'transaction']) {
+  for (const target of ['today', 'reminders', 'budgets', 'cards', 'forecast', 'cycle', 'invoice', 'transaction', 'debt']) {
     assert.ok(routeFor({ target })?.pathname, `${target} não resolveu`);
   }
 });

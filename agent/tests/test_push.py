@@ -101,6 +101,11 @@ async def test_item_sem_uuid_cai_na_lista_de_antes(monkeypatch):
     assert enviados[1]["data"] == {"target": "today"}
 
 
+def test_debt_eh_alvo_de_item():
+    assert "debt" in push.TARGETS
+    assert push._ITEM_FALLBACK["debt"] == "today"
+
+
 def test_todo_alvo_de_target_for_esta_em_targets():
     for kind in ("cycle_closed", "budget_80", "invoice_due", "balance_x", "qualquer"):
         assert push.target_for(kind) in push.TARGETS

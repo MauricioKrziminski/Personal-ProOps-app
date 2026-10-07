@@ -15,11 +15,11 @@ EXPO_URL = "https://exp.host/--/api/v2/push/send"
 
 # `target` é chave de uma allowlist no app (src/lib/notifications.ts), não rota
 # livre: payload externo não pode escolher para onde o app navega.
-TARGETS = ("today", "reminders", "budgets", "cards", "forecast", "cycle", "invoice", "transaction")
+TARGETS = ("today", "reminders", "budgets", "cards", "forecast", "cycle", "invoice", "transaction", "debt")
 
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 # Alvo de ITEM sem uuid válido cai na lista de antes: o app nunca monta rota com texto cru.
-_ITEM_FALLBACK = {"invoice": "cards", "transaction": "today"}
+_ITEM_FALLBACK = {"invoice": "cards", "transaction": "today", "debt": "today"}
 
 
 def target_for(kind: str) -> str:
