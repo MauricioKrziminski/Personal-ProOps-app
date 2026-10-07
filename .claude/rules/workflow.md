@@ -40,7 +40,8 @@
      e modelos): repetir a seção custa só o que mudou. Com chave paga, sempre `--teto-usd`.
    - Para VER a rodada (caso a caso, comparada com a anterior, com custo): `--langfuse`. Ela vira
      um experimento no Langfuse (`ai-gemini.md`). Saída 3 = a rodada não chamou o modelo (cota):
-     o resultado não vale, mesmo que diga "passou".
+     o resultado não vale, mesmo que diga "passou". (Rodada SÓ de caso sem modelo — "sim", "ok" —
+     também sai 3; é o preço de a trava ser por rodada, não por caso. Não "conserte" a trava por isso.)
 
    O pytest usa dublês e dublê sempre concorda: essa suíte é a única que diz se a pessoa pode
    responder do jeito dela, e a seção de segurança é a que impede que "interpretar melhor" vire

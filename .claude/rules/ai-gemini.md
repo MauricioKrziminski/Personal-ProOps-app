@@ -60,7 +60,11 @@ nenhum outro:
   estão nem no prompt, nem na suíte, nem no treino. Custo da seção de segurança: US$ 0,003 no Lite
   contra US$ 0,021 no Flash. **Trocar `GEMINI_MODEL_GATE` em produção é decisão do dono do
   produto**: 18 casos de segurança são amostra pequena, e o caminho medido para decidir é o modo
-  sombra (`GEMINI_SHADOW_GATE`) antes da troca. O score do próprio GEPA não é evidência; só a suíte.
+  sombra (`GEMINI_SHADOW_GATE`, ligado no staging em 06/10) antes da troca. O score do próprio
+  GEPA não é evidência; só a suíte. **A sombra no Cloud Run é AMOSTRA, não censo:** o serviço tem
+  CPU só durante a requisição (sem `--no-cpu-throttling`), e a comparação roda em segundo plano
+  depois da resposta — parte congela ou morre com a instância. O que aparece em `shadow_diff`
+  vale; contar ausência como "concordou" não. Log: `jsonPayload.message:"shadow_diff"` no serviço.
 
   **O Lite do parse é o 3.1, não o 3.5, e a diferença é DINHEIRO.** Em "48x de 1470" o
   3.5-flash-lite devolveu `705600` em vez de `7056000` — uma ordem de grandeza — em 1 de 3
@@ -208,8 +212,8 @@ nenhum outro:
   **NEM `ai_events` NEM o Langfuse enxergam as suítes — só a fatura enxerga** (medido em
   15/09/2026). Entre 08 e 11/09 a API do Gemini recebeu **5.923 chamadas** (Cloud Monitoring,
   `serviceruntime.googleapis.com/api/request_count` no projeto `gen-lang-client-0373931877`) e o
-  Langfuse traçou **~500**: os scripts de avaliação e os `probe_*` chamam o modelo fora do grafo,
-  então não passam pelo handler de tracing. Ler "o Langfuse diz US$ 0,83 no mês" como se fosse o
+  Langfuse traçou **~500** (leitura de 15/09; na verdade os scripts PASSAVAM pelo handler, via
+  `Settings` lendo o `.env`, e chegavam como traces soltos — corrigido em 06/10, ver abaixo). Ler "o Langfuse diz US$ 0,83 no mês" como se fosse o
   gasto é como a conta some. Custo real: console de faturamento da conta `01ED4C-C3849B-0169D7`
   (Relatórios, por serviço e SKU) ou o export para o BigQuery.
 
@@ -219,7 +223,8 @@ nenhum outro:
   penduradas no caso (custo por rodada na comparação). O nome da rodada diz prompt, modelo do
   gate, raciocínio, filtro e commit. Sem a flag o harness ZERA `LANGFUSE_PUBLIC_KEY`: o projeto do
   Langfuse é o mesmo da produção, e antes disso cada chamada da avaliação virava trace solto no
-  meio do tráfego real. Os `probe_*` continuam fora — a fatura segue sendo a fonte do custo.
+  meio do tráfego real. Os `probe_*` NÃO zeram: continuam mandando traces soltos ao Langfuse de
+  produção. A fatura segue sendo a fonte do custo.
 
   **Rodada sem nenhuma chamada ao modelo concluída não vale e sai com código 3**
   (`eval_cache.rodada_invalida`). Cota esgotada (429) é engolida dentro dos classificadores e vira

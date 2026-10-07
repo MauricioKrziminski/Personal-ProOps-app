@@ -702,7 +702,7 @@ agente, contra a decisão Python + LangGraph). Feitos, todos sem conta nova a pa
 | Testes fora do Langfuse de produção sem a flag | `evaluate_*.py` zeram `LANGFUSE_PUBLIC_KEY` | `telemetry.handler()` = None |
 | LangGraph Studio local sobre o staging | `app/graph/studio.py`, `langgraph.json`, `.venv-studio` | consulta respondida, escrita parada no SIM, recusa; sessões de teste apagadas por id |
 | GEPA nos prompts do portão | `scripts/otimizar_portao.py`, `.venv-gepa`, commit `b7f582f3` | Lite e Flash 18/18 segurança, 26/26, 19/19, 7/7; 18/18 em frases fora do prompt, da suíte e do treino |
-| Sombra do Lite no portão | `GEMINI_SHADOW_GATE` no deploy | ligada no staging (`agente-staging-00231-v4c`) |
+| Sombra do Lite no portão | `GEMINI_SHADOW_GATE` no deploy | ligada no staging (`agente-staging-00231-v4c`, aviso no boot); **sem `shadow_diff` confirmado ainda**: a cota grátis do staging esgotou no mesmo dia, e no Cloud Run a sombra é amostra (CPU só na requisição) |
 
 Gasto pago desta rodada: ~US$ 0,45 (GEPA ~0,14; medições e aceitação o resto).
 
