@@ -613,6 +613,10 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === '@/components/motion/presenca') return { Presenca: function Presenca(p: any) { return p.visivel ? p.children : null; }, MudancaSuave: 'MudancaSuave', TrocaSuave: 'TrocaSuave', usePresencaAtiva: () => true, usePresenca: (visivel: boolean) => ({ presente: visivel, estilo: {}, reduzir: true }) };
       if (name === '@/hooks/use-theme') return { useTheme: () => ({}), useScheme: () => 'light', PaletaTingida: 'PaletaTingida' };
       // portão de "a tela está pronta": no harness nada carrega, então ele já nasce aberto
+      if (name === '@/hooks/use-apagar-com-alcance') return { useApagarComAlcance: () => ({
+        apagar: (alvo: any) => writes.push({ operation: 'apagarComAlcance', value: alvo }),
+        apagarNoAlcance: (alvo: any, alcance: string) => writes.push({ operation: 'apagarComAlcance', value: { ...alvo, alcance } }),
+        pendente: false }) };
       if (name === '@/hooks/use-tela-pronta') return { useTelaPronta: (...consultas: any[]) => { gates.push(consultas); return true; } };
       // Carregado DE VERDADE: ele é a regra que se quer testar, não um arredor da tela.
       if (name === '@/hooks/use-voltar-quando-fechar') return load('src/hooks/use-voltar-quando-fechar.ts');
