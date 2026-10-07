@@ -16,7 +16,7 @@ declare
   conta uuid; serie uuid; t_pago uuid; t_atrasada uuid; t_ancora uuid; t_depois uuid; t_longe uuid; cartao uuid; t_pai uuid; t_fee uuid;
   r jsonb; n int; chave uuid := gen_random_uuid(); cfg text[];
   plano uuid; p1 uuid; p2 uuid; p3 uuid; p4 uuid; soma bigint; k int; ent uuid; q1 uuid; q2 uuid; q3 uuid; q4 uuid;
-  lem uuid; filho uuid;
+  lem uuid; filho uuid; fatura uuid; compra uuid;
   d uuid; pg1 uuid; pg2 uuid; pg3 uuid; restante bigint;
 begin
   select id into ws from public.workspaces where owner_id = u;
@@ -428,10 +428,65 @@ begin
     assert sqlstate = '22023', format('lembrete future: %s %s', sqlstate, sqlerrm);
   end;
   assert n <> -1, 'future em lembrete devia ser recusado';
-  r := public.delete_scoped('reminder', lem, 'all', gen_random_uuid());
+  -- (a) "Só esta" no pai com edição pendente da mesma vez: o filho sai também
   reset role;
-  assert not exists (select 1 from public.reminders where id = lem), 'todas apaga o lembrete';
+  update public.reminders set skip_run_at = null where id = lem;
+  insert into public.reminders (user_id, workspace_id, title, next_run_at, timezone, channel, active, source, parent_reminder_id, original_run_at)
+  select u, ws, 'Remédio AA (depois)', next_run_at + interval '5 minutes', 'America/Sao_Paulo', 'push', true, 'app', id, next_run_at
+    from public.reminders where id = lem returning id into filho;
   set local role authenticated;
+  r := public.delete_scoped('reminder', lem, 'one', gen_random_uuid());
+  reset role;
+  assert not exists (select 1 from public.reminders where id = filho), 'só esta leva a edição pendente da mesma vez';
+  assert (select skip_run_at = next_run_at from public.reminders where id = lem), 'e a vez fica pulada';
+  -- (b)+(c) "Todas" pelo filho: conta pai + filhos e apaga tudo
+  reset role;
+  insert into public.reminders (user_id, workspace_id, title, next_run_at, timezone, channel, active, source, parent_reminder_id, original_run_at)
+  select u, ws, 'Remédio AA (filho)', next_run_at + interval '5 minutes', 'America/Sao_Paulo', 'push', true, 'app', id, next_run_at
+    from public.reminders where id = lem returning id into filho;
+  set local role authenticated;
+  r := public.delete_scoped_preview('reminder', filho, 'all');
+  assert (r->>'apagadas')::int = 2, format('prévia conta pai + filho: %s', r);
+  r := public.delete_scoped('reminder', filho, 'all', gen_random_uuid());
+  reset role;
+  assert not exists (select 1 from public.reminders where id in (lem, filho) or parent_reminder_id = lem), 'todas apaga pai e filhos';
+  -- só esta num lembrete avulso apaga a linha
+  insert into public.reminders (user_id, workspace_id, title, next_run_at, timezone, channel, active, source)
+  values (u, ws, 'Avulso AA', now() + interval '2 hours', 'America/Sao_Paulo', 'push', true, 'app') returning id into lem;
+  set local role authenticated;
+  r := public.delete_scoped('reminder', lem, 'one', gen_random_uuid());
+  reset role;
+  assert not exists (select 1 from public.reminders where id = lem), 'avulso: só esta apaga';
+  -- lembrete de outro membro
+  insert into public.reminders (user_id, workspace_id, title, next_run_at, timezone, channel, active, source)
+  values (outro, ws_outro, 'Alheio AA', now() + interval '2 hours', 'America/Sao_Paulo', 'push', true, 'app') returning id into lem;
+  set local role authenticated;
+  n := 0;
+  begin
+    perform public.delete_scoped('reminder', lem, 'one', gen_random_uuid());
+    n := -1;
+  exception when others then
+    assert sqlerrm = 'Esse registro não existe mais', format('alheio: %s %s', sqlstate, sqlerrm);
+  end;
+  assert n <> -1, 'lembrete alheio devia ser recusado';
+  set local role authenticated;
+
+  -- ── Task 5: fatura paga em parte não fica com total abaixo do pago ──
+  reset role;
+  insert into public.card_invoices (workspace_id, user_id, account_id, reference_month, closing_date, due_date, paid_cents)
+  values (ws, u, cartao, date '2031-03-01', hoje - 5, hoje + 2, 5000) returning id into fatura;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, invoice_id)
+  values (ws, u, 'expense', 6000, 'Mercado AA', hoje - 10, 'pending', cartao, fatura) returning id into compra;
+  update public.transactions set invoice_id = fatura where id = compra;
+  set local role authenticated;
+  n := 0;
+  begin
+    delete from public.transactions where id = compra;
+    n := -1;
+  exception when others then
+    assert sqlstate = 'P0001' and sqlerrm like 'A fatura de % já tem pagamento:%', format('fatura parcial: %s %s', sqlstate, sqlerrm);
+  end;
+  assert n <> -1, 'apagar a compra devia ser recusado';
 
   -- BLOCOS DAS PRÓXIMAS TAREFAS ENTRAM AQUI
   reset role;

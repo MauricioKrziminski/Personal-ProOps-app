@@ -4472,6 +4472,25 @@ export type Database = {
         Args: { p_plan_id: string }
         Returns: number
       }
+      delete_scoped: {
+        Args: {
+          p_alcance: string
+          p_anchor?: string
+          p_id: string
+          p_request_id: string
+          p_tipo: string
+        }
+        Returns: Json
+      }
+      delete_scoped_preview: {
+        Args: {
+          p_alcance: string
+          p_anchor?: string
+          p_id: string
+          p_tipo: string
+        }
+        Returns: Json
+      }
       draft_lines: {
         Args: { p_drafts: Json; p_from: string; p_to: string }
         Returns: Json

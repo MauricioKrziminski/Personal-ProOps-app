@@ -214,6 +214,7 @@ begin
   -- ── B. transferência recorrente: projeção, previstas, materialização ───────
   reset role;
   -- só a transferência fica no espaço: os eventos de caixa abaixo são dela
+  update public.card_invoices set paid_cents = 0 where workspace_id = w;   -- o gatilho de apagar não deixa fatura paga em parte ficar abaixo do pago
   delete from public.transactions where workspace_id = w;
   delete from public.recurring_transactions where id in (s1, s2, s3, s4, s5, s6);
   select coalesce(sum(amount_cents) filter(where kind='income'),0),coalesce(sum(amount_cents) filter(where kind='expense'),0)
