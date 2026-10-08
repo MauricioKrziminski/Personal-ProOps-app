@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { COLUNAS_COPIADAS, COLUNAS_IGNORADAS, paramsDaCopia } from './duplicar.ts';
+import { COLUNAS_COPIADAS, COLUNAS_IGNORADAS, paramsDaCopia, podeDuplicar } from './duplicar.ts';
 import { decodeModelo, encodeModelo } from './favoritos.ts';
 
 test('a lista de colunas copiadas e ignoradas é exatamente a do contrato F22', () => {
@@ -40,4 +40,8 @@ test('decodeModelo ignora chave desconhecida, zera valor inválido e o encode s�
   assert.ok(!('invoice_id' in m) && !('foo' in m));
   assert.equal(decodeModelo(null).kind, 'expense');
   assert.deepEqual(encodeModelo({ kind: 'income', amount_cents: 100, invoice_id: 'i' } as any), { kind: 'income', amount_cents: 100 });
+});
+
+test('o lançamento de um adiantamento não duplica', () => {
+  assert.equal(podeDuplicar({ adiantamento: { source: 'plan' } }), false);
 });

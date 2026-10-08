@@ -64,6 +64,7 @@ import { useApagarComAlcance } from '@/hooks/use-apagar-com-alcance';
 import { alvoDoLancamento } from '@/lib/apagar-com-alcance';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
 import { diferencaDoPrevisto, previstoDoLancamento } from '@/lib/previsto';
+import { apoioDoAdiantamento } from '@/lib/anticipation';
 import { dueInline, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
 import { filterExpectedLines, mesclarPrevistas, previstasNaTela, type ItemDoExtrato } from '@/lib/ledger-expected';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
@@ -264,13 +265,16 @@ const LinhaDoExtrato = memo(function LinhaDoExtrato({
   const previsto = previstoDoLancamento(tx);
   const badges = [
     // "parcela 2" some quando o título já diz "(2/10)" — a mesma informação duas vezes.
-    tx.installment_no && !/\(\d+\/\d+\)$/.test(tituloDaLinha) ? `parcela ${tx.installment_no}` : null,
+    tx.installment_no && !tx.adiantamento && !/\(\d+\/\d+\)$/.test(tituloDaLinha) ? `parcela ${tx.installment_no}` : null,
     rotuloDaCompra(tx),
     emAberto && tx.invoice_id === null
       ? dueInline(tx.kind, tx.due_at ? formatDateBR(tx.due_at).slice(0, 5) : null).replace(/^previsto( · )?/, '')
       : null,
     // Paga com outro valor: o valor da linha é o pago, e aqui a DIFERENÇA (08/10/2026).
-    diferencaDoPrevisto(Number(tx.amount_cents), previsto, brl, tx.kind === 'income' ? 'recebeu' : 'pagou'),
+    // O adiantamento (08/10/2026) diz o que cobriu e o desconto.
+    tx.adiantamento
+      ? apoioDoAdiantamento(tx.adiantamento, Number(tx.amount_cents), tx.expected_amount_cents, brl)
+      : diferencaDoPrevisto(Number(tx.amount_cents), previsto, brl, tx.kind === 'income' ? 'recebeu' : 'pagou'),
   ].filter(Boolean);
   // Transferência não tem sinal na lista global — ela não é entrada nem saída do
   // conjunto. No extrato de UMA conta ela tem: sai da conta de origem e ENTRA na de

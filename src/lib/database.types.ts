@@ -3415,6 +3415,7 @@ export type Database = {
       transactions: {
         Row: {
           account_id: string | null
+          adiantamento: Json | null
           amount_cents: number
           attachment_path: string | null
           auto_confirm: boolean
@@ -3461,6 +3462,7 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
+          adiantamento?: Json | null
           amount_cents: number
           attachment_path?: string | null
           auto_confirm?: boolean
@@ -3507,6 +3509,7 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
+          adiantamento?: Json | null
           amount_cents?: number
           attachment_path?: string | null
           auto_confirm?: boolean
@@ -4258,6 +4261,10 @@ export type Database = {
         }[]
       }
       anticipation_candidates: { Args: { p_pay_on?: string }; Returns: Json }
+      apply_anticipation: {
+        Args: { p_input: Json; p_request_id: string }
+        Returns: Json
+      }
       approve_import_items: { Args: { p_item_ids: string[] }; Returns: number }
       bill_reminders_overview: {
         Args: never
@@ -4496,7 +4503,10 @@ export type Database = {
         Args: { p_input: Json; p_request_id: string }
         Returns: Json
       }
-      cycle_breakdown: { Args: { p_month: string; p_view?: string }; Returns: Json }
+      cycle_breakdown: {
+        Args: { p_month: string; p_view?: string }
+        Returns: Json
+      }
       cycle_lines: {
         Args: { p_month: string; p_view?: string }
         Returns: {
@@ -4598,6 +4608,10 @@ export type Database = {
       }
       draft_lines: {
         Args: { p_drafts: Json; p_from: string; p_to: string }
+        Returns: Json
+      }
+      edit_anticipation: {
+        Args: { p_id: string; p_input: Json }
         Returns: Json
       }
       edit_budget: {
@@ -5513,6 +5527,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

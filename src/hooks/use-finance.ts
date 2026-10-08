@@ -33,7 +33,7 @@ import { toIlikeTerm } from '@/lib/search';
 import { dateWindows, timestampDateBounds, type ListFiltersValue } from '@/lib/list-filters';
 import { ACCOUNT_TYPES } from '@/lib/accounts';
 import { acharLinhaNoCache } from '@/lib/linha-do-cache';
-import { adiantaveisNoMes, semCancelamentoRepetido, type Adiantavel, type EscolhaDeAdiantamento } from '@/lib/anticipation';
+import { adiantaveisNoMes, semCancelamentoRepetido, type Adiantavel, type EscolhaDeAdiantamento, type RegistroDeAdiantamento } from '@/lib/anticipation';
 import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
 import { filtroDoEstado } from '@/lib/data-da-compra';
 import type { HipoteseNoCiclo, OcorrenciaDaHipotese } from '@/lib/rascunho-no-ciclo';
@@ -108,6 +108,8 @@ export type Transaction = Pick<
   // `20260909110000`: entra sozinho na data em vez de esperar baixa. Em receita o padrão é
   // false — Pix de terceiro precisa de comprovação; salário é onde ligar faz sentido.
   | 'auto_confirm'
+  // O previsto da baixa com outro valor e, no adiantamento, a soma das parcelas cobertas.
+  | 'expected_amount_cents'
 > & Partial<ExpenseClassification> & SubcategoryMetadata & {
   kind: TransactionKind;
   workspace_id?: string;
@@ -131,6 +133,8 @@ export type Transaction = Pick<
    * entre o valor pago e a parcela é encargo/desconto ou juros (`detalheDoPagamento`). Só leitura.
    */
   debts?: Partial<Pick<Debt, 'name' | 'kind' | 'calculation_mode' | 'installments'>> | null;
+  /** O lançamento de um adiantamento aplicado (`20261010130000`): o que ele cobriu. */
+  adiantamento?: RegistroDeAdiantamento | null;
 };
 
 /**
@@ -233,7 +237,7 @@ export type TxSummaryRow = Omit<Fns['transactions_summary']['Returns'][number], 
 };
 
 const TRANSACTION_COLUMNS =
-  'id, workspace_id, subcategory_id, subcategories!transactions_subcategory_id_fkey(name), expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, payment_method, pix_fee_for_transaction_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_interest_cents, debt_balance_after_cents, expected_amount_cents, edit_revision, auto_confirm, rollover_of_invoice_id, pays_invoice_id, down_payment_debt_id, down_payment_plan_id, installment_plans!transactions_installment_plan_id_fkey(first_occurred_at)';
+  'id, workspace_id, subcategory_id, subcategories!transactions_subcategory_id_fkey(name), expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, payment_method, pix_fee_for_transaction_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_interest_cents, debt_balance_after_cents, expected_amount_cents, adiantamento, edit_revision, auto_confirm, rollover_of_invoice_id, pays_invoice_id, down_payment_debt_id, down_payment_plan_id, installment_plans!transactions_installment_plan_id_fkey(first_occurred_at)';
 
 /**
  * As LISTAS de lançamentos levam o modo da dívida: ele diz se `debt_principal_cents` é a parcela do
@@ -3423,6 +3427,53 @@ export function useSaveTransaction() {
   });
 }
 
+/**
+ * Aplicar um adiantamento do "E se…?" (08/10/2026): UM lançamento, e a origem (compra,
+ * financiamento, série) muda junto, numa transação. A tentativa repete com o MESMO id enquanto o
+ * pedido não muda — o recibo no banco devolve o resultado em vez de gravar duas vezes.
+ */
+export type PedidoDeAdiantamento = {
+  source: 'plan' | 'debt' | 'recurring';
+  ref_id: string;
+  paid_on: string;
+  amount_cents: number;
+  account_id: string;
+  description: string;
+  parcelas: ({ id: string } | { n: number } | { on: string })[];
+};
+
+export function useApplyAnticipation() {
+  const invalidate = useInvalidateFinance();
+  const attempt = useRef<{ key: string; id: string } | null>(null);
+  return useMutation({
+    mutationFn: async (pedido: PedidoDeAdiantamento) => {
+      const key = JSON.stringify(pedido);
+      if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
+      const requestId = attempt.current.id;
+      const { data, error } = await supabase.rpc('apply_anticipation', {
+        p_input: pedido as unknown as Json, p_request_id: requestId,
+      });
+      if (error) throw error;
+      if (attempt.current?.id === requestId) attempt.current = null;
+      return data as unknown as { id: string };
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Título, valor, data e conta do lançamento de um adiantamento (`edit_anticipation`). */
+export function useEditAnticipation() {
+  const invalidate = useInvalidateFinance();
+  return useMutation({
+    mutationFn: async (input: { id: string; description: string; amount_cents: number; paid_on: string; account_id: string }) => {
+      const { id, ...campos } = input;
+      const { error } = await supabase.rpc('edit_anticipation', { p_id: id, p_input: campos as unknown as Json });
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+}
+
 export function useDeleteTransaction() {
   const invalidate = useInvalidateFinance();
   return useMutation({
@@ -4208,7 +4259,12 @@ export interface InstallmentParcel {
   occurred_at: string;
   invoice_id: string | null;
   status: 'pending' | 'cleared';
+  /** O lançamento de um adiantamento (`20261010130000`): ocupa os números das parcelas que cobriu. */
+  adiantamento?: RegistroDeAdiantamento | null;
 }
+
+/** Quantos números de parcela a linha ocupa: N no adiantamento, 1 nas outras (`private.peso_da_parcela`). */
+const pesoDaParcela = (p: InstallmentParcel) => (p.adiantamento ? Math.max(1, p.adiantamento.parcelas.length) : 1);
 
 export interface InstallmentPlanSummary extends Partial<ExpenseClassification>, SubcategoryMetadata {
   id: string;
@@ -4358,7 +4414,7 @@ async function buscarPlanos(apenas?: string): Promise<InstallmentPlanSummary[]> 
     (lote, from, to) =>
       supabase
         .from('transactions')
-        .select('id, edit_revision, installment_plan_id, installment_no, amount_cents, expected_amount_cents, occurred_at, status, invoice_id')
+        .select('id, edit_revision, installment_plan_id, installment_no, amount_cents, expected_amount_cents, occurred_at, status, invoice_id, adiantamento')
         .in('installment_plan_id', lote)
         .order('installment_no')
         .range(from, to),
@@ -4397,14 +4453,15 @@ async function buscarPlanos(apenas?: string): Promise<InstallmentPlanSummary[]> 
     const pago = parcels
       .filter((p) => p.status === 'cleared')
       .reduce((soma, p) => soma + p.amount_cents, 0);
+    // O adiantamento é trava de peso N, como no banco (`update_installment_plan`).
     const travadas = parcels.filter(
-      (p) => p.status === 'cleared' || (p.invoice_id && faturaFechada.has(p.invoice_id)),
+      (p) => p.adiantamento || p.status === 'cleared' || (p.invoice_id && faturaFechada.has(p.invoice_id)),
     );
     const emOrdem = [...parcels].sort(
       (a, b) => (a.installment_no ?? 0) - (b.installment_no ?? 0),
     );
     const proxima = emOrdem.find(
-      (p) => !(p.status === 'cleared' || (p.invoice_id && faturaFechada.has(p.invoice_id))),
+      (p) => !(p.adiantamento || p.status === 'cleared' || (p.invoice_id && faturaFechada.has(p.invoice_id))),
     );
     return {
       id: plan.id,
@@ -4420,16 +4477,16 @@ async function buscarPlanos(apenas?: string): Promise<InstallmentPlanSummary[]> 
       edit_revision: plan.edit_revision,
       total_cents: plan.total_cents,
       installments: n,
-      paid: parcels.filter((p) => p.status === 'cleared').length,
+      paid: parcels.filter((p) => p.status === 'cleared').reduce((soma, p) => soma + pesoDaParcela(p), 0),
       installment_cents: proxima?.amount_cents ?? emOrdem[0]?.amount_cents ?? base,
       last_installment_cents:
         emOrdem[emOrdem.length - 1]?.amount_cents ?? plan.total_cents - base * (n - 1),
       remaining_cents: Math.max(0, plan.total_cents - pago),
-      locked: travadas.length,
+      locked: travadas.reduce((soma, p) => soma + pesoDaParcela(p), 0),
       locked_cents: travadas.reduce((soma, p) => soma + p.amount_cents, 0),
-      locked_paid: travadas.filter((p) => p.status === 'cleared').length,
+      locked_paid: travadas.filter((p) => p.status === 'cleared').reduce((soma, p) => soma + pesoDaParcela(p), 0),
       locked_in_invoice: travadas.filter((p) => p.invoice_id).length,
-      last_locked_no: travadas.reduce((maior, p) => Math.max(maior, p.installment_no ?? 0), 0),
+      last_locked_no: travadas.reduce((maior, p) => Math.max(maior, (p.installment_no ?? 0) + pesoDaParcela(p) - 1), 0),
       paid_floor: parcels
         .filter((p) => p.status === 'cleared' && p.invoice_id && faturaPagaDeVerdade.has(p.invoice_id))
         .reduce((maior, p) => Math.max(maior, p.installment_no ?? 0), 0),

@@ -101,9 +101,12 @@ export function papelDaTransacao(tx: { recurring_id?: string | null; installment
 
 /** Editar um lançamento que se tem à mão: o avulso não tem passado, os outros o hospedeiro pergunta. */
 export function hrefDoLancamento(
-  tx: { id: string; recurring_id?: string | null; installment_plan_id?: string | null; debt_id?: string | null; pix_fee_for_transaction_id?: string | null },
+  tx: { id: string; recurring_id?: string | null; installment_plan_id?: string | null; debt_id?: string | null; pix_fee_for_transaction_id?: string | null; adiantamento?: unknown },
   extra: Record<string, string> = {},
 ) {
+  // O lançamento de um adiantamento se edita na tela do adiantamento (08/10/2026): o formulário
+  // comum mudaria valor e data sem mexer no que ele cobriu.
+  if (tx.adiantamento) return { pathname: '/finance/aplicar-adiantamento' as const, params: { id: tx.id } as Record<string, string> };
   const papel = papelDaTransacao(tx);
   return hrefDoLancar('uma', { id: tx.pix_fee_for_transaction_id ?? tx.id, origem: 'transacao', papel, ...(papel === 'avulsa' ? { passado: '0' } : {}), ...extra });
 }

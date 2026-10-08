@@ -1109,6 +1109,7 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     antes = await db.fetch_one(
         """
         select id, kind, amount_cents, category, description, occurred_at, installment_no,
+               adiantamento is not null as adiantamento,
                (select p.installments from public.installment_plans p
                  where p.id = t.installment_plan_id and p.workspace_id = t.workspace_id
                ) as plan_installments
@@ -1118,6 +1119,10 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     )
     if not antes:
         return ToolResult("🤷 Esse lançamento não está mais aqui.", read_only=True)
+    # O lançamento de um adiantamento (20261010130000) tem valor, data, título e conta presos ao
+    # que ele cobriu: o banco os mantém em qualquer escrita comum, e dizer "pronto" seria mentir.
+    if antes.get("adiantamento") and set(patch) - {"category"}:
+        return ToolResult(ADIANTAMENTO_SO_NO_APP, read_only=True)
     if "description" in patch and antes.get("installment_no") and antes.get("plan_installments"):
         # ponytail: terceira cópia do formato "(k/N)" (ver `_SUFIXO_DA_PARCELA`);
         # `test_o_sufixo_da_parcela_e_o_mesmo_da_rpc` prende as três
@@ -1581,6 +1586,25 @@ async def _apagar_plano(ctx: ExecContext) -> ToolResult:
     )
 
 
+ADIANTAMENTO_SO_NO_APP = (
+    "Esse é um adiantamento de parcelas: valor, data, título e conta se mudam no app, em "
+    "*Editar adiantamento*. A categoria eu mudo por aqui."
+)
+
+
+async def _apagar_lancamento(ctx: ExecContext, alvo: dict) -> None:
+    """Apaga um lançamento. O de um adiantamento de COMPRA desfaz (as parcelas voltam) pela função
+    do banco; o de dívida e de série desfaz pelo gatilho do próprio DELETE (20261010130000).
+    `workspace_id` no DELETE: o id já vem de um select escopado, mas a garantia é local."""
+    if alvo.get("adiantamento_da_compra"):
+        await db.execute("select private.desfazer_adiantamento_da_compra(%s)", alvo["id"])
+        return
+    await db.execute(
+        "delete from public.transactions where id = %s and workspace_id = %s",
+        alvo["id"], ctx.workspace_id,
+    )
+
+
 async def delete_transaction(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     if _alvo_e_plano(ctx):
         return await _apagar_plano(ctx)
@@ -1590,17 +1614,15 @@ async def delete_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
 
     alvo = await db.fetch_one(
         """
-        select id, kind, amount_cents, category, description
+        select id, kind, amount_cents, category, description,
+               coalesce(adiantamento->>'source' = 'plan', false) as adiantamento_da_compra
         from public.transactions where id = %s and workspace_id = %s
         """,
         cands[0]["id"], ctx.workspace_id,
     )
     if not alvo:
         return ToolResult("🤷 Esse lançamento não está mais aqui.", read_only=True)
-    await db.execute(
-        "delete from public.transactions where id = %s and workspace_id = %s",
-        alvo["id"], ctx.workspace_id,
-    )
+    await _apagar_lancamento(ctx, alvo)
     return ToolResult(f"🗑️ Apagado: {describe(alvo)}.", result_id=alvo["id"])
 
 
@@ -1609,7 +1631,8 @@ async def undo_last(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     # e o SIM, apagar é o que ele LEU, não o que virou último no meio do caminho.
     alvo = await db.fetch_one(
         """
-        select id, kind, amount_cents, category, description
+        select id, kind, amount_cents, category, description,
+               coalesce(adiantamento->>'source' = 'plan', false) as adiantamento_da_compra
         from public.transactions where id = %s and workspace_id = %s
         """,
         ctx.target["candidates"][0]["id"], ctx.workspace_id,
@@ -1617,12 +1640,7 @@ async def undo_last(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     if not alvo:
         return ToolResult("🤷 Não achei nenhum lançamento para apagar.", read_only=True)
 
-    # `workspace_id` no DELETE: o id já vem de um select escopado, mas depender
-    # disso é depender de quem chama. Aqui a garantia é local.
-    await db.execute(
-        "delete from public.transactions where id = %s and workspace_id = %s",
-        alvo["id"], ctx.workspace_id,
-    )
+    await _apagar_lancamento(ctx, alvo)
     return ToolResult(f"🗑️ Apagado: {describe(alvo)}.", result_id=alvo["id"])
 
 

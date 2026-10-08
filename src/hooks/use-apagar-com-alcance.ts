@@ -68,7 +68,38 @@ export function useApagarComAlcance(aoApagar?: (p: PreviaDoApagar) => void) {
     else executar();
   };
 
-  const apagar = (alvo: AlvoDoApagar) => askDeleteScope(alvo.tipo, (alcance) => { void apagarNoAlcance(alvo, alcance); });
+  // O lançamento de um adiantamento: apagar DESFAZ e não tem alcance (08/10/2026). Na compra, o
+  // "Só esta" do banco devolve as parcelas; avulso, apagar a linha basta (o gatilho devolve).
+  const desfazer = useMutation({
+    mutationFn: async (alvo: AlvoDoApagar) => {
+      if (alvo.adiantamento === 'compra') {
+        const { error } = await supabase.rpc('delete_scoped', {
+          p_tipo: 'installment', p_id: alvo.id, p_alcance: 'one', p_request_id: newClientMessageId(),
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('transactions').delete().eq('id', alvo.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => invalidateFinance(qc),
+  });
+  const desfazerAdiantamento = (alvo: AlvoDoApagar) => confirmDestructive(
+    'Desfazer o adiantamento?',
+    'Desfazer',
+    () => desfazer.mutate(alvo, {
+      onSuccess: () => {
+        toast({ message: 'Adiantamento desfeito: as parcelas voltaram.', tone: 'success' });
+        aoApagar?.({ apagadas: 1, pagas: 0, somaPagasCents: 0, contas: [], desde: null, apagaContrato: false, viraAvista: false });
+      },
+      onError: (e) => toast({ message: financeErrorMessage(e, 'Não deu para desfazer. Tenta de novo.'), tone: 'error' }),
+    }),
+    'O lançamento sai e o que ele adiantou volta como era.',
+  );
 
-  return { apagar, apagarNoAlcance, pendente: escrita.isPending };
+  const apagar = (alvo: AlvoDoApagar) => alvo.adiantamento
+    ? desfazerAdiantamento(alvo)
+    : askDeleteScope(alvo.tipo, (alcance) => { void apagarNoAlcance(alvo, alcance); });
+
+  return { apagar, apagarNoAlcance, pendente: escrita.isPending || desfazer.isPending };
 }

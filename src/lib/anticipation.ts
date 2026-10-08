@@ -18,6 +18,10 @@ export type ParcelaAdiantavel = {
   cents: number;
   /** Valor presente no dia do pagamento (financiamento com taxa); igual a `cents` no resto. */
   pv_cents: number;
+  /** A linha da parcela, quando ela já existe (compra, recorrente gerada); `null` no resto. */
+  id?: string | null;
+  /** O dia da ocorrência (a data da compra, a da recorrente, o vencimento da dívida). */
+  on?: string;
 };
 
 export type Adiantavel = {
@@ -275,4 +279,83 @@ export function dicaDasParcelas(total: number, quantas: number, jaAdiantadas: nu
     : '';
   const depois = ficam === 0 ? 'não fica nenhuma' : `${ficam === 1 ? 'fica' : 'ficam'} ${plural(ficam)}`;
   return `Faltam ${plural(total)}${rascunho}. Adiantando ${quantas}, ${depois}.`;
+}
+
+/**
+ * Aplicar (08/10/2026): as parcelas que um adiantamento do rascunho tirou, achadas na lista do
+ * banco pelo dia em que cada uma sairia (o `start` dos `cancel` do grupo). Dia repetido conta
+ * uma vez por draft (a semanal no cartão vence várias no mesmo dia). `null` = alguma não está mais
+ * lá (paga, mudou, venceu): o adiantamento precisa ser refeito.
+ */
+export function parcelasDoGrupo(item: Adiantavel, dias: readonly string[]): ParcelaAdiantavel[] | null {
+  const livres = [...item.events];
+  const saida: ParcelaAdiantavel[] = [];
+  for (const dia of dias) {
+    const i = livres.findIndex((e) => e.day === dia);
+    if (i < 0) return null;
+    saida.push(livres.splice(i, 1)[0]);
+  }
+  return saida.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : (a.n ?? 0) - (b.n ?? 0)));
+}
+
+/** O pedido ao banco: a linha quando ela existe, o número na dívida, a data na recorrente prevista. */
+export function pedidoDasParcelas(
+  source: FonteAdiantavel,
+  parcelas: readonly ParcelaAdiantavel[],
+): ({ id: string } | { n: number } | { on: string })[] {
+  return parcelas.map((p) =>
+    p.id ? { id: p.id } : source === 'debt' ? { n: p.n ?? 0 } : { on: p.on ?? p.day });
+}
+
+/** O título que o lançamento nasce com: "Adiantamento de 3 parcelas de Fone" / "de 2 meses de". */
+export function tituloDoAdiantamento(source: FonteAdiantavel, quantas: number, nome: string): string {
+  const oQue = source === 'recurring'
+    ? `${quantas} ${quantas === 1 ? 'mês' : 'meses'}`
+    : `${quantas} ${quantas === 1 ? 'parcela' : 'parcelas'}`;
+  return `Adiantamento de ${oQue} de ${nome}`;
+}
+
+/** O que mora em `transactions.adiantamento` (20261010130000), só o que a tela lê. */
+export type RegistroDeAdiantamento = {
+  source: FonteAdiantavel;
+  ref_id: string;
+  modo?: 'proximas' | 'ultimas';
+  /** `day` é o dia em que sairia do caixa (dívida, série); na compra, a linha guardada traz o `due_at`. */
+  parcelas: { n?: number | null; on?: string; day?: string; cents?: number | string; linha?: { due_at?: string | null } }[];
+};
+
+/** "parcelas 10 a 12", "parcela 4", "3 meses": o que o lançamento cobriu, em poucas palavras. */
+export function oQueOAdiantamentoCobriu(a: RegistroDeAdiantamento): string {
+  const qtd = a.parcelas.length;
+  if (a.source === 'recurring') return `${qtd} ${qtd === 1 ? 'mês' : 'meses'}`;
+  const ns = a.parcelas.map((p) => Number(p.n)).filter((n) => Number.isFinite(n)).sort((x, y) => x - y);
+  if (ns.length === 0) return `${qtd} ${qtd === 1 ? 'parcela' : 'parcelas'}`;
+  if (ns.length === 1) return `parcela ${ns[0]}`;
+  const seguidas = ns.every((n, i) => i === 0 || n === ns[i - 1] + 1);
+  return seguidas ? `parcelas ${ns[0]} a ${ns[ns.length - 1]}` : `parcelas ${ns.join(', ')}`;
+}
+
+/**
+ * O apoio da linha de um adiantamento: o que ele cobriu e, quando o pago difere da soma das
+ * parcelas, a diferença dita como DESCONTO (ou o que se pagou a mais) — *"pode ser que tenha
+ * desconto, tem que mostrar isso também"*.
+ */
+export function apoioDoAdiantamento(
+  a: RegistroDeAdiantamento,
+  pagoCents: number,
+  previstoCents: number | null | undefined,
+  brl: (c: number) => string,
+): string {
+  const partes = [`adiantamento · ${oQueOAdiantamentoCobriu(a)}`];
+  if (previstoCents != null && previstoCents !== pagoCents) {
+    partes.push(previstoCents > pagoCents
+      ? `desconto de ${brl(previstoCents - pagoCents)}`
+      : `${brl(pagoCents - previstoCents)} a mais`);
+  }
+  return partes.join(' · ');
+}
+
+/** O dia que o "Aplicar" sugere: o da hipótese, nunca antes de hoje. */
+export function diaDoAplicar(pagarEm: string, hoje: string): string {
+  return pagarEm < hoje ? hoje : pagarEm;
 }

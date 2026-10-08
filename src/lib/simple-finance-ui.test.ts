@@ -273,6 +273,8 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
     useDebtPaymentVersions: () => ({ ...query, isSuccess: true, data: (options.debtPayments ?? []).map((p) => ({ ...p, edit_revision: p.edit_revision ?? 0 })) }),
     usePayDebtInstallment: () => mutation('payDebt'),
     useDeleteTransaction: () => mutation('deleteTransaction'),
+    useApplyAnticipation: () => mutation('applyAnticipation'),
+    useEditAnticipation: () => mutation('editAnticipation'),
     useSaveAccount: () => mutation('saveAccount'),
     useCreateAccount: () => ({ ...mutation('createAccount'), unconfirmedInput: null }),
     useDefaultWorkspaceId: () => ({ ...query, isSuccess: true, data: 'ws-1' }),
@@ -4144,7 +4146,7 @@ test('Projeção: com hipótese no rascunho, o erro da simulação aparece na li
   assert.deepEqual(ladosDe(card), { direita: ['Aplicar'], esquerda: ['Tirar'], mais: true, pontaDireita: 'Aplicar', pontaEsquerda: 'Tirar' });
 });
 
-test('Rascunho da versão 1: a parcelada sem conta não aplica (o formulário ficaria sem a conta); o adiantamento nunca aplica', () => {
+test('Rascunho da versão 1: a parcelada sem conta não aplica (o formulário ficaria sem a conta); o adiantamento aplica na tela dele', () => {
   const ui = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [
     { kind: 'expense', amount_cents: 300000, start: '2026-10-01', installments: 6, mode: 'total', grupo: 'h1' },
     { kind: 'expense', amount_cents: 50000, start: '2026-10-01', installments: 1, mode: 'total', grupo: 'h2', rotulo: 'adianta a tv' },
@@ -4153,7 +4155,9 @@ test('Rascunho da versão 1: a parcelada sem conta não aplica (o formulário fi
   const aplicar = (d: any) => d.props.acoes.find((a: any) => a.label === 'Aplicar');
   const [parcelada, adiantamento] = deslizaveis(ui);
   assert.equal(aplicar(parcelada).disabled, true);
-  assert.equal(aplicar(adiantamento), undefined);
+  // 08/10/2026: *"tudo que eu colocar ali na hipótese, eu devo conseguir aplicar"*.
+  ui.interact(() => aplicar(adiantamento).onPress());
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { pathname: '/finance/aplicar-adiantamento', params: { grupo: 'h2' } });
   // e a v1 de um valor só vira hipótese completa, sem conta
   const simples = screen(forecastFile, { forecastAccounts: [{ id: 'conta-1' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [{ kind: 'income', amount_cents: 5000, start: '2026-10-01', installments: 1, mode: 'total', grupo: 'g' }], detalhadas: [] }) } });
   simples.interact(() => aplicar(deslizaveis(simples)[0]).onPress());
@@ -8563,4 +8567,54 @@ test('E se: o rascunho em ordem, separado por período, com o saldo do período 
   const linhas = nos.filter((n: any) => n.type === 'Row' && /^Sai R\$/.test(n.props.title ?? ''));
   assert.match(linhas[0].props.title, /05\/11\/2026/);
   assert.match(linhas[1].props.title, /06\/12\/2026/);
+});
+
+test('Aplicar o adiantamento: nasce da hipótese, grava UM lançamento e salvar tira o grupo do rascunho', () => {
+  const rascunho = JSON.stringify({ versao: 2, hipoteses: [], adiantamentos: [
+    { kind: 'expense', amount_cents: 4500, start: '2026-10-01', installments: 1, mode: 'total', grupo: 'g1',
+      rotulo: 'adianta 2 parcelas de Fone', adiantar: { ref_id: 'plano-1', quantas: 2, quais: 'ultimas' } },
+    { kind: 'expense', amount_cents: 2500, start: '2026-11-10', installments: 1, mode: 'cancel', grupo: 'g1' },
+    { kind: 'expense', amount_cents: 2500, start: '2026-12-10', installments: 1, mode: 'cancel', grupo: 'g1' },
+  ] });
+  const ui = screen('src/app/finance/aplicar-adiantamento.tsx', {
+    params: { grupo: 'g1' },
+    preferencias: { 'projecao:rascunho': rascunho },
+    forecastAccounts: [{ id: 'conta-1', name: 'Nubank', type: 'checking', archived: false }],
+    anticipation: [{ source: 'plan', ref_id: 'plano-1', title: 'Fone', account_name: 'Nubank', total_n: 6, taxa: null, events: [
+      { n: 4, day: '2026-10-10', cents: 2500, pv_cents: 2500, id: 'p4', on: '2026-10-10' },
+      { n: 5, day: '2026-11-10', cents: 2500, pv_cents: 2500, id: 'p5', on: '2026-11-10' },
+      { n: 6, day: '2026-12-10', cents: 2500, pv_cents: 2500, id: 'p6', on: '2026-12-10' }] }],
+  });
+  // o desconto é dito: as duas somavam 50 e a hipótese paga 45
+  assert.ok(ui.nodes().some((n: any) => n.type === 'Field' && /^Desconto de/.test(String(n.props.hint ?? ''))), 'mostra o desconto');
+  const header = ui.nodes().find((n: any) => n.type === 'TaskHeader');
+  assert.equal(header.props.title, 'Aplicar adiantamento');
+  ui.interact(() => header.props.action.props.onPress());
+  const pedido = ui.pedidos.find((p: any) => p.operation === 'applyAnticipation');
+  assert.deepEqual(JSON.parse(JSON.stringify(pedido.value)), {
+    source: 'plan', ref_id: 'plano-1', paid_on: '2026-10-01', amount_cents: 4500, account_id: 'conta-1',
+    description: 'Adiantamento de 2 parcelas de Fone', parcelas: [{ id: 'p5' }, { id: 'p6' }],
+  });
+  ui.interact(() => pedido.opts.onSuccess({ id: 'p5' }));
+  // rascunho vazio grava '' (o mesmo do "Limpar")
+  assert.ok('projecao:rascunho' in ui.preferenciasGravadas && !String(ui.preferenciasGravadas['projecao:rascunho']).includes('g1'),
+    'o grupo saiu do rascunho');
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.navigations.at(-1))), { back: true });
+});
+
+test('Aplicar o adiantamento: parcela que mudou desde a hipótese não grava nada', () => {
+  const rascunho = JSON.stringify({ versao: 2, hipoteses: [], adiantamentos: [
+    { kind: 'expense', amount_cents: 2500, start: '2026-10-01', installments: 1, mode: 'total', grupo: 'g1',
+      rotulo: 'adianta 1 parcela de Fone', adiantar: { ref_id: 'plano-1', quantas: 1, quais: 'ultimas' } },
+    { kind: 'expense', amount_cents: 2500, start: '2027-01-10', installments: 1, mode: 'cancel', grupo: 'g1' },
+  ] });
+  const ui = screen('src/app/finance/aplicar-adiantamento.tsx', {
+    params: { grupo: 'g1' }, preferencias: { 'projecao:rascunho': rascunho },
+    forecastAccounts: [{ id: 'conta-1', name: 'Nubank', type: 'checking', archived: false }],
+    anticipation: [{ source: 'plan', ref_id: 'plano-1', title: 'Fone', account_name: 'Nubank', total_n: 6, taxa: null,
+      events: [{ n: 6, day: '2026-12-10', cents: 2500, pv_cents: 2500, id: 'p6', on: '2026-12-10' }] }],
+  });
+  assert.ok(ui.nodes().some((n: any) => n.type === 'EmptyState' && n.props.title === 'Esta hipótese mudou'));
+  const header = ui.nodes().find((n: any) => n.type === 'TaskHeader');
+  assert.equal(header.props.action.props.disabled, true);
 });

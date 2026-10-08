@@ -348,6 +348,10 @@ Dívidas), costurados por `?de=`, "Voltar" e `dismiss(2)`. Hoje é uma tela moda
   `transaction-form`, `nova-recorrente`, `novo-financiamento`, `recurring?edit=`/`?create=1` e
   `debts?create=financing`/`?id=&edit=1` — APK em campo, notificação e link antigo continuam
   chegando. Rota nova de criar ou editar esses três tipos não nasce: é `hrefDoLancar`.
+- **A exceção é o adiantamento** (08/10/2026): ele não é um quarto tipo, é o pagamento de
+  parcelas que já existem. "Aplicar" no "E se…?" abre `/finance/aplicar-adiantamento?grupo=`
+  (parcelas cobertas, título, valor com o desconto, data e conta) e o lançamento dele reabre a
+  mesma tela por `?id=` (`hrefDoLancamento`); apagar pergunta "Desfazer o adiantamento?", sem alcance.
 
 ### Formulário num `Sheet` que OUTRA tela abriu devolve para ela ao fechar
 

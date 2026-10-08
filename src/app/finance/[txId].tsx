@@ -45,6 +45,7 @@ import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { detalheDoPagamento } from '@/lib/confirmar-baixa';
 import { diferencaDoPrevisto, previstoDaLinha } from '@/lib/previsto';
+import { apoioDoAdiantamento } from '@/lib/anticipation';
 import { foldCategory, mergeCategories } from '@/lib/categories-merge';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive } from '@/lib/item-actions';
@@ -295,7 +296,12 @@ export default function TransactionDetailScreen() {
               {detalheDaDivida}
             </ThemedText>
           ) : null}
-          {previsto !== null ? (
+          {tx.adiantamento ? (
+            <ThemedText type="small" style={tabular}>
+              {`${apoioDoAdiantamento(tx.adiantamento, Number(tx.amount_cents), tx.expected_amount_cents, brl)
+                .replace(/^a/, 'A')} · as parcelas somavam ${brl(Number(tx.expected_amount_cents ?? 0))}`}
+            </ThemedText>
+          ) : previsto !== null ? (
             <ThemedText type="small" style={tabular}>
               {`Previsto ${brl(previsto)} · ${diferencaDoPrevisto(Number(tx.amount_cents), previsto, brl, tx.kind === 'income' ? 'recebeu' : 'pagou')}`}
             </ThemedText>

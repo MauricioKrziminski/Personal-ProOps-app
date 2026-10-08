@@ -15,6 +15,12 @@ import {
   semCancelamentoRepetido,
   ultimoDia,
   valorSugerido,
+  parcelasDoGrupo,
+  pedidoDasParcelas,
+  tituloDoAdiantamento,
+  oQueOAdiantamentoCobriu,
+  apoioDoAdiantamento,
+  diaDoAplicar,
   type Adiantavel,
 } from './anticipation.ts';
 
@@ -182,4 +188,41 @@ test('adiantar: a dica diz quantas faltam e quantas ficam depois de adiantar', (
   assert.equal(dicaDasParcelas(44, 12, 0), 'Faltam 44 parcelas. Adiantando 12, ficam 32 parcelas.');
   assert.equal(dicaDasParcelas(8, 7, 3), 'Faltam 8 parcelas (3 já adiantadas no rascunho). Adiantando 7, fica 1 parcela.');
   assert.equal(dicaDasParcelas(2, 2, 0), 'Faltam 2 parcelas. Adiantando 2, não fica nenhuma.');
+});
+
+test('aplicar: as parcelas do grupo saem da lista do banco pelo dia, e somem se mudaram', () => {
+  const item: Adiantavel = {
+    source: 'plan', ref_id: 'p', title: 'Fone', account_name: 'Conta', total_n: 6, taxa: null,
+    events: [
+      { n: 4, day: '2026-12-10', cents: 100, pv_cents: 100, id: 'a', on: '2026-11-20' },
+      { n: 5, day: '2027-01-10', cents: 100, pv_cents: 100, id: 'b', on: '2026-12-20' },
+      { n: 6, day: '2027-01-10', cents: 100, pv_cents: 100, id: 'c', on: '2027-01-02' },
+    ],
+  };
+  assert.deepEqual(parcelasDoGrupo(item, ['2027-01-10', '2027-01-10'])?.map((p) => p.id), ['b', 'c']);
+  assert.equal(parcelasDoGrupo(item, ['2027-02-10']), null);
+  assert.equal(parcelasDoGrupo(item, ['2027-01-10', '2027-01-10', '2027-01-10']), null);
+});
+
+test('aplicar: o pedido leva a linha, o número da dívida ou a data da prevista', () => {
+  const p = (x: Partial<{ n: number | null; id: string | null; on: string }>) =>
+    ({ n: null, day: '2026-12-01', cents: 1, pv_cents: 1, ...x });
+  assert.deepEqual(pedidoDasParcelas('plan', [p({ id: 'a', n: 2 })]), [{ id: 'a' }]);
+  assert.deepEqual(pedidoDasParcelas('debt', [p({ n: 9 })]), [{ n: 9 }]);
+  assert.deepEqual(pedidoDasParcelas('recurring', [p({ on: '2027-03-15' })]), [{ on: '2027-03-15' }]);
+});
+
+test('aplicar: título, o que cobriu e o desconto', () => {
+  assert.equal(tituloDoAdiantamento('plan', 3, 'Fone'), 'Adiantamento de 3 parcelas de Fone');
+  assert.equal(tituloDoAdiantamento('recurring', 1, 'Academia'), 'Adiantamento de 1 mês de Academia');
+  assert.equal(oQueOAdiantamentoCobriu({ source: 'plan', ref_id: 'p', parcelas: [{ n: 12 }, { n: 10 }, { n: 11 }] }), 'parcelas 10 a 12');
+  assert.equal(oQueOAdiantamentoCobriu({ source: 'debt', ref_id: 'd', parcelas: [{ n: 4 }] }), 'parcela 4');
+  assert.equal(oQueOAdiantamentoCobriu({ source: 'recurring', ref_id: 'r', parcelas: [{}, {}] }), '2 meses');
+  const brl = (c: number) => `R$ ${(c / 100).toFixed(2)}`;
+  const a = { source: 'plan' as const, ref_id: 'p', parcelas: [{ n: 5 }, { n: 6 }] };
+  assert.equal(apoioDoAdiantamento(a, 4500, 5000, brl), 'adiantamento · parcelas 5 a 6 · desconto de R$ 5.00');
+  assert.equal(apoioDoAdiantamento(a, 5000, 5000, brl), 'adiantamento · parcelas 5 a 6');
+  assert.equal(apoioDoAdiantamento(a, 5100, 5000, brl), 'adiantamento · parcelas 5 a 6 · R$ 1.00 a mais');
+  assert.equal(diaDoAplicar('2026-09-01', '2026-10-08'), '2026-10-08');
+  assert.equal(diaDoAplicar('2026-12-01', '2026-10-08'), '2026-12-01');
 });

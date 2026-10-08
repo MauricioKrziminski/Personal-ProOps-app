@@ -860,11 +860,13 @@ export default function ForecastScreen() {
   };
   /** Uma linha de adiantamento do rascunho (um grupo de drafts). */
   const linhaDoAdiantamento = (chave: string, d: Draft) => {
-    // O adiantamento não aplica nesta versão (spec 2026-09-28, §6).
     const titulo = `Sai ${brl(d.amount_cents)} · ${d.rotulo ?? 'adiantamento'} · em ${isoToBR(d.start)}`;
     const resto = faltam.get(chave);
     const subtitulo = resto === undefined ? undefined : resto === 0 ? 'quita tudo' : `faltam ${resto}`;
+    // Aplicar (08/10/2026): a confirmação do adiantamento, que grava UM lançamento.
     const acoes: ItemAction[] = [
+      { label: 'Aplicar', icon: 'checkmark.circle', arrasto: 'direita',
+        onPress: () => router.push({ pathname: '/finance/aplicar-adiantamento', params: { grupo: chave } }) },
       { label: 'Editar', icon: 'pencil', onPress: () => editarAdiantamento(chave, d) },
       { label: 'Tirar', icon: 'trash', destructive: true, arrasto: 'esquerda', desfaz: true, onPress: () => tirarAdiantamento(chave) },
     ];

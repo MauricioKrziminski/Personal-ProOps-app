@@ -450,7 +450,8 @@ export default function InstallmentsScreen() {
     const parcelas = [...plano.parcels].sort(
       (a, b) => (a.installment_no ?? 0) - (b.installment_no ?? 0),
     );
-    const atual = nextPendingInstallment(parcelas, plano.installments);
+    // O adiantamento em aberto (data futura, fatura do cartão) não é "a próxima parcela".
+    const atual = nextPendingInstallment(parcelas.filter((p) => !p.adiantamento), plano.installments);
     /**
      * As parcelas em duas metades (24/09/2026), como a linha do tempo da dívida: o que falta a
      * partir da próxima, e o que já foi pago do mais recente para o mais antigo — aos poucos.
@@ -478,15 +479,25 @@ export default function InstallmentsScreen() {
         : estado === 'atrasado' ? `atrasada · venceu ${data}`
         // No cartão quem vence é a FATURA: a parcela só entra nela.
         : `${proxima ? 'a próxima · ' : ''}${parcela.invoice_id ? 'na fatura' : 'vence'} · ${data}`;
-      const apoio = [quando, diferencaDoPrevisto(Number(parcela.amount_cents), previstoDaLinha(parcela), brl)]
-        .filter(Boolean).join(' · ');
-      const titulo = `${parcela.installment_no ?? '—'}ª parcela`;
+      // O adiantamento (08/10/2026) ocupa os números que cobriu e diz o desconto.
+      const adiantou = parcela.adiantamento;
+      const apoio = adiantou
+        ? [`adiantadas · ${parcela.status === 'cleared' ? 'pagas' : parcela.invoice_id ? 'na fatura' : 'a pagar'} · ${data}`,
+           Number(parcela.expected_amount_cents ?? 0) > Number(parcela.amount_cents)
+             ? `desconto de ${brl(Number(parcela.expected_amount_cents) - Number(parcela.amount_cents))}` : null]
+            .filter(Boolean).join(' · ')
+        : [quando, diferencaDoPrevisto(Number(parcela.amount_cents), previstoDaLinha(parcela), brl)]
+            .filter(Boolean).join(' · ');
+      const ultimaCoberta = (parcela.installment_no ?? 0) + (adiantou ? adiantou.parcelas.length : 1) - 1;
+      const titulo = adiantou && ultimaCoberta > (parcela.installment_no ?? 0)
+        ? `${parcela.installment_no}ª a ${ultimaCoberta}ª parcelas`
+        : `${parcela.installment_no ?? '—'}ª parcela`;
       return {
         chave: parcela.id,
         titulo,
         apoio,
         cents: Number(parcela.amount_cents),
-        estado: parcela.status === 'cleared' ? 'paga' : proxima ? 'proxima' : 'futura',
+        estado: parcela.status === 'cleared' ? 'paga' : proxima && !adiantou ? 'proxima' : 'futura',
         accessibilityLabel: `${titulo} de ${plano.installments}, ${apoio}, ${brl(parcela.amount_cents)}`,
         onPress: () =>
           router.push({

@@ -62,6 +62,7 @@ export function paramsDaCopia(origem: Origem, hojeBR: string, totalDeParcelas?: 
 }
 
 /** Pagamento de dívida, de fatura e juros do Pix não duplicam: a cópia seria um gasto solto. */
-export function podeDuplicar(tx: { debt_id?: string | null; pays_invoice_id?: string | null; pix_fee_for_transaction_id?: string | null }): boolean {
-  return !tx.debt_id && !tx.pays_invoice_id && !tx.pix_fee_for_transaction_id;
+export function podeDuplicar(tx: { debt_id?: string | null; pays_invoice_id?: string | null; pix_fee_for_transaction_id?: string | null; adiantamento?: unknown }): boolean {
+  // O adiantamento (08/10/2026) cobre parcelas de uma origem: a cópia seria um gasto solto.
+  return !tx.debt_id && !tx.pays_invoice_id && !tx.pix_fee_for_transaction_id && !tx.adiantamento;
 }

@@ -1,7 +1,14 @@
 import { deleteScopeChoices, type EditScope, type EditScopeKind } from './edit-scope-model.ts';
 
 export type TipoDoApagar = 'occurrence' | 'installment' | 'debt_payment' | 'recurring' | 'plan' | 'debt' | 'reminder';
-export type AlvoDoApagar = { tipo: TipoDoApagar; id: string; nome: string; ancora?: string };
+export type AlvoDoApagar = {
+  tipo: TipoDoApagar; id: string; nome: string; ancora?: string;
+  /**
+   * O lançamento de um adiantamento (08/10/2026): apagar DESFAZ, sem pergunta de alcance. Na
+   * compra é o "Só esta" do banco; avulso (dívida, série), o apagar comum, que o gatilho desfaz.
+   */
+  adiantamento?: 'compra' | 'avulso';
+};
 export type PreviaDoApagar = {
   apagadas: number; pagas: number; somaPagasCents: number; contas: string[]; desde: string | null;
   apagaContrato: boolean;
@@ -72,9 +79,12 @@ export function textoDoApagado(p: PreviaDoApagar): string {
 
 /** Ocorrência, parcela e pagamento perguntam o alcance; o avulso não (`null`). */
 export function alvoDoLancamento(
-  tx: { id: string; recurring_id?: string | null; installment_plan_id?: string | null; debt_id?: string | null },
+  tx: { id: string; recurring_id?: string | null; installment_plan_id?: string | null; debt_id?: string | null; adiantamento?: unknown },
   nome: string,
 ): AlvoDoApagar | null {
+  if (tx.adiantamento) {
+    return { tipo: 'installment', id: tx.id, nome, adiantamento: tx.installment_plan_id ? 'compra' : 'avulso' };
+  }
   if (tx.recurring_id) return { tipo: 'occurrence', id: tx.id, nome };
   if (tx.installment_plan_id) return { tipo: 'installment', id: tx.id, nome };
   if (tx.debt_id) return { tipo: 'debt_payment', id: tx.id, nome };

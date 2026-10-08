@@ -93,3 +93,8 @@ test('F09 comum conserva filho compatível em conversão e limpa depois de salva
   const { subcategory_id, ...legacy } = common;
   assert.equal(Object.hasOwn(comumDepoisDeSalvar(legacy), 'subcategory_id'), false);
 });
+
+test('o lançamento de um adiantamento se edita na tela do adiantamento', () => {
+  const href = hrefDoLancamento({ id: 'a', installment_plan_id: 'p', adiantamento: { source: 'plan' } });
+  assert.deepEqual(href, { pathname: '/finance/aplicar-adiantamento', params: { id: 'a' } });
+});

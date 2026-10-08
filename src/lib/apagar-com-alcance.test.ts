@@ -84,3 +84,9 @@ test('a prévia recusa apagadas negativo ou fracionário', () => {
   assert.throws(() => lerPrevia({ ...ok, apagadas: -1 }));
   assert.throws(() => lerPrevia({ ...ok, apagadas: 1.5 }));
 });
+
+test('apagar o lançamento de um adiantamento DESFAZ, sem pergunta de alcance', () => {
+  assert.equal(alvoDoLancamento({ id: 'a', installment_plan_id: 'p', adiantamento: { source: 'plan' } }, 'x')?.adiantamento, 'compra');
+  assert.equal(alvoDoLancamento({ id: 'b', adiantamento: { source: 'debt' } }, 'x')?.adiantamento, 'avulso');
+  assert.equal(alvoDoLancamento({ id: 'c', installment_plan_id: 'p' }, 'x')?.adiantamento, undefined);
+});

@@ -928,6 +928,21 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
   financiamento é o valor presente pela taxa do contrato, por meses inteiros (CDC art. 52 §2º),
   e é EDITÁVEL — é estimativa.
 
+  **E ele se APLICA como um lançamento só** (`20261010130000`, spec
+  `2026-10-08-aplicar-adiantamento-design.md`, decisões do dono do produto). `transactions.adiantamento`
+  marca o lançamento e guarda o que ele cobriu; `expected_amount_cents` = a soma das parcelas, e a
+  diferença para o pago é o desconto ("parcelas 9 a 10 · desconto de R$ 50,00"). Na COMPRA o
+  lançamento mora dentro do plano, no número da 1ª coberta, com PESO N
+  (`private.peso_da_parcela`): as outras cobertas saem e as que sobram mantêm o número. Na DÍVIDA é
+  avulso: "as últimas" encurta (`installments −= N`), "as próximas" conta N pagas. Na SÉRIE é
+  avulso e as datas cobertas ficam puladas (`recurring_moved_occurrences`, que
+  `recurring_projection_all_for` passou a respeitar). Status como o "Paguei". O gatilho
+  `a_adiantamento_fica` congela valor, data, conta, título e vínculos fora de `edit_anticipation`
+  (GUC `proops.editando_adiantamento`); `update_installment_plan` e `apagar_parcelas` o tratam como
+  parcela travada que ocupa N números. **Apagar desfaz**: na compra pelo "Só esta"
+  (`desfazer_adiantamento_da_compra`), na dívida e na série pelo gatilho AFTER DELETE
+  `restaura_adiantamento` — a dívida recusa se mudou depois. `supabase/tests/aplicar_adiantamento.sql`.
+
 
 - **Receita atrasada sai da projeção depois de 3 dias; despesa atrasada NÃO** (`20260909200000`).
   `greatest(coalesce(due_at, occurred_at), current_date)` empurra todo previsto vencido para hoje.

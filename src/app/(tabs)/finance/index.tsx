@@ -21,6 +21,7 @@ import { ExtendedFab } from '@/components/ui/extended-fab';
 import { useLancarPorVoz } from '@/components/finance/lancar-por-voz';
 import { DetalheDoCicloSheet } from '@/components/finance/detalhe-do-ciclo-sheet';
 import { diferencaDoPrevisto, previstoDoLancamento } from '@/lib/previsto';
+import { apoioDoAdiantamento } from '@/lib/anticipation';
 import { ATALHOS_DE_LANCAMENTO } from '@/lib/atalhos-de-lancamento';
 import { HeroPanel } from '@/components/ui/hero-panel';
 import { explicaCiclo } from '@/lib/explicacoes';
@@ -555,8 +556,11 @@ export default function FinanceScreen() {
                     <LedgerRow
                       title={titulo}
                       subtitle={[
-                        // Pago com outro valor: a diferença, como em Lançamentos (08/10/2026).
-                        diferencaDoPrevisto(Number(tx.amount_cents), previsto, brl, tx.kind === 'income' ? 'recebeu' : 'pagou'),
+                        // Pago com outro valor: a diferença, como em Lançamentos (08/10/2026); o
+                        // adiantamento diz o que cobriu e o desconto.
+                        tx.adiantamento
+                          ? apoioDoAdiantamento(tx.adiantamento, Number(tx.amount_cents), tx.expected_amount_cents, brl)
+                          : diferencaDoPrevisto(Number(tx.amount_cents), previsto, brl, tx.kind === 'income' ? 'recebeu' : 'pagou'),
                         tx.category,
                         SOURCE_LABEL[tx.source],
                       ].filter(Boolean).join(' · ') || undefined}
