@@ -610,7 +610,7 @@ trilha do iPhone em Release): voltando do Face ID na abertura, o `RCTTiming` do 
 num estado em que nem o display link nem o NSTimer disparam — todo `setTimeout`/`setInterval`/rAF
 do app morreu, enquanto o toque e o Reanimated seguiam. `modules/proops-relogio` arma, na thread
 do JS, um timer de socorro para o próximo alvo + 0,25 s: achando timer vencido, dispara e
-ressincroniza o display link (provado no simulador forçando o mesmo estado; sem disparo em dobro).
+ressincroniza o display link (provado no simulador forçando um estado com o mesmo sintoma; sem disparo em dobro).
 Na cortina, `dormir` e `doisQuadros` contam no relógio da UI (`esperarNaUi`) como segunda camada.
 Ao subir o React Native, ler `modules/proops-relogio/README.md`.
 

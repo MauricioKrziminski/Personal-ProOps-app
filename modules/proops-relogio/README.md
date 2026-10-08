@@ -9,5 +9,5 @@ normal e o log do Xcode mostra `[ProOpsRelogio] RCTTiming mudou: a rede dos time
 instalada.` — aí é revisar o `RCTTiming.mm` novo (`node_modules/react-native/React/CoreModules/`).
 
 Como provar que ela funciona (feito em 08/10/2026 no simulador): pausar o display link do JS com
-`_paused` = NO na thread do JS (o estado do iPhone) — sem a rede nenhum `setTimeout` volta; com
+`_paused` = NO na thread do JS (um estado com o mesmo sintoma do iPhone) — sem a rede nenhum `setTimeout` volta; com
 ela o primeiro volta em ~0,3 s e o resto segue no ritmo normal, sem disparo em dobro.
