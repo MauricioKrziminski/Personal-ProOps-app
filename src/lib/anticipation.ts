@@ -236,7 +236,7 @@ export function semCancelamentoRepetido<T extends DraftLido>(drafts: readonly T[
 
 /**
  * Quantas parcelas da fonte ainda faltariam DEPOIS de cada adiantamento, na ordem dos pagamentos:
- * as que vencem depois do dia do pagamento, menos as que este grupo e os pagos antes (ou junto)
+ * as que vencem depois do MÊS do pagamento, menos as que este grupo e os pagos antes (ou junto)
  * dele já adiantaram. `candidatos` é a lista do banco a partir de hoje; sem a fonte nela, o grupo
  * fica sem número (nada a afirmar enquanto a lista não chegou).
  */
@@ -259,9 +259,11 @@ export function faltamDepois(
       const pagoEm = drafts.find((x) => x.grupo === d.grupo && x.adiantar)?.start;
       if (fonte.get(d.grupo) === item.ref_id && pagoEm && pagoEm <= p.start) ate.add(d.start);
     }
-    // Depois do DIA do pagamento, não do mês: a parcela de 10/11 ainda falta para quem adiantou
-    // no dia 1º de novembro (ela só não é adiantável nesse mês — `adiantaveisNoMes`).
-    saida.set(p.grupo, item.events.filter((e) => e.day > p.start && !ate.has(e.day)).length);
+    // Depois do MÊS do pagamento, a régua de `adiantaveisNoMes` (a da folha): a parcela do próprio
+    // mês sai nele de todo jeito. Pelo dia, a linha dizia "faltam 1" ao lado da folha dizendo "não
+    // fica nenhuma" (08/10/2026).
+    const mes = p.start.slice(0, 7);
+    saida.set(p.grupo, item.events.filter((e) => e.day.slice(0, 7) > mes && !ate.has(e.day)).length);
   }
   return saida;
 }

@@ -174,8 +174,16 @@ test('faltam depois de cada adiantamento, na ordem dos pagamentos', () => {
   const g2 = draftsDoAdiantamento(tv, tv.events.slice(1, 3), 200, '2026-12-01', 'g2');
   // a ordem no rascunho não importa: quem conta é a data do pagamento
   const f = faltamDepois([...g2, ...g1], [tv]);
-  assert.equal(f.get('g1'), 3, 'depois de novembro: 7, 8 e 9 (10, 11 e 12 adiantadas)');
-  assert.equal(f.get('g2'), 0, 'depois de dezembro: 8 e 9 adiantadas; a 7 vence em novembro');
+  // A régua é o MÊS, a mesma da folha (`adiantaveisNoMes`): a parcela do próprio mês do pagamento
+  // sai nele de todo jeito. Pelo dia, a de 10/11 pagando em 01/11 virava um "faltam 1" ao lado de
+  // uma folha dizendo "não fica nenhuma" (08/10/2026).
+  assert.equal(f.get('g1'), 2, 'depois de novembro: 8 e 9 (a 7 sai em novembro; 10, 11 e 12 adiantadas)');
+  assert.equal(f.get('g2'), 0, 'depois de dezembro: 8 e 9 adiantadas, 10 a 12 também');
+  // o caso do print: em dezembro adianta as 4 de janeiro a abril; a de 11/12 sai em dezembro
+  const emp: Adiantavel = { ...tv, ref_id: 'emp', events: ['2026-12-11', '2027-01-11', '2027-02-11', '2027-03-11', '2027-04-11']
+    .map((day, i) => ({ n: 4 + i, day, cents: 87015, pv_cents: 87015 })) };
+  const g4 = draftsDoAdiantamento(emp, emp.events.slice(1), 348060, '2026-12-01', 'g4');
+  assert.equal(faltamDepois(g4, [emp]).get('g4'), 0, 'quita tudo, como a folha diz');
   // fonte sem candidatos conhecidos (lista ainda carregando): sem número
   assert.equal(faltamDepois(g1, []).get('g1'), undefined);
   // conta fixa não tem fim: sem número
