@@ -3,6 +3,13 @@
 Registro, não regra: o que está em cada banco HOJE se confere na fonte (`CLAUDE.md`, *Banco e
 fila*). Entradas movidas do `CLAUDE.md` em 26/09/2026, na ordem em que estavam lá.
 
+**Produção e staging ALINHADOS em `20261009140000`** — 17 migrations para a v1.9.0, de
+`20261007120000` a `20261009140000` (lembrete de conta, apagar com alcance, pausa com prazo,
+carência, "só esta" e lembrete por pessoa). `migration list --project-ref` mostrou exatamente essas
+17 pendentes; aplicadas pelo Gabriel em 07/10/2026 com `PROOPS_PROD_OK=1` e `--project-ref`.
+Conferência em leitura: `20261009140000`, `130000` e `120400` no topo de `schema_migrations`;
+`_bill_reminders_due()` e `_alerts_to_send()` respondem sem erro.
+
 **Produção e staging ALINHADOS em `20261006160000`** — as 6 da auditoria do agente
 (`docs/qa/2026-10-06-auditoria-agente-ia.md`): `20261006100000_claim_recupera_processing`,
 `110000_ai_events_uso`, `120000_transacao_embeddings`, `130000_agent_feedback`,
@@ -298,20 +305,22 @@ de telefone e push token de todos os workspaces, alcançável com a anon key e s
 derruba a Hoje e a Projeção com `42501 permission denied`, porque `debt_schedule_for` é
 `security invoker` e a chamada aninhada usa o privilégio do `authenticated`.
 
-**Lembrete de conta** — `20261007120000`, `20261007120100` e `20261007120200`: staging 07/10/2026, produção pendente.
+**Lembrete de conta** — `20261007120000`, `20261007120100` e `20261007120200`: staging 07/10/2026, produção 07/10/2026.
 Sobem juntas (a segunda faz o lembrete próprio substituir o aviso automático).
 
-**Apagar com alcance** — `20261008100000`, `20261008100100`, `20261008100200`, `20261008100300`, `20261008100400` e `20261008100500`: staging 07/10/2026, produção pendente.
+**Apagar com alcance** — `20261008100000`, `20261008100100`, `20261008100200`, `20261008100300`, `20261008100400` e `20261008100500`: staging 07/10/2026, produção 07/10/2026.
 Sobem juntas (`100400`/`100500` são o gatilho que impede o apagar comum de deixar fatura paga em parte abaixo do pago).
 
-**Apagar com alcance, revisão final** — `20261008100600`: staging 07/10/2026, produção pendente. Sobe junto das seis de `20261008100000` a `20261008100500` (espaço do pai na série e no lembrete; "Esta e as próximas" leva a paga depois da âncora).
+**Apagar com alcance, revisão final** — `20261008100600`: staging 07/10/2026, produção 07/10/2026. Sobe junto das seis de `20261008100000` a `20261008100500` (espaço do pai na série e no lembrete; "Esta e as próximas" leva a paga depois da âncora).
 
-**Pausar com prazo e carência** — `20261009120000` (pausa da série) e `20261009120100` (carência da dívida): staging 07/10/2026, produção pendente.
+**Pausar com prazo e carência** — `20261009120000` (pausa da série) e `20261009120100` (carência da dívida): staging 07/10/2026, produção 07/10/2026.
 Sobem juntas, depois das de `20261008…`.
 
-**Carência, correções** — `20261009120200`: staging 07/10/2026, produção pendente. Sobe junto de `20261009120000` e `20261009120100`.
+**Carência, correções** — `20261009120200`: staging 07/10/2026, produção 07/10/2026. Sobe junto de `20261009120000` e `20261009120100`.
 
-**Carência, ordem e âncora** — `20261009120300`: staging 07/10/2026, produção pendente. Sobe junto de `20261009120000`, `120100` e `120200`.
+**Carência, ordem e âncora** — `20261009120300`: staging 07/10/2026, produção 07/10/2026. Sobe junto de `20261009120000`, `120100` e `120200`.
 
-**Carência, revisão final** — `20261009120400`: staging 07/10/2026, produção pendente. Sobe junto de `20261009120000`, `120100`, `120200` e `120300`.
+**Carência, revisão final** — `20261009120400`: staging 07/10/2026, produção 07/10/2026. Sobe junto de `20261009120000`, `120100`, `120200` e `120300`.
 Ordem de deploy em produção: migrations, depois o agente (confirmar a revisão nova do Cloud Run servindo) e só então a tag do app. Agente antigo re-materializa as linhas pausadas; agente novo antes das migrations quebra o agendador e o cron de lembretes, que selecionam as colunas novas.
+
+**Lembrete: "só esta" e parcela da dívida** — `20261009130000`; **lembrete por pessoa e envio único** — `20261009140000`: staging e produção 07/10/2026. Sobem depois das de `20261009120…`.
