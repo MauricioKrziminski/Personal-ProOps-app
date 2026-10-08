@@ -21,7 +21,7 @@ import { Motion, Space, tabular } from '@/design/tokens';
 import { usarDica } from '@/hooks/use-dicas';
 import { invoiceQuery, type CardInvoice, type Transaction } from '@/hooks/use-finance';
 import { formatDateBR, localISODate } from '@/hooks/use-items';
-import { STATUS_DA_FATURA, contagemDeLancamentos, contaNaFatura } from '@/lib/card-status';
+import { contagemDeLancamentos, contaNaFatura, rotuloDoStatus } from '@/lib/card-status';
 
 export type ResumoDaFatura = {
   status: string;
@@ -36,7 +36,7 @@ export type ResumoDaFatura = {
 /** O que a doca mostra de uma fatura — a mesma conta da tela, para o clone do voo usar também. */
 export function resumoDaFatura(data: { invoice: CardInvoice; transactions: Transaction[] }): ResumoDaFatura {
   return {
-    status: STATUS_DA_FATURA[data.invoice.status] ?? data.invoice.status,
+    status: rotuloDoStatus(data.invoice),
     atrasada:
       data.invoice.due_date < localISODate() && !['paid', 'rolled'].includes(data.invoice.status),
     contagem: data.transactions.length,

@@ -698,7 +698,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
       if (name === '@/lib/account-form') return load('src/lib/account-form.ts');
       if (name === '@/components/finance/account-form') return load('src/components/finance/account-form.tsx');
-      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias' || name === '@/lib/comecar' || name === '@/lib/duplicar' || name === '@/lib/favoritos' || name === '@/lib/apagar-com-alcance' || name === '@/lib/carencia') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias' || name === '@/lib/comecar' || name === '@/lib/duplicar' || name === '@/lib/favoritos' || name === '@/lib/apagar-com-alcance' || name === '@/lib/carencia' || name === '@/lib/pagar-fatura') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       // o `categorias.ts` importa o mapa de ícones por caminho relativo (roda no `node --test` puro)
       if (name === '../design/category-icons.ts') return { categoryIcon: () => 'circle' };
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
@@ -1310,14 +1310,14 @@ test('Lançamento: sem "Lembrar" em pagamento de dívida, de fatura e juro do Pi
   }
 });
 
-test('Lançamento à vista no cartão: "Lembrar da fatura" aponta para a fatura', () => {
+test('Lançamento à vista no cartão: "Lembrar" é da compra, não da fatura', () => {
   const tx = { id: 't', kind: 'expense', status: 'cleared', amount_cents: 500, description: 'Compra', category: 'x', account_id: 'a',
     counterparty_account_id: null, occurred_at: '2026-10-02', created_at: '2026-10-02T12:00:00Z', invoice_id: 'f1',
     installment_plan_id: null, recurring_id: null, debt_id: null, pays_invoice_id: null, pix_fee_for_transaction_id: null };
   const ui = screen('src/app/finance/[txId].tsx', { txs: [tx], params: { txId: 't' } });
-  const acao = ui.nodes().find((n: any) => n.type === 'HeaderActions').props.menu.actions.find((a: any) => a.label === 'Lembrar da fatura');
+  const acao = ui.nodes().find((n: any) => n.type === 'HeaderActions').props.menu.actions.find((a: any) => a.label === 'Lembrar');
   ui.interact(() => acao.onPress());
-  assert.equal(copia(ui.navigations.at(-1)).params.conta, 'invoice_id:f1');
+  assert.equal(copia(ui.navigations.at(-1)).params.conta, 'transaction_id:t');
 });
 
 test('archived debts have a place to come back from', () => {
@@ -1692,16 +1692,37 @@ test('trocar cobrança e valor com pagamento registrado não oferece reescrever 
   assert.deepEqual(copia(ui.writes[0].value.paymentVersions), { p1: 2 });
 });
 
-test('visible invoice settlement confirms then marks paid without issuing an account payment', () => {
+test('Fatura: UM botão Pagar sob a face; desligar "Descontar de uma conta" só marca como paga', () => {
+  // 07/10/2026: os botões moravam no fim da lista (rolar 60 compras para pagar) e eram dois, com
+  // efeitos diferentes, lado a lado — marcar como paga o que se queria pagar da conta foi o engano.
   const ui = screen('src/app/finance/invoice/[id].tsx');
-  ui.button('Registrar pagamento');
+  const doca = ui.nodes().find((n: any) => n.type === 'InvoiceDock');
+  assert.ok(JSON.stringify(doca.props.children).includes('"Pagar"'), 'o Pagar mora sob a face, no topo');
+  assert.ok(
+    !ui.nodes().some((n: any) => n.type === 'Button' && ['Registrar pagamento', 'Marcar como paga'].includes(n.props.label)),
+    'os dois botões antigos saíram',
+  );
+  ui.press('Pagar');
+  const chave = ui.nodes().find((n: any) => n.type === 'SwitchRow' && n.props.label === 'Descontar de uma conta');
+  assert.equal(chave.props.value, true, 'descontar da conta é o padrão');
+  ui.interact(() => chave.props.onValueChange(false));
+  assert.ok(!ui.nodes().some((n: any) => n.type === 'MoneyField'), 'só marcando, não há valor a escolher');
   ui.press('Marcar como paga');
-  assert.equal(ui.writes.length, 0, 'confirmation comes before settlement');
-  assert.equal(ui.confirmations.length, 1);
-  ui.confirmations[0]();
+  assert.equal(ui.confirmations.length, 0, 'a folha já é a confirmação');
   assert.equal(ui.writes.length, 1);
   assert.equal(ui.writes[0].operation, 'settleInvoice');
   assert.equal(ui.writes[0].value.invoiceId, 'invoice-1');
+});
+
+test('Fatura: com a chave ligada o Paguei move o dinheiro (transferência), nunca só marca', () => {
+  const ui = screen('src/app/finance/invoice/[id].tsx', { forecastAccounts: [{ id: 'cc', name: 'Conta', type: 'checking' }] });
+  ui.press('Pagar');
+  const paguei = () => ui.nodes().find((n: any) => n.type === 'Button' && String(n.props.label).startsWith('Paguei'));
+  assert.ok(paguei(), 'o botão da folha diz quanto e de onde');
+  // uma conta só já vem escolhida (o mesmo de antes): o Paguei nasce pronto
+  assert.equal(paguei().props.disabled, false);
+  ui.interact(() => paguei().props.onPress());
+  assert.deepEqual(ui.writes.map((w: any) => w.operation), ['payInvoice']);
 });
 
 // A face ancorada carrega o que o card de total carregava (Regra 0 da fase 4): estado,

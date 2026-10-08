@@ -236,6 +236,14 @@ scroll, ta ridiculo isso"*.
 Quem resolve "a ação some numa lista longa" é o **menu "…" do header**, que já existe e alcança
 de qualquer ponto do scroll — não uma faixa permanente.
 
+> **A fatura tem as ações no TOPO, sob o total** (07/10/2026, decisão do dono do produto: *"o
+> usuário tem que scrollar tudo… só para apertar que pagou?"*). Não é a faixa fixa recusada: os
+> botões rolam junto com o cartão, logo abaixo dele. E **pagar é UM botão** — se o dinheiro sai de
+> uma conta (`pay_invoice`) ou se a fatura só fica marcada como paga (`settle_invoice`) é a chave
+> "Descontar de uma conta" da folha; dois botões vizinhos com efeitos diferentes levaram a marcar
+> como paga a fatura que se queria pagar da conta. Varredura do mesmo dia: nenhuma outra tela tem
+> ação principal depois de uma lista longa.
+
 Continuam de fora da regra, por serem outra coisa: o **FAB** (idioma das duas plataformas, botão
 pequeno no canto), o **compositor do Agente** (é campo de entrada, como o do WhatsApp) e a
 **barra de formatação da nota** (toolbar acima do teclado). O que a regra proíbe é faixa de AÇÃO

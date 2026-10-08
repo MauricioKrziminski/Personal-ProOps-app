@@ -10,6 +10,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { ButtonRow } from '@/components/ui/button-row';
 import { Sheet, SheetScroll } from '@/components/ui/sheet';
+import { SwitchRow } from '@/components/ui/switch-row';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Card } from '@/components/ui/card';
 import { Dica } from '@/components/ui/dica';
@@ -55,8 +56,9 @@ import { alvoDoLancamento } from '@/lib/apagar-com-alcance';
 import { useBillReminderFor } from '@/hooks/use-bill-reminders';
 import { hrefDoLembrete, resumoDosAvisos } from '@/lib/lembrete-de-conta';
 import { estadoDaLinha } from '@/lib/settle-labels';
-import { STATUS_DA_FATURA, contaNaFatura } from '@/lib/card-status';
+import { contaNaFatura, rotuloDoStatus } from '@/lib/card-status';
 import { accountLabel } from '@/lib/accounts';
+import { podeConfirmarPagamento } from '@/lib/pagar-fatura';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
 import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
@@ -151,6 +153,9 @@ export default function InvoiceScreen() {
   // quanto vai ser pago AGORA. Nasce igual ao que falta, então pagar tudo continua sendo um toque.
   const [valorCents, setValorCents] = useState(0);
   const [payerId, setPayerId] = useState<string | null>(null);
+  // Pagar é UM botão (07/10/2026): a folha decide se o dinheiro sai de uma conta (ligada, o
+  // padrão) ou se a fatura só fica marcada como paga, sem mexer no saldo.
+  const [desconta, setDesconta] = useState(true);
   const [dataBR, setDataBR] = useState(() => formatDateBR(localISODate()));
 
   // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
@@ -289,6 +294,8 @@ export default function InvoiceScreen() {
   const abrirPagamento = () => {
     // o erro do pagamento é mostrado DENTRO do sheet (toast fica atrás do Modal nativo)
     pay.reset();
+    settle.reset();
+    setDesconta(true);
     // pré-seleciona a conta cadastrada como pagadora do cartão — sem isso o usuário escolhe
     // a mesma conta todo mês. Só vale se ela ainda for uma pagadora válida (pode ter sido
     // arquivada ou virado cartão), senão o banco recusaria e o usuário não saberia por quê.
@@ -387,31 +394,26 @@ export default function InvoiceScreen() {
   };
 
   /**
-   * Quitar SEM movimentar dinheiro.
+   * Quitar SEM movimentar dinheiro — a chave "Descontar de uma conta" desligada.
    *
-   * O caso é dado histórico: as parcelas retroativas criam faturas de meses
-   * passados que, na vida real, já foram pagas antes de o app existir. Pagá-las
-   * pelo botão normal criaria uma transferência e tiraria do saldo de HOJE um
-   * dinheiro que saiu há meses.
+   * O caso é a fatura paga fora do app (ou dado histórico de antes do app): pagá-la pelo caminho
+   * normal criaria uma transferência e tiraria do saldo de HOJE um dinheiro que já saiu. A folha
+   * é a confirmação: o efeito ("Fica paga sem mexer no saldo") está escrito acima do botão.
    */
-  const quitarSemCaixa = () => {
-    if (!fatura) return;
-    confirmDestructive(
-      'Marcar como paga sem mexer no saldo?',
-      'Marcar como paga',
-      () => {
-        settle.mutate(
-          { invoiceId: fatura.id, paidAt: localISODate() },
-          {
-            onSuccess: () => toast({ message: 'Fatura marcada como paga.', tone: 'success' }),
-            onError: () =>
-              toast({ message: 'Não deu para marcar a fatura. Tenta de novo?', tone: 'error' }),
-          },
-        );
+  const marcarComoPaga = () => {
+    if (!fatura || !dataISO) return;
+    settle.mutate(
+      { invoiceId: fatura.id, paidAt: dataISO },
+      {
+        onSuccess: () => {
+          setPagando(false);
+          toast({ message: 'Fatura marcada como paga.', tone: 'success' });
+        },
+        onError: (erro) => toast({ message: mensagemDoErro(erro), tone: 'error' }),
       },
-      `A fatura fica quitada e nenhum lançamento de pagamento é criado — seu saldo não muda. Use quando ela já foi paga fora do app.`,
     );
   };
+  const confirmavel = podeConfirmarPagamento({ desconta, payerId, dataISO, valorCents, falta });
 
   /**
    * Tudo que se faz com a fatura se desfaz (26/09/2026, *"tudo que se cria se edita"*). O
@@ -496,7 +498,7 @@ export default function InvoiceScreen() {
           <InvoiceDock
             nome={nomeDoCartao}
             resumo={{
-              status: STATUS_DA_FATURA[fatura.status] ?? fatura.status,
+              status: rotuloDoStatus(fatura),
               atrasada: vencida && !paga && !adiada,
               contagem: compras.length,
               totalCents: total,
@@ -553,6 +555,34 @@ export default function InvoiceScreen() {
                 </ThemedText>
               </View>
             ) : null}
+            {/*
+              ⚠️ **As ações moram NO TOPO, sob o total** (07/10/2026, decisão do dono do produto).
+              No fim da lista, uma fatura de 60 compras exigia rolar tudo para tocar em pagar
+              (*"o usuário tem que scrollar tudo… só para apertar que pagou?"*). Não é a barra
+              fixa recusada em 15/09/2026: os botões rolam junto com o cartão. "Pagar" é UM botão;
+              se o dinheiro sai de uma conta ou se a fatura só fica marcada como paga é a chave da
+              folha — dois botões vizinhos com efeitos diferentes foi o engano que motivou a troca.
+            */}
+            {podePagar ? (
+              <ButtonRow>
+                <Button
+                  block
+                  label="Pagar"
+                  disabled={settle.isPending || pay.isPending || roll.isPending}
+                  onPress={abrirPagamento}
+                />
+                {podeAdiar ? (
+                  <Button
+                    block
+                    label="Jogar para a próxima"
+                    variant="secondary"
+                    loading={roll.isPending}
+                    disabled={settle.isPending || pay.isPending}
+                    onPress={adiar}
+                  />
+                ) : null}
+              </ButtonRow>
+            ) : null}
           </InvoiceDock>
           <Dica id="fatura-cartao" tela="fatura" />
         </Animated.View>
@@ -565,60 +595,6 @@ export default function InvoiceScreen() {
       ) : null}
     </View>
   );
-
-  /**
-   * ⚠️ **As ações vivem NO FIM DA LISTA, nunca ancoradas sobre ela** (15/09/2026, decisão do
-   * dono do produto, revertendo o desenho anterior).
-   *
-   * Eram um bloco irmão do `FlatList`, fixo no rodapé da janela — o argumento escrito era "a
-   * ação primária não some quando a fatura tem 200 linhas". O custo real foi maior que o
-   * ganho: três botões com três legendas ocupavam ~180dp permanentes, as compras rolavam por
-   * baixo e a última linha ficava cortada ao meio para sempre. A queixa foi literal — *"esses
-   * botoes fixos na tela enquanto scrollo, ele tem que ficar la em baixo e nao fixo no scroll,
-   * ta ridiculo isso"*.
-   *
-   * Quem resolve "não some numa fatura longa" é o menu "…" do header, que já tem "Marcar como
-   * paga" e fica acessível de qualquer ponto do scroll.
-   */
-  /*
-    Três botões e nenhuma legenda (16/09/2026, decisão do dono do produto: *"ta muito texto,
-    somente o essencial"*). Cada botão tinha uma frase embaixo e o rodapé fechava com um
-    parágrafo; a diferença entre pagar e quitar (finance.md) continua dita, mas no lugar em que
-    a pessoa DECIDE: a confirmação de "Marcar como paga" diz que o saldo não muda, a de "Jogar
-    para a próxima" explica os encargos, e o sheet de pagamento diz que entra como transferência.
-  */
-  const rodape =
-    fatura && podePagar ? (
-      <View style={styles.acoes}>
-        <Button
-          block
-          size="lg"
-          label="Registrar pagamento"
-          disabled={settle.isPending || pay.isPending}
-          onPress={abrirPagamento}
-        />
-        <ButtonRow>
-          <Button
-            block
-            label="Marcar como paga"
-            variant="secondary"
-            loading={settle.isPending}
-            disabled={pay.isPending}
-            onPress={quitarSemCaixa}
-          />
-          {podeAdiar ? (
-            <Button
-              block
-              label="Jogar para a próxima"
-              variant="secondary"
-              loading={roll.isPending}
-              disabled={settle.isPending || pay.isPending}
-              onPress={adiar}
-            />
-          ) : null}
-        </ButtonRow>
-      </View>
-    ) : null;
 
   if (inexistente) {
     return (
@@ -679,8 +655,8 @@ export default function InvoiceScreen() {
                   ...(pagamentos.length > 0
                     ? [{ label: pagamentos.length === 1 ? 'Ver o pagamento' : 'Ver os pagamentos', icon: 'arrow.left.arrow.right' as const, onPress: verPagamentos }]
                     : []),
-                  ...(!paga && !adiada
-                    ? [{ label: 'Marcar como paga', icon: 'checkmark.circle' as const, onPress: quitarSemCaixa }]
+                  ...(podePagar
+                    ? [{ label: 'Pagar…', icon: 'checkmark.circle' as const, onPress: abrirPagamento }]
                     : []),
                   ...(paga && fatura.settled_manually
                     ? [{ label: 'Desmarcar como paga', icon: 'arrow.uturn.backward' as const, onPress: desmarcarPaga }]
@@ -723,7 +699,6 @@ export default function InvoiceScreen() {
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={cabecalho}
-        ListFooterComponent={rodape}
         ListEmptyComponent={
           fatura && !invoice.isLoading ? (
             <EmptyState compacto
@@ -805,22 +780,26 @@ export default function InvoiceScreen() {
           />
 
           <SheetScroll contentContainerStyle={styles.sheetBody}>
-            <Field
-              label="Valor" obrigatorio
-              error={valorCents > falta ? `Falta ${formatBRL(falta)} nesta fatura.` : undefined}
-              hint={parcial ? `Você já pagou ${formatBRL(jaPago)}.` : undefined}>
-              {/* Superfície de DECISÃO: este é o valor que a pessoa está confirmando pagar, e
-                  por isso o campo é editável e mostra o número por extenso. O que sobrar fica na
-                  fatura, como fica no rotativo do cartão de verdade. */}
-              <MoneyField
-                valueCents={valorCents}
-                onChangeCents={setValorCents}
-                invalid={valorCents <= 0}
-              />
-            </Field>
+            <SwitchRow label="Descontar de uma conta" value={desconta} onValueChange={setDesconta} />
+
+            {desconta ? (
+              <Field
+                label="Valor" obrigatorio
+                error={valorCents > falta ? `Falta ${formatBRL(falta)} nesta fatura.` : undefined}
+                hint={parcial ? `Você já pagou ${formatBRL(jaPago)}.` : undefined}>
+                {/* Superfície de DECISÃO: este é o valor que a pessoa está confirmando pagar, e
+                    por isso o campo é editável e mostra o número por extenso. O que sobrar fica na
+                    fatura, como fica no rotativo do cartão de verdade. */}
+                <MoneyField
+                  valueCents={valorCents}
+                  onChangeCents={setValorCents}
+                  invalid={valorCents <= 0}
+                />
+              </Field>
+            ) : null}
 
             {/* Erro de rede e "não tem conta" são coisas diferentes e não podem ter o mesmo texto. */}
-            {accounts.isError ? (
+            {!desconta ? null : accounts.isError ? (
               <ErrorBand
                 message="Não deu para carregar suas contas."
                 onRetry={accounts.refetch}
@@ -861,30 +840,42 @@ export default function InvoiceScreen() {
               />
             </Field>
 
+            {desconta ? null : (
+              <ThemedText type="small" themeColor="textSecondary">
+                {parcial
+                  ? `Fica paga sem mexer no saldo — os ${brl(falta)} que faltam contam como pagos fora do app.`
+                  : 'Fica paga sem mexer no saldo.'}
+              </ThemedText>
+            )}
+
             <Button
               block
               size="lg"
               // rótulo COMPLETO de propósito: é a ação irreversível da tela, e "Paguei" sozinho
               // não descreve o que vai acontecer (nem na tela, nem no leitor de tela)
               label={
-                pay.isPending
-                  ? 'Registrando…'
-                  : `Paguei ${formatBRL(valorCents)}${pagadora ? ` com ${accountLabel(pagadora)}` : ''}`
+                !desconta
+                  ? settle.isPending ? 'Marcando…' : 'Marcar como paga'
+                  : pay.isPending
+                    ? 'Registrando…'
+                    : `Paguei ${formatBRL(valorCents)}${pagadora ? ` com ${accountLabel(pagadora)}` : ''}`
               }
-              loading={pay.isPending}
-              disabled={!payerId || !dataISO || valorCents <= 0 || valorCents > falta}
-              onPress={registrar}
+              loading={pay.isPending || settle.isPending}
+              disabled={!confirmavel || pay.isPending || settle.isPending}
+              onPress={desconta ? registrar : marcarComoPaga}
             />
 
-            {pay.isError ? (
+            {(desconta ? pay.isError : settle.isError) ? (
               <ThemedText type="small" themeColor="danger" style={styles.centered}>
-                {mensagemDoErro(pay.error)}
+                {mensagemDoErro(desconta ? pay.error : settle.error)}
               </ThemedText>
             ) : null}
 
-            <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-              Entra como transferência — o gasto já contou na compra.
-            </ThemedText>
+            {desconta ? (
+              <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
+                Entra como transferência — o gasto já contou na compra.
+              </ThemedText>
+            ) : null}
           </SheetScroll>
       </Sheet>
     </Screen>
@@ -920,8 +911,6 @@ const styles = StyleSheet.create({
   centered: {
     textAlign: 'center',
   },
-  // O fim da lista (§1 do design): as ações nunca ficam ancoradas sobre as compras.
-  acoes: { gap: Space.sm, paddingTop: Space.sm },
   sheetBody: {
     gap: Space.xl,
     padding: Space.lg,

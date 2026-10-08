@@ -86,6 +86,25 @@ export const STATUS_DA_FATURA: Record<string, string> = {
   rolled: 'Adiada',
 };
 
+/**
+ * A palavra do estado na tela da fatura (07/10/2026).
+ *
+ * Paga e adiada vêm do banco (são decisões). Entre ABERTA e FECHADA quem decide é a data de
+ * fechamento, a mesma régua de `estadoDaFatura` em Cartões: o `status` só vira `closed` quando o
+ * agendador passa, e até lá a fatura que fechou ontem aparecia "Aberta" na tela dela e "Fechada"
+ * em Cartões — duas telas discordando sobre a mesma fatura.
+ */
+export function rotuloDoStatus(
+  fatura: { status: string; closing_date: string },
+  hoje = new Date(),
+): string {
+  if (fatura.status === 'paid' || fatura.status === 'rolled') return STATUS_DA_FATURA[fatura.status];
+  if (fatura.status === 'open' || fatura.status === 'closed') {
+    return diasAte(fatura.closing_date, hoje) < 0 ? 'Fechada' : 'Aberta';
+  }
+  return STATUS_DA_FATURA[fatura.status] ?? fatura.status;
+}
+
 export function contagemDeLancamentos(n: number): string {
   return `${n} ${n === 1 ? 'lançamento' : 'lançamentos'}`;
 }

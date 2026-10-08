@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { diasAte, estadoDaFatura, ordemDaPilha, outrasFaturas, parcialDaFatura, prazoLabel } from './card-status.ts';
+import { diasAte, estadoDaFatura, ordemDaPilha, outrasFaturas, parcialDaFatura, prazoLabel, rotuloDoStatus } from './card-status.ts';
 
 const hoje = new Date(2026, 8, 16, 22, 30);
 
@@ -74,4 +74,13 @@ test('parcialDaFatura: só com pagamento feito e ainda faltando', () => {
   assert.equal(parcialDaFatura({ invoice_total_cents: 0, invoice_open_cents: 0 }), null);
   // a RPC devolve bigint, que pode chegar como string
   assert.deepEqual(parcialDaFatura({ invoice_total_cents: '100000', invoice_open_cents: '25000' }), { pago: 75000, falta: 25000 });
+});
+
+test('rotuloDoStatus: aberta x fechada pela data de fechamento; paga e adiada pelo banco', () => {
+  // `hoje` = 16/09: a fatura que fechou ontem é Fechada mesmo com o status ainda `open`
+  assert.equal(rotuloDoStatus({ status: 'open', closing_date: '2026-09-15' }, hoje), 'Fechada');
+  assert.equal(rotuloDoStatus({ status: 'open', closing_date: '2026-09-16' }, hoje), 'Aberta');
+  assert.equal(rotuloDoStatus({ status: 'closed', closing_date: '2026-09-15' }, hoje), 'Fechada');
+  assert.equal(rotuloDoStatus({ status: 'paid', closing_date: '2026-09-20' }, hoje), 'Paga');
+  assert.equal(rotuloDoStatus({ status: 'rolled', closing_date: '2026-09-01' }, hoje), 'Adiada');
 });
