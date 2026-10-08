@@ -8,7 +8,8 @@ fila*). Entradas movidas do `CLAUDE.md` em 26/09/2026, na ordem em que estavam l
 carência, "só esta" e lembrete por pessoa). `migration list --project-ref` mostrou exatamente essas
 17 pendentes; aplicadas pelo Gabriel em 07/10/2026 com `PROOPS_PROD_OK=1` e `--project-ref`.
 Conferência em leitura: `20261009140000`, `130000` e `120400` no topo de `schema_migrations`;
-`_bill_reminders_due()` e `_alerts_to_send()` respondem sem erro.
+`_bill_reminders_due()` e `_alerts_to_send()` respondem sem erro. Na ordem migrations → agente: o deploy
+`agente-00107-8bp`, conferido com health 200 e `/cron/reminders` 200 sem erro na revisão.
 
 **Produção e staging ALINHADOS em `20261006160000`** — as 6 da auditoria do agente
 (`docs/qa/2026-10-06-auditoria-agente-ia.md`): `20261006100000_claim_recupera_processing`,
