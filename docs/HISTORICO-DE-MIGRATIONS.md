@@ -325,3 +325,5 @@ Sobem juntas, depois das de `20261008…`.
 Ordem de deploy em produção: migrations, depois o agente (confirmar a revisão nova do Cloud Run servindo) e só então a tag do app. Agente antigo re-materializa as linhas pausadas; agente novo antes das migrations quebra o agendador e o cron de lembretes, que selecionam as colunas novas.
 
 **Lembrete: "só esta" e parcela da dívida** — `20261009130000`; **lembrete por pessoa e envio único** — `20261009140000`: staging e produção 07/10/2026. Sobem depois das de `20261009120…`.
+
+**Lembrete: compra e fatura no cartão são coisas diferentes** — `20261009150000`: staging e produção 07/10/2026 (aplicada pelo Gabriel com `PROOPS_PROD_OK=1` e `--project-ref`; conferida em leitura: no topo de `schema_migrations`, `bill_reminder_dues` nova, `_bill_reminders_due()` e `_alerts_to_send()` sem erro). Só banco: o agente não mudou.
