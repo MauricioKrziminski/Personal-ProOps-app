@@ -27,6 +27,7 @@ import { Motion } from '@/design/tokens';
 import { progressoDaCapa } from '@/design/wave-math';
 import { useTheme } from '@/hooks/use-theme';
 import {
+  TETO_DA_ABERTURA_MS,
   esperaDaAbertura,
   esperaDaMarca,
   origemValida,
@@ -34,6 +35,7 @@ import {
   type Onda,
   type Ponto,
 } from '@/lib/session-gate';
+import { marcar } from '@/lib/trilha-da-abertura';
 
 import type { CortinaApi } from './session-curtain.types';
 
@@ -160,8 +162,10 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
           cancelAnimation(progresso);
           progresso.set(alvo);
           ok();
+          marcar('animar:prazo', { alvo });
         }, ms + FOLGA_DA_ANIMACAO_MS);
         const terminou = () => {
+          marcar('animar:callback', { alvo });
           clearTimeout(prazo);
           ok();
         };
@@ -237,6 +241,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   }, [alturaDaTela, animar, cancelarPreparo, progresso]);
 
   const cobrirJa = useCallback(() => {
+    marcar('cortina:cobrirJa');
     coberturaAtual.current = null;
     cancelAnimation(progresso);
     progresso.set(0);
@@ -245,6 +250,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
 
   const descobrir = useCallback(
     async (o: Onda, duracao: number) => {
+      marcar('cortina:descobrir', { modo: o.mode, ate: o.ate ?? null });
       coberturaAtual.current = null;
       setOnda(o);
       setFase('revelando');
@@ -255,6 +261,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       // As duas metades da transição têm a mesma duração, mesmo com distâncias diferentes.
       const alvo = o.ate === 'capa' ? progressoDaCapa(alturaDaTela) : 1;
       await animar(alvo, duracao);
+      marcar('cortina:aberta');
       setFase('aberta');
       setCamadaMontada(false);
     },
@@ -262,6 +269,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   );
 
   const abrirJa = useCallback(() => {
+    marcar('cortina:abrirJa');
     cancelarPreparo();
     coberturaAtual.current = null;
     cancelAnimation(progresso);
@@ -285,6 +293,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   const acordar = useRef<(() => void) | null>(null);
 
   const marcarPronto = useCallback((destino: 'app' | 'conta') => {
+    marcar('abertura:marcarPronto', { destino, ja: pronto.current.valor });
     if (pronto.current.valor) return;
     pronto.current.valor = true;
     pronto.current.destino = destino;
@@ -292,6 +301,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const segurarAbertura = useCallback(() => {
+    marcar('abertura:segurar', { ja: pronto.current.segurando });
     pronto.current.segurando = true;
     acordar.current?.();
   }, []);
@@ -307,6 +317,10 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     o sistema pergunta e a tinta sobe direto no app desbloqueado.
   */
   const comecou = useRef(false);
+  /** Quando a abertura começou: a saída por toque só vale depois do teto curto. */
+  const inicioDaAbertura = useRef(0);
+  /** A pessoa tocou na cortina presa e ela abriu: a espera da abertura não revela de novo. */
+  const saiuPorToque = useRef(false);
   const construir = useCallback(() => {
     construcao.set(0);
     construcao.set(
@@ -321,6 +335,8 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     if (comecou.current) return;
     comecou.current = true;
     const desde = Date.now();
+    inicioDaAbertura.current = desde;
+    marcar('abertura:inicio');
     construir();
 
     void (async () => {
@@ -328,6 +344,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       // Dorme até o teto OU até alguém avisar (pronto/segurar); o teto é relido a cada volta.
       while (!p.valor) {
         const falta = esperaDaAbertura(desde, Date.now(), p.segurando);
+        marcar('abertura:espera', { falta, segurando: p.segurando });
         if (falta <= 0) break;
         await new Promise<void>((ok) => {
           const timer = setTimeout(ok, falta);
@@ -338,9 +355,11 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
         });
       }
       acordar.current = null;
+      marcar('abertura:saiu-da-espera', { pronto: p.valor, destino: p.destino, ms: Date.now() - desde });
       // A marca não pode ser um lampejo: a passagem "marca → app" acontece em toda abertura
       // (também com Reduzir Movimento — ficar parada na tela não é movimento).
       await dormir(esperaDaMarca(desde, Date.now()));
+      if (saiuPorToque.current) return;
       // Teto estourado deixa o destino em `app`: revelar tudo é o lado seguro.
       const capa = pronto.current.destino === 'conta';
       await descobrir(
@@ -348,8 +367,34 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
         Motion.curtain.duration,
       );
       setAberturaFeita(true);
+      marcar('abertura:fim');
     })();
   }, [construir, descobrir]);
+
+  /*
+    A saída de emergência (08/10/2026): a cortina da abertura presa depois do teto curto abre com
+    um toque. Toque é evento, não timer — chega ao JS mesmo que a espera tenha se perdido. Com a
+    trava ligada, o que aparece é a trava, que pede a senha de novo.
+  */
+  const sairPorToque = useCallback(() => {
+    if (!comecou.current || saiuPorToque.current) return;
+    if (Date.now() - inicioDaAbertura.current < TETO_DA_ABERTURA_MS) return;
+    marcar('abertura:saida-por-toque');
+    saiuPorToque.current = true;
+    abrirJa();
+  }, [abrirJa]);
+
+  // Uma batida por segundo enquanto a abertura não termina: prova se os timers do JS andam.
+  useEffect(() => {
+    if (aberturaFeita) return;
+    let n = 0;
+    const batida = setInterval(() => {
+      n += 1;
+      marcar('tic', { n });
+      if (n >= 40) clearInterval(batida);
+    }, 1000);
+    return () => clearInterval(batida);
+  }, [aberturaFeita]);
 
   const esconderSplash = useCallback(() => {
     const s = splash.current;
@@ -411,6 +456,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   );
 
   const aoLayout = useCallback(() => {
+    marcar('camada:layout', { ja: splash.current.layout });
     splash.current.layout = true;
     esconderSplash();
   }, [esconderSplash]);
@@ -430,6 +476,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
                 comMarca={!aberturaFeita}
                 construcao={construcao}
                 onLayout={aoLayout}
+                onToque={fase === 'abertura' && !aberturaFeita ? sairPorToque : undefined}
               />
             )}
           </SaindoContext.Provider>
@@ -447,6 +494,7 @@ function Camada({
   comMarca,
   construcao,
   onLayout,
+  onToque,
 }: {
   fase: FaseDaCortina;
   onda: Onda;
@@ -455,6 +503,8 @@ function Camada({
   comMarca: boolean;
   construcao: SharedValue<number>;
   onLayout: () => void;
+  /** Só na abertura: a saída de emergência da cortina presa. */
+  onToque?: () => void;
 }) {
   const theme = useTheme();
   const veu = useAnimatedStyle(() => ({ opacity: 1 - progresso.get() }));
@@ -462,6 +512,8 @@ function Camada({
   return (
     <View
       onLayout={onLayout}
+      onStartShouldSetResponder={onToque ? () => true : undefined}
+      onResponderRelease={onToque}
       // Enquanto cobre, a camada engole o toque (ela é o alvo, e não tem responder). Revelando,
       // o app de baixo já é o destino.
       pointerEvents={fase === 'aberta' || fase === 'revelando' ? 'none' : 'auto'}

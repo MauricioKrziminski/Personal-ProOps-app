@@ -39,6 +39,7 @@ import { SessionProvider, useSession } from '@/hooks/use-session';
 import { SemConexao } from '@/components/auth/sem-conexao';
 import { hasCompletedOnboarding } from '@/lib/onboarding';
 import { attachNotificationListeners, configureNotificationHandler } from '@/lib/notifications';
+import { marcar } from '@/lib/trilha-da-abertura';
 
 SplashScreen.preventAutoHideAsync();
 configureNotificationHandler();
@@ -135,6 +136,7 @@ function AvisoDaAbertura({ pronto, temSessao }: { pronto: boolean; temSessao: bo
   const cortina = useCortina();
   const { carregando, locked, estado } = useLock();
   useEffect(() => {
+    marcar('aviso', { pronto, carregando, temSessao, locked, estado });
     if (carregando) return;
     /*
       ⚠️ **Segurar NÃO espera as fontes** (06/10/2026). A trava pede a senha assim que sessão e
@@ -454,6 +456,7 @@ function AppTree() {
 
                   <Stack.Screen name="profile/members" options={{ title: 'Pessoas' }} />
                   <Stack.Screen name="profile/alerts" options={{ title: 'Histórico de alertas' }} />
+                  <Stack.Screen name="profile/diagnostico" options={{ title: 'Diagnóstico da abertura' }} />
 
                   {/* Mesma regra do `notes/[id]`: em `new` o conteúdo é o campo vazio, e em
                       `[id]` o nome da conversa só é conhecido depois da query. */}
