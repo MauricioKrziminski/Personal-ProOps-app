@@ -96,6 +96,8 @@ export interface CartaoDaPilha {
   name: string;
   invoice_id: string | null;
   invoice_total_cents: number;
+  /** O que ainda falta da fatura corrente (líquido do pagamento parcial). */
+  invoice_open_cents?: number;
   credit_limit_cents: number | null;
   available_limit_cents: number | null;
   closing_date: string | null;
@@ -108,6 +110,7 @@ type LinhaDoResumo = {
   name: string;
   invoice_id: string | null;
   invoice_total_cents: number | string | null;
+  invoice_open_cents?: number | string | null;
   credit_limit_cents: number | string | null;
   available_limit_cents: number | string | null;
   closing_date: string | null;
@@ -122,12 +125,32 @@ export function cartaoDaPilha(c: LinhaDoResumo): CartaoDaPilha {
     name: c.name,
     invoice_id: c.invoice_id,
     invoice_total_cents: Number(c.invoice_total_cents ?? 0),
+    ...(c.invoice_open_cents == null ? {} : { invoice_open_cents: Number(c.invoice_open_cents) }),
     credit_limit_cents: c.credit_limit_cents == null ? null : Number(c.credit_limit_cents),
     available_limit_cents: c.available_limit_cents == null ? null : Number(c.available_limit_cents),
     closing_date: c.closing_date,
     due_date: c.due_date,
     overdue_count: Number(c.overdue_count ?? 0),
   };
+}
+
+/**
+ * A fatura corrente foi paga EM PARTE? Devolve quanto já foi pago e quanto falta.
+ *
+ * O número grande do cartão continua sendo o TOTAL da fatura (o valor impresso nela), e por isso
+ * um pagamento parcial não mudava nada na face, em Cartões nem na Carteira — só a tela da fatura
+ * dizia "pago · falta" (07/10/2026: *"tem que mostrar a fatura atual e o que falta pagar"*).
+ * `invoice_open_cents` (`card_summary`) já é o líquido; `null` quando não houve pagamento, quando
+ * já foi quitada ou quando a coluna não veio.
+ */
+export function parcialDaFatura(c: {
+  invoice_total_cents: number | string | null;
+  invoice_open_cents?: number | string | null;
+}): { pago: number; falta: number } | null {
+  if (c.invoice_open_cents == null) return null;
+  const total = Number(c.invoice_total_cents ?? 0);
+  const falta = Number(c.invoice_open_cents);
+  return falta > 0 && falta < total ? { pago: total - falta, falta } : null;
 }
 
 /**

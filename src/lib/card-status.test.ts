@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { diasAte, estadoDaFatura, ordemDaPilha, outrasFaturas, prazoLabel } from './card-status.ts';
+import { diasAte, estadoDaFatura, ordemDaPilha, outrasFaturas, parcialDaFatura, prazoLabel } from './card-status.ts';
 
 const hoje = new Date(2026, 8, 16, 22, 30);
 
@@ -63,4 +63,15 @@ test('pilha: o escolhido vai para a frente e o resto fica na ordem original', ()
   assert.equal(ids(null), 'abcdef');
   assert.equal(ids(undefined), 'abcdef');
   assert.deepEqual(ordemDaPilha([], 'a', 6), []);
+});
+
+test('parcialDaFatura: só com pagamento feito e ainda faltando', () => {
+  assert.deepEqual(parcialDaFatura({ invoice_total_cents: 100000, invoice_open_cents: 44067 }), { pago: 55933, falta: 44067 });
+  // sem pagamento, quitada, ou sem a coluna (APK antigo / fixture): nada a dizer
+  assert.equal(parcialDaFatura({ invoice_total_cents: 100000, invoice_open_cents: 100000 }), null);
+  assert.equal(parcialDaFatura({ invoice_total_cents: 100000, invoice_open_cents: 0 }), null);
+  assert.equal(parcialDaFatura({ invoice_total_cents: 100000 }), null);
+  assert.equal(parcialDaFatura({ invoice_total_cents: 0, invoice_open_cents: 0 }), null);
+  // a RPC devolve bigint, que pode chegar como string
+  assert.deepEqual(parcialDaFatura({ invoice_total_cents: '100000', invoice_open_cents: '25000' }), { pago: 75000, falta: 25000 });
 });

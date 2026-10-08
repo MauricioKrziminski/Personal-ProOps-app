@@ -13,7 +13,7 @@ import { LARGURA_DE_DESENHO, alturaDoCartao } from '@/design/card-geometry';
 import { Radius, Space, tabular } from '@/design/tokens';
 import { formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
-import type { CartaoDaPilha } from '@/lib/card-status';
+import { parcialDaFatura, type CartaoDaPilha } from '@/lib/card-status';
 
 /**
  * As três tintas de uma face: a do texto, a do texto secundário e a das pílulas.
@@ -184,6 +184,9 @@ export function BaseDaPilha({ card, onFatura }: { card: CartaoDaPilha; onFatura?
   const usado = Number(card.invoice_total_cents ?? 0);
 
   const livre = Number(card.available_limit_cents ?? 0);
+  // Paga em parte (07/10/2026): o número grande segue sendo a fatura, e a linha logo abaixo diz o
+  // que já saiu e o que ainda falta — antes nada na face mudava depois de um pagamento parcial.
+  const parcial = parcialDaFatura(card);
 
   // Uma linha só: a data é a informação e o chevron diz que é botão.
   const fecha = (
@@ -221,6 +224,13 @@ export function BaseDaPilha({ card, onFatura }: { card: CartaoDaPilha; onFatura?
         )}
       </View>
 
+      {parcial ? (
+        <ThemedText type="meta" themeColor={t.suave} style={tabular}>
+          {`pago ${brl(parcial.pago)} · `}
+          <ThemedText type="meta" themeColor={t.tinta} style={tabular}>{`falta ${brl(parcial.falta)}`}</ThemedText>
+        </ThemedText>
+      ) : null}
+
       {limite > 0 ? <ProgressBar value={usado} max={limite} tone={t.tinta} track={t.chip} /> : null}
 
       <View style={styles.rodape}>
@@ -243,10 +253,11 @@ export function BaseDaPilha({ card, onFatura }: { card: CartaoDaPilha; onFatura?
  * obedece ao "esconder saldo" também na voz.
  */
 export function rotuloDoCartao(
-  card: Pick<CartaoDaPilha, 'name' | 'invoice_total_cents'>,
+  card: Pick<CartaoDaPilha, 'name' | 'invoice_total_cents' | 'invoice_open_cents'>,
   brl: (cents: number) => string
 ) {
-  return `${card.name}, fatura de ${brl(Number(card.invoice_total_cents ?? 0))}`;
+  const parcial = parcialDaFatura(card);
+  return `${card.name}, fatura de ${brl(Number(card.invoice_total_cents ?? 0))}${parcial ? `, falta ${brl(parcial.falta)}` : ''}`;
 }
 
 const styles = StyleSheet.create({

@@ -31,6 +31,7 @@ import { Deslizavel } from '@/components/ui/deslizavel';
 import {
   diasAte as daysUntil,
   estadoDaFatura as estadoFatura,
+  parcialDaFatura,
   prazoLabel,
 } from '@/lib/card-status';
 
@@ -237,6 +238,7 @@ export default function CardsScreen() {
         const livre = Number(card.available_limit_cents ?? 0);
         const pct = limite > 0 ? naoPago / limite : 0;
         const podePagar = estado === 'Fechada' || estado === 'Atrasada';
+        const parcial = parcialDaFatura(card);
 
         return (
           <Animated.View
@@ -296,7 +298,7 @@ export default function CardsScreen() {
                 { label: 'Editar cartão', icon: 'pencil', onPress: () => router.push(`/finance/accounts?edit=${card.account_id}`) },
                 { label: 'Arquivar cartão', curto: 'Arquivar', icon: 'archivebox', destructive: true, arrasto: 'esquerda', onPress: () => arquivar(card) },
               ]}
-              accessibilityLabel={`${card.name}, ${estado ? `fatura ${estado.toLowerCase()}` : 'sem fatura aberta'}, ${brl(totalFatura)}${card.due_date ? `, ${prazoLabel(card.due_date, 'vence')}` : ''}`}>
+              accessibilityLabel={`${card.name}, ${estado ? `fatura ${estado.toLowerCase()}` : 'sem fatura aberta'}, ${brl(totalFatura)}${parcial ? `, falta ${brl(parcial.falta)}` : ''}${card.due_date ? `, ${prazoLabel(card.due_date, 'vence')}` : ''}`}>
               <View style={styles.cardHead}>
                 <Miniatura card={card} onPress={() => abrirNaCarteira(card)} />
                 <ThemedText type="smallBold" style={styles.cardName}>
@@ -320,6 +322,12 @@ export default function CardsScreen() {
                 variant="title"
                 tone={estado === 'Atrasada' ? 'danger' : 'text'}
               />
+              {parcial ? (
+                <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
+                  {`Pago ${brl(parcial.pago)} · falta `}
+                  <ThemedText type="footnote" style={tabular}>{brl(parcial.falta)}</ThemedText>
+                </ThemedText>
+              ) : null}
 
               <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
                 {card.invoice_id && card.closing_date && card.due_date

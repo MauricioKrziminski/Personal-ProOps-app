@@ -43,7 +43,7 @@ import { formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useSession } from '@/hooks/use-session';
-import { cartaoDaPilha, estadoDaFatura, ordemDaPilha, prazoLabel } from '@/lib/card-status';
+import { cartaoDaPilha, estadoDaFatura, ordemDaPilha, parcialDaFatura, prazoLabel } from '@/lib/card-status';
 
 
 /**
@@ -493,6 +493,7 @@ function Detalhes({ card }: { card: CardSummary }) {
   const livre = Number(card.available_limit_cents ?? 0);
   const pct = limite > 0 ? naoPago / limite : 0;
   const atrasadas = Number(card.overdue_count ?? 0);
+  const parcial = parcialDaFatura(card);
 
   return (
     <View style={styles.detalhes}>
@@ -501,6 +502,12 @@ function Detalhes({ card }: { card: CardSummary }) {
           Fatura atual
         </ThemedText>
         <CountUpMoney cents={Number(card.invoice_total_cents ?? 0)} variant="money" tone="text" />
+        {parcial ? (
+          <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
+            {`Pago ${brl(parcial.pago)} · falta `}
+            <ThemedText type="footnote" style={tabular}>{brl(parcial.falta)}</ThemedText>
+          </ThemedText>
+        ) : null}
         <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
           {card.invoice_id && card.closing_date && card.due_date
             ? `${prazoLabel(card.closing_date, 'fecha')} · vence ${formatDateBR(card.due_date)}`
