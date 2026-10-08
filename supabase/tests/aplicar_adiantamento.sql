@@ -12,7 +12,7 @@ declare
   hoje date := (now() at time zone 'America/Sao_Paulo')::date;
   conta uuid; cartao uuid; plano uuid; p1 uuid; p2 uuid; p3 uuid; p4 uuid; p5 uuid; p6 uuid;
   item jsonb; r jsonb; chave uuid := gen_random_uuid(); n int; soma bigint; t record;
-  divida uuid; serie uuid; o1 uuid; o2 uuid; d1 date; d2 date; d3 date; plano2 uuid; c1 uuid; c2 uuid; c3 uuid;
+  divida uuid; serie uuid; o1 uuid; o2 uuid; d1 date; d2 date; d3 date; plano2 uuid; c1 uuid; c2 uuid; c3 uuid; c4 uuid;
 begin
   select id into ws from public.workspaces where owner_id = u;
   insert into public.accounts (workspace_id, user_id, name, type) values (ws, u, 'Conta AD', 'checking') returning id into conta;
@@ -232,6 +232,26 @@ begin
   delete from public.transactions where id = (r->>'id')::uuid;
   assert (select count(*) from public.transactions where id in (o1, o2)) = 2, 'as geradas voltaram com o mesmo id';
   assert not exists (select 1 from private.recurring_moved_occurrences where recurring_id = serie), 'as marcas saíram';
+
+  -- ── 10) a estrutura não muda por tabela; a conta apagada passa (20261010130200) ────────────
+  insert into public.accounts (workspace_id, user_id, name, type) values (ws, u, 'Conta AD 2', 'checking') returning id into c4;
+  r := public.apply_anticipation(jsonb_build_object(
+         'source', 'recurring', 'ref_id', serie, 'paid_on', hoje, 'amount_cents', 5000, 'account_id', c4,
+         'description', 'Adiantei academia', 'parcelas', jsonb_build_array(jsonb_build_object('id', o1))), gen_random_uuid());
+  begin
+    update public.transactions set installment_plan_id = plano, installment_no = 9 where id = (r->>'id')::uuid;
+    assert false, 'virar parcela de uma compra é recusa, não silêncio';
+  exception when sqlstate 'P0001' then null;
+  end;
+  begin
+    update public.transactions set kind = 'income' where id = (r->>'id')::uuid;
+    assert false, 'trocar o tipo é recusa';
+  exception when sqlstate 'P0001' then null;
+  end;
+  delete from public.accounts where id = c4;
+  select * into t from public.transactions where id = (r->>'id')::uuid;
+  assert t.account_id is null and t.adiantamento is not null and t.amount_cents = 5000,
+    format('apagar a conta deixa o adiantamento sem conta: %s', row_to_json(t));
 end $$;
 
 rollback;

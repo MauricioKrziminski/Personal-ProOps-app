@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from app.config import get_settings
 from app.domain.correcao_plano import (
+    ADIANTAMENTO_SO_NO_APP,
     ULTIMO_DIA,
     ULTIMO_DIA_NO_CARTAO,
     ULTIMO_DIA_SO_NA_COMPRA,
@@ -422,6 +423,11 @@ def erro_de_correcao(action, target: dict | None) -> str | None:
     if (target or {}).get("correction_error"):
         return target["correction_error"]
     cands = (target or {}).get("candidates") or []
+    if ((target or {}).get("status") == "found" and cands and cands[0].get("adiantamento")
+            and any([action.new_amount_cents is not None, action.new_occurred_at, action.new_description,
+                     action.new_account, action.installments,
+                     getattr(action, "already_paid_count", None) is not None])):
+        return ADIANTAMENTO_SO_NO_APP
     n_plano = (cands[0].get("plan_installments")
                if (target or {}).get("status") == "found" and cands else None)
     # `installments` só é correção quando MUDA algo: igual ao N do plano é pista de

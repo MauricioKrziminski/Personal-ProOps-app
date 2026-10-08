@@ -941,7 +941,10 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
   (GUC `proops.editando_adiantamento`); `update_installment_plan` e `apagar_parcelas` o tratam como
   parcela travada que ocupa N números. **Apagar desfaz**: na compra pelo "Só esta"
   (`desfazer_adiantamento_da_compra`), na dívida e na série pelo gatilho AFTER DELETE
-  `restaura_adiantamento` — a dívida recusa se mudou depois. `supabase/tests/aplicar_adiantamento.sql`.
+  `restaura_adiantamento` — a dívida recusa se mudou depois. **Tipo, compra, série e dívida não
+  se seguram, se RECUSAM** (`20261010130200`): segurado, `convert_transaction_to_installments` criava
+  um plano órfão sem a 1ª parcela. A conta que vira null pela FK (conta apagada) passa.
+  `supabase/tests/aplicar_adiantamento.sql`.
 
 
 - **Receita atrasada sai da projeção depois de 3 dias; despesa atrasada NÃO** (`20260909200000`).

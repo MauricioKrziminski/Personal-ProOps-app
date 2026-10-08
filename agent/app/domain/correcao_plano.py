@@ -29,6 +29,10 @@ SEM_CARTAO = ("Você não tem cartão cadastrado, e uma compra parcelada precisa
               "Cadastre o cartão no app e me pede de novo." + NADA)
 CARTAO_FALTANDO = "Não sei em qual cartão parcelar." + NADA + " Me manda de novo dizendo o cartão."
 LINHA_SUMIU = "🤷 Esse lançamento não está mais aqui." + NADA
+# O lançamento de um adiantamento (20261010130000) tem valor, data, título, conta e tipo presos ao
+# que ele cobriu: só a categoria muda por aqui.
+ADIANTAMENTO_SO_NO_APP = ("Esse é um adiantamento de parcelas: valor, data, título e conta se mudam no "
+                          "app, em *Editar adiantamento*. A categoria eu mudo por aqui." + NADA)
 
 
 def e_conversao(action) -> bool:
@@ -105,6 +109,8 @@ def qual_cartao(nomes: list[str]) -> str:
 
 def recusa_de_conversao(linha: dict, parcelas: int) -> str | None:
     """A recusa da RPC que o estado da linha já decide — `None` quando dá para parcelar."""
+    if linha.get("adiantamento"):
+        return ADIANTAMENTO_SO_NO_APP
     if linha.get("installment_plan_id"):
         return None if linha.get("plan_installments") == parcelas else MUDAR_PARCELAS
     if not 2 <= parcelas <= 72:

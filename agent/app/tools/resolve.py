@@ -279,6 +279,8 @@ def veredito(
             # O valor previsto: a frase da baixa compara com o que a pessoa disse que pagou.
             **({"amount_cents": int(r["amount_cents"])}
                if tabela == "transactions" and r.get("amount_cents") is not None else {}),
+            # o adiantamento (20261010130000): a correção é recusada ANTES do SIM (`policy`)
+            **({"adiantamento": True} if tabela == "transactions" and r.get("adiantamento") else {}),
             **(_candidato_plano(r) if tabela == "installment_plans" else {}),
         }
         for r in linhas[:MOSTRAR]
@@ -966,7 +968,7 @@ async def _opcoes_de_conta(workspace_id, nome: str) -> dict:
 _DETALHE_DA_LINHA = """
     select t.id, t.kind, t.amount_cents, t.occurred_at, t.description, t.merchant, t.category,
            t.installment_plan_id, p.installments as plan_installments,
-           t.recurring_id, t.debt_id, t.rollover_of_invoice_id,
+           t.recurring_id, t.debt_id, t.rollover_of_invoice_id, t.adiantamento is not null as adiantamento,
            private.parcela_travada('pending', t.invoice_id) as fatura_travada,
            a.id as account_id, a.name as account_name, a.type as account_type
     from public.transactions t

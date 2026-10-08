@@ -17,6 +17,7 @@ import psycopg
 from app import db
 from app.domain import matching
 from app.domain.correcao_plano import (
+    ADIANTAMENTO_SO_NO_APP,
     ULTIMO_DIA,
     ULTIMO_DIA_NO_CARTAO,
     ultimo_dia_das_parcelas,
@@ -258,13 +259,15 @@ async def reference_window(
         with pista as (
           select nullif(%s, '')::text as termo, %s::bigint as cents, %s::date as dia
         )
-        (select t.id, t.kind, t.amount_cents, t.category, t.description, t.merchant, t.occurred_at
+        (select t.id, t.kind, t.amount_cents, t.category, t.description, t.merchant, t.occurred_at,
+                t.adiantamento is not null as adiantamento
            from public.transactions t
           where t.workspace_id = %s and t.occurred_at <= current_date
           order by t.occurred_at desc, t.created_at desc
           limit %s)
         union all
-        (select t.id, t.kind, t.amount_cents, t.category, t.description, t.merchant, t.occurred_at
+        (select t.id, t.kind, t.amount_cents, t.category, t.description, t.merchant, t.occurred_at,
+                t.adiantamento is not null as adiantamento
            from public.transactions t cross join pista p
           where t.workspace_id = %s and t.occurred_at > current_date
             and (
@@ -1119,8 +1122,8 @@ async def update_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     )
     if not antes:
         return ToolResult("🤷 Esse lançamento não está mais aqui.", read_only=True)
-    # O lançamento de um adiantamento (20261010130000) tem valor, data, título e conta presos ao
-    # que ele cobriu: o banco os mantém em qualquer escrita comum, e dizer "pronto" seria mentir.
+    # Segunda trava (a primeira é `policy.erro_de_correcao`, antes do SIM): o banco mantém valor,
+    # data, título e conta do adiantamento em qualquer escrita comum, e dizer "pronto" seria mentir.
     if antes.get("adiantamento") and set(patch) - {"category"}:
         return ToolResult(ADIANTAMENTO_SO_NO_APP, read_only=True)
     if "description" in patch and antes.get("installment_no") and antes.get("plan_installments"):
@@ -1586,23 +1589,20 @@ async def _apagar_plano(ctx: ExecContext) -> ToolResult:
     )
 
 
-ADIANTAMENTO_SO_NO_APP = (
-    "Esse é um adiantamento de parcelas: valor, data, título e conta se mudam no app, em "
-    "*Editar adiantamento*. A categoria eu mudo por aqui."
-)
-
-
-async def _apagar_lancamento(ctx: ExecContext, alvo: dict) -> None:
+async def _apagar_lancamento(ctx: ExecContext, alvo: dict) -> str:
     """Apaga um lançamento. O de um adiantamento de COMPRA desfaz (as parcelas voltam) pela função
     do banco; o de dívida e de série desfaz pelo gatilho do próprio DELETE (20261010130000).
     `workspace_id` no DELETE: o id já vem de um select escopado, mas a garantia é local."""
     if alvo.get("adiantamento_da_compra"):
         await db.execute("select private.desfazer_adiantamento_da_compra(%s)", alvo["id"])
-        return
+        return f"🗑️ Apagado: {describe(alvo)}. As parcelas que ele adiantava voltaram para a compra."
     await db.execute(
         "delete from public.transactions where id = %s and workspace_id = %s",
         alvo["id"], ctx.workspace_id,
     )
+    if alvo.get("adiantamento"):
+        return f"🗑️ Apagado: {describe(alvo)}. O que ele adiantava voltou como era."
+    return f"🗑️ Apagado: {describe(alvo)}."
 
 
 async def delete_transaction(ctx: ExecContext, action: FinanceAction) -> ToolResult:
@@ -1615,6 +1615,7 @@ async def delete_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     alvo = await db.fetch_one(
         """
         select id, kind, amount_cents, category, description,
+               adiantamento is not null as adiantamento,
                coalesce(adiantamento->>'source' = 'plan', false) as adiantamento_da_compra
         from public.transactions where id = %s and workspace_id = %s
         """,
@@ -1622,8 +1623,7 @@ async def delete_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     )
     if not alvo:
         return ToolResult("🤷 Esse lançamento não está mais aqui.", read_only=True)
-    await _apagar_lancamento(ctx, alvo)
-    return ToolResult(f"🗑️ Apagado: {describe(alvo)}.", result_id=alvo["id"])
+    return ToolResult(await _apagar_lancamento(ctx, alvo), result_id=alvo["id"])
 
 
 async def undo_last(ctx: ExecContext, action: FinanceAction) -> ToolResult:
@@ -1632,6 +1632,7 @@ async def undo_last(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     alvo = await db.fetch_one(
         """
         select id, kind, amount_cents, category, description,
+               adiantamento is not null as adiantamento,
                coalesce(adiantamento->>'source' = 'plan', false) as adiantamento_da_compra
         from public.transactions where id = %s and workspace_id = %s
         """,
@@ -1640,8 +1641,7 @@ async def undo_last(ctx: ExecContext, action: FinanceAction) -> ToolResult:
     if not alvo:
         return ToolResult("🤷 Não achei nenhum lançamento para apagar.", read_only=True)
 
-    await _apagar_lancamento(ctx, alvo)
-    return ToolResult(f"🗑️ Apagado: {describe(alvo)}.", result_id=alvo["id"])
+    return ToolResult(await _apagar_lancamento(ctx, alvo), result_id=alvo["id"])
 
 
 async def create_goal(ctx: ExecContext, action: FinanceAction) -> ToolResult:
