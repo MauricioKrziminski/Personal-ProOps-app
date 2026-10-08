@@ -1,5 +1,6 @@
 -- docker exec -i supabase_db_app-proops psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f - < supabase/tests/valor_previsto_da_baixa.sql
 -- Pago × previsto (20261010100000): a baixa com outro valor guarda o previsto; uma vez só.
+-- E (20261010120000): desfazer a baixa mantém o previsto original; mudar o valor em aberto é previsto novo.
 \set ON_ERROR_STOP on
 begin;
 set local timezone to 'America/Sao_Paulo';
@@ -92,5 +93,33 @@ begin
   update public.transactions set amount_cents = 6900 where id = gas;
   assert (select expected_amount_cents is null from public.transactions where id = gas), 'correção de linha paga não inventa previsto';
 end $$;
+
+-- 7. desfazer e pagar de novo pelo app (`confirm_payment_scoped`): o previsto ORIGINAL fica; mudar
+--    o valor em aberto entre uma coisa e outra é dizer um previsto novo (20261010120000)
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000e7f01', true);
+set local role authenticated;
+do $$
+declare
+  w uuid := '00000000-0000-0000-0000-0000000e7f02';
+  agua uuid;
+begin
+  select id into agua from public.transactions where workspace_id = w and description = 'Agua';
+  update public.transactions set status = 'pending' where id = agua;
+  perform public.confirm_payment_scoped(agua, current_date, 4500, 'one');
+  assert (select expected_amount_cents = 5000 from public.transactions where id = agua), 'primeira baixa guarda o previsto';
+  update public.transactions set status = 'pending' where id = agua;
+  assert (select expected_amount_cents = 5000 from public.transactions where id = agua), 'desfazer não apaga o previsto';
+  perform public.confirm_payment_scoped(agua, current_date, 4000, 'one');
+  assert (select amount_cents = 4000 and expected_amount_cents = 5000 from public.transactions where id = agua),
+         'pagar de novo com outro valor mantém o previsto original';
+  update public.transactions set status = 'pending' where id = agua;
+  update public.transactions set amount_cents = 6000 where id = agua;
+  assert (select expected_amount_cents is null from public.transactions where id = agua),
+         'mudar o valor em aberto é um previsto novo';
+  perform public.confirm_payment_scoped(agua, current_date, 5500, 'one');
+  assert (select amount_cents = 5500 and expected_amount_cents = 6000 from public.transactions where id = agua),
+         'a baixa depois de mudar o previsto guarda o previsto novo';
+end $$;
+reset role;
 
 rollback;

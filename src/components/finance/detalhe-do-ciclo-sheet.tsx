@@ -80,6 +80,13 @@ export function DetalheDoCicloSheet({
               <Linha rotulo={`= ${r.fim}`} cents={fim} forte />
               {faltou > 0 ? <Linha rotulo="Faltou pagar" cents={-faltou} tone="danger" forte /> : null}
             </View>
+            {/* Fechado devendo, o número do ciclo é o que faltou pagar — e ele fica FORA da soma,
+                como na tela do ciclo (o abatimento automático foi recusado pelo dono do produto). */}
+            {faltou > 0 ? (
+              <ThemedText type="small" themeColor="textSecondary">
+                O ciclo fechou devendo o que faltou pagar; isso não sai do que sobrou na conta.
+              </ThemedText>
+            ) : null}
             {onVerCiclo ? (
               <Button label="Ver o que fecha o ciclo" variant="secondary" onPress={onVerCiclo} />
             ) : null}

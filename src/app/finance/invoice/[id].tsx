@@ -402,8 +402,10 @@ export default function InvoiceScreen() {
    */
   const marcarComoPaga = () => {
     if (!fatura || !dataISO) return;
+    // Nada foi pago num dia que ainda não chegou (`finance.md`): sem mover dinheiro não há o que
+    // agendar, e `settle_invoice` grava a data como vier — inclusive nas linhas de cartão.
     settle.mutate(
-      { invoiceId: fatura.id, paidAt: dataISO },
+      { invoiceId: fatura.id, paidAt: dataISO > hoje ? hoje : dataISO },
       {
         onSuccess: () => {
           setPagando(false);
@@ -836,6 +838,7 @@ export default function InvoiceScreen() {
                 value={dataBR}
                 onChange={setDataBR}
                 accessibilityLabel="Data do pagamento"
+                max={desconta ? undefined : hoje}
                 invalid={!dataISO}
               />
             </Field>
