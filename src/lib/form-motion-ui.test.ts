@@ -194,6 +194,7 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === '@/components/finance/calendar') return { Calendar: 'Calendar' };
       if (id === '@/lib/dates') return load('src/lib/dates.ts');
       if (id === '@/lib/money-field-fit') return load('src/lib/money-field-fit.ts');
+      if (id === '@/lib/quantidade') return load('src/lib/quantidade.ts');
       if (id === './dates.ts') return load('src/lib/dates.ts');
       if (id === '@/lib/lancar') return load('src/lib/lancar.ts');
       if (id === '@/lib/atalhos-de-lancamento') return load('src/lib/atalhos-de-lancamento.ts');

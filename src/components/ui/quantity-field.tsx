@@ -10,6 +10,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { useOpacidadeSuave } from '@/components/motion/cores-suaves';
 import { usePresencaAtiva } from '@/components/motion/presenca';
+import { digitarQuantidade } from '@/lib/quantidade';
 
 /**
  * Quantidade ABERTA: digita qualquer número, e − / + para o ajuste fino. Nunca atalhos fixos
@@ -80,10 +81,9 @@ export function QuantityField({
         value={digitando ?? String(assentado)}
         onChangeText={(t) => {
           if (!ativo) return;
-          const digitos = t.replace(/\D/g, '').slice(0, String(max).length);
-          setDigitando(digitos);
-          const n = Number(digitos);
-          if (n >= min) onChange(Math.min(n, max));
+          const { mostra, valor } = digitarQuantidade(t, { min, max });
+          setDigitando(mostra);
+          if (valor !== null) onChange(valor);
         }}
         onBlur={() => setDigitando(null)}
         keyboardType="number-pad"

@@ -114,7 +114,13 @@ export function SessionProvider({
           await doisQuadros();
         });
       }
-      if (!vivo) return;
+      /*
+        ⚠️ **Sem `if (!vivo) return` aqui** (08/10/2026, *"termina a animação da logo e a cortina
+        trava fechada"*). `vivo` cai também quando o efeito REINICIA — a identidade de `cortina`
+        muda com a altura da tela e com Reduzir Movimento —, e parar depois de cobrir deixava a
+        tinta fechada: o efeito novo vê a sessão já anotada em `mostrado` e não abre cortina
+        nenhuma. A fila (`fila`, um ref) é única e serializa as trocas, então terminar esta é seguro.
+      */
       if (antes !== undefined && antes !== depois) aoTrocarDeUsuario?.();
       setEstado({ session: next, loading: false });
       await doisQuadros();

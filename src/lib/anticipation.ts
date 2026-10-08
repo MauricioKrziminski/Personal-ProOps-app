@@ -261,3 +261,18 @@ export function faltamDepois(
   }
   return saida;
 }
+
+/**
+ * A dica de "Quantas parcelas" no Adiantar (08/10/2026, *"tem que mostrar quantas faltariam
+ * contando com a quantidade que eu estou querendo adiantar"*): quantas faltam hoje e quantas FICAM
+ * depois de adiantar as escolhidas. `total` já desconta as adiantadas no mesmo rascunho.
+ */
+export function dicaDasParcelas(total: number, quantas: number, jaAdiantadas: number): string {
+  const plural = (n: number) => `${n} ${n === 1 ? 'parcela' : 'parcelas'}`;
+  const ficam = Math.max(0, total - quantas);
+  const rascunho = jaAdiantadas > 0
+    ? ` (${jaAdiantadas} já ${jaAdiantadas === 1 ? 'adiantada' : 'adiantadas'} no rascunho)`
+    : '';
+  const depois = ficam === 0 ? 'não fica nenhuma' : `${ficam === 1 ? 'fica' : 'ficam'} ${plural(ficam)}`;
+  return `Faltam ${plural(total)}${rascunho}. Adiantando ${quantas}, ${depois}.`;
+}

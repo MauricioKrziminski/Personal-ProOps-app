@@ -14,6 +14,7 @@ import { SelectField, type SelectOption } from '@/components/ui/select-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Space } from '@/design/tokens';
 import type { Adiantavel, ParcelaAdiantavel, Quais } from '@/lib/anticipation';
+import { dicaDasParcelas } from '@/lib/anticipation';
 import { isoToBR } from '@/lib/dates';
 
 /** `ordem`: o `SelectField` junta só cabeçalhos CONSECUTIVOS — a lista vem do banco por data. */
@@ -123,7 +124,7 @@ export function AdiantarCampos(p: Props) {
           label={recorrente ? 'Quantos meses' : 'Quantas parcelas'}
           hint={recorrente
             ? undefined
-            : `De ${total} ${total === 1 ? 'parcela' : 'parcelas'} a vencer${p.jaAdiantadas > 0 ? ` · ${p.jaAdiantadas} já adiantada${p.jaAdiantadas === 1 ? '' : 's'} no rascunho` : ''}.`}>
+            : dicaDasParcelas(total, p.quantas, p.jaAdiantadas)}>
           <QuantityField value={p.quantas} max={total} onChange={p.onQuantas} />
         </Field>
       </Presenca>

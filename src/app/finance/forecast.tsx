@@ -491,8 +491,14 @@ export default function ForecastScreen() {
    * inteira em zero. `serie.length === 0` nunca acontece — `generate_series` devolve uma linha por
    * dia mesmo sem nenhum lançamento, e o empty antigo era inalcançável.
    */
+  /*
+    ⚠️ **Esqueleto só enquanto alguém BUSCA** (08/10/2026, *"às vezes fica carregando infinito"*).
+    O placeholder (o horizonte anterior) contava como carregando mesmo com a busca parada — pausada
+    sem foco/rede, ou a chave trocada por uma preferência lida depois —, e o herói ficava em
+    esqueleto até sair e voltar. Parado, mostra o número que tem.
+  */
   const projecaoCarregando = emMes
-    ? mensal.isLoading || mensal.isPlaceholderData || (simulando && simulacao.isLoading)
+    ? mensal.isLoading || (mensal.isPlaceholderData && mensal.isFetching) || (simulando && simulacao.isLoading)
     : forecast.isLoading || (simulando && simulacao.isLoading);
   const nadaParaProjetar =
     !projecaoCarregando &&
@@ -946,9 +952,12 @@ export default function ForecastScreen() {
         {temCompletas && !leituraPorContaFalhou ? (
           mudancas ? (
             <OndeMuda mudancas={mudancas} onAbrir={(conta) => router.push({ pathname: '/finance/hipotese', params: { conta, dias: String(dias) } })} />
-          ) : simulacao.isError || horizonte.contas.isError || horizonte.cartoes.isError ? null : (
+          ) : simulacao.isFetching || horizonte.contas.isFetching || horizonte.cartoes.isFetching ? (
+            // Só enquanto busca: a simulação que volta sem as leituras por conta (erro numa
+            // hipótese) deixava o esqueleto para sempre, e o rascunho mora no aparelho — reabrir a
+            // tela não mudava nada. Parado e sem resposta, o bloco some (o erro aparece abaixo).
             <SkeletonList linhas={2} />
-          )
+          ) : null
         ) : null}
         </>
       ) : (
@@ -956,7 +965,8 @@ export default function ForecastScreen() {
           Simule uma entrada ou saída.
         </ThemedText>
       )}
-      {simulacao.isError || errosDaSimulacao.some((e) => e.leitura) || horizonte.contas.isError || horizonte.cartoes.isError ? (
+      {simulacao.isError || errosDaSimulacao.some((e) => e.leitura) || horizonte.contas.isError || horizonte.cartoes.isError
+        || (temCompletas && simulacao.isSuccess && !simulacao.isPlaceholderData && !simulacao.isFetching && (!contasDepois || !cartoesDepois)) ? (
         <ErrorBand
           message="Não deu para calcular o rascunho — os números acima são os reais."
           onRetry={() => {

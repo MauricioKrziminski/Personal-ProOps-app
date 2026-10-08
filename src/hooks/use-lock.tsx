@@ -82,6 +82,8 @@ const bio: typeof LocalAuthentication | null = (() => {
 
 const CHAVE_MODO = 'lock-mode';
 const CHAVE_ESPERA = 'lock-delay';
+/** Quanto o sucesso do prompt espera o `active` da mesma visita antes de ler o estado real. */
+const ESPERA_DO_ACTIVE_MS = 3000;
 
 interface LockContexto {
   mode: LockMode;
@@ -407,7 +409,12 @@ export function LockProvider({ children }: { children: ReactNode }) {
         // Sucesso nativo pode chegar antes do active, inclusive mais de um segundo antes.
         // Só o retorno dessa mesma visita permite revelar; sair de novo invalida a espera.
         if (AppState.currentState !== 'active') {
-          const permitir = await new Promise<boolean>((resolve) => { tentativa.aoVoltar = resolve; });
+          // Com teto: se o `active` desta visita se perder, `emVoo` ficava preso e nem o toque no
+          // disco pedia de novo. Passado o teto, vale o estado real do app.
+          const permitir = await Promise.race([
+            new Promise<boolean>((resolve) => { tentativa.aoVoltar = resolve; }),
+            new Promise<boolean>((resolve) => setTimeout(() => resolve(AppState.currentState === 'active'), ESPERA_DO_ACTIVE_MS)),
+          ]);
           if (!permitir || tentativa.cancelada || AppState.currentState !== 'active') return 'trancado' as const;
         }
         setLocked(false);
@@ -434,6 +441,19 @@ export function LockProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     pedirRef.current = () => void autenticar();
   }, [autenticar]);
+
+  useEffect(() => {
+    /*
+      ⚠️ **O pedido que ficou para "a volta" também sai quando a SESSÃO chega** (08/10/2026, *"às
+      vezes termina a animação da logo e a cortina trava fechada"*). Na abertura a cortina monta
+      com o app ainda não `active` e guarda o pedido (`pedirNaVolta`); o `active` que viria
+      cumpri-lo só pede com sessão conhecida — e quando a sessão chegava DEPOIS dele, ninguém mais
+      pedia a senha: a marca ficava parada até o teto de 20 s da abertura.
+    */
+    if (temSessao && pedirNaVolta.current && vigia.current.mode === 'on' && AppState.currentState === 'active') {
+      pedirRef.current();
+    }
+  }, [temSessao]);
 
   const semTrancar = useCallback(async <T,>(fn: () => Promise<T>) => {
     abrirUiDoSistema();

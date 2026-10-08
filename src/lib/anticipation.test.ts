@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
+  dicaDasParcelas,
   adiantaveisNoMes,
   agruparHipoteses,
   quantasQueCabem,
@@ -175,4 +176,10 @@ test('faltam depois de cada adiantamento, na ordem dos pagamentos', () => {
   const aluguel: Adiantavel = { ...tv, source: 'recurring', ref_id: 'r', total_n: null };
   const g3 = draftsDoAdiantamento(aluguel, aluguel.events.slice(0, 2), 200, '2026-11-01', 'g3');
   assert.equal(faltamDepois(g3, [aluguel]).get('g3'), undefined);
+});
+
+test('adiantar: a dica diz quantas faltam e quantas ficam depois de adiantar', () => {
+  assert.equal(dicaDasParcelas(44, 12, 0), 'Faltam 44 parcelas. Adiantando 12, ficam 32 parcelas.');
+  assert.equal(dicaDasParcelas(8, 7, 3), 'Faltam 8 parcelas (3 já adiantadas no rascunho). Adiantando 7, fica 1 parcela.');
+  assert.equal(dicaDasParcelas(2, 2, 0), 'Faltam 2 parcelas. Adiantando 2, não fica nenhuma.');
 });
