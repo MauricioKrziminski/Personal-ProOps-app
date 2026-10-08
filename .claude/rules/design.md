@@ -239,10 +239,13 @@ de qualquer ponto do scroll — não uma faixa permanente.
 > **A fatura tem as ações no TOPO, sob o total** (07/10/2026, decisão do dono do produto: *"o
 > usuário tem que scrollar tudo… só para apertar que pagou?"*). Não é a faixa fixa recusada: os
 > botões rolam junto com o cartão, logo abaixo dele. E **pagar é UM botão** — se o dinheiro sai de
-> uma conta (`pay_invoice`) ou se a fatura só fica marcada como paga (`settle_invoice`) é a chave
-> "Descontar de uma conta" da folha; dois botões vizinhos com efeitos diferentes levaram a marcar
-> como paga a fatura que se queria pagar da conta. Varredura do mesmo dia: nenhuma outra tela tem
-> ação principal depois de uma lista longa.
+> uma conta (`pay_invoice`) ou se a fatura só fica marcada como paga (`settle_invoice`) é UMA
+> pergunta da folha, **"De onde saiu o dinheiro?"**: as contas e, no fim, "Paguei por fora do app"
+> (`PAGOU_POR_FORA`, `lib/pagar-fatura.ts`); só depois aparecem os campos que a resposta pede.
+> Dois botões vizinhos com efeitos diferentes levaram a marcar como paga a fatura que se queria
+> pagar da conta, e uma chave "Descontar de uma conta" separada do "Pagar com" eram duas perguntas
+> para uma decisão (08/10/2026). Varredura do mesmo dia: nenhuma outra tela tem ação principal
+> depois de uma lista longa (o passo final do "Começar" foi ajustado).
 
 Continuam de fora da regra, por serem outra coisa: o **FAB** (idioma das duas plataformas, botão
 pequeno no canto), o **compositor do Agente** (é campo de entrada, como o do WhatsApp) e a

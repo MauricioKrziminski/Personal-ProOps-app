@@ -15,3 +15,16 @@ export function podeConfirmarPagamento(o: {
   if (!o.desconta) return true;
   return Boolean(o.payerId) && o.valorCents > 0 && o.valorCents <= o.falta;
 }
+
+/**
+ * "De onde saiu o dinheiro?" tem as contas e, no fim, esta escolha: o pagamento aconteceu fora do
+ * app (ou numa conta que não está aqui), e a fatura só fica marcada como paga, sem mexer em saldo.
+ * Era uma chave "Descontar de uma conta" SEPARADA do "Pagar com" (08/10/2026: *"descontar de uma
+ * conta tinha que estar junto com pagar com, não?"*) — duas perguntas para uma decisão só.
+ */
+export const PAGOU_POR_FORA = 'pagou-por-fora';
+
+/** O pagamento move dinheiro de uma conta? `null` (ainda não escolheu) conta como sim: pede a conta. */
+export function descontaDaConta(origem: string | null): boolean {
+  return origem !== PAGOU_POR_FORA;
+}

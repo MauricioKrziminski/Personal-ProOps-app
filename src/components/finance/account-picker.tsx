@@ -23,6 +23,12 @@ type AccountPickerProps = {
   placeholder?: string;
   /** Operações mostram dinheiro; filtros continuam escolhendo só a identidade. */
   financialContext?: boolean;
+  /**
+   * Uma escolha que NÃO é conta, no fim da lista ("Paguei por fora do app"). Diferente de
+   * `emptyLabel` (o "nenhuma", com id `null`, que também é o estado de não escolhido): esta tem
+   * id próprio, então "ainda não escolheu" continua distinguível dela.
+   */
+  extraOption?: SelectOption;
 };
 
 export function AccountPicker(props: AccountPickerProps) {
@@ -97,9 +103,13 @@ function AccountPickerField({
   disabled,
   emptyLabel,
   placeholder = 'Escolher conta',
+  extraOption,
   context,
 }: AccountPickerProps & { context?: AccountPickerContext }) {
-  const opcoes = useMemo<SelectOption[]>(() => accountSelectOptions(accounts, emptyLabel, null, context), [accounts, emptyLabel, context]);
+  const opcoes = useMemo<SelectOption[]>(
+    () => [...accountSelectOptions(accounts, emptyLabel, null, context), ...(extraOption ? [extraOption] : [])],
+    [accounts, emptyLabel, context, extraOption],
+  );
 
   return (
     <SelectField

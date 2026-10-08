@@ -10,7 +10,6 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { ButtonRow } from '@/components/ui/button-row';
 import { Sheet, SheetScroll } from '@/components/ui/sheet';
-import { SwitchRow } from '@/components/ui/switch-row';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Card } from '@/components/ui/card';
 import { Dica } from '@/components/ui/dica';
@@ -58,7 +57,8 @@ import { hrefDoLembrete, resumoDosAvisos } from '@/lib/lembrete-de-conta';
 import { estadoDaLinha } from '@/lib/settle-labels';
 import { contaNaFatura, rotuloDoStatus } from '@/lib/card-status';
 import { accountLabel } from '@/lib/accounts';
-import { podeConfirmarPagamento } from '@/lib/pagar-fatura';
+import { descontaDaConta, PAGOU_POR_FORA, podeConfirmarPagamento } from '@/lib/pagar-fatura';
+import type { SelectOption } from '@/components/ui/select-field';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
 import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
@@ -155,7 +155,6 @@ export default function InvoiceScreen() {
   const [payerId, setPayerId] = useState<string | null>(null);
   // Pagar é UM botão (07/10/2026): a folha decide se o dinheiro sai de uma conta (ligada, o
   // padrão) ou se a fatura só fica marcada como paga, sem mexer no saldo.
-  const [desconta, setDesconta] = useState(true);
   const [dataBR, setDataBR] = useState(() => formatDateBR(localISODate()));
 
   // `isError` e não só `data`: o TanStack guarda o resultado anterior quando o refetch
@@ -295,7 +294,6 @@ export default function InvoiceScreen() {
     // o erro do pagamento é mostrado DENTRO do sheet (toast fica atrás do Modal nativo)
     pay.reset();
     settle.reset();
-    setDesconta(true);
     // pré-seleciona a conta cadastrada como pagadora do cartão — sem isso o usuário escolhe
     // a mesma conta todo mês. Só vale se ela ainda for uma pagadora válida (pode ter sido
     // arquivada ou virado cartão), senão o banco recusaria e o usuário não saberia por quê.
@@ -394,7 +392,7 @@ export default function InvoiceScreen() {
   };
 
   /**
-   * Quitar SEM movimentar dinheiro — a chave "Descontar de uma conta" desligada.
+   * Quitar SEM movimentar dinheiro — a resposta "Paguei por fora do app" em "De onde saiu o dinheiro?".
    *
    * O caso é a fatura paga fora do app (ou dado histórico de antes do app): pagá-la pelo caminho
    * normal criaria uma transferência e tiraria do saldo de HOJE um dinheiro que já saiu. A folha
@@ -415,6 +413,7 @@ export default function InvoiceScreen() {
       },
     );
   };
+  const desconta = descontaDaConta(payerId);
   const confirmavel = podeConfirmarPagamento({ desconta, payerId, dataISO, valorCents, falta });
 
   /**
@@ -782,13 +781,45 @@ export default function InvoiceScreen() {
           />
 
           <SheetScroll contentContainerStyle={styles.sheetBody}>
-            <SwitchRow label="Descontar de uma conta" value={desconta} onValueChange={setDesconta} />
+            {/* UMA pergunta decide o pagamento (08/10/2026): de qual conta saiu, ou "por fora do
+                app" — e só então aparecem os campos que aquela resposta precisa. Antes eram uma
+                chave "Descontar de uma conta" e, longe dela, o "Pagar com". */}
+            {accounts.isError ? (
+              <ErrorBand
+                message="Não deu para carregar suas contas."
+                onRetry={accounts.refetch}
+              />
+            ) : null}
+            <Field
+              label="De onde saiu o dinheiro?"
+              obrigatorio
+              hint={pagadoras.length === 0 && !accounts.isLoading && !accounts.isError
+                ? 'Nenhuma conta cadastrada: cadastre a conta de onde o dinheiro sai, ou marque como paga por fora.'
+                : undefined}>
+              <AccountPicker financialContext
+                accounts={pagadoras}
+                value={payerId}
+                onChange={setPayerId}
+                placeholder="Escolher a conta"
+                extraOption={OPCAO_POR_FORA}
+                actions={[{
+                  id: 'cadastrar-conta',
+                  label: 'Cadastrar conta',
+                  icon: 'plus',
+                  onPress: () => {
+                    reabrirPagamento.current = 'pedido';
+                    setPagando(false);
+                    router.push('/finance/accounts?create=1');
+                  },
+                }]}
+              />
+            </Field>
 
             {desconta ? (
               <Field
-                label="Valor" obrigatorio
+                label="Quanto você pagou" obrigatorio
                 error={valorCents > falta ? `Falta ${formatBRL(falta)} nesta fatura.` : undefined}
-                hint={parcial ? `Você já pagou ${formatBRL(jaPago)}.` : undefined}>
+                hint={parcial ? `Falta ${formatBRL(falta)} · você já pagou ${formatBRL(jaPago)}.` : undefined}>
                 {/* Superfície de DECISÃO: este é o valor que a pessoa está confirmando pagar, e
                     por isso o campo é editável e mostra o número por extenso. O que sobrar fica na
                     fatura, como fica no rotativo do cartão de verdade. */}
@@ -799,37 +830,6 @@ export default function InvoiceScreen() {
                 />
               </Field>
             ) : null}
-
-            {/* Erro de rede e "não tem conta" são coisas diferentes e não podem ter o mesmo texto. */}
-            {!desconta ? null : accounts.isError ? (
-              <ErrorBand
-                message="Não deu para carregar suas contas."
-                onRetry={accounts.refetch}
-              />
-            ) : pagadoras.length === 0 && !accounts.isLoading ? (
-              <EmptyState compacto
-                icon="building.columns"
-                title="Nenhuma conta para pagar"
-                hint="Cadastre a conta de onde o dinheiro sai para registrar o pagamento."
-                action={{
-                  label: 'Cadastrar conta',
-                  onPress: () => {
-                    reabrirPagamento.current = 'pedido';
-                    setPagando(false);
-                    router.push('/finance/accounts?create=1');
-                  },
-                }}
-              />
-            ) : (
-              <Field label="Pagar com" obrigatorio>
-                <AccountPicker financialContext
-                  accounts={pagadoras}
-                  value={payerId}
-                  onChange={setPayerId}
-                  placeholder="Escolher a conta que paga"
-                />
-              </Field>
-            )}
 
             <Field
               label="Data do pagamento"
@@ -846,8 +846,8 @@ export default function InvoiceScreen() {
             {desconta ? null : (
               <ThemedText type="small" themeColor="textSecondary">
                 {parcial
-                  ? `Fica paga sem mexer no saldo — os ${brl(falta)} que faltam contam como pagos fora do app.`
-                  : 'Fica paga sem mexer no saldo.'}
+                  ? `A fatura fica paga sem mexer no saldo de nenhuma conta: os ${brl(falta)} que faltam contam como pagos fora do app.`
+                  : 'A fatura fica paga sem mexer no saldo de nenhuma conta.'}
               </ThemedText>
             )}
 
@@ -876,7 +876,7 @@ export default function InvoiceScreen() {
 
             {desconta ? (
               <ThemedText type="small" themeColor="textSecondary" style={styles.centered}>
-                Entra como transferência — o gasto já contou na compra.
+                Sai do saldo da conta e não conta como gasto de novo: as compras já contaram.
               </ThemedText>
             ) : null}
           </SheetScroll>
@@ -884,6 +884,15 @@ export default function InvoiceScreen() {
     </Screen>
   );
 }
+
+/** A escolha que não é conta, no fim de "De onde saiu o dinheiro?" (constante: o picker memoiza). */
+const OPCAO_POR_FORA: SelectOption = {
+  id: PAGOU_POR_FORA,
+  label: 'Paguei por fora do app',
+  meta: 'Só marca como paga, sem mexer no saldo',
+  icon: 'checkmark.circle',
+  neutral: true,
+};
 
 const styles = StyleSheet.create({
   /** A dica encosta no cartão — mais perto que o `gap` entre blocos. */

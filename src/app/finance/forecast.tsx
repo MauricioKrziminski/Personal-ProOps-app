@@ -935,7 +935,7 @@ export default function ForecastScreen() {
               {saldo === null ? null : (
                 <ThemedText type="small" themeColor="textSecondary" style={tabular}>
                   {'fecha em '}
-                  <Money cents={Number(saldo)} variant="footnote" tone={Number(saldo) < 0 ? 'danger' : 'text'} signed />
+                  <Money cents={Number(saldo)} variant="footnote" tone={Number(saldo) < 0 ? 'danger' : 'text'} />
                 </ThemedText>
               )}
             </View>
@@ -1381,22 +1381,25 @@ export default function ForecastScreen() {
 
           {faltaNaFolha ? <Note icon="info.circle">{faltaNaFolha}</Note> : null}
 
+          {/* O resultado da hipótese ANTES do "Ver resultado" (08/10/2026: com a cara de rodapé, um
+              leigo não o via): um bloco com o número grande, o mês/ciclo dele e o de antes. */}
           {periodoDaPrevia ? (
-            <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-              {`${monthTitle(periodoDaPrevia.mes)}${regua.view === 'cycle' ? ` (${isoToBR(periodoDaPrevia.de).slice(0, 5)}–${isoToBR(periodoDaPrevia.ate).slice(0, 5)})` : ''} fecha em `}
+            <Card style={styles.previa}>
+              <ThemedText type="small" themeColor="textSecondary">
+                {`Com esta hipótese, ${monthTitle(periodoDaPrevia.mes).toLowerCase()}${regua.view === 'cycle' ? ` (${isoToBR(periodoDaPrevia.de).slice(0, 5)} a ${isoToBR(periodoDaPrevia.ate).slice(0, 5)})` : ''} fecha em`}
+              </ThemedText>
               <Money
                 cents={Number(periodoDaPrevia.saldo)}
-                variant="footnote"
+                variant="title2"
                 tone={Number(periodoDaPrevia.saldo) < 0 ? 'danger' : 'text'}
-                signed
               />
               {antesDaPrevia && Number(antesDaPrevia.saldo) !== Number(periodoDaPrevia.saldo) ? (
-                <>
-                  {' · era '}
-                  <Money cents={Number(antesDaPrevia.saldo)} variant="footnote" tone="textSecondary" signed />
-                </>
+                <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                  {'Sem ela: '}
+                  <Money cents={Number(antesDaPrevia.saldo)} variant="footnote" tone="textSecondary" />
+                </ThemedText>
               ) : null}
-            </ThemedText>
+            </Card>
           ) : null}
 
           {editando ? (
@@ -1435,6 +1438,7 @@ export default function ForecastScreen() {
 }
 
 const styles = StyleSheet.create({
+  previa: { gap: Space.xs },
   // A lista e o seu "Ver mais" a `Space.md` um do outro, como título e conteúdo.
   lista: { gap: Space.md },
   horizonteCorpo: {

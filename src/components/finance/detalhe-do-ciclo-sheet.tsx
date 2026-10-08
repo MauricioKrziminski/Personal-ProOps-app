@@ -65,7 +65,8 @@ export function DetalheDoCicloSheet({
             <View style={styles.bloco}>
               <Linha rotulo={r.partida} cents={d.partida.cents} forte />
               {d.partida.contas.map((c) => (
-                <Linha key={c.account_id ?? 'sem-conta'} rotulo={c.nome} cents={c.cents} recuo />
+                // O que foi lançado sem conta (pelo WhatsApp, quase sempre) também é caixa: o nome diz isso.
+                <Linha key={c.account_id ?? 'sem-conta'} rotulo={c.account_id ? c.nome : 'Lançamentos sem conta'} cents={c.cents} recuo />
               ))}
             </View>
             <View style={styles.bloco}>

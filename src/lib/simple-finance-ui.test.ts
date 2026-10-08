@@ -1692,9 +1692,10 @@ test('trocar cobrança e valor com pagamento registrado não oferece reescrever 
   assert.deepEqual(copia(ui.writes[0].value.paymentVersions), { p1: 2 });
 });
 
-test('Fatura: UM botão Pagar sob a face; desligar "Descontar de uma conta" só marca como paga', () => {
+test('Fatura: UM botão Pagar sob a face; "Paguei por fora do app" na MESMA pergunta só marca como paga', () => {
   // 07/10/2026: os botões moravam no fim da lista (rolar 60 compras para pagar) e eram dois, com
   // efeitos diferentes, lado a lado — marcar como paga o que se queria pagar da conta foi o engano.
+  // 08/10/2026: a chave "Descontar de uma conta" e o "Pagar com" viraram UMA pergunta.
   const ui = screen('src/app/finance/invoice/[id].tsx');
   const doca = ui.nodes().find((n: any) => n.type === 'InvoiceDock');
   assert.ok(JSON.stringify(doca.props.children).includes('"Pagar"'), 'o Pagar mora sob a face, no topo');
@@ -1703,9 +1704,12 @@ test('Fatura: UM botão Pagar sob a face; desligar "Descontar de uma conta" só 
     'os dois botões antigos saíram',
   );
   ui.press('Pagar');
-  const chave = ui.nodes().find((n: any) => n.type === 'SwitchRow' && n.props.label === 'Descontar de uma conta');
-  assert.equal(chave.props.value, true, 'descontar da conta é o padrão');
-  ui.interact(() => chave.props.onValueChange(false));
+  assert.ok(!ui.nodes().some((n: any) => n.type === 'SwitchRow'), 'não existe mais a chave separada');
+  const origem = () => ui.nodes().find((n: any) => n.type === 'AccountPicker');
+  assert.equal(origem().props.extraOption.label, 'Paguei por fora do app', 'por fora é uma das respostas da pergunta');
+  const paguei = () => ui.nodes().find((n: any) => n.type === 'Button' && String(n.props.label).startsWith('Paguei'));
+  assert.equal(paguei().props.disabled, true, 'sem escolher de onde saiu, nada é gravado');
+  ui.interact(() => origem().props.onChange(origem().props.extraOption.id));
   assert.ok(!ui.nodes().some((n: any) => n.type === 'MoneyField'), 'só marcando, não há valor a escolher');
   ui.press('Marcar como paga');
   assert.equal(ui.confirmations.length, 0, 'a folha já é a confirmação');
@@ -1714,7 +1718,7 @@ test('Fatura: UM botão Pagar sob a face; desligar "Descontar de uma conta" só 
   assert.equal(ui.writes[0].value.invoiceId, 'invoice-1');
 });
 
-test('Fatura: com a chave ligada o Paguei move o dinheiro (transferência), nunca só marca', () => {
+test('Fatura: escolhida uma conta, o Paguei move o dinheiro (transferência), nunca só marca', () => {
   const ui = screen('src/app/finance/invoice/[id].tsx', { forecastAccounts: [{ id: 'cc', name: 'Conta', type: 'checking' }] });
   ui.press('Pagar');
   const paguei = () => ui.nodes().find((n: any) => n.type === 'Button' && String(n.props.label).startsWith('Paguei'));
@@ -8527,7 +8531,7 @@ test('E se: o rascunho em ordem, separado por período, com o saldo do período 
     && /de 2026/.test(JSON.stringify(n.props.children)));
   assert.deepEqual(cabecalhos.map((n: any) => [].concat(n.props.children)[0]), ['Novembro de 2026', 'Dezembro de 2026']);
   // o saldo do cabeçalho é o da simulação (o rascunho dentro), não o real
-  const saldos = nos.filter((n: any) => n.type === 'Money' && n.props.variant === 'footnote' && n.props.signed).map((n: any) => n.props.cents);
+  const saldos = nos.filter((n: any) => n.type === 'Money' && n.props.variant === 'footnote').map((n: any) => n.props.cents);
   assert.ok(saldos.includes(899000) && saldos.includes(-2201000), `saldos simulados: ${saldos}`);
   assert.ok(!saldos.includes(800000), 'o saldo real (sem o rascunho) não aparece com o rótulo do rascunho');
   // as linhas seguem a ordem dos períodos
