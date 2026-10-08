@@ -605,12 +605,14 @@ abertura curta. Com a trava ligada, `segurarAbertura()` estica o teto para 20 s:
 senha sobre a marca e, confirmada, a tinta sobe DIRETO no app (a trava some por baixo, sem a onda
 dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
 
-**As esperas da cortina contam no relógio da UI thread, nunca em `setTimeout`/rAF** (08/10/2026,
-trilha do iPhone em Release): voltando do Face ID na abertura, todo timer do JS parou (passam pelo
-`RCTTiming`) enquanto o toque e o Reanimated seguiam — a marca terminava e a tinta não subia.
-`esperarNaUi` (`withTiming` + `runOnJS`) é o caminho de `dormir` e `doisQuadros`. Reproduz-se no
-simulador com `diag-congelar-timers` = `"1"` no AsyncStorage (só `__DEV__`): os timers viram no-op
-no `trava:destravou`, e a cortina tem que abrir assim mesmo.
+**Os timers do JS no iOS têm uma rede nativa, e a cortina não depende deles** (08/10/2026,
+trilha do iPhone em Release): voltando do Face ID na abertura, o `RCTTiming` do React Native ficou
+num estado em que nem o display link nem o NSTimer disparam — todo `setTimeout`/`setInterval`/rAF
+do app morreu, enquanto o toque e o Reanimated seguiam. `modules/proops-relogio` arma, na thread
+do JS, um timer de socorro para o próximo alvo + 0,25 s: achando timer vencido, dispara e
+ressincroniza o display link (provado no simulador forçando o mesmo estado; sem disparo em dobro).
+Na cortina, `dormir` e `doisQuadros` contam no relógio da UI (`esperarNaUi`) como segunda camada.
+Ao subir o React Native, ler `modules/proops-relogio/README.md`.
 
 **A marca se DESENHA na abertura** (06/10/2026, pedido do dono do produto): um relógio só de
 1,5 s na UI thread (*"mais suave, devagar, fluido"*) — o contorno de `markPath` por trim, o

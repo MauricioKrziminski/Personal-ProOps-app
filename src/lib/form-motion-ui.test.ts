@@ -170,7 +170,6 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === '@/hooks/use-theme') return { useTheme: () => ({ curtain: '#0B0B0C' }), useScheme: () => 'light' };
       if (id === '@/hooks/use-lock') return { useLock: () => config.lock };
       if (id === '@/lib/trava-na-tela') return travaNaTelaMod;
-      if (id === '@/lib/trilha-da-abertura') return { marcar() {}, congelarTimersSeDiagnostico() {} };
       if (id === '@/components/motion/marca-se-construindo') return { CONSTRUCAO_MS: 1500, MarcaSeConstruindo: () => null };
       if (id === '@/components/motion/session-curtain') return { useCortinaSaindo: () => config.ativo, useCortinaAberta: () => config.aberta ?? false };
       if (id === '@/components/motion/wave-curtain') return { WaveCurtain: 'WaveCurtain' };

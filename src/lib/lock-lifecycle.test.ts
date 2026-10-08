@@ -98,7 +98,6 @@ function mountLock(
     if (name === '@/hooks/use-session') return { useSession: () => ({ session, loading: sessionLoading }) };
     if (name === '../../modules/proops-privacidade') return { protegerAoSair() {} };
     if (name === '@/lib/lock-policy') return policy;
-    if (name === '@/lib/trilha-da-abertura') return { marcar() {}, congelarTimersSeDiagnostico() {} };
     throw new Error(`Unexpected dependency ${name}`);
   });
   function AutoAuthenticateChild() {

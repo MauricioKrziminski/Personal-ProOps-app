@@ -597,8 +597,6 @@ function AppAndHelp() {
   return (
     <Section heading="block" title="Ajuda e app">
       <Row title="Como usar o ProOps" icon="questionmark.circle" onPress={() => router.push('/guia')} />
-      {/* ponytail: diagnóstico temporário da cortina presa (`lib/trilha-da-abertura.ts`) */}
-      <Row title="Diagnóstico da abertura" icon="doc.text" onPress={() => router.push('/profile/diagnostico')} />
       {appUpdate.state.status === 'unsupported' ? null : (
         <Row
           title="Atualização do app"

@@ -15,7 +15,6 @@ import { comTeto } from '@/lib/com-teto';
 import { TETO_DA_TROCA_MS, ondaDaTroca, precisaDeCortina } from '@/lib/session-gate';
 import { carregarSessao } from '@/lib/session-load';
 import { supabase } from '@/lib/supabase';
-import { marcar } from '@/lib/trilha-da-abertura';
 
 interface SessaoMostrada {
   session: Session | null;
@@ -122,7 +121,6 @@ export function SessionProvider({
         tinta fechada: o efeito novo vê a sessão já anotada em `mostrado` e não abre cortina
         nenhuma. A fila (`fila`, um ref) é única e serializa as trocas, então terminar esta é seguro.
       */
-      marcar('sessao:trocar:coberta');
       if (antes !== undefined && antes !== depois) aoTrocarDeUsuario?.();
       setEstado({ session: next, loading: false });
       await doisQuadros();
@@ -138,7 +136,6 @@ export function SessionProvider({
       const depois = next?.user.id ?? null;
       const antes = mostrado.current;
       const comCortina = precisaDeCortina(antes, depois);
-      marcar('sessao:receber', { antes: antes === undefined ? 'indef' : antes ? 'conta' : null, depois: depois ? 'conta' : null, comCortina });
       mostrado.current = depois;
       fila.current = fila.current
         .then(async () => {

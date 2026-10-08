@@ -37,7 +37,6 @@ import {
   type Onda,
   type Ponto,
 } from '@/lib/session-gate';
-import { marcar } from '@/lib/trilha-da-abertura';
 
 import type { CortinaApi } from './session-curtain.types';
 
@@ -56,10 +55,9 @@ const TETO_DO_PREPARO_MS = 4000;
 */
 /*
   ⚠️ **As esperas da cortina contam no relógio da UI thread, nunca em `setTimeout`/rAF**
-  (08/10/2026, trilha do iPhone): voltando do Face ID, TODO timer do JS parou — o `tic` morreu no
-  instante do `active` e o `dormir(0)` nunca resolveu —, enquanto o toque e o Reanimated seguiam
-  vivos. Os dois timers do JS passam pelo `RCTTiming`, e é ele que fica mudo. `withTiming` com
-  callback anda no relógio de quadros do Reanimated e volta ao JS por `runOnJS`, sem `RCTTiming`.
+  (08/10/2026): no iPhone, voltando do Face ID, o `RCTTiming` ficou mudo e TODO timer do JS parou,
+  enquanto o toque e o Reanimated seguiam. A causa é tratada no nativo (`modules/proops-relogio`);
+  aqui é a segunda camada: a cortina não pode depender daquilo que já falhou uma vez.
   `ReduceMotion.Never`: aqui ele é relógio, não animação — com Reduzir Movimento ele pularia ao fim.
 */
 const esperarNaUi = (ms: number) =>
@@ -181,10 +179,8 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
           cancelAnimation(progresso);
           progresso.set(alvo);
           ok();
-          marcar('animar:prazo', { alvo });
         }, ms + FOLGA_DA_ANIMACAO_MS);
         const terminou = () => {
-          marcar('animar:callback', { alvo });
           clearTimeout(prazo);
           ok();
         };
@@ -260,7 +256,6 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   }, [alturaDaTela, animar, cancelarPreparo, progresso]);
 
   const cobrirJa = useCallback(() => {
-    marcar('cortina:cobrirJa');
     coberturaAtual.current = null;
     cancelAnimation(progresso);
     progresso.set(0);
@@ -269,7 +264,6 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
 
   const descobrir = useCallback(
     async (o: Onda, duracao: number) => {
-      marcar('cortina:descobrir', { modo: o.mode, ate: o.ate ?? null });
       coberturaAtual.current = null;
       setOnda(o);
       setFase('revelando');
@@ -280,7 +274,6 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       // As duas metades da transição têm a mesma duração, mesmo com distâncias diferentes.
       const alvo = o.ate === 'capa' ? progressoDaCapa(alturaDaTela) : 1;
       await animar(alvo, duracao);
-      marcar('cortina:aberta');
       setFase('aberta');
       setCamadaMontada(false);
     },
@@ -288,7 +281,6 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   );
 
   const abrirJa = useCallback(() => {
-    marcar('cortina:abrirJa');
     cancelarPreparo();
     coberturaAtual.current = null;
     cancelAnimation(progresso);
@@ -312,7 +304,6 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   const acordar = useRef<(() => void) | null>(null);
 
   const marcarPronto = useCallback((destino: 'app' | 'conta') => {
-    marcar('abertura:marcarPronto', { destino, ja: pronto.current.valor });
     if (pronto.current.valor) return;
     pronto.current.valor = true;
     pronto.current.destino = destino;
@@ -320,7 +311,6 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const segurarAbertura = useCallback(() => {
-    marcar('abertura:segurar', { ja: pronto.current.segurando });
     pronto.current.segurando = true;
     acordar.current?.();
   }, []);
@@ -355,7 +345,6 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     comecou.current = true;
     const desde = Date.now();
     inicioDaAbertura.current = desde;
-    marcar('abertura:inicio');
     construir();
 
     void (async () => {
@@ -363,7 +352,6 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
       // Dorme até o teto OU até alguém avisar (pronto/segurar); o teto é relido a cada volta.
       while (!p.valor) {
         const falta = esperaDaAbertura(desde, Date.now(), p.segurando);
-        marcar('abertura:espera', { falta, segurando: p.segurando });
         if (falta <= 0) break;
         await new Promise<void>((ok) => {
           const timer = setTimeout(ok, falta);
@@ -374,7 +362,6 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
         });
       }
       acordar.current = null;
-      marcar('abertura:saiu-da-espera', { pronto: p.valor, destino: p.destino, ms: Date.now() - desde });
       // A marca não pode ser um lampejo: a passagem "marca → app" acontece em toda abertura
       // (também com Reduzir Movimento — ficar parada na tela não é movimento).
       await dormir(esperaDaMarca(desde, Date.now()));
@@ -386,7 +373,6 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
         Motion.curtain.duration,
       );
       setAberturaFeita(true);
-      marcar('abertura:fim');
     })();
   }, [construir, descobrir]);
 
@@ -398,37 +384,9 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   const sairPorToque = useCallback(() => {
     if (!comecou.current || saiuPorToque.current) return;
     if (Date.now() - inicioDaAbertura.current < TETO_DA_ABERTURA_MS) return;
-    marcar('abertura:saida-por-toque');
     saiuPorToque.current = true;
     abrirJa();
   }, [abrirJa]);
-
-  /*
-    Dois relógios por 60 s desde a montagem (ponytail: diagnóstico temporário): `tic` é o timer do
-    JS (`RCTTiming`), `tic-ui` é o da UI thread. Um parado e o outro andando mostra a janela em que
-    os timers do JS morreram — e se voltam depois de a cortina abrir.
-  */
-  useEffect(() => {
-    let vivo = true;
-    let n = 0;
-    const batida = setInterval(() => {
-      n += 1;
-      marcar('tic', { n });
-      if (n >= 60) clearInterval(batida);
-    }, 1000);
-    const batidaUi = (k: number) => {
-      void esperarNaUi(1000).then(() => {
-        if (!vivo) return;
-        marcar('tic-ui', { n: k });
-        if (k < 60) batidaUi(k + 1);
-      });
-    };
-    batidaUi(1);
-    return () => {
-      vivo = false;
-      clearInterval(batida);
-    };
-  }, []);
 
   const esconderSplash = useCallback(() => {
     const s = splash.current;
@@ -490,7 +448,6 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
   );
 
   const aoLayout = useCallback(() => {
-    marcar('camada:layout', { ja: splash.current.layout });
     splash.current.layout = true;
     esconderSplash();
   }, [esconderSplash]);

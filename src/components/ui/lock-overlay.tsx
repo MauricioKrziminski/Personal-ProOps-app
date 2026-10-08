@@ -44,7 +44,6 @@ import { Motion, Radius, Space } from '@/design/tokens';
 import { useLock } from '@/hooks/use-lock';
 import { useTheme } from '@/hooks/use-theme';
 import { marcarTravaNaTela } from '@/lib/trava-na-tela';
-import { marcar } from '@/lib/trilha-da-abertura';
 
 type EstadoDaTrava = ReturnType<typeof useLock>['estado'];
 
@@ -155,7 +154,6 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
     (`autenticar` recusa a segunda chamada em voo) — é o que torna isto seguro sob o StrictMode.
   */
   useEffect(() => {
-    marcar('trava:cortina-montou');
     void autenticar();
   }, [autenticar]);
 
@@ -173,7 +171,6 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
       Destravou com a abertura ainda cobrindo (a senha pedida sobre a marca): a trava sai na hora,
       por baixo da tinta, e quem conta a passagem é a abertura subindo direto no app.
     */
-    marcar('trava:saindo', { cortinaSaindo });
     if (!cortinaSaindo) {
       onSaiu();
       return;
@@ -189,7 +186,7 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
     const some = Motion.duration.exit;
     const espera = some + marca + Motion.duration.base;
     let vigente = true;
-    const concluir = () => { marcar('trava:saiu', { vigente }); if (vigente) onSaiu(); };
+    const concluir = () => { if (vigente) onSaiu(); };
     painelSai.set(withTiming(1, { duration: some }));
     construcao.set(withDelay(some, withTiming(1, { duration: marca, easing: Easing.linear })));
     progresso.set(

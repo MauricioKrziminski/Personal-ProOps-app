@@ -47,7 +47,6 @@ import {
   type LockDelay,
   type LockMode,
 } from '@/lib/lock-policy';
-import { congelarTimersSeDiagnostico, marcar } from '@/lib/trilha-da-abertura';
 
 /**
  * O módulo nativo — ou `null` quando ele não está neste build.
@@ -219,7 +218,6 @@ export function LockProvider({ children }: { children: ReactNode }) {
       const podeUsar = podeTrancar(nivel);
       const modo = ((m as LockMode) ?? 'off') === 'on' && podeUsar ? 'on' : 'off';
       const espera = (Number(d) === 30 || Number(d) === 60 ? Number(d) : 0) as LockDelay;
-      marcar('trava:preferencia', { modo, nivel, espera });
       if (!vivo) return;
       setMode(modo);
       setDelay(espera);
@@ -294,12 +292,6 @@ export function LockProvider({ children }: { children: ReactNode }) {
     if (Platform.OS === 'web') return;
     vivo.current = true;
     const sub = AppState.addEventListener('change', (s) => {
-      marcar('appstate', {
-        para: s,
-        pedirNaVolta: pedirNaVolta.current,
-        tentativa: tentativaAtual.current ? { autenticada: tentativaAtual.current.autenticada, cancelada: tentativaAtual.current.cancelada } : null,
-        systemUiOpen: vigia.current.systemUiOpen,
-      });
       if (s === 'active') {
         const tentativa = tentativaAtual.current;
         if (tentativa?.autenticada && !tentativa.cancelada) tentativa.aoVoltar?.(true);
@@ -380,10 +372,8 @@ export function LockProvider({ children }: { children: ReactNode }) {
   const emVoo = useRef(false);
 
   const autenticar = useCallback(async () => {
-    marcar('trava:autenticar', { vivo: vivo.current, emVoo: emVoo.current });
     if (!vivo.current || emVoo.current) return 'trancado' as const;
     if (AppState.currentState !== 'active') {
-      marcar('trava:autenticar:fica-para-a-volta');
       pedirNaVolta.current = true;
       return 'trancado' as const;
     }
@@ -413,7 +403,6 @@ export function LockProvider({ children }: { children: ReactNode }) {
           })
         : { success: false as const };
       const saida = aposAutenticar(r);
-      marcar('trava:resultado', { saida, erro: 'error' in r ? r.error : null, cancelada: tentativa.cancelada });
       if (tentativa.cancelada) return 'trancado' as const;
       if (saida === 'aberto') {
         tentativa.autenticada = true;
@@ -426,19 +415,15 @@ export function LockProvider({ children }: { children: ReactNode }) {
             new Promise<boolean>((resolve) => { tentativa.aoVoltar = resolve; }),
             new Promise<boolean>((resolve) => setTimeout(() => resolve(AppState.currentState === 'active'), ESPERA_DO_ACTIVE_MS)),
           ]);
-          marcar('trava:espera-do-active', { permitir, cancelada: tentativa.cancelada });
           if (!permitir || tentativa.cancelada || AppState.currentState !== 'active') return 'trancado' as const;
         }
-        marcar('trava:destravou');
-        congelarTimersSeDiagnostico();
         setLocked(false);
       }
       // Falhou FICA falhado: o botão passa a dizer "Tentar de novo" e a cortina diz o porquê.
       // Voltar sozinho para `trancado` apagaria a única pista de que a tentativa aconteceu.
       setEstado(saida === 'aberto' ? 'trancado' : 'falhou');
       return saida;
-    } catch (erro) {
-      marcar('trava:excecao', { erro: String(erro) });
+    } catch {
       if (!tentativa.cancelada) setEstado('falhou');
       return 'trancado' as const;
     } finally {
