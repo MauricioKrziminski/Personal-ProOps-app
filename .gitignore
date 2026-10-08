@@ -76,3 +76,4 @@ docs/verification/
 
 # Cache de resultados das suítes de avaliação (agent/scripts/eval_cache.py)
 agent/.eval-cache/
+scripts/__pycache__/
