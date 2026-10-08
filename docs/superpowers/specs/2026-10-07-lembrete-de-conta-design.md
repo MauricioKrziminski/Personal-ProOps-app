@@ -208,10 +208,13 @@ pela última migration) e acrescenta só o `not exists`. Suíte SQL inteira depo
 
 ## Adendo 09/10/2026 — precedência e parcela da dívida (`20261009130000`)
 
-- **O mais específico substitui o mais geral NAQUELE vencimento**, por espaço: fatura direta >
-  uma ocorrência / uma parcela da dívida > série, compra, dívida inteira. No cartão, um "Só esta"
-  numa compra (ou o lembrete da própria fatura) cala o da série/compra para aquela fatura. Não é
-  silenciar: apagar o "Só esta" devolve o da série.
+- **"Só esta" substitui o lembrete da PRÓPRIA série/compra naquela ocorrência**, e "só a Nª" o da
+  dívida inteira naquela parcela. Não é silenciar: apagar o "Só esta" devolve o da série.
+- **No cartão, compra e fatura são coisas diferentes** (`20261009150000`, *"só esta no cartão não
+  tem que valer para a fatura inteira"*): o lembrete de uma compra (só esta, série ou parcelada)
+  avisa da COMPRA — nome e valor dela, no vencimento da fatura em que cai, "Netflix (fatura
+  Nubank)" — e abre o lançamento; o lembrete da fatura é da fatura. Um não cala o outro, e o aviso
+  automático da fatura só cala pelo lembrete da fatura.
 - **Um aviso por coisa a pagar**: lembretes que chegam ao mesmo vencimento, para a mesma pessoa,
   no mesmo dia e hora saem uma vez, com os canais somados; "já enviado" vale para todo lembrete
   que cobria aquele vencimento naquela hora (criar o "Só esta" depois do envio não reenvia).

@@ -137,11 +137,18 @@ begin
   assert (select count(distinct invoice_id) from public.transactions where account_id = cartao) = 1, 'fixture: as duas compras na mesma fatura';
   insert into public.bill_reminders (workspace_id, user_id, recurring_id, days_before, at_time, channel)
   values (ws, u, serie2, 0, '00:00', 'push');
-  select count(*) into n from private.bill_reminder_dues(array[ws]) d where d.target = 'invoice' and d.ref = fatura;
-  assert n = 1, format('fatura devia aparecer UMA vez, veio %s', n);
-  update public.card_invoices set status = 'paid' where id = fatura;
+  -- a compra é a compra (não a fatura): cada uma avisa dela, no vencimento da fatura em que cai
+  select count(*) into n from private.bill_reminder_dues(array[ws]) d
+  where d.target = 'transaction' and d.ref in (select id from public.transactions where invoice_id = fatura)
+    and d.due_date = (select due_date from public.card_invoices where id = fatura)
+    and d.title = 'Streaming BL (fatura Cartão BL)';
+  assert n = 2, format('cada compra devia avisar dela, veio %s', n);
   select count(*) into n from private.bill_reminder_dues(array[ws]) d where d.ref = fatura;
-  assert n = 0, 'fatura paga não toca';
+  assert n = 0, 'o lembrete da compra não vira lembrete da fatura';
+  update public.card_invoices set status = 'paid' where id = fatura;
+  select count(*) into n from private.bill_reminder_dues(array[ws]) d
+  where d.ref in (select id from public.transactions where invoice_id = fatura);
+  assert n = 0, 'compra de fatura paga não toca';
 
   -- 5) financiamento: "todas" expande o cronograma; "só a nº N" só ela
   insert into public.debts (workspace_id, user_id, name, kind, principal_cents, remaining_cents, installments, installment_cents, due_day, account_id)
@@ -171,10 +178,10 @@ begin
   values (ws, u, tx2, 0, '09:00', 'push');
   select count(*) into n from public._alerts_to_send() a where a.kind = 'bill_due' and a.ref = tx2::text;
   assert n = 0, 'com lembrete próprio, o automático cala';
-  -- fatura: coberta por uma ocorrência dentro dela (a série2 tem lembrete "todas")
+  -- fatura: o lembrete de uma compra dela NÃO cala o automático da fatura (são coisas diferentes)
   update public.card_invoices set status = 'open', due_date = hoje + 2 where id = fatura;
   select count(*) into n from public._alerts_to_send() a where a.kind = 'invoice_due' and a.ref = fatura::text;
-  assert n = 0, 'fatura com compra coberta não recebe o automático';
+  assert n = 1, 'lembrete de compra não cala o automático da fatura';
   delete from public.bill_reminders where recurring_id = serie2;
   select count(*) into n from public._alerts_to_send() a where a.kind = 'invoice_due' and a.ref = fatura::text;
   assert n = 1, 'sem lembrete, a fatura recebe o automático';
@@ -232,10 +239,9 @@ begin
     join public.bill_reminders b on b.id = d.bill_reminder_id where b.recurring_id = serie;
   assert n = 2, 'tirado o "só esta", a série volta a valer na ocorrência';
 
-  -- 12) cartão: duas séries na mesma fatura, mesmo dia e hora = UM aviso, canais somados;
-  --     "só esta" numa compra cala as séries NAQUELA fatura; enviado não re-dispara
+  -- 12) cartão: compra e fatura são coisas diferentes
   declare
-    cartao2 uuid; sa uuid; sb uuid; fat2 uuid; linha_a uuid;
+    cartao2 uuid; sa uuid; sb uuid; fat2 uuid; linha_a uuid; linha_b uuid; so uuid;
   begin
     insert into public.accounts (workspace_id, user_id, name, type, closing_day, due_day)
     values (ws, u, 'Cartão BL2', 'credit_card', 1, 10) returning id into cartao2;
@@ -246,39 +252,41 @@ begin
     insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, recurring_id, source)
     values (ws, u, 'expense', 1000, 'Série A BL', hoje, 'pending', cartao2, sa, 'recurring') returning id into linha_a;
     insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, recurring_id, source)
-    values (ws, u, 'expense', 2000, 'Série B BL', hoje, 'pending', cartao2, sb, 'recurring');
+    values (ws, u, 'expense', 2000, 'Série B BL', hoje, 'pending', cartao2, sb, 'recurring') returning id into linha_b;
     select invoice_id into fat2 from public.transactions where id = linha_a;
     assert (select count(distinct invoice_id) from public.transactions where account_id = cartao2) = 1, 'fixture: mesma fatura';
     update public.card_invoices set status = 'open', due_date = hoje where id = fat2;
     insert into public.bill_reminders (workspace_id, user_id, recurring_id, days_before, at_time, channel)
     values (ws, u, sa, 0, '00:00', 'push'), (ws, u, sb, 0, '00:00', 'whatsapp');
-    select count(*) into n from public._bill_reminders_due() d where d.ref = fat2;
-    assert n = 1, format('duas séries na mesma fatura, mesma hora: devia sair 1 aviso, veio %s', n);
-    assert (select d.channel from public._bill_reminders_due() d where d.ref = fat2) = 'both', 'canais deviam somar';
-    -- enviado pelo representante: nenhum lembrete daquele vencimento/hora toca de novo
-    insert into private.bill_reminder_sends (bill_reminder_id, due_date, sent_at)
-    select d.bill_reminder_id, d.due_date, now() from public._bill_reminders_due() d where d.ref = fat2;
-    select count(*) into n from public._bill_reminders_due() d where d.ref = fat2;
-    assert n = 0, 'enviado não pode tocar de novo pelo outro lembrete do grupo';
-    -- apagar o lembrete que enviou não faz o outro reenviar: o livro de envios não some junto
-    delete from public.bill_reminders b using private.bill_reminder_sends s
-    where s.bill_reminder_id = b.id and s.due_date = hoje and b.recurring_id in (sa, sb);
-    assert (select count(*) from public.bill_reminders where recurring_id in (sa, sb)) = 1, 'fixture: sobrou um';
-    select count(*) into n from public._bill_reminders_due() d where d.ref = fat2;
-    assert n = 0, format('apagado o que enviou, o outro não reenvia (veio %s)', n);
-    -- "só esta" na compra A, mesma hora, criado depois do envio: cala as séries e não reenvia
+    -- duas séries na mesma fatura, mesma hora: DOIS avisos, um de cada compra, com o nome e o valor dela
+    select count(*) into n from public._bill_reminders_due() d where d.ref in (linha_a, linha_b);
+    assert n = 2, format('cada compra avisa dela mesma, veio %s', n);
+    assert (select d.title || '|' || d.amount_cents || '|' || d.channel from public._bill_reminders_due() d where d.ref = linha_a)
+      = 'Série A BL (fatura Cartão BL2)|1000|push', 'aviso da compra A';
+    -- "só esta" na compra A substitui só a série A, naquela compra; a B segue com a dela
     insert into public.bill_reminders (workspace_id, user_id, transaction_id, days_before, at_time, channel)
-    values (ws, u, linha_a, 0, '00:00', 'push');
-    select count(*) into n from private.bill_reminder_dues(array[ws]) d where d.ref = fat2;
-    assert n = 1, format('com "só esta" na fatura, só ele devia valer, veio %s', n);
-    select count(*) into n from public._bill_reminders_due() d where d.ref = fat2;
-    assert n = 0, format('"só esta" criado depois do envio, mesma hora: não reenvia (veio %s)', n);
-    -- lembrete da própria fatura vence o "só esta" da compra
-    insert into public.bill_reminders (workspace_id, user_id, invoice_id, days_before, at_time, channel)
-    values (ws, u, fat2, 1, '08:00', 'push');
+    values (ws, u, linha_a, 1, '08:00', 'push') returning id into so;
+    select count(*) into n from private.bill_reminder_dues(array[ws]) d where d.ref = linha_a;
+    assert n = 1, format('compra A: só o "só esta", veio %s', n);
+    assert (select d.bill_reminder_id from private.bill_reminder_dues(array[ws]) d where d.ref = linha_a) = so, 'quem vale na A é o "só esta"';
     select count(*) into n from private.bill_reminder_dues(array[ws]) d
-      join public.bill_reminders b on b.id = d.bill_reminder_id where d.ref = fat2 and b.invoice_id is null;
-    assert n = 0, 'o lembrete da fatura devia calar os das compras';
+      join public.bill_reminders b on b.id = d.bill_reminder_id where d.ref = linha_b and b.recurring_id = sb;
+    assert n = 1, '"só esta" numa compra não cala a série de OUTRA compra da fatura';
+    -- o lembrete da fatura é dela: não cala nem é calado pelos das compras
+    insert into public.bill_reminders (workspace_id, user_id, invoice_id, days_before, at_time, channel)
+    values (ws, u, fat2, 0, '00:00', 'push');
+    select count(*) into n from private.bill_reminder_dues(array[ws]) d where d.ref = fat2 and d.target = 'invoice';
+    assert n = 1, 'a fatura avisa dela';
+    select count(*) into n from private.bill_reminder_dues(array[ws]) d where d.ref in (linha_a, linha_b);
+    assert n = 2, 'as compras continuam com os delas';
+    -- enviado: tirar o "só esta" não faz a série A reenviar o mesmo aviso (livro de envios)
+    delete from public.bill_reminders where id = so;
+    insert into private.bill_reminder_sends (bill_reminder_id, due_date, sent_at)
+    select d.bill_reminder_id, d.due_date, now() from public._bill_reminders_due() d where d.ref = linha_a;
+    insert into public.bill_reminders (workspace_id, user_id, transaction_id, days_before, at_time, channel)
+    values (ws, u, linha_a, 0, '00:00', 'whatsapp') returning id into so;
+    select count(*) into n from public._bill_reminders_due() d where d.ref = linha_a;
+    assert n = 0, format('mesmo aviso já enviado pela série: o "só esta" não reenvia (veio %s)', n);
   end;
 
   -- 13) dívida inteira + "só a Nª": a parcela toca UMA vez, pelo lembrete dela
