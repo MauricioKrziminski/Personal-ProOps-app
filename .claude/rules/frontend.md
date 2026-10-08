@@ -352,6 +352,8 @@ Dívidas), costurados por `?de=`, "Voltar" e `dismiss(2)`. Hoje é uma tela moda
   parcelas que já existem. "Aplicar" no "E se…?" abre `/finance/aplicar-adiantamento?grupo=`
   (parcelas cobertas, título, valor com o desconto, data e conta) e o lançamento dele reabre a
   mesma tela por `?id=` (`hrefDoLancamento`); apagar pergunta "Desfazer o adiantamento?", sem alcance.
+  Com hipóteses, ciclo, fatura e "Como chego nesse valor" leem a simulação inteira
+  (`useRegistrosSimulados` → `useCicloSimulado`/`useDetalheSimulado`), nunca o real com remendo.
 
 ### Formulário num `Sheet` que OUTRA tela abriu devolve para ela ao fechar
 

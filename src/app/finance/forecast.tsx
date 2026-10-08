@@ -70,6 +70,7 @@ import {
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
 import {
   agruparHipoteses,
+  contaDoAdiantamento,
   draftsDoAdiantamento,
   quantasQueCabem,
   faltamDepois,
@@ -251,6 +252,8 @@ export default function ForecastScreen() {
   const [adiantarQtd, setAdiantarQtd] = useState(1);
   const [adiantarQuais, setAdiantarQuais] = useState<Quais>('ultimas');
   const [adiantarValor, setAdiantarValor] = useState<number | null>(null);
+  /** `undefined` = a conta da origem (o padrão); `null` = "sem conta", escolhido. */
+  const [adiantarConta, setAdiantarConta] = useState<string | null | undefined>(undefined);
   /**
    * O que está aberto para edição: o `id` da hipótese, ou o `grupo` do adiantamento; `null` = a
    * folha cria. Editar um adiantamento TROCA os drafts dele no mesmo lugar (`substituirGrupo`) — um
@@ -350,6 +353,7 @@ export default function ForecastScreen() {
   const qtdAdiantar = quantasQueCabem(itemAdiantar, adiantarQtd);
   const parcelasAdiantar = itemAdiantar ? escolherParcelas(itemAdiantar, qtdAdiantar, adiantarQuais) : [];
   const valorAdiantar = adiantarValor ?? valorSugerido(parcelasAdiantar);
+  const contaAdiantar = contaDoAdiantamento({ conta: adiantarConta }, itemAdiantar);
   /** O que falta na hipótese da folha, em uma frase — o botão desligado diz por quê. */
   const faltaNaFolha = tipoDaFolha === 'hipotese' ? faltaNaHipotese(hipotese) : null;
   const podeAplicar = tipoDaFolha === 'adiantar'
@@ -366,7 +370,7 @@ export default function ForecastScreen() {
   const grupoDaPrevia = editando ?? 'previa';
   const candidata = sheetAberto && tipoDaFolha === 'hipotese' && faltaNaFolha === null ? hipotese : null;
   const draftsDaPrevia = sheetAberto && tipoDaFolha === 'adiantar' && itemAdiantar && podeAplicar
-    ? draftsDoAdiantamento(itemAdiantar, parcelasAdiantar, valorAdiantar, pagarEm, grupoDaPrevia, { quantas: qtdAdiantar, quais: adiantarQuais })
+    ? draftsDoAdiantamento(itemAdiantar, parcelasAdiantar, valorAdiantar, pagarEm, grupoDaPrevia, { quantas: qtdAdiantar, quais: adiantarQuais, conta: contaAdiantar })
     : null;
   const dataDaPrevia = candidata ? dataDaHipotese(candidata) : draftsDaPrevia ? pagarEm : null;
   const pedidoDaPrevia = dataDaPrevia
@@ -655,7 +659,7 @@ export default function ForecastScreen() {
         return;
       }
       const novos = draftsDoAdiantamento(itemAdiantar, parcelasAdiantar, valorAdiantar, pagarEm, grupo,
-        { quantas: qtdAdiantar, quais: adiantarQuais });
+        { quantas: qtdAdiantar, quais: adiantarQuais, conta: contaAdiantar });
       setAdiantamentos((antes) => (editando ? substituirGrupo(antes, editando, novos) : [...antes, ...novos]));
       // O ganho de adiantar "as últimas" está no FIM do contrato: a janela vai até a última
       // parcela tirada, senão a projeção mostraria só o custo.
@@ -663,6 +667,7 @@ export default function ForecastScreen() {
       Haptics.selectionAsync();
       setAdiantarId(null);
       setAdiantarValor(null);
+      setAdiantarConta(undefined);
       if (fecha) {
         fecharFolha();
         setModoDaHipotese('mes');
@@ -702,6 +707,7 @@ export default function ForecastScreen() {
     setMesAdiantar(currentMonth());
     setAdiantarId(null);
     setAdiantarValor(null);
+    setAdiantarConta(undefined);
     setSheetAberto(true);
   };
 
@@ -723,6 +729,7 @@ export default function ForecastScreen() {
     setAdiantarQuais(d.adiantar.quais);
     // o valor que a pessoa aprovou — escolher outra coisa volta à sugestão
     setAdiantarValor(d.amount_cents);
+    setAdiantarConta(d.adiantar.conta);
     setSheetAberto(true);
   };
 
@@ -862,7 +869,12 @@ export default function ForecastScreen() {
   const linhaDoAdiantamento = (chave: string, d: Draft) => {
     const titulo = `Sai ${brl(d.amount_cents)} · ${d.rotulo ?? 'adiantamento'} · em ${isoToBR(d.start)}`;
     const resto = faltam.get(chave);
-    const subtitulo = resto === undefined ? undefined : resto === 0 ? 'quita tudo' : `faltam ${resto}`;
+    // A simulação grava o adiantamento como o "Aplicar" (08/10/2026): o que não dá para gravar não
+    // entra no número, e a linha diz por quê em vez de somar em silêncio.
+    const problema = simulacao.mudaram.includes(chave)
+      ? 'as parcelas mudaram: edite ou tire'
+      : simulacao.errosDosAdiantamentos[chave];
+    const subtitulo = problema ?? (resto === undefined ? undefined : resto === 0 ? 'quita tudo' : `faltam ${resto}`);
     // Aplicar (08/10/2026): a confirmação do adiantamento, que grava UM lançamento.
     const acoes: ItemAction[] = [
       { label: 'Aplicar', icon: 'checkmark.circle', arrasto: 'direita',
@@ -875,6 +887,7 @@ export default function ForecastScreen() {
         <Row
           title={titulo}
           subtitle={subtitulo}
+          destructive={Boolean(problema)}
           onPress={() => editarAdiantamento(chave, d)}
           onLongPress={() => showItemActions(titulo, acoes)}
           accessibilityLabel={`Hipótese: ${titulo}${subtitulo ? `. ${subtitulo}` : ''}`}
@@ -1361,7 +1374,11 @@ export default function ForecastScreen() {
                 setAdiantarQtd(1);
                 setAdiantarQuais('ultimas');
                 setAdiantarValor(null);
+                setAdiantarConta(undefined);
               }}
+              contas={accounts.data ?? []}
+              conta={contaAdiantar}
+              onConta={setAdiantarConta}
               quantas={qtdAdiantar}
               onQuantas={(n) => {
                 setAdiantarQtd(n);
@@ -1444,6 +1461,7 @@ export default function ForecastScreen() {
         month={detalheDoMes?.mes ?? localISODate()}
         view={regua.view}
         rascunho={simulando ? detalheDoMes?.saldo : null}
+        registros={simulando ? simulacao.registros : undefined}
       />
     </Screen>
   );

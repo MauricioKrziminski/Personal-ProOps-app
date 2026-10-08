@@ -29,6 +29,8 @@ export type Adiantavel = {
   ref_id: string;
   title: string;
   account_name: string | null;
+  /** A conta da origem (compra, dívida, série): o padrão de "Conta ou cartão" (20261010140000). */
+  account_id?: string | null;
   total_n: number | null;
   taxa: number | null;
   events: ParcelaAdiantavel[];
@@ -97,7 +99,16 @@ export type DraftDeAdiantamento = {
   adiantar?: EscolhaDeAdiantamento;
 };
 
-export type EscolhaDeAdiantamento = { ref_id: string; quantas: number; quais: Quais };
+export type EscolhaDeAdiantamento = {
+  ref_id: string;
+  quantas: number;
+  quais: Quais;
+  /**
+   * De onde sai o dinheiro (08/10/2026). `undefined` = rascunho de antes do campo: vale a conta da
+   * origem; `null` = "sem conta", escolhido.
+   */
+  conta?: string | null;
+};
 
 /**
  * A hipótese inteira: pagar `valor` em `pagarEm` e desfazer cada parcela escolhida no dia dela.
@@ -360,4 +371,68 @@ export function apoioDoAdiantamento(
 /** O dia que o "Aplicar" sugere: o da hipótese, nunca antes de hoje. */
 export function diaDoAplicar(pagarEm: string, hoje: string): string {
   return pagarEm < hoje ? hoje : pagarEm;
+}
+
+/** O pedido de `apply_anticipation` que a simulação grava (o "Aplicar" sem a tela). */
+export type RegistroDoAdiantamento = {
+  tipo: 'adiantamento';
+  dados: {
+    source: FonteAdiantavel;
+    ref_id: string;
+    paid_on: string;
+    amount_cents: number;
+    account_id: string | null;
+    description: string;
+    parcelas: ReturnType<typeof pedidoDasParcelas>;
+  };
+};
+
+type DraftDoPagamento = DraftLido & { amount_cents: number; adiantar?: EscolhaDeAdiantamento };
+
+/** A conta do adiantamento: a escolhida, ou a da origem no rascunho de antes do campo. */
+export function contaDoAdiantamento(escolha: Pick<EscolhaDeAdiantamento, 'conta'> | undefined, item: Pick<Adiantavel, 'account_id'> | null): string | null {
+  return escolha?.conta !== undefined ? escolha.conta : (item?.account_id ?? null);
+}
+
+/**
+ * A Projeção com hipóteses é o real com as hipóteses GRAVADAS (08/10/2026, *"a projeção tem que ser
+ * exatamente como se fosse o ambiente real com as hipóteses sendo lançamentos reais"*): cada
+ * adiantamento do rascunho vira o MESMO pedido do "Aplicar", que `simular` grava e desfaz. Em
+ * ordem de pagamento. `candidatos` é a lista do banco a partir de hoje; o grupo cujas parcelas
+ * não estão mais nela (pagas, mudaram) vai em `mudaram` e não entra na simulação.
+ */
+export function registrosDosAdiantamentos(
+  drafts: readonly (DraftLido & { amount_cents?: number })[],
+  candidatos: readonly Adiantavel[],
+  hoje: string,
+): { registros: RegistroDoAdiantamento[]; grupos: string[]; mudaram: string[] } {
+  const pagamentos = (drafts.filter((d) => d.adiantar && d.grupo) as DraftDoPagamento[])
+    .sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+  const registros: RegistroDoAdiantamento[] = [];
+  const grupos: string[] = [];
+  const mudaram: string[] = [];
+  for (const p of pagamentos) {
+    const grupo = p.grupo!;
+    const item = candidatos.find((c) => c.ref_id === p.adiantar!.ref_id) ?? null;
+    const dias = drafts.filter((d) => d.mode === 'cancel' && d.grupo === grupo).map((d) => d.start);
+    const parcelas = item ? parcelasDoGrupo(item, dias) : null;
+    if (!item || !parcelas || parcelas.length === 0) {
+      mudaram.push(grupo);
+      continue;
+    }
+    registros.push({
+      tipo: 'adiantamento',
+      dados: {
+        source: item.source,
+        ref_id: item.ref_id,
+        paid_on: diaDoAplicar(p.start, hoje),
+        amount_cents: p.amount_cents,
+        account_id: contaDoAdiantamento(p.adiantar, item),
+        description: tituloDoAdiantamento(item.source, parcelas.length, item.title),
+        parcelas: pedidoDasParcelas(item.source, parcelas),
+      },
+    });
+    grupos.push(grupo);
+  }
+  return { registros, grupos, mudaram };
 }

@@ -89,3 +89,13 @@ test('a abertura segura a marca pela trava sem esperar as fontes', () => {
   assert.doesNotMatch(aviso, /if \(!pronto \|\| carregando\) return;/);
   assert.match(aviso, /cortina\.segurarAbertura\(\);\s*else if \(pronto\) cortina\.marcarPronto/);
 });
+
+test('a simulação grava o adiantamento e não o manda de novo como desconto ao motor de caixa', () => {
+  // 08/10/2026: com o adiantamento GRAVADO em `simular` e também em `drafts`, a parcela sairia duas
+  // vezes da projeção. As leituras de caixa da simulação não recebem draft nenhum.
+  const fonte = readFileSync('src/hooks/use-finance.ts', 'utf8');
+  const sim = fonte.slice(fonte.indexOf('export function useSimulacao('), fonte.indexOf('export function useConverterRegistro('));
+  assert.match(sim, /useRegistrosSimulados\(/);
+  assert.doesNotMatch(sim, /paraOBanco\(o\.adiantamentos\)/);
+  assert.equal((sim.match(/drafts: \[\]/g) ?? []).length, 2, 'forecast e meses sem drafts');
+});

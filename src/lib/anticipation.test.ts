@@ -21,6 +21,7 @@ import {
   oQueOAdiantamentoCobriu,
   apoioDoAdiantamento,
   diaDoAplicar,
+  registrosDosAdiantamentos,
   type Adiantavel,
 } from './anticipation.ts';
 
@@ -233,4 +234,27 @@ test('aplicar: título, o que cobriu e o desconto', () => {
   assert.equal(apoioDoAdiantamento(a, 5100, 5000, brl), 'adiantamento · parcelas 5 a 6 · R$ 1.00 a mais');
   assert.equal(diaDoAplicar('2026-09-01', '2026-10-08'), '2026-10-08');
   assert.equal(diaDoAplicar('2026-12-01', '2026-10-08'), '2026-12-01');
+});
+
+test('simulação: cada adiantamento vira o pedido do Aplicar, em ordem; o que mudou fica de fora', () => {
+  const mac: Adiantavel = {
+    source: 'plan', ref_id: 'mac', title: 'Mac', account_name: 'Nubank', account_id: 'nu', total_n: 10, taxa: null,
+    events: ['2026-11-10', '2026-12-10', '2027-01-10'].map((day, i) => ({ n: 8 + i, day, cents: 50000, pv_cents: 50000, id: `t${8 + i}`, on: day })),
+  };
+  const g2 = draftsDoAdiantamento(mac, mac.events.slice(2), 48000, '2026-12-01', 'g2', { quantas: 1, quais: 'ultimas', conta: null });
+  const g1 = draftsDoAdiantamento(mac, mac.events.slice(1, 2), 49000, '2026-11-01', 'g1');
+  const sumiu = draftsDoAdiantamento({ ...mac, ref_id: 'outra' }, mac.events.slice(0, 1), 100, '2026-11-01', 'g3');
+  const r = registrosDosAdiantamentos([...g2, ...g1, ...sumiu], [mac], '2026-10-08');
+  assert.deepEqual(r.grupos, ['g1', 'g2'], 'pela data do pagamento');
+  assert.deepEqual(r.mudaram, ['g3'], 'a fonte que não está mais na lista não simula');
+  assert.deepEqual(r.registros[0].dados, {
+    source: 'plan', ref_id: 'mac', paid_on: '2026-11-01', amount_cents: 49000, account_id: 'nu',
+    description: 'Adiantamento de 1 parcela de Mac', parcelas: [{ id: 't9' }],
+  }, 'sem conta escolhida (rascunho antigo): a da origem');
+  assert.equal(r.registros[1].dados.account_id, null, '"sem conta" escolhido fica sem conta');
+  // parcela que não existe mais na lista: o grupo mudou
+  const pago = { ...mac, events: mac.events.slice(0, 2) };
+  assert.deepEqual(registrosDosAdiantamentos(g2, [pago], '2026-10-08').mudaram, ['g2']);
+  // pagamento num mês que já passou: paga hoje, como o Aplicar
+  assert.equal(registrosDosAdiantamentos(g1, [mac], '2026-11-05').registros[0].dados.paid_on, '2026-11-05');
 });

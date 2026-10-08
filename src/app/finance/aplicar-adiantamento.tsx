@@ -23,6 +23,7 @@ import {
 } from '@/hooks/use-finance';
 import { useRascunho } from '@/hooks/use-rascunho';
 import {
+  contaDoAdiantamento,
   diaDoAplicar,
   parcelasDoGrupo,
   pedidoDasParcelas,
@@ -82,8 +83,9 @@ export default function AplicarAdiantamento() {
       return { titulo: t.description ?? '', valor: Number(t.amount_cents), dataBR: isoToBR(t.occurred_at), conta: t.account_id };
     }
     if (pagamento && item && daHipotese) {
-      const daOrigem = accounts.data?.find((a) => a.name === item.account_name && !a.archived);
-      const contaPadrao = item.source === 'debt' && daOrigem?.type === 'credit_card' ? null : daOrigem?.id ?? null;
+      // A conta escolhida na hipótese (ou a da origem, no rascunho de antes do campo).
+      const escolhida = accounts.data?.find((a) => a.id === contaDoAdiantamento(pagamento.adiantar, item) && !a.archived);
+      const contaPadrao = item.source === 'debt' && escolhida?.type === 'credit_card' ? null : escolhida?.id ?? null;
       return {
         titulo: tituloDoAdiantamento(item.source, daHipotese.length, item.title),
         valor: pagamento.amount_cents,
@@ -113,15 +115,14 @@ export default function AplicarAdiantamento() {
     : !valores.titulo.trim() ? 'Dê um título'
     : valores.valor <= 0 ? 'Informe quanto você pagou'
     : !dataISO ? 'Escolha a data'
-    : !conta ? 'Escolha de onde saiu o dinheiro'
     : null;
 
   const salvar = () => {
-    if (falta || !valores || !conta || !fonte) return;
+    if (falta || !valores || !fonte) return;
     const aoErrar = (e: unknown) => toast({ message: financeErrorMessage(e, 'Não deu para salvar o adiantamento.'), tone: 'error' });
     if (editando && params.id) {
       editar.mutate(
-        { id: params.id, description: valores.titulo.trim(), amount_cents: valores.valor, paid_on: dataISO, account_id: conta.id },
+        { id: params.id, description: valores.titulo.trim(), amount_cents: valores.valor, paid_on: dataISO, account_id: conta?.id ?? null },
         { onSuccess: () => { toast({ message: 'Adiantamento salvo.', tone: 'success' }); router.back(); }, onError: aoErrar },
       );
       return;
@@ -130,7 +131,7 @@ export default function AplicarAdiantamento() {
     aplicar.mutate(
       {
         source: item.source, ref_id: item.ref_id, paid_on: dataISO, amount_cents: valores.valor,
-        account_id: conta.id, description: valores.titulo.trim(), parcelas: pedidoDasParcelas(item.source, daHipotese),
+        account_id: conta?.id ?? null, description: valores.titulo.trim(), parcelas: pedidoDasParcelas(item.source, daHipotese),
       },
       {
         onSuccess: () => {
@@ -153,7 +154,8 @@ export default function AplicarAdiantamento() {
   const diferenca = valores ? soma - valores.valor : 0;
   const quais = editando ? (registro?.modo === 'proximas' ? 'proximas' : 'ultimas') : pagamento?.adiantar?.quais;
   const efeito = efeitoDoAdiantamento(fonte, quais, cobertas.length);
-  const quando = !conta || !dataISO ? null
+  const quando = !dataISO ? null
+    : !conta ? 'Fica fora de conta e de fatura.'
     : conta.type === 'credit_card' ? `Entra na fatura do ${conta.name}.`
     : dataISO <= hoje ? `Entra como pago em ${isoToBR(dataISO)}.`
     : `Fica para pagar em ${isoToBR(dataISO)}.`;
@@ -203,13 +205,13 @@ export default function AplicarAdiantamento() {
               invalid={!dataISO}
             />
           </Field>
-          <Field label="De onde saiu o dinheiro" obrigatorio hint={quando ?? undefined}>
+          <Field label="De onde saiu o dinheiro" hint={quando ?? undefined}>
             <AccountPicker
               financialContext
               accounts={contas}
               value={valores.conta}
               onChange={(id) => setForm({ ...valores, conta: id })}
-              placeholder="Escolher a conta"
+              emptyLabel="Sem conta"
             />
           </Field>
           {falta && falta !== 'Carregando' ? <Note tone="warning">{falta}</Note> : null}

@@ -902,7 +902,6 @@ const FORA_DE_PROPOSITO: Record<string, string> = {
   // Histórico de alertas enviados: não deriva do ledger, tem vida própria no cron.
   'alerts-sent': 'não é derivada de lançamento',
   // As ocorrências das hipóteses do rascunho no ciclo: aritmética do rascunho, não lê lançamento.
-  'draft-lines': 'não lê lançamento, só o rascunho',
   // O fluxo de importação é dono do próprio ciclo (lote → itens → conciliação) e invalida sozinho.
   'import-batches': 'o fluxo de importação invalida as próprias etapas',
   'import-batch': 'idem',

@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Radius, Space, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
-import { type CycleView, useCycleBreakdown } from '@/hooks/use-finance';
+import { type CycleView, type RegistroParaSimular, useCycleBreakdown, useDetalheSimulado } from '@/hooks/use-finance';
 import { isoToBR } from '@/lib/dates';
 import { rotulosDoDetalhe, saidasPorBalde } from '@/lib/detalhe-do-ciclo';
 import type { Explicacao } from '@/lib/explicacoes';
@@ -19,9 +19,10 @@ import type { Explicacao } from '@/lib/explicacoes';
  * "Como chego nesse valor" (07/10/2026): a folha que abre ao tocar no número do ciclo.
  *
  * Partida (conta por conta no ciclo aberto) + o que entra − o que sai = o número tocado. Tudo vem
- * de `cycle_breakdown`, das mesmas fontes do número. `rascunho` é para a tela que soma hipóteses
- * (que o banco não conhece): ela passa o número que MOSTRA, e a diferença vira a linha
- * "Hipóteses do rascunho" — a conta continua fechando no número tocado.
+ * de `cycle_breakdown`, das mesmas fontes do número. Com o rascunho (`registros`, 08/10/2026), a
+ * MESMA leitura roda dentro de `simular`, com tudo gravado: as partes já trazem as hipóteses. O
+ * `rascunho` (o número que a tela MOSTRA) segue como rede: o que ainda diferir vira a linha
+ * "Hipóteses do rascunho", e a conta fecha no número tocado.
  */
 export function DetalheDoCicloSheet({
   visible,
@@ -29,6 +30,7 @@ export function DetalheDoCicloSheet({
   month,
   view,
   rascunho,
+  registros,
   explicacao,
   atalhos = [],
 }: {
@@ -39,12 +41,17 @@ export function DetalheDoCicloSheet({
   view?: CycleView;
   /** O número que a tela mostra COM as hipóteses do rascunho; ausente = a tela é o real. */
   rascunho?: number | null;
+  /** O rascunho gravado na simulação: com ele, as partes vêm de `simular`. */
+  registros?: RegistroParaSimular[];
   /** O "Como é calculado" do número (o que era o "i" do painel), no fim da folha. */
   explicacao?: Explicacao | null;
   /** Só o que é DESTES números (o ciclo, o que entra, o que sai, a projeção). */
   atalhos?: readonly { label: string; onPress: () => void }[];
 }) {
-  const detalhe = useCycleBreakdown(month, view, visible);
+  const simulando = (registros?.length ?? 0) > 0;
+  const real = useCycleBreakdown(month, view, visible && !simulando);
+  const simulado = useDetalheSimulado(registros ?? [], month, view, visible && simulando);
+  const detalhe = simulando ? simulado : real;
   const d = detalhe.data;
   const r = d ? rotulosDoDetalhe(d.estado) : null;
   const base = d ? (d.estado === 'fechado' ? (d.caixaNoFim ?? d.resultado) : d.resultado) : 0;

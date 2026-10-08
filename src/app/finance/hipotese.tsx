@@ -15,6 +15,7 @@ import { HeroLabel } from '@/components/ui/section-head';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { VerMais } from '@/components/ui/ver-mais';
 import { Space, tabular } from '@/design/tokens';
+import { useMonthRuler } from '@/components/finance/month-ruler';
 import { useAccounts, useHorizonteReal, useSimulacao } from '@/hooks/use-finance';
 import { useAosPoucos } from '@/hooks/use-aos-poucos';
 import { useRascunho } from '@/hooks/use-rascunho';
@@ -37,10 +38,12 @@ export default function HipoteseScreen() {
   const params = useLocalSearchParams<{ conta?: string; dias?: string }>();
   const dias = Number(params.dias) >= 1 && Number(params.dias) <= 3650 ? Math.round(Number(params.dias)) : 90;
   const { rascunho } = useRascunho();
+  const regua = useMonthRuler('projecao');
   const temRascunho = rascunho.hipoteses.length > 0 || rascunho.adiantamentos.length > 0;
   const accounts = useAccounts();
   const simulacao = useSimulacao({
-    dias, modo: 'dia', view: undefined, hipoteses: rascunho.hipoteses, adiantamentos: rascunho.adiantamentos,
+    // A régua da Projeção (a tela vem dela): sem ela, o detalhe somava outro período (08/10/2026).
+    dias, modo: 'dia', view: regua.view, hipoteses: rascunho.hipoteses, adiantamentos: rascunho.adiantamentos,
     porConta: true, enabled: temRascunho,
   });
   const horizonte = useHorizonteReal(dias, temRascunho);

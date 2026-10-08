@@ -893,7 +893,7 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
   MESMOS construtores do salvar, `src/lib/escrita.ts`): cria numa subtransação, lê e desfaz. Fatura
   (`set_invoice`), cronograma de dívida e recorrência saem das regras reais — conferido no staging
   em 29/09/2026 criando cada forma de verdade: `accounts_horizon`/`cards_horizon` deram o MESMO
-  JSON que a simulação, nas seis formas. Só o adiantamento continua `Draft` de cancelamento.
+  JSON que a simulação, nas seis formas. Desde `20261010140000` o adiantamento também (abaixo).
   Financiamento simulado se chama "Financiamento da hipótese N": `debts` tem nome ÚNICO no espaço,
   e dois chamados "Hipótese" faziam o segundo voltar 23505. Custo medido: ~0,5 s com 10 hipóteses
   em 10 anos, com o detalhe por conta.
@@ -945,6 +945,18 @@ com as mesmas recusas do banco levantadas antes do SIM (ver `agent.md`).
   se seguram, se RECUSAM** (`20261010130200`): segurado, `convert_transaction_to_installments` criava
   um plano órfão sem a 1ª parcela. A conta que vira null pela FK (conta apagada) passa.
   `supabase/tests/aplicar_adiantamento.sql`.
+
+  **Na Projeção o adiantamento é SIMULADO como aplicado, não como `Draft`** (`20261010140000`–
+  `160000`, *"a projeção tem que ser exatamente como se fosse o ambiente real com as hipóteses sendo
+  lançamentos reais"*). Com os `Draft` de cancelamento só o caixa sabia: o ciclo de março, a fatura
+  aberta e "Como chego nesse valor" ainda listavam a parcela adiantada. Hoje `simular` aceita
+  `tipo: 'adiantamento'` e chama `apply_anticipation` dentro da subtransação — toda leitura vê o
+  MESMO banco simulado (`linhas_do_ciclo`, `detalhe_do_ciclo`, `compras_das_faturas` no formato de
+  `useInvoice`, `contas`/`cartoes`), e a projeção recebe `drafts: []`. O app monta os pedidos
+  (`registrosDosAdiantamentos`, em ordem de data) das candidatas de HOJE; grupo cujas parcelas
+  mudaram não simula e a linha diz "as parcelas mudaram". A folha pede **Conta ou cartão** (padrão:
+  a da origem, `anticipation_candidates.account_id`; "Sem conta" vale, e aplicar/editar aceitam
+  conta nula). `supabase/tests/simular_adiantamento.sql`.
 
 
 - **Receita atrasada sai da projeção depois de 3 dias; despesa atrasada NÃO** (`20260909200000`).

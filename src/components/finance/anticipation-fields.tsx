@@ -1,6 +1,7 @@
 import type { UseQueryResult } from '@tanstack/react-query';
 import { StyleSheet, View } from 'react-native';
 
+import { AccountPicker, type PickableAccount } from '@/components/finance/account-picker';
 import { MonthPicker, currentMonth } from '@/components/finance/month-picker';
 import { Presenca } from '@/components/motion/presenca';
 import { ThemedText } from '@/components/themed-text';
@@ -45,6 +46,10 @@ interface Props {
   parcelas: ParcelaAdiantavel[];
   valor: number;
   onValor: (cents: number) => void;
+  /** De onde sai o dinheiro (08/10/2026): nasce na conta da origem; `null` = sem conta. */
+  contas: readonly PickableAccount[];
+  conta: string | null;
+  onConta: (id: string | null) => void;
 }
 
 /**
@@ -132,6 +137,18 @@ export function AdiantarCampos(p: Props) {
       <Field label="Pagar em">
         <MonthPicker month={p.mes ?? currentMonth()} onChange={p.onMes} />
       </Field>
+
+      <Presenca visivel={Boolean(p.item)}>
+        {/* O pagamento de dívida sai de uma conta, nunca de um cartão (`aplicar_adiantamento`). */}
+        <Field label="Conta ou cartão">
+          <AccountPicker financialContext
+            accounts={p.item?.source === 'debt' ? p.contas.filter((c) => c.type !== 'credit_card') : [...p.contas]}
+            value={p.conta}
+            onChange={p.onConta}
+            emptyLabel="Sem conta"
+          />
+        </Field>
+      </Presenca>
 
       <Presenca visivel={Boolean(p.item && p.parcelas.length > 0)} style={styles.resultado}>
       {p.item && p.parcelas.length > 0 ? (

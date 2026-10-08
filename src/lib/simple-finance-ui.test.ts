@@ -61,7 +61,7 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; notesPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; resumoErro?: boolean; arquivados?: any[]; draftLines?: any; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean; favoritos?: any[]; favoritosArquivados?: any[]; billReminders?: any[]; billRemindersPending?: boolean; pausaPrevia?: any; pausaBuscando?: boolean; carencias?: any[]; carenciaPrevia?: any; carenciaBuscando?: boolean; carenciasPendentes?: boolean; carenciasErro?: boolean; carenciaErro?: boolean } = {}) {
+function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; notesPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; resumoErro?: boolean; arquivados?: any[]; mudaram?: string[]; errosDosAdiantamentos?: Record<string, string>; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean; favoritos?: any[]; favoritosArquivados?: any[]; billReminders?: any[]; billRemindersPending?: boolean; pausaPrevia?: any; pausaBuscando?: boolean; carencias?: any[]; carenciaPrevia?: any; carenciaBuscando?: boolean; carenciasPendentes?: boolean; carenciasErro?: boolean; carenciaErro?: boolean } = {}) {
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
@@ -209,7 +209,15 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       : { ...query, isPending: false, isSuccess: true, data: { plan: options.plan ?? 'pro' } },
     useMonthLines: () => ({ ...query, data: options.monthLines ?? [] }),
     useCycleLines: () => ({ ...query, data: options.cycleLines ?? [] }),
-    useDraftLines: (hipoteses: any[]) => hipoteses.length ? { ...query, isPending: false, isSuccess: true, data: options.draftLines ?? { antes: 0, linhas: [] } } : { ...query, isPending: true, data: undefined },
+    // O rascunho como registros de `simular` (08/10/2026): cada hipótese e cada adiantamento é UM registro.
+    useRegistrosSimulados: (hipoteses: any[], adiantamentos: any[]) => {
+      const grupos = adiantamentos.filter((d: any) => d.adiantar && d.grupo).map((d: any) => d.grupo);
+      return {
+        registros: [...hipoteses.map((h: any) => ({ tipo: 'lancamento', dados: h })), ...grupos.map((g: string) => ({ tipo: 'adiantamento', dados: { grupo: g } }))],
+        nHipoteses: hipoteses.length, grupos, mudaram: options.mudaram ?? [], pronto: true, falhou: false,
+      };
+    },
+    useDetalheSimulado: () => ({ ...query, isPending: true, data: undefined }),
     // A tela do ciclo mostra o esqueleto enquanto não tem a série — sem este dublê ela nunca
     // chega a renderizar linha nenhuma, e o teste passaria a medir o esqueleto.
     // `cycleSeriesPending`: a série de OUTRO mês chegando (a troca de mês, com o portão já aberto).
@@ -357,10 +365,11 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       forecastDrafts = o.adiantamentos;
       simulacoes.push(o);
       const ativo = o.enabled && (o.hipoteses.length > 0 || o.adiantamentos.length > 0);
+      const extras = { mudaram: options.mudaram ?? [], errosDosAdiantamentos: options.errosDosAdiantamentos ?? {}, registros: [] };
       return ativo
-        ? { ...query, isPending: false, isSuccess: true, isPlaceholderData: Boolean(options.simulacao?.placeholder),
+        ? { ...query, ...extras, isPending: false, isSuccess: true, isPlaceholderData: Boolean(options.simulacao?.placeholder),
             data: options.simulacao ?? { forecast: [{ day: '2026-09-18', balance_cents: 10000, in_cents: 0, out_cents: 0 }], erros: [] } }
-        : { ...query, isPending: true, data: undefined };
+        : { ...query, ...extras, isPending: true, data: undefined };
     },
     useHorizonteReal: () => ({
       contas: { ...query, isPending: false, isSuccess: true, data: options.horizonte?.contas ?? [] },
@@ -4099,28 +4108,46 @@ test('Histórico de alertas: não lido até a pessoa marcar; Lida à direita, Li
   assert.ok(ui.nodes().some((n: any) => n.type === 'EmptyState'));
 });
 
-test('Ciclo aberto pela Projeção com um adiantamento: o pagamento e a parcela que deixa de sair entram na lista, sem salvar', () => {
-  // 28/09/2026: "tem que mostrar com aqueles valores da projeção de hipótese (sem salvar)… como se fosse real"
+test('Ciclo aberto pela Projeção com um adiantamento: ele é GRAVADO na simulação, e a lista é a do banco com ele', () => {
+  // 08/10/2026: *"a projeção tem que ser exatamente como se fosse o ambiente real com as hipóteses
+  // sendo lançamentos reais"* — a parcela adiantada some do ciclo dela porque `simular` aplica o
+  // adiantamento; não há mais linha "Parcela adiantada" somada por cima da parcela que ficava.
   const rascunho = JSON.stringify({ versao: 2, hipoteses: [], adiantamentos: [
-    { kind: 'expense', amount_cents: 157000, start: '2026-09-28', installments: 1, mode: 'total', grupo: 'g', rotulo: 'adianta 2 parcelas de Carro' },
+    { kind: 'expense', amount_cents: 157000, start: '2026-09-28', installments: 1, mode: 'total', grupo: 'g', rotulo: 'adianta 2 parcelas de Carro', adiantar: { ref_id: 'carro', quantas: 2, quais: 'ultimas' } },
     { kind: 'expense', amount_cents: 124500, start: '2026-10-05', installments: 1, mode: 'cancel', grupo: 'g' },
   ] });
   const ui = screen('src/app/finance/cycle.tsx', {
     params: { month: '2026-10', view: 'cycle', hipoteses: '1' },
     preferencias: { 'projecao:rascunho': rascunho },
-    cycleRow: { mes: '2026-10-01', ini: '2026-09-11', fim: '2026-10-10', estado: 'aberto', comecei_com: 100000, entrou: 500000, saiu: 400000, resultado: 200000, caixa_no_fim: 200000, faltou_pagar: 0, confere: true },
-    draftLines: { antes: 0, linhas: [
-      { i: 0, day: '2026-09-28', kind: 'expense', cents: 157000 },
-      { i: 1, day: '2026-10-05', kind: 'expense', cents: -124500 },
-    ] },
+    cicloSimulado: {
+      ciclo: { mes: '2026-10-01', ini: '2026-09-11', fim: '2026-10-10', estado: 'aberto', comecei_com: 100000, entrou: 500000, saiu: 400000, resultado: 200000, caixa_no_fim: 200000, faltou_pagar: 0, confere: true },
+      linhas: [{ day: '2026-09-28', in_cents: 0, out_cents: 157000, title: 'Adiantamento de 2 parcelas de Carro', origin: 'transaction', ref_id: 'ad1', method_label: null, realizado: true, atrasada: false }],
+      idsHipotese: ['ad1'], faturasComHipotese: [], erros: [],
+    },
   });
-  assert.ok(ui.nodes().some((n: any) => n.type === 'SectionHead' && /^Hipóteses do rascunho/.test(n.props.title)), 'o grupo das hipóteses');
+  assert.ok(ui.nodes().some((n: any) => n.type === 'SectionHead' && /^Hipóteses do rascunho/.test(n.props.title)), 'o lançamento do adiantamento vai ao grupo das hipóteses');
   const titulos = ui.nodes().filter((n: any) => typeof n.type === 'function' && n.type.name === 'Linha').map((n: any) => n.props.linha.title);
-  assert.ok(titulos.includes('Adianta 2 parcelas de Carro'));
-  assert.ok(titulos.includes('Parcela adiantada'));
+  assert.deepEqual(titulos, ['Adiantamento de 2 parcelas de Carro']);
   const fechamento = ui.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'Fechamento');
-  assert.equal(fechamento.props.hipoteses, 1, 'um adiantamento é UMA hipótese');
+  assert.equal(fechamento.props.registros.length, 1, 'um adiantamento é UM registro');
+  assert.equal(fechamento.props.registros[0].tipo, 'adiantamento');
   assert.equal(ui.writes.length, 0, 'nada é salvo');
+});
+
+test('Ciclo pela Projeção: o adiantamento cujas parcelas mudaram fica de fora e a tela diz', () => {
+  const rascunho = JSON.stringify({ versao: 2, hipoteses: [], adiantamentos: [
+    { kind: 'expense', amount_cents: 157000, start: '2026-09-28', installments: 1, mode: 'total', grupo: 'g', rotulo: 'adianta', adiantar: { ref_id: 'carro', quantas: 2, quais: 'ultimas' } },
+  ] });
+  const ui = screen('src/app/finance/cycle.tsx', {
+    params: { month: '2026-10', view: 'cycle', hipoteses: '1' },
+    preferencias: { 'projecao:rascunho': rascunho },
+    mudaram: ['g'],
+    cicloSimulado: {
+      ciclo: { mes: '2026-10-01', ini: '2026-09-11', fim: '2026-10-10', estado: 'aberto', comecei_com: 0, entrou: 0, saiu: 0, resultado: 0, caixa_no_fim: 0, faltou_pagar: 0, confere: true },
+      linhas: [], idsHipotese: [], faturasComHipotese: [], erros: [],
+    },
+  });
+  assert.ok(ui.nodes().some((n: any) => n.type === 'ThemedText' && /ficou de fora/.test(String(n.props.children))));
 });
 
 test('Ciclo aberto de outro lugar não usa o rascunho do aparelho', () => {
@@ -4132,7 +4159,7 @@ test('Ciclo aberto de outro lugar não usa o rascunho do aparelho', () => {
     cycleRow: { mes: '2026-10-01', ini: '2026-09-11', fim: '2026-10-10', estado: 'aberto', comecei_com: 100000, entrou: 500000, saiu: 400000, resultado: 200000, caixa_no_fim: 200000, faltou_pagar: 0, confere: true },
   });
   const fechamento = ui.nodes().find((n: any) => typeof n.type === 'function' && n.type.name === 'Fechamento');
-  assert.equal(fechamento.props.hipoteses, 0);
+  assert.equal(fechamento.props.registros.length, 0);
   assert.equal(Number(fechamento.props.ciclo.saiu), 400000, 'o ciclo real');
 });
 
@@ -8580,7 +8607,7 @@ test('Aplicar o adiantamento: nasce da hipótese, grava UM lançamento e salvar 
     params: { grupo: 'g1' },
     preferencias: { 'projecao:rascunho': rascunho },
     forecastAccounts: [{ id: 'conta-1', name: 'Nubank', type: 'checking', archived: false }],
-    anticipation: [{ source: 'plan', ref_id: 'plano-1', title: 'Fone', account_name: 'Nubank', total_n: 6, taxa: null, events: [
+    anticipation: [{ source: 'plan', ref_id: 'plano-1', title: 'Fone', account_name: 'Nubank', account_id: 'conta-1', total_n: 6, taxa: null, events: [
       { n: 4, day: '2026-10-10', cents: 2500, pv_cents: 2500, id: 'p4', on: '2026-10-10' },
       { n: 5, day: '2026-11-10', cents: 2500, pv_cents: 2500, id: 'p5', on: '2026-11-10' },
       { n: 6, day: '2026-12-10', cents: 2500, pv_cents: 2500, id: 'p6', on: '2026-12-10' }] }],

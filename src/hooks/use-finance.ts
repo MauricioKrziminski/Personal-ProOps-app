@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { IconName } from '@/components/ui/icon';
 import type { NoteColorName } from '@/constants/theme';
@@ -33,10 +33,9 @@ import { toIlikeTerm } from '@/lib/search';
 import { dateWindows, timestampDateBounds, type ListFiltersValue } from '@/lib/list-filters';
 import { ACCOUNT_TYPES } from '@/lib/accounts';
 import { acharLinhaNoCache } from '@/lib/linha-do-cache';
-import { adiantaveisNoMes, semCancelamentoRepetido, type Adiantavel, type EscolhaDeAdiantamento, type RegistroDeAdiantamento } from '@/lib/anticipation';
+import { adiantaveisNoMes, registrosDosAdiantamentos, semCancelamentoRepetido, type Adiantavel, type EscolhaDeAdiantamento, type RegistroDeAdiantamento, type RegistroDoAdiantamento } from '@/lib/anticipation';
 import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
 import { filtroDoEstado } from '@/lib/data-da-compra';
-import type { HipoteseNoCiclo, OcorrenciaDaHipotese } from '@/lib/rascunho-no-ciclo';
 import { registroDaHipotese, type Hipotese, type RegistroSimulado } from '@/lib/hipotese';
 import type { CartaoNoHorizonte, ContaNoHorizonte } from '@/lib/onde-muda';
 import type { Alcance, OrigemDaConversao } from '@/lib/lancar';
@@ -1406,13 +1405,46 @@ export function useForecastMonths(days: number, drafts: Draft[], enabled = true,
 /** Erro de uma hipótese (`indice`) ou de uma leitura (`leitura`) da simulação. */
 export type ErroDaHipotese = { indice?: number; leitura?: string; mensagem: string; codigo?: string };
 
+/** O que `simular` grava: as hipóteses e os adiantamentos (o pedido do "Aplicar"). */
+export type RegistroParaSimular = RegistroSimulado | RegistroDoAdiantamento;
+
 /**
- * A simulação do "E se…?" (spec 2026-09-29): as hipóteses viram registros de verdade dentro de
- * `simular`, as leituras correm e tudo é desfeito. Os adiantamentos seguem como `drafts` das
- * leituras de caixa. Com `porConta`, vêm junto o horizonte por conta e por cartão — o "depois"
+ * Os registros de um rascunho (08/10/2026): as hipóteses COMPLETAS, na ordem, e depois os
+ * adiantamentos como o pedido do "Aplicar" (`registrosDosAdiantamentos`) — a Projeção é o real com
+ * tudo isso gravado. A lista do banco é a de HOJE; até ela chegar, `pronto` segura quem simula
+ * (simular sem os adiantamentos mostraria um número que nunca existiu).
+ */
+export function useRegistrosSimulados(hipoteses: readonly Hipotese[], adiantamentos: readonly Draft[], enabled = true) {
+  const comAdiantamento = adiantamentos.some((d) => d.adiantar);
+  const hoje = localISODate();
+  const candidatos = useAnticipationCandidates(hoje, enabled && comAdiantamento, false);
+  return useMemo(() => {
+    const dasHipoteses = hipoteses.map((h, i) => registroDaHipotese(h, i)).filter((r): r is RegistroSimulado => r !== null);
+    const ad = comAdiantamento && candidatos.data
+      ? registrosDosAdiantamentos(adiantamentos, candidatos.data, hoje)
+      : { registros: [], grupos: [], mudaram: [] };
+    return {
+      registros: [...dasHipoteses, ...ad.registros] as RegistroParaSimular[],
+      /** Quantos registros são hipóteses: `erros[].indice` abaixo disso é de hipótese, acima é de adiantamento. */
+      nHipoteses: dasHipoteses.length,
+      /** O grupo de cada adiantamento simulado, na ordem dos registros. */
+      grupos: ad.grupos,
+      /** Adiantamentos cujas parcelas não estão mais lá (pagas, mudaram): fora da simulação. */
+      mudaram: ad.mudaram,
+      pronto: !comAdiantamento || candidatos.isSuccess,
+      falhou: comAdiantamento && candidatos.isError,
+    };
+  }, [hipoteses, adiantamentos, comAdiantamento, candidatos.data, candidatos.isSuccess, candidatos.isError, hoje]);
+}
+
+/**
+ * A simulação do "E se…?" (spec 2026-09-29): as hipóteses E os adiantamentos (08/10/2026) viram
+ * registros de verdade dentro de `simular`, as leituras correm e tudo é desfeito — nenhuma leitura
+ * recebe mais `drafts`, então nenhuma enxerga uma hipótese que outra não enxerga. Com `porConta`, vêm junto o horizonte por conta e por cartão — o "depois"
  * do Onde muda. Uma chamada só por tela: criar e desfazer duas vezes seria pagar a escrita duas.
  *
- * `erros[].indice` aponta para as hipóteses COMPLETAS, na ordem — as incompletas não vão.
+ * `erros[].indice` aponta para as hipóteses COMPLETAS, na ordem — as incompletas não vão; o erro
+ * de um adiantamento sai em `errosDosAdiantamentos`, pelo grupo.
  */
 export function useSimulacao(o: {
   dias: number;
@@ -1430,13 +1462,12 @@ export function useSimulacao(o: {
    */
   previa?: boolean;
 }) {
-  const registros = o.hipoteses.map((h, i) => registroDaHipotese(h, i)).filter((r): r is RegistroSimulado => r !== null);
-  const drafts = paraOBanco(o.adiantamentos);
+  const { registros, nHipoteses, grupos, mudaram, pronto } = useRegistrosSimulados(o.hipoteses, o.adiantamentos, o.enabled);
   useRealtimeInvalidate('transactions', ['simular']);
-  return useQuery({
-    enabled: o.enabled && (registros.length > 0 || drafts.length > 0),
+  const consulta = useQuery({
+    enabled: o.enabled && pronto && registros.length > 0,
     placeholderData: o.previa ? undefined : (anterior: unknown) => anterior as never,
-    queryKey: ['simular', o.modo, String(o.dias), JSON.stringify(drafts), JSON.stringify(registros), o.view ?? '', o.porConta, Boolean(o.comMeses)],
+    queryKey: ['simular', o.modo, String(o.dias), JSON.stringify(registros), o.view ?? '', o.porConta, Boolean(o.comMeses)],
     queryFn: async (): Promise<{
       forecast?: ForecastDay[];
       meses?: ProjecaoMensal;
@@ -1444,10 +1475,10 @@ export function useSimulacao(o: {
       cartoes?: CartaoNoHorizonte[];
       erros: ErroDaHipotese[];
     }> => {
-      const meses = { meses: { days: o.dias, drafts, view: o.view ?? null } };
+      const meses = { meses: { days: o.dias, drafts: [], view: o.view ?? null } };
       const leitura: Record<string, unknown> = o.modo === 'mes'
         ? meses
-        : { forecast: { days: o.dias, drafts }, ...(o.comMeses ? meses : {}) };
+        : { forecast: { days: o.dias, drafts: [] }, ...(o.comMeses ? meses : {}) };
       if (o.porConta) Object.assign(leitura, { contas: { days: o.dias }, cartoes: { days: o.dias } });
       const { data, error } = await supabase.rpc('simular', { p_registros: registros as never, p_leituras: leitura as never });
       if (error) throw error;
@@ -1462,6 +1493,16 @@ export function useSimulacao(o: {
       };
     },
   });
+  const erros = consulta.data?.erros;
+  const errosDosAdiantamentos = useMemo(() => {
+    const saida: Record<string, string> = {};
+    for (const e of erros ?? []) {
+      const grupo = e.indice !== undefined && e.indice >= nHipoteses ? grupos[e.indice - nHipoteses] : undefined;
+      if (grupo) saida[grupo] = e.mensagem;
+    }
+    return saida;
+  }, [erros, nHipoteses, grupos]);
+  return Object.assign(consulta, { mudaram, errosDosAdiantamentos, registros: pronto ? registros : [] });
 }
 
 /**
@@ -2695,6 +2736,29 @@ export function useCycleBreakdown(month: string, view: CycleView | undefined, en
   });
 }
 
+/**
+ * "Como chego nesse valor" COM o rascunho (08/10/2026): a mesma `cycle_breakdown`, lida dentro de
+ * `simular` com as hipóteses e os adiantamentos gravados — as partes somam até o número da
+ * Projeção, sem uma linha "Hipóteses do rascunho" escondendo o que mudou.
+ */
+export function useDetalheSimulado(registros: RegistroParaSimular[], month: string, view: CycleView | undefined, enabled: boolean) {
+  return useQuery({
+    enabled: enabled && registros.length > 0,
+    gcTime: 0,
+    queryKey: ['simular', 'detalhe', primeiroDiaDoMes(month), view ?? '', JSON.stringify(registros)],
+    queryFn: async (): Promise<DetalheDoCiclo> => {
+      const { data, error } = await supabase.rpc('simular', {
+        p_registros: registros as never,
+        p_leituras: { detalhe_do_ciclo: { mes: primeiroDiaDoMes(month), view: view ?? null } } as never,
+      });
+      if (error) throw error;
+      const r = data as { leituras?: { detalhe_do_ciclo?: unknown }; erros?: ErroDaHipotese[] } | null;
+      if (!r?.leituras?.detalhe_do_ciclo) throw new Error(r?.erros?.[0]?.mensagem ?? 'detalhe do ciclo indisponível');
+      return lerDetalheDoCiclo(r.leituras.detalhe_do_ciclo);
+    },
+  });
+}
+
 export type Spendable = Fns['spendable']['Returns'][number];
 
 /**
@@ -2727,32 +2791,12 @@ export function useSpendable(view?: CycleView) {
 }
 
 /**
- * As ocorrências das hipóteses do rascunho dentro de um ciclo (`draft_lines`, sobre o motor da
- * Projeção). Nada é salvo: o rascunho chega pela rota e vive só enquanto a tela está aberta.
- */
-export function useDraftLines(hipoteses: readonly HipoteseNoCiclo[], de: string | undefined, ate: string | undefined) {
-  const drafts = hipoteses.map(({ rotulo: _rotulo, ...d }) => d);
-  return useQuery({
-    queryKey: ['draft-lines', JSON.stringify(drafts), de ?? '', ate ?? ''],
-    enabled: drafts.length > 0 && Boolean(de) && Boolean(ate),
-    // Como o rascunho da Projeção: não sobrevive a sair da tela.
-    gcTime: 0,
-    queryFn: async (): Promise<{ antes: number; linhas: OcorrenciaDaHipotese[] }> => {
-      const { data, error } = await supabase.rpc('draft_lines', { p_drafts: drafts, p_from: de!, p_to: ate! });
-      if (error) throw error;
-      const r = data as { antes?: number; linhas?: OcorrenciaDaHipotese[] } | null;
-      return { antes: Number(r?.antes ?? 0), linhas: r?.linhas ?? [] };
-    },
-  });
-}
-
-/**
  * O ciclo COM as hipóteses detalhadas (spec 2026-09-28, seção 7): o fechamento e as linhas vêm de
  * `simular` — os registros são criados de verdade, lidos e desfeitos. `idsHipotese` são os
  * `ref_id` que a hipótese CRIOU (a linha vai ao grupo dela); `faturasComHipotese` são faturas que
  * já existiam e receberam a hipótese (continuam no grupo delas, marcadas).
  */
-export function useCicloSimulado(registros: RegistroSimulado[], month: string, view?: CycleView) {
+export function useCicloSimulado(registros: RegistroParaSimular[], month: string, view?: CycleView) {
   return useQuery({
     enabled: registros.length > 0 && Boolean(month),
     gcTime: 0,
@@ -2761,11 +2805,16 @@ export function useCicloSimulado(registros: RegistroSimulado[], month: string, v
       const mes = primeiroDiaDoMes(month);
       const { data, error } = await supabase.rpc('simular', {
         p_registros: registros as never,
-        p_leituras: { ciclo: { de: mes, ate: mes, view: view ?? null }, linhas_do_ciclo: { mes, view: view ?? null } } as never,
+        p_leituras: {
+          ciclo: { de: mes, ate: mes, view: view ?? null },
+          linhas_do_ciclo: { mes, view: view ?? null },
+          // A fatura aberta no ciclo lista as compras da SIMULAÇÃO, não as do banco real (08/10/2026).
+          compras_das_faturas: { mes, view: view ?? null },
+        } as never,
       });
       if (error) throw error;
       const r = data as {
-        leituras?: { ciclo?: CycleRow[]; linhas_do_ciclo?: CycleLine[] };
+        leituras?: { ciclo?: CycleRow[]; linhas_do_ciclo?: CycleLine[]; compras_das_faturas?: Record<string, Transaction[]> };
         criados?: { ids?: string[]; faturas?: string[] }[];
         erros?: ErroDaHipotese[];
       } | null;
@@ -2773,6 +2822,7 @@ export function useCicloSimulado(registros: RegistroSimulado[], month: string, v
         ciclo: r?.leituras?.ciclo?.find((c) => mesmoMes(c.mes, month)) ?? null,
         // `null` = a leitura falhou dentro do `simular` (não é "sem linhas"): a tela mostra o erro.
         linhas: r?.leituras?.linhas_do_ciclo ?? null,
+        comprasDasFaturas: r?.leituras?.compras_das_faturas ?? {},
         idsHipotese: (r?.criados ?? []).flatMap((c) => c.ids ?? []),
         faturasComHipotese: (r?.criados ?? []).flatMap((c) => c.faturas ?? []),
         erros: r?.erros ?? [],
@@ -3437,7 +3487,8 @@ export type PedidoDeAdiantamento = {
   ref_id: string;
   paid_on: string;
   amount_cents: number;
-  account_id: string;
+  /** `null` = sem conta: fora de conta e de fatura, como todo lançamento (20261010140000). */
+  account_id: string | null;
   description: string;
   parcelas: ({ id: string } | { n: number } | { on: string })[];
 };
@@ -3465,7 +3516,7 @@ export function useApplyAnticipation() {
 export function useEditAnticipation() {
   const invalidate = useInvalidateFinance();
   return useMutation({
-    mutationFn: async (input: { id: string; description: string; amount_cents: number; paid_on: string; account_id: string }) => {
+    mutationFn: async (input: { id: string; description: string; amount_cents: number; paid_on: string; account_id: string | null }) => {
       const { id, ...campos } = input;
       const { error } = await supabase.rpc('edit_anticipation', { p_id: id, p_input: campos as unknown as Json });
       if (error) throw error;

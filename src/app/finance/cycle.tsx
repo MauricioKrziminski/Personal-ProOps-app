@@ -20,7 +20,7 @@ import { Radius, Space } from '@/design/tokens';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { VerMais } from '@/components/ui/ver-mais';
 import { useAosPoucos, useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
-import { type CycleLine, type CycleRow, type CycleView, type Draft, useCicloSimulado, useCycleLines, useCycleMonth, useCycleSeries, useDraftLines, useInvoice } from '@/hooks/use-finance';
+import { type CycleLine, type CycleRow, type CycleView, type Draft, type RegistroParaSimular, type Transaction, useCicloSimulado, useCycleLines, useCycleMonth, useCycleSeries, useInvoice, useRegistrosSimulados } from '@/hooks/use-finance';
 import { DetalheDoCicloSheet } from '@/components/finance/detalhe-do-ciclo-sheet';
 import { LinhaDoTempo } from '@/components/finance/linha-do-tempo';
 import { describeCycle } from '@/lib/cycle-label';
@@ -28,9 +28,8 @@ import { baldeDaOrigem, ORDEM_DOS_BALDES } from '@/lib/detalhe-do-ciclo';
 import { rotaDaLinha } from '@/lib/cycle-routes';
 import { isoToBR, mesmoMes } from '@/lib/dates';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
-import { fechamentoComHipoteses, linhasDasHipoteses, type HipoteseNoCiclo } from '@/lib/rascunho-no-ciclo';
 import { motivoDaHipotese } from '@/lib/rascunho';
-import { registroDaHipotese } from '@/lib/hipotese';
+import type { Hipotese } from '@/lib/hipotese';
 import { useRascunho } from '@/hooks/use-rascunho';
 
 /**
@@ -101,31 +100,25 @@ export default function CycleDetailScreen() {
 
   const serie = useCycleSeries(month, month, view);
   const linhas = useCycleLines(month, view);
-  // Aberto pela Projeção com rascunho (`?hipoteses=1`), o ciclo lê as hipóteses do APARELHO (spec
-  // 2026-09-29): as hipóteses viram registros em `simular` — criados, lidos e desfeitos — e os
-  // adiantamentos somam por cima, pelo motor da Projeção. De outro lugar, o ciclo é o real.
+  // Aberto pela Projeção com rascunho (`?hipoteses=1`), o ciclo é o real com o rascunho do
+  // APARELHO gravado (08/10/2026): hipóteses e adiantamentos viram registros em `simular` —
+  // criados, lidos e desfeitos. A parcela adiantada some do ciclo dela, como sumiria de verdade.
+  // De outro lugar, o ciclo é o real.
   const comHipoteses = params.hipoteses === '1';
   const { rascunho: noAparelho } = useRascunho();
-  const registros = useMemo(
-    () => (comHipoteses ? noAparelho.hipoteses.flatMap((h, i) => registroDaHipotese(h, i) ?? []) : []),
-    [comHipoteses, noAparelho.hipoteses],
+  const simulados = useRegistrosSimulados(
+    comHipoteses ? noAparelho.hipoteses : SEM_HIPOTESES,
+    comHipoteses ? noAparelho.adiantamentos : SEM_ADIANTAMENTOS,
+    comHipoteses,
   );
+  const registros = simulados.pronto ? simulados.registros : SEM_REGISTROS;
+  const esperandoRascunho = comHipoteses && !simulados.pronto && !simulados.falhou;
   const comDetalhadas = registros.length > 0;
   const simulado = useCicloSimulado(registros, month, view);
-  const cicloReal = comDetalhadas
+  const ciclo = comDetalhadas
     ? (simulado.data?.ciclo ?? null)
     : (serie.data?.find((c) => mesmoMes(c.mes, month)) ?? null);
   const linhasBase = comDetalhadas ? simulado.data?.linhas : linhas.data;
-  // As hipóteses da Projeção, quando se chega por ela com um rascunho (28/09/2026): entram na lista
-  // e no fechamento como se fossem reais, e nada é salvo.
-  const adiantamentos = comHipoteses ? noAparelho.adiantamentos : SEM_ADIANTAMENTOS;
-  const hipoteses = useMemo(() => paraOCiclo(adiantamentos), [adiantamentos]);
-  const gruposDeAdiantar = new Set(adiantamentos.map((d) => d.grupo)).size;
-  const rascunho = useDraftLines(hipoteses, cicloReal?.ini, cicloReal?.fim);
-  const comRascunho = hipoteses.length > 0;
-  const ciclo = cicloReal && rascunho.data
-    ? fechamentoComHipoteses(cicloReal, rascunho.data.antes, rascunho.data.linhas)
-    : cicloReal;
 
   /**
    * Quantas linhas cada grupo mostra (24/09/2026): um ciclo tem 30 a 150 movimentos, e desenhar
@@ -133,8 +126,9 @@ export default function CycleDetailScreen() {
    */
   const janelas = useJanelasPorGrupo(`${month}|${view}|${lado}`);
 
+  const criadosNaSimulacao = useMemo(() => new Set(simulado.data?.idsHipotese ?? []), [simulado.data]);
   const grupos = useMemo(() => {
-    const criados = new Set(simulado.data?.idsHipotese ?? []);
+    const criados = criadosNaSimulacao;
     const faturasCom = new Set(simulado.data?.faturasComHipotese ?? []);
     // A linha que a hipótese CRIOU vira linha de hipótese (grupo próprio, sem destino — o registro
     // não existe); a fatura que já existia continua no grupo dela, dizendo que inclui a hipótese.
@@ -145,27 +139,22 @@ export default function CycleDetailScreen() {
           ? { ...l, method_label: [l.method_label, 'inclui hipótese'].filter(Boolean).join(' · ') }
           : l,
     );
-    const todas = [
-      ...base,
-      ...(linhasDasHipoteses(rascunho.data?.linhas ?? [], hipoteses) as unknown as CycleLine[]),
-    ];
-    const doLado = todas.filter((l) =>
+    const doLado = base.filter((l) =>
       lado === 'tudo' ? true : lado === 'entra' ? Number(l.in_cents) > 0 : Number(l.in_cents) === 0
     );
     return agrupar(doLado, brl);
-  }, [linhasBase, simulado.data, rascunho.data, hipoteses, lado, brl]);
+  }, [linhasBase, simulado.data, criadosNaSimulacao, lado, brl]);
 
   // A leitura que falha DENTRO do `simular` volta em `erros` (a RPC responde 200): com o ciclo ou
   // as linhas nulos, é erro — senão a tela ficava no esqueleto para sempre.
   const leituraSimuladaFalhou = comDetalhadas && simulado.isSuccess && (!simulado.data?.ciclo || !simulado.data?.linhas);
-  if (serie.isError || linhas.isError || (comRascunho && rascunho.isError) || (comDetalhadas && simulado.isError) || leituraSimuladaFalhou) {
+  if (serie.isError || linhas.isError || simulados.falhou || (comDetalhadas && simulado.isError) || leituraSimuladaFalhou) {
     return (
       <Screen>
         <ErrorCard
           onRetry={() => {
             void serie.refetch();
             void linhas.refetch();
-            if (comRascunho) void rascunho.refetch();
             if (comDetalhadas) void simulado.refetch();
           }}
         />
@@ -173,7 +162,7 @@ export default function CycleDetailScreen() {
     );
   }
 
-  if (serie.isPending || !ciclo || (comRascunho && rascunho.isPending) || (comDetalhadas && simulado.isPending)) {
+  if (serie.isPending || esperandoRascunho || !ciclo || (comDetalhadas && simulado.isPending)) {
     return (
       <Screen>
         <Skeleton height={220} radius={Radius.md} />
@@ -184,7 +173,14 @@ export default function CycleDetailScreen() {
   const errosDaSimulacao = simulado.data?.erros ?? [];
   const fechamento = (
     <>
-      <Fechamento ciclo={ciclo} month={month} view={view} hipoteses={registros.length + gruposDeAdiantar} />
+      <Fechamento ciclo={ciclo} month={month} view={view} registros={registros} />
+      {simulados.mudaram.length > 0 ? (
+        <ThemedText type="small" themeColor="warning">
+          {simulados.mudaram.length === 1
+            ? 'Um adiantamento do rascunho ficou de fora: as parcelas dele mudaram. Refaça-o na Projeção.'
+            : `${simulados.mudaram.length} adiantamentos do rascunho ficaram de fora: as parcelas deles mudaram. Refaça-os na Projeção.`}
+        </ThemedText>
+      ) : null}
       {errosDaSimulacao.map((e, i) => (
         <ThemedText key={i} type="small" themeColor="danger">
           {`Não deu para simular ${e.indice !== undefined ? `a ${e.indice + 1}ª hipótese` : 'uma leitura'}: ${motivoDaHipotese(e)}`}
@@ -217,7 +213,12 @@ export default function CycleDetailScreen() {
         <SectionHead title={g.titulo} />
         <Section>
           {j.visiveis.map((l, i) => (
-            <Linha key={`${l.origin}-${l.ref_id}-${i}`} linha={l} />
+            <Linha
+              key={`${l.origin}-${l.ref_id}-${i}`}
+              linha={l}
+              compras={comDetalhadas ? (simulado.data?.comprasDasFaturas?.[l.ref_id] ?? []) : undefined}
+              criados={criadosNaSimulacao}
+            />
           ))}
         </Section>
         <VerMais restantes={j.restantes} onPress={() => janelas.verMais(g.chave)} />
@@ -234,7 +235,7 @@ export default function CycleDetailScreen() {
       escreve o próprio padding é a que diverge.
     */
     // Puxar para atualizar, como as outras telas de dados (25/09/2026): era a única sem.
-    <Screen wide={tablet} onRefresh={() => Promise.all([serie.refetch(), linhas.refetch(), ...(comRascunho ? [rascunho.refetch()] : [])])}>
+    <Screen wide={tablet} onRefresh={() => Promise.all([serie.refetch(), linhas.refetch(), ...(comDetalhadas ? [simulado.refetch()] : [])])}>
       {tablet ? (
         <FinanceAnalysisPanes primary={fechamento} support={<>{filtro}{movimentos}</>} compact={compact} />
       ) : compact}
@@ -249,7 +250,8 @@ export default function CycleDetailScreen() {
  * `comecei + entrou − saiu` dá o caixa que de fato ficou, e a dívida é uma linha à parte. Somar
  * as duas seria o abatimento automático que o dono do produto recusou.
  */
-function Fechamento({ ciclo, month, view, hipoteses }: { ciclo: CycleRow; month: string; view: CycleView; hipoteses: number }) {
+function Fechamento({ ciclo, month, view, registros }: { ciclo: CycleRow; month: string; view: CycleView; registros: RegistroParaSimular[] }) {
+  const hipoteses = registros.length;
   const nome = monthTitle(month).replace(/ de \d{4}$/, '').toLowerCase();
   const d = describeCycle(ciclo, nome);
   const faltou = Number(ciclo.faltou_pagar ?? 0);
@@ -273,6 +275,7 @@ function Fechamento({ ciclo, month, view, hipoteses }: { ciclo: CycleRow; month:
         month={month}
         view={view}
         rascunho={hipoteses > 0 ? Number(ciclo.resultado) : null}
+        registros={registros}
       />
       <ThemedText type="caption" themeColor="textSecondary">
         {`${isoToBR(ciclo.ini)} a ${isoToBR(ciclo.fim)} · ciclo ${ciclo.estado}`}
@@ -330,12 +333,18 @@ function Conta({
  * `abre`, não a "é fatura": com o segundo, toda fatura atrasada dispararia um fetch cujo
  * resultado é jogado fora, e numa tela com seis faturas isso é seis consultas para nada.
  */
-function Linha({ linha }: { linha: CycleLine }) {
+function Linha({ linha, compras: simuladas, criados }: {
+  linha: CycleLine;
+  /** No ciclo simulado, as compras da fatura vêm de DENTRO da simulação (com o rascunho gravado). */
+  compras?: Transaction[];
+  /** O que a simulação criou: não existe de verdade, então não abre detalhe. */
+  criados?: ReadonlySet<string>;
+}) {
   const brl = useBRL();
   const abre = linha.origin === 'invoice' && !linha.atrasada;
-  const fatura = useInvoice(abre ? linha.ref_id : undefined);
+  const fatura = useInvoice(abre && !simuladas ? linha.ref_id : undefined);
   // As compras da fatura aberta também vêm aos poucos: uma fatura tem de 30 a 150 compras.
-  const compras = useAosPoucos(abre ? (fatura.data?.transactions ?? []) : [], linha.ref_id);
+  const compras = useAosPoucos(abre ? (simuladas ?? fatura.data?.transactions ?? []) : [], linha.ref_id);
   const entra = Number(linha.in_cents) > 0;
   // A linha cabe a 384dp × fonte 1,3: o ano já está no cabeçalho do ciclo, o cartão já está no
   // título da fatura, e o "(atrasada)" desce para o subtítulo. Quem DECIDE que ela é atrasada
@@ -375,7 +384,8 @@ function Linha({ linha }: { linha: CycleLine }) {
                 const titulo = t.description ?? t.merchant ?? 'Compra';
                 // A data da COMPRA: a parcela 2 em diante mora no mês em que cai, e a linha dizia a
                 // data dela como se fosse a da compra ("Mostre sempre a data do lançamento").
-                const apoio = [rotuloDaCompra(t) ?? isoToBR(t.occurred_at).slice(0, 5), t.category].filter(Boolean).join(' · ');
+                const hipotese = criados?.has(t.id) ?? false;
+                const apoio = [hipotese ? 'hipótese' : null, rotuloDaCompra(t) ?? isoToBR(t.occurred_at).slice(0, 5), t.category].filter(Boolean).join(' · ');
                 return {
                   chave: t.id,
                   titulo,
@@ -383,7 +393,7 @@ function Linha({ linha }: { linha: CycleLine }) {
                   cents: Number(t.amount_cents),
                   estado: 'item' as const,
                   accessibilityLabel: `${titulo}, ${apoio}, ${brl(Number(t.amount_cents))}`,
-                  onPress: () => router.push({ pathname: '/finance/[txId]', params: { txId: t.id } }),
+                  onPress: hipotese ? undefined : () => router.push({ pathname: '/finance/[txId]', params: { txId: t.id } }),
                 };
               }),
             }]}
@@ -459,19 +469,5 @@ const styles = StyleSheet.create({
 });
 
 const SEM_ADIANTAMENTOS: Draft[] = [];
-
-/**
- * Os adiantamentos como o ciclo os recebe: o draft do motor e o nome. As parcelas que um
- * adiantamento cancela levam o nome dele (só o draft do pagamento tem `rotulo`).
- */
-function paraOCiclo(drafts: readonly Draft[]): HipoteseNoCiclo[] {
-  const doGrupo = new Map(drafts.filter((d) => d.grupo && d.rotulo).map((d) => [d.grupo!, d.rotulo!]));
-  return drafts.map((d) => ({
-    kind: d.kind,
-    amount_cents: d.amount_cents,
-    start: d.start,
-    installments: d.installments,
-    mode: d.mode,
-    rotulo: d.rotulo ?? (d.grupo ? doGrupo.get(d.grupo) : undefined),
-  }));
-}
+const SEM_HIPOTESES: Hipotese[] = [];
+const SEM_REGISTROS: RegistroParaSimular[] = [];
