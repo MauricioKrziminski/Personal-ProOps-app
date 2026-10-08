@@ -56,8 +56,9 @@ const TETO_DO_PREPARO_MS = 4000;
 /*
   ⚠️ **As esperas da cortina contam no relógio da UI thread, nunca em `setTimeout`/rAF**
   (08/10/2026): no iPhone, voltando do Face ID, o `RCTTiming` ficou mudo e TODO timer do JS parou,
-  enquanto o toque e o Reanimated seguiam. A causa é tratada no nativo (`modules/proops-relogio`);
-  aqui é a segunda camada: a cortina não pode depender daquilo que já falhou uma vez.
+  enquanto o toque e o Reanimated seguiam. A causa foi corrigida no próprio RCTTiming
+  (`patches/react-native+0.86.3.patch`); aqui a cortina continua sem depender dos timers do JS, que
+  param sempre que a thread do JS está ocupada.
   `ReduceMotion.Never`: aqui ele é relógio, não animação — com Reduzir Movimento ele pularia ao fim.
 */
 const esperarNaUi = (ms: number) =>

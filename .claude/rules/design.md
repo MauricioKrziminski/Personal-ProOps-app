@@ -605,14 +605,16 @@ abertura curta. Com a trava ligada, `segurarAbertura()` estica o teto para 20 s:
 senha sobre a marca e, confirmada, a tinta sobe DIRETO no app (a trava some por baixo, sem a onda
 dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
 
-**Os timers do JS no iOS têm uma rede nativa, e a cortina não depende deles** (08/10/2026,
-trilha do iPhone em Release): voltando do Face ID na abertura, o `RCTTiming` do React Native ficou
-num estado em que nem o display link nem o NSTimer disparam — todo `setTimeout`/`setInterval`/rAF
-do app morreu, enquanto o toque e o Reanimated seguiam. `modules/proops-relogio` arma, na thread
-do JS, um timer de socorro para o próximo alvo + 0,25 s: achando timer vencido, dispara e
-ressincroniza o display link (provado no simulador forçando um estado com o mesmo sintoma; sem disparo em dobro).
-Na cortina, `dormir` e `doisQuadros` contam no relógio da UI (`esperarNaUi`) como segunda camada.
-Ao subir o React Native, ler `modules/proops-relogio/README.md`.
+**Os timers do JS no iOS: a causa foi corrigida no RCTTiming, e a cortina não depende deles**
+(08/10/2026). Voltando do Face ID na abertura, todo `setTimeout`/`setInterval`/rAF do app parava
+enquanto o toque e o Reanimated seguiam. Medido no iPhone instrumentando o `RCTTiming`: os avisos de
+ativo/inativo eram tratados na thread PRINCIPAL, e o NSTimer de reserva nascia no runloop dela (só
+no modo padrão) — durante o Face ID ele atrasava 0,85–1,03 s e a thread do JS só conseguia mover a
+data dele. `patches/react-native+0.86.3.patch` leva o tratamento para a thread dos timers (medido
+depois: tudo na thread do JS, reserva com no máximo 15 ms de atraso, nenhuma trava sem rede). Por
+isso `buildReactNativeFromSource` (o núcleo pré-compilado não receberia o patch; build iOS mais
+lento). Na cortina, `dormir` e `doisQuadros` continuam no relógio da UI (`esperarNaUi`): timer do JS
+também para sempre que a thread do JS está ocupada. Ao subir o React Native, ler `patches/README.md`.
 
 **A marca se DESENHA na abertura** (06/10/2026, pedido do dono do produto): um relógio só de
 1,5 s na UI thread (*"mais suave, devagar, fluido"*) — o contorno de `markPath` por trim, o

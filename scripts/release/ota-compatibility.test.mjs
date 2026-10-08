@@ -24,7 +24,7 @@ test('missing receipt, wrong source or tag fail closed', async () => {
   }
 });
 
-for (const path of ['package.json', 'package-lock.json', 'app.json', 'app.config.js', 'eas.json', 'plugins/with-native.js', 'modules/example/index.ts', 'android/app/src/Main.kt', '.fingerprintignore', 'fingerprint.config.js']) {
+for (const path of ['package.json', 'package-lock.json', 'app.json', 'app.config.js', 'eas.json', 'plugins/with-native.js', 'modules/example/index.ts', 'patches/react-native+0.86.3.patch', 'android/app/src/Main.kt', '.fingerprintignore', 'fingerprint.config.js']) {
   test(`changed native source ${path} blocks even an unchanged fingerprint`, async () => {
     let calls = 0;
     await assert.rejects(publishCompatibleUpdate(base, base, { ...reference, changedFiles: [path] }, () => calls++));

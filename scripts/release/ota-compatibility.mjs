@@ -4,7 +4,7 @@ import { assertAttestedBuild } from './native-compatibility.mjs';
 export function assertOtaCompatible(base, current, { tag, sourceCommit, changedFiles = [] }) {
   // Fingerprint configuration itself can exclude native inputs. Also freeze native/build
   // inputs explicitly so a new ignore rule or unsupported plugin cannot weaken this gate.
-  const nativeInput = /^(?:package(?:-lock)?\.json$|(?:app|eas|metro|babel|fingerprint)\.config\.|app\.json$|eas\.json$|\.fingerprintignore$|\.easignore$|(?:android|ios|modules|plugins)\/)/;
+  const nativeInput = /^(?:package(?:-lock)?\.json$|(?:app|eas|metro|babel|fingerprint)\.config\.|app\.json$|eas\.json$|\.fingerprintignore$|\.easignore$|(?:android|ios|modules|plugins|patches)\/)/;
   assert.ok(!changedFiles.some((path) => nativeInput.test(path)), 'Entradas nativas alteradas; gere um APK nativo.');
   assert.match(tag, /^v\d+\.\d+\.\d+$/);
   assert.equal(base.schema, 1, 'APK sem comprovante de compatibilidade; publique um novo APK.');

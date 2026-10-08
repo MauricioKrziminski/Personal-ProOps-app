@@ -146,6 +146,10 @@ module.exports = ({ config }) => {
         {
           ios: {
             enableSceneSupport: true,
+            // O RCTTiming leva uma correção (patches/react-native+0.86.3.patch) e o núcleo
+            // pré-compilado do React Native não a receberia: compilar do código-fonte é o que faz
+            // o patch valer. Sai quando a correção estiver numa versão do React Native.
+            buildReactNativeFromSource: true,
           },
         },
       ],

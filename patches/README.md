@@ -35,3 +35,26 @@ cold/warm-link and protected-route checks before accepting the upgrade. If the
 upstream fix is incomplete, regenerate a reviewed patch with the
 [standard patch-package workflow](https://github.com/ds300/patch-package#making-patches)
 instead of relaxing the version guard.
+
+# React Native: RCTTiming on the timers thread (iOS)
+
+`react-native+0.86.3.patch` changes only `React/CoreModules/RCTTiming.mm`. App
+lifecycle notifications (resign/become active, background/foreground) and
+proximity changes used to be handled on the main thread, while the rest of
+`RCTTiming` runs on the thread that creates timers (the JS thread). The
+background `NSTimer` was then installed on the main run loop in the default
+mode only: measured on an iPhone behind Face ID, it fired 0.85–1.03 s late and
+every JS timer stalled meanwhile. The patch forwards those handlers to the
+timers thread (`-performOnTimingThread:`), so all timer state and the sleep
+timer live on one thread.
+
+It takes effect only because `app.config.js` sets
+`expo-build-properties` → `ios.buildReactNativeFromSource: true`; the
+precompiled React Native core would not contain it (and Expo modules are then
+built from source too, so iOS builds are slower). `patch-package
+--error-on-fail` makes a React Native upgrade fail installation visibly if the
+file changed.
+
+When a React Native release contains this fix, remove the patch and
+`buildReactNativeFromSource`, then repeat cold launches behind Face ID on a
+device before accepting the upgrade.
