@@ -946,13 +946,13 @@ export function useInvoiceHead(invoiceId: string | undefined) {
     enabled: Boolean(invoiceId),
     initialData: () => {
       const i = daFatura()?.data?.invoice;
-      return i ? { reference_month: i.reference_month, due_date: i.due_date } : undefined;
+      return i ? { reference_month: i.reference_month, due_date: i.due_date, status: i.status } : undefined;
     },
     initialDataUpdatedAt: () => daFatura()?.dataUpdatedAt,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('card_invoices')
-        .select('reference_month, due_date')
+        .select('reference_month, due_date, status')
         .eq('id', invoiceId!)
         .maybeSingle();
       if (error) throw error;

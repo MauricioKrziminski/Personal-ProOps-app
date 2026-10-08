@@ -13,7 +13,7 @@ export type Alvo =
 export type Aviso = { days_before: number; at_time: string };
 
 export type Aberto =
-  | { tipo: 'lancamento'; tx: { id: string; recurring_id: string | null; installment_plan_id: string | null; invoice_id: string | null; status: string } }
+  | { tipo: 'lancamento'; tx: TxDoLembrete }
   | { tipo: 'divida'; debtId: string; parcela?: number }
   | { tipo: 'fatura'; invoiceId: string }
   | { tipo: 'serie'; recurringId: string }
@@ -21,13 +21,28 @@ export type Aberto =
 
 export const AVISO_PADRAO: Aviso = { days_before: 0, at_time: '09:00' };
 
+/** `fatura_status`: o status da fatura da linha de cartão (null/ausente = ainda não se sabe). */
+export type TxDoLembrete = {
+  id: string; recurring_id: string | null; installment_plan_id: string | null; invoice_id: string | null;
+  status: string; fatura_status?: string | null;
+};
+
+/** Já paga: fora do cartão pelo status da linha; no cartão pela FATURA (a compra fica `cleared` antes). */
+export const estaPaga = (tx: TxDoLembrete) =>
+  tx.invoice_id ? tx.fatura_status === 'paid' || tx.fatura_status === 'rolled' : tx.status !== 'pending';
+
 /** "Só este" e "Todas as próximas"; `todas: null` = não há série, a tela não pergunta. */
 export function alvosDoAberto(a: Aberto): { so: Alvo; todas: Alvo | null } {
   switch (a.tipo) {
     case 'lancamento': {
       const { tx } = a;
-      if (tx.recurring_id) return { so: { transaction_id: tx.id }, todas: { recurring_id: tx.recurring_id } };
-      if (tx.installment_plan_id) return { so: { transaction_id: tx.id }, todas: { installment_plan_id: tx.installment_plan_id } };
+      // Ocorrência já paga: "Só esta" não teria o que lembrar (o banco recusa) — vale a série/compra.
+      if (tx.recurring_id) return estaPaga(tx)
+        ? { so: { recurring_id: tx.recurring_id }, todas: null }
+        : { so: { transaction_id: tx.id }, todas: { recurring_id: tx.recurring_id } };
+      if (tx.installment_plan_id) return estaPaga(tx)
+        ? { so: { installment_plan_id: tx.installment_plan_id }, todas: null }
+        : { so: { transaction_id: tx.id }, todas: { installment_plan_id: tx.installment_plan_id } };
       // Compra à vista no cartão não vence sozinha: quem vence é a fatura.
       if (tx.invoice_id) return { so: { invoice_id: tx.invoice_id }, todas: null };
       return { so: { transaction_id: tx.id }, todas: null };

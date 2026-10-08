@@ -1,6 +1,9 @@
 -- Lembrete de conta (07/10/2026): a intenção é gravada, o disparo é derivado do vencimento ATUAL.
 begin;
 set local timezone to 'America/Sao_Paulo';
+-- O aviso só é devido se já existia no momento dele (20261009140000): os lembretes do teste nascem
+-- "antigos"; o caso do recém-criado (15c) grava `created_at` à mão. Volta com o rollback.
+alter table public.bill_reminders alter column created_at set default now() - interval '2 days';
 
 insert into auth.users (id, instance_id, aud, role, phone, raw_user_meta_data, raw_app_meta_data)
 values
@@ -257,6 +260,12 @@ begin
     select d.bill_reminder_id, d.due_date, now() from public._bill_reminders_due() d where d.ref = fat2;
     select count(*) into n from public._bill_reminders_due() d where d.ref = fat2;
     assert n = 0, 'enviado não pode tocar de novo pelo outro lembrete do grupo';
+    -- apagar o lembrete que enviou não faz o outro reenviar: o livro de envios não some junto
+    delete from public.bill_reminders b using private.bill_reminder_sends s
+    where s.bill_reminder_id = b.id and s.due_date = hoje and b.recurring_id in (sa, sb);
+    assert (select count(*) from public.bill_reminders where recurring_id in (sa, sb)) = 1, 'fixture: sobrou um';
+    select count(*) into n from public._bill_reminders_due() d where d.ref = fat2;
+    assert n = 0, format('apagado o que enviou, o outro não reenvia (veio %s)', n);
     -- "só esta" na compra A, mesma hora, criado depois do envio: cala as séries e não reenvia
     insert into public.bill_reminders (workspace_id, user_id, transaction_id, days_before, at_time, channel)
     values (ws, u, linha_a, 0, '00:00', 'push');
@@ -355,6 +364,102 @@ begin
   end;
   assert n <> -1, 'receita devia ser recusada';
   reset role;
+
+  -- 15) o lembrete é DA PESSOA
+  declare
+    hoje_occ uuid; tx3 uuid; tx5 uuid; rep uuid; plano uuid;
+  begin
+    insert into public.workspace_members (workspace_id, user_id, role) values (ws, outro, 'member');
+    select id into hoje_occ from public.transactions where recurring_id = serie and occurred_at = hoje;
+    -- (a) o membro salva e apaga o DELE; o meu fica
+    perform set_config('request.jwt.claim.sub', outro::text, true);
+    perform set_config('request.jwt.claims', json_build_object('sub', outro, 'role', 'authenticated')::text, true);
+    set local role authenticated;
+    perform public.save_bill_reminder(jsonb_build_object('recurring_id', serie), '[{"days_before":0,"at_time":"00:00"}]', 'push');
+    reset role;
+    assert (select count(*) from public.bill_reminders where recurring_id = serie) = 2, 'o do membro soma, não substitui';
+    set local role authenticated;
+    -- a lista do membro só tem o dele
+    assert (select count(*) from public.bill_reminders_overview() o where o.alvo ->> 'recurring_id' = serie::text) = 1,
+      'a lista mostra só os meus';
+    perform public.save_bill_reminder(jsonb_build_object('recurring_id', serie), '[]', 'push');
+    reset role;
+    assert (select count(*) from public.bill_reminders where recurring_id = serie and user_id = u) = 1,
+      'apagar o do membro não apaga o meu';
+    -- (b) o "só esta" do membro não cala a minha série naquela ocorrência
+    insert into public.bill_reminders (workspace_id, user_id, transaction_id, days_before, at_time, channel)
+    values (ws, outro, hoje_occ, 0, '00:00', 'push');
+    select count(*) into n from private.bill_reminder_dues(array[ws]) d
+      join public.bill_reminders b on b.id = d.bill_reminder_id where d.ref = hoje_occ and b.user_id = u;
+    assert n = 1, 'a minha série continua tocando a ocorrência';
+    -- (c) quem sai do espaço deixa de receber
+    select count(*) into n from public._bill_reminders_due() d where d.user_id = outro and d.ref = hoje_occ;
+    assert n = 1, format('membro recebe, veio %s', n);
+    delete from public.workspace_members where workspace_id = ws and user_id = outro;
+    select count(*) into n from public._bill_reminders_due() d where d.user_id = outro;
+    assert n = 0, 'ex-membro não recebe';
+    -- (d) o aviso automático (do dono) só cala pelo lembrete do dono
+    insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id)
+    values (ws, u, 'expense', 3300, 'Gás BL', hoje, 'pending', conta) returning id into tx3;
+    insert into public.bill_reminders (workspace_id, user_id, transaction_id, days_before, at_time, channel)
+    values (ws, outro, tx3, 0, '09:00', 'push');
+    select count(*) into n from public._alerts_to_send() a where a.kind = 'bill_due' and a.ref = tx3::text;
+    assert n = 1, 'lembrete de outra pessoa não cala o aviso do dono';
+
+    -- (e) o aviso criado depois do seu momento não toca hoje (mudar a hora não reenvia)
+    insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id)
+    values (ws, u, 'expense', 4400, 'Net BL', hoje, 'pending', conta) returning id into tx5;
+    insert into public.bill_reminders (workspace_id, user_id, transaction_id, days_before, at_time, channel, created_at)
+    values (ws, u, tx5, 0, '00:00', 'push', now()) returning id into rep;
+    select count(*) into n from public._bill_reminders_due() d where d.ref = tx5;
+    assert n = 0, 'criado depois do momento não toca hoje';
+    update public.bill_reminders set created_at = now() - interval '2 days' where id = rep;
+    select count(*) into n from public._bill_reminders_due() d where d.ref = tx5;
+    assert n = 1, 'existia no momento: toca';
+
+    -- (f) espera entre tentativas dobra; com 8 desiste
+    insert into private.bill_reminder_sends (bill_reminder_id, due_date, attempts) values (rep, hoje, 1);
+    assert (select user_id = u and transaction_id = tx5 and at_time = '00:00'
+            from private.bill_reminder_sends where bill_reminder_id = rep), 'o envio descreve o lembrete';
+    update private.bill_reminder_sends set attempts = 2 where bill_reminder_id = rep;
+    select count(*) into n from public._bill_reminders_due() d where d.ref = tx5;
+    assert n = 0, 'logo depois de falhar, espera';
+    update private.bill_reminder_sends set tentado_em = now() - interval '5 minutes' where bill_reminder_id = rep;
+    select count(*) into n from public._bill_reminders_due() d where d.ref = tx5;
+    assert n = 1, 'passada a espera (4 min para a 2ª), tenta de novo';
+    update private.bill_reminder_sends set attempts = 8, tentado_em = now() - interval '1 day' where bill_reminder_id = rep;
+    select count(*) into n from public._bill_reminders_due() d where d.ref = tx5;
+    assert n = 0, 'com 8 tentativas desiste';
+
+    -- (g) salvar recusa fatura paga e compra sem parcela em aberto
+    update public.card_invoices set status = 'paid' where id = fatura;
+    insert into public.installment_plans (workspace_id, user_id, total_cents, installments, first_occurred_at, description)
+    values (ws, u, 2000, 2, hoje - 60, 'Plano BL') returning id into plano;
+    insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, paid_at, account_id, installment_plan_id, installment_no)
+    values (ws, u, 'expense', 1000, 'Plano BL (1/2)', hoje - 60, 'cleared', hoje - 60, conta, plano, 1),
+           (ws, u, 'expense', 1000, 'Plano BL (2/2)', hoje - 30, 'cleared', hoje - 30, conta, plano, 2);
+    perform set_config('request.jwt.claim.sub', u::text, true);
+    perform set_config('request.jwt.claims', json_build_object('sub', u, 'role', 'authenticated')::text, true);
+    set local role authenticated;
+    begin
+      perform public.save_bill_reminder(jsonb_build_object('invoice_id', fatura), '[{"days_before":0,"at_time":"09:00"}]', 'push');
+      n := -1;
+    exception when others then
+      assert sqlerrm = 'Essa fatura já foi paga ou adiada', format('fatura paga: %s', sqlerrm);
+    end;
+    assert n <> -1, 'fatura paga devia ser recusada';
+    begin
+      perform public.save_bill_reminder(jsonb_build_object('installment_plan_id', plano), '[{"days_before":0,"at_time":"09:00"}]', 'push');
+      n := -1;
+    exception when others then
+      assert sqlerrm = 'Essa compra já foi toda paga', format('compra paga: %s', sqlerrm);
+    end;
+    assert n <> -1, 'compra toda paga devia ser recusada';
+    -- remover continua passando
+    n := public.save_bill_reminder(jsonb_build_object('invoice_id', fatura), '[]', 'push');
+    assert n = 0, 'remover da fatura paga passa';
+    reset role;
+  end;
 
   -- 7) RLS: o outro usuário não lê
   perform set_config('request.jwt.claim.sub', outro::text, true);

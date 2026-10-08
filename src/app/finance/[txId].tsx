@@ -56,7 +56,7 @@ import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
 import { useBillReminderFor } from '@/hooks/use-bill-reminders';
-import { alvosDoAberto, hrefDoLembrete, resumoDosAvisos } from '@/lib/lembrete-de-conta';
+import { alvosDoAberto, estaPaga, hrefDoLembrete, resumoDosAvisos } from '@/lib/lembrete-de-conta';
 
 /**
  * Lançamento (detalhe) — a tela que faltava.
@@ -129,7 +129,8 @@ export default function TransactionDetailScreen() {
   const series = useRecurringSerie(tx?.recurring_id);
   const serie = series.data ?? undefined;
   // Lembrete de conta: o do alvo "só esta" OU o da série/compra. Hooks antes de qualquer return.
-  const alvosLembrete = tx ? alvosDoAberto({ tipo: 'lancamento', tx }) : null;
+  const txDoLembrete = tx ? { ...tx, fatura_status: invoice.data?.status ?? null } : null;
+  const alvosLembrete = txDoLembrete ? alvosDoAberto({ tipo: 'lancamento', tx: txDoLembrete }) : null;
   const lembreteSo = useBillReminderFor(alvosLembrete?.so ?? null);
   const lembreteTodas = useBillReminderFor(alvosLembrete?.todas ?? null);
   const lembrete = lembreteSo ?? lembreteTodas;
@@ -356,7 +357,7 @@ export default function TransactionDetailScreen() {
       {lembrete ? (
         <Section>
           <Row icon="bell" title={resumoDosAvisos(lembrete.avisos)}
-            onPress={() => router.push(hrefDoLembrete({ tipo: 'lancamento', tx }, title))} />
+            onPress={() => txDoLembrete && router.push(hrefDoLembrete({ tipo: 'lancamento', tx: txDoLembrete }, title))} />
         </Section>
       ) : null}
       <Section title="Como isso entrou">
@@ -520,11 +521,11 @@ export default function TransactionDetailScreen() {
               : []),
             // Pagamento de dívida, de fatura e juro do Pix não são conta a vencer.
             ...(tx.kind === 'expense' && !tx.debt_id && !tx.pays_invoice_id && !tx.pix_fee_for_transaction_id &&
-                (tx.status === 'pending' || tx.recurring_id || tx.installment_plan_id || tx.invoice_id)
+                (tx.recurring_id || tx.installment_plan_id || (txDoLembrete && !estaPaga(txDoLembrete)))
               ? [{
                   label: lembrete ? 'Editar lembrete' : tx.invoice_id && !tx.recurring_id && !tx.installment_plan_id ? 'Lembrar da fatura' : 'Lembrar',
                   icon: 'bell' as const,
-                  onPress: () => router.push(hrefDoLembrete({ tipo: 'lancamento', tx }, title)),
+                  onPress: () => txDoLembrete && router.push(hrefDoLembrete({ tipo: 'lancamento', tx: txDoLembrete }, title)),
                 }]
               : []),
             // Só com a série carregada, ativa e fora de uma pausa (a mesma régua de Recorrentes).

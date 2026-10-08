@@ -1,8 +1,9 @@
 """Lembrete de conta (cron de 1 minuto): quem decide o que toca é `_bill_reminders_due()`.
 
 A reserva em `private.bill_reminder_sends` acontece ANTES do envio, sob trava de sessão (o mesmo
-at-least-once dos lembretes). Falha soma `attempts`; com 5 a função do banco deixa de devolver o
-aviso — template pago não entra em loop. Canais e portão do WhatsApp são os do lembrete comum.
+at-least-once dos lembretes). Falha soma `attempts`, e o banco espera 2^attempts minutos antes de
+devolver o aviso de novo; com `MAX_TENTATIVAS` ele deixa de devolver — template pago não entra em
+loop, e uma queda curta do push não perde o aviso. Canais e portão do WhatsApp são os do lembrete comum.
 """
 
 from __future__ import annotations
@@ -16,6 +17,9 @@ from app.domain.money import cents_to_brl
 from app.jobs import reminders
 
 log = logging.getLogger(__name__)
+
+# O MESMO teto de `public._bill_reminders_due()` (20261009140000).
+MAX_TENTATIVAS = 8
 
 
 def hoje_local() -> date:
@@ -48,11 +52,11 @@ async def run() -> dict:
                 " where bill_reminder_id = %s and due_date = %s",
                 linha["bill_reminder_id"], linha["due_date"],
             )
-            if not estado or estado["sent_at"] is not None or estado["attempts"] >= reminders.MAX_SEND_ATTEMPTS:
+            if not estado or estado["sent_at"] is not None or estado["attempts"] >= MAX_TENTATIVAS:
                 continue
             corpo = texto(linha["title"], linha["amount_cents"], linha["due_date"], hoje)
             # at-least-once: se a entrega passa e o update de sent_at falha, o próximo minuto reenvia,
-            # limitado por MAX_SEND_ATTEMPTS.
+            # limitado por MAX_TENTATIVAS.
             try:
                 await reminders._entregar({**linha, "title": corpo}, alvo=linha["target"], ref=str(linha["ref"]))
                 await db.execute(

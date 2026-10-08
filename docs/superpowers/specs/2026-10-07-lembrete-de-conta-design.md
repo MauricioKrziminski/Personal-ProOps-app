@@ -219,3 +219,13 @@ pela última migration) e acrescenta só o `not exists`. Suíte SQL inteira depo
   "Só esta / Todas as próximas"; só na próxima e nas futuras.
 - **O salvar recusa o que nunca toca**: receita/transferência/pagamento de dívida ou de fatura,
   ocorrência já paga, parcela fora do contrato ou já paga. Remover sempre passa.
+- **O lembrete é DA PESSOA** (`20261009140000`): salvar, a precedência, a lista e o silêncio do
+  aviso automático olham só os lembretes de quem salvou — num espaço compartilhado um membro não
+  edita, apaga nem cala o do outro. Quem sai do espaço deixa de receber.
+- **O aviso só é devido se já existia no momento dele** (`created_at <= dia + hora`): mudar a hora
+  de um aviso já enviado, ou criar um com a hora de hoje já passada, não dispara na hora.
+- **O livro de envios (`private.bill_reminder_sends`) descreve a si mesmo** (pessoa, alvo, dias,
+  hora) e não some com o lembrete: apagar o lembrete que enviou não faz outro reenviar.
+- **Entrega com folga**: até 8 tentativas, esperando 2^tentativas minutos (~4 h no total).
+- **Ocorrência já paga** (fora do cartão pelo status; no cartão pela fatura) abre o lembrete direto
+  na série/compra, sem perguntar; "Lembrar da fatura" some com a fatura paga.

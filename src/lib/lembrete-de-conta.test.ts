@@ -18,6 +18,14 @@ test('o que se abriu decide onde o lembrete fica pendurado', () => {
   assert.deepEqual(alvosDoAberto({ tipo: 'divida', debtId: 'd1' }), { so: { debt_id: 'd1' }, todas: null });
   assert.deepEqual(alvosDoAberto({ tipo: 'serie', recurringId: 'r1' }), { so: { recurring_id: 'r1' }, todas: null });
   assert.deepEqual(alvosDoAberto({ tipo: 'fatura', invoiceId: 'f1' }), { so: { invoice_id: 'f1' }, todas: null });
+  // ocorrência já paga: só a série/compra, sem perguntar
+  assert.deepEqual(alvosDoAberto({ tipo: 'lancamento', tx: { ...tx({ recurring_id: 'r1' }), status: 'cleared' } }),
+    { so: { recurring_id: 'r1' }, todas: null });
+  assert.deepEqual(alvosDoAberto({ tipo: 'lancamento', tx: { ...tx({ installment_plan_id: 'p1', invoice_id: 'f1' }), status: 'cleared', fatura_status: 'paid' } }),
+    { so: { installment_plan_id: 'p1' }, todas: null });
+  // no cartão a linha fica `cleared` com a fatura aberta: ainda não está paga
+  assert.deepEqual(alvosDoAberto({ tipo: 'lancamento', tx: { ...tx({ installment_plan_id: 'p1', invoice_id: 'f1' }), status: 'cleared', fatura_status: 'closed' } }),
+    { so: { transaction_id: 't1' }, todas: { installment_plan_id: 'p1' } });
 });
 
 test('o aviso se lê como a pessoa fala', () => {

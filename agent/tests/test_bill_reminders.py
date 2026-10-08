@@ -105,7 +105,7 @@ def _instala(monkeypatch, banco):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("estado", [
     {"sent_at": "2026-10-07T09:00", "attempts": 0},
-    {"sent_at": None, "attempts": reminders.MAX_SEND_ATTEMPTS},
+    {"sent_at": None, "attempts": bill_reminders.MAX_TENTATIVAS},
 ])
 async def test_ja_enviado_ou_sem_tentativas_nao_manda_nada(monkeypatch, ambiente, estado):
     _instala(monkeypatch, _Banco([_linha(channel="both", alerts_whatsapp_enabled=True)], estado))
