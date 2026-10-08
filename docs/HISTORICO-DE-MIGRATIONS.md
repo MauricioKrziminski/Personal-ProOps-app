@@ -327,3 +327,6 @@ Ordem de deploy em produção: migrations, depois o agente (confirmar a revisão
 **Lembrete: "só esta" e parcela da dívida** — `20261009130000`; **lembrete por pessoa e envio único** — `20261009140000`: staging e produção 07/10/2026. Sobem depois das de `20261009120…`.
 
 **Lembrete: compra e fatura no cartão são coisas diferentes** — `20261009150000`: staging e produção 07/10/2026 (aplicada pelo Gabriel com `PROOPS_PROD_OK=1` e `--project-ref`; conferida em leitura: no topo de `schema_migrations`, `bill_reminder_dues` nova, `_bill_reminders_due()` e `_alerts_to_send()` sem erro). Só banco: o agente não mudou.
+
+**Valor previsto, detalhe do ciclo e aplicar o adiantamento** — `20261010100000` (valor previsto da baixa), `20261010110000` (detalhe do ciclo), `20261010120000` (previsto sobrevive ao desfazer), `20261010130000` (aplicar adiantamento), `20261010130100` (renumeração bigint) e `20261010130200` (trava que recusa mudar a estrutura): staging 08/10/2026, produção 08/10/2026 (aplicadas pelo Gabriel com `PROOPS_PROD_OK=1` e `--project-ref`; conferidas no `migration list`).
+Ordem: migrations, agente (seleciona `transactions.adiantamento`) e só então a tag do app (lê `expected_amount_cents` e `adiantamento`).
