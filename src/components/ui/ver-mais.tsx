@@ -34,7 +34,10 @@ export function VerMais({
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingTop: Space.xs },
+  // Respiro dos DOIS lados (07/10/2026): dentro de um `Section` o "Ver mais" é um filho como as
+  // linhas, e só com `paddingTop` a pílula encostava no fio da linha seguinte — no ciclo, o
+  // "Ver mais (15)" das compras ficava colado no "Pagamento da fatura" logo abaixo.
+  wrap: { paddingVertical: Space.sm },
   // O `Button` abraça o conteúdo à esquerda; o "Ver mais" fica no meio, embaixo da lista.
   centro: { alignSelf: 'center' },
 });
