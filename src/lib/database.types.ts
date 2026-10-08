@@ -3432,6 +3432,7 @@ export type Database = {
           down_payment_plan_id: string | null
           due_at: string | null
           edit_revision: number
+          expected_amount_cents: number | null
           expense_necessity: string | null
           expense_necessity_source: string | null
           expense_pattern: string | null
@@ -3477,6 +3478,7 @@ export type Database = {
           down_payment_plan_id?: string | null
           due_at?: string | null
           edit_revision?: number
+          expected_amount_cents?: number | null
           expense_necessity?: string | null
           expense_necessity_source?: string | null
           expense_pattern?: string | null
@@ -3522,6 +3524,7 @@ export type Database = {
           down_payment_plan_id?: string | null
           due_at?: string | null
           edit_revision?: number
+          expected_amount_cents?: number | null
           expense_necessity?: string | null
           expense_necessity_source?: string | null
           expense_pattern?: string | null

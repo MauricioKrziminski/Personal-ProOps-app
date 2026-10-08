@@ -63,6 +63,7 @@ import { confirmDestructive } from '@/lib/item-actions';
 import { useApagarComAlcance } from '@/hooks/use-apagar-com-alcance';
 import { alvoDoLancamento } from '@/lib/apagar-com-alcance';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
+import { parcelaDoContratoPaga, previstoDaLinha } from '@/lib/previsto';
 import { dueInline, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
 import { filterExpectedLines, mesclarPrevistas, previstasNaTela, type ItemDoExtrato } from '@/lib/ledger-expected';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
@@ -260,6 +261,9 @@ const LinhaDoExtrato = memo(function LinhaDoExtrato({
    * vencimento É a data daquela conta.
    */
   const tituloDaLinha = tx.description || tx.merchant || tx.category || 'Sem descrição';
+  const previsto =
+    previstoDaLinha(tx) ??
+    (tx.debts?.calculation_mode ? parcelaDoContratoPaga(tx, tx.debts.calculation_mode !== 'fixed_installments') : null);
   const badges = [
     // "parcela 2" some quando o título já diz "(2/10)" — a mesma informação duas vezes.
     tx.installment_no && !/\(\d+\/\d+\)$/.test(tituloDaLinha) ? `parcela ${tx.installment_no}` : null,
@@ -267,6 +271,8 @@ const LinhaDoExtrato = memo(function LinhaDoExtrato({
     emAberto && tx.invoice_id === null
       ? dueInline(tx.kind, tx.due_at ? formatDateBR(tx.due_at).slice(0, 5) : null).replace(/^previsto( · )?/, '')
       : null,
+    // Paga com outro valor (07/10/2026): o valor da linha é o pago; o previsto vem aqui, curto.
+    previsto === null ? null : `previsto ${brl(previsto)}`,
   ].filter(Boolean);
   // Transferência não tem sinal na lista global — ela não é entrada nem saída do
   // conjunto. No extrato de UMA conta ela tem: sai da conta de origem e ENTRA na de

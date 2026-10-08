@@ -8,6 +8,7 @@ import { HitTarget, Radius, Space, tabular } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
 import { isoToBR, localISODate } from '@/lib/dates';
 import type { ItemDaLinha } from '@/lib/debt-history';
+import { parcelaDoContratoPaga } from '@/lib/previsto';
 
 /** O nó do trilho mede isto; o trilho é centrado nele. */
 const NO = 12;
@@ -27,8 +28,16 @@ const NO = 12;
 export function DebtTimeline({
   anos,
   onItemPress,
+  comJuros = false,
 }: {
   anos: { ano: string; itens: ItemDaLinha[] }[];
+  /**
+   * O contrato tem juros (não é de parcela fixa). Decide o que a parcela PAGA diz além do valor
+   * (07/10/2026, *"mostra o valor de cada parcela, mas como já paguei, mostra quanto paguei de
+   * fato"*): na parcela fixa, a parcela do contrato quando o pagamento saiu diferente; com juros,
+   * quanto daquele pagamento foi juros.
+   */
+  comJuros?: boolean;
   /** Toda parcela abre (25/09/2026): a paga com lançamento, o lançamento; a outra, a tela dela. */
   onItemPress?: (item: ItemDaLinha) => void;
 }) {
@@ -62,11 +71,21 @@ export function DebtTimeline({
                     : proxima
                       ? `a próxima · vence ${isoToBR(item.iso)}`
                       : `vence ${isoToBR(item.iso)}`;
+            // O valor à direita é o PAGO; a parcela do contrato (ou os juros) vai na linha de apoio.
+            const contrato = item.estado === 'paga'
+              ? parcelaDoContratoPaga({ amount_cents: item.cents, debt_principal_cents: item.principalCents }, comJuros)
+              : null;
+            const jurosPagos = item.estado === 'paga' && comJuros && (item.jurosPagosCents ?? 0) > 0 ? item.jurosPagosCents! : null;
+            const apoio = [
+              quando,
+              contrato === null ? null : `parcela ${brl(contrato)}`,
+              jurosPagos === null ? null : `juros ${brl(jurosPagos)}`,
+            ].filter(Boolean).join(' · ');
             return (
               <Pressable
                 key={item.n}
                 accessibilityRole={onItemPress ? 'button' : undefined}
-                accessibilityLabel={`${item.n}ª parcela, ${quando}, ${brl(item.cents)}`}
+                accessibilityLabel={`${item.n}ª parcela, ${apoio}, ${item.estado === 'paga' ? 'pago ' : ''}${brl(item.cents)}`}
                 disabled={!onItemPress}
                 onPress={() => onItemPress?.(item)}
                 // Linha de lista: o toque acende o FUNDO, sem escala (design §5).
@@ -107,7 +126,7 @@ export function DebtTimeline({
                     {`${item.n}ª parcela`}
                   </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                    {item.jurosCents ? `${quando} · juros ${brl(item.jurosCents)}` : quando}
+                    {item.jurosCents ? `${apoio} · juros ${brl(item.jurosCents)}` : apoio}
                   </ThemedText>
                 </View>
                 <Money

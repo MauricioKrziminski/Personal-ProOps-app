@@ -23,6 +23,10 @@ export interface PaidInstallment {
   registered: boolean;
   /** O lançamento do pagamento, quando existe — tocar na parcela paga abre ele. */
   txId?: string;
+  /** A parcela do contrato que o pagamento quitou (`debt_principal_cents`), quando registrado. */
+  principal_cents?: number | null;
+  /** Juros/encargo do pagamento (`debt_interest_cents`): no modo fixo, negativo é desconto. */
+  interest_cents?: number | null;
 }
 
 export interface DebtPaymentRow {
@@ -30,6 +34,8 @@ export interface DebtPaymentRow {
   debt_payment_no: number | null;
   occurred_at: string;
   amount_cents: number;
+  debt_principal_cents?: number | null;
+  debt_interest_cents?: number | null;
 }
 
 export interface DebtDeclaredEstimateRow {
@@ -86,6 +92,8 @@ export function paidInstallments({
             payment_cents: Number(real.amount_cents),
             registered: true,
             ...(real.id ? { txId: real.id } : {}),
+            ...(real.debt_principal_cents == null ? {} : { principal_cents: Number(real.debt_principal_cents) }),
+            ...(real.debt_interest_cents == null ? {} : { interest_cents: Number(real.debt_interest_cents) }),
           }
         : {
             installment_no: n,
@@ -105,6 +113,9 @@ export interface ItemDaLinha {
   jurosCents: number | null;
   estado: 'paga' | 'estimada' | 'proxima' | 'futura';
   txId?: string;
+  /** Só na paga com lançamento: a parcela do contrato e os juros que aquele pagamento quitou. */
+  principalCents?: number;
+  jurosPagosCents?: number;
 }
 
 /**
@@ -128,6 +139,8 @@ export function linhaDoTempo(
       jurosCents: null,
       estado: p.registered ? ('paga' as const) : ('estimada' as const),
       ...(p.txId ? { txId: p.txId } : {}),
+      ...(p.principal_cents == null ? {} : { principalCents: p.principal_cents }),
+      ...(p.interest_cents == null ? {} : { jurosPagosCents: p.interest_cents }),
     })),
     // O cronograma começa em `pagas + 1`; a parcela que já tem pagamento lançado não é futura.
     ...futuras.filter((p) => !historico.some((h) => h.installment_no === p.installment_no)).map((p, i) => ({

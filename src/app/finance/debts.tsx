@@ -207,6 +207,8 @@ export default function DebtsScreen() {
    * parcelas desenhava as 360 de uma vez, com a próxima centenas de linhas abaixo do topo.
    */
   const secoes = secoesDaLinha(historico, detalhe ? (schedule.data ?? []) : []);
+  // Parcela fixa (o `check` do contrato) ou com juros: decide o que a parcela paga diz além do valor.
+  const debtComJuros = detalhe ? detalhe.calculation_mode !== 'fixed_installments' && Number(detalhe.interest_rate_monthly) > 0 : false;
   const aSeguir = useAosPoucos(secoes.aSeguir, detalhe?.id ?? '');
   const jaPagas = useAosPoucos(secoes.pagas, detalhe?.id ?? '');
   const pagadoras = (accounts.data ?? []).filter((a) => a.type !== 'credit_card');
@@ -804,14 +806,14 @@ export default function DebtsScreen() {
           {aSeguir.visiveis.length > 0 ? (
             <View style={styles.secaoDaLinha}>
               <SectionHead title="A seguir" inset={false} />
-              <DebtTimeline anos={porAno(aSeguir.visiveis)} onItemPress={abrirParcela} />
+              <DebtTimeline anos={porAno(aSeguir.visiveis)} onItemPress={abrirParcela} comJuros={debtComJuros} />
               <VerMais restantes={aSeguir.restantes} onPress={aSeguir.verMais} />
             </View>
           ) : null}
           {jaPagas.visiveis.length > 0 ? (
             <View style={styles.secaoDaLinha}>
               <SectionHead title="Já pagas" inset={false} />
-              <DebtTimeline anos={porAno(jaPagas.visiveis)} onItemPress={abrirParcela} />
+              <DebtTimeline anos={porAno(jaPagas.visiveis)} onItemPress={abrirParcela} comJuros={debtComJuros} />
               <VerMais restantes={jaPagas.restantes} onPress={jaPagas.verMais} />
             </View>
           ) : null}

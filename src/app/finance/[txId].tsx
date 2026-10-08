@@ -44,6 +44,7 @@ import { alvoDoLancamento } from '@/lib/apagar-com-alcance';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { detalheDoPagamento } from '@/lib/confirmar-baixa';
+import { previstoDaLinha } from '@/lib/previsto';
 import { foldCategory, mergeCategories } from '@/lib/categories-merge';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive } from '@/lib/item-actions';
@@ -272,6 +273,8 @@ export default function TransactionDetailScreen() {
   // Pagamento de dívida: o que o valor pago carrega, embaixo do total (parcela + encargo/desconto,
   // ou amortização + juros). Lido da linha, então muda junto quando o valor é corrigido.
   const detalheDaDivida = detalheDoPagamento(tx, tx.debts?.calculation_mode, brl);
+  // Paga com outro valor (07/10/2026): o previsto mora sob o valor pago, como o detalhe da dívida.
+  const previsto = detalheDaDivida ? null : previstoDaLinha(tx);
 
   const mainContent = (
     <>
@@ -290,6 +293,11 @@ export default function TransactionDetailScreen() {
           {detalheDaDivida ? (
             <ThemedText type="small" style={tabular}>
               {detalheDaDivida}
+            </ThemedText>
+          ) : null}
+          {previsto !== null ? (
+            <ThemedText type="small" style={tabular}>
+              {`Previsto ${brl(previsto)}`}
             </ThemedText>
           ) : null}
           <ThemedText type="small" themeColor="textSecondary" style={tabular}>

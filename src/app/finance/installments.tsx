@@ -57,6 +57,7 @@ import { listFiltersActive, type ListFiltersValue } from '@/lib/list-filters';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 import { hrefDoLancar } from '@/lib/lancar';
+import { previstoDaLinha } from '@/lib/previsto';
 
 /**
  * Parceladas — "o que eu já comprometi nos próximos meses, e quanto falta para acabar?".
@@ -468,6 +469,7 @@ export default function InstallmentsScreen() {
                 "atrasada", onde antes lia "prevista". É o certo — ninguém a pagou.
               */
               const estado = estadoDaLinha({ ...parcela, kind: 'expense', due_at: null }, hoje);
+              const previsto = previstoDaLinha(parcela);
               const rotulo =
                 parcela.status === 'cleared' ? 'paga'
                 : estado === 'atrasado' ? 'atrasada'
@@ -477,7 +479,7 @@ export default function InstallmentsScreen() {
                 <Pressable
                   key={parcela.id}
                   accessibilityRole="button"
-                  accessibilityLabel={`Parcela ${parcela.installment_no ?? ''} de ${plano.installments}, ${brl(parcela.amount_cents)}, ${rotulo}, ${formatDateBR(parcela.occurred_at)}`}
+                  accessibilityLabel={`Parcela ${parcela.installment_no ?? ''} de ${plano.installments}, ${brl(parcela.amount_cents)}${previsto !== null ? `, previsto ${brl(previsto)}` : ''}, ${rotulo}, ${formatDateBR(parcela.occurred_at)}`}
                   onPress={() =>
                     router.push({
                       pathname: '/finance/[txId]',
@@ -490,10 +492,19 @@ export default function InstallmentsScreen() {
                         styles.parcela,
                         { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
                       ]}>
-                      <ThemedText type="small" style={tabular}>
-                        {parcela.installment_no ?? '—'}/{plano.installments} ·{' '}
-                        {formatDateBR(parcela.occurred_at)}
-                      </ThemedText>
+                      <View style={styles.parcelaTexto}>
+                        <ThemedText type="small" style={tabular}>
+                          {parcela.installment_no ?? '—'}/{plano.installments} ·{' '}
+                          {formatDateBR(parcela.occurred_at)}
+                        </ThemedText>
+                        {/* Paga com outro valor (07/10/2026): o valor à direita é o pago, e o
+                            previsto fica aqui embaixo, pequeno — os dois sem brigar. */}
+                        {previsto !== null ? (
+                          <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
+                            previsto {brl(previsto)}
+                          </ThemedText>
+                        ) : null}
+                      </View>
                       <View style={styles.parcelaValor}>
                         <ThemedText
                           type="small"
@@ -818,6 +829,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.xl,
     paddingVertical: Space.sm,
   },
+  parcelaTexto: { flexShrink: 1, gap: Space.half },
   parcelaValor: {
     flexDirection: 'row',
     alignItems: 'center',

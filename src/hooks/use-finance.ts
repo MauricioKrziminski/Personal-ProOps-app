@@ -129,7 +129,7 @@ export type Transaction = Pick<
    * A dívida de um pagamento, embutida só no DETALHE (`useTransaction`): o modo diz se a diferença
    * entre o valor pago e a parcela é encargo/desconto ou juros (`detalheDoPagamento`). Só leitura.
    */
-  debts?: Pick<Debt, 'name' | 'kind' | 'calculation_mode' | 'installments'> | null;
+  debts?: Partial<Pick<Debt, 'name' | 'kind' | 'calculation_mode' | 'installments'>> | null;
 };
 
 /**
@@ -232,7 +232,7 @@ export type TxSummaryRow = Omit<Fns['transactions_summary']['Returns'][number], 
 };
 
 const TRANSACTION_COLUMNS =
-  'id, workspace_id, subcategory_id, subcategories!transactions_subcategory_id_fkey(name), expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, payment_method, pix_fee_for_transaction_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_balance_after_cents, edit_revision, auto_confirm, rollover_of_invoice_id, pays_invoice_id, down_payment_debt_id, down_payment_plan_id, installment_plans!transactions_installment_plan_id_fkey(first_occurred_at)';
+  'id, workspace_id, subcategory_id, subcategories!transactions_subcategory_id_fkey(name), expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, payment_method, pix_fee_for_transaction_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_interest_cents, debt_balance_after_cents, expected_amount_cents, edit_revision, auto_confirm, rollover_of_invoice_id, pays_invoice_id, down_payment_debt_id, down_payment_plan_id, installment_plans!transactions_installment_plan_id_fkey(first_occurred_at)';
 
 export interface TransactionFilters {
   /**
@@ -316,7 +316,11 @@ export function useTransactions(filters: TransactionFilters) {
     queryKey: ['transactions', 'list', canonicalFilters],
     initialPageParam: 0,
     queryFn: async ({ pageParam }): Promise<Transaction[]> => {
-      let query = supabase.from('transactions').select(TRANSACTION_COLUMNS);
+      // O modo da dívida diz se `debt_principal_cents` é a parcela do contrato (o "previsto" de um
+      // pagamento de parcela fixa feito com outro valor) ou a amortização do mês.
+      let query = supabase
+        .from('transactions')
+        .select(`${TRANSACTION_COLUMNS}, debts!transactions_debt_id_fkey(calculation_mode)`);
       // Borda ausente significa intervalo aberto; nunca enviar gte/lte.undefined.
       if (from) query = query.gte('occurred_at', from);
       if (to) query = query.lte('occurred_at', to);
@@ -2250,7 +2254,7 @@ export function useDebtPayments(debtId: string | undefined) {
     queryFn: async (): Promise<DebtPaymentRow[]> => {
       const { data, error } = await supabase
         .from('transactions')
-        .select('id, debt_payment_no, occurred_at, amount_cents')
+        .select('id, debt_payment_no, occurred_at, amount_cents, debt_principal_cents, debt_interest_cents')
         .eq('debt_id', debtId!)
         .order('occurred_at');
       if (error) throw error;
@@ -4175,6 +4179,8 @@ export interface InstallmentParcel {
   edit_revision?: number;
   installment_no: number | null;
   amount_cents: number;
+  /** O previsto quando a baixa trocou o valor (`20261010100000`); null no resto. */
+  expected_amount_cents?: number | null;
   occurred_at: string;
   invoice_id: string | null;
   status: 'pending' | 'cleared';
@@ -4328,7 +4334,7 @@ async function buscarPlanos(apenas?: string): Promise<InstallmentPlanSummary[]> 
     (lote, from, to) =>
       supabase
         .from('transactions')
-        .select('id, edit_revision, installment_plan_id, installment_no, amount_cents, occurred_at, status, invoice_id')
+        .select('id, edit_revision, installment_plan_id, installment_no, amount_cents, expected_amount_cents, occurred_at, status, invoice_id')
         .in('installment_plan_id', lote)
         .order('installment_no')
         .range(from, to),
