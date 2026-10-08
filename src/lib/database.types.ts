@@ -4496,6 +4496,7 @@ export type Database = {
         Args: { p_input: Json; p_request_id: string }
         Returns: Json
       }
+      cycle_breakdown: { Args: { p_month: string; p_view?: string }; Returns: Json }
       cycle_lines: {
         Args: { p_month: string; p_view?: string }
         Returns: {

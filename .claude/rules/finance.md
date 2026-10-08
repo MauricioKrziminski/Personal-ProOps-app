@@ -567,6 +567,21 @@ cronograma a partir da PRÓXIMA parcela. Se um dia ela passar a devolver as já 
 pagas do carro moram só no cadastro (`debt_installments_undocumented`). Seria história reescrita
 para baixo, em silêncio. Medido antes de aplicar: abril a agosto deram delta 0,00.
 
+## "Como chego nesse valor" abre o número em partes que SOMAM até ele (07/10/2026)
+
+`cycle_breakdown(p_month, p_view)` (`20261010110000`) devolve a conta do número do ciclo, das
+mesmas fontes que o calculam: no ciclo **aberto** a partida é o caixa de HOJE conta por conta
+(`caixa_das_contas`, "Sem conta" quando há lançamento sem conta) e entra/sai são só o que ainda
+não aconteceu (`cash_events` sem `realizado`) — vale porque `cash_total(hoje) = comecei_com +
+entrou_realizado − saiu_realizado`, conferido em todos os espaços do staging; no **previsto** a
+partida é o fim do ciclo anterior; no **fechado**, o `comecei_com`, com "Faltou pagar" FORA da
+soma (como na tela do ciclo). As saídas se agrupam pelos baldes da tela do ciclo
+(`baldeDaOrigem`, `lib/detalhe-do-ciclo.ts`, a régua única). A folha (`DetalheDoCicloSheet`) abre
+pelo número do herói de Finanças (e o item do menu), pelo número do `Fechamento` do ciclo e pelo
+mês expandido da Projeção. Tela que soma hipóteses passa o número que MOSTRA (`rascunho`) e a
+diferença vira a linha "Hipóteses do rascunho" — a conta fecha sempre no número tocado.
+`supabase/tests/detalhe_do_ciclo.sql` prende a identidade nos três estados e nas duas réguas.
+
 ## O acumulado é o produto, não um detalhe da Projeção
 
 A pergunta que faz o usuário manter uma planilha ao lado do app não é "quanto entrou e saiu neste
@@ -950,6 +965,15 @@ próximas". Outro valor CORRIGE antes (`update_transaction_scoped`, `one` ou `fu
 dá a baixa: falhando a correção, nada é marcado como pago. O mesmo valor é o resultado de antes,
 com um toque a mais. Por isso o "Paguei" do arrasto não tem mais "Desfazer": ele não grava sem
 confirmar.
+
+**O previsto fica guardado** (`transactions.expected_amount_cents`, `20261010100000`): a baixa
+com outro valor grava o valor de ANTES — pelo gatilho `expected_amount_on_settle` (pending →
+cleared mudando o valor, em qualquer caminho) e por `confirm_payment_scoped`, que corrige antes de
+baixar. O valor da linha é o PAGO; o previsto aparece curto no apoio ("previsto R$ X",
+`lib/previsto.ts`) em Lançamentos, Parceladas e no detalhe, e só quando difere. Dívida de parcela
+fixa não precisa da coluna: o contrato mora em `debt_principal_cents` ("parcela R$ X" na linha do
+tempo). Baixa antiga não tem previsto (só as ocorrências de série desde 28/09 receberam o da
+versão da regra); a coluna nula não mostra nada.
 
 ## Editar em série — "o passado só muda à mão"
 

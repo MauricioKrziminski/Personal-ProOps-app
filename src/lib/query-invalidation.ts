@@ -29,7 +29,7 @@ export const FINANCE_KEYS = [
     dependia de o websocket estar de pé. Dar baixa numa conta offline deixava o número velho na
     tela até o próximo foco.
   */
-  ['cycle'], ['cycle-series'], ['cycle-lines'], ['cycle-range'], ['forecast-months'], ['spendable'],
+  ['cycle'], ['cycle-series'], ['cycle-breakdown'], ['cycle-lines'], ['cycle-range'], ['forecast-months'], ['spendable'],
   // A citação do Financeiro (`agent-activity`) mostra o registro ATUAL: editar pelo app a renova.
   ['agent-activity'],
   // O Próximo passo da Hoje conta importações e compras parceladas: importar a fatura ou lançar

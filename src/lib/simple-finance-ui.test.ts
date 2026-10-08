@@ -698,7 +698,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
       if (name === '@/lib/account-form') return load('src/lib/account-form.ts');
       if (name === '@/components/finance/account-form') return load('src/components/finance/account-form.tsx');
-      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias' || name === '@/lib/comecar' || name === '@/lib/duplicar' || name === '@/lib/favoritos' || name === '@/lib/apagar-com-alcance' || name === '@/lib/carencia' || name === '@/lib/pagar-fatura' || name === '@/lib/hipoteses-por-periodo' || name === '@/lib/previsto') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias' || name === '@/lib/comecar' || name === '@/lib/duplicar' || name === '@/lib/favoritos' || name === '@/lib/apagar-com-alcance' || name === '@/lib/carencia' || name === '@/lib/pagar-fatura' || name === '@/lib/hipoteses-por-periodo' || name === '@/lib/previsto' || name === '@/lib/detalhe-do-ciclo') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       // o `categorias.ts` importa o mapa de ícones por caminho relativo (roda no `node --test` puro)
       if (name === '../design/category-icons.ts') return { categoryIcon: () => 'circle' };
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
@@ -2315,6 +2315,20 @@ test('Financeiro: os atalhos do mosaico levam aos mesmos destinos de antes', () 
   for (const d of ['/finance/transactions', '/finance/accounts', '/finance/budgets', '/finance/forecast', '/finance/manage']) {
     assert.ok(destinos.includes(d), `o mosaico perdeu ${d}`);
   }
+});
+
+test('Financeiro: o número do herói abre "Como chego nesse valor", e a folha leva ao ciclo', () => {
+  const ui = screen(financeiroFile);
+  const folha = () => ui.nodes().find((n: any) => n.type === 'DetalheDoCicloSheet');
+  assert.equal(folha().props.visible, false);
+  // O número mora no `value` do painel (o resto do painel abre o menu).
+  const numero = ui.nodes().find((n: any) => n.type === 'HeroPanel').props.value;
+  assert.equal(numero.props.accessibilityHint, 'Mostra como chego nesse valor');
+  ui.interact(() => numero.props.onPress());
+  assert.equal(folha().props.visible, true);
+  ui.interact(() => folha().props.onVerCiclo());
+  assert.equal(folha().props.visible, false);
+  assert.equal(ui.navigations.at(-1).pathname, '/finance/cycle');
 });
 
 test('Financeiro: Entra e Sai abrem o ciclo filtrado pelo lado', () => {

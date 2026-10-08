@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { Fragment, useMemo, useState } from 'react';
-import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 
 import { ErrorCard } from '@/components/error-card';
 import { FinanceTabletCanvas } from '@/components/finance/finance-tablet-canvas';
@@ -19,6 +19,7 @@ import { CountUpMoney } from '@/components/ui/count-up-money';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ExtendedFab } from '@/components/ui/extended-fab';
 import { useLancarPorVoz } from '@/components/finance/lancar-por-voz';
+import { DetalheDoCicloSheet } from '@/components/finance/detalhe-do-ciclo-sheet';
 import { ATALHOS_DE_LANCAMENTO } from '@/lib/atalhos-de-lancamento';
 import { Explica } from '@/components/ui/explica';
 import { HeroPanel } from '@/components/ui/hero-panel';
@@ -128,6 +129,7 @@ export default function FinanceScreen() {
   const previousRange = useMonthRange(previousMonth, regua.view);
   const isCurrent = month === mesCorrente;
   const [heroPaneWidth, setHeroPaneWidth] = useState(0);
+  const [detalheAberto, setDetalheAberto] = useState(false);
   const daysLeft = cycle.data?.diasAteOFim ?? daysToMonthEnd();
 
   // `daysLeft` só é o definitivo com a resposta de `cycle_now`; antes dela é o palpite do mês civil,
@@ -346,7 +348,12 @@ export default function FinanceScreen() {
             )}
             value={heroLoading
               ? <Skeleton width="70%" height={46} tone="hero" />
-              : <CountUpMoney cents={descricao?.cents ?? 0} variant="heroMoney" tone={cicloRuim ? 'onHeroDanger' : 'onHero'} />}
+              : (
+                // O número abre "Como chego nesse valor" (07/10/2026); o resto do painel, o menu.
+                <Pressable accessibilityRole="button" accessibilityHint="Mostra como chego nesse valor" onPress={() => setDetalheAberto(true)}>
+                  <CountUpMoney cents={descricao?.cents ?? 0} variant="heroMoney" tone={cicloRuim ? 'onHeroDanger' : 'onHero'} />
+                </Pressable>
+              )}
             footer={!heroLoading && descricao?.rodape ? (
               <View style={styles.heroRodape}>
                 <ThemedText type="footnote" themeColor="onHeroMuted">{descricao.rodape.label}</ThemedText>
@@ -387,6 +394,7 @@ export default function FinanceScreen() {
             onPress={heroLoading ? undefined : () => {
               usarDica('fin-painel');
               showItemActions('Mais opções', [
+              { label: 'Como chego nesse valor', icon: 'chart.bar.doc.horizontal', onPress: () => setDetalheAberto(true) },
               { label: 'Ver o que fecha o ciclo', icon: 'list.bullet', onPress: () => abrirCiclo('tudo') },
               { label: 'O que entra', icon: 'arrow.down.circle', onPress: () => abrirCiclo('entra') },
               { label: 'O que sai', icon: 'arrow.up.circle', onPress: () => abrirCiclo('sai') },
@@ -635,7 +643,20 @@ export default function FinanceScreen() {
       wide={tablet}
       grouped
       topBar={<AppHeader title={ROTULO_DA_ABA.finance} />}
-      overlay={<><ExtendedFab label="Lançar" icon="plus" onPress={lancar} />{porVoz.folha}</>}
+      overlay={<>
+        <ExtendedFab label="Lançar" icon="plus" onPress={lancar} />
+        {porVoz.folha}
+        <DetalheDoCicloSheet
+          visible={detalheAberto}
+          onClose={() => setDetalheAberto(false)}
+          month={month}
+          view={regua.view}
+          onVerCiclo={() => {
+            setDetalheAberto(false);
+            abrirCiclo('tudo');
+          }}
+        />
+      </>}
       onRefresh={() =>
         Promise.all([
           refazerPeriodo(),

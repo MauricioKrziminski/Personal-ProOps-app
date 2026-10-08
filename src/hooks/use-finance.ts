@@ -4,6 +4,7 @@ import type { IconName } from '@/components/ui/icon';
 import type { NoteColorName } from '@/constants/theme';
 import { aparenciaDaCategoria, nomeDaCategoria, type Categoria } from '@/lib/categorias';
 import { contaNaFatura } from '@/lib/card-status';
+import { lerDetalheDoCiclo, type DetalheDoCiclo } from '@/lib/detalhe-do-ciclo';
 import { assertPaymentMethod, type PaymentMethod } from '@/lib/payment-method';
 import { normalizePaymentMethodFilters, paymentMethodFilterExpression, type PaymentMethodFilter } from '@/lib/payment-method-filters';
 import { expenseClassificationFromRecord, type ExpenseClassification, type ExpenseClassificationDefaults } from '@/lib/expense-classification';
@@ -2579,6 +2580,7 @@ const REGUA_MUDOU = [
   */
   ['spendable'],
   ['cycle-series'],
+  ['cycle-breakdown'],
   ['cycle-lines'],
   ['cycle-range'],
   ['forecast'],
@@ -2663,6 +2665,25 @@ export function useCycleSeries(de: string, ate: string, view?: CycleView) {
       });
       if (error) throw error;
       return data;
+    },
+  });
+}
+
+/**
+ * "Como chego nesse valor": o número do ciclo aberto em partes que SOMAM até ele
+ * (`cycle_breakdown`, `20261010110000`). Só busca quando a folha abre (`enabled`).
+ */
+export function useCycleBreakdown(month: string, view: CycleView | undefined, enabled: boolean) {
+  useRealtimeMonth('cycle-breakdown');
+  return useQuery({
+    queryKey: ['cycle-breakdown', primeiroDiaDoMes(month), view ?? ''],
+    enabled,
+    queryFn: async (): Promise<DetalheDoCiclo> => {
+      const { data, error } = await supabase.rpc('cycle_breakdown', {
+        p_month: primeiroDiaDoMes(month), p_view: view ?? undefined,
+      });
+      if (error) throw error;
+      return lerDetalheDoCiclo(data);
     },
   });
 }

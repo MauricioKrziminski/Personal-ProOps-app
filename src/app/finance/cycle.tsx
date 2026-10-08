@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useBRL } from '@/components/ui/conceal';
 import { ErrorCard } from '@/components/error-card';
@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 import { Row, Section } from '@/components/ui/row';
+import { Icon } from '@/components/ui/icon';
 import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Segmented } from '@/components/ui/segmented';
 import { Screen } from '@/components/ui/screen';
@@ -20,7 +21,9 @@ import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { VerMais } from '@/components/ui/ver-mais';
 import { useAosPoucos, useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
 import { type CycleLine, type CycleRow, type CycleView, type Draft, useCicloSimulado, useCycleLines, useCycleMonth, useCycleSeries, useDraftLines, useInvoice } from '@/hooks/use-finance';
+import { DetalheDoCicloSheet } from '@/components/finance/detalhe-do-ciclo-sheet';
 import { describeCycle } from '@/lib/cycle-label';
+import { baldeDaOrigem, ORDEM_DOS_BALDES } from '@/lib/detalhe-do-ciclo';
 import { rotaDaLinha } from '@/lib/cycle-routes';
 import { isoToBR, mesmoMes } from '@/lib/dates';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
@@ -180,7 +183,7 @@ export default function CycleDetailScreen() {
   const errosDaSimulacao = simulado.data?.erros ?? [];
   const fechamento = (
     <>
-      <Fechamento ciclo={ciclo} month={month} hipoteses={registros.length + gruposDeAdiantar} />
+      <Fechamento ciclo={ciclo} month={month} view={view} hipoteses={registros.length + gruposDeAdiantar} />
       {errosDaSimulacao.map((e, i) => (
         <ThemedText key={i} type="small" themeColor="danger">
           {`Não deu para simular ${e.indice !== undefined ? `a ${e.indice + 1}ª hipótese` : 'uma leitura'}: ${motivoDaHipotese(e)}`}
@@ -245,15 +248,31 @@ export default function CycleDetailScreen() {
  * `comecei + entrou − saiu` dá o caixa que de fato ficou, e a dívida é uma linha à parte. Somar
  * as duas seria o abatimento automático que o dono do produto recusou.
  */
-function Fechamento({ ciclo, month, hipoteses }: { ciclo: CycleRow; month: string; hipoteses: number }) {
+function Fechamento({ ciclo, month, view, hipoteses }: { ciclo: CycleRow; month: string; view: CycleView; hipoteses: number }) {
   const nome = monthTitle(month).replace(/ de \d{4}$/, '').toLowerCase();
   const d = describeCycle(ciclo, nome);
   const faltou = Number(ciclo.faltou_pagar ?? 0);
+  const [detalhe, setDetalhe] = useState(false);
 
   return (
     <Card style={styles.painel}>
       <HeroLabel>{d.label}</HeroLabel>
-      <Money cents={d.cents} variant="money" tone={d.ruim ? 'danger' : 'text'} signed />
+      {/* O número abre "Como chego nesse valor" (07/10/2026): conta por conta, e o que ainda vem. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityHint="Mostra como chego nesse valor"
+        onPress={() => setDetalhe(true)}
+        style={styles.numero}>
+        <Money cents={d.cents} variant="money" tone={d.ruim ? 'danger' : 'text'} signed />
+        <Icon name="chevron.right" size="sm" color="textSecondary" />
+      </Pressable>
+      <DetalheDoCicloSheet
+        visible={detalhe}
+        onClose={() => setDetalhe(false)}
+        month={month}
+        view={view}
+        rascunho={hipoteses > 0 ? Number(ciclo.resultado) : null}
+      />
       <ThemedText type="caption" themeColor="textSecondary">
         {`${isoToBR(ciclo.ini)} a ${isoToBR(ciclo.fim)} · ciclo ${ciclo.estado}`}
       </ThemedText>
@@ -372,23 +391,7 @@ function Linha({ linha }: { linha: CycleLine }) {
  * cabeçalho é dinheiro visível: precisa obedecer ao "esconder saldo" como o resto da tela.
  */
 function agrupar(linhas: CycleLine[], brl: (cents: number) => string) {
-  const balde = (l: CycleLine) => {
-    if (l.origin === 'hipotese') return 'Hipóteses do rascunho';
-    if (Number(l.in_cents) > 0) return 'Entradas';
-    if (l.origin === 'invoice' || l.origin === 'invoice_payment') return 'Faturas de cartão';
-    if (l.origin === 'debt_schedule') return 'Parcelas de financiamento';
-    if (l.origin === 'recurring_projection') return 'Previstos da recorrência';
-    return 'Boletos, pix e gastos';
-  };
-  const ordem = [
-    // Primeiro: é o que a pessoa veio ver ao abrir o ciclo pela Projeção com um rascunho.
-    'Hipóteses do rascunho',
-    'Faturas de cartão',
-    'Boletos, pix e gastos',
-    'Parcelas de financiamento',
-    'Previstos da recorrência',
-    'Entradas',
-  ];
+  const balde = (l: CycleLine) => baldeDaOrigem(l.origin, Number(l.in_cents) > 0);
 
   const mapa = new Map<string, CycleLine[]>();
   for (const l of linhas) {
@@ -398,7 +401,8 @@ function agrupar(linhas: CycleLine[], brl: (cents: number) => string) {
     else mapa.set(k, [l]);
   }
 
-  return ordem
+  // Hipóteses primeiro: é o que a pessoa veio ver ao abrir o ciclo pela Projeção com um rascunho.
+  return ORDEM_DOS_BALDES
     .filter((t) => mapa.has(t))
     .map((titulo) => ({
       chave: titulo,
@@ -425,6 +429,7 @@ const styles = StyleSheet.create({
   // Título do grupo → linhas a `Space.md`: sem isto o rótulo encostava no card (23/09/2026).
   grupo: { gap: Space.md },
   painel: { gap: Space.xs },
+  numero: { flexDirection: 'row', alignItems: 'center', gap: Space.xs, alignSelf: 'flex-start' },
   conta: { gap: Space.xs, paddingTop: Space.sm },
   contaLinha: {
     flexDirection: 'row',

@@ -12,6 +12,8 @@ import { useGoalPlanning } from '@/hooks/use-goal-planning';
 import { ThemedText } from '@/components/themed-text';
 import { HeaderActions } from '@/components/ui/header-actions';
 import { Button } from '@/components/ui/button';
+import { ButtonRow } from '@/components/ui/button-row';
+import { DetalheDoCicloSheet } from '@/components/finance/detalhe-do-ciclo-sheet';
 import { Chip } from '@/components/finance/chip';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -222,6 +224,8 @@ export default function ForecastScreen() {
   const [modoDaHipotese, setModoDaHipotese] = useState<'mes' | null>(null);
   const modo = modoDaHipotese ?? modoEscolhido;
   const [mesAberto, setMesAberto] = useState<string | null>(null);
+  // "Como chego nesse valor" de um mês (07/10/2026): o mês e o saldo que a linha mostra.
+  const [detalheDoMes, setDetalheDoMes] = useState<{ mes: string; saldo: number } | null>(null);
   /**
    * Rascunho de cenário — mora no APARELHO (`useRascunho`). Uma hipótese só, rápida de fazer; o
    * formulário completo aparece ao aplicar (spec 2026-09-29).
@@ -780,7 +784,7 @@ export default function ForecastScreen() {
             </View>
             <View
               accessible
-              accessibilityLabel={`Saldo hoje ${brl(hoje)}, no fim do período ${brl(fim)}${primeiroNegativo ? `, negativo a partir de ${isoToBR(primeiroNegativo)}` : ''}`}>
+              accessibilityLabel={`No fim de hoje ${brl(hoje)}, no fim do período ${brl(fim)}${primeiroNegativo ? `, negativo a partir de ${isoToBR(primeiroNegativo)}` : ''}`}>
               <MeasuredSparkline
                 values={valores}
                 height={96}
@@ -1164,24 +1168,34 @@ export default function ForecastScreen() {
                     debaixo do número e dizia outra coisa, na mesma tela. Quem detalha o que está
                     dentro do ciclo é a tela do ciclo, que soma exatamente este número.
                   */}
-                  <Button
-                    label="Ver o ciclo"
-                    variant="secondary"
-                    size="sm"
-                    onPress={() =>
-                      router.push({
-                        pathname: '/finance/cycle',
-                        params: {
-                          month: m.mes,
-                          view: regua.view,
-                          tipo: 'sai',
-                          // Com rascunho, o ciclo abre COM as hipóteses, como a linha acima já soma.
-                          // Ele as lê do aparelho (o rascunho mora lá), e nada é salvo.
-                          ...(simulando ? { hipoteses: '1' } : {}),
-                        },
-                      })
-                    }
-                  />
+                  <ButtonRow>
+                    <Button
+                      label="Como chego nesse valor"
+                      variant="secondary"
+                      size="sm"
+                      block
+                      onPress={() => setDetalheDoMes({ mes: m.mes, saldo: m.saldo })}
+                    />
+                    <Button
+                      label="Ver o ciclo"
+                      variant="secondary"
+                      size="sm"
+                      block
+                      onPress={() =>
+                        router.push({
+                          pathname: '/finance/cycle',
+                          params: {
+                            month: m.mes,
+                            view: regua.view,
+                            tipo: 'sai',
+                            // Com rascunho, o ciclo abre COM as hipóteses, como a linha acima já soma.
+                            // Ele as lê do aparelho (o rascunho mora lá), e nada é salvo.
+                            ...(simulando ? { hipoteses: '1' } : {}),
+                          },
+                        })
+                      }
+                    />
+                  </ButtonRow>
                 </Animated.View>
               ) : null}
             </View>
@@ -1409,6 +1423,13 @@ export default function ForecastScreen() {
       </Sheet>
 
       {baixa.folha}
+      <DetalheDoCicloSheet
+        visible={detalheDoMes !== null}
+        onClose={() => setDetalheDoMes(null)}
+        month={detalheDoMes?.mes ?? localISODate()}
+        view={regua.view}
+        rascunho={simulando ? detalheDoMes?.saldo : null}
+      />
     </Screen>
   );
 }
