@@ -56,7 +56,14 @@ interface HeroPanelProps {
   actions?: QuickAction[];
   /** Liga o botão de olho na linha do rótulo. */
   concealable?: boolean;
+  /**
+   * Tocar no painel abre o DETALHE do número (08/10/2026, *"tem lugar que você clica que vê o
+   * detalhe e tem lugar que mostra as opções… o usuário tem que adivinhar onde clica"*): o painel
+   * inteiro faz uma coisa só, e o "›" ao lado do número diz que ele abre. Não existe mais "…".
+   */
   onPress?: () => void;
+  /** O que o toque abre, para o leitor de tela ("Como chego nesse valor"). */
+  onPressLabel?: string;
   /** `live` desenha a tinta viva por baixo do conteúdo (raízes). `flat` é a tinta chapada. */
   surface?: 'flat' | 'live';
 }
@@ -66,8 +73,8 @@ interface HeroPanelProps {
  *
  * ## Anatomia
  *
- * Um bloco chapado com calha de 20. Dentro, nesta ordem: rótulo pequeno + os botões de
- * "…" e de olho, o número em `heroMoney`, a linha de estado em mono colorido, o gráfico, os
+ * Um bloco chapado com calha de 20. Dentro, nesta ordem: rótulo pequeno + o botão de olho, o
+ * número em `heroMoney` (com "›" quando o painel abre o detalhe), a linha de estado em mono colorido, o gráfico, os
  * atalhos, e a faixa de rodapé sangrada.
  *
  * ## O desenho (16/09/2026)
@@ -89,6 +96,7 @@ export function HeroPanel({
   actions,
   concealable = false,
   onPress,
+  onPressLabel = 'Ver detalhes',
   surface = 'flat',
 }: HeroPanelProps) {
   const theme = useTheme();
@@ -123,7 +131,7 @@ export function HeroPanel({
         <View style={styles.inner}>
           {top ? <View style={styles.top}>{top}</View> : null}
 
-          {/* O cartão todo abre o menu; os controles internos mantêm suas ações próprias. */}
+          {/* O cartão todo abre o detalhe; o olho mantém a ação própria. */}
           <View style={styles.body}>
             <View style={styles.labelRow}>
               {typeof label === 'string' ? (
@@ -134,46 +142,36 @@ export function HeroPanel({
                 label
               )}
               {badge}
-              {/*
-                Os dois chips andam JUNTOS, num grupo só.
-
-                A `labelRow` é `space-between`, e com três filhos soltos (rótulo, "…", olho) ela
-                espalhava os TRÊS: o "…" caía no meio da linha, longe do olho e longe do rótulo,
-                parecendo um botão perdido. Agrupados, o `space-between` volta a ter dois lados —
-                rótulo de um, ações do outro.
-              */}
-              {onPress || concealable ? (
+              {concealable ? (
                 <View style={styles.acoes}>
-                  {onPress ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Mais opções"
-                      onPress={onPress}
-                      hitSlop={Space.sm}
-                      style={[styles.eye, { backgroundColor: vidro ? 'transparent' : theme.heroChip }]}>
-                      {vidro ? <GlassBackdrop fallbackColor={theme.heroChip} radius={Radius.pill} colorScheme="dark" /> : null}
-                      <Icon name="ellipsis" size="sm" color="onHero" />
-                    </Pressable>
-                  ) : null}
-                  {concealable ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={concealed ? 'Mostrar valor' : 'Ocultar valor'}
-                      onPress={toggle}
-                      hitSlop={Space.sm}
-                      style={[styles.eye, { backgroundColor: vidro ? 'transparent' : theme.heroChip }]}>
-                      {vidro ? <GlassBackdrop fallbackColor={theme.heroChip} radius={Radius.pill} colorScheme="dark" /> : null}
-                      <Icon name={concealed ? 'eye.slash' : 'eye'} size="sm" color="onHero" />
-                    </Pressable>
-                  ) : null}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={concealed ? 'Mostrar valor' : 'Ocultar valor'}
+                    onPress={toggle}
+                    hitSlop={Space.sm}
+                    style={[styles.eye, { backgroundColor: vidro ? 'transparent' : theme.heroChip }]}>
+                    {vidro ? <GlassBackdrop fallbackColor={theme.heroChip} radius={Radius.pill} colorScheme="dark" /> : null}
+                    <Icon name={concealed ? 'eye.slash' : 'eye'} size="sm" color="onHero" />
+                  </Pressable>
                 </View>
               ) : null}
             </View>
 
-            {/* O número do herói divide a faixa com o olho e o "…": encolhe para caber. */}
-            <View style={styles.valueRow}>
-              <DinheiroEncolhe.Provider value>{value}</DinheiroEncolhe.Provider>
-            </View>
+            {/* O número do herói divide a faixa com o "›": encolhe para caber. */}
+            {onPress ? (
+              // O número é o botão acessível do painel (o resto do painel faz o mesmo ao toque, mas
+              // fica fora do leitor para o olho continuar alcançável).
+              <Pressable accessibilityRole="button" accessibilityHint={onPressLabel} onPress={onPress} style={styles.valueRow}>
+                <View style={styles.shrink}>
+                  <DinheiroEncolhe.Provider value>{value}</DinheiroEncolhe.Provider>
+                </View>
+                <Icon name="chevron.right" size="md" color="onHeroMuted" />
+              </Pressable>
+            ) : (
+              <View style={styles.valueRow}>
+                <DinheiroEncolhe.Provider value>{value}</DinheiroEncolhe.Provider>
+              </View>
+            )}
 
             {secondary ? (
               <View style={styles.secondaryRow}>
@@ -232,7 +230,7 @@ const styles = StyleSheet.create({
   top: { marginBottom: Space.lg },
   body: { gap: Space.xs },
   labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Space.sm },
-  /** O par de chips. `flexShrink: 0` pela mesma razão do `eye` logo abaixo. */
+  /** O chip do olho. `flexShrink: 0` pela mesma razão do `eye` logo abaixo. */
   acoes: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, flexShrink: 0 },
   /**
    * `flexShrink: 0`: o rótulo ao lado agora encolhe (ver `ThemedText`), mas sem isto o Yoga

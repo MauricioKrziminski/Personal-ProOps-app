@@ -20,8 +20,8 @@ function glifo(tipo: string): IconName {
 
 export interface DinheiroDoDiaProps {
   painel: PainelDoDia;
-  /** Tocar no número: o menu de sempre (ciclo, projeção, patrimônio, metas). */
-  onAbrirMenu: () => void;
+  /** Tocar no número: "Como chego nesse valor" (a conta do número, 08/10/2026). */
+  onAbrirDetalhe: () => void;
   /** O caixa das contas; `null` quando os saldos falharam (a tela desenha o erro). */
   caixa: Caixa | null;
   contasAbertas: boolean;
@@ -45,7 +45,7 @@ export interface DinheiroDoDiaProps {
  */
 export function DinheiroDoDia({
   painel,
-  onAbrirMenu,
+  onAbrirDetalhe,
   caixa,
   contasAbertas,
   onAlternarContas,
@@ -71,8 +71,8 @@ export function DinheiroDoDia({
           accessibilityRole="button"
           // O número é um `TextInput` animado, escondido do leitor: sem isto ele lia rótulo e legenda e pulava o VALOR.
           accessibilityLabel={[`${painel.rotulo}: ${brl(painel.cents)}`, painel.legenda].filter(Boolean).join('. ')}
-          accessibilityHint="Abre o ciclo, a projeção, o patrimônio e as metas"
-          onPress={onAbrirMenu}>
+          accessibilityHint="Mostra como chego nesse valor"
+          onPress={onAbrirDetalhe}>
           {({ pressed }) => (
             <View style={[styles.topo, { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' }]}>
               <View style={styles.rotulo}>

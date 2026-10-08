@@ -343,7 +343,8 @@ no dia 3 e vencendo no 10, ela some da Hoje em ~23 dos 30 dias do mês. `upcomin
 traz a fatura (`kind = 'invoice'`, pelo `invoice_open_cents`, sem `paid`/`rolled` e sem duplicar
 a compra que está dentro dela): o que faltava não era dado nem seção, era o link.
 
-O conserto é o item "Ver o que fecha o ciclo" no menu do painel, apontando para `/finance/cycle`
+O conserto é o atalho "Ver o que fecha o ciclo" (hoje na folha "Como chego nesse valor", que o
+toque no painel abre — o painel não tem mais menu desde 08/10/2026), apontando para `/finance/cycle`
 — a lista que já existe, agrupada, com a fatura abrindo nas compras. **Alargar a janela dos 7
 dias seria o conserto errado**: a Hoje viraria a tela do ciclo com outro nome.
 
@@ -577,8 +578,10 @@ entrou_realizado − saiu_realizado`, conferido em todos os espaços do staging;
 partida é o fim do ciclo anterior; no **fechado**, o `comecei_com`, com "Faltou pagar" FORA da
 soma (como na tela do ciclo). As saídas se agrupam pelos baldes da tela do ciclo
 (`baldeDaOrigem`, `lib/detalhe-do-ciclo.ts`, a régua única). A folha (`DetalheDoCicloSheet`) abre
-pelo número do herói de Finanças (e o item do menu), pelo número do `Fechamento` do ciclo e pelo
-mês expandido da Projeção. Tela que soma hipóteses passa o número que MOSTRA (`rascunho`) e a
+por QUALQUER toque no painel de Finanças (08/10/2026: o painel faz uma coisa só — sem "…" e sem
+"i"; a explicação do cálculo e os atalhos sobre esses números — o ciclo, o que entra, o que sai, a
+Projeção — moram na folha), pelo número do `Fechamento` do ciclo e pelo mês expandido da Projeção.
+A Hoje tem a sua (`DetalheDoDiaSheet`): em conta − o que vence até a próxima entrada = livre ÷ dias. Tela que soma hipóteses passa o número que MOSTRA (`rascunho`) e a
 diferença vira a linha "Hipóteses do rascunho" — a conta fecha sempre no número tocado.
 `supabase/tests/detalhe_do_ciclo.sql` prende a identidade nos três estados e nas duas réguas.
 
@@ -969,8 +972,9 @@ confirmar.
 **O previsto fica guardado** (`transactions.expected_amount_cents`, `20261010100000`): a baixa
 com outro valor grava o valor de ANTES — pelo gatilho `expected_amount_on_settle` (pending →
 cleared mudando o valor, em qualquer caminho) e por `confirm_payment_scoped`, que corrige antes de
-baixar. O valor da linha é o PAGO; o previsto aparece curto no apoio ("previsto R$ X",
-`lib/previsto.ts`) em Lançamentos, Parceladas e no detalhe, e só quando difere. Dívida de parcela
+baixar. O valor da linha é o PAGO; quando difere, o apoio diz a DIFERENÇA ("pagou R$ 10,00 a
+menos", `diferencaDoPrevisto` em `lib/previsto.ts`, 08/10/2026 — dois valores soltos confundiam) em
+Lançamentos, Últimos lançamentos, Parceladas, na linha do tempo da dívida e no detalhe. Dívida de parcela
 fixa não precisa da coluna: o contrato mora em `debt_principal_cents` ("parcela R$ X" na linha do
 tempo). Baixa antiga não tem previsto (só as ocorrências de série desde 28/09 receberam o da
 versão da regra); a coluna nula não mostra nada.

@@ -44,3 +44,19 @@ export function previstoDoLancamento(t: {
   const modo = t.debts?.calculation_mode;
   return previstoDaLinha(t) ?? (modo ? parcelaDoContratoPaga(t, modo !== 'fixed_installments') : null);
 }
+
+/**
+ * A frase que explica por que ESTA linha tem detalhe e as outras não (08/10/2026, *"está confuso
+ * mostrando o valor da parcela e o valor pago só em algumas"*): em vez de um segundo valor solto,
+ * a DIFERENÇA — "pagou R$ 10,00 a menos". As iguais não dizem nada, e o porquê fica na frase.
+ * `brl` entra por parâmetro para obedecer ao "esconder saldo".
+ */
+export function diferencaDoPrevisto(
+  pago: number,
+  previsto: number | null,
+  brl: (cents: number) => string,
+  verbo: 'pagou' | 'recebeu' = 'pagou',
+): string | null {
+  if (previsto === null || previsto === pago) return null;
+  return `${verbo} ${brl(Math.abs(pago - previsto))} ${pago < previsto ? 'a menos' : 'a mais'}`;
+}

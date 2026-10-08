@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { parcelaDoContratoPaga, previstoDaLinha, previstoDoLancamento } from './previsto.ts';
+import { diferencaDoPrevisto, parcelaDoContratoPaga, previstoDaLinha, previstoDoLancamento } from './previsto.ts';
 
 test('previstoDaLinha: só na linha PAGA com valor diferente do previsto', () => {
   assert.equal(previstoDaLinha({ status: 'cleared', amount_cents: 11000, expected_amount_cents: 12000 }), 12000);
@@ -27,4 +27,12 @@ test('previstoDoLancamento: o guardado na baixa, ou a parcela do contrato da dí
   assert.equal(previstoDoLancamento({ ...parcela, debts: { calculation_mode: 'fixed_installments' } }), 116667);
   assert.equal(previstoDoLancamento({ ...parcela, debts: { calculation_mode: 'amortized' } }), null, 'com juros o principal é amortização');
   assert.equal(previstoDoLancamento(parcela), null, 'sem o modo da dívida, não adivinha');
+});
+
+test('diferencaDoPrevisto: diz a diferença, e nada quando pagou o previsto', () => {
+  const brl = (c: number) => `R$ ${(c / 100).toFixed(2)}`;
+  assert.equal(diferencaDoPrevisto(115667, 116667, brl), 'pagou R$ 10.00 a menos');
+  assert.equal(diferencaDoPrevisto(21000, 20000, brl, 'recebeu'), 'recebeu R$ 10.00 a mais');
+  assert.equal(diferencaDoPrevisto(20000, 20000, brl), null);
+  assert.equal(diferencaDoPrevisto(20000, null, brl), null);
 });

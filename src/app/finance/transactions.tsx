@@ -63,7 +63,7 @@ import { confirmDestructive } from '@/lib/item-actions';
 import { useApagarComAlcance } from '@/hooks/use-apagar-com-alcance';
 import { alvoDoLancamento } from '@/lib/apagar-com-alcance';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
-import { previstoDoLancamento } from '@/lib/previsto';
+import { diferencaDoPrevisto, previstoDoLancamento } from '@/lib/previsto';
 import { dueInline, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
 import { filterExpectedLines, mesclarPrevistas, previstasNaTela, type ItemDoExtrato } from '@/lib/ledger-expected';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
@@ -269,8 +269,8 @@ const LinhaDoExtrato = memo(function LinhaDoExtrato({
     emAberto && tx.invoice_id === null
       ? dueInline(tx.kind, tx.due_at ? formatDateBR(tx.due_at).slice(0, 5) : null).replace(/^previsto( · )?/, '')
       : null,
-    // Paga com outro valor (07/10/2026): o valor da linha é o pago; o previsto vem aqui, curto.
-    previsto === null ? null : `previsto ${brl(previsto)}`,
+    // Paga com outro valor: o valor da linha é o pago, e aqui a DIFERENÇA (08/10/2026).
+    diferencaDoPrevisto(Number(tx.amount_cents), previsto, brl, tx.kind === 'income' ? 'recebeu' : 'pagou'),
   ].filter(Boolean);
   // Transferência não tem sinal na lista global — ela não é entrada nem saída do
   // conjunto. No extrato de UMA conta ela tem: sai da conta de origem e ENTRA na de

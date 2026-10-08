@@ -15,7 +15,7 @@ export const DICAS = [
     id: 'hoje-painel',
     telas: ['hoje'],
     icone: 'hand.tap',
-    texto: 'Toque no valor para ver o que fecha o ciclo, a projeção e as metas.',
+    texto: 'Toque no valor para ver como chego nele.',
   },
   {
     // A MESMA dica na Hoje ("Nas contas") e na lista de Contas: aprendeu numa, sabe na outra.
@@ -34,7 +34,7 @@ export const DICAS = [
     id: 'fin-painel',
     telas: ['financeiro'],
     icone: 'hand.tap',
-    texto: 'Toque no painel para ver o ciclo, o que entra e o que sai.',
+    texto: 'Toque no painel para ver como chego nele.',
   },
   {
     id: 'fin-pilha',
@@ -164,7 +164,7 @@ export const GUIA: readonly { titulo: string; itens: readonly ItemDoGuia[] }[] =
   {
     titulo: 'Planejar',
     itens: [
-      { titulo: 'O ciclo, o que entra e sai', texto: 'Toque no painel de Finanças.', dica: 'fin-painel' },
+      { titulo: 'Como chego no valor do ciclo', texto: 'Toque no painel de Finanças.', dica: 'fin-painel' },
       { titulo: 'Projeção e simulação', texto: 'Até quando o dinheiro dura, e se você comprar algo.', href: '/finance/forecast' },
       { titulo: 'Metas', texto: 'Guardar para um objetivo.', href: '/finance/goals' },
       { titulo: 'Orçamentos', texto: 'Um limite por categoria.', href: '/finance/budgets' },
@@ -184,7 +184,7 @@ export const GUIA: readonly { titulo: string; itens: readonly ItemDoGuia[] }[] =
     titulo: 'Gestos',
     itens: [
       { titulo: 'Arrastar um card', texto: 'Para os lados: ações rápidas. Segurar: todas.', dica: 'lista-arrasto' },
-      { titulo: 'Tocar no valor da Hoje', texto: 'Ciclo, projeção e metas.', dica: 'hoje-painel' },
+      { titulo: 'Tocar no valor da Hoje', texto: 'Como chego nele.', dica: 'hoje-painel' },
       { titulo: 'Arrastar no gráfico', texto: 'O saldo de cada dia.', dica: 'fin-grafico' },
     ],
   },

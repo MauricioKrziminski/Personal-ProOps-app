@@ -2185,15 +2185,21 @@ test('Hoje: lembrete que ficou de outro dia diz a data dele; o de hoje tem o AGO
   );
 });
 
-test('Hoje: o dinheiro vem por dia, com o livre total na legenda, e tocar abre o menu de sempre', () => {
+test('Hoje: o dinheiro vem por dia, com o livre total na legenda, e tocar abre a conta dele', () => {
   // caixa 3.300 − 300 comprometido = 3.000 livres; de 08/09 até o fim do ciclo (30/09) são 22 dias.
   const ui = screen(hojeFile, { spendable: { caixa: 330_000, comprometido_ate_entrada: 30_000, comprometido_no_ciclo: 30_000, proxima_entrada: null } });
   const dinheiro = ui.nodes().find((n: any) => n.type === 'DinheiroDoDia');
   assert.equal(dinheiro.props.painel.rotulo, 'Dá para gastar por dia');
   assert.equal(dinheiro.props.painel.cents, Math.floor(300_000 / 22));
   assert.equal(dinheiro.props.painel.legenda, 'R$ 3000.00 livre até 30/09');
-  ui.interact(() => dinheiro.props.onAbrirMenu());
-  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Ver o que fecha o ciclo', 'Projeção', 'Patrimônio', 'Metas']);
+  // 08/10/2026: o toque abre a CONTA do número, não um menu de destinos.
+  const folha = () => ui.nodes().find((n: any) => n.type === 'DetalheDoDiaSheet');
+  assert.equal(folha().props.visible, false);
+  ui.interact(() => dinheiro.props.onAbrirDetalhe());
+  assert.equal(folha().props.visible, true);
+  assert.equal(folha().props.caixa - folha().props.comprometido, 300_000, 'a folha mostra a conta do livre');
+  assert.deepEqual(copia(folha().props.atalhos.map((a: any) => a.label)), ['Ver o que vence no ciclo', 'Projeção']);
+  assert.equal(ui.actions.length, 0, 'nenhum menu');
   assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'usarDica', value: 'hoje-painel' });
 
   const noVermelho = screen(hojeFile, { spendable: { caixa: 10_000, comprometido_ate_entrada: 50_000, comprometido_no_ciclo: 50_000, proxima_entrada: null } });
@@ -2321,16 +2327,19 @@ test('Financeiro: os atalhos do mosaico levam aos mesmos destinos de antes', () 
   }
 });
 
-test('Financeiro: o número do herói abre "Como chego nesse valor", e a folha leva ao ciclo', () => {
+test('Financeiro: o painel faz UMA coisa — abre "Como chego nesse valor" com os atalhos desses números', () => {
+  // 08/10/2026: "tem lugar que você clica que vê o detalhe e tem lugar que mostra as opções".
   const ui = screen(financeiroFile);
+  const painel = () => ui.nodes().find((n: any) => n.type === 'HeroPanel');
   const folha = () => ui.nodes().find((n: any) => n.type === 'DetalheDoCicloSheet');
+  assert.equal(painel().props.badge, undefined, 'sem o "i" solto no painel');
+  assert.equal(painel().props.onPressLabel, 'Como chego nesse valor');
   assert.equal(folha().props.visible, false);
-  // O número mora no `value` do painel (o resto do painel abre o menu).
-  const numero = ui.nodes().find((n: any) => n.type === 'HeroPanel').props.value;
-  assert.equal(numero.props.accessibilityHint, 'Mostra como chego nesse valor');
-  ui.interact(() => numero.props.onPress());
+  ui.interact(() => painel().props.onPress());
+  assert.equal(ui.actions.length, 0, 'nenhum menu de opções');
   assert.equal(folha().props.visible, true);
-  ui.interact(() => folha().props.onVerCiclo());
+  assert.deepEqual(copia(folha().props.atalhos.map((a: any) => a.label)), ['Ver o que fecha o ciclo', 'O que entra', 'O que sai', 'Projeção']);
+  ui.interact(() => folha().props.atalhos[0].onPress());
   assert.equal(folha().props.visible, false);
   assert.equal(ui.navigations.at(-1).pathname, '/finance/cycle');
 });
@@ -2953,10 +2962,24 @@ test('Parcelada aberta: "A seguir" a partir da próxima, e "Pagas" da mais recen
     plans: [{ id: 'p1', title: 'tv', description: 'tv', merchant: null, category: 'casa', account_id: null, total_cents: 120000, installments: 4, installment_cents: 30000, first_occurred_at: '2026-07-10', active: true, paid: 2, remaining_cents: 60000, locked: 2, locked_cents: 60000, locked_paid: 2, parcels: parcelas }],
   });
   ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.accessibilityState?.expanded === false).props.onPress());
-  const ordem = ui.nodes()
-    .filter((n: any) => n.type === 'Pressable' && /^Parcela \d/.test(n.props.accessibilityLabel ?? ''))
-    .map((n: any) => Number(n.props.accessibilityLabel.match(/^Parcela (\d+)/)[1]));
-  assert.deepEqual(JSON.parse(JSON.stringify(ordem)), [3, 4, 2, 1]);
+  // A linha do tempo das listas que se abrem (08/10/2026), a mesma da dívida.
+  const itens = ui.nodes()
+    .filter((n: any) => n.type === 'LinhaDoTempo')
+    .flatMap((n: any) => n.props.grupos.flatMap((g: any) => g.itens));
+  assert.deepEqual(JSON.parse(JSON.stringify(itens.map((i: any) => i.titulo))), ['3ª parcela', '4ª parcela', '2ª parcela', '1ª parcela']);
+  assert.deepEqual(JSON.parse(JSON.stringify(itens.map((i: any) => i.estado))), ['proxima', 'futura', 'paga', 'paga']);
+});
+
+test('Parcelada aberta: a paga com outro valor diz a diferença, e só ela', () => {
+  const parcelas = [1, 2, 3].map((n) => ({ id: `t${n}`, installment_no: n, amount_cents: n === 1 ? 29000 : 30000, expected_amount_cents: n === 1 ? 30000 : null, occurred_at: `2026-0${6 + n}-10`, status: n <= 2 ? 'cleared' : 'pending', invoice_id: null }));
+  const ui = screen('src/app/finance/installments.tsx', {
+    plans: [{ id: 'p1', title: 'tv', description: 'tv', merchant: null, category: 'casa', account_id: null, total_cents: 89000, installments: 3, installment_cents: 30000, first_occurred_at: '2026-07-10', active: true, paid: 2, remaining_cents: 30000, locked: 2, locked_cents: 59000, locked_paid: 2, parcels: parcelas }],
+  });
+  ui.interact((nodes: any[]) => nodes.find((n) => (n.type === 'Pressable' || n.type === 'PressableScale') && n.props.accessibilityState?.expanded === false).props.onPress());
+  const itens = ui.nodes().filter((n: any) => n.type === 'LinhaDoTempo').flatMap((n: any) => n.props.grupos.flatMap((g: any) => g.itens));
+  const apoio = (t: string) => itens.find((i: any) => i.titulo === t).apoio;
+  assert.match(apoio('1ª parcela'), /pagou R\$ 10\.00 a menos/);
+  assert.doesNotMatch(apoio('2ª parcela'), /pagou/);
 });
 
 test('Regras: a lista vem aos poucos, com "Ver mais"', () => {
@@ -3245,7 +3268,7 @@ const dicas = (ui: ReturnType<typeof screen>) =>
 test('Hoje: a dica do painel mora no card do dinheiro, e tocar no valor a encerra', () => {
   const ui = screen(hojeFile, { balances: [saldo('Nubank', 'checking', 120_00)] });
   assert.deepEqual(dicas(ui), ['hoje-painel']);
-  ui.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.onAbrirMenu();
+  ui.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.onAbrirDetalhe();
   assert.deepEqual(copia(ui.writes.at(-1)), { operation: 'usarDica', value: 'hoje-painel' });
   // A das contas só existe com as contas abertas na tela.
   ui.interact(() => ui.nodes().find((n: any) => n.type === 'DinheiroDoDia').props.onAlternarContas());
@@ -5414,8 +5437,10 @@ test('Seletor de categoria: chips com ícone e cor, "Nova" cria e já escolhe, "
   assert.equal(ui.navigations.at(-1), '/finance/categories');
 });
 
-test('Categorias se alcança pelo Gerenciar, pelo Perfil e pelo menu das Finanças', () => {
-  for (const f of ['src/app/finance/manage.tsx', 'src/app/(tabs)/profile/index.tsx', 'src/app/(tabs)/finance/index.tsx']) {
+// O painel das Finanças deixou de ter menu (08/10/2026: "se eu clico no gráfico eu tenho um
+// objetivo de ver sobre aqueles valores… não ver categorias"): Categorias fica no Gerenciar e no Perfil.
+test('Categorias se alcança pelo Gerenciar e pelo Perfil', () => {
+  for (const f of ['src/app/finance/manage.tsx', 'src/app/(tabs)/profile/index.tsx']) {
     assert.match(readFileSync(f, 'utf8'), /'\/finance\/categories'/, f);
   }
 });

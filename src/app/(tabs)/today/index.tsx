@@ -23,6 +23,7 @@ import { useBRL } from '@/components/ui/conceal';
 import { Dica } from '@/components/ui/dica';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ExtendedFab } from '@/components/ui/extended-fab';
+import { DetalheDoDiaSheet } from '@/components/feed/detalhe-do-dia-sheet';
 import { ATALHOS_DE_LANCAMENTO } from '@/lib/atalhos-de-lancamento';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
@@ -293,31 +294,27 @@ export default function TodayScreen() {
   const abrirLembrete = (id: string) => router.push({ pathname: '/reminder-form', params: { id, ocorrencia: '1' } });
 
   /*
-    O toque no número do dinheiro abre o MENU (o mesmo do herói antigo e do Financeiro). `mes` e
-    `view` saem do próprio `cycle.data`, nunca de um default — o destino tem que mostrar o período
-    que a tela nomeou (`finance.md`).
+    O toque no número do dinheiro abre a CONTA dele (08/10/2026), como o painel de Finanças — não um
+    menu de destinos. `mes` e `view` do atalho saem do próprio `cycle.data`, nunca de um default: o
+    destino tem que mostrar o período que a tela nomeou (`finance.md`).
   */
-  const abrirMenu = () => {
+  const [detalheDoDia, setDetalheDoDia] = useState(false);
+  const abrirDetalhe = () => {
     usarDica('hoje-painel');
-    showItemActions('Mais opções', [
-      ...(cycle.data?.mes
-        ? [
-            {
-              label: 'Ver o que fecha o ciclo',
-              icon: 'list.bullet' as const,
-              onPress: () =>
-                router.push({
-                  pathname: '/finance/cycle',
-                  params: { month: cycle.data.mes, view: cycle.data.view, tipo: 'sai' },
-                }),
-            },
-          ]
-        : []),
-      { label: 'Projeção', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
-      { label: 'Patrimônio', icon: 'building.columns', onPress: () => router.push('/finance/net-worth') },
-      { label: 'Metas', icon: 'target', onPress: () => router.push('/finance/goals') },
-    ]);
+    setDetalheDoDia(true);
   };
+  const atalhosDoDia = [
+    ...(cycle.data?.mes
+      ? [{
+          label: 'Ver o que vence no ciclo',
+          onPress: () => {
+            setDetalheDoDia(false);
+            router.push({ pathname: '/finance/cycle', params: { month: cycle.data!.mes, view: cycle.data!.view, tipo: 'sai' } });
+          },
+        }]
+      : []),
+    { label: 'Projeção', onPress: () => { setDetalheDoDia(false); router.push('/finance/forecast'); } },
+  ];
 
   if (!pronta) {
     return (
@@ -449,7 +446,7 @@ export default function TodayScreen() {
       <View style={styles.comDica}>
         <DinheiroDoDia
           painel={painel}
-          onAbrirMenu={abrirMenu}
+          onAbrirDetalhe={abrirDetalhe}
           caixa={saldos.isError ? null : emConta}
           contasAbertas={contasAbertas}
           onAlternarContas={() => setContasAbertas((v) => !v)}
@@ -518,6 +515,17 @@ export default function TodayScreen() {
         <>
           {baixa.folha}
           {porVoz.folha}
+          <DetalheDoDiaSheet
+            visible={detalheDoDia}
+            onClose={() => setDetalheDoDia(false)}
+            painel={painel}
+            caixa={caixa}
+            comprometido={comprometido}
+            ate={ateQuando}
+            entrada={proximaEntrada}
+            diasLivres={diasLivres}
+            atalhos={atalhosDoDia}
+          />
           {/* Criar ONDE se vê o dia (25/09/2026): a Hoje mostra lançamentos, lembretes e notas. */}
           <ExtendedFab
             label="Lançar"

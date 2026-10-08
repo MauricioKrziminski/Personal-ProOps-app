@@ -117,6 +117,25 @@ dono do produto para o app inteiro.
   nada alterado, nenhum passado (dívida sem pagamento, compra sem parcela antes da próxima) ou
   campo que é sempre do contrato inteiro (nº de parcelas, pagas).
 
+### Painel de número abre o DETALHE dele, e só isso (08/10/2026)
+
+*"Tem lugar que você clica que vê o detalhe e tem lugar que mostra as opções… o usuário tem que
+adivinhar onde clica"* e *"se eu clico no gráfico eu tenho um objetivo de ver sobre aqueles
+valores… não ver categorias"*. O painel (`HeroPanel` em Finanças, `DinheiroDoDia` na Hoje) faz UMA
+coisa ao toque — em qualquer ponto, número ou gráfico: abre "Como chego nesse valor", a conta do
+número. Sem "…" e sem "i" no painel: a explicação do cálculo vai no fim da folha, e os atalhos dela
+são só sobre esses números (o ciclo, o que entra, o que sai, a Projeção). Destino sem relação com o
+número (Patrimônio, Metas, Categorias) mora nos Atalhos/Gerenciar. O "›" ao lado do número é o
+sinal de que ele abre.
+
+### Lista que se ABRE dentro de outra coisa: a linha do tempo (08/10/2026)
+
+*"Quando abrir uma lista de algo que eu expandi ele tem que ficar bonito e padronizado"*. As partes
+de um contrato ou de um grupo — parcelas de financiamento e de compra parcelada, compras da fatura
+no ciclo — usam `LinhaDoTempo` (`components/finance/linha-do-tempo.tsx`): trilho à esquerda, nó do
+estado (paga, próxima com fundo, futura, `item`), título e apoio em letra de corpo, valor à direita.
+"A seguir" e "Já pagas" com `SectionHead`. Lista nova desse tipo nasce nela, não num `Row` solto.
+
 ### Lista: do mais recente para o mais antigo, e aos poucos (24/09/2026)
 
 *"em tudo tem que ser do mais recente para o mais antigo… sempre preze pelo lazy loading,
@@ -455,7 +474,7 @@ tela. Entradas sem rota órfã: todo ponto tem caminho a partir de Hoje, Finanç
   passos da Hoje e o estado vazio de Finanças). **A tela segura o passo durante o salvar**
   (`onSalvando` até o `onCriada`): as contas recarregavam antes de o progresso gravar e o passo
   efetivo piscava (resumo, ou passo 1 ainda tocável).
-- `/finance/acumulacao` — simulador local (Patrimônio → Investimentos e menu do painel); premissas em
+- `/finance/acumulacao` — simulador local (Patrimônio → "Quanto vou acumular"); premissas em
   `usePreferencia`, nunca banco; até 3 cenários; a curva troca quando o cálculo termina.
 - `/finance/why` — "Por que mudou?" (bloco "Onde foi o dinheiro"); tocar numa linha abre Lançamentos
   com `from`/`to` exatos e o filtro da dimensão, e o total da lista bate com o da linha.

@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { Fragment, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 
 import { ErrorCard } from '@/components/error-card';
 import { FinanceTabletCanvas } from '@/components/finance/finance-tablet-canvas';
@@ -20,9 +20,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ExtendedFab } from '@/components/ui/extended-fab';
 import { useLancarPorVoz } from '@/components/finance/lancar-por-voz';
 import { DetalheDoCicloSheet } from '@/components/finance/detalhe-do-ciclo-sheet';
-import { previstoDoLancamento } from '@/lib/previsto';
+import { diferencaDoPrevisto, previstoDoLancamento } from '@/lib/previsto';
 import { ATALHOS_DE_LANCAMENTO } from '@/lib/atalhos-de-lancamento';
-import { Explica } from '@/components/ui/explica';
 import { HeroPanel } from '@/components/ui/hero-panel';
 import { explicaCiclo } from '@/lib/explicacoes';
 import { ItemLink } from '@/components/ui/item-link';
@@ -344,17 +343,9 @@ export default function FinanceScreen() {
             label={heroLoading
               ? <Skeleton width="40%" height={16} tone="hero" />
               : descricao?.label ?? 'Saldo projetado'}
-            badge={heroLoading ? undefined : (
-              <Explica indicador="Resultado do ciclo" explicacao={explicaCiclo(ciclo, { month, view: regua.view })} tom="onHeroMuted" />
-            )}
             value={heroLoading
               ? <Skeleton width="70%" height={46} tone="hero" />
-              : (
-                // O número abre "Como chego nesse valor" (07/10/2026); o resto do painel, o menu.
-                <Pressable accessibilityRole="button" accessibilityHint="Mostra como chego nesse valor" onPress={() => setDetalheAberto(true)}>
-                  <CountUpMoney cents={descricao?.cents ?? 0} variant="heroMoney" tone={cicloRuim ? 'onHeroDanger' : 'onHero'} />
-                </Pressable>
-              )}
+              : <CountUpMoney cents={descricao?.cents ?? 0} variant="heroMoney" tone={cicloRuim ? 'onHeroDanger' : 'onHero'} />}
             footer={!heroLoading && descricao?.rodape ? (
               <View style={styles.heroRodape}>
                 <ThemedText type="footnote" themeColor="onHeroMuted">{descricao.rodape.label}</ThemedText>
@@ -392,20 +383,13 @@ export default function FinanceScreen() {
               />
             ) : undefined}
             concealable
+            // O painel faz UMA coisa (08/10/2026): abre "Como chego nesse valor". Os atalhos sobre
+            // esses números moram na folha; Patrimônio, Metas e Categorias estão em Atalhos/Gerenciar.
             onPress={heroLoading ? undefined : () => {
               usarDica('fin-painel');
-              showItemActions('Mais opções', [
-              { label: 'Como chego nesse valor', icon: 'chart.bar.doc.horizontal', onPress: () => setDetalheAberto(true) },
-              { label: 'Ver o que fecha o ciclo', icon: 'list.bullet', onPress: () => abrirCiclo('tudo') },
-              { label: 'O que entra', icon: 'arrow.down.circle', onPress: () => abrirCiclo('entra') },
-              { label: 'O que sai', icon: 'arrow.up.circle', onPress: () => abrirCiclo('sai') },
-              { label: 'Projeção', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/forecast') },
-              { label: 'Patrimônio', icon: 'building.columns', onPress: () => router.push('/finance/net-worth') },
-              { label: 'Metas', icon: 'target', onPress: () => router.push('/finance/goals') },
-              { label: 'Quanto vou acumular', icon: 'chart.line.uptrend.xyaxis', onPress: () => router.push('/finance/acumulacao') },
-              { label: 'Categorias', icon: 'tag', onPress: () => router.push('/finance/categories') },
-              ]);
+              setDetalheAberto(true);
             }}
+            onPressLabel="Como chego nesse valor"
           />
         )}
         {/* Só com a curva na tela: a dica ensina o gesto DELA. */}
@@ -570,8 +554,8 @@ export default function FinanceScreen() {
                     <LedgerRow
                       title={titulo}
                       subtitle={[
-                        // Pago com outro valor (07/10/2026): o previsto curto, como em Lançamentos.
-                        previsto === null ? null : `previsto ${brl(previsto)}`,
+                        // Pago com outro valor: a diferença, como em Lançamentos (08/10/2026).
+                        diferencaDoPrevisto(Number(tx.amount_cents), previsto, brl, tx.kind === 'income' ? 'recebeu' : 'pagou'),
                         tx.category,
                         SOURCE_LABEL[tx.source],
                       ].filter(Boolean).join(' · ') || undefined}
@@ -658,10 +642,13 @@ export default function FinanceScreen() {
           onClose={() => setDetalheAberto(false)}
           month={month}
           view={regua.view}
-          onVerCiclo={() => {
-            setDetalheAberto(false);
-            abrirCiclo('tudo');
-          }}
+          explicacao={explicaCiclo(ciclo, { month, view: regua.view })}
+          atalhos={[
+            { label: 'Ver o que fecha o ciclo', onPress: () => { setDetalheAberto(false); abrirCiclo('tudo'); } },
+            { label: 'O que entra', onPress: () => { setDetalheAberto(false); abrirCiclo('entra'); } },
+            { label: 'O que sai', onPress: () => { setDetalheAberto(false); abrirCiclo('sai'); } },
+            { label: 'Projeção', onPress: () => { setDetalheAberto(false); router.push('/finance/forecast'); } },
+          ]}
         />
       </>}
       onRefresh={() =>

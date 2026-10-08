@@ -22,6 +22,7 @@ import { VerMais } from '@/components/ui/ver-mais';
 import { useAosPoucos, useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
 import { type CycleLine, type CycleRow, type CycleView, type Draft, useCicloSimulado, useCycleLines, useCycleMonth, useCycleSeries, useDraftLines, useInvoice } from '@/hooks/use-finance';
 import { DetalheDoCicloSheet } from '@/components/finance/detalhe-do-ciclo-sheet';
+import { LinhaDoTempo } from '@/components/finance/linha-do-tempo';
 import { describeCycle } from '@/lib/cycle-label';
 import { baldeDaOrigem, ORDEM_DOS_BALDES } from '@/lib/detalhe-do-ciclo';
 import { rotaDaLinha } from '@/lib/cycle-routes';
@@ -330,6 +331,7 @@ function Conta({
  * resultado é jogado fora, e numa tela com seis faturas isso é seis consultas para nada.
  */
 function Linha({ linha }: { linha: CycleLine }) {
+  const brl = useBRL();
   const abre = linha.origin === 'invoice' && !linha.atrasada;
   const fatura = useInvoice(abre ? linha.ref_id : undefined);
   // As compras da fatura aberta também vêm aos poucos: uma fatura tem de 30 a 150 compras.
@@ -363,19 +365,31 @@ function Linha({ linha }: { linha: CycleLine }) {
         }
         onPress={destino(linha)}
       />
-      {abre
-        ? compras.visiveis.map((t) => (
-            <Row
-              key={t.id}
-              title={t.description ?? t.merchant ?? 'Compra'}
-              // A data da COMPRA: a parcela 2 em diante mora no mês em que cai, e a linha dizia a
-              // data dela como se fosse a da compra ("Mostre sempre a data do lançamento").
-              subtitle={[rotuloDaCompra(t) ?? isoToBR(t.occurred_at).slice(0, 5), t.category].filter(Boolean).join(' · ')}
-              trailing={<Money cents={Number(t.amount_cents)} variant="footnote" />}
-              onPress={() => router.push({ pathname: '/finance/[txId]', params: { txId: t.id } })}
-            />
-          ))
-        : null}
+      {/* As compras da fatura a vencer, na linha do tempo das listas que se abrem (08/10/2026): o
+          trilho diz que elas são PARTE da fatura acima, e não linhas soltas do ciclo. */}
+      {abre && compras.visiveis.length > 0 ? (
+        <View style={styles.dentroDaFatura}>
+          <LinhaDoTempo
+            grupos={[{
+              itens: compras.visiveis.map((t) => {
+                const titulo = t.description ?? t.merchant ?? 'Compra';
+                // A data da COMPRA: a parcela 2 em diante mora no mês em que cai, e a linha dizia a
+                // data dela como se fosse a da compra ("Mostre sempre a data do lançamento").
+                const apoio = [rotuloDaCompra(t) ?? isoToBR(t.occurred_at).slice(0, 5), t.category].filter(Boolean).join(' · ');
+                return {
+                  chave: t.id,
+                  titulo,
+                  apoio,
+                  cents: Number(t.amount_cents),
+                  estado: 'item' as const,
+                  accessibilityLabel: `${titulo}, ${apoio}, ${brl(Number(t.amount_cents))}`,
+                  onPress: () => router.push({ pathname: '/finance/[txId]', params: { txId: t.id } }),
+                };
+              }),
+            }]}
+          />
+        </View>
+      ) : null}
       {abre ? <VerMais restantes={compras.restantes} onPress={compras.verMais} /> : null}
     </>
   );
@@ -429,6 +443,8 @@ const styles = StyleSheet.create({
   // Título do grupo → linhas a `Space.md`: sem isto o rótulo encostava no card (23/09/2026).
   grupo: { gap: Space.md },
   painel: { gap: Space.xs },
+  // As compras abertas sob a fatura: recuadas, para o trilho ficar sob o título dela.
+  dentroDaFatura: { paddingLeft: Space.md, paddingRight: Space.sm, paddingBottom: Space.sm },
   numero: { flexDirection: 'row', alignItems: 'center', gap: Space.xs, alignSelf: 'flex-start' },
   conta: { gap: Space.xs, paddingTop: Space.sm },
   contaLinha: {

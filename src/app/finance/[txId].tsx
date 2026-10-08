@@ -44,7 +44,7 @@ import { alvoDoLancamento } from '@/lib/apagar-com-alcance';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
 import { detalheDoPagamento } from '@/lib/confirmar-baixa';
-import { previstoDaLinha } from '@/lib/previsto';
+import { diferencaDoPrevisto, previstoDaLinha } from '@/lib/previsto';
 import { foldCategory, mergeCategories } from '@/lib/categories-merge';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { confirmDestructive } from '@/lib/item-actions';
@@ -297,7 +297,7 @@ export default function TransactionDetailScreen() {
           ) : null}
           {previsto !== null ? (
             <ThemedText type="small" style={tabular}>
-              {`Previsto ${brl(previsto)}`}
+              {`Previsto ${brl(previsto)} · ${diferencaDoPrevisto(Number(tx.amount_cents), previsto, brl, tx.kind === 'income' ? 'recebeu' : 'pagou')}`}
             </ThemedText>
           ) : null}
           <ThemedText type="small" themeColor="textSecondary" style={tabular}>

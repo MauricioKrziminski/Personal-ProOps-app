@@ -25,7 +25,7 @@ import { Screen } from '@/components/ui/screen';
 import { Deslizavel } from '@/components/ui/deslizavel';
 import { VerMais } from '@/components/ui/ver-mais';
 import { useJanelasPorGrupo } from '@/hooks/use-aos-poucos';
-import { HeroLabel } from '@/components/ui/section-head';
+import { HeroLabel, SectionHead } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { BarTrack, ProgressBar } from '@/components/ui/sparkline';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
@@ -57,7 +57,8 @@ import { listFiltersActive, type ListFiltersValue } from '@/lib/list-filters';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 import { hrefDoLancar } from '@/lib/lancar';
-import { previstoDaLinha } from '@/lib/previsto';
+import { diferencaDoPrevisto, previstoDaLinha } from '@/lib/previsto';
+import { LinhaDoTempo, type ItemNoTempo } from '@/components/finance/linha-do-tempo';
 
 /**
  * Parceladas — "o que eu já comprometi nos próximos meses, e quanto falta para acabar?".
@@ -458,65 +459,41 @@ export default function InstallmentsScreen() {
     const pagas = parcelas.filter((p) => p.status === 'cleared').reverse();
     const jSeguir = janelas.janelaDe(`${plano.id}:seguir`, aSeguir);
     const jPagas = janelas.janelaDe(`${plano.id}:pagas`, pagas);
-    const linhaDaParcela = (parcela: (typeof parcelas)[number]) => {
-              /*
-                A parcela de cartão fica `pending` até a fatura ser paga: chamar de "prevista" a
-                parcela do mês passado é a mesma mentira que a lista de Lançamentos contava.
-
-                ⚠️ `InstallmentParcel` não tem `due_at`, e o tipo de `estadoDaLinha` o exige desde
-                a Tarefa 2 — escrito assim de propósito: parcela de compra é sempre despesa. A
-                consequência é real: uma parcela sem cartão e com data passada agora lê
-                "atrasada", onde antes lia "prevista". É o certo — ninguém a pagou.
-              */
-              const estado = estadoDaLinha({ ...parcela, kind: 'expense', due_at: null }, hoje);
-              const previsto = previstoDaLinha(parcela);
-              const rotulo =
-                parcela.status === 'cleared' ? 'paga'
-                : estado === 'atrasado' ? 'atrasada'
-                : estado === 'previsto' ? 'prevista'
-                : 'na fatura';
-              return (
-                <Pressable
-                  key={parcela.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Parcela ${parcela.installment_no ?? ''} de ${plano.installments}, ${brl(parcela.amount_cents)}${previsto !== null ? `, previsto ${brl(previsto)}` : ''}, ${rotulo}, ${formatDateBR(parcela.occurred_at)}`}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/finance/[txId]',
-                      params: { txId: parcela.id, month: parcela.occurred_at.slice(0, 7) },
-                    })
-                  }>
-                  {({ pressed }) => (
-                    <View
-                      style={[
-                        styles.parcela,
-                        { backgroundColor: pressed ? theme.backgroundSelected : 'transparent' },
-                      ]}>
-                      <View style={styles.parcelaTexto}>
-                        <ThemedText type="small" style={tabular}>
-                          {parcela.installment_no ?? '—'}/{plano.installments} ·{' '}
-                          {formatDateBR(parcela.occurred_at)}
-                        </ThemedText>
-                        {/* Paga com outro valor (07/10/2026): o valor à direita é o pago, e o
-                            previsto fica aqui embaixo, pequeno — os dois sem brigar. */}
-                        {previsto !== null ? (
-                          <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
-                            previsto {brl(previsto)}
-                          </ThemedText>
-                        ) : null}
-                      </View>
-                      <View style={styles.parcelaValor}>
-                        <ThemedText
-                          type="small"
-                          themeColor={parcela.status === 'cleared' ? 'success' : 'textSecondary'}>
-                          {rotulo}
-                        </ThemedText>
-                        <Money cents={parcela.amount_cents} variant="subhead" />
-                      </View>
-                    </View>
-                  )}
-                </Pressable>
-              );
+    /**
+     * Uma parcela na linha do tempo (08/10/2026): o MESMO desenho das parcelas de um financiamento
+     * — "Nª parcela", quando, o valor à direita e o nó do estado. A paga com outro valor diz a
+     * diferença ("pagou R$ 10,00 a menos"), e só ela: o porquê do detalhe fica na frase.
+     */
+    const itemDaParcela = (parcela: (typeof parcelas)[number], proxima: boolean): ItemNoTempo => {
+      /*
+        A parcela de cartão fica `pending` até a fatura ser paga: chamar de "prevista" a parcela do
+        mês passado é a mesma mentira que a lista de Lançamentos contava. `InstallmentParcel` não
+        tem `due_at` (parcela de compra é sempre despesa): sem cartão e com data passada, ela lê
+        "atrasada" — é o certo, ninguém a pagou.
+      */
+      const estado = estadoDaLinha({ ...parcela, kind: 'expense', due_at: null }, hoje);
+      const data = formatDateBR(parcela.occurred_at);
+      const quando =
+        parcela.status === 'cleared' ? `paga · ${data}`
+        : estado === 'atrasado' ? `atrasada · venceu ${data}`
+        // No cartão quem vence é a FATURA: a parcela só entra nela.
+        : `${proxima ? 'a próxima · ' : ''}${parcela.invoice_id ? 'na fatura' : 'vence'} · ${data}`;
+      const apoio = [quando, diferencaDoPrevisto(Number(parcela.amount_cents), previstoDaLinha(parcela), brl)]
+        .filter(Boolean).join(' · ');
+      const titulo = `${parcela.installment_no ?? '—'}ª parcela`;
+      return {
+        chave: parcela.id,
+        titulo,
+        apoio,
+        cents: Number(parcela.amount_cents),
+        estado: parcela.status === 'cleared' ? 'paga' : proxima ? 'proxima' : 'futura',
+        accessibilityLabel: `${titulo} de ${plano.installments}, ${apoio}, ${brl(parcela.amount_cents)}`,
+        onPress: () =>
+          router.push({
+            pathname: '/finance/[txId]',
+            params: { txId: parcela.id, month: parcela.occurred_at.slice(0, 7) },
+          }),
+      };
     };
     const resumo = plano.active
       ? `${atual} de ${plano.installments} · ${brl(plano.installment_cents)}/mês`
@@ -572,19 +549,19 @@ export default function InstallmentsScreen() {
 
         <Presenca visivel={expandido} style={styles.parcelas}>
             {aSeguir.length > 0 ? (
-              <ThemedText type="meta" themeColor="textSecondary" style={styles.subtituloParcelas}>
-                A seguir
-              </ThemedText>
+              <View style={styles.grupoDeParcelas}>
+                <SectionHead title="A seguir" />
+                <LinhaDoTempo grupos={[{ itens: jSeguir.visiveis.map((p, k) => itemDaParcela(p, k === 0)) }]} />
+                <VerMais restantes={jSeguir.restantes} onPress={() => janelas.verMais(`${plano.id}:seguir`)} />
+              </View>
             ) : null}
-            {jSeguir.visiveis.map(linhaDaParcela)}
-            <VerMais restantes={jSeguir.restantes} onPress={() => janelas.verMais(`${plano.id}:seguir`)} />
             {pagas.length > 0 ? (
-              <ThemedText type="meta" themeColor="textSecondary" style={styles.subtituloParcelas}>
-                Pagas
-              </ThemedText>
+              <View style={styles.grupoDeParcelas}>
+                <SectionHead title="Já pagas" />
+                <LinhaDoTempo grupos={[{ itens: jPagas.visiveis.map((p) => itemDaParcela(p, false)) }]} />
+                <VerMais restantes={jPagas.restantes} onPress={() => janelas.verMais(`${plano.id}:pagas`)} />
+              </View>
             ) : null}
-            {jPagas.visiveis.map(linhaDaParcela)}
-            <VerMais restantes={jPagas.restantes} onPress={() => janelas.verMais(`${plano.id}:pagas`)} />
         </Presenca>
       </Animated.View>
     );
@@ -772,10 +749,6 @@ export default function InstallmentsScreen() {
 
 const styles = StyleSheet.create({
   lista: { gap: Space.md },
-  // Alinhado ao texto das parcelas (o mesmo recuo de `parcela`).
-  // "A seguir"/"Pagas" a `Space.md` do texto da primeira parcela (a linha já traz `sm` em cima) e
-  // mais longe do grupo de cima que do próprio (§2, 25/09/2026).
-  subtituloParcelas: { paddingTop: Space.md, paddingBottom: Space.xs, paddingHorizontal: Space.xl },
   paneBody: {
     gap: Space.xl,
     minWidth: 0,
@@ -818,22 +791,14 @@ const styles = StyleSheet.create({
   planoValor: {
     alignItems: 'flex-end',
   },
+  // As parcelas abertas: "A seguir"/"Já pagas" e a linha do tempo, no ritmo da ficha da dívida.
+  // O título a `Space.md` das parcelas dele (§2), como na ficha da dívida.
+  grupoDeParcelas: { gap: Space.md },
   parcelas: {
-    paddingBottom: Space.sm,
-  },
-  parcela: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Space.md,
-    paddingHorizontal: Space.xl,
-    paddingVertical: Space.sm,
-  },
-  parcelaTexto: { flexShrink: 1, gap: Space.half },
-  parcelaValor: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.sm,
+    gap: Space.xl,
+    paddingHorizontal: Space.md,
+    paddingTop: Space.sm,
+    paddingBottom: Space.md,
   },
   sheetBody: {
     gap: Space.xl,
