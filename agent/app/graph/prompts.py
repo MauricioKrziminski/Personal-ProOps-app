@@ -47,7 +47,10 @@ Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
   viagem") também; já ATUALIZAR o valor ou registrar o rendimento de um investimento é cadastros.
   Corrigir quantas parcelas de uma compra já foram pagas também é financas; CORRIGIR um aporte
   JÁ feito numa meta (valor, data ou nota dele) é cadastros.
-  Não infira financiamento só porque o item é carro/moto: preencha financial_entity para o sistema conferir o tipo do registro.
+  Não infira financiamento só porque o item é carro/moto: quando a mensagem paga, marca ou quita
+  PARCELAS/PRESTAÇÃO de algo já cadastrado, preencha financial_entity para o sistema conferir o tipo
+  do registro. Gasto ou compra NOVA que só cita o item ("gastei 300 de revisão do carro", "paguei
+  80 de gasolina da moto", "comprei uma paleta pro carro") deixa financial_entity null.
 - "financas_consulta": PERGUNTAR sobre dinheiro, sem registrar nada — "quanto
   gastei?", "qual meu saldo?", "quanto tá a fatura?", "vou ficar no vermelho?",
   "posso comprar X?", "quanto gastei no pix?", "por que meu gasto subiu esse mês?".

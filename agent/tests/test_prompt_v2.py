@@ -27,7 +27,7 @@ from app.services import consumo, embeddings, gemini
 
 # --- pinos do caminho v1 ------------------------------------------------------------------
 
-PIN_ROUTER = "2512ae06"
+PIN_ROUTER = "3f459db8"
 PIN_FINANCE = "d16a6394"
 PIN_FINANCE_QUERY = "5d4cc1d7"
 PIN_NOTES = "ffd30b04"

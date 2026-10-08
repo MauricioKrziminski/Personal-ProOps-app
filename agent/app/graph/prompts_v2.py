@@ -76,7 +76,9 @@ Domínios:
   ("separei 300 da nubank pra viagem", "guardei mais 200"), valor de bem, regra de categorização,
   apagar ou corrigir algo já lançado, marcar como pagas parcelas de compra JÁ criadas e corrigir
   quantas já foram pagas. Financiamento só se a pessoa disser: não infira por ser carro/moto;
-  preencha financial_entity para o sistema conferir o tipo do registro.
+  quando ela paga, marca ou quita PARCELAS/PRESTAÇÃO de algo já cadastrado, preencha
+  financial_entity para o sistema conferir o tipo do registro. Gasto ou compra NOVA que só cita o
+  item ("gastei 300 de revisão do carro", "gasolina da moto") deixa financial_entity null.
 - "financas_consulta": PERGUNTAR sobre dinheiro, sem registrar nada — "quanto gastei?", "qual meu
   saldo?", "quanto tá a fatura?", "vou ficar no vermelho?", "posso comprar X?", "quanto gastei no
   pix?", "por que meu gasto subiu esse mês?".

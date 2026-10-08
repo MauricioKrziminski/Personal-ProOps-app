@@ -381,6 +381,17 @@ async def finance_node(state: AgentState, config: RunnableConfig = None) -> dict
         # "no cartão" sem nome não é conta: vazio deixa o sistema usar o da linha ou perguntar
         if a.new_account and a.new_account.strip().casefold() in _CARTAO_GENERICO:
             a.new_account = None
+        if a.type == FinanceActionType.CREATE_INSTALLMENT_PURCHASE and a.installments == 1:
+            # "em 1x no crédito" é compra À VISTA no cartão, não parcelamento (08/10/2026, produção:
+            # o SIM dizia "em 1x… 1 pendentes" e só DEPOIS dele vinha "precisa de 2 ou mais
+            # parcelas"). Vira gasto, e o cartão que a ação já implicava fica no nome da conta:
+            # sem ele, "Nubank" casaria com a conta corrente de mesmo nome.
+            a.type = FinanceActionType.CREATE_EXPENSE
+            a.installments = a.current_installment = a.already_paid_count = None
+            if not a.account or a.account.strip().casefold() in _CARTAO_GENERICO:
+                a.account = guards.extract_account_fallback(texto_orig) or a.account
+            if a.account and matching.infer_account_type(a.account) is None:
+                a.account = f"cartão {a.account}"
         if a.type.value.startswith("create_"):
             # Campo de correção numa CRIAÇÃO é só o dado trocado de lugar (bateria de
             # 21/09/2026: "parcelei o notebook em 6 vezes, 4200 no inter" chegava em
@@ -791,6 +802,16 @@ async def resolve_node(state: AgentState) -> dict:
     # frase os sustenta; falhar nunca bloqueia o lançamento
     alvos = await atributos.congelar(
         state["workspace_id"], state.get("text", ""), acoes, alvos, pular=set(_incompletas(state, acoes)))
+
+    # nº de parcelas fora de 2..99 é recusado ANTES do SIM: a mesma régua da tool, que só
+    # roda depois dele (confirmar uma coisa e ouvir "não dá" é o oposto de pedir confirmação)
+    for i, a in enumerate(acoes):
+        if (getattr(a, "type", None) == FinanceActionType.CREATE_INSTALLMENT_PURCHASE
+                and not alvos[i].get("correction_error")):
+            try:
+                guards.require_installments(a.installments)
+            except guards.Level1Error as err:
+                alvos[i] = {**alvos[i], "correction_error": err.mensagem_usuario}
 
     return {"targets": with_resources(alvos), "results": esclarecimentos,
             "draft": _rascunho(state, acoes, alvos)}
