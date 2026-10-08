@@ -34,6 +34,9 @@ O serviço que recebe do WhatsApp, decide e escreve. Substituiu o par
 - **Validação de Nível 1 em `app/tools/guards.py`**, depois do modelo e antes do banco: valor
   inteiro e plausível, data dentro de ±5 anos, categoria normalizada, parcelas 2..99. É código
   puro e testado — é a única forma de o comportamento não mudar quando o modelo mudar.
+  **O que a tool recusaria é recusado ANTES do SIM** (08/10/2026, produção: "em 1x no crédito"
+  era confirmado e só depois vinha "precisa de 2 ou mais parcelas"): `resolve_node` confere as
+  parcelas, e `finance_node` transforma a compra parcelada em 1x em gasto no cartão.
 - **Resposta ao usuário é template Python.** Zero segunda chamada de LLM para escrever texto sobre
   números que já lemos: um modelo escrevendo "você gastou aproximadamente" em cima de um valor
   exato é alucinação com custo extra. O nó `geral` (saudação, ajuda) também não chama modelo.
@@ -61,6 +64,12 @@ uma lista de palavras decidindo o que a pessoa quis.
 |---|---|---|
 | `_guard_debt_history`: `\b(parcelas\|anteriores)\b` vetava pagamento de dívida | "paguei as parcelas de setembro" era recusado; "quitei as anteriores" passava | aritmética do contrato: valor múltiplo exato da prestação PERGUNTA se é histórico ou amortização |
 | `route()`: `status_request`/`creating`/`explicit_debt` decidiam desambiguação | "quitei as anteriores da moto" não casava e a pergunta nunca aparecia | `financial_entity` (que o modelo preenche) + a consulta ao banco |
+
+**`financial_entity` é só para PARCELA/PRESTAÇÃO de algo já cadastrado** (08/10/2026). O ROUTER
+mandava preenchê-lo sempre que aparecia carro/moto, e "gastei 24,49 … paleta para o carro" abria
+"Qual deles você quer alterar?" (11 de 16 compras novas, medido no Lite). Com a regra dizendo que
+compra nova que só cita o item deixa o campo null: 0 de 27, e os pagamentos de parcela seguem 15/15
+(sonda com repetição, frases fora do prompt incluídas).
 | `interpret_choice` era o único intérprete de "qual deles?" | só número, ordinal e rótulo exato; "o do mercado" virava intenção nova | regex continua como fast-path grátis, e a falha cai em `escolher_candidato` |
 
 **Um SIM não resolve uma pergunta "qual deles?"** (09/09/2026, medido em produção).
