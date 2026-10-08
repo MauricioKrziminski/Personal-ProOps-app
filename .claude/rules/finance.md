@@ -1235,7 +1235,36 @@ desmarca a quitação e desfaz o adiamento (`docs/AGENTE-PARIDADE-COM-O-APP.md`)
 
 - `assets` + `asset_valuations` (marcação com data). Valor novo entra sempre por `update_asset_value`, que grava no histórico — nunca `update` direto na coluna.
 - **Histórico é SNAPSHOT** (`net_worth_snapshots`, tirado pelo `finance-scheduler`), não reconstrução: não existe histórico de valor de imóvel/investimento/dívida, e reconstruir seria inventar número. A série começa quando o usuário começa a usar.
-- **Caixa inclui transação sem conta.** `private.cash_total()` é a fonte única — usada por patrimônio e pela projeção. Lançamento do WhatsApp costuma vir sem conta; ignorá-lo zerava o caixa de quem só usa o WhatsApp (bug corrigido na `0028`).
+- **Caixa inclui transação sem conta.** Lançamento do WhatsApp costuma vir sem conta; ignorá-lo zerava o caixa de quem só usa o WhatsApp (bug corrigido na `0028`). `private.cash_total()` é o caixa do **Dá para gastar** (ver abaixo); o patrimônio soma `private.caixa_das_contas` INTEIRO, com a conta de investimento em Investimentos.
+
+## "Dá para gastar" não é o patrimônio (`20261010170000`, `20261010170100`, `20261010170200`)
+
+**Dinheiro aplicado não é dinheiro para gastar.** Com a conta de investimento dentro de
+`cash_total`, aplicar R$ 1.000 no CDB não mudava o livre do mês, e o rendimento o AUMENTAVA. A
+régua é UMA função, `private.conta_no_disponivel(type, spendable)`: cartão nunca; senão
+`coalesce(accounts.spendable, type <> 'investment')`. `spendable` null = o padrão do tipo (o app só
+grava quando a pessoa foge dele; o `check` recusa valor em cartão). Chave no formulário da conta:
+"Conta no Dá para gastar"; no agente, `resource_update accounts spendable`.
+
+- **Quem filtra são os AGREGADOS, nunca as fontes por conta.** `caixa_das_contas` e
+  `eventos_de_caixa` continuam completos (o detalhe por conta e o "Onde muda" precisam deles);
+  `cash_total`, `private.eventos_disponiveis` (Projeção, metas) e `cash_events` (ciclo, livre)
+  aplicam a régua. `account_balances` devolve `disponivel` no FIM (o app e o agente agrupam por ela,
+  e caem no tipo quando a coluna não vem — agente ou APK antes da migration).
+- **A transferência que CRUZA a fronteira é saída (ou entrada) do disponível**: aplicar é
+  `origin = 'guardar'` (ramos 7 e 8 de `cash_events`, com a atrasada no dia de hoje) e a série
+  recorrente de aporte é `'guardar_previsto'` (ramo 9). Entre duas contas do mesmo lado continua
+  neutra. Gasto, dívida e fatura PAGOS por uma conta fora saem do disponível só pela fronteira.
+- **Linha que mora num CARTÃO é dinheiro da conta que PAGA a fatura** (`20261010170200`): o cartão
+  nunca está no disponível, e julgar pela própria conta sumia com a série no cartão ainda não
+  materializada (ciclo mais otimista que a Projeção, achado na revisão). Fatura, série, lançamento
+  sem fatura e dívida no cartão olham `payment_account_id`; sem pagadora, entram.
+- **Patrimônio não muda com a régua.** `net_worth_now` soma todo o caixa; aplicar só move de
+  "Dinheiro em conta" para "Investimentos". O que está fora aparece nas folhas "Como chego nesse
+  valor" como "Guardado, fora do Dá para gastar", FORA da soma, só no ciclo aberto.
+- `supabase/tests/dinheiro_para_gastar.sql` prende as identidades (ciclo `confere`, partida =
+  `cash_total`, Projeção = `cash_total` + eventos) e cada ramo; a régua SQL e a TS
+  (`padraoNoDisponivel`) são presas uma à outra em `account-form.test.ts`.
 
 ## Alertas proativos
 

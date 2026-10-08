@@ -50,3 +50,18 @@ test('detalhe do ciclo: o aberto fala do que ainda vai acontecer', () => {
   assert.equal(rotulosDoDetalhe('previsto').partida, 'Veio do ciclo anterior');
   assert.equal(rotulosDoDetalhe('fechado').fim, 'Sobrou na conta');
 });
+
+test('o guardado vem FORA da partida, e aplicar cai no balde dele', () => {
+  const d = lerDetalheDoCiclo({ ...json, fora: [{ account_id: 'cdb', nome: 'CDB', tipo: 'investment', cents: '80000' }] });
+  assert.deepEqual(d.fora, [{ account_id: 'cdb', nome: 'CDB', tipo: 'investment', cents: 80000 }]);
+  assert.deepEqual(lerDetalheDoCiclo(json).fora, [], 'servidor antigo sem a chave');
+  assert.equal(baldeDaOrigem('guardar', false), 'Guardado e investido');
+  assert.equal(baldeDaOrigem('guardar_previsto', false), 'Guardado e investido');
+  assert.equal(baldeDaOrigem('guardar', true), 'Entradas', 'resgatar é entrada');
+  const saidas = saidasPorBalde({ porOrigem: [
+    { origin: 'transaction', in_cents: 0, out_cents: 1000 },
+    { origin: 'guardar', in_cents: 0, out_cents: 3000 },
+    { origin: 'guardar_previsto', in_cents: 0, out_cents: 2000 },
+  ] });
+  assert.deepEqual(saidas, [{ titulo: 'Boletos, pix e gastos', cents: 1000 }, { titulo: 'Guardado e investido', cents: 5000 }]);
+});

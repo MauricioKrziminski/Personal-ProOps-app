@@ -27,6 +27,8 @@ export interface DetalheDoCiclo {
   resultado: number;
   caixaNoFim: number | null;
   faltouPagar: number | null;
+  /** As contas FORA do que dá para gastar (investimento, ou a que a pessoa tirou): fora da soma. */
+  fora: ContaDaPartida[];
 }
 
 const n = (v: unknown) => Number(v ?? 0);
@@ -58,6 +60,12 @@ export function lerDetalheDoCiclo(json: unknown): DetalheDoCiclo {
       out_cents: n(o.out_cents),
     })),
     resultado: n(j.resultado),
+    fora: ((j.fora ?? []) as Record<string, unknown>[]).map((c) => ({
+      account_id: (c.account_id as string | null) ?? null,
+      nome: String(c.nome ?? ''),
+      tipo: (c.tipo as string | null) ?? null,
+      cents: n(c.cents),
+    })),
     caixaNoFim: nOuNull(j.caixa_no_fim),
     faltouPagar: nOuNull(j.faltou_pagar),
   };
@@ -70,6 +78,7 @@ export const ORDEM_DOS_BALDES = [
   'Boletos, pix e gastos',
   'Parcelas de financiamento',
   'Previstos da recorrência',
+  'Guardado e investido',
   'Entradas',
 ] as const;
 
@@ -80,6 +89,8 @@ export function baldeDaOrigem(origin: string, entra: boolean): (typeof ORDEM_DOS
   if (origin === 'invoice' || origin === 'invoice_payment') return 'Faturas de cartão';
   if (origin === 'debt_schedule') return 'Parcelas de financiamento';
   if (origin === 'recurring_projection') return 'Previstos da recorrência';
+  // Aplicar no investimento (ou na conta tirada do "Dá para gastar"): sai do que dá para gastar.
+  if (origin === 'guardar' || origin === 'guardar_previsto') return 'Guardado e investido';
   return 'Boletos, pix e gastos';
 }
 

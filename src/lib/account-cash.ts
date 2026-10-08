@@ -12,8 +12,7 @@
  * assumida, e é por isso que cartão tem fatura, não saldo.
  */
 
-/** As contas que GUARDAM dinheiro. Investimento e cartão são outra pergunta. */
-export const GUARDA_DINHEIRO = ['checking', 'savings', 'cash'] as const;
+import { entraNoDisponivel } from './accounts.ts';
 
 export type SaldoDeConta = {
   account_id: string | null;
@@ -23,6 +22,8 @@ export type SaldoDeConta = {
   cleared_cents: number | string;
   pending_in_cents: number | string;
   pending_out_cents: number | string;
+  /** Entra no "Dá para gastar" (`private.conta_no_disponivel`, 20261010170000). */
+  disponivel?: boolean | null;
 };
 
 export type LinhaDeCaixa = {
@@ -50,8 +51,9 @@ export type Caixa = {
  * ver "Sem conta · R$ 300,00" é o que faz a pessoa ir lá dizer de qual conta saiu.
  */
 export function caixaDasContas(saldos: readonly SaldoDeConta[]): Caixa {
+  // A régua do banco: investimento e a conta que a pessoa tirou ficam fora, como no livre.
   const doCaixa = saldos.filter(
-    (s) => s.account_id === null || (GUARDA_DINHEIRO as readonly string[]).includes(s.type)
+    (s) => s.account_id === null || (s.type !== 'credit_card' && entraNoDisponivel(s))
   );
 
   const linhas = doCaixa

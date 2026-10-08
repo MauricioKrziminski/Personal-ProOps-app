@@ -29,3 +29,8 @@ test('o que é projetado da regra não tem destino', () => {
   // Não existe lançamento para abrir: a recorrente distante é expandida da regra, não criada.
   assert.equal(rotaDaLinha('recurring_projection', 'rec-1'), null);
 });
+
+test('aplicar no investimento abre a transferência; o aporte previsto da regra não abre nada', () => {
+  assert.deepEqual(rotaDaLinha('guardar', 't1'), { pathname: '/finance/[txId]', params: { txId: 't1' } });
+  assert.equal(rotaDaLinha('guardar_previsto', 'r1'), null);
+});

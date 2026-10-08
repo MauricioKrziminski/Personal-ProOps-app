@@ -45,7 +45,7 @@ import {
   type AccountBalance,
 } from '@/hooks/use-finance';
 import { useVoltarQuandoFechar } from '@/hooks/use-voltar-quando-fechar';
-import { saldoDaConta } from '@/lib/accounts';
+import { entraNoDisponivel, saldoDaConta } from '@/lib/accounts';
 import { confirmDestructive } from '@/lib/item-actions';
 
 /**
@@ -75,8 +75,6 @@ const ICONE: Record<string, SymbolViewProps['name']> = {
   ...Object.fromEntries(ACCOUNT_TYPES.map((t) => [t.value, t.icon])),
   none: 'questionmark.circle',
 };
-
-const GUARDA_DINHEIRO = ['checking', 'savings', 'cash'];
 
 /**
  * Confirmação de ação destrutiva.
@@ -151,8 +149,10 @@ export default function AccountsScreen() {
       a.name.localeCompare(b.name),
   );
   const semConta = linhas.find((l) => l.account_id === null);
-  const dinheiro = linhas.filter((l) => l.account_id && GUARDA_DINHEIRO.includes(l.type));
-  const investimentos = linhas.filter((l) => l.account_id && l.type === 'investment');
+  // Dinheiro = o que dá para gastar; o resto (investimento, ou a conta que a pessoa tirou) é
+  // guardado. A régua é a do banco, a mesma do livre e da Projeção (20261010170000).
+  const dinheiro = linhas.filter((l) => l.account_id && l.type !== 'credit_card' && entraNoDisponivel(l));
+  const investimentos = linhas.filter((l) => l.account_id && l.type !== 'credit_card' && !entraNoDisponivel(l));
   const cartoes = linhas.filter((l) => l.account_id && l.type === 'credit_card');
 
   /**
@@ -376,7 +376,7 @@ export default function AccountsScreen() {
           ) : null}
           <View style={styles.heroSplit}>
             <View style={styles.heroPart}>
-              <HeroLabel>investido</HeroLabel>
+              <HeroLabel>guardado</HeroLabel>
               <Money cents={investido} variant="subhead" tone="textSecondary" />
             </View>
             <View style={styles.heroPart}>
@@ -407,7 +407,7 @@ export default function AccountsScreen() {
       ) : null}
       {dinheiro.length > 0 ? <Section title="Dinheiro">{dinheiro.map(linhaConta)}</Section> : null}
       {investimentos.length > 0 ? (
-        <Section title="Investimentos">{investimentos.map(linhaConta)}</Section>
+        <Section title="Guardado e investido">{investimentos.map(linhaConta)}</Section>
       ) : null}
       {cartoes.length > 0 ? <Section title="Cartões">{cartoes.map(linhaConta)}</Section> : null}
     </>

@@ -27,6 +27,7 @@ export function rotaDaLinha(origin: string, refId: string): Rota | null {
     case 'invoice_payment':
     case 'transaction':
     case 'transaction_overdue':
+    case 'guardar':
       return { pathname: '/finance/[txId]', params: { txId: refId } };
     default:
       return null;

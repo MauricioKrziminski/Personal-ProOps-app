@@ -416,6 +416,45 @@ async def test_conta_padrao_sai_de_values_e_escreve_no_workspace(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_tirar_a_conta_do_da_para_gastar_grava_a_coluna(monkeypatch):
+    """A chave "Conta no Dá para gastar" do app (20261010170000): `spendable` é coluna de verdade."""
+    async def fetch(*a):
+        return [_linha(name="Poupança", type="savings", archived=False)]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    acao = action(resource="accounts", kind="resource_update", spendable="false")
+    prepared = await resources.prepare(ctx(), acao)
+    assert prepared["values"] == {"spendable": False}
+    assert "conta no Dá para gastar: não" in prepared["summary"]
+    assert needs_confirmation(acao, 1.0)
+
+    escritas = []
+
+    async def fetch_one(sql, *args):
+        escritas.append((sql, args))
+        return {"id": prepared["id"]}
+
+    monkeypatch.setattr(resources.db, "fetch_one", fetch_one)
+    await resources.execute(
+        ExecContext("user", "workspace", None, "America/Sao_Paulo", "", "app:1", target={"prepared": prepared}),
+        acao,
+    )
+    sql, args = escritas[0]
+    assert "update public.accounts set spendable = %s where id = %s" in sql, sql
+    assert args[0] is False, args
+
+
+@pytest.mark.asyncio
+async def test_cartao_nao_tem_da_para_gastar(monkeypatch):
+    async def fetch(*a):
+        return [_linha(name="Nubank", type="credit_card", archived=False)]
+
+    monkeypatch.setattr(resources.db, "fetch", fetch)
+    with pytest.raises(Level1Error):
+        await resources.prepare(ctx(), action(resource="cards", kind="resource_update", spendable="false"))
+
+
+@pytest.mark.asyncio
 async def test_tipo_da_conta_troca_entre_contas(monkeypatch):
     # 26/09/2026: "tudo que se cria se edita" — a poupança vira corrente sem recusa.
     async def fetch(*a):

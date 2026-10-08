@@ -58,6 +58,8 @@ export function DetalheDoCicloSheet({
   const hipoteses = d && rascunho != null ? rascunho - base : 0;
   const fim = base + hipoteses;
   const faltou = d?.estado === 'fechado' ? Number(d.faltouPagar ?? 0) : 0;
+  // O dinheiro guardado é de HOJE: só no ciclo aberto, que é o que parte do caixa de hoje.
+  const fora = d?.estado === 'aberto' ? d.fora : [];
   const theme = useTheme();
 
   return (
@@ -93,6 +95,14 @@ export function DetalheDoCicloSheet({
               <LinhaDaConta rotulo={`= ${r.fim}`} cents={fim} forte />
               {faltou > 0 ? <LinhaDaConta rotulo="Faltou pagar" cents={-faltou} tone="danger" forte /> : null}
             </View>
+            {fora.length > 0 ? (
+              <View style={styles.bloco}>
+                <LinhaDaConta rotulo="Guardado, fora do Dá para gastar" cents={fora.reduce((s, c) => s + c.cents, 0)} forte />
+                {fora.map((c) => (
+                  <LinhaDaConta key={c.account_id ?? c.nome} rotulo={c.nome} cents={c.cents} recuo />
+                ))}
+              </View>
+            ) : null}
             {/* Fechado devendo, o número do ciclo é o que faltou pagar — e ele fica FORA da soma,
                 como na tela do ciclo (o abatimento automático foi recusado pelo dono do produto). */}
             {faltou > 0 ? (

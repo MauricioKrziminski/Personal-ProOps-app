@@ -96,6 +96,7 @@ export type Database = {
           payment_account_id: string | null
           rotativo_auto: boolean
           rotativo_rate_monthly: number | null
+          spendable: boolean | null
           type: string
           updated_at: string
           user_id: string
@@ -115,6 +116,7 @@ export type Database = {
           payment_account_id?: string | null
           rotativo_auto?: boolean
           rotativo_rate_monthly?: number | null
+          spendable?: boolean | null
           type?: string
           updated_at?: string
           user_id: string
@@ -134,6 +136,7 @@ export type Database = {
           payment_account_id?: string | null
           rotativo_auto?: boolean
           rotativo_rate_monthly?: number | null
+          spendable?: boolean | null
           type?: string
           updated_at?: string
           user_id?: string
@@ -3884,6 +3887,7 @@ export type Database = {
           account_id: string
           balance_cents: number
           cleared_cents: number
+          disponivel: boolean
           name: string
           pending_in_cents: number
           pending_out_cents: number
@@ -4201,6 +4205,7 @@ export type Database = {
           account_id: string
           balance_cents: number
           cleared_cents: number
+          disponivel: boolean
           name: string
           pending_in_cents: number
           pending_out_cents: number

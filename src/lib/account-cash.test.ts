@@ -68,3 +68,15 @@ test('conta zerada e sem nada a receber não vira linha', () => {
     ['Viva', 'Só a receber']
   );
 });
+
+test('"Nas contas" segue o que dá para gastar: investimento e conta tirada ficam fora', () => {
+  const c = caixaDasContas([
+    saldo({ name: 'Nubank', cleared_cents: 1000_00, disponivel: true }),
+    saldo({ name: 'Reserva', type: 'savings', cleared_cents: 500_00, disponivel: false }),
+    saldo({ name: 'CDB', type: 'investment', cleared_cents: 700_00, disponivel: false }),
+    saldo({ name: 'CDB posto', type: 'investment', cleared_cents: 200_00, disponivel: true }),
+    saldo({ name: 'Tesouro', type: 'investment', cleared_cents: 900_00 }),
+  ]);
+  assert.equal(c.total, 1200_00);
+  assert.deepEqual(c.linhas.map((l) => l.nome).sort(), ['CDB posto', 'Nubank']);
+});

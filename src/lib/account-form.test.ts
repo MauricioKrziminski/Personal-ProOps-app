@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { emptyAccountForm, accountFormFromAccount, accountFormErrors, accountFormPayload, accountFormErrorMessage } from './account-form.ts';
+import { readFileSync } from 'node:fs';
+import { emptyAccountForm, accountFormFromAccount, accountFormErrors, accountFormPayload, accountFormErrorMessage, contaNoDisponivel, padraoNoDisponivel } from './account-form.ts';
 
 test('shared account defaults are fresh, zero-valued and respect the chosen type', () => {
   assert.equal(emptyAccountForm('credit_card').type, 'credit_card');
@@ -117,4 +118,45 @@ test('editing a negative account cannot silently flip its sign by selecting an u
   }
   // New drafts still use unsigned amount intentionally when selecting these types.
   assert.equal(accountFormPayload({ ...emptyAccountForm('cash'), name: 'Cash', negativo: true, saldoCents: 1000 }).initial_balance_cents, 1000);
+});
+
+test('"Conta no Dá para gastar": investimento nasce fora, o resto dentro, cartão nunca', () => {
+  assert.equal(padraoNoDisponivel('checking'), true);
+  assert.equal(padraoNoDisponivel('savings'), true);
+  assert.equal(padraoNoDisponivel('cash'), true);
+  assert.equal(padraoNoDisponivel('investment'), false);
+  assert.equal(padraoNoDisponivel('credit_card'), false);
+  assert.equal(contaNoDisponivel({ type: 'investment', spendable: true }), true);
+  assert.equal(contaNoDisponivel({ type: 'savings', spendable: false }), false);
+  assert.equal(contaNoDisponivel({ type: 'credit_card', spendable: true }), false);
+});
+
+test('a escolha grava null quando É o padrão do tipo, e o tipo novo volta a mandar', () => {
+  const base = { ...emptyAccountForm('savings'), name: 'Poupança' };
+  assert.equal(accountFormPayload(base).spendable, null);
+  assert.equal(accountFormPayload({ ...base, spendable: false }).spendable, false, 'poupança tirada');
+  assert.equal(accountFormPayload({ ...base, spendable: true }).spendable, null, 'igual ao padrão');
+  const cdb = { ...emptyAccountForm('investment'), name: 'CDB' };
+  assert.equal(accountFormPayload(cdb).spendable, null);
+  assert.equal(accountFormPayload({ ...cdb, spendable: true }).spendable, true, 'investimento posto');
+  // tirou a poupança e depois virou investimento: "fora" é o padrão do tipo novo
+  assert.equal(accountFormPayload({ ...base, spendable: false, type: 'investment' }).spendable, null);
+  const cartao = { ...emptyAccountForm('credit_card'), name: 'Cartão', closingDay: '3', dueDay: '10', spendable: true };
+  assert.equal(accountFormPayload(cartao).spendable, null, 'o banco recusa spendable em cartão');
+});
+
+test('editar a conta traz a escolha gravada (sem ela, salvar apagaria a escolha)', () => {
+  const form = accountFormFromAccount({ id: 'a', name: 'Reserva', type: 'savings', initial_balance_cents: 0, spendable: false });
+  assert.equal(form.spendable, false);
+  assert.equal(accountFormPayload(form).spendable, false);
+  assert.equal(accountFormFromAccount({ id: 'b', name: 'X', type: 'checking', initial_balance_cents: 0 }).spendable, null);
+});
+
+test('o padrão do formulário é o do banco (a única cópia da regra fora do SQL)', () => {
+  const sql = readFileSync('supabase/migrations/20261010170000_dinheiro_para_gastar.sql', 'utf8');
+  assert.match(sql, /coalesce\(p_spendable, p_type is distinct from 'investment'\)/);
+  assert.match(sql, /p_type is distinct from 'credit_card'/);
+  for (const t of ['checking', 'savings', 'cash', 'investment', 'credit_card'] as const) {
+    assert.equal(padraoNoDisponivel(t), t !== 'investment' && t !== 'credit_card', t);
+  }
 });

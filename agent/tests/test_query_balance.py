@@ -86,3 +86,43 @@ async def test_sem_previsto_nao_inventa_aviso(monkeypatch):
     assert "A receber" not in msg
     assert "A pagar" not in msg
     assert "Dívida de cartão" not in msg
+
+
+@pytest.mark.asyncio
+async def test_segue_a_regra_do_banco_e_nao_o_tipo(monkeypatch):
+    """`disponivel` (20261010170000) decide: poupança tirada sai do dinheiro, investimento posto entra."""
+    async def fetch(*a, **k):
+        return [
+            {"account_id": "a1", "name": "Nubank", "type": "checking", "disponivel": True,
+             "balance_cents": 100000, "cleared_cents": 100000, "pending_in_cents": 0, "pending_out_cents": 0},
+            {"account_id": "a2", "name": "Reserva", "type": "savings", "disponivel": False,
+             "balance_cents": 50000, "cleared_cents": 50000, "pending_in_cents": 0, "pending_out_cents": 0},
+            {"account_id": "a3", "name": "CDB liquidez", "type": "investment", "disponivel": True,
+             "balance_cents": 20000, "cleared_cents": 20000, "pending_in_cents": 0, "pending_out_cents": 0},
+            {"account_id": "a4", "name": "Tesouro", "type": "investment", "disponivel": False,
+             "balance_cents": 70000, "cleared_cents": 70000, "pending_in_cents": 0, "pending_out_cents": 0},
+        ]
+
+    monkeypatch.setattr(queries.db, "fetch", fetch)
+    msg = (await queries.query_balance(_ctx(), None)).message
+    assert "Dinheiro disponível: *R$ 1.200,00*" in msg, msg  # 1.000 + 200 do CDB posto
+    assert "Guardado e investido: R$ 1.200,00" in msg, msg  # 500 da poupança tirada + 700
+
+
+@pytest.mark.asyncio
+async def test_sem_a_coluna_cai_no_tipo(monkeypatch):
+    """Deploy antes da migration: sem `disponivel`, investimento fora e poupança dentro."""
+    async def fetch(*a, **k):
+        return [
+            {"account_id": "a1", "name": "Nubank", "type": "checking",
+             "balance_cents": 100000, "cleared_cents": 100000, "pending_in_cents": 0, "pending_out_cents": 0},
+            {"account_id": "a2", "name": "Poupança", "type": "savings",
+             "balance_cents": 50000, "cleared_cents": 50000, "pending_in_cents": 0, "pending_out_cents": 0},
+            {"account_id": "a3", "name": "Tesouro", "type": "investment",
+             "balance_cents": 70000, "cleared_cents": 70000, "pending_in_cents": 0, "pending_out_cents": 0},
+        ]
+
+    monkeypatch.setattr(queries.db, "fetch", fetch)
+    msg = (await queries.query_balance(_ctx(), None)).message
+    assert "Dinheiro disponível: *R$ 1.500,00*" in msg, msg
+    assert "Guardado e investido: R$ 700,00" in msg, msg

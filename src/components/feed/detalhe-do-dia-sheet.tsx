@@ -25,6 +25,7 @@ export function DetalheDoDiaSheet({
   ate,
   entrada,
   diasLivres,
+  guardado = 0,
   atalhos,
 }: {
   visible: boolean;
@@ -36,6 +37,8 @@ export function DetalheDoDiaSheet({
   ate: string | null;
   entrada: string | null;
   diasLivres: number | null;
+  /** O que está nas contas FORA do "Dá para gastar" (investimento, ou a conta tirada): à parte. */
+  guardado?: number;
   atalhos: readonly { label: string; onPress: () => void }[];
 }) {
   const theme = useTheme();
@@ -60,6 +63,9 @@ export function DetalheDoDiaSheet({
             </>
           ) : null}
         </View>
+        {guardado !== 0 ? (
+          <LinhaDaConta rotulo="Guardado, fora do Dá para gastar" cents={guardado} forte />
+        ) : null}
         {atalhos.length > 0 ? (
           <Section>
             {atalhos.map((a) => <Row key={a.label} title={a.label} onPress={a.onPress} />)}
@@ -68,7 +74,7 @@ export function DetalheDoDiaSheet({
         <View style={styles.bloco}>
           <ThemedText type="smallBold">Como é calculado</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            O dinheiro em conta hoje menos o que vence até a próxima entrada de dinheiro (ou até o fim
+            O dinheiro em conta hoje (sem o guardado e o investido) menos o que vence até a próxima entrada de dinheiro (ou até o fim
             do ciclo), dividido pelos dias até lá. Faturas contam no vencimento.
           </ThemedText>
         </View>

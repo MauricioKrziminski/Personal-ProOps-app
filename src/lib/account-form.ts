@@ -21,17 +21,36 @@ export interface AccountFormState {
   fechamentoInclusivo: boolean;
   rotativoAuto: boolean;
   rotativoRate: string;
+  /** Entra no "Dá para gastar"? null = o padrão do tipo (`padraoNoDisponivel`). */
+  spendable: boolean | null;
 }
 
+/**
+ * O padrão de cada tipo — a cópia, para o formulário, de `private.conta_no_disponivel`
+ * (`20261010170000`): investimento fica fora, cartão nunca, o resto entra. As somas não leem
+ * daqui; elas leem o banco (`account_balances.disponivel`).
+ */
+export const padraoNoDisponivel = (type: AccountType) => type !== 'investment' && type !== 'credit_card';
+
+/** A chave como a tela a mostra: a escolha da pessoa, ou o padrão do tipo. */
+export const contaNoDisponivel = (form: Pick<AccountFormState, 'type' | 'spendable'>) =>
+  form.type !== 'credit_card' && (form.spendable ?? padraoNoDisponivel(form.type));
+
+/** Grava `null` quando a escolha É o padrão: mudar o tipo depois volta a seguir o tipo novo. */
+const spendableParaGravar = (form: AccountFormState) =>
+  form.type === 'credit_card' || form.spendable === null || form.spendable === padraoNoDisponivel(form.type)
+    ? null
+    : form.spendable;
+
 export function emptyAccountForm(type: AccountType = 'checking'): AccountFormState {
-  return { name: '', type, saldoCents: 0, negativo: false, base: null, originalInitialBalanceCents: null, closingDay: '', dueDay: '', limitCents: 0, payerId: null, fechamentoInclusivo: false, rotativoAuto: false, rotativoRate: '' };
+  return { name: '', type, saldoCents: 0, negativo: false, base: null, originalInitialBalanceCents: null, closingDay: '', dueDay: '', limitCents: 0, payerId: null, fechamentoInclusivo: false, rotativoAuto: false, rotativoRate: '', spendable: null };
 }
 
 export function accountFormFromAccount(account: {
   id: string; name: string; type: AccountType; initial_balance_cents: number;
   closing_day?: number | null; due_day?: number | null; credit_limit_cents?: number | null;
   payment_account_id?: string | null; closing_day_inclusive?: boolean | null;
-  rotativo_auto?: boolean | null; rotativo_rate_monthly?: number | null;
+  rotativo_auto?: boolean | null; rotativo_rate_monthly?: number | null; spendable?: boolean | null;
 }, currentBalance?: number | null): AccountFormState {
   const current = currentBalance ?? account.initial_balance_cents;
   return { id: account.id, name: account.name, type: account.type,
@@ -43,6 +62,7 @@ export function accountFormFromAccount(account: {
     limitCents: account.credit_limit_cents ?? 0, payerId: account.payment_account_id ?? null,
     fechamentoInclusivo: account.closing_day_inclusive ?? false, rotativoAuto: account.rotativo_auto ?? false,
     rotativoRate: account.rotativo_rate_monthly == null ? '' : formatNumberBR(account.rotativo_rate_monthly * 100),
+    spendable: account.spendable ?? null,
   };
 }
 
@@ -88,6 +108,7 @@ export function accountFormPayload(form: AccountFormState) {
     rotativo_auto: card ? form.rotativoAuto : false,
     rotativo_rate_monthly: card && form.rotativoRate.trim() ? Number(form.rotativoRate.trim().replace(',', '.')) / 100 : null,
     payment_account_id: card ? form.payerId : null,
+    spendable: spendableParaGravar(form),
   };
 }
 

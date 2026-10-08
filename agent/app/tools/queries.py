@@ -38,9 +38,10 @@ from app.tools.base import ExecContext, ToolResult
 
 KIND_EMOJI = {"expense": "💸", "income": "💰"}
 
-# As contas que GUARDAM dinheiro. Cópia literal de `GUARDA_DINHEIRO` em
-# `src/app/finance/accounts.tsx:63` — o WhatsApp e a tela têm que agrupar igual, senão o
-# usuário vê dois "saldos" diferentes e nenhum dos dois ganha confiança.
+# As contas que entram no "Dá para gastar" quando o banco ainda não manda `disponivel` (deploy
+# antes da migration `20261010170000`). Quem decide é o banco (`private.conta_no_disponivel`): a
+# pessoa pode tirar a poupança ou pôr um investimento, e a tela, o livre e esta resposta seguem
+# a MESMA coluna.
 GUARDA_DINHEIRO = ("checking", "savings", "cash")
 
 
@@ -65,8 +66,12 @@ async def query_balance(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     if not rows:
         return ToolResult("💼 Você ainda não tem contas nem lançamentos.", read_only=True)
 
-    dinheiro = [r for r in rows if r["type"] in GUARDA_DINHEIRO or r["account_id"] is None]
-    investimentos = [r for r in rows if r["type"] == "investment"]
+    def no_disponivel(r) -> bool:
+        valor = r.get("disponivel")
+        return bool(valor) if valor is not None else r["type"] in GUARDA_DINHEIRO
+
+    dinheiro = [r for r in rows if r["account_id"] is None or (r["type"] != "credit_card" and no_disponivel(r))]
+    investimentos = [r for r in rows if r["account_id"] is not None and r["type"] != "credit_card" and not no_disponivel(r)]
     cartoes = [r for r in rows if r["type"] == "credit_card"]
 
     def col(linha, nome: str) -> int:
@@ -98,7 +103,7 @@ async def query_balance(ctx: ExecContext, action: FinanceQuery) -> ToolResult:
     ]
 
     if investido:
-        partes.append(f"\n📈 Investido: {cents_to_brl(investido)}")
+        partes.append(f"\n📈 Guardado e investido: {cents_to_brl(investido)}")
 
     if divida:
         partes.append(f"\n💳 Dívida de cartão: {cents_to_brl(divida)}")

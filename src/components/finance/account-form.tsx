@@ -11,6 +11,8 @@ import { ACCOUNT_TYPES } from '@/lib/accounts';
 import {
   accountDayValid,
   accountFormErrors,
+  contaNoDisponivel,
+  padraoNoDisponivel,
   type AccountFormState,
   type AccountType,
 } from '@/lib/account-form';
@@ -236,6 +238,7 @@ export function AccountFormFields({
             </Field>
           </>
         ) : (
+          <>
           <Field label={form.id && !form.base ? 'Saldo inicial' : 'Saldo atual'} error={errors.saldoCents}>
             <MoneyField
               readOnly={disabled}
@@ -256,6 +259,20 @@ export function AccountFormFields({
               </View>
             </Presenca>
           </Field>
+          {/*
+            Dinheiro do dia a dia ou guardado (10/10/2026): investimento nasce fora, o resto
+            dentro, e a pessoa decide por conta. Desligada, a conta sai do "Dá para gastar", do
+            livre e da Projeção, e continua no Patrimônio.
+          */}
+          <SwitchRow
+            label="Conta no Dá para gastar"
+            value={contaNoDisponivel(form)}
+            onValueChange={(v: boolean) =>
+              change({ ...form, spendable: v === padraoNoDisponivel(form.type) ? null : v })
+            }
+            disabled={disabled}
+          />
+          </>
         )}
       </TrocaSuave>
     </View>

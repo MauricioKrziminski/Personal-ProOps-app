@@ -23,7 +23,8 @@ begin perform set_config('role','none',true);
  perform set_config('role','authenticated',true);end $$;
 create function pg_temp.cash(w uuid) returns bigint language plpgsql as $$
 declare n bigint;
-begin perform set_config('role','none',true);n:=private.cash_total(array[w]);
+-- O dinheiro de TODAS as contas (20261010170000): `cash_total` passou a ser só o que dá para gastar.
+begin perform set_config('role','none',true);n:=(select coalesce(sum(c.cents),0) from private.caixa_das_contas(array[w]) c);
  perform set_config('role','authenticated',true);return n;end $$;
 create function pg_temp.pos(p uuid) returns jsonb language sql as $$
  select x from jsonb_array_elements(public.investment_positions()) x where (x->>'account_id')::uuid=p $$;

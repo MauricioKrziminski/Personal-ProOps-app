@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { accountSelectOptions, accountLabel, inicialParaOSaldo, saldoDaConta } from './accounts.ts';
+import { accountSelectOptions, accountLabel, entraNoDisponivel, inicialParaOSaldo, saldoDaConta } from './accounts.ts';
 
 test('o cartão diz que é cartão — foi o que custou R$ 4.000 em produção', () => {
   // As quatro contas reais de 09/09/2026, na ordem em que apareciam no seletor.
@@ -173,4 +173,13 @@ test('F03: contrato de qualidade inválido não apresenta número como confirmad
   for (const limit_status of [undefined, null, 'unexpected']) {
     assert.equal(f03Options({ cards: f03Query([{ ...f03Card, limit_status }]) })[2].detail, 'Limite indisponível');
   }
+});
+
+test('entra no "Dá para gastar": a coluna do banco decide; sem ela, o tipo', () => {
+  assert.equal(entraNoDisponivel({ type: 'savings', disponivel: false }), false, 'poupança tirada');
+  assert.equal(entraNoDisponivel({ type: 'investment', disponivel: true }), true, 'investimento posto');
+  assert.equal(entraNoDisponivel({ type: 'investment' }), false);
+  assert.equal(entraNoDisponivel({ type: 'savings', disponivel: null }), true);
+  assert.equal(entraNoDisponivel({ type: 'credit_card' }), false);
+  assert.equal(entraNoDisponivel({ type: 'none' }), true, '"sem conta"');
 });

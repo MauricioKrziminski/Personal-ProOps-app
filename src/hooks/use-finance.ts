@@ -162,6 +162,8 @@ export type Account = Pick<
   // rotativo: só fazem sentido em cartão
   | 'rotativo_auto'
   | 'rotativo_rate_monthly'
+  // entra no "Dá para gastar"? null = padrão do tipo (`20261010170000`)
+  | 'spendable'
 > & { type: (typeof ACCOUNT_TYPES)[number]['value'] };
 
 /**
@@ -585,7 +587,7 @@ export function useAccounts(selectedId?: string | null, includeArchived = false)
       return fetchPaged<Account>((from, to) => {
         let query = supabase
           .from('accounts')
-          .select('id, name, type, initial_balance_cents, archived, closing_day, due_day, credit_limit_cents, payment_account_id, closing_day_inclusive, rotativo_auto, rotativo_rate_monthly, created_at')
+          .select('id, name, type, initial_balance_cents, archived, closing_day, due_day, credit_limit_cents, payment_account_id, closing_day_inclusive, rotativo_auto, rotativo_rate_monthly, spendable, created_at')
           .order('created_at').order('id');
         if (!includeArchived) query = selectedId ? query.or(`archived.eq.false,id.eq.${selectedId}`) : query.eq('archived', false);
         return query.range(from, to);
@@ -3818,6 +3820,7 @@ export type CreateAccountInput = {
   closing_day_inclusive?: boolean;
   rotativo_auto?: boolean;
   rotativo_rate_monthly?: number | null;
+  spendable?: boolean | null;
 };
 
 export type CreateAccountResult = {
@@ -3926,6 +3929,7 @@ export function useSaveAccount() {
       closing_day_inclusive?: boolean;
       rotativo_auto?: boolean;
       rotativo_rate_monthly?: number | null;
+      spendable?: boolean | null;
     }) => {
       if (id) {
         const { error } = await supabase.from('accounts').update(input).eq('id', id);

@@ -101,6 +101,15 @@ export type AccountPickerContext = {
   concealed: boolean;
 };
 
+/**
+ * A linha de `account_balances` entra no "Dá para gastar"? Quem decide é o banco
+ * (`disponivel`, de `private.conta_no_disponivel`, 20261010170000); a queda pelo tipo só vale
+ * enquanto o servidor ainda não manda a coluna (app novo antes da migration).
+ */
+export function entraNoDisponivel(l: { type: string; disponivel?: boolean | null }): boolean {
+  return l.disponivel ?? (l.type !== 'investment' && l.type !== 'credit_card');
+}
+
 /** SQL bigint may arrive as text; never round an unsafe aggregate or turn null into zero. */
 function safeCents(value: unknown): number | null {
   if (typeof value !== 'number' && (typeof value !== 'string' || !/^-?\d+$/.test(value))) return null;

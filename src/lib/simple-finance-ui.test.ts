@@ -155,6 +155,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
     ASSET_CLASSES: [{ value: 'investment', label: 'Investimento', icon: 'chart.line.uptrend.xyaxis' }],
     useDebts: () => ({ ...query, data: options.debts ?? [], isPending: Boolean(options.debtsPending), isSuccess: !options.debtsPending && !options.debtsError, isError: Boolean(options.debtsError), refetch: async () => { refetches.push('debts'); } }),
     useCardSummary: () => ({ ...query, isSuccess: true, data: options.cards ?? [] }),
+    useCycleBreakdown: () => ({ ...query, isPending: false, isSuccess: options.breakdown != null, data: options.breakdown }),
     useCardInvoices: () => ({ ...query, isSuccess: true, data: options.faturas ?? [] }),
     useCategoriesUsed: () => ({ ...query, isSuccess: true, data: options.categoriasUsadas ?? [] }),
     useCategoryClassificationDefaults: (workspaceId?: string, enabled = true) => {
@@ -8644,4 +8645,86 @@ test('Aplicar o adiantamento: parcela que mudou desde a hipótese não grava nad
   assert.ok(ui.nodes().some((n: any) => n.type === 'EmptyState' && n.props.title === 'Esta hipótese mudou'));
   const header = ui.nodes().find((n: any) => n.type === 'TaskHeader');
   assert.equal(header.props.action.props.disabled, true);
+});
+
+test('Dá para gastar: a chave da conta segue o padrão do tipo e só grava quando a pessoa foge dele', () => {
+  const base = { name: 'CDB', type: 'investment', saldoCents: 0, negativo: false, base: null, originalInitialBalanceCents: null, closingDay: '', dueDay: '', limitCents: 0, payerId: null, fechamentoInclusivo: false, rotativoAuto: false, rotativoRate: '', spendable: null };
+  const montar = (form: any) => {
+    const changes: any[] = [];
+    const ui = screen('src/components/finance/account-form.tsx', { componente: 'AccountFormFields', props: { form, onChange: (n: any) => changes.push(n), accounts: [], disabled: false, autoFocus: false } });
+    const chave = () => ui.nodes().find((n: any) => n.type === 'SwitchRow' && n.props.label === 'Conta no Dá para gastar');
+    return { ui, changes, chave };
+  };
+  // investimento: fora por padrão; ligar grava true; desligar de volta grava null (o padrão)
+  const inv = montar(base);
+  assert.equal(inv.chave().props.value, false);
+  inv.ui.interact(() => inv.chave().props.onValueChange(true));
+  assert.equal(inv.changes.at(-1).spendable, true);
+  inv.ui.interact(() => inv.chave().props.onValueChange(false));
+  assert.equal(inv.changes.at(-1).spendable, null);
+  // a escolha gravada aparece ao editar
+  assert.equal(montar({ ...base, spendable: true }).chave().props.value, true);
+  // poupança: dentro por padrão; desligar grava false, religar volta a null
+  const pou = montar({ ...base, type: 'savings' });
+  assert.equal(pou.chave().props.value, true);
+  pou.ui.interact(() => pou.chave().props.onValueChange(false));
+  assert.equal(pou.changes.at(-1).spendable, false);
+  assert.equal(montar({ ...base, type: 'savings', spendable: false }).chave().props.value, false);
+  // cartão não tem a chave
+  assert.equal(montar({ ...base, type: 'credit_card' }).chave(), undefined);
+});
+
+test('Dá para gastar: criar conta manda a escolha; Contas separa Dinheiro de Guardado pela régua do banco', () => {
+  const ui = screen('src/app/finance/accounts.tsx', { params: { create: '1' } });
+  ui.fill('Nome', 'Reserva');
+  ui.interact(() => ui.nodes().find((n: any) => n.type === 'SwitchRow' && n.props.label === 'Conta no Dá para gastar').props.onValueChange(false));
+  ui.press('Salvar');
+  assert.equal(ui.pedidos.at(-1).operation, 'createAccount');
+  assert.equal(ui.pedidos.at(-1).value.spendable, false, 'conta corrente tirada do livre');
+
+  const linha = (id: string, name: string, type: string, disponivel: boolean | undefined, c: number) =>
+    ({ account_id: id, name, type, disponivel, balance_cents: c, cleared_cents: c, pending_in_cents: 0, pending_out_cents: 0 });
+  const contas = screen('src/app/finance/accounts.tsx', {
+    balances: [linha('a1', 'Nubank', 'checking', true, 10000), linha('a2', 'Reserva', 'savings', false, 50000),
+      linha('a3', 'CDB liquidez', 'investment', true, 20000), linha('a4', 'Tesouro', 'investment', undefined, 70000)],
+    forecastAccounts: ['a1', 'a2', 'a3', 'a4'].map((id) => ({ id, name: id, type: 'checking', archived: false })),
+  });
+  const titulos = (titulo: string) => {
+    const s = contas.nodes().find((n: any) => n.type === 'Section' && n.props.title === titulo);
+    assert.ok(s, `seção ${titulo}`);
+    return JSON.stringify(s.props.children);
+  };
+  const dinheiro = titulos('Dinheiro');
+  const guardado = titulos('Guardado e investido');
+  assert.ok(dinheiro.includes('a1') && dinheiro.includes('a3'), 'corrente e o CDB posto pela pessoa');
+  assert.ok(guardado.includes('a2') && guardado.includes('a4'), 'poupança tirada e o investimento sem a coluna (padrão do tipo)');
+  assert.ok(!dinheiro.includes('a2') && !guardado.includes('a1'));
+});
+
+test('Dá para gastar: as folhas dizem o guardado FORA da conta, e só no ciclo aberto', () => {
+  const linhas = (ui: any) => ui.nodes().filter((n: any) => n.type?.name === 'LinhaDaConta').map((n: any) => `${n.props.rotulo}:${n.props.cents}`);
+  const detalhe = (estado: string) => ({
+    estado, ini: '2026-09-11', fim: '2026-10-10',
+    partida: { tipo: 'contas', cents: 100000, contas: [{ account_id: 'a1', nome: 'Nubank', cents: 100000 }] },
+    entra: 0, sai: 0, porOrigem: [], resultado: 0, caixaNoFim: null, faltouPagar: null,
+    fora: [{ account_id: 'a2', nome: 'Tesouro', cents: 70000 }, { account_id: 'a3', nome: 'Reserva', cents: 5000 }],
+  });
+  const folha = (estado: string) => screen('src/components/finance/detalhe-do-ciclo-sheet.tsx', { componente: 'DetalheDoCicloSheet', breakdown: detalhe(estado), props: { visible: true, onClose: () => {}, month: '2026-10' } });
+  const aberto = linhas(folha('aberto'));
+  assert.ok(aberto.includes('Guardado, fora do Dá para gastar:75000'), JSON.stringify(aberto));
+  const cabeca = folha('aberto').nodes().find((n: any) => n.type?.name === 'LinhaDaConta' && n.props.rotulo.startsWith('Guardado'));
+  assert.equal(cabeca.props.forte, true, 'fora da soma: sem o sinal de + das parcelas da conta');
+  assert.ok(aberto.includes('Tesouro:70000') && aberto.includes('Reserva:5000'));
+  assert.ok(aberto.includes('Nubank:100000'), 'a partida continua só com o que dá para gastar');
+  const previsto = linhas(folha('previsto'));
+  assert.ok(previsto.length > 0, 'a folha do previsto desenhou a conta');
+  assert.ok(!previsto.some((l: string) => l.startsWith('Guardado')), 'o guardado é de hoje: não vai ao ciclo futuro');
+
+  const l = (id: string, type: string, disponivel: boolean | undefined, c: number) =>
+    ({ account_id: id, name: id, type, disponivel, balance_cents: c, cleared_cents: c, pending_in_cents: 0, pending_out_cents: 0 });
+  const hoje = screen(hojeFile, {
+    spendable: { caixa: 100_000, comprometido_ate_entrada: 0, comprometido_no_ciclo: 0, proxima_entrada: null },
+    balances: [l('a1', 'checking', true, 100_000), l('a2', 'investment', undefined, 70_000), l('a3', 'savings', false, 5_000), l('c1', 'credit_card', undefined, -9_000)],
+  });
+  assert.equal(hoje.nodes().find((n: any) => n.type === 'DetalheDoDiaSheet').props.guardado, 75_000, 'investimento e a conta tirada; cartão nunca');
 });

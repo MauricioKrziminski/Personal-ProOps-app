@@ -51,6 +51,7 @@ import { useSession } from '@/hooks/use-session';
 import { useSetupProgress } from '@/hooks/use-setup-progress';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { caixaDasContas } from '@/lib/account-cash';
+import { entraNoDisponivel } from '@/lib/accounts';
 import { PASSO } from '@/lib/aos-poucos';
 import { orcamentosApertados } from '@/lib/budget-tight';
 import { diaCurtoBR, diasAte, greetingBR, rotuloDoDia, somaDias } from '@/lib/dates';
@@ -524,6 +525,9 @@ export default function TodayScreen() {
             ate={ateQuando}
             entrada={proximaEntrada}
             diasLivres={diasLivres}
+            guardado={(saldos.data ?? [])
+              .filter((l) => l.account_id && l.type !== 'credit_card' && !entraNoDisponivel(l))
+              .reduce((s, l) => s + Number(l.cleared_cents), 0)}
             atalhos={atalhosDoDia}
           />
           {/* Criar ONDE se vê o dia (25/09/2026): a Hoje mostra lançamentos, lembretes e notas. */}

@@ -45,6 +45,10 @@ CASOS = [
     ("tira a nota lista de compras da lixeira", "notes", "resource_update", "trashed", False),
     ("restaura a nota lista de compras", "notes", "resource_update", "trashed", False),
     ("apaga de vez a nota lista de compras que está na lixeira", "notes", "resource_delete", "trashed", True),
+    # A chave "Conta no Dá para gastar" (20261010170000).
+    ("tira o Nubank do dá para gastar", "accounts", "resource_update", "spendable", False),
+    ("o dinheiro do Nubank é guardado, não conta ele no livre do mês", "accounts", "resource_update", "spendable", False),
+    ("pode contar o Nubank como dinheiro disponível pra gastar de novo", "accounts", "resource_update", "spendable", True),
 ]
 
 

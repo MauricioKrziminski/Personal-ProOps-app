@@ -33,7 +33,9 @@ begin
  insert into public.accounts(id,workspace_id,user_id,name,type,archived) values(arch,w,u,'Arquivada','checking',true);
  insert into public.goals(id,workspace_id,user_id,name,target_cents) values(g,w,u,'Meta',1000000);
  -- baseline dos agregados (papel dono: net_worth_now e cash_total são internos)
- cash0:=private.cash_total(array[w]);
+ -- o dinheiro de TODAS as contas: `cash_total` é só o que dá para gastar (20261010170000), e
+ -- aplicar/resgatar o move de propósito (supabase/tests/dinheiro_para_gastar.sql)
+ cash0:=(select coalesce(sum(c.cents),0) from private.caixa_das_contas(array[w]) c);
  select coalesce(sum(amount_cents) filter(where kind='income'),0),coalesce(sum(amount_cents) filter(where kind='expense'),0) into inc0,exp0 from public.transactions where workspace_id=w;
  select net_cents into net0 from private.net_worth_now(w);
  perform set_config('request.jwt.claim.sub',u::text,true);perform set_config('role','authenticated',true);
@@ -216,7 +218,7 @@ begin
  delete from public.transactions where id=t_card;
  assert (select coalesce(sum(amount_cents) filter(where kind='income'),0) from public.transactions where workspace_id=w)=inc0,'receita mudou';
  assert (select coalesce(sum(amount_cents) filter(where kind='expense'),0) from public.transactions where workspace_id=w)=exp0,'despesa mudou';
- assert private.cash_total(array[w])=cash0,'caixa total mudou';
+ assert (select coalesce(sum(c.cents),0) from private.caixa_das_contas(array[w]) c)=cash0,'caixa total mudou';
  assert (select net_cents from private.net_worth_now(w))=net0,'patrimônio líquido mudou';
 end $$;
 -- Terceiro cenário: proteção da transferência criada, paid_at/status/auto_confirm na edição e cascata.

@@ -67,7 +67,7 @@ begin
  -- The daily cash source is unchanged by simulation, and equals the existing event truth.
  for x in select p from jsonb_array_elements(daily->'points') p loop
   select private.cash_total(array[w])+coalesce(sum(e.in_cents::numeric-e.out_cents::numeric),0)
-   into expected from private.eventos_de_caixa(array[w],current_date+100) e where e.day<=(x->>'day')::date;
+   into expected from private.eventos_disponiveis(array[w],current_date+100) e where e.day<=(x->>'day')::date;
   assert (x->>'cash_cents')::numeric=expected,'Projection diverged from existing cash events';
  end loop;
  foreach bad in array array[preview||'{"unknown":1}',preview-'items',preview||'{"items":null}',

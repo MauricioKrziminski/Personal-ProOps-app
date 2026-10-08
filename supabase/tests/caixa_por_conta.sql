@@ -56,15 +56,18 @@ declare
   ws uuid[] := array(select private.my_workspace_ids());
   dif int;
 begin
-  -- 1. caixa por conta soma o cash_total
-  if (select coalesce(sum(cents), 0) from private.caixa_das_contas(ws, current_date))
+  -- 1. caixa por conta soma o cash_total — o das contas que entram no que dá para gastar
+  -- (20261010170000: investimento e conta tirada pela pessoa ficam fora)
+  if (select coalesce(sum(c.cents), 0) from private.caixa_das_contas(ws, current_date) c
+        left join public.accounts a on a.id = c.account_id
+       where private.conta_no_disponivel(a.type, a.spendable))
      <> private.cash_total(ws, current_date) then
     raise exception '1. caixa_das_contas não soma o cash_total';
   end if;
   -- 2. dia a dia, saldo inicial + eventos por conta = cash_flow_forecast
   select count(*) into dif from public.cash_flow_forecast(400) f
-  where f.balance_cents <> (select sum(cents) from private.caixa_das_contas(ws, current_date))
-        + coalesce((select sum(e.in_cents - e.out_cents) from private.eventos_de_caixa(ws, current_date + 400) e
+  where f.balance_cents <> private.cash_total(ws, current_date)
+        + coalesce((select sum(e.in_cents - e.out_cents) from private.eventos_disponiveis(ws, current_date + 400) e
                     where e.day <= f.day), 0);
   if dif > 0 then raise exception '2. % dias divergem da projeção', dif; end if;
   -- 3. a fatura de C sai de A; a de D não tem conta
