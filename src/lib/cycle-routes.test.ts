@@ -28,6 +28,7 @@ test('fatura abre a FATURA; o pagamento dela abre o LANÇAMENTO', () => {
 test('o que é projetado da regra não tem destino', () => {
   // Não existe lançamento para abrir: a recorrente distante é expandida da regra, não criada.
   assert.equal(rotaDaLinha('recurring_projection', 'rec-1'), null);
+  assert.equal(rotaDaLinha('guardar_previsto', 'rec-1'), null, 'o aporte previsto da regra também não tem lançamento');
 });
 
 test('aplicar no investimento abre a transferência; o aporte previsto da regra não abre nada', () => {
