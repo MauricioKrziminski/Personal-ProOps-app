@@ -390,6 +390,7 @@ export default function FinanceScreen() {
               setDetalheAberto(true);
             }}
             onPressLabel="Como chego nesse valor"
+            valueAccessibilityLabel={descricao ? `${descricao.label}: ${brl(descricao.cents)}` : undefined}
           />
         )}
         {/* Só com a curva na tela: a dica ensina o gesto DELA. */}

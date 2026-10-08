@@ -64,6 +64,11 @@ interface HeroPanelProps {
   onPress?: () => void;
   /** O que o toque abre, para o leitor de tela ("Como chego nesse valor"). */
   onPressLabel?: string;
+  /**
+   * O valor FALADO ("Vou fechar em: R$ 30.927,69"): o número animado fica escondido do leitor, e
+   * sem isto o botão do painel era lido só como "botão".
+   */
+  valueAccessibilityLabel?: string;
   /** `live` desenha a tinta viva por baixo do conteúdo (raízes). `flat` é a tinta chapada. */
   surface?: 'flat' | 'live';
 }
@@ -97,6 +102,7 @@ export function HeroPanel({
   concealable = false,
   onPress,
   onPressLabel = 'Ver detalhes',
+  valueAccessibilityLabel,
   surface = 'flat',
 }: HeroPanelProps) {
   const theme = useTheme();
@@ -161,7 +167,7 @@ export function HeroPanel({
             {onPress ? (
               // O número é o botão acessível do painel (o resto do painel faz o mesmo ao toque, mas
               // fica fora do leitor para o olho continuar alcançável).
-              <Pressable accessibilityRole="button" accessibilityHint={onPressLabel} onPress={onPress} style={styles.valueRow}>
+              <Pressable accessibilityRole="button" accessibilityLabel={valueAccessibilityLabel} accessibilityHint={onPressLabel} onPress={onPress} style={styles.valueRow}>
                 <View style={styles.shrink}>
                   <DinheiroEncolhe.Provider value>{value}</DinheiroEncolhe.Provider>
                 </View>
