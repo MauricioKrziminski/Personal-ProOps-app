@@ -698,7 +698,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
       if (name === '@/lib/account-form') return load('src/lib/account-form.ts');
       if (name === '@/components/finance/account-form') return load('src/components/finance/account-form.tsx');
-      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias' || name === '@/lib/comecar' || name === '@/lib/duplicar' || name === '@/lib/favoritos' || name === '@/lib/apagar-com-alcance' || name === '@/lib/carencia' || name === '@/lib/pagar-fatura') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias' || name === '@/lib/comecar' || name === '@/lib/duplicar' || name === '@/lib/favoritos' || name === '@/lib/apagar-com-alcance' || name === '@/lib/carencia' || name === '@/lib/pagar-fatura' || name === '@/lib/hipoteses-por-periodo') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       // o `categorias.ts` importa o mapa de ícones por caminho relativo (roda no `node --test` puro)
       if (name === '../design/category-icons.ts') return { categoryIcon: () => 'circle' };
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
@@ -4371,7 +4371,7 @@ test('E se: as hipóteses completas vão à simulação com o detalhe por conta;
     { id: 'b', kind: 'expense', forma: 'parcelado', valor_cents: 900, parcelas: 3, repete: 'monthly', conta: null, data: '2026-10-05' },
   ];
   const ui = screen(forecastFile, { forecastAccounts: [{ id: 'cc', name: 'Itaú', type: 'checking' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 2, hipoteses, adiantamentos: [] }) } });
-  const o = ui.simulacoes.at(-1);
+  const o = ui.simulacoes.filter((s: any) => !s.previa).at(-1);
   assert.equal(o.porConta, true);
   assert.deepEqual(JSON.parse(JSON.stringify(o.hipoteses.map((h: any) => h.id))), ['a', 'b'], 'o hook recebe todas e descarta a incompleta');
   const incompleta = ui.nodes().find((n: any) => n.type === 'Row' && /Escolha a conta/.test(n.props.subtitle ?? ''));
@@ -4483,7 +4483,7 @@ test('E se: só com hipótese incompleta nada é simulado e o "Onde muda" não f
   // A parcelada da v1 sem conta fica fora da simulação: a consulta desligada fica `isPending`
   // para sempre, e o bloco desenhava esqueleto eterno (frontend.md, consulta desligada).
   const ui = screen(forecastFile, { forecastAccounts: [{ id: 'cc' }], preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 1, rapidas: [{ kind: 'expense', amount_cents: 900, start: '2026-10-02', installments: 3, mode: 'total', grupo: 'g' }], detalhadas: [] }) } });
-  assert.equal(ui.simulacoes.at(-1).enabled, false);
+  assert.equal(ui.simulacoes.filter((s: any) => !s.previa).at(-1).enabled, false);
   assert.equal(ui.nodes().some((n: any) => n.type === 'SkeletonList'), false);
   // e a leitura que falha DENTRO do simular vira faixa de erro, não esqueleto ao lado dela
   const hipoteses = [{ id: 'a', kind: 'expense', forma: 'uma', valor_cents: 1000, parcelas: 1, repete: 'monthly', conta: 'cc', data: '2026-10-05' }];
@@ -8490,4 +8490,34 @@ test('Carência (fix): sem parcela em aberto o menu não oferece a pausa; sem to
   assert.ok(!ui.nodes().find((n: any) => n.type === 'HeaderActions').props.menu.actions.some((a: any) => a.label === 'Pausar pagamentos…'));
   const sem = carenciaSheet({ ...carro, installments: null }, { carenciaPrevia: previaFixa });
   assert.equal(qtd(sem, 'Parcela em que a carência começa').props.max, undefined);
+});
+
+test('E se: o rascunho em ordem, separado por período, com o saldo do período SIMULADO (07/10/2026)', () => {
+  // A dezembro foi criada antes da de novembro: a lista segue a DATA, não a ordem de criação.
+  const hipoteses = [
+    { id: 'dez', kind: 'expense', forma: 'uma', valor_cents: 3000000, parcelas: 1, repete: 'monthly', conta: 'cc', data: '2026-12-06' },
+    { id: 'nov', kind: 'expense', forma: 'uma', valor_cents: 1000, parcelas: 1, repete: 'monthly', conta: 'cc', data: '2026-11-05' },
+  ];
+  const mes = (m: string, saldo: number) =>
+    ({ mes: m, de: `${m}-01`, ate: `${m}-${m.endsWith('11') ? '30' : '31'}`, saldo, entra: 0, sai: 0, primeiroNegativo: null, parcial: false });
+  const real = [mes('2026-11', 900000), mes('2026-12', 800000)];
+  const simulado = [mes('2026-11', 899000), mes('2026-12', -2201000)];
+  const ui = screen(forecastFile, {
+    forecastAccounts: [{ id: 'cc', name: 'Itaú', type: 'checking' }],
+    preferencias: { 'projecao:rascunho': JSON.stringify({ versao: 2, hipoteses, adiantamentos: [] }) },
+    forecastMonths: real,
+    simulacao: { forecast: [], meses: { hoje: 0, meses: simulado }, contas: [], cartoes: [], erros: [] },
+  });
+  const nos = ui.nodes();
+  const cabecalhos = nos.filter((n: any) => n.type === 'ThemedText' && n.props.type === 'smallBold'
+    && /de 2026/.test(JSON.stringify(n.props.children)));
+  assert.deepEqual(cabecalhos.map((n: any) => [].concat(n.props.children)[0]), ['Novembro de 2026', 'Dezembro de 2026']);
+  // o saldo do cabeçalho é o da simulação (o rascunho dentro), não o real
+  const saldos = nos.filter((n: any) => n.type === 'Money' && n.props.variant === 'footnote' && n.props.signed).map((n: any) => n.props.cents);
+  assert.ok(saldos.includes(899000) && saldos.includes(-2201000), `saldos simulados: ${saldos}`);
+  assert.ok(!saldos.includes(800000), 'o saldo real (sem o rascunho) não aparece com o rótulo do rascunho');
+  // as linhas seguem a ordem dos períodos
+  const linhas = nos.filter((n: any) => n.type === 'Row' && /^Sai R\$/.test(n.props.title ?? ''));
+  assert.match(linhas[0].props.title, /05\/11\/2026/);
+  assert.match(linhas[1].props.title, /06\/12\/2026/);
 });

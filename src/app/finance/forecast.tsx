@@ -57,6 +57,8 @@ import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { currentMonth, monthTitle } from '@/components/finance/month-picker';
 import { mesDoCorte, veioDe, type MesProjetado } from '@/lib/forecast-months';
+import { agruparPorPeriodo, periodoDe } from '@/lib/hipoteses-por-periodo';
+import { useDebounced } from '@/hooks/use-debounced';
 import {
   diasAte,
   isoToBR,
@@ -271,7 +273,7 @@ export default function ForecastScreen() {
   // registros de verdade e os adiantamentos vão como `drafts`, nos DOIS modos. A projeção real
   // segue sem drafts — curva e tabela não têm como discordar por caminho.
   const regua = useMonthRuler('projecao');
-  const mensal = useForecastMonths(dias, [], emMes, regua.view);
+  const mensal = useForecastMonths(dias, [], emMes || hipoteses.length > 0 || adiantamentos.length > 0, regua.view);
   const goalPlanning = useGoalPlanning(dias, regua.view, emMes ? 'month' : 'day');
   const goalPlanEditor = useGoalPlanEditor(dias, regua.view, emMes ? 'month' : 'day');
   const simulando = hipoteses.length > 0 || adiantamentos.length > 0;
@@ -281,6 +283,8 @@ export default function ForecastScreen() {
     // Só a hipótese COMPLETA vai à simulação: com só incompletas, ligada ela ficaria pendente
     // para sempre (a consulta desligada fica `isPending`) e o "Onde muda" em esqueleto.
     porConta: temCompletas, enabled: temCompletas || adiantamentos.length > 0,
+    // O saldo de cada período da lista do rascunho (07/10/2026) — no modo Mês ele já vem.
+    comMeses: true,
   });
   // O "antes" do Onde muda: o horizonte real por conta e por cartão.
   const horizonte = useHorizonteReal(dias, temCompletas);
@@ -347,6 +351,53 @@ export default function ForecastScreen() {
   const podeAplicar = tipoDaFolha === 'adiantar'
     ? parcelasAdiantar.length > 0 && valorAdiantar > 0
     : faltaNaFolha === null;
+
+  /**
+   * A prévia da folha (07/10/2026, *"se ficar negativo, ele tem que mostrar o saldo daquele mês
+   * antes de clicar em ver resultado"*): o rascunho COM a hipótese da folha, no período em que ela
+   * começa, contra o rascunho de agora. Editando, a hipótese TROCA a versão dela — somada, o "era"
+   * compararia com um rascunho que a teria duas vezes. Espera 350 ms parada e não mostra número
+   * de outra versão: some na hora em que algo muda e volta com o número novo.
+   */
+  const grupoDaPrevia = editando ?? 'previa';
+  const candidata = sheetAberto && tipoDaFolha === 'hipotese' && faltaNaFolha === null ? hipotese : null;
+  const draftsDaPrevia = sheetAberto && tipoDaFolha === 'adiantar' && itemAdiantar && podeAplicar
+    ? draftsDoAdiantamento(itemAdiantar, parcelasAdiantar, valorAdiantar, pagarEm, grupoDaPrevia, { quantas: qtdAdiantar, quais: adiantarQuais })
+    : null;
+  const dataDaPrevia = candidata ? dataDaHipotese(candidata) : draftsDaPrevia ? pagarEm : null;
+  const pedidoDaPrevia = dataDaPrevia
+    ? JSON.stringify({
+        data: dataDaPrevia,
+        // o período pode terminar até um mês depois da data: a janela vai além dele
+        dias: Math.max(dias, (HORIZONTES.find((h) => h.dias >= diasAte(dataDaPrevia) + 62) ?? HORIZONTES[HORIZONTES.length - 1]).dias),
+        hipoteses: candidata
+          ? (editando ? hipoteses.map((h) => (h.id === editando ? candidata : h)) : [...hipoteses, candidata])
+          : hipoteses,
+        adiantamentos: draftsDaPrevia
+          ? (editando ? substituirGrupo(adiantamentos, editando, draftsDaPrevia) : [...adiantamentos, ...draftsDaPrevia])
+          : adiantamentos,
+      })
+    : null;
+  const pedidoParado = useDebounced(pedidoDaPrevia, 350);
+  const previaPronta = pedidoDaPrevia !== null && pedidoParado === pedidoDaPrevia;
+  const previa = previaPronta
+    ? (JSON.parse(pedidoParado!) as { data: string; dias: number; hipoteses: Hipotese[]; adiantamentos: Draft[] })
+    : null;
+  const comAHipotese = useSimulacao({
+    dias: previa?.dias ?? dias, modo: 'mes', view: regua.view,
+    hipoteses: previa?.hipoteses ?? [], adiantamentos: previa?.adiantamentos ?? [],
+    porConta: false, enabled: previa !== null, previa: true,
+  });
+  const rascunhoAtivo = hipoteses.some((h) => !faltaNaHipotese(h)) || adiantamentos.length > 0;
+  const semAHipotese = useSimulacao({
+    dias: previa?.dias ?? dias, modo: 'mes', view: regua.view, hipoteses, adiantamentos,
+    porConta: false, enabled: previa !== null && rascunhoAtivo, previa: true,
+  });
+  const semRascunho = useForecastMonths(previa?.dias ?? dias, [], previa !== null && !rascunhoAtivo, regua.view);
+  const periodoDaPrevia = previa ? periodoDe(comAHipotese.data?.meses?.meses ?? [], previa.data) : null;
+  const antesDaPrevia = previa
+    ? periodoDe((rascunhoAtivo ? semAHipotese.data?.meses?.meses : semRascunho.data?.meses) ?? [], previa.data)
+    : null;
   // `?? forecast.data` enquanto a simulação carrega: sem isso a tela PISCA vazia a cada
   // suposição somada, e o destaque salta de um número real para nada e de volta.
   const serie = (simulando ? (serieSimulada ?? forecast.data) : forecast.data) ?? [];
@@ -768,6 +819,80 @@ export default function ForecastScreen() {
     </Animated.View>
   ) : null;
 
+  /** Uma linha de hipótese do rascunho. */
+  const linhaDaHipotese = (h: Hipotese) => {
+    const falta = faltaNaHipotese(h);
+    const erro = falta ? undefined : errosDaSimulacao.find((e) => e.indice === completas.indexOf(h));
+    const resumo = resumoDaHipotese(h, brl, nomeDaConta);
+    // Com nome, o nome é o título e o resumo desce para a linha de baixo.
+    const nome = h.titulo?.trim();
+    const titulo = nome || resumo;
+    // Incompleta (a v1 parcelada sem conta) não aplica: o formulário ficaria sem a conta.
+    const aviso = falta ?? (erro ? `Não dá para aplicar: ${motivoDaHipotese(erro)}` : undefined);
+    const acoes: ItemAction[] = [
+      { label: 'Aplicar', icon: 'checkmark.circle', arrasto: 'direita', disabled: falta !== null, onPress: () => aplicarHipotese(h) },
+      { label: 'Editar', icon: 'pencil', onPress: () => editarHipotese(h) },
+      { label: 'Tirar', icon: 'trash', destructive: true, arrasto: 'esquerda', desfaz: true, onPress: () => tirarHipotese(h) },
+    ];
+    return (
+      // Tocar edita; o arrasto aplica (direita) e tira (esquerda).
+      <Deslizavel key={h.id} titulo={titulo} acoes={acoes}>
+        <Row
+          title={titulo}
+          subtitle={nome ? (aviso ? `${resumo}\n${aviso}` : resumo) : aviso}
+          destructive={Boolean(aviso)}
+          onPress={() => editarHipotese(h)}
+          onLongPress={() => showItemActions(titulo, acoes)}
+          accessibilityLabel={`Hipótese: ${titulo}${nome ? `. ${resumo}` : ''}${aviso ? `. ${aviso}` : ''}`}
+        />
+      </Deslizavel>
+    );
+  };
+  /** Uma linha de adiantamento do rascunho (um grupo de drafts). */
+  const linhaDoAdiantamento = (chave: string, d: Draft) => {
+    // O adiantamento não aplica nesta versão (spec 2026-09-28, §6).
+    const titulo = `Sai ${brl(d.amount_cents)} · ${d.rotulo ?? 'adiantamento'} · em ${isoToBR(d.start)}`;
+    const resto = faltam.get(chave);
+    const subtitulo = resto === undefined ? undefined : resto === 0 ? 'quita tudo' : `faltam ${resto}`;
+    const acoes: ItemAction[] = [
+      { label: 'Editar', icon: 'pencil', onPress: () => editarAdiantamento(chave, d) },
+      { label: 'Tirar', icon: 'trash', destructive: true, arrasto: 'esquerda', desfaz: true, onPress: () => tirarAdiantamento(chave) },
+    ];
+    return (
+      <Deslizavel key={chave} titulo={titulo} acoes={acoes}>
+        <Row
+          title={titulo}
+          subtitle={subtitulo}
+          onPress={() => editarAdiantamento(chave, d)}
+          onLongPress={() => showItemActions(titulo, acoes)}
+          accessibilityLabel={`Hipótese: ${titulo}${subtitulo ? `. ${subtitulo}` : ''}`}
+        />
+      </Deslizavel>
+    );
+  };
+  /**
+   * O rascunho em ordem, separado por período (07/10/2026): hipótese pela data dela, adiantamento
+   * pelo dia do pagamento. As BORDAS do período saem da projeção real (a régua não depende do
+   * rascunho); o SALDO, da simulação atual — o rascunho já dentro. Enquanto ela não chega o
+   * cabeçalho fica sem número: o saldo real ali seria o mês sem as hipóteses, com o rótulo delas.
+   */
+  const simulacaoLigada = temCompletas || adiantamentos.length > 0;
+  const mesesSimulados = simulacao.isPlaceholderData ? undefined : simulacao.data?.meses?.meses;
+  const saldoDoPeriodo = (mes: string, real: number): number | null =>
+    simulacaoLigada ? (mesesSimulados?.find((m) => m.mes === mes)?.saldo ?? null) : real;
+  const porPeriodo = agruparPorPeriodo<
+    { tipo: 'hipotese'; h: Hipotese } | { tipo: 'adiantamento'; chave: string; d: Draft }
+  >(
+    [
+      ...hipoteses.map((h) => ({ data: dataDaHipotese(h), item: { tipo: 'hipotese' as const, h } })),
+      ...gruposDeAdiantar.map(({ chave, principal }) => ({
+        data: principal.start,
+        item: { tipo: 'adiantamento' as const, chave, d: principal },
+      })),
+    ],
+    mensal.data?.meses ?? [],
+  );
+
   const scenario = !nadaParaProjetar ? (
     // O `gap` é o do `Card` (`Space.md`, §2): era `lg`, e o título "E se…?" ficava longe do que ele abre.
     <Card>
@@ -790,53 +915,28 @@ export default function ForecastScreen() {
       </View>
       {simulando ? (
         <>
-        {hipoteses.map((h) => {
-          const falta = faltaNaHipotese(h);
-          const erro = falta ? undefined : errosDaSimulacao.find((e) => e.indice === completas.indexOf(h));
-          const resumo = resumoDaHipotese(h, brl, nomeDaConta);
-          // Com nome, o nome é o título e o resumo desce para a linha de baixo.
-          const nome = h.titulo?.trim();
-          const titulo = nome || resumo;
-          // Incompleta (a v1 parcelada sem conta) não aplica: o formulário ficaria sem a conta.
-          const aviso = falta ?? (erro ? `Não dá para aplicar: ${motivoDaHipotese(erro)}` : undefined);
-          const acoes: ItemAction[] = [
-            { label: 'Aplicar', icon: 'checkmark.circle', arrasto: 'direita', disabled: falta !== null, onPress: () => aplicarHipotese(h) },
-            { label: 'Editar', icon: 'pencil', onPress: () => editarHipotese(h) },
-            { label: 'Tirar', icon: 'trash', destructive: true, arrasto: 'esquerda', desfaz: true, onPress: () => tirarHipotese(h) },
-          ];
+        {porPeriodo.map((g) => {
+          const saldo = g.periodo ? saldoDoPeriodo(g.mes, Number(g.periodo.saldo)) : null;
           return (
-            // Tocar edita; o arrasto aplica (direita) e tira (esquerda).
-            <Deslizavel key={h.id} titulo={titulo} acoes={acoes}>
-              <Row
-                title={titulo}
-                subtitle={nome ? (aviso ? `${resumo}\n${aviso}` : resumo) : aviso}
-                destructive={Boolean(aviso)}
-                onPress={() => editarHipotese(h)}
-                onLongPress={() => showItemActions(titulo, acoes)}
-                accessibilityLabel={`Hipótese: ${titulo}${nome ? `. ${resumo}` : ''}${aviso ? `. ${aviso}` : ''}`}
-              />
-            </Deslizavel>
-          );
-        })}
-        {gruposDeAdiantar.map(({ chave, principal: d }) => {
-          // O adiantamento não aplica nesta versão (spec 2026-09-28, §6).
-          const titulo = `Sai ${brl(d.amount_cents)} · ${d.rotulo ?? 'adiantamento'} · em ${isoToBR(d.start)}`;
-          const resto = faltam.get(chave);
-          const subtitulo = resto === undefined ? undefined : resto === 0 ? 'quita tudo' : `faltam ${resto}`;
-          const acoes: ItemAction[] = [
-            { label: 'Editar', icon: 'pencil', onPress: () => editarAdiantamento(chave, d) },
-            { label: 'Tirar', icon: 'trash', destructive: true, arrasto: 'esquerda', desfaz: true, onPress: () => tirarAdiantamento(chave) },
-          ];
-          return (
-            <Deslizavel key={chave} titulo={titulo} acoes={acoes}>
-              <Row
-                title={titulo}
-                subtitle={subtitulo}
-                onPress={() => editarAdiantamento(chave, d)}
-                onLongPress={() => showItemActions(titulo, acoes)}
-                accessibilityLabel={`Hipótese: ${titulo}${subtitulo ? `. ${subtitulo}` : ''}`}
-              />
-            </Deslizavel>
+          <View key={g.chave} style={styles.periodo}>
+            <View style={styles.periodoTopo} accessible accessibilityRole="header">
+              <ThemedText type="smallBold" style={styles.periodoNome}>
+                {monthTitle(g.mes)}
+                {regua.view === 'cycle' && g.periodo ? (
+                  <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                    {` · ${isoToBR(g.periodo.de).slice(0, 5)}–${isoToBR(g.periodo.ate).slice(0, 5)}`}
+                  </ThemedText>
+                ) : null}
+              </ThemedText>
+              {saldo === null ? null : (
+                <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+                  {'fecha em '}
+                  <Money cents={Number(saldo)} variant="footnote" tone={Number(saldo) < 0 ? 'danger' : 'text'} signed />
+                </ThemedText>
+              )}
+            </View>
+            {g.itens.map((x) => (x.tipo === 'hipotese' ? linhaDaHipotese(x.h) : linhaDoAdiantamento(x.chave, x.d)))}
+          </View>
           );
         })}
         {temCompletas && !leituraPorContaFalhou ? (
@@ -1267,6 +1367,24 @@ export default function ForecastScreen() {
 
           {faltaNaFolha ? <Note icon="info.circle">{faltaNaFolha}</Note> : null}
 
+          {periodoDaPrevia ? (
+            <ThemedText type="small" themeColor="textSecondary" style={tabular}>
+              {`${monthTitle(periodoDaPrevia.mes)}${regua.view === 'cycle' ? ` (${isoToBR(periodoDaPrevia.de).slice(0, 5)}–${isoToBR(periodoDaPrevia.ate).slice(0, 5)})` : ''} fecha em `}
+              <Money
+                cents={Number(periodoDaPrevia.saldo)}
+                variant="footnote"
+                tone={Number(periodoDaPrevia.saldo) < 0 ? 'danger' : 'text'}
+                signed
+              />
+              {antesDaPrevia && Number(antesDaPrevia.saldo) !== Number(periodoDaPrevia.saldo) ? (
+                <>
+                  {' · era '}
+                  <Money cents={Number(antesDaPrevia.saldo)} variant="footnote" tone="textSecondary" signed />
+                </>
+              ) : null}
+            </ThemedText>
+          ) : null}
+
           {editando ? (
             <Button
               label="Tirar hipótese"
@@ -1341,6 +1459,12 @@ const styles = StyleSheet.create({
   rascunhoFaixa: {
     gap: Space.sm,
   },
+  /** Um período do rascunho: o cabeçalho cola nas linhas dele (`Space.xs`), os períodos se separam pelo `gap` do Card. */
+  periodo: { gap: Space.xs },
+  // Nome do período em cima e o saldo embaixo, sempre: lado a lado, um período quebrava e o
+  // vizinho não, e a lista ficava com cabeçalhos de duas formas.
+  periodoTopo: { gap: Space.half },
+  periodoNome: { flexShrink: 0, maxWidth: '100%' },
   rascunhoTopo: {
     flexDirection: 'row',
     alignItems: 'center',

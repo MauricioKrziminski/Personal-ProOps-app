@@ -1410,14 +1410,21 @@ export function useSimulacao(o: {
   adiantamentos: Draft[];
   porConta: boolean;
   enabled: boolean;
+  /** No modo `dia`, traz os meses junto — o saldo de cada período da lista do rascunho. */
+  comMeses?: boolean;
+  /**
+   * A prévia da folha: sem o resultado anterior enquanto o novo chega (número de rascunho velho
+   * embaixo do valor novo é mentira) — a mesma régua da prévia "Ao salvar".
+   */
+  previa?: boolean;
 }) {
   const registros = o.hipoteses.map((h, i) => registroDaHipotese(h, i)).filter((r): r is RegistroSimulado => r !== null);
   const drafts = paraOBanco(o.adiantamentos);
   useRealtimeInvalidate('transactions', ['simular']);
   return useQuery({
     enabled: o.enabled && (registros.length > 0 || drafts.length > 0),
-    placeholderData: (anterior) => anterior,
-    queryKey: ['simular', o.modo, String(o.dias), JSON.stringify(drafts), JSON.stringify(registros), o.view ?? '', o.porConta],
+    placeholderData: o.previa ? undefined : (anterior: unknown) => anterior as never,
+    queryKey: ['simular', o.modo, String(o.dias), JSON.stringify(drafts), JSON.stringify(registros), o.view ?? '', o.porConta, Boolean(o.comMeses)],
     queryFn: async (): Promise<{
       forecast?: ForecastDay[];
       meses?: ProjecaoMensal;
@@ -1425,9 +1432,10 @@ export function useSimulacao(o: {
       cartoes?: CartaoNoHorizonte[];
       erros: ErroDaHipotese[];
     }> => {
+      const meses = { meses: { days: o.dias, drafts, view: o.view ?? null } };
       const leitura: Record<string, unknown> = o.modo === 'mes'
-        ? { meses: { days: o.dias, drafts, view: o.view ?? null } }
-        : { forecast: { days: o.dias, drafts } };
+        ? meses
+        : { forecast: { days: o.dias, drafts }, ...(o.comMeses ? meses : {}) };
       if (o.porConta) Object.assign(leitura, { contas: { days: o.dias }, cartoes: { days: o.dias } });
       const { data, error } = await supabase.rpc('simular', { p_registros: registros as never, p_leituras: leitura as never });
       if (error) throw error;
