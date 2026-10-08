@@ -77,4 +77,27 @@ export function formatarTrilha(linhas: readonly LinhaDaTrilha[]): string {
     .join('\n');
 }
 
+/*
+  Reprodução no simulador (só `__DEV__`): com `diag-congelar-timers` = "1" no AsyncStorage,
+  `setTimeout`, `setInterval` e `requestAnimationFrame` viram no-ops no instante em que a trava
+  destrava — o estado que a trilha do iPhone mostrou. A cortina tem que abrir assim mesmo.
+*/
+let congelarNaDestrava = false;
+if (__DEV__) {
+  AsyncStorage.getItem('diag-congelar-timers')
+    .then((v) => {
+      congelarNaDestrava = v === '1';
+    })
+    .catch(() => {});
+}
+
+export function congelarTimersSeDiagnostico(): void {
+  if (!__DEV__ || !congelarNaDestrava) return;
+  marcar('diag:timers-congelados');
+  const g = globalThis as unknown as Record<string, unknown>;
+  g.setTimeout = () => 0;
+  g.setInterval = () => 0;
+  g.requestAnimationFrame = () => 0;
+}
+
 marcar('boot');

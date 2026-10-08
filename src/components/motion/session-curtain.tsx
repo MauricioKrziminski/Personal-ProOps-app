@@ -12,7 +12,9 @@ import {
 import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
+  ReduceMotion,
   cancelAnimation,
+  makeMutable,
   runOnJS,
   useAnimatedStyle,
   useReducedMotion,
@@ -52,14 +54,31 @@ const TETO_DO_PREPARO_MS = 4000;
   com o app fora do primeiro plano (o prompt de senha do sistema), e a abertura esperava os dois
   sem saída. A trava (`lock-overlay.tsx`) já tinha o seu prazo; a cortina da raiz não tinha.
 */
-const doisQuadros = () =>
+/*
+  ⚠️ **As esperas da cortina contam no relógio da UI thread, nunca em `setTimeout`/rAF**
+  (08/10/2026, trilha do iPhone): voltando do Face ID, TODO timer do JS parou — o `tic` morreu no
+  instante do `active` e o `dormir(0)` nunca resolveu —, enquanto o toque e o Reanimated seguiam
+  vivos. Os dois timers do JS passam pelo `RCTTiming`, e é ele que fica mudo. `withTiming` com
+  callback anda no relógio de quadros do Reanimated e volta ao JS por `runOnJS`, sem `RCTTiming`.
+  `ReduceMotion.Never`: aqui ele é relógio, não animação — com Reduzir Movimento ele pularia ao fim.
+*/
+const esperarNaUi = (ms: number) =>
   new Promise<void>((ok) => {
-    const prazo = setTimeout(ok, 120);
-    requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(prazo); ok(); }));
+    const relogio = makeMutable(0);
+    relogio.value = withTiming(
+      1,
+      { duration: Math.max(ms, 0), reduceMotion: ReduceMotion.Never },
+      () => {
+        'worklet';
+        runOnJS(ok)();
+      },
+    );
   });
+/** Dois quadros a 60 Hz: o React aplica a onda nova antes de o progresso andar. */
+const doisQuadros = () => esperarNaUi(34);
 /** Folga além da duração antes de a cortina assumir que o callback da animação não vem. */
 const FOLGA_DA_ANIMACAO_MS = 600;
-const dormir = (ms: number) => new Promise<void>((ok) => setTimeout(ok, ms));
+const dormir = esperarNaUi;
 
 const CortinaContext = createContext<CortinaApi | null>(null);
 const FaseContext = createContext<FaseDaCortina>('abertura');
@@ -384,17 +403,32 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
     abrirJa();
   }, [abrirJa]);
 
-  // Uma batida por segundo enquanto a abertura não termina: prova se os timers do JS andam.
+  /*
+    Dois relógios por 60 s desde a montagem (ponytail: diagnóstico temporário): `tic` é o timer do
+    JS (`RCTTiming`), `tic-ui` é o da UI thread. Um parado e o outro andando mostra a janela em que
+    os timers do JS morreram — e se voltam depois de a cortina abrir.
+  */
   useEffect(() => {
-    if (aberturaFeita) return;
+    let vivo = true;
     let n = 0;
     const batida = setInterval(() => {
       n += 1;
       marcar('tic', { n });
-      if (n >= 40) clearInterval(batida);
+      if (n >= 60) clearInterval(batida);
     }, 1000);
-    return () => clearInterval(batida);
-  }, [aberturaFeita]);
+    const batidaUi = (k: number) => {
+      void esperarNaUi(1000).then(() => {
+        if (!vivo) return;
+        marcar('tic-ui', { n: k });
+        if (k < 60) batidaUi(k + 1);
+      });
+    };
+    batidaUi(1);
+    return () => {
+      vivo = false;
+      clearInterval(batida);
+    };
+  }, []);
 
   const esconderSplash = useCallback(() => {
     const s = splash.current;

@@ -47,7 +47,7 @@ import {
   type LockDelay,
   type LockMode,
 } from '@/lib/lock-policy';
-import { marcar } from '@/lib/trilha-da-abertura';
+import { congelarTimersSeDiagnostico, marcar } from '@/lib/trilha-da-abertura';
 
 /**
  * O módulo nativo — ou `null` quando ele não está neste build.
@@ -430,6 +430,7 @@ export function LockProvider({ children }: { children: ReactNode }) {
           if (!permitir || tentativa.cancelada || AppState.currentState !== 'active') return 'trancado' as const;
         }
         marcar('trava:destravou');
+        congelarTimersSeDiagnostico();
         setLocked(false);
       }
       // Falhou FICA falhado: o botão passa a dizer "Tentar de novo" e a cortina diz o porquê.

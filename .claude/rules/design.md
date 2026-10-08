@@ -605,6 +605,13 @@ abertura curta. Com a trava ligada, `segurarAbertura()` estica o teto para 20 s:
 senha sobre a marca e, confirmada, a tinta sobe DIRETO no app (a trava some por baixo, sem a onda
 dela). Cancelou, a abertura revela a trava, que tem o "tentar de novo".
 
+**As esperas da cortina contam no relógio da UI thread, nunca em `setTimeout`/rAF** (08/10/2026,
+trilha do iPhone em Release): voltando do Face ID na abertura, todo timer do JS parou (passam pelo
+`RCTTiming`) enquanto o toque e o Reanimated seguiam — a marca terminava e a tinta não subia.
+`esperarNaUi` (`withTiming` + `runOnJS`) é o caminho de `dormir` e `doisQuadros`. Reproduz-se no
+simulador com `diag-congelar-timers` = `"1"` no AsyncStorage (só `__DEV__`): os timers viram no-op
+no `trava:destravou`, e a cortina tem que abrir assim mesmo.
+
 **A marca se DESENHA na abertura** (06/10/2026, pedido do dono do produto): um relógio só de
 1,5 s na UI thread (*"mais suave, devagar, fluido"*) — o contorno de `markPath` por trim, o
 preenchimento entrando e o nome "ProOps" subindo em fade, com as etapas sobrepostas e curva
