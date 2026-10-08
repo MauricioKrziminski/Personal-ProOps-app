@@ -20,6 +20,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ExtendedFab } from '@/components/ui/extended-fab';
 import { useLancarPorVoz } from '@/components/finance/lancar-por-voz';
 import { DetalheDoCicloSheet } from '@/components/finance/detalhe-do-ciclo-sheet';
+import { previstoDoLancamento } from '@/lib/previsto';
 import { ATALHOS_DE_LANCAMENTO } from '@/lib/atalhos-de-lancamento';
 import { Explica } from '@/components/ui/explica';
 import { HeroPanel } from '@/components/ui/hero-panel';
@@ -548,6 +549,7 @@ export default function FinanceScreen() {
           <Section>
             {(recent.data ?? []).map((tx) => {
               const titulo = tx.description || tx.merchant || tx.category || 'Sem descrição';
+              const previsto = previstoDoLancamento(tx);
               const destino = { pathname: '/finance/[txId]' as const, params: { txId: tx.id, month: tx.occurred_at.slice(0, 7) } };
               return (
                 <ItemLink
@@ -567,7 +569,12 @@ export default function FinanceScreen() {
                   {({ onLongPress }) => (
                     <LedgerRow
                       title={titulo}
-                      subtitle={[tx.category, SOURCE_LABEL[tx.source]].filter(Boolean).join(' · ') || undefined}
+                      subtitle={[
+                        // Pago com outro valor (07/10/2026): o previsto curto, como em Lançamentos.
+                        previsto === null ? null : `previsto ${brl(previsto)}`,
+                        tx.category,
+                        SOURCE_LABEL[tx.source],
+                      ].filter(Boolean).join(' · ') || undefined}
                       icon={aparencia(tx.category, tx.kind).icon}
                       tinta={aparencia(tx.category, tx.kind).cor}
                       cents={tx.kind === 'expense' ? -tx.amount_cents : tx.amount_cents}

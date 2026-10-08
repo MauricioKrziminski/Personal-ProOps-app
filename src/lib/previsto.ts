@@ -28,3 +28,19 @@ export function parcelaDoContratoPaga(
   const parcela = Number(p.debt_principal_cents);
   return parcela > 0 && parcela !== Number(p.amount_cents) ? parcela : null;
 }
+
+/**
+ * O previsto de uma linha de LISTA de lançamentos, das duas fontes: o guardado na baixa, ou — num
+ * pagamento de dívida de parcela fixa — a parcela do contrato. As listas leem o modo da dívida
+ * embutido (`debts.calculation_mode`); sem ele, só a primeira fonte vale.
+ */
+export function previstoDoLancamento(t: {
+  status: string;
+  amount_cents: Cents;
+  expected_amount_cents?: Cents;
+  debt_principal_cents?: Cents;
+  debts?: { calculation_mode?: string | null } | null;
+}): number | null {
+  const modo = t.debts?.calculation_mode;
+  return previstoDaLinha(t) ?? (modo ? parcelaDoContratoPaga(t, modo !== 'fixed_installments') : null);
+}

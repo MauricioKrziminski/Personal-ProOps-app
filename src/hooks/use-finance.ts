@@ -235,6 +235,13 @@ export type TxSummaryRow = Omit<Fns['transactions_summary']['Returns'][number], 
 const TRANSACTION_COLUMNS =
   'id, workspace_id, subcategory_id, subcategories!transactions_subcategory_id_fkey(name), expense_pattern, expense_pattern_source, expense_necessity, expense_necessity_source, kind, amount_cents, currency, category, description, account_id, counterparty_account_id, payment_method, pix_fee_for_transaction_id, occurred_at, source, created_at, status, due_at, invoice_id, installment_plan_id, installment_no, merchant, recurring_id, debt_id, debt_payment_no, debt_principal_cents, debt_interest_cents, debt_balance_after_cents, expected_amount_cents, edit_revision, auto_confirm, rollover_of_invoice_id, pays_invoice_id, down_payment_debt_id, down_payment_plan_id, installment_plans!transactions_installment_plan_id_fkey(first_occurred_at)';
 
+/**
+ * As LISTAS de lançamentos levam o modo da dívida: ele diz se `debt_principal_cents` é a parcela do
+ * contrato (o previsto de um pagamento de parcela fixa feito com outro valor, `previstoDoLancamento`)
+ * ou a amortização do mês.
+ */
+const LIST_COLUMNS = `${TRANSACTION_COLUMNS}, debts!transactions_debt_id_fkey(calculation_mode)`;
+
 export interface TransactionFilters {
   /**
    * As bordas do período EXIBIDO, já resolvidas — nunca um `YYYY-MM` para este hook recortar.
@@ -317,11 +324,7 @@ export function useTransactions(filters: TransactionFilters) {
     queryKey: ['transactions', 'list', canonicalFilters],
     initialPageParam: 0,
     queryFn: async ({ pageParam }): Promise<Transaction[]> => {
-      // O modo da dívida diz se `debt_principal_cents` é a parcela do contrato (o "previsto" de um
-      // pagamento de parcela fixa feito com outro valor) ou a amortização do mês.
-      let query = supabase
-        .from('transactions')
-        .select(`${TRANSACTION_COLUMNS}, debts!transactions_debt_id_fkey(calculation_mode)`);
+      let query = supabase.from('transactions').select(LIST_COLUMNS);
       // Borda ausente significa intervalo aberto; nunca enviar gte/lte.undefined.
       if (from) query = query.gte('occurred_at', from);
       if (to) query = query.lte('occurred_at', to);
@@ -491,7 +494,7 @@ export function useRecentTransactions(limit = 5) {
     queryFn: async (): Promise<Transaction[]> => {
       const { data, error } = await supabase
         .from('transactions')
-        .select(TRANSACTION_COLUMNS)
+        .select(LIST_COLUMNS)
         .lte('occurred_at', hoje)
         .order('occurred_at', { ascending: false })
         .order('created_at', { ascending: false })

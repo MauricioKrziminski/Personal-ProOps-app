@@ -134,7 +134,8 @@ export default function ComecarScreen() {
       </View>
     ) : (
       <View style={styles.bloco}>
-        <Resumo itens={ef.jaTinhaContas ? todas : criadas} titulo={ef.jaTinhaContas ? 'Suas contas' : 'Criado'} />
+        {/* As ações vêm ANTES do resumo (07/10/2026): com muitas contas ele cresce, e a ação não
+            pode ficar no fim de uma lista longa — a mesma régua do "Pagar" da fatura. */}
         <Button label="Abrir Finanças" onPress={() => router.replace('/finance')} />
         <ButtonRow>
           {!ef.cartaoId && !todas.some((c) => c.type === 'credit_card') ? (
@@ -142,6 +143,7 @@ export default function ComecarScreen() {
           ) : null}
           <Button label="Lançar" variant="secondary" block onPress={lancar} />
         </ButtonRow>
+        <Resumo itens={ef.jaTinhaContas ? todas : criadas} titulo={ef.jaTinhaContas ? 'Suas contas' : 'Criado'} />
       </View>
     )
   );

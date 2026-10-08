@@ -63,7 +63,7 @@ import { confirmDestructive } from '@/lib/item-actions';
 import { useApagarComAlcance } from '@/hooks/use-apagar-com-alcance';
 import { alvoDoLancamento } from '@/lib/apagar-com-alcance';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
-import { parcelaDoContratoPaga, previstoDaLinha } from '@/lib/previsto';
+import { previstoDoLancamento } from '@/lib/previsto';
 import { dueInline, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
 import { filterExpectedLines, mesclarPrevistas, previstasNaTela, type ItemDoExtrato } from '@/lib/ledger-expected';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
@@ -261,9 +261,7 @@ const LinhaDoExtrato = memo(function LinhaDoExtrato({
    * vencimento É a data daquela conta.
    */
   const tituloDaLinha = tx.description || tx.merchant || tx.category || 'Sem descrição';
-  const previsto =
-    previstoDaLinha(tx) ??
-    (tx.debts?.calculation_mode ? parcelaDoContratoPaga(tx, tx.debts.calculation_mode !== 'fixed_installments') : null);
+  const previsto = previstoDoLancamento(tx);
   const badges = [
     // "parcela 2" some quando o título já diz "(2/10)" — a mesma informação duas vezes.
     tx.installment_no && !/\(\d+\/\d+\)$/.test(tituloDaLinha) ? `parcela ${tx.installment_no}` : null,
