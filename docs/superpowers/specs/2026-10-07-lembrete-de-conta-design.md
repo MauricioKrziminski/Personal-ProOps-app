@@ -205,3 +205,17 @@ pela última migration) e acrescenta só o `not exists`. Suíte SQL inteira depo
   daqui a 2 min → push chega e abre o registro; repetir com financiamento; log confirma que o
   automático não mandou aquele registro; limpar pelos IDs anotados.
 - **Produção** só com pedido: migrations → agente → app.
+
+## Adendo 09/10/2026 — precedência e parcela da dívida (`20261009130000`)
+
+- **O mais específico substitui o mais geral NAQUELE vencimento**, por espaço: fatura direta >
+  uma ocorrência / uma parcela da dívida > série, compra, dívida inteira. No cartão, um "Só esta"
+  numa compra (ou o lembrete da própria fatura) cala o da série/compra para aquela fatura. Não é
+  silenciar: apagar o "Só esta" devolve o da série.
+- **Um aviso por coisa a pagar**: lembretes que chegam ao mesmo vencimento, para a mesma pessoa,
+  no mesmo dia e hora saem uma vez, com os canais somados; "já enviado" vale para todo lembrete
+  que cobria aquele vencimento naquela hora (criar o "Só esta" depois do envio não reenvia).
+- **A parcela da dívida tem "Lembrar"** na tela dela (`/finance/debt-installment`), com
+  "Só esta / Todas as próximas"; só na próxima e nas futuras.
+- **O salvar recusa o que nunca toca**: receita/transferência/pagamento de dívida ou de fatura,
+  ocorrência já paga, parcela fora do contrato ou já paga. Remover sempre passa.

@@ -14,9 +14,11 @@ import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { Space, tabular } from '@/design/tokens';
 import { DEBT_KINDS, useDebtDeclaredEstimates, useDebtPayments, useDebtSchedule, useDebts } from '@/hooks/use-finance';
+import { useBillReminderFor } from '@/hooks/use-bill-reminders';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { isoToBR } from '@/lib/dates';
 import { paidInstallments, secoesDaLinha } from '@/lib/debt-history';
+import { hrefDoLembrete, resumoDosAvisos } from '@/lib/lembrete-de-conta';
 import { aoVoltarParaDivida } from '@/lib/volta-da-parcela';
 
 /**
@@ -38,6 +40,10 @@ export default function DebtInstallmentScreen() {
   const payments = useDebtPayments(params.debt);
   const declaredEstimates = useDebtDeclaredEstimates(params.debt);
   const pronta = useTelaPronta(debts, schedule, payments, declaredEstimates);
+  // Lembrete: o desta parcela ("Só esta") ou, sem ele, o da dívida inteira. Hooks antes de qualquer return.
+  const lembreteSo = useBillReminderFor(params.debt && n > 0 ? { debt_id: params.debt, debt_installment_no: n } : null);
+  const lembreteTodas = useBillReminderFor(params.debt ? { debt_id: params.debt } : null);
+  const lembrete = lembreteSo ?? lembreteTodas;
 
   const atualizar = () => Promise.all([debts.refetch(), schedule.refetch(), payments.refetch(), declaredEstimates.refetch()]);
   const titulo = Number.isInteger(n) && n > 0 ? `${n}ª parcela` : 'Parcela';
@@ -162,6 +168,18 @@ export default function DebtInstallmentScreen() {
           onPress={() => router.back()}
         />
       </Section>
+
+      {/* Só o que ainda vence se lembra; a escolha "Só esta / Todas as próximas" é do formulário. */}
+      {(item.estado === 'proxima' || item.estado === 'futura') && !divida.archived && Number(divida.remaining_cents) > 0 ? (
+        <Section>
+          <Row
+            icon="bell"
+            title={lembrete ? resumoDosAvisos(lembrete.avisos) : 'Lembrar'}
+            subtitle={lembrete && !lembreteSo ? 'Todas as parcelas' : undefined}
+            onPress={() => router.push(hrefDoLembrete({ tipo: 'divida', debtId: divida.id, parcela: n }, `${divida.name} · ${n}ª parcela`))}
+          />
+        </Section>
+      ) : null}
 
       {item.estado === 'estimada' ? (
         <Note icon="info.circle">Conta como paga no contrato, sem lançamento no app.</Note>

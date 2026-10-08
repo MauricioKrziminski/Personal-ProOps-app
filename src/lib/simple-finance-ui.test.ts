@@ -3612,6 +3612,41 @@ test('Parcela da dívida: a próxima mostra valor e vencimento, e "Paguei esta p
   assert.throws(() => tela('10').button('Paguei esta parcela'), 'só a próxima se paga — pagamento é em ordem');
 });
 
+test('Parcela da dívida: "Lembrar" abre o formulário com Só esta / Todas, e a parcela paga não tem', () => {
+  const schedule = [
+    { installment_no: 9, due_date: '2026-10-05', payment_cents: 147000, interest_cents: null, principal_cents: null, balance_cents: 5733000 },
+    { installment_no: 10, due_date: '2026-11-05', payment_cents: 147000, interest_cents: null, principal_cents: null, balance_cents: 5586000 },
+  ];
+  const tela = (n: string, billReminders: any[] = []) => screen('src/app/finance/debt-installment.tsx', {
+    debts: [carro], params: { debt: 'd1', n }, debtPayments: [], debtSchedule: schedule, billReminders,
+  });
+  const ui = tela('10');
+  const lembrar = ui.nodes().find((n: any) => n.type === 'Row' && n.props.icon === 'bell');
+  assert.equal(lembrar?.props.title, 'Lembrar');
+  ui.interact(() => lembrar.props.onPress());
+  assert.deepEqual(copia(ui.navigations.at(-1)), {
+    pathname: '/reminder-form',
+    params: { conta: 'debt_id:d1:10', todas: 'debt_id:d1', nome: `${carro.name} · 10ª parcela` },
+  });
+  // Só o da dívida inteira: a linha mostra os avisos e diz que vale para todas
+  const todas = tela('10', [{ alvo: { debt_id: 'd1' }, title: carro.name, channel: 'push', avisos: [{ days_before: 2, at_time: '09:00' }], next_due: null }]);
+  const linha = todas.nodes().find((n: any) => n.type === 'Row' && n.props.icon === 'bell');
+  assert.equal(linha?.props.subtitle, 'Todas as parcelas');
+  // O desta parcela vence o da dívida
+  const so = tela('10', [
+    { alvo: { debt_id: 'd1' }, title: carro.name, channel: 'push', avisos: [{ days_before: 2, at_time: '09:00' }], next_due: null },
+    { alvo: { debt_id: 'd1', debt_installment_no: 10 }, title: carro.name, channel: 'push', avisos: [{ days_before: 0, at_time: '08:00' }], next_due: null },
+  ]);
+  const linhaSo = so.nodes().find((n: any) => n.type === 'Row' && n.props.icon === 'bell');
+  assert.equal(linhaSo?.props.subtitle, undefined);
+  assert.match(String(linhaSo?.props.title), /no dia/);
+  // Parcela já paga (só contada): nada a lembrar
+  const paga = screen('src/app/finance/debt-installment.tsx', {
+    debts: [carro], params: { debt: 'd1', n: '3' }, debtPayments: [], debtSchedule: schedule,
+  });
+  assert.ok(!paga.nodes().some((n: any) => n.type === 'Row' && n.props.icon === 'bell'), 'parcela paga não tem lembrete');
+});
+
 test('Parcela antiga apenas declarada conserva seu valor no detalhe após editar parcelas futuras', () => {
   const ui = screen('src/app/finance/debt-installment.tsx', {
     debts: [{ ...carro, installments: 4, installments_paid: 3, installment_cents: 11000 }],

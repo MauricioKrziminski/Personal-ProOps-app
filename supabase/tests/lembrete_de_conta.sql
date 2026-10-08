@@ -213,6 +213,149 @@ begin
   select count(*) into n from private.bill_reminder_dues(array[ws]) d where d.ref = divida and d.title is null;
   assert n = 0, 'título da parcela não pode ser nulo';
 
+  -- 11) série + "só esta": a ocorrência com lembrete próprio toca UMA vez (o dela); a irmã segue a série
+  select id into tx2 from public.transactions where recurring_id = serie and occurred_at = hoje + 30;
+  insert into public.bill_reminders (workspace_id, user_id, transaction_id, days_before, at_time, channel)
+  values (ws, u, tx2, 3, '10:00', 'push');
+  select count(*) into n from private.bill_reminder_dues(array[ws]) d where d.ref = tx2;
+  assert n = 1, format('ocorrência com "só esta" devia aparecer 1 vez, veio %s', n);
+  assert (select b.transaction_id from private.bill_reminder_dues(array[ws]) d
+          join public.bill_reminders b on b.id = d.bill_reminder_id where d.ref = tx2) = tx2, 'quem toca é o "só esta"';
+  select count(*) into n from private.bill_reminder_dues(array[ws]) d
+    join public.bill_reminders b on b.id = d.bill_reminder_id where b.recurring_id = serie;
+  assert n = 1, format('a série devia ficar só com a irmã, veio %s', n);
+  delete from public.bill_reminders where transaction_id = tx2;
+  select count(*) into n from private.bill_reminder_dues(array[ws]) d
+    join public.bill_reminders b on b.id = d.bill_reminder_id where b.recurring_id = serie;
+  assert n = 2, 'tirado o "só esta", a série volta a valer na ocorrência';
+
+  -- 12) cartão: duas séries na mesma fatura, mesmo dia e hora = UM aviso, canais somados;
+  --     "só esta" numa compra cala as séries NAQUELA fatura; enviado não re-dispara
+  declare
+    cartao2 uuid; sa uuid; sb uuid; fat2 uuid; linha_a uuid;
+  begin
+    insert into public.accounts (workspace_id, user_id, name, type, closing_day, due_day)
+    values (ws, u, 'Cartão BL2', 'credit_card', 1, 10) returning id into cartao2;
+    insert into public.recurring_transactions (workspace_id, user_id, kind, amount_cents, description, rrule, dtstart, next_run_at, account_id)
+    values (ws, u, 'expense', 1000, 'Série A BL', 'FREQ=MONTHLY', hoje, hoje, cartao2) returning id into sa;
+    insert into public.recurring_transactions (workspace_id, user_id, kind, amount_cents, description, rrule, dtstart, next_run_at, account_id)
+    values (ws, u, 'expense', 2000, 'Série B BL', 'FREQ=MONTHLY', hoje, hoje, cartao2) returning id into sb;
+    insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, recurring_id, source)
+    values (ws, u, 'expense', 1000, 'Série A BL', hoje, 'pending', cartao2, sa, 'recurring') returning id into linha_a;
+    insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id, recurring_id, source)
+    values (ws, u, 'expense', 2000, 'Série B BL', hoje, 'pending', cartao2, sb, 'recurring');
+    select invoice_id into fat2 from public.transactions where id = linha_a;
+    assert (select count(distinct invoice_id) from public.transactions where account_id = cartao2) = 1, 'fixture: mesma fatura';
+    update public.card_invoices set status = 'open', due_date = hoje where id = fat2;
+    insert into public.bill_reminders (workspace_id, user_id, recurring_id, days_before, at_time, channel)
+    values (ws, u, sa, 0, '00:00', 'push'), (ws, u, sb, 0, '00:00', 'whatsapp');
+    select count(*) into n from public._bill_reminders_due() d where d.ref = fat2;
+    assert n = 1, format('duas séries na mesma fatura, mesma hora: devia sair 1 aviso, veio %s', n);
+    assert (select d.channel from public._bill_reminders_due() d where d.ref = fat2) = 'both', 'canais deviam somar';
+    -- enviado pelo representante: nenhum lembrete daquele vencimento/hora toca de novo
+    insert into private.bill_reminder_sends (bill_reminder_id, due_date, sent_at)
+    select d.bill_reminder_id, d.due_date, now() from public._bill_reminders_due() d where d.ref = fat2;
+    select count(*) into n from public._bill_reminders_due() d where d.ref = fat2;
+    assert n = 0, 'enviado não pode tocar de novo pelo outro lembrete do grupo';
+    -- "só esta" na compra A, mesma hora, criado depois do envio: cala as séries e não reenvia
+    insert into public.bill_reminders (workspace_id, user_id, transaction_id, days_before, at_time, channel)
+    values (ws, u, linha_a, 0, '00:00', 'push');
+    select count(*) into n from private.bill_reminder_dues(array[ws]) d where d.ref = fat2;
+    assert n = 1, format('com "só esta" na fatura, só ele devia valer, veio %s', n);
+    select count(*) into n from public._bill_reminders_due() d where d.ref = fat2;
+    assert n = 0, format('"só esta" criado depois do envio, mesma hora: não reenvia (veio %s)', n);
+    -- lembrete da própria fatura vence o "só esta" da compra
+    insert into public.bill_reminders (workspace_id, user_id, invoice_id, days_before, at_time, channel)
+    values (ws, u, fat2, 1, '08:00', 'push');
+    select count(*) into n from private.bill_reminder_dues(array[ws]) d
+      join public.bill_reminders b on b.id = d.bill_reminder_id where d.ref = fat2 and b.invoice_id is null;
+    assert n = 0, 'o lembrete da fatura devia calar os das compras';
+  end;
+
+  -- 13) dívida inteira + "só a Nª": a parcela toca UMA vez, pelo lembrete dela
+  declare
+    moto uuid;
+  begin
+    insert into public.debts (workspace_id, user_id, name, kind, principal_cents, remaining_cents, installments, installment_cents, due_day, account_id)
+    values (ws, u, 'Moto BL', 'financing', 120000, 120000, 12, 10000, extract(day from hoje)::int, conta) returning id into moto;
+    insert into public.bill_reminders (workspace_id, user_id, debt_id, days_before, at_time, channel)
+    values (ws, u, moto, 0, '00:00', 'push');
+    insert into public.bill_reminders (workspace_id, user_id, debt_id, debt_installment_no, days_before, at_time, channel)
+    values (ws, u, moto, 1, 0, '00:00', 'whatsapp');
+    select count(*) into n from private.bill_reminder_dues(array[ws]) d where d.ref = moto and d.title like '%(1/12)';
+    assert n = 1, format('a 1ª parcela devia aparecer 1 vez, veio %s', n);
+    assert (select b.debt_installment_no from private.bill_reminder_dues(array[ws]) d
+            join public.bill_reminders b on b.id = d.bill_reminder_id
+            where d.ref = moto and d.title like '%(1/12)') = 1, 'quem toca a 1ª é o lembrete dela';
+    select count(*) into n from private.bill_reminder_dues(array[ws]) d where d.ref = moto and d.title like '%(2/12)';
+    assert n = 1, 'a 2ª segue com o da dívida inteira';
+    select count(*) into n from public._bill_reminders_due() d where d.ref = moto;
+    assert n = case when (select min(s.due_date) from private.debt_schedule_for(moto) s) = hoje then 1 else 0 end,
+      format('a parcela de hoje toca uma vez, veio %s', n);
+
+    -- 14) o salvar recusa o que nunca toca (e remover sempre passa)
+    perform set_config('request.jwt.claim.sub', u::text, true);
+    perform set_config('request.jwt.claims', json_build_object('sub', u, 'role', 'authenticated')::text, true);
+    set local role authenticated;
+    begin
+      perform public.save_bill_reminder(jsonb_build_object('debt_id', moto, 'debt_installment_no', 13), '[{"days_before":0,"at_time":"09:00"}]', 'push');
+      n := -1;
+    exception when others then
+      assert sqlerrm = 'Essa parcela não existe no contrato', format('parcela 13: %s', sqlerrm);
+    end;
+    assert n <> -1, 'parcela fora do contrato devia ser recusada';
+    begin
+      perform public.save_bill_reminder(jsonb_build_object('debt_id', moto, 'debt_installment_no', 0), '[{"days_before":0,"at_time":"09:00"}]', 'push');
+      n := -1;
+    exception when others then
+      assert sqlerrm = 'Essa parcela não existe no contrato', format('parcela 0: %s', sqlerrm);
+    end;
+    assert n <> -1, 'parcela 0 devia ser recusada';
+    reset role;
+    update public.debts set installments_paid = 2, remaining_cents = 100000 where id = moto;
+    set local role authenticated;
+    begin
+      perform public.save_bill_reminder(jsonb_build_object('debt_id', moto, 'debt_installment_no', 2), '[{"days_before":0,"at_time":"09:00"}]', 'push');
+      n := -1;
+    exception when others then
+      assert sqlerrm = 'Essa parcela já foi paga', format('parcela paga: %s', sqlerrm);
+    end;
+    assert n <> -1, 'parcela já paga devia ser recusada';
+    n := public.save_bill_reminder(jsonb_build_object('debt_id', moto, 'debt_installment_no', 3), '[{"days_before":0,"at_time":"09:00"}]', 'push');
+    assert n = 1, 'parcela futura grava';
+    -- remover um lembrete que virou morto (a 1ª, já paga) sempre passa
+    n := public.save_bill_reminder(jsonb_build_object('debt_id', moto, 'debt_installment_no', 1), '[]', 'push');
+    assert n = 0, 'remover devia passar';
+    reset role;
+    assert not exists (select 1 from public.bill_reminders where debt_id = moto and debt_installment_no = 1), 'a 1ª devia sair';
+    -- o título da lista diz qual parcela
+    set local role authenticated;
+    assert (select o.title from public.bill_reminders_overview() o
+            where o.alvo ->> 'debt_installment_no' = '3') = 'Moto BL · 3ª parcela', 'título devia dizer a parcela';
+    reset role;
+  end;
+  -- ocorrência paga e receita não aceitam "só esta"
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, paid_at, account_id)
+  values (ws, u, 'expense', 900, 'Paga BL', hoje, 'cleared', hoje, conta) returning id into tx2;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, occurred_at, status, account_id)
+  values (ws, u, 'income', 900, 'Receita BL', hoje + 1, 'pending', conta) returning id into tx;
+  set local role authenticated;
+  begin
+    perform public.save_bill_reminder(jsonb_build_object('transaction_id', tx2), '[{"days_before":0,"at_time":"09:00"}]', 'push');
+    n := -1;
+  exception when others then
+    assert sqlerrm like 'Essa já foi paga%', format('paga: %s', sqlerrm);
+  end;
+  assert n <> -1, 'ocorrência paga devia ser recusada';
+  begin
+    perform public.save_bill_reminder(jsonb_build_object('transaction_id', tx), '[{"days_before":0,"at_time":"09:00"}]', 'push');
+    n := -1;
+  exception when others then
+    assert sqlerrm = 'Lembrete é para conta a pagar', format('receita: %s', sqlerrm);
+  end;
+  assert n <> -1, 'receita devia ser recusada';
+  reset role;
+
   -- 7) RLS: o outro usuário não lê
   perform set_config('request.jwt.claim.sub', outro::text, true);
   perform set_config('request.jwt.claims', json_build_object('sub', outro, 'role', 'authenticated')::text, true);

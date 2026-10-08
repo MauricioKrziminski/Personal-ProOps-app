@@ -150,7 +150,9 @@ não tem campo para isso; o custo é a nota não mostrar o lembrete criado pelo 
 na dívida, na fatura, na série e na compra grava avisos (dias antes + hora + canal) que o cron de
 1 minuto entrega pelo vencimento ATUAL. O agente NÃO cria nem edita esse lembrete: "me lembra da
 parcela do carro 2 dias antes" vira lembrete solto (`create_reminder`). Lacuna declarada — pede
-resolver o registro-alvo dentro de uma ação de lembrete.
+resolver o registro-alvo dentro de uma ação de lembrete. Desde 09/10/2026 a tela de UMA parcela
+do financiamento também tem "Lembrar" (Só esta / Todas as próximas), e o alvo mais específico de um
+vencimento substitui o mais geral naquele vencimento (`20261009130000`).
 
 **Apagar com alcance** (`delete_scoped`, `delete_scoped_preview`, 07/10/2026). No app, apagar uma
 ocorrência de recorrente, parcela ou pagamento de financiamento pergunta "Só esta / Esta e as

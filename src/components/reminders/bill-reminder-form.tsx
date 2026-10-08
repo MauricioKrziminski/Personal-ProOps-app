@@ -18,6 +18,7 @@ import { Space } from '@/design/tokens';
 import { useBillReminderFor, useBillReminders, useSaveBillReminder } from '@/hooks/use-bill-reminders';
 import { useAlertPreferences } from '@/hooks/use-push';
 import { useSession } from '@/hooks/use-session';
+import { financeErrorMessage } from '@/lib/finance-form';
 import { AVISO_PADRAO, alvoDoParam, quandoDoAviso, type Aviso } from '@/lib/lembrete-de-conta';
 
 const CANAIS = [
@@ -76,7 +77,8 @@ export function BillReminderForm({ conta, todas, nome }: { conta: string; todas?
           toast({ message: novos.length ? 'Lembrete salvo.' : 'Lembrete removido.', tone: 'success' });
           router.back();
         },
-        onError: () => toast({ message: 'Não deu para salvar. Tenta de novo.', tone: 'error' }),
+        // A recusa do banco tem motivo ("Essa já foi paga…"); repetir não muda nada.
+        onError: (e) => toast({ message: financeErrorMessage(e, 'Não deu para salvar. Tenta de novo.'), tone: 'error' }),
       },
     );
 
