@@ -523,7 +523,7 @@ export default function TransactionDetailScreen() {
             ...(tx.kind === 'expense' && !tx.debt_id && !tx.pays_invoice_id && !tx.pix_fee_for_transaction_id &&
                 (tx.recurring_id || tx.installment_plan_id || (txDoLembrete && !estaPaga(txDoLembrete)))
               ? [{
-                  label: lembrete ? 'Editar lembrete' : tx.invoice_id && !tx.recurring_id && !tx.installment_plan_id ? 'Lembrar da fatura' : 'Lembrar',
+                  label: lembrete ? 'Editar lembrete' : 'Lembrar',
                   icon: 'bell' as const,
                   onPress: () => txDoLembrete && router.push(hrefDoLembrete({ tipo: 'lancamento', tx: txDoLembrete }, title)),
                 }]

@@ -11,8 +11,8 @@ test('o que se abriu decide onde o lembrete fica pendurado', () => {
     { so: { transaction_id: 't1' }, todas: { recurring_id: 'r1' } });
   assert.deepEqual(alvosDoAberto({ tipo: 'lancamento', tx: tx({ installment_plan_id: 'p1' }) }),
     { so: { transaction_id: 't1' }, todas: { installment_plan_id: 'p1' } });
-  // compra à vista no cartão: quem vence é a fatura
-  assert.deepEqual(alvosDoAberto({ tipo: 'lancamento', tx: tx({ invoice_id: 'f1' }) }), { so: { invoice_id: 'f1' }, todas: null });
+  // compra à vista no cartão: o lembrete é da compra (o da fatura mora na fatura)
+  assert.deepEqual(alvosDoAberto({ tipo: 'lancamento', tx: tx({ invoice_id: 'f1' }) }), { so: { transaction_id: 't1' }, todas: null });
   assert.deepEqual(alvosDoAberto({ tipo: 'divida', debtId: 'd1', parcela: 9 }),
     { so: { debt_id: 'd1', debt_installment_no: 9 }, todas: { debt_id: 'd1' } });
   assert.deepEqual(alvosDoAberto({ tipo: 'divida', debtId: 'd1' }), { so: { debt_id: 'd1' }, todas: null });

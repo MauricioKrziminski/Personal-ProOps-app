@@ -43,8 +43,8 @@ export function alvosDoAberto(a: Aberto): { so: Alvo; todas: Alvo | null } {
       if (tx.installment_plan_id) return estaPaga(tx)
         ? { so: { installment_plan_id: tx.installment_plan_id }, todas: null }
         : { so: { transaction_id: tx.id }, todas: { installment_plan_id: tx.installment_plan_id } };
-      // Compra à vista no cartão não vence sozinha: quem vence é a fatura.
-      if (tx.invoice_id) return { so: { invoice_id: tx.invoice_id }, todas: null };
+      // Compra à vista (no cartão também): o lembrete é DA COMPRA, no vencimento da fatura em que ela
+      // cai. Avisar a fatura é outra coisa, e mora na tela da fatura (07/10/2026).
       return { so: { transaction_id: tx.id }, todas: null };
     }
     case 'divida':

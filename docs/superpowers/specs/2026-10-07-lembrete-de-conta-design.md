@@ -68,7 +68,7 @@ Tabela nova **`public.bill_reminders`**, uma linha por AVISO:
   | parcela de compra | `transaction_id` | `installment_plan_id` |
   | financiamento | `debt_id` + `debt_installment_no` | `debt_id` |
   | fatura | `invoice_id` | — |
-  | compra à vista no cartão | `invoice_id` da compra ("Lembrar da fatura") | — |
+  | compra à vista no cartão | `transaction_id` — a COMPRA, no vencimento da fatura (desde 07/10/2026; o da fatura é na tela da fatura) | — |
 
   Ocorrência PREVISTA (só na regra) é materializada pelo toque, como já é hoje
   (`materialize_recurring_occurrence`), e vira `transaction_id`.
@@ -158,7 +158,7 @@ pela última migration) e acrescenta só o `not exists`. Suíte SQL inteira depo
 
 - **Onde aparece "Lembrar"** (vira "Editar lembrete" quando já existe):
   - menu do lançamento (`/finance/[txId].tsx`, `HeaderActions`) — avulso, parcela, ocorrência;
-    compra no cartão mostra **"Lembrar da fatura"**;
+    compra no cartão mostra **"Lembrar"** e lembra da compra (era "Lembrar da fatura" até 07/10/2026);
   - ficha do financiamento (`debts.tsx?id=`, cabeçalho ao lado de "Editar", e `listaDaDivida`);
   - fatura (`/finance/invoice/[id].tsx`, menu);
   - Recorrentes (`acoesDaSerie`, cria direto em "Todas as próximas");
@@ -211,7 +211,7 @@ pela última migration) e acrescenta só o `not exists`. Suíte SQL inteira depo
 - **"Só esta" substitui o lembrete da PRÓPRIA série/compra naquela ocorrência**, e "só a Nª" o da
   dívida inteira naquela parcela. Não é silenciar: apagar o "Só esta" devolve o da série.
 - **No cartão, compra e fatura são coisas diferentes** (`20261009150000`, *"só esta no cartão não
-  tem que valer para a fatura inteira"*): o lembrete de uma compra (só esta, série ou parcelada)
+  tem que valer para a fatura inteira"*): o lembrete de uma compra (avulsa, só esta, série ou parcelada)
   avisa da COMPRA — nome e valor dela, no vencimento da fatura em que cai, "Netflix (fatura
   Nubank)" — e abre o lançamento; o lembrete da fatura é da fatura. Um não cala o outro, e o aviso
   automático da fatura só cala pelo lembrete da fatura.
@@ -231,4 +231,4 @@ pela última migration) e acrescenta só o `not exists`. Suíte SQL inteira depo
   hora) e não some com o lembrete: apagar o lembrete que enviou não faz outro reenviar.
 - **Entrega com folga**: até 8 tentativas, esperando 2^tentativas minutos (~4 h no total).
 - **Ocorrência já paga** (fora do cartão pelo status; no cartão pela fatura) abre o lembrete direto
-  na série/compra, sem perguntar; "Lembrar da fatura" some com a fatura paga.
+  na série/compra, sem perguntar; "Lembrar" some na compra avulsa de fatura paga.
