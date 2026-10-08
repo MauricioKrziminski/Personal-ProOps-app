@@ -8,6 +8,10 @@ import {
   substituirGrupo,
   draftsDoAdiantamento,
   escolherParcelas,
+  faltamDepois,
+  parcelasJaAdiantadas,
+  semAsJaAdiantadas,
+  semCancelamentoRepetido,
   ultimoDia,
   valorSugerido,
   type Adiantavel,
@@ -120,4 +124,55 @@ test('cada mês à frente tira UMA parcela, e ir e voltar dá sempre o mesmo nú
   // e a quantidade pedida assenta junto, guardando a escolha
   assert.equal(quantasQueCabem(adiantaveisNoMes([tv], '2026-10-01')[0], 9), 8);
   assert.equal(quantasQueCabem(adiantaveisNoMes([tv], '2026-09-22')[0], 9), 9);
+});
+
+// 07/10/2026: "se eu já adiantei 3 parcelas no mês anterior e for adiantar mais no mês seguinte, no
+// mesmo rascunho, ele tem que mostrar o que sobrou". A lista do banco não conhece o rascunho.
+const tv: Adiantavel = {
+  source: 'plan', ref_id: 'p', title: 'TV', account_name: null, total_n: 12, taxa: null,
+  events: ['2026-11-10', '2026-12-10', '2027-01-10', '2027-02-10', '2027-03-10', '2027-04-10']
+    .map((day, i) => ({ n: 7 + i, day, cents: 100, pv_cents: 100 })),
+};
+
+test('o segundo adiantamento da mesma compra não reoferece as parcelas do primeiro', () => {
+  const g1 = draftsDoAdiantamento(tv, tv.events.slice(-3), 300, '2026-11-01', 'g1', { quantas: 3, quais: 'ultimas' });
+  const resto = semAsJaAdiantadas([tv], parcelasJaAdiantadas(g1));
+  assert.deepEqual(resto[0].events.map((e) => e.n), [7, 8, 9]);
+  // editando o próprio g1, as parcelas dele voltam a ser escolhíveis
+  assert.equal(semAsJaAdiantadas([tv], parcelasJaAdiantadas(g1, 'g1'))[0].events.length, 6);
+  // outra fonte com o mesmo dia não é afetada
+  const outra = { ...tv, ref_id: 'outra' };
+  assert.equal(semAsJaAdiantadas([outra], parcelasJaAdiantadas(g1))[0].events.length, 6);
+});
+
+test('fonte que ficou sem parcela nenhuma some da lista', () => {
+  const tudo = draftsDoAdiantamento(tv, tv.events, 600, '2026-11-01', 'g1');
+  assert.deepEqual(semAsJaAdiantadas([tv], parcelasJaAdiantadas(tudo)), []);
+});
+
+test('rascunho antigo com a mesma parcela cancelada em dois grupos é deduplicado no envio', () => {
+  const g1 = draftsDoAdiantamento(tv, tv.events.slice(-3), 300, '2026-11-01', 'g1');
+  const g2 = draftsDoAdiantamento(tv, tv.events.slice(-3), 300, '2026-12-01', 'g2');
+  const limpo = semCancelamentoRepetido([...g1, ...g2]);
+  assert.equal(limpo.filter((d) => d.mode === 'cancel').length, 3);
+  assert.equal(limpo.filter((d) => d.mode === 'total').length, 2, 'os dois pagamentos ficam');
+  // idempotente: limpar de novo não muda nada
+  assert.deepEqual(semCancelamentoRepetido(limpo), limpo);
+  // sem repetição, devolve igual
+  assert.deepEqual(semCancelamentoRepetido(g1), g1);
+});
+
+test('faltam depois de cada adiantamento, na ordem dos pagamentos', () => {
+  const g1 = draftsDoAdiantamento(tv, tv.events.slice(-3), 300, '2026-11-01', 'g1');
+  const g2 = draftsDoAdiantamento(tv, tv.events.slice(1, 3), 200, '2026-12-01', 'g2');
+  // a ordem no rascunho não importa: quem conta é a data do pagamento
+  const f = faltamDepois([...g2, ...g1], [tv]);
+  assert.equal(f.get('g1'), 3, 'depois de novembro: 7, 8 e 9 (10, 11 e 12 adiantadas)');
+  assert.equal(f.get('g2'), 0, 'depois de dezembro: 8 e 9 adiantadas; a 7 vence em novembro');
+  // fonte sem candidatos conhecidos (lista ainda carregando): sem número
+  assert.equal(faltamDepois(g1, []).get('g1'), undefined);
+  // conta fixa não tem fim: sem número
+  const aluguel: Adiantavel = { ...tv, source: 'recurring', ref_id: 'r', total_n: null };
+  const g3 = draftsDoAdiantamento(aluguel, aluguel.events.slice(0, 2), 200, '2026-11-01', 'g3');
+  assert.equal(faltamDepois(g3, [aluguel]).get('g3'), undefined);
 });

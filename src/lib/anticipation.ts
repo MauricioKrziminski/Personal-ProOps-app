@@ -165,3 +165,99 @@ export function substituirGrupo<T extends { grupo?: string }>(drafts: T[], grupo
   const antes = drafts.slice(0, primeiro).filter((d) => d.grupo !== grupo).length;
   return [...resto.slice(0, antes), ...novos, ...resto.slice(antes)];
 }
+
+/**
+ * A chave de UMA parcela de uma fonte: fonte + dia em que ela sai do caixa. O `cancel` não guarda
+ * o nº da parcela (recorrente nem tem), mas guarda o dia (`start = p.day`), e uma fonte não tem
+ * duas parcelas no mesmo dia — então a chave vale também para rascunho gravado antes desta regra.
+ */
+export function chaveDaParcela(ref_id: string, day: string): string {
+  return `${ref_id}|${day}`;
+}
+
+/** O mínimo de um draft que estas contas leem — vale para o `Draft` do hook e para o daqui. */
+type DraftLido = { mode?: string; grupo?: string; start: string; adiantar?: { ref_id: string } };
+
+/** A fonte de cada grupo vem do draft de PAGAMENTO dele (o único que tem `adiantar`). */
+function fonteDosGrupos(drafts: readonly DraftLido[]): Map<string, string> {
+  const fonte = new Map<string, string>();
+  for (const d of drafts) if (d.adiantar && d.grupo) fonte.set(d.grupo, d.adiantar.ref_id);
+  return fonte;
+}
+
+/**
+ * As parcelas que o rascunho JÁ adiantou, fora do grupo `exceto` (o que está sendo editado).
+ *
+ * ⚠️ 07/10/2026: `anticipation_candidates` lê só o banco, e o rascunho mora no aparelho. Sem
+ * descontar isto, o segundo adiantamento da mesma compra oferecia as mesmas parcelas do primeiro,
+ * dizia "N a vencer" sem tirar as já adiantadas e cancelava a MESMA parcela duas vezes — a projeção
+ * devolvia ao caixa uma saída que só existia uma vez (saldo otimista, sem erro nenhum).
+ */
+export function parcelasJaAdiantadas(drafts: readonly DraftLido[], exceto?: string): Set<string> {
+  const fonte = fonteDosGrupos(drafts);
+  const ja = new Set<string>();
+  for (const d of drafts) {
+    if (d.mode !== 'cancel' || !d.grupo || d.grupo === exceto) continue;
+    const ref = fonte.get(d.grupo);
+    if (ref) ja.add(chaveDaParcela(ref, d.start));
+  }
+  return ja;
+}
+
+/** A lista do banco sem as parcelas já adiantadas; a fonte que ficou vazia sai. */
+export function semAsJaAdiantadas(lista: readonly Adiantavel[], ja: ReadonlySet<string>): Adiantavel[] {
+  if (ja.size === 0) return [...lista];
+  return lista
+    .map((i) => ({ ...i, events: i.events.filter((e) => !ja.has(chaveDaParcela(i.ref_id, e.day))) }))
+    .filter((i) => i.events.length > 0);
+}
+
+/**
+ * Defesa no ENVIO: o cancelamento de uma parcela que outro grupo já cancelou sai (fica o primeiro).
+ * Cobre o rascunho gravado no aparelho antes de `semAsJaAdiantadas` existir. Idempotente.
+ */
+export function semCancelamentoRepetido<T extends DraftLido>(drafts: readonly T[]): T[] {
+  const fonte = fonteDosGrupos(drafts);
+  const vistas = new Set<string>();
+  return drafts.filter((d) => {
+    if (d.mode !== 'cancel' || !d.grupo) return true;
+    const ref = fonte.get(d.grupo);
+    if (!ref) return true;
+    const chave = chaveDaParcela(ref, d.start);
+    if (vistas.has(chave)) return false;
+    vistas.add(chave);
+    return true;
+  });
+}
+
+/**
+ * Quantas parcelas da fonte ainda faltariam DEPOIS de cada adiantamento, na ordem dos pagamentos:
+ * as que vencem depois do dia do pagamento, menos as que este grupo e os pagos antes (ou junto)
+ * dele já adiantaram. `candidatos` é a lista do banco a partir de hoje; sem a fonte nela, o grupo
+ * fica sem número (nada a afirmar enquanto a lista não chegou).
+ */
+export function faltamDepois(
+  drafts: readonly DraftLido[],
+  candidatos: readonly Adiantavel[],
+): Map<string, number> {
+  const fonte = fonteDosGrupos(drafts);
+  const pagamentos = drafts
+    .filter((d): d is DraftLido & { grupo: string; adiantar: { ref_id: string } } => Boolean(d.adiantar && d.grupo))
+    .sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+  const saida = new Map<string, number>();
+  for (const p of pagamentos) {
+    const item = candidatos.find((c) => c.ref_id === p.adiantar.ref_id);
+    // Conta fixa não tem fim: "faltam 117" seria o tamanho da janela da projeção, não um fato.
+    if (!item || item.source === 'recurring') continue;
+    const ate = new Set<string>();
+    for (const d of drafts) {
+      if (d.mode !== 'cancel' || !d.grupo) continue;
+      const pagoEm = drafts.find((x) => x.grupo === d.grupo && x.adiantar)?.start;
+      if (fonte.get(d.grupo) === item.ref_id && pagoEm && pagoEm <= p.start) ate.add(d.start);
+    }
+    // Depois do DIA do pagamento, não do mês: a parcela de 10/11 ainda falta para quem adiantou
+    // no dia 1º de novembro (ela só não é adiantável nesse mês — `adiantaveisNoMes`).
+    saida.set(p.grupo, item.events.filter((e) => e.day > p.start && !ate.has(e.day)).length);
+  }
+  return saida;
+}

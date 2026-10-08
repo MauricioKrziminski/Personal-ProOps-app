@@ -25,6 +25,13 @@ const FONTE: Record<Adiantavel['source'], { grupo: string; icone: SelectOption['
 
 interface Props {
   consulta: UseQueryResult<Adiantavel[]>;
+  /**
+   * A lista JÁ sem as parcelas que outros adiantamentos do rascunho tiraram (`semAsJaAdiantadas`).
+   * A consulta continua sendo quem diz carregando/erro; o que se escolhe é isto.
+   */
+  lista: Adiantavel[];
+  /** Quantas parcelas do item escolhido o rascunho já adiantou (fora a hipótese em edição). */
+  jaAdiantadas: number;
   item: Adiantavel | null;
   itemId: string | null;
   onItem: (id: string | null) => void;
@@ -47,7 +54,7 @@ interface Props {
  */
 export function AdiantarCampos(p: Props) {
   const brl = useBRL();
-  const lista = p.consulta.data ?? [];
+  const lista = p.lista;
 
   const ordenada = [...lista].sort((a, b) => FONTE[a.source].ordem - FONTE[b.source].ordem);
   const opcoes: SelectOption[] = ordenada.map((i) => {
@@ -114,7 +121,9 @@ export function AdiantarCampos(p: Props) {
       <Presenca visivel={Boolean(p.item)}>
         <Field
           label={recorrente ? 'Quantos meses' : 'Quantas parcelas'}
-          hint={recorrente ? undefined : `De ${total} ${total === 1 ? 'parcela' : 'parcelas'} a vencer.`}>
+          hint={recorrente
+            ? undefined
+            : `De ${total} ${total === 1 ? 'parcela' : 'parcelas'} a vencer${p.jaAdiantadas > 0 ? ` · ${p.jaAdiantadas} já adiantada${p.jaAdiantadas === 1 ? '' : 's'} no rascunho` : ''}.`}>
           <QuantityField value={p.quantas} max={total} onChange={p.onQuantas} />
         </Field>
       </Presenca>

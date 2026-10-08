@@ -68,6 +68,9 @@ import {
   agruparHipoteses,
   draftsDoAdiantamento,
   quantasQueCabem,
+  faltamDepois,
+  parcelasJaAdiantadas,
+  semAsJaAdiantadas,
   substituirGrupo,
   escolherParcelas,
   ultimoDia,
@@ -303,6 +306,12 @@ export default function ForecastScreen() {
   const serieSimulada = simulacao.data?.forecast;
   const mensalExibido = simulando ? (simulacao.data?.meses ?? mensal.data) : mensal.data;
   const gruposDeAdiantar = useMemo(() => agruparHipoteses(adiantamentos), [adiantamentos]);
+  // "faltam N" de cada adiantamento, contado sobre a lista do banco a partir de hoje (07/10/2026).
+  const candidatosDeHoje = useAnticipationCandidates(localISODate(), adiantamentos.length > 0, false);
+  const faltam = useMemo(
+    () => faltamDepois(adiantamentos, candidatosDeHoje.data ?? []),
+    [adiantamentos, candidatosDeHoje.data],
+  );
   /**
    * "Onde muda" (spec 2026-09-29, §4): antes (real) × depois (simulado). Só com as quatro leituras
    * na mão e a simulação ATUAL — com a anterior, o "depois" seria de outro rascunho.
@@ -321,7 +330,13 @@ export default function ForecastScreen() {
 
   const pagarEm = diaDoPagamento(mesAdiantar);
   const adiantaveis = useAnticipationCandidates(pagarEm, sheetAberto && tipoDaFolha === 'adiantar');
-  const itemAdiantar = adiantaveis.data?.find((i) => i.ref_id === adiantarId) ?? null;
+  // ⚠️ A lista do banco não conhece o rascunho: o que outro adiantamento já tirou sai daqui
+  // (07/10/2026), senão o segundo adiantamento da mesma compra reoferecia as mesmas parcelas.
+  const jaNoRascunho = parcelasJaAdiantadas(adiantamentos, tipoDaFolha === 'adiantar' ? (editando ?? undefined) : undefined);
+  const adiantaveisLiquidos = semAsJaAdiantadas(adiantaveis.data ?? [], jaNoRascunho);
+  const itemAdiantar = adiantaveisLiquidos.find((i) => i.ref_id === adiantarId) ?? null;
+  const itemBruto = adiantaveis.data?.find((i) => i.ref_id === adiantarId);
+  const jaAdiantadasDoItem = itemBruto && itemAdiantar ? itemBruto.events.length - itemAdiantar.events.length : 0;
   // A quantidade ASSENTA no que ainda vence depois do pagamento (`quantasQueCabem`): trocar o
   // mês para mais tarde diminui o número na tela, em vez de travar a hipótese com um erro.
   const qtdAdiantar = quantasQueCabem(itemAdiantar, adiantarQtd);
@@ -806,6 +821,8 @@ export default function ForecastScreen() {
         {gruposDeAdiantar.map(({ chave, principal: d }) => {
           // O adiantamento não aplica nesta versão (spec 2026-09-28, §6).
           const titulo = `Sai ${brl(d.amount_cents)} · ${d.rotulo ?? 'adiantamento'} · em ${isoToBR(d.start)}`;
+          const resto = faltam.get(chave);
+          const subtitulo = resto === undefined ? undefined : resto === 0 ? 'quita tudo' : `faltam ${resto}`;
           const acoes: ItemAction[] = [
             { label: 'Editar', icon: 'pencil', onPress: () => editarAdiantamento(chave, d) },
             { label: 'Tirar', icon: 'trash', destructive: true, arrasto: 'esquerda', desfaz: true, onPress: () => tirarAdiantamento(chave) },
@@ -814,9 +831,10 @@ export default function ForecastScreen() {
             <Deslizavel key={chave} titulo={titulo} acoes={acoes}>
               <Row
                 title={titulo}
+                subtitle={subtitulo}
                 onPress={() => editarAdiantamento(chave, d)}
                 onLongPress={() => showItemActions(titulo, acoes)}
-                accessibilityLabel={`Hipótese: ${titulo}`}
+                accessibilityLabel={`Hipótese: ${titulo}${subtitulo ? `. ${subtitulo}` : ''}`}
               />
             </Deslizavel>
           );
@@ -1208,6 +1226,8 @@ export default function ForecastScreen() {
           {tipoDaFolha === 'adiantar' ? (
             <AdiantarCampos
               consulta={adiantaveis}
+              lista={adiantaveisLiquidos}
+              jaAdiantadas={jaAdiantadasDoItem}
               item={itemAdiantar}
               itemId={adiantarId}
               onItem={(id) => {

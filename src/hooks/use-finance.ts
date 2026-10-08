@@ -32,7 +32,7 @@ import { toIlikeTerm } from '@/lib/search';
 import { dateWindows, timestampDateBounds, type ListFiltersValue } from '@/lib/list-filters';
 import { ACCOUNT_TYPES } from '@/lib/accounts';
 import { acharLinhaNoCache } from '@/lib/linha-do-cache';
-import { adiantaveisNoMes, type Adiantavel, type EscolhaDeAdiantamento } from '@/lib/anticipation';
+import { adiantaveisNoMes, semCancelamentoRepetido, type Adiantavel, type EscolhaDeAdiantamento } from '@/lib/anticipation';
 import { useRealtimeInvalidate, workspaceId } from '@/hooks/use-items';
 import { filtroDoEstado } from '@/lib/data-da-compra';
 import type { HipoteseNoCiclo, OcorrenciaDaHipotese } from '@/lib/rascunho-no-ciclo';
@@ -1330,7 +1330,8 @@ export type Draft = {
 
 /** O que vai ao banco: `grupo`/`rotulo` são da tela e mudariam a chave do cache à toa. */
 function paraOBanco(drafts: Draft[]) {
-  return drafts.map(({ grupo: _g, rotulo: _r, adiantar: _a, ...d }) => d);
+  // A mesma parcela cancelada por dois adiantamentos do rascunho sai uma vez só (`anticipation.ts`).
+  return semCancelamentoRepetido(drafts).map(({ grupo: _g, rotulo: _r, adiantar: _a, ...d }) => d);
 }
 
 /**
@@ -1338,7 +1339,7 @@ function paraOBanco(drafts: Draft[]) {
  * em que cada parcela sai do caixa e o valor presente no dia do pagamento (`pagarEm`). JSON de
  * propósito: a lista passa das 1000 linhas que o PostgREST corta em silêncio.
  */
-export function useAnticipationCandidates(pagarEm: string, enabled = true) {
+export function useAnticipationCandidates(pagarEm: string, enabled = true, porMes = true) {
   useRealtimeInvalidate('transactions', ['anticipation-candidates']);
   return useQuery({
     enabled,
@@ -1351,7 +1352,9 @@ export function useAnticipationCandidates(pagarEm: string, enabled = true) {
     },
     // A régua do MÊS (`adiantaveisNoMes`) vale também sobre o placeholder: enquanto o mês novo
     // carrega, a lista do anterior já aparece recortada no mês novo, sem piscar o número velho.
-    select: (lista) => adiantaveisNoMes(lista, pagarEm),
+    // `porMes: false` é a lista inteira a partir do dia: o "faltam N" da linha do adiantamento conta
+    // também a parcela que ainda vence no mês do pagamento (ela não é adiantável, mas falta).
+    select: (lista) => (porMes ? adiantaveisNoMes(lista, pagarEm) : lista),
   });
 }
 
