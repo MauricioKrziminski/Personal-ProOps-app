@@ -194,6 +194,6 @@ o principal.
 - **Renegociação / troca de taxa com histórico.** `debts` não guarda histórico de taxa; editar
   sobrescreve, e a tabela Price passa a valer dali para a frente.
 - **Criar dívida pelo WhatsApp.** A IA não tem ação para isso e o `responseSchema` está no teto de
-  15 propriedades (`.claude/rules/ai-gemini.md`).
+  15 propriedades (`.claude/rules/ia.md`).
 - **IOF, seguro, tarifa embutida.** O modelo é Price puro; embutir custo acessório sem campo para ele
   seria inventar número.

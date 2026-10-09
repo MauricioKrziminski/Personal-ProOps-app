@@ -23,9 +23,8 @@ from app.domain.reconcile import (
     Existente, Item, conciliar, natureza_estrutural, pares_para_julgar, parse_parcela,
 )
 from app.domain.statement import ParsedLine, ofx_tipo, parse_csv, parse_ofx
-from app.services.gemini import (
-    GEMINI_BATCH, classify_statement_lines, judge_statement_pairs, modelo,
-)
+from app.domain.importacao_ia import classify_statement_lines, judge_statement_pairs
+from app.services.ia import PAPEL_BATCH, modelo
 
 log = logging.getLogger(__name__)
 
@@ -106,7 +105,7 @@ async def run(
         await conversation.soltar_reserva()
         raise
     await db.record_ai_event(
-        user_id=user_id, workspace_id=workspace_id, channel="app", model=modelo(GEMINI_BATCH),
+        user_id=user_id, workspace_id=workspace_id, channel="app", model=modelo(PAPEL_BATCH),
         confidence=None, result={"import": True, "items": resultado["items"]}, kind="import",
     )
     return resultado

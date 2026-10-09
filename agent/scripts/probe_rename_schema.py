@@ -22,13 +22,13 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.eval_cache import usar_gemini_gratis  # noqa: E402
+from scripts.eval_cache import usar_modelos_economicos  # noqa: E402
 
-usar_gemini_gratis()
+usar_modelos_economicos()
 
 from app.graph.prompts import FINANCE
 from app.graph.schemas import FinanceAction, FinanceActionType, FinancePlan
-from app.services import gemini
+from app.services import ia
 
 # Formas diferentes de pedir a MESMA coisa. Uma lista de sinônimos no código seria a armadilha
 # que `regex-nao-infere-sentido` descreve; aqui elas existem para MEDIR se o modelo aguenta.
@@ -46,7 +46,7 @@ async def main() -> int:
     falhas = 0
     for frase in FRASES:
         try:
-            r = await gemini.structured(FinancePlan, gemini.GEMINI_PARSE).ainvoke(
+            r = await ia.structured(FinancePlan, ia.PAPEL_PARSE).ainvoke(
                 [("system", FINANCE), ("human", frase)]
             )
             a = r.actions[0]

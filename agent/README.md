@@ -65,8 +65,8 @@ mais estrangularia o pool de 4 conexões.
 ```bash
 # os schemas passam no Gemini de verdade? (3 chamadas do Flash-Lite)
 export GEMINI_API_KEY=...
-.venv/bin/python scripts/validate_gemini_schemas.py
-.venv/bin/python scripts/validate_gemini_schemas.py --probe   # acha o teto real
+.venv/bin/python scripts/validate_schemas.py
+.venv/bin/python scripts/validate_schemas.py --probe   # acha o teto real
 
 # as migrations 0040/0041 se comportam num Postgres de verdade?
 npx supabase start
@@ -87,7 +87,7 @@ só isso que muda — nenhuma lógica de negócio conhece o Cloud Run.
 | O que exige confirmação humana | `app/graph/policy.py` |
 | Validação antes do banco | `app/tools/guards.py` |
 | Envelope anti-injection | `app/security.py` (`wrap_untrusted`) |
-| Modelos do Gemini (fixados) | `app/services/gemini.py` |
+| Modelos do Gemini (fixados) | `app/services/ia.py` |
 | Mapa ação -> função | `app/tools/registry.py` |
 | Prompts por domínio | `app/graph/prompts.py` |
 

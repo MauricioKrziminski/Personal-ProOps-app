@@ -42,7 +42,7 @@ class Settings(BaseSettings):
 
     # --- IA ---
     gemini_api_key: str = ""
-    # Claude (Anthropic): a IA de produção/staging por papel (`services/gemini.py`); o Gemini fica
+    # Claude (Anthropic): a IA de produção/staging por papel (`services/ia.py`); o Gemini fica
     # com embeddings e com a reserva entre provedores.
     anthropic_api_key: str = ""
     groq_api_key: str = ""

@@ -3,7 +3,7 @@
 import pytest
 
 from app.domain import confirm
-from app.services import gemini
+from app.services import ia
 
 LISTA = [{"id": "t1", "label": "R$ 45 mercado"}, {"id": "t2", "label": "R$ 45 padaria"}]
 CONFIRMACAO = {"id": "p1", "thread_id": "t", "summary": "registrar gasto de R$ 45",
@@ -21,7 +21,7 @@ def sem_modelo(monkeypatch):
     def nunca(*a, **k):
         raise AssertionError("o fast-path não pode chamar o modelo")
 
-    monkeypatch.setattr(gemini, "structured", nunca)
+    monkeypatch.setattr(ia, "structured", nunca)
 
 
 @pytest.mark.parametrize("texto", ["sim", "SIM!!", "Sim.", "s", "ss", "  pode  sim ", "👍 ok",
@@ -99,7 +99,7 @@ async def test_o_outro_chega_ao_classificador_semantico_e_nao_cancela(monkeypatc
     from app.graph.schemas import CandidateChoice
 
     modelo = AsyncMock(return_value=CandidateChoice(index=2))
-    monkeypatch.setattr(gemini, "structured",
+    monkeypatch.setattr(ia, "structured",
                         lambda *a, **kw: type("M", (), {"ainvoke": modelo})())
     uso = {}
     decisao = await confirm.decide({"text": "o outro"}, ESCOLHA, uso)

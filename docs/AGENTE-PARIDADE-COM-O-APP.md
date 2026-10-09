@@ -256,7 +256,7 @@ VALOR ou DATA, que é o que a pessoa pergunta sobre dinheiro.
 
 **Nenhuma custou orçamento de schema, e o teto foi MEDIDO antes** (`scripts/probe_query_schema.py`,
 09/09/2026): `FinanceQuery` 7×12 = 84 passa — ficamos em 7×11 = 77; `NotesAction` 9×8 = 72 passa e
-é onde ficamos. Estimar aqui já custou uma quebra em produção (`ai-gemini.md`).
+é onde ficamos. Estimar aqui já custou uma quebra em produção (`ia.md`).
 
 ## O roteador precisou de uma linha
 

@@ -288,7 +288,7 @@ async def test_creation_model_omissions_do_not_shrink_total_or_lose_history(
         ]
     )
     monkeypatch.setattr(
-        nodes.gemini,
+        nodes.ia,
         "structured",
         lambda *a, **_: type("Model", (), {"ainvoke": AsyncMock(return_value=parsed)})(),
     )

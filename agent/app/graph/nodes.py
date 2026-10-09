@@ -47,7 +47,7 @@ from app.domain.required import faltando
 from app.domain.money import cents_to_brl
 from app.graph.state import CHAVE_MIDIA, AgentState
 from app.tools import atributos, guards, lote_d, movimentos, resolve
-from app.services import gemini
+from app.services import ia
 from app.tools.base import ExecContext
 from app.tools.finance import apply_rules
 from app.tools.registry import AJUDA, execute
@@ -135,9 +135,9 @@ async def route(state: AgentState) -> dict:
     # o schema e o texto enviados são os de sempre, byte a byte (`tests/test_prompt_v2.py`).
     v2 = prompts_v2.ligado()
     sistema_router = prompts_v2.ROUTER_V2 if v2 else ROUTER
-    modelo = gemini.structured(
-        RouterDecisionV2 if v2 else RouterDecision, gemini.GEMINI_ROUTER, no="router",
-        versao=gemini.versao_do_prompt(sistema_router),
+    modelo = ia.structured(
+        RouterDecisionV2 if v2 else RouterDecision, ia.PAPEL_ROUTER, no="router",
+        versao=ia.versao_do_prompt(sistema_router),
     )
     decisao: RouterDecision = await modelo.ainvoke(
         [
@@ -339,7 +339,7 @@ async def finance_node(state: AgentState, config: RunnableConfig = None) -> dict
         return {}  # ações semeadas ou turno cancelado: não reextrair
 
     historico = state.get("messages")[:-1] if state.get("messages") else None
-    prazo = gemini.PRAZO_LONGO if state.get("media") else gemini.PRAZO_COM_RESERVA
+    prazo = ia.PRAZO_LONGO if state.get("media") else ia.PRAZO_COM_RESERVA
     v2 = prompts_v2.ligado()
     # Pedido refeito ANTES do SIM (`corrigindo`): o router lê "na verdade…" como correção, mas a
     # frase é um registro NOVO — monta TODOS os módulos, senão falta o parcelado (total × parcela).
@@ -348,9 +348,9 @@ async def finance_node(state: AgentState, config: RunnableConfig = None) -> dict
         prompts_v2.finance(subs, tem_anexo=bool(state.get("media")))
         if v2 else FINANCE
     )
-    modelo = gemini.structured(
-        FinancePlan, gemini.GEMINI_PARSE, prazo=prazo,
-        no="finance_parse", versao=gemini.versao_do_prompt(sistema),
+    modelo = ia.structured(
+        FinancePlan, ia.PAPEL_PARSE, prazo=prazo,
+        no="finance_parse", versao=ia.versao_do_prompt(sistema),
     )
     midia = ((config or {}).get("configurable") or {}).get(CHAVE_MIDIA)
     contas = await _contas_do_turno(state)
@@ -454,9 +454,9 @@ async def finance_query_node(state: AgentState) -> dict:
     historico = state.get("messages")[:-1] if state.get("messages") else None
     v2 = prompts_v2.ligado()
     sistema = prompts_v2.finance_query(tem_historico=bool(historico)) if v2 else FINANCE_QUERY
-    modelo = gemini.structured(
-        FinanceQueryPlan, gemini.GEMINI_PARSE,
-        no="finance_query", versao=gemini.versao_do_prompt(sistema),
+    modelo = ia.structured(
+        FinanceQueryPlan, ia.PAPEL_PARSE,
+        no="finance_query", versao=ia.versao_do_prompt(sistema),
     )
     contas = await _contas_do_turno(state)
     exemplos = await exemplos_dinamicos.parecidos(state.get("text", ""), "consulta") if v2 else ""
@@ -521,8 +521,8 @@ async def notes_node(state: AgentState) -> dict:
 
     historico = state.get("messages")[:-1] if state.get("messages") else None
     pastas = await _pastas_do_workspace(state["workspace_id"])
-    modelo = gemini.structured(
-        NotesPlan, gemini.GEMINI_PARSE, no="notes", versao=gemini.versao_do_prompt(NOTES)
+    modelo = ia.structured(
+        NotesPlan, ia.PAPEL_PARSE, no="notes", versao=ia.versao_do_prompt(NOTES)
     )
     plano: NotesPlan = await modelo.ainvoke(
         [
@@ -639,8 +639,8 @@ Catálogo:
         planned = [ResourceAction.model_validate(a) for a in state.get('resource_actions') or []]
         calls = 0
     else:
-        plan = await gemini.structured(
-            ResourcePlan, gemini.GEMINI_PARSE, no="cadastros", versao=gemini.versao_do_prompt(prompt)
+        plan = await ia.structured(
+            ResourcePlan, ia.PAPEL_PARSE, no="cadastros", versao=ia.versao_do_prompt(prompt)
         ).ainvoke([('system',prompt),('human',user)])
         planned, calls = _com_campos_do_rascunho(plan.actions, state.get('resource_draft') or []), 1
     if Domain.NOTAS.value in (state.get('domains') or []):

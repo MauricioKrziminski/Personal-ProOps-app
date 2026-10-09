@@ -140,9 +140,9 @@ def resposta_exata(texto: str | None) -> bool | None:
 async def _classificar(texto: str, resumo: str) -> str:
     from app.graph.schemas import ConfirmDecision
     from app.security import wrap_untrusted
-    from app.services.gemini import GEMINI_GATE, structured, versao_do_prompt
+    from app.services.ia import PAPEL_GATE, structured, versao_do_prompt
 
-    modelo = structured(ConfirmDecision, GEMINI_GATE, no="gate:confirmacao",
+    modelo = structured(ConfirmDecision, PAPEL_GATE, no="gate:confirmacao",
                         versao=versao_do_prompt(_PROMPT_CONFIRMACAO))
     # ⚠️ **O resumo é conteúdo do USUÁRIO e não pode entrar no system prompt.**
     #
@@ -256,7 +256,7 @@ async def escolher_candidato(
         return None
     from app.graph.schemas import CandidateChoice
     from app.security import wrap_untrusted
-    from app.services.gemini import GEMINI_GATE, structured, versao_do_prompt
+    from app.services.ia import PAPEL_GATE, structured, versao_do_prompt
 
     lista = "\n".join(
         f"{i}. {c.get('label','')}" + (f" ({c['when']})" if c.get("when") else "")
@@ -264,7 +264,7 @@ async def escolher_candidato(
     )
     try:
         decisao = await structured(
-            CandidateChoice, GEMINI_GATE, no="gate:escolha", versao=versao_do_prompt(_PROMPT_ESCOLHA),
+            CandidateChoice, PAPEL_GATE, no="gate:escolha", versao=versao_do_prompt(_PROMPT_ESCOLHA),
         ).ainvoke(
             [
                 ("system", _PROMPT_ESCOLHA),
@@ -316,7 +316,7 @@ async def _classificar_aviso(
 ) -> dict:
     from app.graph.schemas import PendingReplyDecision
     from app.security import wrap_untrusted
-    from app.services.gemini import structured, versao_do_prompt
+    from app.services.ia import structured, versao_do_prompt
 
     if allow_scope:
         context = "Pode revisar o intervalo das parcelas desta proposta."

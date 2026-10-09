@@ -1,13 +1,13 @@
 """O texto da resposta de consulta — **template Python, sem modelo nenhum.**
 
-⚠️ **Isto já foi uma SEGUNDA chamada de LLM, e era proibido desde sempre.** `ai-gemini.md`:
+⚠️ **Isto já foi uma SEGUNDA chamada de LLM, e era proibido desde sempre.** `ia.md`:
 *"Sem segunda chamada de LLM para formatar resposta de consulta — a saída do WhatsApp é template
 Python puro. Um modelo escrevendo 'você gastou aproximadamente' em cima de um valor exato é
 alucinação com custo extra."* O código pedia ao Gemini para redigir o texto por cima de números
 que o banco já tinha dado prontos, e o template abaixo existia só como rede para quando o modelo
 falhava — ou seja, a versão correta estava lá o tempo todo, atrás de um `try`.
 
-Mora em `domain/` e não em `services/gemini.py` de propósito: dentro do cliente do modelo, a
+Mora em `domain/` e não em `services/ia.py` de propósito: dentro do cliente do modelo, a
 próxima pessoa que precisar de "um texto melhor" acrescenta uma chamada de novo. Aqui não há o
 que chamar.
 

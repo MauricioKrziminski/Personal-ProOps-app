@@ -99,11 +99,11 @@ class _ModeloFalso:
 
 @pytest.mark.asyncio
 async def test_classificar_de_confirmacao_monta_a_chamada_de_verdade(monkeypatch):
-    from app.services import gemini
+    from app.services import ia
 
     falso = _ModeloFalso("approve")
     modelos: list[str | None] = []
-    monkeypatch.setattr(gemini, "structured", lambda schema, model=None, **_: (modelos.append(model), falso)[1])
+    monkeypatch.setattr(ia, "structured", lambda schema, model=None, **_: (modelos.append(model), falso)[1])
 
     # ⚠️ Sentinelas, não frases naturais: "manda bala" é um EXEMPLO literal dentro do system
     # prompt estático, então procurá-la lá daria falso positivo para sempre.
@@ -112,7 +112,7 @@ async def test_classificar_de_confirmacao_monta_a_chamada_de_verdade(monkeypatch
     # O portão roda no modelo BOM, não no barato do parse. Medido em 09/09/2026:
     # no Lite, "apaga todos" voltava approved=True. Cair para o padrão aqui é
     # regressão de SEGURANÇA e não aparece em nenhum outro teste.
-    assert modelos == [gemini.GEMINI_GATE]
+    assert modelos == [ia.PAPEL_GATE]
 
     papeis = [m[0] for m in falso.mensagens]
     assert papeis == ["system", "human", "human"]
@@ -138,15 +138,15 @@ async def test_classificar_de_confirmacao_monta_a_chamada_de_verdade(monkeypatch
 @pytest.mark.asyncio
 async def test_classificar_de_rascunho_monta_a_chamada_de_verdade(monkeypatch):
     from app.domain import draft
-    from app.services import gemini
+    from app.services import ia
 
     falso = _ModeloFalso("answer")
     modelos: list[str | None] = []
-    monkeypatch.setattr(gemini, "structured", lambda schema, model=None, **_: (modelos.append(model), falso)[1])
+    monkeypatch.setattr(ia, "structured", lambda schema, model=None, **_: (modelos.append(model), falso)[1])
 
     assert (await draft._classificar("foi 5000", "qual o valor?")).decision == "answer"
     assert "<user_input>" in falso.mensagens[1][1]
-    assert modelos == [gemini.GEMINI_GATE]
+    assert modelos == [ia.PAPEL_GATE]
 
 
 @pytest.mark.asyncio
@@ -155,11 +155,11 @@ async def test_classificar_de_rascunho_extrai_na_MESMA_chamada(monkeypatch):
     dobraria a latência e comeria duas das 500 requisições diárias do Flash-Lite
     para chegar no mesmo lugar."""
     from app.domain import draft
-    from app.services import gemini
+    from app.services import ia
 
     falso = _ModeloFalso("answer", extracted_value="nubank")
     modelos: list[str | None] = []
-    monkeypatch.setattr(gemini, "structured", lambda schema, model=None, **_: (modelos.append(model), falso)[1])
+    monkeypatch.setattr(ia, "structured", lambda schema, model=None, **_: (modelos.append(model), falso)[1])
 
     decisao = await draft._classificar(
         "acabei de criar um pelo app, chama nubank cartao", "qual cartão?"
@@ -196,9 +196,9 @@ def _sempre(valor):
 
 
 def _modelo(monkeypatch, indice):
-    from app.services import gemini
+    from app.services import ia
     monkeypatch.setattr(
-        gemini, "structured", lambda *a, **kw: type("M", (), {"ainvoke": _escolha(indice)})()
+        ia, "structured", lambda *a, **kw: type("M", (), {"ainvoke": _escolha(indice)})()
     )
 
 
@@ -218,12 +218,12 @@ async def test_descrever_o_item_escolhe_como_o_numero_escolhe(monkeypatch):
 @pytest.mark.asyncio
 async def test_numero_nao_gasta_chamada_de_modelo(monkeypatch):
     """O regex vem primeiro de propósito: clique e número continuam custando zero."""
-    from app.services import gemini
+    from app.services import ia
 
     def nunca(*a, **kw):
         raise AssertionError("número não deveria chamar o modelo")
 
-    monkeypatch.setattr(gemini, "structured", nunca)
+    monkeypatch.setattr(ia, "structured", nunca)
     assert (await confirm.decide({"text": "2"}, ESCOLHA, {}))["candidate_id"] == "t2"
 
 
@@ -250,12 +250,12 @@ async def test_soft_warning_nunca_passa_pelo_classificador_de_escolha(monkeypatc
     uma opção nunca é consentir a compra. Quem interpreta lá é `_classificar_aviso`.
     """
     from unittest.mock import AsyncMock
-    from app.services import gemini
+    from app.services import ia
 
     def nunca(*a, **kw):
         raise AssertionError("soft_warning não pode usar o classificador de escolha")
 
-    monkeypatch.setattr(gemini, "structured", nunca)
+    monkeypatch.setattr(ia, "structured", nunca)
     monkeypatch.setattr(
         confirm, "_classificar_aviso", AsyncMock(return_value={"decision": "unclear"})
     )

@@ -32,7 +32,7 @@ def _estado(media):
 @pytest.mark.asyncio
 async def test_a_mensagem_do_modelo_leva_a_parte_de_midia(monkeypatch):
     modelo = _Modelo()
-    monkeypatch.setattr(nodes.gemini, "structured", lambda *_a, **_k: modelo)
+    monkeypatch.setattr(nodes.ia, "structured", lambda *_a, **_k: modelo)
     config = {"configurable": {CHAVE_MIDIA: MIDIA}}
 
     await nodes.finance_node(_estado(marca_da_midia(MIDIA)), config)
@@ -45,7 +45,7 @@ async def test_a_mensagem_do_modelo_leva_a_parte_de_midia(monkeypatch):
 @pytest.mark.asyncio
 async def test_sem_bytes_segue_so_o_texto(monkeypatch):
     modelo = _Modelo()
-    monkeypatch.setattr(nodes.gemini, "structured", lambda *_a, **_k: modelo)
+    monkeypatch.setattr(nodes.ia, "structured", lambda *_a, **_k: modelo)
 
     await nodes.finance_node(_estado(marca_da_midia(MIDIA)))
 
@@ -71,7 +71,7 @@ async def test_o_langgraph_injeta_o_config_no_no_de_financas(monkeypatch):
     from app.graph.state import AgentState
 
     modelo = _Modelo()
-    monkeypatch.setattr(nodes.gemini, "structured", lambda *_a, **_k: modelo)
+    monkeypatch.setattr(nodes.ia, "structured", lambda *_a, **_k: modelo)
     g = StateGraph(AgentState)
     g.add_node("f", nodes.finance_node)
     g.add_edge(START, "f")

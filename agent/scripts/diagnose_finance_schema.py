@@ -36,9 +36,9 @@ from enum import Enum
 from typing import Any
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from scripts.eval_cache import usar_gemini_gratis  # noqa: E402
+from scripts.eval_cache import usar_modelos_economicos  # noqa: E402
 
-usar_gemini_gratis()
+usar_modelos_economicos()
 
 from pydantic import BaseModel, Field, create_model  # noqa: E402
 
@@ -48,12 +48,12 @@ from app.graph.schemas import (  # noqa: E402
     FinancePlan,
     NotesPlan,
 )
-from app.services import gemini  # noqa: E402
+from app.services import ia  # noqa: E402
 
-# mesma classificação do validate_gemini_schemas.py: chave ruim / rede fora /
+# mesma classificação do validate_schemas.py: chave ruim / rede fora /
 # cota estourada também devolvem 400 INVALID_ARGUMENT, e confundir isso com
 # "schema recusado" faria alguém cortar campo por causa de um typo na chave
-from scripts.validate_gemini_schemas import _erro_de_ambiente  # noqa: E402
+from scripts.validate_schemas import _erro_de_ambiente  # noqa: E402
 
 VERDE, VERMELHO, AMARELO, CINZA, FIM = "\033[32m", "\033[31m", "\033[33m", "\033[90m", "\033[0m"
 
@@ -89,7 +89,7 @@ def variante(nome: str, *, tipos: list[str], campos: list[str], inteiros_viram_s
 
 async def tenta(rotulo: str, modelo: type[BaseModel], detalhe: str) -> bool:
     try:
-        r = await gemini.structured(modelo, gemini.GEMINI_PARSE).ainvoke(
+        r = await ia.structured(modelo, ia.PAPEL_PARSE).ainvoke(
             [("system", SISTEMA), ("human", MENSAGEM)]
         )
     except Exception as err:  # noqa: BLE001
@@ -113,7 +113,7 @@ async def main() -> int:
         print(f"{VERMELHO}GEMINI_API_KEY não definida.{FIM}")
         return 1
 
-    print(f"modelo: {gemini.modelo(gemini.GEMINI_PARSE)}")
+    print(f"modelo: {ia.modelo(ia.PAPEL_PARSE)}")
     print(f"real:   {len(CAMPOS)} propriedades, enum de {len(TIPOS)} valores, "
           f"{len(INTEIROS)} INTEGER ({', '.join(INTEIROS)})\n")
 
@@ -143,7 +143,7 @@ async def main() -> int:
     print(f"\n{'-' * 62}\nveredito")
     if r["real"]:
         print(f"  {AMARELO}O schema real passou agora. A recusa anterior foi transitória{FIM}")
-        print("  (cota, indisponibilidade). Rode validate_gemini_schemas.py de novo.")
+        print("  (cota, indisponibilidade). Rode validate_schemas.py de novo.")
         return 0
     if not r["notas"]:
         print(f"  {AMARELO}Nem Notas passou — o problema não é o schema de Finanças.{FIM}")

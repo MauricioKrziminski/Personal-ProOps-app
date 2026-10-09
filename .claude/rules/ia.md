@@ -3,19 +3,19 @@ paths:
   - "agent/**"
 ---
 
-# IA — Claude (produção), Gemini (avaliação, embeddings, reserva) + Groq (áudio)
+# IA — modelos por papel (Claude em produção; Gemini em suítes, reserva e embeddings) + Groq (áudio)
 
 **Desde 09/10/2026 o modelo do agente é Claude** (pedido do Gabriel: o plano Max traz US$ 200/mês
 de crédito da API na org `ProOps's Individual Org`). STT continua Groq Whisper. A tabela por papel
-mora em `gemini.MODELOS` (o nome do módulo ficou, para não espalhar troca de nome):
+mora em `ia.MODELOS`:
 
-| papel | produção e staging | suítes/sondas (`IA_PROVEDOR=gemini`) |
+| papel | produção e staging | suítes/sondas (`IA_TABELA=economica`) |
 |---|---|---|
 | `router` / `parse` / `batch` | `claude-haiku-5-5` (sem raciocínio, esforço `low`) | `gemini-3.1-flash-lite` |
 | `gate` (portão do SIM) | `claude-sonnet-5-5` (raciocínio adaptativo, esforço `medium`) | `gemini-3.7-flash` |
 | `embedding` | `gemini-embedding-2` (a Anthropic não tem embeddings) | idem |
 
-- **O provedor sai do NOME do modelo** (`claude-*` / `gemini-*`); `GEMINI_MODEL_<PAPEL>` troca o
+- **O provedor sai do NOME do modelo** (`claude-*` / `gemini-*`); `IA_MODELO_<PAPEL>` troca o
   modelo de um papel e aceita os dois.
 - **Reserva entre provedores**: router/parse/batch, Haiku → Sonnet → `gemini-3.1-flash-lite`; o
   portão, Sonnet → `gemini-3.7-flash` (o único medido aprovando certo). Só entra quando a chamada
@@ -34,10 +34,10 @@ mora em `gemini.MODELOS` (o nome do módulo ficou, para não espalhar troca de n
   ferramenta não é estrita, quem segura a forma é o Pydantic, e saída inválida cai na reserva.
   **Armadilha:** o Sonnet/Opus 5.5 recusa `tool_choice` FORÇADO; ele só funciona porque, com
   raciocínio adaptativo, o langchain usa `tool_choice` auto. Desligar o raciocínio do portão faria
-  o langchain forçar a ferramenta e devolver 400 em toda confirmação (`test_claude.py` prende o
+  o langchain forçar a ferramenta e devolver 400 em toda confirmação (`test_ia_provedores.py` prende o
   raciocínio por família). Os tetos do Gemini abaixo (produto propriedades × enum) continuam
   valendo para as suítes e a reserva.
-- **Suítes no Gemini gratuito, menos a aprovação do portão**: os scripts põem `IA_PROVEDOR=gemini`
+- **Suítes no Gemini gratuito, menos a aprovação do portão**: os scripts põem `IA_TABELA=economica`
   sozinhos. A rodada que APROVA o portão (`--secao segurança`) roda com `--gate-producao` (só o gate
   no Sonnet de produção) e `--teto-usd`.
 - **Crédito**: workspaces `staging` (com limite de gasto) e `producao` na org; saldo em Console →
@@ -55,7 +55,7 @@ nenhum outro:
 |---|---|
 | Prompts por domínio + envelope `<user_input>` | `app/graph/prompts.py` |
 | Schemas de saída (Pydantic) | `app/graph/schemas.py` |
-| Cliente e modelos fixados | `app/services/gemini.py` |
+| Cliente e modelos fixados | `app/services/ia.py` |
 | Nós e roteamento | `app/graph/nodes.py`, `app/graph/build.py` |
 | O que exige confirmação | `app/graph/policy.py` |
 | Execução das ações | `app/tools/` |
@@ -75,17 +75,17 @@ nenhum outro:
   | `gate` | `gemini-3.7-flash` | só em resposta DIGITADA, e é o portão de segurança |
   | `batch` | `gemini-3.1-flash-lite` | extrato, lote inteiro numa chamada |
 
-  **`GEMINI_ROUTER/PARSE/BATCH/GATE` (`app/services/gemini.py`) são os PAPÉIS** (`"router"`,
-  `"parse"`, `"batch"`, `"gate"`), não nomes de modelo; o nome sai de `gemini.modelo(papel)`. Antes
-  eram nomes, e três papéis com o mesmo modelo viravam `batch` no mapa reverso: `GEMINI_MODEL_PARSE`
-  e `GEMINI_MODEL_ROUTER` NÃO trocavam nada e o consumo rotulava router e parse como batch (achado
-  no E2E de 06/10/2026). Troca por ambiente: `GEMINI_MODEL_<PAPEL>`.
+  **`PAPEL_ROUTER/PARSE/BATCH/GATE` (`app/services/ia.py`) são os PAPÉIS** (`"router"`,
+  `"parse"`, `"batch"`, `"gate"`), não nomes de modelo; o nome sai de `ia.modelo(papel)`. Antes
+  eram nomes, e três papéis com o mesmo modelo viravam `batch` no mapa reverso: `IA_MODELO_PARSE`
+  e `IA_MODELO_ROUTER` NÃO trocavam nada e o consumo rotulava router e parse como batch (achado
+  no E2E de 06/10/2026). Troca por ambiente: `IA_MODELO_<PAPEL>`.
 
   **A divisão veio de medição, em 09/09/2026.** Entre 01 e 09/09 tudo ficou em `gemini-3.7-flash`
   (commit `bb927ea`, "upgrade"). Rodando `evaluate_answer_forms.py` inteiro no Lite: **86/94**, e
   uma das quedas é do lado que não pode cair — *"apaga todos"* voltou `approved: True`. As oito
   saem todas de `domain/confirm.py` e `domain/draft.py`, que chamavam o modelo PADRÃO; nenhuma é
-  do router nem do parse. Daí `GEMINI_GATE`, que é o antigo `GEMINI_ESCALATE` finalmente ligado em
+  do router nem do parse. Daí `PAPEL_GATE`, que é o antigo `GEMINI_ESCALATE` finalmente ligado em
   alguma coisa. `tests/test_confirm_semantic.py` quebra se o portão cair para o padrão.
 
   **Remedido em 06/10/2026, depois do GEPA: o Lite PASSA o portão, e ele continua no Flash.**
@@ -97,9 +97,9 @@ nenhum outro:
   decidir e ordem embutida viram `unclear`/-1. Resultado: segurança 18/18, confirmação 26/26,
   escolha 19/19 e rascunho 7/7 no Lite (três repetições) E no Flash, mais 18/18 em frases que não
   estão nem no prompt, nem na suíte, nem no treino. Custo da seção de segurança: US$ 0,003 no Lite
-  contra US$ 0,021 no Flash. **Trocar `GEMINI_MODEL_GATE` em produção é decisão do dono do
+  contra US$ 0,021 no Flash. **Trocar `IA_MODELO_GATE` em produção é decisão do dono do
   produto**: 18 casos de segurança são amostra pequena, e o caminho medido para decidir é o modo
-  sombra (`GEMINI_SHADOW_GATE`, ligado no staging em 06/10) antes da troca. O score do próprio
+  sombra (`IA_SOMBRA_GATE`, ligado no staging em 06/10) antes da troca. O score do próprio
   GEPA não é evidência; só a suíte. **A sombra no Cloud Run é AMOSTRA, não censo:** o serviço tem
   CPU só durante a requisição (sem `--no-cpu-throttling`), e a comparação roda em segundo plano
   depois da resposta — parte congela ou morre com a instância. O que aparece em `shadow_diff`
@@ -114,7 +114,7 @@ nenhum outro:
   "confirma?" é grátis e, quando o modelo entendeu errado, é a resposta mais útil de qualquer
   forma.
 - **Modelo FORA DO AR é outra coisa: router, parse e batch têm reserva no modelo do papel `gate`**
-  (`gemini.structured` → `with_fallbacks`, 22/09/2026). O Lite respondeu `503 high demand` e
+  (`ia.structured` → `with_fallbacks`, 22/09/2026). O Lite respondeu `503 high demand` e
   `ReadTimeout` por horas, e sem reserva TODA mensagem virava "Não consegui processar". A reserva
   só roda quando a chamada FALHA — não é escalonamento por confiança, e não remover achando que
   é. **Custo a conhecer:** durante uma queda do Lite, todo turno de produção vai para o Flash
@@ -125,13 +125,13 @@ nenhum outro:
   reserva (portão) continua 30 s e UMA nova tentativa (o Lite degradado levou
   15,7 s para "diga ok").
 
-  **Disjuntor** (`gemini.py`, `FALHAS_PARA_ABRIR`): 3 falhas de disponibilidade em 60 s abrem o
+  **Disjuntor** (`ia.py`, `FALHAS_PARA_ABRIR`): 3 falhas de disponibilidade em 60 s abrem o
   disjuntor por 120 s e o principal é pulado, indo direto à reserva. O motivo da reserva
   (`indisponivel` | `invalida`) vai nos metadados da chamada e em `ai_events.calls[].reserva_motivo`.
 
   **Raciocínio (`thinking_level`)**: o Lite mediu 0 token de raciocínio (06/10/2026), então router e
   parse não têm o que baixar. O `gemini-3.7-flash` (gate) roda em `medium` por padrão, cobrado como
-  saída. `GEMINI_THINKING_<PAPEL>` (`minimal|low|medium|high`, `gemini.raciocinio`) liga o nível por
+  saída. `IA_RACIOCINIO_<PAPEL>` (`minimal|low|medium|high`, `ia.raciocinio`) liga o nível por
   papel; sem ela vale o padrão do modelo. **Baixar o gate só depois da seção de segurança do
   `evaluate_answer_forms.py` com a variável ligada** — é o portão do SIM.
   Medido em 06/10/2026 (chave paga, as 70 do portão: confirmação, escolha, rascunho, segurança):
@@ -228,8 +228,8 @@ nenhum outro:
   do dia em diante, ela inteira é paga. Três execuções num dia consumiram quase todo o
   crédito da conta.
 
-  **A escolha de modelo mora em UM lugar: `gemini.MODELOS`**, uma tabela por PAPEL (`router`,
-  `parse`, `batch`, `gate`), lida por `gemini.modelo(papel)`. `GEMINI_MODEL_<PAPEL>` troca o
+  **A escolha de modelo mora em UM lugar: `ia.MODELOS`**, uma tabela por PAPEL (`router`,
+  `parse`, `batch`, `gate`), lida por `ia.modelo(papel)`. `IA_MODELO_<PAPEL>` troca o
   modelo daquele papel sem tocar no código — vazias em produção, e `modelo()` grava WARNING
   quando estão ligadas, porque modelo trocado em silêncio é medição que deixa de valer sem
   ninguém perceber. Papel desconhecido levanta, em vez de cair num default.
@@ -238,7 +238,7 @@ nenhum outro:
   lido antes do papel já tirou router e parse do Lite (500/dia grátis) para o Flash (20/dia) em
   silêncio e, noutra vez, levou o gate de confirmação para o Lite em produção — a combinação que
   a suíte reprova (o Lite aprova "apaga todos"). A troca de modelo é por papel
-  (`GEMINI_MODEL_<PAPEL>`), e `tests/test_schemas.py` quebra o build se um nome de modelo
+  (`IA_MODELO_<PAPEL>`), e `tests/test_schemas.py` quebra o build se um nome de modelo
   aparecer fora da tabela.
 
   | quando | comando |
@@ -298,7 +298,7 @@ nenhum outro:
   Toda sonda imprime quantas chamadas vai fazer ANTES de fazer.
 
   **No nível gratuito as avaliações tentam de novo em 503/429** (`scripts/eval_cache.com_paciencia`,
-  06/10/2026). Se um modelo estiver sem cota, troque-o por papel com `GEMINI_MODEL_<PAPEL>` em vez
+  06/10/2026). Se um modelo estiver sem cota, troque-o por papel com `IA_MODELO_<PAPEL>` em vez
   de reexecutar a suíte inteira.
 
   **Com chave PAGA, rode com `--teto-usd`** (`evaluate_answer_forms`, `evaluate_conversation_understanding`,
@@ -372,7 +372,7 @@ nenhum outro:
   `app/worker.py`). A mídia chega ao Gemini pelo `config["configurable"]` (`CHAVE_MIDIA`) e vira
   parte `file` base64 no turno humano; o download recusa mídia acima de 16 MiB
   (`MidiaGrandeDemais`) com mensagem à pessoa. Anexo pula o router e vai direto para finanças (é quase sempre cupom/fatura).
-- Importação de extrato (OFX/CSV) tem prompt próprio e enxuto: `gemini.classify_statement_lines` manda o lote
+- Importação de extrato (OFX/CSV) tem prompt próprio e enxuto: `ia.classify_statement_lines` manda o lote
   INTEIRO numa chamada e recebe um array na mesma ordem. O índice é o contrato.
 - **Regra do usuário ganha da IA**: `_match_rule` roda depois do parse (WhatsApp) e antes do Gemini
   (importação, economizando chamada). É a resposta à queixa de "categorizou errado e não dá para

@@ -2915,7 +2915,7 @@ esse era o erro da primeira versão deste plano, e ele foi pego rodando o harnes
 ## Fora de escopo (declarado)
 
 - **O agente não parcela nem desparcela pelo WhatsApp.** `FinanceAction` está no teto medido de
-  252 (`ai-gemini.md`), e uma frase de uma linha reescrevendo N linhas de dinheiro sem mostrar o
+  252 (`ia.md`), e uma frase de uma linha reescrevendo N linhas de dinheiro sem mostrar o
   contrato é o que `docs/AGENTE-PARIDADE-COM-O-APP.md` já excluiu para o reparcelamento. Se
   entrar, entra pelo catálogo de `ResourceAction`, que segue em 5×5 — e vira linha nova naquela
   tabela.

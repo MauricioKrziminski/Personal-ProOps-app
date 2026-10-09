@@ -3,12 +3,12 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _provedor_de_ia_limpo(monkeypatch):
-    """Cada teste começa na tabela padrão (Claude): `IA_PROVEDOR`/`GEMINI_MODEL_*` de fora, ou
+    """Cada teste começa na tabela padrão (Claude): `IA_TABELA`/`IA_MODELO_*` de fora, ou
     deixados por outro teste (os scripts de avaliação gravam em `os.environ`), não podem vazar."""
     import os
 
-    for nome in [n for n in os.environ if n == "IA_PROVEDOR" or n.startswith(
-            ("GEMINI_MODEL_", "GEMINI_THINKING_", "GEMINI_SHADOW_"))]:
+    for nome in [n for n in os.environ if n == "IA_TABELA" or n.startswith(
+            ("IA_MODELO_", "IA_RACIOCINIO_", "IA_SOMBRA_"))]:
         monkeypatch.delenv(nome)
 
 

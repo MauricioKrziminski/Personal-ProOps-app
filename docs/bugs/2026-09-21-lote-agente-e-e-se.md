@@ -7,7 +7,7 @@ driver que chama `app_chat` como o app faz — o mesmo `run_turn` do WhatsApp.
 > ⚠️ Nesta data a cota grátis diária do `gemini-3.1-flash-lite` (500) da chave do staging
 > estourou no meio da reprodução. As rodadas seguintes usaram `GEMINI_MODEL_BATCH/ROUTER/PARSE=
 > gemini-3.5-flash-lite` SÓ no processo local — serve para o fluxo, não para aprovar prompt
-> (ele errou valor 1 em 15, `ai-gemini.md`). Achado de passagem: `GEMINI_MODEL_ROUTER`
+> (ele errou valor 1 em 15, `ia.md`). Achado de passagem: `GEMINI_MODEL_ROUTER`
 > sozinho NÃO troca o router, porque `_PAPEL_POR_NOME` mapeia o nome repetido
 > (`gemini-3.1-flash-lite`) para o ÚLTIMO papel da tabela (`batch`).
 

@@ -388,7 +388,7 @@ deploy() {
   # `AGENTE_RLS=true ./scripts/setup-gcp.sh staging`. `--set-env-vars` SUBSTITUI todas as
   # variáveis: uma flag ligada à mão no console sumiria no deploy seguinte, em silêncio.
   local flags="" v
-  for v in AGENTE_RLS AGENT_PROMPT_V2 GEMINI_THINKING_GATE GEMINI_SHADOW_PARSE GEMINI_SHADOW_GATE \
+  for v in AGENTE_RLS AGENT_PROMPT_V2 IA_RACIOCINIO_GATE IA_SOMBRA_PARSE IA_SOMBRA_GATE \
            TURNO_LENTO_SECONDS CUSTO_DIARIO_ALERTA_USD WHATSAPP_TYPING_INDICATOR; do
     if [[ -n "${!v:-}" ]]; then flags+=",${v}=${!v}"; fi
   done

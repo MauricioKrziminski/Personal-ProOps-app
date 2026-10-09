@@ -28,26 +28,26 @@
      `notas`, `cadastro`, `escolha`, `corrigir`, `loteB/guardar`…; a lista é `secoes()`) e, para
      roteamento e histórico de conversa, `evaluate_conversation_understanding.py --cases <ids>`.
      Rode a seção ANTES de mexer (a linha de base) e depois: regressão é caso que passava e deixou
-     de passar. As suítes rodam no Gemini GRATUITO (`IA_PROVEDOR=gemini`, os scripts põem
+     de passar. As suítes rodam no Gemini GRATUITO (`IA_TABELA=economica`, os scripts põem
      sozinhos; o crédito do Claude fica para o tráfego). Enquanto itera, `--barato` (gate no Lite).
    - **Mexeu no portão do SIM** (`domain/confirm.py`, prompt/schema do gate, `policy.py`) → também
      `--secao segurança --gate-producao --teto-usd 1`, **sem `--barato`**: aprova quem roda no
      modelo de PRODUÇÃO do portão (Claude Sonnet), e só essa rodada gasta crédito da Anthropic.
    - **Suíte INTEIRA só quando a mudança alcança todas as seções:** modelo de um papel
-     (`services/gemini.py`, `GEMINI_MODEL_*`/`GEMINI_THINKING_*`), prompt do roteador ou bloco
+     (`services/ia.py`, `IA_MODELO_*`/`IA_RACIOCINIO_*`), prompt do roteador ou bloco
      comum dos prompts, campo ou ORDEM de campo de um schema compartilhado (`FinanceAction`: a
      ordem mudou o resultado de três costuras diferentes em 06/10/2026), troca de versão de prompt
      (`AGENT_PROMPT_V2`). Uma vez, no fim, sem flag.
    - Caso que não mudou sai do cache (`agent/.eval-cache`, chave = caso + hash de prompts, schemas
      e modelos): repetir a seção custa só o que mudou. Com chave paga, sempre `--teto-usd`.
    - Para VER a rodada (caso a caso, comparada com a anterior, com custo): `--langfuse`. Ela vira
-     um experimento no Langfuse (`ai-gemini.md`). Saída 3 = a rodada não chamou o modelo (cota):
+     um experimento no Langfuse (`ia.md`). Saída 3 = a rodada não chamou o modelo (cota):
      o resultado não vale, mesmo que diga "passou". (Rodada SÓ de caso sem modelo — "sim", "ok" —
      também sai 3; é o preço de a trava ser por rodada, não por caso. Não "conserte" a trava por isso.)
 
    O pytest usa dublês e dublê sempre concorda: essa suíte é a única que diz se a pessoa pode
    responder do jeito dela, e a seção de segurança é a que impede que "interpretar melhor" vire
-   "aprovou o que não devia". Custo e cota em `ai-gemini.md`.
+   "aprovou o que não devia". Custo e cota em `ia.md`.
 
    O `ruff` entrou em 07/09/2026 porque o pytest não pega tudo: `nodes.py` usava `guards.` sem ter
    importado o módulo, e em produção isso virava `NameError` — o app respondia "Não consegui

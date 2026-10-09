@@ -3,11 +3,11 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.eval_cache import usar_gemini_gratis  # noqa: E402
+from scripts.eval_cache import usar_modelos_economicos  # noqa: E402
 
-usar_gemini_gratis()
+usar_modelos_economicos()
 from app.graph.schemas import FinanceAction
-from app.services import gemini
+from app.services import ia
 from pydantic import Field, create_model
 
 
@@ -32,7 +32,7 @@ async def main():
             confidence=(float, 1.0),
         )
         try:
-            r = await gemini.structured(plan).ainvoke(
+            r = await ia.structured(plan).ainvoke(
                 [("human", "Todas as 8 anteriores do carro, marque como pagas")]
             )
             print("PASS", count, r.model_dump_json(), flush=True)

@@ -11,17 +11,17 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.eval_cache import usar_gemini_gratis  # noqa: E402
+from scripts.eval_cache import usar_modelos_economicos  # noqa: E402
 
-usar_gemini_gratis()
+usar_modelos_economicos()
 
 from app.graph.prompts import FINANCE
 from app.graph.schemas import FinanceAction, FinancePlan
-from app.services import gemini
+from app.services import ia
 
 
 async def main():
-    response = await gemini.structured(FinancePlan, gemini.GEMINI_PARSE).ainvoke([
+    response = await ia.structured(FinancePlan, ia.PAPEL_PARSE).ainvoke([
         ('system', FINANCE),
         ('human', 'Muda meu último gasto para 54 reais na conta Nubank'),
     ])
@@ -31,7 +31,7 @@ async def main():
     assert action.new_amount_cents == 5400
     assert action.new_account and 'nubank' in action.new_account.lower()
     assert not action.account, 'current/search account must not carry the correction'
-    print(f'PASS model={gemini.modelo(gemini.GEMINI_PARSE)}, properties={len(FinanceAction.model_fields)}')
+    print(f'PASS model={ia.modelo(ia.PAPEL_PARSE)}, properties={len(FinanceAction.model_fields)}')
     print(response.model_dump_json())
 
 

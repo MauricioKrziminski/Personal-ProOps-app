@@ -30,4 +30,4 @@ commit de uma linha sem co-autor; nenhuma tag.
 - Prompt modular / consolidação (M10, 11), cascata objetiva, `thinking_level` medido, cache
   explícito por limiar, roteador por embedding atrás de flag.
 - RLS como segunda camada (13), limite de taxa por usuário, alertas e orçamento em `setup-gcp.sh`.
-- Avaliação completa com Gemini real, suíte SQL inteira, docs (`agent.md`, `ai-gemini.md`).
+- Avaliação completa com Gemini real, suíte SQL inteira, docs (`agent.md`, `ia.md`).

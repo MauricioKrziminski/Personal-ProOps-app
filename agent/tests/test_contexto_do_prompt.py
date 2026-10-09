@@ -112,7 +112,7 @@ async def test_o_no_de_consulta_manda_as_contas_ao_modelo(monkeypatch):
         return CONTAS
 
     monkeypatch.setattr(db, "accounts", accounts)
-    monkeypatch.setattr(nodes.gemini, "structured", lambda *_a, **_k: Modelo())
+    monkeypatch.setattr(nodes.ia, "structured", lambda *_a, **_k: Modelo())
     nodes._CONTAS_DO_TURNO.clear()
 
     await nodes.finance_query_node({

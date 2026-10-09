@@ -15,7 +15,7 @@ import pytest
 from app.domain import matching
 from app.graph import nodes
 from app.graph.schemas import FinanceAction, FinanceActionType, FinancePlan
-from app.services import gemini
+from app.services import ia
 from app.tools import finance
 
 
@@ -30,8 +30,8 @@ class _ModeloFake:
 def _parse(monkeypatch, texto: str, **campos) -> dict:
     plano = FinancePlan(actions=[FinanceAction(
         type=FinanceActionType.CREATE_INSTALLMENT_PURCHASE, amount_cents=2449, installments=1, **campos)])
-    monkeypatch.setattr(nodes.gemini, "structured", lambda *_a, **_k: _ModeloFake(plano))
-    monkeypatch.setattr(gemini, "structured", lambda *_a, **_k: _ModeloFake(plano))
+    monkeypatch.setattr(nodes.ia, "structured", lambda *_a, **_k: _ModeloFake(plano))
+    monkeypatch.setattr(ia, "structured", lambda *_a, **_k: _ModeloFake(plano))
     return {"text": texto, "timezone": "America/Sao_Paulo", "messages": None}
 
 
@@ -97,7 +97,7 @@ async def test_parcela_dita_como_total_vira_total_antes_do_sim(monkeypatch):
     plano = FinancePlan(actions=[FinanceAction(
         type=FinanceActionType.CREATE_INSTALLMENT_PURCHASE, amount_cents=30000, installments=10,
         description="TV", account="cartão Inter")])
-    monkeypatch.setattr(nodes.gemini, "structured", lambda *_a, **_k: _ModeloFake(plano))
+    monkeypatch.setattr(nodes.ia, "structured", lambda *_a, **_k: _ModeloFake(plano))
     estado = {"text": "Comprei uma TV em 10x de 300 no cartão Inter", "timezone": "America/Sao_Paulo",
               "messages": None}
     (acao,) = (await nodes.finance_node(estado))["finance_actions"]
@@ -109,7 +109,7 @@ async def test_total_certo_nao_e_multiplicado(monkeypatch):
     plano = FinancePlan(actions=[FinanceAction(
         type=FinanceActionType.CREATE_INSTALLMENT_PURCHASE, amount_cents=300000, installments=10,
         description="TV", account="cartão Inter")])
-    monkeypatch.setattr(nodes.gemini, "structured", lambda *_a, **_k: _ModeloFake(plano))
+    monkeypatch.setattr(nodes.ia, "structured", lambda *_a, **_k: _ModeloFake(plano))
     estado = {"text": "Comprei uma TV em 10x de 300 no cartão Inter", "timezone": "America/Sao_Paulo",
               "messages": None}
     (acao,) = (await nodes.finance_node(estado))["finance_actions"]

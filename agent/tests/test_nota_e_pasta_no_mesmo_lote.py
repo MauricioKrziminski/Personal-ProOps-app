@@ -70,7 +70,7 @@ class Banco:
 
 
 def _plano_dos_dois(notas: list[NotesAction], cadastros: list[ResourceAction]):
-    """`gemini.structured(schema, modelo)`: cada extrator recebe o SEU plano."""
+    """`ia.structured(schema, modelo)`: cada extrator recebe o SEU plano."""
 
     def structured(schema, *_a, **_k):
         class Modelo:
@@ -121,7 +121,7 @@ async def _rodar(monkeypatch, dominios, notas, cadastros, banco, texto):
         return None
 
     monkeypatch.setattr(nodes, "route", route)
-    monkeypatch.setattr(nodes.gemini, "structured", _plano_dos_dois(notas, cadastros))
+    monkeypatch.setattr(nodes.ia, "structured", _plano_dos_dois(notas, cadastros))
     monkeypatch.setattr(registry.db, "fetch", banco.fetch)
     monkeypatch.setattr(registry.db, "fetch_one", banco.fetch_one)
     monkeypatch.setattr(registry.db, "reserve_execution", sim)

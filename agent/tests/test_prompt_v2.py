@@ -23,7 +23,7 @@ from app.graph.schemas import (
     RouterDecision,
     RouterDecisionV2,
 )
-from app.services import consumo, embeddings, gemini
+from app.services import consumo, embeddings, ia
 
 # --- pinos do caminho v1 ------------------------------------------------------------------
 
@@ -41,10 +41,10 @@ def _h(texto: str) -> str:
 
 
 def test_prompts_v1_continuam_byte_a_byte_iguais():
-    assert gemini.versao_do_prompt(prompts.ROUTER) == PIN_ROUTER
-    assert gemini.versao_do_prompt(prompts.FINANCE) == PIN_FINANCE
-    assert gemini.versao_do_prompt(prompts.FINANCE_QUERY) == PIN_FINANCE_QUERY
-    assert gemini.versao_do_prompt(prompts.NOTES) == PIN_NOTES
+    assert ia.versao_do_prompt(prompts.ROUTER) == PIN_ROUTER
+    assert ia.versao_do_prompt(prompts.FINANCE) == PIN_FINANCE
+    assert ia.versao_do_prompt(prompts.FINANCE_QUERY) == PIN_FINANCE_QUERY
+    assert ia.versao_do_prompt(prompts.NOTES) == PIN_NOTES
 
 
 def test_schema_do_router_v1_continua_o_mesmo():
@@ -74,7 +74,7 @@ def test_a_flag_nasce_desligada():
 
 
 class _Captura:
-    """Dublê de `gemini.structured`: guarda schema, nó, versão e as mensagens que o modelo viu."""
+    """Dublê de `ia.structured`: guarda schema, nó, versão e as mensagens que o modelo viu."""
 
     def __init__(self, respostas: dict):
         self.respostas, self.chamadas = respostas, []
@@ -104,7 +104,7 @@ def _instalar(monkeypatch, v2: bool, router_sub=None):
         FinancePlan: FinancePlan(actions=[]),
         FinanceQueryPlan: FinanceQueryPlan(actions=[]),
     })
-    monkeypatch.setattr(nodes.gemini, "structured", cap)
+    monkeypatch.setattr(nodes.ia, "structured", cap)
     return cap
 
 

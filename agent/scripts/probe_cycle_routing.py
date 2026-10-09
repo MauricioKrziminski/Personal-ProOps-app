@@ -30,14 +30,14 @@ warnings.filterwarnings("ignore", category=UserWarning, module="langchain_google
 logging.getLogger("google_genai").setLevel(logging.ERROR)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from scripts.eval_cache import usar_gemini_gratis  # noqa: E402
+from scripts.eval_cache import usar_modelos_economicos  # noqa: E402
 
-usar_gemini_gratis()
+usar_modelos_economicos()
 
 from app.domain.dates import local_datetime_iso  # noqa: E402
 from app.graph import prompts  # noqa: E402
 from app.graph.schemas import FinanceQueryPlan, FinanceQueryType  # noqa: E402
-from app.services import gemini  # noqa: E402
+from app.services import ia  # noqa: E402
 
 VERDE, VERMELHO, CINZA, FIM = "\033[32m", "\033[31m", "\033[90m", "\033[0m"
 
@@ -84,7 +84,7 @@ CASOS: list[tuple[str, set[FinanceQueryType]]] = [
 
 
 async def rodar(texto: str) -> FinanceQueryType | None:
-    modelo = gemini.structured(FinanceQueryPlan, gemini.GEMINI_PARSE)
+    modelo = ia.structured(FinanceQueryPlan, ia.PAPEL_PARSE)
     try:
         plano = await modelo.ainvoke(
             [
@@ -101,7 +101,7 @@ async def rodar(texto: str) -> FinanceQueryType | None:
 
 
 async def main() -> int:
-    print(f"modelo: {gemini.modelo(gemini.GEMINI_PARSE)}\n")
+    print(f"modelo: {ia.modelo(ia.PAPEL_PARSE)}\n")
     falhas = 0
     for texto, esperado in CASOS:
         veio = await rodar(texto)

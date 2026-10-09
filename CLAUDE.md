@@ -14,8 +14,8 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
   O modelo é **Claude** em produção e no staging (09/10/2026, pedido do Gabriel: crédito mensal
   da API no plano Max, org `ProOps's Individual Org`): **Haiku 5.5** em router/parse/batch e
   **Sonnet 5.5** no portão do SIM. O **Gemini** continua em três lugares: embeddings, as suítes de
-  avaliação e sondas (nível gratuito, `IA_PROVEDOR=gemini`, automático nos scripts) e a reserva
-  quando o Claude falha (fora do ar ou sem crédito). Detalhes em `ai-gemini.md`.
+  avaliação e sondas (nível gratuito, `IA_TABELA=economica`, automático nos scripts) e a reserva
+  quando o Claude falha (fora do ar ou sem crédito). Detalhes em `ia.md`.
 - **Banco e fila:** **Supabase Postgres** (camada gratuita) — `messages_queue` com controle de
   concorrência. O Supabase é banco e fila; deixou de ser onde a lógica roda.
 
@@ -182,7 +182,7 @@ planejar, mesmo sem ter aberto arquivo nenhum.
 | regra | área |
 |---|---|
 | `.claude/rules/design.md` | `src/**`, `plugins/**`, `app.json` |
-| `.claude/rules/agent.md`, `ai-gemini.md`, `whatsapp.md` | `agent/**` |
+| `.claude/rules/agent.md`, `ia.md`, `whatsapp.md` | `agent/**` |
 | `.claude/rules/supabase.md` | `supabase/**`, `scripts/supabase-target*` |
 
 Não importe estas regras com `@` aqui: o import força a carga no início e anula o `paths:`.

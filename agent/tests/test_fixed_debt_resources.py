@@ -239,7 +239,7 @@ async def test_no_de_cadastros_usa_a_acao_pronta_sem_chamar_o_modelo(workspace, 
     def nunca(*a, **kw):
         raise AssertionError("ação pronta não pode gastar chamada de modelo")
 
-    monkeypatch.setattr(nodes.gemini, "structured", nunca)
+    monkeypatch.setattr(nodes.ia, "structured", nunca)
     saida = await nodes.resource_node({
         "user_id": "user", "workspace_id": "workspace", "phone": None,
         "timezone": "America/Sao_Paulo", "text": "É financiamento",
@@ -275,7 +275,7 @@ async def test_no_de_cadastros_sem_acao_pronta_ainda_extrai(workspace, monkeypat
             from app.graph.schemas import ResourcePlan
             return ResourcePlan(actions=[])
 
-    monkeypatch.setattr(nodes.gemini, "structured", lambda *a, **kw: Modelo())
+    monkeypatch.setattr(nodes.ia, "structured", lambda *a, **kw: Modelo())
     saida = await nodes.resource_node({
         "user_id": "user", "workspace_id": "workspace", "phone": None,
         "timezone": "America/Sao_Paulo", "text": "nenhuma parcela paga ainda",

@@ -93,7 +93,7 @@ Três coisas que **não dá para fazer só no app** e precisam de decisão de ba
 
 **Conferir e corrigir.** O caminho feliz é: olhar o valor, olhar a categoria, tocar em **Editar** ou
 em **Mudar categoria**. Corrigir nunca cria lançamento novo — é `update`, a mesma regra que o prompt
-do Gemini segue (`.claude/rules/ai-gemini.md`).
+do Gemini segue (`.claude/rules/ia.md`).
 
 ## Ações secundárias
 

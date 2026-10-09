@@ -43,7 +43,7 @@ por papel, reserva de disponibilidade — está acima da média do que se vê em
   para escolher o prazo e para pôr `tem_anexo=True` no texto; `user_turn` acrescenta a frase
   "O usuário anexou um documento" e manda só texto.
 - `git log -G data_b64` mostra que nunca existiu envio multimodal, desde o primeiro commit do
-  agente Python (31/08). Não é regressão: a feature documentada em `ai-gemini.md` ("Imagem e PDF
+  agente Python (31/08). Não é regressão: a feature documentada em `ia.md` ("Imagem e PDF
   entram no mesmo nó…") **nunca funcionou** no agente Python.
 - Efeito: o modelo é instruído a extrair os lançamentos de um documento que não vê. Ou devolve
   vazio e o fluxo pergunta o valor, ou inventa. O SIM contém o dano, mas a feature está morta.
@@ -305,7 +305,7 @@ Em ordem de custo:
 | `NOTES` | 4.381 | ~1,1 mil |
 
 Some a isso o schema serializado e até ~2 mil tokens de histórico, enviado duas vezes por turno
-(router e domínio). **`agent.md` diz "~800 tokens por domínio" e `ai-gemini.md` diz "US$ 0,0009
+(router e domínio). **`agent.md` diz "~800 tokens por domínio" e `ia.md` diz "US$ 0,0009
 por turno": os dois números estão velhos.** "Cache não é alavanca" também foi decidido com o
 prompt de 800 tokens. `FINANCE` + schema está perto do mínimo de 4.096 do cache implícito.
 
@@ -502,7 +502,7 @@ Corte de custo da própria suíte, que hoje é o maior gasto:
 | **Sonda do teto de 252** (seção 4) | elimina a 3ª chamada (`atributos`) em todo lançamento com pista | agora | uma tarde de sonda |
 | **Prompt modular por intenção** | o prompt de finanças (~3 mil tokens) vai inteiro até num "gastei 10 no café". O router (schema minúsculo, sobra folga) passa a devolver sub-intenções (criar, corrigir, parcelado, fatura, dívida, meta) e o nó monta só os módulos relevantes, em ordem canônica | primeiros pagantes | **tensão real com o cache**: prompt menor cai abaixo do mínimo de 4.096 do cache implícito. Volume baixo: prompt menor ganha. Volume alto: prefixo estável grande e cacheado ganha. Ordem canônica mantém o módulo-base cacheável nos dois casos |
 | **Cache explícito** | entrada cacheada custa uma fração | escala | ponto de equilíbrio = custo de armazenamento/hora ÷ economia por chamada. ⚠️ Preço de cache do 3.1-flash-lite e do 3.7-flash não confirmado; calcular com a tabela oficial antes |
-| **Cascata por falha OBJETIVA** (Lite → Flash só quando Pydantic, guard ou campo obrigatório falham; nunca por confiança auto-relatada) | menos "não consegui", menos perguntas | primeiros pagantes | compatível com `ai-gemini.md`, que proíbe escalar por confiança. A decisão de perguntar em vez de escalar veio da cota grátis do Flash (20/dia), e com faturamento ela pode ser revista |
+| **Cascata por falha OBJETIVA** (Lite → Flash só quando Pydantic, guard ou campo obrigatório falham; nunca por confiança auto-relatada) | menos "não consegui", menos perguntas | primeiros pagantes | compatível com `ia.md`, que proíbe escalar por confiança. A decisão de perguntar em vez de escalar veio da cota grátis do Flash (20/dia), e com faturamento ela pode ser revista |
 | **Roteador por embedding** (kNN sobre exemplos rotulados; LLM só com margem baixa ou várias intenções) | ~metade das chamadas do router | escala | depende dos rótulos do ciclo de dados. Multi-intenção é a melhor qualidade do produto e o kNN só resolve o caso de uma intenção: o LLM continua no caminho |
 
 ## 12. Plataforma e confiabilidade
@@ -665,7 +665,7 @@ Três estados por item: **feito** (com o commit), **decidido não fazer** (com o
 - **Portão de produção (3.7-flash, chave paga, com teto):** confirmação, escolha, rascunho e
   segurança — **70/70**, inclusive "aham"/"claro" que o portão Lite errava. US$ 0,047 (o fast-path
   do "sim" fez 26 casos de confirmação custarem 17 chamadas). Com `thinking_level=low`: 70/70 por
-  US$ 0,039; o padrão ficou `medium` (ver `ai-gemini.md`). Gasto total na chave paga: US$ 0,086.
+  US$ 0,039; o padrão ficou `medium` (ver `ia.md`). Gasto total na chave paga: US$ 0,086.
 - **Formas de resposta, v1:** 282/302. Das 20 falhas: 7 timeouts com o principal fora, 2 do portão
   Lite ("aham", "claro"), 4 do critério envelhecido de "encerrar", 5 do aporte (corrigido depois) e
   2 de correção sem valor de busca. A v2 rodou até a cota diária acabar: os 53 primeiros casos

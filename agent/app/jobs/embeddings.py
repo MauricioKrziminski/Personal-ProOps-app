@@ -18,7 +18,7 @@ import time
 
 from app import db
 from app.services import embeddings
-from app.services.gemini import modelo
+from app.services.ia import modelo
 
 # Lançamentos por rodada. Uma chamada de embedding em lote cobre todos; 50 por minuto zera um
 # backlog de milhares em algumas horas e fica longe do teto de pedidos do nível gratuito.

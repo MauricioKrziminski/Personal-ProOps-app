@@ -113,7 +113,7 @@ def callbacks() -> list[Any]:
 def callbacks_llm() -> list[Any]:
     """Callbacks de TODO cliente do Gemini: o coletor de tokens + Langfuse, se ligado.
 
-    Fica no cliente (`gemini.llm`) e não no `config` de quem chama: assim a chamada fora do grafo
+    Fica no cliente (`ia.llm`) e não no `config` de quem chama: assim a chamada fora do grafo
     (portão, rascunho, lote de extrato) também é rastreada e contada. Dentro do grafo o handler é
     o mesmo objeto do `callbacks()` e o langchain não o duplica.
     """

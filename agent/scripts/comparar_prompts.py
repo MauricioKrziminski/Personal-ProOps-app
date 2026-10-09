@@ -28,10 +28,10 @@ from unittest.mock import patch
 
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
-from scripts.eval_cache import carregar_env, usar_gemini_gratis  # noqa: E402
+from scripts.eval_cache import carregar_env, usar_modelos_economicos  # noqa: E402
 
 carregar_env()
-usar_gemini_gratis()
+usar_modelos_economicos()
 os.environ.setdefault("DATABASE_URL", "postgresql://sem-banco/nesta-comparacao")
 os.environ.setdefault("WHATSAPP_APP_SECRET", "sem-envio")
 

@@ -22,7 +22,7 @@ def test_guarda_reaproveita_e_invalida(tmp_path, monkeypatch):
     # modelo do papel mudou -> idem
     monkeypatch.undo()
     monkeypatch.setattr(eval_cache, "PASTA", tmp_path)
-    monkeypatch.setenv("GEMINI_MODEL_GATE", "outro-modelo")
+    monkeypatch.setenv("IA_MODELO_GATE", "outro-modelo")
     assert CacheDeAvaliacao("t").get("caso") is None
 
 
@@ -93,9 +93,9 @@ def test_orcamento_soma_toda_chamada_e_para_no_teto(monkeypatch):
 
 
 def test_nivel_de_raciocinio_entra_na_chave(monkeypatch):
-    monkeypatch.delenv("GEMINI_THINKING_GATE", raising=False)
+    monkeypatch.delenv("IA_RACIOCINIO_GATE", raising=False)
     padrao = CacheDeAvaliacao("teste_raciocinio", ativo=False)._chave("x")
-    monkeypatch.setenv("GEMINI_THINKING_GATE", "low")
+    monkeypatch.setenv("IA_RACIOCINIO_GATE", "low")
     assert CacheDeAvaliacao("teste_raciocinio", ativo=False)._chave("x") != padrao
 
 
@@ -119,36 +119,36 @@ def test_nome_da_corrida_carrega_o_que_distingue_a_rodada():
                                               filtro=None, sha="?")
 
 
-def test_usar_gemini_gratis_padrao_e_respeita_o_explicito(monkeypatch):
-    monkeypatch.delenv("IA_PROVEDOR", raising=False)
-    monkeypatch.delenv("GEMINI_MODEL_GATE", raising=False)
-    eval_cache.usar_gemini_gratis()
+def test_usar_modelos_economicos_padrao_e_respeita_o_explicito(monkeypatch):
+    monkeypatch.delenv("IA_TABELA", raising=False)
+    monkeypatch.delenv("IA_MODELO_GATE", raising=False)
+    eval_cache.usar_modelos_economicos()
     import os
-    assert os.environ["IA_PROVEDOR"] == "gemini"
-    assert "GEMINI_MODEL_GATE" not in os.environ  # sem a flag o gate não vai para produção
+    assert os.environ["IA_TABELA"] == "economica"
+    assert "IA_MODELO_GATE" not in os.environ  # sem a flag o gate não vai para produção
 
-    monkeypatch.setenv("IA_PROVEDOR", "claude")
-    eval_cache.usar_gemini_gratis()
-    assert os.environ["IA_PROVEDOR"] == "claude"
+    monkeypatch.setenv("IA_TABELA", "padrao")
+    eval_cache.usar_modelos_economicos()
+    assert os.environ["IA_TABELA"] == "padrao"
 
 
 def test_gate_producao_so_troca_o_gate(monkeypatch):
     import os
 
-    from app.services import gemini
+    from app.services import ia
 
-    monkeypatch.delenv("IA_PROVEDOR", raising=False)
-    monkeypatch.delenv("GEMINI_MODEL_GATE", raising=False)
-    eval_cache.usar_gemini_gratis(gate_producao=True)
-    assert os.environ["IA_PROVEDOR"] == "gemini"
-    assert os.environ["GEMINI_MODEL_GATE"] == gemini.MODELOS["gate"]
-    assert "GEMINI_MODEL_ROUTER" not in os.environ
+    monkeypatch.delenv("IA_TABELA", raising=False)
+    monkeypatch.delenv("IA_MODELO_GATE", raising=False)
+    eval_cache.usar_modelos_economicos(gate_producao=True)
+    assert os.environ["IA_TABELA"] == "economica"
+    assert os.environ["IA_MODELO_GATE"] == ia.MODELOS["gate"]
+    assert "IA_MODELO_ROUTER" not in os.environ
 
 
 def test_barato_usa_o_router_da_tabela_gemini():
-    from app.services import gemini
+    from app.services import ia
 
-    assert eval_cache.modelo_barato() == gemini.MODELOS_GEMINI["router"]
+    assert eval_cache.modelo_barato() == ia.MODELOS_ECONOMICOS["router"]
 
 
 def test_erros_transitorios_do_claude_tem_paciencia():

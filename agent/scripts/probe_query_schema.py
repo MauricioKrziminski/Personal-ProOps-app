@@ -6,7 +6,7 @@ A de LEITURA ficou para depois, e é a que este probe habilita: para o agente re
 "quais minhas recorrências?", "quando cai meu salário?" e "quanto falta da dívida?" faltam
 valores de enum em `FinanceQuery` e em `NotesAction`.
 
-⚠️ **O limite é o PRODUTO propriedades × valores de enum, e ele é MEDIDO.** `ai-gemini.md`:
+⚠️ **O limite é o PRODUTO propriedades × valores de enum, e ele é MEDIDO.** `ia.md`:
 `15×22 = 330` recusa, `198`/`150`/`105` passam, e estimar já custou uma quebra em produção.
 `FinanceAction` está no teto de 252; os schemas de consulta estão em 63 e a folga PARECE larga —
 mas "parece" é exatamente o que esta suíte existe para não aceitar.
@@ -32,9 +32,9 @@ from enum import Enum  # noqa: E402
 from typing import Any  # noqa: E402
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from scripts.eval_cache import usar_gemini_gratis  # noqa: E402
+from scripts.eval_cache import usar_modelos_economicos  # noqa: E402
 
-usar_gemini_gratis()
+usar_modelos_economicos()
 
 from pydantic import BaseModel, Field, create_model  # noqa: E402
 
@@ -44,8 +44,8 @@ from app.graph.schemas import (  # noqa: E402
     NotesAction,
     NotesActionType,
 )
-from app.services import gemini  # noqa: E402
-from scripts.validate_gemini_schemas import _erro_de_ambiente  # noqa: E402
+from app.services import ia  # noqa: E402
+from scripts.validate_schemas import _erro_de_ambiente  # noqa: E402
 
 VERDE, VERMELHO, AMARELO, CINZA, FIM = "\033[32m", "\033[31m", "\033[33m", "\033[90m", "\033[0m"
 
@@ -75,7 +75,7 @@ def _plano(nome: str, base: type[BaseModel], tipos: list[str], extras: int):
 async def tenta(rotulo: str, modelo: type[BaseModel], props: int, enum: int) -> bool:
     detalhe = f"{props} props × enum {enum} = {props * enum}"
     try:
-        await gemini.structured(modelo, gemini.GEMINI_PARSE).ainvoke(
+        await ia.structured(modelo, ia.PAPEL_PARSE).ainvoke(
             [("system", SISTEMA), ("human", MENSAGEM)]
         )
     except Exception as err:  # noqa: BLE001
@@ -97,7 +97,7 @@ async def main() -> int:
     fq = [t.value for t in FinanceQueryType]
     na = [t.value for t in NotesActionType]
     nfq, nna = len(FinanceQuery.model_fields), len(NotesAction.model_fields)
-    print(f"modelo: {gemini.modelo(gemini.GEMINI_PARSE)}")
+    print(f"modelo: {ia.modelo(ia.PAPEL_PARSE)}")
     print(f"hoje: FinanceQuery {nfq}×{len(fq)}={nfq * len(fq)} · NotesAction {nna}×{len(na)}={nna * len(na)}\n")
 
     ok: dict[str, bool] = {}

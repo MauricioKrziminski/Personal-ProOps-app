@@ -27,7 +27,7 @@ from app.domain import confirm, draft, matching
 from app.domain.money import cents_to_brl
 from app.graph.state import CHAVE_MIDIA, marca_da_midia
 from app.security import effective_thread_id, sanitize_untrusted
-from app.services import consumo, gemini, telemetry
+from app.services import consumo, ia, telemetry
 
 log = logging.getLogger(__name__)
 
@@ -1041,7 +1041,7 @@ async def _audit(sessao: dict, estado: dict, uso: dict | None = None) -> None:
         user_id=sessao["user_id"],
         workspace_id=sessao["workspace_id"],
         channel=sessao.get("channel") or "whatsapp",
-        model=gemini.modelo(gemini.GEMINI_PARSE),
+        model=ia.modelo(ia.PAPEL_PARSE),
         confidence=estado.get("confidence"),
         result={
             "domains": estado.get("domains", []),

@@ -27,13 +27,13 @@ warnings.filterwarnings("ignore", category=UserWarning, module="langchain_google
 logging.getLogger("google_genai").setLevel(logging.ERROR)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from scripts.eval_cache import usar_gemini_gratis  # noqa: E402
+from scripts.eval_cache import usar_modelos_economicos  # noqa: E402
 
-usar_gemini_gratis()
+usar_modelos_economicos()
 
 from app.graph.prompts import FINANCE_QUERY, user_turn  # noqa: E402
 from app.graph.schemas import FinanceQueryPlan, FinanceQueryType  # noqa: E402
-from app.services import gemini  # noqa: E402
+from app.services import ia  # noqa: E402
 
 VERDE, VERMELHO, CINZA, FIM = "\033[32m", "\033[31m", "\033[90m", "\033[0m"
 SIM = FinanceQueryType.SIMULATE_SCENARIO
@@ -58,7 +58,7 @@ CASOS = [
 
 
 async def um(msg: str, esperado: FinanceQueryType, campos: dict) -> bool:
-    modelo = gemini.structured(FinanceQueryPlan, gemini.GEMINI_PARSE)
+    modelo = ia.structured(FinanceQueryPlan, ia.PAPEL_PARSE)
     plano = await modelo.ainvoke(
         [("system", FINANCE_QUERY), ("human", user_turn(msg, "2026-09-10T15:00:00", "America/Sao_Paulo"))]
     )
@@ -85,7 +85,7 @@ async def main() -> int:
     if not os.getenv("GEMINI_API_KEY"):
         print(f"{VERMELHO}GEMINI_API_KEY não definida.{FIM}")
         return 1
-    print(f"modelo: {gemini.modelo(gemini.GEMINI_PARSE)}\n")
+    print(f"modelo: {ia.modelo(ia.PAPEL_PARSE)}\n")
     ok = [await um(*c) for c in CASOS]
     print(f"\n{'-' * 70}\n{sum(ok)}/{len(ok)}")
     return 0 if all(ok) else 1

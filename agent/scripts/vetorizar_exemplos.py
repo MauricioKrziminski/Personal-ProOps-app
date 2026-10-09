@@ -13,7 +13,7 @@ import json
 
 from app.graph import exemplos
 from app.services import embeddings
-from app.services.gemini import modelo
+from app.services.ia import modelo
 
 LOTE = 80
 PAUSA_S = 65

@@ -8,8 +8,8 @@ para **function calling**. É outro caminho, com outra serialização e possivel
 outro limite. Descobrir isso em produção custa o parse inteiro parando.
 
     export GEMINI_API_KEY=...
-    .venv/bin/python scripts/validate_gemini_schemas.py
-    .venv/bin/python scripts/validate_gemini_schemas.py --probe   # acha o teto real
+    .venv/bin/python scripts/validate_schemas.py
+    .venv/bin/python scripts/validate_schemas.py --probe   # acha o teto real
 
 Sem `--probe` gasta 3 chamadas do Flash-Lite (cota grátis: 500/dia).
 """
@@ -27,9 +27,9 @@ warnings.filterwarnings("ignore", category=UserWarning, module="langchain_google
 logging.getLogger("google_genai").setLevel(logging.ERROR)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from scripts.eval_cache import usar_gemini_gratis  # noqa: E402
+from scripts.eval_cache import usar_modelos_economicos  # noqa: E402
 
-usar_gemini_gratis()
+usar_modelos_economicos()
 
 from pydantic import BaseModel, Field, create_model  # noqa: E402
 
@@ -40,7 +40,7 @@ from app.graph.schemas import (  # noqa: E402
     NotesPlan,
     RouterDecision,
 )
-from app.services import gemini  # noqa: E402
+from app.services import ia  # noqa: E402
 
 VERDE, VERMELHO, AMARELO, FIM = "\033[32m", "\033[31m", "\033[33m", "\033[0m"
 
@@ -104,7 +104,7 @@ async def testa(nome: str, modelo: type[BaseModel], prompt: str, mensagem: str) 
     print(f"\n{nome}: {props} props × {valores} valores de enum = {orcamento}{marca}", flush=True)
 
     try:
-        chain = gemini.structured(modelo, gemini.GEMINI_PARSE)
+        chain = ia.structured(modelo, ia.PAPEL_PARSE)
         resposta = await chain.ainvoke([("system", prompt), ("human", mensagem)])
     except Exception as err:  # noqa: BLE001
         texto = str(err)
@@ -143,7 +143,7 @@ async def probe() -> None:
         campos = {f"campo_{i}": (str | None, Field(None, description=f"campo {i}")) for i in range(meio)}
         Sonda = create_model("Sonda", **campos)  # type: ignore[call-overload]
         try:
-            await gemini.structured(Sonda, gemini.GEMINI_PARSE).ainvoke(
+            await ia.structured(Sonda, ia.PAPEL_PARSE).ainvoke(
                 [("system", "Devolva o objeto vazio."), ("human", "oi")]
             )
             ultimo_ok, baixo = meio, meio + 1
@@ -171,7 +171,7 @@ async def main() -> int:
         print("é o único jeito de saber se o schema passa. Exporte a chave e rode de novo.")
         return 1
 
-    print(f"modelo: {gemini.modelo(gemini.GEMINI_PARSE)}")
+    print(f"modelo: {ia.modelo(ia.PAPEL_PARSE)}")
     # Sequencial de propósito. Com `gather` os quatro cabeçalhos saíam juntos e
     # os resultados chegavam fora de ordem — num diagnóstico, ler o resultado de
     # um schema debaixo do cabeçalho de outro é pior do que esperar 40 segundos.

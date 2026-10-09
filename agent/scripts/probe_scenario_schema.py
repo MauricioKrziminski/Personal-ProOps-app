@@ -3,7 +3,7 @@
 
 A validação de 10/09/2026 achou o buraco: a tela simula receita, hipótese que REPETE todo mês,
 data de início e várias suposições empilhadas; o agente só sabia "posso comprar X em Nx",
-sempre gasto, sempre começando hoje. Fechar isso pede campos novos — e `ai-gemini.md` é
+sempre gasto, sempre começando hoje. Fechar isso pede campos novos — e `ia.md` é
 explícito: **o limite é o PRODUTO propriedades × valores de enum, e ele é MEDIDO.** A recusa é
 um `400 INVALID_ARGUMENT` sem detalhe, e estimar aqui já custou uma quebra em produção.
 
@@ -34,9 +34,9 @@ warnings.filterwarnings("ignore", category=UserWarning, module="langchain_google
 logging.getLogger("google_genai").setLevel(logging.ERROR)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from scripts.eval_cache import usar_gemini_gratis  # noqa: E402
+from scripts.eval_cache import usar_modelos_economicos  # noqa: E402
 
-usar_gemini_gratis()
+usar_modelos_economicos()
 
 from app.graph.schemas import FinanceQuery, FinanceQueryType  # noqa: E402
 from scripts.probe_query_schema import VERDE, VERMELHO, FIM, _plano, tenta  # noqa: E402

@@ -19,7 +19,7 @@ from app import db, logctx
 from app.config import DEV_SALT, get_settings
 from app.graph import build as graph_build
 from app.routes import chat, cron, finance_draft, hooks, inbound, internal, worker
-from app.services import gemini, groq, telemetry, whatsapp
+from app.services import ia, groq, telemetry, whatsapp
 
 CAMPOS_EXTRAS = ("alerta", "pendentes", "falhas", "shadow", "duracao_s", "custo_usd")
 
@@ -63,7 +63,7 @@ log = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     _checa_producao()
-    gemini.avisar_sombras()
+    ia.avisar_sombras()
     await db.open_pools()
     await graph_build.setup()
     log.info("pronto")

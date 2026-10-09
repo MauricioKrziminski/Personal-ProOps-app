@@ -27,7 +27,7 @@ import time
 from pathlib import Path
 
 from app.services import embeddings
-from app.services.gemini import modelo
+from app.services.ia import modelo
 
 log = logging.getLogger(__name__)
 

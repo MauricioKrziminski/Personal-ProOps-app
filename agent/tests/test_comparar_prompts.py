@@ -39,7 +39,7 @@ async def test_um_caminho_nos_dois_modos(monkeypatch):
 
         return _M()
 
-    monkeypatch.setattr(nodes.gemini, "structured", structured)
+    monkeypatch.setattr(nodes.ia, "structured", structured)
     monkeypatch.setattr(get_settings(), "agent_prompt_v2", False)
 
     v1 = await comparar_prompts._um_caminho(False, "gastei 10 no café", [])

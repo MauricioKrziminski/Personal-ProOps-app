@@ -23,7 +23,7 @@ from typing import Any
 
 from app.config import get_settings
 from app.services import consumo
-from app.services.gemini import modelo
+from app.services.ia import modelo
 
 log = logging.getLogger(__name__)
 

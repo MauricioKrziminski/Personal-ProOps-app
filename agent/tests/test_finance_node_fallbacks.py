@@ -21,7 +21,7 @@ import pytest
 
 from app.graph import nodes
 from app.graph.schemas import FinanceAction, FinanceActionType, FinancePlan
-from app.services import gemini
+from app.services import ia
 
 
 class _ModeloFake:
@@ -37,8 +37,8 @@ class _ModeloFake:
 @pytest.fixture
 def sem_gemini(monkeypatch):
     def instalar(plano: FinancePlan) -> None:
-        monkeypatch.setattr(gemini, "structured", lambda *_a, **_k: _ModeloFake(plano))
-        monkeypatch.setattr(nodes.gemini, "structured", lambda *_a, **_k: _ModeloFake(plano))
+        monkeypatch.setattr(ia, "structured", lambda *_a, **_k: _ModeloFake(plano))
+        monkeypatch.setattr(nodes.ia, "structured", lambda *_a, **_k: _ModeloFake(plano))
 
     return instalar
 

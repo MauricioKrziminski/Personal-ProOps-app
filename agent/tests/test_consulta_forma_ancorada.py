@@ -17,7 +17,7 @@ class _Fake:
 async def _forma(monkeypatch, texto, proposta):
     plano = FinanceQueryPlan(actions=[FinanceQuery(type=FinanceQueryType.QUERY_TRANSACTIONS,
                                                    payment_method=proposta)])
-    monkeypatch.setattr(nodes.gemini, "structured", lambda *_a, **_k: _Fake(plano))
+    monkeypatch.setattr(nodes.ia, "structured", lambda *_a, **_k: _Fake(plano))
 
     async def _sem_contas(_s):
         return []

@@ -29,13 +29,13 @@ from psycopg.rows import dict_row
 from pydantic import BaseModel, Field
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from scripts.eval_cache import usar_gemini_gratis  # noqa: E402
+from scripts.eval_cache import usar_modelos_economicos  # noqa: E402
 
-usar_gemini_gratis()
+usar_modelos_economicos()
 
 from app.config import get_settings  # noqa: E402
 from app.security import wrap_untrusted
-from app.services import gemini
+from app.services import ia
 from app.services.telemetry import mascarar_texto
 
 CAMPOS = Literal["valor", "categoria", "conta", "data", "tipo_de_acao", "descricao", "parcelas",
@@ -72,8 +72,8 @@ def amostra(n: int, dias: int) -> list[dict]:
 async def julga(caso: dict) -> Veredito:
     pedido = mascarar_texto(caso["input_text"])
     proposta = mascarar_texto(json.dumps(caso["proposal"], ensure_ascii=False))
-    juiz = gemini.structured(Veredito, "gate", no="avaliacao_online",
-                             versao=gemini.versao_do_prompt(RUBRICA))
+    juiz = ia.structured(Veredito, "gate", no="avaliacao_online",
+                             versao=ia.versao_do_prompt(RUBRICA))
     return await juiz.ainvoke([
         ("system", RUBRICA),
         ("human", wrap_untrusted("user_input", pedido) + "\n" + wrap_untrusted("proposal", proposta)),
@@ -90,7 +90,7 @@ async def main() -> None:
     casos = amostra(min(args.n, args.max), args.dias)
     if args.n > args.max:
         print(f"--n {args.n} passa do --max {args.max}: amostra cortada em {args.max}.")
-    print(f"{len(casos)} chamadas a {gemini.modelo('gate')} (uma por caso). Começando.")
+    print(f"{len(casos)} chamadas a {ia.modelo('gate')} (uma por caso). Começando.")
     if not casos:
         return
 

@@ -11,7 +11,7 @@ from langchain_core.outputs import ChatGeneration, LLMResult
 
 from app import conversation, db
 from app.config import get_settings
-from app.services import consumo, gemini, telemetry
+from app.services import consumo, ia, telemetry
 
 USER = UUID("11111111-1111-1111-1111-111111111111")
 WS = UUID("22222222-2222-2222-2222-222222222222")
@@ -71,8 +71,8 @@ def test_modelo_sem_preco_nao_inventa_custo():
     turno = consumo.abrir()
     _chamar(consumo.coletor, "a", _resposta("gemini-9-misterioso", 10, 10))
     assert turno.totais()["custo_usd"] is None
-    assert gemini.custo_usd("gemini-3.7-flash-lite", 10, 10) is None  # prefixo não casa
-    assert gemini.custo_usd("models/gemini-3.7-flash", 1_000_000, 0) == 0.75
+    assert ia.custo_usd("gemini-3.7-flash-lite", 10, 10) is None  # prefixo não casa
+    assert ia.custo_usd("models/gemini-3.7-flash", 1_000_000, 0) == 0.75
 
 
 def test_um_modelo_sem_preco_zera_o_custo_do_turno_todo():
@@ -88,15 +88,15 @@ def test_fora_de_turno_aberto_o_coletor_ignora():
 
 
 def test_todo_cliente_do_gemini_leva_o_coletor():
-    gemini._cache.clear()
+    ia._cache.clear()
     for papel in ("router", "gate", "batch"):
-        assert consumo.coletor in gemini.llm(papel).callbacks
+        assert consumo.coletor in ia.llm(papel).callbacks
 
 
 def test_versao_do_prompt_e_hash_curto_e_estavel():
-    assert gemini.versao_do_prompt("a") == gemini.versao_do_prompt("a")
-    assert gemini.versao_do_prompt("a") != gemini.versao_do_prompt("b")
-    assert len(gemini.versao_do_prompt("a")) == 8
+    assert ia.versao_do_prompt("a") == ia.versao_do_prompt("a")
+    assert ia.versao_do_prompt("a") != ia.versao_do_prompt("b")
+    assert len(ia.versao_do_prompt("a")) == 8
 
 
 # --- Langfuse: máscara, canal, shutdown -------------------------------------

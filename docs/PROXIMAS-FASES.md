@@ -1146,7 +1146,7 @@ Nenhum bloco pode aparecer enquanto outro ainda mostra skeleton.
 >
 > A divisão de modelos de 09/09 (`router`/`parse` no Lite, `gate` no Flash) derrubou o custo
 > unitário em **~10×**. E o dia 11/09 sozinho — 233 traces de sonda — custou US$ 0,22, mais que
-> um quarto dos 60 dias: a frase de `ai-gemini.md` ("o custo não está no tráfego, está nas
+> um quarto dos 60 dias: a frase de `ia.md` ("o custo não está no tráfego, está nas
 > suítes") continua valendo, agora com número.
 >
 > ⚠️ **Staging e produção escrevem no MESMO projeto do Langfuse** (as chaves dos dois `.env` são
@@ -1242,7 +1242,7 @@ Só a fatura explica a fatura. Custo real se confere no console de faturamento (
 
 E a ordem de grandeza bate com o susto: 5.923 chamadas custam **R$ 14 se tudo for Lite e R$ 68 se
 tudo for Flash**. O split por modelo não existe no Monitoring, então o intervalo é o que dá para
-afirmar — mas o `ai-gemini.md` já registrava que "três execuções num dia consumiram quase todo o
+afirmar — mas o `ia.md` já registrava que "três execuções num dia consumiram quase todo o
 crédito da conta", e é exatamente este o caminho.
 
 **O trial de 7 dias não é risco de custo.** No uso real (~230 mensagens em 7 dias) ele custa
@@ -1436,7 +1436,7 @@ gcloud beta billing projects describe personal-proops-agent
 #### 2. Gemini
 
 A tabela de modelo por papel está em `agent/app/services/gemini.py` (`MODELOS`) e a régua de custo
-em `.claude/rules/ai-gemini.md`:
+em `.claude/rules/ia.md`:
 
 | papel | modelo | volume | cota grátis |
 |---|---|---|---|

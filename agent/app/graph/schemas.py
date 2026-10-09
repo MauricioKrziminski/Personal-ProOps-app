@@ -118,7 +118,7 @@ CompactInstallmentScope = Annotated[
 
 
 class FinanceAction(BaseModel):
-    """22 propriedades × 14 valores de enum = 308 (soma 36), dentro do teto medido (ver ai-gemini.md).
+    """22 propriedades × 14 valores de enum = 308 (soma 36), dentro do teto medido (ver ia.md).
 
     Escrita e correção ficam JUNTAS de propósito. Separá-las obrigaria o router a
     decidir se "o mercado de ontem foi 120" é lançamento novo ou correção — e

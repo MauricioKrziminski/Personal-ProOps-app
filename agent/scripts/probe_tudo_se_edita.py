@@ -24,9 +24,9 @@ from pathlib import Path
 warnings.filterwarnings("ignore", category=UserWarning, module="langchain_google_genai.*")
 logging.getLogger("google_genai").setLevel(logging.ERROR)
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.eval_cache import usar_gemini_gratis  # noqa: E402
+from scripts.eval_cache import usar_modelos_economicos  # noqa: E402
 
-usar_gemini_gratis()
+usar_modelos_economicos()
 
 from app.graph import nodes  # noqa: E402
 from app.graph.schemas import FinanceAction, ResourceAction  # noqa: E402

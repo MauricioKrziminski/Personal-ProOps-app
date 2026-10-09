@@ -1,7 +1,7 @@
 """Cache dos resultados das suítes de avaliação (Gemini real custa dinheiro e cota).
 
 Chave de cada caso = (id do caso, hash dos prompts e schemas, modelo de cada papel). O hash é o
-`gemini.versao_do_prompt` sobre os textos de `graph/prompts.py` (e os prompts de `domain/confirm.py`,
+`ia.versao_do_prompt` sobre os textos de `graph/prompts.py` (e os prompts de `domain/confirm.py`,
 `domain/draft.py` e `tools/atributos.py`) mais o JSON schema de todo modelo Pydantic desses módulos.
 Só caso que PASSOU entra: o que falhou roda de novo, sempre.
 
@@ -21,7 +21,7 @@ RAIZ = Path(__file__).resolve().parents[1]
 PASTA = RAIZ / ".eval-cache"
 
 
-CHAVES_DO_ENV = ("GEMINI_", "ANTHROPIC_API_KEY", "IA_PROVEDOR")
+CHAVES_DO_ENV = ("GEMINI_API_KEY", "ANTHROPIC_API_KEY", "IA_")
 
 
 def carregar_env() -> None:
@@ -31,41 +31,41 @@ def carregar_env() -> None:
         if linha.startswith(CHAVES_DO_ENV) and "=" in linha:
             chave, valor = linha.split("=", 1)
             valor = valor.split("#")[0].strip().strip('"')
-            if valor:  # `IA_PROVEDOR=` vazio no .env não pode ganhar do padrão grátis
+            if valor:  # `IA_TABELA=` vazio no .env não pode ganhar do padrão grátis
                 os.environ.setdefault(chave, valor)
 
 
-def usar_gemini_gratis(gate_producao: bool = False) -> None:
-    """Suítes e sondas rodam no Gemini GRATUITO por padrão (o crédito do Claude é de produção).
+def usar_modelos_economicos(gate_producao: bool = False) -> None:
+    """Suítes e sondas rodam na tabela econômica (Gemini gratuito) por padrão (o crédito do Claude é de produção).
 
-    `IA_PROVEDOR` já definido pela pessoa vence. `gate_producao` põe SÓ o gate no modelo de
+    `IA_TABELA` já definido pela pessoa vence. `gate_producao` põe SÓ o gate no modelo de
     produção (a rodada que aprova a seção de segurança; pede ANTHROPIC_API_KEY). Chamar ANTES de
     construir qualquer cliente de modelo.
     """
-    os.environ.setdefault("IA_PROVEDOR", "gemini")
+    os.environ.setdefault("IA_TABELA", "economica")
     if gate_producao:
-        from app.services import gemini
+        from app.services import ia
 
-        os.environ["GEMINI_MODEL_GATE"] = gemini.MODELOS["gate"]
+        os.environ["IA_MODELO_GATE"] = ia.MODELOS["gate"]
 
 
 def modelo_barato() -> str:
-    """O modelo do `--barato`: o router da tabela GEMINI (grátis), nunca o Claude de produção."""
-    from app.services import gemini
+    """O modelo do `--barato`: o router da tabela econômica (grátis), nunca o Claude de produção."""
+    from app.services import ia
 
-    return gemini.MODELOS_GEMINI["router"]
+    return ia.MODELOS_ECONOMICOS["router"]
 
 
 def hash_prompts_e_schemas() -> str:
     from pydantic import BaseModel
 
-    from app.domain import confirm, draft
+    from app.domain import confirm, draft, importacao_ia
     from app.graph import exemplos, prompts, prompts_v2, schemas
-    from app.services import gemini
+    from app.services import ia
     from app.tools import atributos
 
     partes: list[str] = []
-    modulos = (prompts, confirm, draft, atributos, schemas)
+    modulos = (prompts, confirm, draft, importacao_ia, atributos, schemas)
     if prompt_v2_ligado():
         # v2: os módulos de prompt e o banco de exemplos também decidem o resultado
         modulos += (prompts_v2,)
@@ -78,7 +78,7 @@ def hash_prompts_e_schemas() -> str:
                   and valor.__module__ == modulo.__name__):
                 partes.append(f"{modulo.__name__}.{nome}="
                               + json.dumps(valor.model_json_schema(), sort_keys=True))
-    return gemini.versao_do_prompt("\n".join(partes))
+    return ia.versao_do_prompt("\n".join(partes))
 
 
 def prompt_v2_ligado() -> bool:
@@ -98,10 +98,10 @@ def ligar_prompt_v2() -> None:
 
 
 def modelos() -> dict[str, str]:
-    """Lido DEPOIS de qualquer `GEMINI_MODEL_<PAPEL>` ser definido (ex.: `--barato`)."""
-    from app.services import gemini
+    """Lido DEPOIS de qualquer `IA_MODELO_<PAPEL>` ser definido (ex.: `--barato`)."""
+    from app.services import ia
 
-    return {papel: gemini.modelo(papel) for papel in gemini.MODELOS}
+    return {papel: ia.modelo(papel) for papel in ia.MODELOS}
 
 
 class CacheDeAvaliacao:
@@ -112,11 +112,11 @@ class CacheDeAvaliacao:
         # v1 e v2 têm chaves DIFERENTES e convivem no mesmo arquivo; com a flag desligada a chave
         # é a de antes do v2 existir.
         extra = [{"prompt_v2": True}] if prompt_v2_ligado() else []
-        # `GEMINI_THINKING_<PAPEL>` muda a resposta do modelo sem mudar prompt nem modelo: sem ele
+        # `IA_RACIOCINIO_<PAPEL>` muda a resposta do modelo sem mudar prompt nem modelo: sem ele
         # na chave, medir o portão em `low` devolvia o resultado do padrão, do cache (06/10/2026).
-        from app.services import gemini
+        from app.services import ia
 
-        niveis = {p: n for p in gemini.MODELOS if (n := gemini.raciocinio(p))}
+        niveis = {p: n for p in ia.MODELOS if (n := ia.raciocinio(p))}
         if niveis:
             extra.append({"raciocinio": niveis})
         self._sufixo = json.dumps([hash_prompts_e_schemas(), modelos(), *extra], sort_keys=True)
@@ -179,7 +179,7 @@ class Orcamento:
     Toda chamada ao Gemini passa pelo coletor de `consumo`; aqui cada uma também é somada numa
     lista da RODADA (os scripts abrem turnos por caso, e o turno sozinho perderia a soma). O resumo
     sai no fim — inclusive quando o teto interrompe —, para a chave paga nunca rodar no escuro.
-    Modelo sem preço na tabela (`gemini.PRECOS_USD_POR_MILHAO`) é contado à parte, nunca chutado.
+    Modelo sem preço na tabela (`ia.PRECOS_USD_POR_MILHAO`) é contado à parte, nunca chutado.
     """
 
     def __init__(self, teto_usd: float | None = None):
@@ -292,7 +292,7 @@ def rodar_experimento(*, dataset: str, itens: list[dict], tarefa, filtro: str | 
 
     from langfuse import Evaluation
 
-    from app.services import gemini
+    from app.services import ia
 
     cliente = cliente_langfuse()
     ids = {id_do_item(dataset, i["caso"]): i["caso"] for i in itens}
@@ -309,8 +309,8 @@ def rodar_experimento(*, dataset: str, itens: list[dict], tarefa, filtro: str | 
         alvo = cliente.get_dataset(dataset)
         alvo.items = [i for i in alvo.items if i.id in ids]
 
-        niveis = {p: n for p in gemini.MODELOS if (n := gemini.raciocinio(p))}
-        meta = {"prompt": "v2" if v2 else "v1", "gate": gemini.modelo("gate"), "raciocinio": niveis,
+        niveis = {p: n for p in ia.MODELOS if (n := ia.raciocinio(p))}
+        meta = {"prompt": "v2" if v2 else "v1", "gate": ia.modelo("gate"), "raciocinio": niveis,
                 "filtro": filtro or "", "git": sha_curto(), "modelos": modelos()}
         nome = nome_da_corrida(agora=datetime.now().strftime("%Y-%m-%d %H:%M"), v2=v2,
                                gate=meta["gate"], raciocinio=niveis, filtro=filtro, sha=meta["git"])

@@ -10,7 +10,7 @@ from langchain_core.messages import HumanMessage
 from pydantic import BaseModel
 
 from app.graph import schemas as S
-from app.services import gemini
+from app.services import ia
 
 class _S(BaseModel):
     x: int
@@ -30,7 +30,7 @@ def _payload(cliente, schema=S.FinancePlan):
     ("gate", "adaptive", "medium", 16000, False),
 ])
 def test_payload_do_claude(papel, thinking, effort, max_tokens, forcada):
-    c = gemini.llm(papel)
+    c = ia.llm(papel)
     assert c.temperature is None
     pl = _payload(c)
     assert "temperature" not in {k for k, v in pl.items() if v is not None}
@@ -48,14 +48,14 @@ def test_payload_do_claude(papel, thinking, effort, max_tokens, forcada):
 
 def test_thinking_do_claude_e_fixo_por_familia(monkeypatch):
     """Sonnet/Opus 5.5 com thinking diferente de adaptive viraria tool_choice forçado (400)."""
-    monkeypatch.setenv("GEMINI_THINKING_GATE", "high")
+    monkeypatch.setenv("IA_RACIOCINIO_GATE", "high")
     for nome in ("claude-sonnet-5-5", "claude-opus-5-5", "claude-sonnet-5-6"):
-        assert gemini._config_claude(nome, None)["thinking"] == {"type": "adaptive"}
-        assert gemini._config_claude(nome, "low")["thinking"] == {"type": "adaptive"}
-    assert gemini._config_claude("claude-haiku-5-5", "high")["thinking"] == {"type": "disabled"}
+        assert ia._config_claude(nome, None)["thinking"] == {"type": "adaptive"}
+        assert ia._config_claude(nome, "low")["thinking"] == {"type": "adaptive"}
+    assert ia._config_claude("claude-haiku-5-5", "high")["thinking"] == {"type": "disabled"}
     for papel in ("router", "parse", "batch", "gate"):
-        assert gemini.llm(papel).thinking["type"] == (
-            "disabled" if "haiku" in gemini.modelo(papel) else "adaptive")
+        assert ia.llm(papel).thinking["type"] == (
+            "disabled" if "haiku" in ia.modelo(papel) else "adaptive")
 
 
 def _sem_tool_call(monkeypatch):
@@ -75,38 +75,38 @@ async def test_sonnet_sem_tool_call_levanta_e_vai_a_reserva(monkeypatch):
     from langchain_core.runnables import RunnableLambda
 
     _sem_tool_call(monkeypatch)
-    cadeia = gemini._com_schema(gemini.llm("gate"), "claude-sonnet-5-5", _S)
+    cadeia = ia._com_schema(ia.llm("gate"), "claude-sonnet-5-5", _S)
     with pytest.raises(OutputParserException):
         await cadeia.ainvoke("oi")
 
-    gemini._falhas.clear()
-    r = gemini._ComReserva(runnable=cadeia, fallbacks=[RunnableLambda(lambda _: "reserva")],
+    ia._falhas.clear()
+    r = ia._ComReserva(runnable=cadeia, fallbacks=[RunnableLambda(lambda _: "reserva")],
                            chave="sonnet", metadados={})
     assert await r.ainvoke("oi") == "reserva"
-    assert "sonnet" not in gemini._falhas  # saída inválida não abre o disjuntor
+    assert "sonnet" not in ia._falhas  # saída inválida não abre o disjuntor
 
 
 async def test_haiku_sem_tool_call_devolve_none_e_vai_a_reserva(monkeypatch):
     from langchain_core.runnables import RunnableLambda
 
     _sem_tool_call(monkeypatch)
-    cadeia = gemini._com_schema(gemini.llm("router"), "claude-haiku-5-5", _S)
+    cadeia = ia._com_schema(ia.llm("router"), "claude-haiku-5-5", _S)
     assert await cadeia.ainvoke("oi") is None
-    r = gemini._ComReserva(runnable=cadeia, fallbacks=[RunnableLambda(lambda _: "reserva")],
+    r = ia._ComReserva(runnable=cadeia, fallbacks=[RunnableLambda(lambda _: "reserva")],
                            chave="haiku", metadados={})
     assert await r.ainvoke("oi") == "reserva"
 
 
 async def test_sombra_no_claude_usa_function_calling_com_raw(monkeypatch):
     _sem_tool_call(monkeypatch)
-    c = gemini._construir("claude-haiku-5-5", None, 0.1, 30, 0, callbacks=False)
+    c = ia._construir("claude-haiku-5-5", None, 0.1, 30, 0, callbacks=False)
     assert c.callbacks is None
-    r = await gemini._com_schema(c, "claude-haiku-5-5", _S, include_raw=True).ainvoke("oi")
+    r = await ia._com_schema(c, "claude-haiku-5-5", _S, include_raw=True).ainvoke("oi")
     assert r["parsed"] is None and r["raw"].content == "texto solto"
 
 
 def test_prazo_e_tentativas_vao_ao_cliente():
-    c = gemini.llm("router", timeout=10, max_retries=0)
+    c = ia.llm("router", timeout=10, max_retries=0)
     assert (c.default_request_timeout, c.max_retries) == (10, 0)
 
 
@@ -125,7 +125,7 @@ def test_indisponivel_por_classe_do_sdk(erro, fora):
     else:
         status = 429 if cls is anthropic.RateLimitError else 500
         e = cls("x", response=httpx.Response(status, request=req), body=None)
-    assert gemini._indisponivel(e) is fora
+    assert ia._indisponivel(e) is fora
 
 
 def _http(status, mensagem):
@@ -139,15 +139,15 @@ def _http(status, mensagem):
 
 
 def test_indisponivel_529_402_e_credito_esgotado():
-    assert gemini._indisponivel(_http(529, "Overloaded"))
-    assert gemini._indisponivel(_http(402, "billing"))
-    assert gemini._indisponivel(_http(400, "Your credit balance is too low to access the API"))
-    assert not gemini._indisponivel(_http(400, "schema inválido"))
+    assert ia._indisponivel(_http(529, "Overloaded"))
+    assert ia._indisponivel(_http(402, "billing"))
+    assert ia._indisponivel(_http(400, "Your credit balance is too low to access the API"))
+    assert not ia._indisponivel(_http(400, "schema inválido"))
 
 
 def test_precos_do_claude():
-    assert gemini.custo_usd("claude-haiku-5-5", 1_000_000, 1_000_000) == 0.6
-    assert gemini.custo_usd("claude-sonnet-5-5", 1_000_000, 1_000_000) == 12.0
+    assert ia.custo_usd("claude-haiku-5-5", 1_000_000, 1_000_000) == 0.6
+    assert ia.custo_usd("claude-sonnet-5-5", 1_000_000, 1_000_000) == 12.0
 
 
 B64 = base64.b64encode(b"abc").decode()

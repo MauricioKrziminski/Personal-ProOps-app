@@ -1,6 +1,6 @@
 """Consumo de IA por turno: tokens, modelo REAL que respondeu e custo estimado.
 
-Um `ColetorDeUso` (callback do langchain) fica em todo cliente de IA (`gemini.llm`: Claude ou Gemini) e lê o
+Um `ColetorDeUso` (callback do langchain) fica em todo cliente de IA (`ia.llm`: Claude ou Gemini) e lê o
 `usage_metadata` de cada resposta. Quem acumula é o `ConsumoDoTurno` do turno corrente, guardado
 num `ContextVar`: o motor abre um por turno (`abrir`), e toda chamada feita dentro dele — nó do
 grafo, portão, rascunho, lote de extrato — soma no MESMO objeto, sem ninguém precisar passar nada.
@@ -35,7 +35,7 @@ class ConsumoDoTurno:
         """Somas para as colunas de `ai_events`; tudo `None` quando nada foi medido.
 
         O custo é `None` se QUALQUER chamada com token for de modelo sem preço na tabela:
-        somar só o que se conhece subestimaria em silêncio, e `ai-gemini.md` manda não chutar.
+        somar só o que se conhece subestimaria em silêncio, e `ia.md` manda não chutar.
         """
         if not self.chamadas:
             return {"input_tokens": None, "output_tokens": None, "cached_tokens": None,
@@ -94,7 +94,7 @@ class ColetorDeUso(BaseCallbackHandler):
 
 
 def _chamada(response: Any, meta: dict) -> dict[str, Any]:
-    from app.services.gemini import custo_usd
+    from app.services.ia import custo_usd
 
     msg = response.generations[0][0].message
     uso = getattr(msg, "usage_metadata", None) or {}

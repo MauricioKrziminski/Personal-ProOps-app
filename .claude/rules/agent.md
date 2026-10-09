@@ -42,8 +42,8 @@ O serviço que recebe do WhatsApp, decide e escreve. Substituiu o par
   exato é alucinação com custo extra. O nó `geral` (saudação, ajuda) também não chama modelo.
 - **Teto MEDIDO do schema: o PRODUTO propriedades × valores de enum, não cada um.** O
   `FinanceAction` está em **308** (22×14, soma 36; teto medido de 720 no Lite em 06/10/2026, ver
-  `ai-gemini.md`); os outros seguem em 198/31. Passar disso devolve `400 INVALID_ARGUMENT` sem detalhe. `tests/test_schemas.py` prende o limite — somar campo
-  exige tirar outro, ou rodar o probe antes. Números e histórico em `ai-gemini.md`.
+  `ia.md`); os outros seguem em 198/31. Passar disso devolve `400 INVALID_ARGUMENT` sem detalhe. `tests/test_schemas.py` prende o limite — somar campo
+  exige tirar outro, ou rodar o probe antes. Números e histórico em `ia.md`.
 
 ## Padrão de texto: valida estrutura, nunca infere sentido
 
@@ -150,7 +150,7 @@ foi assim que renomear um lançamento ficou de fora por meses.
 Onde a capacidade nova cabe, em ordem: **campo no catálogo de `ResourceAction`** (5×5, sobra
 folga, e campo virtual traduzido no `prepare` não precisa nem existir como coluna) → **alvo novo
 resolvido** para uma ação que já existe → tipo de ação novo, que hoje **não cabe** em
-`FinanceAction` (22 campos × 14 = 308, teto medido de 720 em 06/10/2026; ver `ai-gemini.md`).
+`FinanceAction` (22 campos × 14 = 308, teto medido de 720 em 06/10/2026; ver `ia.md`).
 
 ## Correção de compra parcelada, sem menu (21/09/2026)
 
@@ -215,7 +215,7 @@ Ele foi removido (`update_transaction`, `agent/app/tools/finance.py`); dar baixa
 
   **Custos aceitos:** cada registro custa um toque a mais. No WhatsApp a confirmação sai como
   botão dentro da janela de 24h (grátis), e o clique é igualdade exata (zero modelo). A
-  confirmação **digitada** passa pelo gate semântico (`GEMINI_GATE`, Claude Sonnet, ~US$ 0,004 por
+  confirmação **digitada** passa pelo gate semântico (`PAPEL_GATE`, Claude Sonnet, ~US$ 0,004 por
   resposta) — um "sim" escrito em cada café é o custo que a decisão aceita.
 
   **Todo caminho de escrita termina no `gate`:** o turno normal, o rascunho completado
@@ -320,7 +320,7 @@ pergunta.** Deduzir é a terceira coisa, e ela não existe.
 | situação | o que fazer |
 |---|---|
 | não citou nada | preferência GRAVADA pelo usuário (`workspaces.default_account_id`, `accounts.payment_account_id`) — não é palpite, é configuração |
-| citou e não existe | pergunta, listando o que existe — **quando a lista é curta e útil** (contas, cartões). Para LANÇAMENTO ela não é: listar os 40 mais recentes é exatamente a queixa de 15/09/2026 (*"pedi para remover o nuuvem e ele me deu um monte de lançamento nada a ver"*), então ali a pergunta cita o termo — "não achei nada com «nuuvem»; confere o nome, ou me diz o valor ou a data?". Rationale em `ai-gemini.md`. |
+| citou e não existe | pergunta, listando o que existe — **quando a lista é curta e útil** (contas, cartões). Para LANÇAMENTO ela não é: listar os 40 mais recentes é exatamente a queixa de 15/09/2026 (*"pedi para remover o nuuvem e ele me deu um monte de lançamento nada a ver"*), então ali a pergunta cita o termo — "não achei nada com «nuuvem»; confere o nome, ou me diz o valor ou a data?". Rationale em `ia.md`. |
 | citou e casa com duas | pergunta, com os dois nomes |
 | campo obrigatório faltando | pergunta ("Para cadastrar X, informe Y. **Ainda não salvei nada.**") |
 | dois itens candidatos | `interrupt()` com a lista — já era assim |
@@ -479,7 +479,7 @@ garantia sozinho virou responsabilidade do código:
 - `/worker/sweep` roda junto do cron de lembretes: se o agendamento no Cloud Tasks falhar, a
   mensagem seria perdida em silêncio — que é o bug que esta arquitetura existe para matar.
 - **Cache explícito do Gemini: decidido não construir agora** (06/10/2026, medição e break-even em
-  `ai-gemini.md`). `agent/scripts/agent_metrics.py` mostra as chamadas/dia por versão de prompt
+  `ia.md`). `agent/scripts/agent_metrics.py` mostra as chamadas/dia por versão de prompt
   contra `BREAK_EVEN_CHAMADAS_DIA`; quando uma versão passar dele, reavalie.
 - Router + domínio são **duas** chamadas por mensagem, também no turno que cria lançamento (os atributos saem do
   parse principal, sem terceira chamada) — e a cota grátis do Flash-Lite é 500/dia.
@@ -497,7 +497,7 @@ garantia sozinho virou responsabilidade do código:
 - **O turno tem prazo de 240 s** (`worker_turn_timeout_seconds`) e volta para a fila. O claim recupera
   `processing` com mais de 5 min; na 3ª tentativa a mensagem vira `failed` e a pessoa é avisada UMA
   vez.
-- **Modo sombra** `GEMINI_SHADOW_<PAPEL>`: roda outro modelo ao lado, para comparar sem trocar o de
+- **Modo sombra** `IA_SOMBRA_<PAPEL>`: roda outro modelo ao lado, para comparar sem trocar o de
   produção. **Langfuse** mascara e-mail, CPF, CNPJ e telefone antes de enviar.
 - **SLO com alerta** (`setup-gcp.sh alertas`, linhas `jsonPayload.alerta`): fila parada, falhas
   definitivas, 5xx, **turno lento** (worker, acima de `TURNO_LENTO_SECONDS`, 30) e **custo de IA**

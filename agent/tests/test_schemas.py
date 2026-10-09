@@ -140,21 +140,21 @@ def test_schemas_de_decisao_constroem_de_verdade():
 def test_os_modelos_de_producao_sao_os_documentados():
     """A troca de modelo por variável de ambiente é para TESTE, não para produção.
 
-    `GEMINI_MODEL_LITE`/`GEMINI_MODEL_GATE` existem para uma execução de
+    `IA_MODELO_LITE`/`IA_MODELO_GATE` existem para uma execução de
     iteração caber no nível gratuito (Flash-Lite: 500/dia; Flash: 20/dia). As
     constantes são o que vale quando ninguém pediu troca — e a divisão entre
     elas veio de medição: o gate no Lite reprova 8 dos 94 casos, e uma das
     quedas é "apaga todos" voltando `approved: True`.
     """
-    from app.services import gemini
+    from app.services import ia
 
-    assert gemini.MODELOS[gemini.GEMINI_ROUTER] == "claude-haiku-5-5"
-    assert gemini.MODELOS[gemini.GEMINI_PARSE] == "claude-haiku-5-5"
-    assert gemini.MODELOS[gemini.GEMINI_BATCH] == "claude-haiku-5-5"
-    assert gemini.MODELOS[gemini.GEMINI_GATE] == "claude-sonnet-5-5"
-    assert gemini.MODELOS["embedding"] == "gemini-embedding-2"
-    # a tabela antiga, intacta: é a das suítes (IA_PROVEDOR=gemini) e a RESERVA entre provedores
-    assert gemini.MODELOS_GEMINI == {
+    assert ia.MODELOS[ia.PAPEL_ROUTER] == "claude-haiku-5-5"
+    assert ia.MODELOS[ia.PAPEL_PARSE] == "claude-haiku-5-5"
+    assert ia.MODELOS[ia.PAPEL_BATCH] == "claude-haiku-5-5"
+    assert ia.MODELOS[ia.PAPEL_GATE] == "claude-sonnet-5-5"
+    assert ia.MODELOS["embedding"] == "gemini-embedding-2"
+    # a tabela antiga, intacta: é a das suítes (IA_TABELA=economica) e a RESERVA entre provedores
+    assert ia.MODELOS_ECONOMICOS == {
         "router": "gemini-3.1-flash-lite", "parse": "gemini-3.1-flash-lite",
         "batch": "gemini-3.1-flash-lite", "gate": "gemini-3.7-flash",
         "embedding": "gemini-embedding-2",
@@ -162,33 +162,33 @@ def test_os_modelos_de_producao_sao_os_documentados():
 
 
 def test_sem_variavel_de_ambiente_o_modelo_nao_muda(monkeypatch):
-    from app.services import gemini
+    from app.services import ia
 
     monkeypatch.delenv("GEMINI_MODEL", raising=False)
-    monkeypatch.delenv("GEMINI_MODEL_GATE", raising=False)
-    assert gemini.modelo("gate") == "claude-sonnet-5-5"
-    monkeypatch.setenv("GEMINI_MODEL_GATE", "gemini-3.1-flash-lite")
-    assert gemini.modelo("gate") == "gemini-3.1-flash-lite"
-    monkeypatch.setenv("GEMINI_MODEL_GATE", "  ")  # vazia = não definida
-    assert gemini.modelo("gate") == "claude-sonnet-5-5"
+    monkeypatch.delenv("IA_MODELO_GATE", raising=False)
+    assert ia.modelo("gate") == "claude-sonnet-5-5"
+    monkeypatch.setenv("IA_MODELO_GATE", "gemini-3.1-flash-lite")
+    assert ia.modelo("gate") == "gemini-3.1-flash-lite"
+    monkeypatch.setenv("IA_MODELO_GATE", "  ")  # vazia = não definida
+    assert ia.modelo("gate") == "claude-sonnet-5-5"
 
 
 def test_gemini_model_global_nao_existe_mais(monkeypatch):
     """`GEMINI_MODEL` era a arma carregada: voltou em `2c849a4` e saiu de novo.
 
-    Só `GEMINI_MODEL_<PAPEL>` troca modelo — o global não é mais lido em lugar
+    Só `IA_MODELO_<PAPEL>` troca modelo — o global não é mais lido em lugar
     nenhum, nem pelo ambiente, nem por `settings.gemini_model` (que não existe
     mais). O valor injetado não pode coincidir com NENHUM padrão de `MODELOS`
     (nem Lite nem Flash) — senão as asserções de router/parse/batch passariam
     por coincidência mesmo com o bug de volta (o global sempre bateu com o
     próprio padrão deles).
     """
-    from app.services import gemini
+    from app.services import ia
 
-    monkeypatch.delenv("GEMINI_MODEL_GATE", raising=False)
+    monkeypatch.delenv("IA_MODELO_GATE", raising=False)
     monkeypatch.setenv("GEMINI_MODEL", "modelo-que-nao-pode-aparecer")
     for papel in ("router", "parse", "batch", "gate"):
-        assert gemini.modelo(papel) == gemini.MODELOS[papel]  # global NÃO alcança
+        assert ia.modelo(papel) == ia.MODELOS[papel]  # global NÃO alcança
 
 
 def test_papel_desconhecido_levanta_em_vez_de_cair_num_default():
@@ -200,17 +200,17 @@ def test_papel_desconhecido_levanta_em_vez_de_cair_num_default():
     """
     import pytest
 
-    from app.services import gemini
+    from app.services import ia
 
     with pytest.raises(ValueError, match="papel de modelo desconhecido"):
-        gemini.modelo("inventado")
+        ia.modelo("inventado")
 
 
 def test_existe_UM_lugar_que_escolhe_modelo():
     """Nenhum nome de modelo cru fora da tabela.
 
     Três mecanismos coexistiam (as constantes, `settings.gemini_model` e as
-    variáveis de troca). Uma tabela, uma função: `gemini.MODELOS` + `modelo()`.
+    variáveis de troca). Uma tabela, uma função: `ia.MODELOS` + `modelo()`.
     """
     import pathlib
     import re
@@ -218,7 +218,7 @@ def test_existe_UM_lugar_que_escolhe_modelo():
     raiz = pathlib.Path(__file__).resolve().parent.parent / "app"
     fora = []
     for arquivo in raiz.rglob("*.py"):
-        if arquivo.name == "gemini.py":
+        if arquivo.name == "ia.py":
             continue
         for n, linha in enumerate(arquivo.read_text().splitlines(), 1):
             if re.search(r"""["'](gemini-[0-9]|claude-)""", linha):
@@ -250,13 +250,13 @@ def test_catalogo_de_notas_cabe_no_prompt_sem_crescer_o_schema():
 def test_principal_com_reserva_tem_prazo_curto_e_sem_nova_tentativa():
     """O Lite parado segurava 30 s antes de a reserva entrar (voz: 33,7 s no staging)."""
     from app.graph.schemas import FinancePlan
-    from app.services import gemini
+    from app.services import ia
 
-    gemini._cache.clear()
-    gemini.structured(FinancePlan, gemini.GEMINI_PARSE)
-    gemini.structured(FinancePlan, gemini.GEMINI_PARSE, prazo=gemini.PRAZO_LONGO)
-    haiku, sonnet = gemini.modelo("parse"), gemini.modelo("gate")
-    assert (haiku, 0.1, gemini.PRAZO_COM_RESERVA, 0, None) in gemini._cache
-    assert (haiku, 0.1, gemini.PRAZO_LONGO, 0, None) in gemini._cache
-    assert (sonnet, 0.1, gemini.PRAZO_LONGO, 0, None) in gemini._cache  # reserva do volume e portão
-    assert (gemini.MODELOS_GEMINI["parse"], 0.1, gemini.PRAZO_LONGO, 1, None) in gemini._cache  # a reserva final
+    ia._cache.clear()
+    ia.structured(FinancePlan, ia.PAPEL_PARSE)
+    ia.structured(FinancePlan, ia.PAPEL_PARSE, prazo=ia.PRAZO_LONGO)
+    haiku, sonnet = ia.modelo("parse"), ia.modelo("gate")
+    assert (haiku, 0.1, ia.PRAZO_COM_RESERVA, 0, None) in ia._cache
+    assert (haiku, 0.1, ia.PRAZO_LONGO, 0, None) in ia._cache
+    assert (sonnet, 0.1, ia.PRAZO_LONGO, 0, None) in ia._cache  # reserva do volume e portão
+    assert (ia.MODELOS_ECONOMICOS["parse"], 0.1, ia.PRAZO_LONGO, 1, None) in ia._cache  # a reserva final

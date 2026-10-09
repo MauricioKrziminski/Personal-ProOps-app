@@ -5,7 +5,7 @@
 > mensagem para o agente, ele já tem que me levar para a tela de conversa instantaneamente"*.
 >
 > Handoff: `.superpowers/sdd/HANDOFF-2026-09-21-agente-engessado.md`. Travas que valem para todas
-> as tarefas: `.claude/rules/agent.md`, `ai-gemini.md`, `frontend.md`, `design.md`.
+> as tarefas: `.claude/rules/agent.md`, `ia.md`, `frontend.md`, `design.md`.
 
 ---
 
@@ -109,7 +109,7 @@ Toda tarefa começa escrevendo o teste que FALHA (TDD) e mostra a falha no relat
 - Testes: `test_sem_variavel_de_ambiente_o_modelo_nao_muda` fica verde (hoje VERMELHO, provado);
   `test_gemini_model_global_troca_todos_os_papeis` (`tests/test_schemas.py:146`) é INVERTIDO:
   `GEMINI_MODEL` no ambiente não muda papel nenhum.
-- `ai-gemini.md`: registrar que o global voltou em `2c849a4` (19/09) e saiu de novo.
+- `ia.md`: registrar que o global voltou em `2c849a4` (19/09) e saiu de novo.
 - Staging: `gcloud run services update agente-staging --region southamerica-east1 --project
   personal-proops-agent --remove-env-vars GEMINI_MODEL`. Produção (`agente`): só com SIM do Gabriel.
 
