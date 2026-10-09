@@ -1,0 +1,5 @@
+{
+  "ignore": {
+    "files": [".claude/**", "agent/**", "docs/**", "android/**", "ios/**"]
+  }
+}
