@@ -148,10 +148,17 @@ def test_os_modelos_de_producao_sao_os_documentados():
     """
     from app.services import gemini
 
-    assert gemini.MODELOS[gemini.GEMINI_ROUTER] == "gemini-3.1-flash-lite"
-    assert gemini.MODELOS[gemini.GEMINI_PARSE] == "gemini-3.1-flash-lite"
-    assert gemini.MODELOS[gemini.GEMINI_BATCH] == "gemini-3.1-flash-lite"
-    assert gemini.MODELOS[gemini.GEMINI_GATE] == "gemini-3.7-flash"
+    assert gemini.MODELOS[gemini.GEMINI_ROUTER] == "claude-haiku-5-5"
+    assert gemini.MODELOS[gemini.GEMINI_PARSE] == "claude-haiku-5-5"
+    assert gemini.MODELOS[gemini.GEMINI_BATCH] == "claude-haiku-5-5"
+    assert gemini.MODELOS[gemini.GEMINI_GATE] == "claude-sonnet-5-5"
+    assert gemini.MODELOS["embedding"] == "gemini-embedding-2"
+    # a tabela antiga, intacta: é a das suítes (IA_PROVEDOR=gemini) e a RESERVA entre provedores
+    assert gemini.MODELOS_GEMINI == {
+        "router": "gemini-3.1-flash-lite", "parse": "gemini-3.1-flash-lite",
+        "batch": "gemini-3.1-flash-lite", "gate": "gemini-3.7-flash",
+        "embedding": "gemini-embedding-2",
+    }
 
 
 def test_sem_variavel_de_ambiente_o_modelo_nao_muda(monkeypatch):
@@ -159,9 +166,11 @@ def test_sem_variavel_de_ambiente_o_modelo_nao_muda(monkeypatch):
 
     monkeypatch.delenv("GEMINI_MODEL", raising=False)
     monkeypatch.delenv("GEMINI_MODEL_GATE", raising=False)
-    assert gemini.modelo("gate") == "gemini-3.7-flash"
+    assert gemini.modelo("gate") == "claude-sonnet-5-5"
     monkeypatch.setenv("GEMINI_MODEL_GATE", "gemini-3.1-flash-lite")
     assert gemini.modelo("gate") == "gemini-3.1-flash-lite"
+    monkeypatch.setenv("GEMINI_MODEL_GATE", "  ")  # vazia = não definida
+    assert gemini.modelo("gate") == "claude-sonnet-5-5"
 
 
 def test_gemini_model_global_nao_existe_mais(monkeypatch):
@@ -178,10 +187,8 @@ def test_gemini_model_global_nao_existe_mais(monkeypatch):
 
     monkeypatch.delenv("GEMINI_MODEL_GATE", raising=False)
     monkeypatch.setenv("GEMINI_MODEL", "modelo-que-nao-pode-aparecer")
-    assert gemini.modelo("router") == "gemini-3.1-flash-lite"  # global NÃO alcança
-    assert gemini.modelo("parse") == "gemini-3.1-flash-lite"  # global NÃO alcança
-    assert gemini.modelo("batch") == "gemini-3.1-flash-lite"  # global NÃO alcança
-    assert gemini.modelo("gate") == "gemini-3.7-flash"  # global NÃO alcança
+    for papel in ("router", "parse", "batch", "gate"):
+        assert gemini.modelo(papel) == gemini.MODELOS[papel]  # global NÃO alcança
 
 
 def test_papel_desconhecido_levanta_em_vez_de_cair_num_default():
@@ -214,7 +221,7 @@ def test_existe_UM_lugar_que_escolhe_modelo():
         if arquivo.name == "gemini.py":
             continue
         for n, linha in enumerate(arquivo.read_text().splitlines(), 1):
-            if re.search(r'"gemini-[0-9]', linha) or re.search(r"'gemini-[0-9]", linha):
+            if re.search(r"""["'](gemini-[0-9]|claude-)""", linha):
                 fora.append(f"{arquivo.name}:{n}")
     assert not fora, f"nome de modelo fora da tabela: {fora}"
 
@@ -248,7 +255,8 @@ def test_principal_com_reserva_tem_prazo_curto_e_sem_nova_tentativa():
     gemini._cache.clear()
     gemini.structured(FinancePlan, gemini.GEMINI_PARSE)
     gemini.structured(FinancePlan, gemini.GEMINI_PARSE, prazo=gemini.PRAZO_LONGO)
-    lite, flash = gemini.modelo("parse"), gemini.modelo("gate")
-    assert (lite, 0.1, gemini.PRAZO_COM_RESERVA, 0, None) in gemini._cache
-    assert (lite, 0.1, gemini.PRAZO_LONGO, 0, None) in gemini._cache
-    assert (flash, 0.1, 30, 1, None) in gemini._cache  # a reserva continua com prazo e nova tentativa
+    haiku, sonnet = gemini.modelo("parse"), gemini.modelo("gate")
+    assert (haiku, 0.1, gemini.PRAZO_COM_RESERVA, 0, None) in gemini._cache
+    assert (haiku, 0.1, gemini.PRAZO_LONGO, 0, None) in gemini._cache
+    assert (sonnet, 0.1, gemini.PRAZO_LONGO, 0, None) in gemini._cache  # reserva do volume e portão
+    assert (gemini.MODELOS_GEMINI["gate"], 0.1, 30, 1, None) in gemini._cache  # a reserva final

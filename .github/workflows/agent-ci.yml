@@ -57,10 +57,11 @@ jobs:
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: ruff check app --select F,E9
       # Sem rede e sem banco: os nós que falam com o mundo são dublês. `tests/conftest.py` não
-      # exige env; a chave é falsa só para os clientes do Gemini poderem ser construídos.
+      # exige env; as chaves são falsas só para os clientes (Claude e Gemini) poderem ser construídos.
       - run: pytest -q
         env:
           GEMINI_API_KEY: fake
+          ANTHROPIC_API_KEY: fake
 
   app:
     runs-on: ubuntu-latest

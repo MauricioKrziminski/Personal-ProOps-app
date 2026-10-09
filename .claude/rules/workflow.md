@@ -19,7 +19,7 @@
 4. **Mudou `agent/` → `.venv/bin/ruff check app --select F,E9` E `.venv/bin/pytest` verdes.**
    Teste que fala com rede ou banco não entra: os nós que falam com o mundo viram dublê.
 
-   **Mexeu em prompt, schema de classificador ou catálogo → avaliação com Gemini real, SÓ da
+   **Mexeu em prompt, schema de classificador ou catálogo → avaliação com modelo real, SÓ da
    parte mexida** (decisão do dono do produto, 06/10/2026: *"rodar o teste somente daquela parte
    que mexeu e garantir que não houve regressão, só rodar o teste completo quando for preciso"*).
    Ela não roda no CI: cada commit pagaria a suíte inteira por uma mudança que toca uma seção.
@@ -28,9 +28,11 @@
      `notas`, `cadastro`, `escolha`, `corrigir`, `loteB/guardar`…; a lista é `secoes()`) e, para
      roteamento e histórico de conversa, `evaluate_conversation_understanding.py --cases <ids>`.
      Rode a seção ANTES de mexer (a linha de base) e depois: regressão é caso que passava e deixou
-     de passar. Enquanto itera, `--barato` (gate no Flash-Lite, de graça).
+     de passar. As suítes rodam no Gemini GRATUITO (`IA_PROVEDOR=gemini`, os scripts põem
+     sozinhos; o crédito do Claude fica para o tráfego). Enquanto itera, `--barato` (gate no Lite).
    - **Mexeu no portão do SIM** (`domain/confirm.py`, prompt/schema do gate, `policy.py`) → também
-     `--secao segurança`, **sem `--barato`**: aprova quem roda no modelo de PRODUÇÃO do portão.
+     `--secao segurança --gate-producao --teto-usd 1`, **sem `--barato`**: aprova quem roda no
+     modelo de PRODUÇÃO do portão (Claude Sonnet), e só essa rodada gasta crédito da Anthropic.
    - **Suíte INTEIRA só quando a mudança alcança todas as seções:** modelo de um papel
      (`services/gemini.py`, `GEMINI_MODEL_*`/`GEMINI_THINKING_*`), prompt do roteador ou bloco
      comum dos prompts, campo ou ORDEM de campo de um schema compartilhado (`FinanceAction`: a

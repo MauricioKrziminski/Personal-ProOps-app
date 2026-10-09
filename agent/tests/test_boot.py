@@ -20,6 +20,7 @@ PROD = {
     "OIDC_AUDIENCE": "https://agente-x.run.app",
     "DATABASE_URL": "postgresql://x/y",
     "GEMINI_API_KEY": "g",
+    "ANTHROPIC_API_KEY": "a",
     "WHATSAPP_TOKEN": "t",
     "WHATSAPP_APP_SECRET": "s",
 }

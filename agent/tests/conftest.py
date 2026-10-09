@@ -2,6 +2,17 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
+def _provedor_de_ia_limpo(monkeypatch):
+    """Cada teste começa na tabela padrão (Claude): `IA_PROVEDOR`/`GEMINI_MODEL_*` de fora, ou
+    deixados por outro teste (os scripts de avaliação gravam em `os.environ`), não podem vazar."""
+    import os
+
+    for nome in [n for n in os.environ if n == "IA_PROVEDOR" or n.startswith(
+            ("GEMINI_MODEL_", "GEMINI_THINKING_", "GEMINI_SHADOW_"))]:
+        monkeypatch.delenv(nome)
+
+
+@pytest.fixture(autouse=True)
 def _sem_rede_no_embedding(monkeypatch):
     """O cliente de embedding da busca semântica nunca sobe de verdade: falha como um 429, que é o
     caminho "sem semântica, cai no lexical". Teste que o quer troca `embeddings._embeddings`."""

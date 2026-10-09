@@ -117,3 +117,39 @@ def test_nome_da_corrida_carrega_o_que_distingue_a_rodada():
     assert nome == "2026-10-06 12:00 | v2 | gate=gemini-x | think-gate=low | filtro=aprovar | abc123"
     assert "v1" in eval_cache.nome_da_corrida(agora="t", v2=False, gate="g", raciocinio={},
                                               filtro=None, sha="?")
+
+
+def test_usar_gemini_gratis_padrao_e_respeita_o_explicito(monkeypatch):
+    monkeypatch.delenv("IA_PROVEDOR", raising=False)
+    monkeypatch.delenv("GEMINI_MODEL_GATE", raising=False)
+    eval_cache.usar_gemini_gratis()
+    import os
+    assert os.environ["IA_PROVEDOR"] == "gemini"
+    assert "GEMINI_MODEL_GATE" not in os.environ  # sem a flag o gate não vai para produção
+
+    monkeypatch.setenv("IA_PROVEDOR", "claude")
+    eval_cache.usar_gemini_gratis()
+    assert os.environ["IA_PROVEDOR"] == "claude"
+
+
+def test_gate_producao_so_troca_o_gate(monkeypatch):
+    import os
+
+    from app.services import gemini
+
+    monkeypatch.delenv("IA_PROVEDOR", raising=False)
+    monkeypatch.delenv("GEMINI_MODEL_GATE", raising=False)
+    eval_cache.usar_gemini_gratis(gate_producao=True)
+    assert os.environ["IA_PROVEDOR"] == "gemini"
+    assert os.environ["GEMINI_MODEL_GATE"] == gemini.MODELOS["gate"]
+    assert "GEMINI_MODEL_ROUTER" not in os.environ
+
+
+def test_barato_usa_o_router_da_tabela_gemini():
+    from app.services import gemini
+
+    assert eval_cache.modelo_barato() == gemini.MODELOS_GEMINI["router"]
+
+
+def test_erros_transitorios_do_claude_tem_paciencia():
+    assert all(t in eval_cache.TRANSITORIOS for t in ("overloaded", "529", "rate_limit"))

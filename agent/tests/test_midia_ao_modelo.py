@@ -39,9 +39,7 @@ async def test_a_mensagem_do_modelo_leva_a_parte_de_midia(monkeypatch):
 
     partes = modelo.mensagens[1].content
     assert partes[0]["type"] == "text" and "anexou" in partes[0]["text"]
-    assert partes[1] == {
-        "type": "file", "source_type": "base64", "data": B64, "mime_type": "application/pdf",
-    }
+    assert partes[1] == {"type": "file", "base64": B64, "mime_type": "application/pdf"}
 
 
 @pytest.mark.asyncio
@@ -83,4 +81,4 @@ async def test_o_langgraph_injeta_o_config_no_no_de_financas(monkeypatch):
         _estado(marca_da_midia(MIDIA)), config={"configurable": {CHAVE_MIDIA: MIDIA}}
     )
 
-    assert modelo.mensagens[1].content[1]["data"] == B64
+    assert modelo.mensagens[1].content[1]["base64"] == B64

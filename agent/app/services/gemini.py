@@ -1,4 +1,12 @@
-"""Google Gemini — a IA do produto (decisão imutável: nunca Claude API).
+"""A IA do produto: Claude (Anthropic) em produção/staging, Gemini nos embeddings e na reserva.
+
+Divisão (09/10/2026): router, parse e batch rodam no Haiku e o portão (gate) no Sonnet
+(`MODELOS`); o Gemini continua nos embeddings, como reserva ENTRE provedores (Haiku -> Sonnet ->
+Gemini flash) e nas avaliações locais (`IA_PROVEDOR=gemini` troca a tabela inteira por
+`MODELOS_GEMINI`, a antiga). O provedor sai do NOME do modelo (`provedor`). O nome do módulo e as
+constantes/variáveis `GEMINI_*` ficam como estão: renomear é churn sem ganho.
+
+Lições que seguem valendo (todas medidas no Gemini, daí os números abaixo):
 
 Modelos FIXADOS, nunca alias `-latest`. O alias já migrou sozinho em produção
 para um modelo que recusava o schema e tinha 20 requisições/dia — o parse parou
@@ -46,17 +54,25 @@ import hashlib
 import logging
 import os
 import time
+import warnings
 from typing import Any, Literal, TypeVar
 
 from langchain_core.exceptions import OutputParserException
 from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.config import ensure_config
 from langchain_core.runnables.fallbacks import RunnableWithFallbacks
+from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, ValidationError
 
 from app.config import get_settings
 from app.services import telemetry
+
+# O langchain avisa a CADA construção da cadeia do Sonnet (raciocínio adaptativo + ferramenta) que
+# a chamada da ferramenta não é garantida. Já é tratado: sem tool call ele levanta
+# `OutputParserException`, `_saida_invalida` reconhece e a reserva assume. Sem o filtro, uma linha
+# de WARNING por turno no Cloud Logging, mesmo quando o Sonnet nem é chamado.
+warnings.filterwarnings("ignore", message=r"You are attempting to use structured output via forced tool calling")
 
 # ---------------------------------------------------------------------------
 # A ESCOLHA DE MODELO ACONTECE AQUI, E SÓ AQUI
@@ -77,6 +93,21 @@ from app.services import telemetry
 # ("apaga todos" voltou `approved: True`). Router e parse são duas chamadas por
 # mensagem — é o volume, e é onde a cota grátis importa.
 MODELOS: dict[str, str] = {
+    # Claude (09/10/2026): Haiku no volume, Sonnet no portão de segurança.
+    "router": "claude-haiku-5-5",
+    "parse": "claude-haiku-5-5",
+    "batch": "claude-haiku-5-5",
+    # Portão de confirmação e preenchimento de rascunho (`domain/confirm.py`, `domain/draft.py`).
+    "gate": "claude-sonnet-5-5",
+    # Vetores da busca semântica de lançamento (`services/embeddings.py`). Só texto; 768
+    # dimensões normalizadas à mão. Fixado como os demais: trocar de modelo muda o espaço dos
+    # vetores, e `transaction_embeddings.model` faz o job reembedar tudo.
+    "embedding": "gemini-embedding-2",
+}
+
+# A tabela anterior (Gemini), intacta: vale com `IA_PROVEDOR=gemini` (avaliações locais) e o
+# `gate` dela é a RESERVA entre provedores quando o principal é Claude.
+MODELOS_GEMINI: dict[str, str] = {
     "router": "gemini-3.1-flash-lite",
     "parse": "gemini-3.1-flash-lite",
     "batch": "gemini-3.1-flash-lite",
@@ -94,19 +125,32 @@ log = logging.getLogger(__name__)
 _avisados: set[str] = set()
 
 
+T = TypeVar("T", bound=BaseModel)
+
+
+def _tabela() -> dict[str, str]:
+    """A tabela padrão: `IA_PROVEDOR=gemini` -> `MODELOS_GEMINI`; `claude` ou vazio -> `MODELOS`."""
+    provedor_ia = os.environ.get("IA_PROVEDOR", "").strip().lower()
+    if provedor_ia == "gemini":
+        return MODELOS_GEMINI
+    if provedor_ia in ("", "claude"):
+        return MODELOS
+    # um typo não pode escolher provedor em silêncio
+    raise ValueError(f"IA_PROVEDOR={provedor_ia!r} (aceito: gemini, claude)")
+
+
 def modelo(papel: str) -> str:
     """O modelo de um papel — com a troca de TESTE/AMBIENTE aplicada, se houver.
 
-    Só `GEMINI_MODEL_<PAPEL>` (`GEMINI_MODEL_GATE`, `GEMINI_MODEL_PARSE`, ...)
-    troca modelo, e só daquele papel. Não existe global: `GEMINI_MODEL` já foi
-    isso duas vezes e as duas vezes virou modelo trocado em produção sem
-    ninguém pedir — não reintroduzir.
-
-    Se a variável do papel não estiver definida, usa a tabela padrão `MODELOS`.
+    `GEMINI_MODEL_<PAPEL>` (`GEMINI_MODEL_GATE`, `GEMINI_MODEL_PARSE`, ...) troca o modelo
+    daquele papel e vence qualquer tabela (vazia = não definida). Não existe global:
+    `GEMINI_MODEL` já foi isso duas vezes e as duas vezes virou modelo trocado em produção sem
+    ninguém pedir — não reintroduzir. Sem a variável do papel vale `MODELOS`, ou `MODELOS_GEMINI`
+    com `IA_PROVEDOR=gemini`.
     """
     if papel not in MODELOS:
         raise ValueError(f"papel de modelo desconhecido: {papel!r} (tenho {sorted(MODELOS)})")
-    padrao = MODELOS[papel]
+    padrao = _tabela()[papel]
     trocado = os.environ.get(f"GEMINI_MODEL_{papel.upper()}", "").strip()
     if not trocado or trocado == padrao:
         return padrao
@@ -117,6 +161,15 @@ def modelo(papel: str) -> str:
         log.warning("modelo do papel %s trocado de %s para %s (ambiente)",
                     papel, padrao, trocado)
     return trocado
+
+
+def provedor(nome: str) -> Literal["anthropic", "gemini"]:
+    """O provedor de um modelo, pelo NOME (`claude-*` / `gemini-*`); qualquer outro levanta."""
+    if nome.startswith("claude-"):
+        return "anthropic"
+    if nome.startswith("gemini-"):
+        return "gemini"
+    raise ValueError(f"modelo sem provedor conhecido: {nome!r} (esperado claude-* ou gemini-*)")
 
 
 # Os PAPÉIS, para quem chama `llm`/`structured`. O nome do modelo sai sempre de `modelo(papel)`.
@@ -133,6 +186,10 @@ GEMINI_GATE = "gate"
 # O cache (`cached_tokens`) NÃO tem desconto aqui: o preço dele não foi confirmado para estes
 # modelos, então o custo é um TETO (entrada cacheada cobrada como entrada normal).
 PRECOS_USD_POR_MILHAO: dict[str, tuple[float, float]] = {
+    # Claude, tabela da Anthropic (API própria), prompts < 100 mil tokens, lida em 09/10/2026.
+    # `input_tokens` do langchain-anthropic já soma o cache lido/escrito: o custo é um TETO.
+    "claude-haiku-5-5": (0.10, 0.50),
+    "claude-sonnet-5-5": (2.00, 10.00),
     "gemini-3.1-flash-lite": (0.25, 1.50),
     "gemini-3.7-flash": (0.75, 3.75),
     # Embedding: só entrada (US$ 0,15 / 1 M de tokens, tabela oficial lida em 06/10/2026).
@@ -161,9 +218,7 @@ def versao_do_prompt(texto: str) -> str:
     return hashlib.sha256(texto.encode("utf-8")).hexdigest()[:8]
 
 
-_cache: dict[tuple[str, float, float, int, str | None], ChatGoogleGenerativeAI] = {}
-
-T = TypeVar("T", bound=BaseModel)
+_cache: dict[tuple[str, float, float, int, str | None], Any] = {}
 
 # Segundos que o modelo principal tem antes de a reserva assumir (`structured`): texto curto e
 # o que é grande (lote de extrato, anexo).
@@ -190,36 +245,90 @@ def raciocinio(papel: str) -> str | None:
     return nivel
 
 
+# Claude: o custo de pensar e o teto de saída seguem a FAMÍLIA do modelo, não o papel — assim o
+# nome do modelo (que está na chave do cache) basta para identificar o cliente.
+MAX_TOKENS_HAIKU = 8192
+MAX_TOKENS_SONNET = 16000
+
+
+def _config_claude(nome: str, nivel: str | None) -> dict[str, Any]:
+    """`thinking`/`effort`/`max_tokens` do Claude. NUNCA `temperature`: valor fora do padrão é 400
+    no Sonnet 5.5 e no Haiku 5.5 (a saída estruturada é que segura o formato, não a temperatura)."""
+    nivel = "low" if nivel == "minimal" else nivel
+    if "haiku" in nome:
+        return {"thinking": {"type": "disabled"}, "effort": nivel or "low",
+                "max_tokens": MAX_TOKENS_HAIKU}
+    return {"thinking": {"type": "adaptive"}, "effort": nivel or "medium",
+            "max_tokens": MAX_TOKENS_SONNET}
+
+
+def _construir(nome: str, nivel: str | None, temperature: float, timeout: float,
+               max_retries: int, *, callbacks: bool = True) -> Any:
+    """O cliente do provedor do `nome`, sem cache. `callbacks=False` é o modo sombra."""
+    settings = get_settings()
+    # TODA chamada ao modelo passa por aqui, então é aqui que ela ganha o coletor de tokens e o
+    # Langfuse — nó do grafo, portão, rascunho, lote de extrato. O handler que o grafo já injeta
+    # é o MESMO objeto e o langchain não o duplica.
+    cbs = telemetry.callbacks_llm() if callbacks else None
+    if provedor(nome) == "anthropic":
+        return ChatAnthropic(
+            model=nome, api_key=settings.anthropic_api_key, timeout=timeout,
+            max_retries=max_retries, callbacks=cbs, **_config_claude(nome, nivel),
+        )
+    return ChatGoogleGenerativeAI(
+        model=nome,
+        **({"thinking_level": nivel} if nivel else {}),
+        temperature=temperature,
+        google_api_key=settings.gemini_api_key,
+        # Sem reserva (o portão, a segunda leitura) vale esperar: o Lite DEGRADADO responde
+        # devagar mas responde (15,7 s para "diga ok" em 22/09/2026). Com reserva, quem chama
+        # passa um prazo curto — ver `structured`.
+        max_retries=max_retries,
+        timeout=timeout,
+        callbacks=cbs,
+    )
+
+
+def _cliente(nome: str, nivel: str | None = None, temperature: float = 0.1, *,
+             timeout: float = 30, max_retries: int = 1) -> Any:
+    chave = (nome, temperature, timeout, max_retries, nivel)
+    if chave not in _cache:
+        _cache[chave] = _construir(nome, nivel, temperature, timeout, max_retries)
+    return _cache[chave]
+
+
 def llm(
     model: str | None = None, temperature: float = 0.1, *, timeout: float = 30, max_retries: int = 1
-) -> ChatGoogleGenerativeAI:
+) -> Any:
     """Cliente por (modelo, temperatura). Reusar evita reconstruir o transporte.
 
     `model` é o PAPEL ("gate", `GEMINI_PARSE`…): `modelo()` é o único lugar que decide o nome
-    (papel desconhecido levanta). Sem argumento, o papel é `parse`.
+    (papel desconhecido levanta). Sem argumento, o papel é `parse`. Devolve `ChatAnthropic` ou
+    `ChatGoogleGenerativeAI`, conforme o nome. `GEMINI_THINKING_<PAPEL>` troca o raciocínio:
+    `thinking_level` no Gemini, `effort` no Claude.
     """
-    settings = get_settings()
     papel = model or GEMINI_PARSE
-    nome_modelo = modelo(papel)
-    nivel = raciocinio(papel)
-    chave = (nome_modelo, temperature, timeout, max_retries, nivel)
-    if chave not in _cache:
-        _cache[chave] = ChatGoogleGenerativeAI(
-            model=nome_modelo,
-            **({"thinking_level": nivel} if nivel else {}),
-            temperature=temperature,
-            google_api_key=settings.gemini_api_key,
-            # Sem reserva (o portão, a segunda leitura) vale esperar: o Lite DEGRADADO responde
-            # devagar mas responde (15,7 s para "diga ok" em 22/09/2026). Com reserva, quem chama
-            # passa um prazo curto — ver `structured`.
-            max_retries=max_retries,
-            timeout=timeout,
-            # TODA chamada ao Gemini passa por aqui, então é aqui que ela ganha o coletor de
-            # tokens e o Langfuse — nó do grafo, portão, rascunho, lote de extrato. O handler
-            # que o grafo já injeta é o MESMO objeto e o langchain não o duplica.
-            callbacks=telemetry.callbacks_llm(),
-        )
-    return _cache[chave]
+    return _cliente(modelo(papel), raciocinio(papel), temperature,
+                    timeout=timeout, max_retries=max_retries)
+
+
+def _com_schema(cliente: Any, nome: str, schema: type[T], *, include_raw: bool = False) -> Any:
+    """`with_structured_output` com a classe Pydantic; a saída volta como `schema` nos dois provedores.
+
+    Claude: `method="function_calling"` (o padrão do langchain-anthropic), de propósito. Medido na
+    API real em 09/10/2026: `json_schema` (`output_config.format`) recusa o `FinancePlan` com
+    `400 "Schema is too complex"` e estoura a compilação da gramática (>30 s no primeiro uso,
+    mesmo com o schema simplificado); `function_calling` responde em 1–2 s. Armadilha: o Sonnet
+    5.5 REJEITA tool_choice forçado, e só funciona porque o `thinking` adaptativo faz o langchain
+    usar tool_choice `auto` (sem tool call, levanta `OutputParserException`). Com `thinking`
+    desligado o langchain força a tool e é 400 — por isso o `thinking` do Claude é fixo por
+    família em `_config_claude` (só o Haiku desliga; `tests/test_claude.py` prende).
+    """
+    if provedor(nome) == "anthropic":
+        return cliente.with_structured_output(schema, method="function_calling",
+                                              include_raw=include_raw)
+    return cliente.with_structured_output(schema, include_raw=include_raw) if include_raw \
+        else cliente.with_structured_output(schema)
 
 
 # ---------------------------------------------------------------------------
@@ -240,20 +349,35 @@ _falhas: dict[str, list[float]] = {}
 _aberto_ate: dict[str, float] = {}
 
 
-def _indisponivel(erro: BaseException) -> bool:
-    """O principal está FORA DO AR (timeout, 429, 5xx)? Erro de schema/pedido não conta.
+_CLASSES_FORA = frozenset({
+    "ServerError", "ServiceUnavailable", "TooManyRequests",  # Gemini
+    "APIConnectionError", "APITimeoutError", "InternalServerError", "RateLimitError",  # Anthropic
+})
+# 529 = sobrecarga da Anthropic; 402 = cobrança
+_CODIGOS_FORA = (402, 429, 500, 502, 503, 504, 529)
 
-    Reconhece pela estrutura (classe e código HTTP, seguindo a cadeia de causas), não pelo texto.
+
+def _indisponivel(erro: BaseException) -> bool:
+    """O principal está FORA DO AR (timeout, 429, 5xx, 529, sem crédito)? Erro de schema/pedido não conta.
+
+    Reconhece pela estrutura (classe e código HTTP, seguindo a cadeia de causas), não pelo texto —
+    salvo o crédito esgotado da Anthropic, que ver abaixo.
     """
     visto: set[int] = set()
     while erro is not None and id(erro) not in visto:
         visto.add(id(erro))
         nome = type(erro).__name__
-        if "Timeout" in nome or nome in ("ServerError", "ServiceUnavailable", "TooManyRequests"):
+        if "Timeout" in nome or nome in _CLASSES_FORA:
             return True
         for atributo in ("code", "status_code", "status"):
-            if getattr(erro, atributo, None) in (429, 500, 502, 503, 504):
+            if getattr(erro, atributo, None) in _CODIGOS_FORA:
                 return True
+        # ponytail: crédito esgotado chega como 400 `invalid_request_error` (BadRequestError) sem
+        # código próprio; o corpo só distingue pelo texto. Se a Anthropic ganhar um `type`
+        # dedicado, trocar por ele. Sem isso o disjuntor nunca abriria e cada turno pagaria o
+        # prazo do principal antes da reserva.
+        if getattr(erro, "status_code", None) == 400 and "credit balance" in str(erro).lower():
+            return True
         erro = erro.__cause__ or erro.__context__
     return False
 
@@ -365,25 +489,48 @@ def _structured(
     abrir o disjuntor. É falha objetiva, não confiança. A chamada do principal que respondeu e a da
     reserva são contadas pelo coletor de tokens; o motivo vai em `reserva_motivo` nos metadados.
 
-    O PORTÃO não tem reserva para aprovação: a reserva natural seria o Lite, que já foi medido
+    **Com Claude (09/10/2026)** a cadeia é Haiku -> Sonnet -> Gemini flash nos papéis de volume e
+    Sonnet -> Gemini flash no portão (ver o corpo). Com o portão em Gemini (`IA_PROVEDOR=gemini`),
+    vale o texto abaixo.
+
+    O PORTÃO (em Gemini) não tem reserva para aprovação: a reserva natural seria o Lite, que já foi medido
     aprovando "apaga todos". O interpretador de respostas pode tentar uma leitura separada
     SOMENTE de revisão quando o portão falha; nunca confirma ou executa uma ação por ela.
     """
     papel = model
-    reserva = modelo("gate")
     meta = {"papel": papel, "no": no, "prompt_versao": versao}
-    if papel == "gate" or modelo(papel) == reserva:
-        return llm(papel).with_structured_output(schema).with_config(metadata=meta)
+    nome_gate = modelo("gate")
+    if provedor(nome_gate) == "anthropic":
+        # Claude: o portão tem reserva no Gemini aprovado antes da troca, e os papéis de volume
+        # caem nele passando pelo Sonnet (Haiku -> Sonnet -> Gemini flash). Cada `_ComReserva`
+        # tem a SUA chave de disjuntor (o modelo que ele protege).
+        nome_gemini = MODELOS_GEMINI["gate"]
+        gemini_gate = _com_schema(_cliente(nome_gemini), nome_gemini, schema)
+        sonnet = _ComReserva(
+            runnable=_com_schema(
+                _cliente(nome_gate, raciocinio("gate"), timeout=PRAZO_LONGO, max_retries=0),
+                nome_gate, schema),
+            fallbacks=[gemini_gate], chave=nome_gate, metadados=meta)
+        if papel == "gate" or modelo(papel) == nome_gate:
+            return sonnet
+        nome = modelo(papel)
+        return _ComReserva(
+            runnable=_com_schema(
+                _cliente(nome, raciocinio(papel), timeout=prazo, max_retries=0), nome, schema),
+            fallbacks=[sonnet], chave=nome, metadados=meta)
+    # Gemini (suítes, `IA_PROVEDOR=gemini`): o portão NÃO tem reserva.
+    nome_papel = modelo(papel)
+    if papel == "gate" or nome_papel == nome_gate:
+        return _com_schema(llm(papel), nome_papel, schema).with_config(metadata=meta)
     # ⏱️ Com reserva, o principal tem `prazo` e nenhuma nova tentativa (06/10/2026): o Lite parado
     # segurava 30 s antes da reserva entrar, e o "Montar lançamento" da voz levou 33,7 s no staging
     # (Lite sem resposta até o timeout, Flash em 3 s). Texto curto no Lite saudável responde em
     # 1–3 s; o que passa do prazo vai à reserva, que custa 4,9× — só enquanto o Lite está mal.
     # Lote de extrato e anexo pedem `prazo` longo: são grandes e demoram mesmo com o Lite bem.
-    principal = llm(papel, timeout=prazo, max_retries=0).with_structured_output(schema)
     return _ComReserva(
-        runnable=principal,
-        fallbacks=[llm(GEMINI_GATE).with_structured_output(schema)],
-        chave=modelo(papel),
+        runnable=_com_schema(llm(papel, timeout=prazo, max_retries=0), nome_papel, schema),
+        fallbacks=[_com_schema(llm(GEMINI_GATE), nome_gate, schema)],
+        chave=nome_papel,
         metadados=meta,
     )
 
@@ -398,7 +545,7 @@ def _structured(
 # `config` do turno): não entra na cota do usuário nem em `ai_events`. O custo vai só no log.
 # ATENÇÃO: dobra as chamadas ao Gemini do papel (e a cota grátis junto).
 _sombras_vivas: set[asyncio.Task] = set()
-_clientes_sombra: dict[str, ChatGoogleGenerativeAI] = {}
+_clientes_sombra: dict[str, Any] = {}
 
 
 def modelo_sombra(papel: str) -> str | None:
@@ -435,17 +582,17 @@ async def _rodar_sombra(schema, papel: str, no: str | None, nome: str, entrada: 
                         principal: Any) -> None:
     try:
         if nome not in _clientes_sombra:
-            _clientes_sombra[nome] = ChatGoogleGenerativeAI(
-                model=nome, temperature=0.1, google_api_key=get_settings().gemini_api_key,
-                max_retries=0, timeout=PRAZO_LONGO)
+            _clientes_sombra[nome] = _construir(
+                nome, None, 0.1, PRAZO_LONGO, 0, callbacks=False)
         # include_raw: o uso de tokens vem na própria resposta, sem coletor.
-        r = await _clientes_sombra[nome].with_structured_output(schema, include_raw=True).ainvoke(entrada)
+        r = await _com_schema(_clientes_sombra[nome], nome, schema, include_raw=True).ainvoke(entrada)
         uso = getattr(r["raw"], "usage_metadata", None) or {}
         custo = custo_usd(nome, uso.get("input_tokens", 0), uso.get("output_tokens", 0))
-        if r.get("parsed") is None:
+        parsed = r.get("parsed")
+        if parsed is None:
             campos = ["<sombra não devolveu o schema>"]
         else:
-            campos = campos_divergentes(principal, r["parsed"])
+            campos = campos_divergentes(principal, parsed)
         log.info("shadow_diff", extra={"shadow": {
             "papel": papel, "no": no, "modelo_principal": modelo(papel), "modelo_sombra": nome,
             "divergiu": bool(campos), "campos": campos,

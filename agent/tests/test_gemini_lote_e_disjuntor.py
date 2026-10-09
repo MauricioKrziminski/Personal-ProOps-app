@@ -199,7 +199,9 @@ def test_indisponibilidade_segue_a_cadeia_de_causas():
     assert not gemini._indisponivel(ValueError("400"))
 
 
-def test_papel_do_portao_nao_ganha_disjuntor_nem_reserva():
+def test_papel_do_portao_nao_ganha_disjuntor_nem_reserva(monkeypatch):
+    # portão em Gemini (suítes): sem reserva, como sempre. Com Claude ele tem a reserva no Gemini.
+    monkeypatch.setenv("IA_PROVEDOR", "gemini")
     gemini._cache.clear()
     assert not isinstance(gemini.structured(_S, "gate"), gemini._ComReserva)
     assert isinstance(gemini.structured(_S, "parse"), gemini._ComReserva)

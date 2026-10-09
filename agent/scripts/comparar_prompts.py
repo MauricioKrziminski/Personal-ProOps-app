@@ -28,10 +28,10 @@ from unittest.mock import patch
 
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
-for linha in (RAIZ / ".env").read_text().splitlines() if (RAIZ / ".env").exists() else []:
-    if linha.startswith("GEMINI_") and "=" in linha:
-        chave, valor = linha.split("=", 1)
-        os.environ.setdefault(chave, valor.strip().strip('"'))
+from scripts.eval_cache import carregar_env, usar_gemini_gratis  # noqa: E402
+
+carregar_env()
+usar_gemini_gratis()
 os.environ.setdefault("DATABASE_URL", "postgresql://sem-banco/nesta-comparacao")
 os.environ.setdefault("WHATSAPP_APP_SECRET", "sem-envio")
 

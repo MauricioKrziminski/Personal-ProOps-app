@@ -14,10 +14,46 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
 PASTA = RAIZ / ".eval-cache"
+
+
+CHAVES_DO_ENV = ("GEMINI_", "ANTHROPIC_API_KEY", "IA_PROVEDOR")
+
+
+def carregar_env() -> None:
+    """Exporta de `agent/.env` só as chaves de IA (sem sobrescrever o ambiente); o resto fica com o `Settings`."""
+    arquivo = RAIZ / ".env"
+    for linha in arquivo.read_text().splitlines() if arquivo.exists() else []:
+        if linha.startswith(CHAVES_DO_ENV) and "=" in linha:
+            chave, valor = linha.split("=", 1)
+            valor = valor.split("#")[0].strip().strip('"')
+            if valor:  # `IA_PROVEDOR=` vazio no .env não pode ganhar do padrão grátis
+                os.environ.setdefault(chave, valor)
+
+
+def usar_gemini_gratis(gate_producao: bool = False) -> None:
+    """Suítes e sondas rodam no Gemini GRATUITO por padrão (o crédito do Claude é de produção).
+
+    `IA_PROVEDOR` já definido pela pessoa vence. `gate_producao` põe SÓ o gate no modelo de
+    produção (a rodada que aprova a seção de segurança; pede ANTHROPIC_API_KEY). Chamar ANTES de
+    construir qualquer cliente de modelo.
+    """
+    os.environ.setdefault("IA_PROVEDOR", "gemini")
+    if gate_producao:
+        from app.services import gemini
+
+        os.environ["GEMINI_MODEL_GATE"] = gemini.MODELOS["gate"]
+
+
+def modelo_barato() -> str:
+    """O modelo do `--barato`: o router da tabela GEMINI (grátis), nunca o Claude de produção."""
+    from app.services import gemini
+
+    return gemini.MODELOS_GEMINI["router"]
 
 
 def hash_prompts_e_schemas() -> str:
@@ -117,11 +153,12 @@ class CacheDeAvaliacao:
         self.arquivo.write_text(json.dumps(dados, ensure_ascii=False, indent=1, default=str))
 
 
-TRANSITORIOS = ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "DEADLINE")
+TRANSITORIOS = ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "DEADLINE",
+                "overloaded", "529", "rate_limit")
 
 
 async def com_paciencia(chamar, tentativas: int = 4, espera_s: float = 30.0):
-    """Roda `chamar()` de novo quando o Gemini do nível gratuito está ocupado (503/429).
+    """Roda `chamar()` de novo quando o modelo está ocupado (Gemini 503/429; Claude 529/rate_limit).
 
     Sem isso um pico de demanda vira "falhou" e a suíte mede a fila do Google, não o prompt.
     Só nos SCRIPTS: no app a reserva e a fila já cuidam disso.

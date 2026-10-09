@@ -29,10 +29,10 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
-for linha in (RAIZ / ".env").read_text().splitlines() if (RAIZ / ".env").exists() else []:
-    if linha.startswith("GEMINI_") and "=" in linha:
-        chave, valor = linha.split("=", 1)
-        os.environ.setdefault(chave, valor.strip().strip('"'))
+from scripts.eval_cache import carregar_env, usar_gemini_gratis  # noqa: E402
+
+carregar_env()
+usar_gemini_gratis("--gate-producao" in sys.argv)
 os.environ.setdefault("DATABASE_URL", "postgresql://sem-banco/nesta-avaliacao")
 os.environ.setdefault("WHATSAPP_APP_SECRET", "sem-envio")
 if "--langfuse" not in sys.argv:
@@ -41,11 +41,11 @@ if "--langfuse" not in sys.argv:
     os.environ["LANGFUSE_PUBLIC_KEY"] = ""
 
 from scripts.eval_cache import (  # noqa: E402
-    CacheDeAvaliacao, Orcamento, checar_validade, cliente_langfuse, com_paciencia, rodar_experimento,
+    CacheDeAvaliacao, Orcamento, checar_validade, cliente_langfuse, com_paciencia, modelo_barato,
+    rodar_experimento,
 )
 from app.domain import confirm, draft  # noqa: E402
 from app.graph import nodes  # noqa: E402
-from app.services import gemini  # noqa: E402
 from app.tools import movimentos, resources  # noqa: E402
 from app.tools.guards import Level1Error  # noqa: E402
 
@@ -948,7 +948,7 @@ async def main(args):
         #
         # Use enquanto estiver mexendo em prompt. A execução que DECIDE se está
         # pronto roda sem esta flag.
-        os.environ["GEMINI_MODEL_GATE"] = gemini.MODELOS["router"]
+        os.environ["GEMINI_MODEL_GATE"] = modelo_barato()
         print(
             "⚠️  --barato: gate no Flash-Lite (grátis até 500/dia).\n"
             "    O Lite reprova ~8 casos que o Flash passa — este número NÃO "
@@ -1048,8 +1048,17 @@ if __name__ == "__main__":
     parser.add_argument("--langfuse", action="store_true",
                         help="registra a rodada como Experiment no Dataset eval/formas-de-resposta")
     parser.add_argument(
+        "--gate-producao", action="store_true",
+        help="roda o gate no modelo de PRODUÇÃO (Claude): a rodada que APROVA o portão / a seção de "
+             "segurança. Exige ANTHROPIC_API_KEY; combine com --teto-usd. Sem a flag tudo roda no "
+             "Gemini gratuito. Não combina com --barato.",
+    )
+    parser.add_argument(
         "--barato", action="store_true",
         help="roda o gate no Flash-Lite (grátis até 500/dia). Para iterar, "
              "NUNCA para aprovar: o Lite reprova ~8 casos que o Flash passa.",
     )
-    raise SystemExit(asyncio.run(main(parser.parse_args())))
+    args = parser.parse_args()
+    if args.barato and args.gate_producao:
+        parser.error("--barato e --gate-producao se excluem (um põe o gate no Lite, o outro no modelo de produção)")
+    raise SystemExit(asyncio.run(main(args)))

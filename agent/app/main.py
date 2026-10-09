@@ -102,6 +102,8 @@ def _checa_producao() -> None:
             ("THREAD_SALT", s.thread_salt != DEV_SALT and len(s.thread_salt) >= 32),
             ("WORKER_URL", s.worker_url.startswith("https://") and "/worker/" in s.worker_url),
             ("GCP_PROJECT", bool(s.gcp_project) and " " not in s.gcp_project),
+            ("ANTHROPIC_API_KEY", bool(s.anthropic_api_key)),
+            # embeddings e reserva entre provedores
             ("GEMINI_API_KEY", bool(s.gemini_api_key)),
             ("WHATSAPP_TOKEN", bool(s.whatsapp_token)),
             # sem ele a rota recusa TODA mensagem (HMAC) e a Meta reentrega em loop

@@ -315,18 +315,20 @@ async def _detalhes_do_turno(state: AgentState) -> list[dict]:
 def _turno_humano(texto: str, midia: dict | None):
     """A mensagem humana: texto, e o anexo como parte de mídia quando os bytes chegaram.
 
-    Foto de cupom e PDF de fatura entram como bloco `file` base64 (o formato que o
-    `langchain-google-genai` converte em `inline_data`, serve a imagem e ao PDF). Sem os bytes
+    Foto de cupom entra como bloco `image` e PDF de fatura como `file`, ambos base64 no formato
+    padrão do LangChain v1: o `langchain-anthropic` os converte em `image`/`document` e o
+    `langchain-google-genai` em `inline_data` (conferido nos dois, offline). Sem os bytes
     — retomada, ou canal que não os levou — segue só o texto, que já diz que há anexo.
     """
     if not midia or not midia.get("data_b64"):
         return ("human", texto)
     from langchain_core.messages import HumanMessage
 
+    mime = midia.get("mime_type") or "application/octet-stream"
     return HumanMessage(content=[
         {"type": "text", "text": texto},
-        {"type": "file", "source_type": "base64", "data": midia["data_b64"],
-         "mime_type": midia.get("mime_type") or "application/octet-stream"},
+        {"type": "image" if mime.startswith("image/") else "file",
+         "base64": midia["data_b64"], "mime_type": mime},
     ])
 
 
@@ -415,10 +417,14 @@ async def finance_node(state: AgentState, config: RunnableConfig = None) -> dict
             FinanceActionType.CREATE_INSTALLMENT_PURCHASE,
         ):
             if a.type == FinanceActionType.CREATE_INSTALLMENT_PURCHASE:
-                if not a.amount_cents:
-                    from app.domain.money import parse_installment_total
+                from app.domain.money import parcela_dita, parse_installment_total
 
+                if not a.amount_cents:
                     a.amount_cents = parse_installment_total(texto_orig, a.installments)
+                elif a.installments and a.amount_cents == parcela_dita(texto_orig, a.installments):
+                    # "10x de 300" com o modelo devolvendo 300 de TOTAL: a frase diz que 300 é a
+                    # parcela (`parcela_dita`). Corrigido ANTES do SIM, que mostra o total certo.
+                    a.amount_cents *= a.installments
                 if (
                     a.already_paid_count is not None
                     and not a.current_installment

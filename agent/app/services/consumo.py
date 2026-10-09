@@ -1,6 +1,6 @@
 """Consumo de IA por turno: tokens, modelo REAL que respondeu e custo estimado.
 
-Um `ColetorDeUso` (callback do langchain) fica em todo cliente do Gemini (`gemini.llm`) e lê o
+Um `ColetorDeUso` (callback do langchain) fica em todo cliente de IA (`gemini.llm`: Claude ou Gemini) e lê o
 `usage_metadata` de cada resposta. Quem acumula é o `ConsumoDoTurno` do turno corrente, guardado
 num `ContextVar`: o motor abre um por turno (`abrir`), e toda chamada feita dentro dele — nó do
 grafo, portão, rascunho, lote de extrato — soma no MESMO objeto, sem ninguém precisar passar nada.

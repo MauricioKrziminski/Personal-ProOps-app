@@ -42,6 +42,9 @@ class Settings(BaseSettings):
 
     # --- IA ---
     gemini_api_key: str = ""
+    # Claude (Anthropic): a IA de produção/staging por papel (`services/gemini.py`); o Gemini fica
+    # com embeddings e com a reserva entre provedores.
+    anthropic_api_key: str = ""
     groq_api_key: str = ""
     # Prompts v2 (módulos por sub-intenção + exemplos por recuperação). DESLIGADO por padrão: só
     # liga depois da avaliação com o Gemini real (`scripts/comparar_prompts.py`). Desligado, os

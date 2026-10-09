@@ -86,16 +86,31 @@ def parse_installment_total(text: str, installments: int | None) -> int | None:
     fica de fora de propósito: "dia 12 de 150"/"12 de setembro" usam a mesma forma. Em
     "vezes"/"parcelas" o "de" é obrigatório: "12 vezes 3000" pode ser o total.
     """
-    matches = re.findall(
+    matches = _parcelas_ditas(text)
+    if matches:
+        each = parcela_dita(text, installments)
+        return each * installments if each else None
+    return parse_valor_em_centavos(text)
+
+
+def _parcelas_ditas(text: str) -> list[tuple[str, str]]:
+    return re.findall(
         r"\b(\d{1,3})\s*(?:x\s*(?:de\s*)?|(?:vezes|parcelas)\s+de\s*)(?:R\$\s*)?(\d[\d.,]*)",
         text or "", re.IGNORECASE,
     )
-    if matches:
-        if len(matches) == 1 and int(matches[0][0]) == installments:
-            each = parse_valor_em_centavos(matches[0][1].rstrip(".,"))
-            return each * installments if each else None
-        return None
-    return parse_valor_em_centavos(text)
+
+
+def parcela_dita(text: str, installments: int | None) -> int | None:
+    """O V de UM "Nx de V" com N == `installments`, em centavos; senão None (mesma régua acima).
+
+    Rede por cima do modelo (09/10/2026): o Claude Haiku devolveu `amount_cents` = 30000 para
+    "TV em 10x de 300" em toda repetição — a PARCELA no lugar do total, com o exemplo exato no
+    prompt. Quem chama compara: valor do modelo igual à parcela dita = ele esqueceu de multiplicar.
+    """
+    matches = _parcelas_ditas(text)
+    if len(matches) == 1 and int(matches[0][0]) == installments:
+        return parse_valor_em_centavos(matches[0][1].rstrip(".,"))
+    return None
 
 
 def cents_to_brl(cents: int | float | None) -> str:

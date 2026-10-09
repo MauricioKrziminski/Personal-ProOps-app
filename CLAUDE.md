@@ -10,8 +10,12 @@ App mobile pessoal de **notas rápidas, lembretes e controle financeiro operado 
 
 - **Backend:** **Python 3.12 + FastAPI**, portável via Docker, hospedado no **Google Cloud Run**
   com `min_instances = 0`. Código em `agent/`.
-- **Inteligência conversacional:** **LangGraph** (`StateGraph` em Python) com modelos **Gemini**,
-  saída estruturada e caching. **Não usar Claude API.**
+- **Inteligência conversacional:** **LangGraph** (`StateGraph` em Python) com saída estruturada.
+  O modelo é **Claude** em produção e no staging (09/10/2026, pedido do Gabriel: crédito mensal
+  da API no plano Max, org `ProOps's Individual Org`): **Haiku 5.5** em router/parse/batch e
+  **Sonnet 5.5** no portão do SIM. O **Gemini** continua em três lugares: embeddings, as suítes de
+  avaliação e sondas (nível gratuito, `IA_PROVEDOR=gemini`, automático nos scripts) e a reserva
+  quando o Claude falha (fora do ar ou sem crédito). Detalhes em `ai-gemini.md`.
 - **Banco e fila:** **Supabase Postgres** (camada gratuita) — `messages_queue` com controle de
   concorrência. O Supabase é banco e fila; deixou de ser onde a lógica roda.
 

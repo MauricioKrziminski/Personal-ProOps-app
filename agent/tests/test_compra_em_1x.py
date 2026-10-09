@@ -89,3 +89,28 @@ async def test_parcela_invalida_para_antes_do_sim(monkeypatch, parcelas):
     })
     erro = saida["targets"][0]["correction_error"]
     assert "2 ou mais" in erro or "99" in erro
+
+
+@pytest.mark.asyncio
+async def test_parcela_dita_como_total_vira_total_antes_do_sim(monkeypatch):
+    # Claude Haiku, 09/10/2026: "10x de 300" voltava amount_cents=30000 (a parcela) em toda repetição.
+    plano = FinancePlan(actions=[FinanceAction(
+        type=FinanceActionType.CREATE_INSTALLMENT_PURCHASE, amount_cents=30000, installments=10,
+        description="TV", account="cartão Inter")])
+    monkeypatch.setattr(nodes.gemini, "structured", lambda *_a, **_k: _ModeloFake(plano))
+    estado = {"text": "Comprei uma TV em 10x de 300 no cartão Inter", "timezone": "America/Sao_Paulo",
+              "messages": None}
+    (acao,) = (await nodes.finance_node(estado))["finance_actions"]
+    assert acao["amount_cents"] == 300000
+
+
+@pytest.mark.asyncio
+async def test_total_certo_nao_e_multiplicado(monkeypatch):
+    plano = FinancePlan(actions=[FinanceAction(
+        type=FinanceActionType.CREATE_INSTALLMENT_PURCHASE, amount_cents=300000, installments=10,
+        description="TV", account="cartão Inter")])
+    monkeypatch.setattr(nodes.gemini, "structured", lambda *_a, **_k: _ModeloFake(plano))
+    estado = {"text": "Comprei uma TV em 10x de 300 no cartão Inter", "timezone": "America/Sao_Paulo",
+              "messages": None}
+    (acao,) = (await nodes.finance_node(estado))["finance_actions"]
+    assert acao["amount_cents"] == 300000

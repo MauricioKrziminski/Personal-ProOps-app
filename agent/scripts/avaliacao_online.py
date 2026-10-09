@@ -29,6 +29,9 @@ from psycopg.rows import dict_row
 from pydantic import BaseModel, Field
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from scripts.eval_cache import usar_gemini_gratis  # noqa: E402
+
+usar_gemini_gratis()
 
 from app.config import get_settings  # noqa: E402
 from app.security import wrap_untrusted

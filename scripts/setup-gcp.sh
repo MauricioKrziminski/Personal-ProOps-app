@@ -54,11 +54,14 @@ ENV_FILE="${ENV_FILE:-agent/.env.production}"
 SECRET_SUFFIX="${SECRET_SUFFIX:-}"
 
 SEGREDOS=(
-  DATABASE_URL GEMINI_API_KEY GROQ_API_KEY
+  DATABASE_URL GEMINI_API_KEY ANTHROPIC_API_KEY GROQ_API_KEY
   WHATSAPP_TOKEN WHATSAPP_APP_SECRET WHATSAPP_VERIFY_TOKEN WHATSAPP_PHONE_NUMBER_ID
   THREAD_SALT SEND_SMS_HOOK_SECRET REVENUECAT_WEBHOOK_SECRET SUPABASE_JWT_SECRET
   LANGFUSE_PUBLIC_KEY LANGFUSE_SECRET_KEY INTERNAL_SECRET
 )
+
+# Sem estes o agente sobe quebrado (o deploy pularia o segredo ausente em silêncio): o deploy falha.
+SEGREDOS_OBRIGATORIOS=(DATABASE_URL GEMINI_API_KEY ANTHROPIC_API_KEY)
 
 # Lê UMA variável do $ENV_FILE sem dar `source` (o arquivo tem comentários, e
 # source executaria conteúdo). Corta comentário de fim de linha e espaço.
@@ -349,7 +352,15 @@ deploy() {
   local secrets=""
   for nome in "${SEGREDOS[@]}"; do
     local id="${nome//_/-}"; id="$(echo "$id" | tr '[:upper:]' '[:lower:]')""${SECRET_SUFFIX}"
-    gcloud secrets describe "$id" --project "$PROJECT_ID" &>/dev/null || continue
+    if ! gcloud secrets describe "$id" --project "$PROJECT_ID" &>/dev/null; then
+      for obrig in "${SEGREDOS_OBRIGATORIOS[@]}"; do
+        if [ "$nome" = "$obrig" ]; then
+          err "segredo obrigatório ausente no Secret Manager: $id ($nome). Rode '$0 secrets' (com $nome no $ENV_FILE) e repita o deploy."
+          exit 1
+        fi
+      done
+      continue
+    fi
     secrets+="${nome}=${id}:latest,"
   done
   secrets="${secrets%,}"

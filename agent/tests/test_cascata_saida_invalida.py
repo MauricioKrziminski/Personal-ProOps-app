@@ -97,6 +97,7 @@ def test_saida_invalida_segue_a_cadeia_de_causas():
     assert not gemini._saida_invalida(_Fora("503"))
 
 
-def test_o_portao_continua_sem_reserva():
+def test_o_portao_em_gemini_continua_sem_reserva(monkeypatch):
+    monkeypatch.setenv("IA_PROVEDOR", "gemini")
     gemini._cache.clear()
     assert not isinstance(gemini.structured(_S, "gate"), gemini._ComReserva)

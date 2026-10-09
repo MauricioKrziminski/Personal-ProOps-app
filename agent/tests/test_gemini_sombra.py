@@ -23,7 +23,7 @@ class _Principal:
 
 
 def _liga(monkeypatch, retorno_sombra, falha=False):
-    monkeypatch.setenv("GEMINI_SHADOW_PARSE", "modelo-sombra-x")
+    monkeypatch.setenv("GEMINI_SHADOW_PARSE", "gemini-sombra-x")
     monkeypatch.setattr(gemini, "_structured", lambda *a, **k: _Principal(_S(x=1, y=["a"])))
 
     class _Cliente:
@@ -67,7 +67,7 @@ async def test_loga_diff_e_nao_muda_a_resposta(monkeypatch, caplog):
     reg = next(r for r in caplog.records if r.getMessage() == "shadow_diff")
     assert reg.shadow["campos"] == ["x"] and reg.shadow["divergiu"]
     assert reg.shadow["papel"] == "parse" and reg.shadow["no"] == "teste"
-    assert reg.shadow["modelo_sombra"] == "modelo-sombra-x"
+    assert reg.shadow["modelo_sombra"] == "gemini-sombra-x"
     assert "custo_usd" in reg.shadow
 
 
@@ -80,7 +80,7 @@ async def test_erro_da_sombra_so_loga(monkeypatch, caplog):
 
 
 def test_aviso_no_boot(monkeypatch, caplog):
-    monkeypatch.setenv("GEMINI_SHADOW_GATE", "modelo-sombra-x")
+    monkeypatch.setenv("GEMINI_SHADOW_GATE", "gemini-sombra-x")
     caplog.set_level(logging.WARNING, logger="app.services.gemini")
     gemini.avisar_sombras()
     assert any("MODO SOMBRA" in r.getMessage() for r in caplog.records)

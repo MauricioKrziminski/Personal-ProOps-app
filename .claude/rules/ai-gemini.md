@@ -3,9 +3,42 @@ paths:
   - "agent/**"
 ---
 
-# IA — Gemini (classificação) + Groq (áudio)
+# IA — Claude (produção), Gemini (avaliação, embeddings, reserva) + Groq (áudio)
 
-**Decisão imutável: a IA do produto é Google Gemini. Nunca usar Claude API.** STT é Groq Whisper.
+**Desde 09/10/2026 o modelo do agente é Claude** (pedido do Gabriel: o plano Max traz US$ 200/mês
+de crédito da API na org `ProOps's Individual Org`). STT continua Groq Whisper. A tabela por papel
+mora em `gemini.MODELOS` (o nome do módulo ficou, para não espalhar troca de nome):
+
+| papel | produção e staging | suítes/sondas (`IA_PROVEDOR=gemini`) |
+|---|---|---|
+| `router` / `parse` / `batch` | `claude-haiku-5-5` (sem raciocínio, esforço `low`) | `gemini-3.1-flash-lite` |
+| `gate` (portão do SIM) | `claude-sonnet-5-5` (raciocínio adaptativo, esforço `medium`) | `gemini-3.7-flash` |
+| `embedding` | `gemini-embedding-2` (a Anthropic não tem embeddings) | idem |
+
+- **O provedor sai do NOME do modelo** (`claude-*` / `gemini-*`); `GEMINI_MODEL_<PAPEL>` troca o
+  modelo de um papel e aceita os dois.
+- **Reserva entre provedores**: Haiku → Sonnet → `gemini-3.7-flash`; o portão, Sonnet →
+  `gemini-3.7-flash` (o portão aprovado antes da troca). Só entra quando a chamada FALHA — inclusive
+  crédito esgotado, que sem reserva pararia o agente até o mês seguinte. Com o portão em Gemini
+  (suítes) ele continua sem reserva, como abaixo.
+- **Claude não aceita `temperature`** (400 no Haiku/Sonnet 5.5), e a saída estruturada vai por
+  **`method="function_calling"`** com a classe Pydantic. O `json_schema` (saída estrita) foi medido
+  e RECUSADO em 09/10/2026: o `FinancePlan` voltou `400 "Schema is too complex"` ou estourou 30 s
+  compilando a gramática; por ferramenta o mesmo parse sai em 1–2 s, com imagem e PDF. Como a
+  ferramenta não é estrita, quem segura a forma é o Pydantic, e saída inválida cai na reserva.
+  **Armadilha:** o Sonnet/Opus 5.5 recusa `tool_choice` FORÇADO; ele só funciona porque, com
+  raciocínio adaptativo, o langchain usa `tool_choice` auto. Desligar o raciocínio do portão faria
+  o langchain forçar a ferramenta e devolver 400 em toda confirmação (`test_claude.py` prende o
+  raciocínio por família). Os tetos do Gemini abaixo (produto propriedades × enum) continuam
+  valendo para as suítes e a reserva.
+- **Suítes no Gemini gratuito, menos a aprovação do portão**: os scripts põem `IA_PROVEDOR=gemini`
+  sozinhos. A rodada que APROVA o portão (`--secao segurança`) roda com `--gate-producao` (só o gate
+  no Sonnet de produção) e `--teto-usd`.
+- **Crédito**: workspaces `staging` (com limite de gasto) e `producao` na org; saldo em Console →
+  Settings → Billing → Promotional credits. O crédito vence no fim do ciclo e não acumula.
+
+O resto desta página é a história e as medições do Gemini — continua valendo para as suítes, a
+reserva e os embeddings, e é o motivo de várias travas do código.
 
 ## Onde vive
 

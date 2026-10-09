@@ -34,6 +34,9 @@ warnings.filterwarnings("ignore", category=UserWarning, module="langchain_google
 logging.getLogger("google_genai").setLevel(logging.ERROR)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from scripts.eval_cache import usar_gemini_gratis  # noqa: E402
+
+usar_gemini_gratis()
 
 from app.graph.schemas import FinanceQuery, FinanceQueryType  # noqa: E402
 from scripts.probe_query_schema import VERDE, VERMELHO, FIM, _plano, tenta  # noqa: E402

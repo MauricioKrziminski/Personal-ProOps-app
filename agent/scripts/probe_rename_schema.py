@@ -22,6 +22,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from scripts.eval_cache import usar_gemini_gratis  # noqa: E402
+
+usar_gemini_gratis()
 
 from app.graph.prompts import FINANCE
 from app.graph.schemas import FinanceAction, FinanceActionType, FinancePlan

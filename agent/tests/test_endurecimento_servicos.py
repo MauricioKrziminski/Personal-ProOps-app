@@ -211,7 +211,7 @@ async def test_groq_erro_nao_vaza_corpo(monkeypatch):
 
 
 # ---------------------------------------------------------------- boot e logs
-@pytest.mark.parametrize("campo", ["GEMINI_API_KEY", "WHATSAPP_TOKEN", "WHATSAPP_APP_SECRET"])
+@pytest.mark.parametrize("campo", ["GEMINI_API_KEY", "ANTHROPIC_API_KEY", "WHATSAPP_TOKEN", "WHATSAPP_APP_SECRET"])
 def test_cloud_run_sem_segredo_recusa_mesmo_com_backend_inline(monkeypatch, campo):
     from tests.test_boot import PROD
 

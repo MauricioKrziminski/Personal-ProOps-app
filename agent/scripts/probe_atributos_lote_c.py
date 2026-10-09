@@ -17,6 +17,9 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from scripts.eval_cache import usar_gemini_gratis  # noqa: E402
+
+usar_gemini_gratis()
 
 from app.domain import atributos as dom  # noqa: E402
 from app.graph import nodes  # noqa: E402

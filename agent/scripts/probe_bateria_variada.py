@@ -42,6 +42,9 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
+from scripts.eval_cache import usar_gemini_gratis  # noqa: E402
+
+usar_gemini_gratis()
 
 from scripts.evaluate_answer_forms import BASE, H_MERCADO, H_WARDOGS, _hist, _sem_banco  # noqa: E402
 

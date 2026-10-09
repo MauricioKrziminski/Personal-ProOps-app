@@ -68,3 +68,11 @@ class TestParcelaVezesValor:
         from app.domain.money import parse_installment_total
         # sem "de" o número pode ser o total: o padrão não afirma "cada parcela"
         assert parse_installment_total("parcelei em 12 vezes 3000", 12) != 3600000
+
+
+def test_parcela_dita_so_com_o_n_do_modelo():
+    from app.domain.money import parcela_dita
+    assert parcela_dita("Comprei uma TV em 10x de 300 no cartão Inter", 10) == 30000
+    assert parcela_dita("comprei em 10x de 300", 12) is None
+    assert parcela_dita("tv de 3000 em 10x", 10) is None
+    assert parcela_dita("10x de 300 e 5x de 20", 10) is None

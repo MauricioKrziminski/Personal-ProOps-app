@@ -36,6 +36,9 @@ from enum import Enum
 from typing import Any
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from scripts.eval_cache import usar_gemini_gratis  # noqa: E402
+
+usar_gemini_gratis()
 
 from pydantic import BaseModel, Field, create_model  # noqa: E402
 

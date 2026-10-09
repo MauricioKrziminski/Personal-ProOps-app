@@ -47,8 +47,12 @@ if "--langfuse" not in sys.argv:
     # chamada virava um trace solto no meio do tráfego real (06/10/2026).
     os.environ["LANGFUSE_PUBLIC_KEY"] = ""
 from scripts.eval_cache import (
-    CacheDeAvaliacao, Orcamento, checar_validade, cliente_langfuse, com_paciencia, rodar_experimento,
+    CacheDeAvaliacao, Orcamento, carregar_env, checar_validade, cliente_langfuse, com_paciencia,
+    rodar_experimento, usar_gemini_gratis,
 )
+
+carregar_env()
+usar_gemini_gratis("--gate-producao" in sys.argv)
 from app.domain import confirm, draft
 from app.graph import nodes
 from app.graph.schemas import FinanceAction
@@ -580,5 +584,9 @@ if __name__ == "__main__":
                         help="ignora e não grava o cache de resultados (agent/.eval-cache/)")
     parser.add_argument("--langfuse", action="store_true",
                         help="registra a rodada como Experiment no Dataset eval/compreensao-de-conversa")
+    parser.add_argument(
+        "--gate-producao", action="store_true",
+        help="roda o gate no modelo de PRODUÇÃO (Claude): a rodada que APROVA o portão. Exige "
+             "ANTHROPIC_API_KEY; combine com --teto-usd. Sem a flag tudo roda no Gemini gratuito.")
     args = parser.parse_args()
     raise SystemExit(asyncio.run(main(args)))

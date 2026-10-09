@@ -1,6 +1,10 @@
 """Explicit live Gemini probe; database reads/writes replaced. Never sends WhatsApp."""
 
 import asyncio
+
+from scripts.eval_cache import usar_gemini_gratis
+
+usar_gemini_gratis()
 from app.graph import nodes
 from app.graph.schemas import ResourceAction
 from app.tools import resources
