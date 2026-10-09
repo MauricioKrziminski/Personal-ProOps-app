@@ -10,6 +10,8 @@
 #   ./scripts/setup-gcp.sh deploy       # só o deploy do Cloud Run
 #   ./scripts/setup-gcp.sh staging      # serviço/fila/segredos de STAGING (sem crons)
 #   ./scripts/setup-gcp.sh secrets      # só (re)grava os segredos
+#   ./scripts/setup-gcp.sh backup       # backup diário do banco de PRODUÇÃO (bucket + Cloud Run Job + Scheduler)
+#   ./scripts/setup-gcp.sh backup-staging  # o mesmo, para o banco de staging (docs/BACKUP.md)
 #   ./scripts/setup-gcp.sh alertas      # métricas de log, políticas (ALERT_EMAIL) e orçamento
 #                                       # (BILLING_ACCOUNT + BUDGET_AMOUNT, na moeda da conta); sem as variáveis, pula
 #
@@ -18,7 +20,7 @@ set -euo pipefail
 # Os defaults de staging precisam vir ANTES dos de produção, logo abaixo: quando
 # `main()` roda, SERVICE já vale "agente" e um `${SERVICE:-agente-staging}` lá
 # embaixo nunca dispararia — o "staging" faria deploy EM CIMA da produção.
-if [[ "${1:-}" == staging ]]; then
+if [[ "${1:-}" == staging || "${1:-}" == backup-staging ]]; then
   : "${SERVICE:=agente-staging}"
   : "${QUEUE:=whatsapp-debounce-staging}"
   : "${ENV_FILE:=agent/.env}"
@@ -398,6 +400,16 @@ deploy() {
   done
   if [[ -n "$flags" ]]; then printf '  flags: %s\n' "${flags#,}"; fi
 
+  # Painel /admin: a anon key (pública) e os ids de admin vêm do MESMO .env do ambiente. Sem
+  # ADMIN_USER_IDS o painel fica desligado (404). Os ids são separados por vírgula, então a
+  # lista inteira vai com o delimitador `|` do gcloud (`^|^`, ver `gcloud topic escaping`).
+  local admin_ids anon_key
+  admin_ids="$(ler_env ADMIN_USER_IDS)"
+  anon_key="$(ler_env SUPABASE_ANON_KEY)"
+  [[ -n "$admin_ids" ]] || warn "ADMIN_USER_IDS vazio em $ENV_FILE — painel /admin desligado"
+  local base="GCP_PROJECT=${PROJECT_ID},GCP_LOCATION=${REGION},TASKS_QUEUE=${QUEUE},TASKS_SA_EMAIL=${SA_EMAIL},DEBOUNCE_BACKEND=cloud_tasks,DEBOUNCE_SECONDS=3,WORKER_URL=${url_prevista}/worker/process-thread,OIDC_AUDIENCE=${url_prevista},SUPABASE_URL=${supabase_url},WA_ALERT_TEMPLATE=${wa_alert_template}${flags}"
+  local env_vars="^|^${base//,/|}|SUPABASE_ANON_KEY=${anon_key}|ADMIN_USER_IDS=${admin_ids}"
+
   gcloud run deploy "$SERVICE" \
     --source agent \
     --project "$PROJECT_ID" --region "$REGION" \
@@ -410,7 +422,7 @@ deploy() {
     --timeout 300 \
     --quiet \
     --set-secrets "$secrets" \
-    --set-env-vars "GCP_PROJECT=${PROJECT_ID},GCP_LOCATION=${REGION},TASKS_QUEUE=${QUEUE},TASKS_SA_EMAIL=${SA_EMAIL},DEBOUNCE_BACKEND=cloud_tasks,DEBOUNCE_SECONDS=3,WORKER_URL=${url_prevista}/worker/process-thread,OIDC_AUDIENCE=${url_prevista},SUPABASE_URL=${supabase_url},WA_ALERT_TEMPLATE=${wa_alert_template}${flags}"
+    --set-env-vars "$env_vars"
 
   URL="$(gcloud run services describe "$SERVICE" --project "$PROJECT_ID" \
           --region "$REGION" --format='value(status.url)')"
@@ -510,6 +522,60 @@ criar_cron() {
   estado=$(gcloud scheduler jobs describe "$nome" --location "$REGION" --project "$PROJECT_ID" \
     --format='value(state)' 2>/dev/null || echo '?')
   printf '  ✓ %s (%s) — %s (estado preservado)\n' "$nome" "$agenda" "$estado"
+}
+
+# ---------------------------------------------------------------------------
+# 7b. backup diário do banco (Supabase Free não guarda backup)
+# ---------------------------------------------------------------------------
+# Cloud Run Job (imagem oficial postgres:17 = versão do servidor, sem build) roda
+# scripts/backup-banco.sh, que faz pg_dump -Fc e grava no bucket montado (gcsfuse). O Scheduler o
+# dispara todo dia. O segredo é o MESMO database-url do agente (com o sufixo de staging, se for o caso).
+# Idempotente: bucket, política, job e agendamento são create-or-update. Detalhes: docs/BACKUP.md.
+criar_backup() {
+  log "Backup diário do banco (${SECRET_SUFFIX:-produção})"
+  local bucket="${PROJECT_ID}-backups${SECRET_SUFFIX}" job="backup-banco${SECRET_SUFFIX}"
+  local nome=producao; [[ -n "$SECRET_SUFFIX" ]] && nome=staging
+  local segredo="database-url${SECRET_SUFFIX}"
+  gcloud secrets describe "$segredo" --project "$PROJECT_ID" &>/dev/null \
+    || { err "segredo $segredo ausente: rode '$0 secrets' (ou staging) antes"; exit 1; }
+  gcloud services enable run.googleapis.com cloudscheduler.googleapis.com --project "$PROJECT_ID" >/dev/null
+
+  # Privado (acesso público bloqueado), acesso uniforme. diario/ vive 30 dias, semanal/ 90.
+  gcloud storage buckets describe "gs://$bucket" --project "$PROJECT_ID" &>/dev/null \
+    || gcloud storage buckets create "gs://$bucket" --project "$PROJECT_ID" --location "$REGION" \
+         --uniform-bucket-level-access --public-access-prevention >/dev/null
+  local ciclo; ciclo="$(mktemp)"
+  cat > "$ciclo" <<'JSON'
+{"rule": [
+  {"action": {"type": "Delete"}, "condition": {"age": 30, "matchesPrefix": ["diario/"]}},
+  {"action": {"type": "Delete"}, "condition": {"age": 90, "matchesPrefix": ["semanal/"]}}
+]}
+JSON
+  gcloud storage buckets update "gs://$bucket" --lifecycle-file "$ciclo" >/dev/null
+  rm -f "$ciclo"
+  gcloud storage buckets add-iam-policy-binding "gs://$bucket" \
+    --member "serviceAccount:${SA_EMAIL}" --role roles/storage.objectUser >/dev/null
+  ok "bucket gs://$bucket (privado, diario/ 30 dias, semanal/ 90 dias)"
+
+  # `^@^`: o gcloud separa --args por vírgula; o script tem vírgulas, então o delimitador vira @.
+  gcloud run jobs deploy "$job" --project "$PROJECT_ID" --region "$REGION" \
+    --image docker.io/library/postgres:17 \
+    --service-account "$SA_EMAIL" \
+    --set-secrets "DATABASE_URL=${segredo}:latest" \
+    --set-env-vars "BACKUP_DIR=/backup,NOME=${nome}" \
+    --add-volume "name=bk,type=cloud-storage,bucket=${bucket}" \
+    --add-volume-mount "volume=bk,mount-path=/backup" \
+    --cpu 1 --memory 2Gi --task-timeout 20m --max-retries 1 \
+    --command bash --args "^@^-c@$(cat "${BACKUP_SCRIPT:-$(dirname "$0")/backup-banco.sh}")" --quiet >/dev/null
+  ok "job $job"
+
+  local cmd=create
+  gcloud scheduler jobs describe "$job" --location "$REGION" --project "$PROJECT_ID" &>/dev/null && cmd=update
+  gcloud scheduler jobs "$cmd" http "$job" --location "$REGION" --project "$PROJECT_ID" \
+    --schedule "30 3 * * *" --time-zone "America/Sao_Paulo" \
+    --uri "https://run.googleapis.com/v2/projects/${PROJECT_ID}/locations/${REGION}/jobs/${job}:run" \
+    --http-method POST --oauth-service-account-email "$SA_EMAIL" --quiet >/dev/null
+  ok "agendado todo dia 03:30 (America/Sao_Paulo)"
 }
 
 # ---------------------------------------------------------------------------
@@ -627,6 +693,7 @@ main() {
     staging) criar_projeto; gravar_segredos; criar_fila; deploy ;;
     preflight) preflight ;;
     alertas) criar_projeto; criar_alertas ;;
+    backup|backup-staging) criar_projeto; criar_backup ;;
     build-iam) criar_projeto; permitir_build ;;
     sa) criar_projeto; criar_sa ;;
     secrets) criar_projeto; gravar_segredos ;;
@@ -641,9 +708,10 @@ main() {
       deploy
       criar_crons
       retencao_imagens
+      criar_backup
       log "Pronto. Aponte o webhook da Meta para a URL acima."
       ;;
-    *) echo "uso: $0 [tudo|deploy|staging|secrets|preflight|build-iam|sa|alertas|retencao]" >&2; exit 1 ;;
+    *) echo "uso: $0 [tudo|deploy|staging|secrets|preflight|build-iam|sa|alertas|retencao|backup|backup-staging]" >&2; exit 1 ;;
   esac
 }
 # ── Trava de produção ──────────────────────────────────────────────────────
@@ -660,7 +728,7 @@ prod_gate() {
   # de STAGING nos segredos de PRODUÇÃO, sem prompt. Gate por subcomando é mais
   # estrito e é uma linha a menos.
   case "$cmd" in
-    tudo|deploy|secrets|sa|build-iam|alertas|retencao) ;;   # escrevem em produção
+    tudo|deploy|secrets|sa|build-iam|alertas|retencao|backup) ;;   # escrevem em produção
     *) return 0 ;;                         # staging, preflight: passam direto
   esac
 
