@@ -61,6 +61,18 @@
  */
 const VARIANTE = process.env.APP_VARIANT || 'development';
 
+/**
+ * Canal de distribuição, ortogonal à variante: `loja` (Google Play / App Store) ou `apk` (APK
+ * fora da loja, com o atualizador próprio). O eas.json fixa `loja` só no perfil `production`.
+ *
+ * ⚠️ **O default é `apk`**: o workflow `publish-android-release.yml` compila local, sem perfil do
+ * eas.json e sem esta variável, e tem que continuar gerando o APK com o instalador. Build de loja
+ * exige `DISTRIBUICAO=loja` escrito por inteiro. Na loja não existem o plugin `with-apk-installer`
+ * nem a permissão `REQUEST_INSTALL_PACKAGES` (a Play proíbe app que se atualiza fora dela), e o JS
+ * lê `extra.distribuicao` para desligar o aviso "baixe o APK". O OTA do expo-updates vale nos dois.
+ */
+const DISTRIBUICAO = process.env.DISTRIBUICAO === 'loja' ? 'loja' : 'apk';
+
 const IDENTIDADE = {
   development: { id: 'com.proops.personal.dev', nome: 'ProOps' },
   preview: { id: 'com.proops.personal.staging', nome: 'ProOps' },
@@ -79,6 +91,7 @@ module.exports = ({ config }) => {
     name: nome,
     plugins: [
       ...(config.plugins || []),
+      DISTRIBUICAO === 'loja' ? './plugins/with-sem-instalador-apk' : './plugins/with-apk-installer',
       /*
         Widgets (22/09/2026). Os identificadores DERIVAM da variante: o widget do app de dev não
         pode ler o App Group de produção — seria o dinheiro de um banco na tela do outro app.
@@ -161,6 +174,7 @@ module.exports = ({ config }) => {
     // pela variante nativa, impede que staging substitua produção no bundle JavaScript.
     extra: {
       ...(config.extra || {}),
+      distribuicao: DISTRIBUICAO,
       proops: {
         ...(config.extra?.proops || {}),
         ...publicConfig,

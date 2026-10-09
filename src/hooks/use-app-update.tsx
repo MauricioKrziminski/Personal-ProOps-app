@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import * as Application from 'expo-application';
+import Constants from 'expo-constants';
 import { AppState, Platform } from 'react-native';
 
 import {
@@ -33,7 +34,10 @@ interface AppUpdateContextValue {
 }
 
 const AppUpdateContext = createContext<AppUpdateContextValue | null>(null);
-const supported = supportsApkUpdate(Platform.OS, Application.applicationId);
+// Build de loja (extra.distribuicao === 'loja'): a Play proíbe app que se atualiza fora dela.
+const supported =
+  Constants.expoConfig?.extra?.distribuicao !== 'loja' &&
+  supportsApkUpdate(Platform.OS, Application.applicationId);
 
 function messageFrom(error: unknown, fallback: string): string {
   if (error instanceof AppUpdateError) return error.message;

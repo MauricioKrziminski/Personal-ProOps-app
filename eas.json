@@ -9,7 +9,8 @@
       "distribution": "internal",
       "environment": "development",
       "env": {
-        "APP_VARIANT": "development"
+        "APP_VARIANT": "development",
+        "DISTRIBUICAO": "apk"
       },
       "ios": {
         "simulator": false
@@ -21,7 +22,8 @@
       "distribution": "internal",
       "environment": "preview",
       "env": {
-        "APP_VARIANT": "preview"
+        "APP_VARIANT": "preview",
+        "DISTRIBUICAO": "apk"
       },
       "channel": "preview",
       "autoIncrement": true
@@ -37,7 +39,8 @@
       "distribution": "internal",
       "environment": "production",
       "env": {
-        "APP_VARIANT": "production"
+        "APP_VARIANT": "production",
+        "DISTRIBUICAO": "apk"
       },
       "autoIncrement": true,
       "channel": "production",
@@ -48,13 +51,26 @@
     "production": {
       "environment": "production",
       "env": {
-        "APP_VARIANT": "production"
+        "APP_VARIANT": "production",
+        "DISTRIBUICAO": "loja"
       },
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "android": {
+        "buildType": "app-bundle"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "PREENCHER_ASC_APP_ID",
+        "appleTeamId": "7FKQLD9MCJ"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./secrets/google-play-service-account.json",
+        "track": "internal"
+      }
+    }
   }
 }
