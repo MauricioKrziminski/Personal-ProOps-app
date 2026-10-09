@@ -347,7 +347,7 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          {plan.data?.plan ? (
+          {plan.data?.plan && plan.data.access === 'subscriber' ? (
             <View style={[styles.idPlan, { backgroundColor: theme.heroChip }]}>
               <ThemedText type="meta" themeColor="onHeroSuccess">
                 {plan.data.plan.toUpperCase()}
@@ -503,7 +503,7 @@ export default function ProfileScreen() {
 
       <AppAndHelp />
 
-      <Section title="Legal">
+      <Section heading="block" title="Legal">
         <Row title="Termos de Uso" icon="doc.text" onPress={() => abrirLegal(URL_TERMOS)} />
         <Row title="Política de Privacidade" icon="lock" onPress={() => abrirLegal(URL_PRIVACIDADE)} />
       </Section>

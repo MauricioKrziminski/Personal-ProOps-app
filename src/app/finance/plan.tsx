@@ -144,9 +144,13 @@ export default function PlanScreen() {
           <ThemedText type="smallBold">{nomePlano}</ThemedText>
           {estado ? <ThemedText type="small" themeColor={estado.perigo ? 'danger' : 'textSecondary'}>{estado.texto}</ThemedText> : null}
         </View>
-        <HeroLabel>mensagens da IA usadas este mês</HeroLabel>
-        <ThemedText type="subtitle" style={tabular}>{usadas} de {teto}</ThemedText>
-        <ProgressBar value={usadas} max={teto} tone={estourou ? 'danger' : proporcao >= 0.9 ? 'warning' : 'tint'} />
+        {encerrada ? null : (
+          <>
+            <HeroLabel>mensagens da IA usadas este mês</HeroLabel>
+            <ThemedText type="subtitle" style={tabular}>{usadas} de {teto}</ThemedText>
+            <ProgressBar value={usadas} max={teto} tone={estourou ? 'danger' : proporcao >= 0.9 ? 'warning' : 'tint'} />
+          </>
+        )}
         {estourou ? <ThemedText type="small" themeColor="danger">IA pausada até virar o mês</ThemedText> : null}
         {encerrada ? <ThemedText type="small" themeColor="textSecondary">{`Sua assinatura acabou${plano.current_period_end ? ` em ${formatDateBR(plano.current_period_end)}` : ''}. Seus dados continuam aqui para consulta.`}</ThemedText> : null}
         {encerrada ? <Button label="Assinar" onPress={() => router.push('/paywall?from=lapsed')} /> : null}
@@ -155,7 +159,7 @@ export default function PlanScreen() {
     </Animated.View>
   ) : null;
 
-  const planLimits = plano ? (
+  const planLimits = plano && !encerrada ? (
     <Section title="O que seu plano dá">
       <Row title="Pessoas" icon="person.2" chevron={false} trailing={<ThemedText type="smallBold" style={tabular}>{plano.members} de {plano.max_members}</ThemedText>} />
       <Row title="Uso da IA" subtitle="zera todo mês" icon="sparkles" chevron={false} trailing={<ThemedText type="smallBold" style={tabular}>{usadas} de {teto}</ThemedText>} />
@@ -175,7 +179,8 @@ export default function PlanScreen() {
   // esqueleto (25/09/2026). Forma e não nada: no tablet este é o painel PRINCIPAL.
   const people = (
     <>
-      {isLoading && !isError ? <Skeleton height={120} radius={Radius.md} /> : (
+      {/* Encerrada: não há plano com vaga para convidar — o caminho é o Assinar acima. */}
+      {encerrada ? null : isLoading && !isError ? <Skeleton height={120} radius={Radius.md} /> : (
         <View style={styles.bloco}>
           <Field label="Convidar alguém" obrigatorio hint="Vê e lança tudo no mesmo financeiro">
             <TextField value={telefone} onChangeText={setTelefone} placeholder="(51) 99999-8888" keyboardType="phone-pad" autoComplete="tel" />
