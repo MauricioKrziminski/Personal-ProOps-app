@@ -28,7 +28,7 @@ from app.services import consumo, embeddings, gemini
 # --- pinos do caminho v1 ------------------------------------------------------------------
 
 PIN_ROUTER = "3f459db8"
-PIN_FINANCE = "3bf0845c"  # 09/10/2026: detalhe e pix sob 'ignore', medidos no Haiku e no Gemini
+PIN_FINANCE = "d311b689"  # 09/10/2026: detalhe pela palavra-marca, medido no Haiku e no Gemini
 PIN_FINANCE_QUERY = "5d4cc1d7"
 PIN_NOTES = "ffd30b04"
 PIN_SCHEMA_ROUTER = "290d403c0f22daf5"

@@ -478,6 +478,15 @@ async def finance_query_node(state: AgentState) -> dict:
         ]
     )
     acoes = [a for a in plano.actions if a.type.value != "unknown"]
+    from app.domain import atributos as dom
+
+    texto = state.get("text", "")
+    for a in acoes:
+        # A MESMA âncora da escrita (`atributos.forma_proposta`): o filtro só vale se a frase diz o
+        # jeito de pagar. O Claude Haiku punha `credit` em "quanto gastei no cartão nubank?" em 2 de
+        # 3 rodadas (09/10/2026), e o filtro escondia todo gasto do cartão sem forma informada.
+        if a.payment_method and a.payment_method != "not_informed":
+            a.payment_method = dom.forma_proposta(a.payment_method, texto)
     return {
         "finance_queries": [a.model_dump() for a in acoes],
         "llm_calls": 1,
