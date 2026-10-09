@@ -41,6 +41,10 @@ SEM_CONTA = (
 SEM_WORKSPACE = "😕 Sua conta ainda não tem um espaço criado. Abre o app uma vez e me chama de novo!"
 NAO_LI = "🙈 Não consegui ler isso. Mando bem com texto, áudio, foto de cupom e PDF de fatura (até 8MB)."
 MUITAS = conversation.MUITAS
+LIMITE_WHATSAPP = (
+    "📱 Seu limite de respostas do mês pelo WhatsApp acabou. Continue pelo app do ProOps, "
+    "que segue funcionando normalmente. O WhatsApp volta no próximo mês."
+)
 GRANDE_DEMAIS = "📦 Esse arquivo é grande demais para eu ler. Manda uma foto ou um PDF menor (até 8 MB)."
 
 
@@ -73,6 +77,25 @@ async def process_thread(thread_id: str) -> dict:
         return await _process_thread(thread_id)
 
 
+async def _enviar(
+    phone: str, conteudo: str | dict, sessao: dict | None = None, *, workspace_id=None, user_id=None,
+) -> None:
+    """O ÚNICO ponto de envio de resposta do worker: conta em `whatsapp_sends` e manda.
+
+    A unidade do limite é a resposta enviada ao telefone (é o que a Meta cobra), então tudo que
+    sai daqui conta — o resultado do SIM, saudação, NAO_LI, a própria mensagem de limite. Sem
+    workspace (número sem conta) não há de quem contar; o teto desses é por telefone.
+    """
+    if sessao:
+        workspace_id, user_id = sessao.get("workspace_id"), sessao.get("user_id")
+    if workspace_id:
+        await db.registrar_envio(workspace_id, user_id, "reply")
+    if isinstance(conteudo, dict):
+        await whatsapp.try_send_interactive(phone, conteudo)
+    else:
+        await whatsapp.try_send(phone, conteudo)
+
+
 async def _soltar_reserva_sem_falhar() -> None:
     """Turno que falhou não consome a cota: a retentativa reserva de novo."""
     try:
@@ -89,7 +112,7 @@ async def _avisar_falhas(thread_id: str) -> None:
     try:
         phone = await db.falhas_a_avisar(thread_id)
         if phone:
-            await whatsapp.try_send(phone, FALHOU)
+            await _enviar(phone, FALHOU, await db.dono_da_thread(thread_id))
     except Exception:  # noqa: BLE001 — aviso é best-effort; não derruba o turno
         log.exception("aviso de falha não saiu (thread=%s)", thread_id)
 
@@ -162,13 +185,9 @@ async def _turno_com_prazo(lote: list[dict], ids: list, phone: str, thread_id: s
 async def _processar(lote: list[dict], ids: list, phone: str, thread_id: str) -> dict:
     sessao = await db.ensure_session(phone, thread_id)
     if not sessao.get("user_id"):
-        await db.mark_done(ids)
-        await whatsapp.try_send(phone, SEM_CONTA)
-        return {"claimed": len(ids), "status": "sem_conta"}
+        return await _sem_dono(ids, phone, SEM_CONTA, "sem_conta")
     if not sessao.get("workspace_id"):
-        await db.mark_done(ids)
-        await whatsapp.try_send(phone, SEM_WORKSPACE)
-        return {"claimed": len(ids), "status": "sem_workspace"}
+        return await _sem_dono(ids, phone, SEM_WORKSPACE, "sem_workspace")
 
     # limites ANTES de gastar Groq/Gemini: anti-flood por hora e cota do plano
     # por mês. Sem isto o paywall do WhatsApp simplesmente não existe.
@@ -180,8 +199,21 @@ async def _processar(lote: list[dict], ids: list, phone: str, thread_id: str) ->
         if barrado == conversation.MUITAS or await db.reservar_aviso_de_limite(
             sessao["user_id"], sessao["workspace_id"], sessao.get("timezone")
         ):
-            await whatsapp.try_send(phone, barrado)
+            await _enviar(phone, barrado, sessao)
         return {"claimed": len(ids), "status": "limite"}
+
+    # Cota de RESPOSTAS pelo WhatsApp (o chat do app não passa por aqui e segue até o limite de IA).
+    # Estourou: não chama IA, devolve a vaga, avisa UMA vez por dia e depois fica em silêncio.
+    # ponytail: contagem sem lock; duas conversas do mesmo espaço podem passar do teto por 1-2 respostas.
+    cota = await db.cota_whatsapp(sessao["workspace_id"])
+    if cota and cota["whatsapp_replies_month"] >= cota["max_whatsapp_replies_month"]:
+        await conversation.soltar_reserva()
+        await db.mark_done(ids)
+        if await db.reservar_aviso_de_limite(
+            sessao["user_id"], sessao["workspace_id"], sessao.get("timezone"), kind="limite_whatsapp_mes"
+        ):
+            await _enviar(phone, LIMITE_WHATSAPP, sessao)
+        return {"claimed": len(ids), "status": "limite_whatsapp"}
 
     # Retentativa: o turno anterior pode ter rodado (e escrito) antes de morrer.
     # Refazer router+parse (temperatura 0,1) pode propor ações em outra ordem, e aí
@@ -210,12 +242,12 @@ async def _processar(lote: list[dict], ids: list, phone: str, thread_id: str) ->
         if conteudo is None:
             await conversation.soltar_reserva()
             await db.mark_done(ids)
-            await whatsapp.try_send(phone, NAO_LI)
+            await _enviar(phone, NAO_LI, sessao)
             return {"claimed": len(ids), "status": "ilegivel"}
         if conteudo.get("grande_demais"):
             await conversation.soltar_reserva()
             await db.mark_done(ids)
-            await whatsapp.try_send(phone, GRANDE_DEMAIS)
+            await _enviar(phone, GRANDE_DEMAIS, sessao)
             return {"claimed": len(ids), "status": "grande_demais"}
 
         resposta = await _run_graph(sessao, lote, conteudo)
@@ -225,10 +257,20 @@ async def _processar(lote: list[dict], ids: list, phone: str, thread_id: str) ->
     if isinstance(resposta, dict):
         # pergunta interativa; o `mark_done` acima continua vindo ANTES do
         # envio, que é a ordem que impede reprocessar por falha de envio
-        await whatsapp.try_send_interactive(phone, resposta)
+        await _enviar(phone, resposta, sessao)
     elif resposta:
-        await whatsapp.try_send(phone, resposta)
+        await _enviar(phone, resposta, sessao)
     return {"claimed": len(ids), "status": "ok"}
+
+
+async def _sem_dono(ids: list, phone: str, texto: str, status: str) -> dict:
+    """Número sem conta/espaço: não há workspace para contar, então no máximo UMA resposta por
+    telefone a cada 24 h (um número estranho com 100 mensagens custava 100 respostas pagas)."""
+    ja_respondeu = await db.telefone_ja_respondido(phone, ids)
+    await db.mark_done(ids)
+    if not ja_respondeu:
+        await _enviar(phone, texto)
+    return {"claimed": len(ids), "status": status}
 
 
 # ---------------------------------------------------------------------------

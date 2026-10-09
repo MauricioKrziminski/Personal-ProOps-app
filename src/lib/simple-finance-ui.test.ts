@@ -213,6 +213,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
           access: options.access ?? ((options.plan ?? 'pro') === 'free' ? 'lapsed' : 'subscriber'),
           can_import: (options.plan ?? 'pro') !== 'free',
           is_trial: false, members: 1, max_members: 1, ai_messages_month: 3, max_ai_messages_month: 400,
+          whatsapp_replies_month: 5, max_whatsapp_replies_month: 150, whatsapp_notices_today: 0, max_whatsapp_notices_day: 1,
           current_period_end: null, status: 'active', provider: 'apple',
         } },
     useMonthLines: () => ({ ...query, data: options.monthLines ?? [] }),

@@ -62,6 +62,7 @@ begin
   assert (select max_ai_messages_month from private.plan_limits('pro', true)) = 60, 'teste pro 60';
   assert (select max_ai_messages_month from private.plan_limits('free', true)) = 0, 'teste free segue 0';
   assert (select can_import from private.plan_limits('free')) = false, 'free não importa';
+  assert (select max_whatsapp_replies_month from private.plan_limits('pro', true)) = 40, 'teste: 40 respostas';
 
   -- coluna access: nunca -> assinante (teste da loja, 60) -> vencido
   select * into r from private.plan_status_for(ws);

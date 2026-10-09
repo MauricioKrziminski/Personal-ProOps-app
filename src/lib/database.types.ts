@@ -3741,6 +3741,38 @@ export type Database = {
           },
         ]
       }
+      whatsapp_sends: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          user_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          user_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          user_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_sends_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_invites: {
         Row: {
           accepted_at: string | null
@@ -4150,10 +4182,14 @@ export type Database = {
           is_trial: boolean
           max_ai_messages_month: number
           max_members: number
+          max_whatsapp_notices_day: number
+          max_whatsapp_replies_month: number
           members: number
           plan: string
           provider: string
           status: string
+          whatsapp_notices_today: number
+          whatsapp_replies_month: number
         }[]
       }
       _prepare_import_batch: {
@@ -5079,10 +5115,14 @@ export type Database = {
           is_trial: boolean
           max_ai_messages_month: number
           max_members: number
+          max_whatsapp_notices_day: number
+          max_whatsapp_replies_month: number
           members: number
           plan: string
           provider: string
           status: string
+          whatsapp_notices_today: number
+          whatsapp_replies_month: number
         }[]
       }
       preview_finance_write: {

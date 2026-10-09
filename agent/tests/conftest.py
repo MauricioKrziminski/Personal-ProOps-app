@@ -41,6 +41,27 @@ def _trava_de_lembrete_livre(monkeypatch):
     monkeypatch.setattr(db, "trava_de_sessao", _livre)
 
 
+@pytest.fixture(autouse=True)
+def _whatsapp_sem_banco(monkeypatch):
+    """Contagem de envios do WhatsApp sem banco: nada contado, cota livre, telefone novo.
+    Teste do limite troca estes três."""
+    from app import db
+
+    async def _nada(*_a, **_k):
+        return None
+
+    async def _falso(*_a, **_k):
+        return False
+
+    async def _dono(_t):
+        return {}
+
+    monkeypatch.setattr(db, "registrar_envio", _nada)
+    monkeypatch.setattr(db, "cota_whatsapp", _nada)
+    monkeypatch.setattr(db, "telefone_ja_respondido", _falso)
+    monkeypatch.setattr(db, "dono_da_thread", _dono)
+
+
 class UnidadeFalsa:
     """Dublê de `db.unidade_de_trabalho`: sem pool, e conta o que commitou e o que voltou."""
 

@@ -163,6 +163,7 @@ export default function PlanScreen() {
     <Section title="O que seu plano dá">
       <Row title="Pessoas" icon="person.2" chevron={false} trailing={<ThemedText type="smallBold" style={tabular}>{plano.members} de {plano.max_members}</ThemedText>} />
       <Row title="Uso da IA" subtitle="zera todo mês" icon="sparkles" chevron={false} trailing={<ThemedText type="smallBold" style={tabular}>{usadas} de {teto}</ThemedText>} />
+      <Row title="Respostas pelo WhatsApp" subtitle="este mês" icon="bubble.left" chevron={false} trailing={<ThemedText type="smallBold" style={tabular}>{plano.whatsapp_replies_month} de {plano.max_whatsapp_replies_month}</ThemedText>} />
       <Row title="Importar extrato" icon="arrow.down.doc" chevron={false} trailing={<ThemedText type="small" themeColor={plano.can_import ? 'success' : 'textSecondary'}>{plano.can_import ? 'liberada' : 'bloqueada'}</ThemedText>} />
     </Section>
   ) : null;

@@ -825,7 +825,7 @@ async def reservar_cota(
 
 
 async def reservar_aviso_de_limite(
-    user_id: UUID, workspace_id: UUID, timezone_: str | None,
+    user_id: UUID, workspace_id: UUID, timezone_: str | None, kind: str = "limite_do_plano",
 ) -> bool:
     """True = pode avisar (primeira barrada do DIA LOCAL no workspace); False = já avisou hoje.
 
@@ -838,18 +838,84 @@ async def reservar_aviso_de_limite(
     try:
         dia = local_iso_date(timezone_ or "America/Sao_Paulo")
         linha = await fetch_one(
-            """
+            f"""
             insert into public.alerts_sent (workspace_id, user_id, kind, ref, channel, sent_on)
-            values (%s, %s, 'limite_do_plano', 'whatsapp', 'whatsapp', %s)
+            values (%s, %s, '{kind}', 'whatsapp', 'whatsapp', %s)
             on conflict do nothing
             returning id
-            """,
+            """,  # `kind` é constante interna (nunca texto de usuário)
             workspace_id, user_id, dia,
         )
         return linha is not None
     except Exception:  # noqa: BLE001
         log.warning("reserva do aviso de limite falhou: aviso mesmo assim", exc_info=True)
         return True
+
+
+async def registrar_envio(workspace_id: UUID | str, user_id: UUID | str | None, kind: str) -> None:
+    """Conta um envio pelo WhatsApp (`whatsapp_sends`, kind `reply` | `notice`).
+
+    Chamado ANTES do envio e sem olhar o retorno da Meta: `try_send` engole a falha, e contar só o
+    que a Meta confirmou deixaria uma queda dela virar resposta paga sem teto. Best-effort: contar
+    não pode derrubar o turno que já gravou o dado.
+    """
+    try:
+        await execute(
+            "insert into public.whatsapp_sends (workspace_id, user_id, kind) values (%s, %s, %s)",
+            workspace_id, user_id, kind,
+        )
+    except Exception:  # noqa: BLE001
+        log.warning("envio de WhatsApp não contado (%s)", kind, exc_info=True)
+
+
+async def dono_da_thread(thread_id: str) -> dict[str, Any]:
+    """Usuário e workspace da conversa (para contar o aviso de falha); vazio se não houver."""
+    return await fetch_one(
+        "select user_id, workspace_id from public.user_sessions where thread_id = %s", thread_id
+    ) or {}
+
+
+async def cota_whatsapp(workspace_id: UUID | str) -> dict[str, Any] | None:
+    """Respostas do mês e avisos de hoje com os tetos do plano (`_plan_status`); None = sem linha."""
+    return await fetch_one(
+        """
+        select whatsapp_replies_month, max_whatsapp_replies_month,
+               whatsapp_notices_today, max_whatsapp_notices_day
+        from public._plan_status(%s)
+        """,
+        workspace_id,
+    )
+
+
+async def aviso_cabe_hoje(workspace_id: UUID | str | None) -> bool:
+    """Ainda cabe um aviso/lembrete (template) pelo WhatsApp hoje? Sem workspace ou sem linha de
+    plano não há o que contar: cabe. O push nunca passa por aqui."""
+    if not workspace_id:
+        return True
+    cota = await cota_whatsapp(workspace_id)
+    return not cota or cota["whatsapp_notices_today"] < cota["max_whatsapp_notices_day"]
+
+
+async def telefone_ja_respondido(phone: str, ids_do_lote: list) -> bool:
+    """Já houve mensagem DESTE telefone processada nas últimas 24 h? (número sem conta/espaço.)
+
+    Sem workspace não há `alerts_sent` nem `whatsapp_sends`; a própria fila diz. Toda mensagem de
+    número sem conta termina em `done` (respondida ou calada), então a primeira do dia responde e as
+    demais calam — a janela anda enquanto o número insistir. ponytail: sem índice em phone, varre
+    a fila; criar `(phone, processed_at)` se esse caminho esquentar.
+    """
+    from app.domain.phone import candidates
+
+    linha = await fetch_one(
+        """
+        select 1 as x from public.messages_queue
+        where phone = any(%s) and status = 'done' and id <> all(%s)
+          and processed_at >= now() - interval '24 hours'
+        limit 1
+        """,
+        candidates(phone), ids_do_lote,
+    )
+    return linha is not None
 
 
 async def liberar_reserva(reserva_id: str | None) -> None:

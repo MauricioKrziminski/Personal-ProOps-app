@@ -63,7 +63,7 @@ async def run() -> dict:
     agora = now_utc()
     vencidos = await db.fetch(
         """
-        select r.id, r.user_id, r.title, r.recurrence, r.channel, r.next_run_at,
+        select r.id, r.workspace_id, r.user_id, r.title, r.recurrence, r.channel, r.next_run_at,
                r.skip_run_at, r.parent_reminder_id, r.paused_from, r.paused_until,
                r.timezone, r.send_attempts, p.phone, p.expo_push_token,
                p.alerts_whatsapp_enabled
@@ -216,8 +216,13 @@ async def _entregar(
         falhas.append("whatsapp: desligado no Perfil (alerts_whatsapp_enabled)")
     elif precisa_whatsapp and not lembrete["phone"]:
         falhas.append("whatsapp: perfil sem telefone verificado")
+    elif precisa_whatsapp and not await db.aviso_cabe_hoje(lembrete.get("workspace_id")):
+        # teto diário de templates do plano: o WhatsApp pula, o push (acima) já foi
+        falhas.append("whatsapp: teto diário de avisos do plano")
     elif precisa_whatsapp:
         try:
+            if lembrete.get("workspace_id"):
+                await db.registrar_envio(lembrete["workspace_id"], lembrete["user_id"], "notice")
             await whatsapp.send_template(
                 lembrete["phone"], settings.wa_reminder_template, [lembrete["title"]]
             )

@@ -52,6 +52,9 @@ async def run() -> dict:
 
         entregou = False
         for channel in channels:
+            if channel == "whatsapp" and not await db.aviso_cabe_hoje(alerta["workspace_id"]):
+                pulados += 1  # teto diário de templates do plano; o push não passa por aqui
+                continue
             try:
                 await db.execute(
                     """
@@ -83,6 +86,7 @@ async def run() -> dict:
                     )
                 else:
                     # Aviso inferido não pode usar o template que diz "você pediu".
+                    await db.registrar_envio(alerta["workspace_id"], alerta["user_id"], "notice")
                     await whatsapp.send_template(
                         alerta["phone"],
                         get_settings().wa_alert_template,
