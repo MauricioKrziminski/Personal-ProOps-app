@@ -158,7 +158,7 @@ export default function MembersScreen() {
             <ThemedText type="smallBold">Só você por aqui</ThemedText>
             {teto <= 1 ? (
               <ThemedText type="small" themeColor="textSecondary">
-                No Free é só você.
+                Seu plano é para uma pessoa.
               </ThemedText>
             ) : null}
             {/* Sem botão aqui de propósito: o "Ver planos" mora embaixo do "Convidar"

@@ -24,19 +24,14 @@ export interface StoreProduct {
   id: string;
   plan: PaidPlan;
   period: 'monthly' | 'annual';
-  /** só para exibir — o preço que vale é o que a loja devolve no device */
-  fallbackPrice: string;
 }
 
 export const STORE_PRODUCTS: StoreProduct[] = [
-  { id: 'proops.personal.pro.monthly', plan: 'pro', period: 'monthly', fallbackPrice: 'R$ 24,90/mês' },
-  { id: 'proops.personal.pro.annual', plan: 'pro', period: 'annual', fallbackPrice: 'R$ 249,00/ano' },
-  { id: 'proops.personal.family.monthly', plan: 'family', period: 'monthly', fallbackPrice: 'R$ 39,90/mês' },
-  { id: 'proops.personal.family.annual', plan: 'family', period: 'annual', fallbackPrice: 'R$ 399,00/ano' },
+  { id: 'proops.personal.pro.monthly', plan: 'pro', period: 'monthly' },
+  { id: 'proops.personal.pro.annual', plan: 'pro', period: 'annual' },
+  { id: 'proops.personal.family.monthly', plan: 'family', period: 'monthly' },
+  { id: 'proops.personal.family.annual', plan: 'family', period: 'annual' },
 ];
-
-/** Dias de teste grátis. Configurado como introductory offer nas duas lojas. */
-export const TRIAL_DAYS = 7;
 
 /** id do entitlement na RevenueCat — um só, porque o plano vem do produto. */
 export const ENTITLEMENT_ID = 'premium';

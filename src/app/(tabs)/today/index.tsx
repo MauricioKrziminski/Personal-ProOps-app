@@ -31,6 +31,7 @@ import { VerMais } from '@/components/ui/ver-mais';
 import { Motion, Radius, Space } from '@/design/tokens';
 import { useAlertasNaoLidos } from '@/hooks/use-alertas-vistos';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
+import { useSemAssinatura } from '@/hooks/use-acesso';
 import { useAgora } from '@/hooks/use-agora';
 import { useBoolPref } from '@/hooks/use-bool-pref';
 import { usarDica } from '@/hooks/use-dicas';
@@ -52,6 +53,7 @@ import { useSetupProgress } from '@/hooks/use-setup-progress';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { caixaDasContas } from '@/lib/account-cash';
 import { entraNoDisponivel } from '@/lib/accounts';
+import { ROTA_PAYWALL_LEITURA } from '@/lib/acesso';
 import { PASSO } from '@/lib/aos-poucos';
 import { orcamentosApertados } from '@/lib/budget-tight';
 import { diaCurtoBR, diasAte, greetingBR, rotuloDoDia, somaDias } from '@/lib/dates';
@@ -300,6 +302,7 @@ export default function TodayScreen() {
     destino tem que mostrar o período que a tela nomeou (`finance.md`).
   */
   const [detalheDoDia, setDetalheDoDia] = useState(false);
+  const semAssinatura = useSemAssinatura();
   const abrirDetalhe = () => {
     usarDica('hoje-painel');
     setDetalheDoDia(true);
@@ -345,7 +348,18 @@ export default function TodayScreen() {
 
   /* Um card de descoberta por vez (23/09/2026): o Próximo passo espera os Primeiros passos. A
      projeção não tem dado que diga "já viu" — abrir é o que conta, então tocar dispensa. */
-  const passosBlock = mostrarPassos ? (
+  // Sem assinatura (venceu), o lugar do card de descoberta diz por que nada se lança — uma vez, sem herói.
+  const passosBlock = semAssinatura ? (
+    <Bloco key="passos">
+      <EmptyState
+        compacto
+        icon="lock"
+        title="Sua assinatura acabou"
+        hint="Seus dados continuam aqui para consulta."
+        action={{ label: 'Assinar', onPress: () => router.push(ROTA_PAYWALL_LEITURA) }}
+      />
+    </Bloco>
+  ) : mostrarPassos ? (
     <Bloco key="passos">
       <SetupChecklist
         passos={setup.passos}

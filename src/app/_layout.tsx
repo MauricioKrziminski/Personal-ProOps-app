@@ -13,8 +13,8 @@ import {
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { useFonts } from 'expo-font';
 import simbolosAndroid from 'expo-symbols/androidWeights/regular';
-import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, useRootNavigationState } from 'expo-router';
+import { focusManager, MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider, usePathname, useRootNavigationState } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { AppState, Platform } from 'react-native';
@@ -38,6 +38,9 @@ import { carregarPreferencias } from '@/hooks/use-preferencia';
 import { SessionProvider, useSession } from '@/hooks/use-session';
 import { SemConexao } from '@/components/auth/sem-conexao';
 import { hasCompletedOnboarding } from '@/lib/onboarding';
+import { useDestino } from '@/hooks/use-acesso';
+import { aoFalharEscrita } from '@/lib/acesso';
+import { identificar } from '@/lib/compras';
 import { attachNotificationListeners, configureNotificationHandler } from '@/lib/notifications';
 
 SplashScreen.preventAutoHideAsync();
@@ -68,6 +71,16 @@ const modalOptions = {
 const limparCache = () => queryClient.clear();
 
 const queryClient = new QueryClient({
+  /*
+    Escrita recusada por falta de assinatura (PT402, o banco é quem trava) abre o paywall em
+    QUALQUER tela, sem cada hook lembrar. O `onError` de cada mutation continua rodando e pode
+    mostrar o próprio toast por cima — aceito: o paywall é a resposta, o toast é só ruído.
+  */
+  mutationCache: new MutationCache({
+    onError: (error) => {
+      aoFalharEscrita(error, (rota) => router.push(rota as never));
+    },
+  }),
   defaultOptions: {
     queries: {
       // Antes não havia opção default nenhuma: cada foco/mount podia refazer todas as RPCs.
@@ -108,6 +121,7 @@ export default function RootLayout() {
       e a lista de notas, amanhã o que vier.
     */
     <GestureHandlerRootView>
+      <QueryClientProvider client={queryClient}>
       <AppThemeProvider>
         {/*
           Tema → cortina (a camada usa tema) → sessão (o portão usa a cortina) → árvore. O efeito
@@ -120,6 +134,7 @@ export default function RootLayout() {
           </SessionProvider>
         </CortinaProvider>
       </AppThemeProvider>
+      </QueryClientProvider>
     </GestureHandlerRootView>
   );
 }
@@ -202,7 +217,15 @@ function AppTree() {
 
   const { session, loading, semConexao, tentarDeNovo } = useSession();
   // `semConexao` também levanta a abertura: sob a tinta ninguém lê o "Tentar de novo".
-  const pronto = (!loading || !!semConexao) && (fontsLoaded || !!fontError);
+  const userIdDaSessao = session?.user.id ?? null;
+  const onboardingConcluido = !!session && hasCompletedOnboarding(session.user.user_metadata);
+  // O plano decide entre o app e o portão de assinatura; enquanto chega, a abertura segura (não pisca).
+  const destino = useDestino(!!session, onboardingConcluido);
+  // RevenueCat com o id do usuário do Supabase (nunca anônimo): entra, troca e sai com a sessão.
+  useEffect(() => {
+    void identificar(userIdDaSessao);
+  }, [userIdDaSessao]);
+  const pronto = (!loading || !!semConexao) && (fontsLoaded || !!fontError) && destino !== 'aguarda';
   // As preferências de tela (régua, horizonte, período) chegam à memória com a sessão, antes de
   // qualquer tela que as leia: assim a tela nasce como a pessoa deixou, sem trocar um quadro depois.
   const userId = session?.user.id;
@@ -221,7 +244,7 @@ function AppTree() {
   const statusBarStyle = barStyle;
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <>
       <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
         {/* Requisito do `react-native-keyboard-controller`: sem o provider os componentes de
             teclado (o editor de nota) não recebem evento nenhum. Sem `statusBarTranslucent` /
@@ -254,7 +277,7 @@ function AppTree() {
               */}
               {loading && semConexao && tentarDeNovo ? (
                 <SemConexao onRetry={tentarDeNovo} />
-              ) : loading || !(fontsLoaded || fontError) ? null : (
+              ) : loading || destino === 'aguarda' || !(fontsLoaded || fontError) ? null : (
               /*
                * `statusBarStyle` mora AQUI, e só aqui.
                *
@@ -365,7 +388,12 @@ function AppTree() {
                 <Stack.Protected guard={!!session && !hasCompletedOnboarding(session.user.user_metadata)}>
                   <Stack.Screen name="onboarding" options={{ headerShown: false }} />
                 </Stack.Protected>
-                <Stack.Protected guard={!!session && hasCompletedOnboarding(session.user.user_metadata)}>
+                {/* Nunca assinou: só existe a tela de assinatura, sem ✕. Some sozinha quando o plano
+                    vira `subscriber` (o guard do app abre, este fecha — porta de mão única). */}
+                <Stack.Protected guard={destino === 'assinar'}>
+                  <Stack.Screen name="assinar" options={{ headerShown: false }} />
+                </Stack.Protected>
+                <Stack.Protected guard={destino === 'app'}>
                   {/* As cinco raízes de aba. Elas desenham o `AppHeader` por conta própria. */}
                   <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 
@@ -518,6 +546,6 @@ function AppTree() {
           </ConcealProvider>
         </KeyboardProvider>
       </ThemeProvider>
-    </QueryClientProvider>
+    </>
   );
 }

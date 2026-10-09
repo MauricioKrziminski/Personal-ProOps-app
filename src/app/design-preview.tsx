@@ -979,13 +979,14 @@ function seedClient() {
   ]);
 
   client.setQueryData<PlanStatus>(['plan-status'], {
+    access: 'subscriber',
     plan: 'pro',
-    members: 2,
-    max_members: 5,
+    members: 1,
+    max_members: 1,
     ai_messages_month: 143,
     ai_messages_whatsapp: 89,
     ai_messages_app: 54,
-    max_ai_messages_month: 1000,
+    max_ai_messages_month: 400,
     can_import: true,
     current_period_end: ultimoDia,
     is_trial: false,

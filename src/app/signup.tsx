@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
 import { Motion, Space } from '@/design/tokens';
 import { authErrorMessage } from '@/lib/auth-errors';
+import { abrirLegal, URL_PRIVACIDADE, URL_TERMOS } from '@/lib/links-legais';
 import { supabase } from '@/lib/supabase';
 
 /** Janela antes de liberar o reenvio — a mesma do OTP por WhatsApp. */
@@ -144,6 +145,19 @@ export default function SignupScreen() {
     <AuthScreen
       footer={
         <>
+          {onForm ? (
+            <ThemedText type="footnote" themeColor="textSecondary" style={styles.legal}>
+              Ao criar a conta você aceita os{' '}
+              <ThemedText type="footnote" themeColor="textSecondary" style={styles.link} accessibilityRole="link" onPress={() => abrirLegal(URL_TERMOS)}>
+                Termos
+              </ThemedText>{' '}
+              e a{' '}
+              <ThemedText type="footnote" themeColor="textSecondary" style={styles.link} accessibilityRole="link" onPress={() => abrirLegal(URL_PRIVACIDADE)}>
+                Política de Privacidade
+              </ThemedText>
+              .
+            </ThemedText>
+          ) : null}
           <Button
             label={onForm ? 'Criar conta' : 'Confirmar'}
             onPress={onForm ? () => submit() : () => verify()}
@@ -306,4 +320,7 @@ const styles = StyleSheet.create({
   step: { gap: Space.xl },
   copy: { gap: Space.sm },
   note: { flexDirection: 'row', alignItems: 'center', gap: Space.sm },
+  legal: { textAlign: 'center' },
+  // Link é sublinhado, não colorido (design.md §2b).
+  link: { textDecorationLine: 'underline' },
 });

@@ -3309,10 +3309,11 @@ export function useFinancialHealth() {
 
 // ── plano, família e assinatura ─────────────────────────────────────────────
 
+/** Sem preço: o preço só existe na loja (`getOfferings`). `free` é "sem assinatura", não um plano. */
 export const PLANS = [
-  { value: 'free', label: 'Free', price: 'grátis', pitch: '1 pessoa · 100 mensagens/mês' },
-  { value: 'pro', label: 'Pro', price: 'R$ 24,90/mês', pitch: '3 pessoas · 1.000 mensagens · importação' },
-  { value: 'family', label: 'Família', price: 'R$ 39,90/mês', pitch: '5 pessoas · 2.000 mensagens · importação' },
+  { value: 'free', label: 'Sem assinatura', pitch: 'Só consulta' },
+  { value: 'pro', label: 'Pro', pitch: '1 pessoa · 400 mensagens/mês · importação' },
+  { value: 'family', label: 'Família', pitch: '5 pessoas · 1.000 mensagens/mês · importação' },
 ] as const;
 
 export type PlanStatus = Fns['plan_status']['Returns'][number];
@@ -3322,15 +3323,18 @@ export type WorkspaceInvite = Pick<
   'id' | 'phone' | 'created_at'
 > & { role: 'member' | 'viewer'; status: 'pending' | 'accepted' | 'revoked' };
 
+/** Opções compartilhadas: o portão da raiz (`use-acesso`) lê a MESMA chave que as telas. */
+export const planStatusQuery = {
+  queryKey: ['plan-status'],
+  queryFn: async (): Promise<PlanStatus | null> => {
+    const { data, error } = await supabase.rpc('plan_status');
+    if (error) throw error;
+    return data?.[0] ?? null;
+  },
+};
+
 export function usePlanStatus() {
-  return useQuery({
-    queryKey: ['plan-status'],
-    queryFn: async (): Promise<PlanStatus | null> => {
-      const { data, error } = await supabase.rpc('plan_status');
-      if (error) throw error;
-      return data?.[0] ?? null;
-    },
-  });
+  return useQuery(planStatusQuery);
 }
 
 export function useInvites() {

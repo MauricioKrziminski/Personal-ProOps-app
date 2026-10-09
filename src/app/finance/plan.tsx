@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
@@ -54,7 +54,7 @@ function selo(status: string, ate: string | null): { texto: string; perigo: bool
       perigo: false,
     };
   }
-  if (status === 'expired') return { texto: 'expirou', perigo: true };
+  if (status === 'expired') return { texto: 'encerrada', perigo: true };
   if (status === 'canceled') {
     return {
       texto: ate ? `ativo até ${formatDateBR(ate)}` : 'cancelado',
@@ -101,8 +101,9 @@ export default function PlanScreen() {
   const teto = plano?.max_ai_messages_month ?? 0;
   const proporcao = teto > 0 ? usadas / teto : 0;
   const estourou = teto > 0 && usadas >= teto;
-  const nomePlano = PLANS.find((p) => p.value === plano?.plan)?.label ?? plano?.plan ?? '';
-  const estado = plano ? selo(plano.status, plano.current_period_end) : null;
+  const encerrada = plano?.access === 'lapsed';
+  const nomePlano = encerrada ? 'Assinatura encerrada' : (PLANS.find((p) => p.value === plano?.plan)?.label ?? plano?.plan ?? '');
+  const estado = plano && !encerrada ? selo(plano.status, plano.current_period_end) : null;
   const naLoja = plano?.provider === 'apple' || plano?.provider === 'google';
 
   /**
@@ -133,7 +134,7 @@ export default function PlanScreen() {
         }),
       naLoja
         ? 'A cobrança é da loja, então o cancelamento acontece lá. Nenhum dado é apagado — e dá para voltar quando quiser, aqui mesmo.'
-        : 'Seu plano volta para o Free no fim do período. Nenhum dado é apagado — e dá para voltar quando quiser, aqui mesmo.'
+        : 'Você continua com acesso até o fim do período. Nenhum dado é apagado — e dá para voltar quando quiser, aqui mesmo.'
     );
 
   const planHero = plano ? (
@@ -147,7 +148,8 @@ export default function PlanScreen() {
         <ThemedText type="subtitle" style={tabular}>{usadas} de {teto}</ThemedText>
         <ProgressBar value={usadas} max={teto} tone={estourou ? 'danger' : proporcao >= 0.9 ? 'warning' : 'tint'} />
         {estourou ? <ThemedText type="small" themeColor="danger">IA pausada até virar o mês</ThemedText> : null}
-        {plano.status === 'expired' ? <ThemedText type="small" themeColor="danger">Sua assinatura expirou{plano.current_period_end ? ` em ${formatDateBR(plano.current_period_end)}` : ''}. Você voltou para o Free e nada foi apagado.</ThemedText> : null}
+        {encerrada ? <ThemedText type="small" themeColor="textSecondary">{`Sua assinatura acabou${plano.current_period_end ? ` em ${formatDateBR(plano.current_period_end)}` : ''}. Seus dados continuam aqui para consulta.`}</ThemedText> : null}
+        {encerrada ? <Button label="Assinar" onPress={() => router.push('/paywall?from=lapsed')} /> : null}
         {plano.status === 'past_due' ? <ThemedText type="small" themeColor="danger">A loja não conseguiu cobrar. Atualize a forma de pagamento por lá.</ThemedText> : null}
       </Card>
     </Animated.View>
@@ -161,7 +163,7 @@ export default function PlanScreen() {
     </Section>
   ) : null;
 
-  const planBilling = plano && plano.plan !== 'free' ? (
+  const planBilling = plano && plano.access === 'subscriber' ? (
     <Section title="Cobrança">
       <Row title="Onde você assinou" icon="creditcard" chevron={false} trailing={<ThemedText type="small" themeColor="textSecondary">{plano.provider === 'apple' ? 'App Store' : plano.provider === 'google' ? 'Google Play' : (plano.provider ?? '—')}</ThemedText>} />
       {plano.current_period_end ? <Row title={plano.status === 'canceled' ? 'Ativo até' : 'Renova em'} icon="calendar" chevron={false} trailing={<ThemedText type="small" themeColor="textSecondary" style={tabular}>{formatDateBR(plano.current_period_end)}</ThemedText>} /> : null}

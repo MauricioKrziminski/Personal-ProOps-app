@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useAbrirPaywallSemAssinatura } from '@/hooks/use-acesso';
 import { StyleSheet, View } from 'react-native';
 import { TrocaSuave } from '@/components/motion/presenca';
 
@@ -69,6 +70,8 @@ function comumDeParams(p: Record<string, string | undefined>): Comum {
  * eles. Editar abre no tipo do registro; trocar o tipo e salvar pergunta o alcance e converte.
  */
 export default function LancarScreen() {
+  // Sem assinatura (modo leitura) o paywall substitui o formulário (`replace`).
+  useAbrirPaywallSemAssinatura();
   const bruto = useLocalSearchParams();
   // A rota pode repetir um parâmetro (`string[]`): vale o primeiro.
   const p: Record<string, string | undefined> = Object.fromEntries(

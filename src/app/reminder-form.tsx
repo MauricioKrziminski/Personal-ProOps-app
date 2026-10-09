@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useAbrirPaywallSemAssinatura } from '@/hooks/use-acesso';
 import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
@@ -257,6 +258,8 @@ const deviceTimezone = () => {
 };
 
 export default function ReminderFormScreen() {
+  // Sem assinatura (modo leitura) o paywall substitui o formulário (`replace`).
+  useAbrirPaywallSemAssinatura();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   // `title` e `noteId` chegam do menu "Criar lembrete" da nota: o título pré-preenche, e o

@@ -112,8 +112,8 @@ function traduzErro(err: unknown): FalhaImport {
 
   if (erro.status === 402) {
     return {
-      titulo: 'Importar é do plano Pro',
-      detalhe: doServidor || 'No Free dá para registrar pelo WhatsApp à vontade.',
+      titulo: 'Importar precisa de uma assinatura',
+      detalhe: doServidor || 'Assine para importar extratos e faturas.',
     };
   }
   if (erro.status === 422) {
@@ -166,7 +166,7 @@ export default function ImportScreen() {
    * e o arquivo — o Free descobria no fim que a porta estava fechada.
    */
   const plano = usePlanStatus();
-  const semPro = plano.data?.plan === 'free';
+  const semPro = plano.data ? !plano.data.can_import : false;
   const [falha, setFalha] = useState<FalhaImport | null>(null);
   const [editando, setEditando] = useState<ImportItem | null>(null);
   const visitaLinha = useRef(0);
@@ -488,7 +488,7 @@ export default function ImportScreen() {
           </>
         ) : semPro ? (
           <Card style={styles.aviso}>
-            <ThemedText type="smallBold">Importar é do plano Pro</ThemedText>
+            <ThemedText type="smallBold">Importar precisa de uma assinatura</ThemedText>
             <Button label="Ver planos" onPress={() => router.push('/paywall')} block />
           </Card>
         ) : accountsQuery.isPending ? (

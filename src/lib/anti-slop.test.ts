@@ -402,6 +402,7 @@ const GHOST_PERMITIDO = new Set([
   'src/app/link-email.tsx', // "Cancelar"/"Trocar e-mail" e "Reenviar código", pares do passo
   'src/app/link-phone.tsx', // idem, com o número
   'src/app/onboarding.tsx', // "Agora não" sob "Continuar"
+  'src/app/paywall.tsx', // Termos/Privacidade e Sair/Apagar conta, sob o "Assinar" / "Restaurar compras"
   'src/app/signup.tsx', // "Já tenho conta" sob "Criar conta"; "Reenviar código"
   'src/components/auth/email-login-screen.tsx', // "Criar conta" sob "Entrar"; links da linha
   'src/components/login-screen.tsx', // "Voltar"/"Trocar número" e "Reenviar código"
@@ -785,6 +786,7 @@ test('Segmented não passa de 4 opções', () => {
  */
 const SEM_SCREEN = new Set([
   'src/app/index.tsx',                 // só um <Redirect>
+  'src/app/assinar.tsx',               // só delega à `TelaDeAssinatura` do paywall (que usa <Screen>)
   'src/app/design-preview.tsx',        // vitrine de dev: monta as raízes de aba à mão
   'src/app/onboarding.tsx',            // fluxo de tela cheia, com paginação própria
   // As seis portas de conta compartilham a moldura `AuthScreen`.
@@ -1535,7 +1537,7 @@ const VAZIO_GRANDE_PERMITIDO: Record<string, string[]> = {
   'app/finance/rules.tsx': ['Nenhuma regra ainda'],
   'app/finance/transactions.tsx': ['Nenhum lançamento ainda', 'Nada em'],
   'app/finance/wallet.tsx': ['Nenhum cartão cadastrado'],
-  'app/import-history.tsx': ['Importação é do Pro', 'Nenhuma importação ainda'],
+  'app/import-history.tsx': ['Importar precisa de uma assinatura', 'Nenhuma importação ainda'],
   'app/import.tsx': ['Nada para revisar neste arquivo'],
   'app/notes/archived.tsx': ['Não deu para carregar o arquivo', 'Nada arquivado'], // tablet: outro painel
   'app/notes/folder/[id].tsx': ['Pasta não encontrada', 'A pasta'], // só os chips de tag (filtro) acima

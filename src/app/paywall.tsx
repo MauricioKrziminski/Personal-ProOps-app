@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -18,16 +18,26 @@ import { ProgressBar } from '@/components/ui/sparkline';
 import { Motion, Radius, Space, Type, tabular } from '@/design/tokens';
 import { MaxContentWidth } from '@/constants/theme';
 import { PLANS, usePlanStatus } from '@/hooks/use-finance';
-import { TRIAL_DAYS } from '@/lib/billing';
 import { useTheme } from '@/hooks/use-theme';
+import { useApagarConta } from '@/hooks/use-apagar-conta';
+import { useComprar, useOfertas } from '@/hooks/use-compras';
+import { ToastDoModal, useToast } from '@/components/ui/toast';
+import { confirmDestructive } from '@/lib/item-actions';
+import { LOJA } from '@/lib/compras';
+import { abrirLegal, URL_PRIVACIDADE, URL_TERMOS } from '@/lib/links-legais';
+import { opcoesDaLoja, rotuloDoBotao, textoDeRenovacao } from '@/lib/oferta';
+import { supabase } from '@/lib/supabase';
 
 /**
  * Assinar — "o que eu ganho pagando, e o que acontece se eu desistir?".
  *
  * **Nenhum preço mora nesta tela.** Preço varia por país, por promoção e por imposto, e o que
- * vale é o que a loja devolve no aparelho (`getOfferings()`). Enquanto `react-native-purchases`
- * não estiver instalado, o botão de compra fica desabilitado **com o motivo escrito** — botão que
- * não pode funcionar é pior que botão ausente, e preço escrito à mão é pior que os dois.
+ * vale é o que a loja devolve no aparelho (`getOfferings()`). Sem oferta (sem chave, sem módulo
+ * nativo ou loja fora do ar) a tela diz "Assinatura indisponível" — preço escrito à mão é pior.
+ *
+ * Duas formas, um componente: modal fechável (`/paywall`) e **portão** (`/assinar`, sem ✕), que a
+ * raiz mostra a quem nunca assinou. O portão leva Restaurar, Sair e Apagar conta (exigências das
+ * lojas: quem não assina precisa conseguir ir embora).
  *
  * Sem contagem regressiva, sem "oferta acaba hoje", sem preço riscado. O produto se posiciona
  * contra dark pattern de cobrança; a tela de cobrança é onde isso é verdade ou mentira.
@@ -50,26 +60,78 @@ const MOTIVOS: Record<string, Motivo> = {
   },
   trial_ending: {
     titulo: 'Seu teste grátis está acabando',
-    linha: 'Nada é apagado se voltar ao Free',
+  },
+  lapsed: {
+    titulo: 'Sua assinatura acabou',
+    linha: 'Seus dados continuam aqui para consulta. Assine para voltar a lançar.',
+  },
+  portao: {
+    titulo: 'Assine para começar',
+    linha: 'Teste grátis pela loja; cancele quando quiser.',
   },
   plan: {
     titulo: 'Escolha seu plano',
   },
 };
 
-export default function PaywallScreen() {
+/** Quem nunca assinou e entrou pelo portão vê a oferta de teste; quem já teve, não. */
+export function TelaDeAssinatura({ portao = false }: { portao?: boolean }) {
   const theme = useTheme();
   const params = useLocalSearchParams<{ from?: string }>();
   const plano = usePlanStatus();
-  const [escolhido, setEscolhido] = useState<'pro' | 'family'>('pro');
+  const toast = useToast();
+  const ofertas = useOfertas();
+  const comprar = useComprar();
+  const { apagar, apagando } = useApagarConta();
+  const [escolhido, setEscolhido] = useState<string | null>(null);
 
-  const motivo = MOTIVOS[params.from ?? 'plan'] ?? MOTIVOS.plan;
-  const pagos = PLANS.filter((p) => p.value !== 'free');
+  const motivo = MOTIVOS[portao ? 'portao' : (params.from ?? 'plan')] ?? MOTIVOS.plan;
+  const assinante = plano.data?.access === 'subscriber';
   const usadas = plano.data?.ai_messages_month ?? 0;
   const teto = plano.data?.max_ai_messages_month ?? 0;
   const nomeAtual = PLANS.find((p) => p.value === plano.data?.plan)?.label ?? plano.data?.plan ?? '';
-  const naWeb = Platform.OS === 'web';
   const insets = useSafeAreaInsets();
+
+  // Teste grátis só para quem nunca assinou: a loja é quem decide de verdade, a tela só não promete.
+  const opcoes = opcoesDaLoja(ofertas.data ?? [], plano.data?.access === 'never');
+  const atual = opcoes.find((o) => o.pacote.identifier === escolhido) ?? opcoes[0];
+  const nomeDoPlano = (p: 'pro' | 'family') => PLANS.find((x) => x.value === p);
+  const jaTem = assinante && atual?.plano === plano.data?.plan;
+  const semOferta = ofertas.indisponivel || (ofertas.isSuccess && opcoes.length === 0);
+
+  const resultado = (r: 'ativo' | 'aguardando' | 'cancelado') => {
+    if (r === 'ativo') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      toast({ message: 'Assinatura ativa. Obrigado!', tone: 'success' });
+      if (!portao) router.back();
+    } else if (r === 'aguardando') {
+      toast({ message: 'Estamos confirmando sua assinatura. Pode levar alguns instantes.', tone: 'info' });
+    }
+  };
+  const aoFalhar = () => toast({ message: 'Não deu para concluir agora. Tente de novo.', tone: 'error' });
+  const assinar = () => {
+    if (!atual) return;
+    comprar.mutate({ tipo: 'comprar', pacote: atual.pacote as never }, { onSuccess: resultado, onError: aoFalhar });
+  };
+  const restaurar = () => {
+    if (semOferta && ofertas.indisponivel) {
+      toast({ message: 'Compras indisponíveis neste aparelho.', tone: 'error' });
+      return;
+    }
+    comprar.mutate({ tipo: 'restaurar' }, {
+      onSuccess: (r) =>
+        r === 'aguardando'
+          ? toast({ message: 'Não encontramos uma assinatura para restaurar.', tone: 'info' })
+          : resultado(r),
+      onError: aoFalhar,
+    });
+  };
+  const sair = () => {
+    confirmDestructive('Sair da conta?', 'Sair', () => {
+      void supabase.auth.signOut();
+    });
+  };
+  const ocupado = comprar.isPending || apagando;
 
   return (
     /*
@@ -78,9 +140,9 @@ export default function PaywallScreen() {
       para fora junto com o conteúdo — e paywall que não fecha é reprovação na App Review.
     */
     <Screen scroll={false} grouped>
-      <TaskHeader title="Assinar" onClose={() => router.back()} />
+      {portao ? null : <TaskHeader title="Assinar" onClose={() => router.back()} />}
       <ScrollView keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[styles.corpo, { paddingBottom: insets.bottom + Space.xxl }]}
+        contentContainerStyle={[styles.corpo, { paddingBottom: insets.bottom + Space.xxl }, portao && { paddingTop: insets.top + Space.xl }]}
         showsVerticalScrollIndicator={false}>
 
       <View style={styles.bloco}>
@@ -92,15 +154,9 @@ export default function PaywallScreen() {
         ) : null}
       </View>
 
-      {plano.isLoading ? (
-        <>
-          <Skeleton height={148} radius={Radius.lg} />
-          <Skeleton height={110} radius={Radius.md} />
-          <Skeleton height={110} radius={Radius.md} />
-        </>
-      ) : null}
+      {plano.isLoading ? <Skeleton height={110} radius={Radius.lg} /> : null}
 
-      {/* Falhar aqui não pode virar "você é Free". */}
+      {/* Falhar aqui não pode virar "você não assina". */}
       {plano.isError ? (
         <Section title="Seu plano">
           <Row
@@ -112,12 +168,10 @@ export default function PaywallScreen() {
         </Section>
       ) : null}
 
-      {/* O único destaque da tela: os limites de verdade, do banco, não da propaganda. */}
-      {plano.data ? (
+      {/* O único destaque da tela: os limites de verdade, do banco, e só de quem assina. */}
+      {plano.data && assinante ? (
         <Animated.View entering={FadeInDown.duration(Motion.duration.slow)}>
           <Card style={styles.hero}>
-            {/* Um rótulo por valor, e sempre ANTES dele — havia dois `HeroLabel` sanduichando o
-                número, "Seu plano hoje" em cima e "mensagens da IA…" embaixo. */}
             <HeroLabel>Seu plano hoje</HeroLabel>
             <ThemedText type="smallBold">{nomeAtual}</ThemedText>
             <HeroLabel>mensagens da IA usadas este mês</HeroLabel>
@@ -134,42 +188,62 @@ export default function PaywallScreen() {
               {plano.data.max_members === 1 ? 'pessoa' : 'pessoas'} ·{' '}
               {plano.data.can_import ? 'importação liberada' : 'importação bloqueada'}
             </ThemedText>
-            {/* Aqui, e não no rodapé: é informação para DECIDIR, e decidir se olha
-                ao lado do número que a qualifica. */}
-            <Note icon="checkmark.circle">
-              {plano.data.plan === 'free'
-                ? 'O Free continua funcionando, sem prazo.'
-                : 'Cancelar devolve ao Free e não apaga nada.'}
-            </Note>
           </Card>
         </Animated.View>
       ) : null}
 
-      {/* Dois planos, não três: o Free não é produto à venda, é o estado padrão. */}
-      {pagos.map((opcao, index) => {
-        const selecionado = escolhido === opcao.value;
+      {ofertas.isLoading ? (
+        <>
+          <Skeleton height={86} radius={Radius.md} />
+          <Skeleton height={86} radius={Radius.md} />
+        </>
+      ) : null}
+
+      {ofertas.isError ? (
+        <Section title="Planos">
+          <Row
+            title="Não deu para carregar os planos"
+            subtitle="Toque para tentar de novo"
+            icon="exclamationmark.triangle"
+            onPress={() => ofertas.refetch()}
+          />
+        </Section>
+      ) : null}
+
+      {semOferta ? (
+        <Card style={styles.hero}>
+          <ThemedText type="smallBold">Assinatura indisponível no momento</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            Tente de novo mais tarde.
+          </ThemedText>
+        </Card>
+      ) : null}
+
+      {opcoes.map((opcao, index) => {
+        const selecionado = atual?.pacote.identifier === opcao.pacote.identifier;
+        const info = nomeDoPlano(opcao.plano);
         return (
           <Animated.View
-            key={opcao.value}
+            key={opcao.pacote.identifier}
             entering={FadeInDown.duration(Motion.duration.base).delay(
               Math.min(index * Motion.stagger.step, Motion.stagger.cap),
             )}>
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ selected: selecionado }}
-              accessibilityLabel={`Plano ${opcao.label}: ${opcao.pitch}`}
+              accessibilityLabel={`Plano ${info?.label}: ${opcao.preco} ${opcao.periodo ?? ''}`}
               onPress={() => {
                 Haptics.selectionAsync();
-                setEscolhido(opcao.value as 'pro' | 'family');
+                setEscolhido(opcao.pacote.identifier);
               }}>
-              <Card
-                style={[
-                  styles.opcao,
-                  { borderColor: selecionado ? theme.tint : 'transparent' },
-                ]}>
-                <ThemedText type="smallBold">{opcao.label}</ThemedText>
+              <Card style={[styles.opcao, { borderColor: selecionado ? theme.tint : 'transparent' }]}>
+                <ThemedText type="smallBold">{info?.label}</ThemedText>
                 <ThemedText type="small" themeColor="textSecondary">
-                  {opcao.pitch}
+                  {info?.pitch}
+                </ThemedText>
+                <ThemedText type="smallBold" style={tabular}>
+                  {opcao.preco}
+                  {opcao.periodo ? ` ${opcao.periodo}` : ''}
                 </ThemedText>
               </Card>
             </Pressable>
@@ -178,37 +252,41 @@ export default function PaywallScreen() {
       })}
 
       <View style={styles.bloco}>
-        {naWeb ? (
-          <ThemedText type="smallBold">Assinatura só pelo aplicativo</ThemedText>
-        ) : plano.isLoading ? (
-          // O rótulo depende do plano ("Começar N dias grátis" vira "Seu plano atual"): enquanto
-          // ele chega o botão é forma, na altura do `Button` md (25/09/2026).
-          <Skeleton height={50} radius={Radius.pill} />
-        ) : (
-          <Button
-            // Oferecer "dias grátis" do plano que a pessoa JÁ tem era a oferta de teste para quem
-            // está pagando: no plano atual o botão diz o que é, sem cadeado.
-            label={escolhido === plano.data?.plan ? 'Seu plano atual' : `Começar ${TRIAL_DAYS} dias grátis`}
-            icon={escolhido === plano.data?.plan ? 'checkmark.circle' : 'lock'}
-            disabled
-            onPress={() => {}}
-            block
-          />
-        )}
-        {/*
-          UMA linha depois do botão, não três parágrafos empilhados.
-          Eram três blocos de `type="small"` seguidos — o exemplo canônico da
-          queixa "esses textos explicativos embaixo do botão não está bonito".
-          A régua que ficou: texto que ajuda a DECIDIR vem antes do botão; texto
-          que tranquiliza sobre a CONSEQUÊNCIA vem depois, e é uma linha só.
-          O que o Free continua fazendo é informação para decidir, então subiu
-          para o card do plano, ao lado do número que ela qualifica.
-        */}
-        {naWeb ? null : <Note icon="clock">Compra pelas lojas em breve</Note>}
+        {opcoes.length > 0 ? (
+          <>
+            <Button
+              label={jaTem ? 'Seu plano atual' : rotuloDoBotao(atual)}
+              icon={jaTem ? 'checkmark.circle' : undefined}
+              disabled={jaTem || ocupado}
+              loading={comprar.isPending}
+              onPress={assinar}
+              block
+            />
+            <Note icon="clock">{textoDeRenovacao(atual, LOJA)}</Note>
+          </>
+        ) : null}
+        <Button label="Restaurar compras" variant="secondary" disabled={ocupado} onPress={restaurar} block />
       </View>
+
+      <View style={styles.legais}>
+        <Button label="Termos de Uso" variant="ghost" size="sm" onPress={() => abrirLegal(URL_TERMOS)} />
+        <Button label="Política de Privacidade" variant="ghost" size="sm" onPress={() => abrirLegal(URL_PRIVACIDADE)} />
+      </View>
+
+      {portao ? (
+        <View style={styles.bloco}>
+          <Button label="Sair da conta" variant="ghost" size="sm" disabled={ocupado} onPress={sair} />
+          <Button label="Apagar conta" variant="ghost" size="sm" disabled={ocupado} onPress={apagar} />
+        </View>
+      ) : null}
       </ScrollView>
+      {portao ? null : <ToastDoModal />}
     </Screen>
   );
+}
+
+export default function PaywallScreen() {
+  return <TelaDeAssinatura />;
 }
 
 const styles = StyleSheet.create({
@@ -225,6 +303,12 @@ const styles = StyleSheet.create({
     gap: Space.md,
   },
   hero: {
+    gap: Space.md,
+  },
+  legais: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: Space.md,
   },
   opcao: {

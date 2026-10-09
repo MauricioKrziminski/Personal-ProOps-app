@@ -253,8 +253,8 @@ export default function ImportHistoryScreen() {
       {!batches.isLoading && !batches.isError && lista.length === 0 && !filtered && bloqueadoNoPlano ? (
         <EmptyState
           icon="lock"
-          title="Importação é do Pro"
-          hint="No Free dá para registrar pelo WhatsApp à vontade — foto de cupom e PDF de fatura também viram lançamento."
+          title="Importar precisa de uma assinatura"
+          hint="Assine para importar extratos e faturas."
           action={{
             label: 'Ver planos',
             onPress: () => router.push({ pathname: '/paywall', params: { from: 'import' } }),

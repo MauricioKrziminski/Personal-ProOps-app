@@ -40,6 +40,9 @@ import { useSession } from '@/hooks/use-session';
 import { useTheme, useThemeMode, type ThemeMode } from '@/hooks/use-theme';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { ondaDaTroca } from '@/lib/session-gate';
+import { estadoDoPlano } from '@/lib/acesso';
+import { useApagarConta } from '@/hooks/use-apagar-conta';
+import { abrirLegal, URL_PRIVACIDADE, URL_TERMOS } from '@/lib/links-legais';
 import { appUpdateAction, appUpdateSubtitle, type AppUpdateState } from '@/lib/app-update';
 import { supabase, supabaseUrl } from '@/lib/supabase';
 import { telefoneLegivel } from '@/lib/phone-br';
@@ -74,6 +77,10 @@ export default function ProfileScreen() {
   const userId = session?.user?.id;
 
   const plan = usePlanStatus();
+  const estadoPlano = plan.data
+    ? estadoDoPlano(plan.data, plan.data.current_period_end ? formatDateBR(plan.data.current_period_end) : null)
+    : null;
+  const { apagar: apagarConta, apagando } = useApagarConta();
   const ia = useAiMonthStats(currentMonth());
   const profile = useProfile(userId);
   const saveName = useUpdateProfile(userId);
@@ -439,20 +446,18 @@ export default function ProfileScreen() {
         <View style={[styles.planoCard, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
           <View style={styles.planoTopo}>
             <View style={styles.shrink}>
-              <ThemedText type="smallBold">{`Plano ${plan.data.plan}`}</ThemedText>
+              <ThemedText type="smallBold">{estadoPlano!.titulo}</ThemedText>
               <ThemedText type="caption" themeColor="textSecondary">
-                {plan.data.is_trial
-                  ? `Teste até ${formatDateBR(plan.data.current_period_end)}`
-                  : `${plan.data.members} de ${plan.data.max_members} ${plan.data.max_members === 1 ? 'pessoa' : 'pessoas'}`}
+                {estadoPlano!.detalhe}
               </ThemedText>
             </View>
             <View
               style={[
                 styles.planoBadge,
-                { backgroundColor: plan.data.is_trial ? theme.warningSoft : theme.successSoft },
+                { backgroundColor: estadoPlano!.selo === 'ATIVO' ? theme.successSoft : theme.warningSoft },
               ]}>
-              <ThemedText type="meta" themeColor={plan.data.is_trial ? 'warning' : 'success'}>
-                {plan.data.is_trial ? 'TESTE' : 'ATIVO'}
+              <ThemedText type="meta" themeColor={estadoPlano!.selo === 'ATIVO' ? 'success' : 'warning'}>
+                {estadoPlano!.selo}
               </ThemedText>
             </View>
           </View>
@@ -498,6 +503,11 @@ export default function ProfileScreen() {
 
       <AppAndHelp />
 
+      <Section title="Legal">
+        <Row title="Termos de Uso" icon="doc.text" onPress={() => abrirLegal(URL_TERMOS)} />
+        <Row title="Política de Privacidade" icon="lock" onPress={() => abrirLegal(URL_PRIVACIDADE)} />
+      </Section>
+
       <Section>
         <Row
           title="Sair da conta"
@@ -505,6 +515,13 @@ export default function ProfileScreen() {
           destructive
           chevron={false}
           onPress={saindo ? undefined : confirmSignOut}
+        />
+        <Row
+          title="Apagar conta"
+          icon="trash"
+          destructive
+          chevron={false}
+          onPress={saindo || apagando ? undefined : apagarConta}
         />
       </Section>
 

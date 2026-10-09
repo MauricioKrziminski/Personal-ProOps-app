@@ -61,7 +61,7 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; notesPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; resumoErro?: boolean; arquivados?: any[]; mudaram?: string[]; errosDosAdiantamentos?: Record<string, string>; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean; favoritos?: any[]; favoritosArquivados?: any[]; billReminders?: any[]; billRemindersPending?: boolean; pausaPrevia?: any; pausaBuscando?: boolean; carencias?: any[]; carenciaPrevia?: any; carenciaBuscando?: boolean; carenciasPendentes?: boolean; carenciasErro?: boolean; carenciaErro?: boolean } = {}) {
+function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; notesPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; resumoErro?: boolean; arquivados?: any[]; mudaram?: string[]; errosDosAdiantamentos?: Record<string, string>; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean; favoritos?: any[]; favoritosArquivados?: any[]; billReminders?: any[]; billRemindersPending?: boolean; pausaPrevia?: any; pausaBuscando?: boolean; carencias?: any[]; carenciaPrevia?: any; carenciaBuscando?: boolean; carenciasPendentes?: boolean; carenciasErro?: boolean; carenciaErro?: boolean; access?: string; ofertas?: any[] } = {}) {
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
@@ -201,13 +201,20 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
     useDeleteImportBatch: () => mutation('deleteImportBatch'),
     useRecentTransactions: () => (options.recent ? { ...query, isSuccess: true, data: options.recent } : query),
     PLANS: [
-      { value: 'free', label: 'Free', price: 'grátis', pitch: '1 pessoa' },
-      { value: 'pro', label: 'Pro', price: 'R$ 24,90/mês', pitch: '3 pessoas' },
-      { value: 'family', label: 'Família', price: 'R$ 39,90/mês', pitch: '5 pessoas' },
+      { value: 'free', label: 'Sem assinatura', pitch: 'Só consulta' },
+      { value: 'pro', label: 'Pro', pitch: '1 pessoa' },
+      { value: 'family', label: 'Família', pitch: '5 pessoas' },
     ],
     usePlanStatus: () => options.planPending
       ? { ...query, isPending: true, data: undefined }
-      : { ...query, isPending: false, isSuccess: true, data: { plan: options.plan ?? 'pro' } },
+      : { ...query, isPending: false, isSuccess: true, data: {
+          plan: options.plan ?? 'pro',
+          // 'free' no banco = sem assinatura: o app lê `access`, e quem nunca assinou nem chega ao app.
+          access: options.access ?? ((options.plan ?? 'pro') === 'free' ? 'lapsed' : 'subscriber'),
+          can_import: (options.plan ?? 'pro') !== 'free',
+          is_trial: false, members: 1, max_members: 1, ai_messages_month: 3, max_ai_messages_month: 400,
+          current_period_end: null, status: 'active', provider: 'apple',
+        } },
     useMonthLines: () => ({ ...query, data: options.monthLines ?? [] }),
     useCycleLines: () => ({ ...query, data: options.cycleLines ?? [] }),
     // O rascunho como registros de `simular` (08/10/2026): cada hipótese e cada adiantamento é UM registro.
@@ -680,6 +687,19 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
         useSaveBillReminder: () => mutation('saveBillReminder'),
       };
       if (name === '@/hooks/use-push') return { useAlertPreferences: () => ({ ...query, data: { push: true, whatsapp: true } }) };
+      if (name === '@/lib/acesso') return load('src/lib/acesso.ts');
+      if (name === '@/hooks/use-acesso') return load('src/hooks/use-acesso.ts');
+      if (name === '@/lib/oferta') return load('src/lib/oferta.ts');
+      if (name === '@/lib/billing') return load('src/lib/billing.ts');
+      if (name === '@/lib/links-legais') return load('src/lib/links-legais.ts');
+      if (name === 'expo-web-browser') return { openBrowserAsync: (url: string) => navigations.push({ navegador: url }) };
+      // Loja fora do aparelho: `ofertas` indefinido = sem chave/módulo (estado "indisponível").
+      if (name === '@/lib/compras') return { LOJA: 'App Store', comprasDisponiveis: () => options.ofertas !== undefined, identificar: async () => {} };
+      if (name === '@/hooks/use-compras') return {
+        useOfertas: () => ({ ...query, data: options.ofertas ?? [], isSuccess: options.ofertas !== undefined, indisponivel: options.ofertas === undefined }),
+        useComprar: () => mutation('comprar'),
+      };
+      if (name === '@/hooks/use-apagar-conta') return { useApagarConta: () => ({ apagar: () => writes.push({ operation: 'apagarConta', value: null }), apagando: false }) };
       if (name === '@/hooks/use-session') return { useSession: () => ({ session: { user: { id: 'user-1' } } }) };
       if (name === '@/hooks/use-profile') return { useProfile: () => ({ ...query, isSuccess: true, data: { display_name: 'Gabriel Almeida', phone: null } }) };
       if (name === '@/hooks/use-proximo-passo') return { useProximoPasso: () => ({ passo: options.proximo ?? null, dispensar: (id: string) => writes.push({ operation: 'dispensarProximo', value: id }), consultas: [] }) };
@@ -2420,9 +2440,9 @@ const importFile = 'src/app/import.tsx';
 const contasDoImport = [{ id: 'card-1', name: 'Nubank Cartão', type: 'credit_card' }, { id: 'conta-1', name: 'Nubank', type: 'checking' }];
 const temTexto = (ui: any, texto: string) => ui.nodes().some((n: any) => n.type === 'ThemedText' && n.props.children === texto);
 
-test('Importar: no Free o aviso do Pro É a etapa — sem conta, sem arquivo, "Ver planos" leva ao paywall', () => {
+test('Importar: sem importação liberada o aviso É a etapa — sem conta, sem arquivo, "Ver planos" leva ao paywall', () => {
   const ui = screen(importFile, { params: {}, plan: 'free', forecastAccounts: contasDoImport });
-  assert.ok(temTexto(ui, 'Importar é do plano Pro'));
+  assert.ok(temTexto(ui, 'Importar precisa de uma assinatura'));
   assert.equal(ui.nodes().some((n: any) => n.type === 'Button' && n.props.label === 'Escolher arquivo'), false, 'nada de botão que nunca liga');
   assert.equal(ui.nodes().some((n: any) => n.type === 'AccountPicker'), false, 'nada de escolher conta que não leva a lugar nenhum');
   ui.press('Ver planos');
@@ -2844,16 +2864,82 @@ test('Row: fonte de acessibilidade reserva uma linha completa antes de ajustar d
 });
 
 /**
- * Quem já está no Pro via o card do Pro marcado e, embaixo, "Começar 7 dias grátis" — oferta de
- * teste para o plano que a pessoa já tem (visto no iPhone em 24/09/2026). O botão diz o que é.
+ * Assinatura (Fase 3): preço e período só da loja, termo de renovação na tela, e o portão sem ✕.
  */
-test('Paywall: no plano que a pessoa já tem, o botão não oferece dias grátis', () => {
-  const noPro = screen('src/app/paywall.tsx', { plan: 'pro' });
-  const botaoPro = noPro.nodes().find((n: any) => n.type === 'Button');
-  assert.ok(botaoPro, 'o botão existe');
-  assert.equal(botaoPro.props.label, 'Seu plano atual');
-  const noFree = screen('src/app/paywall.tsx', { plan: 'free' });
-  assert.match(String(noFree.nodes().find((n: any) => n.type === 'Button').props.label), /dias grátis/);
+const pacoteDaLoja = (id: string, preco: string, periodo: string, intro: any = null) => ({
+  identifier: id, product: { identifier: id, priceString: preco, subscriptionPeriod: periodo, introPrice: intro },
+});
+const testeDe7Dias = { price: 0, periodUnit: 'DAY', periodNumberOfUnits: 7 };
+const ofertasDoTeste = [
+  pacoteDaLoja('proops.personal.pro.monthly', 'R$ 11,11', 'P1M', testeDe7Dias),
+  pacoteDaLoja('proops.personal.family.annual', 'R$ 99,99', 'P1Y', testeDe7Dias),
+  pacoteDaLoja('produto.desconhecido', 'R$ 1,00', 'P1M'),
+];
+const textosDe = (ui: any): string[] => {
+  const fora: string[] = [];
+  const colher = (c: any) => Array.isArray(c) ? c.forEach(colher) : typeof c === 'string' || typeof c === 'number' ? fora.push(String(c)) : c?.props && colher(c.props.children);
+  ui.nodes().filter((n: any) => n.type === 'ThemedText' || n.type === 'Note').forEach((n: any) => colher(n.props.children));
+  return fora;
+};
+const botoes = (ui: any) => ui.nodes().filter((n: any) => n.type === 'Button').map((n: any) => n.props.label);
+const tela = (extra: any = {}) => screen('src/app/paywall.tsx', { componente: 'TelaDeAssinatura', plan: 'free', access: 'never', ...extra });
+
+test('Paywall sem ofertas: nenhum preço inventado, e Restaurar, Termos e Privacidade continuam na tela', () => {
+  const ui = tela();
+  const t = textosDe(ui).join(' | ');
+  assert.match(t, /Assinatura indisponível no momento/);
+  assert.doesNotMatch(t, /R\$|Free|grátis/, 'sem oferta da loja, sem preço e sem promessa de teste');
+  assert.deepEqual(botoes(ui), ['Restaurar compras', 'Termos de Uso', 'Política de Privacidade']);
+  ui.press('Termos de Uso');
+  assert.deepEqual(ui.navigations.at(-1), { navegador: 'https://proops.com.br/termos' });
+  ui.press('Política de Privacidade');
+  assert.deepEqual(ui.navigations.at(-1), { navegador: 'https://proops.com.br/privacidade' });
+});
+
+test('Paywall: preço e período vêm da loja, o teste só para quem nunca assinou, e a renovação está escrita', () => {
+  const ui = tela({ ofertas: ofertasDoTeste });
+  const t = textosDe(ui).join('');
+  assert.match(t, /R\$ 11,11 por mês/);
+  assert.match(t, /R\$ 99,99 por ano/);
+  assert.doesNotMatch(t, /R\$ 1,00/, 'produto que o servidor não traduz não é oferecido');
+  assert.ok(botoes(ui).includes('Começar 7 dias grátis'));
+  assert.match(t, /Renova automaticamente até você cancelar\. Cancele quando quiser na App Store\./);
+  ui.press('Começar 7 dias grátis');
+  assert.equal(ui.writes.at(-1).operation, 'comprar');
+  assert.equal(ui.writes.at(-1).value.tipo, 'comprar');
+  assert.equal(ui.writes.at(-1).value.pacote.identifier, 'proops.personal.pro.monthly');
+  ui.press('Restaurar compras');
+  assert.equal(ui.writes.at(-1).value.tipo, 'restaurar');
+  // Quem já teve assinatura não é convidado a "começar" um teste que a loja não dá.
+  const voltando = tela({ ofertas: ofertasDoTeste, access: 'lapsed' });
+  assert.ok(botoes(voltando).includes('Assinar'));
+  assert.doesNotMatch(textosDe(voltando).join(' | '), /grátis/);
+});
+
+test('Portão: tela de assinar sem ✕, com Restaurar, Sair, Apagar conta e os links legais', () => {
+  const ui = tela({ ofertas: ofertasDoTeste, props: { portao: true } });
+  assert.equal(ui.nodes().some((n: any) => n.type === 'TaskHeader'), false, 'o portão não se descarta');
+  assert.deepEqual(botoes(ui).filter((l: string) => l !== 'Começar 7 dias grátis'),
+    ['Restaurar compras', 'Termos de Uso', 'Política de Privacidade', 'Sair da conta', 'Apagar conta']);
+  ui.press('Apagar conta');
+  assert.equal(ui.writes.at(-1).operation, 'apagarConta');
+  const modal = tela({ ofertas: ofertasDoTeste });
+  assert.ok(modal.nodes().some((n: any) => n.type === 'TaskHeader'), 'o paywall comum fecha');
+  assert.equal(botoes(modal).includes('Apagar conta'), false);
+});
+
+test('Sem assinatura (lapsed), o formulário de lançar dá lugar ao paywall', () => {
+  const ui = screen('src/app/finance/lancar.tsx', { plan: 'free', access: 'lapsed', executarEfeitos: true, params: {} });
+  assert.deepEqual(ui.navigations.find((n: any) => n.replace), { replace: '/paywall?from=lapsed' });
+  const assinante = screen('src/app/finance/lancar.tsx', { plan: 'pro', executarEfeitos: true, params: {} });
+  assert.equal(assinante.navigations.some((n: any) => n.replace), false);
+});
+
+test('Erro PT402 em qualquer mutation abre o paywall pela raiz', () => {
+  const fonte = readFileSync('src/app/_layout.tsx', 'utf8');
+  assert.match(fonte, /new MutationCache\(\{[\s\S]*aoFalharEscrita\(error/);
+  assert.match(fonte, /guard=\{destino === 'assinar'\}[\s\S]*name="assinar"/);
+  assert.match(fonte, /guard=\{destino === 'app'\}/);
 });
 
 test('Ciclo: dentro de cada grupo, do mais recente para o mais antigo, e 20 por vez com "Ver mais"', () => {

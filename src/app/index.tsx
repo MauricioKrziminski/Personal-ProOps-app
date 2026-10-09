@@ -1,5 +1,6 @@
 import { Redirect } from 'expo-router';
 
+import { useDestino } from '@/hooks/use-acesso';
 import { useSession } from '@/hooks/use-session';
 import { hasCompletedOnboarding } from '@/lib/onboarding';
 
@@ -15,6 +16,9 @@ import { hasCompletedOnboarding } from '@/lib/onboarding';
  */
 export default function Index() {
   const { session, loading } = useSession();
-  if (loading) return null;
-  return <Redirect href={session ? (hasCompletedOnboarding(session.user.user_metadata) ? '/today' : '/onboarding') : '/login'} />;
+  const destino = useDestino(!!session, !!session && hasCompletedOnboarding(session.user.user_metadata));
+  if (loading || destino === 'aguarda') return null;
+  const rota = { conta: '/login', onboarding: '/onboarding', assinar: '/assinar', app: '/today' } as const;
+  // `/assinar` entra nos tipos de rota quando o Expo regenera `.expo/types`.
+  return <Redirect href={rota[destino] as never} />;
 }

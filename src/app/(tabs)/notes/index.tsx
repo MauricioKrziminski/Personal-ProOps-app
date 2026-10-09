@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
 import { router } from 'expo-router';
+import { useSemAssinatura } from '@/hooks/use-acesso';
+import { ROTA_PAYWALL_LEITURA } from '@/lib/acesso';
 import * as Haptics from 'expo-haptics';
 
 import { ColorPicker } from '@/components/notes/color-picker';
@@ -116,6 +118,7 @@ function NoteSkeleton() {
 }
 
 export default function NotesScreen() {
+  const semAssinatura = useSemAssinatura();
   const { windowClass } = useAdaptiveWindow();
   const tablet = windowClass !== 'compact';
   const theme = useTheme();
@@ -243,6 +246,8 @@ export default function NotesScreen() {
   const submitDraft = () => {
     const content = draft.trim();
     if (!content || save.isPending) return;
+    // Modo leitura: o paywall abre e o rascunho fica no campo.
+    if (semAssinatura) return router.push(ROTA_PAYWALL_LEITURA);
     save.mutate(
       { content, folder_id: null },
       {
@@ -361,7 +366,7 @@ export default function NotesScreen() {
           <HeaderIconButton
             icon="square.and.pencil"
             label="Nova nota"
-            onPress={() => router.push('/notes/new')}
+            onPress={() => router.push(semAssinatura ? ROTA_PAYWALL_LEITURA : '/notes/new')}
           />
           <HeaderIconButton icon="ellipsis" label="Mais opções" onPress={menuDaTela} />
         </>
