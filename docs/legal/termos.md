@@ -2,7 +2,7 @@
 
 Vigência: [DATA DE VIGÊNCIA]
 
-Estes Termos regem o uso do aplicativo ProOps e do assistente que responde pelo WhatsApp ("Serviço"), oferecido por [RAZÃO SOCIAL], CNPJ [CNPJ], com sede em [ENDEREÇO] ("ProOps", "nós"). Ao criar uma conta ou usar o Serviço, você declara que leu e concorda com estes Termos e com a [Política de Privacidade](/privacidade).
+Estes Termos regem o uso do aplicativo ProOps e do assistente que responde pelo WhatsApp ("Serviço"), oferecido por PROOPS SOLUTIONS LTDA., CNPJ 69.504.283/0001-05, com sede em Rua Major Feliciano, 549, Centro, Machado/MG, CEP 37750-000 ("ProOps", "nós"). Ao criar uma conta ou usar o Serviço, você declara que leu e concorda com estes Termos e com a [Política de Privacidade](/privacidade).
 
 ## 1. O que é o ProOps
 
@@ -56,7 +56,7 @@ Podemos suspender ou encerrar contas que violem estes Termos, com aviso quando p
 
 Os dados que você registra (lançamentos, notas, anexos, metas etc.) continuam sendo **seus**. Você nos concede apenas a licença necessária para armazená-los, processá-los e exibi-los a você para prestar o Serviço, inclusive enviando trechos a provedores de IA e de transcrição, conforme descrito na Política de Privacidade.
 
-O aplicativo, a marca, o código e o design do ProOps são de propriedade de [RAZÃO SOCIAL] ou de seus licenciantes. Estes Termos não transferem nenhum direito sobre eles, além do direito pessoal, limitado e revogável de uso do Serviço.
+O aplicativo, a marca, o código e o design do ProOps são de propriedade de PROOPS SOLUTIONS LTDA. ou de seus licenciantes. Estes Termos não transferem nenhum direito sobre eles, além do direito pessoal, limitado e revogável de uso do Serviço.
 
 ## 9. Disponibilidade e responsabilidade
 
@@ -74,7 +74,7 @@ Podemos atualizar estes Termos. Mudanças relevantes serão comunicadas no aplic
 
 ## 12. Lei aplicável e foro
 
-Estes Termos são regidos pelas leis da República Federativa do Brasil. Fica eleito o foro da comarca de [CIDADE/UF DO FORO], sem prejuízo do direito do consumidor de ajuizar ação no foro do seu domicílio (art. 101, I, do Código de Defesa do Consumidor).
+Estes Termos são regidos pelas leis da República Federativa do Brasil. Fica eleito o foro da comarca de Machado/MG, sem prejuízo do direito do consumidor de ajuizar ação no foro do seu domicílio (art. 101, I, do Código de Defesa do Consumidor).
 
 ## 13. Contato
 

@@ -2,7 +2,7 @@
 
 Vigência: [DATA DE VIGÊNCIA]
 
-Esta Política explica como [RAZÃO SOCIAL], CNPJ [CNPJ], com sede em [ENDEREÇO] ("ProOps", "nós"), trata dados pessoais no aplicativo ProOps e no assistente do WhatsApp, em conformidade com a Lei Geral de Proteção de Dados (LGPD, Lei 13.709/2018), o Marco Civil da Internet (Lei 12.965/2014) e o Código de Defesa do Consumidor. Somos a **controladora** dos dados.
+Esta Política explica como PROOPS SOLUTIONS LTDA., CNPJ 69.504.283/0001-05, com sede em Rua Major Feliciano, 549, Centro, Machado/MG, CEP 37750-000 ("ProOps", "nós"), trata dados pessoais no aplicativo ProOps e no assistente do WhatsApp, em conformidade com a Lei Geral de Proteção de Dados (LGPD, Lei 13.709/2018), o Marco Civil da Internet (Lei 12.965/2014) e o Código de Defesa do Consumidor. Somos a **controladora** dos dados.
 
 Encarregado pelo tratamento de dados (DPO): [E-MAIL DO ENCARREGADO].
 
