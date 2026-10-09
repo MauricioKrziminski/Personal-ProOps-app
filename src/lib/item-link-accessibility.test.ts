@@ -46,6 +46,7 @@ function harness() {
       console, Date, Set, Map,
       require: (name: string) => {
         if (name === 'react-native') return rn;
+        if (name === 'react-native-worklets') return { scheduleOnRN: (fn: (...a: any[]) => unknown, ...a: unknown[]) => fn(...a) };
         if (name === 'react-native-reanimated') return { Easing: { bezier: () => () => 0, out: (v: unknown) => v, quad: () => 0 } };
         if (name === 'react-native-gesture-handler') return { GestureDetector: identity };
         if (name === 'expo-router') return { ...load('node_modules/expo-router/build/link/Link.js'), router };

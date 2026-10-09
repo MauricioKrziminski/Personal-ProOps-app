@@ -814,6 +814,7 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
     if (name === '@/design/tokens') return { Space: {}, Radius: {}, tabular: {}, Motion: { duration: { base: 200 }, stagger: { step: 30, cap: 400 } } };
     // O Reanimated não roda fora do device; aqui só precisa que `Animated.View` seja um nó com
     // props, que é o que o `visit` do teste percorre.
+    if (name === 'react-native-worklets') return { scheduleOnRN: (fn: (...a: any[]) => unknown, ...a: unknown[]) => fn(...a) };
     if (name === 'react-native-reanimated') {
       const anim = (n: string) => ({ duration: () => anim(n), delay: () => anim(n) });
       return {

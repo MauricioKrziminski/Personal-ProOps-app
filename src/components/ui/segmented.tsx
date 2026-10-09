@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { LayoutChangeEvent, Pressable, StyleSheet, Text, View, type TextProps } from 'react-native';
 import Animated, {
   interpolateColor,
-  runOnJS,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withSpring,
   type SharedValue,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import * as Haptics from 'expo-haptics';
 
 import { Fonts } from '@/constants/theme';
@@ -85,7 +85,7 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
     const alvo = index;
     const assentou = (fim?: boolean) => {
       'worklet';
-      if (fim) runOnJS(setAssentado)(alvo);
+      if (fim) scheduleOnRN(setAssentado, alvo);
     };
     if (index > de) {
       direita.set(withSpring(index + 1, FRENTE));

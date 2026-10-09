@@ -7,7 +7,6 @@ import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Animated, {
-  runOnJS,
   useAnimatedReaction,
   useAnimatedStyle,
   useDerivedValue,
@@ -15,6 +14,7 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
@@ -386,7 +386,7 @@ function ladoQueExecuta(s: Soltura, e: GestureTouchEvent): 'direita' | 'esquerda
       lado === 'esquerda' ? -s.largura.get() : s.largura.get(),
       { duration: Motion.duration.base, easing: Motion.easing.out },
       (fim) => {
-        if (fim) runOnJS(pedir)(lado);
+        if (fim) scheduleOnRN(pedir, lado);
       },
     ),
   );
@@ -470,7 +470,7 @@ function Painel({
     (agora, antes) => {
       if (agora === (antes ?? false)) return;
       estado.abriu.set(agora);
-      if (agora) runOnJS(Haptics.selectionAsync)();
+      if (agora) scheduleOnRN(Haptics.selectionAsync);
     },
   );
   useAnimatedReaction(
@@ -478,7 +478,7 @@ function Painel({
     (agora, antes) => {
       if (agora === (antes ?? false)) return;
       estado.passou.set(agora);
-      if (agora) runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
+      if (agora) scheduleOnRN(Haptics.impactAsync, Haptics.ImpactFeedbackStyle.Light);
       else estado.desligouEm.set(Date.now());
     },
   );
@@ -592,7 +592,7 @@ function BotaoDoPainel({
         .onBegin(() => apertado.set(1))
         .onFinalize(() => apertado.set(0))
         .onEnd((_e, deu) => {
-          if (deu) runOnJS(tocar)(label);
+          if (deu) scheduleOnRN(tocar, label);
         }),
     [dedo, apertado, tocar, label],
   );

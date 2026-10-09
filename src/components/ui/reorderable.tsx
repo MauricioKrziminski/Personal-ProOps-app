@@ -13,7 +13,6 @@ import {
   type GestureType,
 } from 'react-native-gesture-handler';
 import Animated, {
-  runOnJS,
   scrollTo,
   useAnimatedStyle,
   useFrameCallback,
@@ -23,6 +22,7 @@ import Animated, {
   type AnimatedRef,
   type SharedValue,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import * as Haptics from 'expo-haptics';
 
 import {
@@ -473,24 +473,24 @@ function Celula({
       .enabled(enabled)
       .onStart(() => {
         levantar(eixo, index);
-        runOnJS(setAtivo)(true);
-        runOnJS(onArrastando)(true);
-        runOnJS(onLevantou)();
+        scheduleOnRN(setAtivo, true);
+        scheduleOnRN(onArrastando, true);
+        scheduleOnRN(onLevantou);
       })
       .onUpdate((e) => {
         mover(eixo, index, total, e.translationX, e.translationY, geo);
       })
       .onEnd(() => {
         const parado = Math.abs(eixo.dx.value) < PARADO && Math.abs(eixo.dy.value) < PARADO;
-        if (parado && activation === 'toque-longo' && onTapItem) runOnJS(onTapItem)(index);
-        else runOnJS(onSoltou)(index, eixo.alvo.value);
+        if (parado && activation === 'toque-longo' && onTapItem) scheduleOnRN(onTapItem, index);
+        else scheduleOnRN(onSoltou, index, eixo.alvo.value);
       })
       .onFinalize(() => {
         // Sempre, inclusive em cancelamento: sem isto um item fica levantado para sempre depois
         // de uma interrupção (ligação chegando, gesto do sistema, navegação).
         pousar(eixo);
-        runOnJS(setAtivo)(false);
-        runOnJS(onArrastando)(false);
+        scheduleOnRN(setAtivo, false);
+        scheduleOnRN(onArrastando, false);
       });
 
     const comGatilho =
@@ -502,7 +502,7 @@ function Celula({
       **`blocksExternalGesture` é a relação entre os reconhecedores; `scrollEnabled` é a trava
       da tela.** As duas existem porque resolvem coisas diferentes, em tempos diferentes.
 
-      Desligar a rolagem responde ao `onStart`, e o `onStart` sai daqui por `runOnJS`: um
+      Desligar a rolagem responde ao `onStart`, e o `onStart` sai daqui por `scheduleOnRN`: um
       `setState` e um render DEPOIS de o dedo já ter andado os 4px. Nessa fresta o scroll nativo
       ainda está livre para seguir o dedo — é a mesma fresta que faz uma lista no topo começar a
       esticar. Esta linha fecha isso ANTES, no nível em que o RNGH decide quem ganha: o scroll

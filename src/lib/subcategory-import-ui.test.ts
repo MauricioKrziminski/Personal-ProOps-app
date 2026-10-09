@@ -27,6 +27,7 @@ function mount(screen:'rules'|'import', options:{missingWorkspace?:boolean;legac
   if(name==='react/jsx-runtime')return {jsx:(type:any,props:any)=>({type,props}),jsxs:(type:any,props:any)=>({type,props}),Fragment:'Fragment'};
   if(name==='react-native')return {View:'View',StyleSheet:{create:(v:any)=>v}};
   if(name==='expo-router')return {Stack:{Screen:'Stack.Screen'},router:{setParams:()=>{}},useLocalSearchParams:()=>({batch:'batch'})};
+  if (name === 'react-native-worklets') return { scheduleOnRN: (fn: (...a: any[]) => unknown, ...a: unknown[]) => fn(...a) };
   if(name==='react-native-reanimated')return {default:{View:'Animated.View'},FadeInDown:{duration:()=>({delay:()=>null})}};
   if(name==='expo-haptics')return {notificationAsync:()=>{},NotificationFeedbackType:{Success:'success'}};
   if(name==='@/hooks/use-finance')return new Proxy(hooks,{get:(h,key)=>h[String(key)]??(()=>mutation(String(key)))});

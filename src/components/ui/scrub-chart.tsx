@@ -2,7 +2,8 @@ import * as Haptics from 'expo-haptics';
 import { useMemo, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { ThemedText } from '@/components/themed-text';
 import { Sparkline } from '@/components/ui/sparkline';
@@ -68,19 +69,19 @@ export function ScrubChart({
         .failOffsetY([-10, 10])
         // Arrastar na curva é o que a dica do gráfico ensina (`fin-grafico`).
         .onStart(() => {
-          runOnJS(usarDica)('fin-grafico');
+          scheduleOnRN(usarDica, 'fin-grafico');
         })
         .onUpdate((e) => {
           const i = indiceNoX(e.x, pontos.length, width);
           if (i !== indice.get()) {
             indice.set(i);
-            runOnJS(setAtivo)(i);
-            runOnJS(Haptics.selectionAsync)();
+            scheduleOnRN(setAtivo, i);
+            scheduleOnRN(Haptics.selectionAsync);
           }
         })
         .onFinalize(() => {
           indice.set(-1);
-          runOnJS(setAtivo)(-1);
+          scheduleOnRN(setAtivo, -1);
         }),
     [pontos, width, indice]
   );

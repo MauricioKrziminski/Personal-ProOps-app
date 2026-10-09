@@ -52,6 +52,7 @@ function tela(opts: { updateError?: object; setSessionError?: object } = {}) {
       };
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'react-native') return { StyleSheet: { create: (v: unknown) => v }, View: 'View', TextInput: 'TextInput' };
+      if (name === 'react-native-worklets') return { scheduleOnRN: (fn: (...a: any[]) => unknown, ...a: unknown[]) => fn(...a) };
       if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, FadeInLeft: animation, FadeInRight: animation };
       if (name === 'expo-haptics') return { notificationAsync() {}, NotificationFeedbackType: {} };
       if (name === 'expo-router') return { router: { replace: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }), canGoBack: () => true } };

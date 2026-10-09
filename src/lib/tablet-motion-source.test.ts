@@ -81,7 +81,7 @@ test('a cortina da raiz nunca fica presa: toda espera de quadro ou animação te
   // 08/10/2026: voltando do Face ID os timers do JS (setTimeout, rAF) param no iPhone; as esperas
   // da cortina contam no relógio da UI thread.
   const esperas = cortina.slice(cortina.indexOf('const esperarNaUi'), cortina.indexOf('const CortinaContext'));
-  assert.match(esperas, /withTiming\([\s\S]*runOnJS\(ok\)/);
+  assert.match(esperas, /withTiming\([\s\S]*scheduleOnRN\(ok\)/);
   assert.match(esperas, /const doisQuadros = \(\) => esperarNaUi\(/);
   assert.match(esperas, /const dormir = esperarNaUi;/);
   assert.doesNotMatch(esperas, /setTimeout|requestAnimationFrame/, 'timer do JS não segura a cortina');

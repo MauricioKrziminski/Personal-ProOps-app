@@ -93,6 +93,7 @@ function mountCalendar(initial: Props = {}, glass = false, field = false) {
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'react-native') return { View: 'View', Pressable: 'Pressable', useWindowDimensions: () => ({ fontScale: 1 }), Dimensions: { get: () => ({ width: 400, height: 800 }) },
         StyleSheet: { create: (value: unknown) => value, flatten: style, hairlineWidth: 1, absoluteFill: { position: 'absolute' } } };
+      if (name === 'react-native-worklets') return { scheduleOnRN: (fn: (...a: any[]) => unknown, ...a: unknown[]) => fn(...a) };
       if (name === 'react-native-reanimated') return reanimated;
       if (name === 'expo-haptics') return { selectionAsync: () => haptics++ };
       if (name === '@/lib/dates') return load('src/lib/dates.ts');

@@ -3,13 +3,13 @@ import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   interpolateColor,
-  runOnJS,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
   withSpring,
   type SharedValue,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { SymbolViewProps } from 'expo-symbols';
 
@@ -133,7 +133,7 @@ export function PillTabBar({
       progresso.set(
         withSpring(destino, Motion.spring.tab, (fim) => {
           'worklet';
-          if (fim) runOnJS(setAssentado)(destino);
+          if (fim) scheduleOnRN(setAssentado, destino);
         })
       );
     },

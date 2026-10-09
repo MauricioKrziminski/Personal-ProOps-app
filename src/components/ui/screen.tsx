@@ -13,8 +13,8 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
-  runOnJS,
-} from 'react-native-reanimated';
+  } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 
 import { fecharDeslizavelAberto } from '@/components/ui/deslizavel';
@@ -161,7 +161,7 @@ export function Screen({
     },
     // Rolar fecha o card arrastado que estiver aberto (spec 2026-09-23-arrastar-card).
     onBeginDrag: () => {
-      runOnJS(fecharDeslizavelAberto)();
+      scheduleOnRN(fecharDeslizavelAberto);
     },
   });
 

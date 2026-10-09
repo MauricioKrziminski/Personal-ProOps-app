@@ -71,6 +71,7 @@ function mountChip(glass: boolean, selected = false) {
     if (id === 'react') return react;
     if (id === 'react/jsx-runtime') return require(id);
     if (id === 'react-native') return { View: 'View', useWindowDimensions: () => ({ fontScale: config.fontScale }), StyleSheet: { create: (s: any) => s, absoluteFill: { position: 'absolute' }, hairlineWidth: 1 } };
+    if (id === 'react-native-worklets') return { scheduleOnRN: (fn: (...a: any[]) => unknown, ...a: unknown[]) => fn(...a) };
     if (id === 'react-native-reanimated') return reanimated;
     if (id === 'expo-haptics') return { selectionAsync: () => haptics++ };
     if (id === '@/components/ui/glass-backdrop') return { GlassBackdrop: 'GlassBackdrop', supportsLiquidGlass: () => glass };

@@ -4,7 +4,6 @@ import * as Haptics from 'expo-haptics';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  runOnJS,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -12,6 +11,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { CardFace, tintasDoCartao } from '@/components/finance/card-face';
 import { useFlightAnchor, useFlightHidden } from '@/components/motion/flight-layer';
@@ -152,8 +152,8 @@ export function InvoiceDock({
       dx.set(withSpring(0, Motion.spring.encaixe));
       const praEsquerda = e.translationX < -LIMIAR || e.velocityX < -LIMIAR_DE_VELOCIDADE;
       const praDireita = e.translationX > LIMIAR || e.velocityX > LIMIAR_DE_VELOCIDADE;
-      if (praEsquerda && proxima) runOnJS(trocar)(proxima);
-      else if (praDireita && anterior) runOnJS(trocar)(anterior);
+      if (praEsquerda && proxima) scheduleOnRN(trocar, proxima);
+      else if (praDireita && anterior) scheduleOnRN(trocar, anterior);
     });
 
   const medir = (event: LayoutChangeEvent) => {

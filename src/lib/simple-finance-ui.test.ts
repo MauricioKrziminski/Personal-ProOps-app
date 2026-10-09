@@ -466,6 +466,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'react-native') return { StyleSheet: { create: (value: unknown) => value }, View: 'View', Pressable: 'Pressable', ScrollView: 'ScrollView', FlatList: 'FlatList', SectionList: 'SectionList', useWindowDimensions: () => ({ width: 384, height: 800, fontScale: options.fontScale ?? 1 }), Platform: { OS: 'android', select: (o: any) => o.android ?? o.default } };
       // `View` também no topo: sem `__esModule`, o `import Animated from` do TS lê o módulo inteiro.
+      if (name === 'react-native-worklets') return { scheduleOnRN: (fn: (...a: any[]) => unknown, ...a: unknown[]) => fn(...a) };
       if (name === 'react-native-reanimated') return { default: { View: 'AnimatedView' }, View: 'AnimatedView', FadeInDown: animation, FadeOut: animation, FadeIn: animation, ReduceMotion: { System: 'system' }, LinearTransition: animation, useAnimatedRef: () => ({ current: null }),
         // O crossfade do Lançar: com "reduzir movimento" a troca é imediata, e o teste lê a tela logo depois.
         useReducedMotion: () => options.reduzirMovimento ?? true,

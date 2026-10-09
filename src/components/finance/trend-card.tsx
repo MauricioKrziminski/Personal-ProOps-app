@@ -2,7 +2,8 @@ import * as Haptics from 'expo-haptics';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS, useSharedValue } from 'react-native-reanimated';
+import { useSharedValue } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { monthShort, monthTitle } from '@/components/finance/month-picker';
 import { ThemedText } from '@/components/themed-text';
@@ -73,13 +74,13 @@ export function TrendCard({
         const i = noX(e.x);
         if (i !== ultimo.get()) {
           ultimo.set(i);
-          runOnJS(escolher)(i);
+          scheduleOnRN(escolher, i);
         }
       })
       .onFinalize(() => ultimo.set(-1));
     const toque = Gesture.Tap()
       .enabled(largura > 0)
-      .onEnd((e) => runOnJS(escolher)(noX(e.x)));
+      .onEnd((e) => scheduleOnRN(escolher, noX(e.x)));
     return Gesture.Race(arraste, toque);
     // `escolher` só usa setters estáveis: fica fora das dependências de propósito.
   }, [largura, meses.length, ultimo]);

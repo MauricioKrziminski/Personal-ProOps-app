@@ -1,6 +1,7 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { cancelAnimation, ReduceMotion, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { cancelAnimation, ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { Motion, Space } from '@/design/tokens';
 
@@ -35,7 +36,7 @@ export function usePresenca(visivel: boolean, animarEntradaNaMontagem = false, p
         ...Motion.spring.morph,
         reduceMotion: ReduceMotion.System,
       }, (terminou) => {
-        if (terminou) runOnJS(assentar)();
+        if (terminou) scheduleOnRN(assentar);
       }));
     }
     return () => {
@@ -221,7 +222,7 @@ export function TrocaSuave({ estado, children, style, preencher = false, desloca
         };
         progresso.set(withSpring(1, {
           ...Motion.spring.morph, reduceMotion: ReduceMotion.System,
-        }, (terminou) => { if (terminou) runOnJS(assentar)(); }));
+        }, (terminou) => { if (terminou) scheduleOnRN(assentar); }));
       };
     }
     return () => {

@@ -4,7 +4,6 @@ import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
-  runOnJS,
   useAnimatedReaction,
   useAnimatedStyle,
   useReducedMotion,
@@ -13,6 +12,7 @@ import Animated, {
   type AnimatedRef,
   type SharedValue,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { CardFace } from '@/components/finance/card-face';
 import { useFlightHidden } from '@/components/motion/flight-layer';
@@ -167,7 +167,7 @@ export function WalletCarousel({
   useAnimatedReaction(
     () => indiceNoDeslocamento(x.get(), g.passo, total),
     (atual, anterior) => {
-      if (anterior !== null && atual !== anterior) runOnJS(tique)();
+      if (anterior !== null && atual !== anterior) scheduleOnRN(tique);
     },
     [g.passo, total]
   );
@@ -183,7 +183,7 @@ export function WalletCarousel({
       'worklet';
       if (fechando.get()) return;
       fechando.set(true);
-      runOnJS(onEscolher)(i);
+      scheduleOnRN(onEscolher, i);
     };
     const pan = Gesture.Pan()
       .manualActivation(true)
@@ -235,13 +235,13 @@ export function WalletCarousel({
           // A troca do cartão ativo (números, fatura pré-carregada) sai JUNTO com a mola, não no
           // meio do arraste: um re-render no meio do gesto não disputa quadro com o dedo.
           mostrado.set(alvo);
-          runOnJS(onIndice)(alvo);
+          scheduleOnRN(onIndice, alvo);
         } else if (modo.get() === 'fechar' && onFechar) {
           const dy = Math.max(0, e.translationY - folga.get());
           if (dy > LIMIAR_DE_FECHAR || e.velocityY > VELOCIDADE_DE_FECHAR) {
             modo.set('fechando');
             fechando.set(true);
-            runOnJS(onFechar)(dy);
+            scheduleOnRN(onFechar, dy);
           }
         }
       })
@@ -259,7 +259,7 @@ export function WalletCarousel({
           assentar(perto, 0);
           if (perto !== mostrado.get()) {
             mostrado.set(perto);
-            runOnJS(onIndice)(perto);
+            scheduleOnRN(onIndice, perto);
           }
         }
       });
@@ -281,7 +281,7 @@ export function WalletCarousel({
       const i = indiceTocado(e.x, largura, x.get(), passo, total);
       if (i !== mostrado.get()) {
         mostrado.set(i);
-        runOnJS(onIndice)(i);
+        scheduleOnRN(onIndice, i);
       }
       if (Math.abs(x.get() - i * passo) < 1) {
         escolher(i);

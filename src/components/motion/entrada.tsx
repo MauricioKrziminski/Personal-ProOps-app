@@ -2,12 +2,12 @@ import { createContext, useContext, useLayoutEffect, useMemo, useState, type Rea
 import {
   Easing,
   cancelAnimation,
-  runOnJS,
   useReducedMotion,
   useSharedValue,
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { useCortinaFase } from '@/components/motion/session-curtain';
 import { useLock } from '@/hooks/use-lock';
@@ -127,7 +127,7 @@ export function useRelogioDeEntrada(atrasoMs: number, duracaoMs: number, nascerN
     relogio.set(
       withTiming(1, { duration: atraso + duracao, easing: Easing.linear }, (fim) => {
         'worklet';
-        if (fim) runOnJS(setAssentadoEm)(geracao);
+        if (fim) scheduleOnRN(setAssentadoEm, geracao);
       })
     );
     const teto = setTimeout(() => setAssentadoEm(geracao), atraso + duracao + FOLGA_DO_TETO_MS);

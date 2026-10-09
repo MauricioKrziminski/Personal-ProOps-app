@@ -23,7 +23,6 @@ import Animated, {
   FadeIn,
   FadeOut,
   cancelAnimation,
-  runOnJS,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -32,6 +31,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FullWindowOverlay } from 'react-native-screens';
 
@@ -194,7 +194,7 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
         espera,
         withTiming(1, { duration: duracao, easing: Easing.linear }, (fim) => {
           'worklet';
-          if (fim) runOnJS(concluir)();
+          if (fim) scheduleOnRN(concluir);
         })
       )
     );

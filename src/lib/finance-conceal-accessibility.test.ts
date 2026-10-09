@@ -36,6 +36,7 @@ function harness() {
       if (name === '@/lib/cycle-label') return load('src/lib/cycle-label.ts');
       if (name === '@/hooks/use-theme') return { useTheme: () => ({}) };
       if (name === 'react-native') return { View: 'View', Pressable: 'Pressable', StyleSheet: { create: (v: any) => v } };
+      if (name === 'react-native-worklets') return { scheduleOnRN: (fn: (...a: any[]) => unknown, ...a: unknown[]) => fn(...a) };
       if (name === 'react-native-reanimated') return {
         View: 'AnimatedView', FadeIn: animation, runOnJS: (fn: any) => fn,
         useSharedValue: (value: any) => ({ get: () => value, set() {} }),

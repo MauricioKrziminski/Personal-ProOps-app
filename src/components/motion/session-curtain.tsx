@@ -15,13 +15,13 @@ import Animated, {
   ReduceMotion,
   cancelAnimation,
   makeMutable,
-  runOnJS,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { CONSTRUCAO_MS, MarcaSeConstruindo } from '@/components/motion/marca-se-construindo';
 import { WaveCurtain } from '@/components/motion/wave-curtain';
@@ -69,7 +69,7 @@ const esperarNaUi = (ms: number) =>
       { duration: Math.max(ms, 0), reduceMotion: ReduceMotion.Never },
       () => {
         'worklet';
-        runOnJS(ok)();
+        scheduleOnRN(ok);
       },
     );
   });
@@ -192,7 +192,7 @@ export function CortinaProvider({ children }: { children: ReactNode }) {
             () => {
               'worklet';
               // Resolve também quando é cancelada: quem espera é o portão, e ele não pode travar.
-              runOnJS(terminou)();
+              scheduleOnRN(terminou);
             },
           ),
         );

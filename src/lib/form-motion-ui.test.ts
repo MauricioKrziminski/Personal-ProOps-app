@@ -161,6 +161,7 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === 'react-native-keyboard-controller') return { KeyboardAwareScrollView: 'KeyboardAwareScrollView' };
       if (id === '@/design/adaptive-window') return load('src/design/adaptive-window.ts');
       if (id === '@/design/adaptive-sheet') return load('src/design/adaptive-sheet.ts');
+      if (id === 'react-native-worklets') return { scheduleOnRN: (fn: (...a: any[]) => unknown, ...a: unknown[]) => fn(...a) };
       if (id === 'react-native-reanimated') return reanimated;
       if (id === 'expo-haptics') return { selectionAsync() {} };
       if (id === '@/components/motion/presenca') return load('src/components/motion/presenca.tsx');

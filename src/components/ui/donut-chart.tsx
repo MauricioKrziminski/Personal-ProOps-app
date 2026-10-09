@@ -2,7 +2,8 @@ import { useEffect, useMemo, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Group, Path, Skia, rect, type SkPath } from '@shopify/react-native-skia';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
+import { useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { SkiaCanvas } from '@/components/ui/skia-canvas';
 import type { ThemeColor } from '@/constants/theme';
@@ -52,7 +53,7 @@ export function DonutChart({
     () =>
       Gesture.Tap().onEnd((e) => {
         const i = fatiaNoPonto(e.x, e.y, size / 2, raio - espessura / 2 - 6, raio + espessura / 2 + 6, fatias);
-        runOnJS(onSelect)(i);
+        scheduleOnRN(onSelect, i);
       }),
     [fatias, size, raio, espessura, onSelect]
   );

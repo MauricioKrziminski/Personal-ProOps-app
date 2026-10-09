@@ -91,6 +91,7 @@ function mountButton(glass = false) {
       if (name === 'react/jsx-runtime') return require(name);
       if (name === 'react-native') return { View: 'View', Dimensions: { get: () => ({ width: 400, height: 800 }) },
         StyleSheet: { create: (value: unknown) => value, flatten: style, absoluteFill: { position: 'absolute' } } };
+      if (name === 'react-native-worklets') return { scheduleOnRN: (fn: (...a: any[]) => unknown, ...a: unknown[]) => fn(...a) };
       if (name === 'react-native-reanimated') return reanimated;
       if (name === '@/components/motion/presenca') return load('src/components/motion/presenca.tsx');
       if (name === '@/components/motion/cores-suaves') return {

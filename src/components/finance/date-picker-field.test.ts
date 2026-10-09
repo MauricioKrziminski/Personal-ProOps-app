@@ -35,6 +35,7 @@ function datePicker(props: Record<string, unknown>) {
       };
       if (name === 'react/jsx-runtime') return runtime;
       if (name === 'react-native') return { Pressable: 'Pressable', StyleSheet: { create: (value: unknown) => value }, View: 'View' };
+      if (name === 'react-native-worklets') return { scheduleOnRN: (fn: (...a: any[]) => unknown, ...a: unknown[]) => fn(...a) };
       if (name === 'react-native-reanimated') return {
         __esModule: true,
         default: { View: 'AnimatedView' },

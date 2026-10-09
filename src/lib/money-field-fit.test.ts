@@ -41,6 +41,7 @@ function field(initialScale = 3.12) {
       StyleSheet: { create: (v: any) => v, flatten, absoluteFill: { position: 'absolute' } },
       PixelRatio: { get: () => 3 }, useWindowDimensions: () => ({ width: 402, height: 874, fontScale: scale }),
     };
+    if (id === 'react-native-worklets') return { scheduleOnRN: (fn: (...a: any[]) => unknown, ...a: unknown[]) => fn(...a) };
     if (id === 'react-native-reanimated') return {
       __esModule: true, default: { View: 'Animated.View', Text: 'Animated.Text' },
       Easing: { out: (v: any) => v, cubic: 'cubic' }, makeMutable: shared,

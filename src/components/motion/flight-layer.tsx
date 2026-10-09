@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
-  runOnJS,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -9,6 +8,7 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { LARGURA_DE_DESENHO, alturaDoCartao } from '@/design/card-geometry';
 import { quadroDaCaixa, quadroNoVoo, type Caixa, type Pose, type Quadro } from '@/design/flight-math';
@@ -211,7 +211,7 @@ export function FlightProvider({ children }: { children: React.ReactNode }) {
       if (!pouso) {
         desistir.set(
           withTiming(1, { duration: Motion.duration.base, easing: Motion.easing.out }, () => {
-            runOnJS(terminar)(id);
+            scheduleOnRN(terminar, id);
           })
         );
         return;
@@ -221,7 +221,7 @@ export function FlightProvider({ children }: { children: React.ReactNode }) {
       progresso.set(
         withSpring(1, Motion.spring.voo, () => {
           ocultos.set([]);
-          runOnJS(terminar)(id);
+          scheduleOnRN(terminar, id);
         })
       );
     },
