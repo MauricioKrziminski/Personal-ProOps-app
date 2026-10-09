@@ -489,7 +489,7 @@ def _structured(
     abrir o disjuntor. É falha objetiva, não confiança. A chamada do principal que respondeu e a da
     reserva são contadas pelo coletor de tokens; o motivo vai em `reserva_motivo` nos metadados.
 
-    **Com Claude (09/10/2026)** a cadeia é Haiku -> Sonnet -> Gemini flash nos papéis de volume e
+    **Com Claude (09/10/2026)** a cadeia é Haiku -> Sonnet -> Gemini Lite nos papéis de volume e
     Sonnet -> Gemini flash no portão (ver o corpo). Com o portão em Gemini (`IA_PROVEDOR=gemini`),
     vale o texto abaixo.
 
@@ -502,16 +502,22 @@ def _structured(
     nome_gate = modelo("gate")
     if provedor(nome_gate) == "anthropic":
         # Claude: o portão tem reserva no Gemini aprovado antes da troca, e os papéis de volume
-        # caem nele passando pelo Sonnet (Haiku -> Sonnet -> Gemini flash). Cada `_ComReserva`
+        # caem no Gemini passando pelo Sonnet (Haiku -> Sonnet -> Gemini do papel). Cada `_ComReserva`
         # tem a SUA chave de disjuntor (o modelo que ele protege).
-        nome_gemini = MODELOS_GEMINI["gate"]
-        gemini_gate = _com_schema(_cliente(nome_gemini), nome_gemini, schema)
+        # A última parada é o Gemini DAQUELE papel: o portão cai no flash (o único medido aprovando
+        # certo), router/parse/batch no Lite, que era o modelo deles. Medido em 09/10/2026 com a chave
+        # do Claude inválida: o flash devolvia 503/504 ("high demand") e o Lite respondia — com todos
+        # caindo no flash, nenhuma mensagem passava.
+        portao = papel == "gate" or modelo(papel) == nome_gate
+        nome_gemini = MODELOS_GEMINI["gate" if portao else papel]
+        reserva_gemini = _com_schema(
+            _cliente(nome_gemini, timeout=PRAZO_LONGO, max_retries=1), nome_gemini, schema)
         sonnet = _ComReserva(
             runnable=_com_schema(
                 _cliente(nome_gate, raciocinio("gate"), timeout=PRAZO_LONGO, max_retries=0),
                 nome_gate, schema),
-            fallbacks=[gemini_gate], chave=nome_gate, metadados=meta)
-        if papel == "gate" or modelo(papel) == nome_gate:
+            fallbacks=[reserva_gemini], chave=nome_gate, metadados=meta)
+        if portao:
             return sonnet
         nome = modelo(papel)
         return _ComReserva(

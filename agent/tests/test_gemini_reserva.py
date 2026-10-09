@@ -35,7 +35,8 @@ def test_cadeia_com_claude_haiku_sonnet_gemini():
         # o rótulo do consumo continua sendo o do papel que pediu, também na reserva
         assert sonnet.metadados["papel"] == papel
         assert gemini.modelo("gate") == "claude-sonnet-5-5"
-        assert "gemini-3.7-flash" in _modelo(sonnet.fallbacks[0])
+        # a última parada do volume é o Lite (o flash estava em 503 quando a reserva foi medida)
+        assert _modelo(sonnet.fallbacks[0]) == gemini.MODELOS_GEMINI[papel]
 
 
 def test_portao_com_claude_tem_reserva_no_gemini():
