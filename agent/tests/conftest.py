@@ -126,3 +126,14 @@ def _checkpoint_estrito(monkeypatch):
     monkeypatch.setattr(InMemorySaver, "__init__", iniciar_estrito)
     yield barrados  # o teste que barra um tipo DE PROPÓSITO limpa a lista
     assert not barrados, f"tipo fora do allowlist do checkpoint: {barrados}"
+
+
+@pytest.fixture(autouse=True)
+def _conta_nao_suspensa(monkeypatch):
+    """Sem banco nos testes: a conta nunca está suspensa (`test_admin_suspensa` troca por True)."""
+    from app import db
+
+    async def _nao(_user_id):
+        return False
+
+    monkeypatch.setattr(db, "conta_suspensa", _nao)

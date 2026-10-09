@@ -852,6 +852,12 @@ async def reservar_aviso_de_limite(
         return True
 
 
+async def conta_suspensa(user_id: UUID | str) -> bool:
+    """True = `auth.users.banned_until` no futuro (suspensa pelo painel admin)."""
+    r = await fetch_one("select coalesce(banned_until > now(), false) as b from auth.users where id = %s", user_id)
+    return bool(r and r["b"])
+
+
 async def registrar_envio(workspace_id: UUID | str, user_id: UUID | str | None, kind: str) -> None:
     """Conta um envio pelo WhatsApp (`whatsapp_sends`, kind `reply` | `notice`).
 

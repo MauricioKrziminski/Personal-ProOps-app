@@ -86,6 +86,8 @@ class Settings(BaseSettings):
     # uuids (auth.users.id) que podem usar o painel /admin, separados por vírgula. Vazio = painel
     # desligado (toda rota /admin responde 404).
     admin_user_ids: str = ""
+    # Exige aal2 (TOTP) no JWT do painel /admin. Desligado por padrão: o SPA só abre o fluxo de TOTP quando ligado.
+    admin_require_mfa: bool = False
 
     # RLS como segunda camada: ligada, a TOOL roda sob `authenticated` com as claims do dono da
     # conversa (`db.sob_rls`), como o PostgREST faz com o app. Desligada = comportamento antigo.
@@ -131,7 +133,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("LANGFUSE_HOST", "LANGFUSE_BASE_URL"),
     )
 
-    @field_validator("agente_rls", mode="before")
+    @field_validator("agente_rls", "admin_require_mfa", mode="before")
     @classmethod
     def _rls_vazio_e_desligado(cls, v):
         return False if isinstance(v, str) and not re.sub(r"\s+#.*$", "", v).strip() else v

@@ -45,6 +45,7 @@ LIMITE_WHATSAPP = (
     "📱 Seu limite de respostas do mês pelo WhatsApp acabou. Continue pelo app do ProOps, "
     "que segue funcionando normalmente. O WhatsApp volta no próximo mês."
 )
+SUSPENSA = "🚫 Sua conta está suspensa. Fale com o suporte."
 GRANDE_DEMAIS = "📦 Esse arquivo é grande demais para eu ler. Manda uma foto ou um PDF menor (até 8 MB)."
 
 
@@ -188,6 +189,15 @@ async def _processar(lote: list[dict], ids: list, phone: str, thread_id: str) ->
         return await _sem_dono(ids, phone, SEM_CONTA, "sem_conta")
     if not sessao.get("workspace_id"):
         return await _sem_dono(ids, phone, SEM_WORKSPACE, "sem_workspace")
+
+    # Conta suspensa pelo painel admin (auth.users.banned_until): não processa e avisa UMA vez por dia.
+    if await db.conta_suspensa(sessao["user_id"]):
+        await db.mark_done(ids)
+        if await db.reservar_aviso_de_limite(
+            sessao["user_id"], sessao["workspace_id"], sessao.get("timezone"), kind="conta_suspensa"
+        ):
+            await _enviar(phone, SUSPENSA, sessao)
+        return {"claimed": len(ids), "status": "suspensa"}
 
     # limites ANTES de gastar Groq/Gemini: anti-flood por hora e cota do plano
     # por mês. Sem isto o paywall do WhatsApp simplesmente não existe.

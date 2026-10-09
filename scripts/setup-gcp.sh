@@ -413,7 +413,9 @@ deploy() {
   local allow_sandbox sandbox_ids
   allow_sandbox="$(ler_env BILLING_ALLOW_SANDBOX)"
   sandbox_ids="$(ler_env BILLING_SANDBOX_USER_IDS)"
-  local env_vars="^|^${base//,/|}|SUPABASE_ANON_KEY=${anon_key}|ADMIN_USER_IDS=${admin_ids}|BILLING_ALLOW_SANDBOX=${allow_sandbox}|BILLING_SANDBOX_USER_IDS=${sandbox_ids}"
+  local mfa
+  mfa="$(ler_env ADMIN_REQUIRE_MFA)"
+  local env_vars="^|^${base//,/|}|SUPABASE_ANON_KEY=${anon_key}|ADMIN_USER_IDS=${admin_ids}|ADMIN_REQUIRE_MFA=${mfa:-false}|BILLING_ALLOW_SANDBOX=${allow_sandbox}|BILLING_SANDBOX_USER_IDS=${sandbox_ids}"
 
   gcloud run deploy "$SERVICE" \
     --source agent \
