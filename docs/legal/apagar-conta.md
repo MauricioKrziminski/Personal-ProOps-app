@@ -16,14 +16,16 @@ Se você não tem mais o aplicativo instalado ou não consegue entrar, envie um 
 
 - Cadastro (e-mail, nome, telefone vinculado) e acesso à conta.
 - Lançamentos, contas, cartões, faturas, metas, dívidas, orçamentos, bens, investimentos, notas, lembretes e anexos.
-- Histórico de conversa com o assistente e tokens de notificação.
+- Histórico de conversa com o assistente (no aplicativo e no WhatsApp), mensagens recebidas, ações pendentes, estado interno da conversa, avaliações e eventos de uso, e tokens de notificação.
 - Espaços dos quais você é dono, incluindo os dados e os convites desses espaços. Em espaços de outra pessoa, os dados do espaço permanecem com o dono dele.
 
 ## O que pode ficar
 
-- **Cópias de segurança** do banco, que expiram automaticamente em até 90 dias e não são usadas para outra finalidade.
+- **Cópias de segurança** do banco: diárias por 30 dias e semanais por 90 dias. Os dados apagados somem delas ao fim desse prazo (até 90 dias), e elas não são usadas para outra finalidade.
+- **Logs do servidor** (Google Cloud Logging), pela retenção padrão de 30 dias.
+- **Registro de cobrança** (identificador, tipo, data e resultado do evento de assinatura), sem o conteúdo do evento, por ser auditoria financeira.
 - Registros que a lei nos obrigue a manter (por exemplo, registros de acesso pelo prazo legal) e dados necessários para defesa em processos.
-- Dados mantidos pelos prestadores citados na [Política de Privacidade](/privacidade) segundo a retenção deles; amostras de telemetria são mascaradas.
+- Dados mantidos pelos prestadores citados na [Política de Privacidade](/privacidade) segundo a retenção deles (por exemplo, a telemetria do Langfuse segue o plano contratado; as amostras são mascaradas, e os provedores de IA e a Meta seguem os próprios termos).
 
 ## Sua assinatura
 

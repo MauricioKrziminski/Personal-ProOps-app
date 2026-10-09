@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends
 from app import db
 from app.config import get_settings
 from app.domain.dates import now_utc
-from app.jobs import alerts, bill_reminders, checkpoints, embeddings, feedback, reminders, scheduler
+from app.jobs import alerts, bill_reminders, checkpoints, embeddings, feedback, reminders, retencao, scheduler
 from app.routes.worker import sweep
 from app.security import require_internal
 
@@ -138,4 +138,6 @@ async def run_alerts() -> dict:
         rotulos = await feedback.run()
     except Exception:  # noqa: BLE001
         rotulos = {"error": "expurgo de agent_feedback falhou"}
-    return {"alerts": avisos, "checkpoints": limpeza, "feedback": rotulos}
+    # retenção curta da infraestrutura (fila, ações, envios, eventos); `retencao.run` já isola cada tabela
+    retido = await retencao.run()
+    return {"alerts": avisos, "checkpoints": limpeza, "feedback": rotulos, "retencao": retido}

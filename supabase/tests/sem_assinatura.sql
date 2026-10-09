@@ -66,6 +66,46 @@ begin
   insert into public.emergency_reserves (workspace_id, user_id, base_mode, manual_monthly_cents, target_months)
     values (wb, a, 'manual', 100000, 6);
 
+  -- histórico do agente: o de A some (por user_id, telefone e thread); o de B fica
+  update public.profiles set phone = '5511988887771' where id = a;
+  insert into public.user_sessions (thread_id, phone, user_id, workspace_id, session_epoch, channel)
+    values ('sa-ta', '5511988887771', a, wa, 2, 'whatsapp'), ('sa-tb', '5511977776661', b, wb, 0, 'whatsapp');
+  insert into public.user_sessions (thread_id, phone, user_id, workspace_id, channel)  -- órfã: só o telefone de A
+    values ('sa-torfa', '+55 11 88887-771' , null, null, 'whatsapp');
+  insert into public.pending_actions (thread_id, phone, user_id, workspace_id, action, summary, session_id)
+    select 'sa-ta', '5511988887771', a, wa, '{}', 'x', id from public.user_sessions where thread_id = 'sa-ta';
+  insert into public.pending_actions (thread_id, phone, user_id, workspace_id, action, summary, session_id)
+    select 'sa-tb', '5511977776661', b, wb, '{}', 'x', id from public.user_sessions where thread_id = 'sa-tb';
+  insert into public.draft_actions (thread_id, phone, user_id, workspace_id, action, raw_text, missing, session_id)
+    select 'sa-ta', '5511988887771', a, wa, '{}', 'x', 'y', id from public.user_sessions where thread_id = 'sa-ta';
+  insert into public.app_chat_messages (session_id, role, content, status, client_message_id)
+    select id, 'user', 'sa-oi', 'completed', gen_random_uuid() from public.user_sessions where thread_id = 'sa-ta';
+  insert into public.messages_queue (wa_message_id, thread_id, phone, user_id, workspace_id, payload) values
+    ('sa-m1', 'sa-ta', '5511988887771', a, wa, '{}'),
+    ('sa-m2', 'sa-x', '551188887771', null, null, '{}'),        -- sem o 9º dígito, sem usuário: só o telefone
+    ('sa-m3', 'sa-tb', '5511977776661', b, wb, '{}'),
+    ('sa-m4', 'sa-tc', '5511966665551', a, wb, '{}');           -- A em espaço de B (user_id vira null no cascade)
+  insert into public.messages_raw (wa_message_id, direction, phone, payload) values
+    ('sa-r1', 'inbound', '5511988887771', '{}'), ('sa-r2', 'inbound', '5511977776661', '{}');
+  insert into public.agent_routing (phone) values ('5511988887771'), ('5511977776661');
+  insert into public.ai_events (user_id, workspace_id, model, channel) values (a, wb, 'm', 'whatsapp'), (b, wb, 'm', 'whatsapp');
+  insert into public.agent_feedback (workspace_id, user_id, channel, outcome) values (wb, a, 'app', 'approved'), (wb, b, 'app', 'approved');
+  insert into public.whatsapp_sends (workspace_id, user_id, kind) values (wb, a, 'reply'), (wb, b, 'reply');
+  insert into public.executed_actions (source_message_id, action_index, action_type, user_id, workspace_id) values
+    ('sa-e1', 0, 'x', a, wb), ('sa-e2', 0, 'x', b, wb);
+  insert into public.billing_events (id, type, provider, workspace_id, payload) values
+    ('sa-bill-a', 'INITIAL_PURCHASE', 'google', wa, jsonb_build_object('app_user_id', a, 'email', 'a@x')),
+    ('sa-bill-b', 'INITIAL_PURCHASE', 'google', wb, jsonb_build_object('app_user_id', b, 'email', 'b@x'));
+  if pg_catalog.to_regclass('langgraph.checkpoints') is not null then
+    insert into langgraph.checkpoints (thread_id, checkpoint_id, checkpoint) values
+      ('sa-ta', '1', '{}'), ('sa-ta:1', '1', '{}'), ('sa-ta:2', '1', '{}'), ('sa-torfa:1', '1', '{}'),
+      ('sa-tab', '1', '{}'), ('sa-tb', '1', '{}'), ('sa-tb:1', '1', '{}');
+    insert into langgraph.checkpoint_writes (thread_id, checkpoint_id, task_id, idx, channel, blob) values
+      ('sa-ta:2', '1', 't', 0, 'c', '\x00'), ('sa-tb', '1', 't', 0, 'c', '\x00');
+    insert into langgraph.checkpoint_blobs (thread_id, channel, version, type) values
+      ('sa-ta:1', 'c', '1', 't'), ('sa-tb:1', 'c', '1', 't');
+  end if;
+
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   perform set_config('proops.forcar_app', 'on', true);  -- apagar a conta passa mesmo para free vindo do app
   perform public.delete_my_account();
@@ -82,6 +122,32 @@ begin
   assert (select count(*) from public.transactions where workspace_id = wb) = 1, 'gasto de B fica';
   assert (select user_id from public.emergency_reserves where workspace_id = wb) = b, 'reserva do espaço passa ao dono';
   assert exists (select 1 from auth.users where id = c), 'C intocado';
+
+  -- histórico do agente: nada de A sobra; o de B fica
+  assert not exists (select 1 from public.user_sessions where thread_id in ('sa-ta', 'sa-torfa')), 'sessões de A saíram';
+  assert not exists (select 1 from public.pending_actions where thread_id = 'sa-ta')
+     and not exists (select 1 from public.draft_actions where thread_id = 'sa-ta')
+     and not exists (select 1 from public.app_chat_messages where content = 'sa-oi'), 'pending/draft/chat de A saíram';
+  assert (select array_agg(wa_message_id order by wa_message_id) from public.messages_queue where wa_message_id like 'sa-m%')
+         = array['sa-m3'], 'fila de A saiu (user_id, thread e telefone com/sem 9), a de B fica';
+  assert (select array_agg(wa_message_id) from public.messages_raw where wa_message_id like 'sa-r%') = array['sa-r2'], 'messages_raw';
+  assert (select array_agg(phone) from public.agent_routing where phone in ('5511988887771', '5511977776661')) = array['5511977776661'], 'agent_routing';
+  assert (select count(*) from public.ai_events where workspace_id = wb) = 1
+     and (select user_id from public.ai_events where workspace_id = wb) = b, 'ai_events: só o de B';
+  assert (select count(*) from public.agent_feedback where workspace_id = wb) = 1, 'agent_feedback: só o de B';
+  assert (select count(*) from public.whatsapp_sends where workspace_id = wb) = 1, 'whatsapp_sends: só o de B';
+  assert (select count(*) from public.executed_actions where source_message_id in ('sa-e1', 'sa-e2')) = 1, 'executed_actions: só o de B';
+  assert exists (select 1 from public.user_sessions where thread_id = 'sa-tb')
+     and exists (select 1 from public.pending_actions where thread_id = 'sa-tb'), 'sessão e pendente de B ficam';
+  assert (select payload from public.billing_events where id = 'sa-bill-a') = '{"anonimizado": true}'::jsonb
+     and not exists (select 1 from public.billing_events where id = 'sa-bill-a' and payload ? 'email'), 'cobrança de A: linha fica sem payload';
+  assert (select payload->>'email' from public.billing_events where id = 'sa-bill-b') = 'b@x', 'cobrança de B intacta';
+  if pg_catalog.to_regclass('langgraph.checkpoints') is not null then
+    assert (select array_agg(thread_id order by thread_id) from langgraph.checkpoints where thread_id like 'sa-t%')
+           = array['sa-tab', 'sa-tb', 'sa-tb:1'], 'checkpoints de A (todas as épocas e a órfã) saíram; prefixo parecido e B ficam';
+    assert (select array_agg(thread_id) from langgraph.checkpoint_writes where thread_id like 'sa-t%') = array['sa-tb'], 'writes';
+    assert (select array_agg(thread_id) from langgraph.checkpoint_blobs where thread_id like 'sa-t%') = array['sa-tb:1'], 'blobs';
+  end if;
   -- idempotente: sem usuário logado nada acontece
   perform set_config('request.jwt.claims', '', true);
   perform public.delete_my_account();

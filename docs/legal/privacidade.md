@@ -56,11 +56,13 @@ Alguns prestadores (como Anthropic, Google, Groq, Meta, RevenueCat, Expo e Langf
 
 ## 5. Por quanto tempo guardamos
 
-- Enquanto sua conta existir, para prestar o Serviço.
-- **Ao apagar a conta**, os dados da conta e do conteúdo são apagados do banco de dados. Cópias de segurança diárias e semanais expiram automaticamente em **até 90 dias**, e só são usadas para recuperação de desastres.
-- Histórico técnico de conversa do assistente e comentários de avaliação são expurgados periodicamente (por exemplo, o feedback é apagado depois de 180 dias).
+- Enquanto sua conta existir, para prestar o Serviço. O histórico da conversa no aplicativo fica visível para você até você apagá-lo ou apagar a conta.
+- **Ao apagar a conta**, apagamos imediatamente do banco de dados o cadastro, o conteúdo, o histórico do assistente (conversas, mensagens recebidas pelo WhatsApp, ações pendentes, estado interno da conversa, avaliações e eventos de uso) e os arquivos anexados. Dos registros de assinatura mantemos apenas a linha de auditoria da cobrança (identificador, tipo, data e resultado), sem o conteúdo do evento.
+- **Cópias de segurança** do banco: diárias por **30 dias** e semanais por **90 dias**; só servem para recuperação de desastres, não são consultadas para outra finalidade e os dados apagados somem delas ao fim desse prazo (até 90 dias).
+- **Enquanto a conta existe**, dados técnicos do assistente são apagados automaticamente: fila de mensagens do WhatsApp processadas, confirmações e rascunhos encerrados, 30 dias; registro de ações executadas e avisos enviados, 90 dias; contagens de uso e de envios, 13 meses (necessárias para limites do plano e custo); comentários de avaliação, 180 dias.
+- **Logs do servidor** (Google Cloud Logging) seguem a retenção padrão do Google Cloud de **30 dias**.
 - Registros de acesso a aplicações são guardados pelo prazo exigido pelo Marco Civil da Internet, quando aplicável, e dados necessários para cumprir obrigações legais ou defender direitos podem ser mantidos pelo prazo legal.
-- Dados de telemetria enviados ao Langfuse seguem a retenção do serviço e são amostrados e mascarados.
+- Dados de telemetria enviados ao Langfuse seguem a retenção do plano contratado nele, são amostrados e mascarados, e não permitem identificar você diretamente. Os prestadores de IA e transcrição (Anthropic, Google, Groq) e a Meta tratam o conteúdo que recebem segundo os próprios prazos e termos.
 
 ## 6. Seus direitos (LGPD, art. 18)
 
