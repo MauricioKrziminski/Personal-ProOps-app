@@ -19,6 +19,5 @@ export default function Index() {
   const destino = useDestino(!!session, !!session && hasCompletedOnboarding(session.user.user_metadata));
   if (loading || destino === 'aguarda') return null;
   const rota = { conta: '/login', onboarding: '/onboarding', assinar: '/assinar', app: '/today' } as const;
-  // `/assinar` entra nos tipos de rota quando o Expo regenera `.expo/types`.
-  return <Redirect href={rota[destino] as never} />;
+  return <Redirect href={rota[destino]} />;
 }

@@ -107,4 +107,26 @@ begin
   assert (select status from public.workspace_invites where phone = '+5511999990002') = 'accepted';
 end $$;
 
+-- (e) tabela nova de dado nasce com o gatilho: toda tabela de public com workspace_id fora da lista de
+-- exclusão da migration tem que ter `a0_exige_assinatura`. Sem isto a regra seria vigilância.
+do $$
+declare faltando text;
+begin
+  select string_agg(c.table_name, ', ' order by c.table_name) into faltando
+  from information_schema.columns c
+  join information_schema.tables t on t.table_schema = c.table_schema and t.table_name = c.table_name
+  where c.table_schema = 'public' and c.column_name = 'workspace_id' and t.table_type = 'BASE TABLE'
+    and c.table_name not in (
+      'subscriptions','workspaces','workspace_members','workspace_invites','profiles',
+      'ai_events','agent_feedback','alerts_sent','billing_events','user_sessions','messages_queue',
+      'messages_raw','pending_actions','draft_actions','executed_actions','agent_routing',
+      'app_chat_messages','jobs','transaction_embeddings','net_worth_snapshots')
+    and not exists (
+      select 1 from pg_catalog.pg_trigger g
+      where g.tgrelid = format('public.%I', c.table_name)::regclass
+        and g.tgname = 'a0_exige_assinatura' and not g.tgisinternal);
+  assert faltando is null,
+    'tabela de dado sem o portão a0_exige_assinatura (ou ponha na exclusão, com motivo): ' || faltando;
+end $$;
+
 rollback;

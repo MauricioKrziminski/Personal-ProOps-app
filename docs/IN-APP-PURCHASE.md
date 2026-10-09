@@ -212,6 +212,30 @@ O que conferir em `billing_events` (`result` de cada evento):
 - [ ] Texto obrigatório na tela de assinatura: preço, periodicidade, renovação
       automática e como cancelar — a Apple reprova sem isso
 - [ ] Conta de teste para a revisão da Apple (eles precisam entrar no app)
+- [ ] ⚠️ **A revisão da Apple compra em SANDBOX, e sandbox não concede em produção.** O revisor
+      assina, a loja aprova e o webhook recusa (`sandbox`): ele fica preso na tela de assinar e o
+      app é reprovado por "compra não desbloqueia". Antes de mandar para revisão: a conta de teste
+      ganha cortesia `manual` (comando abaixo) E as notas da revisão dizem que ela já é assinante —
+      ou decide-se liberar sandbox só para um `app_user_id` da lista. Decisão do Gabriel.
+
+### Subir para produção sem trancar ninguém
+
+O fim do plano grátis (`20261010180000_sem_assinatura.sql`) põe todo espaço em `free` como "nunca
+assinou" no instante em que cai. Ordem:
+
+1. **Cortesia primeiro** (funciona no schema de hoje), para a sua conta e testadores, no SQL
+   Editor de produção:
+   ```sql
+   update public.subscriptions s
+      set plan = 'family', status = 'active', provider = 'manual',
+          current_period_end = null, is_trial = false
+     from public.workspaces w join auth.users u on u.id = w.owner_id
+    where s.workspace_id = w.id and u.email in ('<seu e-mail>', '<testador>');
+   ```
+2. `migration list --project-ref` e depois o `db push --project-ref` (CLAUDE.md).
+3. Agente (`./scripts/setup-gcp.sh deploy`).
+4. App **1.12.0** por build (dependência nativa nova: nunca OTA). App antigo em campo recebe
+   `PT402` como erro genérico ao salvar, sem paywall — mais um motivo para a cortesia vir antes.
 
 ---
 
@@ -280,8 +304,9 @@ os alertas caem para template do WhatsApp — que é pago, mas funciona.
 7. **Expiração é rede de segurança.** Mesmo que o webhook de EXPIRATION se perca,
    `current_period_end` no passado tira o acesso na hora.
 
-### O que ainda falta no código (depende da Fase 1 e 2)
+### No app (09/10/2026)
 
-- Instalar `react-native-purchases` e configurar com o `appUserID` correto
-- Tela de paywall lendo os preços reais da loja via `getOfferings()`
-- Refetch com retry depois da compra
+`react-native-purchases` com `appUserID` = id do Supabase (`src/lib/compras.ts`), paywall lendo
+`getOfferings()`, Restaurar, refetch com retry e o portão `/assinar`. **Nunca compilado ainda**:
+compra, restaurar e `logIn/logOut` se conferem no primeiro dev client novo (iOS pode pedir
+`pod install` à mão). Sem chave ou sem o módulo, o paywall diz "indisponível".

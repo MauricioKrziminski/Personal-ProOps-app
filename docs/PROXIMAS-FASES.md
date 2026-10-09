@@ -1262,6 +1262,11 @@ assina normalmente e só é cobrado no 8º dia. **Isto não vira estado novo no 
 | saber que é trial | `subscriptions.is_trial`, já existe e já sai em `plan_status()` |
 | fim do trial sem pagar | `EXPIRATION` → `REVOGA` → `effective_plan` cai para `free`, e `plan_status` devolve `status = 'expired'` |
 
+> ✅ **Feito em 09/10/2026** (`20261010180000_sem_assinatura.sql`): sem assinatura é LEITURA, com a
+> escrita barrada NO BANCO (`PT402`), portão `/assinar` para quem nunca assinou, e os limites de
+> `CUSTOS-E-PRECOS.md` §6 (Pro 1/400, Família 5/1000, teste 60). Regra viva em
+> `.claude/rules/finance.md` → *Planos e limites*. O que segue abaixo é o histórico da decisão.
+
 #### A única decisão que "sem free" força: o que `free` passa a ser
 
 Hoje `private.plan_limits('free')` é `1 membro / 100 mensagens / sem importação` — um plano grátis
