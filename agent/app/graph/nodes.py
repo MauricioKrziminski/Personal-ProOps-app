@@ -40,7 +40,7 @@ from app.graph.schemas import (
     NotesPlan,
     RouterDecision,
     RouterDecisionV2,
-    ResourceAction, ResourceActionType, ResourcePlan,
+    ResourceAction, ResourceActionType, ResourceField, ResourcePlan,
 )
 from app.domain import matching
 from app.domain.required import faltando
@@ -538,6 +538,29 @@ async def notes_node(state: AgentState) -> dict:
     }
 
 
+def _com_campos_do_rascunho(acoes: list, rascunho: list[dict]) -> list:
+    """Completar o rascunho pendente não pode PERDER o que ele já tinha.
+
+    O modelo devolve o cadastro inteiro de novo; o Gemini repetia todos os campos, o Claude Haiku
+    devolve só o que a resposta trouxe (09/10/2026: "comecei agora" voltava com
+    `installments_paid=0` e SEM o `due_day=10` do rascunho, e o cadastro ficava incompleto de
+    novo). Ação do mesmo tipo, recurso e nome de um item do rascunho herda os campos que o modelo
+    omitiu; o que ele devolveu vence. Ação de outro assunto não casa e não herda nada.
+    """
+    for acao in acoes:
+        for item in rascunho:
+            if (item.get("type") != acao.type.value or item.get("resource") != acao.resource
+                    or (acao.name and item.get("name") and acao.name != item.get("name"))):
+                continue
+            ditos = {f.name for f in acao.fields}
+            acao.fields += [ResourceField(name=f["name"], value=f["value"])
+                            for f in item.get("fields") or [] if f.get("name") not in ditos]
+            acao.name = acao.name or item.get("name")
+            acao.target_month = acao.target_month or item.get("target_month")
+            break
+    return acoes
+
+
 async def resource_node(state: AgentState) -> dict:
     if state.get("halted"):
         return {}
@@ -567,7 +590,10 @@ recebem o NOME da conta citada, não um ID inventado. Parcelas totais incluem as
 Não confunda compra parcelada NO CARTÃO com financiamento. Uma compra em 48x sem
 menção de cartão pode ser financiamento: peça os dados do contrato, não crie cartão.
 Rascunho anterior só deve ser completado se a mensagem responde à pergunta; se mudar
-assunto não reaproveite dados. Cancelar um cadastro incompleto retorna actions vazio.
+assunto não reaproveite dados. Cancelar um cadastro incompleto retorna actions vazio — mas
+quantidade ZERO ("nenhuma", "zero", "comecei agora", "é nova") é RESPOSTA, valor "0", não
+cancelamento. Gasto ou receita NOVO ("gastei 45 no mercado") não é cadastro: actions vazio;
+duplicar e favorito só quando a pessoa pede para REPETIR, DUPLICAR ou LANÇAR O FAVORITO.
 Para atualizar valor de bem use o domínio financeiro específico, não este cadastro.
 Catálogo:
 """ + resources.prompt_catalogue() + "\n" + _ANTI_INJECTION
@@ -607,7 +633,7 @@ Catálogo:
         plan = await gemini.structured(
             ResourcePlan, gemini.GEMINI_PARSE, no="cadastros", versao=gemini.versao_do_prompt(prompt)
         ).ainvoke([('system',prompt),('human',user)])
-        planned, calls = plan.actions, 1
+        planned, calls = _com_campos_do_rascunho(plan.actions, state.get('resource_draft') or []), 1
     if Domain.NOTAS.value in (state.get('domains') or []):
         # ⚠️ **Nota e lembrete NOVOS têm um dono só: o nó de notas** (23/09/2026). Os dois
         # extratores rodam em paralelo sobre a MESMA frase, e "crie a pasta App e ponha a

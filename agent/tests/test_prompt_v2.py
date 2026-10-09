@@ -28,12 +28,12 @@ from app.services import consumo, embeddings, gemini
 # --- pinos do caminho v1 ------------------------------------------------------------------
 
 PIN_ROUTER = "3f459db8"
-PIN_FINANCE = "d16a6394"
+PIN_FINANCE = "3bf0845c"  # 09/10/2026: detalhe e pix sob 'ignore', medidos no Haiku e no Gemini
 PIN_FINANCE_QUERY = "5d4cc1d7"
 PIN_NOTES = "ffd30b04"
 PIN_SCHEMA_ROUTER = "290d403c0f22daf5"
 PIN_TURNO_SIMPLES = "02e5e46b1513deff"
-PIN_TURNO_COMPLETO = "c94233cd22603a10"
+PIN_TURNO_COMPLETO = "b0faf9bb068ff346"  # 09/10/2026: "subcategoria X" vence o nome da lista (Haiku)
 
 
 def _h(texto: str) -> str:
