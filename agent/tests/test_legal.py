@@ -23,7 +23,7 @@ def test_pagina_legal(rota, titulo):
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/html")
     assert titulo in r.text
-    assert "[E-MAIL" in r.text  # placeholders à vista até o dono preencher
     assert "<script" not in r.text.lower()
-    assert "http://" not in r.text and "https://" not in r.text  # nenhum recurso externo
+    # nenhum recurso externo carregado (link de texto para um site é permitido)
+    assert 'src="http' not in r.text and '<link rel="stylesheet" href="http' not in r.text
     assert "noindex" not in r.text.lower() and "noindex" not in r.headers.get("x-robots-tag", "")
