@@ -368,3 +368,31 @@ async def test_com_assinatura_a_mensagem_usa_o_nome_amigavel(monkeypatch):
     msg = await conversation.check_limits(_sessao())
     assert msg and "5 mensagens do seu plano Família" in msg
     assert "family" not in msg
+
+
+def _handler_com_taxa(monkeypatch, taxa, sempre=False):
+    import langfuse
+    import langfuse.langchain
+
+    recebido = {}
+
+    class Falso:
+        def __init__(self, **kw):
+            recebido.update(kw)
+
+    monkeypatch.setattr(langfuse, "Langfuse", Falso)
+    monkeypatch.setattr(langfuse.langchain, "CallbackHandler", lambda: object())
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk")
+    monkeypatch.setenv("LANGFUSE_SAMPLE_RATE", str(taxa))
+    get_settings.cache_clear()
+    monkeypatch.setattr(telemetry, "_tentou", False)
+    monkeypatch.setattr(telemetry, "_handler", None)
+    monkeypatch.setattr(telemetry, "SEMPRE_AMOSTRAR", sempre)
+    telemetry.handler()
+    return recebido
+
+
+def test_amostragem_vem_do_ambiente_e_experimento_nao_amostra(monkeypatch):
+    assert _handler_com_taxa(monkeypatch, 0.1)["sample_rate"] == 0.1
+    assert _handler_com_taxa(monkeypatch, 0.1, sempre=True)["sample_rate"] == 1.0

@@ -1041,6 +1041,8 @@ if __name__ == "__main__":
     parser.add_argument("--output", help="grava o JSON completo aqui")
     parser.add_argument("--teto-usd", type=float,
                         help="para a rodada quando o gasto medido passar disto (chave paga)")
+    parser.add_argument("--chave-paga", action="store_true",
+                        help="autoriza a GEMINI_API_KEY de produção (exige --teto-usd); sem isto a trava recusa")
     parser.add_argument("--sem-cache", action="store_true",
                         help="ignora e não grava o cache de resultados (agent/.eval-cache/)")
     parser.add_argument("--prompt-v2", action="store_true",

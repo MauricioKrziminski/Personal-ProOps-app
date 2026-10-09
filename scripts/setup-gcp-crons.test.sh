@@ -39,7 +39,7 @@ EOF
 falhas=0
 verifica() { # $1 rótulo  $2 esperado(sim|nao)  $3 padrão
   local achou=nao
-  grep -q "$3" "$chamadas" && achou=sim
+  grep -q -e "$3" "$chamadas" && achou=sim
   if [[ "$achou" == "$2" ]]; then
     printf '  ✓ %s\n' "$1"
   else
@@ -57,6 +57,23 @@ echo "job QUE JÁ EXISTE — estado preservado"
 roda existe
 verifica "atualiza o job"          sim "jobs update"
 verifica "NÃO pausa o que existe"  nao "jobs pause"
+
+echo "retenção de imagens — últimas 10, com a política certa"
+sed -n '/^retencao_imagens() {/,/^}/p' scripts/setup-gcp.sh > "$tmp/ret.sh"
+[[ -s "$tmp/ret.sh" ]] || { echo "✗ não achei retencao_imagens em setup-gcp.sh"; exit 1; }
+cat > "$tmp/gcloud" <<FIM
+#!/usr/bin/env bash
+echo "\$*" >> "$chamadas"
+for a in "\$@"; do [[ -f "\$a" ]] && cat "\$a" >> "$chamadas"; done
+exit 0
+FIM
+chmod +x "$tmp/gcloud"
+: > "$chamadas"
+PATH="$tmp:$PATH" bash -c "ok() { :; }; warn() { :; }; source '$tmp/ret.sh'; retencao_imagens" >/dev/null
+verifica "aplica no repositório do Cloud Run" sim "set-cleanup-policies cloud-run-source-deploy"
+verifica "mantém 10 versões"                  sim '"keepCount": 10'
+verifica "apaga o resto"                      sim '"type": "Delete"'
+verifica "sem dry-run por padrão"             nao "--dry-run"
 
 [[ $falhas -eq 0 ]] && echo "ok" || echo "$falhas falha(s)"
 exit "$falhas"

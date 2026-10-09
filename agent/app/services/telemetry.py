@@ -27,6 +27,8 @@ log = logging.getLogger(__name__)
 _handler: Any | None = None
 _cliente: Any | None = None
 _tentou = False
+# Experimento de avaliação (`--langfuse`) liga isto: o dataset run precisa de 100% dos traces.
+SEMPRE_AMOSTRAR = False
 
 # ---------------------------------------------------------------------------
 # máscara de dado pessoal ANTES de o texto sair para o Langfuse
@@ -96,6 +98,8 @@ def handler() -> Any | None:
             secret_key=settings.langfuse_secret_key,
             host=settings.langfuse_host,
             mask=mascarar,
+            # TraceIdRatioBased: todos os spans do trace herdam a mesma decisão (sem trace órfão)
+            sample_rate=1.0 if SEMPRE_AMOSTRAR else settings.langfuse_sample_rate,
         )
         _handler = CallbackHandler()
     except Exception:  # noqa: BLE001

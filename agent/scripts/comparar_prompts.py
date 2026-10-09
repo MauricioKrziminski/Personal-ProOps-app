@@ -224,6 +224,8 @@ if __name__ == "__main__":
     parser.add_argument("--output", help="grava o JSON completo aqui")
     parser.add_argument("--teto-usd", type=float,
                         help="para a rodada quando o gasto medido passar disto (chave paga)")
+    parser.add_argument("--chave-paga", action="store_true",
+                        help="autoriza a GEMINI_API_KEY de produção (exige --teto-usd); sem isto a trava recusa")
     args = parser.parse_args()
     if args.so_prompts:
         so_prompts()

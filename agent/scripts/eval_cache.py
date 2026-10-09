@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
@@ -35,6 +36,34 @@ def carregar_env() -> None:
                 os.environ.setdefault(chave, valor)
 
 
+def _valor_do_env(arquivo: Path, nome: str) -> str:
+    if not arquivo.exists():
+        return ""
+    for linha in arquivo.read_text().splitlines():
+        if linha.startswith(nome + "="):
+            return linha.split("=", 1)[1].split("#")[0].strip().strip('"')
+    return ""
+
+
+def checar_chave_gemini(argv: list[str] | None = None, raiz: Path = RAIZ) -> None:
+    """Recusa rodar suíte/sonda com a chave PAGA (a de `agent/.env.production`) sem `--chave-paga --teto-usd`.
+
+    A chave efetiva é a do ambiente ou a do `agent/.env`; a de produção, a do `.env.production`.
+    Em 21/09 e 05-07/10/2026 avaliações na chave paga custaram R$ 7-10 por pico. Sem o
+    `.env.production` local não há com o que comparar (a trava não adivinha).
+    """
+    argv = sys.argv if argv is None else argv
+    paga = _valor_do_env(raiz / ".env.production", "GEMINI_API_KEY")
+    efetiva = os.environ.get("GEMINI_API_KEY") or _valor_do_env(raiz / ".env", "GEMINI_API_KEY")
+    if not paga or efetiva != paga or ("--chave-paga" in argv and "--teto-usd" in argv):
+        return
+    print("Recusado: a GEMINI_API_KEY é a de PRODUÇÃO (paga, pré-paga). Suítes e sondas rodam com a "
+          "chave gratuita do staging (agent/.env). Para gastar de propósito: --chave-paga --teto-usd N "
+          "(só evaluate_answer_forms, evaluate_conversation_understanding e comparar_prompts).",
+          flush=True)
+    raise SystemExit(2)
+
+
 def usar_modelos_economicos(gate_producao: bool = False) -> None:
     """Suítes e sondas rodam na tabela econômica (Gemini gratuito) por padrão (o crédito do Claude é de produção).
 
@@ -42,6 +71,7 @@ def usar_modelos_economicos(gate_producao: bool = False) -> None:
     produção (a rodada que aprova a seção de segurança; pede ANTHROPIC_API_KEY). Chamar ANTES de
     construir qualquer cliente de modelo.
     """
+    checar_chave_gemini()
     os.environ.setdefault("IA_TABELA", "economica")
     if gate_producao:
         from app.services import ia
@@ -273,6 +303,7 @@ def cliente_langfuse() -> object:
     from app.services import telemetry
 
     s = get_settings()
+    telemetry.SEMPRE_AMOSTRAR = True  # experimento não pode ser amostrado
     if not (s.langfuse_public_key and s.langfuse_secret_key) or telemetry.handler() is None:
         print("--langfuse pede LANGFUSE_PUBLIC_KEY e LANGFUSE_SECRET_KEY (agent/.env).", flush=True)
         raise SystemExit(2)

@@ -153,3 +153,32 @@ def test_barato_usa_o_router_da_tabela_gemini():
 
 def test_erros_transitorios_do_claude_tem_paciencia():
     assert all(t in eval_cache.TRANSITORIOS for t in ("overloaded", "529", "rate_limit"))
+
+
+def _raiz(tmp_path, env, prod):
+    (tmp_path / ".env").write_text(f"GEMINI_API_KEY={env}  # comentario\n")
+    (tmp_path / ".env.production").write_text(f"GEMINI_API_KEY={prod}\n")
+    return tmp_path
+
+
+def test_trava_recusa_chave_de_producao(tmp_path, monkeypatch):
+    import pytest
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    raiz = _raiz(tmp_path, "paga", "paga")
+    with pytest.raises(SystemExit) as e:
+        eval_cache.checar_chave_gemini([], raiz)
+    assert e.value.code == 2
+    with pytest.raises(SystemExit):  # a flag sozinha não basta: tem que ter teto
+        eval_cache.checar_chave_gemini(["--chave-paga"], raiz)
+    eval_cache.checar_chave_gemini(["--chave-paga", "--teto-usd", "1"], raiz)
+
+
+def test_trava_deixa_passar_chave_gratuita_e_ambiente(tmp_path, monkeypatch):
+    import pytest
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    eval_cache.checar_chave_gemini([], _raiz(tmp_path, "gratis", "paga"))
+    monkeypatch.setenv("GEMINI_API_KEY", "paga")  # o ambiente vence o .env
+    with pytest.raises(SystemExit):
+        eval_cache.checar_chave_gemini([], _raiz(tmp_path, "gratis", "paga"))

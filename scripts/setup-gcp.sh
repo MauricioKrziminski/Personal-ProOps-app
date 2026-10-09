@@ -388,7 +388,11 @@ deploy() {
   # `AGENTE_RLS=true ./scripts/setup-gcp.sh staging`. `--set-env-vars` SUBSTITUI todas as
   # variáveis: uma flag ligada à mão no console sumiria no deploy seguinte, em silêncio.
   local flags="" v
-  for v in AGENTE_RLS AGENT_PROMPT_V2 IA_RACIOCINIO_GATE IA_SOMBRA_PARSE IA_SOMBRA_GATE \
+  # Langfuse: produção amostra 10% dos traces (CUSTOS-E-PRECOS §8); staging 100%.
+  if [[ -z "${LANGFUSE_SAMPLE_RATE:-}" ]]; then
+    if [[ "$SERVICE" == *staging* ]]; then LANGFUSE_SAMPLE_RATE=1.0; else LANGFUSE_SAMPLE_RATE=0.1; fi
+  fi
+  for v in LANGFUSE_SAMPLE_RATE AGENTE_RLS AGENT_PROMPT_V2 IA_RACIOCINIO_GATE IA_SOMBRA_PARSE IA_SOMBRA_GATE \
            TURNO_LENTO_SECONDS CUSTO_DIARIO_ALERTA_USD WHATSAPP_TYPING_INDICATOR; do
     if [[ -n "${!v:-}" ]]; then flags+=",${v}=${!v}"; fi
   done
@@ -431,6 +435,30 @@ deploy() {
 # ---------------------------------------------------------------------------
 # 7. crons
 # ---------------------------------------------------------------------------
+# Retenção do Artifact Registry: cada `deploy --source` empurra uma imagem para
+# `cloud-run-source-deploy` e nada apaga (88 em 15/09, 169 em 07/10/2026, custo subindo a cada
+# deploy). Mantém as 10 versões mais recentes e apaga o resto. Idempotente (set substitui a
+# política). O repositório é COMPARTILHADO por produção e staging (mesmo projeto).
+# `RETENCAO_DRY_RUN=1` só simula: o Artifact Registry registra o que apagaria sem apagar.
+retencao_imagens() {
+  local repo="${AR_REPO:-cloud-run-source-deploy}" politica
+  politica="$(mktemp)"
+  cat > "$politica" <<'JSON'
+[
+  {"name": "manter-10-recentes", "action": {"type": "Keep"}, "mostRecentVersions": {"keepCount": 10}},
+  {"name": "apagar-o-resto", "action": {"type": "Delete"}, "condition": {"tagState": "any"}}
+]
+JSON
+  if gcloud artifacts repositories set-cleanup-policies "$repo" \
+       --project "$PROJECT_ID" --location "$REGION" --policy "$politica" \
+       ${RETENCAO_DRY_RUN:+--dry-run} --quiet; then
+    ok "retenção de imagens em $repo: últimas 10${RETENCAO_DRY_RUN:+ (SIMULAÇÃO, nada é apagado)}"
+  else
+    warn "não apliquei a retenção em $repo (repositório ausente ou sem permissão)"
+  fi
+  rm -f "$politica"
+}
+
 criar_crons() {
   log "Cloud Scheduler"
   local url
@@ -590,7 +618,8 @@ criar_alertas() {
 # ---------------------------------------------------------------------------
 main() {
   case "${1:-tudo}" in
-    deploy)  criar_projeto; deploy; criar_crons ;;
+    deploy)  criar_projeto; deploy; criar_crons; retencao_imagens ;;
+    retencao) criar_projeto; retencao_imagens ;;
     # Staging: mesmo projeto GCP, tudo o mais separado. Sem `criar_crons` DE
     # PROPÓSITO — os jobs do Scheduler têm nome fixo (reminders, finance-scheduler,
     # alerts) e `criar_cron` faz `update` quando já existem: rodar staging
@@ -611,9 +640,10 @@ main() {
       criar_fila
       deploy
       criar_crons
+      retencao_imagens
       log "Pronto. Aponte o webhook da Meta para a URL acima."
       ;;
-    *) echo "uso: $0 [tudo|deploy|staging|secrets|preflight|build-iam|sa|alertas]" >&2; exit 1 ;;
+    *) echo "uso: $0 [tudo|deploy|staging|secrets|preflight|build-iam|sa|alertas|retencao]" >&2; exit 1 ;;
   esac
 }
 # ── Trava de produção ──────────────────────────────────────────────────────
@@ -630,7 +660,7 @@ prod_gate() {
   # de STAGING nos segredos de PRODUÇÃO, sem prompt. Gate por subcomando é mais
   # estrito e é uma linha a menos.
   case "$cmd" in
-    tudo|deploy|secrets|sa|build-iam|alertas) ;;   # escrevem em produção
+    tudo|deploy|secrets|sa|build-iam|alertas|retencao) ;;   # escrevem em produção
     *) return 0 ;;                         # staging, preflight: passam direto
   esac
 

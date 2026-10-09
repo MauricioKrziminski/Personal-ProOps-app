@@ -110,6 +110,9 @@ class Settings(BaseSettings):
     # --- Langfuse ---
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
+    # Fração dos TRACES enviados (0..1). Amostra por trace id: o turno entra inteiro ou não entra.
+    # Produção recomendada 0.1 (docs/CUSTOS-E-PRECOS.md §8); suítes com --langfuse ignoram (100%).
+    langfuse_sample_rate: float = Field(1.0, ge=0.0, le=1.0)
     # Aceita os DOIS nomes: a documentação do Langfuse manda copiar
     # LANGFUSE_BASE_URL, e um .env com esse nome caía no default em silêncio —
     # apontando para a região errada e falhando a autenticação sem alarde.
