@@ -10,7 +10,7 @@ Você pode apagar sua conta do ProOps e todos os dados associados a qualquer mom
 
 ## Sem o aplicativo
 
-Se você não tem mais o aplicativo instalado ou não consegue entrar, envie um pedido para [E-MAIL DE CONTATO] a partir do e-mail cadastrado na conta, com o assunto "Apagar conta". Podemos pedir uma confirmação de identidade. O pedido é atendido em prazo razoável, em regra em até 15 dias.
+Se você não tem mais o aplicativo instalado ou não consegue entrar, envie um pedido para gestao@proops.com.br a partir do e-mail cadastrado na conta, com o assunto "Apagar conta". Podemos pedir uma confirmação de identidade. O pedido é atendido em prazo razoável, em regra em até 15 dias.
 
 ## O que é apagado
 
@@ -33,4 +33,4 @@ Apagar a conta **não cancela a assinatura da loja**. Cancele a assinatura na Ap
 
 ## Dúvidas
 
-[E-MAIL DE CONTATO] ou, para dados pessoais, [E-MAIL DO ENCARREGADO].
+gestao@proops.com.br ou, para dados pessoais, gestao@proops.com.br.

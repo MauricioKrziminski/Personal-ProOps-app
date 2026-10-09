@@ -4,7 +4,7 @@ Vigência: [DATA DE VIGÊNCIA]
 
 Esta Política explica como PROOPS SOLUTIONS LTDA., CNPJ 69.504.283/0001-05, com sede em Rua Major Feliciano, 549, Centro, Machado/MG, CEP 37750-000 ("ProOps", "nós"), trata dados pessoais no aplicativo ProOps e no assistente do WhatsApp, em conformidade com a Lei Geral de Proteção de Dados (LGPD, Lei 13.709/2018), o Marco Civil da Internet (Lei 12.965/2014) e o Código de Defesa do Consumidor. Somos a **controladora** dos dados.
 
-Encarregado pelo tratamento de dados (DPO): [E-MAIL DO ENCARREGADO].
+Encarregado pelo tratamento de dados (DPO): gestao@proops.com.br.
 
 ## 1. Dados que tratamos
 
@@ -68,7 +68,7 @@ Alguns prestadores (como Anthropic, Google, Groq, Meta, RevenueCat, Expo e Langf
 
 Você pode, a qualquer momento: confirmar que tratamos seus dados; acessar; corrigir; pedir anonimização, bloqueio ou eliminação de dados desnecessários; pedir **portabilidade**; obter informação sobre compartilhamento; ser informado sobre a possibilidade de não consentir e suas consequências; **revogar consentimento**, quando for a base; e pedir revisão de decisões automatizadas.
 
-Como exercer: pelo aplicativo você acessa, corrige e apaga seus registros e **apaga a conta** em Perfil → Apagar conta. Para os demais pedidos, escreva para [E-MAIL DO ENCARREGADO]. Responderemos em prazo razoável e podemos pedir confirmação da sua identidade. Você também pode reclamar à Autoridade Nacional de Proteção de Dados (ANPD).
+Como exercer: pelo aplicativo você acessa, corrige e apaga seus registros e **apaga a conta** em Perfil → Apagar conta. Para os demais pedidos, escreva para gestao@proops.com.br. Responderemos em prazo razoável e podemos pedir confirmação da sua identidade. Você também pode reclamar à Autoridade Nacional de Proteção de Dados (ANPD).
 
 ## 7. Inteligência artificial
 
@@ -92,4 +92,4 @@ Podemos atualizar esta Política. Mudanças relevantes serão avisadas no aplica
 
 ## 12. Contato
 
-Dúvidas gerais: [E-MAIL DE CONTATO]. Assuntos de proteção de dados: [E-MAIL DO ENCARREGADO].
+Dúvidas gerais: gestao@proops.com.br. Assuntos de proteção de dados: gestao@proops.com.br.

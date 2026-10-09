@@ -78,4 +78,4 @@ Estes Termos são regidos pelas leis da República Federativa do Brasil. Fica el
 
 ## 13. Contato
 
-Dúvidas, solicitações e reclamações: [E-MAIL DE CONTATO].
+Dúvidas, solicitações e reclamações: gestao@proops.com.br.
