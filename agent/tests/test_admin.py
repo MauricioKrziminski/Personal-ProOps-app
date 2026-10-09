@@ -213,7 +213,8 @@ def test_formato_das_rotas_get(cli, banco):
     assert j["/admin/api/me"].json() == {"user_id": str(ADMIN), "email": "admin@x.com", "aal": "aal1",
                                          "mfa_required": False}
     o = j["/admin/api/overview"].json()
-    assert set(o) == {"accounts", "access", "plans", "usage_month", "signups_by_month", "ai_cost_by_day", "signals"}
+    assert set(o) == {"accounts", "access", "plans", "usage_month", "signups_by_month", "ai_cost_by_day", "signals",
+                    "observability"}
     assert set(o["access"]) == {"subscriber", "trialing", "lapsed", "never", "courtesy", "suspended"}
     assert o["usage_month"]["ai_cost_usd"] == "1.50" and o["ai_cost_by_day"] == [{"day": "2026-10-01", "usd": "0.2000"}]
     assert o["signups_by_month"] == [{"month": "2026-10", "count": 3}]

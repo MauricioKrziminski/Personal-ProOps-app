@@ -55,3 +55,23 @@ export function Confirm({ open, onOpenChange, title, description, children, conf
 export const DialogActions = ({ className, ...p }: ComponentProps<"div">) => (
   <div className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)} {...p} />
 );
+
+/** Detalhe lateral: painel à direita no desktop, folha colada embaixo no celular. */
+export function Drawer({ open, onOpenChange, title, children }: { open: boolean; onOpenChange: (o: boolean) => void; title: string; children: ReactNode }) {
+  return (
+    <D.Root open={open} onOpenChange={onOpenChange}>
+      <D.Portal>
+        <D.Overlay className={overlay} />
+        <D.Content className="fixed z-50 flex flex-col overflow-hidden border bg-popover text-popover-foreground shadow-2xl outline-none max-sm:inset-x-0 max-sm:bottom-0 max-sm:h-[92dvh] max-sm:rounded-t-2xl sm:inset-y-0 sm:right-0 sm:w-full sm:max-w-[680px] sm:border-y-0 sm:border-r-0 data-[state=open]:animate-in max-sm:data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-right data-[state=closed]:animate-out max-sm:data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-right">
+          <D.Title className="sr-only">{title}</D.Title>
+          <D.Description className="sr-only">{title}</D.Description>
+          <div className="flex h-14 shrink-0 items-center justify-between border-b px-5 sm:pl-6">
+            <span className="text-sm font-semibold text-muted-foreground">{title}</span>
+            <D.Close className="-mr-3 grid size-10 place-items-center rounded-lg hover:bg-accent" aria-label="Fechar"><X className="size-4" /></D.Close>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))]">{children}</div>
+        </D.Content>
+      </D.Portal>
+    </D.Root>
+  );
+}

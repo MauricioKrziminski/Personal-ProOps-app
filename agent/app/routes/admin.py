@@ -211,6 +211,11 @@ async def overview(_admin: UUID = Depends(admin_user)):
         """
     ) or {}
     n = lambda k: int(r.get(k) or 0)  # noqa: E731
+    obs = await db.fetch_one(
+        """select (select count(*) from public.error_issues where status = 'open')::int as open,
+                  (select count(*) from public.error_events where created_at >= now() - interval '24 hours')::int as ev,
+                  (select count(*) from public.error_issues where status = 'open' and severity = 'critical')::int as crit"""
+    ) or {}
     meses = await db.fetch(
         """
         select to_char(m, 'YYYY-MM') as month,
@@ -240,6 +245,8 @@ async def overview(_admin: UUID = Depends(admin_user)):
         "signups_by_month": [{"month": m["month"], "count": m["n"]} for m in meses],
         "ai_cost_by_day": [{"day": d["day"], "usd": _usd(d["usd"])} for d in dias],
         "signals": {k: n(k) for k in ("trial_ending_48h", "lapsed_7d", "near_limit", "inactive_subscribers_30d")},
+        "observability": {"open": obs.get("open", 0), "events_24h": obs.get("ev", 0),
+                          "critical_open": obs.get("crit", 0)},
     })
 
 

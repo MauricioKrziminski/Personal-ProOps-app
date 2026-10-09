@@ -9,6 +9,7 @@ export interface Overview {
   usage_month: { ai_turns: number; whatsapp_replies: number; notices: number; ai_cost_usd: string };
   signups_by_month: { month: string; count: number }[];
   ai_cost_by_day: { day: string; usd: string }[];
+  observability: { open: number; critical_open: number; events_24h: number };
   signals: { trial_ending_48h: number; lapsed_7d: number; near_limit: number; inactive_subscribers_30d: number };
 }
 
@@ -85,3 +86,50 @@ export interface SystemInfo {
 
 export interface Me { user_id: string; email: string; aal: "aal1" | "aal2"; mfa_required: boolean }
 export interface Config { supabase_url: string; supabase_anon_key: string; revenuecat_dashboard_url: string }
+
+export type IssueStatus = "open" | "resolved" | "ignored";
+export type IssueSource = "app" | "admin" | "agent";
+export type IssueSeverity = "critical" | "error" | "warning";
+
+export interface Issue {
+  id: string;
+  fingerprint: string;
+  source: IssueSource;
+  kind: string;
+  severity: IssueSeverity;
+  title: string;
+  message: string;
+  route: string | null;
+  status: IssueStatus;
+  first_seen: string;
+  last_seen: string;
+  count: number;
+  users_affected: number;
+  last_app_version: string | null;
+  platforms: string[];
+}
+
+export interface IssuesPage extends Page<Issue> {
+  summary: { open: number; events_24h: number; users_affected_24h: number; new_24h: number; by_source_24h: Record<IssueSource, number> };
+}
+
+export interface IssueEvent {
+  id: string;
+  created_at: string;
+  user_id: string | null;
+  user_email: string | null;
+  platform: string | null;
+  app_version: string | null;
+  route: string | null;
+  message: string;
+  context: Record<string, unknown> | null;
+}
+
+export interface IssueDetail {
+  issue: Issue;
+  stack: string | null;
+  hourly_24h: { hour: string; count: number }[];
+  daily_30d: { day: string; count: number }[];
+  events: IssueEvent[];
+  triage: AuditEvent[];
+}

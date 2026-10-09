@@ -19,12 +19,16 @@ from app.config import get_settings
 
 JANELA_S = 60.0
 _agora = time.monotonic  # trocável nos testes
-_chamadas: dict[UUID, deque[float]] = {}
+_chamadas: dict[UUID | str, deque[float]] = {}
 
 
-def checar(user_id: UUID) -> None:
-    """Conta a chamada; acima do limite levanta 429. `rate_limit_per_minute = 0` desliga."""
-    limite = get_settings().rate_limit_per_minute
+def checar(user_id: UUID | str, limite: int | None = None) -> None:
+    """Conta a chamada; acima do limite levanta 429. `rate_limit_per_minute = 0` desliga.
+
+    `limite` próprio serve a rota que tem teto mais baixo que o geral (ex.: captura de erros, chave `str`).
+    """
+    if limite is None:
+        limite = get_settings().rate_limit_per_minute
     if limite <= 0:
         return
     agora = _agora()

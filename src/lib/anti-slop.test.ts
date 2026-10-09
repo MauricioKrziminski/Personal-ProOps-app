@@ -1486,6 +1486,7 @@ test('toda tela de dados tem puxar para atualizar', () => {
   const semDados: Record<string, string> = {
     'app/guia.tsx': 'conteúdo fixo',
     'app/catalog.tsx': 'vitrine de desenvolvimento',
+    'app/dev-erro.tsx': 'dispara erro de teste, só em desenvolvimento',
     'app/paywall.tsx': 'oferta, não lista',
     'app/reminder-form.tsx': 'formulário',
     'app/finance/lancar.tsx': 'formulário',

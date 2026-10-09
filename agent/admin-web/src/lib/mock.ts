@@ -1,5 +1,5 @@
 // Fixtures fiéis a docs/ADMIN-API.md. Só entra no bundle com VITE_MOCK=1 (dev:mock).
-import type { AccountDetail, AccountRow, AuditEvent, BillingEvent, Overview, SystemInfo } from "./types";
+import type { AccountDetail, Issue, IssueDetail, IssueEvent, IssueSeverity, IssueSource, IssueStatus, AccountRow, AuditEvent, BillingEvent, Overview, SystemInfo } from "./types";
 
 const day = (n: number) => new Date(Date.now() - n * 86400000).toISOString();
 const dateOnly = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
@@ -32,6 +32,7 @@ const OVERVIEW: Overview = {
   usage_month: { ai_turns: 48210, whatsapp_replies: 31877, notices: 6402, ai_cost_usd: "73.4180" },
   signups_by_month: ["2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"].map((month, i) => ({ month, count: [18, 22, 40, 51, 63, 88, 97, 120, 141, 176, 212, 156][i] })),
   ai_cost_by_day: Array.from({ length: 30 }, (_, i) => ({ day: new Date(Date.now() - (29 - i) * 86400000).toISOString().slice(0, 10), usd: (1.6 + Math.sin(i / 3) * 0.7 + (i % 7 === 0 ? 1.1 : 0.3) + i * 0.02).toFixed(4) })),
+  observability: { open: 0, critical_open: 0, events_24h: 0 },
   signals: { trial_ending_48h: 5, lapsed_7d: 11, near_limit: 17, inactive_subscribers_30d: 23 },
 };
 
@@ -86,6 +87,62 @@ function detail(id: string): AccountDetail {
   };
 }
 
+// ---- Observabilidade ----
+const ISSUE_SEEDS: [IssueSource, IssueSeverity, string, string, string | null, string[]][] = [
+  ["agent", "critical", "psycopg.errors.QueryCanceled", "canceling statement due to statement timeout", "/worker/process-thread", []],
+  ["app", "critical", "TypeError", "Cannot read property 'amount_cents' of undefined", "/finance/lancar", ["ios", "android"]],
+  ["app", "error", "InvariantViolation", "Tried to render a Skia canvas with zero width", "/(tabs)/finance", ["android"]],
+  ["agent", "error", "TimeoutError", "Graph API não respondeu em 10s ao enviar a resposta", "/whatsapp-inbound", []],
+  ["admin", "error", "ApiError", "Resposta inesperada de /admin/api/overview", "/", ["web"]],
+  ["app", "warning", "NetworkError", "Network request failed ao sincronizar lembretes", "/(tabs)/index", ["ios", "android"]],
+  ["agent", "critical", "ValidationError", "FinanceAction: campo 'amount_cents' ausente no turno", "/worker/process-thread", []],
+  ["app", "error", "RangeError", "Invalid time value ao formatar a data da fatura", "/finance/invoice", ["ios"]],
+  ["admin", "warning", "ChunkLoadError", "Falha ao carregar o módulo da página de contas", "/contas", ["web"]],
+  ["app", "warning", "SecureStoreError", "Could not decrypt the stored value", "/login", ["android"]],
+];
+const ISSUES: Issue[] = Array.from({ length: 34 }, (_, i) => {
+  const [source, severity, name, message, route, platforms] = ISSUE_SEEDS[i % ISSUE_SEEDS.length];
+  const n = Math.floor(i / ISSUE_SEEDS.length);
+  const count = Math.max(1, Math.round(900 / (i + 1.5)) + (i % 4));
+  return {
+    id: uuid(5000 + i), fingerprint: (0x9e3779b1 * (i + 7)).toString(16).padStart(16, "0").slice(0, 16), source, kind: severity === "critical" ? "crash" : "error", severity,
+    title: n ? `${name} #${n}` : name, message, route, status: (i % 7 === 5 ? "resolved" : i % 11 === 8 ? "ignored" : "open") as IssueStatus,
+    first_seen: day(1 + i * 0.9), last_seen: day(i < 6 ? i * 0.04 : (i * 0.6) % 20), count, users_affected: Math.max(1, Math.round(count / (3 + (i % 5)))),
+    last_app_version: source === "app" ? `1.${4 + (i % 2)}.${i % 3}` : source === "admin" ? "2.0.0" : null, platforms,
+  };
+});
+const sync = () => {
+  const open = ISSUES.filter((x) => x.status === "open");
+  OVERVIEW.observability = { open: open.length, critical_open: open.filter((x) => x.severity === "critical").length, events_24h: 184 };
+};
+const STACKS: Record<string, string> = {
+  agent: "Traceback (most recent call last):\n  File \"app/worker.py\", line 212, in process_thread\n    result = await graph.ainvoke(state, config)\n  File \"app/graph/nodes.py\", line 88, in finance_node\n    rows = await tools.run(action)\n  File \"app/tools/finance.py\", line 140, in run\n    await conn.execute(sql, params)\npsycopg.errors.QueryCanceled: canceling statement due to statement timeout",
+  app: "TypeError: Cannot read property 'amount_cents' of undefined\n    at buildPayload (src/lib/lancar.ts:142:21)\n    at onSubmit (src/components/finance/formulario-do-lancamento.tsx:310:18)\n    at HTMLUnknownElement.callCallback (react-native/Libraries/Renderer/ReactNativeRenderer-prod.js:2891:14)\n    at invokeGuardedCallback (react-native/Libraries/Renderer/ReactNativeRenderer-prod.js:3040:7)",
+  admin: "ApiError: Resposta inesperada\n    at request (assets/index-Dk3f9a.js:1:4821)\n    at async queryFn (assets/index-Dk3f9a.js:1:51233)",
+};
+function issueDetail(id: string): IssueDetail {
+  const issue = ISSUES.find((x) => x.id === id);
+  if (!issue) throw Object.assign(new Error("Erro não encontrado."), { status: 404, code: "not_found" });
+  const seed = ISSUES.indexOf(issue) + 3;
+  const noon = Date.now() - (Date.now() % 3600000);
+  const events: IssueEvent[] = Array.from({ length: Math.min(50, issue.count) }, (_, k) => {
+    const r = ROWS[(seed * 3 + k) % ROWS.length];
+    const anon = issue.source === "agent" ? k % 2 === 0 : k % 6 === 5;
+    return {
+      id: `ev_${seed}_${k}`, created_at: new Date(Date.parse(issue.last_seen) - k * (1.3 + (seed % 5)) * 3600000).toISOString(), user_id: anon ? null : r.user_id, user_email: anon ? null : r.email,
+      platform: issue.platforms.length ? issue.platforms[k % issue.platforms.length] : null, app_version: issue.last_app_version, route: issue.route, message: issue.message, context: k === 0 ? { workspace: "••••", attempt: 2 } : null,
+    };
+  });
+  return {
+    issue, stack: issue.source === "app" && issue.kind === "error" && seed % 3 === 0 ? null : STACKS[issue.source],
+    hourly_24h: Array.from({ length: 24 }, (_, h) => ({ hour: new Date(noon - (23 - h) * 3600000).toISOString(), count: Math.max(0, Math.round((issue.count / 30) * (1 + Math.sin((h + seed) / 2.2)) * (h > 18 ? 1.6 : 1))) })),
+    daily_30d: Array.from({ length: 30 }, (_, d) => ({ day: new Date(Date.now() - (29 - d) * 86400000).toISOString().slice(0, 10), count: Math.max(0, Math.round((issue.count / 18) * (1 + Math.cos((d + seed) / 3)) * (d > 22 ? 1.5 : 0.6))) })),
+    events,
+    triage: issue.status === "open" ? [] : [ev(900 + seed, "issue_triaged", null, { from: "open", to: issue.status })],
+  };
+}
+sync();
+
 const wait = (ms = 350) => new Promise((r) => setTimeout(r, ms));
 const fail = (status: number, code: string, message: string) => { throw Object.assign(new Error(message), { status, code, mock: true }); };
 
@@ -111,6 +168,33 @@ function route(method: string, path: string, body: Record<string, unknown>): unk
   const q = new URLSearchParams(qs);
   if (p === "/me") return { user_id: uuid(900), email: "gestao@proops.com.br", aal: "aal2", mfa_required: false };
   if (p === "/overview") return OVERVIEW;
+  if (p === "/issues") {
+    const all = ISSUES;
+    const st = q.get("status") || "open";
+    const per = { "1h": 1 / 24, "24h": 1, "7d": 7, "30d": 30 }[q.get("period") || "7d"] ?? 7;
+    const s = q.get("q")?.toLowerCase();
+    let r = all.filter((x) => x.status === st && Date.now() - Date.parse(x.last_seen) <= per * 86400000);
+    if (q.get("source")) r = r.filter((x) => x.source === q.get("source"));
+    if (q.get("severity")) r = r.filter((x) => x.severity === q.get("severity"));
+    if (s) r = r.filter((x) => `${x.title} ${x.message} ${x.route ?? ""}`.toLowerCase().includes(s));
+    const key: Record<string, (a: Issue, b: Issue) => number> = {
+      last_seen_desc: (a, b) => b.last_seen.localeCompare(a.last_seen), count_desc: (a, b) => b.count - a.count,
+      users_desc: (a, b) => b.users_affected - a.users_affected, first_seen_desc: (a, b) => b.first_seen.localeCompare(a.first_seen),
+    };
+    const rec = all.filter((x) => Date.now() - Date.parse(x.last_seen) < 86400000);
+    const by = (k: IssueSource) => rec.filter((x) => x.source === k).reduce((n, x) => n + Math.ceil(x.count / 6), 0);
+    const summary = { open: all.filter((x) => x.status === "open").length, events_24h: by("app") + by("admin") + by("agent"), users_affected_24h: rec.reduce((n, x) => n + Math.ceil(x.users_affected / 4), 0), new_24h: all.filter((x) => Date.now() - Date.parse(x.first_seen) < 2 * 86400000).length, by_source_24h: { app: by("app"), admin: by("admin"), agent: by("agent") } };
+    return { ...page(r.sort(key[q.get("sort") ?? "last_seen_desc"] ?? key.last_seen_desc), q), summary };
+  }
+  const im = p.match(/^\/issues\/([^/]+)(?:\/(status))?$/);
+  if (im) {
+    if (im[2]) {
+      const it = ISSUES.find((x) => x.id === im[1]);
+      if (!it) fail(404, "not_found", "Erro não encontrado.");
+      it!.status = body.status as IssueStatus; sync();
+    }
+    return issueDetail(im[1]);
+  }
   if (p === "/system") return SYSTEM;
   if (p === "/audit") {
     let r = AUDIT;

@@ -17,6 +17,7 @@ from app.domain.dates import now_utc
 from app.jobs import alerts, bill_reminders, checkpoints, embeddings, feedback, reminders, retencao, scheduler
 from app.routes.worker import sweep
 from app.security import require_internal
+from app.services import observabilidade
 
 log = logging.getLogger(__name__)
 
@@ -86,21 +87,25 @@ async def run_reminders() -> dict:
     # Lembrete de conta: falha aqui não derruba os lembretes nem o sweep.
     try:
         contas = await bill_reminders.run()
-    except Exception:  # noqa: BLE001
+    except Exception as err:  # noqa: BLE001
+        await observabilidade.capturar(err, route="cron:reminders/contas")
         contas = {"error": "lembretes de conta falharam"}
     try:
         resgate = await sweep()
-    except Exception:  # noqa: BLE001
+    except Exception as err:  # noqa: BLE001
+        await observabilidade.capturar(err, route="cron:reminders/sweep")
         resgate = {"error": "sweep falhou"}
     # Série recém-criada ganha as ocorrências no minuto, não na rodada de hora em hora.
     try:
         novas = await scheduler.materialize_horizon(now_utc(), so_novas=True)
-    except Exception:  # noqa: BLE001
+    except Exception as err:  # noqa: BLE001
+        await observabilidade.capturar(err, route="cron:reminders/novas")
         novas = {"error": "materializar as novas falhou"}
     # Vetores da busca semântica de lançamento: SELECT barato por minuto, Gemini só se houver linha.
     try:
         vetores = await embeddings.run()
-    except Exception:  # noqa: BLE001
+    except Exception as err:  # noqa: BLE001
+        await observabilidade.capturar(err, route="cron:reminders/vetores")
         vetores = {"error": "vetores de lançamento falharam"}
     return {"reminders": lembretes, "contas": contas, "sweep": resgate, "recorrentes_novas": novas,
             "embeddings": vetores, "fila": await checar_fila()}
@@ -131,12 +136,14 @@ async def run_alerts() -> dict:
     avisos = await alerts.run()
     try:
         limpeza = await checkpoints.run()
-    except Exception:  # noqa: BLE001
+    except Exception as err:  # noqa: BLE001
+        await observabilidade.capturar(err, route="cron:alerts/checkpoints")
         limpeza = {"error": "expurgo de checkpoints falhou"}
     # retenção de 180 dias do ciclo de dados; mesma regra: falhar aqui nunca derruba o alerta
     try:
         rotulos = await feedback.run()
-    except Exception:  # noqa: BLE001
+    except Exception as err:  # noqa: BLE001
+        await observabilidade.capturar(err, route="cron:alerts/feedback")
         rotulos = {"error": "expurgo de agent_feedback falhou"}
     # retenção curta da infraestrutura (fila, ações, envios, eventos); `retencao.run` já isola cada tabela
     retido = await retencao.run()

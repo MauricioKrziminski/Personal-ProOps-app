@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ArrowUpRight, BellRing, Clock, ExternalLink, Gift, Hourglass, PauseCircle, UserMinus, UserPlus, Users, type LucideIcon } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, BellRing, Bug, Clock, ExternalLink, Gift, Hourglass, PauseCircle, UserMinus, UserPlus, Users, type LucideIcon } from "lucide-react";
 import { Link } from "react-router";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card } from "@/components/ui/card";
@@ -73,6 +73,20 @@ function Signals({ d }: { d: Overview }) {
   );
 }
 
+function ObservabilityCard({ o }: { o: Overview["observability"] }) {
+  const bad = o.critical_open > 0;
+  return (
+    <Link to="/observabilidade" className={cn("flex min-h-16 items-center gap-4 rounded-lg border bg-card p-4 transition-colors hover:bg-accent/60", bad && "ring-1 ring-destructive/30")}>
+      <span className={cn("grid size-10 shrink-0 place-items-center rounded-full", o.open === 0 ? "bg-success/12 text-success" : bad ? "bg-destructive/10 text-destructive" : "bg-warning/15 text-warning")}><Bug className="size-5" /></span>
+      <div className="min-w-0 flex-1">
+        <p className="font-bold">{o.open === 0 ? "Nenhum erro aberto — tudo calmo" : `${num(o.open)} ${o.open === 1 ? "erro aberto" : "erros abertos"}`}</p>
+        <p className="text-[13px] text-muted-foreground">{num(o.critical_open)} {o.critical_open === 1 ? "crítico" : "críticos"} · {num(o.events_24h)} eventos em 24 h</p>
+      </div>
+      <ArrowUpRight className="size-4 shrink-0 text-muted-foreground" />
+    </Link>
+  );
+}
+
 function Distribution({ d }: { d: Overview }) {
   const total = d.accounts.total || 1;
   const rows: { k: string; label: string; n: number; color: string }[] = [
@@ -119,6 +133,7 @@ export function OverviewPage() {
       {q.isError ? <Card><SectionError error={q.error} onRetry={() => void q.refetch()} /></Card> : !d ? <OverviewSkeleton /> : (
         <>
           <Hero d={d} />
+          <ObservabilityCard o={d.observability} />
           <Signals d={d} />
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <Kpi icon={Users} label="Assinantes ativos" value={d.access.subscriber} to="/contas?access=subscriber" />

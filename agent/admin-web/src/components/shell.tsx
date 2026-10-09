@@ -1,6 +1,7 @@
-import { Activity, CreditCard, LayoutDashboard, LogOut, Moon, MoreHorizontal, ScrollText, Sun, Users, type LucideIcon } from "lucide-react";
+import { Activity, Bug, CreditCard, LayoutDashboard, LogOut, Moon, MoreHorizontal, ScrollText, Sun, Users, type LucideIcon } from "lucide-react";
 import { Suspense, useState } from "react";
 import { NavLink, Outlet } from "react-router";
+import { RouteBoundary } from "@/components/error-boundary";
 import { Logo } from "@/components/brand";
 import { Modal } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
@@ -8,9 +9,10 @@ import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 /** Fonte única da navegação (sidebar no desktop, abas no celular). A ordem importa: as 4 primeiras ficam visíveis. */
-export const SECTIONS: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
+export const SECTIONS: { to: string; label: string; short?: string; icon: LucideIcon; end?: boolean }[] = [
   { to: "/", label: "Visão geral", icon: LayoutDashboard, end: true },
   { to: "/contas", label: "Contas", icon: Users },
+  { to: "/observabilidade", label: "Observabilidade", short: "Erros", icon: Bug },
   { to: "/auditoria", label: "Auditoria", icon: ScrollText },
   { to: "/cobranca", label: "Cobrança", icon: CreditCard },
   { to: "/sistema", label: "Sistema", icon: Activity },
@@ -55,13 +57,13 @@ export function Shell() {
         <header className="sticky top-0 z-30 flex h-14 items-center gap-2.5 border-b bg-background/85 px-4 backdrop-blur lg:hidden">
           <Logo className="size-7 rounded-md" /><span className="font-extrabold tracking-tight">ProOps</span><span className="text-xs font-medium text-muted-foreground">Admin</span>
         </header>
-        <main className="mx-auto w-full max-w-[1280px] px-4 pb-28 pt-5 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8"><Suspense fallback={<div className="h-40" role="status" aria-label="Carregando" />}><Outlet /></Suspense></main>
+        <main className="mx-auto w-full max-w-[1280px] px-4 pb-28 pt-5 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8"><Suspense fallback={<div className="h-40" role="status" aria-label="Carregando" />}><RouteBoundary><Outlet /></RouteBoundary></Suspense></main>
       </div>
 
       <nav aria-label="Seções" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
         {SECTIONS.slice(0, VISIBLE).map((s) => (
           <NavLink key={s.to} to={s.to} end={s.end} className={({ isActive }) => cn("flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold", isActive ? "text-foreground" : "text-muted-foreground")}>
-            {({ isActive }) => (<><span className={cn("grid h-7 w-12 place-items-center rounded-full transition-colors", isActive && "bg-primary text-primary-foreground")}><s.icon className="size-[18px]" /></span>{s.label}</>)}
+            {({ isActive }) => (<><span className={cn("grid h-7 w-12 place-items-center rounded-full transition-colors", isActive && "bg-primary text-primary-foreground")}><s.icon className="size-[18px]" /></span>{s.short ?? s.label}</>)}
           </NavLink>
         ))}
         <button onClick={() => setMore(true)} className="flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold text-muted-foreground">

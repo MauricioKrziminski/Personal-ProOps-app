@@ -14,7 +14,17 @@ import {
 import { useFonts } from 'expo-font';
 import simbolosAndroid from 'expo-symbols/androidWeights/regular';
 import { focusManager, MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider, usePathname, useRootNavigationState } from 'expo-router';
+import {
+  DarkTheme,
+  DefaultTheme,
+  ErrorBoundary as ErrorBoundaryPadrao,
+  type ErrorBoundaryProps,
+  router,
+  Stack,
+  ThemeProvider,
+  usePathname,
+  useRootNavigationState,
+} from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { AppState, Platform } from 'react-native';
@@ -42,9 +52,19 @@ import { useDestino } from '@/hooks/use-acesso';
 import { aoFalharEscrita } from '@/lib/acesso';
 import { identificar } from '@/lib/compras';
 import { attachNotificationListeners, configureNotificationHandler } from '@/lib/notifications';
+import { definirRotaAtual, instalarRelatoDeErros, relatarErro } from '@/lib/relatar-erro';
 
 SplashScreen.preventAutoHideAsync();
 configureNotificationHandler();
+instalarRelatoDeErros();
+
+/** Erro de render que o expo-router captura na raiz: relata para o painel e mostra a tela padrão dele. */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  useEffect(() => {
+    relatarErro(props.error, 'render');
+  }, [props.error]);
+  return <ErrorBoundaryPadrao {...props} />;
+}
 
 /**
  * As telas de conta: sem header, barra de status clara sobre a capa de tinta, e passagem em
@@ -180,6 +200,7 @@ function AppTree() {
 
   // Tabs/stacks can keep screens mounted. Re-entering a route is not a query mount.
   useEffect(() => {
+    definirRotaAtual(pathname);
     void queryClient.refetchQueries({ type: 'active', stale: true });
   }, [pathname]);
 
@@ -534,6 +555,7 @@ function AppTree() {
                       passaram a abrir dos dois lados. */}
                   <Stack.Screen name="link-email" options={{ headerShown: false }} />
                   <Stack.Screen name="catalog" options={{ title: 'Catálogo' }} />
+                  <Stack.Screen name="dev-erro" options={{ title: 'Erro de teste' }} />
                 </Stack.Protected>
               </Stack>
               </FlightProvider>

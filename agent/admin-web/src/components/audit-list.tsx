@@ -1,14 +1,14 @@
-import { Ban, CreditCard, KeyRound, LogOut, MessageSquareOff, Play, ShieldAlert, Trash2, type LucideIcon } from "lucide-react";
+import { Ban, Bug, CreditCard, KeyRound, LogOut, MessageSquareOff, Play, ShieldAlert, Trash2, type LucideIcon } from "lucide-react";
 import { Link } from "react-router";
 import { Badge, type Tone } from "@/components/ui/badge";
-import { AUDIT_LABEL, PLAN_LABEL } from "@/lib/labels";
+import { AUDIT_LABEL, ISSUE_STATUS_LABEL, PLAN_LABEL } from "@/lib/labels";
 import type { AuditEvent } from "@/lib/types";
 import { fmtDate, relTime } from "@/lib/utils";
 
 const META: Record<string, { icon: LucideIcon; tone: Tone }> = {
   plan_changed: { icon: CreditCard, tone: "info" }, plan_forced: { icon: ShieldAlert, tone: "warning" }, suspended: { icon: Ban, tone: "danger" },
   reactivated: { icon: Play, tone: "success" }, signed_out: { icon: LogOut, tone: "neutral" }, password_reset_sent: { icon: KeyRound, tone: "neutral" },
-  whatsapp_unlinked: { icon: MessageSquareOff, tone: "neutral" }, account_deleted: { icon: Trash2, tone: "danger" },
+  whatsapp_unlinked: { icon: MessageSquareOff, tone: "neutral" }, account_deleted: { icon: Trash2, tone: "danger" }, issue_triaged: { icon: Bug, tone: "info" },
 };
 
 export const ActionBadge = ({ action }: { action: string }) => {
@@ -22,6 +22,7 @@ export function payloadText(p: AuditEvent["payload"]): string {
   if (typeof p.plan === "string") out.push(`Plano ${PLAN_LABEL[p.plan] ?? p.plan}`);
   if (typeof p.period_end === "string") out.push(`até ${fmtDate(p.period_end)}`);
   if (typeof p.reason === "string" && p.reason) out.push(`“${p.reason}”`);
+  if (typeof p.from === "string" && typeof p.to === "string") out.push(`${ISSUE_STATUS_LABEL[p.from] ?? p.from} → ${ISSUE_STATUS_LABEL[p.to] ?? p.to}`);
   if (typeof p.email === "string") out.push(p.email);
   return out.join(" · ");
 }

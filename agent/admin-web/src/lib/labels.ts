@@ -9,7 +9,7 @@ export const ORIGIN_LABEL: Record<string, string> = {
 export const AUDIT_LABEL: Record<string, string> = {
   plan_changed: "Plano alterado", plan_forced: "Plano forçado (loja)", suspended: "Conta suspensa",
   reactivated: "Conta reativada", signed_out: "Sessões encerradas", password_reset_sent: "Código de senha enviado",
-  whatsapp_unlinked: "WhatsApp desvinculado", account_deleted: "Conta apagada",
+  whatsapp_unlinked: "WhatsApp desvinculado", issue_triaged: "Erro triado", account_deleted: "Conta apagada",
 };
 export const BILLING_RESULT_LABEL: Record<string, string> = {
   concedido: "Concedido", revogado: "Revogado", duplicado: "Duplicado", sandbox_ignorado: "Sandbox ignorado",
@@ -30,3 +30,10 @@ export const SUB_STATUS_LABEL: Record<string, string> = {
 };
 export const INVITE_STATUS_LABEL: Record<string, string> = { pending: "Pendente", accepted: "Aceito", revoked: "Revogado" };
 export const QUEUE_STATUS_LABEL: Record<string, string> = { failed: "Falhou", pending: "Pendente", processing: "Processando", done: "Concluída" };
+
+export const ISSUE_STATUS_LABEL: Record<string, string> = { open: "Aberto", resolved: "Resolvido", ignored: "Ignorado" };
+export const ISSUE_SOURCE_LABEL: Record<string, string> = { app: "App", admin: "Painel", agent: "Agente" };
+export const ISSUE_SEVERITY_LABEL: Record<string, string> = { critical: "Crítico", error: "Erro", warning: "Aviso" };
+export const ISSUE_PERIODS: [string, string][] = [["1h", "Última hora"], ["24h", "24 horas"], ["7d", "7 dias"], ["30d", "30 dias"]];
+export const ISSUE_SORTS: [string, string][] = [["last_seen_desc", "Mais recentes"], ["count_desc", "Mais eventos"], ["users_desc", "Mais usuários"], ["first_seen_desc", "Mais novos"]];
+export const PLATFORM_LABEL: Record<string, string> = { ios: "iOS", android: "Android", web: "Web" };

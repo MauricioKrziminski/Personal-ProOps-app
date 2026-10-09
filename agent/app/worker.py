@@ -26,7 +26,7 @@ import time
 from app import conversation, db, logctx
 from app.config import get_settings
 from app.security import sanitize_untrusted
-from app.services import groq, tasks, whatsapp
+from app.services import groq, observabilidade, tasks, whatsapp
 
 log = logging.getLogger(__name__)
 
@@ -166,6 +166,7 @@ async def _turno_com_prazo(lote: list[dict], ids: list, phone: str, thread_id: s
 
     except Exception as err:  # noqa: BLE001
         log.exception("worker falhou (thread=%s)", thread_id)
+        await observabilidade.capturar(err, severity="critical", route="worker:turno")
         motivo = "prazo do turno estourou" if isinstance(err, TimeoutError) else repr(err)
         await _soltar_reserva_sem_falhar()
         await _devolver_a_fila(ids, motivo)

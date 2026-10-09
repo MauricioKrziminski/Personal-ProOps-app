@@ -1,4 +1,4 @@
-import type { AccountDetail, AccountRow, AuditEvent, BillingEvent, Config, Me, Overview, Page, SystemInfo } from "./types";
+import type { AccountDetail, IssueDetail, IssuesPage, IssueStatus, AccountRow, AuditEvent, BillingEvent, Config, Me, Overview, Page, SystemInfo } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -11,6 +11,7 @@ export class ApiError extends Error {
 }
 
 let tokenGetter: () => Promise<string | null> = async () => null;
+export const getToken = () => tokenGetter();
 export const setTokenGetter = (fn: () => Promise<string | null>) => { tokenGetter = fn; };
 
 /** Eventos globais que o AuthProvider escuta (401 = sessão morreu; 403 mfa_required = pedir o segundo fator). */
@@ -55,7 +56,12 @@ export type AccountFilters = { q?: string; access?: string; plan?: string; origi
 export type AuditFilters = { action?: string; admin_user_id?: string; target_user_id?: string; page?: number; page_size?: number };
 export type BillingFilters = { q?: string; type?: string; result?: string; page?: number; page_size?: number };
 
+export type IssueFilters = { status?: string; source?: string; severity?: string; period?: string; q?: string; sort?: string; page?: number; page_size?: number };
+
 export const api = {
+  issues: (f: IssueFilters) => request<IssuesPage>("GET", `/issues${qs(f)}`),
+  issue: (id: string) => request<IssueDetail>("GET", `/issues/${id}`),
+  setIssueStatus: (id: string, status: IssueStatus) => request<IssueDetail>("POST", `/issues/${id}/status`, { status }),
   config: () => request<Config>("GET", "/config", undefined, false),
   me: () => request<Me>("GET", "/me"),
   overview: () => request<Overview>("GET", "/overview"),

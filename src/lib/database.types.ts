@@ -166,6 +166,36 @@ export type Database = {
           },
         ]
       }
+      admin_audit_events: {
+        Row: {
+          action: string
+          admin_user_id: string
+          created_at: string
+          id: string
+          payload: Json
+          target_user_id: string | null
+          target_workspace_id: string | null
+        }
+        Insert: {
+          action: string
+          admin_user_id: string
+          created_at?: string
+          id?: string
+          payload?: Json
+          target_user_id?: string | null
+          target_workspace_id?: string | null
+        }
+        Update: {
+          action?: string
+          admin_user_id?: string
+          created_at?: string
+          id?: string
+          payload?: Json
+          target_user_id?: string | null
+          target_workspace_id?: string | null
+        }
+        Relationships: []
+      }
       agent_feedback: {
         Row: {
           channel: string
@@ -1556,6 +1586,110 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      error_events: {
+        Row: {
+          app_version: string | null
+          context: Json
+          created_at: string
+          id: string
+          issue_id: string
+          message: string
+          platform: string | null
+          route: string | null
+          user_id: string | null
+        }
+        Insert: {
+          app_version?: string | null
+          context?: Json
+          created_at?: string
+          id?: string
+          issue_id: string
+          message?: string
+          platform?: string | null
+          route?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          app_version?: string | null
+          context?: Json
+          created_at?: string
+          id?: string
+          issue_id?: string
+          message?: string
+          platform?: string | null
+          route?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "error_events_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "error_issues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      error_issues: {
+        Row: {
+          count: number
+          fingerprint: string
+          first_seen: string
+          id: string
+          kind: string
+          last_app_version: string | null
+          last_seen: string
+          message: string
+          platforms: string[]
+          resolved_at: string | null
+          resolved_by: string | null
+          route: string | null
+          severity: string
+          source: string
+          stack: string | null
+          status: string
+          title: string
+        }
+        Insert: {
+          count?: number
+          fingerprint: string
+          first_seen?: string
+          id?: string
+          kind: string
+          last_app_version?: string | null
+          last_seen?: string
+          message?: string
+          platforms?: string[]
+          resolved_at?: string | null
+          resolved_by?: string | null
+          route?: string | null
+          severity: string
+          source: string
+          stack?: string | null
+          status?: string
+          title: string
+        }
+        Update: {
+          count?: number
+          fingerprint?: string
+          first_seen?: string
+          id?: string
+          kind?: string
+          last_app_version?: string | null
+          last_seen?: string
+          message?: string
+          platforms?: string[]
+          resolved_at?: string | null
+          resolved_by?: string | null
+          route?: string | null
+          severity?: string
+          source?: string
+          stack?: string | null
+          status?: string
+          title?: string
+        }
+        Relationships: []
       }
       executed_actions: {
         Row: {

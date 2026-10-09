@@ -12,14 +12,15 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app import db, logctx
 from app.config import DEV_SALT, get_settings
 from app.graph import build as graph_build
-from app.routes import admin, admin_web, chat, cron, finance_draft, hooks, inbound, internal, legal, worker
-from app.services import ia, groq, telemetry, whatsapp
+from app.routes import admin, admin_observabilidade, admin_web, chat, errors, cron, finance_draft, hooks, inbound, internal, legal, worker
+from app.services import groq, ia, observabilidade, telemetry, whatsapp
 
 CAMPOS_EXTRAS = ("alerta", "pendentes", "falhas", "shadow", "duracao_s", "custo_usd")
 
@@ -134,9 +135,21 @@ app.include_router(internal.router)
 app.include_router(chat.router)
 app.include_router(finance_draft.router)
 app.include_router(admin.router)
+app.include_router(admin_observabilidade.router)
+app.include_router(errors.router)
 app.include_router(admin_web.router)
 app.include_router(legal.router)
 chat.install_error_handlers(app)
+
+
+@app.exception_handler(Exception)
+async def _erro_inesperado(request: Request, exc: Exception):
+    """5xx não tratado: vira issue `critical` com a rota (o gabarito, não a URL com ids) e responde no
+    formato `{code, message}` do resto da API. A captura é best-effort e nunca muda a resposta."""
+    rota = request.scope.get("route")
+    await observabilidade.capturar(
+        exc, severity="critical", route=f"{request.method} {getattr(rota, 'path', request.url.path)}")
+    return JSONResponse({"code": "internal_error", "message": "Algo deu errado do nosso lado."}, status_code=500)
 
 # CORS só para as origens ENUMERADAS. Nunca `*`: a requisição carrega o JWT no
 # header, e `*` com credencial é a porta aberta para qualquer página do mundo.

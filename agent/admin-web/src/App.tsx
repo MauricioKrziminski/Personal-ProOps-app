@@ -11,6 +11,7 @@ const lazyPage = <K extends string>(load: () => Promise<Record<K, ComponentType>
 const OverviewPage = lazyPage(() => import("@/pages/overview"), "OverviewPage");
 const AccountsPage = lazyPage(() => import("@/pages/accounts"), "AccountsPage");
 const AccountDetailPage = lazyPage(() => import("@/pages/account-detail"), "AccountDetailPage");
+const ObservabilityPage = lazyPage(() => import("@/pages/observability"), "ObservabilityPage");
 const AuditPage = lazyPage(() => import("@/pages/audit"), "AuditPage");
 const BillingPage = lazyPage(() => import("@/pages/billing"), "BillingPage");
 const SystemPage = lazyPage(() => import("@/pages/system"), "SystemPage");
@@ -30,6 +31,7 @@ function Gate() {
         <Route index element={<OverviewPage />} />
         <Route path="contas" element={<AccountsPage />} />
         <Route path="contas/:id" element={<AccountDetailPage />} />
+        <Route path="observabilidade" element={<ObservabilityPage />} />
         <Route path="auditoria" element={<AuditPage />} />
         <Route path="cobranca" element={<BillingPage />} />
         <Route path="sistema" element={<SystemPage />} />

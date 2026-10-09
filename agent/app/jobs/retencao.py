@@ -10,6 +10,8 @@ curto e um motivo; quem lê o quê foi conferido antes de cortar:
 | `draft_actions` expirado | 30 dias | rascunho vale 24 h; guarda o texto cru da pessoa |
 | `executed_actions` | 90 dias | idempotência de execução precisa de dias; o feed `agent_activity` mostra só as últimas |
 | `alerts_sent` | 90 dias | dedupe é por dia |
+| `error_events` | 30 dias | mensagem e contexto de erro (já mascarados); o painel mostra os 50 últimos |
+| `error_issues` resolvida/ignorada | 90 dias sem ocorrência | issue aberta nunca sai; os eventos vão pelo prazo acima |
 | `whatsapp_sends`, `ai_events` | 13 meses | limite de respostas e custo leem o mês corrente e o anterior; sobra para comparar o mesmo mês do ano anterior |
 
 `app_chat_messages` NÃO entra: é conteúdo da pessoa, visível no app, e sai com a conta.
@@ -22,6 +24,7 @@ from __future__ import annotations
 import logging
 
 from app import db
+from app.services import observabilidade
 
 log = logging.getLogger(__name__)
 
@@ -39,6 +42,11 @@ _REGRAS = [
     ("alerts_sent", "public.alerts_sent", "sent_on < current_date - 90"),
     ("whatsapp_sends", "public.whatsapp_sends", "created_at < now() - interval '13 months'"),
     ("ai_events", "public.ai_events", "created_at < now() - interval '13 months'"),
+    # observabilidade: o evento guarda mensagem e contexto de erro; o issue só sai quando está encerrado
+    # (resolvido/ignorado) e sem nenhum evento recente (eventos de 30 dias já saíram pela regra acima)
+    ("error_events", "public.error_events", "created_at < now() - interval '30 days'"),
+    ("error_issues", "public.error_issues",
+     "status in ('resolved', 'ignored') and last_seen < now() - interval '90 days'"),
 ]
 
 
@@ -52,8 +60,9 @@ async def run() -> dict:
                 f"select ctid from {tabela} where {cond} limit %s))",
                 TETO_POR_TABELA,
             )
-        except Exception:  # noqa: BLE001 — retenção nunca derruba o cron
+        except Exception as err:  # noqa: BLE001 — retenção nunca derruba o cron
             log.exception("retenção de %s falhou", nome)
+            await observabilidade.capturar(err, route=f"cron:retencao/{nome}")
             out[nome] = "erro"
     log.info("retenção: %s", out)
     return out
