@@ -108,3 +108,52 @@ Query: `q` (app_user_id ou e-mail), `type`, `result`, `page`, `page_size`.
  "ai_cost": {"last_24h_usd": "0.0000", "last_7d_usd": "0.0000"},
  "whatsapp_month": {"replies": 0, "notices": 0}}
 ```
+
+## Observabilidade (erros agrupados, no padrão do ERP)
+
+### Captura — `POST /internal/errors` (não é rota de admin)
+Recebe erros do APP (React Native) e do PAINEL (SPA). O agente grava os PRÓPRIOS erros direto,
+sem HTTP (`app/services/observabilidade.py`, best-effort: nunca derruba quem chamou).
+- Auth: `Authorization: Bearer <JWT>` opcional (sem login também vale: erro da tela de entrar).
+  Com JWT, `user_id` sai do `sub`; NUNCA do corpo.
+- Limites: corpo ≤ 32 KB, até 20 erros por chamada, rate limit por IP e por usuário. Excesso → 429.
+- Corpo: `{"errors": [{"source": "app"|"admin", "kind": "crash"|"error"|"unhandled_rejection"|"render",
+  "name": str, "message": str, "stack": str|null, "route": str|null, "platform": "ios"|"android"|"web"|null,
+  "app_version": str|null, "occurred_at": iso|null, "context": {…} }]}`. Resposta `202 {"accepted": n}`.
+- O servidor MASCARA e-mail, CPF, CNPJ, telefone e números longos em `message`/`stack`/`context`
+  (a mesma régua do Langfuse, `telemetry.py`), corta `stack` em 8 KB e `message` em 500 chars.
+- Fingerprint = sha256(source + name + primeiros 3 frames normalizados, sem número de linha/coluna e
+  sem query), ou de `name + message` normalizada (dígitos → `#`) quando não há stack.
+
+### Admin — `GET /admin/api/issues`
+Query: `status` (`open|resolved|ignored`, padrão `open`), `source` (`app|admin|agent`),
+`severity` (`critical|error|warning`), `period` (`1h|24h|7d|30d`, padrão `7d`, filtra por `last_seen`),
+`q` (título/mensagem/rota), `sort` (`last_seen_desc` padrão, `count_desc`, `users_desc`, `first_seen_desc`),
+`page`, `page_size`.
+```json
+{"items": [Issue], "total": 0, "page": 1, "page_size": 25,
+ "summary": {"open": 0, "events_24h": 0, "users_affected_24h": 0, "new_24h": 0,
+             "by_source_24h": {"app": 0, "admin": 0, "agent": 0}}}
+```
+`Issue`: `{"id","fingerprint","source","kind","severity","title","message","route","status",
+"first_seen","last_seen","count","users_affected","last_app_version","platforms":["ios"]}`.
+Severidade: `critical` = crash/erro não tratado no agente que derrubou o turno ou 5xx; `error` = erro tratado
+relevante; `warning` = o resto. Reabre sozinha (`resolved` → `open`) quando volta a acontecer depois de
+resolvida; `ignored` continua ignorada mas conta.
+
+### `GET /admin/api/issues/{id}`
+```json
+{"issue": Issue, "stack": str|null, "hourly_24h": [{"hour": iso, "count": 0}],
+ "daily_30d": [{"day": "2026-10-09", "count": 0}],
+ "events": [{"id","created_at","user_id","user_email","platform","app_version","route","message","context"}],
+ "triage": [AuditEvent]}
+```
+`events`: últimos 50.
+
+### `POST /admin/api/issues/{id}/status`
+Corpo `{"status": "open"|"resolved"|"ignored"}`. Grava auditoria `issue_triaged` (payload com de/para).
+Resposta: o detalhe atualizado.
+
+`/admin/api/overview` ganha `"observability": {"open": 0, "events_24h": 0, "critical_open": 0}`.
+
+Retenção: eventos 30 dias; issue resolvida ou ignorada sem evento há 90 dias sai.
