@@ -24,3 +24,9 @@ export const SORTS: [string, string][] = [
   ["created_desc", "Mais recentes"], ["created_asc", "Mais antigas"], ["last_sign_in_desc", "Último acesso"], ["last_sign_in_asc", "Sem acesso há mais tempo"],
   ["ai_used_desc", "Maior uso de IA"], ["email_asc", "E-mail (A–Z)"],
 ];
+
+export const SUB_STATUS_LABEL: Record<string, string> = {
+  active: "Ativa", trialing: "Em teste", past_due: "Pagamento atrasado", canceled: "Cancelada", expired: "Vencida",
+};
+export const INVITE_STATUS_LABEL: Record<string, string> = { pending: "Pendente", accepted: "Aceito", revoked: "Revogado" };
+export const QUEUE_STATUS_LABEL: Record<string, string> = { failed: "Falhou", pending: "Pendente", processing: "Processando", done: "Concluída" };

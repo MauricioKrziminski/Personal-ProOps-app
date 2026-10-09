@@ -14,9 +14,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { resultTone } from "@/pages/billing";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { BILLING_RESULT_LABEL, COUNT_LABEL, ORIGIN_LABEL } from "@/lib/labels";
+import { BILLING_RESULT_LABEL, COUNT_LABEL, INVITE_STATUS_LABEL, ORIGIN_LABEL, SUB_STATUS_LABEL } from "@/lib/labels";
 import type { AccountDetail } from "@/lib/types";
-import { fmtDate, monthLabel, num, usd } from "@/lib/utils";
+import { fmtDate, monthLabel, nomeDaConta, num, usd } from "@/lib/utils";
 
 const Row = ({ k, v }: { k: string; v: React.ReactNode }) => (
   <div className="flex items-baseline justify-between gap-4 py-2.5 text-sm"><dt className="shrink-0 text-muted-foreground">{k}</dt><dd className="min-w-0 break-words text-right font-medium">{v}</dd></div>
@@ -64,7 +64,7 @@ function Header({ d, onAction }: { d: AccountDetail; onAction: (k: Parameters<ty
     <Card className="p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="break-all text-xl font-extrabold tracking-tight sm:text-2xl">{a.email}</h1>
+          <h1 className="break-all text-xl font-extrabold tracking-tight sm:text-2xl">{nomeDaConta(a)}</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">{a.name ?? "Sem nome"} · cadastro em {fmtDate(a.created_at)} · acesso <LastSeen iso={a.last_sign_in_at} /></p>
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
             <PlanBadge plan={a.plan} /><StatusBadge a={a} /><OriginBadge origin={a.origin} />
@@ -98,7 +98,7 @@ function Subscription({ d, rc }: { d: AccountDetail; rc?: string }) {
         )}
         <dl className="divide-y">
           <Row k="Plano" v={<PlanBadge plan={s.plan} />} />
-          <Row k="Status" v={s.status || "—"} />
+          <Row k="Status" v={SUB_STATUS_LABEL[s.status] ?? (s.status || "—")} />
           <Row k="Origem" v={ORIGIN_LABEL[s.provider] ?? (s.provider || "—")} />
           <Row k="Período termina em" v={fmtDate(s.current_period_end)} />
           {s.is_trial && <Row k="Teste" v="Sim" />}
@@ -162,14 +162,14 @@ function People({ d }: { d: AccountDetail }) {
       <ul className="divide-y px-1 pb-1 pt-2">
         {d.members.map((m) => (
           <li key={m.user_id} className="flex items-center justify-between gap-3 px-4 py-3">
-            <div className="min-w-0"><p className="truncate text-sm font-semibold">{m.email}</p><p className="truncate text-xs text-muted-foreground">{m.name ?? "Sem nome"}</p></div>
+            <div className="min-w-0"><p className="truncate text-sm font-semibold">{nomeDaConta(m)}</p><p className="truncate text-xs text-muted-foreground">{m.name ?? "Sem nome"}</p></div>
             <Badge tone={m.role === "owner" ? "ink" : "neutral"}>{m.role === "owner" ? "Dono" : "Membro"}</Badge>
           </li>
         ))}
         {d.invites.map((i) => (
           <li key={i.phone + i.created_at} className="flex items-center justify-between gap-3 px-4 py-3">
             <div><p className="text-sm font-semibold">{i.phone}</p><p className="text-xs text-muted-foreground">Convite em {fmtDate(i.created_at)}</p></div>
-            <Badge tone="warning">{i.status === "pending" ? "Pendente" : i.status}</Badge>
+            <Badge tone="warning">{INVITE_STATUS_LABEL[i.status] ?? i.status}</Badge>
           </li>
         ))}
       </ul>

@@ -567,8 +567,10 @@ class ApagarIn(BaseModel):
 async def apagar(user_id: UUID, body: ApagarIn, admin: UUID = Depends(admin_user)):
     _nao_a_si_mesmo(admin, user_id)
     alvo = await _alvo(user_id)
-    if body.confirm_email.strip().lower() != (alvo["email"] or "").strip().lower():
-        raise _erro(409, "email_mismatch", "O e-mail digitado não confere com o da conta.")
+    # Conta antiga só com telefone não tem e-mail: a confirmação é o id dela.
+    esperado = (alvo["email"] or str(user_id)).strip().lower()
+    if body.confirm_email.strip().lower() != esperado:
+        raise _erro(409, "email_mismatch", "O que foi digitado não confere com o e-mail (ou o ID) da conta.")
     async with db.unidade_de_trabalho():
         await _auditar(admin, "account_deleted", alvo)  # só ids: o e-mail some junto com a conta
         await db.execute("select private.apagar_conta(%s)", user_id)

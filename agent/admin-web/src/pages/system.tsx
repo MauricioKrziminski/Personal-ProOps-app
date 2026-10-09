@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { cn, duration, fmtDate, num, relTime, usd } from "@/lib/utils";
+import { QUEUE_STATUS_LABEL } from "@/lib/labels";
 
 const Stat = ({ label, value, tone }: { label: string; value: string; tone?: "bad" | "warn" }) => (
   <div className="px-3 py-2">
@@ -40,7 +41,7 @@ export function SystemPage() {
             {d.recent_failures.length === 0 ? <Empty title="Nenhuma falha recente" hint="Mensagens com erro aparecem aqui, sem o texto da pessoa." /> : (
               <ul className="divide-y p-1">{d.recent_failures.map((f, i) => (
                 <li key={i} className="space-y-1.5 px-4 py-3.5">
-                  <div className="flex flex-wrap items-center gap-2"><Badge tone="danger">{f.status}</Badge><span className="text-xs text-muted-foreground" title={fmtDate(f.created_at, true)}>{relTime(f.created_at)} · {fmtDate(f.created_at, true)}</span></div>
+                  <div className="flex flex-wrap items-center gap-2"><Badge tone="danger">{QUEUE_STATUS_LABEL[f.status] ?? f.status}</Badge><span className="text-xs text-muted-foreground" title={fmtDate(f.created_at, true)}>{relTime(f.created_at)} · {fmtDate(f.created_at, true)}</span></div>
                   <p className="break-words font-mono text-[13px] leading-snug">{f.last_error}</p>
                 </li>
               ))}</ul>

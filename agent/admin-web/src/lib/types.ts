@@ -15,7 +15,7 @@ export interface Overview {
 export interface AccountRow {
   user_id: string;
   workspace_id: string | null;
-  email: string;
+  email: string | null;
   name: string | null;
   created_at: string;
   last_sign_in_at: string | null;
@@ -70,7 +70,7 @@ export interface AccountDetail {
     months: { month: string; ai_turns: number; whatsapp_replies: number; ai_cost_usd: string }[];
   };
   counts: Record<"transactions" | "accounts" | "cards" | "notes" | "reminders" | "goals" | "debts" | "recurring", number>;
-  members: { user_id: string; email: string; name: string | null; role: "owner" | "member" }[];
+  members: { user_id: string; email: string | null; name: string | null; role: "owner" | "member" }[];
   invites: { phone: string; status: string; created_at: string }[];
   billing_events: { id: string; type: string; result: string; created_at: string }[];
   admin_events: AuditEvent[];

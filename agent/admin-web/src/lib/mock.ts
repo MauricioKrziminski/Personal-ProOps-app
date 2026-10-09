@@ -16,7 +16,7 @@ const ROWS: AccountRow[] = Array.from({ length: 58 }, (_, i) => {
   const waMax = plan === "free" ? 30 : 1000;
   const aiUsed = Math.min(Math.round(((i * 37) % 100) / 100 * aiMax * (i % 11 === 0 ? 1.05 : 1)), aiMax);
   return {
-    user_id: uuid(i + 1), workspace_id: uuid(1000 + i), email: `${(name ?? "conta" + i).toLowerCase().normalize("NFD").replace(/[^a-z]/g, "").slice(0, 14)}${i}@exemplo.com`,
+    user_id: uuid(i + 1), workspace_id: uuid(1000 + i), email: i === 4 ? null : `${(name ?? "conta" + i).toLowerCase().normalize("NFD").replace(/[^a-z]/g, "").slice(0, 14)}${i}@exemplo.com` /* conta antiga só com telefone */,
     name, created_at: day(3 + i * 6), last_sign_in_at: kind === 5 ? null : day((i * 5) % 45), suspended: kind === 8,
     plan: plan as AccountRow["plan"], status: kind === 4 ? "canceled" : kind === 3 ? "trialing" : kind <= 2 || kind === 7 ? "active" : "none",
     access: kind <= 3 || kind === 7 ? "subscriber" : kind === 4 ? "lapsed" : "never", is_trial: kind === 3,
@@ -129,7 +129,7 @@ function route(method: string, path: string, body: Record<string, unknown>): unk
   if (p === "/accounts" && method === "GET") {
     let r = [...ROWS];
     const s = q.get("q")?.toLowerCase();
-    if (s) r = r.filter((a) => a.email.includes(s) || a.name?.toLowerCase().includes(s));
+    if (s) r = r.filter((a) => (a.email ?? "").includes(s) || a.name?.toLowerCase().includes(s));
     const acc = q.get("access");
     if (acc) r = r.filter((a) => (acc === "suspended" ? a.suspended : acc === "trialing" ? a.is_trial : acc === "courtesy" ? a.origin === "manual" && a.access === "subscriber" : acc === "subscriber" ? a.access === "subscriber" && !a.is_trial : a.access === acc));
     if (q.get("plan")) r = r.filter((a) => a.plan === q.get("plan"));
@@ -139,7 +139,8 @@ function route(method: string, path: string, body: Record<string, unknown>): unk
     const cmp: Record<string, (a: AccountRow, b: AccountRow) => number> = {
       created_desc: (a, b) => b.created_at.localeCompare(a.created_at), created_asc: (a, b) => a.created_at.localeCompare(b.created_at),
       last_sign_in_desc: (a, b) => (b.last_sign_in_at ?? "").localeCompare(a.last_sign_in_at ?? ""), ai_used_desc: (a, b) => b.ai_used - a.ai_used,
-      email_asc: (a, b) => a.email.localeCompare(b.email),
+      email_asc: (a, b) => (a.email ?? "").localeCompare(b.email ?? ""),
+      last_sign_in_asc: (a, b) => (a.last_sign_in_at ?? "").localeCompare(b.last_sign_in_at ?? ""),
     };
     return page(r.sort(cmp[sort] ?? cmp.created_desc), q);
   }

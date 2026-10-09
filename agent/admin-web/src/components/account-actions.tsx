@@ -9,6 +9,7 @@ import { Menu, MenuContent, MenuItem, MenuSep, MenuTrigger } from "@/components/
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
 import { api, ApiError } from "@/lib/api";
 import type { AccountRow } from "@/lib/types";
+import { chaveDeConfirmacao, nomeDaConta } from "@/lib/utils";
 
 export type ActionKind = "plan" | "suspend" | "reactivate" | "signout" | "reset" | "unlink" | "delete";
 export type Target = { kind: ActionKind; row: AccountRow } | null;
@@ -30,7 +31,7 @@ export function AccountMenu({ row, onAction, withOpen, trigger }: { row: Account
   return (
     <Menu>
       <MenuTrigger asChild>
-        {trigger === "button" ? <Button variant="outline"><MoreHorizontal />Mais ações</Button> : <Button variant="ghost" size="icon" aria-label={`Ações de ${row.email}`}><MoreHorizontal /></Button>}
+        {trigger === "button" ? <Button variant="outline"><MoreHorizontal />Mais ações</Button> : <Button variant="ghost" size="icon" aria-label={`Ações de ${nomeDaConta(row)}`}><MoreHorizontal /></Button>}
       </MenuTrigger>
       <MenuContent>
         {withOpen && <MenuItem onSelect={() => nav(`/contas/${row.user_id}`)}><ExternalLink />Abrir conta</MenuItem>}
@@ -40,7 +41,7 @@ export function AccountMenu({ row, onAction, withOpen, trigger }: { row: Account
         <MenuItem onSelect={() => onAction("reset")}><KeyRound />Enviar código de senha</MenuItem>
         {row.whatsapp_linked && <MenuItem onSelect={() => onAction("unlink")}><MessageSquareOff />Desvincular WhatsApp</MenuItem>}
         <MenuSep />
-        <MenuItem onSelect={() => void copy(row.email, "E-mail")}><Copy />Copiar e-mail</MenuItem>
+        <MenuItem disabled={!row.email} onSelect={() => row.email && void copy(row.email, "E-mail")}><Copy />Copiar e-mail</MenuItem>
         <MenuItem onSelect={() => void copy(row.user_id, "ID do usuário")}><Copy />Copiar ID do usuário</MenuItem>
         {row.workspace_id && <MenuItem onSelect={() => void copy(row.workspace_id!, "ID do espaço")}><Copy />Copiar ID do espaço</MenuItem>}
         <MenuSep />
@@ -99,13 +100,15 @@ export function ActionHost({ target, onClose }: { target: Target; onClose: () =>
   if (!target) return null;
   const { kind, row } = target;
   const go = () => m.mutate({ kind, row });
-  const who = <strong className="break-all text-foreground">{row.email}</strong>;
+  const who = <strong className="break-all text-foreground">{nomeDaConta(row)}</strong>;
+  const chave = chaveDeConfirmacao(row);
+  const pedeChave = row.email ? "Digite o e-mail da conta para confirmar" : "Digite o ID da conta para confirmar";
 
   if (kind === "plan") {
     const store = isStore(row.origin) || needForce;
-    const okForce = !store || (force && email.trim().toLowerCase() === row.email.toLowerCase());
+    const okForce = !store || (force && email.trim().toLowerCase() === chave.toLowerCase());
     return (
-      <Modal open onOpenChange={(o) => !o && close()} title="Mudar plano" description={row.email}>
+      <Modal open onOpenChange={(o) => !o && close()} title="Mudar plano" description={nomeDaConta(row)}>
         <div><Label htmlFor="plan">Plano</Label>
           <Select id="plan" value={plan} onChange={(e) => setPlan(e.target.value as typeof plan)}><option value="free">Free</option><option value="pro">Pro</option><option value="family">Família</option></Select></div>
         {plan !== "free" && (
@@ -120,7 +123,7 @@ export function ActionHost({ target, onClose }: { target: Target; onClose: () =>
             <p className="font-semibold text-warning">Assinatura gerenciada pela loja</p>
             <p className="mt-1 text-muted-foreground">A próxima notificação da {row.origin === "google" ? "Google Play" : "App Store"} sobrescreve esta mudança.</p>
             <label className="mt-3 flex min-h-10 items-center gap-2.5 font-medium"><input type="checkbox" className="size-4 accent-[var(--primary)]" checked={force} onChange={(e) => setForce(e.target.checked)} />Forçar mesmo assim</label>
-            {force && <div className="mt-2"><Label htmlFor="fe">Digite o e-mail da conta para confirmar</Label><Input id="fe" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={row.email} /></div>}
+            {force && <div className="mt-2"><Label htmlFor="fe">{pedeChave}</Label><Input id="fe" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={chave} /></div>}
           </div>
         )}
         <DialogActions>
@@ -141,9 +144,9 @@ export function ActionHost({ target, onClose }: { target: Target; onClose: () =>
   }
   if (kind === "delete") {
     return (
-      <Confirm open onOpenChange={(o) => !o && close()} destructive title="Apagar conta" confirmLabel="Apagar para sempre" busy={m.isPending} disabled={email.trim().toLowerCase() !== row.email.toLowerCase()} onConfirm={go}
+      <Confirm open onOpenChange={(o) => !o && close()} destructive title="Apagar conta" confirmLabel="Apagar para sempre" busy={m.isPending} disabled={email.trim().toLowerCase() !== chave.toLowerCase()} onConfirm={go}
         description={<>Isto apaga {who} e todos os dados dela. <strong className="text-foreground">É definitivo e não tem volta.</strong> A assinatura na loja não é cancelada: se houver cobrança ativa, a pessoa continua sendo cobrada.</>}>
-        <div><Label htmlFor="del">Digite o e-mail da conta para confirmar</Label><Input id="del" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={row.email} /></div>
+        <div><Label htmlFor="del">{pedeChave}</Label><Input id="del" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={chave} /></div>
       </Confirm>
     );
   }

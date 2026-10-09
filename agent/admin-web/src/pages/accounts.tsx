@@ -14,7 +14,7 @@ import { api } from "@/lib/api";
 import { useSearchBox, useUrlState } from "@/lib/url-state";
 import { ACCESS_LABEL, ORIGIN_LABEL, PLAN_LABEL, SORTS } from "@/lib/labels";
 import type { AccountRow } from "@/lib/types";
-import { fmtDate } from "@/lib/utils";
+import { fmtDate, nomeDaConta } from "@/lib/utils";
 
 const PAGE_SIZE = 25;
 
@@ -59,7 +59,7 @@ export function AccountsPage() {
                 <THead><tr><TH>Conta</TH><TH>Plano</TH><TH>Status</TH><TH>Origem</TH><TH>IA no mês</TH><TH>WhatsApp</TH><TH>Último acesso</TH><TH className="w-12"><span className="sr-only">Ações</span></TH></tr></THead>
                 <tbody>{items.map((a) => (
                   <TR key={a.user_id}>
-                    <TD className="max-w-[280px]"><Link to={`/contas/${a.user_id}`} className="block truncate font-semibold hover:underline">{a.email}</Link><p className="truncate text-xs text-muted-foreground">{a.name ?? "Sem nome"} · desde {fmtDate(a.created_at)}</p></TD>
+                    <TD className="max-w-[280px]"><Link to={`/contas/${a.user_id}`} className="block truncate font-semibold hover:underline">{nomeDaConta(a)}</Link><p className="truncate text-xs text-muted-foreground">{a.name ?? "Sem nome"} · desde {fmtDate(a.created_at)}</p></TD>
                     <TD><PlanBadge plan={a.plan} /></TD>
                     <TD><StatusBadge a={a} /></TD>
                     <TD><OriginBadge origin={a.origin} /></TD>
@@ -85,7 +85,7 @@ function MobileRow({ a, onAction }: { a: AccountRow; onAction: (k: Parameters<ty
     <li className="p-4">
       <div className="flex items-start justify-between gap-2">
         <Link to={`/contas/${a.user_id}`} className="min-w-0 flex-1">
-          <p className="truncate font-semibold">{a.email}</p>
+          <p className="truncate font-semibold">{nomeDaConta(a)}</p>
           <p className="truncate text-xs text-muted-foreground">{a.name ?? "Sem nome"} · desde {fmtDate(a.created_at)}</p>
         </Link>
         <AccountMenu row={a} withOpen onAction={onAction} />

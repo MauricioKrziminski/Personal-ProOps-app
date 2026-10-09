@@ -47,3 +47,9 @@ export function duration(sec: number): string {
   if (sec < 3600) return `${Math.floor(sec / 60)} min`;
   return `${Math.floor(sec / 3600)} h ${Math.floor((sec % 3600) / 60)} min`;
 }
+
+/** Conta antiga criada só por telefone não tem e-mail: mostra o nome, senão um rótulo. */
+export const nomeDaConta = (a: { email: string | null; name?: string | null }): string =>
+  a.email ?? a.name ?? "Conta sem e-mail";
+/** O que se digita para confirmar ação destrutiva: o e-mail, ou o ID quando não há e-mail. */
+export const chaveDeConfirmacao = (a: { email: string | null; user_id: string }): string => a.email ?? a.user_id;
