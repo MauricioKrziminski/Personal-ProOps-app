@@ -1275,6 +1275,22 @@ grava quando a pessoa foge dele; o `check` recusa valor em cartão). Chave no fo
 
 ## Planos e limites
 
+- **Não existe plano grátis** (decisão do dono do produto, 09/10/2026). A entrada é o teste de 7
+  dias da LOJA (oferta introdutória, com cartão, cobra no 8º dia). `plan = 'free'` continua no
+  banco e quer dizer **sem assinatura**: 0 mensagens de IA, sem importar. Não renomear — app em
+  campo, `check` e defaults leem o valor.
+- `plan_status.access` (coluna no FIM): `subscriber` | `never` (nunca assinou: o app só mostra a
+  tela de assinar, não descartável, com Restaurar, Sair e Apagar conta) | `lapsed` (venceu: entra
+  e LÊ). **"Não lança" mora no banco**: o gatilho `private.tg_exige_assinatura` recusa escrita
+  vinda do PostgREST (`session_user = 'authenticator'`) em workspace sem assinatura com `PT402`
+  (HTTP 402), e o app abre o paywall nesse código. Agente, cron e testes conectam como `postgres`
+  e passam; `delete_my_account` passa pela GUC `proops.apagando_conta`. Tabela de dado nova
+  recebe o gatilho.
+- **Preço não entra no código.** O paywall lê preço e período da loja (`getOfferings`, RevenueCat);
+  sem oferta, diz "indisponível" — nunca um preço de reserva.
+- Cortesia (dono, testadores) é dado, não código: `update subscriptions set plan='family',
+  status='active', provider='manual', current_period_end=null` pelo SQL Editor. `guard_billing`
+  impede o app de fazer isso.
 - **Limite de plano mora em `private.plan_limits`, num lugar só.** Espalhar número de plano pelo código é como o produto acaba cobrando de um jeito e entregando de outro.
 - `plan_status()` devolve plano + consumo do mês + limites numa chamada: serve a tela E o gate da
   IA em `conversation.check_limits` (`agent/app/conversation.py`). O consumo do mês é `count(*)` de `ai_events` —

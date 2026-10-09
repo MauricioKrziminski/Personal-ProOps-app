@@ -8,9 +8,11 @@ governada por App Review, só o binário é.
 O backend já está pronto e testado. O que falta é tudo que exige você logado nas
 contas da Apple, do Google e da RevenueCat.
 
-> **O Free não vem da loja.** A loja só avisa compra, renovação, cancelamento,
-> expiração e reembolso. Free é o estado padrão — a ausência de assinatura ativa.
-> Por isso o Free continua funcionando com a loja fora do ar.
+> **Não existe plano grátis (09/10/2026).** A porta de entrada é o teste de 7 dias
+> da loja, com cartão. `plan = 'free'` no banco é o estado **sem assinatura**: quem
+> nunca assinou só vê a tela de assinar; quem venceu entra e só LÊ (o banco recusa
+> escrita com `PT402`). Regra completa em `.claude/rules/finance.md` → *Planos e limites*.
+> **Nenhum preço entra no código** — o paywall lê da loja.
 
 ---
 
@@ -58,18 +60,21 @@ conta para o requisito de produção.
 ## Fase 1 — criar os produtos
 
 Os ids abaixo estão fixados em `src/lib/billing.ts` e replicados em
-`supabase/functions/_shared/billing.ts`. **Digite exatamente assim.** Um id
+`agent/app/domain/billing.py`. **Digite exatamente assim.** Um id
 diferente vira compra que a loja aprova e o nosso webhook não sabe traduzir — o
 usuário paga e não recebe nada (aparece como `produto_desconhecido` em
 `billing_events`). O teste `src/lib/billing.test.ts` trava a divergência entre os
 dois arquivos, mas não tem como conferir o que você digitou na loja.
 
-| Product ID | Plano | Período | Preço |
-|---|---|---|---|
-| `proops.personal.pro.monthly` | Pro | 1 mês | R$ 24,90 |
-| `proops.personal.pro.annual` | Pro | 1 ano | R$ 249,00 |
-| `proops.personal.family.monthly` | Família | 1 mês | R$ 39,90 |
-| `proops.personal.family.annual` | Família | 1 ano | R$ 399,00 |
+| Product ID | Plano | Período |
+|---|---|---|
+| `proops.personal.pro.monthly` | Pro | 1 mês |
+| `proops.personal.pro.annual` | Pro | 1 ano |
+| `proops.personal.family.monthly` | Família | 1 mês |
+| `proops.personal.family.annual` | Família | 1 ano |
+
+**Preço: a decidir.** A proposta com a conta de custo está em `docs/CUSTOS-E-PRECOS.md` §6.
+O preço só existe na loja; mudar o preço nunca exige build.
 
 ### 1.1 App Store Connect
 
@@ -123,14 +128,14 @@ no aparelho.
    contas nossas. Trocar de aparelho continua funcionando normal (é o mesmo App
    User ID).
 8. **Webhook** (Integrations → Webhooks):
-   - URL: `https://kwriuifcwyvdrxtspjiz.supabase.co/functions/v1/billing-webhook`
+   - URL: `<URL do Cloud Run do agente>/hooks/billing` (o `setup-gcp.sh` imprime no fim)
    - Authorization header: uma string aleatória longa, gerada por você
-   - Guardar essa string: é o `REVENUECAT_WEBHOOK_SECRET`
-
-```bash
-npx supabase secrets set REVENUECAT_WEBHOOK_SECRET='<a mesma string>'
-npx supabase functions deploy billing-webhook
-```
+   - Guardar essa string: é o `REVENUECAT_WEBHOOK_SECRET`, no **GCP Secret Manager**
+     (`agent/.env.example` documenta; `./scripts/setup-gcp.sh secrets` sobe)
+9. **API keys públicas** (Project settings → API keys): a do iOS (`appl_…`) e a do
+   Android (`goog_…`) vão em `EXPO_PUBLIC_REVENUECAT_IOS_KEY` /
+   `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` (variáveis do EAS por ambiente). Sem elas o
+   paywall diz "Assinatura indisponível" — não quebra.
 
 ---
 
@@ -177,15 +182,8 @@ numa faixa de teste interno.
 ⚠️ **Por padrão, evento de sandbox NÃO concede plano** — é proteção, senão
 qualquer um com StoreKit Testing viraria Pro de graça. Para testar ponta a ponta:
 
-```bash
-npx supabase secrets set BILLING_ALLOW_SANDBOX=true
-```
-
-**Essa chave tem que sair antes de publicar:**
-
-```bash
-npx supabase secrets unset BILLING_ALLOW_SANDBOX
-```
+`BILLING_ALLOW_SANDBOX=true` no agente do **staging** (variável do Cloud Run).
+**Em produção ela nunca existe.**
 
 O `environment` real fica gravado em `billing_events.payload` de qualquer jeito,
 então dá para auditar depois se alguém entrou por sandbox.
@@ -197,19 +195,20 @@ O que conferir em `billing_events` (`result` de cada evento):
 | Comprar com trial | `concedido` | plano vira Pro, `status = trialing` |
 | Renovar | `concedido` | `status = active`, `is_trial = false` |
 | Cancelar | `concedido` | **continua Pro até vencer** — cancelar é "não vai renovar" |
-| Deixar vencer | `revogado` | volta para Free |
-| Reembolsar | `revogado` | volta para Free |
+| Deixar vencer | `revogado` | sem assinatura: entra e só lê |
+| Reembolsar | `revogado` | sem assinatura: entra e só lê |
 | Mesmo evento reenviado | `duplicado` | nada acontece |
 
 ---
 
 ## Fase 5 — antes de publicar
 
-- [ ] `BILLING_ALLOW_SANDBOX` removida dos secrets
+- [ ] `BILLING_ALLOW_SANDBOX` ausente no agente de produção
 - [ ] Small Business Program aprovado (senão é 30%)
 - [ ] Os 4 product ids conferidos letra por letra nas duas lojas
 - [ ] Preços em BRL nas duas lojas
-- [ ] Termos de uso e política de privacidade publicados (as duas lojas exigem)
+- [ ] Termos de uso e política de privacidade publicados nas URLs de `src/lib/links-legais.ts` (as duas lojas exigem)
+- [ ] Google Play: URL de exclusão de conta (Data safety) — o app já tem Perfil → Apagar conta; a loja pede também um link web
 - [ ] Texto obrigatório na tela de assinatura: preço, periodicidade, renovação
       automática e como cancelar — a Apple reprova sem isso
 - [ ] Conta de teste para a revisão da Apple (eles precisam entrar no app)
@@ -255,14 +254,14 @@ os alertas caem para template do WhatsApp — que é pago, mas funciona.
 
 | Peça | Onde |
 |---|---|
-| Produtos, trial e entitlement (fonte única) | `src/lib/billing.ts` + cópia em `_shared/billing.ts`, travadas por `src/lib/billing.test.ts` |
-| Webhook | `supabase/functions/billing-webhook/index.ts` |
+| Produtos, trial e entitlement (fonte única) | `src/lib/billing.ts` + cópia em `agent/app/domain/billing.py`, travadas por `src/lib/billing.test.ts` |
+| Webhook | `POST /hooks/billing` (`agent/app/routes/hooks.py`) |
 | Concessão de plano (única porta de entrada) | `public._apply_entitlement` (`0035`) |
 | Expiração automática se o webhook se perder | `private.effective_plan` (`0034`) |
 | Auditoria e idempotência | `public.billing_events` (`0034`) |
 | Cancelamento vai para a loja | `public.cancel_subscription` (`0036`) |
 | Tela mostra trial / expirado / gerenciar na loja | `src/app/finance/plan.tsx` |
-| Aviso de fim de teste, 2 dias antes | `_alerts_to_send` (`0037`), entregue pelo `send-alerts` |
+| Aviso de fim de teste, 2 dias antes | `_alerts_to_send` (`0037`), entregue pelo `/cron/alerts` |
 
 ### Como o app está protegido
 
@@ -279,7 +278,7 @@ os alertas caem para template do WhatsApp — que é pago, mas funciona.
 6. **Uma compra libera um workspace** — unique parcial em `(provider, external_id)`.
    Sem isso, o mesmo `original_transaction_id` pagaria por várias contas.
 7. **Expiração é rede de segurança.** Mesmo que o webhook de EXPIRATION se perca,
-   `current_period_end` no passado derruba o plano para Free na hora.
+   `current_period_end` no passado tira o acesso na hora.
 
 ### O que ainda falta no código (depende da Fase 1 e 2)
 
