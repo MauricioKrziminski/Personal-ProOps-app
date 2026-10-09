@@ -17,10 +17,16 @@ mora em `gemini.MODELOS` (o nome do módulo ficou, para não espalhar troca de n
 
 - **O provedor sai do NOME do modelo** (`claude-*` / `gemini-*`); `GEMINI_MODEL_<PAPEL>` troca o
   modelo de um papel e aceita os dois.
-- **Reserva entre provedores**: Haiku → Sonnet → `gemini-3.7-flash`; o portão, Sonnet →
-  `gemini-3.7-flash` (o portão aprovado antes da troca). Só entra quando a chamada FALHA — inclusive
-  crédito esgotado, que sem reserva pararia o agente até o mês seguinte. Com o portão em Gemini
-  (suítes) ele continua sem reserva, como abaixo.
+- **Reserva entre provedores**: router/parse/batch, Haiku → Sonnet → `gemini-3.1-flash-lite`; o
+  portão, Sonnet → `gemini-3.7-flash` (o único medido aprovando certo). Só entra quando a chamada
+  FALHA — inclusive crédito esgotado, que acontece TODO MÊS por algumas horas entre o crédito vencer
+  e o novo cair (o ciclo vira no dia 3/4). Medido em 09/10/2026 com a key do Claude inválida: os dois
+  saltos do Claude custam < 1 s (401 é rápido) e o Lite responde; com o volume caindo no flash, que
+  estava em 503/504, nenhuma mensagem passava. Com o portão em Gemini (suítes) ele continua sem
+  reserva, como abaixo.
+- **Sonnet NÃO é candidato a parse sem remedir**: com raciocínio adaptativo a ferramenta não é
+  forçada, e como parse ele devolveu sem chamada de ferramenta em 14 de 15 casos de cadastro
+  (09/10/2026). No portão (prompts curtos) passou 70/70.
 - **Claude não aceita `temperature`** (400 no Haiku/Sonnet 5.5), e a saída estruturada vai por
   **`method="function_calling"`** com a classe Pydantic. O `json_schema` (saída estrita) foi medido
   e RECUSADO em 09/10/2026: o `FinancePlan` voltou `400 "Schema is too complex"` ou estourou 30 s
