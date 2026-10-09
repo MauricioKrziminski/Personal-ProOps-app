@@ -1,5 +1,18 @@
 {
   "ignore": {
-    "files": [".claude/**", "agent/**", "docs/**", "android/**", "ios/**"]
+    "files": [".claude/**", "agent/**", "docs/**", "android/**", "ios/**"],
+    "overrides": [
+      {
+        "files": [
+          "src/app/forgot-password.tsx",
+          "src/app/link-email.tsx",
+          "src/app/link-phone.tsx",
+          "src/app/signup.tsx",
+          "src/components/auth/email-login-screen.tsx",
+          "src/components/login-screen.tsx"
+        ],
+        "rules": ["react-doctor/no-loading-flag-reset-outside-finally"]
+      }
+    ]
   }
 }

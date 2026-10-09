@@ -1,4 +1,4 @@
-import { Children, Fragment, useEffect, useState, type ReactNode } from 'react';
+import { Children, Fragment, isValidElement, useEffect, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions, type AccessibilityState } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import type { SymbolViewProps } from 'expo-symbols';
@@ -292,7 +292,9 @@ export function Section({
           { backgroundColor: theme.surface, borderColor: theme.cardBorder },
         ]}>
         {items.map((child, i) => (
-          <Fragment key={i}>
+          // A chave que o `toArray` deu ao filho, não a posição: uma linha condicional que some no
+          // meio do grupo levaria o estado da arrastável de baixo para a de cima.
+          <Fragment key={isValidElement(child) && child.key != null ? child.key : i}>
             {i > 0 ? <View style={[styles.separator, { backgroundColor: theme.separator }]} /> : null}
             {child}
           </Fragment>
