@@ -377,3 +377,51 @@ async def test_turno_sem_modelo_devolve_a_vaga_da_cota(monkeypatch):
         monkeypatch.setattr(conversation, "soltar_reserva", soltar)
         await worker.process_thread("t1")
     assert len(soltas) == 3
+
+
+async def test_aviso_de_limite_sai_uma_vez_por_dia_local(monkeypatch):
+    """1ª barrada avisa, 2ª no mesmo dia marca done em silêncio, o dia seguinte avisa de novo;
+    a rajada por hora (MUITAS) não entra na conta."""
+    from app.domain import dates
+
+    _preparar(monkeypatch, [_msg()], run_turn=None)
+    reservas: set[tuple] = set()  # o unique de alerts_sent
+    dia = ["2026-10-09"]
+    enviados: list[str] = []
+    done: list = []
+    barrado = ["📊 limite"]
+
+    async def check(_s):
+        return barrado[0]
+
+    async def fetch_one(sql, ws, uid, d):
+        assert "'limite_do_plano'" in sql and "on conflict do nothing" in sql
+        if (ws, d) in reservas:
+            return None
+        reservas.add((ws, d))
+        return {"id": 1}
+
+    async def mark_done(ids):
+        done.append(ids)
+
+    async def envia(_p, texto):
+        enviados.append(texto)
+
+    monkeypatch.setattr(conversation, "check_limits", check)
+    monkeypatch.setattr(db, "fetch_one", fetch_one)
+    monkeypatch.setattr(dates, "local_iso_date", lambda _tz, _i=None: dia[0])
+    monkeypatch.setattr(worker.db, "mark_done", mark_done)
+    monkeypatch.setattr(worker.whatsapp, "try_send", envia)
+
+    for esperado in (1, 1, 2):
+        if esperado == 2:
+            dia[0] = "2026-10-10"
+        r = await worker.process_thread("t1")
+        assert r["status"] == "limite"
+        assert len(enviados) == esperado
+    assert len(done) == 3  # silêncio não deixa a mensagem na fila
+
+    barrado[0] = conversation.MUITAS
+    await worker.process_thread("t1")
+    await worker.process_thread("t1")
+    assert enviados[2:] == [conversation.MUITAS] * 2

@@ -79,7 +79,7 @@ STATUS = {
 MENSAGEM = {
     404: "Essa conversa não existe.",
     409: "Essa conversa está processando uma mensagem. Tenta de novo em instantes.",
-    402: "Você usou as mensagens de IA do seu plano este mês.",
+    402: "O agente faz parte da assinatura, ou as mensagens de IA do seu plano acabaram este mês.",
     429: "Muitas mensagens em pouco tempo. Aguarda um pouquinho.",
     422: "Essa confirmação não vale mais. Me manda de novo o que você quer.",
     500: "Não consegui processar essa mensagem.",

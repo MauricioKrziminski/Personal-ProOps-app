@@ -91,7 +91,7 @@ class DbFalso:
 
     def __init__(self):
         self.eventos: list[dict] = []
-        self.plano = {"plan": "free", "ai_messages_month": 0, "max_ai_messages_month": 50}
+        self.plano = {"plan": "pro", "ai_messages_month": 0, "max_ai_messages_month": 50}
         self.na_hora = 0
 
     async def expire_drafts(self): ...
@@ -391,7 +391,7 @@ async def test_cada_canal_grava_o_proprio_nome_em_ai_events(mundo):
 
 async def test_cota_estourada_barra_os_dois_canais(mundo, monkeypatch):
     """Um saldo só. Gastar pelo app tem que gastar do saldo do WhatsApp."""
-    mundo.db.plano = {"plan": "free", "ai_messages_month": 50, "max_ai_messages_month": 50}
+    mundo.db.plano = {"plan": "pro", "ai_messages_month": 50, "max_ai_messages_month": 50}
 
     with pytest.raises(app_chat.PlanLimit):
         await app_chat.create_conversation(

@@ -148,6 +148,23 @@ def _canal(sessao: dict) -> str:
     return sessao.get("channel") or "whatsapp"
 
 
+NOME_DO_PLANO = {"pro": "Pro", "family": "Família"}
+
+
+def _mensagem_de_mes_estourado(plano: dict) -> str:
+    """`free` = sem assinatura (0 mensagens): o agente é da assinatura, e a porta é o teste do app."""
+    if plano["plan"] == "free":
+        return (
+            "🔒 O agente faz parte da assinatura. No app dá para começar o teste grátis de "
+            "7 dias e usar por aqui — seus dados continuam todos lá."
+        )
+    nome = NOME_DO_PLANO.get(plano["plan"], "")
+    return (
+        f"📊 Você usou as {plano['max_ai_messages_month']} mensagens do seu plano{' ' + nome if nome else ''} "
+        "este mês. Elas voltam no próximo ciclo; seus dados continuam todos aí."
+    )
+
+
 async def check_limits(sessao: dict, *, kind: str = "turn") -> str | None:
     """Mensagem de recusa, ou None para seguir — e, seguindo, a vaga fica RESERVADA.
 
@@ -173,12 +190,7 @@ async def check_limits(sessao: dict, *, kind: str = "turn") -> str | None:
     if r["barrado"] == "hora":
         return MUITAS
     if r["barrado"] == "mes":
-        plano = r["plano"]
-        return (
-            f"📊 Você usou as {plano['max_ai_messages_month']} mensagens do plano "
-            f"{plano['plan']} este mês. No app dá para subir de plano e continuar "
-            "agora mesmo — seus dados continuam todos aí."
-        )
+        return _mensagem_de_mes_estourado(r["plano"])
     # a partir daqui tudo que o modelo gastar neste contexto é deste turno
     consumo.abrir()
     consumo.guardar_reserva(r["reserva_id"])

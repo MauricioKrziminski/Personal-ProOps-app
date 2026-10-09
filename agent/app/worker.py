@@ -175,7 +175,12 @@ async def _processar(lote: list[dict], ids: list, phone: str, thread_id: str) ->
     barrado = await conversation.check_limits(sessao)
     if barrado:
         await db.mark_done(ids)
-        await whatsapp.try_send(phone, barrado)
+        # O aviso de limite sai UMA vez por dia por workspace (resposta paga); a rajada por
+        # hora (MUITAS) não entra: é transitória e a pessoa precisa saber que esperar resolve.
+        if barrado == conversation.MUITAS or await db.reservar_aviso_de_limite(
+            sessao["user_id"], sessao["workspace_id"], sessao.get("timezone")
+        ):
+            await whatsapp.try_send(phone, barrado)
         return {"claimed": len(ids), "status": "limite"}
 
     # Retentativa: o turno anterior pode ter rodado (e escrito) antes de morrer.

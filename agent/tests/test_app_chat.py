@@ -630,7 +630,7 @@ async def test_cota_mensal_e_rajada_viram_codigos_diferentes(repo, monkeypatch):
         )
 
     async def plano(sessao):
-        return "📊 Você usou as 100 mensagens do plano free este mês."
+        return "🔒 O agente faz parte da assinatura."
 
     monkeypatch.setattr(app_chat.conversation, "check_limits", plano)
     with pytest.raises(app_chat.PlanLimit):
@@ -649,7 +649,7 @@ async def test_limite_nao_deixa_a_mensagem_presa_em_processing(repo, monkeypatch
     sid = inicial.conversation["id"]
 
     async def plano(sessao):
-        return "📊 Você usou as 100 mensagens do plano free este mês."
+        return "🔒 O agente faz parte da assinatura."
 
     monkeypatch.setattr(app_chat.conversation, "check_limits", plano)
     with pytest.raises(app_chat.PlanLimit):

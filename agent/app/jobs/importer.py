@@ -123,8 +123,8 @@ async def _importar(
     plano = await db.fetch_one("select * from public._plan_status(%s)", workspace_id)
     if plano and not plano.get("can_import"):
         raise ImportError_(
-            f"Importar extrato é do plano Pro. No {plano['plan']} dá para registrar "
-            "pelo WhatsApp à vontade.",
+            "Importar extrato faz parte da assinatura. No app dá para começar o teste "
+            "grátis de 7 dias.",
             status=402,
         )
 

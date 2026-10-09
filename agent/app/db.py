@@ -787,6 +787,8 @@ async def reservar_cota(
                 if plano is None:
                     # Workspace sem linha de plano: antes valia "sem limite mensal" (fail-open).
                     # Agora vale o limite do plano MAIS RESTRITO, e o log diz que é fallback.
+                    # Com free = 0 isso é bloqueio total, de propósito: sem linha o workspace
+                    # não existe, e fail closed é o certo para custo de IA.
                     cur = await conn.execute(
                         """
                         select min(l.max_ai_messages_month)::int as limite
@@ -820,6 +822,34 @@ async def reservar_cota(
                 (user_id, workspace_id, channel, kind),
             )
             return {"barrado": None, "plano": plano, "reserva_id": str((await cur.fetchone())["id"])}
+
+
+async def reservar_aviso_de_limite(
+    user_id: UUID, workspace_id: UUID, timezone_: str | None,
+) -> bool:
+    """True = pode avisar (primeira barrada do DIA LOCAL no workspace); False = já avisou hoje.
+
+    Reserva em `alerts_sent` ANTES do envio (a resposta no WhatsApp é paga). `sent_on` vai
+    explícito: o default `current_date` do banco é o dia do UTC. Se a reserva falhar, avisa:
+    calar o paywall é pior que uma mensagem a mais.
+    """
+    from app.domain.dates import local_iso_date
+
+    try:
+        dia = local_iso_date(timezone_ or "America/Sao_Paulo")
+        linha = await fetch_one(
+            """
+            insert into public.alerts_sent (workspace_id, user_id, kind, ref, channel, sent_on)
+            values (%s, %s, 'limite_do_plano', 'whatsapp', 'whatsapp', %s)
+            on conflict do nothing
+            returning id
+            """,
+            workspace_id, user_id, dia,
+        )
+        return linha is not None
+    except Exception:  # noqa: BLE001
+        log.warning("reserva do aviso de limite falhou: aviso mesmo assim", exc_info=True)
+        return True
 
 
 async def liberar_reserva(reserva_id: str | None) -> None:

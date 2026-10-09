@@ -92,7 +92,7 @@ def test_exige_token(mundo):
 
 
 def test_cota_do_plano_recusa_antes_do_modelo(mundo, monkeypatch):
-    mundo.visto["limite"] = "Você usou as 100 mensagens do plano free este mês."
+    mundo.visto["limite"] = "O agente faz parte da assinatura."
 
     async def nao_chama(_estado):
         raise AssertionError("cota estourada não chama o modelo")

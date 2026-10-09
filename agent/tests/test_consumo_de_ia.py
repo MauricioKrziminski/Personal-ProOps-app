@@ -176,6 +176,7 @@ class _Banco:
         self.linhas: list[dict] = []
         self.lock = asyncio.Lock()
         self.maximo_mes = maximo_mes
+        self.nome_plano = "pro"
         self.plano = plano
 
     def pool(self):
@@ -223,7 +224,7 @@ class _Conexao:
             if not b.plano:
                 return _Cursor(None)
             turnos = sum(1 for r in b.linhas if r["kind"] == "turn")
-            return _Cursor({"plan": "free", "ai_messages_month": turnos,
+            return _Cursor({"plan": b.nome_plano, "ai_messages_month": turnos,
                             "max_ai_messages_month": b.maximo_mes})
         if "plan_limits" in sql:
             return _Cursor({"limite": 15})
@@ -253,7 +254,7 @@ async def test_dez_conversas_em_paralelo_com_tres_vagas_passam_so_tres(monkeypat
     monkeypatch.setattr(db, "pool", banco.pool)
     resultados = await asyncio.gather(*(conversation.check_limits(_sessao()) for _ in range(10)))
     assert sum(r is None for r in resultados) == 3
-    assert sum(bool(r) and "plano" in r for r in resultados) == 7
+    assert sum(bool(r) and "3 mensagens do seu plano Pro" in r for r in resultados) == 7
     assert sum(1 for r in banco.linhas if r["reserved"]) == 3
 
 
@@ -264,7 +265,7 @@ async def test_workspace_sem_linha_de_plano_aplica_o_limite_mais_restrito(monkey
     monkeypatch.setattr(db, "pool", banco.pool)
     with caplog.at_level(logging.WARNING):
         barrado = await conversation.check_limits(_sessao())
-    assert barrado and "15 mensagens" in barrado
+    assert barrado and "assinatura" in barrado
     assert "sem linha em plan_status" in caplog.text
 
 
@@ -347,3 +348,23 @@ async def test_audit_passa_o_uso_inclusive_o_de_fora_do_grafo(monkeypatch):
     await conversation._audit(_sessao(), {}, {"llm_calls": 1})  # o SIM digitado, fora do grafo
     assert gravados[0]["uso"]["input_tokens"] == 50
     assert gravados[0]["uso"]["chamadas"][0]["papel"] == "gate"
+
+
+async def test_sem_assinatura_a_mensagem_manda_comecar_o_teste_e_nao_fala_de_plano(monkeypatch):
+    banco = _Banco(maximo_mes=0)
+    banco.nome_plano = "free"
+    monkeypatch.setattr(db, "pool", banco.pool)
+    msg = await conversation.check_limits(_sessao())
+    assert msg and "assinatura" in msg and "teste grátis de 7 dias" in msg
+    assert "plano" not in msg and "R$" not in msg
+
+
+async def test_com_assinatura_a_mensagem_usa_o_nome_amigavel(monkeypatch):
+    banco = _Banco(maximo_mes=5)
+    banco.nome_plano = "family"
+    banco.linhas = [{"user_id": USER, "kind": "turn", "reserved": False, "id": f"x{i}"}
+                    for i in range(5)]
+    monkeypatch.setattr(db, "pool", banco.pool)
+    msg = await conversation.check_limits(_sessao())
+    assert msg and "5 mensagens do seu plano Família" in msg
+    assert "family" not in msg
