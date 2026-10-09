@@ -4141,6 +4141,7 @@ export type Database = {
       _plan_status: {
         Args: { ws_id: string }
         Returns: {
+          access: string
           ai_messages_app: number
           ai_messages_month: number
           ai_messages_whatsapp: number
@@ -4592,6 +4593,7 @@ export type Database = {
         Args: { p_plan_id: string }
         Returns: number
       }
+      delete_my_account: { Args: never; Returns: undefined }
       delete_scoped: {
         Args: {
           p_alcance: string
@@ -5068,6 +5070,7 @@ export type Database = {
       plan_status: {
         Args: never
         Returns: {
+          access: string
           ai_messages_app: number
           ai_messages_month: number
           ai_messages_whatsapp: number

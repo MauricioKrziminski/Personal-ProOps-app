@@ -56,7 +56,24 @@ begin
   select min(l.max_ai_messages_month)::int into lim
     from unnest(array['free', 'pro', 'family']) as p(plano),
          lateral private.plan_limits(p.plano) as l;
-  assert lim = 15, format('limite mais restrito esperado 15, veio %s', lim);
+  assert lim = 0, format('limite mais restrito esperado 0, veio %s', lim);
+  assert (select max_ai_messages_month from private.plan_limits('pro')) = 400, 'pro 400';
+  assert (select max_ai_messages_month from private.plan_limits('family')) = 1000, 'family 1000';
+  assert (select max_ai_messages_month from private.plan_limits('pro', true)) = 60, 'teste pro 60';
+  assert (select max_ai_messages_month from private.plan_limits('free', true)) = 0, 'teste free segue 0';
+  assert (select can_import from private.plan_limits('free')) = false, 'free não importa';
+
+  -- coluna access: nunca -> assinante (teste da loja, 60) -> vencido
+  select * into r from private.plan_status_for(ws);
+  assert r.access = 'never', format('access esperado never, veio %s', r.access);
+  update public.subscriptions set plan = 'pro', status = 'trialing', provider = 'google', is_trial = true
+   where workspace_id = ws;
+  select * into r from private.plan_status_for(ws);
+  assert r.access = 'subscriber' and r.max_ai_messages_month = 60,
+    format('teste da loja: access %s limite %s', r.access, r.max_ai_messages_month);
+  update public.subscriptions set status = 'canceled' where workspace_id = ws;
+  select * into r from private.plan_status_for(ws);
+  assert r.access = 'lapsed' and r.plan = 'free', format('vencida: access %s plano %s', r.access, r.plan);
 
   -- reserva vencida sai no passo de limpeza
   update public.ai_events set created_at = now() - interval '7 minutes' where id = rid;

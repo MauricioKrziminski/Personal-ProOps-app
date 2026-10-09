@@ -13,6 +13,9 @@ values
    'authenticated', 'c@teste.local', '{}', '{}');
 
 -- O caminho antigo continua: quem entra POR TELEFONE com convite pendente aceita o convite.
+-- (plano família: sem assinatura o espaço só tem 1 vaga e o convite fica pendente)
+update public.subscriptions set plan = 'family'
+ where workspace_id in (select id from public.workspaces where owner_id = '00000000-0000-0000-0000-00000000a001');
 insert into public.workspace_invites (workspace_id, phone, role, invited_by)
 select w.id, '+5511999990000', 'member', w.owner_id
 from public.workspaces w where w.owner_id = '00000000-0000-0000-0000-00000000a001';
