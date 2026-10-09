@@ -42,7 +42,7 @@ Erros de regra: **409** `{"error":"<codigo>","message":"<frase pt-BR para a tela
 ### `GET /admin/api/accounts`
 Query: `q` (e-mail ou nome), `access` (`subscriber|trialing|lapsed|never|courtesy|suspended`),
 `plan` (`free|pro|family`), `origin` (`apple|google|manual|test_store|none`),
-`sort` (`created_desc` padrão, `created_asc`, `last_sign_in_desc`, `ai_used_desc`, `email_asc`),
+`sort` (`created_desc` padrão, `created_asc`, `last_sign_in_desc`, `last_sign_in_asc`, `ai_used_desc`, `email_asc`),
 `page` (1..), `page_size` (padrão 25, máx 100). Paginação NO SERVIDOR.
 `{"items": [AccountRow], "total": 0, "page": 1, "page_size": 25}`
 

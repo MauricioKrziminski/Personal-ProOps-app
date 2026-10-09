@@ -1,0 +1,120 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/plus-jakarta-sans";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Identidade do app: papel morno e tinta quase-preta (src/constants/theme.ts do app). */
+:root {
+  --background: #f2f1ee;
+  --foreground: #0b0b0c;
+  --card: #ffffff;
+  --card-foreground: #0b0b0c;
+  --popover: #ffffff;
+  --popover-foreground: #0b0b0c;
+  --primary: #0b0b0c;
+  --primary-foreground: #ffffff;
+  --secondary: #e8e7e3;
+  --secondary-foreground: #0b0b0c;
+  --muted: #e8e7e3;
+  --muted-foreground: #5f5f64;
+  --accent: #e8e7e3;
+  --accent-foreground: #0b0b0c;
+  --destructive: #c0362c;
+  --destructive-foreground: #ffffff;
+  --border: #dddcd7;
+  --input: #cfcec8;
+  --ring: #0b0b0c;
+  --success: #157a45;
+  --warning: #8a5300;
+  --hero: #0b0b0c;
+  --hero-foreground: #f4f4f2;
+  --hero-muted: #a3a3a8;
+  --chart-1: #0b0b0c;
+  --chart-2: #8c8b86;
+  --chart-3: #157a45;
+  --chart-4: #b7791f;
+  --chart-5: #c0362c;
+  --radius: 0.875rem;
+}
+
+.dark {
+  --background: #0b0b0c;
+  --foreground: #f4f4f2;
+  --card: #161617;
+  --card-foreground: #f4f4f2;
+  --popover: #1c1c1e;
+  --popover-foreground: #f4f4f2;
+  --primary: #f4f4f2;
+  --primary-foreground: #0b0b0c;
+  --secondary: #232325;
+  --secondary-foreground: #f4f4f2;
+  --muted: #232325;
+  --muted-foreground: #a3a3a8;
+  --accent: #232325;
+  --accent-foreground: #f4f4f2;
+  --destructive: #ff8a7f;
+  --destructive-foreground: #0b0b0c;
+  --border: #2b2b2e;
+  --input: #3a3a3e;
+  --ring: #f4f4f2;
+  --success: #4cd68a;
+  --warning: #f2b356;
+  --hero: #1c1c1e;
+  --hero-foreground: #f4f4f2;
+  --hero-muted: #a3a3a8;
+  --chart-1: #f4f4f2;
+  --chart-2: #6f6f74;
+  --chart-3: #4cd68a;
+  --chart-4: #f2b356;
+  --chart-5: #ff8a7f;
+}
+
+@theme inline {
+  --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-hero: var(--hero);
+  --color-hero-foreground: var(--hero-foreground);
+  --color-hero-muted: var(--hero-muted);
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-sm: calc(var(--radius) - 8px);
+}
+
+@layer base {
+  * { border-color: var(--border); }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "tnum" 1, "cv11" 1;
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  button, [role="button"], a, select { touch-action: manipulation; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

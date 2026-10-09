@@ -72,6 +72,7 @@ _ORDEM = {
     "created_desc": "created_at desc, user_id",
     "created_asc": "created_at, user_id",
     "last_sign_in_desc": "last_sign_in_at desc nulls last, user_id",
+    "last_sign_in_asc": "last_sign_in_at nulls first, user_id",
     "ai_used_desc": "ai_used desc, user_id",
     "email_asc": "lower(email), user_id",
 }
@@ -271,7 +272,7 @@ async def accounts(
     access: Literal["subscriber", "trialing", "lapsed", "never", "courtesy", "suspended"] | None = None,
     plan: Literal["free", "pro", "family"] | None = None,
     origin: Literal["apple", "google", "manual", "test_store", "none"] | None = None,
-    sort: Literal["created_desc", "created_asc", "last_sign_in_desc", "ai_used_desc", "email_asc"] = "created_desc",
+    sort: Literal["created_desc", "created_asc", "last_sign_in_desc", "last_sign_in_asc", "ai_used_desc", "email_asc"] = "created_desc",
     page: int = Query(1, ge=1, le=100_000),
     page_size: int = Query(25, ge=1, le=100),
     _admin: UUID = Depends(admin_user),

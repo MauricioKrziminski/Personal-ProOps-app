@@ -80,3 +80,6 @@ scripts/__pycache__/
 
 # chave de serviço do Google Play (eas submit) — fora do repo
 /secrets/
+
+# painel /admin: build do admin-web copiado no Docker; nunca versionado
+agent/app/static/admin/

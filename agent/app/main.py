@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import db, logctx
 from app.config import DEV_SALT, get_settings
 from app.graph import build as graph_build
-from app.routes import admin, chat, cron, finance_draft, hooks, inbound, internal, legal, worker
+from app.routes import admin, admin_web, chat, cron, finance_draft, hooks, inbound, internal, legal, worker
 from app.services import ia, groq, telemetry, whatsapp
 
 CAMPOS_EXTRAS = ("alerta", "pendentes", "falhas", "shadow", "duracao_s", "custo_usd")
@@ -134,6 +134,7 @@ app.include_router(internal.router)
 app.include_router(chat.router)
 app.include_router(finance_draft.router)
 app.include_router(admin.router)
+app.include_router(admin_web.router)
 app.include_router(legal.router)
 chat.install_error_handlers(app)
 
