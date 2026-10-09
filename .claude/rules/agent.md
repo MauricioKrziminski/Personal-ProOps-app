@@ -215,7 +215,7 @@ Ele foi removido (`update_transaction`, `agent/app/tools/finance.py`); dar baixa
 
   **Custos aceitos:** cada registro custa um toque a mais. No WhatsApp a confirmação sai como
   botão dentro da janela de 24h (grátis), e o clique é igualdade exata (zero modelo). A
-  confirmação **digitada** passa pelo gate semântico (`GEMINI_GATE`, Flash, ~US$ 0,002 por
+  confirmação **digitada** passa pelo gate semântico (`GEMINI_GATE`, Claude Sonnet, ~US$ 0,004 por
   resposta) — um "sim" escrito em cada café é o custo que a decisão aceita.
 
   **Todo caminho de escrita termina no `gate`:** o turno normal, o rascunho completado
