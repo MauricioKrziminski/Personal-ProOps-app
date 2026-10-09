@@ -13,12 +13,20 @@ import type { PurchasesPackage } from 'react-native-purchases';
  * em volta de `require` não serve no Metro. Sem chave ou sem módulo, o estado é `indisponivel`.
  */
 // Referências estáticas: o Expo só troca `process.env.EXPO_PUBLIC_*` escrito por extenso.
-const CHAVE =
+const CHAVE_LOJA =
   Platform.OS === 'ios'
     ? process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY
     : Platform.OS === 'android'
       ? process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY
       : undefined;
+
+/**
+ * Loja de teste da RevenueCat (chave `test_...`, compra simulada sem conta Apple/Google). SÓ em
+ * `__DEV__`: o SDK derruba de propósito um build de release com essa chave, e o React Native não
+ * expõe a trava de exceção. Em dev, se definida, vence as chaves de loja (é um opt-in explícito).
+ */
+const CHAVE_TESTE = __DEV__ ? process.env.EXPO_PUBLIC_REVENUECAT_TEST_KEY : undefined;
+const CHAVE = CHAVE_TESTE || CHAVE_LOJA;
 
 /** Onde a pessoa cancela: a loja do aparelho. */
 export const LOJA = Platform.OS === 'ios' ? 'App Store' : 'Google Play';

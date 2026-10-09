@@ -82,11 +82,17 @@ async def revenuecat(request: Request) -> JSONResponse:
 
     produto = str(evento.get("product_id") or "")
     eh_sandbox = str(evento.get("environment") or "").upper() == "SANDBOX"
-    permite_sandbox = settings.billing_allow_sandbox == "true"
+    app_user_id = str(evento.get("app_user_id") or "")
+    permite_sandbox = billing.sandbox_permitido(
+        app_user_id,
+        settings.billing_allow_sandbox == "true",
+        settings.billing_sandbox_ids,
+    )
     if eh_sandbox and permite_sandbox:
         log.warning(
-            "⚠️ BILLING_ALLOW_SANDBOX ligada: concedendo a partir de evento de SANDBOX. "
-            "Desligue antes de publicar."
+            "⚠️ concedendo a partir de evento de SANDBOX (BILLING_ALLOW_SANDBOX ou "
+            "BILLING_SANDBOX_USER_IDS) para %s. Em produção só a conta da revisão deve cair aqui.",
+            app_user_id,
         )
 
     resultado = await db.fetch_one(
@@ -96,7 +102,7 @@ async def revenuecat(request: Request) -> JSONResponse:
         ) as resultado
         """,
         evento_id,
-        str(evento.get("app_user_id") or ""),
+        app_user_id,
         billing.provider_for_store(evento.get("store")) or "",
         str(
             evento.get("original_transaction_id")

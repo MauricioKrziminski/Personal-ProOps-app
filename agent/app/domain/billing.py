@@ -46,6 +46,8 @@ PROVIDERS = {
     "STRIPE": "stripe",
     "RC_BILLING": "rc_billing",
     "PROMOTIONAL": "promotional",
+    # Loja de teste da RevenueCat (chave test_...): sempre chega com environment SANDBOX.
+    "TEST_STORE": "test_store",
 }
 
 
@@ -74,3 +76,8 @@ def ms_to_date(ms: int | None) -> str | None:
         return datetime.fromtimestamp(int(ms) / 1000, tz=_tz.utc).date().isoformat()
     except (ValueError, OSError, OverflowError):
         return None
+
+
+def sandbox_permitido(app_user_id: str | None, allow: bool, ids: set[str]) -> bool:
+    """Evento de sandbox concede? Chave global ligada, ou o usuário está na lista da revisão."""
+    return allow or str(app_user_id or "").strip().lower() in ids

@@ -408,7 +408,12 @@ deploy() {
   anon_key="$(ler_env SUPABASE_ANON_KEY)"
   [[ -n "$admin_ids" ]] || warn "ADMIN_USER_IDS vazio em $ENV_FILE — painel /admin desligado"
   local base="GCP_PROJECT=${PROJECT_ID},GCP_LOCATION=${REGION},TASKS_QUEUE=${QUEUE},TASKS_SA_EMAIL=${SA_EMAIL},DEBOUNCE_BACKEND=cloud_tasks,DEBOUNCE_SECONDS=3,WORKER_URL=${url_prevista}/worker/process-thread,OIDC_AUDIENCE=${url_prevista},SUPABASE_URL=${supabase_url},WA_ALERT_TEMPLATE=${wa_alert_template}${flags}"
-  local env_vars="^|^${base//,/|}|SUPABASE_ANON_KEY=${anon_key}|ADMIN_USER_IDS=${admin_ids}"
+  # Compra de teste: staging liga BILLING_ALLOW_SANDBOX=true; produção deixa vazio e só lista o id da
+  # conta da revisão da Apple em BILLING_SANDBOX_USER_IDS (docs/IN-APP-PURCHASE.md, Fase 5).
+  local allow_sandbox sandbox_ids
+  allow_sandbox="$(ler_env BILLING_ALLOW_SANDBOX)"
+  sandbox_ids="$(ler_env BILLING_SANDBOX_USER_IDS)"
+  local env_vars="^|^${base//,/|}|SUPABASE_ANON_KEY=${anon_key}|ADMIN_USER_IDS=${admin_ids}|BILLING_ALLOW_SANDBOX=${allow_sandbox}|BILLING_SANDBOX_USER_IDS=${sandbox_ids}"
 
   gcloud run deploy "$SERVICE" \
     --source agent \

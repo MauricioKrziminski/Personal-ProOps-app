@@ -65,7 +65,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
-  const realm = createContext({ performance, Date: options.datasReais ? Date : fixtureDate });
+  const realm = createContext({ performance, Date: options.datasReais ? Date : fixtureDate, process: { env: { EXPO_PUBLIC_AGENT_URL: 'https://agente.exemplo/' } } });
   const inRealm = runInContext(`(() => {
     const copies = new WeakMap();
     function copy(value) {
@@ -2892,9 +2892,9 @@ test('Paywall sem ofertas: nenhum preço inventado, e Restaurar, Termos e Privac
   assert.doesNotMatch(t, /R\$|Free|grátis/, 'sem oferta da loja, sem preço e sem promessa de teste');
   assert.deepEqual(botoes(ui), ['Restaurar compras', 'Termos de Uso', 'Política de Privacidade']);
   ui.press('Termos de Uso');
-  assert.deepEqual(ui.navigations.at(-1), { navegador: 'https://proops.com.br/termos' });
+  assert.deepEqual(ui.navigations.at(-1), { navegador: 'https://agente.exemplo/termos' });
   ui.press('Política de Privacidade');
-  assert.deepEqual(ui.navigations.at(-1), { navegador: 'https://proops.com.br/privacidade' });
+  assert.deepEqual(ui.navigations.at(-1), { navegador: 'https://agente.exemplo/privacidade' });
 });
 
 test('Paywall: preço e período vêm da loja, o teste só para quem nunca assinou, e a renovação está escrita', () => {

@@ -185,6 +185,10 @@ qualquer um com StoreKit Testing viraria Pro de graça. Para testar ponta a pont
 `BILLING_ALLOW_SANDBOX=true` no agente do **staging** (variável do Cloud Run).
 **Em produção ela nunca existe.**
 
+**Sem conta da Apple/Google:** a Test Store da RevenueCat (chave `test_...`, só em dev client)
+simula a compra; o webhook chega com `store: TEST_STORE` e `environment: SANDBOX` (provider
+`test_store`), então também exige `BILLING_ALLOW_SANDBOX=true` no staging.
+
 O `environment` real fica gravado em `billing_events.payload` de qualquer jeito,
 então dá para auditar depois se alguém entrou por sandbox.
 
@@ -212,11 +216,12 @@ O que conferir em `billing_events` (`result` de cada evento):
 - [ ] Texto obrigatório na tela de assinatura: preço, periodicidade, renovação
       automática e como cancelar — a Apple reprova sem isso
 - [ ] Conta de teste para a revisão da Apple (eles precisam entrar no app)
-- [ ] ⚠️ **A revisão da Apple compra em SANDBOX, e sandbox não concede em produção.** O revisor
-      assina, a loja aprova e o webhook recusa (`sandbox`): ele fica preso na tela de assinar e o
-      app é reprovado por "compra não desbloqueia". Antes de mandar para revisão: a conta de teste
-      ganha cortesia `manual` (comando abaixo) E as notas da revisão dizem que ela já é assinante —
-      ou decide-se liberar sandbox só para um `app_user_id` da lista. Decisão do Gabriel.
+- [ ] ⚠️ **A revisão da Apple compra em SANDBOX, e sandbox não concede em produção.** Decidido: no
+      agente de PRODUÇÃO, `BILLING_SANDBOX_USER_IDS=<uuid da conta de teste da revisão>` (o
+      `auth.users.id`, o mesmo `app_user_id` do RevenueCat; vários separados por vírgula). Evento de
+      sandbox concede só para quem está na lista (log de aviso a cada concessão); qualquer outro
+      continua recusado. A conta é a que vai nas notas da revisão. Depois da aprovação, esvaziar a
+      variável e redeployar. `BILLING_ALLOW_SANDBOX` segue ausente em produção.
 
 ### Subir para produção sem trancar ninguém
 

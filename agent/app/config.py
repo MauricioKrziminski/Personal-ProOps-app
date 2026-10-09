@@ -73,6 +73,9 @@ class Settings(BaseSettings):
     revenuecat_webhook_secret: str = ""
     # 'true' SÓ durante os testes de sandbox da loja. TEM que sair antes de publicar.
     billing_allow_sandbox: str = ""
+    # uuids (app_user_id) cujo evento de SANDBOX concede mesmo com a chave acima desligada: a conta de
+    # teste da revisão da Apple, que compra em sandbox contra o agente de PRODUÇÃO. Separados por vírgula.
+    billing_sandbox_user_ids: str = ""
     # URL do projeto Supabase. Dela sai o JWKS que valida o JWT do app.
     # NÃO é o segredo simétrico legado: este projeto assina com ES256
     # (chave assimétrica), e verificar com HS256 rejeitaria todo token.
@@ -158,6 +161,16 @@ class Settings(BaseSettings):
         for bruto in self.admin_user_ids.split(","):
             try:
                 ids.add(UUID(bruto.strip()))
+            except ValueError:
+                continue
+        return ids
+
+    @property
+    def billing_sandbox_ids(self) -> set[str]:
+        ids: set[str] = set()
+        for bruto in self.billing_sandbox_user_ids.split(","):
+            try:
+                ids.add(str(UUID(bruto.strip())))
             except ValueError:
                 continue
         return ids
