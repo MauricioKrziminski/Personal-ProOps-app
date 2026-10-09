@@ -1,6 +1,7 @@
 """Configuração única do serviço. Todo segredo entra por env var."""
 
 import re
+from uuid import UUID
 from functools import lru_cache
 
 from pydantic import AliasChoices, Field, field_validator
@@ -76,6 +77,12 @@ class Settings(BaseSettings):
     # NÃO é o segredo simétrico legado: este projeto assina com ES256
     # (chave assimétrica), e verificar com HS256 rejeitaria todo token.
     supabase_url: str = ""
+    # Chave PÚBLICA (anon/publishable) do mesmo projeto: o painel /admin a entrega ao navegador
+    # para o login por e-mail e senha. Nunca a service_role.
+    supabase_anon_key: str = ""
+    # uuids (auth.users.id) que podem usar o painel /admin, separados por vírgula. Vazio = painel
+    # desligado (toda rota /admin responde 404).
+    admin_user_ids: str = ""
 
     # RLS como segunda camada: ligada, a TOOL roda sob `authenticated` com as claims do dono da
     # conversa (`db.sob_rls`), como o PostgREST faz com o app. Desligada = comportamento antigo.
@@ -144,6 +151,16 @@ class Settings(BaseSettings):
             return v
         limpo = re.sub(r"\s+#.*$", "", v).strip()
         return "" if limpo.startswith("#") else limpo
+
+    @property
+    def admin_ids(self) -> set[UUID]:
+        ids: set[UUID] = set()
+        for bruto in self.admin_user_ids.split(","):
+            try:
+                ids.add(UUID(bruto.strip()))
+            except ValueError:
+                continue
+        return ids
 
     @property
     def jwks_url(self) -> str:
