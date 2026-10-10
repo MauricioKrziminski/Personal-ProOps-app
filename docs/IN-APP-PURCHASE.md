@@ -238,9 +238,14 @@ assinou" no instante em que cai. Ordem:
     where s.workspace_id = w.id and u.email in ('<seu e-mail>', '<testador>');
    ```
 2. `migration list --project-ref` e depois o `db push --project-ref` (CLAUDE.md).
-3. Agente (`./scripts/setup-gcp.sh deploy`).
+3. Agente (`./scripts/setup-gcp.sh deploy`). Antes, em `agent/.env.production`:
+   `ADMIN_REQUIRE_MFA=true` (o deploy recusa sem) e **`AI_CONSENT_REQUIRED` ausente ou `false`**.
 4. App **1.12.0** por build (dependência nativa nova: nunca OTA). App antigo em campo recebe
    `PT402` como erro genérico ao salvar, sem paywall — mais um motivo para a cortesia vir antes.
+5. **Só depois que a 1.12.0 estiver nas lojas e instalada por quem usa:** `AI_CONSENT_REQUIRED=true`
+   em `agent/.env.production` e `./scripts/setup-gcp.sh deploy`. Antes disso, quem está no app
+   antigo não tem tela para autorizar a IA e o assistente pararia de responder (WhatsApp incluso).
+   Dá para conferir no painel quem já autorizou (detalhe da conta → "IA autorizada").
 
 ---
 
