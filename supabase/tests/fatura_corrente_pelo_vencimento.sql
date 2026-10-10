@@ -40,6 +40,13 @@ begin
 
   -- vencida e sem pagar: vai para atrasadas, a corrente passa a ser a seguinte
   update public.card_invoices set due_date = hoje - 1 where id = b_set;
+  -- (atrasada só com algo em aberto, `20261010235000`: a vazia não conta)
+  insert into public.transactions (id, workspace_id, user_id, account_id, kind, amount_cents, category, description, occurred_at, status)
+    values ('00000000-0000-0000-0000-000000000c32', ws, usr, cb, 'expense', 5000, 'outros', 'Compra', hoje - 20, 'pending');
+  update public.transactions set invoice_id = b_set where id = '00000000-0000-0000-0000-000000000c32';
+  -- o gatilho abriu uma fatura para a data da compra; sobrou vazia e não é o que o teste mede
+  delete from public.card_invoices ci where ci.account_id = cb and ci.id not in (b_set, b_out)
+    and not exists (select 1 from public.transactions t where t.invoice_id = ci.id);
   select * into r from public._card_summary(usr) where account_id = cb;
   if r.invoice_id is distinct from b_out then raise exception '3. vencida sem pagar: corrente deveria ser a seguinte'; end if;
   if r.overdue_count <> 1 or r.oldest_overdue_invoice_id is distinct from b_set then
