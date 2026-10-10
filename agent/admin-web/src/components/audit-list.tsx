@@ -39,7 +39,7 @@ export function AuditRow({ e, showTarget = true }: { e: AuditEvent; showTarget?:
         <span className="text-muted-foreground">Por </span><span className="font-semibold">{e.admin_email ?? e.admin_user_id.slice(0, 8)}</span>
         {showTarget && (e.target_user_id ? <> <span className="text-muted-foreground">em </span><Link className="break-all font-semibold hover:underline" to={`/contas/${e.target_user_id}`}>{e.target_email ?? e.target_user_id}</Link></> : e.target_email ? <> <span className="text-muted-foreground">em </span><span className="break-all font-semibold">{e.target_email}</span></> : null)}
       </p>
-      {detail && <p className="text-[13px] text-muted-foreground">{detail}</p>}
+      {detail && <p className="text-[13px] text-muted-foreground [overflow-wrap:anywhere]">{detail}</p>}
     </div>
   );
 }

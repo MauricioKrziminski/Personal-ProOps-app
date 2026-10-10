@@ -74,7 +74,7 @@ function detail(id: string): AccountDetail {
   return {
     account: a,
     profile: { phone: a.whatsapp_linked ? "+55 11 9•••• 4821" : null, email_confirmed_at: a.created_at, onboarding_completed: a.access !== "never", banned_until: a.suspended ? "2126-10-09T00:00:00Z" : null, sessions: a.suspended ? 0 : 2 },
-    subscription: { plan: a.plan, status: a.status, provider: a.origin ?? "none", external_id: a.origin ? "rc_" + a.user_id.slice(-8) : "", product_id: a.origin ? "proops.pro.monthly" : "", environment: "production", is_trial: a.is_trial, current_period_end: a.period_end, canceled_at: a.access === "lapsed" ? day(6) : null, store_managed: store },
+    subscription: { plan: a.plan, status: a.status, provider: a.origin ?? "none", origin: a.origin, external_id: a.origin ? "rc_" + a.user_id.slice(-8) : "", product_id: a.origin ? "proops.pro.monthly" : "", environment: "production", is_trial: a.is_trial, current_period_end: a.period_end, canceled_at: a.access === "lapsed" ? day(6) : null, store_managed: store },
     usage: {
       current: { ai_used: a.ai_used, ai_max: a.ai_max, wa_used: a.wa_used, wa_max: a.wa_max, notices_today: 1, notices_max: 3, ai_cost_usd: (a.ai_used * 0.0021).toFixed(4) },
       months: ["2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"].map((month, i) => ({ month, ai_turns: 40 + i * 31 + (a.ai_used % 17), whatsapp_replies: 25 + i * 22, ai_cost_usd: (0.1 + i * 0.07).toFixed(4) })),

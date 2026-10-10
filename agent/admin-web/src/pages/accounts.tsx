@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TD, TH, THead, TR } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import { useSearchBox, useUrlState } from "@/lib/url-state";
-import { ACCESS_LABEL, ORIGIN_LABEL, PLAN_LABEL, SORTS } from "@/lib/labels";
+import { ACCESS_LABEL, ORIGIN_LABEL, PLAN_LABEL, SIGNAL_LABEL, SORTS } from "@/lib/labels";
 import type { AccountRow } from "@/lib/types";
 import { fmtDate, nomeDaConta } from "@/lib/utils";
 
@@ -26,9 +26,9 @@ export function AccountsPage() {
   const [target, setTarget] = useState<Target>(null);
   const clear = () => { setText(""); setSp({}, { replace: true }); };
 
-  const filters = { q: get("q"), access: get("access"), plan: get("plan"), origin: get("origin"), sort: get("sort") || "created_desc", page: Number(get("page")) || 1, page_size: PAGE_SIZE };
+  const filters = { q: get("q"), access: get("access"), signal: get("signal"), plan: get("plan"), origin: get("origin"), sort: get("sort") || "created_desc", page: Number(get("page")) || 1, page_size: PAGE_SIZE };
   const q = useQuery({ queryKey: ["accounts", filters], queryFn: () => api.accounts(filters), placeholderData: keepPreviousData });
-  const active = ["q", "access", "plan", "origin"].some((k) => get(k));
+  const active = ["q", "access", "signal", "plan", "origin"].some((k) => get(k));
   const items = q.data?.items ?? [];
 
   return (
@@ -45,6 +45,13 @@ export function AccountsPage() {
           <Select aria-label="Origem" value={get("origin")} onChange={(e) => set({ origin: e.target.value })}><option value="">Origem</option>{Object.entries(ORIGIN_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
           <Select aria-label="Ordenar por" value={filters.sort} onChange={(e) => set({ sort: e.target.value })}>{SORTS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
         </div>
+        {get("signal") && (
+          <div className="mt-2 flex items-center gap-2 text-sm" data-testid="signal-chip">
+            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border bg-accent px-3 font-medium">Sinal: {SIGNAL_LABEL[get("signal")] ?? get("signal")}
+              <button type="button" aria-label="Limpar sinal" className="grid size-6 place-items-center rounded-full hover:bg-background" onClick={() => set({ signal: "" })}><X className="size-3.5" /></button>
+            </span>
+          </div>
+        )}
         {active && <Button variant="ghost" size="sm" className="mt-2" onClick={clear}><X />Limpar filtros</Button>}
       </Card>
 

@@ -10,6 +10,8 @@ export class ApiError extends Error {
   }
 }
 
+const RETRY_429_MS = [1000, 2000, 4000];
+
 let tokenGetter: () => Promise<string | null> = async () => null;
 export const getToken = () => tokenGetter();
 export const setTokenGetter = (fn: () => Promise<string | null>) => { tokenGetter = fn; };
@@ -29,17 +31,22 @@ export async function request<T>(method: "GET" | "POST", path: string, body?: un
     if (t) headers.Authorization = `Bearer ${t}`;
   }
   let res: Response;
-  try {
-    res = await fetch(`/admin/api${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-  } catch {
-    throw new ApiError(0, "network", "Sem conexão com o servidor. Verifique a internet e tente de novo.");
+  // 429 numa LEITURA: tenta de novo com recuo (1 s, 2 s, 4 s). Escrita nunca repete sozinha.
+  for (let tentativa = 0; ; tentativa++) {
+    try {
+      res = await fetch(`/admin/api${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    } catch {
+      throw new ApiError(0, "network", "Sem conexão com o servidor. Verifique a internet e tente de novo.");
+    }
+    if (res.status !== 429 || method !== "GET" || tentativa >= RETRY_429_MS.length) break;
+    await new Promise((r) => setTimeout(r, RETRY_429_MS[tentativa]));
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const code = typeof data?.error === "string" ? data.error : "error";
     if (res.status === 401 && auth) authEvents.dispatchEvent(new Event("unauthorized"));
     if (res.status === 403 && code === "mfa_required") authEvents.dispatchEvent(new Event("mfa_required"));
-    const fallback = res.status === 422 ? "Dados inválidos." : res.status === 404 ? "Não encontrado." : "Não foi possível concluir. Tente de novo.";
+    const fallback = res.status === 429 ? "Muitas ações seguidas; tente em alguns segundos." : res.status === 422 ? "Dados inválidos." : res.status === 404 ? "Não encontrado." : "Não foi possível concluir. Tente de novo.";
     throw new ApiError(res.status, code, typeof data?.message === "string" ? data.message : fallback);
   }
   return data as T;
@@ -52,7 +59,7 @@ const qs = (p: Record<string, string | number | undefined | null>) => {
   return s ? `?${s}` : "";
 };
 
-export type AccountFilters = { q?: string; access?: string; plan?: string; origin?: string; sort?: string; page?: number; page_size?: number };
+export type AccountFilters = { q?: string; access?: string; signal?: string; plan?: string; origin?: string; sort?: string; page?: number; page_size?: number };
 export type AuditFilters = { action?: string; admin_user_id?: string; target_user_id?: string; page?: number; page_size?: number };
 export type BillingFilters = { q?: string; type?: string; result?: string; page?: number; page_size?: number };
 

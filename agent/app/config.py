@@ -118,6 +118,8 @@ class Settings(BaseSettings):
     # 0 desliga. A régua é ABUSO, não uso: a conversa aberta relê o turno a cada 3 s
     # (`POLL_MS` em `src/hooks/use-agent-chat.ts`) = 20/min, e o resto do app soma por cima.
     rate_limit_per_minute: int = 120
+    # Idem, só para `/admin/api/*` (por admin): o painel abre cada tela com ~8 chamadas. 0 desliga.
+    admin_rate_limit_per_minute: int = 600
 
     # --- Langfuse ---
     langfuse_public_key: str = ""

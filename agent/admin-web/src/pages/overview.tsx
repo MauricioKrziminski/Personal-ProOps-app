@@ -51,10 +51,10 @@ function Hero({ d }: { d: Overview }) {
 function Signals({ d }: { d: Overview }) {
   const s = d.signals;
   const items: { icon: LucideIcon; label: string; n: number; to: string; bad?: boolean }[] = [
-    { icon: Hourglass, label: "Teste acaba em 48 h", n: s.trial_ending_48h, to: "/contas?access=trialing" },
-    { icon: UserMinus, label: "Encerradas nos últimos 7 dias", n: s.lapsed_7d, to: "/contas?access=lapsed", bad: true },
-    { icon: BellRing, label: "Perto do limite do mês", n: s.near_limit, to: "/contas?access=subscriber&sort=ai_used_desc" },
-    { icon: Clock, label: "Assinantes sem acesso há 30 dias", n: s.inactive_subscribers_30d, to: "/contas?access=subscriber&sort=last_sign_in_asc" },
+    { icon: Hourglass, label: "Teste acaba em 48 h", n: s.trial_ending_48h, to: "/contas?signal=trial_ending_48h" },
+    { icon: UserMinus, label: "Encerradas nos últimos 7 dias", n: s.lapsed_7d, to: "/contas?signal=lapsed_7d", bad: true },
+    { icon: BellRing, label: "Perto do limite do mês", n: s.near_limit, to: "/contas?signal=near_limit&sort=ai_used_desc" },
+    { icon: Clock, label: "Assinantes sem acesso há 30 dias", n: s.inactive_subscribers_30d, to: "/contas?signal=inactive_subscribers_30d&sort=last_sign_in_asc" },
   ];
   return (
     <Section title="Sinais" aside={<span className="text-xs text-muted-foreground">Toque para ver as contas</span>}>

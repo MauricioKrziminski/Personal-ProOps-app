@@ -379,3 +379,57 @@ def test_auditoria_filtra_e_pagina_no_servidor(cli, banco):
     assert r.status_code == 200 and r.json()["page"] == 2 and r.json()["page_size"] == 10
     sql = [s for s in banco["sql"] if "order by e.created_at desc, e.id" in s][0]
     assert "e.action = %s" in sql and "e.target_user_id = %s" in sql and "limit %s offset %s" in sql
+
+
+# ── correções do E2E (D1, D3, D5, D8, 422, 429) ───────────────────────────────────────────────────────
+@pytest.mark.parametrize("sinal", ["trial_ending_48h", "lapsed_7d", "near_limit", "inactive_subscribers_30d"])
+def test_sinal_filtra_a_lista_com_o_mesmo_criterio_da_contagem(cli, banco, sinal):
+    assert cli.get("/admin/api/overview").status_code == 200
+    r = cli.get(f"/admin/api/accounts?signal={sinal}")
+    assert r.status_code == 200
+    crit = admin._SINAIS[sinal]
+    sqls = [s for s in banco["sql"] if crit in s]
+    # o MESMO texto de critério na contagem do overview e na lista (total e página)
+    assert any("count(*) filter" in s for s in sqls) and sum("from base where" in s for s in sqls) >= 2
+
+
+def test_sinal_desconhecido_e_422_no_formato_do_contrato(cli, banco):
+    r = cli.get("/admin/api/accounts?signal=qualquer")
+    assert r.status_code == 422 and r.json()["error"] == "invalid_request" and r.json()["message"]
+
+
+def test_motivo_da_suspensao_aceita_300_e_recusa_301(cli, banco):
+    assert cli.post(f"/admin/api/accounts/{ALVO}/suspend", json={"reason": "x" * 300}).status_code == 200
+    r = cli.post(f"/admin/api/accounts/{ALVO}/suspend", json={"reason": "x" * 301})
+    assert r.status_code == 422 and r.json()["error"] == "invalid_request"
+
+
+def test_detalhe_devolve_a_origem_normalizada_igual_a_da_lista(cli, banco):
+    banco["provider"] = "app_store"
+    d = cli.get(f"/admin/api/accounts/{ALVO}").json()
+    assert d["subscription"]["origin"] == "apple"
+    assert admin._linha(_linha_base(provider="app_store"))["origin"] == "apple"
+    banco["provider"] = None
+    assert cli.get(f"/admin/api/accounts/{ALVO}").json()["subscription"]["origin"] is None
+
+
+def test_password_reset_sem_email_e_409_no_email_sem_chamar_a_rede(cli, banco, monkeypatch):
+    async def sem_email(sql, *a):
+        return {"id": ALVO, "email": None, "phone": None, "ws": WS}
+
+    monkeypatch.setattr(admin, "_alvo", lambda _u: sem_email("", ()))
+    r = cli.post(f"/admin/api/accounts/{ALVO}/password-reset", json={})
+    assert r.status_code == 409 and r.json()["error"] == "no_email" and r.json()["message"]
+    assert banco["escritas"] == []
+
+
+def test_429_do_painel_tem_codigo_e_frase(cli, banco, monkeypatch):
+    from fastapi import HTTPException as H
+
+    async def estoura(_req):
+        raise H(status_code=429, detail="muitas requisições", headers={"Retry-After": "5"})
+
+    monkeypatch.setattr(admin, "current_user", estoura)
+    r = cli.get("/admin/api/overview")
+    assert r.status_code == 429 and r.headers["retry-after"] == "5"
+    assert r.json() == {"error": "rate_limited", "message": "Muitas ações seguidas; tente em alguns segundos."}

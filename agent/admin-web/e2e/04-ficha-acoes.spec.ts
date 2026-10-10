@@ -17,6 +17,13 @@ test.describe("Ficha da conta: leitura", () => {
     await abrir(page, "apple");
     for (const h of ["Assinatura", "Uso", "Dados", "Membros e convites", "Histórico de cobrança", "Auditoria da conta"]) await expect(page.getByRole("heading", { name: h, exact: true })).toBeVisible();
     await expect(page.getByText("Assinatura gerenciada pela loja")).toBeVisible();
+    // D5: origem normalizada (a mesma da lista), nunca o provider cru "app_store"
+    await expect(secao(page, "Assinatura").locator("dt:text-is('Origem') + dd")).toHaveText("App Store");
+    await expect(page.getByText("app_store", { exact: true })).toHaveCount(0);
+    const det = await adminApi("GET", `/accounts/${U.apple.id}`);
+    const lista = await adminApi("GET", `/accounts?q=${U.apple.email}`);
+    expect(det.body.subscription.origin).toBe("apple");
+    expect(det.body.subscription.origin).toBe(lista.body.items[0].origin);
     const dados = page.locator("dl").filter({ hasText: "Lançamentos" }).first();
     for (const [k, v] of [["Lançamentos", 4], ["Contas", 2], ["Cartões", 1], ["Notas", 3], ["Metas", 0]] as const)
       await expect(dados.locator("div").filter({ has: page.getByText(k, { exact: true }) }).first().locator("dd")).toHaveText(String(v));
@@ -28,6 +35,15 @@ test.describe("Ficha da conta: leitura", () => {
     await expect(cobr).toContainText("INITIAL_PURCHASE");
     await expect(cobr).toContainText("Duplicado");
     await shot(page, info, "ficha-apple");
+  });
+
+  test("D6: gráfico de uso em ordem cronológica (mais antigo à esquerda)", async ({ page }) => {
+    await abrir(page, "apple");
+    const api = (await adminApi("GET", `/accounts/${U.apple.id}`)).body.usage.months.map((m: any) => m.month as string);
+    const esperado = [...api].sort().map((ym) => ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"][Number(ym.slice(5)) - 1] + "/" + ym.slice(2, 4));
+    const ticks = page.locator("[role=img] .recharts-cartesian-axis-tick-value").filter({ hasText: /^[a-z]{3}\/\d{2}$/ });
+    await expect(ticks).toHaveCount(6);
+    expect(await ticks.allTextContents()).toEqual(esperado);
   });
 
   test("familia: dono, membro e convite pendente", async ({ page }) => {
@@ -186,14 +202,18 @@ test.describe("Ficha da conta: ações (serial, mexem no banco)", () => {
     expect((await audit("a-susp")).map((x) => x.action)).toEqual(["suspended", "reactivated"]);
   });
 
-  test("motivo longo (a tela aceita até 300 caracteres) é gravado", async ({ page }) => {
-    test.fail(true, "D3: a tela deixa digitar 300 caracteres no motivo, a API só aceita 200 (422 'Dados inválidos.')");
+  test("D3: motivo de até 300 caracteres é gravado; a tela corta no limite da API e mostra o contador", async ({ page }) => {
     await abrir(page, "a-susp");
     await page.getByRole("button", { name: "Suspender", exact: true }).click();
     const dlg = page.getByRole("alertdialog");
-    await dlg.getByLabel("Motivo").fill("x".repeat(250));
+    await dlg.getByLabel("Motivo").fill("x".repeat(350)); // a tela corta em 300
+    await expect(dlg.getByTestId("reason-count")).toHaveText("300/300");
     await dlg.getByRole("button", { name: "Suspender", exact: true }).click();
     await expect(page.getByText("Conta suspensa.", { exact: true }).first()).toBeVisible();
+    expect((await audit("a-susp")).at(-1)!.payload.reason).toHaveLength(300);
+    expect((await adminApi("POST", `/accounts/${U["a-susp"].id}/suspend`, { reason: "y".repeat(301) })).status).toBe(422);
+    // desfaz para os testes seguintes (reativar é auditado, mas a ordem dos testes seguintes só olha o fim)
+    await adminApi("POST", `/accounts/${U["a-susp"].id}/reactivate`, {});
   });
 
   test("encerrar sessões apaga auth.sessions e audita", async ({ page }) => {
@@ -222,12 +242,16 @@ test.describe("Ficha da conta: ações (serial, mexem no banco)", () => {
     expect((await audit("a-reset")).map((x) => x.action)).toEqual(["signed_out", "password_reset_sent"]);
   });
 
-  test("enviar código para conta SEM e-mail falha com mensagem e não audita", async ({ page }) => {
+  test("D8: conta SEM e-mail: a ação vem desabilitada com o motivo; a API responde 409 no_email e não audita", async ({ page }) => {
     await page.goto(`/admin/contas/${U.sememail.id}`);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await maisAcoes(page, "Enviar código de senha");
-    await page.getByRole("alertdialog").getByRole("button", { name: "Enviar código" }).click();
-    await expect(page.locator("[data-sonner-toast][data-type=error]")).toBeVisible();
+    await page.getByRole("button", { name: "Mais ações" }).click();
+    const item = page.getByRole("menuitem", { name: /Enviar código de senha/ });
+    await expect(item).toHaveAttribute("aria-disabled", "true");
+    await expect(item).toContainText("conta sem e-mail");
+    const r = await adminApi("POST", `/accounts/${U.sememail.id}/password-reset`, {});
+    expect(r.status).toBe(409);
+    expect(r.body).toMatchObject({ error: "no_email" });
     expect((await audit("sememail")).length).toBe(0);
   });
 

@@ -79,7 +79,11 @@ async def current_user(request: Request) -> UUID:
         raise HTTPException(status_code=401, detail="não foi possível validar o token") from err
 
     user_id = UUID(payload["sub"])
-    ratelimit.checar(user_id)
+    if request.url.path.startswith("/admin/api"):
+        # o painel abre telas com ~8 chamadas: limite próprio, por admin, sem afrouxar o resto do agente
+        ratelimit.checar(f"admin:{user_id}", settings.admin_rate_limit_per_minute)
+    else:
+        ratelimit.checar(user_id)
     return user_id
 
 

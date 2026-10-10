@@ -49,6 +49,10 @@ test.describe("Observabilidade (contra o contrato de docs/ADMIN-API.md)", () => 
     expect(rows.length).toBeGreaterThan(0);
     const bruto = JSON.stringify(rows);
     for (const vazou of ["fulano.teste@example.com", "beltrano@example.com", "ciclano@example.com", "11988887777", "12345678909"]) expect(bruto, vazou).not.toContain(vazou);
+    // D7: cada formato com o seu rótulo (telefone não é mais "[cpf]")
+    const msg = rows.map((r) => r.message).join("|");
+    expect(msg).toContain("tel [telefone] cpf [cpf]");
+    expect(msg).toContain("[email]");
   });
 
   test("detalhe: gaveta com stack, séries e ocorrência que leva à conta", async ({ page }) => {
@@ -109,11 +113,38 @@ test.describe("Observabilidade (contra o contrato de docs/ADMIN-API.md)", () => 
     expect((await issueDb()).status).toBe("open");
     await page.getByRole("button", { name: "Resolver" }).click();
     await expect(page.getByText("Erro resolvido")).toBeVisible();
-    await page.waitForTimeout(900); // toasts empilhados animam; só o do "resolvido" nos interessa
-    await page.locator("[data-sonner-toast]").filter({ hasText: "Erro resolvido" }).getByRole("button", { name: "Desfazer" }).dispatchEvent("click");
+    // D9: o "Desfazer" é clicável de verdade (sem dispatchEvent): nada o cobre
+    await page.locator("[data-sonner-toast][data-visible=true]").filter({ hasText: "Erro resolvido" }).getByRole("button", { name: "Desfazer" }).click();
     await expect.poll(async () => (await issueDb()).status).toBe("open");
     const n = await sql<any>("select count(*) n from public.admin_audit_events where action = 'issue_triaged'");
     expect(Number(n[0].n)).toBeGreaterThanOrEqual(5);
+  });
+
+  test("D9: toasts não cobrem o cabeçalho da gaveta, ficam em um só e o novo substitui o anterior", async ({ page }, info) => {
+    await lista(page);
+    await linha(page).first().click();
+    const gaveta = page.getByRole("dialog");
+    await expect(gaveta.getByRole("heading", { name: "Últimas 24 horas" })).toBeVisible();
+    const status = async (nome: string) => { await gaveta.getByRole("button", { name: nome, exact: true }).click(); };
+    const visiveis = page.locator("[data-sonner-toast][data-visible=true]");
+    // 1) "Desfazer" clicável de verdade, dentro de uma gaveta modal
+    await status("Resolver");
+    await expect(visiveis).toHaveCount(1);
+    await visiveis.first().getByRole("button", { name: "Desfazer" }).click();
+    await expect.poll(async () => (await issueDb()).status).toBe("open");
+    // 2) ações seguidas: o toast novo substitui o anterior (um só visível) e não cobre o cabeçalho da gaveta
+    await status("Resolver");
+    await expect(page.getByText("Erro resolvido")).toBeVisible();
+    await status("Reabrir");
+    await expect(visiveis).toHaveCount(1);
+    await expect(visiveis.first()).toContainText("Erro reaberto");
+    const g = (await gaveta.boundingBox())!;
+    const t = (await visiveis.first().boundingBox())!;
+    const cabecalho = { x: g.x, y: g.y, w: g.width, h: 56 }; // h-14
+    const cruza = t.x < cabecalho.x + cabecalho.w && t.x + t.width > cabecalho.x && t.y < cabecalho.y + cabecalho.h && t.y + t.height > cabecalho.y;
+    expect(cruza, "toast sobre o cabeçalho da gaveta").toBe(false);
+    await shot(page, info, "obs-toast-gaveta");
+    expect((await issueDb()).status).toBe("open");
   });
 
   test("filtros: origem Painel, severidade, período e busca; limpar", async ({ page }) => {

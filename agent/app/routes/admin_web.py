@@ -22,7 +22,7 @@ _SEGURANCA = {"X-Robots-Tag": "noindex, nofollow", "X-Content-Type-Options": "no
 def _csp() -> str:
     conecta = " ".join(filter(None, ["'self'", get_settings().supabase_url.rstrip("/")]))
     return (
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; "
         f"connect-src {conecta}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
     )
 

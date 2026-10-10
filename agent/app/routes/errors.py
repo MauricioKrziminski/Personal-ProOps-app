@@ -60,6 +60,10 @@ class LoteIn(BaseModel):
     errors: list[ErroIn]
 
 
+def _invalido(mensagem: str) -> JSONResponse:
+    return JSONResponse({"error": "invalid_request", "message": mensagem}, status_code=422)
+
+
 def _ip(request: Request) -> str:
     xff = request.headers.get("x-forwarded-for", "")
     return xff.split(",")[-1].strip() or (request.client.host if request.client else "?")
@@ -85,10 +89,10 @@ async def receber(request: Request):
         raise HTTPException(status_code=413, detail="corpo grande demais")
     try:
         lote = LoteIn.model_validate(json.loads(bruto))
-    except (ValueError, ValidationError) as err:
-        raise HTTPException(status_code=422, detail="formato inválido") from err
+    except (ValueError, ValidationError):
+        return _invalido("Formato inválido.")
     if not lote.errors or len(lote.errors) > MAX_ERROS:
-        raise HTTPException(status_code=422, detail=f"envie de 1 a {MAX_ERROS} erros")
+        return _invalido(f"Envie de 1 a {MAX_ERROS} erros.")
 
     user_id = await _usuario(request)
     if user_id:

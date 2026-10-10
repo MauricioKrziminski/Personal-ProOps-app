@@ -14,6 +14,9 @@ import { chaveDeConfirmacao, nomeDaConta } from "@/lib/utils";
 export type ActionKind = "plan" | "suspend" | "reactivate" | "signout" | "reset" | "unlink" | "delete";
 export type Target = { kind: ActionKind; row: AccountRow } | null;
 
+/** Mesmo limite de `SuspenderIn.reason` na API (admin.py, MOTIVO_MAX). */
+export const MOTIVO_MAX = 300;
+
 const isStore = (o: AccountRow["origin"]) => o === "apple" || o === "google";
 
 export async function copy(text: string, what: string) {
@@ -38,7 +41,7 @@ export function AccountMenu({ row, onAction, withOpen, trigger }: { row: Account
         <MenuItem onSelect={() => onAction("plan")}><UserCog />Mudar plano</MenuItem>
         {row.suspended ? <MenuItem onSelect={() => onAction("reactivate")}><Play />Reativar conta</MenuItem> : <MenuItem onSelect={() => onAction("suspend")}><Ban />Suspender conta</MenuItem>}
         <MenuItem onSelect={() => onAction("signout")}><LogOut />Encerrar sessões</MenuItem>
-        <MenuItem onSelect={() => onAction("reset")}><KeyRound />Enviar código de senha</MenuItem>
+        <MenuItem disabled={!row.email} onSelect={() => onAction("reset")}><KeyRound />{row.email ? "Enviar código de senha" : "Enviar código de senha (conta sem e-mail)"}</MenuItem>
         {row.whatsapp_linked && <MenuItem onSelect={() => onAction("unlink")}><MessageSquareOff />Desvincular WhatsApp</MenuItem>}
         <MenuSep />
         <MenuItem disabled={!row.email} onSelect={() => row.email && void copy(row.email, "E-mail")}><Copy />Copiar e-mail</MenuItem>
@@ -138,7 +141,8 @@ export function ActionHost({ target, onClose }: { target: Target; onClose: () =>
     return (
       <Confirm open onOpenChange={(o) => !o && close()} destructive title="Suspender conta" confirmLabel="Suspender" busy={m.isPending} disabled={reason.trim().length < 3} onConfirm={go}
         description={<>{who} perde o acesso, as sessões são encerradas e o agente para de responder no WhatsApp (avisa 1 vez por dia).</>}>
-        <div><Label htmlFor="reason">Motivo</Label><Textarea id="reason" value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} placeholder="Ex.: chargeback confirmado" /></div>
+        <div><Label htmlFor="reason">Motivo</Label><Textarea id="reason" value={reason} maxLength={MOTIVO_MAX} onChange={(e) => setReason(e.target.value)} placeholder="Ex.: chargeback confirmado" />
+          <p className="mt-1 text-right text-xs tabular-nums text-muted-foreground" aria-live="polite" data-testid="reason-count">{reason.length}/{MOTIVO_MAX}</p></div>
       </Confirm>
     );
   }

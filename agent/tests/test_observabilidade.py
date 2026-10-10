@@ -372,3 +372,21 @@ async def test_falha_de_job_do_cron_vira_issue(monkeypatch):
     monkeypatch.setattr(cron.embeddings, "run", quebra)
     r = await cron.run_reminders()
     assert vistos == ["cron:reminders/vetores"] and r["embeddings"] == {"error": "vetores de lançamento falharam"}
+
+
+# ── máscara de PII: o rótulo certo para cada formato BR ───────────────────────────────────────────────
+@pytest.mark.parametrize("texto,rotulo", [
+    ("11988887777", "[telefone]"), ("(11) 98888-7777", "[telefone]"), ("11 98888-7777", "[telefone]"),
+    ("+55 11 98888-7777", "[telefone]"), ("5511988887777", "[telefone]"), ("(11) 3333-4444", "[telefone]"),
+    ("123.456.789-09", "[cpf]"), ("12345678909", "[cpf]"),
+    ("12.345.678/0001-90", "[cnpj]"), ("12345678000190", "[cnpj]"),
+    ("ana.silva+x@empresa.com.br", "[email]"),
+])
+def test_mascara_rotula_cada_formato(texto, rotulo):
+    from app.services.telemetry import mascarar_texto
+    assert mascarar_texto(f"erro com {texto} no meio") == f"erro com {rotulo} no meio"
+
+
+def test_422_da_captura_segue_o_contrato(cli):
+    r = cli.post("/internal/errors", json={"errors": []})
+    assert r.status_code == 422 and r.json()["error"] == "invalid_request" and r.json()["message"]

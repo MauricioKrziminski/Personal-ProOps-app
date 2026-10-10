@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { isMobile, loginAdmin, shot, U } from "./support";
+import { adminApi, isMobile, loginAdmin, shot, token, U } from "./support";
 
 const ROTAS: [string, string, string][] = [["/admin/", "Visão geral", "Visão geral"], ["/admin/contas", "Contas", "Contas"], ["/admin/observabilidade", "Observabilidade", "Observabilidade"], ["/admin/auditoria", "Auditoria", "Auditoria"], ["/admin/cobranca", "Cobrança", "Cobrança"], ["/admin/sistema", "Sistema", "Sistema"]];
 
@@ -9,6 +9,7 @@ test.describe("Navegação, tema e hardening do SPA", () => {
     expect(r.status()).toBe(200);
     const h = r.headers();
     expect(h["content-security-policy"]).toContain("script-src 'self'");
+    expect(h["content-security-policy"]).toContain("font-src 'self' data:");
     expect(h["content-security-policy"]).toContain("connect-src 'self' http://127.0.0.1:54321");
     expect(h["x-robots-tag"]).toContain("noindex");
     expect(h["cache-control"]).toBe("no-store");
@@ -19,7 +20,6 @@ test.describe("Navegação, tema e hardening do SPA", () => {
   });
 
   test("todas as páginas abrem sem erro de console, sem violação de CSP e sem rolagem horizontal", async ({ page }, info) => {
-    test.fail(true, "D4: CSP do painel bloqueia a fonte embutida (data:font/woff2) — falta font-src 'self' data: em routes/admin_web.py:_csp");
     const erros: string[] = [];
     page.on("console", (m) => { if (m.type() === "error") erros.push(m.text()); });
     page.on("pageerror", (e) => erros.push(String(e)));
@@ -37,11 +37,8 @@ test.describe("Navegação, tema e hardening do SPA", () => {
     const larg = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: window.innerWidth }));
     expect(larg.sw, "ficha rola na horizontal").toBeLessThanOrEqual(larg.iw);
     await shot(page, info, "pagina-ficha");
-    const resto = erros.filter((e) => !/favicon/.test(e) && !/Loading the font 'data:/.test(e));
-    expect(resto.map((e) => e.slice(0, 160))).toEqual([]);
-    // D4: a CSP não tem font-src, e o Vite embute a Plus Jakarta Sans como data:font/woff2 → bloqueada.
-    test.info().annotations.push({ type: "D4", description: `${erros.length - resto.length} violações de CSP por fonte data:` });
-    expect.soft(erros.length - resto.length, "D4: fonte data: bloqueada pela CSP (falta font-src)").toBe(0);
+    // D2 (corrigido): `font-src 'self' data:` — nenhuma violação de CSP, nem de fonte
+    expect(erros.filter((e) => !/favicon/.test(e)).map((e) => e.slice(0, 160))).toEqual([]);
   });
 
   test("tema escuro liga, persiste ao recarregar e volta ao claro", async ({ page }, info) => {
@@ -107,5 +104,30 @@ test.describe("Navegação, tema e hardening do SPA", () => {
     const box = await page.getByRole("dialog").boundingBox();
     expect(box!.width).toBeLessThanOrEqual(390);
     await shot(page, info, "mobile-dialogo-plano");
+  });
+
+  const limite429 = { status: 429, headers: { "Retry-After": "1", "Content-Type": "application/json" }, body: JSON.stringify({ error: "rate_limited", message: "Muitas ações seguidas; tente em alguns segundos." }) };
+
+  test("D4: 429 na abertura (login) é repetido com recuo e o painel abre", async ({ page }) => {
+    test.setTimeout(60_000);
+    let n = 0;
+    await page.route("**/admin/api/me", (r) => (++n <= 2 ? r.fulfill(limite429) : r.continue()));
+    await loginAdmin(page);
+    expect(n).toBe(3);
+  });
+
+  test("D4: 429 persistente numa lista mostra a mensagem clara (não 'Dados inválidos')", async ({ page }, info) => {
+    test.setTimeout(60_000);
+    await loginAdmin(page);
+    await page.route(/\/admin\/api\/accounts\?/, (r) => r.fulfill(limite429));
+    await page.goto("/admin/contas");
+    await expect(page.getByText("Muitas ações seguidas; tente em alguns segundos.").first()).toBeVisible({ timeout: 25_000 });
+    await shot(page, info, "limite-429");
+  });
+
+  test("D4: a rajada normal de uma abertura de tela não chega ao limite do painel", async () => {
+    const tk = await token(U.admin);
+    const rs = await Promise.all(Array.from({ length: 40 }, () => adminApi("GET", "/overview", undefined, tk)));
+    expect(rs.map((r) => r.status).filter((s) => s !== 200)).toEqual([]);
   });
 });

@@ -2,6 +2,7 @@ import { lazy, type ComponentType } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { Toaster } from "sonner";
+import { useIsMobile } from "@/lib/hooks";
 import { Shell } from "@/components/shell";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ThemeProvider, useTheme } from "@/lib/theme";
@@ -43,7 +44,9 @@ function Gate() {
 
 function Toasts() {
   const { mode } = useTheme();
-  return <Toaster theme={mode} position="top-center" richColors closeButton toastOptions={{ style: { fontFamily: "var(--font-sans)" } }} />;
+  const mobile = useIsMobile();
+  // embaixo: no alto o toast cobria o cabeçalho da gaveta/folha; um por vez (o novo toma o lugar do anterior)
+  return <Toaster theme={mode} position={mobile ? "bottom-center" : "bottom-right"} visibleToasts={1} richColors closeButton style={{ pointerEvents: "auto" }} toastOptions={{ style: { fontFamily: "var(--font-sans)", pointerEvents: "auto" } }} />;
 }
 
 export default function App() {

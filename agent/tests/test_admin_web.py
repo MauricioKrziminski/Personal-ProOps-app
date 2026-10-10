@@ -57,6 +57,7 @@ def test_csp_so_com_supabase_do_projeto(cli):
     assert "script-src 'self';" in csp and "connect-src 'self' https://x.supabase.co;" in csp
     assert "frame-ancestors 'none'" in csp and "unsafe-inline" in csp.split("style-src")[1].split(";")[0]
     assert "script-src 'self' 'unsafe-inline'" not in csp
+    assert "font-src 'self' data:;" in csp  # a fonte do SPA é embutida (data:)
 
 
 def test_assets_cache_longo_e_arquivo_inexistente_404(cli):

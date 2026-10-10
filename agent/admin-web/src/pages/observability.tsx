@@ -174,7 +174,7 @@ function IssueBody({ id }: { id: string }) {
       void qc.invalidateQueries({ queryKey: ["issues"] });
       void qc.invalidateQueries({ queryKey: ["overview"] });
       const msg = v.status === "resolved" ? "Erro resolvido" : v.status === "ignored" ? "Erro ignorado" : "Erro reaberto";
-      toast.success(msg, { action: { label: "Desfazer", onClick: () => m.mutate({ status: v.prev, prev: v.status }) } });
+      toast.success(msg, { id: "issue-status", action: { label: "Desfazer", onClick: () => m.mutate({ status: v.prev, prev: v.status }) } });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Não foi possível atualizar."),
   });

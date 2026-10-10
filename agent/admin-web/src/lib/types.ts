@@ -63,7 +63,7 @@ export interface AccountDetail {
   account: AccountRow;
   profile: { phone: string | null; email_confirmed_at: string | null; onboarding_completed: boolean; banned_until: string | null; sessions: number };
   subscription: {
-    plan: string; status: string; provider: string; external_id: string; product_id: string; environment: string;
+    plan: string; status: string; provider: string; origin: Origin | null; external_id: string; product_id: string; environment: string;
     is_trial: boolean; current_period_end: string | null; canceled_at: string | null; store_managed: boolean;
   };
   usage: {

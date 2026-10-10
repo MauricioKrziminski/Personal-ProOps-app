@@ -23,6 +23,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from psycopg.types.json import Jsonb
@@ -66,6 +67,19 @@ _ACESSO = {
     "subscriber": _ASSINANTE, "trialing": _TESTE, "courtesy": _CORTESIA,
     "lapsed": "access = 'lapsed'", "never": "access = 'never'", "suspended": "suspended",
 }
+# Sinais da Visão geral: UM critério, usado pela contagem (overview) e pela lista (`/accounts?signal=`).
+_SINAIS = {
+    "trial_ending_48h": """access = 'subscriber' and is_trial and period_end is not null
+        and period_end between (now() at time zone 'America/Sao_Paulo')::date
+                           and (now() at time zone 'America/Sao_Paulo')::date + 2""",
+    "lapsed_7d": """exists (select 1 from public.subscriptions s where s.workspace_id = base.workspace_id
+        and private.effective_plan(base.workspace_id) = 'free' and s.provider is not null
+        and coalesce(s.canceled_at, s.updated_at) >= now() - interval '7 days')""",
+    "near_limit": """access = 'subscriber' and ((ai_max > 0 and ai_used >= 0.8 * ai_max)
+        or (wa_max > 0 and wa_used >= 0.8 * wa_max))""",
+    "inactive_subscribers_30d": """access = 'subscriber'
+        and (last_sign_in_at is null or last_sign_in_at < now() - interval '30 days')""",
+}
 _ORIGEM_SQL = {"apple": "app_store", "google": "play_store", "manual": "manual", "test_store": "test_store"}
 _ORIGEM_API = {v: k for k, v in _ORIGEM_SQL.items()}
 _ORDEM = {
@@ -96,9 +110,14 @@ class _Rota(APIRoute):
         async def handler(request: Request):
             try:
                 return _no_store(await original(request))
+            except RequestValidationError:
+                return _no_store(JSONResponse({"error": "invalid_request", "message": "Esse pedido não está no formato esperado."},
+                                              status_code=422))
             except HTTPException as e:
                 if e.status_code == 401:
                     corpo = {"error": "unauthorized"}
+                elif e.status_code == 429:
+                    corpo = {"error": "rate_limited", "message": "Muitas ações seguidas; tente em alguns segundos."}
                 elif isinstance(e.detail, dict):
                     corpo = e.detail
                 else:
@@ -191,18 +210,10 @@ async def overview(_admin: UUID = Depends(admin_user)):
           count(*) filter (where suspended)::int as suspended,
           count(*) filter (where plan = 'pro')::int as pro,
           count(*) filter (where plan = 'family')::int as family,
-          count(*) filter (where access = 'subscriber' and is_trial and period_end is not null
-                             and period_end between (now() at time zone 'America/Sao_Paulo')::date
-                                                and (now() at time zone 'America/Sao_Paulo')::date + 2)::int as trial_ending_48h,
-          count(*) filter (where access = 'subscriber'
-                             and ((ai_max > 0 and ai_used >= 0.8 * ai_max)
-                               or (wa_max > 0 and wa_used >= 0.8 * wa_max)))::int as near_limit,
-          count(*) filter (where access = 'subscriber'
-                             and (last_sign_in_at is null or last_sign_in_at < now() - interval '30 days'))::int
-            as inactive_subscribers_30d,
-          (select count(*) from prim join public.subscriptions s on s.workspace_id = prim.ws
-            where private.effective_plan(prim.ws) = 'free' and s.provider is not null
-              and coalesce(s.canceled_at, s.updated_at) >= now() - interval '7 days')::int as lapsed_7d,
+          count(*) filter (where {_SINAIS['trial_ending_48h']})::int as trial_ending_48h,
+          count(*) filter (where {_SINAIS['near_limit']})::int as near_limit,
+          count(*) filter (where {_SINAIS['inactive_subscribers_30d']})::int as inactive_subscribers_30d,
+          count(*) filter (where {_SINAIS['lapsed_7d']})::int as lapsed_7d,
           (select count(*) from public.ai_events where kind = 'turn' and created_at >= {_MES})::int as ai_turns,
           (select count(*) from public.whatsapp_sends where kind = 'reply' and created_at >= {_MES})::int as replies,
           (select count(*) from public.whatsapp_sends where kind = 'notice' and created_at >= {_MES})::int as notices,
@@ -279,6 +290,7 @@ async def accounts(
     access: Literal["subscriber", "trialing", "lapsed", "never", "courtesy", "suspended"] | None = None,
     plan: Literal["free", "pro", "family"] | None = None,
     origin: Literal["apple", "google", "manual", "test_store", "none"] | None = None,
+    signal: Literal["trial_ending_48h", "lapsed_7d", "near_limit", "inactive_subscribers_30d"] | None = None,
     sort: Literal["created_desc", "created_asc", "last_sign_in_desc", "last_sign_in_asc", "ai_used_desc", "email_asc"] = "created_desc",
     page: int = Query(1, ge=1, le=100_000),
     page_size: int = Query(25, ge=1, le=100),
@@ -290,6 +302,8 @@ async def accounts(
         args += [_like(q)] * 2
     if access:
         onde.append(f"({_ACESSO[access]})")
+    if signal:
+        onde.append(f"({_SINAIS[signal]})")
     if plan:
         onde.append("plan = %s")
         args.append(plan)
@@ -402,7 +416,8 @@ async def _detalhe(user_id: UUID) -> dict:
                     "banned_until": _iso(u.get("banned_until")), "sessions": u.get("sessoes") or 0},
         "subscription": {
             "plan": sub.get("plan") or "free", "status": sub.get("status") or "active",
-            "provider": prov or "", "external_id": sub.get("external_id") or "",
+            "provider": prov or "", "origin": _ORIGEM_API.get(prov, prov) if prov else None,
+            "external_id": sub.get("external_id") or "",
             "product_id": sub.get("product_id") or "", "environment": sub.get("environment") or "",
             "is_trial": bool(sub.get("is_trial")), "current_period_end": _iso(sub.get("current_period_end")),
             "canceled_at": _iso(sub.get("canceled_at")),
@@ -497,8 +512,11 @@ async def mudar_plano(user_id: UUID, body: PlanoIn, admin: UUID = Depends(admin_
     return _json(await _detalhe(user_id))
 
 
+MOTIVO_MAX = 300  # o mesmo número na UI (account-actions.tsx)
+
+
 class SuspenderIn(BaseModel):
-    reason: str = Field("", max_length=200)
+    reason: str = Field("", max_length=MOTIVO_MAX)
 
 
 @router.post("/accounts/{user_id}/suspend")
@@ -533,6 +551,8 @@ async def sair(user_id: UUID, admin: UUID = Depends(admin_user)):
 @router.post("/accounts/{user_id}/password-reset")
 async def redefinir_senha(user_id: UUID, admin: UUID = Depends(admin_user)):
     alvo = await _alvo(user_id)
+    if not alvo.get("email"):
+        raise _erro(409, "no_email", "A conta não tem e-mail cadastrado, então não há para onde enviar o código.")
     s = get_settings()
     # rede FORA da transação (segura lock); só audita se o Supabase aceitou o envio
     try:

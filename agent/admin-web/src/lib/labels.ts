@@ -2,6 +2,10 @@ export const ACCESS_LABEL: Record<string, string> = {
   subscriber: "Assinante", trialing: "Em teste", lapsed: "Encerrada", never: "Nunca assinou",
   courtesy: "Cortesia", suspended: "Suspensa",
 };
+export const SIGNAL_LABEL: Record<string, string> = {
+  trial_ending_48h: "Teste acaba em 48 h", lapsed_7d: "Encerradas nos últimos 7 dias", near_limit: "Perto do limite do mês",
+  inactive_subscribers_30d: "Assinantes sem acesso há 30 dias",
+};
 export const PLAN_LABEL: Record<string, string> = { free: "Free", pro: "Pro", family: "Família" };
 export const ORIGIN_LABEL: Record<string, string> = {
   apple: "App Store", google: "Google Play", manual: "Manual", test_store: "Loja de teste", none: "Sem origem",

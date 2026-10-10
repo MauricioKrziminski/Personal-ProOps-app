@@ -14,7 +14,13 @@ Servido pelo agente. O SPA (`agent/admin-web/`, build copiado para `app/static/a
 - Nenhuma resposta traz conteúdo financeiro (lançamentos, valores, saldos, notas, lembretes): só
   cadastro, assinatura, uso e CONTAGENS.
 
-Erros de regra: **409** `{"error":"<codigo>","message":"<frase pt-BR para a tela>"}`. Entrada inválida: **422**.
+Erros de regra: **409** `{"error":"<codigo>","message":"<frase pt-BR para a tela>"}`. Entrada inválida: **422**
+`{"error":"invalid_request","message":"Esse pedido não está no formato esperado."}` (também em `/internal/errors`).
+
+Limite de taxa: `/admin/api/*` tem limite PRÓPRIO, por admin (`ADMIN_RATE_LIMIT_PER_MINUTE`, padrão 600; 0 desliga),
+separado do geral do agente (`RATE_LIMIT_PER_MINUTE`). Estourou → **429**
+`{"error":"rate_limited","message":"Muitas ações seguidas; tente em alguns segundos."}` com `Retry-After`.
+O SPA repete leituras (GET) em 429 com recuo de 1 s, 2 s e 4 s.
 
 ## Rotas
 
@@ -42,6 +48,8 @@ Erros de regra: **409** `{"error":"<codigo>","message":"<frase pt-BR para a tela
 ### `GET /admin/api/accounts`
 Query: `q` (e-mail ou nome), `access` (`subscriber|trialing|lapsed|never|courtesy|suspended`),
 `plan` (`free|pro|family`), `origin` (`apple|google|manual|test_store|none`),
+`signal` (`trial_ending_48h|lapsed_7d|near_limit|inactive_subscribers_30d`: o MESMO critério SQL que conta `signals` no
+`/overview` — `_SINAIS` em `admin.py` —, então o `total` da lista é o número do sinal),
 `sort` (`created_desc` padrão, `created_asc`, `last_sign_in_desc`, `last_sign_in_asc`, `ai_used_desc`, `email_asc`),
 `page` (1..), `page_size` (padrão 25, máx 100). Paginação NO SERVIDOR.
 `{"items": [AccountRow], "total": 0, "page": 1, "page_size": 25}`
@@ -65,7 +73,8 @@ Query: `q` (e-mail ou nome), `access` (`subscriber|trialing|lapsed|never|courtes
               "banned_until": "iso|null", "sessions": 0},
   "subscription": {"plan": "", "status": "", "provider": "", "external_id": "", "product_id": "",
                    "environment": "", "is_trial": false, "current_period_end": "date|null",
-                   "canceled_at": "iso|null", "store_managed": false},
+                   "canceled_at": "iso|null", "store_managed": false,
+                   "origin": "apple|google|manual|test_store|null"},
   "usage": {"current": {"ai_used": 0, "ai_max": 0, "wa_used": 0, "wa_max": 0, "notices_today": 0,
                         "notices_max": 0, "ai_cost_usd": "0.0000"},
             "months": [{"month": "2026-10", "ai_turns": 0, "whatsapp_replies": 0, "ai_cost_usd": "0.0000"}]},
@@ -77,16 +86,17 @@ Query: `q` (e-mail ou nome), `access` (`subscriber|trialing|lapsed|never|courtes
   "admin_events": ["AuditEvent"]
 }
 ```
-`months`: últimos 6. `billing_events` e `admin_events`: últimos 50.
+`months`: últimos 6, do mês mais novo ao mais antigo (a tela os ordena do mais antigo ao mais novo).
+`subscription.provider` é o valor cru da tabela (`app_store`…); `subscription.origin` é o normalizado, igual ao `origin` da lista. `billing_events` e `admin_events`: últimos 50.
 
 ### Ações (todas `POST`, corpo JSON, resposta = o `GET /accounts/{user_id}` atualizado)
 | rota | corpo | regra |
 |---|---|---|
 | `/accounts/{id}/plan` | `{"plan": "free|pro|family", "period_end": "date|null", "force": false}` | grava `provider='manual'`, `status='active'` (`free` → `canceled`). Assinatura de LOJA (`apple`/`google`) → 409 `store_managed` salvo `force: true` (o SPA exige digitar o e-mail; a próxima notificação da loja sobrescreve) |
-| `/accounts/{id}/suspend` | `{"reason": "str"}` | `auth.users.banned_until` longe no futuro + apaga `auth.sessions`. O agente para de responder pelo WhatsApp (aviso 1x/dia) |
+| `/accounts/{id}/suspend` | `{"reason": "str"}` (até 300 caracteres, o mesmo limite do campo na tela) | `auth.users.banned_until` longe no futuro + apaga `auth.sessions`. O agente para de responder pelo WhatsApp (aviso 1x/dia) |
 | `/accounts/{id}/reactivate` | `{}` | limpa `banned_until` |
 | `/accounts/{id}/sign-out` | `{}` | apaga `auth.sessions` |
-| `/accounts/{id}/password-reset` | `{}` | envia o código de recuperação (`/auth/v1/recover` com a anon key) |
+| `/accounts/{id}/password-reset` | `{}` | envia o código de recuperação (`/auth/v1/recover` com a anon key). Conta sem e-mail → 409 `no_email` (a tela desabilita a ação) |
 | `/accounts/{id}/unlink-whatsapp` | `{}` | `profiles.phone = null` e a sessão do WhatsApp sai |
 | `/accounts/{id}/delete` | `{"confirm_email": "str"}` | `confirm_email` igual ao da conta, sem caixa; apaga como `delete_my_account`. Resposta `{"deleted": true}` |
 

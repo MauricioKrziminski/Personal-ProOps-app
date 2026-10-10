@@ -33,6 +33,7 @@ SEMPRE_AMOSTRAR = False
 # ---------------------------------------------------------------------------
 # máscara de dado pessoal ANTES de o texto sair para o Langfuse
 # ---------------------------------------------------------------------------
+# A ORDEM importa: telefone (11 dígitos com 9 na 3ª posição) antes do CPF sem pontuação, que também tem 11.
 # Só padrões ESTRUTURAIS (a forma do dado), nunca lista de palavras: e-mail, CPF/CNPJ, telefone
 # e sequência longa de dígitos. Valor em R$ fica — é o que se precisa para depurar um turno.
 # UUID fica DE PROPÓSITO: é o id do candidato, da pendência (`pa:<uuid>`) e do lançamento, sem
@@ -42,8 +43,8 @@ SEMPRE_AMOSTRAR = False
 _MASCARAS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"), "[email]"),
     (re.compile(r"(?<!\d)\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}(?!\d)"), "[cnpj]"),
-    (re.compile(r"(?<!\d)\d{3}\.?\d{3}\.?\d{3}-?\d{2}(?!\d)"), "[cpf]"),
     (re.compile(r"(?<!\d)(?:\+?55[\s-]?)?\(?\d{2}\)?[\s-]?9?\d{4}[\s-]?\d{4}(?!\d)"), "[telefone]"),
+    (re.compile(r"(?<!\d)\d{3}\.?\d{3}\.?\d{3}-?\d{2}(?!\d)"), "[cpf]"),
     (re.compile(r"(?<![\w-])\d{9,}(?![\w-])"), "[numero]"),  # só número isolado: não corta um UUID
 ]
 

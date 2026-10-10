@@ -55,13 +55,12 @@ test.describe("Visão geral", () => {
     for (const e of emails) await expect(page.getByText(e, { exact: true }).locator("visible=true")).toBeVisible();
   });
 
-  // Cada sinal conta com um critério MAIS ESTREITO que o filtro para onde o link aponta. A lista aberta
-  // não bate com o número clicado. DEFEITO D1 (docs/E2E-PAINEL.md): test.fail() até corrigir.
+  // D1 (corrigido): o link do sinal usa `signal=`, o MESMO critério SQL da contagem do overview.
   const sinais: [string, number, RegExp][] = [
-    ["Teste acaba em 48 h", SEED.signals.trial_ending_48h, /access=trialing/],
-    ["Encerradas nos últimos 7 dias", SEED.signals.lapsed_7d, /access=lapsed/],
-    ["Perto do limite do mês", SEED.signals.near_limit, /access=subscriber/],
-    ["Assinantes sem acesso há 30 dias", SEED.signals.inactive_subscribers_30d, /access=subscriber/],
+    ["Teste acaba em 48 h", SEED.signals.trial_ending_48h, /signal=trial_ending_48h/],
+    ["Encerradas nos últimos 7 dias", SEED.signals.lapsed_7d, /signal=lapsed_7d/],
+    ["Perto do limite do mês", SEED.signals.near_limit, /signal=near_limit/],
+    ["Assinantes sem acesso há 30 dias", SEED.signals.inactive_subscribers_30d, /signal=inactive_subscribers_30d/],
   ];
   for (const [label, n, url] of sinais) {
     test(`sinal "${label}" abre Contas filtrada (acesso certo)`, async ({ page }) => {
@@ -70,11 +69,26 @@ test.describe("Visão geral", () => {
       await expect(page.getByRole("heading", { name: "Contas", exact: true })).toBeVisible();
     });
     test(`sinal "${label}": a lista aberta tem ${n} conta(s), o número do sinal`, async ({ page }) => {
-      test.fail(true, "D1: o link do sinal filtra só por acesso/ordem; a lista traz mais contas que o número do sinal");
       await page.getByRole("link").filter({ hasText: label }).click();
       await expect(page.getByText(new RegExp(`^${n} ${n === 1 ? "conta" : "contas"}$`))).toBeVisible();
+      await expect(page.getByTestId("signal-chip")).toContainText(label);
     });
   }
+
+  test("D1: o número de cada sinal é o total da lista de /accounts?signal= (API) e o chip limpa o filtro", async ({ page }) => {
+    const ov = await adminApi("GET", "/overview");
+    for (const k of Object.keys(SEED.signals)) {
+      const l = await adminApi("GET", `/accounts?signal=${k}`);
+      expect(l.body.total, k).toBe(ov.body.signals[k]);
+    }
+    expect((await adminApi("GET", "/accounts?signal=x")).status).toBe(422);
+    await page.getByRole("link").filter({ hasText: "Perto do limite do mês" }).click();
+    await expect(page.getByTestId("signal-chip")).toBeVisible();
+    await page.getByRole("button", { name: "Limpar sinal" }).click();
+    await expect(page.getByTestId("signal-chip")).toHaveCount(0);
+    await expect(page).not.toHaveURL(/signal=/);
+    await expect(page.getByText(`${SEED.total} contas`)).toBeVisible();
+  });
 
   test("o cartão de observabilidade leva para /observabilidade", async ({ page }) => {
     await page.getByRole("link", { name: /erro|tudo calmo/i }).first().click();

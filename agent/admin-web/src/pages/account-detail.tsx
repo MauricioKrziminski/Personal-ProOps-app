@@ -99,7 +99,7 @@ function Subscription({ d, rc }: { d: AccountDetail; rc?: string }) {
         <dl className="divide-y">
           <Row k="Plano" v={<PlanBadge plan={s.plan} />} />
           <Row k="Status" v={SUB_STATUS_LABEL[s.status] ?? (s.status || "—")} />
-          <Row k="Origem" v={ORIGIN_LABEL[s.provider] ?? (s.provider || "—")} />
+          <Row k="Origem" v={s.origin ? (ORIGIN_LABEL[s.origin] ?? s.origin) : "—"} />
           <Row k="Período termina em" v={fmtDate(s.current_period_end)} />
           {s.is_trial && <Row k="Teste" v="Sim" />}
           {s.canceled_at && <Row k="Cancelada em" v={fmtDate(s.canceled_at, true)} />}
@@ -114,7 +114,8 @@ function Subscription({ d, rc }: { d: AccountDetail; rc?: string }) {
 
 function Usage({ d }: { d: AccountDetail }) {
   const c = d.usage.current;
-  const months = d.usage.months.map((m) => ({ ...m, label: monthLabel(m.month) }));
+  // a API manda do mês mais novo ao mais antigo; o gráfico lê da esquerda para a direita, do mais antigo ao mais novo
+  const months = [...d.usage.months].sort((a, b) => a.month.localeCompare(b.month)).map((m) => ({ ...m, label: monthLabel(m.month) }));
   return (
     <Section title="Uso" aside={<span className="text-xs text-muted-foreground">Custo de IA no mês {usd(c.ai_cost_usd, 4)}</span>}>
       <div className="grid gap-4 p-5 sm:grid-cols-3">

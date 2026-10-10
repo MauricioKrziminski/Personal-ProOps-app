@@ -8,12 +8,15 @@ const overlay = "fixed inset-0 z-50 bg-black/55 backdrop-blur-[2px] data-[state=
 /** Mobile: folha colada embaixo e rolável; desktop: diálogo centralizado. */
 const panel = "fixed z-50 flex max-h-[92dvh] flex-col gap-4 overflow-y-auto border bg-popover p-5 text-popover-foreground shadow-2xl max-sm:inset-x-0 max-sm:bottom-0 max-sm:rounded-t-2xl max-sm:pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:left-1/2 sm:top-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl data-[state=open]:animate-in data-[state=open]:fade-in-0 max-sm:data-[state=open]:slide-in-from-bottom sm:data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0";
 
+/** Tocar no toast (ex.: "Desfazer") não é "clicar fora": não pode fechar a gaveta/folha por baixo. */
+const ignoraToast = (e: Event) => { if ((e.target as HTMLElement | null)?.closest?.("[data-sonner-toaster]")) e.preventDefault(); };
+
 export function Modal({ open, onOpenChange, title, description, children }: { open: boolean; onOpenChange: (o: boolean) => void; title: string; description?: string; children: ReactNode }) {
   return (
     <D.Root open={open} onOpenChange={onOpenChange}>
       <D.Portal>
         <D.Overlay className={overlay} />
-        <D.Content className={panel}>
+        <D.Content className={panel} onInteractOutside={ignoraToast}>
           <div className="flex items-start justify-between gap-3">
             <div>
               <D.Title className="text-lg font-bold tracking-tight">{title}</D.Title>
@@ -62,7 +65,7 @@ export function Drawer({ open, onOpenChange, title, children }: { open: boolean;
     <D.Root open={open} onOpenChange={onOpenChange}>
       <D.Portal>
         <D.Overlay className={overlay} />
-        <D.Content className="fixed z-50 flex flex-col overflow-hidden border bg-popover text-popover-foreground shadow-2xl outline-none max-sm:inset-x-0 max-sm:bottom-0 max-sm:h-[92dvh] max-sm:rounded-t-2xl sm:inset-y-0 sm:right-0 sm:w-full sm:max-w-[680px] sm:border-y-0 sm:border-r-0 data-[state=open]:animate-in max-sm:data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-right data-[state=closed]:animate-out max-sm:data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-right">
+        <D.Content onInteractOutside={ignoraToast} className="fixed z-50 flex flex-col overflow-hidden border bg-popover text-popover-foreground shadow-2xl outline-none max-sm:inset-x-0 max-sm:bottom-0 max-sm:h-[92dvh] max-sm:rounded-t-2xl sm:inset-y-0 sm:right-0 sm:w-full sm:max-w-[680px] sm:border-y-0 sm:border-r-0 data-[state=open]:animate-in max-sm:data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-right data-[state=closed]:animate-out max-sm:data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-right">
           <D.Title className="sr-only">{title}</D.Title>
           <D.Description className="sr-only">{title}</D.Description>
           <div className="flex h-14 shrink-0 items-center justify-between border-b px-5 sm:pl-6">

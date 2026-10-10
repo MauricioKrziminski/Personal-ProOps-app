@@ -47,9 +47,28 @@ async def test_current_user_aplica_o_limite(monkeypatch):
     u = uuid4()
     monkeypatch.setattr(get_settings(), "supabase_url", "https://x.supabase.co")
     monkeypatch.setattr(auth, "decode_token", lambda _t: {"sub": str(u)})
-    req = Request({"type": "http", "headers": [(b"authorization", b"Bearer t")]})
+    req = Request({"type": "http", "path": "/chat", "headers": [(b"authorization", b"Bearer t")]})
     for _ in range(3):
         assert await auth.current_user(req) == u
     with pytest.raises(HTTPException) as e:
         await auth.current_user(req)
     assert e.value.status_code == 429
+
+
+async def test_painel_tem_limite_proprio_por_admin_sem_afrouxar_o_resto(monkeypatch):
+    u = uuid4()
+    monkeypatch.setattr(get_settings(), "supabase_url", "https://x.supabase.co")
+    monkeypatch.setattr(get_settings(), "admin_rate_limit_per_minute", 10)
+    monkeypatch.setattr(auth, "decode_token", lambda _t: {"sub": str(u)})
+    cab = [(b"authorization", b"Bearer t")]
+    painel = Request({"type": "http", "path": "/admin/api/overview", "headers": cab})
+    app = Request({"type": "http", "path": "/chat/x", "headers": cab})
+    for _ in range(10):  # acima do limite geral (3), dentro do do painel (10)
+        await auth.current_user(painel)
+    with pytest.raises(HTTPException) as e:
+        await auth.current_user(painel)
+    assert e.value.status_code == 429
+    for _ in range(3):  # o contador do app é outro: o painel não o consumiu
+        await auth.current_user(app)
+    with pytest.raises(HTTPException):
+        await auth.current_user(app)

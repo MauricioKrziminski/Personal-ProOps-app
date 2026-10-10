@@ -14,7 +14,7 @@ test.describe("Auditoria (depois das ações do 04)", () => {
   test.beforeEach(async ({ page }) => { await loginAdmin(page); await page.goto("/admin/auditoria"); });
 
   test("lista TODAS as ações feitas (uma linha por evento do banco)", async ({ page }, info) => {
-    expect(n).toBe(11) // 3 plano + 1 forçado + 2 suspensão + 2 sessões/código... (ver 04);
+    expect(n).toBe(13); // 11 do fluxo do 04 + suspender/reativar do teste do motivo longo (D3)
     await expect(linhas(page)).toHaveCount(n);
     await expect(page.getByText(`1–${n} de ${n}`)).toBeVisible();
     for (const a of Object.keys(porAcao)) await expect(page.getByText(ROTULO[a], { exact: true }).locator("visible=true").first(), a).toBeVisible();
