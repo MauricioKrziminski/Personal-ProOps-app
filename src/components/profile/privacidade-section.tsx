@@ -42,6 +42,9 @@ export function PrivacidadeSection() {
       <Row
         title="Autorizar o uso de IA"
         icon="wand.and.stars"
+        // Sem ler o consentimento a chave ficaria desligada para sempre, sem dizer por quê.
+        subtitle={consentimento.isError ? 'Não deu para ler agora. Toque para tentar de novo.' : undefined}
+        onPress={consentimento.isError ? () => { void consentimento.refetch(); } : undefined}
         trailing={
           <Interruptor
             value={!!consentimento.data?.ai_consent_at}

@@ -4,7 +4,7 @@ import { StyleSheet } from 'react-native';
 import { useCortina } from '@/components/motion/session-curtain';
 import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
-import { Row } from '@/components/ui/row';
+import { Row, RowSeparator } from '@/components/ui/row';
 import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useToast } from '@/components/ui/toast';
@@ -83,7 +83,12 @@ export function SegurancaRows() {
 
   return (
     <>
-      {temSenha ? <Row title="Trocar senha" icon="key" onPress={() => setAberto(true)} /> : null}
+      {temSenha ? (
+        <>
+          <Row title="Trocar senha" icon="key" onPress={() => setAberto(true)} />
+          <RowSeparator />
+        </>
+      ) : null}
       <Row title="Sair de todos os aparelhos" icon="rectangle.portrait.and.arrow.right" chevron={false} onPress={sairDeTodos} />
 
       <Sheet visible={aberto} onClose={fechar}>

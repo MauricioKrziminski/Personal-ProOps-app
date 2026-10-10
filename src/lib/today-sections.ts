@@ -272,7 +272,7 @@ export type DiaDaSemana = {
   /** O gasto do dia — `daily_spending`, a régua de `transactions_summary`. Zero no futuro. */
   saiu: number;
   entrou: number;
-  /** Futuro: o que vence ou vai cair no cartão — os MESMOS itens dos Próximos dias, sem receita. */
+  /** Futuro: o que vence (conta, fatura, parcela) — os itens dos Próximos dias, sem receita e sem compra no cartão. */
   previsto: number;
   previstos: number;
   /** Futuro: a receita prevista. */
@@ -318,7 +318,8 @@ export function semanaDoDia(v: {
     const tipo = delta < 0 ? 'passado' : delta === 0 ? 'hoje' : 'futuro';
     const gasto = tipo === 'futuro' ? undefined : gastoDo.get(day);
     const itens = tipo === 'futuro' ? (itensDo.get(day) ?? []) : [];
-    const saidas = itens.filter((i) => i.kind !== 'income');
+    // Compra no cartão não vence: vai postar na fatura, que já é a marca do dia em que o caixa sai.
+    const saidas = itens.filter((i) => i.kind !== 'income' && i.kind !== 'card');
     const saiu = Number(gasto?.expense_cents ?? 0);
     dias.push({
       day,

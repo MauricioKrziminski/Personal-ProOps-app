@@ -1617,6 +1617,8 @@ export function useUpcomingCardCharges(limit = 4) {
         .from('transactions')
         .select('id, description, merchant, occurred_at, amount_cents, invoice_id')
         .in('invoice_id', [...cartaoDe.keys()])
+        // A régua de `contaNaFatura` (card-status.ts): despesa e transferência que sai do cartão.
+        .in('kind', ['expense', 'transfer'])
         .gte('occurred_at', hoje)
         .order('occurred_at', { ascending: true })
         .limit(limit);

@@ -57,6 +57,9 @@ export function Interruptor({
       disabled={disabled || !ativo}
       accessibilityLabel={accessibilityLabel}
       trackColor={Platform.OS === 'android' ? { false: theme.textSecondary, true: theme.tint } : undefined}
+      // Desligado: trilho em `textSecondary` (≥ 4,5:1 sobre o card nos dois temas, contrast.test.ts) —
+      // o cinza do sistema sumia no escuro. No iOS o trilho desligado é o `ios_backgroundColor`.
+      ios_backgroundColor={theme.textSecondary}
       thumbColor={Platform.OS === 'android' ? (value ? theme.onTint : theme.surface) : undefined}
     />
   );

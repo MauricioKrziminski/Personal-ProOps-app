@@ -304,6 +304,12 @@ export function Section({
   );
 }
 
+/** O fio entre linhas de um `Section` — para o componente que devolve várias `Row` num fragmento. */
+export function RowSeparator() {
+  const theme = useTheme();
+  return <View style={[styles.separator, { backgroundColor: theme.separator }]} />;
+}
+
 /** O piso do título antes de o valor descer de linha — ver `row` abaixo. */
 const MIN_TITULO = 134;
 

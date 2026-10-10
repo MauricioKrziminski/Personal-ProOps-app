@@ -71,3 +71,16 @@ test('contrast() confere com a referência WCAG', () => {
   assert.equal(Math.round(contrast('#FFFFFF', '#000000') * 100) / 100, 21);
   assert.equal(Math.round(contrast('#777777', '#FFFFFF') * 100) / 100, 4.48);
 });
+
+test('Switch desligado: só pelo Interruptor, cujo trilho é textSecondary (≥ 3:1 contra o card, WCAG 1.4.11)', () => {
+  const raiz = join(import.meta.dirname, '..');
+  const interruptor = readFileSync(join(raiz, 'components', 'ui', 'switch-row.tsx'), 'utf8');
+  assert.match(interruptor, /false: theme\.textSecondary/);
+  assert.match(interruptor, /ios_backgroundColor=\{theme\.textSecondary\}/);
+  const alertas = readFileSync(join(raiz, 'components', 'profile', 'alert-preferences-section.tsx'), 'utf8');
+  assert.doesNotMatch(alertas, /<Switch\b/, 'Switch cru volta ao cinza do sistema, que some no escuro');
+  for (const modo of ['light', 'dark'] as const) {
+    const p = paleta(modo);
+    assert.ok(contrast(p.textSecondary, p.surface) >= 3, `${modo}: trilho desligado sem 3:1`);
+  }
+});

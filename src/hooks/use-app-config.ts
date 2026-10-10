@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
 
 import { useAgora } from '@/hooks/use-agora';
 import { usePreferencia } from '@/hooks/use-preferencia';
-import { bancoSolto } from '@/lib/banco-solto';
+import { supabase } from '@/lib/supabase';
 import {
   avisoNoPrazo,
   avisoVisivel,
@@ -27,8 +27,8 @@ export function useAppConfig() {
     retry: false,
     queryFn: async (): Promise<AppConfig | null> => {
       try {
-        const { data, error } = await bancoSolto.from('app_config').select('id, min_version_ios, min_version_android, latest_version_ios, latest_version_android, store_url_ios, store_url_android, notice_title, notice_body, notice_level, notice_until, updated_at').eq('id', 1).maybeSingle<AppConfig>();
-        return error ? null : data;
+        const { data, error } = await supabase.from('app_config').select('id, min_version_ios, min_version_android, latest_version_ios, latest_version_android, store_url_ios, store_url_android, notice_title, notice_body, notice_level, notice_until, updated_at').eq('id', 1).maybeSingle();
+        return error ? null : (data as AppConfig | null);
       } catch {
         return null;
       }
@@ -71,6 +71,6 @@ export function useAppPing(userId: string | undefined) {
   useEffect(() => {
     const versao = Application.nativeApplicationVersion;
     if (!userId || !versao) return;
-    void Promise.resolve(bancoSolto.rpc('app_ping', { p_version: versao, p_platform: plataforma })).catch(() => {});
+    void Promise.resolve(supabase.rpc('app_ping', { p_version: versao, p_platform: plataforma })).catch(() => {});
   }, [userId]);
 }

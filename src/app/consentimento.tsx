@@ -71,7 +71,11 @@ export default function ConsentimentoScreen() {
           }
         />
         {/* Quem não concorda não fica preso: sai da conta. */}
-        <Button label="Sair da conta" variant="ghost" onPress={() => { void supabase.auth.signOut(); }} />
+        <Button label="Sair da conta" variant="ghost" onPress={() => {
+            void supabase.auth.signOut().then(({ error }) => {
+              if (error) toast({ message: 'Não foi possível sair agora.', tone: 'error' });
+            });
+          }} />
       </ScrollView>
     </Screen>
   );

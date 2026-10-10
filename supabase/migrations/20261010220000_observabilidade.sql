@@ -2,7 +2,7 @@
 -- RLS ligada sem policy e sem grant: só o papel do agente lê/escreve. Sem `workspace_id` de propósito
 -- (a asserção (e) de sem_assinatura.sql varre esse nome). `error_events.user_id` tem FK `set null` para
 -- auth.users: apagar a conta anula o autor do erro por qualquer caminho, sem tocar em `apagar_conta`.
-create table public.error_issues (
+create table if not exists public.error_issues (
   id uuid primary key default gen_random_uuid(),
   fingerprint text not null unique,
   source text not null check (source in ('app', 'admin', 'agent')),
@@ -21,12 +21,12 @@ create table public.error_issues (
   resolved_at timestamptz,
   resolved_by uuid
 );
-create index error_issues_status_last_seen_idx on public.error_issues (status, last_seen desc);
-create index error_issues_last_seen_idx on public.error_issues (last_seen desc);
-create index error_issues_count_idx on public.error_issues (count desc);
-create index error_issues_first_seen_idx on public.error_issues (first_seen desc);
+create index if not exists error_issues_status_last_seen_idx on public.error_issues (status, last_seen desc);
+create index if not exists error_issues_last_seen_idx on public.error_issues (last_seen desc);
+create index if not exists error_issues_count_idx on public.error_issues (count desc);
+create index if not exists error_issues_first_seen_idx on public.error_issues (first_seen desc);
 
-create table public.error_events (
+create table if not exists public.error_events (
   id uuid primary key default gen_random_uuid(),
   issue_id uuid not null references public.error_issues (id) on delete cascade,
   created_at timestamptz not null default now(),
@@ -37,9 +37,9 @@ create table public.error_events (
   message text not null default '',
   context jsonb not null default '{}'
 );
-create index error_events_issue_idx on public.error_events (issue_id, created_at desc);
-create index error_events_created_idx on public.error_events (created_at desc);
-create index error_events_user_idx on public.error_events (user_id) where user_id is not null;
+create index if not exists error_events_issue_idx on public.error_events (issue_id, created_at desc);
+create index if not exists error_events_created_idx on public.error_events (created_at desc);
+create index if not exists error_events_user_idx on public.error_events (user_id) where user_id is not null;
 
 alter table public.error_issues enable row level security;
 alter table public.error_events enable row level security;
@@ -47,7 +47,7 @@ revoke all on public.error_issues, public.error_events from public, anon, authen
 
 -- Upsert atômico: agrupa pelo fingerprint, conta, atualiza last_seen e REABRE a resolvida
 -- (`ignored` continua ignorada mas conta). Grava o evento junto. Devolve o id do issue.
-create function private.registrar_erro(
+create or replace function private.registrar_erro(
   p_fingerprint text, p_source text, p_kind text, p_severity text, p_title text, p_message text,
   p_route text, p_stack text, p_user uuid, p_platform text, p_app_version text, p_context jsonb
 ) returns uuid

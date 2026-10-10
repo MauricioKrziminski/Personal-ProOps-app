@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
+import { useToast } from '@/components/ui/toast';
 import { Space } from '@/design/tokens';
 import { useDecisaoDeVersao } from '@/hooks/use-app-config';
 
@@ -15,6 +16,7 @@ import { useDecisaoDeVersao } from '@/hooks/use-app-config';
 export default function TelaAtualizar() {
   const { url } = useDecisaoDeVersao();
   const insets = useSafeAreaInsets();
+  const toast = useToast();
   return (
     <ThemedView style={[styles.tela, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.bloco}>
@@ -23,7 +25,15 @@ export default function TelaAtualizar() {
         <ThemedText type="small" themeColor="textSecondary" style={styles.centro}>
           Esta versão não funciona mais. Instale a mais recente para continuar.
         </ThemedText>
-        {url ? <Button label="Atualizar" style={styles.botao} onPress={() => { void Linking.openURL(url).catch(() => {}); }} /> : null}
+        {url ? (
+          <Button
+            label="Atualizar"
+            style={styles.botao}
+            onPress={() => { void Linking.openURL(url).catch(() => toast({ message: 'Não deu para abrir a loja.', tone: 'error' })); }}
+          />
+        ) : (
+          <ThemedText type="small" themeColor="textSecondary" style={styles.centro}>Procure o ProOps na loja de aplicativos.</ThemedText>
+        )}
       </View>
     </ThemedView>
   );

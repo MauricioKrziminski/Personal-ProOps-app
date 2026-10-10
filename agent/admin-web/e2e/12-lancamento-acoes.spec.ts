@@ -23,10 +23,25 @@ test.describe("Lançamento: ações que gravam", () => {
     const n = (await adminApi("GET", "/accounts?access=lapsed")).body.total as number;
     await expect(page.getByText(new RegExp(`^${n} contas?$`))).toBeVisible();
     const antes = (await sql("select 1 from public.admin_audit_events where action = 'accounts_exported'")).length;
-    const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Exportar CSV" }).click()]);
-    expect(dl.suggestedFilename()).toMatch(/^contas-\d{4}-\d{2}-\d{2}\.csv$/);
-    const txt = await (await import("node:fs")).promises.readFile((await dl.path())!, "utf8");
+    // Fórmula na planilha: o nome de uma encerrada começa com "=" e o CSV tem que neutralizá-lo com "'".
+    const nomeOriginal = U.encerrada.name;
+    await sql("update public.profiles set display_name = '=1+1' where id = $1", [U.encerrada.id]);
+    let txt: string;
+    try {
+      const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Exportar CSV" }).click()]);
+      expect(dl.suggestedFilename()).toMatch(/^contas-\d{4}-\d{2}-\d{2}\.csv$/);
+      txt = await (await import("node:fs")).promises.readFile((await dl.path())!, "utf8");
+    } finally {
+      await sql("update public.profiles set display_name = $2 where id = $1", [U.encerrada.id, nomeOriginal]);
+    }
     expect(txt.trim().split("\n")).toHaveLength(n + 1); // cabeçalho + as encerradas
+    expect(txt.charCodeAt(0), "BOM UTF-8 no início (o Excel abre com acento certo)").toBe(0xfeff);
+    const [cabecalho, ...linhas] = txt.slice(1).trim().split("\r\n");
+    expect(cabecalho).toBe("user_id,email,name,created_at,last_sign_in_at,last_seen_at,last_app_version,plan,status,access,is_trial,period_end,origin,ai_used,ai_max,wa_used,wa_max,whatsapp_linked,suspended");
+    const celulas = linhas.find((l) => l.startsWith(`${U.encerrada.id},`))!.split(",");
+    expect(celulas[1]).toBe(U.encerrada.email); // célula conhecida do seed
+    expect(celulas[2], "fórmula neutralizada: começa com apóstrofo").toBe("'=1+1");
+    expect(celulas[9]).toBe("lapsed");
     await expect(page.getByText("CSV exportado.")).toBeVisible();
     await expect.poll(async () => (await sql("select 1 from public.admin_audit_events where action = 'accounts_exported'")).length).toBe(antes + 1);
   });

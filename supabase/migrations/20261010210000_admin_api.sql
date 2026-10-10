@@ -4,7 +4,7 @@
 --    Sem FK nos alvos: a linha de "account_deleted" tem que sobreviver ao apagar. Payload só com ids.
 -- 2) O corpo de delete_my_account (20261010200000) vira private.apagar_conta(p_user); delete_my_account
 --    continua auth.uid()-only e só delega.
-create table public.admin_audit_events (
+create table if not exists public.admin_audit_events (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
   admin_user_id uuid not null,
@@ -13,12 +13,12 @@ create table public.admin_audit_events (
   target_workspace_id uuid,
   payload jsonb not null default '{}'
 );
-create index admin_audit_events_created_idx on public.admin_audit_events (created_at desc);
-create index admin_audit_events_target_idx on public.admin_audit_events (target_user_id, created_at desc);
+create index if not exists admin_audit_events_created_idx on public.admin_audit_events (created_at desc);
+create index if not exists admin_audit_events_target_idx on public.admin_audit_events (target_user_id, created_at desc);
 alter table public.admin_audit_events enable row level security;
 revoke all on public.admin_audit_events from public, anon, authenticated;
 
-create function private.apagar_conta(p_user uuid)
+create or replace function private.apagar_conta(p_user uuid)
 returns void
 language plpgsql security definer
 set search_path = ''

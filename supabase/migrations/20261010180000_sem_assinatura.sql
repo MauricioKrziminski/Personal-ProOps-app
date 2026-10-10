@@ -7,6 +7,7 @@
 -- Drop da versão de 1 argumento: com o default da nova, as duas coexistiriam e `plan_limits('pro')`
 -- viraria chamada ambígua (o agente chama com 1 argumento).
 drop function if exists private.plan_limits(text);
+drop function if exists private.plan_limits(text, boolean); -- reaplicável: o retorno muda na 20261010190000
 create function private.plan_limits(p_plan text, p_trial boolean default false)
 returns table(max_members int, max_ai_messages_month int, can_import boolean)
 language sql immutable
@@ -131,7 +132,7 @@ grant execute on function public.plan_status() to authenticated, service_role;
 -- security definer, então RPCs chamadas pelo app também são barradas — é o desejado). O agente conecta
 -- como postgres pelo pooler e os testes SQL também: passam. `proops.forcar_app` só existe para o teste
 -- e só pode deixar a regra MAIS rígida.
-create function private.requisicao_do_app()
+create or replace function private.requisicao_do_app()
 returns boolean
 language sql stable
 set search_path = ''
@@ -142,7 +143,7 @@ $$;
 revoke execute on function private.requisicao_do_app() from public, anon, authenticated;
 
 -- security definer: o gatilho roda como o papel do app e `effective_plan` lê subscriptions (RLS).
-create function private.tg_exige_assinatura()
+create or replace function private.tg_exige_assinatura()
 returns trigger
 language plpgsql security definer
 set search_path = ''
@@ -200,7 +201,7 @@ end $$;
 -- ── 4. apagar a própria conta ─────────────────────────────────────────────────────────────────────────
 -- Quem não assina precisa conseguir sair (loja e LGPD). Storage: o bucket `receipts` guarda objetos sob
 -- `<workspace_id>/…` e o Supabase não deixa apagar storage.objects por SQL — o app/agente os remove antes.
-create function public.delete_my_account()
+create or replace function public.delete_my_account()
 returns void
 language plpgsql security definer
 set search_path = ''

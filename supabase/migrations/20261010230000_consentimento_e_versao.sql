@@ -8,14 +8,14 @@
 --    O token de push mora em profiles.expo_push_token e sai junto do perfil: apagar a conta já o leva.
 
 alter table public.profiles
-  add column terms_version text,
-  add column terms_accepted_at timestamptz,
-  add column ai_consent_at timestamptz,
-  add column last_app_version text,
-  add column last_app_platform text check (last_app_platform in ('ios', 'android', 'web')),
-  add column last_seen_at timestamptz;
+  add column if not exists terms_version text,
+  add column if not exists terms_accepted_at timestamptz,
+  add column if not exists ai_consent_at timestamptz,
+  add column if not exists last_app_version text,
+  add column if not exists last_app_platform text check (last_app_platform in ('ios', 'android', 'web')),
+  add column if not exists last_seen_at timestamptz;
 
-create function private.accept_terms(p_version text, p_ai_consent boolean)
+create or replace function private.accept_terms(p_version text, p_ai_consent boolean)
 returns jsonb
 language plpgsql security definer
 set search_path = ''
@@ -44,14 +44,14 @@ $$;
 revoke execute on function private.accept_terms(text, boolean) from public, anon;
 grant execute on function private.accept_terms(text, boolean) to authenticated;
 
-create function public.accept_terms(p_version text, p_ai_consent boolean)
+create or replace function public.accept_terms(p_version text, p_ai_consent boolean)
 returns jsonb language sql security invoker set search_path = '' as $$
   select private.accept_terms(p_version, p_ai_consent);
 $$;
 revoke execute on function public.accept_terms(text, boolean) from public, anon;
 grant execute on function public.accept_terms(text, boolean) to authenticated;
 
-create function private.set_ai_consent(p_consent boolean)
+create or replace function private.set_ai_consent(p_consent boolean)
 returns jsonb
 language plpgsql security definer
 set search_path = ''
@@ -73,14 +73,14 @@ $$;
 revoke execute on function private.set_ai_consent(boolean) from public, anon;
 grant execute on function private.set_ai_consent(boolean) to authenticated;
 
-create function public.set_ai_consent(p_consent boolean)
+create or replace function public.set_ai_consent(p_consent boolean)
 returns jsonb language sql security invoker set search_path = '' as $$
   select private.set_ai_consent(p_consent);
 $$;
 revoke execute on function public.set_ai_consent(boolean) from public, anon;
 grant execute on function public.set_ai_consent(boolean) to authenticated;
 
-create function private.app_ping(p_version text, p_platform text)
+create or replace function private.app_ping(p_version text, p_platform text)
 returns void
 language plpgsql security definer
 set search_path = ''
@@ -104,14 +104,14 @@ $$;
 revoke execute on function private.app_ping(text, text) from public, anon;
 grant execute on function private.app_ping(text, text) to authenticated;
 
-create function public.app_ping(p_version text, p_platform text)
+create or replace function public.app_ping(p_version text, p_platform text)
 returns void language sql security invoker set search_path = '' as $$
   select private.app_ping(p_version, p_platform);
 $$;
 revoke execute on function public.app_ping(text, text) from public, anon;
 grant execute on function public.app_ping(text, text) to authenticated;
 
-create table public.app_config (
+create table if not exists public.app_config (
   id smallint primary key default 1 check (id = 1),
   min_version_ios text, min_version_android text,
   latest_version_ios text, latest_version_android text,
@@ -125,17 +125,18 @@ create table public.app_config (
 alter table public.app_config enable row level security;
 revoke all on public.app_config from public, anon, authenticated;
 grant select on public.app_config to anon, authenticated;
+drop policy if exists "app_config: leitura publica" on public.app_config;
 create policy "app_config: leitura publica" on public.app_config
   for select to anon, authenticated using (true);
-insert into public.app_config (id) values (1);
+insert into public.app_config (id) values (1) on conflict (id) do nothing;
 
-create table public.admin_account_notes (
+create table if not exists public.admin_account_notes (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   admin_user_id uuid not null,
   body text not null check (char_length(body) between 1 and 2000),
   created_at timestamptz not null default now()
 );
-create index admin_account_notes_user_idx on public.admin_account_notes (user_id, created_at desc);
+create index if not exists admin_account_notes_user_idx on public.admin_account_notes (user_id, created_at desc);
 alter table public.admin_account_notes enable row level security;
 revoke all on public.admin_account_notes from public, anon, authenticated;

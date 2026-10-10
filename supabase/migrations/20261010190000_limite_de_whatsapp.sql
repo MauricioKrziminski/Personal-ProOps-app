@@ -4,14 +4,14 @@
 --   notice = aviso ou lembrete proativo (send_template)
 -- Limites: sem assinatura 0/0 · Pro 150 respostas/mês e 1 aviso/dia · Família 300 e 2 · teste de 7 dias: respostas 40.
 
-create table public.whatsapp_sends (
+create table if not exists public.whatsapp_sends (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
   user_id uuid,
   kind text not null check (kind in ('reply', 'notice')),
   created_at timestamptz not null default now()
 );
-create index whatsapp_sends_ws_idx on public.whatsapp_sends (workspace_id, kind, created_at);
+create index if not exists whatsapp_sends_ws_idx on public.whatsapp_sends (workspace_id, kind, created_at);
 -- infra: RLS ligada SEM policy. Só o agente (papel que ignora RLS) escreve e lê.
 alter table public.whatsapp_sends enable row level security;
 revoke all on public.whatsapp_sends from public, anon, authenticated;

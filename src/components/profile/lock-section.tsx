@@ -13,7 +13,7 @@
 import { StyleSheet, View } from 'react-native';
 
 import { Note } from '@/components/ui/note';
-import { Row } from '@/components/ui/row';
+import { Row, RowSeparator } from '@/components/ui/row';
 import { Interruptor } from '@/components/ui/switch-row';
 import { ThemedText } from '@/components/themed-text';
 import { useToast } from '@/components/ui/toast';
@@ -78,6 +78,7 @@ export function LockRows() {
         icon="lock"
         trailing={<Interruptor value={ligado} onValueChange={(v) => void escolher(v)} accessibilityLabel="Pedir para desbloquear ao abrir" />}
       />
+      {ligado ? <RowSeparator /> : null}
       {ligado ? (
         <Row
           title="Depois de sair do app"

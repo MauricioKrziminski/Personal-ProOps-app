@@ -1,8 +1,9 @@
-import { StyleSheet, Switch, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 
 import { Presenca } from '@/components/motion/presenca';
 import { Row, Section } from '@/components/ui/row';
+import { Interruptor } from '@/components/ui/switch-row';
 import { useToast } from '@/components/ui/toast';
 import { Space } from '@/design/tokens';
 import { useTheme } from '@/hooks/use-theme';
@@ -117,7 +118,7 @@ export function AlertPreferencesSection({
         icon="bell.badge"
         chevron={false}
         trailing={
-          <Switch
+          <Interruptor
             value={pushEnabled}
             disabled={
               busy ||
@@ -142,7 +143,7 @@ export function AlertPreferencesSection({
         icon="bubble.left"
         chevron={false}
         trailing={
-          <Switch
+          <Interruptor
             value={whatsappEnabled}
             disabled={
               busy ||

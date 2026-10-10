@@ -217,8 +217,8 @@ test('a semana tem hoje no meio: o que saiu para trás, o previsto para a frente
   ]);
   assert.deepEqual(dias.map((d) => d.saiu), [5000, 0, 31240, 116667, 0, 0, 0]);
   assert.equal(dias[2].entrou, 400000);
-  assert.equal(dias[4].previsto, 21430 + 500000 + 7000, 'os MESMOS itens dos Próximos dias, fatura inclusive, sem a receita');
-  assert.equal(dias[4].previstos, 3);
+  assert.equal(dias[4].previsto, 21430 + 500000, 'conta e fatura vencem; a compra no cartão (7000) vai postar na fatura e não conta');
+  assert.equal(dias[4].previstos, 2, 'compromisso é o que vence, nunca compra no cartão');
   assert.equal(dias[4].aEntrar, 400000);
   assert.deepEqual(dias.map((d) => d.acima), [false, false, false, true, false, false, false]);
   assert.equal(teto, 116667);
@@ -277,4 +277,11 @@ test('Fatura paga em parte: a frase "ainda vai entrar" compara o futuro com o TO
   const { agora } = agendaDoDia([{ kind: 'invoice', ref_id: 'f1', title: 'Fatura', amount_cents: 2000, due_date: '2026-10-10', overdue: false, future_cents: 3000, total_cents: 10000 }], [], '2026-10-10');
   const i = agora[0];
   assert.equal(fraseAindaVaiEntrar(i.futuroCents, i.totalCents ?? i.cents, (c) => String(c)), '3000 ainda vai entrar');
+});
+
+test('a compra futura no cartão só lê linha que conta na fatura (despesa e transferência)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const hook = readFileSync(new URL('../hooks/use-finance.ts', import.meta.url), 'utf8');
+  const corpo = hook.slice(hook.indexOf('export function useUpcomingCardCharges'));
+  assert.match(corpo.slice(0, corpo.indexOf('\n}\n')), /\.in\('kind', \['expense', 'transfer'\]\)/);
 });
