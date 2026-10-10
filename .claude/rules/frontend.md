@@ -77,6 +77,9 @@ card de erro e a recuperação.
     "Categoria" por "Para a conta"; "Parcelas" troca o rótulo de "Data" por "Data da primeira
     parcela". Vindo depois, a tela se remonta debaixo do dedo.
   - Campo longo (uma lista de contas) não parte um grupo curto ao meio.
+- **"Ainda vai sair/cair" tem UMA data** (10/10/2026, padrão do Mobills, Organizze e YNAB): a escolhida
+  é o vencimento e grava `occurred_at = due_at`; "Comprou em outra data?" abre o par "Data da compra" +
+  "Vence em" (`lib/uma-data.ts`, e já abre assim se o registro tem as duas diferentes).
 - **Campo obrigatório se vê ANTES de salvar** (06/10/2026, *"o usuário só descobre quando clica
   em salvar"*): `Field obrigatorio` desenha um ` *` cinza no rótulo (e ", obrigatório" no leitor
   de tela). A régua é o GUARDA do salvar (zod, `podeSalvar`, `disabled`), nunca o `NOT NULL`;

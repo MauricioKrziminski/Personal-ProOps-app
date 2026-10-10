@@ -37,6 +37,7 @@ import { molduraEmTela } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useRascunho } from '@/hooks/use-rascunho';
 import { pendenciaDoAplicar } from '@/lib/hipotese';
+import { abreComDuasDatas, dataUnicaEVencimento, oferecerOutraData, rotuloOutraData } from '@/lib/uma-data';
 import { argsDaParcelada, dadosDoLancamento, detalheDaEscrita, mudancaDoDetalhe } from '@/lib/escrita';
 import { prepararLancamento, type LancamentoPreparado } from '@/lib/lancamento-write';
 import { SwitchRow } from '@/components/ui/switch-row';
@@ -254,6 +255,15 @@ export function FormularioDoLancamento(props: Props) {
   // Fora do cartão: lá `due_at` é o vencimento da FATURA, e a data da compra é outra coisa.
   const umaData = Boolean(editing?.recurring_id && !editing.invoice_id);
   const dataDaSerie = umaData && editing?.status === 'pending' ? (editing.due_at ?? editing.occurred_at) : null;
+  /*
+    ⚠️ **"Ainda vai sair/cair" tem UMA data** (10/10/2026, padrão do Mobills, Organizze e YNAB):
+    a escolhida é o vencimento e grava `occurred_at = due_at`. O par "Data da compra" + "Vence em"
+    só aparece se a pessoa pedir ("Comprou em outra data?") ou se o registro já tiver as duas
+    diferentes. Parcela de compra mantém o vencimento à parte (a data dela é a do cronograma).
+  */
+  const [outraData, setOutraData] = useState(() => abreComDuasDatas(editing));
+  const naCompraInicial = Boolean(editing?.installment_plan_id);
+  const umaDataSemVencimento = Boolean(editing && !umaData && !naCompraInicial && editing.status === 'pending' && !editing.due_at && !editing.invoice_id);
 
   // Aberto pelo "Aplicar": data futura fora do cartão nasce a pagar, como foi simulada.
   const doAplicar = !editing && deHipotese
@@ -298,7 +308,7 @@ export function FormularioDoLancamento(props: Props) {
       occurred_at: editing ? isoToBR(dataDaSerie ?? editing.occurred_at) : comum.dataBR,
       pending: editing ? editing.status === 'pending' : (doAplicar?.pending ?? false),
       installment_occurrence: Boolean(editing?.installment_plan_id),
-      due_at: dataDaSerie ? isoToBR(dataDaSerie) : editing?.due_at ? isoToBR(editing.due_at) : (doAplicar?.due_at ?? null),
+      due_at: dataDaSerie ? isoToBR(dataDaSerie) : editing?.due_at ? isoToBR(editing.due_at) : umaDataSemVencimento ? isoToBR(editing!.occurred_at) : (doAplicar?.due_at ?? null),
     },
   });
 
@@ -387,10 +397,11 @@ export function FormularioDoLancamento(props: Props) {
   const podeAdiar = kind !== 'transfer' && !isCard && installmentCount <= 1 &&
     !editing?.debt_id && !editing?.down_payment_debt_id && !editing?.down_payment_plan_id;
   // O campo "Data" É o vencimento: rótulo "Vence em" e sem o atalho "Ontem" (vencimento não é compra).
-  const dataEVencimento = umaData && podeAdiar && pending;
+  const naCompra = Boolean(editing?.installment_plan_id);
+  const contextoDaData = { serie: umaData, naCompra, podeAdiar, pending, outraData };
+  const dataEVencimento = dataUnicaEVencimento(contextoDaData);
   /* Ao salvar uma parcela, a pessoa escolhe entre a linha e a compra inteira. A compra inteira
      abre `CamposDaCompra` para revisar total, conta, número, data inicial e parcelas já pagas. */
-  const naCompra = Boolean(editing?.installment_plan_id);
   /**
    * Esta parcela está numa FATURA de cartão paga, adiada ou paga em parte: o valor e a data dela
    * não mudam — mudar a tiraria da fatura em que foi paga. Fora do cartão, a paga se corrige à
@@ -477,7 +488,7 @@ export function FormularioDoLancamento(props: Props) {
     (accounts ?? []).find((a) => a.id === formSerie?.accountId) ?? null);
   const mudaData = (br: string, intencao: 'fixo' | 'ultimo' = 'fixo') => {
     setValue('occurred_at', br, { shouldValidate: true });
-    if (umaData) setValue('due_at', br);
+    if (umaData || (!outraData && podeAdiar && !naCompra && getValues('pending'))) setValue('due_at', br);
     setIntencaoDoDia(intencao);
   };
 
@@ -1499,7 +1510,7 @@ export function FormularioDoLancamento(props: Props) {
                     : podeAdiar && pending && kind === 'expense' ? 'Data da compra' : 'Data'
               }
               hint={parcelaNaFatura ? 'Paga na fatura do cartão: a data desta parcela não muda' : undefined}
-              error={errors.occurred_at?.message ?? (umaData ? errors.due_at?.message : undefined)
+              error={errors.occurred_at?.message ?? (dataEVencimento ? errors.due_at?.message : undefined)
                 ?? ((editing?.down_payment_debt_id || editing?.down_payment_plan_id) && isValidBRDate(occurredAt) && brToISO(occurredAt) > localISODate()
                   ? 'A entrada paga não pode ter data futura' : undefined)}>
               {/*
@@ -1551,6 +1562,15 @@ export function FormularioDoLancamento(props: Props) {
           )}
         />
 
+        <Presenca visivel={oferecerOutraData(contextoDaData)}>
+          <Button
+            label={rotuloOutraData(kind)}
+            variant="secondary"
+            size="sm"
+            onPress={() => setOutraData(true)}
+          />
+        </Presenca>
+
         {/* Conta a pagar: o gasto entra na projeção pelo vencimento, não pela data de hoje. */}
         <Presenca visivel={podeAdiar}>
             <Card>
@@ -1573,13 +1593,13 @@ export function FormularioDoLancamento(props: Props) {
                       value={field.value ? 'yes' : 'no'}
                       onChange={(v) => {
                         field.onChange(v === 'yes');
-                        if (umaData && v === 'yes') setValue('due_at', getValues('occurred_at'));
+                        if (v === 'yes' && (umaData || (!outraData && !naCompra))) setValue('due_at', getValues('occurred_at'));
                       }}
                     />
                   )}
                 />
                 <Presenca visivel={pending} style={styles.pendingCard}>
-                    {umaData ? null : (
+                    {dataEVencimento ? null : (
                     <Controller
                       control={control}
                       name="due_at"

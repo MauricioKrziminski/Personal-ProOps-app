@@ -59,11 +59,12 @@ Só o que muda no form (a anatomia completa está em `transacao-form.md`):
    *"Entra na projeção e some quando você marcar como paga."* Sem essa frase, o toggle é um mistério.
 2. **"Vence em"** — aparece só com o toggle ligado. `DateTimePicker` nativo, default: **hoje + 7
    dias** (chute útil de boleto; qualquer default é melhor que um campo vazio obrigatório).
-3. **Rótulo do campo de data principal** — com o toggle ligado, "Data" continua sendo `occurred_at`
-   (a data de referência do gasto) e "Vence em" é `due_at`. Quando o usuário não mexe em "Data",
-   ela acompanha o vencimento — porque para uma conta a pagar as duas datas costumam ser a mesma, e
-   `upcoming_bills` usa `coalesce(due_at, occurred_at)` (`0014_forecast.sql:264`) de qualquer
-   forma.
+3. **Uma data só (10/10/2026, padrão do Mobills, Organizze e YNAB).** Com o toggle ligado o campo
+   de data vira "Vence em" (receita: "Previsto para") e grava `occurred_at = due_at`: o gasto conta
+   no mês do vencimento. Quem comprou em outra data toca em "Comprou em outra data?" ("Lançar em
+   outra data?" na receita), e aí volta o par "Data da compra" + "Vence em" (vencimento ≥ data).
+   Editar um registro com as duas datas diferentes abre já com os dois campos; iguais, com um.
+   Desligar o toggle volta ao campo "Data" único. Regra pura em `src/lib/uma-data.ts`.
 4. **Aviso do cartão** — se a conta escolhida for `credit_card`, o toggle **desaparece** com uma
    linha explicando: *"Compra no cartão já entra na fatura de setembro — o caixa sai no vencimento
    dela."* O trigger `set_invoice` (`0013`) já resolve a fatura, e um `pending` manual em cima disso
