@@ -56,13 +56,15 @@ export function useApagarComAlcance(aoApagar?: (p: PreviaDoApagar) => void) {
       erro(e);
       return;
     }
-    const executar = () => escrita.mutate({ alvo, alcance }, {
-      onSuccess: (r) => {
+    // `mutateAsync`: o `onSuccess` do `mutate` não dispara se a tela que apagou já desmontou (o
+    // hospedeiro troca o formulário por "não encontrei" quando a lista refaz sem a linha).
+    const executar = () => escrita.mutateAsync({ alvo, alcance }).then(
+      (r) => {
         toast({ message: textoDoApagado(r), tone: 'success' });
         aoApagar?.(r);
       },
-      onError: erro,
-    });
+      erro,
+    );
     const frase = fraseDoEstrago(previa, formatBRL, alvo.tipo);
     if (frase) confirmDestructive(`Apagar ${alvo.nome}?`, 'Apagar', executar, frase);
     else executar();

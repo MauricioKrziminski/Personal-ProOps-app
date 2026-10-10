@@ -13,7 +13,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { SymbolViewProps } from 'expo-symbols';
 
-import { progressoDeEntrada, useRelogioDeEntrada } from '@/components/motion/entrada';
+import { progressoDeEntrada, useEntrada, useRelogioDeEntrada } from '@/components/motion/entrada';
 import { Contador } from '@/components/ui/contador';
 import { Icon } from '@/components/ui/icon';
 import { centroDoSlot, distanciaDaAba, escalaDoRotulo, folgaDaMola, larguraDoAlvo, posicaoDesenhada } from '@/design/tab-pill';
@@ -39,6 +39,8 @@ const BAR_MAX = 560;
 /** A subida da barra na entrada: logo depois dos primeiros blocos da tela. */
 const ATRASO_DA_BARRA_MS = 120;
 const DURACAO_DA_BARRA_MS = 520;
+/** Depois da subida, o quanto esperar antes de o React fixar a barra no lugar à força. */
+const FOLGA_DA_BARRA_MS = 800;
 /** Quanto o rótulo pode passar da largura do slot (metade de cada lado). */
 const SOBRA = 14;
 
@@ -164,15 +166,33 @@ export function PillTabBar({
     transform: [{ translateY: (1 - progressoDeEntrada(relogio.get())) * descida }],
   }));
 
+  /*
+    ⚠️ **O repouso da barra NÃO depende do relógio nem do Reanimated** (10/10/2026). Num arranque a
+    frio a barra às vezes nunca foi desenhada (1 em 6, emulador): as abas nem entravam na árvore de
+    acessibilidade, e só voltou quando a Activity foi recriada. A subida escondia a barra por um
+    estilo animado e o fim dependia de `assentado` — que passa pelo mesmo caminho do Reanimated e da
+    cortina. Agora, passado o tempo da subida mais uma folga, o React troca a view animada por uma
+    `View` COMUM e nova (outra `key`: a animada guarda o que o Reanimated escreveu nela), no lugar.
+  */
+  const { geracao } = useEntrada();
+  const [forcadaEm, setForcadaEm] = useState<number | null>(null);
+  useEffect(() => {
+    const t = setTimeout(() => setForcadaEm(geracao), ATRASO_DA_BARRA_MS + DURACAO_DA_BARRA_MS + FOLGA_DA_BARRA_MS);
+    return () => clearTimeout(t);
+  }, [geracao]);
+  const noLugar = entrou || forcadaEm === geracao;
+  // Centrada na área SEGURA: deitado, o recorte da câmera é inset de um dos lados.
+  const estiloDaRaiz = [
+    styles.raiz,
+    { paddingBottom: insets.bottom + Space.sm, paddingLeft: insets.left, paddingRight: insets.right },
+  ];
+  const Raiz = noLugar ? View : Animated.View;
+
   return (
-    <Animated.View
+    <Raiz
+      key={noLugar ? 'no-lugar' : 'subindo'}
       pointerEvents="box-none"
-      style={[
-        styles.raiz,
-        // Centrada na área SEGURA: deitado, o recorte da câmera é inset de um dos lados.
-        { paddingBottom: insets.bottom + Space.sm, paddingLeft: insets.left, paddingRight: insets.right },
-        entrou ? styles.noLugar : entrada,
-      ]}>
+      style={[...estiloDaRaiz, noLugar ? styles.noLugar : entrada]}>
       <View
         style={[
           styles.pilula,
@@ -248,7 +268,7 @@ export function PillTabBar({
           ))}
         </View>
       </View>
-    </Animated.View>
+    </Raiz>
   );
 }
 

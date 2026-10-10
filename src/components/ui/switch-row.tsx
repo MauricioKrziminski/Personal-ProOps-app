@@ -3,7 +3,7 @@ import { Platform, StyleSheet, Switch, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { MudancaSuave, usePresencaAtiva } from '@/components/motion/presenca';
 import { Space } from '@/design/tokens';
-import { useTheme } from '@/hooks/use-theme';
+import { useScheme, useTheme } from '@/hooks/use-theme';
 
 /**
  * Interruptor de formulário: UMA linha — o que ele faz — e o switch.
@@ -50,6 +50,9 @@ export function Interruptor({
 }) {
   const ativo = usePresencaAtiva();
   const theme = useTheme();
+  const scheme = useScheme();
+  // Polegar desligado: no escuro `surface` é a cor do card e o polegar sumia (meia-lua); `text` contrasta.
+  const polegarDesligado = scheme === 'dark' ? theme.text : theme.surface;
   return (
     <Switch
       value={value}
@@ -60,7 +63,7 @@ export function Interruptor({
       // Desligado: trilho em `textSecondary` (≥ 4,5:1 sobre o card nos dois temas, contrast.test.ts) —
       // o cinza do sistema sumia no escuro. No iOS o trilho desligado é o `ios_backgroundColor`.
       ios_backgroundColor={theme.textSecondary}
-      thumbColor={Platform.OS === 'android' ? (value ? theme.onTint : theme.surface) : undefined}
+      thumbColor={Platform.OS === 'android' ? (value ? theme.onTint : polegarDesligado) : undefined}
     />
   );
 }

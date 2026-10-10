@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
+import { telasParaSairDoApagado } from '@/lib/volta-do-apagado';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { StyleSheet, View } from 'react-native';
@@ -244,7 +245,25 @@ export function FormularioDoLancamento(props: Props) {
   const createPlan = useCreateInstallmentPlan();
   const converter = useConvertToInstallments();
   const remove = useDeleteTransaction();
-  const { apagar } = useApagarComAlcance(() => props.onFechar());
+  const navigation = useNavigation();
+  /*
+    ⚠️ **Apagar fecha a tela por callback que SOBREVIVE ao desmonte** (10/10/2026). O hospedeiro
+    troca este formulário por "Não encontrei esse lançamento" assim que a lista refaz sem a linha,
+    e o `onSuccess` do `mutate` (por chamada) não dispara com o componente desmontado: a tela
+    ficava aberta, com o detalhe por baixo. Por isso `mutateAsync`, e quantas telas sair é decidido
+    ANTES de apagar (apagado, o estado da navegação deste componente já não é confiável).
+    Apagado, sai do formulário E do detalhe do registro, se foi de lá que veio.
+  */
+  const telasAoApagar = useRef<1 | 2>(1);
+  const decidirSaida = () => {
+    const estado = navigation.getState();
+    telasAoApagar.current = estado ? telasParaSairDoApagado(estado.routes, estado.index, editing?.id) : 1;
+  };
+  const sairDoApagado = () => {
+    if (telasAoApagar.current === 2) router.dismiss(2);
+    else props.onFechar();
+  };
+  const { apagar } = useApagarComAlcance(sairDoApagado);
 
   /*
     ⚠️ **Na ocorrência de uma SÉRIE a data É o vencimento** (26/09/2026). O agendador grava
@@ -1084,6 +1103,7 @@ export function FormularioDoLancamento(props: Props) {
 
   const onDelete = () => {
     if (!editing) return;
+    decidirSaida();
     const alvo = alvoDoLancamento(editing, editing.description || editing.merchant || editing.category || 'Lançamento');
     if (alvo) return apagar(alvo);
     const what = `${formatBRL(editing.amount_cents)}${editing.category ? ` em ${editing.category}` : ''}`;
@@ -1091,13 +1111,13 @@ export function FormularioDoLancamento(props: Props) {
       'Apagar este lançamento?',
       'Apagar',
       () =>
-        remove.mutate(editing.id, {
-          onSuccess: () => {
-            props.onFechar();
+        remove.mutateAsync(editing.id).then(
+          () => {
+            sairDoApagado();
             toast({ message: `Apaguei ${what}.`, tone: 'success' });
           },
-          onError: (error) => toast({ message: financeErrorMessage(error, 'Não deu para apagar. Tenta de novo.'), tone: 'error' }),
-        }),
+          (error) => toast({ message: financeErrorMessage(error, 'Não deu para apagar. Tenta de novo.'), tone: 'error' }),
+        ),
       `${what}. Isso não volta.`,
     );
   };

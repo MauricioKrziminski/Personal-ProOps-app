@@ -44,10 +44,24 @@ export const FINANCE_KEYS = [
  */
 const SEM_RECALCULAR = new Set(['simular']);
 
+/**
+ * Refeitas AGORA mesmo fora de foco. A fatura que o formulário "+" deixou por baixo é uma consulta
+ * inativa (`consulta-em-foco`): só marcada velha, ela voltava ao foco mostrando o dado de antes
+ * ("0 lançamentos", "Nenhuma compra") por vários segundos até o refetch terminar (10/10/2026). É
+ * poucas linhas e a pilha costuma ter uma só; o salvar espera por ela como espera pelas ativas.
+ */
+const REFAZER_INATIVAS = new Set(['invoice']);
+
 export function invalidateKeys(client: QueryClient, keys: readonly (readonly string[])[]) {
   return Promise.all(
     keys.map((queryKey) =>
-      client.invalidateQueries(SEM_RECALCULAR.has(queryKey[0]) ? { queryKey, refetchType: 'none' } : { queryKey }),
+      client.invalidateQueries(
+        SEM_RECALCULAR.has(queryKey[0])
+          ? { queryKey, refetchType: 'none' }
+          : REFAZER_INATIVAS.has(queryKey[0])
+            ? { queryKey, refetchType: 'all' }
+            : { queryKey },
+      ),
     ),
   );
 }

@@ -18,6 +18,9 @@ test('estado sai das datas: atrasada vence antes de fechada', () => {
   assert.equal(estadoDaFatura({ ...base, due_date: '2026-09-20' }, hoje), 'Fechada');
   assert.equal(estadoDaFatura({ ...base, closing_date: '2026-10-03', due_date: '2026-10-10' }, hoje), 'Aberta');
   assert.equal(estadoDaFatura({ ...base, invoice_id: null }, hoje), null);
+  // vencida sem nada em aberto não é atrasada
+  assert.equal(estadoDaFatura({ ...base, invoice_open_cents: 0 }, hoje), 'Fechada');
+  assert.equal(estadoDaFatura({ ...base, invoice_open_cents: 5000 }, hoje), 'Atrasada');
 });
 
 test('outras faturas: o que o limite usa fora da corrente e das atrasadas', () => {

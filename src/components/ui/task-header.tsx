@@ -55,6 +55,9 @@ import { useTheme } from '@/hooks/use-theme';
  * O **pegador** fica nas duas: as duas fecham arrastando para baixo no iOS, e ele é a única coisa
  * na tela que diz isso. (No Android ele é decorativo — já era, nos 22 sheets.)
  */
+/** Teto da escala do título do cabeçalho: ✕, título e ação cabem numa faixa em qualquer Dynamic Type. */
+export const TETO_DO_TITULO = 1.3;
+
 export function TaskHeader({
   title,
   subtitle,
@@ -104,8 +107,10 @@ export function TaskHeader({
         </Pressable>
         {/*
           O piso do título é a palavra MAIS LARGA dele, medida: abaixo disso ela partiria no meio
-          ("recorrênci/a" com 40% fixo, 29/09/2026). Não cabendo ao lado do ✕ e da ação, a ação
-          desce (a linha tem `flexWrap`).
+          ("recorrênci/a" com 40% fixo, 29/09/2026). Não cabendo ao lado do ✕ e da ação, a ação desce
+          (a linha tem `flexWrap`) — mas o título de chrome tem teto de escala (`TETO_DO_TITULO`,
+          10/10/2026): em accessibility-large "Novo lançamento" quebrava em duas linhas e o
+          "Salvar" caía para uma linha própria; com o teto, ✕, título e "Salvar" ficam numa faixa.
         */}
         <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.medidor}>
           <View
@@ -115,12 +120,12 @@ export function TaskHeader({
               setPalavraMaisLarga((atual) => (atual === w ? atual : w));
             }}>
             {title.split(/\s+/).filter(Boolean).map((p, i) => (
-              <ThemedText key={i} type="subtitle" style={styles.semEncolher}>{p}</ThemedText>
+              <ThemedText key={i} type="subtitle" maxFontSizeMultiplier={TETO_DO_TITULO} style={styles.semEncolher}>{p}</ThemedText>
             ))}
           </View>
         </View>
         <View style={[styles.headText, { minWidth: palavraMaisLarga }]}>
-          <ThemedText type="subtitle">{title}</ThemedText>
+          <ThemedText type="subtitle" maxFontSizeMultiplier={TETO_DO_TITULO}>{title}</ThemedText>
           {subtitle ? (
             <ThemedText type="footnote" themeColor="textSecondary">
               {subtitle}
@@ -166,6 +171,7 @@ const styles = StyleSheet.create({
   semEncolher: { flexShrink: 0 },
   headAction: {
     marginLeft: 'auto',
+    flexShrink: 0,
   },
   /*
     32 de geometria com `hitSlop` de 8 fecha os 44pt de alvo (design.md §11) sem o disco pesar

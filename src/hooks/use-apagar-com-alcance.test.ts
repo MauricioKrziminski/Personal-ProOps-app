@@ -34,6 +34,7 @@ function montar({ previa = PREVIA, previaErro, escritaErro }: { previa?: any; pr
       useQueryClient: () => ({}),
       useMutation: ({ mutationFn, onSuccess }: any) => ({
         isPending: false,
+        mutateAsync: (vars: any) => mutationFn(vars).then((r: any) => { onSuccess?.(r); return r; }),
         mutate: (vars: any, opts: any) => { void mutationFn(vars).then((r: any) => { onSuccess?.(r); opts?.onSuccess?.(r); }, (e: any) => opts?.onError?.(e)); },
       }),
     },

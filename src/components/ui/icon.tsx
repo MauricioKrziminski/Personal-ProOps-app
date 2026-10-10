@@ -183,7 +183,7 @@ const MATERIAL: Record<string, MaterialName> = {
   timer: 'timer',
   tablecells: 'table_chart',
   tag: 'label',
-  target: 'flag',
+  target: 'target',
   'text.badge.checkmark': 'playlist_add_check',
   'text.quote': 'format_quote',
   trash: 'delete',

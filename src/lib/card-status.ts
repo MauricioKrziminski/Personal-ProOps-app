@@ -32,11 +32,19 @@ export type EstadoDaFatura = 'Aberta' | 'Fechada' | 'Atrasada';
  * aberta" de uma versão anterior mentia para quem tinha fatura vencida.
  */
 export function estadoDaFatura(
-  card: { invoice_id: string | null; closing_date: string | null; due_date: string | null },
+  card: {
+    invoice_id: string | null;
+    closing_date: string | null;
+    due_date: string | null;
+    /** Ausente numa RPC antiga: aí vale só a data. */
+    invoice_open_cents?: number | null;
+  },
   hoje = new Date()
 ): EstadoDaFatura | null {
   if (!card.invoice_id) return null;
-  if (card.due_date && diasAte(card.due_date, hoje) < 0) return 'Atrasada';
+  // Vencida sem nada em aberto não é dívida (compras apagadas, tudo pago): não é "Atrasada".
+  const nadaEmAberto = card.invoice_open_cents != null && Number(card.invoice_open_cents) <= 0;
+  if (card.due_date && diasAte(card.due_date, hoje) < 0 && !nadaEmAberto) return 'Atrasada';
   if (card.closing_date && diasAte(card.closing_date, hoje) < 0) return 'Fechada';
   return 'Aberta';
 }

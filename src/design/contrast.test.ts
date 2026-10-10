@@ -76,11 +76,15 @@ test('Switch desligado: só pelo Interruptor, cujo trilho é textSecondary (≥ 
   const raiz = join(import.meta.dirname, '..');
   const interruptor = readFileSync(join(raiz, 'components', 'ui', 'switch-row.tsx'), 'utf8');
   assert.match(interruptor, /false: theme\.textSecondary/);
+  assert.match(interruptor, /scheme === 'dark' \? theme\.text : theme\.surface/);
   assert.match(interruptor, /ios_backgroundColor=\{theme\.textSecondary\}/);
   const alertas = readFileSync(join(raiz, 'components', 'profile', 'alert-preferences-section.tsx'), 'utf8');
   assert.doesNotMatch(alertas, /<Switch\b/, 'Switch cru volta ao cinza do sistema, que some no escuro');
   for (const modo of ['light', 'dark'] as const) {
     const p = paleta(modo);
     assert.ok(contrast(p.textSecondary, p.surface) >= 3, `${modo}: trilho desligado sem 3:1`);
+    // O polegar desligado tem que se ler: contra o trilho (claro) e contra o card (escuro, onde sumia).
+    const polegar = modo === 'dark' ? p.text : p.surface;
+    assert.ok(contrast(polegar, modo === 'dark' ? p.surface : p.textSecondary) >= 3, `${modo}: polegar desligado sem 3:1`);
   }
 });

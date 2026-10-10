@@ -116,3 +116,14 @@ test('Icon: todo SF Symbol usado no app está no mapa SF → Material', () => {
     'ícone fora do mapa vira "circle" vazio no Android'
   );
 });
+
+test('Icon: todo valor do mapa existe no Material Symbols e `target` é o alvo, não a bandeira', () => {
+  const src = readFileSync(join(SRC, 'components/ui/icon.tsx'), 'utf8');
+  const simbolos = new Set(
+    Object.keys(JSON.parse(readFileSync(join(SRC, '../node_modules/expo-symbols/build/android/symbols.json'), 'utf8')))
+  );
+  const pares = [...src.matchAll(/^\s*'?([a-zA-Z0-9.]+)'?:\s*'([a-z0-9_]+)',/gm)];
+  const inexistentes = pares.filter((m) => !simbolos.has(m[2])).map((m) => `${m[1]} → ${m[2]}`);
+  assert.deepEqual(inexistentes, []);
+  assert.match(src, /^\s*target: 'target',/m);
+});

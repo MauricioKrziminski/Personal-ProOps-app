@@ -666,7 +666,8 @@ export default function InvoiceScreen() {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={cabecalho}
         ListEmptyComponent={
-          fatura && !invoice.isLoading ? (
+          // Vazio só afirmado com a consulta ASSENTADA (frontend.md): em refetch, o 0 pode ser o de antes.
+          fatura && invoice.isSuccess && !invoice.isFetching ? (
             <EmptyState compacto
               icon="doc.text"
               title="Nenhuma compra nesta fatura"
