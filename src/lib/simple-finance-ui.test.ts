@@ -491,7 +491,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === 'expo-haptics') return { selectionAsync() {}, notificationAsync() {}, NotificationFeedbackType: { Success: 'success', Warning: 'warning' } };
       // `back` é navegação como qualquer outra e ENTRA na lista: é o que prende o "fechar um
       // formulário que outra tela abriu devolve para ela" (`useVoltarQuandoFechar`).
-      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, Redirect: 'Redirect', useLocalSearchParams: () => options.params ?? (file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), useFocusEffect: () => {}, useIsFocused: () => true, router: { push: (to: any) => navigations.push(to), replace: (to: any) => navigations.push({ replace: to }), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }), dismissAll: () => navigations.push({ dismissAll: true }), dismiss: (n?: number) => navigations.push({ dismiss: n ?? 1 }), canDismiss: () => !options.primeiraDaPilha, canGoBack: () => !options.primeiraDaPilha } };
+      if (name === 'expo-router') return { Stack: { Screen: 'StackScreen' }, Redirect: 'Redirect', useLocalSearchParams: () => file.endsWith('finance/transactions.tsx') && !options.abrePadrao ? { ver: 'todos', ...(options.params ?? {}) } : options.params ?? (file.endsWith('finance/debts.tsx') ? {} : { id: 'invoice-1' }), useFocusEffect: () => {}, useIsFocused: () => true, router: { push: (to: any) => navigations.push(to), replace: (to: any) => navigations.push({ replace: to }), navigate: (to: any) => navigations.push(to), back: () => navigations.push({ back: true }), dismissAll: () => navigations.push({ dismissAll: true }), dismiss: (n?: number) => navigations.push({ dismiss: n ?? 1 }), canDismiss: () => !options.primeiraDaPilha, canGoBack: () => !options.primeiraDaPilha } };
       if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ bottom: 0 }) };
       if (name === '@/hooks/use-finance') return finance;
       if (name === '@/hooks/use-goal-money') return {
@@ -733,7 +733,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
       if (name === '@/lib/account-form') return load('src/lib/account-form.ts');
       if (name === '@/components/finance/account-form') return load('src/components/finance/account-form.tsx');
-      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias' || name === '@/lib/comecar' || name === '@/lib/duplicar' || name === '@/lib/favoritos' || name === '@/lib/apagar-com-alcance' || name === '@/lib/carencia' || name === '@/lib/pagar-fatura' || name === '@/lib/hipoteses-por-periodo' || name === '@/lib/previsto' || name === '@/lib/detalhe-do-ciclo') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias' || name === '@/lib/comecar' || name === '@/lib/duplicar' || name === '@/lib/favoritos' || name === '@/lib/apagar-com-alcance' || name === '@/lib/carencia' || name === '@/lib/pagar-fatura' || name === '@/lib/hipoteses-por-periodo' || name === '@/lib/previsto' || name === '@/lib/detalhe-do-ciclo' || name === '@/lib/ver-lancamentos') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       // o `categorias.ts` importa o mapa de ícones por caminho relativo (roda no `node --test` puro)
       if (name === '../design/category-icons.ts') return { categoryIcon: () => 'circle' };
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
@@ -6078,7 +6078,7 @@ test('F05: link altera tela montada; ausência conserva método e vazio limpa so
   const params: Record<string, string> = { paymentMethods: 'pix,not_informed' };
   const ui = screen(transacoesFile, { params });
   assert.deepEqual(copia(ui.transactionQueries.at(-1)?.paymentMethods), ['pix', 'not_informed']);
-  applyListFilters(ui, { q: 'salário', selections: { status: 'pending' }, multiSelections: { paymentMethods: ['boleto'] } });
+  applyListFilters(ui, { q: 'salário', multiSelections: { paymentMethods: ['boleto'] } });
   delete params.paymentMethods; params.month = '2026-10';
   ui.interact(() => {});
   assert.deepEqual(copia(ui.transactionQueries.at(-1)?.paymentMethods), ['boleto']);
@@ -6087,7 +6087,7 @@ test('F05: link altera tela montada; ausência conserva método e vazio limpa so
   params.paymentMethods = ''; ui.interact(() => {});
   assert.deepEqual(copia(ui.transactionQueries.at(-1)?.paymentMethods), []);
   assert.equal(ui.transactionQueries.at(-1)?.q, 'salário');
-  assert.equal(ui.transactionQueries.at(-1)?.status, 'pending');
+  assert.equal(ui.transactionQueries.at(-1)?.status, undefined, 'a folha de filtros não mexe no chip');
 });
 
 test('F05: link malformado mostra recuperação e bloqueia leitura ampliada, Aplicar resolve', () => {
@@ -6232,14 +6232,14 @@ test('Lançamentos: um único editor conserva todos os critérios e resume o rec
     ui.press('Filtros');
     assert.equal(ui.nodes().find(n => n.type === 'ListFilters').props.visible, true);
     const value = { q: 'hotel', from: '2026-09-01', to: '2026-09-30', minCents: 0, maxCents: 20000,
-      selections: { kind: 'expense', status: 'cleared', category: 'viagem', accountId: 'c1', source: 'import' } };
+      selections: { kind: 'expense', category: 'viagem', accountId: 'c1', source: 'import' } };
     applyListFilters(ui, value);
     assert.deepEqual(copia(ui.nodes().find(n => n.type === 'ListFilters').props.value), value);
-    assert.match(filterScreenText(ui), /Filtros · 8/);
-    const summary = ui.nodes().find(n => n.props.accessibilityLabel?.includes('Gastos · Concluído'));
-    assert.match(summary.props.accessibilityLabel, /Nubank Cartão.*Gastos.*Concluído.*viagem.*Importado.*R\$ 0.00 a R\$ 200.00.*hotel/);
-    assert.equal(summary.props.children, 'Nubank Cartão · Gastos · mais 5', 'resumo revela a quantidade de critérios adicionais sem truncar os nomes');
-    assert.ok(!ui.nodes().some(n => ['Chip', 'Segmented'].includes(n.type)), 'critérios são editados na folha');
+    assert.match(filterScreenText(ui), /Filtros · 7/);
+    const summary = ui.nodes().find(n => n.props.accessibilityLabel?.includes('Nubank Cartão · Gastos'));
+    assert.match(summary.props.accessibilityLabel, /Nubank Cartão.*Gastos.*viagem.*Importado.*R\$ 0.00 a R\$ 200.00.*hotel/);
+    assert.equal(summary.props.children, 'Nubank Cartão · Gastos · mais 4', 'resumo revela a quantidade de critérios adicionais sem truncar os nomes');
+    assert.ok(!ui.nodes().some(n => ['Chip', 'Segmented'].includes(n.type) && !['Aconteceu', 'Previsto', 'Todos'].includes(n.props.label)), 'critérios são editados na folha; só os chips de situação ficam na tela');
     assert.ok(!ui.nodes().some(n => n.type === 'PeriodSummaryCard'), 'total global não é exibido sobre um recorte');
     const menu = ui.nodes().find(n => n.type === 'HeaderActions').props.menu.actions;
     assert.ok(!menu.some((a: any) => ['Conta', 'Origem'].includes(a.label)), 'menu não duplica o editor');
@@ -8190,8 +8190,8 @@ test('F15: tocar numa linha oferece os dois períodos com as bordas exatas e o "
   ui.interact(() => ui.actions[1].onPress());
   const [antes, depois] = ui.navigations.slice(-2).map((n: any) => copia(n));
   assert.equal(antes.pathname, '/finance/transactions');
-  assert.deepEqual(antes.params, { from: '2026-09-01', to: '2026-09-30', kind: 'expense', lente: 'gasto', category: 'none' });
-  assert.deepEqual(depois.params, { from: '2026-10-01', to: '2026-10-31', kind: 'expense', lente: 'gasto', category: 'none' });
+  assert.deepEqual(antes.params, { from: '2026-09-01', to: '2026-09-30', kind: 'expense', lente: 'gasto', ver: 'todos', category: 'none' });
+  assert.deepEqual(depois.params, { from: '2026-10-01', to: '2026-10-31', kind: 'expense', lente: 'gasto', ver: 'todos', category: 'none' });
 });
 
 test('F15: linhas sem mudança só aparecem em "Ver todas"', () => {
@@ -8816,4 +8816,20 @@ test('Dá para gastar: as folhas dizem o guardado FORA da conta, e só no ciclo 
     balances: [l('a1', 'checking', true, 100_000), l('a2', 'investment', undefined, 70_000), l('a3', 'savings', false, 5_000), l('c1', 'credit_card', undefined, -9_000)],
   });
   assert.equal(hoje.nodes().find((n: any) => n.type === 'DetalheDoDiaSheet').props.guardado, 75_000, 'investimento e a conta tirada; cartão nunca');
+});
+
+test('Lançamentos abre em "Aconteceu", os chips trocam a lista e o chip não é critério da folha', () => {
+  const ui = screen(transacoesFile, { abrePadrao: true, txs: [] });
+  const chips = () => ui.nodes().filter((n: any) => n.type === 'Chip');
+  assert.deepEqual(chips().map((n: any) => n.props.label), ['Aconteceu', 'Previsto', 'Todos']);
+  assert.deepEqual(chips().filter((n: any) => n.props.selected).map((n: any) => n.props.label), ['Aconteceu']);
+  assert.equal(ui.transactionQueries.at(-1)?.status, 'cleared');
+  const toca = (rotulo: string) => ui.interact(() => chips().find((n: any) => n.props.label === rotulo).props.onPress());
+  toca('Previsto');
+  assert.equal(ui.transactionQueries.at(-1)?.status, 'pending');
+  toca('Todos');
+  assert.equal(ui.transactionQueries.at(-1)?.status, undefined);
+  assert.ok(!ui.nodes().some((n: any) => n.type === 'ListFilters' && n.props.value.selections?.status), 'o chip não é critério da folha');
+  const serie = screen(transacoesFile, { abrePadrao: true, params: { recurringId: 'r1' } });
+  assert.equal(serie.nodes().filter((n: any) => n.type === 'Chip').length, 0, 'ocorrências de uma série não têm chip');
 });

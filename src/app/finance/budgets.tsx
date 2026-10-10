@@ -231,7 +231,7 @@ export default function BudgetsScreen() {
     });
 
   const verLancamentos = (category: string) =>
-    router.push({ pathname: '/finance/transactions', params: { month, category } });
+    router.push({ pathname: '/finance/transactions', params: { month, category, ver: 'todos' } });
 
   const salvar = () => {
     if (!form?.category || form.limitCents <= 0) return;

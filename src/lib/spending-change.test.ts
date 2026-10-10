@@ -39,7 +39,7 @@ test('barra proporcional ao maior', () => {
 test('link por linha usa as bordas exatas e o "sem X" da dimensão', () => {
   const p = { curFrom: '2026-10-01', curTo: '2026-10-31', prevFrom: '2026-09-01', prevTo: '2026-09-30' };
   assert.deepEqual(rowLinkParams('category', { key: 'lazer' }, p, 'previous'),
-    { from: '2026-09-01', to: '2026-09-30', kind: 'expense', lente: 'gasto', category: 'lazer' });
+    { from: '2026-09-01', to: '2026-09-30', kind: 'expense', lente: 'gasto', ver: 'todos', category: 'lazer' });
   assert.equal(rowLinkParams('category', { key: null }, p, 'current').category, 'none');
   assert.equal(rowLinkParams('subcategory', { key: null }, p, 'current').subcategoryId, 'none');
   assert.equal(rowLinkParams('payment_method', { key: null }, p, 'current').paymentMethods, 'not_informed');

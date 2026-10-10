@@ -633,7 +633,7 @@ export default function InstallmentsScreen() {
             accessibilityLabel={`${monthLabel(mes.month)}, ${brl(mes.cents)} em parcelas${mes.month < mesAtual ? ', já passou' : ''}`}
             style={styles.barSlot}
             onPress={() =>
-              router.push({ pathname: '/finance/transactions', params: { month: mes.month } })
+              router.push({ pathname: '/finance/transactions', params: { month: mes.month, ver: 'todos' } })
             }>
             <View style={styles.barTrack}>
               <Bar

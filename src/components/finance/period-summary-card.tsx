@@ -17,13 +17,15 @@ interface Props {
   /** Somado por COMPETÊNCIA, na mesma janela da lista logo abaixo. */
   entrou: number;
   saiu: number;
-  /** Quanto de cada um ainda NÃO aconteceu (`status = 'pending'`). */
+  /** Quanto de cada um ainda NÃO aconteceu (a régua da data, a do chip "Aconteceu"). */
   entrouPrevisto: number;
   saiuPrevisto: number;
   /** Nome do mês já em minúsculas, ex. `outubro`. */
   nomeDoMes: string;
-  /** Quantos lançamentos a lista abaixo está mostrando. */
-  lancamentos: number;
+  /** Quantos lançamentos a lista abaixo está mostrando; `null` quando só se conhece o período inteiro. */
+  lancamentos: number | null;
+  /** O chip da lista: o card resume SÓ esse pedaço (`null` = o período inteiro). */
+  recorte?: 'cleared' | 'pending' | null;
   /** O mesmo período pela outra lente — vira o link do rodapé. `null` enquanto carrega. */
   ciclo: CycleRow | null;
   onAbrirCiclo: () => void;
@@ -73,6 +75,7 @@ export function PeriodSummaryCard({
   saiuPrevisto,
   nomeDoMes,
   lancamentos,
+  recorte = null,
   ciclo,
   onAbrirCiclo,
 }: Props) {
@@ -95,10 +98,10 @@ export function PeriodSummaryCard({
           ~98% futuro: dizia "GASTEI EM OUTUBRO R$ 3.842,78" quando R$ 83,97 tinham acontecido.
           O rótulo agora é neutro, e quem separa passado de futuro são as barras.
         */}
-        <HeroLabel>{`Gastos de ${nomeDoMes}`}</HeroLabel>
+        <HeroLabel>{recorte === 'cleared' ? `Gastos que aconteceram em ${nomeDoMes}` : recorte === 'pending' ? `Gastos previstos em ${nomeDoMes}` : `Gastos de ${nomeDoMes}`}</HeroLabel>
         <Money cents={saiu} variant="money" />
         <ThemedText type="footnote" themeColor="textSecondary">
-          {`${lancamentos === 1 ? '1 lançamento' : `${lancamentos} lançamentos`} · por data da compra`}
+          {`${lancamentos === null ? '' : `${lancamentos === 1 ? '1 lançamento' : `${lancamentos} lançamentos`} · `}por data da compra`}
         </ThemedText>
 
         <View style={styles.barras}>
@@ -109,8 +112,8 @@ export function PeriodSummaryCard({
             gráfico em telas vizinhas é como elas divergem. Quem separa as barras é a PALAVRA à
             esquerda e a claridade — que é o que funciona sem enxergar cor.
           */}
-          <Fluxo rotulo="entrou" cents={entrou} previsto={entrouPrevisto} max={escala} forte />
-          <Fluxo rotulo="saiu" cents={saiu} previsto={saiuPrevisto} max={escala} />
+          <Fluxo rotulo="entrou" cents={entrou} previsto={entrouPrevisto} max={escala} forte semDivisao={recorte === 'pending'} />
+          <Fluxo rotulo="saiu" cents={saiu} previsto={saiuPrevisto} max={escala} semDivisao={recorte === 'pending'} />
         </View>
 
         {d ? (
@@ -183,7 +186,7 @@ export function PeriodSummaryCard({
 
 /**
  * Uma das duas barras: o rótulo à esquerda, o total à direita, e a barra dizendo quanto disso
- * JÁ ACONTECEU.
+ * JÁ ACONTECEU (na régua da DATA, `realizado_cents`: a mesma do chip "Aconteceu").
  *
  * ## Duas perguntas numa linha só
  *
@@ -193,13 +196,13 @@ export function PeriodSummaryCard({
  * carrega o realizado dentro da própria linha. Sem a caixa, `value/total` encheria as duas
  * barras e apagaria justamente a comparação.
  *
- * ## Por que `status` e não a data
+ * ## Por que a DATA e não o `status`
  *
- * Logo abaixo deste card estão os chips **"Já aconteceu" / "Ainda vai acontecer"**, que filtram
- * `status`. A regra desta tela é que o topo soma o que está embaixo — então tocar no chip tem
- * que devolver exatamente o número que o card mostra. Cortar por DATA aqui daria um número que
- * nenhum chip reproduz. (Na Fatura o corte É a data, porque lá a pergunta é outra — "por que o
- * app é maior que meu extrato?" — e o rótulo diz "com data à frente", não "vai acontecer".)
+ * Logo abaixo deste card estão os chips **Aconteceu | Previsto | Todos**, e a regra desta tela é
+ * que o topo soma o que está embaixo — então o número do card tem que ser o que o chip lista.
+ * Aconteceu = efetivado OU compra de cartão com data até hoje (`filtroDoEstado`); compra de
+ * cartão fica `pending` até a fatura ser paga e ainda assim já foi feita. (Na Fatura o corte
+ * também é a data, com o rótulo "com data à frente".)
  */
 function Fluxo({
   rotulo,
@@ -207,6 +210,7 @@ function Fluxo({
   previsto,
   max,
   forte = false,
+  semDivisao = false,
 }: {
   rotulo: string;
   cents: number;
@@ -214,11 +218,13 @@ function Fluxo({
   max: number;
   /** A barra de "entrou" é a mais clara das duas; "saiu" fica em cinza de dado. */
   forte?: boolean;
+  /** No chip "Previsto" tudo é previsto: a linha "já aconteceu: nada ainda" seria ruído. */
+  semDivisao?: boolean;
 }) {
   const brl = useBRL();
   const jaAconteceu = Math.max(0, cents - previsto);
   // Nada pendente = a barra cheia já diz tudo, e a linha repetiria o total (§1, eco).
-  const mostrarSplit = previsto > 0;
+  const mostrarSplit = previsto > 0 && !semDivisao;
 
   return (
     /*

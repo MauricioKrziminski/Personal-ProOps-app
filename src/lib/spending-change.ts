@@ -64,6 +64,6 @@ export function rowLinkParams(dimension: SpendingDimension, row: Pick<SpendingCh
   return {
     from: which === 'current' ? periods.curFrom : periods.prevFrom,
     to: which === 'current' ? periods.curTo : periods.prevTo,
-    kind: 'expense', lente: 'gasto', [PARAM[dimension]]: row.key ?? nullKey,
+    kind: 'expense', lente: 'gasto', ver: 'todos', [PARAM[dimension]]: row.key ?? nullKey,
   };
 }

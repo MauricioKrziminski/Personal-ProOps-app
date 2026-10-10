@@ -594,8 +594,8 @@ export default function FinanceScreen() {
           <BlockHeader title="Para onde foi" tag="por data da compra" />
           <SpendingDonut
             itens={itensDaRosca}
-            onOpenCategory={(category) => openTransactions({ category })}
-            onOpenAll={() => openTransactions({ kind: 'expense' })}
+            onOpenCategory={(category) => openTransactions({ category, ver: 'todos' })}
+            onOpenAll={() => openTransactions({ kind: 'expense', ver: 'todos' })}
           />
           {range.from && range.to && previousRange.from && previousRange.to ? (
             <Button

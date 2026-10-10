@@ -66,6 +66,8 @@ import { rotuloDaCompra } from '@/lib/data-da-compra';
 import { diferencaDoPrevisto, previstoDoLancamento } from '@/lib/previsto';
 import { apoioDoAdiantamento } from '@/lib/anticipation';
 import { dueInline, estadoDaLinha, settleLabel } from '@/lib/settle-labels';
+import { Chip } from '@/components/finance/chip';
+import { totaisDoChip, verInicial, VER_OPCOES, type VerLancamentos } from '@/lib/ver-lancamentos';
 import { filterExpectedLines, mesclarPrevistas, previstasNaTela, type ItemDoExtrato } from '@/lib/ledger-expected';
 import { useConfirmarBaixa } from '@/components/finance/confirmar-baixa';
 import { useDebounced } from '@/hooks/use-debounced';
@@ -106,18 +108,6 @@ const KIND_OPTIONS = [
   { value: 'income', label: 'Receitas' },
   { value: 'transfer', label: 'Transferências' },
 ] as const satisfies readonly { value: TransactionKind | 'all'; label: string }[];
-
-/**
- * ⚠️ **O filtro é da DATA, a mesma régua da pílula** (`filtroDoEstado`, 24/09/2026). Era do
- * `status`, e compra de cartão fica `pending` até a fatura ser paga: a compra de ontem nunca
- * aparecia em "Concluído" (o wardogs). "Concluído" = já aconteceu; "Em aberto" = previsto,
- * atrasado ou receita que não caiu.
- */
-const STATUS_OPTIONS: { value: 'all' | 'pending' | 'cleared'; label: string }[] = [
-  { value: 'all', label: 'Tudo' },
-  { value: 'pending', label: 'Em aberto' },
-  { value: 'cleared', label: 'Concluído' },
-];
 
 /** Rótulo da ORIGEM como filtro. `SOURCE_LABEL` é o subtítulo da linha e deixa `app` vazio. */
 const SOURCE_FILTER: { value: TransactionSource; label: string }[] = [
@@ -419,6 +409,8 @@ export default function TransactionsScreen() {
     kind?: string;
     category?: string;
     recurringId?: string;
+    /** `todos` | `previsto` | `aconteceu`: o chip com que a tela abre (padrão: Aconteceu). */
+    ver?: string;
     /** Id da conta/cartão, ou `none` para os lançamentos sem conta. */
     accountId?: string;
     subcategoryId?: string | string[];
@@ -442,7 +434,7 @@ export default function TransactionsScreen() {
       ? params.kind
       : 'all'
   );
-  const [status, setStatus] = useState<'all' | 'pending' | 'cleared'>('all');
+  const [status, setStatus] = useState<VerLancamentos>(() => verInicial(params.ver, params.recurringId, params.lente));
   const [lenteGasto, setLenteGasto] = useState(params.lente === 'gasto');
   const [category, setCategory] = useState<string | undefined>(params.category);
   const [accountId, setAccountId] = useState<string | undefined>(params.accountId);
@@ -490,10 +482,11 @@ export default function TransactionsScreen() {
    * desfaz escolha que o usuário fez na tela. `recurringId` fica de fora: é lido direto de
    * `params`, sem estado.
    */
-  const link = JSON.stringify([params.from, params.to, params.lente, params.month, params.kind, params.category, params.accountId, params.paymentMethods, params.expensePatterns, params.expenseNecessities, params.subcategoryId]);
+  const link = JSON.stringify([params.from, params.to, params.lente, params.month, params.kind, params.category, params.accountId, params.paymentMethods, params.expensePatterns, params.expenseNecessities, params.subcategoryId, params.ver]);
   const [linkAplicado, setLinkAplicado] = useState(link);
   if (link !== linkAplicado) {
     setLinkAplicado(link);
+    if (params.ver) setStatus(verInicial(params.ver));
     if (params.month) setMesEscolhido(params.month);
     if (params.from && params.to) setCustomDates(janelaDoLink(params.from, params.to));
     if (params.lente !== undefined) setLenteGasto(params.lente === 'gasto');
@@ -631,29 +624,33 @@ export default function TransactionsScreen() {
     let entrouPrevisto = 0;
     let saiuPrevisto = 0;
     let linhas = 0;
+    let realizadoLinhas = 0;
     for (const r of summary.data ?? []) {
       if (r.kind === 'income') {
         entrou += Number(r.total_cents);
-        entrouPrevisto += Number(r.pending_cents);
+        // previsto na régua da DATA, a da lista (`realizado_cents`), não a do `status`
+        entrouPrevisto += Number(r.total_cents) - Number(r.realizado_cents);
       }
       if (r.kind === 'expense') {
         saiu += Number(r.total_cents);
-        saiuPrevisto += Number(r.pending_cents);
+        saiuPrevisto += Number(r.total_cents) - Number(r.realizado_cents);
       }
       linhas += Number(r.tx_count);
+      realizadoLinhas += Number(r.realizado_count);
     }
     /*
       As previstas estão NA lista (misturadas por data), então entram no card — o total do topo
       soma exatamente as linhas de baixo. A que nasce paga (`status`) já aconteceu; o resto é previsto.
     */
     for (const p of previstasVisiveis) {
-      // a mesma régua de `pending_cents` do resumo: o que ainda não saiu do caixa
+      // a que nasce paga já aconteceu; o resto é previsto
       const emAberto = p.status === 'cleared' ? 0 : p.amount_cents;
       if (p.kind === 'income') { entrou += p.amount_cents; entrouPrevisto += emAberto; }
       else { saiu += p.amount_cents; saiuPrevisto += emAberto; }
       linhas += 1;
+      if (p.status === 'cleared') realizadoLinhas += 1;
     }
-    return { entrou, saiu, entrouPrevisto, saiuPrevisto, linhas };
+    return { entrou, saiu, entrouPrevisto, saiuPrevisto, linhas, realizadoLinhas };
   }, [summary.data, previstasVisiveis]);
 
   const accounts = useAccounts(undefined, true);
@@ -760,7 +757,7 @@ export default function TransactionsScreen() {
   // A mesma fonte governa a folha, a contagem e o resumo: não há filtros paralelos.
   const filterValue: ListFiltersValue = {
     q: search, ...customDates, minCents, maxCents, selections: {
-      kind: kind === 'all' ? '' : kind, status: status === 'all' ? '' : status,
+      kind: kind === 'all' ? '' : kind,
       category: category ?? '', ...(subcategoryId !== undefined ? { subcategoryId: subcategoryId === null ? 'none' : subcategoryId } : {}), accountId: accountId ?? '', source: source ?? '',
     },
     ...(paymentMethods.length || expensePatterns.length || expenseNecessities.length ? {
@@ -783,7 +780,6 @@ export default function TransactionsScreen() {
   const filterDetails = [
     tituloDaConta,
     kind !== 'all' ? KIND_OPTIONS.find(o => o.value === kind)?.label : undefined,
-    status !== 'all' ? STATUS_OPTIONS.find(o => o.value === status)?.label : undefined,
     category === NO_CATEGORY ? 'Sem categoria' : category,
     lenteGasto ? 'Gastos lançados por data, sem fatura adiada' : undefined,
     subcategoryId === null ? 'Sem detalhe' : subcategoryId !== undefined ? selectedDetail ? `${selectedDetail.parent_category} · ${selectedDetail.name}` : 'Detalhe a conferir' : undefined,
@@ -822,7 +818,7 @@ export default function TransactionsScreen() {
 
   const clearFilters = () => {
     setKind('all');
-    setStatus('all'); setLenteGasto(false);
+    setLenteGasto(false);
     setCategory(undefined); setSubcategoryId(undefined); setDetailLinkInvalid(false);
     setAccountId(undefined);
     setSource(undefined);
@@ -843,7 +839,6 @@ export default function TransactionsScreen() {
     setSearch(value.q ?? ''); setCustomDates({ from: value.from, to: value.to });
     setMinCents(value.minCents); setMaxCents(value.maxCents);
     setKind((value.selections?.kind || 'all') as typeof kind);
-    setStatus((value.selections?.status || 'all') as typeof status);
     const nextCategory = value.selections?.category || undefined;
     const parsedDetail = parseSubcategoryFilter(value.selections?.subcategoryId || undefined);
     const nextDetail = typeof parsedDetail.id === 'string' ? detailItems.find(item => item.id === parsedDetail.id) : undefined;
@@ -984,13 +979,11 @@ export default function TransactionsScreen() {
         <Skeleton height={284} radius={Radius.md} />
       ) : (
         <PeriodSummaryCard
-          entrou={totais.entrou}
-          saiu={totais.saiu}
-          entrouPrevisto={totais.entrouPrevisto}
-          saiuPrevisto={totais.saiuPrevisto}
+          {...totaisDoChip(totais, status)}
+          recorte={status === 'all' ? null : status}
           ciclo={ciclo}
           nomeDoMes={monthTitle(month).replace(/ de \d{4}$/, '').toLowerCase()}
-          lancamentos={totais.linhas}
+          lancamentos={status === 'cleared' ? totais.realizadoLinhas : status === 'pending' ? totais.linhas - totais.realizadoLinhas : totais.linhas}
           onAbrirCiclo={() =>
             router.push({
               pathname: '/finance/cycle',
@@ -998,6 +991,19 @@ export default function TransactionsScreen() {
             })
           }
         />
+      )}
+
+      {/*
+        Os chips ficam ENTRE o card e a lista (pedido do dono do produto). Não são o "filtro
+        ativo" que esconde o card: o card reflete o chip. Na lista de ocorrências de uma série
+        não há chip — ali o futuro é o assunto.
+      */}
+      {params.recurringId ? null : (
+        <View style={styles.chips} accessibilityRole="tablist">
+          {VER_OPCOES.map((o) => (
+            <Chip key={o.value} label={o.label} selected={status === o.value} onPress={() => setStatus(o.value)} />
+          ))}
+        </View>
       )}
 
       {/* As previstas moram na lista, no dia delas; a falha da leitura delas aparece aqui. */}
@@ -1059,6 +1065,12 @@ export default function TransactionsScreen() {
       icon="tray"
       title="Nenhum lançamento ainda"
       hint={'Manda *gastei 45 no mercado* no WhatsApp —\nou toca no + para lançar aqui'}
+    />
+  ) : status !== 'all' && !params.recurringId ? (
+    <EmptyState compacto
+      icon="calendar"
+      title={status === 'cleared' ? `Nada aconteceu ${periodDescription}` : `Nada previsto ${periodDescription}`}
+      action={{ label: 'Ver todos', onPress: () => setStatus('all') }}
     />
   ) : (
     <EmptyState
@@ -1257,7 +1269,6 @@ export default function TransactionsScreen() {
         ]}
         selects={[
           { key: 'kind', label: 'Tipo', options: KIND_OPTIONS.filter(o => o.value !== 'all').map(o => ({ id: o.value, label: o.label })) },
-          { key: 'status', label: 'Situação', options: STATUS_OPTIONS.filter(o => o.value !== 'all').map(o => ({ id: o.value, label: o.label })) },
           { key: 'category', label: 'Categoria', options: (categories.data ?? []).map(c => ({ id: c.category, label: c.category })) },
           { key: 'subcategoryId', label: 'Detalhe', options: [{ id: 'none', label: 'Sem detalhe' },
             ...detailItems.map(item => ({ id: item.id, label: `${item.parent_category} · ${item.name}` }))] },
@@ -1284,6 +1295,7 @@ export default function TransactionsScreen() {
 }
 
 const styles = StyleSheet.create({
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm },
   filterOverview: { gap: Space.sm },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Space.md },
   filterText: { flexGrow: 1, flexShrink: 1, flexBasis: 180, minWidth: 180 },
