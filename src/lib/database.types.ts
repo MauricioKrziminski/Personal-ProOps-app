@@ -166,6 +166,30 @@ export type Database = {
           },
         ]
       }
+      admin_account_notes: {
+        Row: {
+          admin_user_id: string
+          body: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          admin_user_id: string
+          body: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          admin_user_id?: string
+          body?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       admin_audit_events: {
         Row: {
           action: string
@@ -478,6 +502,54 @@ export type Database = {
             referencedColumns: ["session_id", "id"]
           },
         ]
+      }
+      app_config: {
+        Row: {
+          id: number
+          latest_version_android: string | null
+          latest_version_ios: string | null
+          min_version_android: string | null
+          min_version_ios: string | null
+          notice_body: string | null
+          notice_level: string | null
+          notice_title: string | null
+          notice_until: string | null
+          store_url_android: string | null
+          store_url_ios: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: number
+          latest_version_android?: string | null
+          latest_version_ios?: string | null
+          min_version_android?: string | null
+          min_version_ios?: string | null
+          notice_body?: string | null
+          notice_level?: string | null
+          notice_title?: string | null
+          notice_until?: string | null
+          store_url_android?: string | null
+          store_url_ios?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: number
+          latest_version_android?: string | null
+          latest_version_ios?: string | null
+          min_version_android?: string | null
+          min_version_ios?: string | null
+          notice_body?: string | null
+          notice_level?: string | null
+          notice_title?: string | null
+          notice_until?: string | null
+          store_url_android?: string | null
+          store_url_ios?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       asset_valuations: {
         Row: {
@@ -3002,6 +3074,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          ai_consent_at: string | null
           alerts_enabled: boolean
           alerts_push_enabled: boolean
           alerts_whatsapp_enabled: boolean
@@ -3009,13 +3082,19 @@ export type Database = {
           display_name: string | null
           expo_push_token: string | null
           id: string
+          last_app_platform: string | null
+          last_app_version: string | null
+          last_seen_at: string | null
           locale: string
           phone: string | null
+          terms_accepted_at: string | null
+          terms_version: string | null
           timezone: string
           updated_at: string
           whatsapp_verified: boolean
         }
         Insert: {
+          ai_consent_at?: string | null
           alerts_enabled?: boolean
           alerts_push_enabled?: boolean
           alerts_whatsapp_enabled?: boolean
@@ -3023,13 +3102,19 @@ export type Database = {
           display_name?: string | null
           expo_push_token?: string | null
           id: string
+          last_app_platform?: string | null
+          last_app_version?: string | null
+          last_seen_at?: string | null
           locale?: string
           phone?: string | null
+          terms_accepted_at?: string | null
+          terms_version?: string | null
           timezone?: string
           updated_at?: string
           whatsapp_verified?: boolean
         }
         Update: {
+          ai_consent_at?: string | null
           alerts_enabled?: boolean
           alerts_push_enabled?: boolean
           alerts_whatsapp_enabled?: boolean
@@ -3037,8 +3122,13 @@ export type Database = {
           display_name?: string | null
           expo_push_token?: string | null
           id?: string
+          last_app_platform?: string | null
+          last_app_version?: string | null
+          last_seen_at?: string | null
           locale?: string
           phone?: string | null
+          terms_accepted_at?: string | null
+          terms_version?: string | null
           timezone?: string
           updated_at?: string
           whatsapp_verified?: boolean
@@ -4370,6 +4460,10 @@ export type Database = {
       }
       _workspace_ids: { Args: { uid: string }; Returns: string[] }
       accept_pending_invites: { Args: never; Returns: number }
+      accept_terms: {
+        Args: { p_ai_consent: boolean; p_version: string }
+        Returns: Json
+      }
       account_balances: {
         Args: never
         Returns: {
@@ -4437,6 +4531,10 @@ export type Database = {
         }[]
       }
       anticipation_candidates: { Args: { p_pay_on?: string }; Returns: Json }
+      app_ping: {
+        Args: { p_platform: string; p_version: string }
+        Returns: undefined
+      }
       apply_anticipation: {
         Args: { p_input: Json; p_request_id: string }
         Returns: Json
@@ -5370,6 +5468,7 @@ export type Database = {
         }
         Returns: Json
       }
+      set_ai_consent: { Args: { p_consent: boolean }; Returns: Json }
       settle_invoice: {
         Args: { p_invoice_id: string; p_paid_at?: string }
         Returns: string
