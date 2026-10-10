@@ -13,14 +13,21 @@ workspace é verificada antes de qualquer escrita. A verificação em si mora em
 
 from __future__ import annotations
 
+import json
 import logging
+import time
+from collections import deque
+from datetime import datetime
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from app.auth import current_user, ensure_member
 from app.jobs import importer
+from app.services import exportar_dados
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/internal", tags=["app"])
@@ -71,3 +78,29 @@ async def import_statement(
         )
     except importer.ImportError_ as err:
         raise HTTPException(status_code=err.status, detail=err.mensagem) from err
+
+
+# ── exportar os dados (LGPD) ─────────────────────────────────────────────────────────────────────────────
+EXPORT_POR_HORA = 3
+_agora = time.monotonic  # trocável nos testes
+_pedidos: dict[UUID, deque[float]] = {}  # ponytail: por instância (min_instances = 0 zera); contador compartilhado se virar abuso
+
+
+@router.get("/export")
+async def exportar(user_id: UUID = Depends(current_user)) -> Response:
+    """Todos os dados da pessoa em JSON. O usuário sai do `sub`; limite de 3 por hora."""
+    agora = _agora()
+    janela = _pedidos.setdefault(user_id, deque())
+    while janela and agora - janela[0] >= 3600:
+        janela.popleft()
+    if len(janela) >= EXPORT_POR_HORA:
+        return JSONResponse({"error": "rate_limited"}, status_code=429,
+                            headers={"Retry-After": str(int(3600 - (agora - janela[0])) + 1)})
+    janela.append(agora)
+    dados = await exportar_dados.exportar(user_id)
+    dia = datetime.now(ZoneInfo("America/Sao_Paulo")).date().isoformat()
+    return Response(
+        content=json.dumps(dados, ensure_ascii=False, default=str),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="proops-dados-{dia}.json"', "Cache-Control": "no-store"},
+    )

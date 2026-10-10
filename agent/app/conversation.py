@@ -32,6 +32,20 @@ from app.services import consumo, ia, telemetry
 log = logging.getLogger(__name__)
 
 MUITAS = "😅 Muitas mensagens em pouco tempo. Aguarda um pouquinho e tenta de novo!"
+# Sem `profiles.ai_consent_at` (e `AI_CONSENT_REQUIRED` ligada) a IA não roda: é a frase que o WhatsApp
+# manda (uma vez por dia) e o valor que `check_limits` devolve para as rotas do app virarem 403.
+SEM_CONSENTIMENTO_IA = "Para usar o assistente, autorize o uso de IA no app: Perfil → Privacidade e dados."
+
+
+class ConsentimentoNecessario(Exception):
+    """A rota do app usa IA e a pessoa não consentiu: vira 403 `ai_consent_required` (handler em `routes/chat.py`)."""
+
+
+async def sem_consentimento_de_ia(user_id) -> bool:
+    """True = a flag está ligada e a pessoa não autorizou a IA. Desligada: nem toca no banco."""
+    if not get_settings().ai_consent_required:
+        return False
+    return not await db.ia_consentida(user_id)
 
 # Quanto do passado entra no prompt, por canal.
 #
@@ -183,6 +197,10 @@ async def check_limits(sessao: dict, *, kind: str = "turn") -> str | None:
     um áudio vira turno depois, e a importação é recurso do plano Pro, não "mensagem").
     """
     settings = get_settings()
+    # O consentimento vem ANTES da cota e não reserva vaga: quem recusa aqui não chama modelo nenhum.
+    # A importação (`import`) fica de fora — ela segue sem a camada de IA em `jobs/importer.py`.
+    if kind != "import" and await sem_consentimento_de_ia(sessao["user_id"]):
+        return SEM_CONSENTIMENTO_IA
     r = await db.reservar_cota(
         user_id=sessao["user_id"], workspace_id=sessao["workspace_id"], channel=_canal(sessao),
         max_por_hora=settings.max_parses_per_hour, kind=kind,

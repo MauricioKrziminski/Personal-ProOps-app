@@ -211,6 +211,7 @@ def _issue_row(**kw):
 def adm(monkeypatch):
     get_settings.cache_clear()
     monkeypatch.setenv("ADMIN_USER_IDS", str(ADMIN))
+    monkeypatch.setenv("ADMIN_REQUIRE_MFA", "false")
     estado = {"id": ADMIN, "sql": [], "writes": [], "status": "open"}
 
     async def _user(_req):

@@ -8,8 +8,9 @@ Servido pelo agente. O SPA (`agent/admin-web/`, build copiado para `app/static/a
 - `ADMIN_USER_IDS` vazio → toda rota `/admin*` responde **404**.
 - Sem token / token inválido → **401** `{"error":"unauthorized"}`.
 - `sub` fora da lista → **403** `{"error":"forbidden"}`.
-- `ADMIN_REQUIRE_MFA=true` e o JWT sem `aal: "aal2"` → **403** `{"error":"mfa_required"}`. O SPA abre o
-  fluxo de TOTP do supabase-js (`auth.mfa.enroll/challenge/verify`) e repete.
+- `ADMIN_REQUIRE_MFA` é **`true` por padrão** (variável ausente ou vazia = ligada; `setup-gcp.sh` RECUSA subir
+  produção sem `true`). Ligada e o JWT sem `aal: "aal2"` → **403** `{"error":"mfa_required"}`. O SPA abre o
+  fluxo de TOTP do supabase-js (`auth.mfa.enroll/challenge/verify`) e repete. Só o staging e o E2E local passam `false`.
 - Toda escrita grava em `public.admin_audit_events` na MESMA transação.
 - Nenhuma resposta traz conteúdo financeiro (lançamentos, valores, saldos, notas, lembretes): só
   cadastro, assinatura, uso e CONTAGENS.
@@ -39,18 +40,23 @@ O SPA repete leituras (GET) em 429 com recuo de 1 s, 2 s e 4 s.
   "usage_month": {"ai_turns": 0, "whatsapp_replies": 0, "notices": 0, "ai_cost_usd": "0.00"},
   "signups_by_month": [{"month": "2026-10", "count": 0}],
   "ai_cost_by_day": [{"day": "2026-10-09", "usd": "0.0000"}],
-  "signals": {"trial_ending_48h": 0, "lapsed_7d": 0, "near_limit": 0, "inactive_subscribers_30d": 0}
+  "signals": {"trial_ending_48h": 0, "lapsed_7d": 0, "near_limit": 0, "inactive_subscribers_30d": 0},
+  "versions": [{"platform": "ios|android|web", "version": "1.4.2", "users": 0}]
 }
 ```
+`versions`: quem abriu o app nos últimos 30 dias (`profiles.last_seen_at`), por plataforma e versão, do mais usado ao menos.
+`inactive_subscribers_30d`: assinante sem uso há 30 dias, lendo `coalesce(last_seen_at, last_sign_in_at)` (login não é uso).
 `signups_by_month`: 12 meses, zerados inclusive. `ai_cost_by_day`: 30 dias, zerados inclusive.
 `near_limit`: assinante com IA ou WhatsApp >= 80% do limite do mês. Dinheiro sempre texto decimal.
 
 ### `GET /admin/api/accounts`
-Query: `q` (e-mail ou nome), `access` (`subscriber|trialing|lapsed|never|courtesy|suspended`),
+Query: `q` (e-mail ou nome; com 4 ou mais dígitos em `q` também casa o TELEFONE, comparando só os dígitos dele),
+`access` (`subscriber|trialing|lapsed|never|courtesy|suspended`),
 `plan` (`free|pro|family`), `origin` (`apple|google|manual|test_store|none`),
 `signal` (`trial_ending_48h|lapsed_7d|near_limit|inactive_subscribers_30d`: o MESMO critério SQL que conta `signals` no
 `/overview` — `_SINAIS` em `admin.py` —, então o `total` da lista é o número do sinal),
-`sort` (`created_desc` padrão, `created_asc`, `last_sign_in_desc`, `last_sign_in_asc`, `ai_used_desc`, `email_asc`),
+`sort` (`created_desc` padrão, `created_asc`, `last_sign_in_desc`, `last_sign_in_asc`, `ai_used_desc`, `email_asc`,
+`last_seen_desc`, `last_seen_asc`),
 `page` (1..), `page_size` (padrão 25, máx 100). Paginação NO SERVIDOR.
 `{"items": [AccountRow], "total": 0, "page": 1, "page_size": 25}`
 
@@ -61,16 +67,28 @@ Query: `q` (e-mail ou nome), `access` (`subscriber|trialing|lapsed|never|courtes
   "created_at": "iso", "last_sign_in_at": "iso|null", "suspended": false,
   "plan": "free|pro|family", "status": "str", "access": "subscriber|never|lapsed",
   "is_trial": false, "period_end": "date|null", "origin": "apple|google|manual|test_store|null",
-  "ai_used": 0, "ai_max": 0, "wa_used": 0, "wa_max": 0, "whatsapp_linked": false
+  "ai_used": 0, "ai_max": 0, "wa_used": 0, "wa_max": 0, "whatsapp_linked": false,
+  "last_app_version": "str|null", "last_seen_at": "iso|null"
 }
 ```
+
+### `GET /admin/api/accounts.csv`
+Os MESMOS filtros e a MESMA ordem de `/accounts` (`q`, `access`, `plan`, `origin`, `signal`, `sort`), sem paginação.
+Mais de **10.000** linhas → **422** `{"error":"too_many_rows","message":…}` (nada é gravado). `text/csv; charset=utf-8`
+com BOM, `Content-Disposition: attachment; filename="contas-AAAA-MM-DD.csv"`. Colunas: `user_id, email, name,
+created_at, last_sign_in_at, last_seen_at, last_app_version, plan, status, access, is_trial, period_end, origin,
+ai_used, ai_max, wa_used, wa_max, whatsapp_linked, suspended` (sem telefone). Texto que começa com `= + - @` ganha `'`
+na frente (a planilha não executa como fórmula). Auditoria `accounts_exported` (`payload`: `filters` e `total`).
 
 ### `GET /admin/api/accounts/{user_id}`
 ```json
 {
   "account": "AccountRow",
   "profile": {"phone": "str|null", "email_confirmed_at": "iso|null", "onboarding_completed": false,
-              "banned_until": "iso|null", "sessions": 0},
+              "banned_until": "iso|null", "sessions": 0,
+              "terms_version": "str|null", "terms_accepted_at": "iso|null", "ai_consent_at": "iso|null",
+              "last_app_version": "str|null", "last_app_platform": "ios|android|web|null",
+              "last_seen_at": "iso|null", "push_tokens": 0, "notes_count": 0},
   "subscription": {"plan": "", "status": "", "provider": "", "external_id": "", "product_id": "",
                    "environment": "", "is_trial": false, "current_period_end": "date|null",
                    "canceled_at": "iso|null", "store_managed": false,
@@ -81,7 +99,7 @@ Query: `q` (e-mail ou nome), `access` (`subscriber|trialing|lapsed|never|courtes
   "counts": {"transactions": 0, "accounts": 0, "cards": 0, "notes": 0, "reminders": 0, "goals": 0,
              "debts": 0, "recurring": 0},
   "members": [{"user_id": "uuid", "email": "str", "name": "str|null", "role": "owner|member"}],
-  "invites": [{"phone": "str", "status": "str", "created_at": "iso"}],
+  "invites": [{"id": "uuid", "phone": "str", "status": "str", "created_at": "iso"}],
   "billing_events": [{"id": "", "type": "", "result": "", "created_at": "iso"}],
   "admin_events": ["AuditEvent"]
 }
@@ -99,13 +117,32 @@ Query: `q` (e-mail ou nome), `access` (`subscriber|trialing|lapsed|never|courtes
 | `/accounts/{id}/password-reset` | `{}` | envia o código de recuperação (`/auth/v1/recover` com a anon key). Conta sem e-mail → 409 `no_email` (a tela desabilita a ação) |
 | `/accounts/{id}/unlink-whatsapp` | `{}` | `profiles.phone = null` e a sessão do WhatsApp sai |
 | `/accounts/{id}/delete` | `{"confirm_email": "str"}` | `confirm_email` igual ao da conta, sem caixa; apaga como `delete_my_account`. Resposta `{"deleted": true}` |
+| `/accounts/{id}/invites/{invite_id}/revoke` | `{}` | a regra do app (`status = 'revoked'`); só convite PENDENTE do espaço desta conta: outro estado → 409 `invite_not_pending`, outro espaço → 404. Auditoria `invite_revoked` (só o id, sem o telefone do convidado) |
+| `/accounts/{id}/members/{member_user_id}/remove` | `{}` | tira o membro do espaço da conta. O dono → 409 `cannot_remove_owner`; quem não é membro → 404. Auditoria `member_removed` |
+| `/accounts/{id}/notify` | `{"title": "str ≤ 60", "body": "str ≤ 180"}` | push Expo para o aparelho da conta (serviço de push do agente). Sem aparelho → 409 `no_push_tokens`; Expo fora → 502 `push_failed` (sem auditoria). Resposta `{"sent": 1}` (não é o detalhe). Auditoria `push_sent` (só o título) |
+
+### Notas internas — `GET|POST /accounts/{id}/notes`, `DELETE /accounts/{id}/notes/{note_id}`
+Nota livre do time sobre a conta (`public.admin_account_notes`, inacessível ao app; some junto com a conta).
+`GET` → `{"items": [{"id","body","created_at","admin_user_id","admin_email"}]}`, mais recente primeiro.
+`POST {"body": "1..2000 caracteres (espaços das pontas saem)"}` → a nota criada. `DELETE` → `{"deleted": true}`
+(nota de outra conta → 404). Auditorias `note_added` e `note_deleted` guardam só o `note_id`, nunca o texto.
+
+### Configuração do app — `GET|PUT /app-config`
+Linha única `public.app_config` (o app a lê pelo Supabase, anon): versão mínima/recomendada por plataforma, link da
+loja e aviso. `GET` → os 10 campos + `updated_at` + `updated_by`:
+`min_version_ios|android` (bloqueio), `latest_version_ios|android` (aviso dispensável), `store_url_ios` (só `https://apps.apple.com/` ou `https://itunes.apple.com/`), `store_url_android` (só `https://play.google.com/`),
+`notice_title` (≤ 120), `notice_body` (≤ 1000), `notice_level` (`info|warning|critical`), `notice_until` (iso; `null` = sem prazo).
+`PUT` com os 10 campos (substitui; campo ausente ou texto vazio vira `null`; `updated_at`/`updated_by` no corpo são ignorados).
+Versão `MAJOR.MINOR.PATCH`, URL de loja nos hosts acima, nível da lista; fora disso 422. Sem nenhuma mudança não grava nem audita.
+Auditoria `app_config_changed` (`payload.changes`: `{campo: {"from","to"}}`).
 
 ### `GET /admin/api/audit`
 Query: `action`, `admin_user_id`, `target_user_id`, `page`, `page_size`.
 `{"items": [AuditEvent], "total": 0, "page": 1, "page_size": 50}`
 `AuditEvent`: `{"id","created_at","action","admin_user_id","admin_email","target_user_id","target_email","payload"}`.
 `action`: `plan_changed`, `plan_forced`, `suspended`, `reactivated`, `signed_out`, `password_reset_sent`,
-`whatsapp_unlinked`, `account_deleted`.
+`whatsapp_unlinked`, `account_deleted`, `accounts_exported`, `note_added`, `note_deleted`, `invite_revoked`,
+`member_removed`, `push_sent`, `app_config_changed`.
 
 ### `GET /admin/api/billing-events`
 Query: `q` (app_user_id ou e-mail), `type`, `result`, `page`, `page_size`.
@@ -167,3 +204,19 @@ Resposta: o detalhe atualizado.
 `/admin/api/overview` ganha `"observability": {"open": 0, "events_24h": 0, "critical_open": 0}`.
 
 Retenção: eventos 30 dias; issue resolvida ou ignorada sem evento há 90 dias sai.
+
+
+## Fora do painel: exportar os dados da pessoa (LGPD)
+
+`GET /internal/export` (JWT do APP, não é rota de admin): JSON com o perfil dela (sem o token de push) e os dados dos espaços de que
+é membro, lidos SOB RLS como ela (sai o que o app mostra a ela, nada que a policy esconde num espaço compartilhado), mais o texto que mandou pelo WhatsApp (`Content-Disposition: attachment; filename="proops-dados-AAAA-MM-DD.json"`), no máximo 3 por hora por
+usuário (429 `{"error":"rate_limited"}`). Para quem não tem o app: `agent/scripts/exportar_dados.py <user_id>`. **O painel
+NÃO exporta dado financeiro.** O que fica de fora (fila e execução do agente, billing, telemetria) está em
+`app/services/exportar_dados.py`.
+
+## Consentimento de IA
+
+`AI_CONSENT_REQUIRED` (padrão `false`; staging liga). Ligada e sem `profiles.ai_consent_at`, `conversation.check_limits`
+recusa antes de qualquer modelo: rotas do app (chat, voz `/internal/finance/draft`, transcrição de áudio) →
+**403** `{"error":"ai_consent_required"}`; WhatsApp → um aviso por dia (`alerts_sent`, kind `sem_consentimento_ia`) e nada
+em `ai_events`; a importação de extrato segue, só sem categoria/natureza/julgamento por IA.

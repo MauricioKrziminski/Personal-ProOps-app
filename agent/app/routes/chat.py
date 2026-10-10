@@ -315,6 +315,14 @@ def install_error_handlers(app) -> None:
         detalhe = exc.detail if isinstance(exc.detail, str) and exc.detail.strip() else None
         return _erro(exc.status_code, codigo, detalhe or MENSAGEM.get(exc.status_code))
 
+    @app.exception_handler(conversation.ConsentimentoNecessario)
+    async def _sem_consentimento(request: Request, exc: conversation.ConsentimentoNecessario):
+        # `error` é o contrato das rotas do app; `code`/`message` são o formato desta API de chat
+        return JSONResponse(status_code=403, content={
+            "error": "ai_consent_required", "code": "ai_consent_required",
+            "message": "Autorize o uso de IA no app para usar o assistente.",
+        })
+
     @app.exception_handler(app_chat.ChatError)
     async def _dominio(request: Request, exc: app_chat.ChatError):
         status = STATUS.get(type(exc), 500)
@@ -385,7 +393,10 @@ async def transcrever_audio(user_id: Usuario, file: ArquivoAudio) -> Transcricao
     if not perfil or not perfil.get("workspace_id"):
         raise _erro_audio(404, "no_workspace", "Não achei o seu espaço.")
     sessao = {"user_id": user_id, "workspace_id": perfil["workspace_id"], "channel": "app"}
-    if await conversation.check_limits(sessao, kind="transcription"):
+    limite = await conversation.check_limits(sessao, kind="transcription")
+    if limite == conversation.SEM_CONSENTIMENTO_IA:
+        raise conversation.ConsentimentoNecessario()
+    if limite:
         raise _erro_audio(429, "rate_limit", "Muitas mensagens em pouco tempo. Aguarda um pouquinho.")
     try:
         # Nome controlado pelo servidor: o nome do cliente nunca chega ao Groq.

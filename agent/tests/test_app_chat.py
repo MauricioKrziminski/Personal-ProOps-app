@@ -1002,3 +1002,25 @@ async def test_mensagem_digitada_nao_carimba_pergunta_nenhuma(repo):
     balao = next(m for m in repo.mensagens
                  if (m.get("ui_payload") or {}).get("draft_id") == str(rascunho))
     assert "resolved" not in balao["ui_payload"]
+
+
+@pytest.mark.asyncio
+async def test_sem_consentimento_de_ia_vira_excecao_propria_e_nao_deixa_a_mensagem_presa(repo, monkeypatch):
+    """Flag ligada e sem `ai_consent_at`: o app recebe 403 `ai_consent_required` (não paywall nem rajada)."""
+    inicial = await app_chat.create_conversation(
+        user_id=USER, client_message_id=uuid4(), content="oi"
+    )
+    sid = inicial.conversation["id"]
+    repo.turnos.clear()
+
+    async def sem_consentimento(sessao):
+        return app_chat.conversation.SEM_CONSENTIMENTO_IA
+
+    monkeypatch.setattr(app_chat.conversation, "check_limits", sem_consentimento)
+    with pytest.raises(app_chat.conversation.ConsentimentoNecessario):
+        await app_chat.send_message(
+            user_id=USER, session_id=sid, client_message_id=uuid4(), content="x"
+        )
+    assert repo.turnos == [], "o motor não pode rodar sem consentimento"
+    assert repo.sessoes[sid]["lease_expires_at"] is None
+    assert not any(m["status"] == "processing" for m in repo.mensagens)

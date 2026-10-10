@@ -252,3 +252,25 @@ async def test_job_com_embedding_fora_do_ar_nao_grava_e_descansa(banco_do_job, m
     assert banco_do_job["gravados"] == []
     assert await job.run() == {"embedded": 0, "descansando": True}
     assert len(chamadas) == 1  # a segunda rodada nem tentou
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("flag,filtra", [("true", True), ("false", False)])
+async def test_embeddings_so_de_workspace_cujo_dono_consentiu(monkeypatch, flag, filtra):
+    from app.config import get_settings
+
+    monkeypatch.setenv("AI_CONSENT_REQUIRED", flag)
+    get_settings.cache_clear()
+    vistos = []
+
+    async def fetch(sql, *a):
+        vistos.append(sql)
+        return []
+
+    monkeypatch.setattr(db, "fetch", fetch)
+    await db.transacoes_sem_vetor("m", 10)
+    get_settings.cache_clear()
+    sql = vistos[0]
+    assert ("p.ai_consent_at is not null" in sql) is filtra
+    if filtra:
+        assert "w.owner_id" in sql, "a régua é o DONO do workspace"

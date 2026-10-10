@@ -207,11 +207,14 @@ async def _processar(lote: list[dict], ids: list, phone: str, thread_id: str) ->
         await db.mark_done(ids)
         # O aviso de limite sai UMA vez por dia por workspace (resposta paga); a rajada por
         # hora (MUITAS) não entra: é transitória e a pessoa precisa saber que esperar resolve.
+        # Sem consentimento de IA o aviso é próprio e também sai UMA vez por dia (`alerts_sent`).
+        sem_consentimento = barrado == conversation.SEM_CONSENTIMENTO_IA
         if barrado == conversation.MUITAS or await db.reservar_aviso_de_limite(
-            sessao["user_id"], sessao["workspace_id"], sessao.get("timezone")
+            sessao["user_id"], sessao["workspace_id"], sessao.get("timezone"),
+            **({"kind": "sem_consentimento_ia"} if sem_consentimento else {}),
         ):
             await _enviar(phone, barrado, sessao)
-        return {"claimed": len(ids), "status": "limite"}
+        return {"claimed": len(ids), "status": "sem_consentimento_ia" if sem_consentimento else "limite"}
 
     # Cota de RESPOSTAS pelo WhatsApp (o chat do app não passa por aqui e segue até o limite de IA).
     # Estourou: não chama IA, devolve a vaga, avisa UMA vez por dia e depois fica em silêncio.

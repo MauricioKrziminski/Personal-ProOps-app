@@ -86,8 +86,15 @@ class Settings(BaseSettings):
     # uuids (auth.users.id) que podem usar o painel /admin, separados por vírgula. Vazio = painel
     # desligado (toda rota /admin responde 404).
     admin_user_ids: str = ""
-    # Exige aal2 (TOTP) no JWT do painel /admin. Desligado por padrão: o SPA só abre o fluxo de TOTP quando ligado.
-    admin_require_mfa: bool = False
+    # Exige aal2 (TOTP) no JWT do painel /admin. LIGADO por padrão (09/10/2026): esquecer a variável
+    # não pode abrir o painel só com senha. O E2E local e o staging passam `false` de forma explícita.
+    admin_require_mfa: bool = True
+
+    # Consentimento de IA (LGPD): ligado, quem não tem `profiles.ai_consent_at` não chega ao modelo
+    # (app: 403 `ai_consent_required`; WhatsApp: um aviso por dia). Desligado = nada muda. Produção
+    # fica `false` até o app com a tela de consentimento estar na loja (o app em campo não consegue
+    # consentir); o staging liga.
+    ai_consent_required: bool = False
 
     # RLS como segunda camada: ligada, a TOOL roda sob `authenticated` com as claims do dono da
     # conversa (`db.sob_rls`), como o PostgREST faz com o app. Desligada = comportamento antigo.
@@ -135,10 +142,16 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("LANGFUSE_HOST", "LANGFUSE_BASE_URL"),
     )
 
-    @field_validator("agente_rls", "admin_require_mfa", mode="before")
+    @field_validator("agente_rls", "ai_consent_required", mode="before")
     @classmethod
     def _rls_vazio_e_desligado(cls, v):
         return False if isinstance(v, str) and not re.sub(r"\s+#.*$", "", v).strip() else v
+
+    @field_validator("admin_require_mfa", mode="before")
+    @classmethod
+    def _mfa_vazio_e_ligado(cls, v):
+        # variável vazia = não configurada: vale o default seguro (ligado), nunca "desligado"
+        return True if isinstance(v, str) and not re.sub(r"\s+#.*$", "", v).strip() else v
 
     @field_validator("*", mode="before")
     @classmethod

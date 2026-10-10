@@ -14,7 +14,10 @@ Segurança:
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import logging
+import re
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
@@ -24,14 +27,15 @@ from zoneinfo import ZoneInfo
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.routing import APIRoute
 from psycopg.types.json import Jsonb
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app import db
 from app.auth import current_user, decode_token
 from app.config import get_settings
+from app.services import push
 
 log = logging.getLogger(__name__)
 
@@ -47,7 +51,7 @@ prim as ({_PRIM}),
 base as (
   select p.id as user_id, prim.ws as workspace_id, u.email::text as email, p.display_name as name,
          p.created_at, u.last_sign_in_at, coalesce(u.banned_until > now(), false) as suspended,
-         (p.phone is not null) as whatsapp_linked,
+         (p.phone is not null) as whatsapp_linked, p.phone, p.last_app_version, p.last_seen_at,
          coalesce(ps.plan, 'free') as plan, coalesce(ps.status, 'active') as status,
          coalesce(ps.access, 'never') as access, coalesce(ps.is_trial, false) as is_trial,
          ps.current_period_end as period_end, ps.provider,
@@ -78,7 +82,8 @@ _SINAIS = {
     "near_limit": """access = 'subscriber' and ((ai_max > 0 and ai_used >= 0.8 * ai_max)
         or (wa_max > 0 and wa_used >= 0.8 * wa_max))""",
     "inactive_subscribers_30d": """access = 'subscriber'
-        and (last_sign_in_at is null or last_sign_in_at < now() - interval '30 days')""",
+        and (coalesce(last_seen_at, last_sign_in_at) is null
+             or coalesce(last_seen_at, last_sign_in_at) < now() - interval '30 days')""",
 }
 _ORIGEM_SQL = {"apple": "app_store", "google": "play_store", "manual": "manual", "test_store": "test_store"}
 _ORIGEM_API = {v: k for k, v in _ORIGEM_SQL.items()}
@@ -89,6 +94,8 @@ _ORDEM = {
     "last_sign_in_asc": "last_sign_in_at nulls first, user_id",
     "ai_used_desc": "ai_used desc, user_id",
     "email_asc": "lower(email), user_id",
+    "last_seen_desc": "last_seen_at desc nulls last, user_id",
+    "last_seen_asc": "last_seen_at nulls first, user_id",
 }
 
 
@@ -227,6 +234,12 @@ async def overview(_admin: UUID = Depends(admin_user)):
                   (select count(*) from public.error_events where created_at >= now() - interval '24 hours')::int as ev,
                   (select count(*) from public.error_issues where status = 'open' and severity = 'critical')::int as crit"""
     ) or {}
+    versoes = await db.fetch(
+        """select last_app_platform as platform, last_app_version as version, count(*)::int as users
+           from public.profiles
+           where last_seen_at >= now() - interval '30 days' and last_app_version is not null
+           group by 1, 2 order by 3 desc, 1, 2"""
+    )
     meses = await db.fetch(
         """
         select to_char(m, 'YYYY-MM') as month,
@@ -258,6 +271,7 @@ async def overview(_admin: UUID = Depends(admin_user)):
         "signals": {k: n(k) for k in ("trial_ending_48h", "lapsed_7d", "near_limit", "inactive_subscribers_30d")},
         "observability": {"open": obs.get("open", 0), "events_24h": obs.get("ev", 0),
                           "critical_open": obs.get("crit", 0)},
+        "versions": [{"platform": v["platform"], "version": v["version"], "users": v["users"]} for v in versoes],
     })
 
 
@@ -277,6 +291,7 @@ def _linha(r: dict) -> dict:
         "ai_used": r.get("ai_used") or 0, "ai_max": r.get("ai_max") or 0,
         "wa_used": r.get("wa_used") or 0, "wa_max": r.get("wa_max") or 0,
         "whatsapp_linked": bool(r.get("whatsapp_linked")),
+        "last_app_version": r.get("last_app_version"), "last_seen_at": _iso(r.get("last_seen_at")),
     }
 
 
@@ -284,22 +299,25 @@ def _like(q: str) -> str:
     return "%" + q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
 
-@router.get("/accounts")
-async def accounts(
-    q: str = Query("", max_length=100),
-    access: Literal["subscriber", "trialing", "lapsed", "never", "courtesy", "suspended"] | None = None,
-    plan: Literal["free", "pro", "family"] | None = None,
-    origin: Literal["apple", "google", "manual", "test_store", "none"] | None = None,
-    signal: Literal["trial_ending_48h", "lapsed_7d", "near_limit", "inactive_subscribers_30d"] | None = None,
-    sort: Literal["created_desc", "created_asc", "last_sign_in_desc", "last_sign_in_asc", "ai_used_desc", "email_asc"] = "created_desc",
-    page: int = Query(1, ge=1, le=100_000),
-    page_size: int = Query(25, ge=1, le=100),
-    _admin: UUID = Depends(admin_user),
-):
+Acesso = Literal["subscriber", "trialing", "lapsed", "never", "courtesy", "suspended"]
+Plano = Literal["free", "pro", "family"]
+Origem = Literal["apple", "google", "manual", "test_store", "none"]
+Sinal = Literal["trial_ending_48h", "lapsed_7d", "near_limit", "inactive_subscribers_30d"]
+Ordem = Literal["created_desc", "created_asc", "last_sign_in_desc", "last_sign_in_asc", "ai_used_desc", "email_asc",
+                "last_seen_desc", "last_seen_asc"]
+
+
+def _filtro(q: str, access, plan, origin, signal) -> tuple[str, list]:
+    """O WHERE da lista e do CSV: um critério só, para os dois nunca divergirem."""
     onde, args = ["true"], []
     if q.strip():
-        onde.append("(email ilike %s or name ilike %s)")
-        args += [_like(q)] * 2
+        busca, args = "email ilike %s or name ilike %s", [_like(q)] * 2
+        # com 4+ dígitos em `q`, procura também no telefone (só os dígitos dele, qualquer formatação)
+        digitos = re.sub(r"\D", "", q)
+        if len(digitos) >= 4:
+            busca += " or regexp_replace(coalesce(phone, ''), '\\D', '', 'g') like %s"
+            args.append(f"%{digitos}%")
+        onde.append(f"({busca})")
     if access:
         onde.append(f"({_ACESSO[access]})")
     if signal:
@@ -312,7 +330,22 @@ async def accounts(
     elif origin:
         onde.append("provider = %s")
         args.append(_ORIGEM_SQL[origin])
-    filtro = " and ".join(onde)
+    return " and ".join(onde), args
+
+
+@router.get("/accounts")
+async def accounts(
+    q: str = Query("", max_length=100),
+    access: Acesso | None = None,
+    plan: Plano | None = None,
+    origin: Origem | None = None,
+    signal: Sinal | None = None,
+    sort: Ordem = "created_desc",
+    page: int = Query(1, ge=1, le=100_000),
+    page_size: int = Query(25, ge=1, le=100),
+    _admin: UUID = Depends(admin_user),
+):
+    filtro, args = _filtro(q, access, plan, origin, signal)
     total = await db.fetch_one(f"with {_BASE} select count(*)::int as n from base where {filtro}", *args)
     limite, desloc = _pagina(page, page_size)
     linhas = await db.fetch(
@@ -321,6 +354,48 @@ async def accounts(
     )
     return _json({"items": [_linha(r) for r in linhas], "total": (total or {}).get("n", 0),
                   "page": page, "page_size": page_size})
+
+
+CSV_TETO = 10_000
+_CSV_COLUNAS = ("user_id", "email", "name", "created_at", "last_sign_in_at", "last_seen_at", "last_app_version",
+                "plan", "status", "access", "is_trial", "period_end", "origin", "ai_used", "ai_max", "wa_used",
+                "wa_max", "whatsapp_linked", "suspended")
+
+
+def _celula(v) -> str:
+    """Valor de CSV; texto que começa com `= + - @` ganha `'` (a planilha não executa como fórmula)."""
+    t = "" if v is None else str(v).lower() if isinstance(v, bool) else str(v)
+    return "'" + t if t[:1] in ("=", "+", "-", "@", "\t", "\r") else t
+
+
+@router.get("/accounts.csv")
+async def accounts_csv(
+    q: str = Query("", max_length=100),
+    access: Acesso | None = None,
+    plan: Plano | None = None,
+    origin: Origem | None = None,
+    signal: Sinal | None = None,
+    sort: Ordem = "created_desc",
+    admin: UUID = Depends(admin_user),
+):
+    filtro, args = _filtro(q, access, plan, origin, signal)
+    total = (await db.fetch_one(f"with {_BASE} select count(*)::int as n from base where {filtro}", *args) or {}).get("n", 0)
+    if total > CSV_TETO:
+        raise _erro(422, "too_many_rows", f"São {total} contas; o teto do CSV é {CSV_TETO}. Refine os filtros.")
+    linhas = await db.fetch(f"with {_BASE} select * from base where {filtro} order by {_ORDEM[sort]}", *args)
+    saida = io.StringIO()
+    escritor = csv.writer(saida, lineterminator="\r\n")
+    escritor.writerow(_CSV_COLUNAS)
+    for r in linhas:
+        linha = _linha(r)
+        escritor.writerow([_celula(linha[c]) for c in _CSV_COLUNAS])
+    filtros = {k: v for k, v in {"q": q.strip() or None, "access": access, "plan": plan, "origin": origin,
+                                 "signal": signal, "sort": sort}.items() if v is not None}
+    async with db.unidade_de_trabalho():
+        await _auditar(admin, "accounts_exported", None, {"filters": filtros, "total": len(linhas)})
+    nome = f"contas-{datetime.now(_FUSO).date().isoformat()}.csv"
+    return Response(content=("\ufeff" + saida.getvalue()).encode("utf-8"), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{nome}"'})
 
 
 def _evento(r: dict) -> dict:  # forma única de AuditEvent
@@ -349,7 +424,10 @@ async def _detalhe(user_id: UUID) -> dict:
     u = await db.fetch_one(
         """select p.phone, u.email_confirmed_at, u.banned_until,
                   coalesce(u.raw_user_meta_data->>'onboarding_completed', 'false') = 'true' as onboarding,
-                  (select count(*) from auth.sessions s where s.user_id = u.id)::int as sessoes
+                  (select count(*) from auth.sessions s where s.user_id = u.id)::int as sessoes,
+                  p.terms_version, p.terms_accepted_at, p.ai_consent_at, p.last_app_version,
+                  p.last_app_platform, p.last_seen_at, (p.expo_push_token is not null)::int as push_tokens,
+                  (select count(*) from public.admin_account_notes n where n.user_id = p.id)::int as notes_count
            from public.profiles p join auth.users u on u.id = p.id where p.id = %s""",
         user_id,
     ) or {}
@@ -397,7 +475,7 @@ async def _detalhe(user_id: UUID) -> dict:
            where m.workspace_id = %s order by m.created_at, m.user_id""", ws,
     ) if ws else [])
     convites = (await db.fetch(
-        "select phone, status, created_at from public.workspace_invites where workspace_id = %s order by created_at desc",
+        "select id, phone, status, created_at from public.workspace_invites where workspace_id = %s order by created_at desc",
         ws,
     ) if ws else [])
     cobrancas = await db.fetch(
@@ -413,7 +491,11 @@ async def _detalhe(user_id: UUID) -> dict:
         "account": _linha(acc),
         "profile": {"phone": u.get("phone"), "email_confirmed_at": _iso(u.get("email_confirmed_at")),
                     "onboarding_completed": bool(u.get("onboarding")),
-                    "banned_until": _iso(u.get("banned_until")), "sessions": u.get("sessoes") or 0},
+                    "banned_until": _iso(u.get("banned_until")), "sessions": u.get("sessoes") or 0,
+                    "terms_version": u.get("terms_version"), "terms_accepted_at": _iso(u.get("terms_accepted_at")),
+                    "ai_consent_at": _iso(u.get("ai_consent_at")), "last_app_version": u.get("last_app_version"),
+                    "last_app_platform": u.get("last_app_platform"), "last_seen_at": _iso(u.get("last_seen_at")),
+                    "push_tokens": u.get("push_tokens") or 0, "notes_count": u.get("notes_count") or 0},
         "subscription": {
             "plan": sub.get("plan") or "free", "status": sub.get("status") or "active",
             "provider": prov or "", "origin": _ORIGEM_API.get(prov, prov) if prov else None,
@@ -434,7 +516,7 @@ async def _detalhe(user_id: UUID) -> dict:
                    ("transactions", "accounts", "cards", "notes", "reminders", "goals", "debts", "recurring")},
         "members": [{"user_id": str(m["user_id"]), "email": m["email"], "name": m.get("display_name"),
                      "role": "owner" if m["role"] == "owner" else "member"} for m in membros],
-        "invites": [{"phone": i["phone"], "status": i["status"], "created_at": _iso(i["created_at"])}
+        "invites": [{"id": str(i["id"]), "phone": i["phone"], "status": i["status"], "created_at": _iso(i["created_at"])}
                     for i in convites],
         "billing_events": [{"id": b["id"], "type": b.get("type") or "", "result": b.get("result") or "",
                             "created_at": _iso(b["received_at"])} for b in cobrancas],
@@ -450,7 +532,7 @@ async def conta(user_id: UUID, _admin: UUID = Depends(admin_user)):
 # ── ações ─────────────────────────────────────────────────────────────────────────────────────────────
 async def _alvo(user_id: UUID) -> dict:
     r = await db.fetch_one(
-        """select p.id, u.email::text as email, p.phone,
+        """select p.id, u.email::text as email, p.phone, p.expo_push_token,
                   (select id from public.workspaces w where w.owner_id = p.id order by w.created_at, w.id limit 1) as ws
            from public.profiles p join auth.users u on u.id = p.id where p.id = %s""",
         user_id,
@@ -460,11 +542,13 @@ async def _alvo(user_id: UUID) -> dict:
     return r
 
 
-async def _auditar(admin: UUID, acao: str, alvo: dict, extra: dict | None = None) -> None:
+async def _auditar(admin: UUID, acao: str, alvo: dict | None, extra: dict | None = None) -> None:
+    """`alvo` None = ação sem conta (exportar a lista, configuração do app)."""
+    alvo = alvo or {}
     await db.execute(
         """insert into public.admin_audit_events (admin_user_id, action, target_user_id, target_workspace_id, payload)
            values (%s, %s, %s, %s, %s)""",
-        admin, acao, alvo["id"], alvo.get("ws"), Jsonb(extra or {}),
+        admin, acao, alvo.get("id"), alvo.get("ws"), Jsonb(extra or {}),
     )
 
 
@@ -602,6 +686,202 @@ async def apagar(user_id: UUID, body: ApagarIn, admin: UUID = Depends(admin_user
         await _auditar(admin, "account_deleted", alvo)  # só ids: o e-mail some junto com a conta
         await db.execute("select private.apagar_conta(%s)", user_id)
     return _json({"deleted": True})
+
+
+# ── notas internas, convites, membros, aviso por push ─────────────────────────────────────────────────
+class NotaIn(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    body: str = Field(min_length=1, max_length=2000)
+
+
+_NOTA = """select n.id, n.body, n.created_at, n.admin_user_id, a.email::text as admin_email
+           from public.admin_account_notes n left join auth.users a on a.id = n.admin_user_id"""
+
+
+def _nota(r: dict) -> dict:
+    return {"id": str(r["id"]), "body": r["body"], "created_at": _iso(r["created_at"]),
+            "admin_user_id": str(r["admin_user_id"]), "admin_email": r.get("admin_email")}
+
+
+@router.get("/accounts/{user_id}/notes")
+async def notas(user_id: UUID, _admin: UUID = Depends(admin_user)):
+    await _alvo(user_id)
+    linhas = await db.fetch(_NOTA + " where n.user_id = %s order by n.created_at desc, n.id", user_id)
+    return _json({"items": [_nota(r) for r in linhas]})
+
+
+@router.post("/accounts/{user_id}/notes")
+async def nova_nota(user_id: UUID, body: NotaIn, admin: UUID = Depends(admin_user)):
+    alvo = await _alvo(user_id)
+    async with db.unidade_de_trabalho():
+        nova = await db.fetch_one(
+            """insert into public.admin_account_notes (user_id, admin_user_id, body) values (%s, %s, %s)
+               returning id""", user_id, admin, body.body)
+        await _auditar(admin, "note_added", alvo, {"note_id": str(nova["id"])})  # o texto da nota não vai à auditoria
+    criada = await db.fetch_one(_NOTA + " where n.id = %s", nova["id"])
+    return _json(_nota(criada))
+
+
+@router.delete("/accounts/{user_id}/notes/{note_id}")
+async def apagar_nota(user_id: UUID, note_id: UUID, admin: UUID = Depends(admin_user)):
+    alvo = await _alvo(user_id)
+    async with db.unidade_de_trabalho():
+        apagou = await db.fetch_one(
+            "delete from public.admin_account_notes where id = %s and user_id = %s returning id", note_id, user_id)
+        if apagou is None:
+            raise _erro(404, "not_found")
+        await _auditar(admin, "note_deleted", alvo, {"note_id": str(note_id)})
+    return _json({"deleted": True})
+
+
+@router.post("/accounts/{user_id}/invites/{invite_id}/revoke")
+async def revogar_convite(user_id: UUID, invite_id: UUID, admin: UUID = Depends(admin_user)):
+    alvo = await _alvo(user_id)
+    if not alvo["ws"]:
+        raise _erro(404, "not_found")
+    async with db.unidade_de_trabalho():
+        # a mesma regra do app (`useRevokeInvite`): o convite vira `revoked`; aqui só os do espaço DESTA conta
+        convite = await db.fetch_one(
+            "select status from public.workspace_invites where id = %s and workspace_id = %s for update",
+            invite_id, alvo["ws"])
+        if convite is None:
+            raise _erro(404, "not_found")
+        if convite["status"] != "pending":
+            raise _erro(409, "invite_not_pending", "Esse convite já foi aceito ou revogado.")
+        await db.execute("update public.workspace_invites set status = 'revoked' where id = %s", invite_id)
+        await _auditar(admin, "invite_revoked", alvo, {"invite_id": str(invite_id)})  # sem o telefone do convidado
+    return _json(await _detalhe(user_id))
+
+
+@router.post("/accounts/{user_id}/members/{member_user_id}/remove")
+async def remover_membro(user_id: UUID, member_user_id: UUID, admin: UUID = Depends(admin_user)):
+    alvo = await _alvo(user_id)
+    if not alvo["ws"]:
+        raise _erro(404, "not_found")
+    async with db.unidade_de_trabalho():
+        membro = await db.fetch_one(
+            "select role from public.workspace_members where workspace_id = %s and user_id = %s for update",
+            alvo["ws"], member_user_id)
+        if membro is None:
+            raise _erro(404, "not_found")
+        if membro["role"] == "owner" or member_user_id == user_id:
+            raise _erro(409, "cannot_remove_owner", "O dono do espaço não pode ser removido.")
+        await db.execute("delete from public.workspace_members where workspace_id = %s and user_id = %s",
+                         alvo["ws"], member_user_id)
+        await _auditar(admin, "member_removed", alvo, {"member_user_id": str(member_user_id)})
+    return _json(await _detalhe(user_id))
+
+
+class AvisoIn(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    title: str = Field(min_length=1, max_length=60)
+    body: str = Field(min_length=1, max_length=180)
+
+
+@router.post("/accounts/{user_id}/notify")
+async def avisar(user_id: UUID, body: AvisoIn, admin: UUID = Depends(admin_user)):
+    alvo = await _alvo(user_id)
+    if not alvo.get("expo_push_token"):
+        raise _erro(409, "no_push_tokens", "A conta não tem aparelho registrado para receber o aviso.")
+    # rede FORA da transação; só audita se o Expo aceitou
+    try:
+        await push.send(alvo["expo_push_token"], body.title, body.body)
+    except Exception as err:  # noqa: BLE001
+        log.warning("push do painel falhou: %s", type(err).__name__)
+        raise _erro(502, "push_failed", "Não consegui enviar o aviso. Tente de novo.") from err
+    async with db.unidade_de_trabalho():
+        await _auditar(admin, "push_sent", alvo, {"title": body.title})
+    return _json({"sent": 1})
+
+
+# ── configuração remota do app (versão mínima, aviso) ──────────────────────────────────────────────────
+_VERSAO = re.compile(r"^\d+\.\d+\.\d+$")
+_CONFIG_CAMPOS = ("min_version_ios", "min_version_android", "latest_version_ios", "latest_version_android",
+                  "store_url_ios", "store_url_android", "notice_title", "notice_body", "notice_level", "notice_until")
+
+
+class ConfigIn(BaseModel):
+    """Substitui os 10 campos (o painel manda o formulário inteiro); vazio vira null."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="ignore")  # o painel pode devolver updated_at/updated_by
+    min_version_ios: str | None = None
+    min_version_android: str | None = None
+    latest_version_ios: str | None = None
+    latest_version_android: str | None = None
+    store_url_ios: str | None = Field(None, max_length=500)
+    store_url_android: str | None = Field(None, max_length=500)
+    notice_title: str | None = Field(None, max_length=120)
+    notice_body: str | None = Field(None, max_length=1000)
+    notice_level: Literal["info", "warning", "critical"] | None = None
+    notice_until: datetime | None = None
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def _vazio_e_nulo(cls, v):
+        return None if isinstance(v, str) and not v.strip() else v
+
+    @field_validator("min_version_ios", "min_version_android", "latest_version_ios", "latest_version_android")
+    @classmethod
+    def _semver(cls, v):
+        if v is not None and not _VERSAO.match(v):
+            raise ValueError("versão no formato MAJOR.MINOR.PATCH")
+        return v
+
+    @field_validator("notice_until")
+    @classmethod
+    def _com_fuso(cls, v):
+        # sem fuso na entrada = horário de Brasília (o painel é brasileiro), nunca o fuso da conexão
+        return v.replace(tzinfo=_FUSO) if v is not None and v.tzinfo is None else v
+
+    @field_validator("store_url_ios")
+    @classmethod
+    def _loja_ios(cls, v):
+        if v is not None and not v.startswith(("https://apps.apple.com/", "https://itunes.apple.com/")):
+            raise ValueError("a URL da App Store começa com https://apps.apple.com/ ou https://itunes.apple.com/")
+        return v
+
+    @field_validator("store_url_android")
+    @classmethod
+    def _loja_android(cls, v):
+        if v is not None and not v.startswith("https://play.google.com/"):
+            raise ValueError("a URL da Play Store começa com https://play.google.com/")
+        return v
+
+
+def _config(r: dict) -> dict:
+    out = {c: r.get(c) for c in _CONFIG_CAMPOS}
+    out["notice_until"] = _iso(r.get("notice_until"))
+    out["updated_at"] = _iso(r.get("updated_at"))
+    out["updated_by"] = str(r["updated_by"]) if r.get("updated_by") else None
+    return out
+
+
+@router.get("/app-config")
+async def ver_config(_admin: UUID = Depends(admin_user)):
+    r = await db.fetch_one("select * from public.app_config where id = 1")
+    return _json(_config(r or {}))
+
+
+@router.put("/app-config")
+async def mudar_config(body: ConfigIn, admin: UUID = Depends(admin_user)):
+    novo = body.model_dump()
+    async with db.unidade_de_trabalho():
+        antes = await db.fetch_one("select * from public.app_config where id = 1 for update") or {}
+        # compara os OBJETOS (o mesmo instante em fusos diferentes é igual); só o audit vira texto
+        diff = {c: {"from": _json_valor(antes.get(c)), "to": _json_valor(novo[c])}
+                for c in _CONFIG_CAMPOS if antes.get(c) != novo[c]}
+        if not diff:
+            return _json(_config(antes))
+        depois = await db.fetch_one(
+            f"""update public.app_config set {", ".join(f"{c} = %s" for c in _CONFIG_CAMPOS)},
+                       updated_at = now(), updated_by = %s where id = 1 returning *""",
+            *[novo[c] for c in _CONFIG_CAMPOS], admin)
+        await _auditar(admin, "app_config_changed", None, {"changes": diff})
+    return _json(_config(depois))
+
+
+def _json_valor(v):
+    return v.isoformat() if isinstance(v, datetime) else v
 
 
 # ── auditoria, cobrança, sistema ──────────────────────────────────────────────────────────────────────

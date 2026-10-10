@@ -852,6 +852,12 @@ async def reservar_aviso_de_limite(
         return True
 
 
+async def ia_consentida(user_id: UUID | str) -> bool:
+    """True = `profiles.ai_consent_at` preenchido (a pessoa autorizou o uso de IA no app)."""
+    r = await fetch_one("select ai_consent_at is not null as ok from public.profiles where id = %s", user_id)
+    return bool(r and r["ok"])
+
+
 async def conta_suspensa(user_id: UUID | str) -> bool:
     """True = `auth.users.banned_until` no futuro (suspensa pelo painel admin)."""
     r = await fetch_one("select coalesce(banned_until > now(), false) as b from auth.users where id = %s", user_id)
@@ -1654,8 +1660,14 @@ async def transacoes_sem_vetor(modelo: str, limite: int) -> list[dict[str, Any]]
     # ponytail: varre e calcula md5 de TODO lançamento a cada rodada (O(n) para descobrir que nada
     # está velho). Serve até alguns milhares de linhas; depois, um predicado de "sujo" (updated_at)
     # ou um gatilho que apaga o vetor quando o texto muda."""
+    # Com `AI_CONSENT_REQUIRED` o texto só vai ao Gemini se o DONO do workspace consentiu (o dado é dele).
+    so_com_consentimento = (
+        "and exists (select 1 from public.workspaces w join public.profiles p on p.id = w.owner_id "
+        "where w.id = t.workspace_id and p.ai_consent_at is not null)"
+        if get_settings().ai_consent_required else ""
+    )
     return await fetch(
-        """
+        f"""
         select t.id as transaction_id, t.workspace_id, x.texto, md5(x.texto) as hash
         from public.transactions t
         cross join lateral (
@@ -1664,6 +1676,7 @@ async def transacoes_sem_vetor(modelo: str, limite: int) -> list[dict[str, Any]]
         where x.texto <> ''
           and (e.transaction_id is null or e.content_hash <> md5(x.texto)
                or e.model <> %s or e.workspace_id <> t.workspace_id)
+          {so_com_consentimento}
         order by t.occurred_at desc, t.created_at desc
         limit %s
         """,

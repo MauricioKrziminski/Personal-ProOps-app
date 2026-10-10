@@ -227,10 +227,14 @@ async def _execute_turn(
     # que impede duas abas do mesmo usuário passarem juntas pelo limite.
     limite = await conversation.check_limits(sessao)
     if limite:
+        sem_consentimento = limite == conversation.SEM_CONSENTIMENTO_IA
         await repo.fail_chat_turn(
             session_id=session_id, user_message_id=mensagem["id"],
-            error_code="rate_limit" if limite == conversation.MUITAS else "plan_limit",
+            error_code="ai_consent_required" if sem_consentimento
+            else "rate_limit" if limite == conversation.MUITAS else "plan_limit",
         )
+        if sem_consentimento:
+            raise conversation.ConsentimentoNecessario()
         raise RateLimit(limite) if limite == conversation.MUITAS else PlanLimit(limite)
 
     # Texto novo pode corrigir/cancelar uma proposta HITL sem passar pela rota de

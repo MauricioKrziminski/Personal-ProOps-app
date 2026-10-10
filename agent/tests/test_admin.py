@@ -41,6 +41,7 @@ def _linha_base(**kw):
 def cli(monkeypatch):
     get_settings.cache_clear()
     monkeypatch.setenv("ADMIN_USER_IDS", f"lixo, {ADMIN}")
+    monkeypatch.setenv("ADMIN_REQUIRE_MFA", "false")  # o default é ligado; os testes de MFA ligam de volta
     monkeypatch.setenv("SUPABASE_URL", "https://x.supabase.co")
     monkeypatch.setenv("SUPABASE_ANON_KEY", "anon-publica")
     estado = {"id": ADMIN, "aal": "aal1"}
@@ -120,7 +121,7 @@ def banco(monkeypatch):
         if "from public.workspace_members" in sql:
             return [{"user_id": ALVO, "email": "a@b.com", "display_name": "Ana", "role": "owner"}]
         if "from public.workspace_invites" in sql:
-            return [{"phone": "5511", "status": "pending", "created_at": AGORA}]
+            return [{"id": "11111111-1111-1111-1111-111111111111", "phone": "5511", "status": "pending", "created_at": AGORA}]
         if "from public.billing_events" in sql or "from (select id, received_at" in sql:
             return [{"id": "ev1", "type": "INITIAL_PURCHASE", "result": "ok", "received_at": AGORA,
                      "provider": "app_store", "app_user_id": str(ALVO), "email": "a@b.com",
@@ -214,7 +215,7 @@ def test_formato_das_rotas_get(cli, banco):
                                          "mfa_required": False}
     o = j["/admin/api/overview"].json()
     assert set(o) == {"accounts", "access", "plans", "usage_month", "signups_by_month", "ai_cost_by_day", "signals",
-                    "observability"}
+                    "observability", "versions"}
     assert set(o["access"]) == {"subscriber", "trialing", "lapsed", "never", "courtesy", "suspended"}
     assert o["usage_month"]["ai_cost_usd"] == "1.50" and o["ai_cost_by_day"] == [{"day": "2026-10-01", "usd": "0.2000"}]
     assert o["signups_by_month"] == [{"month": "2026-10", "count": 3}]
@@ -222,7 +223,8 @@ def test_formato_das_rotas_get(cli, banco):
     assert set(lista) == {"items", "total", "page", "page_size"} and lista["page_size"] == 25
     assert set(lista["items"][0]) == {"user_id", "workspace_id", "email", "name", "created_at", "last_sign_in_at",
                                       "suspended", "plan", "status", "access", "is_trial", "period_end", "origin",
-                                      "ai_used", "ai_max", "wa_used", "wa_max", "whatsapp_linked"}
+                                      "ai_used", "ai_max", "wa_used", "wa_max", "whatsapp_linked", "last_app_version",
+                                      "last_seen_at"}
     d = j[f"/admin/api/accounts/{ALVO}"].json()
     assert set(d) == {"account", "profile", "subscription", "usage", "counts", "members", "invites",
                       "billing_events", "admin_events"}

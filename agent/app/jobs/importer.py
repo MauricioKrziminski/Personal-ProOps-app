@@ -96,14 +96,21 @@ async def run(
     barrado = await conversation.check_limits(sessao, kind="import")
     if barrado:
         raise ImportError_(barrado, status=429)
+    # Sem consentimento de IA a importação SEGUE, só sem as duas camadas de modelo (categoria/natureza
+    # e julgamento dos pares): o resultado é o da estrutura, como quando o modelo está fora do ar.
+    sem_ia = await conversation.sem_consentimento_de_ia(user_id)
+    if sem_ia:
+        await conversation.soltar_reserva()  # nenhum modelo será chamado: a vaga volta
     try:
         resultado = await _importar(
             user_id=user_id, workspace_id=workspace_id, content=content, source=source,
-            filename=filename, account_id=account_id,
+            filename=filename, account_id=account_id, sem_ia=sem_ia,
         )
     except BaseException:
         await conversation.soltar_reserva()
         raise
+    if sem_ia:
+        return resultado
     await db.record_ai_event(
         user_id=user_id, workspace_id=workspace_id, channel="app", model=modelo(PAPEL_BATCH),
         confidence=None, result={"import": True, "items": resultado["items"]}, kind="import",
@@ -119,6 +126,7 @@ async def _importar(
     source: str,
     filename: str | None = None,
     account_id: UUID | None = None,
+    sem_ia: bool = False,
 ) -> dict:
     plano = await db.fetch_one("select * from public._plan_status(%s)", workspace_id)
     if plano and not plano.get("can_import"):
@@ -175,7 +183,7 @@ async def _importar(
     detalhes: list[UUID | None] = [None] * len(linhas)
     naturezas: list[str | None] = [None] * len(linhas)
     try:
-        classes = await classify_statement_lines(
+        classes = [] if sem_ia else await classify_statement_lines(
             [("saída" if l.kind == "expense" else "entrada", l.description) for l in linhas],
             cartao=cartao,
         )
@@ -269,7 +277,7 @@ async def _importar(
     # A camada de SENTIDO: o que a estrutura não resolveu vai ao modelo numa chamada só, e a
     # cascata roda de novo com o julgamento. Falhou o modelo, fica o resultado da estrutura —
     # o pior caso é o item aparecer como novo ou "talvez", que a pessoa vê e decide.
-    pares = pares_para_julgar(itens, existentes, vereditos, conta_id=str(account_id))[:MAX_PARES]
+    pares = [] if sem_ia else pares_para_julgar(itens, existentes, vereditos, conta_id=str(account_id))[:MAX_PARES]
     if pares:
         por_id = {t.id: t for t in existentes}
         try:

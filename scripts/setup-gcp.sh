@@ -394,7 +394,12 @@ deploy() {
   if [[ -z "${LANGFUSE_SAMPLE_RATE:-}" ]]; then
     if [[ "$SERVICE" == *staging* ]]; then LANGFUSE_SAMPLE_RATE=1.0; else LANGFUSE_SAMPLE_RATE=0.1; fi
   fi
-  for v in LANGFUSE_SAMPLE_RATE AGENTE_RLS AGENT_PROMPT_V2 IA_RACIOCINIO_GATE IA_SOMBRA_PARSE IA_SOMBRA_GATE \
+  # Consentimento de IA: o staging exige (testa a tela nova); produção só liga quando o app com a
+  # tela estiver na loja — o app em campo não consegue consentir, e ligar antes cala o assistente.
+  if [[ -z "${AI_CONSENT_REQUIRED:-}" ]]; then
+    if [[ "$SERVICE" == *staging* ]]; then AI_CONSENT_REQUIRED=true; else AI_CONSENT_REQUIRED=false; fi
+  fi
+  for v in LANGFUSE_SAMPLE_RATE AI_CONSENT_REQUIRED AGENTE_RLS AGENT_PROMPT_V2 IA_RACIOCINIO_GATE IA_SOMBRA_PARSE IA_SOMBRA_GATE \
            TURNO_LENTO_SECONDS CUSTO_DIARIO_ALERTA_USD WHATSAPP_TYPING_INDICATOR; do
     if [[ -n "${!v:-}" ]]; then flags+=",${v}=${!v}"; fi
   done
@@ -415,6 +420,11 @@ deploy() {
   sandbox_ids="$(ler_env BILLING_SANDBOX_USER_IDS)"
   local mfa
   mfa="$(ler_env ADMIN_REQUIRE_MFA)"
+  # Produção NUNCA sobe o painel sem TOTP: o default do agente é ligado, e o deploy recusa o resto.
+  if [[ "$SERVICE" != *staging* && "$mfa" != "true" ]]; then
+    err "ADMIN_REQUIRE_MFA tem que ser 'true' em $ENV_FILE para produção (hoje: '${mfa:-vazio}')."
+    exit 1
+  fi
   local env_vars="^|^${base//,/|}|SUPABASE_ANON_KEY=${anon_key}|ADMIN_USER_IDS=${admin_ids}|ADMIN_REQUIRE_MFA=${mfa:-false}|BILLING_ALLOW_SANDBOX=${allow_sandbox}|BILLING_SANDBOX_USER_IDS=${sandbox_ids}"
 
   gcloud run deploy "$SERVICE" \

@@ -198,6 +198,8 @@ async def rascunho(body: PedidoDeRascunho, user_id: Annotated[UUID, Depends(curr
     sessao = {"user_id": user_id, "workspace_id": perfil["workspace_id"], "channel": "app"}
     limite = await conversation.check_limits(sessao)
     if limite:
+        if limite == conversation.SEM_CONSENTIMENTO_IA:
+            raise conversation.ConsentimentoNecessario()
         if limite == conversation.MUITAS:
             raise _erro(429, "rate_limit", "Muitas mensagens em pouco tempo. Aguarda um pouquinho.")
         raise _erro(402, "plan_limit", limite)
