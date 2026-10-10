@@ -16,7 +16,7 @@ Se você não tem mais o aplicativo instalado ou não consegue entrar, envie um 
 
 - Cadastro (e-mail, nome, telefone vinculado) e acesso à conta.
 - Lançamentos, contas, cartões, faturas, metas, dívidas, orçamentos, bens, investimentos, notas, lembretes e anexos.
-- Histórico de conversa com o assistente (no aplicativo e no WhatsApp), mensagens recebidas, ações pendentes, estado interno da conversa, avaliações e eventos de uso, e tokens de notificação.
+- Histórico de conversa com o assistente (no aplicativo e no WhatsApp), mensagens recebidas, ações pendentes, estado interno da conversa, avaliações e eventos de uso, tokens de notificação e as notas internas de atendimento sobre a sua conta.
 - Espaços dos quais você é dono, incluindo os dados e os convites desses espaços. Em espaços de outra pessoa, os dados do espaço permanecem com o dono dele.
 
 ## O que pode ficar
@@ -33,4 +33,4 @@ Apagar a conta **não cancela a assinatura da loja**. Cancele a assinatura na Ap
 
 ## Dúvidas
 
-gestao@proops.com.br ou, para dados pessoais, gestao@proops.com.br.
+gestao@proops.com.br, ou no aplicativo em Perfil → Ajuda e suporte.

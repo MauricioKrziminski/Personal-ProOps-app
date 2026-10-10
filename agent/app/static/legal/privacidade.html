@@ -1,6 +1,6 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Política de Privacidade do ProOps</title><style>:root{color-scheme:light dark}body{font:16px/1.6 system-ui,-apple-system,sans-serif;max-width:46rem;margin:0 auto;padding:1.25rem;background:#fff;color:#1c1c1e}h1{font-size:1.6rem}h2{font-size:1.15rem;margin-top:2rem}a{color:#0a58ca}table{border-collapse:collapse;width:100%;font-size:.9rem}td,th{border:1px solid #8884;padding:.4rem;text-align:left;vertical-align:top}@media(prefers-color-scheme:dark){body{background:#111;color:#f2f2f7}a{color:#6ea8fe}}</style></head><body>
 <h1>Política de Privacidade do ProOps</h1>
-<p>Vigência: [DATA DE VIGÊNCIA]</p>
+<p>Vigência: 09/10/2026</p>
 <p>Esta Política explica como PROOPS SOLUTIONS LTDA., CNPJ 69.504.283/0001-05, com sede em Rua Major Feliciano, 549, Centro, Machado/MG, CEP 37750-000 ("ProOps", "nós"), trata dados pessoais no aplicativo ProOps e no assistente do WhatsApp, em conformidade com a Lei Geral de Proteção de Dados (LGPD, Lei 13.709/2018), o Marco Civil da Internet (Lei 12.965/2014) e o Código de Defesa do Consumidor. Somos a <strong>controladora</strong> dos dados.</p>
 <p>Encarregado pelo tratamento de dados (DPO): gestao@proops.com.br.</p>
 <h2>1. Dados que tratamos</h2>
@@ -11,7 +11,7 @@
 <li><strong>Mensagens com o assistente:</strong> texto digitado, <strong>áudios</strong> (que são transcritos em texto), fotos de cupons, PDFs de fatura e arquivos de extrato que você enviar ou importar, e o histórico da conversa necessário para o assistente entender o contexto.</li>
 <li><strong>Assinatura:</strong> identificador da conta de assinatura, plano, status e datas, recebidos da loja e da plataforma de assinaturas. Não recebemos os dados do seu cartão ou meio de pagamento.</li>
 <li><strong>Notificações:</strong> token de notificação push do seu aparelho.</li>
-<li><strong>Dados técnicos e de uso:</strong> registros de operação (logs) do servidor, contagem de mensagens de IA usadas no período, informações do aparelho e da versão do aplicativo necessárias à entrega de atualizações e à segurança.</li>
+<li><strong>Dados técnicos e de uso:</strong> registros de operação (logs) do servidor, contagem de mensagens de IA usadas no período, versão do aplicativo, plataforma (iOS, Android ou web) e data do último acesso, necessárias à entrega de atualizações, ao suporte e à segurança, e registros de erro do aplicativo, do servidor e do painel.</li>
 </ul>
 <p>Não coletamos dados sensíveis de propósito. Se você escrever algo sensível em notas ou mensagens, ele será tratado como o restante do seu conteúdo, apenas para prestar o Serviço.</p>
 <h2>2. Para que usamos (e a base legal)</h2>
@@ -31,9 +31,7 @@
 <ul>
 <li><strong>Supabase:</strong> banco de dados, autenticação e armazenamento de arquivos (comprovantes).</li>
 <li><strong>Google Cloud:</strong> hospedagem do servidor do assistente, filas de tarefas e cópias de segurança, na região de São Paulo (southamerica-east1).</li>
-<li><strong>Anthropic (Claude):</strong> modelo de IA principal, que recebe o texto da conversa e o contexto necessário para interpretar e responder.</li>
-<li><strong>Google (Gemini):</strong> modelo de IA de reserva e geração de representações numéricas de texto (embeddings) usadas na busca.</li>
-<li><strong>Groq:</strong> transcrição de áudio em texto.</li>
+<li><strong>Anthropic (Claude), Google (Gemini) e Groq:</strong> provedores de IA e de transcrição, descritos na seção 7.</li>
 <li><strong>Meta (WhatsApp Business Platform):</strong> transporte das mensagens do WhatsApp. O WhatsApp trata os dados também como controlador, conforme os termos dele.</li>
 <li><strong>Langfuse:</strong> telemetria da qualidade da IA, em servidor da União Europeia, com amostragem de interações e <strong>mascaramento automático</strong> de e-mail, CPF, CNPJ e telefone antes do envio.</li>
 <li><strong>RevenueCat, Apple App Store e Google Play:</strong> gestão e cobrança da assinatura.</li>
@@ -49,15 +47,21 @@
 <li><strong>Ao apagar a conta</strong>, apagamos imediatamente do banco de dados o cadastro, o conteúdo, o histórico do assistente (conversas, mensagens recebidas pelo WhatsApp, ações pendentes, estado interno da conversa, avaliações e eventos de uso) e os arquivos anexados. Dos registros de assinatura mantemos apenas a linha de auditoria da cobrança (identificador, tipo, data e resultado), sem o conteúdo do evento.</li>
 <li><strong>Cópias de segurança</strong> do banco: diárias por <strong>30 dias</strong> e semanais por <strong>90 dias</strong>; só servem para recuperação de desastres, não são consultadas para outra finalidade e os dados apagados somem delas ao fim desse prazo (até 90 dias).</li>
 <li><strong>Enquanto a conta existe</strong>, dados técnicos do assistente são apagados automaticamente: fila de mensagens do WhatsApp processadas, confirmações e rascunhos encerrados, 30 dias; registro de ações executadas e avisos enviados, 90 dias; contagens de uso e de envios, 13 meses (necessárias para limites do plano e custo); comentários de avaliação, 180 dias.</li>
+<li><strong>Registros de erro</strong>: 30 dias. Os agrupamentos de erro são apagados 90 dias depois de resolvidos.</li>
+<li><strong>Histórico do WhatsApp:</strong> a fila de mensagens é apagada em 30 dias; ao apagar a conta, o histórico some por completo.</li>
 <li><strong>Logs do servidor</strong> (Google Cloud Logging) seguem a retenção padrão do Google Cloud de <strong>30 dias</strong>.</li>
 <li>Registros de acesso a aplicações são guardados pelo prazo exigido pelo Marco Civil da Internet, quando aplicável, e dados necessários para cumprir obrigações legais ou defender direitos podem ser mantidos pelo prazo legal.</li>
 <li>Dados de telemetria enviados ao Langfuse seguem a retenção do plano contratado nele, são amostrados e mascarados, e não permitem identificar você diretamente. Os prestadores de IA e transcrição (Anthropic, Google, Groq) e a Meta tratam o conteúdo que recebem segundo os próprios prazos e termos.</li>
 </ul>
 <h2>6. Seus direitos (LGPD, art. 18)</h2>
 <p>Você pode, a qualquer momento: confirmar que tratamos seus dados; acessar; corrigir; pedir anonimização, bloqueio ou eliminação de dados desnecessários; pedir <strong>portabilidade</strong>; obter informação sobre compartilhamento; ser informado sobre a possibilidade de não consentir e suas consequências; <strong>revogar consentimento</strong>, quando for a base; e pedir revisão de decisões automatizadas.</p>
-<p>Como exercer: pelo aplicativo você acessa, corrige e apaga seus registros e <strong>apaga a conta</strong> em Perfil → Apagar conta. Para os demais pedidos, escreva para gestao@proops.com.br. Responderemos em prazo razoável e podemos pedir confirmação da sua identidade. Você também pode reclamar à Autoridade Nacional de Proteção de Dados (ANPD).</p>
+<p>Como exercer: pelo aplicativo você acessa, corrige e apaga seus registros, <strong>baixa seus dados</strong> em Perfil → Privacidade e dados → Baixar meus dados (arquivo JSON) e <strong>apaga a conta</strong> em Perfil → Apagar conta. Se não tiver o aplicativo, peça a exportação por e-mail para gestao@proops.com.br. Para os demais pedidos, escreva para o mesmo endereço. Respondemos em até 15 dias e podemos pedir confirmação da sua identidade. Você também pode reclamar à Autoridade Nacional de Proteção de Dados (ANPD).</p>
 <h2>7. Inteligência artificial</h2>
-<p>O assistente usa IA para interpretar mensagens e sugerir registros. Ele pode errar. Nenhuma alteração de dados é gravada sem a sua confirmação. Os prestadores de IA recebem o conteúdo necessário para responder cada mensagem; não os usamos para treinar modelos próprios, e utilizamos os serviços de IA por meio das interfaces comerciais (API) dos prestadores. As decisões do assistente são apoio à organização e não substituem aconselhamento profissional.</p>
+<p>O assistente usa IA para interpretar mensagens e sugerir registros. Ele pode errar. Nenhuma alteração de dados é gravada sem a sua confirmação.</p>
+<p><strong>Quem recebe:</strong> Anthropic (Claude), Google (Gemini) e Groq (transcrição de áudio).</p>
+<p><strong>O que é enviado:</strong> suas mensagens, os áudios (para transcrição), as linhas de extrato importado e o contexto financeiro necessário para responder. Esses prestadores não treinam modelos com esse conteúdo; usamos as interfaces comerciais (API) deles.</p>
+<p><strong>Autorização separada:</strong> o uso de IA só acontece se você autorizar, no aplicativo, em uma escolha própria que vem <strong>desligada por padrão</strong>. Você pode revogá-la a qualquer momento em <strong>Perfil → Privacidade e dados</strong>. Sem a autorização, o assistente fica desligado; o restante do aplicativo segue funcionando.</p>
+<p>As respostas do assistente são apoio à organização e não substituem aconselhamento profissional.</p>
 <h2>8. Segurança</h2>
 <p>Adotamos medidas como criptografia em trânsito, controle de acesso por conta e por espaço (isolamento por usuário no banco), segredos fora do código, validação de assinatura das mensagens do WhatsApp e cópias de segurança. Nenhum sistema é totalmente imune; em caso de incidente relevante, comunicaremos você e a ANPD conforme a lei.</p>
 <h2>9. Crianças e adolescentes</h2>
@@ -65,7 +69,7 @@
 <h2>10. Cookies e rastreamento</h2>
 <p>Esta Política se aplica ao aplicativo e às páginas legais publicadas por nós, que não usam cookies, scripts de terceiros nem rastreamento.</p>
 <h2>11. Alterações</h2>
-<p>Podemos atualizar esta Política. Mudanças relevantes serão avisadas no aplicativo ou por e-mail, e a data de vigência acima será atualizada.</p>
+<p>Podemos atualizar esta Política. Mudanças relevantes serão avisadas no aplicativo, a data de vigência acima será atualizada e você será convidado a aceitar a nova versão na próxima abertura.</p>
 <h2>12. Contato</h2>
-<p>Dúvidas gerais: gestao@proops.com.br. Assuntos de proteção de dados: gestao@proops.com.br.</p>
+<p>Dúvidas gerais e assuntos de proteção de dados: gestao@proops.com.br. No aplicativo, o suporte fica em <strong>Perfil → Ajuda e suporte</strong>.</p>
 </body></html>

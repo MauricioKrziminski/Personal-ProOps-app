@@ -1,6 +1,6 @@
 # Política de Privacidade do ProOps
 
-Vigência: [DATA DE VIGÊNCIA]
+Vigência: 09/10/2026
 
 Esta Política explica como PROOPS SOLUTIONS LTDA., CNPJ 69.504.283/0001-05, com sede em Rua Major Feliciano, 549, Centro, Machado/MG, CEP 37750-000 ("ProOps", "nós"), trata dados pessoais no aplicativo ProOps e no assistente do WhatsApp, em conformidade com a Lei Geral de Proteção de Dados (LGPD, Lei 13.709/2018), o Marco Civil da Internet (Lei 12.965/2014) e o Código de Defesa do Consumidor. Somos a **controladora** dos dados.
 
@@ -14,7 +14,7 @@ Encarregado pelo tratamento de dados (DPO): gestao@proops.com.br.
 - **Mensagens com o assistente:** texto digitado, **áudios** (que são transcritos em texto), fotos de cupons, PDFs de fatura e arquivos de extrato que você enviar ou importar, e o histórico da conversa necessário para o assistente entender o contexto.
 - **Assinatura:** identificador da conta de assinatura, plano, status e datas, recebidos da loja e da plataforma de assinaturas. Não recebemos os dados do seu cartão ou meio de pagamento.
 - **Notificações:** token de notificação push do seu aparelho.
-- **Dados técnicos e de uso:** registros de operação (logs) do servidor, contagem de mensagens de IA usadas no período, informações do aparelho e da versão do aplicativo necessárias à entrega de atualizações e à segurança.
+- **Dados técnicos e de uso:** registros de operação (logs) do servidor, contagem de mensagens de IA usadas no período, versão do aplicativo, plataforma (iOS, Android ou web) e data do último acesso, necessárias à entrega de atualizações, ao suporte e à segurança, e registros de erro do aplicativo, do servidor e do painel.
 
 Não coletamos dados sensíveis de propósito. Se você escrever algo sensível em notas ou mensagens, ele será tratado como o restante do seu conteúdo, apenas para prestar o Serviço.
 
@@ -38,9 +38,7 @@ Usamos operadores (prestadores) que tratam dados em nosso nome, somente para as 
 
 - **Supabase:** banco de dados, autenticação e armazenamento de arquivos (comprovantes).
 - **Google Cloud:** hospedagem do servidor do assistente, filas de tarefas e cópias de segurança, na região de São Paulo (southamerica-east1).
-- **Anthropic (Claude):** modelo de IA principal, que recebe o texto da conversa e o contexto necessário para interpretar e responder.
-- **Google (Gemini):** modelo de IA de reserva e geração de representações numéricas de texto (embeddings) usadas na busca.
-- **Groq:** transcrição de áudio em texto.
+- **Anthropic (Claude), Google (Gemini) e Groq:** provedores de IA e de transcrição, descritos na seção 7.
 - **Meta (WhatsApp Business Platform):** transporte das mensagens do WhatsApp. O WhatsApp trata os dados também como controlador, conforme os termos dele.
 - **Langfuse:** telemetria da qualidade da IA, em servidor da União Europeia, com amostragem de interações e **mascaramento automático** de e-mail, CPF, CNPJ e telefone antes do envio.
 - **RevenueCat, Apple App Store e Google Play:** gestão e cobrança da assinatura.
@@ -60,6 +58,8 @@ Alguns prestadores (como Anthropic, Google, Groq, Meta, RevenueCat, Expo e Langf
 - **Ao apagar a conta**, apagamos imediatamente do banco de dados o cadastro, o conteúdo, o histórico do assistente (conversas, mensagens recebidas pelo WhatsApp, ações pendentes, estado interno da conversa, avaliações e eventos de uso) e os arquivos anexados. Dos registros de assinatura mantemos apenas a linha de auditoria da cobrança (identificador, tipo, data e resultado), sem o conteúdo do evento.
 - **Cópias de segurança** do banco: diárias por **30 dias** e semanais por **90 dias**; só servem para recuperação de desastres, não são consultadas para outra finalidade e os dados apagados somem delas ao fim desse prazo (até 90 dias).
 - **Enquanto a conta existe**, dados técnicos do assistente são apagados automaticamente: fila de mensagens do WhatsApp processadas, confirmações e rascunhos encerrados, 30 dias; registro de ações executadas e avisos enviados, 90 dias; contagens de uso e de envios, 13 meses (necessárias para limites do plano e custo); comentários de avaliação, 180 dias.
+- **Registros de erro**: 30 dias. Os agrupamentos de erro são apagados 90 dias depois de resolvidos.
+- **Histórico do WhatsApp:** a fila de mensagens é apagada em 30 dias; ao apagar a conta, o histórico some por completo.
 - **Logs do servidor** (Google Cloud Logging) seguem a retenção padrão do Google Cloud de **30 dias**.
 - Registros de acesso a aplicações são guardados pelo prazo exigido pelo Marco Civil da Internet, quando aplicável, e dados necessários para cumprir obrigações legais ou defender direitos podem ser mantidos pelo prazo legal.
 - Dados de telemetria enviados ao Langfuse seguem a retenção do plano contratado nele, são amostrados e mascarados, e não permitem identificar você diretamente. Os prestadores de IA e transcrição (Anthropic, Google, Groq) e a Meta tratam o conteúdo que recebem segundo os próprios prazos e termos.
@@ -68,11 +68,19 @@ Alguns prestadores (como Anthropic, Google, Groq, Meta, RevenueCat, Expo e Langf
 
 Você pode, a qualquer momento: confirmar que tratamos seus dados; acessar; corrigir; pedir anonimização, bloqueio ou eliminação de dados desnecessários; pedir **portabilidade**; obter informação sobre compartilhamento; ser informado sobre a possibilidade de não consentir e suas consequências; **revogar consentimento**, quando for a base; e pedir revisão de decisões automatizadas.
 
-Como exercer: pelo aplicativo você acessa, corrige e apaga seus registros e **apaga a conta** em Perfil → Apagar conta. Para os demais pedidos, escreva para gestao@proops.com.br. Responderemos em prazo razoável e podemos pedir confirmação da sua identidade. Você também pode reclamar à Autoridade Nacional de Proteção de Dados (ANPD).
+Como exercer: pelo aplicativo você acessa, corrige e apaga seus registros, **baixa seus dados** em Perfil → Privacidade e dados → Baixar meus dados (arquivo JSON) e **apaga a conta** em Perfil → Apagar conta. Se não tiver o aplicativo, peça a exportação por e-mail para gestao@proops.com.br. Para os demais pedidos, escreva para o mesmo endereço. Respondemos em até 15 dias e podemos pedir confirmação da sua identidade. Você também pode reclamar à Autoridade Nacional de Proteção de Dados (ANPD).
 
 ## 7. Inteligência artificial
 
-O assistente usa IA para interpretar mensagens e sugerir registros. Ele pode errar. Nenhuma alteração de dados é gravada sem a sua confirmação. Os prestadores de IA recebem o conteúdo necessário para responder cada mensagem; não os usamos para treinar modelos próprios, e utilizamos os serviços de IA por meio das interfaces comerciais (API) dos prestadores. As decisões do assistente são apoio à organização e não substituem aconselhamento profissional.
+O assistente usa IA para interpretar mensagens e sugerir registros. Ele pode errar. Nenhuma alteração de dados é gravada sem a sua confirmação.
+
+**Quem recebe:** Anthropic (Claude), Google (Gemini) e Groq (transcrição de áudio).
+
+**O que é enviado:** suas mensagens, os áudios (para transcrição), as linhas de extrato importado e o contexto financeiro necessário para responder. Esses prestadores não treinam modelos com esse conteúdo; usamos as interfaces comerciais (API) deles.
+
+**Autorização separada:** o uso de IA só acontece se você autorizar, no aplicativo, em uma escolha própria que vem **desligada por padrão**. Você pode revogá-la a qualquer momento em **Perfil → Privacidade e dados**. Sem a autorização, o assistente fica desligado; o restante do aplicativo segue funcionando.
+
+As respostas do assistente são apoio à organização e não substituem aconselhamento profissional.
 
 ## 8. Segurança
 
@@ -88,8 +96,8 @@ Esta Política se aplica ao aplicativo e às páginas legais publicadas por nós
 
 ## 11. Alterações
 
-Podemos atualizar esta Política. Mudanças relevantes serão avisadas no aplicativo ou por e-mail, e a data de vigência acima será atualizada.
+Podemos atualizar esta Política. Mudanças relevantes serão avisadas no aplicativo, a data de vigência acima será atualizada e você será convidado a aceitar a nova versão na próxima abertura.
 
 ## 12. Contato
 
-Dúvidas gerais: gestao@proops.com.br. Assuntos de proteção de dados: gestao@proops.com.br.
+Dúvidas gerais e assuntos de proteção de dados: gestao@proops.com.br. No aplicativo, o suporte fica em **Perfil → Ajuda e suporte**.

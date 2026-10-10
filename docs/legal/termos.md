@@ -1,6 +1,6 @@
 # Termos de Uso do ProOps
 
-Vigência: [DATA DE VIGÊNCIA]
+Vigência: 09/10/2026
 
 Estes Termos regem o uso do aplicativo ProOps e do assistente que responde pelo WhatsApp ("Serviço"), oferecido por PROOPS SOLUTIONS LTDA., CNPJ 69.504.283/0001-05, com sede em Rua Major Feliciano, 549, Centro, Machado/MG, CEP 37750-000 ("ProOps", "nós"). Ao criar uma conta ou usar o Serviço, você declara que leu e concorda com estes Termos e com a [Política de Privacidade](/privacidade).
 
@@ -21,6 +21,8 @@ O ProOps é uma ferramenta de organização. **Não é consultoria financeira, d
 
 O assistente usa modelos de inteligência artificial para interpretar suas mensagens, textos transcritos de áudio, imagens e documentos que você enviar. A IA **pode errar** ao interpretar valores, datas, categorias ou intenções.
 
+O uso da IA depende de uma **autorização separada** que você dá no aplicativo (vem desligada por padrão) e pode revogar a qualquer momento em **Perfil → Privacidade e dados**. Sem ela, o assistente fica desligado e o restante do aplicativo continua funcionando. Os provedores de IA estão listados na [Política de Privacidade](/privacidade).
+
 Por isso, ações que gravam ou alteram dados exigem a sua **confirmação** (por exemplo, responder "SIM"). Confira sempre o que o assistente mostra antes de confirmar. Você pode corrigir ou apagar qualquer registro pelo aplicativo.
 
 ## 4. Assinatura, teste grátis e cancelamento
@@ -30,7 +32,7 @@ Por isso, ações que gravam ou alteram dados exigem a sua **confirmação** (po
 - O preço, a periodicidade e a moeda são exibidos pela loja no momento da contratação. Não fixamos valores nestes Termos.
 - A cobrança, a renovação, o cancelamento e os reembolsos são geridos **pela loja** (Apple ou Google), segundo as regras dela. Para cancelar, use as configurações de assinaturas da sua conta na loja; apagar a conta no ProOps **não cancela** a assinatura da loja.
 - Direito de arrependimento (art. 49 do Código de Defesa do Consumidor): contratações feitas fora de estabelecimento comercial podem ser desfeitas em até 7 dias, nos termos da lei e das regras da loja.
-- Sem assinatura ativa (por exemplo, após o fim ou cancelamento), o aplicativo fica em **modo de consulta**: você continua acessando e exportando o que já registrou, mas não cria nem altera registros e o assistente deixa de responder.
+- Sem assinatura ativa (por exemplo, após o fim ou cancelamento), o aplicativo fica em **modo de consulta**: você continua acessando o que já registrou e pode baixar seus dados em **Perfil → Privacidade e dados → Baixar meus dados** (arquivo JSON), mas não cria nem altera registros e o assistente deixa de responder.
 
 ## 5. Limites de uso
 
@@ -70,7 +72,7 @@ O tratamento de dados pessoais segue a Lei Geral de Proteção de Dados (Lei 13.
 
 ## 11. Alterações dos Termos
 
-Podemos atualizar estes Termos. Mudanças relevantes serão comunicadas no aplicativo ou por e-mail com antecedência razoável. Se você continuar usando o Serviço após a vigência da nova versão, ela passa a valer para você; se não concordar, pode cancelar a assinatura e apagar a conta.
+Podemos atualizar estes Termos. Mudanças relevantes serão comunicadas por aviso no aplicativo, e você será convidado a aceitar a nova versão na próxima abertura. Se não concordar, pode cancelar a assinatura e apagar a conta.
 
 ## 12. Lei aplicável e foro
 
@@ -78,4 +80,4 @@ Estes Termos são regidos pelas leis da República Federativa do Brasil. Fica el
 
 ## 13. Contato
 
-Dúvidas, solicitações e reclamações: gestao@proops.com.br.
+Dúvidas, solicitações e reclamações: gestao@proops.com.br. No aplicativo, o suporte fica em **Perfil → Ajuda e suporte**.
