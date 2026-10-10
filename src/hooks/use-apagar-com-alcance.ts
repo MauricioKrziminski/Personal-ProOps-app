@@ -61,7 +61,12 @@ export function useApagarComAlcance(aoApagar?: (p: PreviaDoApagar) => void) {
     const executar = () => escrita.mutateAsync({ alvo, alcance }).then(
       (r) => {
         toast({ message: textoDoApagado(r), tone: 'success' });
-        aoApagar?.(r);
+        // Apagou: uma falha de navegação depois disso não pode virar rejeição solta (nem toast de erro).
+        try {
+          aoApagar?.(r);
+        } catch (e) {
+          console.warn('[apagar] sair da tela falhou', e);
+        }
       },
       erro,
     );

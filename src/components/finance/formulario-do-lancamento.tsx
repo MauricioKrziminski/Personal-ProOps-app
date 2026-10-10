@@ -1113,7 +1113,11 @@ export function FormularioDoLancamento(props: Props) {
       () =>
         remove.mutateAsync(editing.id).then(
           () => {
-            sairDoApagado();
+            try {
+              sairDoApagado();
+            } catch {
+              props.onFechar(); // pilha diferente da esperada: ao menos fecha o formulário
+            }
             toast({ message: `Apaguei ${what}.`, tone: 'success' });
           },
           (error) => toast({ message: financeErrorMessage(error, 'Não deu para apagar. Tenta de novo.'), tone: 'error' }),
