@@ -11,7 +11,7 @@ import { Interruptor } from '@/components/ui/switch-row';
 import { useToast } from '@/components/ui/toast';
 import { MaxContentWidth } from '@/constants/theme';
 import { Space } from '@/design/tokens';
-import { useAceitarTermos } from '@/hooks/use-consentimento';
+import { useAceitarTermos, useConsentimento } from '@/hooks/use-consentimento';
 import { abrirLegal, URL_PRIVACIDADE, URL_TERMOS } from '@/lib/links-legais';
 import { supabase } from '@/lib/supabase';
 import { IA_PADRAO } from '@/lib/termos';
@@ -25,7 +25,10 @@ export default function ConsentimentoScreen() {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const aceitar = useAceitarTermos();
-  const [ia, setIa] = useState(IA_PADRAO);
+  // Termos novos não podem revogar em silêncio a IA que a pessoa já tinha autorizado: o portão só
+  // abre esta tela com o consentimento já lido, então o valor de partida é o gravado.
+  const atual = useConsentimento().data?.ai_consent_at;
+  const [ia, setIa] = useState(() => (atual ? true : IA_PADRAO));
 
   return (
     <Screen scroll={false} grouped>

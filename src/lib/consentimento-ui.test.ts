@@ -8,7 +8,7 @@ import ts from 'typescript';
 const require = createRequire(import.meta.url);
 
 /* A tela de consentimento renderizada com os hooks como dublês (mesma técnica de forgot-password-ui). */
-function tela() {
+function tela(consentidoEm: string | null = null) {
   const state: any[] = [];
   let cursor = 0;
   const aceites: unknown[] = [];
@@ -20,14 +20,14 @@ function tela() {
     if (name === 'react') return {
       useState(initial: any) {
         const i = cursor++;
-        if (!(i in state)) state[i] = initial;
+        if (!(i in state)) state[i] = typeof initial === 'function' ? initial() : initial;
         return [state[i], (v: any) => { state[i] = v; }];
       },
     };
     if (name === 'react/jsx-runtime') return require(name);
     if (name === 'react-native') return { StyleSheet: { create: (v: unknown) => v }, View: 'View', ScrollView: 'ScrollView' };
     if (name === 'react-native-safe-area-context') return { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) };
-    if (name === '@/hooks/use-consentimento') return { useAceitarTermos: () => ({ isPending: false, mutate: (v: unknown) => aceites.push(v) }) };
+    if (name === '@/hooks/use-consentimento') return { useAceitarTermos: () => ({ isPending: false, mutate: (v: unknown) => aceites.push(v) }), useConsentimento: () => ({ data: { terms_version: null, ai_consent_at: consentidoEm } }) };
     if (name === '@/components/ui/toast') return { useToast: () => () => {} };
     if (name === '@/lib/termos') return require('./termos.ts');
     return new Proxy({}, { get: (_, key) => String(key) });
@@ -71,4 +71,10 @@ test('consentimento: a tela nomeia os três fornecedores e os dois textos legais
   const fonte = readFileSync('src/app/consentimento.tsx', 'utf8');
   for (const nome of ['Anthropic', 'Google', 'Groq', 'Termos de Uso', 'Política de Privacidade']) assert.ok(fonte.includes(nome), nome);
   assert.match(fonte, /não treinam modelos/i);
+});
+
+test('consentimento: termos novos não desligam a IA que a pessoa já tinha autorizado', () => {
+  const t = tela('2026-09-01T12:00:00Z');
+  const chave = t.achar((n) => n.props.accessibilityLabel === 'Autorizar o uso de IA');
+  assert.equal(chave.props.value, true);
 });

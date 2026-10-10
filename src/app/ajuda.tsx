@@ -6,6 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { abrirLegal, URL_APAGAR_CONTA, URL_PRIVACIDADE, URL_TERMOS } from '@/lib/links-legais';
+import { EMAIL_SUPORTE } from '@/lib/suporte';
 import { abrirSuporte } from '@/lib/suporte-abrir';
 
 /** Ajuda e suporte: o caminho até uma pessoa, os guias e a versão/build sempre à vista. */
@@ -15,7 +16,7 @@ export default function AjudaScreen() {
   return (
     <Screen grouped>
       <Section>
-        <Row title="Falar com o suporte" icon="envelope" onPress={() => { void abrirSuporte(); }} />
+        <Row title="Falar com o suporte" subtitle={EMAIL_SUPORTE} icon="envelope" onPress={() => { void abrirSuporte(); }} />
         <Row title="Como usar o ProOps" icon="questionmark.circle" onPress={() => router.push('/guia')} />
       </Section>
       <Section title="Legal">
