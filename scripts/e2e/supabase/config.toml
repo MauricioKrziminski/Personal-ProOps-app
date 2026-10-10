@@ -1,0 +1,48 @@
+# Supabase LOCAL só para o E2E do painel (scripts/e2e-painel.sh). Projeto próprio: não mexe no
+# volume do `app-proops` nem em nenhum projeto remoto. As migrations NÃO são aplicadas pelo CLI
+# (a 0008 exige segredos do Vault): o script as aplica uma a uma via psql no container.
+project_id = "proops-e2e"
+
+[api]
+enabled = true
+port = 54321
+
+[db]
+port = 54322
+major_version = 17
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:8095"
+additional_redirect_urls = ["http://127.0.0.1:8095"]
+jwt_expiry = 3600
+enable_signup = true
+enable_anonymous_sign_ins = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = false
+enable_confirmations = false
+max_frequency = "1s"
+otp_length = 6
+otp_expiry = 3600
+
+[auth.email.template.recovery]
+subject = "Seu código de recuperação"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.rate_limit]
+email_sent = 1000
+sign_in_sign_ups = 1000
+token_verifications = 1000
+
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[inbucket]
+enabled = true
+port = 54324
