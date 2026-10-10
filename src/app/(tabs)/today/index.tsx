@@ -290,7 +290,7 @@ export default function TodayScreen() {
         valueTone={i.kind === 'income' ? 'success' : i.atrasado ? 'danger' : 'text'}
         icon={iconeDoItem(i)}
         cartao={i.cartao}
-        aindaVai={i.kind === 'invoice' ? fraseAindaVaiEntrar(i.futuroCents, i.cents, brl) : null}
+        aindaVai={i.kind === 'invoice' ? fraseAindaVaiEntrar(i.futuroCents, i.totalCents ?? i.cents, brl) : null}
         action={onde === 'agora' ? acaoDoItem(i) : undefined}
         onPress={abrirItem(i)}
       />

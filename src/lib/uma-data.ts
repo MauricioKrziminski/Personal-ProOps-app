@@ -28,6 +28,46 @@ export function abreComDuasDatas(r: { status?: string; occurred_at?: string; due
   return Boolean(r && r.status === 'pending' && !r.recurring_id && !r.invoice_id && r.due_at && r.due_at !== r.occurred_at);
 }
 
+/** O mesmo, sobre o estado restaurado do formulário (datas em texto, `dd/mm/aaaa`, iguais entre si). */
+export function abreComDuasDatasGuardado(g: { pending?: boolean; occurred_at?: string; due_at?: string | null } | undefined): boolean {
+  return Boolean(g && g.pending && g.due_at && g.due_at !== g.occurred_at);
+}
+
+/**
+ * Registro pendente SEM vencimento gravado (antigo): o campo abre com a data dele, e salvar sem
+ * mexer não pode gravar `due_at = occurred_at` (nada alterado = nada a gravar).
+ */
+export function vencimentoAGravar(
+  editing: { due_at: string | null; occurred_at: string },
+  dueAt: string | null,
+): string | null {
+  return editing.due_at == null && dueAt === editing.occurred_at ? editing.due_at : dueAt;
+}
+
+export type PendenciaReservada = { pending: boolean; due_at: string | null };
+
+/**
+ * Trocar a conta por um CARTÃO desliga "Ainda vai sair" (a fatura já cobre o caixa), mas voltar
+ * para uma conta na mesma visita devolve o que a pessoa tinha. Enquanto em cartão, nada é escrito.
+ */
+export function aoTrocarDeConta(c: {
+  paraCartao: boolean;
+  pending: boolean;
+  due_at: string | null;
+  reservada: PendenciaReservada | null;
+}): { pending: boolean; due_at: string | null; reservada: PendenciaReservada | null } {
+  if (c.paraCartao) {
+    return {
+      pending: false,
+      due_at: null,
+      reservada: c.pending ? { pending: true, due_at: c.due_at } : c.reservada,
+    };
+  }
+  return c.reservada
+    ? { pending: true, due_at: c.reservada.due_at, reservada: null }
+    : { pending: c.pending, due_at: c.due_at, reservada: null };
+}
+
 export function rotuloOutraData(kind: string | null | undefined): string {
   return kind === 'income' ? 'Lançar em outra data?' : 'Comprou em outra data?';
 }

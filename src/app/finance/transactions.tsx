@@ -486,7 +486,7 @@ export default function TransactionsScreen() {
   const [linkAplicado, setLinkAplicado] = useState(link);
   if (link !== linkAplicado) {
     setLinkAplicado(link);
-    if (params.ver) setStatus(verInicial(params.ver));
+    setStatus(verInicial(params.ver, params.recurringId, params.lente));
     if (params.month) setMesEscolhido(params.month);
     if (params.from && params.to) setCustomDates(janelaDoLink(params.from, params.to));
     if (params.lente !== undefined) setLenteGasto(params.lente === 'gasto');

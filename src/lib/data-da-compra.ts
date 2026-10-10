@@ -31,20 +31,18 @@ export function rotuloDaCompra(tx: ComPlano): string | null {
 }
 
 /**
- * O filtro "Em aberto" / "Concluído" da lista, na régua da DATA — a mesma de `estadoDaLinha`.
+ * O filtro "Em aberto" / "Concluído" da lista. UMA régua (`estadoDaLinha`, `transactions_summary`):
+ * linha de cartão (`invoice_id`) vale pela DATA — aconteceu se `occurred_at <= hoje`, mesmo
+ * nascendo `cleared`; fora do cartão vale pelo `status` (`cleared` = aconteceu).
  *
- * ⚠️ Era `status`. Compra de cartão fica `pending` até a fatura ser paga, então a compra de ontem
- * nunca era "Concluído" — sumia do filtro que devia mostrá-la (o wardogs, 24/09/2026). "Concluído"
- * é o que já aconteceu: efetivado, OU compra de cartão com data de hoje para trás. O resto do
- * `pending` (previsto, atrasado, receita que não caiu) é "Em aberto".
+ * ⚠️ Era `status` puro: a compra de cartão de ontem (`pending` até a fatura ser paga) nunca era
+ * "Concluído" (wardogs, 24/09/2026), e depois `cleared OR cartão-até-hoje` deixava a compra de
+ * cartão FUTURA, nascida `cleared`, em "Aconteceu" enquanto a fatura a mostra como "Ainda vai entrar".
  *
  * `ou` vai inteiro num `.or()` do PostgREST; `hoje` é a data LOCAL (`localISODate`).
  */
-export function filtroDoEstado(
-  estado: 'pending' | 'cleared',
-  hoje: string,
-): { status?: 'pending'; ou: string } {
+export function filtroDoEstado(estado: 'pending' | 'cleared', hoje: string): { ou: string } {
   return estado === 'cleared'
-    ? { ou: `status.eq.cleared,and(invoice_id.not.is.null,occurred_at.lte.${hoje})` }
-    : { status: 'pending', ou: `invoice_id.is.null,occurred_at.gt.${hoje}` };
+    ? { ou: `and(invoice_id.is.null,status.eq.cleared),and(invoice_id.not.is.null,occurred_at.lte.${hoje})` }
+    : { ou: `and(invoice_id.is.null,status.eq.pending),and(invoice_id.not.is.null,occurred_at.gt.${hoje})` };
 }

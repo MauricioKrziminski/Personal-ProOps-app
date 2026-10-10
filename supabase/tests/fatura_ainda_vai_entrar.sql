@@ -69,14 +69,18 @@ begin
   select * into r from public._upcoming_bills(usr, 60) where kind = 'invoice' and ref_id = fat;
   assert r.amount_cents = 18000 and r.future_cents = 3000,
     format('4: upcoming_bills fatura %s / %s, esperado 18000 / 3000', r.amount_cents, r.future_cents);
+  assert r.total_cents = 18000, format('4: total bruto %s, esperado 18000', r.total_cents);
   select * into r from public._upcoming_bills(usr, 60) where ref_id = boleto;
-  assert r.future_cents is null, '4: o boleto avulso não tem "ainda vai entrar"';
+  assert r.total_cents is null and r.future_cents is null, '4: o boleto avulso não tem "ainda vai entrar"';
 
   -- 5. pagamento parcial não mexe no futuro: ele é do total, não do aberto
   update public.card_invoices set paid_cents = 4000 where id = fat;
   select * into r from public._card_summary(usr) where account_id = cartao;
   assert r.invoice_open_cents = 14000 and r.invoice_future_cents = 3000,
     format('5: aberto %s / futuro %s, esperado 14000 / 3000', r.invoice_open_cents, r.invoice_future_cents);
+  select * into r from public._upcoming_bills(usr, 60) where kind = 'invoice' and ref_id = fat;
+  assert r.amount_cents = 14000 and r.total_cents = 18000,
+    format('5: upcoming_bills aberto %s / total %s, esperado 14000 / 18000', r.amount_cents, r.total_cents);
 
   raise notice 'fatura_ainda_vai_entrar: 5 grupos de asserções OK';
 end $$;

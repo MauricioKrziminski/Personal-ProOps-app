@@ -21,3 +21,10 @@ test('os chips repartem o período: aconteceu + previsto = todos', () => {
   assert.equal(a.saiu + p.saiu, t.saiu);
   assert.deepEqual(totaisDoChip(t, 'all'), t);
 });
+
+test('link novo SEM `ver` com a tela aberta volta ao chip do link, não mantém o anterior', async () => {
+  const { readFileSync } = await import('node:fs');
+  const tela = readFileSync(new URL('../app/finance/transactions.tsx', import.meta.url), 'utf8');
+  assert.ok(tela.includes('setStatus(verInicial(params.ver, params.recurringId, params.lente));'));
+  assert.ok(!tela.includes('if (params.ver) setStatus('), 'o chip só mudava quando o link trazia `ver`');
+});

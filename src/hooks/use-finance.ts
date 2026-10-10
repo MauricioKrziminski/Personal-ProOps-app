@@ -351,7 +351,6 @@ export function useTransactions(filters: TransactionFilters) {
       // "Em aberto"/"Concluído" na régua da DATA, a mesma da pílula (`filtroDoEstado`).
       if (filters.status) {
         const estado = filtroDoEstado(filters.status, localISODate());
-        if (estado.status) query = query.eq('status', estado.status);
         query = query.or(estado.ou);
       }
       if (filters.source) query = query.eq('source', filters.source);

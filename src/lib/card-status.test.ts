@@ -106,3 +106,10 @@ test('a fatura lista no topo o que ainda vai entrar (a mais próxima primeiro) e
   assert.deepEqual(gruposDaFatura([t('x', '2026-10-10')], '2026-10-10').map((g) => g.futura), [false], 'hoje não é à frente');
   assert.deepEqual(gruposDaFatura([], '2026-10-10'), []);
 });
+
+test('Estorno com data à frente não entra em "Ainda vai entrar" (não está no total), só no seu dia', () => {
+  const c = (id: string, kind: string, occurred_at: string) => ({ id, kind, occurred_at });
+  const grupos = gruposDaFatura([c('a', 'expense', '2026-10-20'), c('e', 'income', '2026-10-25'), c('b', 'expense', '2026-10-09')], '2026-10-10');
+  assert.deepEqual(grupos.filter((g) => g.futura).flatMap((g) => g.itens.map((t) => t.id)), ['a']);
+  assert.deepEqual(grupos.find((g) => g.chave === '2026-10-25')?.itens.map((t) => t.id), ['e']);
+});

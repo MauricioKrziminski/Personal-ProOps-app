@@ -212,11 +212,14 @@ export function contaNaFatura(kind: string): boolean {
  */
 export type GrupoDaFatura<T> = { chave: string; data: string | null; futura: boolean; itens: T[] };
 
-export function gruposDaFatura<T extends { occurred_at: string }>(compras: readonly T[], hoje: string): GrupoDaFatura<T>[] {
-  const futuras = compras.filter((t) => t.occurred_at > hoje).sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
+export function gruposDaFatura<T extends { occurred_at: string; kind?: string }>(compras: readonly T[], hoje: string): GrupoDaFatura<T>[] {
+  // "Ainda vai entrar" soma o que está NO total da fatura (`contaNaFatura`); o estorno com data à
+  // frente não entra no total e aparece só no seu dia.
+  const eFuturaDaFatura = (t: T) => t.occurred_at > hoje && (t.kind === undefined || contaNaFatura(t.kind));
+  const futuras = compras.filter(eFuturaDaFatura).sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
   const porDia = new Map<string, T[]>();
   for (const t of compras) {
-    if (t.occurred_at > hoje) continue;
+    if (eFuturaDaFatura(t)) continue;
     porDia.set(t.occurred_at, [...(porDia.get(t.occurred_at) ?? []), t]);
   }
   return [

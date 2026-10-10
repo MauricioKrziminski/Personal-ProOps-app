@@ -348,7 +348,8 @@ test('transactions aplicam múltiplos meios e null antes de paginar, junto às o
     const p = url.searchParams;
     const ors = p.getAll('or');
     assert.equal(ors.length, 4, 'status, pagamento, conta recebida e busca são grupos independentes em AND');
-    assert.ok(ors.includes('(invoice_id.is.null,occurred_at.gt.' + new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) + ')'));
+    const hoje = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+    assert.ok(ors.includes(`(and(invoice_id.is.null,status.eq.pending),and(invoice_id.not.is.null,occurred_at.gt.${hoje}))`));
     assert.ok(ors.includes('(account_id.eq.received,counterparty_account_id.eq.received)'));
     assert.ok(ors.includes('(description.ilike.%loja%,merchant.ilike.%loja%,category.ilike.%loja%)'));
     assert.deepEqual(p.getAll('occurred_at'), ['gte.2026-12-31', 'lte.2027-01-01']);
@@ -356,7 +357,7 @@ test('transactions aplicam múltiplos meios e null antes de paginar, junto às o
     assert.equal(p.get('category'), 'eq.casa');
     assert.equal(p.get('kind'), 'eq.income');
     assert.equal(p.get('source'), 'eq.import');
-    assert.equal(p.get('status'), 'eq.pending');
+    assert.equal(p.get('status'), null, 'o status vai dentro do grupo OR (cartão vale pela data)');
     assert.equal(p.get('recurring_id'), 'eq.series');
     assert.equal(p.get('order'), 'occurred_at.desc,created_at.desc,id.desc');
     assert.equal(p.get('limit'), '50');

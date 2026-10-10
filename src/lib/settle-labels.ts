@@ -161,9 +161,10 @@ export function estadoDaLinha(
   },
   hoje: string,
 ): EstadoDaLinha {
-  if (tx.status !== 'pending') return null;
   // Datas ISO (`YYYY-MM-DD`) comparam como string — é como o resto do app já compara.
+  // Cartão vale pela DATA, nascendo `cleared` ou não (a mesma régua de `filtroDoEstado`).
   if (tx.invoice_id) return tx.occurred_at > hoje ? 'previsto' : null;
+  if (tx.status !== 'pending') return null;
   const quando = tx.due_at ?? tx.occurred_at;
   if (quando >= hoje) return 'previsto';
   // ⚠️ Receita não ATRASA — ela não CAIU. Ninguém "deve" um salário, e este arquivo nasceu

@@ -31,9 +31,12 @@ begin
     (w,u,'expense', 900,'cartão futuro',hoje + 3,'app','pending',card),
     (w,u,'income', 4000,'salário',hoje - 2,'app','cleared',null),
     (w,u,'income',  200,'a receber',hoje + 4,'app','pending',null);
+  -- cartão futuro nascido cleared (o que o app grava): pela data, é previsto
+  insert into public.transactions(workspace_id,user_id,kind,amount_cents,description,occurred_at,source,status,account_id)
+    values (w,u,'expense',1100,'cartão futuro cleared',hoje + 2,'app','cleared',card);
 
-  assert (select count(*) from public.transactions where workspace_id = w and invoice_id is not null) = 2,
-    'as duas compras de cartão caíram numa fatura (senão o teste não prova nada)';
+  assert (select count(*) from public.transactions where workspace_id = w and invoice_id is not null) = 3,
+    'as três compras de cartão caíram numa fatura (senão o teste não prova nada)';
 
   perform set_config('request.jwt.claim.sub',u::text,true);
   perform set_config('role','authenticated',true);
@@ -43,7 +46,7 @@ begin
          sum(realizado_cents) filter (where kind='income') as ri, sum(realizado_count) filter (where kind='income') as rci
     into r from public.transactions_summary(hoje - 10, hoje + 10);
 
-  assert r.t = 3400, format('total de gasto %s', r.t);
+  assert r.t = 4500, format('total de gasto %s', r.t);
   assert r.re = 1700 and r.rc = 2, format('realizado: pago 1000 + cartão de ontem 700 (veio %s em %s linhas)', r.re, r.rc);
   assert r.p = 2400, format('por status o cartão de ontem seria previsto (veio %s)', r.p);
   assert r.ri = 4000 and r.rci = 1, format('entrada realizada %s em %s', r.ri, r.rci);
@@ -51,7 +54,7 @@ begin
   -- a soma bate com as linhas que a lista mostra em "Aconteceu" (mesmo predicado da consulta do app)
   select coalesce(sum(amount_cents),0) into via_lista from public.transactions
    where kind = 'expense' and occurred_at between hoje - 10 and hoje + 10
-     and (status = 'cleared' or (invoice_id is not null and occurred_at <= hoje));
+     and case when invoice_id is not null then occurred_at <= hoje else status = 'cleared' end;
   assert via_lista = r.re, format('lista %s vs realizado %s', via_lista, r.re);
 
   -- sem permissão para anon

@@ -269,3 +269,12 @@ test('um dia enorme não esmaga a régua: o teto para em 3× o "por dia"', () =>
   const semRegua = semanaDoDia({ hoje: HOJE, gastos: [{ day: HOJE, expense_cents: 3_000_000, income_cents: 0 }], proximos: [], porDia: null });
   assert.equal(semRegua.teto, 3_000_000, 'sem régua, o teto é o maior gasto');
 });
+
+test('Fatura paga em parte: a frase "ainda vai entrar" compara o futuro com o TOTAL bruto, não com o em aberto', async () => {
+  const { fraseAindaVaiEntrar } = await import('./card-status.ts');
+  const { agendaDoDia } = await import('./today-sections.ts');
+  // total 10.000, pago 8.000 (aberto 2.000), 3.000 com data à frente
+  const { agora } = agendaDoDia([{ kind: 'invoice', ref_id: 'f1', title: 'Fatura', amount_cents: 2000, due_date: '2026-10-10', overdue: false, future_cents: 3000, total_cents: 10000 }], [], '2026-10-10');
+  const i = agora[0];
+  assert.equal(fraseAindaVaiEntrar(i.futuroCents, i.totalCents ?? i.cents, (c) => String(c)), '3000 ainda vai entrar');
+});

@@ -29,11 +29,10 @@ test('Compra de outro ano leva o ano junto', () => {
 test('"Concluído" é o que já aconteceu — a mesma régua da pílula', () => {
   const hoje = '2026-09-24';
   assert.deepEqual(filtroDoEstado('cleared', hoje), {
-    ou: 'status.eq.cleared,and(invoice_id.not.is.null,occurred_at.lte.2026-09-24)',
+    ou: 'and(invoice_id.is.null,status.eq.cleared),and(invoice_id.not.is.null,occurred_at.lte.2026-09-24)',
   });
   assert.deepEqual(filtroDoEstado('pending', hoje), {
-    status: 'pending',
-    ou: 'invoice_id.is.null,occurred_at.gt.2026-09-24',
+    ou: 'and(invoice_id.is.null,status.eq.pending),and(invoice_id.not.is.null,occurred_at.gt.2026-09-24)',
   });
   // Espelho das duas expressões sobre as mesmas linhas que `estadoDaLinha` decide: toda linha cai
   // em exatamente um dos dois filtros, e "Concluído" é exatamente a que não tem pílula.
@@ -44,9 +43,10 @@ test('"Concluído" é o que já aconteceu — a mesma régua da pílula', () => 
     { kind: 'expense', status: 'cleared', occurred_at: '2026-09-02', due_at: null, invoice_id: null },
     { kind: 'expense', status: 'pending', occurred_at: '2026-09-05', due_at: '2026-09-05', invoice_id: null }, // boleto atrasado
     { kind: 'income', status: 'pending', occurred_at: '2026-10-05', due_at: null, invoice_id: null },
+    { kind: 'expense', status: 'cleared', occurred_at: '2026-10-05', due_at: null, invoice_id: 'f2' }, // cartão futuro nascido cleared = previsto
   ];
-  const concluido = (t: (typeof linhas)[number]) => t.status === 'cleared' || (t.invoice_id !== null && t.occurred_at <= hoje);
-  const emAberto = (t: (typeof linhas)[number]) => t.status === 'pending' && (t.invoice_id === null || t.occurred_at > hoje);
+  const concluido = (t: (typeof linhas)[number]) => t.invoice_id !== null ? t.occurred_at <= hoje : t.status === 'cleared';
+  const emAberto = (t: (typeof linhas)[number]) => t.invoice_id !== null ? t.occurred_at > hoje : t.status === 'pending';
   for (const t of linhas) {
     assert.notEqual(concluido(t), emAberto(t), JSON.stringify(t));
     assert.equal(concluido(t), estadoDaLinha(t, hoje) === null, JSON.stringify(t));

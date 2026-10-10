@@ -4458,6 +4458,7 @@ export type Database = {
           overdue: boolean
           ref_id: string
           title: string
+          total_cents: number
         }[]
       }
       _workspace_ids: { Args: { uid: string }; Returns: string[] }
@@ -5541,6 +5542,7 @@ export type Database = {
           overdue: boolean
           ref_id: string
           title: string
+          total_cents: number
         }[]
       }
       update_asset_value: {

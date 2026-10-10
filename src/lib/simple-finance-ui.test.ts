@@ -8862,6 +8862,17 @@ test('Ainda vai sair: uma data só grava occurred_at = due_at, e "outra data" ab
   assert.deepEqual(campos(outra), ['Data da compra', 'Vence em'], 'volta o par');
   assert.throws(() => outra.button('Comprou em outra data?'), 'o link some depois de aberto');
 
+  // Conta > cartão > conta na mesma visita devolve "Ainda vai sair" e o vencimento (QA Android, 10/10/2026).
+  const trocar = abrir({}, { forecastAccounts: [{ id: 'c1', name: 'Conta', type: 'checking' }, { id: 'k1', name: 'Cartão', type: 'credit_card' }] });
+  const noCaixa = () => trocar.nodes().find((n: any) => n.type === 'Segmented' && n.props.options.some((o: any) => o.label === 'Ainda vai sair'));
+  caixa(trocar, 'yes');
+  const conta = (id: string) => trocar.interact(() => trocar.nodes().find((n: any) => n.type === 'AccountPicker').props.onChange(id));
+  conta('k1');
+  assert.equal(noCaixa(), undefined, 'em cartão o campo não existe');
+  conta('c1');
+  assert.equal(noCaixa()?.props.value, 'yes', 'voltou a conta: "Ainda vai sair" volta');
+  assert.deepEqual(campos(trocar), ['Vence em']);
+
   const receita = abrir({ comum: { kind: 'income', descricao: 'Freela', valorCents: 5000, contaId: 'c1', dataBR: '20/10/2026', categoria: null } });
   caixa(receita, 'yes');
   assert.ok(receita.button('Lançar em outra data?'));

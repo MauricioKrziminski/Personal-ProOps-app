@@ -37,7 +37,7 @@ import { molduraEmTela } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useRascunho } from '@/hooks/use-rascunho';
 import { pendenciaDoAplicar } from '@/lib/hipotese';
-import { abreComDuasDatas, dataUnicaEVencimento, oferecerOutraData, rotuloOutraData } from '@/lib/uma-data';
+import { abreComDuasDatas, abreComDuasDatasGuardado, aoTrocarDeConta, dataUnicaEVencimento, oferecerOutraData, rotuloOutraData, vencimentoAGravar, type PendenciaReservada } from '@/lib/uma-data';
 import { argsDaParcelada, dadosDoLancamento, detalheDaEscrita, mudancaDoDetalhe } from '@/lib/escrita';
 import { prepararLancamento, type LancamentoPreparado } from '@/lib/lancamento-write';
 import { SwitchRow } from '@/components/ui/switch-row';
@@ -261,7 +261,10 @@ export function FormularioDoLancamento(props: Props) {
     só aparece se a pessoa pedir ("Comprou em outra data?") ou se o registro já tiver as duas
     diferentes. Parcela de compra mantém o vencimento à parte (a data dela é a do cronograma).
   */
-  const [outraData, setOutraData] = useState(() => abreComDuasDatas(editing));
+  const guardado = props.estadoGuardado as FormValues | undefined;
+  const [outraData, setOutraData] = useState(() => abreComDuasDatas(editing) || abreComDuasDatasGuardado(guardado));
+  // "Ainda vai sair" e o vencimento, guardados enquanto a conta é um cartão (voltar à conta devolve).
+  const pendenciaReservada = useRef<PendenciaReservada | null>(null);
   const naCompraInicial = Boolean(editing?.installment_plan_id);
   const umaDataSemVencimento = Boolean(editing && !umaData && !naCompraInicial && editing.status === 'pending' && !editing.due_at && !editing.invoice_id);
 
@@ -269,7 +272,6 @@ export function FormularioDoLancamento(props: Props) {
   const doAplicar = !editing && deHipotese
     ? pendenciaDoAplicar(comum.dataBR, accounts?.find((a) => a.id === comum.contaId)?.type, localISODate())
     : null;
-  const guardado = props.estadoGuardado as FormValues | undefined;
   const { control, handleSubmit, setValue, getValues, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),
     // `editing` já chegou resolvido pelo gate — sem `useEffect`+`reset`, sem corrida. Criando, os
@@ -962,7 +964,7 @@ export function FormularioDoLancamento(props: Props) {
     }
     const adiado = podeAdiar && values.pending;
     const status = podeAdiar ? (adiado ? 'pending' : 'cleared') : editing.status;
-    const dueAt = adiado && values.due_at ? brToISO(values.due_at) : editing.due_at;
+    const dueAt = vencimentoAGravar(editing, adiado && values.due_at ? brToISO(values.due_at) : editing.due_at);
     const patch: Parameters<typeof salvarParcela.mutate>[0]['patch'] = {};
     Object.assign(patch, expenseClassificationPatch(expenseClassificationFromRecord(editing), classification.classification));
     Object.assign(patch, mudancaDoDetalhe(editing, values, editing.category, values.category));
@@ -1028,7 +1030,7 @@ export function FormularioDoLancamento(props: Props) {
           if (!formSerie && podeAdiar) {
             const status = values.pending ? 'pending' : 'cleared';
             if (status !== editing.status) patch.status = status;
-            const dueAt = values.pending && values.due_at ? brToISO(values.due_at) : editing.due_at;
+            const dueAt = vencimentoAGravar(editing, values.pending && values.due_at ? brToISO(values.due_at) : editing.due_at);
             if (dueAt !== editing.due_at) patch.due_at = dueAt;
           }
           if (!Object.keys(patch).length) return props.onFechar();
@@ -1363,9 +1365,18 @@ export function FormularioDoLancamento(props: Props) {
                     field.onChange(next);
                     // Trocar para cartão desliga "vou pagar depois" em vez de só escondê-lo.
                     const escolhida = (accounts ?? []).find((a) => a.id === next);
-                    if (escolhida?.type === 'credit_card') {
-                      setValue('pending', false);
-                      setValue('due_at', null);
+                    const antes = pendenciaReservada.current;
+                    const paraCartao = escolhida?.type === 'credit_card';
+                    const trocou = aoTrocarDeConta({
+                      paraCartao,
+                      pending: getValues('pending'),
+                      due_at: getValues('due_at') ?? null,
+                      reservada: antes,
+                    });
+                    pendenciaReservada.current = trocou.reservada;
+                    if (paraCartao || antes) {
+                      setValue('pending', trocou.pending);
+                      setValue('due_at', trocou.pending && !outraData ? getValues('occurred_at') : trocou.due_at);
                     }
                     // Limpar a conta esconde a fileira de parcelas (`podeParcelarAqui`);
                     // escolher OUTRA conta (inclusive cartão) mantém `installments`.
