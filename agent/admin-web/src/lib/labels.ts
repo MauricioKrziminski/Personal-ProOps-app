@@ -14,6 +14,9 @@ export const AUDIT_LABEL: Record<string, string> = {
   plan_changed: "Plano alterado", plan_forced: "Plano forçado (loja)", suspended: "Conta suspensa",
   reactivated: "Conta reativada", signed_out: "Sessões encerradas", password_reset_sent: "Código de senha enviado",
   whatsapp_unlinked: "WhatsApp desvinculado", issue_triaged: "Erro triado", account_deleted: "Conta apagada",
+  accounts_exported: "Contas exportadas (CSV)", note_added: "Nota adicionada", note_deleted: "Nota apagada",
+  invite_revoked: "Convite revogado", member_removed: "Membro removido", push_sent: "Notificação enviada",
+  app_config_changed: "Configuração do app alterada",
 };
 export const BILLING_RESULT_LABEL: Record<string, string> = {
   concedido: "Concedido", revogado: "Revogado", duplicado: "Duplicado", sandbox_ignorado: "Sandbox ignorado",
@@ -27,6 +30,7 @@ export const COUNT_LABEL: Record<string, string> = {
 export const SORTS: [string, string][] = [
   ["created_desc", "Mais recentes"], ["created_asc", "Mais antigas"], ["last_sign_in_desc", "Último acesso"], ["last_sign_in_asc", "Sem acesso há mais tempo"],
   ["ai_used_desc", "Maior uso de IA"], ["email_asc", "E-mail (A–Z)"],
+  ["last_seen_desc", "Último uso do app"], ["last_seen_asc", "Sem uso do app há mais tempo"],
 ];
 
 export const SUB_STATUS_LABEL: Record<string, string> = {
@@ -41,3 +45,4 @@ export const ISSUE_SEVERITY_LABEL: Record<string, string> = { critical: "Crític
 export const ISSUE_PERIODS: [string, string][] = [["1h", "Última hora"], ["24h", "24 horas"], ["7d", "7 dias"], ["30d", "30 dias"]];
 export const ISSUE_SORTS: [string, string][] = [["last_seen_desc", "Mais recentes"], ["count_desc", "Mais eventos"], ["users_desc", "Mais usuários"], ["first_seen_desc", "Mais novos"]];
 export const PLATFORM_LABEL: Record<string, string> = { ios: "iOS", android: "Android", web: "Web" };
+export const NOTICE_LEVEL_LABEL: Record<string, string> = { info: "Informação", warning: "Atenção", critical: "Crítico" };

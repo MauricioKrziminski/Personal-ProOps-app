@@ -4,11 +4,12 @@ import { Link } from "react-router";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PageHeader, SectionError, Section } from "@/components/states";
+import { Empty, PageHeader, SectionError, Section } from "@/components/states";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useIsMobile } from "@/lib/hooks";
 import type { Overview } from "@/lib/types";
+import { PLATFORM_LABEL } from "@/lib/labels";
 import { cn, dayLabel, monthLabel, num, usd } from "@/lib/utils";
 
 function ChartTip({ active, payload, label, fmt }: { active?: boolean; payload?: { value: number }[]; label?: string; fmt: (v: number) => string }) {
@@ -120,6 +121,33 @@ function Distribution({ d }: { d: Overview }) {
   );
 }
 
+function Versions({ d }: { d: Overview }) {
+  const platforms = (["ios", "android", "web"] as const).filter((p) => d.versions.some((v) => v.platform === p));
+  return (
+    <Section title="Versões do app em uso" aside={<span className="text-xs text-muted-foreground">Últimos 30 dias</span>}>
+      {platforms.length === 0 ? <Empty title="Nenhum uso registrado" hint="Aparece quando o app com a versão nova for aberto." /> : (
+        <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3" data-testid="versions">
+          {platforms.map((p) => {
+            const rows = d.versions.filter((v) => v.platform === p);
+            const max = Math.max(...rows.map((r) => r.users));
+            return (
+              <div key={p} data-platform={p}>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{PLATFORM_LABEL[p]}</p>
+                <ul className="space-y-2">{rows.map((r) => (
+                  <li key={r.version} className="text-sm" data-testid="version-row">
+                    <div className="mb-1 flex justify-between"><span className="font-semibold tabular-nums">{r.version}</span><span className="tabular-nums text-muted-foreground">{num(r.users)} {r.users === 1 ? "pessoa" : "pessoas"}</span></div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-[var(--chart-1)]" style={{ width: `${(r.users / max) * 100}%` }} /></div>
+                  </li>
+                ))}</ul>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Section>
+  );
+}
+
 export function OverviewPage() {
   const { config } = useAuth();
   const q = useQuery({ queryKey: ["overview"], queryFn: api.overview });
@@ -153,6 +181,8 @@ export function OverviewPage() {
               ))}
             </dl>
           </Section>
+
+          <Versions d={d} />
 
           <div className="grid gap-5 lg:grid-cols-2">
             <Section title="Cadastros por mês" aside={<span className="text-xs text-muted-foreground">12 meses</span>}>

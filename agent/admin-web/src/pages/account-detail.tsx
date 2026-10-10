@@ -1,7 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Ban, ExternalLink, Play, Smartphone, UserCog } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Ban, ExternalLink, Play, Smartphone, Trash2, UserCog } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
+import { toast } from "sonner";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AccountMenu, ActionHost, type Target } from "@/components/account-actions";
 import { AuditRow } from "@/components/audit-list";
@@ -10,13 +11,15 @@ import { Empty, SectionError, Section } from "@/components/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Confirm } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { resultTone } from "@/pages/billing";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { BILLING_RESULT_LABEL, COUNT_LABEL, INVITE_STATUS_LABEL, ORIGIN_LABEL, SUB_STATUS_LABEL } from "@/lib/labels";
+import { PLATFORM_LABEL, BILLING_RESULT_LABEL, COUNT_LABEL, INVITE_STATUS_LABEL, ORIGIN_LABEL, SUB_STATUS_LABEL } from "@/lib/labels";
 import type { AccountDetail } from "@/lib/types";
-import { fmtDate, monthLabel, nomeDaConta, num, usd } from "@/lib/utils";
+import { relTime, fmtDate, monthLabel, nomeDaConta, num, usd } from "@/lib/utils";
 
 const Row = ({ k, v }: { k: string; v: React.ReactNode }) => (
   <div className="flex items-baseline justify-between gap-4 py-2.5 text-sm"><dt className="shrink-0 text-muted-foreground">{k}</dt><dd className="min-w-0 break-words text-right font-medium">{v}</dd></div>
@@ -43,7 +46,9 @@ export function AccountDetailPage() {
             <Subscription d={d} rc={config?.revenuecat_dashboard_url} />
             <Usage d={d} />
             <Counts d={d} />
+            <AppInfo d={d} />
             <People d={d} />
+            <Notes d={d} />
             <Billing d={d} />
             <Section title="Auditoria da conta" aside={<Link to={`/auditoria?target_user_id=${d.account.user_id}`} className="text-xs font-semibold underline-offset-4 hover:underline">Ver tudo</Link>}>
               {d.admin_events.length === 0 ? <Empty title="Nenhuma ação registrada" hint="Mudanças feitas por administradores nesta conta aparecem aqui." /> : (
@@ -76,7 +81,7 @@ function Header({ d, onAction }: { d: AccountDetail; onAction: (k: Parameters<ty
           {a.suspended
             ? <Button variant="outline" onClick={() => onAction("reactivate")} className="flex-1 sm:flex-none"><Play />Reativar</Button>
             : <Button variant="outline" onClick={() => onAction("suspend")} className="flex-1 sm:flex-none"><Ban />Suspender</Button>}
-          <AccountMenu row={a} onAction={onAction} trigger="button" />
+          <AccountMenu row={a} onAction={onAction} trigger="button" pushTokens={d.profile.push_tokens} />
         </div>
       </div>
       {a.suspended && <p role="status" className="mt-4 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm font-medium text-destructive">Conta suspensa. Sem acesso ao app e sem respostas no WhatsApp.</p>}
@@ -157,24 +162,106 @@ function Counts({ d }: { d: AccountDetail }) {
   );
 }
 
+type Remover = { kind: "member"; id: string; label: string } | { kind: "invite"; id: string; label: string } | null;
+
 function People({ d }: { d: AccountDetail }) {
+  const qc = useQueryClient();
+  const [alvo, setAlvo] = useState<Remover>(null);
+  const uid = d.account.user_id;
+  const m = useMutation({
+    mutationFn: (r: NonNullable<Remover>) => api.act(uid, r.kind === "member" ? `members/${r.id}/remove` : `invites/${r.id}/revoke`),
+    onSuccess: async (_d, r) => {
+      toast.success(r.kind === "member" ? "Membro removido." : "Convite revogado.");
+      await Promise.all(["account", "audit"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
+      setAlvo(null);
+    },
+    onError: (e) => { toast.error(e instanceof Error ? e.message : "Não foi possível concluir."); setAlvo(null); },
+  });
   return (
     <Section title="Membros e convites">
       <ul className="divide-y px-1 pb-1 pt-2">
-        {d.members.map((m) => (
-          <li key={m.user_id} className="flex items-center justify-between gap-3 px-4 py-3">
-            <div className="min-w-0"><p className="truncate text-sm font-semibold">{nomeDaConta(m)}</p><p className="truncate text-xs text-muted-foreground">{m.name ?? "Sem nome"}</p></div>
-            <Badge tone={m.role === "owner" ? "ink" : "neutral"}>{m.role === "owner" ? "Dono" : "Membro"}</Badge>
+        {d.members.map((mb) => (
+          <li key={mb.user_id} className="flex items-center justify-between gap-3 px-4 py-3">
+            <div className="min-w-0"><p className="truncate text-sm font-semibold">{nomeDaConta(mb)}</p><p className="truncate text-xs text-muted-foreground">{mb.name ?? "Sem nome"}</p></div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Badge tone={mb.role === "owner" ? "ink" : "neutral"}>{mb.role === "owner" ? "Dono" : "Membro"}</Badge>
+              {mb.role !== "owner" && <Button variant="outline" size="sm" onClick={() => setAlvo({ kind: "member", id: mb.user_id, label: nomeDaConta(mb) })}>Remover</Button>}
+            </div>
           </li>
         ))}
         {d.invites.map((i) => (
-          <li key={i.phone + i.created_at} className="flex items-center justify-between gap-3 px-4 py-3">
+          <li key={i.id} className="flex items-center justify-between gap-3 px-4 py-3">
             <div><p className="text-sm font-semibold">{i.phone}</p><p className="text-xs text-muted-foreground">Convite em {fmtDate(i.created_at)}</p></div>
-            <Badge tone="warning">{INVITE_STATUS_LABEL[i.status] ?? i.status}</Badge>
+            <div className="flex shrink-0 items-center gap-2">
+              <Badge tone="warning">{INVITE_STATUS_LABEL[i.status] ?? i.status}</Badge>
+              {i.status === "pending" && <Button variant="outline" size="sm" onClick={() => setAlvo({ kind: "invite", id: i.id, label: i.phone })}>Revogar</Button>}
+            </div>
           </li>
         ))}
       </ul>
       {d.members.length + d.invites.length === 0 && <Empty title="Sem membros" />}
+      {alvo && (
+        <Confirm open onOpenChange={(o) => !o && setAlvo(null)} destructive busy={m.isPending} onConfirm={() => m.mutate(alvo)}
+          title={alvo.kind === "member" ? "Remover membro" : "Revogar convite"} confirmLabel={alvo.kind === "member" ? "Remover" : "Revogar"}
+          description={alvo.kind === "member" ? <><strong className="break-all text-foreground">{alvo.label}</strong> perde o acesso aos dados deste espaço.</> : <>O convite para <strong className="text-foreground">{alvo.label}</strong> deixa de valer.</>} />
+      )}
+    </Section>
+  );
+}
+
+function AppInfo({ d }: { d: AccountDetail }) {
+  const p = d.profile;
+  return (
+    <Section title="App e consentimento">
+      <dl className="divide-y px-5 pb-4 pt-1">
+        <Row k="Termos aceitos" v={p.terms_version ? `Versão ${p.terms_version}, em ${fmtDate(p.terms_accepted_at, true)}` : "Ainda não aceitou"} />
+        <Row k="IA autorizada" v={p.ai_consent_at ? fmtDate(p.ai_consent_at, true) : "Não"} />
+        <Row k="Versão do app" v={p.last_app_version ? `${p.last_app_version}${p.last_app_platform ? ` · ${PLATFORM_LABEL[p.last_app_platform]}` : ""}` : "—"} />
+        <Row k="Último uso do app" v={p.last_seen_at ? `${relTime(p.last_seen_at)} (${fmtDate(p.last_seen_at, true)})` : "Nunca"} />
+        <Row k="Tokens de push" v={p.push_tokens} />
+      </dl>
+    </Section>
+  );
+}
+
+const NOTA_MAX = 2000;
+
+function Notes({ d }: { d: AccountDetail }) {
+  const qc = useQueryClient();
+  const uid = d.account.user_id;
+  const [text, setText] = useState("");
+  const [apagar, setApagar] = useState<string | null>(null);
+  const q = useQuery({ queryKey: ["notes", uid], queryFn: () => api.notes(uid) });
+  const refresh = () => Promise.all(["notes", "account", "audit"].map((k) => qc.invalidateQueries({ queryKey: [k] })));
+  const add = useMutation({
+    mutationFn: () => api.addNote(uid, text.trim()),
+    onSuccess: async () => { toast.success("Nota adicionada."); setText(""); await refresh(); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Não foi possível salvar a nota."),
+  });
+  const del = useMutation({
+    mutationFn: (id: string) => api.deleteNote(uid, id),
+    onSuccess: async () => { toast.success("Nota apagada."); setApagar(null); await refresh(); },
+    onError: (e) => { toast.error(e instanceof Error ? e.message : "Não foi possível apagar."); setApagar(null); },
+  });
+  const items = q.data?.items ?? [];
+  return (
+    <Section title="Notas internas" aside={<span className="text-xs text-muted-foreground">Só o time vê</span>}>
+      <div className="flex flex-col gap-2 px-5 pt-3">
+        <Textarea aria-label="Nova nota" placeholder="Ex.: pediu reembolso pelo suporte" value={text} maxLength={NOTA_MAX} onChange={(e) => setText(e.target.value)} />
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs tabular-nums text-muted-foreground">{text.length}/{NOTA_MAX}</span>
+          <Button size="sm" onClick={() => add.mutate()} disabled={add.isPending || !text.trim()}>{add.isPending ? "Salvando…" : "Adicionar nota"}</Button>
+        </div>
+      </div>
+      {q.isError ? <SectionError error={q.error} onRetry={() => void q.refetch()} /> : !q.data ? <Skeleton className="m-5 h-16 rounded-lg" /> : items.length === 0 ? <Empty title="Nenhuma nota" hint="Registre contexto de atendimento para o próximo da fila." /> : (
+        <ul className="divide-y px-1 pb-1 pt-2">{items.map((n) => (
+          <li key={n.id} className="flex items-start justify-between gap-3 px-4 py-3" data-testid="note">
+            <div className="min-w-0"><p className="whitespace-pre-wrap break-words text-sm">{n.body}</p><p className="mt-1 text-xs text-muted-foreground">{n.admin_email ?? "Admin"} · {fmtDate(n.created_at, true)}</p></div>
+            <Button variant="ghost" size="icon" aria-label="Apagar nota" onClick={() => setApagar(n.id)}><Trash2 /></Button>
+          </li>
+        ))}</ul>
+      )}
+      {apagar && <Confirm open onOpenChange={(o) => !o && setApagar(null)} destructive title="Apagar nota" confirmLabel="Apagar" busy={del.isPending} onConfirm={() => del.mutate(apagar)} description="A nota some para todo o time. A auditoria guarda só que ela foi apagada." />}
     </Section>
   );
 }

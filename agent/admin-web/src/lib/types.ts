@@ -10,6 +10,7 @@ export interface Overview {
   signups_by_month: { month: string; count: number }[];
   ai_cost_by_day: { day: string; usd: string }[];
   observability: { open: number; critical_open: number; events_24h: number };
+  versions: { platform: "ios" | "android" | "web"; version: string; users: number }[];
   signals: { trial_ending_48h: number; lapsed_7d: number; near_limit: number; inactive_subscribers_30d: number };
 }
 
@@ -32,6 +33,8 @@ export interface AccountRow {
   wa_used: number;
   wa_max: number;
   whatsapp_linked: boolean;
+  last_app_version: string | null;
+  last_seen_at: string | null;
 }
 
 export interface Page<T> { items: T[]; total: number; page: number; page_size: number }
@@ -61,7 +64,11 @@ export interface BillingEvent {
 
 export interface AccountDetail {
   account: AccountRow;
-  profile: { phone: string | null; email_confirmed_at: string | null; onboarding_completed: boolean; banned_until: string | null; sessions: number };
+  profile: { phone: string | null; email_confirmed_at: string | null; onboarding_completed: boolean; banned_until: string | null; sessions: number;
+    terms_version: string | null; terms_accepted_at: string | null; ai_consent_at: string | null;
+    last_app_version: string | null; last_app_platform: "ios" | "android" | "web" | null; last_seen_at: string | null;
+    push_tokens: number; notes_count: number;
+  };
   subscription: {
     plan: string; status: string; provider: string; origin: Origin | null; external_id: string; product_id: string; environment: string;
     is_trial: boolean; current_period_end: string | null; canceled_at: string | null; store_managed: boolean;
@@ -72,7 +79,7 @@ export interface AccountDetail {
   };
   counts: Record<"transactions" | "accounts" | "cards" | "notes" | "reminders" | "goals" | "debts" | "recurring", number>;
   members: { user_id: string; email: string | null; name: string | null; role: "owner" | "member" }[];
-  invites: { phone: string; status: string; created_at: string }[];
+  invites: { id: string; phone: string; status: string; created_at: string }[];
   billing_events: { id: string; type: string; result: string; created_at: string }[];
   admin_events: AuditEvent[];
 }
@@ -132,4 +139,15 @@ export interface IssueDetail {
   daily_30d: { day: string; count: number }[];
   events: IssueEvent[];
   triage: AuditEvent[];
+}
+
+export interface Note { id: string; body: string; created_at: string; admin_user_id: string; admin_email: string | null }
+
+export type NoticeLevel = "info" | "warning" | "critical";
+export interface AppConfig {
+  min_version_ios: string | null; min_version_android: string | null;
+  latest_version_ios: string | null; latest_version_android: string | null;
+  store_url_ios: string | null; store_url_android: string | null;
+  notice_title: string | null; notice_body: string | null; notice_level: NoticeLevel | null; notice_until: string | null;
+  updated_at: string | null; updated_by: string | null;
 }

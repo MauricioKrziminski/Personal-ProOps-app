@@ -15,6 +15,7 @@ const AccountDetailPage = lazyPage(() => import("@/pages/account-detail"), "Acco
 const ObservabilityPage = lazyPage(() => import("@/pages/observability"), "ObservabilityPage");
 const AuditPage = lazyPage(() => import("@/pages/audit"), "AuditPage");
 const BillingPage = lazyPage(() => import("@/pages/billing"), "BillingPage");
+const AppConfigPage = lazyPage(() => import("@/pages/app-config"), "AppConfigPage");
 const SystemPage = lazyPage(() => import("@/pages/system"), "SystemPage");
 
 const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false, retry: 1 } } });
@@ -35,6 +36,7 @@ function Gate() {
         <Route path="observabilidade" element={<ObservabilityPage />} />
         <Route path="auditoria" element={<AuditPage />} />
         <Route path="cobranca" element={<BillingPage />} />
+        <Route path="app" element={<AppConfigPage />} />
         <Route path="sistema" element={<SystemPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

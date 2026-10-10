@@ -21,11 +21,12 @@ const ROWS: AccountRow[] = Array.from({ length: 58 }, (_, i) => {
     plan: plan as AccountRow["plan"], status: kind === 4 ? "canceled" : kind === 3 ? "trialing" : kind <= 2 || kind === 7 ? "active" : "none",
     access: kind <= 3 || kind === 7 ? "subscriber" : kind === 4 ? "lapsed" : "never", is_trial: kind === 3,
     period_end: kind <= 4 || kind === 7 ? dateOnly(kind === 3 ? 2 : kind === 4 ? -5 : 18 + i) : null,
-    origin: origin as AccountRow["origin"], ai_used: aiUsed, ai_max: aiMax, wa_used: Math.round(waMax * (((i * 13) % 100) / 100)), wa_max: waMax, whatsapp_linked: kind !== 6 && kind !== 5,
+    origin: origin as AccountRow["origin"], ai_used: aiUsed, ai_max: aiMax, wa_used: Math.round(waMax * (((i * 13) % 100) / 100)), wa_max: waMax, whatsapp_linked: kind !== 6 && kind !== 5, last_app_version: kind === 5 ? null : "1.4.2", last_seen_at: kind === 5 ? null : day(i % 9),
   };
 });
 
 const OVERVIEW: Overview = {
+  versions: [{ platform: "ios", version: "1.4.2", users: 120 }, { platform: "android", version: "1.4.2", users: 90 }, { platform: "android", version: "1.4.0", users: 14 }],
   accounts: { total: 1284, new_7d: 41, new_30d: 168 },
   access: { subscriber: 312, trialing: 27, lapsed: 94, never: 782, courtesy: 9, suspended: 3 },
   plans: { pro: 241, family: 71 },
@@ -73,7 +74,7 @@ function detail(id: string): AccountDetail {
   const store = a.origin === "apple" || a.origin === "google";
   return {
     account: a,
-    profile: { phone: a.whatsapp_linked ? "+55 11 9•••• 4821" : null, email_confirmed_at: a.created_at, onboarding_completed: a.access !== "never", banned_until: a.suspended ? "2126-10-09T00:00:00Z" : null, sessions: a.suspended ? 0 : 2 },
+    profile: { phone: a.whatsapp_linked ? "+55 11 9•••• 4821" : null, email_confirmed_at: a.created_at, onboarding_completed: a.access !== "never", banned_until: a.suspended ? "2126-10-09T00:00:00Z" : null, sessions: a.suspended ? 0 : 2, terms_version: "2026-10-09", terms_accepted_at: a.created_at, ai_consent_at: a.created_at, last_app_version: a.last_app_version, last_app_platform: "ios", last_seen_at: a.last_seen_at, push_tokens: 1, notes_count: 0 },
     subscription: { plan: a.plan, status: a.status, provider: a.origin ?? "none", origin: a.origin, external_id: a.origin ? "rc_" + a.user_id.slice(-8) : "", product_id: a.origin ? "proops.pro.monthly" : "", environment: "production", is_trial: a.is_trial, current_period_end: a.period_end, canceled_at: a.access === "lapsed" ? day(6) : null, store_managed: store },
     usage: {
       current: { ai_used: a.ai_used, ai_max: a.ai_max, wa_used: a.wa_used, wa_max: a.wa_max, notices_today: 1, notices_max: 3, ai_cost_usd: (a.ai_used * 0.0021).toFixed(4) },
@@ -81,7 +82,7 @@ function detail(id: string): AccountDetail {
     },
     counts: { transactions: 412, accounts: 4, cards: 2, notes: 18, reminders: 7, goals: 3, debts: 1, recurring: 9 },
     members: [{ user_id: a.user_id, email: a.email, name: a.name, role: "owner" }, ...(a.plan === "family" ? [{ user_id: uuid(777), email: "convidado@exemplo.com", name: "Convidado", role: "member" as const }] : [])],
-    invites: a.plan === "family" ? [{ phone: "+55 21 9•••• 0099", status: "pending", created_at: day(4) }] : [],
+    invites: a.plan === "family" ? [{ id: uuid(888), phone: "+55 21 9•••• 0099", status: "pending", created_at: day(4) }] : [],
     billing_events: BILLING.slice(0, 5).map((b) => ({ id: b.id, type: b.type, result: b.result, created_at: b.created_at })),
     admin_events: AUDIT.filter((e) => e.target_user_id === id).slice(0, 10),
   };

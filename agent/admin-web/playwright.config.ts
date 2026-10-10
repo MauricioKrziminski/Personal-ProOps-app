@@ -4,7 +4,7 @@ import { defineConfig } from "@playwright/test";
 // mexem no mesmo banco, e a ordem dos arquivos (01-, 02-…) importa. O projeto `mobile` roda ANTES e
 // só com os specs de leitura, para ver o seed intacto; o `desktop` roda tudo.
 const base = process.env.E2E_BASE_URL ?? "http://127.0.0.1:8095";
-const SO_DESKTOP = [/04-ficha/, /06-auditoria/, /08-observabilidade/, /09-whatsapp/, /10-mfa/];
+const SO_DESKTOP = [/04-ficha/, /06-auditoria/, /08-observabilidade/, /09-whatsapp/, /10-mfa/, /12-lancamento/];
 
 export default defineConfig({
   testDir: "./e2e",

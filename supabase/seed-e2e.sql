@@ -54,6 +54,19 @@ delete from auth.identities i using e where i.user_id = e.uid and e.slug in ('se
 update auth.users u set last_sign_in_at = case when e.slug = 'google' then now() - interval '40 days' else now() - interval '1 day' end
   from e where u.id = e.uid and e.slug in ('manual', 'familia', 'apple', 'google', 'teste1', 'teste2', 'a-loja');
 
+-- configuração remota do app volta ao vazio (o teste da página App parte dela)
+update public.app_config set min_version_ios = null, min_version_android = null, latest_version_ios = null, latest_version_android = null,
+  store_url_ios = null, store_url_android = null, notice_title = null, notice_body = null, notice_level = null, notice_until = null where id = 1;
+
+-- versão/uso do app, aceite dos termos, consentimento de IA e push (painel: ficha, lista e "Versões em uso").
+-- google fica SEM last_seen_at de propósito: o sinal de inativos cai no login de 40 dias.
+update public.profiles p set last_app_version = v.ver, last_app_platform = v.plat, last_seen_at = now() - make_interval(days => v.d)
+  from (values ('apple', '1.4.2', 'ios', 2), ('familia', '1.4.2', 'android', 1), ('manual', '1.4.0', 'ios', 5)) v(slug, ver, plat, d)
+  join e on e.slug = v.slug where p.id = e.uid;
+update public.profiles p set terms_version = '2026-10-09', terms_accepted_at = now() - interval '3 days', ai_consent_at = now() - interval '3 days'
+  from e where p.id = e.uid and e.slug = 'apple';
+update public.profiles p set expo_push_token = 'ExponentPushToken[e2e-fake-token]' from e where p.id = e.uid and e.slug = 'familia';
+
 update auth.users u set banned_until = now() + interval '100 years' from e where u.id = e.uid and e.slug = 'suspensa';
 
 -- ── assinaturas ─────────────────────────────────────────────────────────────────────────────────────────

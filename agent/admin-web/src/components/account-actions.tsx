@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Ban, Copy, ExternalLink, KeyRound, LogOut, MessageSquareOff, MoreHorizontal, Play, Trash2, UserCog } from "lucide-react";
+import { Ban, Copy, ExternalLink, KeyRound, LogOut, MessageSquareOff, MoreHorizontal, BellRing, Play, Trash2, UserCog } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -11,11 +11,14 @@ import { api, ApiError } from "@/lib/api";
 import type { AccountRow } from "@/lib/types";
 import { chaveDeConfirmacao, nomeDaConta } from "@/lib/utils";
 
-export type ActionKind = "plan" | "suspend" | "reactivate" | "signout" | "reset" | "unlink" | "delete";
+export type ActionKind = "plan" | "suspend" | "reactivate" | "signout" | "reset" | "unlink" | "delete" | "notify";
 export type Target = { kind: ActionKind; row: AccountRow } | null;
 
 /** Mesmo limite de `SuspenderIn.reason` na API (admin.py, MOTIVO_MAX). */
 export const MOTIVO_MAX = 300;
+/** Mesmos limites de `AvisoIn` na API (admin.py). */
+export const AVISO_TITULO_MAX = 60;
+export const AVISO_TEXTO_MAX = 180;
 
 const isStore = (o: AccountRow["origin"]) => o === "apple" || o === "google";
 
@@ -29,7 +32,7 @@ export async function copy(text: string, what: string) {
 }
 
 /** Menu "…" da conta — mesmo conteúdo na lista e no detalhe. */
-export function AccountMenu({ row, onAction, withOpen, trigger }: { row: AccountRow; onAction: (k: ActionKind) => void; withOpen?: boolean; trigger?: "icon" | "button" }) {
+export function AccountMenu({ row, onAction, withOpen, trigger, pushTokens }: { row: AccountRow; onAction: (k: ActionKind) => void; withOpen?: boolean; trigger?: "icon" | "button"; pushTokens?: number }) {
   const nav = useNavigate();
   return (
     <Menu>
@@ -42,6 +45,7 @@ export function AccountMenu({ row, onAction, withOpen, trigger }: { row: Account
         {row.suspended ? <MenuItem onSelect={() => onAction("reactivate")}><Play />Reativar conta</MenuItem> : <MenuItem onSelect={() => onAction("suspend")}><Ban />Suspender conta</MenuItem>}
         <MenuItem onSelect={() => onAction("signout")}><LogOut />Encerrar sessões</MenuItem>
         <MenuItem disabled={!row.email} onSelect={() => onAction("reset")}><KeyRound />{row.email ? "Enviar código de senha" : "Enviar código de senha (conta sem e-mail)"}</MenuItem>
+        <MenuItem disabled={pushTokens === 0} onSelect={() => onAction("notify")}><BellRing />{pushTokens === 0 ? "Enviar notificação (sem aparelho)" : "Enviar notificação"}</MenuItem>
         {row.whatsapp_linked && <MenuItem onSelect={() => onAction("unlink")}><MessageSquareOff />Desvincular WhatsApp</MenuItem>}
         <MenuSep />
         <MenuItem disabled={!row.email} onSelect={() => row.email && void copy(row.email, "E-mail")}><Copy />Copiar e-mail</MenuItem>
@@ -56,7 +60,7 @@ export function AccountMenu({ row, onAction, withOpen, trigger }: { row: Account
 
 const DONE: Record<ActionKind, string> = {
   plan: "Plano atualizado.", suspend: "Conta suspensa.", reactivate: "Conta reativada.", signout: "Sessões encerradas.",
-  reset: "Código de recuperação enviado.", unlink: "WhatsApp desvinculado.", delete: "Conta apagada.",
+  reset: "Código de recuperação enviado.", unlink: "WhatsApp desvinculado.", delete: "Conta apagada.", notify: "Notificação enviada.",
 };
 
 /** Hospeda o diálogo da ação escolhida. Toda ação: confirmação, loading, toast e refetch. */
@@ -70,11 +74,13 @@ export function ActionHost({ target, onClose }: { target: Target; onClose: () =>
   const [force, setForce] = useState(false);
   const [needForce, setNeedForce] = useState(false);
   const [email, setEmail] = useState("");
+  const [title, setTitle] = useState("");
+  const [text, setText] = useState("");
 
-  const reset = () => { setReason(""); setPlan("pro"); setPeriodEnd(""); setNoEnd(false); setForce(false); setNeedForce(false); setEmail(""); };
+  const reset = () => { setTitle(""); setText(""); setReason(""); setPlan("pro"); setPeriodEnd(""); setNoEnd(false); setForce(false); setNeedForce(false); setEmail(""); };
   const close = () => { reset(); onClose(); };
 
-  const m = useMutation({
+  const m = useMutation<unknown, Error, { kind: ActionKind; row: AccountRow }>({
     mutationFn: ({ kind, row }: { kind: ActionKind; row: AccountRow }) => {
       const id = row.user_id;
       switch (kind) {
@@ -85,6 +91,7 @@ export function ActionHost({ target, onClose }: { target: Target; onClose: () =>
         case "reset": return api.act(id, "password-reset");
         case "unlink": return api.act(id, "unlink-whatsapp");
         case "delete": return api.act(id, "delete", { confirm_email: email.trim() });
+        case "notify": return api.notify(id, title.trim(), text.trim());
       }
     },
     onSuccess: async (_d, { kind, row }) => {
@@ -144,6 +151,21 @@ export function ActionHost({ target, onClose }: { target: Target; onClose: () =>
         <div><Label htmlFor="reason">Motivo</Label><Textarea id="reason" value={reason} maxLength={MOTIVO_MAX} onChange={(e) => setReason(e.target.value)} placeholder="Ex.: chargeback confirmado" />
           <p className="mt-1 text-right text-xs tabular-nums text-muted-foreground" aria-live="polite" data-testid="reason-count">{reason.length}/{MOTIVO_MAX}</p></div>
       </Confirm>
+    );
+  }
+  if (kind === "notify") {
+    return (
+      <Modal open onOpenChange={(o) => !o && close()} title="Enviar notificação" description={nomeDaConta(row)}>
+        <div><Label htmlFor="ntitle">Título</Label><Input id="ntitle" value={title} maxLength={AVISO_TITULO_MAX} onChange={(e) => setTitle(e.target.value)} />
+          <p className="mt-1 text-right text-xs tabular-nums text-muted-foreground" aria-live="polite" data-testid="title-count">{title.length}/{AVISO_TITULO_MAX}</p></div>
+        <div><Label htmlFor="nbody">Texto</Label><Textarea id="nbody" value={text} maxLength={AVISO_TEXTO_MAX} onChange={(e) => setText(e.target.value)} />
+          <p className="mt-1 text-right text-xs tabular-nums text-muted-foreground" aria-live="polite" data-testid="body-count">{text.length}/{AVISO_TEXTO_MAX}</p></div>
+        <p className="text-xs text-muted-foreground">Vai como push para o aparelho da pessoa. Fica registrado na auditoria (só o título).</p>
+        <DialogActions>
+          <Button variant="outline" onClick={close} disabled={m.isPending}>Cancelar</Button>
+          <Button onClick={go} disabled={m.isPending || !title.trim() || !text.trim()}>{m.isPending ? "Enviando…" : "Enviar"}</Button>
+        </DialogActions>
+      </Modal>
     );
   }
   if (kind === "delete") {

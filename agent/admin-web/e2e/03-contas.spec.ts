@@ -25,7 +25,7 @@ test.describe("Contas", () => {
   });
 
   test("busca por e-mail, por nome e sem resultado; limpar filtros", async ({ page }) => {
-    const busca = page.getByLabel("Buscar por e-mail ou nome");
+    const busca = page.getByLabel("Buscar por e-mail, nome ou telefone");
     await busca.fill("apple@e2e");
     await total(page, 1);
     await expect(links(page).first()).toContainText("apple@e2e.proops.test");
@@ -40,7 +40,7 @@ test.describe("Contas", () => {
   });
 
   test("busca trata % e _ como texto (não como curinga)", async ({ page }) => {
-    await page.getByLabel("Buscar por e-mail ou nome").fill("%");
+    await page.getByLabel("Buscar por e-mail, nome ou telefone").fill("%");
     await expect(page.getByText("Nenhuma conta encontrada")).toBeVisible();
   });
 
@@ -83,7 +83,7 @@ test.describe("Contas", () => {
   });
 
   test("conta SEM e-mail aparece pelo nome e abre a ficha", async ({ page }) => {
-    await page.getByLabel("Buscar por e-mail ou nome").fill("Pedro Sem Email");
+    await page.getByLabel("Buscar por e-mail, nome ou telefone").fill("Pedro Sem Email");
     await total(page, 1);
     const l = links(page).first();
     await expect(l).toContainText("Pedro Sem Email");
@@ -94,7 +94,7 @@ test.describe("Contas", () => {
   });
 
   test("link da lista abre a ficha da conta certa", async ({ page }) => {
-    await page.getByLabel("Buscar por e-mail ou nome").fill("familia@");
+    await page.getByLabel("Buscar por e-mail, nome ou telefone").fill("familia@");
     await total(page, 1);
     await links(page).first().click();
     await expect(page).toHaveURL(new RegExp(`/contas/${U.familia.id}$`));

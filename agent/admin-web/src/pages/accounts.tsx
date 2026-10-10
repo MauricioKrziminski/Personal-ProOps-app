@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Search, X } from "lucide-react";
+import { Download, Search, X } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router";
 import { AccountMenu, ActionHost, type Target } from "@/components/account-actions";
 import { LastSeen, OriginBadge, PlanBadge, StatusBadge, UsageBar } from "@/components/badges";
@@ -10,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TD, TH, THead, TR } from "@/components/ui/table";
-import { api } from "@/lib/api";
+import { api, downloadAccountsCsv } from "@/lib/api";
 import { useSearchBox, useUrlState } from "@/lib/url-state";
 import { ACCESS_LABEL, ORIGIN_LABEL, PLAN_LABEL, SIGNAL_LABEL, SORTS } from "@/lib/labels";
 import type { AccountRow } from "@/lib/types";
@@ -28,17 +29,24 @@ export function AccountsPage() {
 
   const filters = { q: get("q"), access: get("access"), signal: get("signal"), plan: get("plan"), origin: get("origin"), sort: get("sort") || "created_desc", page: Number(get("page")) || 1, page_size: PAGE_SIZE };
   const q = useQuery({ queryKey: ["accounts", filters], queryFn: () => api.accounts(filters), placeholderData: keepPreviousData });
+  const [exporting, setExporting] = useState(false);
+  const exportCsv = async () => {
+    setExporting(true);
+    try { await downloadAccountsCsv(filters); toast.success("CSV exportado."); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Não foi possível exportar."); }
+    finally { setExporting(false); }
+  };
   const active = ["q", "access", "signal", "plan", "origin"].some((k) => get(k));
   const items = q.data?.items ?? [];
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Contas" subtitle={q.data ? `${q.data.total.toLocaleString("pt-BR")} ${q.data.total === 1 ? "conta" : "contas"}` : "Busque, filtre e aja rápido."} />
+      <PageHeader title="Contas" subtitle={q.data ? `${q.data.total.toLocaleString("pt-BR")} ${q.data.total === 1 ? "conta" : "contas"}` : "Busque, filtre e aja rápido."} actions={<Button variant="outline" onClick={() => void exportCsv()} disabled={exporting}><Download />{exporting ? "Exportando…" : "Exportar CSV"}</Button>} />
       <Card className="p-3 sm:p-4">
         <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-[minmax(0,1.6fr)_repeat(4,minmax(0,1fr))]">
           <div className="relative col-span-2 lg:col-span-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input aria-label="Buscar por e-mail ou nome" placeholder="Buscar por e-mail ou nome" className="pl-9" value={text} onChange={(e) => setText(e.target.value)} />
+            <Input aria-label="Buscar por e-mail, nome ou telefone" placeholder="Buscar por e-mail, nome ou telefone" className="pl-9" value={text} onChange={(e) => setText(e.target.value)} />
           </div>
           <Select aria-label="Acesso" value={get("access")} onChange={(e) => set({ access: e.target.value })}><option value="">Acesso</option>{Object.entries(ACCESS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
           <Select aria-label="Plano" value={get("plan")} onChange={(e) => set({ plan: e.target.value })}><option value="">Plano</option>{Object.entries(PLAN_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select>
@@ -63,7 +71,7 @@ export function AccountsPage() {
             <ul className="divide-y md:hidden">{items.map((a) => <MobileRow key={a.user_id} a={a} onAction={(kind) => setTarget({ kind, row: a })} />)}</ul>
             <div className="hidden md:block">
               <Table>
-                <THead><tr><TH>Conta</TH><TH>Plano</TH><TH>Status</TH><TH>Origem</TH><TH>IA no mês</TH><TH>WhatsApp</TH><TH>Último acesso</TH><TH className="w-12"><span className="sr-only">Ações</span></TH></tr></THead>
+                <THead><tr><TH>Conta</TH><TH>Plano</TH><TH>Status</TH><TH>Origem</TH><TH>IA no mês</TH><TH>WhatsApp</TH><TH>Versão do app</TH><TH>Último uso</TH><TH className="w-12"><span className="sr-only">Ações</span></TH></tr></THead>
                 <tbody>{items.map((a) => (
                   <TR key={a.user_id}>
                     <TD className="max-w-[280px]"><Link to={`/contas/${a.user_id}`} className="block truncate font-semibold hover:underline">{nomeDaConta(a)}</Link><p className="truncate text-xs text-muted-foreground">{a.name ?? "Sem nome"} · desde {fmtDate(a.created_at)}</p></TD>
@@ -72,7 +80,8 @@ export function AccountsPage() {
                     <TD><OriginBadge origin={a.origin} /></TD>
                     <TD><UsageBar used={a.ai_used} max={a.ai_max} label="Uso de IA no mês" /></TD>
                     <TD><UsageBar used={a.wa_used} max={a.wa_max} label="Respostas de WhatsApp no mês" /></TD>
-                    <TD><LastSeen iso={a.last_sign_in_at} /></TD>
+                    <TD><span className="text-sm tabular-nums" data-testid="app-version">{a.last_app_version ?? "—"}</span></TD>
+                    <TD><LastSeen iso={a.last_seen_at} /></TD>
                     <TD><AccountMenu row={a} withOpen onAction={(kind) => setTarget({ kind, row: a })} /></TD>
                   </TR>
                 ))}</tbody>
@@ -102,7 +111,7 @@ function MobileRow({ a, onAction }: { a: AccountRow; onAction: (k: Parameters<ty
         <div><p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">IA no mês</p><UsageBar used={a.ai_used} max={a.ai_max} label="Uso de IA no mês" /></div>
         <div><p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">WhatsApp</p><UsageBar used={a.wa_used} max={a.wa_max} label="Respostas de WhatsApp no mês" /></div>
       </div>
-      <p className="mt-2.5 text-xs text-muted-foreground">Último acesso: <LastSeen iso={a.last_sign_in_at} /></p>
+      <p className="mt-2.5 text-xs text-muted-foreground">App {a.last_app_version ?? "—"} · último uso: <LastSeen iso={a.last_seen_at} /></p>
     </li>
   );
 }
