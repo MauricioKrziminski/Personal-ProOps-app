@@ -10,6 +10,7 @@ import { AgoraLinha, GrupoDoDia, RotuloNoGrupo } from '@/components/feed/grupo-d
 import { LinhaDeLembrete } from '@/components/feed/lembrete-do-dia';
 import { NotasDaHoje } from '@/components/feed/notas-da-hoje';
 import { SemanaDoDia } from '@/components/feed/semana-do-dia';
+import { FaixasDeAviso } from '@/components/ui/faixa-de-aviso';
 import { ProximoPassoCard } from '@/components/feed/proximo-passo';
 import { SetupChecklist } from '@/components/feed/setup-checklist';
 import { TodayTabletCanvas } from '@/components/feed/today-tablet-canvas';
@@ -343,6 +344,7 @@ export default function TodayScreen() {
         </ThemedText>
       ) : null}
       <ThemedText type="caption" themeColor="textSecondary">{diaCurtoBR(hoje)}</ThemedText>
+      <FaixasDeAviso />
     </View>
   );
 

@@ -397,6 +397,7 @@ test('hint de Field cabe em duas linhas', () => {
  */
 const GHOST_PERMITIDO = new Set([
   'src/app/catalog.tsx', // o catálogo do design mostra a variante
+  'src/app/consentimento.tsx', // "Sair da conta" sob "Concordo e continuar"
   'src/app/forgot-password.tsx', // "Voltar" e "Reenviar código", pares do botão do passo
   'src/app/import.tsx', // "Marcar todos": ação de cabeçalho da lista da prévia
   'src/app/link-email.tsx', // "Cancelar"/"Trocar e-mail" e "Reenviar código", pares do passo
@@ -789,6 +790,7 @@ const SEM_SCREEN = new Set([
   'src/app/assinar.tsx',               // só delega à `TelaDeAssinatura` do paywall (que usa <Screen>)
   'src/app/design-preview.tsx',        // vitrine de dev: monta as raízes de aba à mão
   'src/app/onboarding.tsx',            // fluxo de tela cheia, com paginação própria
+  'src/app/atualizar.tsx',             // bloqueio de versão: toma o lugar do app inteiro, sem rolagem
   // As seis portas de conta compartilham a moldura `AuthScreen`.
   'src/app/login.tsx',
   'src/app/signup.tsx',
@@ -1485,6 +1487,8 @@ test('toda tela de dados tem puxar para atualizar', () => {
   // e o Detalhe do ciclo também não tinha. Quem não tem o gesto diz por quê.
   const semDados: Record<string, string> = {
     'app/guia.tsx': 'conteúdo fixo',
+    'app/ajuda.tsx': 'links fixos; só a versão do aparelho',
+    'app/consentimento.tsx': 'aceite dos termos, sem lista',
     'app/catalog.tsx': 'vitrine de desenvolvimento',
     'app/dev-erro.tsx': 'dispara erro de teste, só em desenvolvimento',
     'app/paywall.tsx': 'oferta, não lista',

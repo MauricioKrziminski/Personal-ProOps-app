@@ -16,8 +16,8 @@ import { hasCompletedOnboarding } from '@/lib/onboarding';
  */
 export default function Index() {
   const { session, loading } = useSession();
-  const destino = useDestino(!!session, !!session && hasCompletedOnboarding(session.user.user_metadata));
+  const destino = useDestino(!!session, !!session && hasCompletedOnboarding(session.user.user_metadata), session?.user.id);
   if (loading || destino === 'aguarda') return null;
-  const rota = { conta: '/login', onboarding: '/onboarding', assinar: '/assinar', app: '/today' } as const;
+  const rota = { conta: '/login', consentimento: '/consentimento', onboarding: '/onboarding', assinar: '/assinar', app: '/today' } as const;
   return <Redirect href={rota[destino]} />;
 }

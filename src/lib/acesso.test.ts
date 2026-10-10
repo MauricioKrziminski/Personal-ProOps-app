@@ -4,18 +4,36 @@ import { test } from 'node:test';
 import ts from 'typescript';
 
 import { aoFalharEscrita, decisaoDeAcesso, estadoDoPlano, estaSemAssinatura } from './acesso.ts';
+import { TERMOS_VERSAO } from './termos.ts';
 import { diasDeTeste, opcoesDaLoja, periodoEscrito } from './oferta.ts';
 
 const pronto = (access: string) => ({ isPending: false, isError: false, data: { access } });
+const aceitou = { isPending: false, isError: false, data: { terms_version: TERMOS_VERSAO } };
 
 test('portão: nunca assinou só tem a tela de assinar; lapsed entra em leitura; erro falha aberto', () => {
-  assert.equal(decisaoDeAcesso(false, false, { isPending: true, isError: false }), 'conta');
-  assert.equal(decisaoDeAcesso(true, false, { isPending: true, isError: false }), 'onboarding');
-  assert.equal(decisaoDeAcesso(true, true, { isPending: true, isError: false }), 'aguarda', 'não pisca');
-  assert.equal(decisaoDeAcesso(true, true, pronto('never')), 'assinar');
-  assert.equal(decisaoDeAcesso(true, true, pronto('lapsed')), 'app');
-  assert.equal(decisaoDeAcesso(true, true, pronto('subscriber')), 'app');
-  assert.equal(decisaoDeAcesso(true, true, { isPending: true, isError: true }), 'app', 'plano falhou: o banco protege');
+  assert.equal(decisaoDeAcesso(false, false, { isPending: true, isError: false }, aceitou), 'conta');
+  assert.equal(decisaoDeAcesso(true, false, { isPending: true, isError: false }, aceitou), 'onboarding');
+  assert.equal(decisaoDeAcesso(true, true, { isPending: true, isError: false }, aceitou), 'aguarda', 'não pisca');
+  assert.equal(decisaoDeAcesso(true, true, pronto('never'), aceitou), 'assinar');
+  assert.equal(decisaoDeAcesso(true, true, pronto('lapsed'), aceitou), 'app');
+  assert.equal(decisaoDeAcesso(true, true, pronto('subscriber'), aceitou), 'app');
+  assert.equal(decisaoDeAcesso(true, true, { isPending: true, isError: true }, aceitou), 'app', 'plano falhou: o banco protege');
+});
+
+
+test('consentimento: entre a conta e o onboarding, antes de assinar; aguarda; falha aberto', () => {
+  const plano = pronto('never');
+  const semAceite = { isPending: false, isError: false, data: { terms_version: null } };
+  const velho = { isPending: false, isError: false, data: { terms_version: '2025-01-01' } };
+  assert.equal(decisaoDeAcesso(false, false, plano, semAceite), 'conta', 'sem sessão manda o login');
+  assert.equal(decisaoDeAcesso(true, false, plano, semAceite), 'consentimento', 'antes do onboarding');
+  assert.equal(decisaoDeAcesso(true, true, plano, semAceite), 'consentimento', 'antes de assinar');
+  assert.equal(decisaoDeAcesso(true, true, plano, velho), 'consentimento', 'versão antiga aceita de novo');
+  assert.equal(decisaoDeAcesso(true, false, plano, aceitou), 'onboarding');
+  assert.equal(decisaoDeAcesso(true, true, plano, aceitou), 'assinar');
+  assert.equal(decisaoDeAcesso(true, true, plano, { isPending: true, isError: false }), 'aguarda', 'perfil carregando');
+  assert.equal(decisaoDeAcesso(true, true, pronto('subscriber'), { isPending: false, isError: true }), 'app', 'perfil falhou: abre');
+  assert.equal(decisaoDeAcesso(true, false, plano, { isPending: true, isError: true }), 'onboarding', 'erro com pendência antiga: abre');
 });
 
 test('modo leitura: lapsed ou plano free; plano ausente (erro) não bloqueia', () => {

@@ -1,3 +1,4 @@
+import { AutorizarIa, IA_SEM_CONSENTIMENTO } from '@/components/agent/autorizar-ia';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, router } from 'expo-router';
@@ -79,7 +80,7 @@ const LEASE_MS = 300_000;
 type Item =
   | { key: string; kind: 'user' | 'assistant'; message: AgentMessage }
   | { key: string; kind: 'processing' }
-  | { key: string; kind: 'failed'; texto: string; retryable: boolean };
+  | { key: string; kind: 'failed'; texto: string; retryable: boolean; codigo?: string | null };
 
 /** `listening` é a escuta ao vivo do aparelho; `recording`/`transcribing`, o caminho da Groq. */
 type EstadoDoAudio = 'idle' | 'starting' | 'recording' | 'listening' | 'transcribing';
@@ -505,12 +506,12 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
     }
 
     const falha = erro
-      ? { texto: erro.message, retryable: erro.policy.retryable }
+      ? { texto: erro.message, retryable: erro.policy.retryable, codigo: erro.code }
       // Turno que terminou não "demorou demais": a resposta está logo acima.
       : desistiu && noBanco?.status !== 'completed'
         ? { texto: 'Essa mensagem demorou demais.', retryable: true }
         : noBanco?.status === 'failed'
-          ? falhaDoTurno(noBanco)
+          ? { ...falhaDoTurno(noBanco), codigo: noBanco.error_code }
           : null;
 
     if (falha) {
@@ -519,6 +520,7 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
         kind: 'failed',
         texto: falha.texto,
         retryable: falha.retryable && Boolean(emVoo),
+        codigo: falha.codigo,
       });
     } else if (rodando) {
       out.push({ key: 'pensando', kind: 'processing' });
@@ -793,9 +795,13 @@ const Linha = memo(function Linha({
   if (item.kind === 'failed') {
     return (
       <View style={styles.status}>
-        <ThemedText type="footnote" themeColor="danger">
-          {item.texto}
-        </ThemedText>
+        {item.codigo === IA_SEM_CONSENTIMENTO ? (
+          <AutorizarIa aoAutorizar={onRetry} />
+        ) : (
+          <ThemedText type="footnote" themeColor="danger">
+            {item.texto}
+          </ThemedText>
+        )}
         {item.retryable ? (
           <Button label="Tentar novamente" variant="secondary" size="sm" onPress={onRetry} />
         ) : null}

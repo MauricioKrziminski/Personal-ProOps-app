@@ -1,3 +1,4 @@
+import { AutorizarIa, IA_SEM_CONSENTIMENTO } from '@/components/agent/autorizar-ia';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { AppState, Keyboard, Linking, StyleSheet, View } from 'react-native';
@@ -53,6 +54,7 @@ function FolhaPorVoz({ onClose }: { onClose: () => void }) {
   const [texto, setTexto] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [semMicrofone, setSemMicrofone] = useState(false);
+  const [semConsentimento, setSemConsentimento] = useState(false);
 
   const mudar = (f: Fase) => { faseAtual.current = f; setFase(f); };
 
@@ -99,7 +101,8 @@ function FolhaPorVoz({ onClose }: { onClose: () => void }) {
       const { text } = await transcribeAudio(uri);
       setTexto((antes) => [antes.trim(), text.trim()].filter(Boolean).join(' '));
     } catch (e) {
-      setErro(e instanceof AgentApiError ? e.message : 'Não consegui transcrever o áudio. Tente novamente.');
+      if (e instanceof AgentApiError && e.code === IA_SEM_CONSENTIMENTO) setSemConsentimento(true);
+      else setErro(e instanceof AgentApiError ? e.message : 'Não consegui transcrever o áudio. Tente novamente.');
     } finally {
       if (uri) apagarGravacao(uri);
       mudar('parado');
@@ -111,6 +114,7 @@ function FolhaPorVoz({ onClose }: { onClose: () => void }) {
     if (!fala || faseAtual.current !== 'parado') return;
     Keyboard.dismiss();
     setErro(null);
+    setSemConsentimento(false);
     mudar('montando');
     try {
       const rascunho = await createFinanceDraft(fala, localISODate(), Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -118,7 +122,8 @@ function FolhaPorVoz({ onClose }: { onClose: () => void }) {
       router.push(hrefDoRascunho(rascunho));
     } catch (e) {
       // o texto fica: a pessoa tenta de novo sem falar tudo outra vez
-      setErro(e instanceof AgentApiError ? e.message : 'Não consegui montar o lançamento. Tente de novo.');
+      if (e instanceof AgentApiError && e.code === IA_SEM_CONSENTIMENTO) setSemConsentimento(true);
+      else setErro(e instanceof AgentApiError ? e.message : 'Não consegui montar o lançamento. Tente de novo.');
       mudar('parado');
     }
   };
@@ -145,8 +150,9 @@ function FolhaPorVoz({ onClose }: { onClose: () => void }) {
             <Button label="Abrir ajustes" variant="secondary" onPress={() => { void Linking.openSettings(); }} />
           </>
         ) : null}
+        {semConsentimento ? <AutorizarIa aoAutorizar={() => setSemConsentimento(false)} /> : null}
         {erro ? <Note icon="exclamationmark.triangle" tone="danger">{erro}</Note> : null}
-        {!gravando && (texto || erro || fase === 'montando') ? (
+        {!gravando && (texto || erro || semConsentimento || fase === 'montando') ? (
           <>
             <Field label="O que você falou" obrigatorio>
               <TextField

@@ -506,6 +506,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
         useSpendingChange: () => ({ ...query, isPending: false, isSuccess: true, data: options.spending, refetch: async () => { refetches.push('spending-change'); } }),
       };
       if (name === '@/lib/spending-change') return load('src/lib/spending-change.ts');
+      if (name === '@/hooks/use-avaliacao') return { useAvaliacaoDepoisDeSalvar: () => async () => {} };
       if (name === '@/hooks/use-favoritos') return {
         NOME_REPETIDO: '23505',
         useFavoritos: (arquivados = false) => ({ ...query, isSuccess: true, isPending: false, data: (arquivados ? options.favoritosArquivados : options.favoritos) ?? [] }),

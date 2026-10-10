@@ -14,6 +14,7 @@ import { Note } from '@/components/ui/note';
 import { Screen } from '@/components/ui/screen';
 import { FormularioEmTela } from '@/components/ui/sheet';
 import { ToastDoModal, useToast } from '@/components/ui/toast';
+import { useAvaliacaoDepoisDeSalvar } from '@/hooks/use-avaliacao';
 import { useConverterRegistro, useDebts, useInstallmentPlan, useTransaction } from '@/hooks/use-finance';
 import { usePurchaseDownPayment } from '@/hooks/use-down-payment';
 import { isoToBR, localISODate } from '@/lib/dates';
@@ -102,6 +103,7 @@ export default function LancarScreen() {
   const lerComum = useRef<() => Comum>(() => comum);
   const lerEstado = useRef<() => unknown>(() => undefined);
   const toast = useToast();
+  const avaliar = useAvaliacaoDepoisDeSalvar();
   const converter = useConverterRegistro();
   const originCreation = useRef<OriginCreationController | null>(null);
   const [creatingOrigin, setCreatingOrigin] = useState(false);
@@ -165,6 +167,7 @@ export default function LancarScreen() {
   };
 
   const onSalvo = (criarOutro: boolean) => {
+    void avaliar();
     if (!criarOutro) return router.back();
     setComum(comumDepoisDeSalvar(lerComum.current()));
     setEstados({});

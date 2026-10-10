@@ -13,6 +13,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
 import { LockRows } from '@/components/profile/lock-section';
+import { PrivacidadeSection } from '@/components/profile/privacidade-section';
+import { SegurancaRows } from '@/components/profile/seguranca-rows';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonHero, SkeletonList, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -42,7 +44,6 @@ import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import { ondaDaTroca } from '@/lib/session-gate';
 import { estadoDoPlano } from '@/lib/acesso';
 import { useApagarConta } from '@/hooks/use-apagar-conta';
-import { abrirLegal, URL_PRIVACIDADE, URL_TERMOS } from '@/lib/links-legais';
 import { appUpdateAction, appUpdateSubtitle, type AppUpdateState } from '@/lib/app-update';
 import { supabase, supabaseUrl } from '@/lib/supabase';
 import { telefoneLegivel } from '@/lib/phone-br';
@@ -133,6 +134,7 @@ export default function ProfileScreen() {
   const segurancaEAparencia = (
     <Section heading="block" title="Segurança e aparência">
       <LockRows />
+      <SegurancaRows />
       <Row
         title="Tema"
         icon="circle.lefthalf.filled"
@@ -503,10 +505,7 @@ export default function ProfileScreen() {
 
       <AppAndHelp />
 
-      <Section heading="block" title="Legal">
-        <Row title="Termos de Uso" icon="doc.text" onPress={() => abrirLegal(URL_TERMOS)} />
-        <Row title="Política de Privacidade" icon="lock" onPress={() => abrirLegal(URL_PRIVACIDADE)} />
-      </Section>
+      <PrivacidadeSection />
 
       <Section>
         <Row
@@ -613,7 +612,7 @@ function AppAndHelp() {
   const action = appUpdateAction(appUpdate.state);
   return (
     <Section heading="block" title="Ajuda e app">
-      <Row title="Como usar o ProOps" icon="questionmark.circle" onPress={() => router.push('/guia')} />
+      <Row title="Ajuda e suporte" icon="questionmark.circle" onPress={() => router.push('/ajuda')} />
       {appUpdate.state.status === 'unsupported' ? null : (
         <Row
           title="Atualização do app"

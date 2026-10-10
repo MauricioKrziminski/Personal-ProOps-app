@@ -14,6 +14,7 @@ const url = (override: string | undefined, caminho: string): string | null =>
 
 export const URL_TERMOS = url(process.env.EXPO_PUBLIC_TERMOS_URL, 'termos');
 export const URL_PRIVACIDADE = url(process.env.EXPO_PUBLIC_PRIVACIDADE_URL, 'privacidade');
+export const URL_APAGAR_CONTA = url(undefined, 'apagar-conta');
 
 /** Abre no navegador do sistema (a folha de leitura), sem sair do app. */
 export const abrirLegal = (link: string | null) => {

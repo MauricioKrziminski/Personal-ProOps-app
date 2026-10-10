@@ -43,6 +43,8 @@ import { ConcealProvider } from '@/components/ui/conceal';
 import { SincronizaWidgets } from '@/widgets/sincroniza';
 import { ToastProvider } from '@/components/ui/toast';
 import { AppUpdateProvider } from '@/hooks/use-app-update';
+import { useAppPing, useDecisaoDeVersao } from '@/hooks/use-app-config';
+import TelaAtualizar from '@/app/atualizar';
 import { ThemeProvider as AppThemeProvider, useBarStyle, useScheme, useTheme } from '@/hooks/use-theme';
 import { carregarPreferencias } from '@/hooks/use-preferencia';
 import { SessionProvider, useSession } from '@/hooks/use-session';
@@ -241,7 +243,10 @@ function AppTree() {
   const userIdDaSessao = session?.user.id ?? null;
   const onboardingConcluido = !!session && hasCompletedOnboarding(session.user.user_metadata);
   // O plano decide entre o app e o portão de assinatura; enquanto chega, a abertura segura (não pisca).
-  const destino = useDestino(!!session, onboardingConcluido);
+  const destino = useDestino(!!session, onboardingConcluido, userIdDaSessao ?? undefined);
+  useAppPing(userIdDaSessao ?? undefined);
+  // Versão abaixo do mínimo: a tela de bloqueio TOMA o lugar do app (não é rota, não tem "voltar").
+  const bloqueadoPorVersao = useDecisaoDeVersao().tipo === 'bloquear';
   // RevenueCat com o id do usuário do Supabase (nunca anônimo): entra, troca e sai com a sessão.
   useEffect(() => {
     void identificar(userIdDaSessao);
@@ -298,6 +303,8 @@ function AppTree() {
               */}
               {loading && semConexao && tentarDeNovo ? (
                 <SemConexao onRetry={tentarDeNovo} />
+              ) : bloqueadoPorVersao ? (
+                <TelaAtualizar />
               ) : loading || destino === 'aguarda' || !(fontsLoaded || fontError) ? null : (
               /*
                * `statusBarStyle` mora AQUI, e só aqui.
@@ -406,7 +413,12 @@ function AppTree() {
                   <Stack.Screen name="forgot-password" options={contaOptions} />
                 </Stack.Protected>
 
-                <Stack.Protected guard={!!session && !hasCompletedOnboarding(session.user.user_metadata)}>
+                {/* Termos novos (ou nunca aceitos): antes do onboarding e da assinatura. Porta de mão
+                    única — aceitar fecha esta tela e o destino seguinte abre. */}
+                <Stack.Protected guard={destino === 'consentimento'}>
+                  <Stack.Screen name="consentimento" options={{ headerShown: false }} />
+                </Stack.Protected>
+                <Stack.Protected guard={destino === 'onboarding'}>
                   <Stack.Screen name="onboarding" options={{ headerShown: false }} />
                 </Stack.Protected>
                 {/* Nunca assinou: só existe a tela de assinatura, sem ✕. Some sozinha quando o plano
@@ -542,6 +554,7 @@ function AppTree() {
                   <Stack.Screen name="reminders" options={{ title: 'Lembretes' }} />
                   <Stack.Screen name="search" options={{ title: 'Buscar' }} />
                   <Stack.Screen name="guia" options={{ title: 'Como usar o ProOps' }} />
+                  <Stack.Screen name="ajuda" options={{ title: 'Ajuda e suporte' }} />
                 <Stack.Screen name="import" options={{ title: 'Importar' }} />
                 <Stack.Screen name="import-history" options={{ title: 'Importações' }} />
                   {/* Paywall é modal fechável SEMPRE: paywall que não fecha é reprovação na App Review. */}

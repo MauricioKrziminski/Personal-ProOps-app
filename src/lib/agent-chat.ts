@@ -359,6 +359,8 @@ export function marcarTurnoLocal<M extends ComSeq>(
 const FALHA: Record<string, { texto: string; retryable: boolean }> = {
   plan_limit: { texto: 'Você usou todas as mensagens do plano este mês.', retryable: false },
   rate_limit: { texto: 'Muitas mensagens seguidas. Espera um pouco.', retryable: true },
+  // O retry é do cartão "Autorizar o uso de IA" (conversation-screen), que liga o consentimento antes.
+  ai_consent_required: { texto: 'O assistente precisa da sua autorização para usar IA.', retryable: false },
   internal: { texto: 'Não consegui processar essa mensagem.', retryable: true },
 };
 

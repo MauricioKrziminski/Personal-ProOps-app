@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/icon';
 import { Mark } from '@/components/ui/mark';
 import { ThemedText } from '@/components/themed-text';
 import { Space } from '@/design/tokens';
+import { abrirSuporte } from '@/lib/suporte-abrir';
 
 /**
  * Loading e erro padrão das telas.
@@ -43,6 +44,8 @@ export function ErrorCard({ onRetry, message = 'Não deu para carregar' }: { onR
         terceiro e último lugar do app onde um `Button` mora dentro de um container centralizado.
       */}
       <Button label="Tentar de novo" onPress={onRetry} size="sm" style={styles.retry} />
+      {/* O e-mail já leva versão, plataforma, id e o que a tela estava dizendo. */}
+      <Button label="Falar com o suporte" onPress={() => { void abrirSuporte(message); }} variant="secondary" size="sm" style={styles.retry} />
     </Card>
   );
 }

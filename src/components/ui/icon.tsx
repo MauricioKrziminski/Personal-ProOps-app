@@ -142,6 +142,8 @@ const MATERIAL: Record<string, MaterialName> = {
   'textformat.size': 'format_size',
   minus: 'horizontal_rule',
   lock: 'lock',
+  envelope: 'mail',
+  key: 'key',
   shield: 'shield',
   magnifyingglass: 'search',
   'note.text': 'description',

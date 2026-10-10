@@ -195,10 +195,11 @@ export async function agentFetch<T>(
   }
 
   if (!resposta.ok) {
-    const { code, message } = (corpo ?? {}) as { code?: string; message?: string };
+    // O 403 de consentimento chega como `{"error": "ai_consent_required"}`; o resto, `{code, message}`.
+    const { code, error, message } = (corpo ?? {}) as { code?: string; error?: string; message?: string };
     throw new AgentApiError(
       resposta.status,
-      code ?? 'error',
+      code ?? error ?? 'error',
       message ?? 'Não consegui falar com o agente.',
     );
   }

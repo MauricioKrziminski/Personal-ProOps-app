@@ -1,3 +1,5 @@
+import { TERMOS_VERSAO } from './termos.ts';
+
 /**
  * Quem pode o quê, a partir do `plan_status` — puro, para o portão e os testes lerem a mesma regra.
  *
@@ -11,7 +13,14 @@ export interface PlanoLido {
   data?: { access?: string | null; plan?: string | null } | null;
 }
 
-export type Destino = 'conta' | 'onboarding' | 'aguarda' | 'assinar' | 'app';
+export type Destino = 'conta' | 'consentimento' | 'onboarding' | 'aguarda' | 'assinar' | 'app';
+
+/** O que o portão precisa do perfil: a versão dos Termos que a pessoa aceitou. */
+export interface TermosLidos {
+  isPending: boolean;
+  isError: boolean;
+  data?: { terms_version?: string | null } | null;
+}
 
 /**
  * O destino da pessoa na abertura. **Falha ABERTO**: se o plano não carrega, entra no app — o
@@ -21,8 +30,13 @@ export function decisaoDeAcesso(
   temSessao: boolean,
   onboardingConcluido: boolean,
   plano: PlanoLido,
+  termos: TermosLidos,
 ): Destino {
   if (!temSessao) return 'conta';
+  // Termos novos (ou nunca aceitos) vêm ANTES do onboarding e da assinatura. Perfil que não carrega
+  // falha ABERTO, como o plano: o servidor é quem recusa IA sem consentimento.
+  if (termos.isPending && !termos.isError) return 'aguarda';
+  if (!termos.isError && termos.data && termos.data.terms_version !== TERMOS_VERSAO) return 'consentimento';
   if (!onboardingConcluido) return 'onboarding';
   if (plano.isPending && !plano.isError) return 'aguarda';
   return plano.data?.access === 'never' ? 'assinar' : 'app';

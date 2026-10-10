@@ -4,16 +4,18 @@ import { useEffect } from 'react';
 import { useQuery as useQueryDaRaiz } from '@tanstack/react-query';
 import { router } from 'expo-router';
 
+import { consentimentoQuery } from '@/hooks/use-consentimento';
 import { planStatusQuery, usePlanStatus } from '@/hooks/use-finance';
 import { decisaoDeAcesso, estaSemAssinatura, ROTA_PAYWALL_LEITURA, type Destino } from '@/lib/acesso';
 
 /**
- * Para onde a pessoa vai na abertura (conta, onboarding, assinar ou app). Só consulta o plano
+ * Para onde a pessoa vai na abertura (conta, consentimento, onboarding, assinar ou app). Só consulta o plano
  * quando há sessão E onboarding concluído; antes disso o destino não depende dele.
  */
-export function useDestino(temSessao: boolean, onboardingConcluido: boolean): Destino {
+export function useDestino(temSessao: boolean, onboardingConcluido: boolean, userId: string | undefined): Destino {
+  const termos = useQueryDaRaiz({ ...consentimentoQuery(userId), enabled: temSessao && !!userId });
   const plano = useQueryDaRaiz({ ...planStatusQuery, enabled: temSessao && onboardingConcluido });
-  return decisaoDeAcesso(temSessao, onboardingConcluido, plano);
+  return decisaoDeAcesso(temSessao, onboardingConcluido, plano, termos);
 }
 
 /** Dentro do app, a pessoa está em modo leitura? (`lapsed`). Plano que não carregou não bloqueia. */

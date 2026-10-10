@@ -73,6 +73,15 @@ const VARIANTE = process.env.APP_VARIANT || 'development';
  */
 const DISTRIBUICAO = process.env.DISTRIBUICAO === 'loja' ? 'loja' : 'apk';
 
+/**
+ * Build de loja SEM `EXPO_PUBLIC_AGENT_URL` falha aqui: sem ela os links dos Termos e da Política
+ * somem em silêncio (`links-legais.ts`), e a loja exige os dois. Exportar a URL do agente no
+ * ambiente do build (eas.json `env` ou segredo do EAS).
+ */
+if (DISTRIBUICAO === 'loja' && !(process.env.EXPO_PUBLIC_AGENT_URL || '').trim()) {
+  throw new Error('Build de loja exige EXPO_PUBLIC_AGENT_URL (links de Termos e Privacidade).');
+}
+
 const IDENTIDADE = {
   development: { id: 'com.proops.personal.dev', nome: 'ProOps' },
   preview: { id: 'com.proops.personal.staging', nome: 'ProOps' },
