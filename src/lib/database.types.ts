@@ -5516,6 +5516,8 @@ export type Database = {
           category: string
           kind: string
           pending_cents: number
+          realizado_cents: number
+          realizado_count: number
           total_cents: number
           tx_count: number
         }[]
