@@ -9,6 +9,7 @@ import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import * as settleLabels from './settle-labels.ts';
 import * as dates from './dates.ts';
 import * as todaySections from './today-sections.ts';
+import * as cardStatus from './card-status.ts';
 import * as aosPoucos from './aos-poucos.ts';
 import * as budgetTight from './budget-tight.ts';
 import * as accountCash from './account-cash.ts';
@@ -784,6 +785,7 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
     if (name === '@/components/finance/lancar-por-voz') return { useLancarPorVoz: () => ({ abrir: () => {}, folha: null }) };
     // Puros, carregados de verdade pelo mesmo motivo de `dates` e `settle-labels` (abaixo).
     if (name === '@/lib/today-sections') return todaySections;
+    if (name === '@/lib/card-status') return cardStatus;
     // `PASSO` é a janela do atrasado: pelo Proxy ele viraria a string 'PASSO' e a lista, vazia.
     if (name === '@/lib/aos-poucos') return aosPoucos;
     if (name === '@/lib/budget-tight') return budgetTight;

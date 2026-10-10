@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { diasAte, estadoDaFatura, ordemDaPilha, outrasFaturas, parcialDaFatura, prazoLabel, rotuloDoStatus } from './card-status.ts';
+import { diasAte, estadoDaFatura, fraseAindaVaiEntrar, gruposDaFatura, ordemDaPilha, outrasFaturas, parcialDaFatura, prazoLabel, rotuloDoStatus } from './card-status.ts';
 
 const hoje = new Date(2026, 8, 16, 22, 30);
 
@@ -83,4 +83,26 @@ test('rotuloDoStatus: aberta x fechada pela data de fechamento; paga e adiada pe
   assert.equal(rotuloDoStatus({ status: 'closed', closing_date: '2026-09-15' }, hoje), 'Fechada');
   assert.equal(rotuloDoStatus({ status: 'paid', closing_date: '2026-09-20' }, hoje), 'Paga');
   assert.equal(rotuloDoStatus({ status: 'rolled', closing_date: '2026-09-01' }, hoje), 'Adiada');
+});
+
+test('a frase "ainda vai entrar": só com algo à frente e que não seja a fatura inteira', () => {
+  const brl = (c: number) => `R$ ${(c / 100).toFixed(2)}`;
+  assert.equal(fraseAindaVaiEntrar(3000, 18000, brl), 'R$ 30.00 ainda vai entrar');
+  assert.equal(fraseAindaVaiEntrar('3000', '18000', brl), 'R$ 30.00 ainda vai entrar', 'bigint chega como texto');
+  assert.equal(fraseAindaVaiEntrar(0, 18000, brl), null);
+  assert.equal(fraseAindaVaiEntrar(undefined, 18000, brl), null, 'coluna que não veio');
+  assert.equal(fraseAindaVaiEntrar(null, 18000, brl), null);
+  assert.equal(fraseAindaVaiEntrar(18000, 18000, brl), null, 'a fatura inteira à frente repetiria o número grande');
+});
+
+test('a fatura lista no topo o que ainda vai entrar (a mais próxima primeiro) e depois um grupo por dia', () => {
+  const t = (id: string, occurred_at: string) => ({ id, occurred_at });
+  const grupos = gruposDaFatura([t('a', '2026-10-12'), t('b', '2026-10-09'), t('c', '2026-10-09'), t('d', '2026-10-20'), t('e', '2026-10-15')], '2026-10-10');
+  assert.deepEqual(grupos.map((g) => [g.chave, g.futura]), [['ainda-vai-entrar', true], ['2026-10-09', false]]);
+  assert.deepEqual(grupos[0].itens.map((i) => i.id), ['a', 'e', 'd']);
+  assert.deepEqual(grupos[1].itens.map((i) => i.id), ['b', 'c']);
+  const total = grupos.flatMap((g) => g.itens).length;
+  assert.equal(total, 5, 'o total do topo soma exatamente o que está embaixo');
+  assert.deepEqual(gruposDaFatura([t('x', '2026-10-10')], '2026-10-10').map((g) => g.futura), [false], 'hoje não é à frente');
+  assert.deepEqual(gruposDaFatura([], '2026-10-10'), []);
 });

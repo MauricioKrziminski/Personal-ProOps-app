@@ -15,5 +15,7 @@ test('cards keeps compact reading order and composes a measured tablet decision 
   assert.match(source, /router\.push\(\{ pathname: '\/finance\/wallet'/);
   assert.match(source, /router\.push\(\{ pathname: '\/finance\/invoice\/\[id\]'/);
   assert.match(source, /title="Faturas anteriores"/);
-  assert.match(source, /contexto\.invoice_open_cents \?\? contexto\.invoice_total_cents/);
+  // o MESMO número do card da lista: o total, com "pago · falta" quando paga em parte
+  assert.match(source, /cents=\{Number\(contexto\.invoice_total_cents \?\? 0\)\}/);
+  assert.match(source, /parcialDoContexto/);
 });

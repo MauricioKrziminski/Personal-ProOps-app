@@ -46,7 +46,7 @@ import {
   type Transaction,
 } from '@/hooks/use-finance';
 import { formatBRL, formatDateBR, localISODate } from '@/hooks/use-items';
-import { formatNumberBR } from '@/lib/dates';
+import { diaCurtoBR, formatNumberBR } from '@/lib/dates';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { passoDaVolta, type Volta } from '@/lib/reabrir-ao-voltar';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
@@ -55,7 +55,7 @@ import { alvoDoLancamento } from '@/lib/apagar-com-alcance';
 import { useBillReminderFor } from '@/hooks/use-bill-reminders';
 import { hrefDoLembrete, resumoDosAvisos } from '@/lib/lembrete-de-conta';
 import { estadoDaLinha } from '@/lib/settle-labels';
-import { contaNaFatura, rotuloDoStatus } from '@/lib/card-status';
+import { contaNaFatura, gruposDaFatura, rotuloDoStatus } from '@/lib/card-status';
 import { accountLabel } from '@/lib/accounts';
 import { descontaDaConta, PAGOU_POR_FORA, podeConfirmarPagamento } from '@/lib/pagar-fatura';
 import type { SelectOption } from '@/components/ui/select-field';
@@ -197,7 +197,7 @@ export default function InvoiceScreen() {
    * estavam certos** — o banco mostra o que já postou, o app mostra como a fatura vai FECHAR —,
    * e o que faltava era a tela dizer qual dos dois ela estava mostrando.
    *
-   * ⚠️ **Esta linha explica a diferença; ela NÃO reconcilia com o extrato.** Medido no staging
+   * ⚠️ **A frase "ainda vai entrar" explica a diferença; ela NÃO reconcilia com o extrato.** Medido no staging
    * nessa fatura: R$ 228,95 têm data à frente (DAS de 20/09 e Carro Peças de 22/09), o que
    * deixaria "até hoje" em R$ 3.531,25 — nem o total do app, nem os R$ 3.660,28 do banco. O
    * banco posta no ritmo dele, não na data que a compra tem aqui, então qualquer par
@@ -209,15 +209,8 @@ export default function InvoiceScreen() {
     .filter((t) => contaNaFatura(t.kind) && t.occurred_at > hoje)
     .reduce((soma, t) => soma + t.amount_cents, 0);
 
-  const dias = useMemo(() => {
-    const mapa = new Map<string, Transaction[]>();
-    for (const t of compras) {
-      const lista = mapa.get(t.occurred_at) ?? [];
-      lista.push(t);
-      mapa.set(t.occurred_at, lista);
-    }
-    return [...mapa.entries()].map(([data, itens]) => ({ data, itens }));
-  }, [compras]);
+  // Ainda vai entrar no topo (as com data à frente), depois um grupo por dia (`gruposDaFatura`).
+  const dias = useMemo(() => gruposDaFatura(compras, hoje), [compras, hoje]);
 
   // Quem são as faturas vizinhas: todas as do cartão (o hook não tem teto desde 24/09/2026), menos
   // a FUTURA sem compra nenhuma — ela sobra de parcelado encurtado ou apagado, e as setas paravam
@@ -503,41 +496,13 @@ export default function InvoiceScreen() {
               atrasada: vencida && !paga && !adiada,
               contagem: compras.length,
               totalCents: total,
+              futuroCents: aindaVem,
               fecha: fatura.closing_date,
               vence: fatura.due_date,
             }}
             faturas={navegaveis}
             atualId={fatura.id}
             onChange={(destino) => router.setParams({ id: destino })}>
-            {/*
-                Só aparece quando PARTE do total está à frente. Numa fatura já fechada não há
-                o que dizer; numa fatura inteiramente futura (a de dezembro, hoje) a linha
-                repetiria o número grande palavra por palavra — soma que repete a única parcela
-                é eco, não resumo (§1). Quem já diz que ela é futura é o `fecha · vence` logo
-                acima.
-
-                ⚠️ **UM número, e nenhuma palavra emprestada.** Mostrar o par
-                `lançado X · ainda vem Y` convidava a conferir o "lançado" contra o extrato do
-                banco — e ele NÃO bate, porque o banco posta no ritmo dele, não na data que a
-                compra tem aqui. O que responde a pergunta ("por que o app é maior que a minha
-                fatura hoje?") é só a parte que ainda não aconteceu.
-
-                ⚠️ **E não é "já aconteceu / ainda vai acontecer"**, que são as palavras dos
-                chips de Lançamentos — lá elas filtram `status`, aqui o corte é a DATA
-                (`finance.md`: compra de cartão fica `pending` até a fatura ser paga). Mesmo
-                rótulo para duas réguas é como as duas passam a divergir sem ninguém ver.
-            */}
-            {aindaVem > 0 && aindaVem < total ? (
-              <ThemedText type="small" themeColor="textSecondary" style={tabular}>
-                {/*
-                  `brl()` e não `<Money>`: o valor está no MEIO de uma frase, e `Money` entra
-                  como irmão `flexShrink: 0` — quebraria a sentença. `formatBRL` cru vazaria o
-                  valor com o saldo escondido, que é o que o olho ao lado do total acabou de
-                  esconder.
-                */}
-                Inclui {brl(aindaVem)} com data à frente
-              </ThemedText>
-            ) : null}
             {paga && fatura.paid_at ? (
               <View style={styles.pagaLinha}>
                 <Icon name="checkmark.circle.fill" size="md" color="success" />
@@ -695,7 +660,7 @@ export default function InvoiceScreen() {
         }}
         data={dias}
         style={styles.flex}
-        keyExtractor={(g) => g.data}
+        keyExtractor={(g) => g.chave}
         contentContainerStyle={[styles.lista, { paddingBottom: insets.bottom + Space.xxxl }]}
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
@@ -714,7 +679,7 @@ export default function InvoiceScreen() {
             entering={FadeInDown.duration(Motion.duration.slow).delay(
               Math.min(index * Motion.stagger.step, Motion.stagger.cap)
             )}>
-            <Section title={formatDateBR(item.data)}>
+            <Section title={item.futura ? 'Ainda vai entrar' : formatDateBR(item.data!)}>
               {item.itens.map((tx) => {
                 const prevista = estadoDaLinha(tx, hoje) !== null;
                 const parcela =
@@ -750,7 +715,7 @@ export default function InvoiceScreen() {
                         tinta={aparencia(tx.category, tx.kind).cor}
                         // A parcela mora no dia em que cai nesta fatura; a compra é de antes
                         // ("Mostre sempre a data do lançamento", 24/09/2026).
-                        subtitle={[tx.category, parcela, rotuloDaCompra(tx), prevista ? 'prevista' : null]
+                        subtitle={[item.futura ? diaCurtoBR(tx.occurred_at) : null, tx.category, parcela, rotuloDaCompra(tx), prevista ? 'prevista' : null]
                           .filter(Boolean)
                           .join(' · ')}
                         accessibilityLabel={`${tx.description ?? 'Sem descrição'}, ${brl(tx.amount_cents)}${prevista ? ', parcela prevista' : ''}`}

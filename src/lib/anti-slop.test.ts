@@ -1593,11 +1593,11 @@ test('Ocorrência de série: uma data só (o vencimento), e o caminho para edita
   const fonte = readFileSync(join(SRC, 'components/finance/formulario-do-lancamento.tsx'), 'utf8');
   // No cartão o `due_at` é o vencimento da fatura: lá continuam sendo duas coisas.
   assert.match(fonte, /const umaData = Boolean\(editing\?\.recurring_id && !editing\.invoice_id\)/);
-  assert.match(fonte, /const dataEVencimento = umaData && podeAdiar && pending/);
+  assert.match(fonte, /const dataEVencimento = dataUnicaEVencimento\(contextoDaData\)/);
   assert.match(fonte, /dataEVencimento\s*\?\s*dueFieldLabel\(kind\)/, 'o campo de data vira "Vence em"');
   assert.match(fonte, /\{dataEVencimento \|\| parcelaNaFatura \? null : \(\s*<View style=\{styles\.chipRow\}>/, 'sem o "Ontem" num vencimento');
-  assert.match(fonte, /\{umaData \? null : \(\s*<Controller\s+control=\{control\}\s+name="due_at"/, 'sem o segundo campo');
-  assert.match(fonte, /if \(umaData\) setValue\('due_at', br\)/, 'o vencimento escondido anda com a data');
+  assert.match(fonte, /\{dataEVencimento \? null : \(\s*<Controller\s+control=\{control\}\s+name="due_at"/, 'sem o segundo campo');
+  assert.match(fonte, /if \(umaData \|\| \(!outraData && [^\n]*\)\) setValue\('due_at', br\)/, 'o vencimento escondido anda com a data');
   // A pessoa escolhe o alcance ao SALVAR, depois de preencher a mudança no lançamento.
   assert.match(fonte, /askEditScope\('occurrence'/);
   assert.match(readFileSync(join(SRC, 'lib/edit-scope-model.ts'), 'utf8'), /Só esta ocorrência[\s\S]*?Esta e as próximas/);

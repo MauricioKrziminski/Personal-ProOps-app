@@ -4233,6 +4233,7 @@ export type Database = {
           credit_limit_cents: number
           due_date: string
           due_day: number
+          invoice_future_cents: number
           invoice_id: string
           invoice_open_cents: number
           invoice_total_cents: number
@@ -4452,6 +4453,7 @@ export type Database = {
         Returns: {
           amount_cents: number
           due_date: string
+          future_cents: number
           kind: string
           overdue: boolean
           ref_id: string
@@ -4592,6 +4594,7 @@ export type Database = {
           credit_limit_cents: number
           due_date: string
           due_day: number
+          invoice_future_cents: number
           invoice_id: string
           invoice_open_cents: number
           invoice_total_cents: number
@@ -5533,6 +5536,7 @@ export type Database = {
         Returns: {
           amount_cents: number
           due_date: string
+          future_cents: number
           kind: string
           overdue: boolean
           ref_id: string

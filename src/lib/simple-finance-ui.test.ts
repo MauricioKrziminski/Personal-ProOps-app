@@ -61,7 +61,7 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; notesPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; resumoErro?: boolean; arquivados?: any[]; mudaram?: string[]; errosDosAdiantamentos?: Record<string, string>; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean; favoritos?: any[]; favoritosArquivados?: any[]; billReminders?: any[]; billRemindersPending?: boolean; pausaPrevia?: any; pausaBuscando?: boolean; carencias?: any[]; carenciaPrevia?: any; carenciaBuscando?: boolean; carenciasPendentes?: boolean; carenciasErro?: boolean; carenciaErro?: boolean; access?: string; ofertas?: any[] } = {}) {
+function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; invoiceTxs?: any[]; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; notesPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; resumoErro?: boolean; arquivados?: any[]; mudaram?: string[]; errosDosAdiantamentos?: Record<string, string>; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean; favoritos?: any[]; favoritosArquivados?: any[]; billReminders?: any[]; billRemindersPending?: boolean; pausaPrevia?: any; pausaBuscando?: boolean; carencias?: any[]; carenciaPrevia?: any; carenciaBuscando?: boolean; carenciasPendentes?: boolean; carenciasErro?: boolean; carenciaErro?: boolean; access?: string; ofertas?: any[] } = {}) {
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
@@ -389,7 +389,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
     ContaComLancamentos: class extends Error {},
     useInvoice: () => options.invoiceMissing ? ({ ...query, isError: true, isSuccess: false, data: undefined, error: { name: 'FaturaInexistente' } }) : ({ ...query, data: {
       invoice: { id: 'invoice-1', account_id: 'card-1', status: options.invoiceStatus ?? 'closed', reference_month: '2026-08-01', closing_date: '2026-08-10', due_date: '2026-08-20', paid_at: options.invoiceStatus === 'paid' ? '2026-08-18' : null, settled_manually: Boolean(options.settledManually) },
-      transactions: [{ id: 'purchase-1', kind: 'expense', amount_cents: 147000, occurred_at: '2026-08-01' }],
+      transactions: options.invoiceTxs ?? [{ id: 'purchase-1', kind: 'expense', amount_cents: 147000, occurred_at: '2026-08-01' }],
       pagamentos: options.pagamentos ?? [],
     } }),
   }, { get: (target, key) => {
@@ -733,7 +733,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
       if (name === '@/lib/account-form') return load('src/lib/account-form.ts');
       if (name === '@/components/finance/account-form') return load('src/components/finance/account-form.tsx');
-      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias' || name === '@/lib/comecar' || name === '@/lib/duplicar' || name === '@/lib/favoritos' || name === '@/lib/apagar-com-alcance' || name === '@/lib/carencia' || name === '@/lib/pagar-fatura' || name === '@/lib/hipoteses-por-periodo' || name === '@/lib/previsto' || name === '@/lib/detalhe-do-ciclo' || name === '@/lib/ver-lancamentos') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/uma-data' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias' || name === '@/lib/comecar' || name === '@/lib/duplicar' || name === '@/lib/favoritos' || name === '@/lib/apagar-com-alcance' || name === '@/lib/carencia' || name === '@/lib/pagar-fatura' || name === '@/lib/hipoteses-por-periodo' || name === '@/lib/previsto' || name === '@/lib/detalhe-do-ciclo' || name === '@/lib/ver-lancamentos') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       // o `categorias.ts` importa o mapa de ícones por caminho relativo (roda no `node --test` puro)
       if (name === '../design/category-icons.ts') return { categoryIcon: () => 'circle' };
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
@@ -1772,7 +1772,7 @@ test('the docked card carries the invoice summary and the explaining lines', () 
   assert.ok(doca, 'a fatura desenha a doca');
   assert.deepEqual(
     { ...doca.props.resumo },
-    { status: 'Paga', atrasada: false, contagem: 1, totalCents: 147000, fecha: '2026-08-10', vence: '2026-08-20' }
+    { status: 'Paga', atrasada: false, contagem: 1, totalCents: 147000, futuroCents: 0, fecha: '2026-08-10', vence: '2026-08-20' }
   );
   assert.equal(doca.props.atualId, 'invoice-1');
   const texto = JSON.stringify(doca.props.children);
@@ -8832,4 +8832,73 @@ test('Lançamentos abre em "Aconteceu", os chips trocam a lista e o chip não é
   assert.ok(!ui.nodes().some((n: any) => n.type === 'ListFilters' && n.props.value.selections?.status), 'o chip não é critério da folha');
   const serie = screen(transacoesFile, { abrePadrao: true, params: { recurringId: 'r1' } });
   assert.equal(serie.nodes().filter((n: any) => n.type === 'Chip').length, 0, 'ocorrências de uma série não têm chip');
+});
+
+test('Ainda vai sair: uma data só grava occurred_at = due_at, e "outra data" abre o par (10/10/2026)', () => {
+  const abrir = (extra: Record<string, unknown> = {}, opts: Parameters<typeof screen>[1] = {}) =>
+    screen('src/components/finance/formulario-do-lancamento.tsx', { componente: 'FormularioDoLancamento',
+      forecastAccounts: [{ id: 'c1', name: 'Conta', type: 'checking' }], ...opts, props: {
+        comum: { kind: 'expense', descricao: 'Boleto', valorCents: 5000, contaId: 'c1', dataBR: '20/10/2026', categoria: null },
+        registrarComum: () => {}, registrarEstado: () => {}, onSalvo: () => {}, onFechar: () => {}, ...extra } });
+  const campos = (ui: any) => ui.nodes().filter((n: any) => n.type === 'Field' && /Data|Vence|Previsto/.test(String(n.props.label))).map((n: any) => n.props.label);
+  const caixa = (ui: any, valor: string) => ui.interact(() => ui.nodes().find((n: any) => n.type === 'Segmented'
+    && n.props.options.some((o: any) => ['Ainda vai sair', 'Ainda vai cair'].includes(o.label))).props.onChange(valor));
+
+  const ui = abrir();
+  assert.deepEqual(campos(ui), ['Data'], 'já saiu: o campo de sempre');
+  caixa(ui, 'yes');
+  assert.deepEqual(campos(ui), ['Vence em'], 'um campo só, com o rótulo do vencimento');
+  assert.ok(ui.button('Comprou em outra data?'), 'o link para a outra data');
+  ui.press('Salvar');
+  assert.equal(ui.writes.length, 1);
+  const v = ui.writes[0].value;
+  const gravado = v.input ?? v;
+  assert.equal(JSON.stringify(gravado).includes('"occurred_at":"2026-10-20"'), true);
+  assert.equal(JSON.stringify(gravado).includes('"due_at":"2026-10-20"'), true, 'as duas colunas iguais');
+
+  const outra = abrir();
+  caixa(outra, 'yes');
+  outra.press('Comprou em outra data?');
+  assert.deepEqual(campos(outra), ['Data da compra', 'Vence em'], 'volta o par');
+  assert.throws(() => outra.button('Comprou em outra data?'), 'o link some depois de aberto');
+
+  const receita = abrir({ comum: { kind: 'income', descricao: 'Freela', valorCents: 5000, contaId: 'c1', dataBR: '20/10/2026', categoria: null } });
+  caixa(receita, 'yes');
+  assert.ok(receita.button('Lançar em outra data?'));
+  assert.deepEqual(campos(receita), ['Previsto para']);
+
+  const editando = (due: string) => abrir({ editing: { id: 't1', kind: 'expense', amount_cents: 5000, description: 'Boleto',
+    category: null, account_id: 'c1', status: 'pending', occurred_at: '2026-10-05', due_at: due, recurring_id: null,
+    installment_plan_id: null, invoice_id: null, merchant: null, payment_method: null, auto_confirm: false } });
+  assert.deepEqual(campos(editando('2026-10-20')), ['Data da compra', 'Vence em'], 'datas diferentes: já com os dois');
+  assert.deepEqual(campos(editando('2026-10-05')), ['Vence em'], 'iguais: um');
+});
+
+test('Fatura: o que tem data à frente vai para o topo em "Ainda vai entrar", e o total soma tudo (10/10/2026)', () => {
+  const ui = screen('src/app/finance/invoice/[id].tsx', { invoiceStatus: 'open', invoiceTxs: [
+    { id: 'p1', kind: 'expense', amount_cents: 147000, occurred_at: '2026-08-01' },
+    { id: 'f2', kind: 'expense', amount_cents: 3000, occurred_at: '2099-02-10' },
+    { id: 'f1', kind: 'expense', amount_cents: 2000, occurred_at: '2099-01-10' },
+  ] });
+  const doca = ui.nodes().find((n) => n.type === 'InvoiceDock');
+  assert.equal(doca.props.resumo.totalCents, 152000, 'o total continua a soma de tudo');
+  assert.equal(doca.props.resumo.futuroCents, 5000);
+  const lista = ui.nodes().find((n: any) => n.type === 'FlatList');
+  assert.deepEqual([...lista.props.data.map((g: any) => g.chave)], ['ainda-vai-entrar', '2026-08-01']);
+  assert.deepEqual([...lista.props.data[0].itens.map((t: any) => t.id)], ['f1', 'f2'], 'a mais próxima primeiro');
+  const texto = JSON.stringify(doca.props.children);
+  assert.ok(!texto.includes('com data à frente'), 'a frase antiga saiu');
+});
+
+test('Cartões: o card e o painel mostram o MESMO número (o total) e a frase do que ainda vai entrar', () => {
+  const ui = screen('src/app/finance/cards.tsx', { cards: [{ account_id: 'card-1', name: 'Nubank Cartão', invoice_id: 'invoice-1',
+    invoice_total_cents: 10000, invoice_open_cents: 6000, invoice_future_cents: 3000, unpaid_total_cents: 6000,
+    closing_date: '2026-10-03', due_date: '2026-10-10', overdue_count: 0 }] });
+  const tem = (re: RegExp) => ui.nodes().filter((n: any) => typeof n.props?.children === 'string' && re.test(n.props.children)).length;
+  const textos = JSON.stringify(ui.nodes().map((n: any) => n.props?.children));
+  assert.ok(tem(/ainda vai entrar/) >= 1, 'a frase aparece');
+  assert.ok(!textos.includes('em aberto nesta fatura'), 'o painel não conta outro número');
+  const dinheiro = ui.nodes().filter((n: any) => n.type === 'Money').map((n: any) => n.props.cents);
+  assert.ok(dinheiro.filter((c: number) => c === 10000).length >= 1);
+  assert.ok(!dinheiro.includes(6000), 'o aberto não vira número grande: ele aparece como "falta"');
 });

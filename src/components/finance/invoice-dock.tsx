@@ -21,7 +21,8 @@ import { Motion, Space, tabular } from '@/design/tokens';
 import { usarDica } from '@/hooks/use-dicas';
 import { invoiceQuery, type CardInvoice, type Transaction } from '@/hooks/use-finance';
 import { formatDateBR, localISODate } from '@/hooks/use-items';
-import { contagemDeLancamentos, contaNaFatura, rotuloDoStatus } from '@/lib/card-status';
+import { contagemDeLancamentos, contaNaFatura, fraseAindaVaiEntrar, rotuloDoStatus } from '@/lib/card-status';
+import { useBRL } from '@/components/ui/conceal';
 
 export type ResumoDaFatura = {
   status: string;
@@ -29,6 +30,8 @@ export type ResumoDaFatura = {
   atrasada: boolean;
   contagem: number;
   totalCents: number;
+  /** A parte do total com data à frente (a data da linha depois de hoje). */
+  futuroCents: number;
   fecha: string;
   vence: string;
 };
@@ -43,6 +46,9 @@ export function resumoDaFatura(data: { invoice: CardInvoice; transactions: Trans
     totalCents: data.transactions
       .filter((t) => contaNaFatura(t.kind))
       .reduce((soma, t) => soma + t.amount_cents, 0),
+    futuroCents: data.transactions
+      .filter((t) => contaNaFatura(t.kind) && t.occurred_at > localISODate())
+      .reduce((soma, t) => soma + t.amount_cents, 0),
     fecha: data.invoice.closing_date,
     vence: data.invoice.due_date,
   };
@@ -51,12 +57,17 @@ export function resumoDaFatura(data: { invoice: CardInvoice; transactions: Trans
 /** A base do cartão ancorado: estado · contagem, o total e as duas datas. */
 export function BaseDaDoca({ nome, resumo }: { nome: string; resumo: ResumoDaFatura }) {
   const t = tintasDoCartao(nome);
+  const brl = useBRL();
+  const aindaVai = fraseAindaVaiEntrar(resumo.futuroCents, resumo.totalCents, brl);
   return (
     <View style={styles.base}>
       <ThemedText type="meta" themeColor={t.suave} style={tabular}>
         {resumo.status} · {contagemDeLancamentos(resumo.contagem)}
       </ThemedText>
       <CountUpMoney cents={resumo.totalCents} variant="money" tone={t.tinta} />
+      {aindaVai ? (
+        <ThemedText type="meta" themeColor={t.suave} style={tabular}>{aindaVai}</ThemedText>
+      ) : null}
       <ThemedText type="meta" themeColor={t.suave} style={tabular}>
         fecha {formatDateBR(resumo.fecha)} · vence {formatDateBR(resumo.vence)}
       </ThemedText>
@@ -73,7 +84,7 @@ const LIMIAR_DE_VELOCIDADE = 700;
  *
  * Ele é o destaque da tela (§1 do design: um por tela) e carrega o que o card de total
  * carregava: estado, contagem, total, fecha · vence; o nome do cartão está na própria face. As
- * linhas que explicam o total ("Inclui X com data à frente", "Paga em", "Pago X · falta Y")
+ * linhas que explicam o total ("Paga em", "Pago X · falta Y")
  * ficam logo abaixo dele (`children`).
  *
  * Deslizar a face troca de fatura pelo MESMO caminho das setas do `InvoicePager` (`onChange`),

@@ -43,7 +43,7 @@ import { formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useSession } from '@/hooks/use-session';
-import { cartaoDaPilha, estadoDaFatura, ordemDaPilha, parcialDaFatura, prazoLabel } from '@/lib/card-status';
+import { cartaoDaPilha, estadoDaFatura, fraseAindaVaiEntrar, ordemDaPilha, parcialDaFatura, prazoLabel } from '@/lib/card-status';
 
 
 /**
@@ -494,6 +494,7 @@ function Detalhes({ card }: { card: CardSummary }) {
   const pct = limite > 0 ? naoPago / limite : 0;
   const atrasadas = Number(card.overdue_count ?? 0);
   const parcial = parcialDaFatura(card);
+  const aindaVai = fraseAindaVaiEntrar(card.invoice_future_cents, card.invoice_total_cents, brl);
 
   return (
     <View style={styles.detalhes}>
@@ -507,6 +508,9 @@ function Detalhes({ card }: { card: CardSummary }) {
             {`Pago ${brl(parcial.pago)} · falta `}
             <ThemedText type="footnote" style={tabular}>{brl(parcial.falta)}</ThemedText>
           </ThemedText>
+        ) : null}
+        {aindaVai ? (
+          <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>{aindaVai}</ThemedText>
         ) : null}
         <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
           {card.invoice_id && card.closing_date && card.due_date

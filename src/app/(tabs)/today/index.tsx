@@ -60,6 +60,7 @@ import { orcamentosApertados } from '@/lib/budget-tight';
 import { diaCurtoBR, diasAte, greetingBR, rotuloDoDia, somaDias } from '@/lib/dates';
 import { showItemActions } from '@/lib/item-actions';
 import { settleLabel } from '@/lib/settle-labels';
+import { fraseAindaVaiEntrar } from '@/lib/card-status';
 import {
   agendaDoDia,
   iconeDoItem,
@@ -289,6 +290,7 @@ export default function TodayScreen() {
         valueTone={i.kind === 'income' ? 'success' : i.atrasado ? 'danger' : 'text'}
         icon={iconeDoItem(i)}
         cartao={i.cartao}
+        aindaVai={i.kind === 'invoice' ? fraseAindaVaiEntrar(i.futuroCents, i.cents, brl) : null}
         action={onde === 'agora' ? acaoDoItem(i) : undefined}
         onPress={abrirItem(i)}
       />

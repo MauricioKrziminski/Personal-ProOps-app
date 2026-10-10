@@ -31,6 +31,7 @@ import { Deslizavel } from '@/components/ui/deslizavel';
 import {
   diasAte as daysUntil,
   estadoDaFatura as estadoFatura,
+  fraseAindaVaiEntrar,
   parcialDaFatura,
   prazoLabel,
 } from '@/lib/card-status';
@@ -186,6 +187,8 @@ export default function CardsScreen() {
   const contexto = lista.find(
     (c) => c.invoice_id && c.due_date && Number(c.invoice_open_cents ?? c.invoice_total_cents ?? 0) > 0
   );
+  const parcialDoContexto = contexto ? parcialDaFatura(contexto) : null;
+  const aindaVaiDoContexto = contexto ? fraseAindaVaiEntrar(contexto.invoice_future_cents, contexto.invoice_total_cents, brl) : null;
 
   // `pagar`: o "Paguei" chega na fatura já com o pagamento aberto — levar só até a fatura
   // obrigava a achar o botão de novo, e "Paguei" que não registra nada é rótulo mentindo.
@@ -239,6 +242,7 @@ export default function CardsScreen() {
         const pct = limite > 0 ? naoPago / limite : 0;
         const podePagar = estado === 'Fechada' || estado === 'Atrasada';
         const parcial = parcialDaFatura(card);
+        const aindaVai = fraseAindaVaiEntrar(card.invoice_future_cents, totalFatura, brl);
 
         return (
           <Animated.View
@@ -327,6 +331,9 @@ export default function CardsScreen() {
                   {`Pago ${brl(parcial.pago)} · falta `}
                   <ThemedText type="footnote" style={tabular}>{brl(parcial.falta)}</ThemedText>
                 </ThemedText>
+              ) : null}
+              {aindaVai ? (
+                <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>{aindaVai}</ThemedText>
               ) : null}
 
               <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
@@ -417,14 +424,21 @@ export default function CardsScreen() {
               </ThemedText>
             </View>
             <Money
-              cents={Number(contexto.invoice_open_cents ?? contexto.invoice_total_cents ?? 0)}
+              cents={Number(contexto.invoice_total_cents ?? 0)}
               variant="subhead"
               tone={estadoFatura(contexto) === 'Atrasada' ? 'danger' : 'text'}
             />
           </View>
-          <ThemedText type="footnote" themeColor="textSecondary">
-            em aberto nesta fatura
-          </ThemedText>
+          {/* O MESMO número do card da lista: o total da fatura, com a mesma linha do que falta. */}
+          {parcialDoContexto ? (
+            <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
+              {`Pago ${brl(parcialDoContexto.pago)} · falta `}
+              <ThemedText type="footnote" style={tabular}>{brl(parcialDoContexto.falta)}</ThemedText>
+            </ThemedText>
+          ) : null}
+          {aindaVaiDoContexto ? (
+            <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>{aindaVaiDoContexto}</ThemedText>
+          ) : null}
           <ThemedText type="footnote" themeColor="textSecondary" style={tabular}>
             {contexto.closing_date && contexto.due_date
               ? `${prazoLabel(contexto.closing_date, 'fecha')} · vence ${formatDateBR(contexto.due_date)}`

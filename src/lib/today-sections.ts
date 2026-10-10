@@ -16,6 +16,8 @@ export type ContaPrevista = {
   amount_cents: number | string;
   kind: 'invoice' | 'transaction' | 'debt' | 'income';
   overdue: boolean;
+  /** Só na fatura: a parte do total com data à frente (`upcoming_bills.future_cents`). */
+  future_cents?: number | string | null;
 };
 
 export type CompraNoCartao = {
@@ -37,6 +39,8 @@ export type ItemDaAgenda = {
   atrasado: boolean;
   cartao: string | null;
   faturaId: string | null;
+  /** Fatura: quanto do total ainda tem data à frente. */
+  futuroCents?: number;
 };
 
 export type Tom = 'danger' | 'warning' | 'success' | 'neutral';
@@ -74,6 +78,7 @@ export function agendaDoDia(
       atrasado: c.overdue,
       cartao: null,
       faturaId: null,
+      futuroCents: Number(c.future_cents ?? 0),
     })),
     ...compras.map((c) => ({
       chave: `card:${c.id}`,

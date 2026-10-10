@@ -117,6 +117,8 @@ export interface CartaoDaPilha {
   invoice_total_cents: number;
   /** O que ainda falta da fatura corrente (líquido do pagamento parcial). */
   invoice_open_cents?: number;
+  /** A parte do total com data à frente (`private.invoice_future_cents`). */
+  invoice_future_cents?: number;
   credit_limit_cents: number | null;
   available_limit_cents: number | null;
   closing_date: string | null;
@@ -130,6 +132,7 @@ type LinhaDoResumo = {
   invoice_id: string | null;
   invoice_total_cents: number | string | null;
   invoice_open_cents?: number | string | null;
+  invoice_future_cents?: number | string | null;
   credit_limit_cents: number | string | null;
   available_limit_cents: number | string | null;
   closing_date: string | null;
@@ -145,6 +148,7 @@ export function cartaoDaPilha(c: LinhaDoResumo): CartaoDaPilha {
     invoice_id: c.invoice_id,
     invoice_total_cents: Number(c.invoice_total_cents ?? 0),
     ...(c.invoice_open_cents == null ? {} : { invoice_open_cents: Number(c.invoice_open_cents) }),
+    ...(c.invoice_future_cents == null ? {} : { invoice_future_cents: Number(c.invoice_future_cents) }),
     credit_limit_cents: c.credit_limit_cents == null ? null : Number(c.credit_limit_cents),
     available_limit_cents: c.available_limit_cents == null ? null : Number(c.available_limit_cents),
     closing_date: c.closing_date,
@@ -198,4 +202,44 @@ export function ordemDaPilha<T extends { account_id: string }>(
  */
 export function contaNaFatura(kind: string): boolean {
   return kind === 'expense' || kind === 'transfer';
+}
+
+/**
+ * A lista da tela da fatura, em grupos: no TOPO "Ainda vai entrar" (as compras com data à frente,
+ * a mais próxima primeiro — é agenda), depois um grupo por dia na ordem em que as compras chegam
+ * (mais recente primeiro). O total do topo soma exatamente as linhas de todos os grupos. O corte é
+ * a DATA, nunca o `status` (`finance.md`).
+ */
+export type GrupoDaFatura<T> = { chave: string; data: string | null; futura: boolean; itens: T[] };
+
+export function gruposDaFatura<T extends { occurred_at: string }>(compras: readonly T[], hoje: string): GrupoDaFatura<T>[] {
+  const futuras = compras.filter((t) => t.occurred_at > hoje).sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
+  const porDia = new Map<string, T[]>();
+  for (const t of compras) {
+    if (t.occurred_at > hoje) continue;
+    porDia.set(t.occurred_at, [...(porDia.get(t.occurred_at) ?? []), t]);
+  }
+  return [
+    ...(futuras.length ? [{ chave: 'ainda-vai-entrar', data: null, futura: true, itens: futuras }] : []),
+    ...[...porDia.entries()].map(([data, itens]) => ({ chave: data, data, futura: false, itens })),
+  ];
+}
+
+/**
+ * A frase única de "quanto do total da fatura ainda vai entrar" (10/10/2026): o total é tudo que o
+ * banco vai cobrar no fechamento (e o que a Projeção tira do caixa), e a parte com data à frente é
+ * compra, parcela ou assinatura que ainda não aconteceu. `null` quando não há o que dizer: nada à
+ * frente, ou a fatura INTEIRA à frente (a frase repetiria o número grande — soma de um item é eco).
+ * `brl` é o formatador de quem chama (`useBRL`), para obedecer ao "esconder saldo".
+ */
+export function fraseAindaVaiEntrar(
+  futuroCents: number | string | null | undefined,
+  totalCents: number | string | null | undefined,
+  brl: (cents: number) => string
+): string | null {
+  const futuro = Number(futuroCents ?? 0);
+  if (!(futuro > 0)) return null;
+  const total = totalCents == null ? null : Number(totalCents);
+  if (total != null && futuro >= total) return null;
+  return `${brl(futuro)} ainda vai entrar`;
 }

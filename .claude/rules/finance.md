@@ -662,6 +662,11 @@ compra, não a única tela que responde quanto resta.
   contam. Antes, 20 leituras filtravam `kind = 'expense'` e a fatura ficava R$ 340 menor em
   silêncio. **Leitura nova de fatura usa o predicado**, nunca `kind = 'expense'` à mão.
   `supabase/tests/pix_no_credito.sql` prende o "uma vez de cada lado".
+- **O total da fatura inclui o que ainda tem data à frente, e a tela diz quanto** (10/10/2026):
+  `private.invoice_future_cents` (linhas da fatura depois de hoje, pela DATA) sai em
+  `card_summary.invoice_future_cents` e `upcoming_bills.future_cents`; a frase "R$ X ainda vai
+  entrar" é `fraseAindaVaiEntrar` (`lib/card-status.ts`), e na tela da fatura essas compras ficam
+  no topo em "Ainda vai entrar".
 - **`card_summary` tem dois números da fatura corrente, e eles não são o mesmo**
   (`20260917120000`): `invoice_total_cents` é BRUTO (a soma das compras, o número grande do
   cartão) e `invoice_open_cents` é o que FALTA (líquido do `paid_cents`). Quem subtrai a corrente

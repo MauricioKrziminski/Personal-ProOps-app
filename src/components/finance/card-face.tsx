@@ -13,7 +13,7 @@ import { LARGURA_DE_DESENHO, alturaDoCartao } from '@/design/card-geometry';
 import { Radius, Space, tabular } from '@/design/tokens';
 import { formatDateBR } from '@/hooks/use-items';
 import { useTheme } from '@/hooks/use-theme';
-import { parcialDaFatura, type CartaoDaPilha } from '@/lib/card-status';
+import { fraseAindaVaiEntrar, parcialDaFatura, type CartaoDaPilha } from '@/lib/card-status';
 
 /**
  * As três tintas de uma face: a do texto, a do texto secundário e a das pílulas.
@@ -187,6 +187,8 @@ export function BaseDaPilha({ card, onFatura }: { card: CartaoDaPilha; onFatura?
   // Paga em parte (07/10/2026): o número grande segue sendo a fatura, e a linha logo abaixo diz o
   // que já saiu e o que ainda falta — antes nada na face mudava depois de um pagamento parcial.
   const parcial = parcialDaFatura(card);
+  // O total inclui o que ainda tem data à frente; a frase diz quanto (10/10/2026).
+  const aindaVai = fraseAindaVaiEntrar(card.invoice_future_cents, usado, brl);
 
   // Uma linha só: a data é a informação e o chevron diz que é botão.
   const fecha = (
@@ -207,6 +209,9 @@ export function BaseDaPilha({ card, onFatura }: { card: CartaoDaPilha; onFatura?
           </ThemedText>
           {/* A face tem proporção fixa: o valor encolhe para caber, nunca parte os dígitos. */}
           <Money cents={usado} variant="title" tone={t.tinta} concealable encolhe />
+          {aindaVai ? (
+            <ThemedText type="meta" themeColor={t.suave} style={tabular}>{aindaVai}</ThemedText>
+          ) : null}
         </View>
         {/* Um toque só não decide entre "ver os cartões" e "abrir a fatura": a fatura tem o
             botão dela, e o resto do cartão abre a Carteira. */}
@@ -253,11 +258,12 @@ export function BaseDaPilha({ card, onFatura }: { card: CartaoDaPilha; onFatura?
  * obedece ao "esconder saldo" também na voz.
  */
 export function rotuloDoCartao(
-  card: Pick<CartaoDaPilha, 'name' | 'invoice_total_cents' | 'invoice_open_cents'>,
+  card: Pick<CartaoDaPilha, 'name' | 'invoice_total_cents' | 'invoice_open_cents' | 'invoice_future_cents'>,
   brl: (cents: number) => string
 ) {
   const parcial = parcialDaFatura(card);
-  return `${card.name}, fatura de ${brl(Number(card.invoice_total_cents ?? 0))}${parcial ? `, falta ${brl(parcial.falta)}` : ''}`;
+  const aindaVai = fraseAindaVaiEntrar(card.invoice_future_cents, card.invoice_total_cents, brl);
+  return `${card.name}, fatura de ${brl(Number(card.invoice_total_cents ?? 0))}${parcial ? `, falta ${brl(parcial.falta)}` : ''}${aindaVai ? `, ${aindaVai}` : ''}`;
 }
 
 const styles = StyleSheet.create({

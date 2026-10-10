@@ -33,6 +33,8 @@ export interface AgendaItemProps {
   icon: IconName;
   /** Compra no cartão: a minifase do emissor no lugar do ícone (cor do banco DENTRO do cartão). */
   cartao?: string | null;
+  /** Fatura: "R$ X ainda vai entrar" — a parte do valor com data à frente. */
+  aindaVai?: string | null;
   action?: { label: string; icon: IconName; onPress: () => void };
   onPress?: () => void;
 }
@@ -50,7 +52,7 @@ export interface AgendaItemProps {
  * ⚠️ **Botão dentro de linha tocável vira ação de acessibilidade da linha**: o leitor de tela não
  * alcança botão dentro de botão.
  */
-export function AgendaItem({ title, meta, metaTone, cents, valueTone, icon, cartao, action, onPress }: AgendaItemProps) {
+export function AgendaItem({ title, meta, metaTone, cents, valueTone, icon, cartao, aindaVai, action, onPress }: AgendaItemProps) {
   const theme = useTheme();
   const pisoDoTitulo = usePisoDoTitulo();
   const brl = useBRL();
@@ -87,6 +89,11 @@ export function AgendaItem({ title, meta, metaTone, cents, valueTone, icon, cart
             </View>
           ) : null}
         </View>
+        {aindaVai ? (
+          <ThemedText type="caption" themeColor="textSecondary">
+            {aindaVai}
+          </ThemedText>
+        ) : null}
       </View>
     </View>
   );
@@ -96,7 +103,7 @@ export function AgendaItem({ title, meta, metaTone, cents, valueTone, icon, cart
       {onPress ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${title}, ${brl(cents)}, ${meta}`}
+          accessibilityLabel={`${title}, ${brl(cents)}, ${meta}${aindaVai ? `, ${aindaVai}` : ''}`}
           accessibilityActions={action ? [{ name: 'activate' }, { name: 'acao', label: action.label }] : undefined}
           onAccessibilityAction={(e) => {
             if (e.nativeEvent.actionName === 'acao') action?.onPress();
