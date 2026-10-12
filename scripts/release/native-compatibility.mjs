@@ -7,7 +7,9 @@ export function productionRuntimeConfig(exp, eas) {
   assert.equal(profile.environment, 'production');
   assert.equal(profile.channel, 'production');
   assert.equal(profile.env?.APP_VARIANT, 'production');
-  assert.deepEqual(Object.keys(profile.env).sort(), ['APP_VARIANT'], 'Variáveis adicionais no perfil precisam ser incluídas na snapshot verificada.');
+  // DISTRIBUICAO escolhe o plugin nativo (instalador de APK x loja): o APK publicado é sempre 'apk'.
+  assert.equal(profile.env?.DISTRIBUICAO, 'apk');
+  assert.deepEqual(Object.keys(profile.env).sort(), ['APP_VARIANT', 'DISTRIBUICAO'], 'Variáveis adicionais no perfil precisam ser incluídas na snapshot verificada.');
   assert.equal(profile.android?.buildType, 'apk');
   assert.equal(profile.distribution, 'internal');
   assert.equal(exp.android?.package, 'com.proops.personal');
@@ -19,7 +21,7 @@ export function productionRuntimeConfig(exp, eas) {
   assert.equal(exp.updates?.url, `https://u.expo.dev/${projectId}`);
   return {
     platform: 'android', environment: profile.environment, channel: profile.channel,
-    variant: profile.env.APP_VARIANT, applicationId: exp.android.package,
+    variant: profile.env.APP_VARIANT, distribuicao: profile.env.DISTRIBUICAO, applicationId: exp.android.package,
     runtimeVersion: exp.version, projectId, updatesUrl: exp.updates.url,
   };
 }

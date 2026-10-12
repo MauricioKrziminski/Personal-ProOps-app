@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { productionRuntimeConfig, attestNativeBuild } from './native-compatibility.mjs';
 const exp = { version: '1.2.0', runtimeVersion: { policy: 'appVersion' }, android: { package: 'com.proops.personal' }, extra: { eas: { projectId: 'project-id' } }, updates: { url: 'https://u.expo.dev/project-id' } };
-const profile = { environment: 'production', channel: 'production', env: { APP_VARIANT: 'production' }, android: { buildType: 'apk' }, distribution: 'internal' };
+const profile = { environment: 'production', channel: 'production', env: { APP_VARIANT: 'production', DISTRIBUICAO: 'apk' }, android: { buildType: 'apk' }, distribution: 'internal' };
 const eas = { build: { distribution: profile } };
 test('receipt identity comes from checked-in production profile and resolved Expo config', () => {
   const actual = productionRuntimeConfig(exp, eas);
@@ -10,7 +10,7 @@ test('receipt identity comes from checked-in production profile and resolved Exp
   assert.equal(actual.channel, profile.channel);
   assert.equal(actual.environment, profile.environment);
 });
-for (const patch of [{ channel: 'staging' }, { environment: 'preview' }, { env: { APP_VARIANT: 'preview' } }, { env: { APP_VARIANT: 'production', EXPO_PUBLIC_OTHER: 'unexpected' } }, { android: { buildType: 'app-bundle' } }, { extends: 'unknown' }]) {
+for (const patch of [{ channel: 'staging' }, { environment: 'preview' }, { env: { APP_VARIANT: 'preview' } }, { env: { APP_VARIANT: 'production', DISTRIBUICAO: 'apk', EXPO_PUBLIC_OTHER: 'unexpected' } }, { env: { APP_VARIANT: 'production', DISTRIBUICAO: 'loja' } }, { android: { buildType: 'app-bundle' } }, { extends: 'unknown' }]) {
   test(`profile ${Object.keys(patch)[0]} drift fails closed`, () => {
     assert.throws(() => productionRuntimeConfig(exp, { build: { distribution: { ...profile, ...patch } } }));
   });
