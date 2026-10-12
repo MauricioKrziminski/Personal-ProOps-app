@@ -20,6 +20,7 @@ import {
   type AgentDecision,
   type AgentMessage,
   type AgentTurn,
+  type MotivoDoRelato,
   type Page,
   createConversation,
   deleteConversation,
@@ -27,6 +28,7 @@ import {
   listConversations,
   listMessages,
   renameConversation,
+  reportMessage,
   resolvePending,
   sendMessage,
 } from '@/lib/agent-api';
@@ -333,6 +335,13 @@ export function useRenameAgentConversation() {
     mutationFn: ({ id, title }: { id: string; title: string }) =>
       renameConversation(id, title),
     onSuccess: () => qc.invalidateQueries({ queryKey: agentKeys.conversations }),
+  });
+}
+
+export function useReportarResposta(conversationId: string, messageId: string) {
+  return useMutation({
+    retry: false,
+    mutationFn: (reason: MotivoDoRelato) => reportMessage(conversationId, messageId, reason),
   });
 }
 

@@ -266,6 +266,16 @@ export function deleteConversation(id: string) {
   return agentFetch<void>(`/internal/chat/conversations/${id}`, { method: 'DELETE' });
 }
 
+export type MotivoDoRelato = 'ofensiva' | 'errada' | 'outra';
+
+/** Reporta uma resposta da IA (política da Google Play). O servidor guarda a cópia do texto. */
+export function reportMessage(conversationId: string, messageId: string, reason: MotivoDoRelato) {
+  return agentFetch<{ ok: true }>(
+    `/internal/chat/conversations/${conversationId}/messages/${messageId}/report`,
+    { method: 'POST', body: JSON.stringify({ reason }) },
+  );
+}
+
 export function listMessages(id: string, before?: number | null, limit = 40) {
   const q = new URLSearchParams({ limit: String(limit) });
   if (before != null) q.set('before', String(before));

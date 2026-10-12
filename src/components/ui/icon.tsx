@@ -75,6 +75,7 @@ const MATERIAL: Record<string, MaterialName> = {
   'exclamationmark.circle': 'error',
   'pin.slash': 'keep_off',
   'eye.slash': 'visibility_off',
+  flag: 'flag',
   bell: 'notifications',
   'bell.badge': 'notifications_active',
   'bell.fill': 'notifications',

@@ -531,12 +531,18 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
   const desenharLinha = useCallback(
     ({ item }: { item: Item }) => (
       <View style={styles.messageFrame}>
-        <Linha item={item} busy={rodando} onDecide={decidir} onRetry={tentarDeNovo} />
+        <Linha
+          item={item}
+          conversationId={conversationId}
+          busy={rodando}
+          onDecide={decidir}
+          onRetry={tentarDeNovo}
+        />
       </View>
     ),
     // A identidade precisa ser estável: sem isso cada tecla digitada no composer
     // devolveria um `renderItem` novo e a conversa inteira remontaria.
-    [rodando, decidir, tentarDeNovo],
+    [rodando, decidir, tentarDeNovo, conversationId],
   );
 
   const aoRolar = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -768,11 +774,13 @@ function ConversationTimeline({
 /** Uma linha da conversa. Fora do componente-pai para não remontar a cada tecla. */
 const Linha = memo(function Linha({
   item,
+  conversationId,
   busy,
   onDecide,
   onRetry,
 }: {
   item: Item;
+  conversationId?: string;
   busy: boolean;
   onDecide: (m: AgentMessage, o: UiOption) => void;
   onRetry: () => void;
@@ -820,6 +828,8 @@ const Linha = memo(function Linha({
       <ChatMessage
         role={item.kind}
         content={options.length > 0 && body ? body : item.message.content}
+        conversationId={conversationId}
+        messageId={item.message.id}
       />
       {item.message.ui_payload ? (
         <ChatActions
