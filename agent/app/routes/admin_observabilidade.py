@@ -151,3 +151,27 @@ async def triar(issue_id: UUID, body: StatusIn, admin: UUID = Depends(admin_user
             admin, Jsonb({"issue_id": str(issue_id), "from": atual["status"], "to": body.status}),
         )
     return _json(await _detalhe(issue_id))
+
+
+@router.get("/ai-reports")
+async def relatos_de_ia(
+    reason: Literal["ofensiva", "errada", "outra"] | None = None,
+    page: int = Query(1, ge=1, le=100_000),
+    page_size: int = Query(25, ge=1, le=100),
+    _admin: UUID = Depends(admin_user),
+):
+    """Relatos de resposta da IA feitos no chat do app (Google Play). Só leitura; o texto é a cópia guardada."""
+    onde, args = ("r.reason = %s", [reason]) if reason else ("true", [])
+    total = await db.fetch_one(f"select count(*)::int as n from public.ai_reports r where {onde}", *args)
+    linhas = await db.fetch(
+        f"""select r.id, r.created_at, r.reason, r.note, r.content, r.user_id, u.email::text as email
+            from public.ai_reports r left join auth.users u on u.id = r.user_id
+            where {onde} order by r.created_at desc, r.id limit %s offset %s""",
+        *args, page_size, (page - 1) * page_size,
+    )
+    return _json({
+        "items": [{"id": str(r["id"]), "created_at": _iso(r["created_at"]), "reason": r["reason"], "note": r["note"],
+                   "content": r["content"], "user_id": str(r["user_id"]) if r["user_id"] else None,
+                   "email": r["email"]} for r in linhas],
+        "total": (total or {}).get("n", 0), "page": page, "page_size": page_size,
+    })

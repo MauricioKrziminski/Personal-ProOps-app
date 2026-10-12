@@ -134,6 +134,11 @@ class Renomear(Corpo):
     title: str = Field(min_length=1, max_length=MAX_TITLE)
 
 
+class Relato(Corpo):
+    reason: Literal["ofensiva", "errada", "outra"]
+    note: str | None = Field(default=None, max_length=500)
+
+
 class Decisao(Corpo):
     client_message_id: UUID
     decision: Literal["approve", "reject", "choose"]
@@ -511,6 +516,18 @@ async def enviar(session_id: UUID, body: NovaMensagem, user_id: Usuario) -> Turn
     except app_chat.ChatError as err:
         raise _traduz(err) from err
     return TurnOut.de(r)
+
+
+@router.post("/conversations/{session_id}/messages/{message_id}/report")
+async def reportar(session_id: UUID, message_id: UUID, body: Relato, user_id: Usuario) -> dict[str, bool]:
+    try:
+        await app_chat.report_message(
+            user_id=user_id, session_id=session_id, message_id=message_id,
+            reason=body.reason, note=(body.note or "").strip() or None,
+        )
+    except app_chat.ChatError as err:
+        raise _traduz(err) from err
+    return {"ok": True}
 
 
 @router.post("/conversations/{session_id}/actions/{pending_id}", response_model=TurnOut)

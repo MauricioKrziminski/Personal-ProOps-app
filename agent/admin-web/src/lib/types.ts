@@ -39,6 +39,16 @@ export interface AccountRow {
 
 export interface Page<T> { items: T[]; total: number; page: number; page_size: number }
 
+export interface AiReport {
+  id: string;
+  created_at: string;
+  reason: "ofensiva" | "errada" | "outra";
+  note: string | null;
+  content: string;
+  user_id: string | null;
+  email: string | null;
+}
+
 export interface AuditEvent {
   id: string;
   created_at: string;

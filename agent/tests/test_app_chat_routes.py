@@ -528,3 +528,52 @@ def test_mensagem_sem_clique_nao_inventa_um(cliente, falso):
         json={"client_message_id": str(uuid4()), "content": "gastei 45"},
     )
     assert falso["chamadas"][-1][1]["clicked_id"] is None
+
+
+# --- reportar resposta da IA -------------------------------------------------
+
+MID = UUID("44444444-4444-4444-4444-444444444444")
+URL_RELATO = f"/internal/chat/conversations/{SID}/messages/{MID}/report"
+
+
+@pytest.fixture
+def relatos(monkeypatch):
+    """Dublê do repositório: `achou` decide se a mensagem é uma resposta do assistente desta pessoa."""
+    estado = {"chamadas": [], "achou": True}
+
+    async def f(session_id, message_id, user_id, reason, note):
+        estado["chamadas"].append((session_id, message_id, user_id, reason, note))
+        return estado["achou"]
+
+    monkeypatch.setattr(app_chat.repo, "report_chat_message", f, raising=False)
+    return estado
+
+
+def test_reportar_grava_com_o_usuario_do_token(cliente, relatos):
+    r = cliente.post(URL_RELATO, json={"reason": "errada", "note": "  valor errado "})
+    assert r.status_code == 200 and r.json() == {"ok": True}
+    assert relatos["chamadas"] == [(SID, MID, USER, "errada", "valor errado")]
+
+
+def test_reportar_repetido_continua_200(cliente, relatos):
+    assert cliente.post(URL_RELATO, json={"reason": "outra"}).status_code == 200
+    r = cliente.post(URL_RELATO, json={"reason": "outra"})
+    assert r.status_code == 200 and r.json() == {"ok": True}
+    assert relatos["chamadas"][-1][4] is None
+
+
+def test_reportar_mensagem_que_nao_e_resposta_desta_pessoa_da_404(cliente, relatos):
+    # vale para a mensagem de outra pessoa e para a do próprio usuário: o banco só acha role 'assistant' dela
+    relatos["achou"] = False
+    assert cliente.post(URL_RELATO, json={"reason": "ofensiva"}).status_code == 404
+
+
+@pytest.mark.parametrize("corpo", [
+    {"reason": "spam"},
+    {},
+    {"reason": "outra", "note": "x" * 501},
+    {"reason": "outra", "user_id": str(USER)},
+])
+def test_reportar_corpo_invalido_da_422(cliente, relatos, corpo):
+    assert cliente.post(URL_RELATO, json=corpo).status_code == 422
+    assert relatos["chamadas"] == []

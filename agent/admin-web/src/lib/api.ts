@@ -1,4 +1,4 @@
-import type { AccountDetail, AppConfig, Note, IssueDetail, IssuesPage, IssueStatus, AccountRow, AuditEvent, BillingEvent, Config, Me, Overview, Page, SystemInfo } from "./types";
+import type { AiReport, AccountDetail, AppConfig, Note, IssueDetail, IssuesPage, IssueStatus, AccountRow, AuditEvent, BillingEvent, Config, Me, Overview, Page, SystemInfo } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -111,6 +111,7 @@ export const api = {
   accounts: (f: AccountFilters) => request<Page<AccountRow>>("GET", `/accounts${qs(f)}`),
   account: (id: string) => request<AccountDetail>("GET", `/accounts/${id}`),
   audit: (f: AuditFilters) => request<Page<AuditEvent>>("GET", `/audit${qs(f)}`),
+  aiReports: (f: { reason?: string; page?: number; page_size?: number }) => request<Page<AiReport>>("GET", `/ai-reports${qs(f)}`),
   billing: (f: BillingFilters) => request<Page<BillingEvent>>("GET", `/billing-events${qs(f)}`),
   system: () => request<SystemInfo>("GET", "/system"),
   notes: (id: string) => request<{ items: Note[] }>("GET", `/accounts/${id}/notes`),

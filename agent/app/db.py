@@ -1302,6 +1302,33 @@ async def chat_messages(
     return list(reversed(linhas))
 
 
+async def report_chat_message(
+    session_id: UUID, message_id: UUID, user_id: UUID, reason: str, note: str | None
+) -> bool:
+    """Guarda o relato com a CÓPIA da resposta. False = não é uma resposta do assistente desta pessoa.
+
+    Repetir é no-op (`unique (user_id, message_id)`) e continua True: o app pode tentar de novo.
+    """
+    linha = await fetch_one(
+        f"""
+        with alvo as (
+          select m.id, m.content, s.id as sid, s.workspace_id
+          from public.app_chat_messages m
+          join public.user_sessions s on s.id = m.session_id
+          where m.id = %s and m.session_id = %s and s.user_id = %s and m.role = 'assistant' {_VISIVEL}
+        ), ins as (
+          insert into public.ai_reports (workspace_id, user_id, session_id, message_id, content, reason, note)
+          select workspace_id, %s, sid, id, content, %s, %s from alvo
+          on conflict (user_id, message_id) do nothing
+          returning 1
+        )
+        select count(*)::int as n from alvo
+        """,
+        message_id, session_id, user_id, user_id, reason, note,
+    )
+    return bool(linha and linha["n"])
+
+
 async def chat_prompt_history(session_id: UUID, limit: int = 40) -> list[dict[str, Any]]:
     """Só o que COMPLETOU, e só desta conversa.
 

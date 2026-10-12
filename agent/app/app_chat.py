@@ -438,6 +438,14 @@ async def resolve_pending(
 # ---------------------------------------------------------------------------
 
 
+async def report_message(
+    *, user_id: UUID, session_id: UUID, message_id: UUID, reason: str, note: str | None
+) -> None:
+    """Relato de uma resposta da IA. Mensagem que não é do assistente desta pessoa = 404."""
+    if not await repo.report_chat_message(session_id, message_id, user_id, reason, note):
+        raise ConversationNotFound()
+
+
 async def delete_conversation(*, user_id: UUID, session_id: UUID) -> None:
     """Esconde, apaga a memória, e só então remove a linha.
 

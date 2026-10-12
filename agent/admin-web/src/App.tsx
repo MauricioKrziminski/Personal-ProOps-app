@@ -14,6 +14,7 @@ const AccountsPage = lazyPage(() => import("@/pages/accounts"), "AccountsPage");
 const AccountDetailPage = lazyPage(() => import("@/pages/account-detail"), "AccountDetailPage");
 const ObservabilityPage = lazyPage(() => import("@/pages/observability"), "ObservabilityPage");
 const AuditPage = lazyPage(() => import("@/pages/audit"), "AuditPage");
+const AiReportsPage = lazyPage(() => import("@/pages/ai-reports"), "AiReportsPage");
 const BillingPage = lazyPage(() => import("@/pages/billing"), "BillingPage");
 const AppConfigPage = lazyPage(() => import("@/pages/app-config"), "AppConfigPage");
 const SystemPage = lazyPage(() => import("@/pages/system"), "SystemPage");
@@ -35,6 +36,7 @@ function Gate() {
         <Route path="contas/:id" element={<AccountDetailPage />} />
         <Route path="observabilidade" element={<ObservabilityPage />} />
         <Route path="auditoria" element={<AuditPage />} />
+        <Route path="relatos" element={<AiReportsPage />} />
         <Route path="cobranca" element={<BillingPage />} />
         <Route path="app" element={<AppConfigPage />} />
         <Route path="sistema" element={<SystemPage />} />

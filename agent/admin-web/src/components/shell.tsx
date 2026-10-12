@@ -1,4 +1,4 @@
-import { Activity, Bug, CreditCard, LayoutDashboard, LogOut, Moon, MoreHorizontal, ScrollText, Smartphone, Sun, Users, type LucideIcon } from "lucide-react";
+import { Activity, Bug, Flag, CreditCard, LayoutDashboard, LogOut, Moon, MoreHorizontal, ScrollText, Smartphone, Sun, Users, type LucideIcon } from "lucide-react";
 import { Suspense, useState } from "react";
 import { NavLink, Outlet } from "react-router";
 import { RouteBoundary } from "@/components/error-boundary";
@@ -14,6 +14,7 @@ export const SECTIONS: { to: string; label: string; short?: string; icon: Lucide
   { to: "/contas", label: "Contas", icon: Users },
   { to: "/observabilidade", label: "Observabilidade", short: "Erros", icon: Bug },
   { to: "/auditoria", label: "Auditoria", icon: ScrollText },
+  { to: "/relatos", label: "Relatos de IA", short: "Relatos", icon: Flag },
   { to: "/cobranca", label: "Cobrança", icon: CreditCard },
   { to: "/app", label: "App", icon: Smartphone },
   { to: "/sistema", label: "Sistema", icon: Activity },
