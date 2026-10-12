@@ -1018,6 +1018,16 @@ export default function TransactionsScreen() {
     consulta desligada fica `isPending` para sempre — o ramo de cima desenharia três linhas de
     esqueleto indefinidamente, mesmo com o portão da tela já aberto.
   */
+  /*
+    Começo de ciclo (12/10/2026, iPhone): a tela abre em "Aconteceu", nada aconteceu ainda, o card
+    some (lista vazia) e sobrava "Nada aconteceu em Novembro de 2026" — o rótulo do ciclo é o mês em
+    que ele TERMINA, e lido em outubro parecia defeito. No período corrente a frase diz "ainda", e o
+    botão leva ao outro chip quando é lá que estão as linhas.
+  */
+  const periodoAtual = !customPeriod && !!range.from && !!range.to && range.from <= hoje && hoje <= range.to;
+  const nestePeriodo = view === 'cycle' ? 'neste ciclo' : 'neste mês';
+  const outroChip: 'cleared' | 'pending' = status === 'cleared' ? 'pending' : 'cleared';
+  const temNoOutroChip = (status === 'cleared' ? totais.linhas - totais.realizadoLinhas : totais.realizadoLinhas) > 0;
   const empty = typeof subcategoryId === 'string' && detailCatalog.isError ? (
     <ErrorCard message="Não consegui conferir este detalhe" onRetry={() => { void detailCatalog.refetch(); }} />
   ) : detailLinkInvalid || detailUnavailable ? (
@@ -1069,8 +1079,16 @@ export default function TransactionsScreen() {
   ) : status !== 'all' && !params.recurringId ? (
     <EmptyState compacto
       icon="calendar"
-      title={status === 'cleared' ? `Nada aconteceu ${periodDescription}` : `Nada previsto ${periodDescription}`}
-      action={{ label: 'Ver todos', onPress: () => setStatus('all') }}
+      title={
+        status === 'cleared'
+          ? periodoAtual ? `Nada aconteceu ainda ${nestePeriodo}` : `Nada aconteceu ${periodDescription}`
+          : periodoAtual ? `Nada mais previsto ${nestePeriodo}` : `Nada previsto ${periodDescription}`
+      }
+      action={
+        temNoOutroChip
+          ? { label: outroChip === 'pending' ? 'Ver previstos' : 'Ver o que aconteceu', onPress: () => setStatus(outroChip) }
+          : { label: 'Ver todos', onPress: () => setStatus('all') }
+      }
     />
   ) : (
     <EmptyState
