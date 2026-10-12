@@ -68,6 +68,10 @@ class EnvioOut(Corpo):
     novos: int
 
 
+class _Falhou(Exception):
+    """Depois da chamada ao modelo: repetir custaria outra chamada e falharia igual."""
+
+
 class _Parar(Exception):
     """Rajada, cota ou modelo fora: o resto fica no aparelho para a próxima abertura."""
 
@@ -153,12 +157,20 @@ async def _interpretar(user_id, ws, item: NotificacaoIn, banco: str, fuso: str):
     )
     if not acoes:
         return None, None, local.date()
+    try:
+        return await _rascunho(ws, texto, banco, acoes, local.date())
+    except Exception as e:  # noqa: BLE001
+        raise _Falhou(type(e).__name__) from None
+
+
+async def _rascunho(ws, texto: str, banco: str, acoes: list[dict], dia: date):
+    local_date = dia
     forma = (dom_atributos.forma_proposta(acoes[0].get("payment_method"), texto)
              if finance_draft._pede_forma(acoes[0]) else None)
     # O nome do banco entra no texto que `montar_rascunho` casa com as contas cadastradas ("Nubank" →
     # a conta/cartão Nubank, só se casar com UM registro); ele não vai ao modelo por aqui.
-    rascunho = await finance_draft.montar_rascunho(ws, f"{banco}\n{texto}", acoes, local.date(), forma)
-    return rascunho, acoes[0], local.date()
+    rascunho = await finance_draft.montar_rascunho(ws, f"{banco}\n{texto}", acoes, local_date, forma)
+    return rascunho, acoes[0], local_date
 
 
 @router.post("/notifications", response_model=EnvioOut)
@@ -197,17 +209,30 @@ async def receber(body: EnvioIn, user_id: Annotated[UUID, Depends(current_user)]
         except _Parar:
             parado = True
             continue
+        except _Falhou as e:
+            rascunho, acao, dia = None, None, None
+            log.warning("Notificação %s (%s) descartada: %s", item.external_id, banco, e)
         usados += 1
-        if rascunho is None:
-            await _gravar(ws, user_id, item, banco, "ignored")
-        else:
-            kind = "income" if acao["type"] == "create_income" else "expense"
-            valor = int(acao.get("amount_cents") or 0) or None
-            ocorreu = date.fromisoformat(acao["occurred_at"]) if acao.get("occurred_at") else dia
-            conta = rascunho.params.get("conta")
-            match = await _duplicata(ws, kind, valor, ocorreu, acao.get("description"), conta) if valor else None
-            await _gravar(ws, user_id, item, banco, "duplicate" if match else "pending", rascunho,
-                          kind, valor, ocorreu, match)
-            novos += 1
+        try:
+            if rascunho is None:
+                await _gravar(ws, user_id, item, banco, "ignored")
+            else:
+                kind = "income" if acao["type"] == "create_income" else "expense"
+                valor = int(acao.get("amount_cents") or 0) or None
+                ocorreu = date.fromisoformat(acao["occurred_at"]) if acao.get("occurred_at") else dia
+                conta = rascunho.params.get("conta")
+                match = await _duplicata(ws, kind, valor, ocorreu, acao.get("description"), conta) if valor else None
+                await _gravar(ws, user_id, item, banco, "duplicate" if match else "pending", rascunho,
+                              kind, valor, ocorreu, match)
+                novos += 1
+        except Exception as e:  # noqa: BLE001
+            # Já custou um modelo: repetir custaria de novo e falharia igual. Grava como ignorada; se
+            # nem isso grava (banco fora), para sem aceitar — o aparelho guarda e tenta depois.
+            log.warning("Notificação %s (%s) com falha após o modelo: %s", item.external_id, banco, type(e).__name__)
+            try:
+                await _gravar(ws, user_id, item, banco, "ignored")
+            except Exception:  # noqa: BLE001
+                parado = True
+                continue
         aceitos.append(item.external_id)
     return EnvioOut(aceitos=aceitos, novos=novos)

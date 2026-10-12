@@ -224,3 +224,28 @@ def test_tem_valor_so_estrutura():
     assert captures.tem_valor("Pix recebido 1.200,00")
     assert not captures.tem_valor("Seu código é 123456")
     assert not captures.tem_valor("Bom dia!")
+
+
+def test_item_que_quebra_depois_do_modelo_vira_ignored_e_o_lote_segue(mundo, monkeypatch):
+    async def quebra_na_primeira(ws, texto, acoes, hoje, forma=None):
+        if "AZEDA" in texto:
+            raise ValueError("2026-09-31")
+        from app.routes.finance_draft import RascunhoOut
+        return RascunhoOut(tipo="uma", params={"kind": "expense"}, perguntas=[], entendido="Gasto")
+
+    monkeypatch.setattr(captures.finance_draft, "montar_rascunho", quebra_na_primeira)
+    r = _envia(_item(texto="Compra de R$ 10,00 em AZEDA"), _item(ext="ext-00000002"))
+    assert r.status_code == 200
+    assert r.json() == {"aceitos": ["ext-00000001", "ext-00000002"], "novos": 1}
+    assert "ignored" in mundo["gravados"][0] and "pending" in mundo["gravados"][1]
+
+
+def test_banco_fora_nao_aceita_e_para_o_lote(mundo, monkeypatch):
+    async def quebra(sql, *args):
+        raise RuntimeError("db fora")
+
+    monkeypatch.setattr(db, "execute", quebra)
+    r = _envia(_item(), _item(ext="ext-00000002"))
+    assert r.status_code == 200
+    assert r.json() == {"aceitos": [], "novos": 0}
+    assert mundo["chamadas"] == 1  # o segundo nem foi interpretado
