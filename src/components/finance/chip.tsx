@@ -63,7 +63,8 @@ export function Chip({ label, selected, onPress, count, icon, tinta }: ChipProps
     return {
       backgroundColor: vidro ? 'transparent' : interpolateColor(limitado, [0, 1], [theme.backgroundElement, theme.tintFill]),
       borderColor: interpolateColor(limitado, [0, 1], [theme.cardBorder, 'transparent']),
-      opacity: pressao.get(),
+      // No vidro a pressão não mexe na opacidade: o material nativo montado sob ela não pinta.
+      opacity: vidro ? 1 : pressao.get(),
       transform: [{ scale: reduzir ? 1 : 1 + 0.2 * (progresso - limitado) }],
     };
   });
@@ -91,16 +92,17 @@ export function Chip({ label, selected, onPress, count, icon, tinta }: ChipProps
       }}>
       <Animated.View style={[styles.chip, superficie]}>
       {vidro ? (
-        <>
-          {/* A tinta nativa não interpola: os dois materiais ficam montados e acompanham
-              o mesmo progresso do texto e do ícone, inclusive ao inverter um toque rápido. */}
-          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, semSelecao]}>
+        /* O vidro nativo NÃO respeita a opacidade animada de um ancestral (iPhone, 12/10/2026): o
+           material montado sob opacidade 0 nunca pinta ("Aconteceu" achatado ao perder a seleção)
+           e o que já pintou não some ao esmaecer (o "Todos" ficava preto, sem rótulo). Por isso um
+           material só, trocado pelo estado — a chave remonta o vidro; texto e ícone seguem a mola. */
+        selected ? (
+          <GlassBackdrop key="escolhido" fallbackColor={theme.tintFill} radius={Radius.pill} tintColor={theme.glassActionTint} />
+        ) : (
+          <View key="comum" pointerEvents="none" style={[StyleSheet.absoluteFill, styles.base, { backgroundColor: theme.backgroundElement }]}>
             <GlassBackdrop fallbackColor={theme.backgroundElement} radius={Radius.pill} />
-          </Animated.View>
-          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, comSelecao]}>
-            <GlassBackdrop fallbackColor={theme.tintFill} radius={Radius.pill} tintColor={theme.glassActionTint} />
-          </Animated.View>
-        </>
+          </View>
+        )
       ) : null}
       {/* `flexShrink: 0`: o chip já não encolhe (Pressable), então parado nada muda; dentro de um
           contêiner com `entering` o rótulo encolhido na medida não se remede (design.md §3). */}
@@ -130,6 +132,7 @@ export function Chip({ label, selected, onPress, count, icon, tinta }: ChipProps
 }
 
 const styles = StyleSheet.create({
+  base: { borderRadius: Radius.pill, borderCurve: 'continuous' },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',

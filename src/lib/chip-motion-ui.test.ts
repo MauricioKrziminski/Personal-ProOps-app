@@ -115,7 +115,7 @@ for (const glass of [false, true]) {
   test(`Chip ${glass ? 'glass' : 'fallback'} colors follow one spring, retaining constant icon/material props and safe overshoot`, () => {
     const ui = mountChip(glass);
     assert.equal(ui.animations.length, 0, 'mount starts at the endpoint without selection animation');
-    const constantLayers = () => ui.nodes().filter((node) => node.type === 'Icon' || node.type === 'GlassBackdrop').map((node) => JSON.stringify(node.props));
+    const constantLayers = () => ui.nodes().filter((node) => node.type === 'Icon').map((node) => JSON.stringify(node.props));
     const layers = constantLayers();
     ui.render(true);
     assert.equal(ui.animations.at(-1).spring, true);
@@ -139,9 +139,12 @@ for (const glass of [false, true]) {
     assert.equal(style(surface).backgroundColor, glass ? 'transparent' : 'blend(element,fill,0.45)');
     assert.equal(style(surface).transform[0].scale, 1, 'ordinary progress does not shrink or grow the label');
     if (glass) {
-      const materials = ui.nodes().filter((node) => node.props.children?.type === 'GlassBackdrop');
-      assert.equal(style(materials[0]).opacity, 0.55);
-      assert.equal(style(materials[1]).opacity, 0.45);
+      // Um material só, trocado pelo ESTADO (o vidro nativo ignora opacidade animada): a mola
+      // em 0,45 ainda mostra o material do estado escolhido, e nenhum vidro mora sob opacidade.
+      const materials = ui.nodes().filter((node) => node.type === 'GlassBackdrop');
+      assert.equal(materials.length, 1);
+      assert.equal(materials[0].props.tintColor, 'glass-fill');
+      assert.equal(style(surface).opacity, 1, 'a pressão não esmaece o vidro');
     }
     assert.deepEqual(constantLayers(), layers);
     const interrupted = ui.animations.at(-1);
@@ -159,7 +162,7 @@ for (const glass of [false, true]) {
       assert.equal(style(surface).backgroundColor, glass ? 'transparent' : endpoint ? 'fill' : 'element');
       assert.ok(Math.abs(style(surface).transform[0].scale - scale) < 1e-10);
       for (const node of ui.nodes().filter((node) => node.props.children?.type === 'Icon' || node.props.children?.type === 'GlassBackdrop')) {
-        assert.ok(style(node).opacity === 0 || style(node).opacity === 1, 'native layers never receive extrapolated opacity');
+        assert.ok([0, 1, undefined].includes(style(node).opacity), 'native layers never receive extrapolated opacity');
       }
       const badge = ui.nodes().find((node) => node.type === 'Animated.View' && node.props.children?.type === 'Animated.Text');
       assert.equal(style(badge).backgroundColor, endpoint ? 'overlay' : 'badge');
