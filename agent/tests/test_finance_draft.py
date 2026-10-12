@@ -272,3 +272,43 @@ def test_nome_cadastrado_ambiguo_na_fala_pergunta(mundo):
     j = _pede("gastei 45 no mercado no nubank").json()
     assert "conta" not in j["params"]
     assert any("mais de uma" in q for q in j["perguntas"])
+
+
+JPEG = b"\xff\xd8\xff\xe0" + b"0" * 64
+
+
+def _pede_imagem(conteudo=JPEG, mime="image/jpeg", nome="print.jpg"):
+    return _cliente().post(
+        "/internal/finance/draft/media",
+        files={"file": (nome, conteudo, mime)},
+        data={"today": HOJE, "timezone": "America/Sao_Paulo"},
+    )
+
+
+def test_imagem_vira_rascunho_com_a_midia_no_config(mundo, monkeypatch):
+    visto = {}
+
+    async def finance_node(estado, config=None):
+        visto["estado"], visto["config"] = estado, config
+        return {"finance_actions": [{"type": "create_expense", "amount_cents": 4590, "description": "pix"}]}
+
+    monkeypatch.setattr(nodes, "finance_node", finance_node)
+    r = _pede_imagem()
+    assert r.status_code == 200
+    assert r.json()["params"]["amount"] == "4590"
+    midia = visto["config"]["configurable"]["midia_do_turno"]
+    assert midia["mime_type"] == "image/jpeg" and midia["data_b64"]
+    assert visto["estado"]["media"] == {"mime_type": "image/jpeg"}
+
+
+def test_imagem_que_nao_e_imagem_e_recusada_sem_modelo(mundo, monkeypatch):
+    async def nao_chama(*_a, **_k):
+        raise AssertionError("não chama o modelo")
+
+    monkeypatch.setattr(nodes, "finance_node", nao_chama)
+    assert _pede_imagem(conteudo=b"%PDF-1.4 ...", mime="image/jpeg").status_code == 422
+    assert _pede_imagem(mime="application/zip", nome="x.zip").status_code == 415
+
+
+def test_imagem_grande_demais(mundo):
+    assert _pede_imagem(conteudo=JPEG + b"0" * (8 * 1024 * 1024)).status_code == 413
