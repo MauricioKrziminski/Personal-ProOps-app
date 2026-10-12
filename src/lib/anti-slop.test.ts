@@ -791,7 +791,8 @@ const SEM_SCREEN = new Set([
   'src/app/design-preview.tsx',        // vitrine de dev: monta as raízes de aba à mão
   'src/app/onboarding.tsx',            // fluxo de tela cheia, com paginação própria
   'src/app/atualizar.tsx',             // bloqueio de versão: toma o lugar do app inteiro, sem rolagem
-  // As seis portas de conta compartilham a moldura `AuthScreen`.
+  // As portas de conta (e o aceite dos termos, logo depois delas) compartilham a moldura `AuthScreen`.
+  'src/app/consentimento.tsx',
   'src/app/login.tsx',
   'src/app/signup.tsx',
   'src/app/forgot-password.tsx',
