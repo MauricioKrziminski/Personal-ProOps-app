@@ -1776,9 +1776,12 @@ test('o Perfil só mostra a captura onde o módulo existe (sem Platform.OS na te
   assert.match(perfil, /Lançar pelas notificações/);
 });
 
-test('a tela de ajustes explica o que é lido antes de pedir o acesso', () => {
+test('a tela de ajustes explica o que é lido antes de pedir o acesso (prominent disclosure)', () => {
   const tela = ler('app/captura-notificacoes.tsx');
   assert.match(tela, /nunca saem do aparelho/);
+  assert.match(tela, /Anthropic/);
+  assert.match(tela, /Concordo e ativar/);
+  assert.match(tela, /Permitir configurações restritas/);
   assert.match(tela, /abrirAjustes/);
 });
 
@@ -1881,6 +1884,15 @@ export default function CapturaNotificacoes() {
 ```
 
 Ícones `lock` e `battery.25`: confira em `src/components/ui/icon.tsx`; o que faltar ganha a entrada no mapa SF → Material (`design.md` §4).
+
+**Exigências de loja (Google Play, User Data policy — "prominent disclosure"; obrigatórias, valem por cima do esqueleto acima):**
+
+1. **Aviso de destaque ANTES de ligar.** Tocar no interruptor desligado NÃO chama `configurarCaptura(true)` nem `abrirAjustes()`: abre uma folha (`Sheet` + `TaskHeader` "Antes de ativar") com o texto, no formato do Google:
+   *"O ProOps lê as notificações dos bancos que você marcar e envia o texto delas ao nosso servidor, que usa IA (Anthropic e Google) para montar lançamentos que você confirma. As outras notificações nunca saem do aparelho, e nada é lançado sem você confirmar. Você pode desligar quando quiser."*
+   e dois botões: **"Concordo e ativar"** (primário) e **"Agora não"**. Só "Concordo e ativar" chama `configurarCaptura(true, …)` e, sem acesso, `abrirAjustes()`. Fechar a folha, voltar ou "Agora não" não liga nada. O aceite é o próprio `ativa` (o serviço não grava nada com `ativa = false`).
+2. **Consentimento de IA antes.** Se a pessoa não autorizou a IA (o mesmo hook que a folha da voz usa para `IA_SEM_CONSENTIMENTO` — `grep -rn "IA_SEM_CONSENTIMENTO\|useConsentimento" src | head`), a folha diz que é preciso autorizar a IA primeiro e o botão leva a Perfil → Privacidade e dados, sem ligar a captura.
+3. **"Configuração restrita" (APK instalado fora da loja, Android 13+).** Se, ao voltar das configurações, o acesso continuar não concedido, a linha "Acesso às notificações" mostra a ajuda: *"Se a opção estiver bloqueada: Configurações → Apps → ProOps → ⋮ → Permitir configurações restritas, e depois ative o acesso."* e um botão **"Abrir detalhes do app"** (`IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS, { data: 'package:' + Application.applicationId })`, com `expo-application`).
+4. O teste de contrato do Step 1 passa a exigir também `Concordo e ativar` e `Permitir configurações restritas` no arquivo da tela, e que `configurarCaptura(true` só apareça dentro do handler do aceite.
 
 - [ ] **Step 4: Perfil**
 
@@ -2114,7 +2126,7 @@ export default function Compartilhado() {
 const styles = StyleSheet.create({ imagem: { width: '100%', aspectRatio: 0.6 } });
 ```
 
-Copie os imports de `ThemedText`, `Note` (`tone`), `Button` (`block`, `loading`) e `localISODate` de uma tela existente (`src/components/finance/lancar-por-voz.tsx` usa quase todos). Se o `IA_SEM_CONSENTIMENTO` vier, mostre o mesmo aviso que a folha da voz mostra (`lancar-por-voz.tsx`).
+Copie os imports de `ThemedText`, `Note` (`tone`), `Button` (`block`, `loading`) e `localISODate` de uma tela existente (`src/components/finance/lancar-por-voz.tsx` usa quase todos). **Obrigatório (Apple 5.1.2(i) — dado a IA de terceiro só com permissão explícita):** se o erro for `IA_SEM_CONSENTIMENTO`, mostre o MESMO aviso e o mesmo caminho para autorizar que a folha da voz mostra (`lancar-por-voz.tsx`), sem tentar de novo sozinho; o servidor já recusa o envio sem consentimento (403).
 
 Em `src/app/_layout.tsx`: envolva a árvore com `<ShareIntentProvider>` (fora do `Stack.Protected`, para o intent sobreviver ao login) e, no componente com sessão, quando `hasShareIntent` ficar verdadeiro, `router.push('/compartilhado')`. Registre `<Stack.Screen name="compartilhado" options={{ title: 'Lançar o que chegou' }} />` dentro do grupo protegido por sessão.
 
@@ -2192,6 +2204,12 @@ Spec `2026-10-12-captura-de-lancamentos-design.md`. **Nada é lançado sozinho**
 ```
 
 `.claude/rules/frontend.md`, em "Telas e rotas novas": `/captura-notificacoes` (Perfil, só onde o módulo existe), `/finance/capturas` e `/compartilhado`.
+
+**Lojas (passos de console do Gabriel, por escrito):** procure o documento de publicação existente (`grep -rli "data safety\|App Store Connect" docs | head`) e acrescente uma seção "Captura de lançamentos" com:
+- **Google Play → Data safety:** coletado "Financial info → Other financial info" e "Purchase history" (texto das notificações dos bancos; finalidade App functionality; NÃO efêmero — o texto fica guardado até confirmar/descartar), "Photos" (imagens compartilhadas; efêmero — não ficam guardadas); criptografado em trânsito; exclusão a pedido; provedores de IA tratados como service provider.
+- **Google Play → revisão:** a "prominent disclosure" está em Perfil → Lançar pelas notificações (folha "Antes de ativar"), antes de abrir o acesso; só pacotes da allowlist; sem `READ_SMS`.
+- **App Store Connect:** nutrition label com Photos, Financial Info e User Content (App Functionality, vinculados ao usuário, sem tracking); a descrição do app menciona "Compartilhar comprovante ou print para o ProOps" (guideline 4.4); a extensão não tem anúncio nem compra.
+Se não houver documento de publicação, acrescente a seção ao spec `docs/superpowers/specs/2026-10-12-captura-de-lancamentos-design.md`.
 
 - [ ] **Step 3: Commit**
 
