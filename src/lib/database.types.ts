@@ -1019,6 +1019,85 @@ export type Database = {
           },
         ]
       }
+      captured_notifications: {
+        Row: {
+          amount_cents: number | null
+          bank: string
+          created_at: string
+          draft: Json | null
+          entendido: string | null
+          external_id: string
+          id: string
+          kind: string | null
+          match_transaction_id: string | null
+          occurred_at: string | null
+          posted_at: string
+          status: string
+          texto: string | null
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          amount_cents?: number | null
+          bank: string
+          created_at?: string
+          draft?: Json | null
+          entendido?: string | null
+          external_id: string
+          id?: string
+          kind?: string | null
+          match_transaction_id?: string | null
+          occurred_at?: string | null
+          posted_at: string
+          status?: string
+          texto?: string | null
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          amount_cents?: number | null
+          bank?: string
+          created_at?: string
+          draft?: Json | null
+          entendido?: string | null
+          external_id?: string
+          id?: string
+          kind?: string | null
+          match_transaction_id?: string | null
+          occurred_at?: string | null
+          posted_at?: string
+          status?: string
+          texto?: string | null
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "captured_notifications_match_transaction_id_fkey"
+            columns: ["match_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "captured_notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "captured_notifications_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       card_invoices: {
         Row: {
           account_id: string
