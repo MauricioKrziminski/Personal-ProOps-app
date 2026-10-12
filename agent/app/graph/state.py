@@ -152,6 +152,10 @@ class AgentState(TypedDict, total=False):
     # lê "original + correção" como registro novo, não como edição de um existente.
     corrigindo: str
 
+    # De onde vem o texto quando NÃO é a pessoa digitando (notificação de banco): instrução NOSSA,
+    # montada pelo código, que `user_turn` põe fora do envelope. Nunca vem do usuário.
+    origem: str | None
+
     # execução
     revision_pending: bool  # Persist revised proposal before asking for approval.
     approved: bool

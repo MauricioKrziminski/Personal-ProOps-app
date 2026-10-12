@@ -384,3 +384,13 @@ async def test_com_o_arquivo_o_indice_nao_chama_o_embedding(monkeypatch):
     monkeypatch.setattr(embeddings, "_embeddings", lambda: fake)
     indice = await exemplos._montar_indice()
     assert len(indice) == len(exemplos.carregar()) and fake.documentos == 0
+
+
+def test_origem_vai_fora_do_envelope_e_sem_ela_nada_muda():
+    from app.graph.prompts import user_turn
+
+    sem = user_turn("Compra de R$ 1,00", "2026-10-12T10:00:00", "America/Sao_Paulo")
+    com = user_turn("Compra de R$ 1,00", "2026-10-12T10:00:00", "America/Sao_Paulo", origem="ORIGEM-X")
+    assert sem == user_turn("Compra de R$ 1,00", "2026-10-12T10:00:00", "America/Sao_Paulo", origem="")
+    assert "ORIGEM-X" in com
+    assert com.index("ORIGEM-X") < com.index("<user_input>")  # fora (antes) do envelope

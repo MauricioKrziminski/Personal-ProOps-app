@@ -372,6 +372,7 @@ async def finance_node(state: AgentState, config: RunnableConfig = None) -> dict
                     contas=contas,
                     detalhes=detalhes,
                     exemplos=exemplos,
+                    origem=state.get("origem") or "",
                 ),
                 midia,
             ),

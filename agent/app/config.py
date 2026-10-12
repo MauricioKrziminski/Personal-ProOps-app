@@ -103,6 +103,9 @@ class Settings(BaseSettings):
     # --- regras ---
     hitl_amount_threshold_cents: int = 100_000
     max_parses_per_hour: int = 60
+    # Aceita notificações de `com.android.shell` (o `adb shell cmd notification post`) como banco de
+    # teste. Só no staging: em produção um pacote de teste seria um jeito de mandar texto à IA.
+    captura_aceita_teste: bool = False
     pending_ttl_minutes: int = 10
     session_idle_hours: int = 6
     # Quanto tempo um turno do app segura a conversa. Vencido, outro turno pode

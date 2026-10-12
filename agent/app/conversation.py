@@ -273,6 +273,7 @@ def _estado_base(
         "draft": {},
         "preset": False,
         "corrigindo": conteudo.get("corrigindo") or "",
+        "origem": "",  # só a captura de notificações preenche (fora do grafo de chat)
         "confidence": 1.0,
         "llm_calls": 0,
         "revision_pending": False,

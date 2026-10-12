@@ -118,6 +118,39 @@ async def run(
     return resultado
 
 
+async def carregar_existentes(workspace_id, de: date, ate: date, account_id: str | None) -> list[Existente]:
+    """Lançamentos candidatos à conciliação entre `de` e `ate`. Com conta, só os dela (e os sem conta);
+    sem conta (captura que não sabe de qual conta veio), todos do espaço."""
+    return [
+        Existente(
+            id=str(r["id"]), kind=r["kind"], amount_cents=int(r["amount_cents"]),
+            occurred_at=r["occurred_at"], description=r["description"], merchant=r["merchant"],
+            account_id=str(r["account_id"]) if r["account_id"] else None,
+            counterparty_account_id=str(r["counterparty_account_id"]) if r["counterparty_account_id"] else None,
+            installment_plan_id=str(r["installment_plan_id"]) if r["installment_plan_id"] else None,
+            installment_no=r["installment_no"], plan_installments=r["plan_installments"],
+            rollover=bool(r["rollover"]), previsto=bool(r["previsto"]),
+        )
+        for r in await db.fetch(
+            """
+            select t.id, t.kind, t.amount_cents, t.occurred_at, t.description, t.merchant,
+                   t.account_id, t.counterparty_account_id, t.installment_plan_id,
+                   t.installment_no, p.installments as plan_installments,
+                   t.rollover_of_invoice_id is not null as rollover,
+                   (t.recurring_id is not null and t.status = 'pending') as previsto
+            from public.transactions t
+            left join public.installment_plans p on p.id = t.installment_plan_id
+            where t.workspace_id = %s
+              and t.occurred_at between %s and %s
+              and (%s::uuid is null or t.account_id = %s::uuid or t.account_id is null
+                   or t.counterparty_account_id = %s::uuid)
+            order by t.occurred_at, t.created_at
+            """,
+            workspace_id, de, ate, account_id, account_id, account_id,
+        )
+    ]
+
+
 async def _importar(
     *,
     user_id: UUID,
@@ -214,33 +247,7 @@ async def _importar(
     # ── conciliação ───────────────────────────────────────────────────────
     datas = [date.fromisoformat(l.occurred_at) for l in linhas]
     de, ate = min(datas) - timedelta(days=MARGEM_CANDIDATOS), max(datas) + timedelta(days=MARGEM_CANDIDATOS)
-    existentes = [
-        Existente(
-            id=str(r["id"]), kind=r["kind"], amount_cents=int(r["amount_cents"]),
-            occurred_at=r["occurred_at"], description=r["description"], merchant=r["merchant"],
-            account_id=str(r["account_id"]) if r["account_id"] else None,
-            counterparty_account_id=str(r["counterparty_account_id"]) if r["counterparty_account_id"] else None,
-            installment_plan_id=str(r["installment_plan_id"]) if r["installment_plan_id"] else None,
-            installment_no=r["installment_no"], plan_installments=r["plan_installments"],
-            rollover=bool(r["rollover"]), previsto=bool(r["previsto"]),
-        )
-        for r in await db.fetch(
-            """
-            select t.id, t.kind, t.amount_cents, t.occurred_at, t.description, t.merchant,
-                   t.account_id, t.counterparty_account_id, t.installment_plan_id,
-                   t.installment_no, p.installments as plan_installments,
-                   t.rollover_of_invoice_id is not null as rollover,
-                   (t.recurring_id is not null and t.status = 'pending') as previsto
-            from public.transactions t
-            left join public.installment_plans p on p.id = t.installment_plan_id
-            where t.workspace_id = %s
-              and t.occurred_at between %s and %s
-              and (t.account_id = %s or t.account_id is null or t.counterparty_account_id = %s)
-            order by t.occurred_at, t.created_at
-            """,
-            workspace_id, de, ate, account_id, account_id,
-        )
-    ]
+    existentes = await carregar_existentes(workspace_id, de, ate, account_id)
     ja_importados = {
         r["external_id"]: str(r["transaction_id"])
         for r in await db.fetch(

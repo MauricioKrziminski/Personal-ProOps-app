@@ -489,6 +489,7 @@ def user_turn(
     contas: list[dict] | None = None,
     detalhes: list[dict] | None = None,
     exemplos: str = "",
+    origem: str = "",
 ) -> str:
     """Monta o turno do usuário: contexto confiável FORA do envelope, texto DENTRO."""
     from app.security import wrap_untrusted
@@ -496,6 +497,10 @@ def user_turn(
     partes = [
         f"Data e hora atual do usuário: {agora_local} (fuso {timezone}).",
     ]
+    if origem:
+        # Texto NOSSO (montado pelo código, nunca do usuário), fora do envelope: diz de onde vem o
+        # texto abaixo (ex.: notificação de banco), que continua sendo DADO.
+        partes.append(origem)
     if history:
         historico_blocos = []
         # SEM corte aqui. A janela é do canal e já foi aplicada pela borda
