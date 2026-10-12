@@ -25,6 +25,11 @@ Data: 12/10/2026. Pedido do dono do produto: *"automatizar o lançamento de um g
    (`agent/app/routes/finance_draft.py`), o MESMO da voz. `ia.md`: "foto de cupom, print de Pix
    e PDF de fatura entram no mesmo nó de domínio e no mesmo schema — nunca um segundo prompt".
    Nenhum schema novo, nenhum campo novo em `FinanceAction`.
+2b. **Instrução fora do envelope, dado dentro.** O texto da notificação vai no `<user_input>` sem
+   nenhuma instrução nossa (o modelo é treinado a tratar o que está lá como dado). "Isto é uma
+   notificação do banco X; fatura fechada, limite e propaganda não são lançamento" vai numa linha
+   confiável que `user_turn` monta de `state["origem"]` — o mesmo lugar do `corrigindo`. Sem
+   `origem`, o turno é idêntico ao de hoje.
 3. **Regex só valida estrutura.** O servidor descarta, sem chamar modelo, a notificação SEM valor
    em reais (`R$ 1` ou `1,23`): movimento de dinheiro sempre tem valor. Quem decide se é compra,
    Pix ou propaganda é o modelo (`agent.md` → *valida estrutura, nunca infere sentido*).
@@ -38,11 +43,17 @@ Data: 12/10/2026. Pedido do dono do produto: *"automatizar o lançamento de um g
 6. **"A confirmar" mora no banco** (`public.captured_notifications`): sobrevive a reinstalar,
    aparece em qualquer aparelho da conta e dá para conciliar. O app só lê e muda o `status`.
 7. **Conciliação reusa a cascata da importação** (`reconcile.conciliar`): o que já está lançado
-   (pelo WhatsApp, por exemplo) entra como `duplicate` com o lançamento achado, fora da Hoje.
+   (pelo WhatsApp, por exemplo) entra como `duplicate` com o lançamento achado, fora da Hoje —
+   inclusive `near_match` e `uncertain` (mesmo valor em poucos dias, nome parecido), porque o nome
+   da notificação ("MERCADO SAO JOSE") quase nunca é o que a pessoa escreveu. Esses vão para
+   "Parecem já lançados", onde ela decide.
+7b. **Capturas não entram no badge da aba nem em `pendentesDaHoje`.** O badge é o que o "Seu dia"
+   tem para resolver (`design.md` §8); o bloco "A confirmar" mostra a própria contagem.
 8. **Cota:** captura não conta no limite MENSAL de mensagens do plano (a pessoa não "mandou
    mensagem"), mas passa pelo consentimento de IA e pela rajada por hora (`check_limits`,
    `kind='capture'`) e grava `ai_events` com `kind='capture'` (custo medido). Teto duro de
-   **60 capturas interpretadas por espaço por dia**. Custo estimado: ~US$ 0,002 por notificação
+   **60 chamadas de modelo de captura por espaço em 24 h** (contadas em `ai_events`, inclusive as
+   que concluíram "não é lançamento"). Custo estimado: ~US$ 0,002 por notificação
    no Haiku.
 9. **Compartilhar não precisa de fila**: a pessoa está com o app na mão. Imagem vai a
    `POST /internal/finance/draft/media`; texto vai ao `/internal/finance/draft` que já existe. O

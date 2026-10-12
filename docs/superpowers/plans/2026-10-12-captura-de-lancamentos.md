@@ -19,7 +19,8 @@
 - Tabela nova: RLS ligada, `revoke all ... from public, anon, authenticated` e grants explícitos, gatilho `a0_exige_assinatura`, publicação `supabase_realtime`.
 - Nenhum schema novo de IA e nenhum campo novo em `FinanceAction`: o intérprete é `nodes.finance_node` + `finance_draft.montar_rascunho`.
 - Regex no agente só valida ESTRUTURA (há valor em reais?), nunca decide se é compra.
-- O texto da notificação é DADO de terceiro: nunca entra em prompt de sistema; vai no turno humano (envelope de `finance_node`).
+- O texto da notificação é DADO de terceiro: vai DENTRO do envelope `<user_input>` e nunca carrega instrução (o modelo é treinado a ignorar instrução ali). O que é instrução ("isto é uma notificação do banco X; fatura fechada não é lançamento") vai FORA do envelope, numa linha confiável que `user_turn` monta a partir de `state["origem"]` — o mesmo lugar do `corrigindo`.
+- Capturas NÃO entram no badge da aba nem em `pendentesDaHoje` (badge é o que o "Seu dia" tem para resolver; `design.md` §8). O bloco "A confirmar" mostra a própria contagem.
 - Commits: uma linha, conventional, **sem** `Co-Authored-By`.
 - `useQuery` vem de `@/lib/consulta-em-foco`, nunca do pacote. `Platform.OS` não entra em `src/app/` (a disponibilidade vem do módulo: `capturaDisponivel()`).
 - Toda rolagem nova declara `keyboardShouldPersistTaps="handled"`; todo `<Sheet>` abre com `<TaskHeader>`; `EmptyState` não compacto entra em `VAZIO_GRANDE_PERMITIDO` com o motivo.
@@ -31,7 +32,7 @@
 
 1. **Notificação que não é lançamento mas tem valor** ("Sua fatura fechou: R$ 1.234,56", "Limite disponível R$ 800,00", "Cashback de R$ 5,00 disponível") não pode virar "a confirmar" de gasto — Task 4 (sonda com modelo real) tem esses casos e exige `nenhum`.
 2. **A mesma compra notificada duas vezes** (o banco reposta a notificação) não pode aparecer duas vezes — Task 5 (dedupe por id no aparelho, janela de 5 min) e Task 2 (`external_id` único).
-3. **A compra que a pessoa JÁ lançou pelo WhatsApp** não aparece na Hoje: vira `duplicate` com o lançamento achado — teste em Task 2.
+3. **A compra que a pessoa JÁ lançou pelo WhatsApp** não aparece na Hoje: vira `duplicate` com o lançamento achado — inclusive quando a descrição difere ("MERCADO SAO JOSE" × "mercado") e só o valor e a data batem (`near_match`/`uncertain` da cascata também viram `duplicate`) — testes em Task 2.
 4. **Sem consentimento de IA, sem assinatura ou na rajada**: o envio não perde notificação (fica no aparelho até dar) e não trava o app — testes em Task 2 (403 e rajada devolvem `aceitos` só do que foi gravado) e em Task 6 (o envio para no primeiro erro sem apagar a fila).
 5. **Notificação de pacote fora da lista** (alguém manda direto à API) é gravada como `ignored` sem chamar modelo, e `com.android.shell` só passa com a flag de teste — teste em Task 2.
 
@@ -275,6 +276,9 @@ git commit -m "feat(db): lançamentos capturados das notificações (captured_no
 - Modify: `agent/app/jobs/importer.py` (extrair `carregar_existentes`, usado pela importação e pela captura)
 - Modify: `agent/app/config.py` (`captura_aceita_teste: bool = False`)
 - Modify: `agent/.env.example` (documentar `CAPTURA_ACEITA_TESTE`)
+- Modify: `agent/app/graph/prompts.py` (`user_turn` ganha `origem: str = ""`, linha confiável FORA do envelope)
+- Modify: `agent/app/graph/nodes.py:~365` (`finance_node` passa `origem=state.get("origem") or ""`)
+- Modify: `agent/app/graph/state.py` (`origem: str | None` no `AgentState`)
 - Create: `agent/app/routes/captures.py`
 - Modify: `agent/app/main.py:136` (incluir o router)
 - Test: `agent/tests/test_captures.py`
@@ -283,9 +287,12 @@ git commit -m "feat(db): lançamentos capturados das notificações (captured_no
 - Consumes: `finance_draft.montar_rascunho(workspace_id, texto, acoes, hoje, forma) -> RascunhoOut`, `finance_draft._CRIA`, `finance_draft._pede_forma`, `finance_draft._fuso_valido`, `nodes.finance_node(estado)`, `conversation.check_limits(sessao, kind=...)`, `db.record_ai_event(..., kind=...)`, `reconcile.conciliar`, `reconcile.Item`.
 - Produces:
   - `importer.carregar_existentes(workspace_id, de: date, ate: date, account_id: str | None) -> list[Existente]`
+  - `prompts.user_turn(..., origem: str = "")` — sem `origem`, a saída é IDÊNTICA à de hoje (o cache das suítes prova).
   - `POST /internal/captures/notifications` body `{timezone: str, items: [{external_id, package, title, text, posted_at}]}` (1..20) → `{aceitos: list[str], novos: int}`. `aceitos` = os `external_id` que o aparelho pode apagar (gravados agora ou já conhecidos).
   - Erros: 403 `ai_consent_required` (nada gravado do que precisava de modelo), 404 `no_workspace`.
-  - `captures.BANCOS: dict[str, str]`, `captures.banco_do_pacote(pacote) -> str | None`, `captures.tem_valor(texto) -> bool`, `captures.frase_da_notificacao(banco, titulo, texto) -> str`, `captures.MAX_POR_DIA = 60`.
+  - `captures.BANCOS: dict[str, str]`, `captures.banco_do_pacote(pacote) -> str | None`, `captures.tem_valor(texto) -> bool`, `captures.origem_da_notificacao(banco) -> str` (a instrução, confiável), `captures.texto_da_notificacao(titulo, texto) -> str` (o dado, envelopado), `captures.MAX_POR_DIA = 60`.
+
+Já conferido ao escrever o plano: `db.reservar_cota` só trata `kind == 'turn'` à parte (nenhuma lista de kinds no SQL além do `ai_events_kind_check`), e `consumo.abrir()` abre um contexto novo a cada `check_limits`, fechado pelo `record_ai_event` — chamar os dois uma vez POR NOTIFICAÇÃO, em sequência, na mesma requisição, é seguro.
 
 - [ ] **Step 1: Extrair `carregar_existentes` sem mudar comportamento**
 
@@ -349,6 +356,28 @@ CAPTURA_ACEITA_TESTE=false
 
 E no `agent/.env` (staging, gitignorado) acrescente `CAPTURA_ACEITA_TESTE=true`.
 
+- [ ] **Step 2b: A origem confiável fora do envelope**
+
+Linha de base ANTES de mexer (sai do cache, custo zero se nada mudou): `cd agent && .venv/bin/python scripts/evaluate_answer_forms.py --secao <a seção de lançamento de gasto; liste com secoes()> --barato`. Anote o resultado.
+
+Teste que falha, em `agent/tests/test_prompts.py` (ou no arquivo de testes de `user_turn` que já existir — `grep -rln "user_turn" agent/tests`):
+
+```python
+from app.graph.prompts import user_turn
+
+
+def test_origem_vai_fora_do_envelope_e_sem_ela_nada_muda():
+    sem = user_turn("Compra de R$ 1,00", "2026-10-12T10:00:00", "America/Sao_Paulo")
+    com = user_turn("Compra de R$ 1,00", "2026-10-12T10:00:00", "America/Sao_Paulo", origem="ORIGEM-X")
+    assert sem == user_turn("Compra de R$ 1,00", "2026-10-12T10:00:00", "America/Sao_Paulo", origem="")
+    assert "ORIGEM-X" in com
+    assert com.index("ORIGEM-X") < com.index("<user_input>")  # fora (antes) do envelope
+```
+
+Em `prompts.user_turn`: parâmetro `origem: str = ""` e, logo depois da linha de data/hora, `if origem: partes.append(origem)` — texto NOSSO, montado pelo código, nunca vindo do usuário. Em `nodes.finance_node` (a chamada de `user_turn` em ~365): `origem=state.get("origem") or ""`. Em `state.py`, `origem: str | None` no `AgentState`.
+
+Depois: `.venv/bin/pytest -q tests/test_prompts.py` (PASS) e a MESMA seção do `evaluate_answer_forms.py` de novo — tem que dar o mesmo resultado (sem `origem` o turno é idêntico, então os casos saem do cache).
+
 - [ ] **Step 3: Escrever os testes que falham**
 
 `agent/tests/test_captures.py`:
@@ -407,6 +436,7 @@ def mundo(monkeypatch):
     async def finance_node(estado):
         v["chamadas"] += 1
         v["ultimo_texto"] = estado["text"]
+        v["ultima_origem"] = estado.get("origem")
         return {"finance_actions": v["acoes"]}
 
     async def montar(ws, texto, acoes, hoje, forma=None):
@@ -473,7 +503,10 @@ def test_compra_vira_pendente_com_rascunho(mundo):
     (linha,) = mundo["gravados"]
     assert "pending" in linha and 4590 in linha
     assert mundo["eventos"][0]["kind"] == "capture"
-    assert "Nubank" in mundo["ultimo_texto"]
+    # a instrução e o banco vão na origem (fora do envelope); o envelope leva só a notificação
+    assert "Nubank" in mundo["ultima_origem"] and "fatura fechada" in mundo["ultima_origem"].lower()
+    assert "Registre" not in mundo["ultimo_texto"]
+    assert "MERCADO SAO JOSE" in mundo["ultimo_texto"]
 
 
 def test_sem_valor_em_reais_nao_chama_modelo(mundo):
@@ -518,6 +551,21 @@ def test_ja_lancado_vira_duplicate_com_o_lancamento(mundo):
     mundo["existentes"] = [Existente(
         id=achado, kind="expense", amount_cents=4590, occurred_at=date(2026, 10, 12),
         description="mercado", merchant=None, account_id=None, counterparty_account_id=None,
+        installment_plan_id=None, installment_no=None, plan_installments=None, rollover=False, previsto=False,
+    )]
+    _envia(_item())
+    linha = mundo["gravados"][0]
+    assert "duplicate" in linha and achado in [str(x) for x in linha]
+
+
+def test_mesmo_valor_com_outro_nome_tambem_vira_duplicate(mundo):
+    # "MERCADO SAO JOSE" na notificação × "pão" lançado pelo WhatsApp um dia antes: a cascata devolve
+    # near_match/uncertain, e isso também sai da Hoje (vai para "Parecem já lançados")
+    achado = str(uuid4())
+    mundo["acoes"] = [{"type": "create_expense", "amount_cents": 4590, "description": "MERCADO SAO JOSE"}]
+    mundo["existentes"] = [Existente(
+        id=achado, kind="expense", amount_cents=4590, occurred_at=date(2026, 10, 11),
+        description="pão", merchant=None, account_id=None, counterparty_account_id=None,
         installment_plan_id=None, installment_no=None, plan_installments=None, rollover=False, previsto=False,
     )]
     _envia(_item())
@@ -658,13 +706,19 @@ def tem_valor(texto: str) -> bool:
     return bool(_VALOR.search(texto))
 
 
-def frase_da_notificacao(banco: str, titulo: str, texto: str) -> str:
-    # Vai no turno humano (envelope de `finance_node`), nunca no prompt de sistema.
+def origem_da_notificacao(banco: str) -> str:
+    """A instrução, CONFIÁVEL: vai fora do envelope (`user_turn(origem=...)`). `banco` vem da allowlist."""
     return (
-        f"Notificação do app do banco {banco}. Registre só se for um gasto, uma compra, um Pix ou uma "
-        "transferência que eu fiz ou recebi. Fatura fechada, limite, saldo, cashback, código, compra "
-        f"negada e propaganda não são lançamento.\n{titulo}\n{texto}"
+        f"O texto do usuário abaixo é uma notificação do app do banco {banco}, copiada do celular — não uma "
+        "mensagem escrita pela pessoa. Crie um lançamento só se ela registrar um gasto, uma compra, um Pix "
+        "ou uma transferência feita ou recebida. Fatura fechada, limite, saldo, cashback, código, compra "
+        "negada e propaganda não são lançamento: nesses casos, nenhuma ação."
     )
+
+
+def texto_da_notificacao(titulo: str, texto: str) -> str:
+    """O DADO: vai dentro do envelope `<user_input>`, sem nenhuma instrução nossa."""
+    return f"{titulo}\n{texto}".strip()
 
 
 async def _gravar(ws, user_id, item: NotificacaoIn, banco: str, status: str, rascunho=None,
@@ -691,7 +745,9 @@ async def _duplicata(ws, kind: str, amount_cents: int, dia: date, descricao: str
         existentes = [replace(t, account_id=None) for t in existentes]
     (v,) = conciliar([Item(0, kind, amount_cents, dia, descricao, None)], existentes,
                      conta_id=conta or "", cartao=False)
-    return v.transaction_id if v.status == "duplicate" else None
+    # O nome da notificação ("MERCADO SAO JOSE") quase nunca é o que a pessoa escreveu ("mercado"):
+    # mesmo valor em poucos dias e nome parecido também saem da Hoje, para ela decidir na lista.
+    return v.transaction_id if v.status in ("duplicate", "near_match", "uncertain") else None
 
 
 async def _interpretar(user_id, ws, item: NotificacaoIn, banco: str, fuso: str):
@@ -702,9 +758,9 @@ async def _interpretar(user_id, ws, item: NotificacaoIn, banco: str, fuso: str):
     if limite:
         raise _Parar(limite)
     local = item.posted_at.astimezone(ZoneInfo(fuso))
-    texto = frase_da_notificacao(banco, item.title, item.text)
-    estado = {"text": texto, "timezone": fuso, "workspace_id": ws, "messages": None,
-              "agora_local": local.replace(tzinfo=None).isoformat(timespec="seconds")}
+    texto = texto_da_notificacao(item.title, item.text)
+    estado = {"text": texto, "origem": origem_da_notificacao(banco), "timezone": fuso, "workspace_id": ws,
+              "messages": None, "agora_local": local.replace(tzinfo=None).isoformat(timespec="seconds")}
     try:
         saida = await nodes.finance_node(estado)
     except Exception:  # noqa: BLE001
@@ -721,7 +777,9 @@ async def _interpretar(user_id, ws, item: NotificacaoIn, banco: str, fuso: str):
         return None, None, local.date()
     forma = (dom_atributos.forma_proposta(acoes[0].get("payment_method"), texto)
              if finance_draft._pede_forma(acoes[0]) else None)
-    rascunho = await finance_draft.montar_rascunho(ws, texto, acoes, local.date(), forma)
+    # O nome do banco entra no texto que `montar_rascunho` casa com as contas cadastradas ("Nubank" →
+    # a conta/cartão Nubank, só se casar com UM registro); ele não vai ao modelo por aqui.
+    rascunho = await finance_draft.montar_rascunho(ws, f"{banco}\n{texto}", acoes, local.date(), forma)
     return rascunho, acoes[0], local.date()
 
 
@@ -737,9 +795,10 @@ async def receber(body: EnvioIn, user_id: Annotated[UUID, Depends(current_user)]
         "select external_id from public.captured_notifications where workspace_id = %s and external_id = any(%s)",
         ws, ids,
     )}
+    # O teto conta CHAMADAS de modelo (custo), inclusive as que concluíram "não é lançamento".
     usados = (await db.fetch_one(
-        """select count(*) as n from public.captured_notifications
-           where workspace_id = %s and created_at > now() - interval '1 day' and status <> 'ignored'""",
+        """select count(*) as n from public.ai_events
+           where workspace_id = %s and kind = 'capture' and created_at > now() - interval '1 day'""",
         ws,
     ) or {"n": 0})["n"]
     aceitos = [e for e in ids if e in conhecidos]
@@ -792,7 +851,7 @@ Expected: PASS em tudo.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add agent/app/routes/captures.py agent/app/main.py agent/app/jobs/importer.py agent/app/config.py agent/.env.example agent/tests/test_captures.py
+git add agent/app/routes/captures.py agent/app/main.py agent/app/jobs/importer.py agent/app/config.py agent/.env.example agent/tests/test_captures.py agent/app/graph/prompts.py agent/app/graph/nodes.py agent/app/graph/state.py agent/tests/test_prompts.py
 git commit -m "feat(agente): interpretar notificações dos bancos como lançamentos a confirmar"
 ```
 
@@ -958,7 +1017,7 @@ O pytest usa dublê e dublê sempre concorda (`workflow.md`, passo 4). O prompt 
 - Create: `agent/scripts/probe_captura_notificacao.py`
 
 **Interfaces:**
-- Consumes: `captures.frase_da_notificacao`, `nodes.finance_node`.
+- Consumes: `captures.origem_da_notificacao`, `captures.texto_da_notificacao`, `nodes.finance_node` (com `state["origem"]`, Task 2 Step 2b). `workspace_id: None` é seguro: `_contas_do_turno` e `_detalhes_do_turno` (`nodes.py:274,303`) devolvem `[]` sem espaço.
 
 - [ ] **Step 1: Escrever a sonda**
 
@@ -979,7 +1038,7 @@ os.environ.setdefault("IA_TABELA", "economica")
 os.environ["LANGFUSE_PUBLIC_KEY"] = ""
 
 from app.graph import nodes  # noqa: E402
-from app.routes.captures import frase_da_notificacao  # noqa: E402
+from app.routes.captures import origem_da_notificacao, texto_da_notificacao  # noqa: E402
 
 # (banco, título, texto, esperado) — esperado: ("expense"|"income", centavos) ou None
 CASOS = [
@@ -1007,8 +1066,9 @@ async def main() -> int:
     print(f"{len(CASOS)} chamadas ao modelo (parse).")
     erros = 0
     for banco, titulo, texto, esperado in CASOS:
-        estado = {"text": frase_da_notificacao(banco, titulo, texto), "timezone": "America/Sao_Paulo",
-                  "workspace_id": None, "messages": None, "agora_local": "2026-10-12T13:05:00"}
+        estado = {"text": texto_da_notificacao(titulo, texto), "origem": origem_da_notificacao(banco),
+                  "timezone": "America/Sao_Paulo", "workspace_id": None, "messages": None,
+                  "agora_local": "2026-10-12T13:05:00"}
         saida = await nodes.finance_node(estado)
         acoes = [a for a in saida.get("finance_actions", []) if a.get("type") in CRIA]
         obtido = None
@@ -1029,7 +1089,9 @@ if __name__ == "__main__":
 - [ ] **Step 2: Rodar**
 
 Run: `cd agent && .venv/bin/python scripts/probe_captura_notificacao.py`
-Expected: `16/16`. Saída 1 = falhou: NÃO mexer no prompt do FINANCE por isso (ele alcança todas as seções da suíte). Ajuste a FRASE de `frase_da_notificacao` (é só da captura), rode a sonda de novo e, se a frase mudar, rode também `pytest -q tests/test_captures.py`. Aceite só com 16/16 em duas rodadas seguidas. Se o modelo responder `429`/`503` (cota), espere e rode de novo — não conte como resultado.
+Expected: `16/16`. Saída 1 = falhou: NÃO mexer no prompt do FINANCE por isso (ele alcança todas as seções da suíte). Ajuste a frase de `origem_da_notificacao` (é só da captura, fora do envelope), rode a sonda de novo e, se a frase mudar, rode também `pytest -q tests/test_captures.py`. Aceite só com 16/16 em duas rodadas seguidas. Se o modelo responder `429`/`503` (cota), espere e rode de novo — não conte como resultado.
+
+Depois, UMA rodada na tabela de PRODUÇÃO (o parse em produção é Claude Haiku, não o Lite das suítes): rode com a variável que seleciona a tabela de produção (`IA_TABELA` sem `economica` — confira o nome do valor em `ia.MODELOS`/`ia.py`). São 16 chamadas no Haiku, centavos de dólar no workspace `staging` da Anthropic. Expected: `16/16` também.
 
 - [ ] **Step 3: Commit**
 
