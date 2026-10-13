@@ -806,6 +806,8 @@ const SEM_SCREEN = new Set([
   'src/app/finance/nova-recorrente.tsx',
   'src/app/finance/novo-financiamento.tsx',
   'src/app/finance/transaction-form.tsx',
+  // Prévia do que chegou pelo Compartilhar: ocupa a tela inteira, sem rolagem, botão no pé.
+  'src/app/compartilhado.tsx',
   // Não é tela: o desvio do link do "Compartilhar" (iOS) antes do roteador.
   'src/app/+native-intent.tsx',
 ]);

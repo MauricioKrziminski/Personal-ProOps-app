@@ -1,15 +1,18 @@
 import { Image } from 'expo-image';
 import { router, useNavigation } from 'expo-router';
+import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useShareIntentContext } from 'expo-share-intent';
 import { useEffect, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AutorizarIa, IA_SEM_CONSENTIMENTO } from '@/components/agent/autorizar-ia';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { Note } from '@/components/ui/note';
-import { Screen } from '@/components/ui/screen';
-import { Radius } from '@/design/tokens';
+import { IOS_26_OU_MAIS } from '@/constants/platform';
+import { Radius, Space } from '@/design/tokens';
+import { useTheme } from '@/hooks/use-theme';
 import { AgentApiError, createFinanceDraft, rascunhoDaImagem } from '@/lib/agent-api';
 import { localISODate } from '@/lib/dates';
 import { hrefDoRascunho } from '@/lib/voice-draft';
@@ -26,6 +29,9 @@ export default function Compartilhado() {
   const [montando, setMontando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [semConsentimento, setSemConsentimento] = useState(false);
+  const theme = useTheme();
+  const alturaDoHeader = useHeaderHeight();
+  const insets = useSafeAreaInsets();
   // O que a tela mostra é o ÚLTIMO compartilhado: o reset da saída não pisca "nada" na transição.
   const [atual, setAtual] = useState(shareIntent);
   if (shareIntent !== atual && (shareIntent.text || shareIntent.files)) setAtual(shareIntent);
@@ -57,24 +63,43 @@ export default function Compartilhado() {
     }
   };
 
-  const proporcao = arquivo?.width && arquivo?.height ? arquivo.width / arquivo.height : 0.6;
+  /*
+    A tela não rola: a prévia ocupa o espaço que sobra e o botão fica embaixo. Sem scroll na raiz,
+    o recuo do header translúcido do iOS 26 é somado à mão (como em `ConversationWorkspace`); com o
+    `Screen`, vindo de outro app pelo Compartilhar, o iOS às vezes não aplicava o recuo e o topo do
+    comprovante ficava debaixo da barra. Uma prévia de altura fixa sobrava vazia embaixo.
+  */
   return (
-    <Screen>
+    <View
+      style={[styles.tela, {
+        backgroundColor: theme.background,
+        paddingTop: (IOS_26_OU_MAIS ? alturaDoHeader : 0) + Space.lg,
+        paddingBottom: insets.bottom + Space.lg,
+        paddingLeft: insets.left + Space.lg,
+        paddingRight: insets.right + Space.lg,
+      }]}>
       {arquivo ? (
-        <Image
-          source={{ uri: arquivo.path }}
-          style={[styles.imagem, { aspectRatio: proporcao }]}
-          contentFit="contain"
-          accessibilityLabel="Imagem compartilhada"
-        />
-      ) : null}
-      {texto && !arquivo ? <ThemedText selectable>{texto}</ThemedText> : null}
-      {nada ? <Note icon="exclamationmark.triangle" tone="warning">Compartilhe uma imagem ou um texto.</Note> : null}
+        <View style={[styles.moldura, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]}>
+          <Image source={{ uri: arquivo.path }} style={styles.imagem} contentFit="contain" accessibilityLabel="Imagem compartilhada" />
+        </View>
+      ) : texto ? (
+        <ScrollView style={[styles.moldura, { backgroundColor: theme.surface, borderColor: theme.cardBorder }]} contentContainerStyle={styles.texto} keyboardShouldPersistTaps="handled">
+          <ThemedText selectable>{texto}</ThemedText>
+        </ScrollView>
+      ) : (
+        <View style={styles.vazio}><Note icon="exclamationmark.triangle" tone="warning">Compartilhe uma imagem ou um texto.</Note></View>
+      )}
       {semConsentimento ? <AutorizarIa aoAutorizar={() => setSemConsentimento(false)} /> : null}
       {erro ? <Note icon="exclamationmark.triangle" tone="danger">{erro}</Note> : null}
-      <Button label="Montar lançamento" loading={montando} disabled={nada || montando} onPress={montar} block />
-    </Screen>
+      <Button label="Montar lançamento" size="lg" loading={montando} disabled={nada || montando} onPress={montar} block />
+    </View>
   );
 }
 
-const styles = StyleSheet.create({ imagem: { width: '100%', maxHeight: 420, alignSelf: 'center', borderRadius: Radius.md, borderCurve: 'continuous' } });
+const styles = StyleSheet.create({
+  tela: { flex: 1, gap: Space.lg },
+  moldura: { flex: 1, borderWidth: 1, borderRadius: Radius.md, borderCurve: 'continuous', overflow: 'hidden' },
+  imagem: { flex: 1, margin: Space.md },
+  texto: { padding: Space.lg },
+  vazio: { flex: 1, justifyContent: 'center' },
+});
