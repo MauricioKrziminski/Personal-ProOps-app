@@ -1,16 +1,29 @@
 # Painel de admin — contrato da API (`/admin/api/*`)
 
-Servido pelo agente. O SPA (`agent/admin-web/`, build copiado para `app/static/admin/` no Docker) fala só com estas rotas.
+Servido por um serviço PRÓPRIO do Cloud Run (`painel` / `painel-staging`, a mesma imagem do agente com
+`SERVICO=admin`), atrás do IAP — `./scripts/setup-gcp.sh painel`. O agente público (`SERVICO=agente`) responde
+**404** em toda rota `/admin*`. O SPA (`agent/admin-web/`, build copiado para `app/static/admin/` no Docker) fala só
+com estas rotas. Guia de operação: `docs/PAINEL-ADMIN.md`.
 
 ## Autenticação
 
+Três camadas, nesta ordem:
+
+1. **IAP**: sem login Google de um e-mail da política do IAP a requisição nem chega ao container (302 para o login
+   do Google; 401 em chamada de API).
+2. **Asserção do IAP** conferida no container (`app/iap.py`, `main._fronteira`): `x-goog-iap-jwt-assertion` ES256 do
+   Google, `aud` = `/projects/<n>/locations/<região>/services/<serviço>`, e-mail em `ADMIN_IAP_EMAILS`. Falhou →
+   **403** `{"error":"forbidden"}`. `ADMIN_EXIGE_IAP=false` só no laptop; no Cloud Run o painel recusa subir sem ela.
+3. **Supabase** (abaixo).
+
 - Toda rota (menos `/admin/api/config`) exige `Authorization: Bearer <JWT do Supabase>`.
-- `ADMIN_USER_IDS` vazio → toda rota `/admin*` responde **404**.
+- `ADMIN_USER_IDS` vazio, ou o processo não é `SERVICO=admin` → toda rota `/admin*` responde **404**.
 - Sem token / token inválido → **401** `{"error":"unauthorized"}`.
 - `sub` fora da lista → **403** `{"error":"forbidden"}`.
 - `ADMIN_REQUIRE_MFA` é **`true` por padrão** (variável ausente ou vazia = ligada; `setup-gcp.sh` RECUSA subir
   produção sem `true`). Ligada e o JWT sem `aal: "aal2"` → **403** `{"error":"mfa_required"}`. O SPA abre o
   fluxo de TOTP do supabase-js (`auth.mfa.enroll/challenge/verify`) e repete. Só o staging e o E2E local passam `false`.
+- A sessão do Supabase no SPA mora no `sessionStorage` (fechou a aba, saiu).
 - Toda escrita grava em `public.admin_audit_events` na MESMA transação.
 - Nenhuma resposta traz conteúdo financeiro (lançamentos, valores, saldos, notas, lembretes): só
   cadastro, assinatura, uso e CONTAGENS.

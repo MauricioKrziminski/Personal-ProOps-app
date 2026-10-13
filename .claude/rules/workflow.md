@@ -112,6 +112,11 @@
   `build-iam`) param e exigem que você digite `PRODUCAO`, ou `PROOPS_PROD_OK=1` — a MESMA saída de
   emergência do hook do Supabase, para não haver duas convenções. `staging` passa direto. Sem isso,
   `./scripts/setup-gcp.sh` sem argumento nenhum fazia deploy em produção sem perguntar nada.
+- **Painel /admin é OUTRO serviço** (`painel`, `painel-staging`, 13/10/2026): `./scripts/setup-gcp.sh painel-staging`
+  (produção: `painel`, com `PROOPS_PROD_OK=1`), DEPOIS do deploy do agente, porque ele reusa a imagem que o agente
+  está servindo. Fica atrás do IAP, e o agente público não tem `/admin`. Guia: `docs/PAINEL-ADMIN.md`. Cada
+  ambiente tem a própria conta de serviço (`agente-runner`, `agente-staging-runner`), com acesso só aos próprios
+  segredos, fila e serviço.
 - Edge Functions: **não existem mais** (09/09/2026). Não há o que deployar; o que era delas é
   rota do agente.
 - App: builds via EAS (`eas.json`: development/preview/staging/distribution/production).

@@ -16,7 +16,7 @@ Pré-requisitos: Docker, `agent/.venv`, Node, `npx playwright install chromium`.
 ## O que sobe
 - **Supabase local** do projeto `proops-e2e` (`scripts/e2e/supabase/config.toml`, via `--workdir`): volume próprio, não toca no `app-proops` nem em remoto. MFA TOTP ligado, template de recuperação com `{{ .Token }}`, Mailpit em `http://127.0.0.1:54324`. As migrations são aplicadas pelo script, uma a uma via `psql` no container (a 0008 pede segredos no Vault; ele os cria), com controle em `public._e2e_migrations`.
 - **Seed**: `scripts/e2e-seed.py` apaga as contas e2e da rodada anterior (`private.apagar_conta`), recria 52 contas pela API admin do GoTrue com **senhas novas** e roda `supabase/seed-e2e.sql` (a tabela de cenários e os números esperados estão no cabeçalho dele e em `agent/admin-web/e2e/seed-data.ts`). Saída: `scripts/e2e/.e2e-config.json` (gitignored; senhas, ids, chaves locais).
-- **Agente** em `127.0.0.1:8095`, com `env -i` (nada do shell nem de `agent/.env`, que é staging), `DATABASE_URL` local, `RATE_LIMIT_PER_MINUTE=0`, WhatsApp com token inválido e `HTTPS_PROXY` morto (o envio falha sem sair do Mac). Serve o SPA buildado copiado para `agent/app/static/admin`.
+- **Dois processos, como no Cloud Run**: o **painel** em `127.0.0.1:8095` (`SERVICO=admin`, `ADMIN_EXIGE_IAP=false`: no laptop não há IAP) e o **agente** em `127.0.0.1:8096` (`SERVICO=agente`: webhook do WhatsApp e `/internal/errors` do app). Os dois com `env -i` (nada do shell nem de `agent/.env`, que é staging), `DATABASE_URL` local, `RATE_LIMIT_PER_MINUTE=0`, WhatsApp com token inválido e `HTTPS_PROXY` morto (o envio falha sem sair do Mac). Serve o SPA buildado copiado para `agent/app/static/admin`.
 - `support.ts` recusa rodar se algum endereço não for localhost.
 
 ## Fases
