@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -9,6 +10,7 @@ import { Radius, Space } from '@/design/tokens';
 import { useReportarResposta } from '@/hooks/use-agent-chat';
 import { useTheme } from '@/hooks/use-theme';
 import type { MotivoDoRelato } from '@/lib/agent-api';
+import { TEXTO_IMAGEM_ENVIADA } from '@/lib/agent-api';
 import { showItemActions } from '@/lib/item-actions';
 
 interface Props {
@@ -17,6 +19,9 @@ interface Props {
   /** Com os dois ids (mensagem do servidor, não `local:`), a resposta ganha o botão de reportar. */
   conversationId?: string;
   messageId?: string;
+  /** A mensagem levou uma imagem. O servidor não a guarda: só há miniatura nesta sessão (`anexoUri`). */
+  temAnexo?: boolean;
+  anexoUri?: string;
 }
 
 /**
@@ -32,7 +37,7 @@ interface Props {
  * Memoizado e recebendo só primitives: a lista rerenderiza a cada tecla do
  * composer, e sem isso toda a conversa remonta a cada letra digitada.
  */
-export const ChatMessage = memo(function ChatMessage({ role, content, conversationId, messageId }: Props) {
+export const ChatMessage = memo(function ChatMessage({ role, content, conversationId, messageId, temAnexo, anexoUri }: Props) {
   const theme = useTheme();
   const meu = role === 'user';
   const reportavel = !meu && !!conversationId && !!messageId && !messageId.startsWith('local:');
@@ -57,6 +62,22 @@ export const ChatMessage = memo(function ChatMessage({ role, content, conversati
             ) : null}
           </View>
         ) : null}
+        {meu && temAnexo ? (
+          anexoUri ? (
+            <Image
+              source={{ uri: anexoUri }}
+              style={styles.miniatura}
+              contentFit="cover"
+              accessibilityLabel="Imagem enviada"
+            />
+          ) : (
+            <View style={styles.selo}>
+              <Icon name="photo" size="sm" color="onBubble" />
+              <ThemedText type="footnote" themeColor="onBubble">Imagem</ThemedText>
+            </View>
+          )
+        ) : null}
+        {meu && temAnexo && content === TEXTO_IMAGEM_ENVIADA ? null : (
         <ThemedText type="default" themeColor={meu ? 'onBubble' : 'text'} selectable>
           {/*
             O motor é compartilhado com o WhatsApp e escreve `*R$ 45,00*`. Sem
@@ -65,6 +86,7 @@ export const ChatMessage = memo(function ChatMessage({ role, content, conversati
           */}
           <ComNegrito texto={content} />
         </ThemedText>
+        )}
       </View>
     </View>
   );
@@ -107,6 +129,8 @@ const styles = StyleSheet.create({
     conversa perde o lado que diz quem falou.
   */
   corpo: { maxWidth: '88%', flexShrink: 1 },
+  miniatura: { width: 160, height: 160, borderRadius: Radius.sm, borderCurve: 'continuous', marginBottom: Space.sm },
+  selo: { flexDirection: 'row', alignItems: 'center', gap: Space.xs, marginBottom: Space.xs },
   cabecalho: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, marginBottom: Space.sm },
   balao: {
     paddingHorizontal: Space.lg,

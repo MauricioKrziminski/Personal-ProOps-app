@@ -85,6 +85,14 @@
       ],
       "expo-image",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Para você enviar fotos de comprovantes ao assistente.",
+          "cameraPermission": "Para fotografar um comprovante e enviar ao assistente.",
+          "microphonePermission": "Permita que o ProOps use o microfone para enviar áudio ao agente."
+        }
+      ],
+      [
         "expo-audio",
         {
           "microphonePermission": "Permita que o ProOps use o microfone para enviar áudio ao agente.",

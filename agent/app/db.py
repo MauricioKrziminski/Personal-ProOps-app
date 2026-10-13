@@ -1365,7 +1365,8 @@ async def chat_prompt_history(session_id: UUID, limit: int = 40) -> list[dict[st
 
 
 async def claim_chat_turn(
-    *, session_id: UUID, user_id: UUID, client_message_id: UUID, content: str
+    *, session_id: UUID, user_id: UUID, client_message_id: UUID, content: str,
+    ui_payload: dict | None = None,
 ) -> dict[str, Any]:
     """Reserva o turno e devolve o que fazer com ele.
 
@@ -1447,11 +1448,12 @@ async def claim_chat_turn(
                 cur = await conn.execute(
                     """
                     insert into public.app_chat_messages
-                      (session_id, client_message_id, role, content, status)
-                    values (%s, %s, 'user', %s, 'processing')
+                      (session_id, client_message_id, role, content, ui_payload, status)
+                    values (%s, %s, 'user', %s, %s, 'processing')
                     returning *
                     """,
-                    (session_id, client_message_id, content),
+                    (session_id, client_message_id, content,
+                     Jsonb(ui_payload) if ui_payload else None),
                 )
             mensagem = (await cur.fetchall())[0]
 

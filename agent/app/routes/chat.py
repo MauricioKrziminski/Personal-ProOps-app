@@ -32,6 +32,7 @@ from fastapi import (
     APIRouter,
     Depends,
     File,
+    Form,
     HTTPException,
     Query,
     Request,
@@ -44,7 +45,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app import app_chat, conversation, db
 from app.auth import current_user
-from app.services import groq
+from app.services import groq, midia_enviada
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/internal/chat", tags=["chat"])
@@ -349,6 +350,7 @@ def _traduz(exc: app_chat.ChatError) -> HTTPException:
 
 Usuario = Annotated[UUID, Depends(current_user)]
 ArquivoAudio = Annotated[UploadFile, File()]
+ArquivoImagem = ArquivoAudio
 
 
 def _formato_audio_valido(extensao: str, audio: bytes) -> bool:
@@ -452,6 +454,53 @@ async def criar(body: NovaConversa, user_id: Usuario) -> TurnOut:
             client_message_id=body.client_message_id,
             content=body.content,
             session_id=body.id,
+        )
+    except app_chat.ChatError as err:
+        raise _traduz(err) from err
+    return TurnOut.de(r)
+
+
+async def _imagem_do_chat(file: UploadFile, content: str | None) -> tuple[dict, str]:
+    """(mídia normalizada, texto a persistir): a legenda, ou o texto fixo quando não há."""
+    legenda = (content or "").strip()
+    if len(legenda) > MAX_CONTENT:
+        raise _erro_audio(422, "caption_too_long", "A legenda é longa demais.")
+    return await midia_enviada.ler_imagem(file), legenda or app_chat.TEXTO_IMAGEM_ENVIADA
+
+
+@router.post("/conversations/media", response_model=TurnOut)
+async def criar_com_imagem(
+    user_id: Usuario,
+    file: ArquivoImagem,
+    client_message_id: Annotated[UUID, Form()],
+    content: Annotated[str | None, Form()] = None,
+    id: Annotated[UUID | None, Form()] = None,
+) -> TurnOut:
+    """Abre a conversa JÁ com uma imagem (e legenda opcional); a imagem nunca é guardada."""
+    midia, texto = await _imagem_do_chat(file, content)
+    try:
+        r = await app_chat.create_conversation(
+            user_id=user_id, client_message_id=client_message_id, content=texto,
+            session_id=id, media=midia,
+        )
+    except app_chat.ChatError as err:
+        raise _traduz(err) from err
+    return TurnOut.de(r)
+
+
+@router.post("/conversations/{session_id}/messages/media", response_model=TurnOut)
+async def enviar_com_imagem(
+    session_id: UUID,
+    user_id: Usuario,
+    file: ArquivoImagem,
+    client_message_id: Annotated[UUID, Form()],
+    content: Annotated[str | None, Form()] = None,
+) -> TurnOut:
+    midia, texto = await _imagem_do_chat(file, content)
+    try:
+        r = await app_chat.send_message(
+            user_id=user_id, session_id=session_id, client_message_id=client_message_id,
+            content=texto, media=midia,
         )
     except app_chat.ChatError as err:
         raise _traduz(err) from err

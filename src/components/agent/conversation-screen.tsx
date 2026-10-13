@@ -7,6 +7,7 @@ import { ActivityIndicator, Alert, Linking, Platform, Pressable, StyleSheet, Vie
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useAnexarImagem } from '@/hooks/use-anexar-imagem';
 import { apagarGravacao, useGravadorDeVoz } from '@/hooks/use-gravador-de-voz';
 import { ChatActions } from '@/components/agent/chat-actions';
 import { AgentChatStart } from '@/components/agent/agent-chat-start';
@@ -42,8 +43,10 @@ import {
   AgentAuthExpiredError,
   type AgentMessage,
   type AgentTurn,
+  TEXTO_IMAGEM_ENVIADA,
   transcribeAudio,
 } from '@/lib/agent-api';
+import { anexoDaMensagem, guardarAnexo } from '@/lib/anexos-locais';
 import {
   abrirConversaNova,
   canSubmitMessage,
@@ -110,6 +113,7 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
   const escuta = useRef<Escuta | null>(null);
   // A gravação com medição é a mesma do "Por voz" do Financeiro (`useGravadorDeVoz`).
   const gravador = useGravadorDeVoz();
+  const anexo = useAnexarImagem();
   useEffect(() => () => { escuta.current?.cancelar(); }, []);
   const [erro, setErro] = useState<AgentApiError | null>(null);
   const [desistiu, setDesistiu] = useState(false);
@@ -218,7 +222,7 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
       setErro(null);
       setDesistiu(false);
       enviar.mutate(
-        { clientMessageId: t.clientMessageId, content: t.content },
+        { clientMessageId: t.clientMessageId, content: t.content, anexoUri: anexoDaMensagem(t.clientMessageId) },
         {
           onSuccess: (resultado: AgentTurn) => {
             // `processing` significa que outro worker já roda ESTE turno. Não há
@@ -365,11 +369,17 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
 
 
   const submeter = useCallback(() => {
-    if (audioPhase.current !== 'idle' || rodando || !canSubmitMessage(texto, { sending: rodando })) return;
-    const conteudo = texto.trim();
+    const imagem = anexo.uri;
+    // Com imagem a legenda é opcional; o servidor grava o mesmo texto fixo.
+    const pode = imagem ? texto.trim().length <= 4_000 : canSubmitMessage(texto, { sending: rodando });
+    if (audioPhase.current !== 'idle' || rodando || !pode) return;
+    const conteudo = texto.trim() || (imagem ? TEXTO_IMAGEM_ENVIADA : '');
     setTexto('');
+    anexo.remover();
     if (conversationId) {
-      disparar(turno.iniciar(conteudo));
+      const t = turno.iniciar(conteudo);
+      if (imagem) guardarAnexo(t.clientMessageId, imagem);
+      disparar(t);
       return;
     }
     // Conversa nova: a tela da conversa abre NO TOQUE, com a mensagem já no
@@ -379,29 +389,37 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
     abrirConversaNova(conteudo, {
       trava,
       gerarId: newClientMessageId,
-      semear: (id, t) =>
-        qc.setQueryData(agentKeys.messages(id), sementeDaConversa(t.clientMessageId, t.content)),
-      enviar: (v) => criar.mutate(v),
+      semear: (id, t) => {
+        if (imagem) guardarAnexo(t.clientMessageId, imagem);
+        qc.setQueryData(agentKeys.messages(id), sementeDaConversa(t.clientMessageId, t.content));
+      },
+      enviar: (v) => criar.mutate({ ...v, anexoUri: imagem ?? undefined }),
       // A raiz da aba precisa continuar na pilha para o Android voltar à
       // conversa nova. A rota /agent/new já ocupa um detalhe e é substituída.
       navegar: (id) => (tabMode ? router.push(conversationRoute(id)) : router.replace(conversationRoute(id))),
     });
-  }, [conversationId, criar, disparar, qc, rodando, tabMode, texto, trava, turno]);
+  }, [anexo, conversationId, criar, disparar, qc, rodando, tabMode, texto, trava, turno]);
 
   const tentarDeNovo = useCallback(() => {
     // O MESMO UUID de antes. Gerar um novo criaria um segundo lançamento do que
     // talvez já tenha rodado no servidor — a idempotência mora nessa chave, e o
     // servidor responde a ela com `recover_turn` em vez de reexecutar.
     if (!emVoo) return;
+    const uri = anexoDaMensagem(emVoo.clientMessageId);
+    if (!uri && ultimaDoUsuario?.ui_payload?.anexo) {
+      // A imagem não é guardada: reabrindo o app, reenviar só o texto mudaria o pedido.
+      toast({ message: 'A imagem não está mais no aparelho. Anexe de novo.', tone: 'error' });
+      return;
+    }
     if (conversationId && retryDoTurno(mensagens) === 'criar') {
       // A criação ainda não voltou do servidor: repete o POST com o MESMO par
       // (id da conversa + cmid). O estado sai do cache, como no primeiro envio.
       setDesistiu(false);
-      criar.mutate({ id: conversationId, clientMessageId: emVoo.clientMessageId, content: emVoo.content });
+      criar.mutate({ id: conversationId, clientMessageId: emVoo.clientMessageId, content: emVoo.content, anexoUri: uri });
       return;
     }
     disparar(emVoo);
-  }, [conversationId, criar, disparar, emVoo, mensagens]);
+  }, [conversationId, criar, disparar, emVoo, mensagens, toast, ultimaDoUsuario]);
 
   // 404 na criação: este id não é uma conversa desta pessoa. Ficar aqui seria
   // uma tela vazia sem saída; volta para o Agente e diz o que houve.
@@ -498,6 +516,7 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
         kind: 'user',
         message: {
           id: `local:${local.clientMessageId}`,
+          client_message_id: local.clientMessageId,
           role: 'user',
           content: local.content,
           status: 'processing',
@@ -643,6 +662,9 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
                 awaitingAction={esperandoAcao}
                 audioState={audioState}
                 onAudioPress={gravarOuTranscrever}
+                anexoUri={anexo.uri}
+                onAttachPress={anexo.escolher}
+                onRemoveAnexo={anexo.remover}
               />
             }
           />
@@ -703,6 +725,9 @@ export function ConversationScreen({ conversationId, initialText = '', title, ta
             awaitingAction={esperandoAcao}
             audioState={audioState}
             onAudioPress={gravarOuTranscrever}
+            anexoUri={anexo.uri}
+            onAttachPress={anexo.escolher}
+            onRemoveAnexo={anexo.remover}
           />
         </>
       )}
@@ -818,6 +843,7 @@ const Linha = memo(function Linha({
   }
 
   const { body, options } = parseUiActions(item.message.ui_payload);
+  const anexoUri = item.kind === 'user' ? anexoDaMensagem(item.message.client_message_id) : undefined;
   return (
     <View style={styles.item}>
       {/*
@@ -830,6 +856,8 @@ const Linha = memo(function Linha({
         content={options.length > 0 && body ? body : item.message.content}
         conversationId={conversationId}
         messageId={item.message.id}
+        temAnexo={item.kind === 'user' && (Boolean(anexoUri) || item.message.ui_payload?.anexo?.tipo === 'imagem')}
+        anexoUri={anexoUri}
       />
       {item.message.ui_payload ? (
         <ChatActions

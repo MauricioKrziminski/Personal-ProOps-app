@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { KeyboardStickyView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +24,10 @@ interface Props {
   /** `listening`: a escuta ao vivo do aparelho escreve no campo; `recording`: grava para a Groq. */
   audioState?: 'idle' | 'starting' | 'recording' | 'listening' | 'transcribing';
   onAudioPress?: () => void;
+  /** Imagem escolhida e ainda não enviada (prévia com X); o texto vira a legenda. */
+  anexoUri?: string | null;
+  onAttachPress?: () => void;
+  onRemoveAnexo?: () => void;
   /** Na entrada da aba, o campo pertence ao conteúdo em vez de virar outra dock. */
   inline?: boolean;
 }
@@ -58,13 +63,20 @@ export function ChatComposer({
   awaitingAction = false,
   audioState = 'idle',
   onAudioPress,
+  anexoUri = null,
+  onAttachPress,
+  onRemoveAnexo,
   inline = false,
 }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
 
   const reservado = insets.bottom;
-  const pode = canSubmitMessage(value, { sending, awaitingAction }) && audioState === 'idle';
+  // Com imagem a legenda é opcional; sem ela só vale texto.
+  const legendaOk = value.trim().length <= MAX_MESSAGE_LENGTH;
+  const pode =
+    (anexoUri ? legendaOk && !sending : canSubmitMessage(value, { sending, awaitingAction })) &&
+    audioState === 'idle';
   const ouvindo = audioState === 'recording' || audioState === 'listening';
   const vidro = supportsLiquidGlass() && pode;
   const restantes = MAX_MESSAGE_LENGTH - value.trim().length;
@@ -95,11 +107,42 @@ export function ChatComposer({
         </ThemedText>
       ) : null}
 
+      {anexoUri ? (
+        <View style={styles.previa}>
+          <Image
+            source={{ uri: anexoUri }}
+            style={[styles.miniatura, { backgroundColor: theme.backgroundElement }]}
+            contentFit="cover"
+            accessibilityLabel="Imagem anexada"
+          />
+          <Pressable
+            onPress={onRemoveAnexo}
+            disabled={sending}
+            hitSlop={Space.md}
+            accessibilityRole="button"
+            accessibilityLabel="Remover imagem"
+            style={[styles.remover, { backgroundColor: theme.tintFill }]}>
+            <Icon name="xmark" size="xs" color="onTint" />
+          </Pressable>
+        </View>
+      ) : null}
+
       <View style={[styles.linha, inline && styles.linhaInline]}>
+        {onAttachPress ? (
+          <Pressable
+            onPress={onAttachPress}
+            disabled={sending}
+            accessibilityRole="button"
+            accessibilityLabel="Anexar imagem"
+            accessibilityState={{ disabled: sending }}
+            style={({ pressed }) => [styles.audio, { backgroundColor: theme.backgroundElement, opacity: pressed ? 0.8 : 1 }]}>
+            <Icon name="paperclip" size={20} color="text" />
+          </Pressable>
+        ) : null}
         <TextField
           value={value}
           onChangeText={onChangeText}
-          placeholder={awaitingAction ? 'Corrija ou complemente aqui' : 'Escreve o que precisa'}
+          placeholder={anexoUri ? 'Legenda (opcional)' : awaitingAction ? 'Corrija ou complemente aqui' : 'Escreve o que precisa'}
           multiline
           // Ouvindo, o texto é da escuta: digitar ao mesmo tempo seria apagado na palavra seguinte.
           editable={audioState !== 'listening'}
@@ -180,6 +223,18 @@ const styles = StyleSheet.create({
   linha: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', flexDirection: 'row', alignItems: 'flex-end', gap: Space.sm },
   linhaInline: { alignItems: 'center' },
   counter: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' },
+  previa: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', paddingTop: Space.xs },
+  miniatura: { width: 72, height: 72, borderRadius: Radius.sm, borderCurve: 'continuous' },
+  remover: {
+    position: 'absolute',
+    top: 0,
+    left: 72 - Space.lg,
+    width: Space.xl,
+    height: Space.xl,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   audio: { width: HitTarget, height: HitTarget, borderRadius: Radius.pill, alignItems: 'center', justifyContent: 'center' },
   campo: {
     flex: 1,

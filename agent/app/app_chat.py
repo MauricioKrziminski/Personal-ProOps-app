@@ -29,6 +29,7 @@ from uuid import UUID
 from app import conversation, db
 from app.graph.build import delete_thread
 from app.security import effective_thread_id
+from app.services import midia_enviada
 
 log = logging.getLogger(__name__)
 
@@ -134,6 +135,10 @@ def _split_reply(resposta: str | dict | None) -> tuple[str, dict | None]:
 # branco não é fallback, é 23514 no meio de um turno que já executou.
 SEM_TEXTO = "…"
 
+# Mensagem do usuário com imagem: a imagem não é guardada, o histórico só sabe que houve uma.
+TEXTO_IMAGEM_ENVIADA = "Imagem enviada"
+ANEXO_IMAGEM = {"anexo": {"tipo": "imagem"}}
+
 
 # ---------------------------------------------------------------------------
 # criar e enviar
@@ -142,7 +147,7 @@ SEM_TEXTO = "…"
 
 async def create_conversation(
     *, user_id: UUID, client_message_id: UUID, content: str,
-    session_id: UUID | None = None,
+    session_id: UUID | None = None, media: dict | None = None,
 ) -> TurnResult:
     """Cria a conversa JÁ com a primeira mensagem dentro.
 
@@ -175,12 +180,13 @@ async def create_conversation(
         session_id=sessao["id"],
         client_message_id=client_message_id,
         content=content,
+        media=media,
     )
 
 
 async def send_message(
     *, user_id: UUID, session_id: UUID, client_message_id: UUID, content: str,
-    clicked_id: str | None = None,
+    clicked_id: str | None = None, media: dict | None = None,
 ) -> TurnResult:
     return await _execute_turn(
         user_id=user_id,
@@ -188,6 +194,7 @@ async def send_message(
         client_message_id=client_message_id,
         content=content,
         clicked_id=clicked_id,
+        media=media,
     )
 
 
@@ -198,6 +205,7 @@ async def _execute_turn(
     client_message_id: UUID,
     content: str,
     clicked_id: str | None = None,
+    media: dict | None = None,
 ) -> TurnResult:
     """O caminho único de todo turno do app: criar, enviar e responder HITL.
 
@@ -205,11 +213,15 @@ async def _execute_turn(
     reservar, checar cota, recuperar, rodar, persistir, soltar — e três cópias
     dela é como uma delas perde o lease ou a recuperação.
     """
+    # Com imagem, `content` é a legenda (ou o texto fixo da rota) e o modelo recebe o
+    # fallback do WhatsApp se não houve legenda. A imagem só vive em `media`: nada a grava.
+    extra = {"ui_payload": ANEXO_IMAGEM} if media else {}
     reivindicado = await repo.claim_chat_turn(
         session_id=session_id,
         user_id=user_id,
         client_message_id=client_message_id,
         content=content,
+        **extra,
     )
     claim = _as_claim(reivindicado)
 
@@ -256,8 +268,9 @@ async def _execute_turn(
                 sessao,
                 source_message_id=origem,
                 conteudo={
-                    "text": content,
-                    "media": None,
+                    "text": content if not media or content != TEXTO_IMAGEM_ENVIADA
+                    else midia_enviada.TEXTO_SEM_LEGENDA,
+                    "media": media,
                     "raw_texts": [content],
                     "clicked_id": clicked_id or "",
                 },

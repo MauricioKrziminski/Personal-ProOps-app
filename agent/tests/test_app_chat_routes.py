@@ -577,3 +577,80 @@ def test_reportar_mensagem_que_nao_e_resposta_desta_pessoa_da_404(cliente, relat
 def test_reportar_corpo_invalido_da_422(cliente, relatos, corpo):
     assert cliente.post(URL_RELATO, json=corpo).status_code == 422
     assert relatos["chamadas"] == []
+
+
+# ---------------------------------------------------------------------------
+# imagem enviada pelo app (multipart)
+# ---------------------------------------------------------------------------
+
+
+def _jpeg():
+    import io
+
+    from PIL import Image
+
+    b = io.BytesIO()
+    Image.new("RGB", (8, 8), "white").save(b, "JPEG")
+    return b.getvalue()
+
+
+def test_mensagem_com_imagem_repassa_a_midia_e_a_legenda(cliente, falso):
+    falso["resultado"] = _turno()
+    cid = uuid4()
+    r = cliente.post(
+        f"/internal/chat/conversations/{SID}/messages/media",
+        files={"file": ("c.jpg", _jpeg(), "image/jpeg")},
+        data={"client_message_id": str(cid), "content": " mercado "},
+    )
+    assert r.status_code == 200
+    nome, kw = falso["chamadas"][-1]
+    assert nome == "send_message"
+    assert kw["user_id"] == USER and kw["session_id"] == SID and kw["client_message_id"] == cid
+    assert kw["content"] == "mercado"
+    assert kw["media"]["mime_type"] == "image/jpeg" and kw["media"]["data_b64"]
+
+
+def test_imagem_sem_legenda_persiste_o_texto_fixo(cliente, falso):
+    falso["resultado"] = _turno()
+    r = cliente.post(
+        "/internal/chat/conversations/media",
+        files={"file": ("c.jpg", _jpeg(), "image/jpeg")},
+        data={"client_message_id": str(uuid4()), "id": str(SID)},
+    )
+    assert r.status_code == 200
+    nome, kw = falso["chamadas"][-1]
+    assert nome == "create_conversation" and kw["content"] == "Imagem enviada"
+    assert kw["session_id"] == SID and kw["media"]
+
+
+def test_imagem_invalida_nao_chega_ao_motor(cliente, falso):
+    for dados, mime, status in [(b"%PDF-1.4", "image/jpeg", 422), (_jpeg(), "application/zip", 415)]:
+        r = cliente.post(
+            f"/internal/chat/conversations/{SID}/messages/media",
+            files={"file": ("c", dados, mime)},
+            data={"client_message_id": str(uuid4())},
+        )
+        assert r.status_code == status
+    assert falso["chamadas"] == []
+
+
+def test_imagem_sem_token_e_401(monkeypatch):
+    app = FastAPI()
+    app.include_router(chat_routes.router)
+    chat_routes.install_error_handlers(app)
+    r = TestClient(app).post(
+        f"/internal/chat/conversations/{SID}/messages/media",
+        files={"file": ("c.jpg", _jpeg(), "image/jpeg")},
+        data={"client_message_id": str(uuid4())},
+    )
+    assert r.status_code == 401
+
+
+def test_imagem_com_limite_estourado_devolve_o_mesmo_erro_do_texto(cliente, falso):
+    falso["erro"] = app_chat.RateLimit("x")
+    r = cliente.post(
+        f"/internal/chat/conversations/{SID}/messages/media",
+        files={"file": ("c.jpg", _jpeg(), "image/jpeg")},
+        data={"client_message_id": str(uuid4())},
+    )
+    assert r.status_code == 429

@@ -11,7 +11,6 @@ por adivinhação.
 
 from __future__ import annotations
 
-import base64
 import logging
 import re
 from calendar import monthrange
@@ -31,7 +30,7 @@ from app.domain.dates import format_date_br
 from app.domain.money import cents_to_brl
 from app.graph import nodes
 from app.graph.state import CHAVE_MIDIA
-from app.services import ia, imagens
+from app.services import ia, midia_enviada
 from app.routes.chat import MAX_CONTENT, Corpo
 from app.routes.chat import _erro_audio as _erro
 from app.tools import finance
@@ -190,20 +189,6 @@ async def montar_rascunho(
     return RascunhoOut(tipo=tipo, params=params, perguntas=perguntas, entendido=entendido)
 
 
-MAX_IMAGEM = 8 * 1024 * 1024  # o mesmo teto da mídia do WhatsApp (`worker.MAX_MEDIA_BYTES`)
-_IMAGENS = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
-
-
-def _assinatura_de_imagem(b: bytes) -> bool:
-    """Estrutura: os bytes são mesmo de uma imagem do tipo aceito (não um PDF com nome de foto)."""
-    return (
-        b.startswith(b"\xff\xd8\xff")
-        or b.startswith(b"\x89PNG\r\n\x1a\n")
-        or (b[:4] == b"RIFF" and b[8:12] == b"WEBP")
-        or (b[4:8] == b"ftyp" and b[8:12] in {b"heic", b"heix", b"mif1", b"msf1", b"heif"})
-    )
-
-
 async def _abrir(user_id):
     """Perfil + cota, igual para fala e imagem: o rascunho é uma mensagem de IA do plano."""
     perfil = await db.chat_profile(user_id)
@@ -229,27 +214,14 @@ async def rascunho_da_imagem(
     today: Annotated[date, Form()],
     timezone: Annotated[str, Form(min_length=1, max_length=64)],
 ) -> RascunhoOut:
-    try:
-        if file.content_type not in _IMAGENS:
-            raise _erro(415, "unsupported_image", "Formato de imagem não aceito.")
-        dados = await file.read(MAX_IMAGEM + 1)
-    finally:
-        await file.close()
-    if len(dados) > MAX_IMAGEM:
-        raise _erro(413, "image_too_large", "A imagem é grande demais. Mande um print.")
-    if not _assinatura_de_imagem(dados):
-        raise _erro(422, "invalid_image", "O arquivo não é uma imagem válida.")
-    try:
-        dados, mime = await imagens.normalizar_em_fila(dados, file.content_type)
-    except imagens.ImagemInvalida:
-        raise _erro(422, "invalid_image", "O arquivo não é uma imagem válida.") from None
+    midia = await midia_enviada.ler_imagem(file)
+    mime = midia["mime_type"]
     perfil = await _abrir(user_id)
     fuso = _fuso_valido(timezone)
     texto = "Extraia o lançamento deste comprovante, cupom ou print de notificação."
     estado = {"text": texto, "timezone": fuso, "workspace_id": perfil["workspace_id"], "messages": None,
               "agora_local": f"{today.isoformat()}T12:00:00", "media": {"mime_type": mime}}
-    config = {"configurable": {CHAVE_MIDIA: {"mime_type": mime,
-                                             "data_b64": base64.b64encode(dados).decode()}}}
+    config = {"configurable": {CHAVE_MIDIA: midia}}
     try:
         saida = await nodes.finance_node(estado, config)
     except Exception:  # noqa: BLE001

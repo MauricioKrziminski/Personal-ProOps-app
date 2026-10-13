@@ -54,6 +54,8 @@ export interface AgentUiPayload {
   body?: string;
   buttons?: string[][];
   rows?: string[][];
+  /** Mensagem do usuário com imagem anexada: a imagem não é guardada, só este selo. */
+  anexo?: { tipo: 'imagem' };
   [key: string]: unknown;
 }
 
@@ -277,6 +279,40 @@ export function createConversation(clientMessageId: string, content: string, id?
   return agentFetch<AgentTurn>('/internal/chat/conversations', {
     method: 'POST',
     body: JSON.stringify({ ...(id ? { id } : {}), client_message_id: clientMessageId, content }),
+  });
+}
+
+/** Texto que o servidor grava quando a imagem vai sem legenda (`app_chat.TEXTO_IMAGEM_ENVIADA`). */
+export const TEXTO_IMAGEM_ENVIADA = 'Imagem enviada';
+
+/** Multipart da mensagem com imagem: o servidor valida o tipo e a assinatura e NÃO guarda o arquivo. */
+function corpoComImagem(uri: string, clientMessageId: string, content: string, id?: string) {
+  const file = new File(uri);
+  if (!file.exists || file.size === 0) {
+    throw new AgentApiError(422, 'invalid_image', 'A imagem chegou vazia. Escolha outra.');
+  }
+  if (file.size > 8 * 1024 * 1024) {
+    throw new AgentApiError(413, 'image_too_large', 'A imagem é grande demais. Escolha outra ou mande um print.');
+  }
+  const body = new FormData();
+  body.append('file', file);
+  body.append('client_message_id', clientMessageId);
+  if (content && content !== TEXTO_IMAGEM_ENVIADA) body.append('content', content);
+  if (id) body.append('id', id);
+  return body;
+}
+
+export function createConversationWithImage(clientMessageId: string, content: string, uri: string, id?: string) {
+  return agentFetch<AgentTurn>('/internal/chat/conversations/media', {
+    method: 'POST',
+    body: corpoComImagem(uri, clientMessageId, content, id),
+  });
+}
+
+export function sendMessageWithImage(id: string, clientMessageId: string, content: string, uri: string) {
+  return agentFetch<AgentTurn>(`/internal/chat/conversations/${id}/messages/media`, {
+    method: 'POST',
+    body: corpoComImagem(uri, clientMessageId, content),
   });
 }
 

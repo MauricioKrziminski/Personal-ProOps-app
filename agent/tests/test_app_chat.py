@@ -93,7 +93,8 @@ class RepoFalso:
             return None
         return s
 
-    async def claim_chat_turn(self, *, session_id, user_id, client_message_id, content):
+    async def claim_chat_turn(self, *, session_id, user_id, client_message_id, content,
+                              ui_payload=None):
         """Ou reserva o turno, ou diz por que não."""
         s = await self.chat_session(session_id, user_id)
         if s is None:
@@ -118,7 +119,8 @@ class RepoFalso:
             ja = {"id": uuid4(), "session_id": session_id,
                   "client_message_id": client_message_id, "role": "user",
                   "content": content, "in_reply_to": None, "status": "processing",
-                  "error_code": None, "ui_payload": None, "sequence": len(self.mensagens)}
+                  "error_code": None, "ui_payload": ui_payload,
+                  "sequence": len(self.mensagens)}
             self.mensagens.append(ja)
         else:
             ja["status"] = "processing"
@@ -1024,3 +1026,66 @@ async def test_sem_consentimento_de_ia_vira_excecao_propria_e_nao_deixa_a_mensag
     assert repo.turnos == [], "o motor não pode rodar sem consentimento"
     assert repo.sessoes[sid]["lease_expires_at"] is None
     assert not any(m["status"] == "processing" for m in repo.mensagens)
+
+
+# ---------------------------------------------------------------------------
+# 14. imagem enviada pelo app
+# ---------------------------------------------------------------------------
+
+MIDIA = {"mime_type": "image/jpeg", "data_b64": "AAAA"}
+
+
+@pytest.mark.asyncio
+async def test_imagem_sem_legenda_vai_ao_motor_e_persiste_texto_fixo(repo):
+    r = await app_chat.create_conversation(
+        user_id=USER, client_message_id=uuid4(),
+        content=app_chat.TEXTO_IMAGEM_ENVIADA, media=MIDIA,
+    )
+    conteudo = repo.turnos[-1]["conteudo"]
+    assert conteudo["media"] == MIDIA, "a mídia não chegou ao run_turn"
+    assert conteudo["text"] == app_chat.midia_enviada.TEXTO_SEM_LEGENDA
+    assert r.user_message["content"] == "Imagem enviada"
+    assert r.user_message["ui_payload"] == {"anexo": {"tipo": "imagem"}}
+    assert "data_b64" not in str(repo.mensagens), "a imagem foi persistida"
+
+
+@pytest.mark.asyncio
+async def test_imagem_com_legenda_usa_a_legenda_como_texto(repo):
+    inicial = await app_chat.create_conversation(
+        user_id=USER, client_message_id=uuid4(), content="oi"
+    )
+    r = await app_chat.send_message(
+        user_id=USER, session_id=inicial.conversation["id"], client_message_id=uuid4(),
+        content="mercado de ontem", media=MIDIA,
+    )
+    assert repo.turnos[-1]["conteudo"]["text"] == "mercado de ontem"
+    assert r.user_message["content"] == "mercado de ontem"
+
+
+@pytest.mark.asyncio
+async def test_imagem_repetida_com_o_mesmo_cmid_nao_roda_o_motor_de_novo(repo):
+    cid = uuid4()
+    for _ in range(2):
+        await app_chat.create_conversation(
+            user_id=USER, client_message_id=cid, content="Imagem enviada", media=MIDIA
+        )
+    assert len(repo.turnos) == 1
+
+
+@pytest.mark.asyncio
+async def test_imagem_respeita_o_limite_antes_do_motor(repo, monkeypatch):
+    inicial = await app_chat.create_conversation(
+        user_id=USER, client_message_id=uuid4(), content="oi"
+    )
+    repo.turnos.clear()
+
+    async def sem_consentimento(sessao):
+        return app_chat.conversation.SEM_CONSENTIMENTO_IA
+
+    monkeypatch.setattr(app_chat.conversation, "check_limits", sem_consentimento)
+    with pytest.raises(app_chat.conversation.ConsentimentoNecessario):
+        await app_chat.send_message(
+            user_id=USER, session_id=inicial.conversation["id"], client_message_id=uuid4(),
+            content="Imagem enviada", media=MIDIA,
+        )
+    assert repo.turnos == []

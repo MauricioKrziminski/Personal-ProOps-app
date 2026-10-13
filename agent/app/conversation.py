@@ -1088,6 +1088,7 @@ async def _audit(sessao: dict, estado: dict, uso: dict | None = None) -> None:
             # o incidente de 23/09/2026 só se provou pela metade daqui
             "resource_actions": estado.get("resource_actions", []),
             "llm_calls": total,
+            **({"media": True} if estado.get("media") else {}),
         },
     )
 

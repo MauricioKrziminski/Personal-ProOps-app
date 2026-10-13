@@ -23,6 +23,7 @@ import {
   type MotivoDoRelato,
   type Page,
   createConversation,
+  createConversationWithImage,
   deleteConversation,
   isAgentConfigured,
   listConversations,
@@ -31,6 +32,7 @@ import {
   reportMessage,
   resolvePending,
   sendMessage,
+  sendMessageWithImage,
 } from '@/lib/agent-api';
 import {
   aplicarTurno,
@@ -190,8 +192,10 @@ export function useCreateAgentConversation() {
     );
   return useMutation({
     retry: false,
-    mutationFn: ({ id, clientMessageId, content }: NovaConversa) =>
-      createConversation(clientMessageId, content, id),
+    mutationFn: ({ id, clientMessageId, content, anexoUri }: NovaConversa) =>
+      anexoUri
+        ? createConversationWithImage(clientMessageId, content, anexoUri, id)
+        : createConversation(clientMessageId, content, id),
     // O retry parte de uma mensagem `failed`: sem isto a tela mostraria a falha
     // antiga, e não "Pensando…", enquanto o novo POST roda.
     onMutate: (v: NovaConversa) => {
@@ -220,6 +224,8 @@ interface NovaConversa {
   id: string;
   clientMessageId: string;
   content: string;
+  /** Imagem local anexada: vai no multipart e nunca é guardada pelo servidor. */
+  anexoUri?: string;
 }
 
 export function useSendAgentMessage(conversationId: string) {
@@ -231,12 +237,18 @@ export function useSendAgentMessage(conversationId: string) {
       clientMessageId,
       content,
       clickedId,
+      anexoUri,
     }: {
       clientMessageId: string;
       content: string;
+      /** Imagem local anexada (rota multipart). */
+      anexoUri?: string;
       /** Clique num botão de rascunho: o id cru vai junto da mensagem. */
       clickedId?: string;
-    }) => sendMessage(conversationId, clientMessageId, content, clickedId),
+    }) =>
+      anexoUri
+        ? sendMessageWithImage(conversationId, clientMessageId, content, anexoUri)
+        : sendMessage(conversationId, clientMessageId, content, clickedId),
     // O "Tentar novamente" reenvia a MESMA mensagem: ela volta a "Pensando…" e o teto de 5 min
     // recomeça AGORA (a tela e a releitura contam do `created_at`). Sem isto, reenviada depois
     // do teto, a tela desistia no instante do reenvio — o mesmo que a criação já fazia.
