@@ -42,23 +42,38 @@ Data: 12/10/2026. Pedido do dono do produto: *"automatizar o lançamento de um g
    quando ela confirmaria de qualquer jeito.
 6. **"A confirmar" mora no banco** (`public.captured_notifications`): sobrevive a reinstalar,
    aparece em qualquer aparelho da conta e dá para conciliar. O app só lê e muda o `status`.
+   **Cada pessoa vê só as PRÓPRIAS capturas** (13/10/2026, decisão do dono do produto): o texto é a
+   notificação do banco de quem a recebeu, e num espaço compartilhado o outro membro não a lê
+   (policy `user_id = auth.uid()` + membro do espaço, migration `20261013130000`). A unicidade
+   continua por ESPAÇO (`workspace_id, external_id`): a mesma notificação de conta conjunta, nos dois
+   celulares, vira UMA captura (a de quem enviou primeiro) — duas virariam dois lançamentos da mesma
+   compra. **Dois aparelhos da mesma pessoa** mandam o mesmo `external_id`: o agente RESERVA a linha
+   (`status = 'processing'`, invisível ao app) antes de chamar o modelo, e o outro envio deixa o item
+   na fila do aparelho até a reserva fechar. Reserva de processo que morreu vence em 10 min.
 7. **Conciliação reusa a cascata da importação** (`reconcile.conciliar`): o que já está lançado
    (pelo WhatsApp, por exemplo) entra como `duplicate` com o lançamento achado, fora da Hoje —
    inclusive `near_match` e `uncertain` (mesmo valor em poucos dias, nome parecido), porque o nome
    da notificação ("MERCADO SAO JOSE") quase nunca é o que a pessoa escreveu. Esses vão para
-   "Parecem já lançados", onde ela decide. O que ela não decidir em **30 dias** vira `discarded`
-   com `texto = null` (o agente varre na próxima captura do espaço): já casou com um lançamento.
+   "Parecem já lançados", onde ela decide. O que ela não decidir em **30 dias** é APAGADO pela
+   retenção diária (`jobs/retencao.py`, no cron de alertas): já casou com um lançamento. A mesma
+   regra apaga a captura resolvida há 30 dias (o rascunho guarda estabelecimento e valor), a de
+   quem saiu do espaço e a reserva abandonada.
 7b. **Capturas não entram no badge da aba nem em `pendentesDaHoje`.** O badge é o que o "Seu dia"
    tem para resolver (`design.md` §8); o bloco "A confirmar" mostra a própria contagem.
 8. **Cota:** captura **exige assinatura ativa** (`plan_status.access = 'subscriber'`, senão 402 e
    a fila fica no aparelho) e o consentimento de IA, mas não conta no limite MENSAL de mensagens
    (a pessoa não "mandou mensagem") nem na rajada por hora do chat — uma fila de fim de semana
    barraria o WhatsApp dela. Grava `ai_events` com `kind='capture'` (custo medido). Teto duro de
-   **60 chamadas de modelo de captura por espaço em 24 h** (contadas em `ai_events`, inclusive as
-   que concluíram "não é lançamento"). Custo estimado: ~US$ 0,002 por notificação
-   no Haiku.
+   **60 chamadas de modelo de captura por espaço em 24 h** (`MAX_CAPTURAS_POR_DIA`, contadas em
+   `ai_events` inclusive as que concluíram "não é lançamento"), conferido DENTRO de
+   `db.reservar_cota`, sob o lock do espaço e contando as reservas em voo: dois aparelhos enviando
+   juntos não passam do teto. Custo estimado: ~US$ 0,002 por notificação no Haiku.
 9. **Compartilhar não precisa de fila**: a pessoa está com o app na mão. Imagem vai a
-   `POST /internal/finance/draft/media`; texto vai ao `/internal/finance/draft` que já existe. O
+   `POST /internal/finance/draft/media`; texto vai ao `/internal/finance/draft` que já existe.
+   **Toda imagem vira JPEG antes do modelo** (`services/imagens.normalizar`, também no WhatsApp):
+   o Claude não aceita HEIC (a foto do iPhone), e sem a conversão a chamada caía na reserva Gemini.
+   A conversão corrige a rotação (EXIF), reduz o maior lado a 2000 px e tira os metadados — inclusive
+   o GPS da foto, que não vai ao provedor de IA. PDF passa intacto. O
    resultado abre `/finance/lancar` preenchido. Conta como mensagem do plano (`kind='turn'`),
    igual à imagem no WhatsApp.
 10. **Biblioteca do Compartilhar:** `expo-share-intent` (autor achorein; SDK 57 → 8.x). No iOS ela
@@ -109,5 +124,5 @@ Teste: `com.android.shell` ("Teste (adb)"), aceito só em `__DEV__` no app e com
 - **Google Play, revisão:** a "prominent disclosure" está em Perfil, Lançar pelas notificações (folha "Antes de
   ativar"), antes de abrir o acesso; só pacotes da allowlist; sem `READ_SMS`.
 - **App Store Connect:** nutrition label com Photos, Financial Info e User Content (App Functionality,
-  vinculados ao usuário, sem tracking); a descrição do app menciona "Compartilhar comprovante ou print para o
+  vinculados ao usuário, sem tracking); a imagem chega ao provedor de IA sem metadados (sem localização); a descrição do app menciona "Compartilhar comprovante ou print para o
   ProOps" (guideline 4.4); a extensão não tem anúncio nem compra.
