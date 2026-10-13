@@ -1,6 +1,6 @@
 # Termos de Uso do ProOps
 
-Vigência: 09/10/2026
+Vigência: 13/10/2026
 
 Estes Termos regem o uso do aplicativo ProOps e do assistente que responde pelo WhatsApp ("Serviço"), oferecido por PROOPS SOLUTIONS LTDA., CNPJ 69.504.283/0001-05, com sede em Rua Major Feliciano, 549, Centro, Machado/MG, CEP 37750-000 ("ProOps", "nós"). Ao criar uma conta ou usar o Serviço, você declara que leu e concorda com estes Termos e com a [Política de Privacidade](/privacidade).
 
@@ -19,7 +19,7 @@ O ProOps é uma ferramenta de organização. **Não é consultoria financeira, d
 
 ## 3. Assistente com inteligência artificial
 
-O assistente usa modelos de inteligência artificial para interpretar suas mensagens, textos transcritos de áudio, imagens e documentos que você enviar. A IA **pode errar** ao interpretar valores, datas, categorias ou intenções.
+O assistente usa modelos de inteligência artificial para interpretar suas mensagens, textos transcritos de áudio, imagens e documentos que você enviar ou compartilhar com o aplicativo e, se você ativar no Android, as notificações dos apps de banco que escolher. Notificação e imagem viram uma sugestão que você confere e confirma. A IA **pode errar** ao interpretar valores, datas, categorias ou intenções.
 
 O uso da IA depende de uma **autorização separada** que você dá no aplicativo (vem desligada por padrão) e pode revogar a qualquer momento em **Perfil → Privacidade e dados**. Sem ela, o assistente fica desligado e o restante do aplicativo continua funcionando. Os provedores de IA estão listados na [Política de Privacidade](/privacidade).
 

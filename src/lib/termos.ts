@@ -1,5 +1,5 @@
-/** Vigência dos Termos e da Política (docs/legal, 09/10/2026). Mudou o texto: muda aqui, e todo mundo aceita de novo. */
-export const TERMOS_VERSAO = '2026-10-09';
+/** Vigência dos Termos e da Política (docs/legal; a Política mudou em 13/10/2026: captura e Compartilhar). Mudou o texto: muda aqui, e todo mundo aceita de novo. */
+export const TERMOS_VERSAO = '2026-10-13';
 
 /** A chave de IA nasce DESLIGADA: consentimento não se presume. */
 export const IA_PADRAO = false;

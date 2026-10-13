@@ -1,6 +1,6 @@
 # Política de Privacidade do ProOps
 
-Vigência: 09/10/2026
+Vigência: 13/10/2026
 
 Esta Política explica como PROOPS SOLUTIONS LTDA., CNPJ 69.504.283/0001-05, com sede em Rua Major Feliciano, 549, Centro, Machado/MG, CEP 37750-000 ("ProOps", "nós"), trata dados pessoais no aplicativo ProOps e no assistente do WhatsApp, em conformidade com a Lei Geral de Proteção de Dados (LGPD, Lei 13.709/2018), o Marco Civil da Internet (Lei 12.965/2014) e o Código de Defesa do Consumidor. Somos a **controladora** dos dados.
 
@@ -14,6 +14,8 @@ Encarregado pelo tratamento de dados (DPO): gestao@proops.com.br.
 - **Mensagens com o assistente:** texto digitado, **áudios** (que são transcritos em texto), fotos de cupons, PDFs de fatura e arquivos de extrato que você enviar ou importar, e o histórico da conversa necessário para o assistente entender o contexto.
 - **Assinatura:** identificador da conta de assinatura, plano, status e datas, recebidos da loja e da plataforma de assinaturas. Não recebemos os dados do seu cartão ou meio de pagamento.
 - **Notificações:** token de notificação push do seu aparelho.
+- **Notificações dos apps de banco (só Android, se você ativar):** o título e o texto das notificações dos apps de banco que você escolher, para sugerir lançamentos "a confirmar". Notificações de outros apps nunca saem do aparelho. Nada é lançado sem você confirmar, e num espaço compartilhado só você vê as suas.
+- **Imagens e textos que você compartilha com o ProOps** (comprovante, print, texto do Pix): usados só para montar a sugestão do lançamento e não guardados. Antes de seguir para o provedor de IA, a imagem é convertida e perde os metadados (como a localização da foto).
 - **Dados técnicos e de uso:** registros de operação (logs) do servidor, contagem de mensagens de IA usadas no período, versão do aplicativo, plataforma (iOS, Android ou web) e data do último acesso, necessárias à entrega de atualizações, ao suporte e à segurança, e registros de erro do aplicativo, do servidor e do painel.
 
 Não coletamos dados sensíveis de propósito. Se você escrever algo sensível em notas ou mensagens, ele será tratado como o restante do seu conteúdo, apenas para prestar o Serviço.
@@ -24,6 +26,7 @@ Não coletamos dados sensíveis de propósito. Se você escrever algo sensível 
 |---|---|
 | Criar e manter a conta, autenticar, entregar o aplicativo e o assistente | Execução de contrato |
 | Interpretar mensagens, transcrever áudio, ler cupons e extratos, responder e registrar o que você pediu | Execução de contrato |
+| Sugerir lançamentos a partir das notificações dos bancos que você escolheu e das imagens e textos que você compartilha | Execução de contrato |
 | Enviar lembretes e avisos (push e WhatsApp) que você configurou | Execução de contrato |
 | Gerir assinatura, limites de uso e cobrança pela loja | Execução de contrato; legítimo interesse |
 | Segurança, prevenção a fraude e abuso, diagnóstico de falhas | Legítimo interesse; prevenção à fraude |
@@ -44,7 +47,7 @@ Usamos operadores (prestadores) que tratam dados em nosso nome, somente para as 
 - **RevenueCat, Apple App Store e Google Play:** gestão e cobrança da assinatura.
 - **Expo:** entrega de notificações push e de atualizações do aplicativo.
 
-Também podemos compartilhar dados com autoridades quando houver ordem legal, e em reorganização societária, com o mesmo nível de proteção. Se você usar um espaço compartilhado do aplicativo (por exemplo, com familiar), os membros do espaço veem os dados daquele espaço.
+Também podemos compartilhar dados com autoridades quando houver ordem legal, e em reorganização societária, com o mesmo nível de proteção. Se você usar um espaço compartilhado do aplicativo (por exemplo, com familiar), os membros do espaço veem os dados daquele espaço — exceto as sugestões vindas das notificações dos bancos, que só quem as recebeu vê.
 
 O aplicativo **não usa rastreadores de terceiros, SDKs de publicidade nem ferramentas de análise comportamental**.
 
@@ -58,6 +61,7 @@ Alguns prestadores (como Anthropic, Google, Groq, Meta, RevenueCat, Expo e Langf
 - **Ao apagar a conta**, apagamos imediatamente do banco de dados o cadastro, o conteúdo, o histórico do assistente (conversas, mensagens recebidas pelo WhatsApp, ações pendentes, estado interno da conversa, avaliações e eventos de uso) e os arquivos anexados. Dos registros de assinatura mantemos apenas a linha de auditoria da cobrança (identificador, tipo, data e resultado), sem o conteúdo do evento.
 - **Cópias de segurança** do banco: diárias por **30 dias** e semanais por **90 dias**; só servem para recuperação de desastres, não são consultadas para outra finalidade e os dados apagados somem delas ao fim desse prazo (até 90 dias).
 - **Enquanto a conta existe**, dados técnicos do assistente são apagados automaticamente: fila de mensagens do WhatsApp processadas, confirmações e rascunhos encerrados, 30 dias; registro de ações executadas e avisos enviados, 90 dias; contagens de uso e de envios, 13 meses (necessárias para limites do plano e custo); comentários de avaliação, 180 dias.
+- **Notificações dos bancos**: o texto fica guardado só enquanto a sugestão espera você decidir, e é apagado quando você confirma ou descarta; a sugestão resolvida é apagada 30 dias depois, assim como a que parece já lançada e ficou 30 dias sem decisão. Ao sair de um espaço compartilhado, as suas sugestões daquele espaço são apagadas.
 - **Registros de erro**: 30 dias. Os agrupamentos de erro são apagados 90 dias depois de resolvidos.
 - **Histórico do WhatsApp:** a fila de mensagens é apagada em 30 dias; ao apagar a conta, o histórico some por completo.
 - **Logs do servidor** (Google Cloud Logging) seguem a retenção padrão do Google Cloud de **30 dias**.
