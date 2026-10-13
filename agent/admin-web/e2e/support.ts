@@ -7,13 +7,13 @@ import { Pool } from "pg";
 
 const RAIZ = path.resolve(import.meta.dirname, "../../..");
 export const CFG = JSON.parse(readFileSync(path.join(RAIZ, "scripts/e2e/.e2e-config.json"), "utf8")) as {
-  apiUrl: string; anonKey: string; serviceKey: string; dbUrl: string; agentUrl: string; mailpitUrl: string; adminIds: string[];
+  apiUrl: string; anonKey: string; serviceKey: string; dbUrl: string; agentUrl: string; panelUrl: string; mailpitUrl: string; adminIds: string[];
   users: Record<string, { id: string; email: string | null; password: string; name: string; phone?: string }>;
 };
 export const U = CFG.users;
 
 // ── guarda: este suite só roda contra localhost ──────────────────────────────────────────────────────────
-for (const url of [CFG.apiUrl, CFG.agentUrl, CFG.dbUrl.replace(/^postgresql:\/\/[^@]*@/, "http://")]) {
+for (const url of [CFG.apiUrl, CFG.agentUrl, CFG.panelUrl, CFG.dbUrl.replace(/^postgresql:\/\/[^@]*@/, "http://")]) {
   if (!/^https?:\/\/(127\.0\.0\.1|localhost)[:/]/.test(url)) throw new Error(`E2E recusado: ${url} não é local`);
 }
 
@@ -54,7 +54,7 @@ export async function token(u: { email: string | null; password: string }): Prom
 }
 export async function adminApi<T = any>(method: string, p: string, body?: unknown, tk?: string): Promise<{ status: number; body: T }> {
   const t = tk ?? (await token(U.admin));
-  const r = await fetch(`${CFG.agentUrl}/admin/api${p}`, { method, headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const r = await fetch(`${CFG.panelUrl}/admin/api${p}`, { method, headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   return { status: r.status, body: (await r.json().catch(() => ({}))) as T };
 }
 

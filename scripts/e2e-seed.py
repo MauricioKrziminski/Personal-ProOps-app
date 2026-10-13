@@ -85,7 +85,7 @@ def main():
 
     cfg = {
         "apiUrl": api, "anonKey": anon, "serviceKey": service, "dbUrl": st["DB_URL"],
-        "agentUrl": "http://127.0.0.1:8095", "mailpitUrl": "http://127.0.0.1:54324",
+        "agentUrl": "http://127.0.0.1:8096", "panelUrl": "http://127.0.0.1:8095", "mailpitUrl": "http://127.0.0.1:54324",
         "adminIds": [users["admin"]["id"], users["admin-mfa"]["id"]], "users": users,
     }
     (WORKDIR / ".e2e-config.json").write_text(json.dumps(cfg, indent=2))

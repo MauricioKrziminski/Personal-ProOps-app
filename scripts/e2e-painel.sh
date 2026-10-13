@@ -18,7 +18,8 @@ RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 E2E="$RAIZ/scripts/e2e"
 WEB="$RAIZ/agent/admin-web"
 RUN="$E2E/run"
-PORTA=8095
+PORTA=8095          # o painel (SERVICO=admin)
+PORTA_AGENTE=8096   # o agente (SERVICO=agente): webhook e /internal/errors
 DB=supabase_db_proops-e2e
 BUILD=1; DOWN=0; UP=0; MFA=false; PW_ARGS=()
 while [ $# -gt 0 ]; do
@@ -70,14 +71,16 @@ python3 "$RAIZ/scripts/e2e-seed.py"
 # ── 5. agente local ─────────────────────────────────────────────────────────────────────────────────────
 cfg() { python3 -c "import json,sys; d=json.load(open('$E2E/.e2e-config.json')); print(eval(sys.argv[1]))" "$1"; }
 derruba_agente() {
-  if [ -f "$RUN/agente.pid" ]; then kill "$(cat "$RUN/agente.pid")" 2>/dev/null || true; fi
-  rm -f "$RUN/agente.pid"
-  lsof -ti "tcp:$PORTA" 2>/dev/null | xargs kill 2>/dev/null || true
+  for nome in agente painel; do
+    if [ -f "$RUN/$nome.pid" ]; then kill "$(cat "$RUN/$nome.pid")" 2>/dev/null || true; fi
+    rm -f "$RUN/$nome.pid"
+  done
+  for p in "$PORTA" "$PORTA_AGENTE"; do lsof -ti "tcp:$p" 2>/dev/null | xargs kill 2>/dev/null || true; done
   sleep 1
 }
-sobe_agente() {  # $1 = ADMIN_REQUIRE_MFA (true|false)
-  derruba_agente
-  mkdir -p "$RUN"
+# Dois processos, como no Cloud Run (13/10/2026): o PAINEL (`SERVICO=admin`, sem IAP no laptop) e o AGENTE
+# (`SERVICO=agente`: webhook, worker, /internal/errors do app). O painel não responde pelas rotas do agente.
+sobe_um() {  # $1 = nome, $2 = porta, $3 = SERVICO, $4 = ADMIN_REQUIRE_MFA
   (
     trap '' HUP
     cd "$RUN" || exit 1
@@ -85,16 +88,23 @@ sobe_agente() {  # $1 = ADMIN_REQUIRE_MFA (true|false)
       NO_PROXY=127.0.0.1,localhost HTTPS_PROXY=http://127.0.0.1:9 HTTP_PROXY=http://127.0.0.1:9 \
       DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
       SUPABASE_URL="$(cfg "d['apiUrl']")" SUPABASE_ANON_KEY="$(cfg "d['anonKey']")" \
-      ADMIN_USER_IDS="$(cfg "','.join(d['adminIds'])")" ADMIN_REQUIRE_MFA="$1" \
+      ADMIN_USER_IDS="$(cfg "','.join(d['adminIds'])")" ADMIN_REQUIRE_MFA="$4" \
+      SERVICO="$3" ADMIN_EXIGE_IAP=false \
       DEBOUNCE_BACKEND=inline WHATSAPP_TOKEN=token-invalido-de-proposito-nao-envia \
       WHATSAPP_APP_SECRET=e2e-app-secret WHATSAPP_PHONE_NUMBER_ID=e2e WHATSAPP_VERIFY_TOKEN=e2e \
       RATE_LIMIT_PER_MINUTE=0 THREAD_SALT=e2e-salt INTERNAL_SECRET=e2e-internal-secret-0123456789 \
       "$RAIZ/agent/.venv/bin/python" -m uvicorn --app-dir "$RAIZ/agent" app.main:app \
-        --host 127.0.0.1 --port "$PORTA" --workers 1
-  ) >"$RUN/agente.log" 2>&1 </dev/null &
-  echo $! >"$RUN/agente.pid"
-  for _ in $(seq 1 60); do curl -fs "http://127.0.0.1:$PORTA/health" >/dev/null 2>&1 && return 0; sleep 1; done
-  echo "agente não subiu; veja $RUN/agente.log" >&2; tail -20 "$RUN/agente.log" >&2; exit 1
+        --host 127.0.0.1 --port "$2" --workers 1
+  ) >"$RUN/$1.log" 2>&1 </dev/null &
+  echo $! >"$RUN/$1.pid"
+  for _ in $(seq 1 60); do curl -fs "http://127.0.0.1:$2/health" >/dev/null 2>&1 && return 0; sleep 1; done
+  echo "$1 não subiu; veja $RUN/$1.log" >&2; tail -20 "$RUN/$1.log" >&2; exit 1
+}
+sobe_agente() {  # $1 = ADMIN_REQUIRE_MFA (true|false)
+  derruba_agente
+  mkdir -p "$RUN"
+  sobe_um painel "$PORTA" admin "$1"
+  sobe_um agente "$PORTA_AGENTE" agente "$1"
 }
 
 if [ "$UP" = 1 ]; then sobe_agente "$MFA"; echo "▸ ambiente de pé (ADMIN_REQUIRE_MFA=$MFA) em http://127.0.0.1:$PORTA/admin/ — rode: cd agent/admin-web && npx playwright test"; exit 0; fi

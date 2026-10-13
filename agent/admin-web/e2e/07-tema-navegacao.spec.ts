@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { adminApi, isMobile, loginAdmin, shot, token, U } from "./support";
 
-const ROTAS: [string, string, string][] = [["/admin/", "Visão geral", "Visão geral"], ["/admin/contas", "Contas", "Contas"], ["/admin/observabilidade", "Observabilidade", "Observabilidade"], ["/admin/auditoria", "Auditoria", "Auditoria"], ["/admin/cobranca", "Cobrança", "Cobrança"], ["/admin/app", "App", "App"], ["/admin/sistema", "Sistema", "Sistema"]];
+const ROTAS: [string, string, string][] = [["/admin/", "Visão geral", "Visão geral"], ["/admin/contas", "Contas", "Contas"], ["/admin/observabilidade", "Observabilidade", "Observabilidade"], ["/admin/auditoria", "Auditoria", "Auditoria"], ["/admin/relatos", "Relatos de IA", "Relatos de IA"], ["/admin/cobranca", "Cobrança", "Cobrança"], ["/admin/app", "App", "App"], ["/admin/sistema", "Sistema", "Sistema"]];
 
 test.describe("Navegação, tema e hardening do SPA", () => {
   test("headers de segurança e theme.js (a CSP proíbe script inline)", async ({ request }) => {
@@ -61,11 +61,11 @@ test.describe("Navegação, tema e hardening do SPA", () => {
     await expect(html).not.toHaveClass(/dark/);
   });
 
-  test("desktop: sidebar com as 7 seções leva a cada página", async ({ page }, info) => {
+  test("desktop: sidebar com as 8 seções leva a cada página", async ({ page }, info) => {
     test.skip(isMobile(info), "só desktop");
     await loginAdmin(page);
     const nav = page.getByRole("navigation", { name: "Seções" }).first();
-    await expect(nav.getByRole("link")).toHaveCount(7);
+    await expect(nav.getByRole("link")).toHaveCount(8);
     for (const [url, rotulo, titulo] of ROTAS) {
       await nav.getByRole("link", { name: rotulo, exact: true }).click();
       await expect(page).toHaveURL(new RegExp(url.replace(/\/$/, "") + "/?$"));
@@ -73,7 +73,7 @@ test.describe("Navegação, tema e hardening do SPA", () => {
     }
   });
 
-  test("celular: 4 abas + Mais (Cobrança, App, Sistema, tema, Sair)", async ({ page }, info) => {
+  test("celular: 4 abas + Mais (Relatos, Cobrança, App, Sistema, tema, Sair)", async ({ page }, info) => {
     test.skip(!isMobile(info), "só celular");
     await loginAdmin(page);
     const nav = page.getByRole("navigation", { name: "Seções" }).last();
@@ -83,7 +83,7 @@ test.describe("Navegação, tema e hardening do SPA", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Observabilidade" })).toBeVisible();
     await nav.getByRole("button", { name: "Mais" }).click();
     const dlg = page.getByRole("dialog");
-    await expect(dlg.getByRole("link")).toHaveCount(3);
+    await expect(dlg.getByRole("link")).toHaveCount(4);
     await shot(page, info, "mobile-mais");
     await dlg.getByRole("link", { name: "Cobrança" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Cobrança" })).toBeVisible();
