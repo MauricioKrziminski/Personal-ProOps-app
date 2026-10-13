@@ -380,7 +380,7 @@ escreve nada que o usuário leia. Mexeu no catálogo ou no prompt → `evaluate_
   nunca um segundo prompt só para imagem. Limite de 8MB e MIME na allowlist (`VISION_MIME` em
   `app/worker.py`). A mídia chega ao Gemini pelo `config["configurable"]` (`CHAVE_MIDIA`) e vira
   parte `file` base64 no turno humano; o download recusa mídia acima de 16 MiB
-  (`MidiaGrandeDemais`) com mensagem à pessoa. Anexo pula o router e vai direto para finanças (é quase sempre cupom/fatura).
+  (`MidiaGrandeDemais`) com mensagem à pessoa. Anexo SEM legenda (ou com legenda só `geral`) passa por UMA leitura da imagem (`LeituraDaImagem`, papel `parse`, uma chamada a mais por turno com imagem) que separa comprovante/fatura (finanças), produto e outro; com legenda de finanças o roteador decide (ver `agent.md`). Sem avaliação com imagem na suíte: a prova é a sonda sintética (Pillow) com modelo real.
 - Importação de extrato (OFX/CSV) tem prompt próprio e enxuto: `ia.classify_statement_lines` manda o lote
   INTEIRO numa chamada e recebe um array na mesma ordem. O índice é o contrato.
 - **Regra do usuário ganha da IA**: `_match_rule` roda depois do parse (WhatsApp) e antes do Gemini

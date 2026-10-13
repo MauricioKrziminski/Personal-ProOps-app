@@ -321,6 +321,16 @@ class FinanceQueryPlan(BaseModel):
     actions: list[FinanceQuery] = Field(default_factory=list, max_length=10)
 
 
+class LeituraDaImagem(BaseModel):
+    """O que a imagem anexada É (route, turno com mídia)."""
+
+    tipo: Literal["comprovante_cupom", "fatura_boleto", "produto", "outro"]
+    o_que: str = Field(default="", description="Nome curto do produto ou do documento, até 80 caracteres.")
+    preco_cents: int | None = Field(None, description="Preço do produto em centavos, só se estiver legível.")
+    parcelas: int | None = Field(None, description="Parcelas anunciadas ('em até 10x'), só se legível.")
+    valor_parcela_cents: int | None = Field(None, description="Valor de cada parcela anunciada, em centavos.")
+
+
 class NotesActionType(str, Enum):
     CREATE_NOTE = "create_note"
     APPEND_NOTE = "append_note"

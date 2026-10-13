@@ -58,6 +58,27 @@ O serviço que recebe do WhatsApp, decide e escreve. Substituiu o par
   (staging, 13/10/2026). Filtro que a linha não satisfaz ("esse gasto do mercado" com o café no
   antecedente) segue a consulta normal; valor e forma de pagamento ainda bloqueiam. O padrão só escolhe entre duas leituras e nunca vira
   porta de entrada que esconda ação; número nunca sai do modelo.
+- **Imagem anexada tem três caminhos** (13/10/2026; antes todo anexo ia direto a finanças, e print de
+  produto + "consigo em 10x?" virava proposta de REGISTRAR). `route` com mídia: legenda que não é
+  saudação passa pelo roteador como qualquer texto (prompt dele intacto); sem legenda
+  (`sem_legenda`, igualdade com `midia_enviada.TEXTO_SEM_LEGENDA`, a marca única das duas bordas) ou
+  com o roteador só em `geral` ("almoço" + comprovante) roda UMA leitura da imagem (`LeituraDaImagem`,
+  papel `parse`, `no="leitura_da_imagem"`): `comprovante_cupom`/`fatura_boleto` → finanças como sempre;
+  `produto` → `geral` com a leitura no estado (`leitura_da_imagem`) e `general_node` responde por
+  TEMPLATE ("📸 Vi *X* por R$ … no total (ou 10x de R$ …)" + a pergunta: ver se cabe ou lançar), todo
+  dinheiro por `cents_to_brl` e o nome (texto de terceiro) cortado e sem marcação; `outro` → template
+  curto. Sem os bytes, ou leitura fora do ar, vale o de antes (finanças). Texto de saudação com mídia
+  também vai à leitura ("oi" + comprovante já perdia a imagem). **`finance_query_node` recebe a imagem**
+  (mesma `_turno_humano`, `tem_anexo`) com uma linha NOSSA em `origem` dizendo que preço e parcelas
+  estão nela e que o total é o preço, não dígitos de números diferentes; e o turno SEGUINTE ao template
+  ("vê se cabe em 10x", sem imagem) recebe a linha irmã quando a última resposta começa com "📸 Vi *"
+  (medido no Haiku: sem ela, 329.990 em 3 de 4 rodadas; com ela, 329.900 em 6 de 6). O `FINANCE_QUERY`
+  estático não mudou. **O exemplo do template é "posso comprar em 10x no cartão?", não "cabe…"**: o roteador
+  lê "cabe" como plano de metas (cadastros). Custo novo: turno só com imagem passa a 2 chamadas (leitura +
+  domínio) e com legenda de produto/geral a 2–3. `simulate_scenario` com cartão CITADO que resolve
+  para UM cartão acrescenta o limite (`queries._linha_do_limite`, `card_limit_context` lido
+  `sob_rls` do dono + join em `accounts` por `workspace_id`; `not_set`, `needs_review`, zero/negativo e
+  positivo são frases diferentes e ausência nunca vira R$ 0,00); sem cartão citado ou ambíguo, sem linha.
 - **Teto MEDIDO do schema: o PRODUTO propriedades × valores de enum, não cada um.** O
   `FinanceAction` está em **308** (22×14, soma 36; teto medido de 720 no Lite em 06/10/2026, ver
   `ia.md`); os outros seguem em 198/31. Passar disso devolve `400 INVALID_ARGUMENT` sem detalhe. `tests/test_schemas.py` prende o limite — somar campo
@@ -501,7 +522,7 @@ garantia sozinho virou responsabilidade do código:
   contra `BREAK_EVEN_CHAMADAS_DIA`; quando uma versão passar dele, reavalie.
 - Router + domínio são **duas** chamadas por mensagem, também no turno que cria lançamento (os atributos saem do
   parse principal, sem terceira chamada) — e a cota grátis do Flash-Lite é 500/dia.
-  Os fast-paths determinísticos — saudação, resposta SIM/NÃO, documento anexo — existem para
+  Os fast-paths determinísticos — saudação, resposta SIM/NÃO — existem para
   devolver parte disso.
 - **Comprovante de Pix leva o NOME do perfil** (`_titular_do_turno`, só em turno com anexo, nos três
   canais: WhatsApp, chat e Compartilhar). O comprovante mostra origem E destino, e sem saber quem

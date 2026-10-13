@@ -13,6 +13,7 @@ extra de custo.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import date
 from uuid import UUID
 
@@ -35,6 +36,8 @@ from app.graph.schemas import FinanceQuery, FinanceQueryType
 from app.jobs.scheduler import HORIZON_DAYS
 from app.tools import lote_d
 from app.tools.base import ExecContext, ToolResult
+
+log = logging.getLogger(__name__)
 
 KIND_EMOJI = {"expense": "💸", "income": "💰"}
 
@@ -746,12 +749,61 @@ async def simulate_scenario(ctx: ExecContext, action: FinanceQuery) -> ToolResul
         if negativo
         else "✅ Você não fica no vermelho nesse período."
     )
+    limite = await _linha_do_limite(ctx, action, rascunhos[0])
     return ToolResult(
         f"🔮 Simulando:\n{hipoteses}\n\n{veredito}\n"
         f"  Saldo em {format_date_br(fim['day'])}: *{cents_to_brl(fim['balance_cents'])}*\n"
-        f"  _Nada disso foi salvo._",
+        + (f"{limite}\n" if limite else "")
+        + "  _Nada disso foi salvo._",
         read_only=True,
     )
+
+
+async def _linha_do_limite(ctx: ExecContext, action: FinanceQuery, hipotese: dict) -> str:
+    """Quanto da compra o LIMITE do cartão citado aguenta, ou `""` (cartão não citado, ambíguo, inexistente).
+
+    A régua é a do app, `public.card_limit_context` (F03): quatro estados que não se misturam —
+    sem limite cadastrado, a revisar (dado legado incompleto: nenhum número), zero/negativo e
+    positivo. Ausência nunca vira R$ 0,00. A função é `invoker` sobre `auth.uid()`, então a leitura
+    roda `sob_rls` do dono; o filtro por `workspace_id` vem do join com `accounts`.
+    Só a primeira hipótese (a mesma que a tela abre) e só compra: receita ou recorrente não gasta limite.
+    """
+    from app.tools.finance import resolve_account
+
+    if not action.account or hipotese["kind"] != "expense" or hipotese["mode"] != "total":
+        return ""
+    cartao = await resolve_account(ctx.workspace_id, action.account, only_cards=True)
+    if not cartao:
+        return ""
+    sql = (
+        "select a.name, c.credit_limit_cents, c.available_limit_cents, c.limit_status "
+        "from public.card_limit_context() c join public.accounts a on a.id = c.account_id "
+        "where c.account_id = %s and a.workspace_id = %s"
+    )
+    try:
+        if db.rls_ativo():
+            linha = await db.fetch_one(sql, cartao, ctx.workspace_id)
+        else:
+            async with db.unidade_de_trabalho():
+                async with db.sob_rls(ctx.user_id):
+                    linha = await db.fetch_one(sql, cartao, ctx.workspace_id)
+    except Exception:  # noqa: BLE001 — a simulação responde sem a linha do limite
+        log.warning("não consegui ler o limite do cartão; a simulação segue sem ele", exc_info=True)
+        return ""
+    if not linha:
+        return ""
+    nome, total = linha["name"], hipotese["amount_cents"]
+    estado, disponivel = linha["limit_status"], linha["available_limit_cents"]
+    if estado == "not_set" or linha["credit_limit_cents"] is None:
+        return f"  💳 {nome} está sem limite cadastrado: não sei dizer se a compra cabe nele."
+    if estado != "available" or disponivel is None:
+        return (f"  💳 O limite disponível de {nome} precisa de revisão no app (há lançamentos que não "
+                "consigo encaixar nas faturas), então não afirmo se a compra cabe.")
+    disponivel = int(disponivel)
+    if disponivel >= total:
+        return f"  💳 Limite disponível em {nome}: {cents_to_brl(disponivel)}. A compra de {cents_to_brl(total)} cabe."
+    return (f"  💳 Limite disponível em {nome}: {cents_to_brl(disponivel)}. A compra de "
+            f"{cents_to_brl(total)} NÃO cabe (faltam {cents_to_brl(total - disponivel)}).")
 
 
 async def query_recurring(ctx: ExecContext, action: FinanceQuery) -> ToolResult:

@@ -26,7 +26,7 @@ import time
 from app import conversation, db, logctx
 from app.config import get_settings
 from app.security import sanitize_untrusted
-from app.services import groq, imagens, observabilidade, tasks, whatsapp
+from app.services import groq, imagens, midia_enviada, observabilidade, tasks, whatsapp
 
 log = logging.getLogger(__name__)
 
@@ -372,7 +372,7 @@ async def _extract_batch(lote: list[dict]) -> dict | None:
 
     texto = sanitize_untrusted("\n".join(textos))
     if media and not texto:
-        texto = "Extraia os lançamentos deste documento (cupom, comprovante ou fatura)."
+        texto = midia_enviada.TEXTO_SEM_LEGENDA
     return {"text": texto, "media": media, "raw_texts": textos, "clicked_id": clicked_id}
 
 

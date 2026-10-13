@@ -156,6 +156,10 @@ class AgentState(TypedDict, total=False):
     # montada pelo código, que `user_turn` põe fora do envelope. Nunca vem do usuário.
     origem: str | None
 
+    # O que a imagem do turno É (`LeituraDaImagem.model_dump()`), quando o roteador a leu e não era
+    # comprovante nem fatura: `general_node` responde por template. None nos outros turnos.
+    leitura_da_imagem: dict | None
+
     # execução
     revision_pending: bool  # Persist revised proposal before asking for approval.
     approved: bool
