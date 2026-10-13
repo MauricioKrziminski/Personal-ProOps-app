@@ -240,6 +240,16 @@ Ele foi removido (`update_transaction`, `agent/app/tools/finance.py`); dar baixa
   à vista"; com outra correção junto ele é ruído e a correção segue. Desparcelar com conta
   nova ("foi à vista no débito do Nubank") grava a conta no lançamento que sobra.
 
+## Notas em lista (13/10/2026)
+
+*"Ele tem que formatar perfeitamente em todos esses casos"*. O `NOTES` escreve a forma que
+`src/lib/note-blocks.ts` desenha: comprar/levar/fazer é SEMPRE `- [ ]`; ideia, filme, nome é
+`- `; ordem é `1.`; o rótulo dito ("Mercado:", "ideias pro app:") vira `# ` (o editor o promove a
+título); vírgula, "•" e "1)" do WhatsApp viram um item por linha com o nosso marcador.
+Acrescentar segue o marcador que a nota JÁ tem (`notes.no_estilo_da_nota`: checklist continua
+checklist, numerada continua a contagem) — o modelo não vê a nota. Casos em
+`evaluate_answer_forms.py --secao "formato da lista"`.
+
 ## Human-In-The-Loop
 
 - **Toda escrita pede SIM** (21/09/2026, decisão do dono do produto: *"toda escrita pede SIM"*).
