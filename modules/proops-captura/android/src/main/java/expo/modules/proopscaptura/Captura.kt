@@ -19,6 +19,12 @@ object Captura {
   // ponytail: teto da fila local; passou disso, as mais antigas saem (o app ficou semanas fechado)
   private const val MAX_PENDENTES = 200
 
+  /** `take` pode partir um par substituto (emoji) ao meio, e o JSON inválido travaria a fila inteira. */
+  private fun String.cortar(n: Int): String {
+    val t = take(n)
+    return if (t.isNotEmpty() && t.length == n && t.last().isHighSurrogate()) t.dropLast(1) else t
+  }
+
   private fun prefs(ctx: Context): SharedPreferences = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
   fun ativa(ctx: Context): Boolean = prefs(ctx).getBoolean("ativa", false)
   fun pacotes(ctx: Context): Set<String> = prefs(ctx).getStringSet("pacotes", emptySet()) ?: emptySet()
@@ -37,9 +43,9 @@ object Captura {
     val n = sbn.notification ?: return
     if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
     val ex = n.extras ?: return
-    val titulo = ex.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty().take(200)
+    val titulo = ex.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty().cortar(200)
     val texto = (ex.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: ex.getCharSequence(Notification.EXTRA_TEXT))
-      ?.toString().orEmpty().take(1000)
+      ?.toString().orEmpty().cortar(1000)
     if (texto.isBlank()) return
     // ponytail: a mesma notificação reposta em até 5 min é uma só; duas compras idênticas na mesma
     // janela também viram uma (raro; a pessoa lança a segunda à mão)
