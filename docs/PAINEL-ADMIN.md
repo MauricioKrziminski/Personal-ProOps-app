@@ -54,16 +54,21 @@ próprio, e o Google **não deixa criar cliente OAuth por linha de comando**. No
    `https://iap.googleapis.com/v1/oauth/clientIds/<CLIENT_ID>:handleRedirect`
 4. Guarde o **Client secret** no seu gerenciador de senhas (não vai para o repositório nem para o `.env`).
 
-Depois, aplique nos dois painéis (o mesmo cliente serve os dois; o script o grava nas configurações do IAP):
+Depois, aplique UMA vez, para a região inteira (os dois painéis herdam; o Google não devolve o segredo, só o hash,
+então depois disso o JSON baixado pode ser apagado — se um dia precisar de novo, gere outro segredo no console):
 
 ```bash
-read -r -p "Client ID: " IAP_OAUTH_CLIENT_ID
-read -r -s -p "Client secret: " IAP_OAUTH_CLIENT_SECRET; echo   # -s: não aparece nem vai para o histórico
-export IAP_OAUTH_CLIENT_ID IAP_OAUTH_CLIENT_SECRET
-CLOUDSDK_CORE_ACCOUNT=gestao.proops@gmail.com ./scripts/setup-gcp.sh painel-staging </dev/null
-CLOUDSDK_CORE_ACCOUNT=gestao.proops@gmail.com PROOPS_PROD_OK=1 ./scripts/setup-gcp.sh painel </dev/null
+ARQ="$(ls -t ~/Downloads/client_secret_*.json | head -1)"
+export IAP_OAUTH_CLIENT_ID="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["web"]["client_id"])' "$ARQ")"
+export IAP_OAUTH_CLIENT_SECRET="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["web"]["client_secret"])' "$ARQ")"
+CLOUDSDK_CORE_ACCOUNT=gestao.proops@gmail.com PROOPS_PROD_OK=1 ./scripts/setup-gcp.sh iap-oauth </dev/null
 unset IAP_OAUTH_CLIENT_ID IAP_OAUTH_CLIENT_SECRET
+rm "$ARQ"
 ```
+
+A "dica de conta" do IAP (abrir já com o e-mail escolhido) não serve aqui: ela só aceita domínio do Google
+Workspace ("Invalid hosted domain" com Gmail). A tela de escolher conta é conforto, não segurança; um perfil do
+Chrome só com `gestao.proops@gmail.com` a evita.
 
 ## Subir e atualizar
 

@@ -12,6 +12,7 @@
 #   ./scripts/setup-gcp.sh painel       # painel /admin de PRODUÇÃO: serviço próprio, atrás do IAP
 #   ./scripts/setup-gcp.sh painel-staging  # o mesmo, para o staging
 #   ./scripts/setup-gcp.sh sa           # contas de serviço e permissões mínimas do ambiente
+#   ./scripts/setup-gcp.sh iap-oauth    # cliente OAuth do IAP para os dois painéis (uma vez; docs/PAINEL-ADMIN.md)
 #   ./scripts/setup-gcp.sh secrets      # só (re)grava os segredos
 #   ./scripts/setup-gcp.sh backup       # backup diário do banco de PRODUÇÃO (bucket + Cloud Run Job + Scheduler)
 #   ./scripts/setup-gcp.sh backup-staging  # o mesmo, para o banco de staging (docs/BACKUP.md)
@@ -556,6 +557,25 @@ deploy() {
 # A imagem é a MESMA do agente (o que estiver servindo agora): rode depois de `deploy`/`staging`.
 # Domínio próprio: a região não tem domain mapping; o caminho seria um load balancer (custo fixo
 # mensal), que não convive com o IAP direto. Fica na URL do run.app, que o IAP já protege.
+# Cliente OAuth próprio do IAP, na REGIÃO (todo serviço do Cloud Run com IAP em $REGION herda: os dois
+# painéis). Uma vez só: o segredo não volta do Google (só o hash), e o JSON baixado pode ser apagado depois.
+# Lê IAP_OAUTH_CLIENT_ID / IAP_OAUTH_CLIENT_SECRET do shell (docs/PAINEL-ADMIN.md); nunca de arquivo do repo.
+iap_oauth() {
+  [[ -n "${IAP_OAUTH_CLIENT_ID:-}" && -n "${IAP_OAUTH_CLIENT_SECRET:-}" ]] \
+    || { err "IAP_OAUTH_CLIENT_ID e IAP_OAUTH_CLIENT_SECRET no ambiente do shell (docs/PAINEL-ADMIN.md)"; exit 1; }
+  gcloud services enable iap.googleapis.com --project "$PROJECT_ID" >/dev/null
+  local cfg; cfg="$(mktemp)"
+  chmod 600 "$cfg"
+  # o arquivo tem o segredo: sai do disco mesmo se o gcloud falhar (set -e)
+  trap 'rm -f "$cfg"' EXIT
+  printf 'accessSettings:\n  oauthSettings:\n    clientId: %s\n    clientSecret: %s\n' \
+    "$IAP_OAUTH_CLIENT_ID" "$IAP_OAUTH_CLIENT_SECRET" > "$cfg"
+  gcloud iap settings set "$cfg" --resource-type=cloud-run --region="$REGION" \
+    --project "$PROJECT_ID" --quiet >/dev/null
+  rm -f "$cfg"; trap - EXIT
+  ok "cliente OAuth próprio aplicado ao IAP de todo o Cloud Run em $REGION (os dois painéis)"
+}
+
 painel() {
   log "Painel: $PAINEL_SERVICE (IAP)"
   local numero imagem anon supabase_url admin_ids emails mfa audiencia
@@ -639,20 +659,9 @@ painel() {
   done
   ok "IAP: entra só ${emails}"
 
-  # Conta Google FORA da organização (Gmail) exige um cliente OAuth próprio no IAP, que o Google só
-  # deixa criar pelo console (docs/PAINEL-ADMIN.md). Com o id e o segredo no ambiente do shell, aplica.
-  if [[ -n "${IAP_OAUTH_CLIENT_ID:-}" && -n "${IAP_OAUTH_CLIENT_SECRET:-}" ]]; then
-    local cfg; cfg="$(mktemp)"
-    chmod 600 "$cfg"
-    # o arquivo tem o segredo: sai do disco mesmo se o gcloud falhar (set -e)
-    trap 'rm -f "$cfg"' EXIT
-    printf 'accessSettings:\n  oauthSettings:\n    clientId: %s\n    clientSecret: %s\n' \
-      "$IAP_OAUTH_CLIENT_ID" "$IAP_OAUTH_CLIENT_SECRET" > "$cfg"
-    gcloud iap settings set "$cfg" --resource-type=cloud-run --service="$PAINEL_SERVICE" \
-      --region="$REGION" --project "$PROJECT_ID" --quiet >/dev/null
-    rm -f "$cfg"; trap - EXIT
-    ok "cliente OAuth próprio aplicado ao IAP"
-  fi
+  # Conta Google FORA da organização (Gmail) exige um cliente OAuth próprio no IAP (`iap_oauth`). Ele vale
+  # para a REGIÃO inteira, então este painel o herda se já foi aplicado; com as variáveis no shell, aplica.
+  if [[ -n "${IAP_OAUTH_CLIENT_ID:-}" && -n "${IAP_OAUTH_CLIENT_SECRET:-}" ]]; then iap_oauth; fi
 
   local url
   url="$(gcloud run services describe "$PAINEL_SERVICE" --region "$REGION" --project "$PROJECT_ID" --format='value(status.url)')"
@@ -926,6 +935,7 @@ main() {
     # repontaria os crons de PRODUÇÃO para a URL de staging, em silêncio.
     staging) criar_projeto; gravar_segredos; criar_sa; criar_fila; deploy; restringir_sa; acompanhar_painel ;;
     painel|painel-staging) criar_projeto; painel ;;
+    iap-oauth) criar_projeto; iap_oauth ;;
     preflight) preflight ;;
     alertas) criar_projeto; criar_alertas ;;
     backup|backup-staging) criar_projeto; criar_sa; criar_backup ;;
@@ -948,7 +958,7 @@ main() {
       criar_backup
       log "Pronto. Aponte o webhook da Meta para a URL acima."
       ;;
-    *) echo "uso: $0 [tudo|deploy|staging|painel|painel-staging|secrets|preflight|build-iam|sa|sa-staging|alertas|retencao|backup|backup-staging]" >&2; exit 1 ;;
+    *) echo "uso: $0 [tudo|deploy|staging|painel|painel-staging|iap-oauth|secrets|preflight|build-iam|sa|sa-staging|alertas|retencao|backup|backup-staging]" >&2; exit 1 ;;
   esac
 }
 # ── Trava de produção ──────────────────────────────────────────────────────
@@ -965,7 +975,7 @@ prod_gate() {
   # de STAGING nos segredos de PRODUÇÃO, sem prompt. Gate por subcomando é mais
   # estrito e é uma linha a menos.
   case "$cmd" in
-    tudo|deploy|secrets|sa|build-iam|alertas|retencao|backup|painel) ;;   # escrevem em produção
+    tudo|deploy|secrets|sa|build-iam|alertas|retencao|backup|painel|iap-oauth) ;;   # escrevem em produção
     *) return 0 ;;                         # staging, preflight: passam direto
   esac
 
