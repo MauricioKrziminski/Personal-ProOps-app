@@ -220,6 +220,7 @@ async def rascunho_da_imagem(
     fuso = _fuso_valido(timezone)
     texto = "Extraia o lançamento deste comprovante, cupom ou print de notificação."
     estado = {"text": texto, "timezone": fuso, "workspace_id": perfil["workspace_id"], "messages": None,
+              "user_id": str(user_id),
               "agora_local": f"{today.isoformat()}T12:00:00", "media": {"mime_type": mime}}
     config = {"configurable": {CHAVE_MIDIA: midia}}
     try:

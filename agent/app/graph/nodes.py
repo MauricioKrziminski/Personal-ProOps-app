@@ -313,6 +313,20 @@ async def _contas_do_turno(state: AgentState) -> list[dict]:
         return []
 
 
+async def _titular_do_turno(state: AgentState) -> str:
+    """O nome do perfil, para o comprovante dizer se o Pix entrou ou saiu; `""` sem ele."""
+    if not state.get("user_id"):
+        return ""
+    from app import db
+
+    try:
+        linha = await db.fetch_one("select display_name from public.profiles where id = %s", state["user_id"])
+    except Exception:  # noqa: BLE001 — contexto opcional nunca derruba o turno
+        log.warning("não consegui ler o nome do perfil; o comprovante segue sem ele")
+        return ""
+    return ((linha or {}).get("display_name") or "").strip()[:80]
+
+
 async def _detalhes_do_turno(state: AgentState) -> list[dict]:
     """Detalhes do espaço para o parse de finanças, ou `[]` — contexto opcional nunca derruba o turno."""
     workspace_id = state.get("workspace_id")
@@ -388,6 +402,7 @@ async def finance_node(state: AgentState, config: RunnableConfig = None) -> dict
                     detalhes=detalhes,
                     exemplos=exemplos,
                     origem=state.get("origem") or "",
+                    titular=await _titular_do_turno(state) if state.get("media") else "",
                 ),
                 midia,
             ),
