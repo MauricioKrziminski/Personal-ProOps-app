@@ -479,6 +479,7 @@ tela. Entradas sem rota órfã: todo ponto tem caminho a partir de Hoje, Finanç
 
 ### Telas e rotas novas
 
+- `/captura-notificacoes` (Perfil, só onde o módulo existe), `/finance/capturas` e `/compartilhado`.
 - `/finance/comecar` — primeiro cadastro em passos puláveis (entradas: passo "contas" dos Primeiros
   passos da Hoje e o estado vazio de Finanças). **A tela segura o passo durante o salvar**
   (`onSalvando` até o `onCriada`): as contas recarregavam antes de o progresso gravar e o passo

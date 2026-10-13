@@ -719,6 +719,13 @@ promete configuração da reserva pelo WhatsApp antes da implementação/avalia�
 |---|---|
 | atalho "Por voz" dos menus Lançar: grava, transcreve, edita o texto e abre `/finance/lancar` pré-preenchido | `POST /internal/finance/draft` só interpreta (mesmo classificador, sem campo novo no schema): não executa tool, não grava `pending_actions`/`executed_actions`, não manda mensagem. Quem salva é o formulário. Não é mutação nova: nada a casar. |
 
+## Captura de lançamentos (12/10/2026)
+
+| app | agente |
+|---|---|
+| "Lançar pelas notificações" (Android): confirmar/descartar o que o banco avisou, em `/finance/capturas` e na Hoje | Fora do agente: a origem é o aparelho; o lançamento confirmado é o mesmo do formulário `/finance/lancar`. |
+| "Compartilhar" comprovante ou print → rascunho em `/finance/lancar` | `POST /internal/finance/draft/media` só interpreta, sem mutação (como a voz). Nada a casar. |
+
 ## Explicações e avisos que abrem o item — F17 (05/10/2026)
 
 | app | agente |

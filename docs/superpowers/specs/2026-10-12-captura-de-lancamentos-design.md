@@ -97,3 +97,15 @@ Teste: `com.android.shell` ("Teste (adb)"), aceito só em `__DEV__` no app e com
 - Confirmar em lote / num toque sem abrir o formulário: entra quando houver regras (o pedido de
   "regras do agente") para dar confiança ao preenchimento automático.
 - E-mail encaminhado; leitura de SMS (descartada: política do Google Play).
+
+## Lojas (passos de console do Gabriel)
+
+- **Google Play, Data safety:** coletado "Financial info, Other financial info" e "Purchase history" (texto das
+  notificações dos bancos; finalidade App functionality; NÃO efêmero, o texto fica guardado até confirmar ou
+  descartar) e "Photos" (imagens compartilhadas; efêmero, não ficam guardadas); criptografado em trânsito;
+  exclusão a pedido; provedores de IA tratados como service provider.
+- **Google Play, revisão:** a "prominent disclosure" está em Perfil, Lançar pelas notificações (folha "Antes de
+  ativar"), antes de abrir o acesso; só pacotes da allowlist; sem `READ_SMS`.
+- **App Store Connect:** nutrition label com Photos, Financial Info e User Content (App Functionality,
+  vinculados ao usuário, sem tracking); a descrição do app menciona "Compartilhar comprovante ou print para o
+  ProOps" (guideline 4.4); a extensão não tem anúncio nem compra.

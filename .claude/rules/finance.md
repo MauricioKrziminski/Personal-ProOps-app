@@ -1614,3 +1614,12 @@ domínio nova; o que o agente NÃO faz de cada um está em `docs/AGENTE-PARIDADE
   entre não arquivados, `fields jsonb` lido só por `decodeModelo` em `src/lib/favoritos.ts`: chave
   desconhecida é ignorada, valor inválido zera o campo). Apagar favorito não toca lançamento; conta
   ou categoria arquivada vem vazia com aviso.
+
+## Captura de lançamentos — notificações e Compartilhar (12/10/2026)
+
+Spec `2026-10-12-captura-de-lancamentos-design.md`. **Nada é lançado sozinho**: a notificação do banco
+(Android) vira `captured_notifications` com o rascunho do MESMO intérprete da voz, e confirmar abre
+`/finance/lancar` preenchido. Regex só confere se há valor em reais. O que já está lançado vira
+`duplicate` pela cascata da importação (`reconcile.conciliar`). A captura não conta no limite mensal
+(`ai_events.kind = 'capture'`), teto de 60 por espaço por dia. Lista de bancos em DOIS lugares
+(`src/lib/captura.ts` e `agent/app/routes/captures.py`, presas por `captura.test.ts`).
