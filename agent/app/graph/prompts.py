@@ -432,15 +432,26 @@ Regras:
 FORMATO DO CONTEÚDO — o app desenha o que estiver escrito, então ESCREVA a forma
 que o texto já tem. Não é enfeite: é a diferença entre uma lista que dá para
 marcar e um parágrafo com vírgulas.
-- Enumeração de coisas ("compra leite, ovos e pão", ditado com vários itens) vira
-  UMA POR LINHA com "- " na frente.
-- Coisas a fazer/comprar/levar, que se riscam ao concluir, viram "- [ ] item".
-- Passo a passo ou ordem explícita ("primeiro..., depois...") vira "1. ", "2. ".
+- Enumeração de coisas — separada por vírgula ("compra leite, ovos e pão"), uma por
+  linha, com "•", "*", "–", emoji ou número na frente — vira UMA POR LINHA. Troque o
+  marcador que a pessoa usou pelo nosso; nunca deixe "•" nem "1)".
+- Coisas a COMPRAR, LEVAR ou FAZER (mercado, compras, mala, viagem, tarefas, pendências),
+  que se riscam ao concluir, viram SEMPRE "- [ ] item" — a lista inteira, nunca "- ".
+- Coisas para lembrar ou consultar, que não se riscam (ideias, filmes, livros, nomes,
+  links), viram "- item".
+- Passo a passo, ranking ou ordem explícita ("primeiro..., depois...", "1) ... 2) ...")
+  vira "1. ", "2. ".
 - Título dito pelo usuário ("anota aí, título Reunião de segunda: ...") vira uma
   primeira linha com "# ". Subtítulo dentro do texto vira "## ".
-- Frase que APRESENTA a lista antes dos itens ("o que levar pra praia: protetor,
-  toalha, chinelo") vira a primeira linha com "# " e os itens vêm embaixo, um por
-  linha — nunca "O que levar pra praia:" solto em cima de "- item".
+- RÓTULO da lista vira a primeira linha com "# " e os itens vêm embaixo, um por linha:
+  a frase que apresenta os itens ("o que levar pra praia: protetor, toalha" → "# O que
+  levar pra praia"; "ideias pro app: ..." → "# Ideias pro app"), a palavra solta antes
+  deles ("Mercado:" numa linha e os itens nas seguintes → "# Mercado") e "lista do
+  mercado" → "# Lista do mercado". Nunca "Mercado:" solto em cima de "- item". Sem
+  rótulo dito, dê um título curto e óbvio do que a lista é ("# Compras", "# Tarefas",
+  "# Ideias") — nunca um item da lista como título, nunca um nome que ninguém disse.
+- Cada item fica como a pessoa escreveu (mesmas palavras, sem trocar maiúscula/minúscula).
+- Em append_note, append_text segue as MESMAS regras (um item por linha, com o marcador).
 - Citação de alguém vira "> ".
 - Ênfase que o usuário FALAR ("põe negrito no prazo") usa a marcação do WhatsApp:
   *negrito*, _itálico_, ~riscado~, `mono`. Nunca use ** (dois asteriscos).

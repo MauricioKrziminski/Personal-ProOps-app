@@ -149,6 +149,23 @@ async def _nota(texto):
     return acoes[0] if acoes else None
 
 
+def _linhas_de_item(c: str) -> list[str]:
+    return [l.strip() for l in c.splitlines() if l.strip() and not l.strip().startswith("#")]
+
+
+def _itens(c: str) -> int:
+    return len(_linhas_de_item(c))
+
+
+def _so_checklist(c: str) -> bool:
+    return all(l.startswith("- [ ] ") for l in _linhas_de_item(c))
+
+
+def _com_titulo(c: str) -> bool:
+    """"# X" ou 1ª linha em texto simples: o app promove as duas a título (`separarTitulo`)."""
+    return c.lstrip().startswith("# ") or not c.lstrip().startswith(("#", "-", "1."))
+
+
 async def _conteudo(texto):
     """O texto que vai para a nota — criando OU acrescentando.
 
@@ -474,6 +491,27 @@ def secoes():
                       "cria uma nota com o que levar pra praia: protetor, toalha, chinelo",
                       "anota os passos: primeiro ligar pro contador, depois juntar as notas, "
                       "por último mandar tudo"]
+        ],
+        # A forma EXATA (13/10/2026, "ele tem que formatar perfeitamente em todos esses casos"):
+        # compra/levar/fazer é checklist, rótulo dito vira título "# ", marcador do WhatsApp vira o nosso.
+        "notas/formato da lista": [
+            (t, f, e, lambda t=t: _conteudo(t))
+            for t, f, e in [
+                ("lista do mercado: arroz, feijão, macarrão, molho de tomate",
+                 lambda c: _itens(c) >= 4 and _so_checklist(c), "checklist"),
+                ("Mercado:\n• tomate\n• cebola\n• alho",
+                 lambda c: _com_titulo(c) and _itens(c) == 3 and _so_checklist(c) and "•" not in c,
+                 "# título + checklist"),
+                ("anota\nleite\novos\npão\ncafé",
+                 lambda c: _itens(c) == 4 and _so_checklist(c), "checklist"),
+                ("coisas pra levar na viagem: carregador, passaporte, remédio, protetor solar",
+                 lambda c: _com_titulo(c) and _itens(c) == 4 and _so_checklist(c), "# título + checklist"),
+                ("anota ideias pro app: modo escuro, exportar pdf, widget de saldo",
+                 lambda c: _com_titulo(c) and _itens(c) == 3, "# título + itens"),
+                ("anota os filmes pra ver:\n1) Duna\n2) Oppenheimer\n3) Interestelar",
+                 lambda c: _com_titulo(c) and "1. Duna" in c and "3. Interestelar" in c,
+                 "# título + numerada"),
+            ]
         ],
         "notas/texto corrido continua texto": [
             (t, lambda c: "\n- " not in c and not c.lstrip().startswith("-"),

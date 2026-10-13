@@ -10,6 +10,7 @@ Duas regras do produto que vivem aqui e não no prompt:
 from __future__ import annotations
 
 import logging
+import re
 from datetime import timedelta
 from uuid import UUID
 
@@ -88,6 +89,31 @@ async def create_note(ctx: ExecContext, action: NotesAction) -> ToolResult:
     )
 
 
+# O mesmo vocabulário de `src/lib/note-blocks.ts` (PREFIXO_DE_LISTA), mais os marcadores que chegam
+# do WhatsApp ("•", "–", "1)").
+_MARCADOR = re.compile(r"^\s*(?:[-*•–]\s\[(?: |x|X)\]\s?|[-*•–]\s+|\d{1,3}[.)]\s+)")
+_TODO = re.compile(r"^\s*[-*]\s\[(?: |x|X)\]")
+_ITEM = re.compile(r"^\s*[-*]\s+")
+_NUMERO = re.compile(r"^\s*(\d{1,3})[.)]\s+")
+
+
+def no_estilo_da_nota(trecho: str, nota: str | None) -> str:
+    """O que se acrescenta segue a lista que a nota JÁ é (13/10/2026): "põe pão" numa checklist
+    entra "- [ ] pão", numa numerada continua a contagem. Nota que não termina em lista: como veio."""
+    ultima = next((l for l in reversed((nota or "").split("\n")) if l.strip()), "")
+    numero = _NUMERO.match(ultima)
+    if _TODO.match(ultima):
+        prefixo = lambda _i: "- [ ] "  # noqa: E731
+    elif _ITEM.match(ultima):
+        prefixo = lambda _i: "- "  # noqa: E731
+    elif numero:
+        prefixo = lambda i: f"{int(numero.group(1)) + 1 + i}. "  # noqa: E731
+    else:
+        return trecho
+    itens = [_MARCADOR.sub("", l).strip() for l in trecho.split("\n")]
+    return "\n".join(prefixo(i) + item for i, item in enumerate(x for x in itens if x))
+
+
 async def append_note(ctx: ExecContext, action: NotesAction) -> ToolResult:
     trecho = guards.require_text(action.append_text, o_que="o que acrescentar")
 
@@ -95,6 +121,10 @@ async def append_note(ctx: ExecContext, action: NotesAction) -> ToolResult:
     nota_id = ctx.target["candidates"][0]["id"]
     rotulo = ctx.target["candidates"][0]["label"]
 
+    # A leitura só escolhe o MARCADOR; o texto continua concatenado no SQL.
+    atual = await db.fetch_one(
+        "select content from public.notes where id = %s and workspace_id = %s", nota_id, ctx.workspace_id)
+    trecho = no_estilo_da_nota(trecho, (atual or {}).get("content"))
     # Concatenação no SQL, não read-modify-write: entre o SELECT e o UPDATE a
     # nota pode ter sido editada no app, e a versão lida sobrescreveria a nova.
     linhas = await db.fetch(
@@ -104,7 +134,8 @@ async def append_note(ctx: ExecContext, action: NotesAction) -> ToolResult:
     )
     if not linhas:
         return ToolResult("🤷 Essa nota não está mais aqui.", read_only=True)
-    return ToolResult(f"📝 Acrescentei *{trecho}* em: {rotulo}", result_id=nota_id)
+    acrescentado = ", ".join(_MARCADOR.sub("", l).strip() for l in trecho.split("\n") if l.strip())
+    return ToolResult(f"📝 Acrescentei *{acrescentado}* em: {rotulo}", result_id=nota_id)
 
 
 async def query_notes(ctx: ExecContext, action: NotesAction) -> ToolResult:

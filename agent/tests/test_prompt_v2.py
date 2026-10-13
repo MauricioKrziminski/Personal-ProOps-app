@@ -30,7 +30,7 @@ from app.services import consumo, embeddings, ia
 PIN_ROUTER = "3f459db8"
 PIN_FINANCE = "d311b689"  # 09/10/2026: detalhe pela palavra-marca, medido no Haiku e no Gemini
 PIN_FINANCE_QUERY = "5d4cc1d7"
-PIN_NOTES = "ffd30b04"
+PIN_NOTES = "fee3012e"  # 13/10/2026: forma da lista (checklist, título do rótulo, marcador do WhatsApp)
 PIN_SCHEMA_ROUTER = "290d403c0f22daf5"
 PIN_TURNO_SIMPLES = "02e5e46b1513deff"
 PIN_TURNO_COMPLETO = "b0faf9bb068ff346"  # 09/10/2026: "subcategoria X" vence o nome da lista (Haiku)
