@@ -36,6 +36,8 @@ paths:
 - **O escopo do dado é o WORKSPACE, não o usuário** (migration `0010_workspaces.sql`): toda tabela de dado tem `workspace_id not null` com `default public.my_default_workspace()` e a policy padrão é
   `for all using (workspace_id in (select private.my_workspace_ids())) with check (...)` — copiar de `transactions`.
   `user_id` continua na tabela como **autor** do lançamento, nunca como filtro de visibilidade.
+  **Exceção declarada: `captured_notifications`** (13/10/2026, decisão do dono do produto) — a leitura
+  é `user_id = auth.uid()` E membro do espaço, porque o texto é a notificação do banco de quem a recebeu.
 - `private.my_workspace_ids()` é `security definer` (senão a policy de `workspace_members` recursaria) e mora no schema `private` **de propósito**: o PostgREST não expõe esse schema, então não vira endpoint `/rest/v1/rpc/`. Não mover para `public`.
 - Tabelas de infra (`messages_queue`, `user_sessions`, `pending_actions`, `executed_actions`,
   `agent_routing`, `ai_events`, e as legadas `jobs`/`messages_raw`): RLS ligada **sem policies**.
