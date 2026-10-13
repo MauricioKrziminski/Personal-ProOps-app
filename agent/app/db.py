@@ -746,6 +746,7 @@ RESERVA_VENCE_EM_MIN = 6
 
 async def reservar_cota(
     *, user_id: UUID, workspace_id: UUID, channel: str, max_por_hora: int, kind: str = "turn",
+    max_capturas_por_dia: int = 0,
 ) -> dict[str, Any]:
     """Checa a cota E reserva a vaga, atomicamente.
 
@@ -755,8 +756,11 @@ async def reservar_cota(
     workspace, só `kind = 'turn'`) e, se couber, insere a linha-reserva. O fim do turno a completa
     (`record_ai_event`) ou a apaga (`liberar_reserva`).
 
-    Devolve `{"barrado": None | "hora" | "mes", "plano": {...} | None, "reserva_id": str | None}`.
+    Devolve `{"barrado": None | "hora" | "mes" | "dia", "plano": {...} | None, "reserva_id": str | None}`.
     Só `kind = 'turn'` confere o mês: transcrição e importação só respondem à rajada por hora.
+    `kind = 'capture'` não entra na hora (uma fila de notificações barraria o chat) e tem o teto
+    `max_capturas_por_dia` por WORKSPACE em 24 h, contando as reservas em voo: dois aparelhos do
+    mesmo espaço enviando juntos passam pela mesma contagem, sob o mesmo lock.
     """
     async with pool().connection() as conn:
         async with conn.transaction():
@@ -770,16 +774,28 @@ async def reservar_cota(
                 """,
                 (workspace_id, RESERVA_VENCE_EM_MIN),
             )
-            cur = await conn.execute(
-                """
-                select count(*)::int as n from public.ai_events
-                where user_id = %s and kind <> 'capture'
-                  and created_at >= now() - interval '1 hour'
-                """,
-                (user_id,),
-            )
-            if (await cur.fetchone())["n"] >= max_por_hora:
-                return {"barrado": "hora", "plano": None, "reserva_id": None}
+            if kind == "capture":
+                cur = await conn.execute(
+                    """
+                    select count(*)::int as n from public.ai_events
+                    where workspace_id = %s and kind = 'capture'
+                      and created_at > now() - interval '1 day'
+                    """,
+                    (workspace_id,),
+                )
+                if (await cur.fetchone())["n"] >= max_capturas_por_dia:
+                    return {"barrado": "dia", "plano": None, "reserva_id": None}
+            else:
+                cur = await conn.execute(
+                    """
+                    select count(*)::int as n from public.ai_events
+                    where user_id = %s and kind <> 'capture'
+                      and created_at >= now() - interval '1 hour'
+                    """,
+                    (user_id,),
+                )
+                if (await cur.fetchone())["n"] >= max_por_hora:
+                    return {"barrado": "hora", "plano": None, "reserva_id": None}
 
             plano = None
             if kind == "turn":

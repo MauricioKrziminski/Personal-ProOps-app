@@ -35,6 +35,8 @@ MUITAS = "😅 Muitas mensagens em pouco tempo. Aguarda um pouquinho e tenta de 
 # Sem `profiles.ai_consent_at` (e `AI_CONSENT_REQUIRED` ligada) a IA não roda: é a frase que o WhatsApp
 # manda (uma vez por dia) e o valor que `check_limits` devolve para as rotas do app virarem 403.
 SEM_CONSENTIMENTO_IA = "Para usar o assistente, autorize o uso de IA no app: Perfil → Privacidade e dados."
+# Teto diário de capturas do espaço (`db.reservar_cota`, kind `capture`): a fila fica no aparelho.
+CAPTURAS_DO_DIA = "Limite diário de notificações interpretadas atingido."
 
 
 class ConsentimentoNecessario(Exception):
@@ -195,6 +197,7 @@ async def check_limits(sessao: dict, *, kind: str = "turn") -> str | None:
 
     `kind` = `turn` (mensagem de IA do plano: hora E mês) · `transcription` · `import` (só a hora:
     um áudio vira turno depois, e a importação é recurso do plano Pro, não "mensagem").
+    `capture` (notificação de banco) não conta na hora nem no mês; tem o teto diário do espaço.
     """
     settings = get_settings()
     # O consentimento vem ANTES da cota e não reserva vaga: quem recusa aqui não chama modelo nenhum.
@@ -204,9 +207,12 @@ async def check_limits(sessao: dict, *, kind: str = "turn") -> str | None:
     r = await db.reservar_cota(
         user_id=sessao["user_id"], workspace_id=sessao["workspace_id"], channel=_canal(sessao),
         max_por_hora=settings.max_parses_per_hour, kind=kind,
+        max_capturas_por_dia=settings.max_capturas_por_dia,
     )
     if r["barrado"] == "hora":
         return MUITAS
+    if r["barrado"] == "dia":
+        return CAPTURAS_DO_DIA
     if r["barrado"] == "mes":
         return _mensagem_de_mes_estourado(r["plano"])
     # a partir daqui tudo que o modelo gastar neste contexto é deste turno

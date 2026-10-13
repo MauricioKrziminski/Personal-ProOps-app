@@ -218,6 +218,9 @@ class _Conexao:
             return _Cursor(None)
         if "delete from public.ai_events" in sql:
             return _Cursor(None)
+        if "interval '1 day'" in sql:
+            assert "kind = 'capture'" in sql and params == (WS,)
+            return _Cursor({"n": sum(1 for r in b.linhas if r["kind"] == "capture")})
         if "interval '1 hour'" in sql:
             return _Cursor({"n": sum(1 for r in b.linhas if r["user_id"] == params[0]
                                          and ("kind <> 'capture'" not in sql or r["kind"] != "capture"))})
@@ -284,6 +287,34 @@ async def test_rajada_por_hora_barra_antes_de_reservar(monkeypatch):
     monkeypatch.setattr(db, "pool", banco.pool)
     assert await conversation.check_limits(_sessao(), kind="import") == conversation.MUITAS
     assert len(banco.linhas) == get_settings().max_parses_per_hour
+
+
+async def test_dois_aparelhos_no_mesmo_espaco_nao_passam_do_teto_diario_de_capturas(monkeypatch):
+    # Dois envios simultâneos do mesmo espaço (dois aparelhos) com 2 vagas sobrando: o teto é contado
+    # sob o lock, com as reservas em voo, então passam exatamente 2 — antes cada envio lia a sua conta.
+    teto = get_settings().max_capturas_por_dia
+    banco = _Banco()
+    banco.linhas = [{"user_id": USER, "kind": "capture", "reserved": False, "id": f"x{i}"}
+                    for i in range(teto - 2)]
+    monkeypatch.setattr(db, "pool", banco.pool)
+    resultados = await asyncio.gather(*(conversation.check_limits(_sessao(), kind="capture") for _ in range(6)))
+    assert sum(r is None for r in resultados) == 2
+    assert sum(r == conversation.CAPTURAS_DO_DIA for r in resultados) == 4
+    assert sum(1 for r in banco.linhas if r["kind"] == "capture") == teto
+
+
+async def test_captura_nao_entra_na_rajada_por_hora_nem_a_rajada_a_barra(monkeypatch):
+    banco = _Banco(maximo_mes=0)
+    banco.linhas = [{"user_id": USER, "kind": "turn", "reserved": False, "id": f"x{i}"}
+                    for i in range(get_settings().max_parses_per_hour)]  # o chat estourou a hora e o mês
+    monkeypatch.setattr(db, "pool", banco.pool)
+    assert await conversation.check_limits(_sessao(), kind="capture") is None
+    assert banco.linhas[-1]["kind"] == "capture"
+    # e a captura não come a hora do chat: a contagem da hora exclui `capture`
+    banco.linhas = [{"user_id": USER, "kind": "capture", "reserved": False, "id": f"c{i}"}
+                    for i in range(get_settings().max_parses_per_hour)]
+    banco.maximo_mes = 1000
+    assert await conversation.check_limits(_sessao()) is None
 
 
 async def test_record_ai_event_completa_a_reserva_em_vez_de_inserir(monkeypatch):

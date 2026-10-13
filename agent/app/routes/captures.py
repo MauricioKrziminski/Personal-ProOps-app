@@ -44,8 +44,10 @@ BANCOS = {
 }
 PACOTE_DE_TESTE = "com.android.shell"
 MAX_POR_ENVIO = 20
-MAX_POR_DIA = 60
 MARGEM_DIAS = 5
+# Uma notificação em interpretação (`processing`) é de quem a reservou; depois disto, a reserva de um
+# processo que morreu no meio volta a valer para o próximo envio.
+RESERVA_VENCE_EM_MIN = 10
 # Estrutura, não sentido: movimento de dinheiro sempre traz valor em reais.
 _VALOR = re.compile(r"R\$\s*\d|\b\d+(?:\.\d{3})*,\d{2}\b")
 
@@ -104,21 +106,74 @@ def texto_da_notificacao(titulo: str, texto: str) -> str:
     return f"{titulo}\n{texto}".strip()
 
 
-async def _gravar(ws, user_id, item: NotificacaoIn, banco: str, status: str, rascunho=None,
-                  kind=None, amount_cents=None, occurred_at=None, match=None) -> None:
-    await db.execute(
-        """
-        insert into public.captured_notifications
-          (workspace_id, user_id, external_id, bank, posted_at, texto, status, draft, entendido,
-           kind, amount_cents, occurred_at, match_transaction_id)
-        values (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s::uuid)
-        on conflict (workspace_id, external_id) do nothing
-        """,
-        ws, user_id, item.external_id, banco, item.posted_at,
+def _colunas(item: NotificacaoIn, status: str, rascunho, kind, amount_cents, occurred_at, match) -> tuple:
+    return (
         None if status == "ignored" else f"{item.title}\n{item.text}"[:1300],
         status, json.dumps(rascunho.model_dump()) if rascunho else None,
         rascunho.entendido if rascunho else None, kind, amount_cents, occurred_at, match,
     )
+
+
+async def _gravar_ignorada(ws, user_id, item: NotificacaoIn, banco: str) -> None:
+    """Sem modelo (pacote fora da lista, sem valor): grava direto, e repetir é no-op."""
+    await db.execute(
+        """
+        insert into public.captured_notifications
+          (workspace_id, user_id, external_id, bank, posted_at, status)
+        values (%s, %s, %s, %s, %s, 'ignored')
+        on conflict (workspace_id, external_id) do nothing
+        """,
+        ws, user_id, item.external_id, banco, item.posted_at,
+    )
+
+
+async def _reservar(ws, user_id, item: NotificacaoIn, banco: str) -> str | None:
+    """Reserva a notificação ANTES do modelo; None = outro envio já a está interpretando.
+
+    A mesma notificação chega de dois aparelhos da pessoa com o MESMO `external_id` (o hash do
+    pacote, do texto e da janela de 5 min). Sem a reserva, os dois liam "não conhecida", os dois
+    pagavam o modelo e o segundo insert virava no-op. A reserva vencida (processo que morreu no
+    meio) é retomada; a viva fica com quem a fez, e o outro aparelho mantém o item na fila.
+    """
+    r = await db.fetch_one(
+        """
+        insert into public.captured_notifications
+          (workspace_id, user_id, external_id, bank, posted_at, status)
+        values (%s, %s, %s, %s, %s, 'processing')
+        on conflict (workspace_id, external_id) do update
+          set user_id = excluded.user_id, bank = excluded.bank, posted_at = excluded.posted_at
+          where captured_notifications.status = 'processing'
+            and captured_notifications.updated_at < now() - make_interval(mins => %s)
+        returning id
+        """,
+        ws, user_id, item.external_id, banco, item.posted_at, RESERVA_VENCE_EM_MIN,
+    )
+    return str(r["id"]) if r else None
+
+
+async def _soltar(reserva: str) -> None:
+    """Devolve a reserva: o item volta para a fila do aparelho e o próximo envio o interpreta."""
+    try:
+        await db.execute(
+            "delete from public.captured_notifications where id = %s and status = 'processing'", reserva)
+    except Exception:  # noqa: BLE001 — sem soltar, ela vence em RESERVA_VENCE_EM_MIN e é retomada
+        log.warning("Reserva de captura %s não foi solta", reserva)
+
+
+async def _concluir(reserva: str, item: NotificacaoIn, status: str, rascunho=None, kind=None,
+                    amount_cents=None, occurred_at=None, match=None) -> None:
+    """Fecha a reserva com o resultado. Sem linha alterada, a reserva venceu e foi retomada: falha."""
+    n = await db.execute(
+        """
+        update public.captured_notifications set
+          texto = %s, status = %s, draft = %s::jsonb, entendido = %s, kind = %s,
+          amount_cents = %s, occurred_at = %s, match_transaction_id = %s::uuid
+        where id = %s and status = 'processing'
+        """,
+        *_colunas(item, status, rascunho, kind, amount_cents, occurred_at, match), reserva,
+    )
+    if n == 0:
+        raise RuntimeError("reserva de captura perdida")
 
 
 async def _duplicata(ws, kind: str, amount_cents: int, dia: date, descricao: str | None, conta: str | None):
@@ -184,27 +239,15 @@ async def receber(body: EnvioIn, user_id: Annotated[UUID, Depends(current_user)]
     plano = await db.plan_status(ws)
     if not plano or plano.get("access") != "subscriber":
         raise _erro(402, "subscription_required", "A captura faz parte da assinatura.")
-    # Duplicata não fica para sempre: depois de 30 dias o texto some e o item sai da lista.
-    try:
-        await db.execute(
-            """update public.captured_notifications set status = 'discarded', texto = null
-               where workspace_id = %s and status = 'duplicate' and posted_at < now() - interval '30 days'""",
-            ws,
-        )
-    except Exception:  # noqa: BLE001 — limpeza é best-effort
-        log.warning("Limpeza de duplicatas antigas falhou")
     fuso = finance_draft._fuso_valido(body.timezone)
     ids = [i.external_id for i in body.items]
+    # Conhecida = já resolvida. A em interpretação (`processing`) não conta: se o outro envio falhar,
+    # ela volta para a fila; se der certo, o próximo envio deste aparelho a acha aqui.
     conhecidos = {r["external_id"] for r in await db.fetch(
-        "select external_id from public.captured_notifications where workspace_id = %s and external_id = any(%s)",
+        """select external_id from public.captured_notifications
+           where workspace_id = %s and external_id = any(%s) and status <> 'processing'""",
         ws, ids,
     )}
-    # O teto conta CHAMADAS de modelo (custo), inclusive as que concluíram "não é lançamento".
-    usados = (await db.fetch_one(
-        """select count(*) as n from public.ai_events
-           where workspace_id = %s and kind = 'capture' and created_at > now() - interval '1 day'""",
-        ws,
-    ) or {"n": 0})["n"]
     aceitos = [e for e in ids if e in conhecidos]
     novos = 0
     parado = False
@@ -214,41 +257,54 @@ async def receber(body: EnvioIn, user_id: Annotated[UUID, Depends(current_user)]
         banco = banco_do_pacote(item.package)
         if not banco or not tem_valor(f"{item.title} {item.text}"):
             try:
-                await _gravar(ws, user_id, item, banco or item.package[:128], "ignored")
+                await _gravar_ignorada(ws, user_id, item, banco or item.package[:128])
             except Exception:  # noqa: BLE001 — um item ruim não trava a fila: fica no aparelho
                 log.warning("Notificação %s ignorada não gravou", item.external_id)
                 continue
             aceitos.append(item.external_id)
             continue
-        if parado or usados >= MAX_POR_DIA:
+        if parado:
             continue  # fica no aparelho
         try:
-            rascunho, acao, dia = await _interpretar(user_id, ws, item, banco, fuso)
-        except _Parar:
+            reserva = await _reservar(ws, user_id, item, banco)
+        except Exception:  # noqa: BLE001 — banco fora: o resto também ficaria
+            log.warning("Notificação %s não foi reservada", item.external_id)
             parado = True
             continue
+        if reserva is None:
+            continue  # outro aparelho está interpretando esta mesma notificação agora
+        try:
+            rascunho, acao, dia = await _interpretar(user_id, ws, item, banco, fuso)
         except _Falhou as e:
             rascunho, acao, dia = None, None, None
             log.warning("Notificação %s (%s) descartada: %s", item.external_id, banco, e)
-        usados += 1
+        except conversation.ConsentimentoNecessario:
+            await _soltar(reserva)
+            raise
+        except Exception as e:  # noqa: BLE001 — teto, modelo fora ou cota indisponível: volta à fila
+            if not isinstance(e, _Parar):
+                log.warning("Notificação %s não foi interpretada: %s", item.external_id, type(e).__name__)
+            await _soltar(reserva)
+            parado = True
+            continue
         try:
             if rascunho is None:
-                await _gravar(ws, user_id, item, banco, "ignored")
+                await _concluir(reserva, item, "ignored")
             else:
                 kind = "income" if acao["type"] == "create_income" else "expense"
                 valor = int(acao.get("amount_cents") or 0) or None
                 ocorreu = date.fromisoformat(acao["occurred_at"]) if acao.get("occurred_at") else dia
                 conta = rascunho.params.get("conta")
                 match = await _duplicata(ws, kind, valor, ocorreu, acao.get("description"), conta) if valor else None
-                await _gravar(ws, user_id, item, banco, "duplicate" if match else "pending", rascunho,
-                              kind, valor, ocorreu, match)
+                await _concluir(reserva, item, "duplicate" if match else "pending", rascunho,
+                                kind, valor, ocorreu, match)
                 novos += 1
         except Exception as e:  # noqa: BLE001
-            # Já custou um modelo: repetir custaria de novo e falharia igual. Grava como ignorada; se
+            # Já custou um modelo: repetir custaria de novo e falharia igual. Fecha como ignorada; se
             # nem isso grava (banco fora), para sem aceitar — o aparelho guarda e tenta depois.
             log.warning("Notificação %s (%s) com falha após o modelo: %s", item.external_id, banco, type(e).__name__)
             try:
-                await _gravar(ws, user_id, item, banco, "ignored")
+                await _concluir(reserva, item, "ignored")
             except Exception:  # noqa: BLE001
                 parado = True
                 continue

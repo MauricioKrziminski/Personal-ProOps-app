@@ -103,6 +103,9 @@ class Settings(BaseSettings):
     # --- regras ---
     hitl_amount_threshold_cents: int = 100_000
     max_parses_per_hour: int = 60
+    # Captura de notificações (`kind='capture'`): fora da rajada por hora do chat, com teto próprio de
+    # chamadas de modelo por espaço em 24 h, conferido sob o lock de `db.reservar_cota`.
+    max_capturas_por_dia: int = 60
     # Aceita notificações de `com.android.shell` (o `adb shell cmd notification post`) como banco de
     # teste. Só no staging: em produção um pacote de teste seria um jeito de mandar texto à IA.
     captura_aceita_teste: bool = False

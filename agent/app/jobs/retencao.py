@@ -12,6 +12,7 @@ curto e um motivo; quem lê o quê foi conferido antes de cortar:
 | `alerts_sent` | 90 dias | dedupe é por dia |
 | `error_events` | 30 dias | mensagem e contexto de erro (já mascarados); o painel mostra os 50 últimos |
 | `error_issues` resolvida/ignorada | 90 dias sem ocorrência | issue aberta nunca sai; os eventos vão pelo prazo acima |
+| `captured_notifications` resolvida, ou "parece já lançada" sem decisão | 30 dias | o rascunho guarda estabelecimento e valor da notificação do banco; depois de resolvida só servia para o aparelho não reenviar, o que acontece em minutos. A de quem saiu do espaço sai no dia seguinte (ninguém mais a vê: a leitura é só do dono) e a reserva `processing` abandonada, em 1 dia |
 | `whatsapp_sends`, `ai_events` | 13 meses | limite de respostas e custo leem o mês corrente e o anterior; sobra para comparar o mesmo mês do ano anterior |
 
 `app_chat_messages` NÃO entra: é conteúdo da pessoa, visível no app, e sai com a conta.
@@ -42,6 +43,13 @@ _REGRAS = [
     ("alerts_sent", "public.alerts_sent", "sent_on < current_date - 90"),
     ("whatsapp_sends", "public.whatsapp_sends", "created_at < now() - interval '13 months'"),
     ("ai_events", "public.ai_events", "created_at < now() - interval '13 months'"),
+    ("captured_notifications", "public.captured_notifications",
+     "(status in ('confirmed', 'discarded', 'ignored') and updated_at < now() - interval '30 days')"
+     " or (status = 'duplicate' and posted_at < now() - interval '30 days')"
+     " or (status = 'processing' and updated_at < now() - interval '1 day')"
+     " or not exists (select 1 from public.workspace_members m"
+     " where m.workspace_id = captured_notifications.workspace_id"
+     " and m.user_id = captured_notifications.user_id)"),
     # observabilidade: o evento guarda mensagem e contexto de erro; o issue só sai quando está encerrado
     # (resolvido/ignorado) e sem nenhum evento recente (eventos de 30 dias já saíram pela regra acima)
     ("error_events", "public.error_events", "created_at < now() - interval '30 days'"),

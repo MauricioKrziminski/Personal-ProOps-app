@@ -53,7 +53,7 @@ class Banco:
             banco.consultas += 1
             return consentiu
 
-        async def reservar(*, user_id, workspace_id, channel, max_por_hora, kind):
+        async def reservar(*, user_id, workspace_id, channel, max_por_hora, kind, max_capturas_por_dia=0):
             banco.reservas.append(kind)
             return {"barrado": None, "plano": {}, "reserva_id": "r1"}
 

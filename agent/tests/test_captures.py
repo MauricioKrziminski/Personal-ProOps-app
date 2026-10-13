@@ -32,9 +32,9 @@ def _config(monkeypatch):
 
 @pytest.fixture
 def mundo(monkeypatch):
-    v = {"acesso": "subscriber", "descartadas": 0, "limite": None, "gravados": [], "eventos": [], "conhecidos": set(), "hoje": 0,
+    v = {"acesso": "subscriber", "limite": None, "gravados": [], "eventos": [], "conhecidos": set(),
          "acoes": [{"type": "create_expense", "amount_cents": 4590, "description": "mercado"}],
-         "chamadas": 0, "existentes": []}
+         "chamadas": 0, "existentes": [], "reservadas": [], "soltas": [], "ocupadas": set()}
 
     async def perfil(_u):
         return {"id": USER, "timezone": "America/Sao_Paulo", "workspace_id": WS}
@@ -62,24 +62,32 @@ def mundo(monkeypatch):
 
     async def fetch(sql, *args):
         if "external_id = any" in sql:
+            assert "status <> 'processing'" in sql  # a em interpretação não é "conhecida"
             return [{"external_id": e} for e in v["conhecidos"] if e in args[1]]
         return []
 
     async def fetch_one(sql, *args):
-        if "count(*)" in sql:
-            return {"n": v["hoje"]}
-        return None
+        assert "'processing'" in sql and "returning id" in sql
+        ext = args[2]
+        if ext in v["ocupadas"]:
+            return None  # outro aparelho reservou e ainda está interpretando
+        v["reservadas"].append(ext)
+        return {"id": f"res-{ext}"}
 
     async def plano(_ws):
         return {"access": v["acesso"]}
 
     async def execute(sql, *args):
-        if "update public.captured_notifications" in sql:
-            v["descartadas"] += 1
-            assert "status = 'duplicate'" in sql and "30 days" in sql and "texto = null" in sql
-            return
-        assert "insert into public.captured_notifications" in sql
-        v["gravados"].append(args)
+        if sql.lstrip().startswith("delete"):
+            v["soltas"].append(args[0])
+            return 1
+        if sql.lstrip().startswith("update"):
+            assert "status = 'processing'" in sql
+            v["gravados"].append(args)
+            return 1
+        assert "insert into public.captured_notifications" in sql and "'ignored'" in sql
+        v["gravados"].append(("ignored", *args))
+        return 1
 
     async def existentes(ws, de, ate, conta):
         return v["existentes"]
@@ -212,19 +220,36 @@ def test_rajada_para_e_devolve_o_que_gravou(mundo):
     assert r.json()["aceitos"] == ["ext-00000002"]
 
 
-def test_teto_diario_deixa_no_aparelho(mundo):
-    mundo["hoje"] = captures.MAX_POR_DIA
-    r = _envia(_item())
+def test_teto_diario_deixa_no_aparelho_e_solta_a_reserva(mundo):
+    mundo["limite"] = conversation.CAPTURAS_DO_DIA
+    r = _envia(_item(), _item(ext="ext-00000002"))
     assert r.json() == {"aceitos": [], "novos": 0}
     assert mundo["chamadas"] == 0
+    # o primeiro reservou e devolveu; o segundo nem reservou (o lote parou)
+    assert mundo["reservadas"] == ["ext-00000001"] and mundo["soltas"] == ["res-ext-00000001"]
 
 
-def test_modelo_fora_do_ar_nao_aceita(mundo, monkeypatch):
+def test_mesma_notificacao_em_interpretacao_noutro_aparelho_fica_na_fila(mundo):
+    mundo["ocupadas"] = {"ext-00000001"}
+    r = _envia(_item(), _item(ext="ext-00000002"))
+    # sem segunda chamada de modelo para a mesma notificação; o outro item segue normalmente
+    assert r.json() == {"aceitos": ["ext-00000002"], "novos": 1}
+    assert mundo["chamadas"] == 1
+
+
+def test_sem_consentimento_solta_a_reserva(mundo):
+    mundo["limite"] = conversation.SEM_CONSENTIMENTO_IA
+    assert _envia(_item()).status_code == 403
+    assert mundo["soltas"] == ["res-ext-00000001"]
+
+
+def test_modelo_fora_do_ar_nao_aceita_e_solta_a_reserva(mundo, monkeypatch):
     async def quebra(_e):
         raise RuntimeError("503")
     monkeypatch.setattr(nodes, "finance_node", quebra)
     r = _envia(_item())
     assert r.status_code == 200 and r.json()["aceitos"] == []
+    assert mundo["soltas"] == ["res-ext-00000001"]
 
 
 def test_tem_valor_so_estrutura():
@@ -268,9 +293,18 @@ def test_sem_assinatura_responde_402_sem_modelo_nem_gravar(mundo, acesso):
     assert mundo["chamadas"] == 0 and mundo["gravados"] == []
 
 
-def test_duplicata_antiga_e_descartada_uma_vez_por_envio(mundo):
-    _envia(_item(), _item(ext="ext-00000002"))
-    assert mundo["descartadas"] == 1
+def test_envio_nao_faz_limpeza(mundo, monkeypatch):
+    # a expiração das duplicatas é da retenção diária (`jobs/retencao.py`), não do caminho quente
+    sqls = []
+    original = db.execute
+
+    async def espia(sql, *args):
+        sqls.append(sql)
+        return await original(sql, *args)
+
+    monkeypatch.setattr(db, "execute", espia)
+    _envia(_item())
+    assert not any("30 days" in q for q in sqls)
 
 
 def test_erro_ao_gravar_ignorada_nao_derruba_o_lote(mundo, monkeypatch):
