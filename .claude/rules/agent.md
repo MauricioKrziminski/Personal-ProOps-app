@@ -51,10 +51,12 @@ O serviço que recebe do WhatsApp, decide e escreve. Substituiu o par
   **"Em que conta ficou esse gasto?"** logo após lançar: o roteador e o parse de consulta rodam
   como sempre; DEPOIS do modelo, `finance_query_node` troca a consulta por um template sobre a linha
   relida (`tools/antecedente.py`, filtrada por workspace) só se há `last_write_id`, o domínio é só
-  consulta, o parse devolveu UMA `query_transactions` sem termo nem filtro (ou nenhuma consulta:
-  "qual a categoria desse gasto?") e `reference.pergunta_do_antecedente` casa. **Período não
-  bloqueia se contém a linha**: com histórico na conversa o modelo põe "hoje" sem a pessoa dizer
-  data (staging, 13/10/2026), e a linha fora do período não é o "esse". O padrão só escolhe entre duas leituras e nunca vira
+  consulta, o parse devolveu UMA `query_transactions` (ou nenhuma: "qual a categoria desse
+  gasto?") e `reference.pergunta_do_antecedente` casa. **Os filtros do parse se conferem CONTRA A
+  LINHA** (`antecedente._bate`: termo, categoria, conta, período), não bloqueiam por existir: com
+  histórico na conversa o modelo resolve "esse lançamento" no nome e no dia da própria linha
+  (staging, 13/10/2026). Filtro que a linha não satisfaz ("esse gasto do mercado" com o café no
+  antecedente) segue a consulta normal; valor e forma de pagamento ainda bloqueiam. O padrão só escolhe entre duas leituras e nunca vira
   porta de entrada que esconda ação; número nunca sai do modelo.
 - **Teto MEDIDO do schema: o PRODUTO propriedades × valores de enum, não cada um.** O
   `FinanceAction` está em **308** (22×14, soma 36; teto medido de 720 no Lite em 06/10/2026, ver

@@ -154,7 +154,7 @@ async def test_antecedente_sem_filtro_vira_template(monkeypatch):
 
 @pytest.mark.parametrize("campos", [{"search_term": "mercado"}, {"category": "lazer"},
                                     {"query_from": "2026-10-12", "query_to": "2026-10-12"},
-                                    {"account": "nubank"}])
+                                    {"account": "inter"}])
 async def test_consulta_com_filtro_dito_segue_normal(monkeypatch, campos):
     _consulta_fake(monkeypatch, **campos)
     r = await nodes.finance_query_node(_estado("quanto foi esse gasto do mercado de ontem?"))
@@ -166,6 +166,14 @@ async def test_periodo_que_contem_a_linha_nao_bloqueia(monkeypatch):
     _consulta_fake(monkeypatch, query_from="2026-10-13", query_to="2026-10-13")
     r = await nodes.finance_query_node(_estado("em que conta ficou esse lançamento?"))
     assert r["finance_queries"] == [] and "Nubank" in r["results"][0]
+
+
+async def test_modelo_resolve_esse_no_nome_da_linha(monkeypatch):
+    # com histórico, o parse devolve o nome e o dia da própria linha como filtro
+    _consulta_fake(monkeypatch, search_term="Café", query_from="2026-10-13", query_to="2026-10-13",
+                   account="nubank")
+    r = await nodes.finance_query_node(_estado("qual a categoria desse lançamento?"))
+    assert r["finance_queries"] == [] and "alimentação" in r["results"][0]
 
 
 async def test_nenhuma_consulta_extraida_vira_template(monkeypatch):
