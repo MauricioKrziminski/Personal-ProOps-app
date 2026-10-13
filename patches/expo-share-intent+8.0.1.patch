@@ -1,0 +1,19 @@
+diff --git a/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt b/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
+index ff5b100..e62626d 100644
+--- a/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
++++ b/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
+@@ -227,11 +227,9 @@ class ExpoShareIntentModule : Module() {
+                     val split = docId.split(":".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+                     val type = split[0]
+ 
+-                    return if ("primary".equals(type, ignoreCase = true)) {
+-                        Environment.getExternalStorageDirectory().toString() + "/" + split[1]
+-                    } else {
+-                        getDataColumn(uri, null, null)
+-                    }
++                    // Scoped storage: o caminho cru de /storage/emulated/0 não é legível pelo app;
++                    // a cópia para o cache (pela permissão do intent) é.
++                    return getDataColumn(uri, null, null)
+                 } else if (isDownloadsDocument(uri)) {
+                     return try {
+                         val id = DocumentsContract.getDocumentId(uri)

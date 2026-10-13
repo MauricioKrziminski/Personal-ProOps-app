@@ -3,8 +3,10 @@ const test = require('node:test');
 
 const base = require('./app.json').expo;
 
-function resolver(distribuicao) {
-  const antes = { d: process.env.DISTRIBUICAO };
+function resolver(distribuicao, variante) {
+  const antes = { d: process.env.DISTRIBUICAO, v: process.env.APP_VARIANT };
+  if (variante === undefined) delete process.env.APP_VARIANT;
+  else process.env.APP_VARIANT = variante;
   process.env.EXPO_PUBLIC_AGENT_URL ||= 'https://agente.exemplo';
   if (distribuicao === undefined) delete process.env.DISTRIBUICAO;
   else process.env.DISTRIBUICAO = distribuicao;
@@ -14,6 +16,8 @@ function resolver(distribuicao) {
   } finally {
     if (antes.d === undefined) delete process.env.DISTRIBUICAO;
     else process.env.DISTRIBUICAO = antes.d;
+    if (antes.v === undefined) delete process.env.APP_VARIANT;
+    else process.env.APP_VARIANT = antes.v;
   }
 }
 
@@ -67,5 +71,20 @@ test('loja sem EXPO_PUBLIC_AGENT_URL falha; apk segue', () => {
     if (url === undefined) delete process.env.EXPO_PUBLIC_AGENT_URL; else process.env.EXPO_PUBLIC_AGENT_URL = url;
     if (antes === undefined) delete process.env.DISTRIBUICAO; else process.env.DISTRIBUICAO = antes;
     delete require.cache[require.resolve('./app.config.js')];
+  }
+});
+
+test('compartilhar: imagem e texto, App Group da própria variante (o mesmo dos widgets)', () => {
+  for (const variante of ['development', 'preview', 'production']) {
+    const cfg = resolver('apk', variante);
+    const share = cfg.plugins.find((p) => Array.isArray(p) && p[0] === 'expo-share-intent');
+    assert.ok(share, `sem expo-share-intent em ${variante}`);
+    const op = share[1];
+    assert.deepEqual(op.androidIntentFilters, ['text/*', 'image/*']);
+    assert.equal(op.iosActivationRules.NSExtensionActivationSupportsImageWithMaxCount, 1);
+    assert.equal(op.iosActivationRules.NSExtensionActivationSupportsText, true);
+    assert.equal(op.iosAppGroupIdentifier, `group.${cfg.ios.bundleIdentifier}`);
+    const widgets = cfg.plugins.find((p) => Array.isArray(p) && p[0] === 'expo-widgets');
+    assert.equal(op.iosAppGroupIdentifier, widgets[1].groupIdentifier);
   }
 });

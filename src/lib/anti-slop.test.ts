@@ -806,6 +806,8 @@ const SEM_SCREEN = new Set([
   'src/app/finance/nova-recorrente.tsx',
   'src/app/finance/novo-financiamento.tsx',
   'src/app/finance/transaction-form.tsx',
+  // Não é tela: o desvio do link do "Compartilhar" (iOS) antes do roteador.
+  'src/app/+native-intent.tsx',
 ]);
 
 test('toda tela de conteúdo usa <Screen>', () => {
@@ -1503,6 +1505,7 @@ test('toda tela de dados tem puxar para atualizar', () => {
     'app/finance/wallet.tsx': 'carrossel de cartões',
     'app/finance/manage.tsx': 'menu de destinos',
     'app/finance/acumulacao.tsx': 'simulador local; só lê o patrimônio inicial',
+    'app/compartilhado.tsx': 'o que chegou pelo Compartilhar; nada do banco',
   };
   const faltando = walk(join(SRC, 'app'))
     .filter((f) => f.endsWith('.tsx') && readFileSync(f, 'utf8').includes('<Screen'))

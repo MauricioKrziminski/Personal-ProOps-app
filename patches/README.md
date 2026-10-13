@@ -58,3 +58,18 @@ file changed.
 When a React Native release contains this fix, remove the patch and
 `buildReactNativeFromSource`, then repeat cold launches behind Face ID on a
 device before accepting the upgrade.
+
+# expo-share-intent: shared file from device storage (Android)
+
+`expo-share-intent+8.0.1.patch` changes only `ExpoShareIntentModule.kt`
+(`getAbsolutePath`). For a document of `com.android.externalstorage.documents`
+on the `primary` volume (sharing from the Files app), the module returned the raw
+`/storage/emulated/0/...` path, which the app cannot read under scoped storage:
+the "Compartilhar" screen showed an empty image and the upload had no file. The
+patch copies that document to the app cache through the content resolver (the
+same `getDataColumn` path the other providers already use), so `path` is a
+readable `file://` in the cache. The version is pinned exactly in `package.json`
+so `patch-package --error-on-fail` fails visibly on an upgrade.
+
+When upstream stops returning raw external-storage paths, remove the patch,
+rebuild Android and share an image from Files → ProOps again.

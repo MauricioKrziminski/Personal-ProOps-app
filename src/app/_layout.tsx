@@ -1,6 +1,6 @@
 import { createNativeQueryFocusHandler } from '@/lib/query-invalidation';
 import { medirConsultas } from '@/lib/medir-consultas';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { MartianMono_400Regular } from '@expo-google-fonts/martian-mono';
 import {
   PlusJakartaSans_400Regular,
@@ -12,6 +12,7 @@ import {
   PlusJakartaSans_700Bold_Italic,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { useFonts } from 'expo-font';
+import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import simbolosAndroid from 'expo-symbols/androidWeights/regular';
 import { focusManager, MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -144,6 +145,11 @@ export default function RootLayout() {
       e a lista de notas, amanhã o que vier.
     */
     <GestureHandlerRootView>
+      {/*
+        O "Compartilhar" chega antes de tudo e fica guardado: sem sessão ele espera o login (por
+        isso não some quando o app vai ao fundo, como na ida ao e-mail buscar o código).
+      */}
+      <ShareIntentProvider options={{ resetOnBackground: false }}>
       <QueryClientProvider client={queryClient}>
       <AppThemeProvider>
         {/*
@@ -158,6 +164,7 @@ export default function RootLayout() {
         </CortinaProvider>
       </AppThemeProvider>
       </QueryClientProvider>
+      </ShareIntentProvider>
     </GestureHandlerRootView>
   );
 }
@@ -183,6 +190,22 @@ function AvisoDaAbertura({ pronto, temSessao }: { pronto: boolean; temSessao: bo
     if (temSessao && locked && estado !== 'falhou') cortina.segurarAbertura();
     else if (pronto) cortina.marcarPronto(temSessao ? 'app' : 'conta');
   }, [pronto, carregando, temSessao, locked, estado, cortina]);
+  return null;
+}
+
+/**
+ * Com sessão e já dentro do app, cada compartilhado abre "Lançar o que chegou" UMA vez (voltar
+ * sem montar não reabre). Espera sair de `/`: o `Redirect` da raiz é um `replace` e trocaria a
+ * tela recém-aberta.
+ */
+function AbreOCompartilhado({ pathname }: { pathname: string }) {
+  const { hasShareIntent, shareIntent } = useShareIntentContext();
+  const aberto = useRef<unknown>(null);
+  useEffect(() => {
+    if (!hasShareIntent || aberto.current === shareIntent || pathname === '/') return;
+    aberto.current = shareIntent;
+    if (pathname !== '/compartilhado') router.push('/compartilhado');
+  }, [hasShareIntent, shareIntent, pathname]);
   return null;
 }
 
@@ -336,6 +359,7 @@ function AppTree() {
                */
               <>
                 <StatusBar style={statusBarStyle} />
+                {destino === 'app' && navegadorPronto ? <AbreOCompartilhado pathname={pathname} /> : null}
                 {/* A camada do voo do cartão mora ao lado do `<Stack>`, acima das telas (800). */}
                 <FlightProvider>
                 <Stack
@@ -562,6 +586,7 @@ function AppTree() {
                 <Stack.Screen name="import-history" options={{ title: 'Importações' }} />
                   <Stack.Screen name="captura-notificacoes" options={{ title: 'Lançar pelas notificações' }} />
                   <Stack.Screen name="finance/capturas" options={{ title: 'A confirmar' }} />
+                  <Stack.Screen name="compartilhado" options={{ title: 'Lançar o que chegou' }} />
                   {/* Paywall é modal fechável SEMPRE: paywall que não fecha é reprovação na App Review. */}
                   <Stack.Screen
                     name="paywall"

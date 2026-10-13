@@ -127,6 +127,22 @@ module.exports = ({ config }) => {
           ],
         },
       ],
+      /*
+        Compartilhar comprovante/print para o ProOps (12/10/2026). O App Group é o MESMO dos widgets
+        (`group.${id}`): um grupo por variante, nunca o de produção no app de dev. No Android o
+        plugin põe a MainActivity em `singleTask` (o intent chega na instância aberta).
+      */
+      [
+        'expo-share-intent',
+        {
+          iosActivationRules: {
+            NSExtensionActivationSupportsText: true,
+            NSExtensionActivationSupportsImageWithMaxCount: 1,
+          },
+          androidIntentFilters: ['text/*', 'image/*'],
+          iosAppGroupIdentifier: `group.${id}`,
+        },
+      ],
       [
         'react-native-android-widget',
         {
