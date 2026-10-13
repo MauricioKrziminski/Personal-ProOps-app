@@ -47,6 +47,7 @@ import { useApagarConta } from '@/hooks/use-apagar-conta';
 import { appUpdateAction, appUpdateSubtitle, type AppUpdateState } from '@/lib/app-update';
 import { supabase, supabaseUrl } from '@/lib/supabase';
 import { telefoneLegivel } from '@/lib/phone-br';
+import { capturaDisponivel } from '../../../../modules/proops-captura';
 
 const TEMAS: { value: ThemeMode; label: string }[] = [
   { value: 'system', label: 'Sistema' },
@@ -493,6 +494,9 @@ export default function ProfileScreen() {
         <Row title="Regras" subtitle="Categoria automática por palavra" icon="wand.and.stars" onPress={() => router.push('/finance/rules')} />
         <Row title="Importar extrato" icon="square.and.arrow.down" onPress={() => router.push('/import')} />
         <Row title="Importações" icon="clock.arrow.circlepath" onPress={() => router.push('/import-history')} />
+        {capturaDisponivel() ? (
+          <Row title="Lançar pelas notificações" icon="bell.badge" onPress={() => router.push('/captura-notificacoes')} />
+        ) : null}
       </Section>
 
       <AlertPreferencesSection

@@ -165,6 +165,7 @@ const MATERIAL: Record<string, MaterialName> = {
   'plus.circle': 'add_circle',
   'plus.circle.fill': 'add_circle',
   'plus.square.on.square': 'library_add',
+  'doc.on.doc': 'content_copy',
   'questionmark.circle': 'help',
   'questionmark.folder': 'folder_open',
   'rectangle.portrait.and.arrow.right': 'logout',

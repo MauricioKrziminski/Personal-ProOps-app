@@ -40,6 +40,7 @@ import {
   type TipoDeLancamento,
 } from '@/lib/lancar';
 import { perguntasDoParam } from '@/lib/voice-draft';
+import { useResolverCaptura } from '@/hooks/use-capturas';
 
 /** De que tabela vem o registro aberto, quando a entrada não diz. */
 const ORIGEM_DO_TIPO: Record<TipoDeLancamento, OrigemDaConversao['tipo']> = {
@@ -85,6 +86,7 @@ export default function LancarScreen() {
   const [contraparte, setContraparte] = useState<string | null>(p.counterparty ?? null);
   const [nota, setNota] = useState<string | null>(p.nota ?? null);
   const usouFavorito = useUsouFavorito();
+  const resolverCaptura = useResolverCaptura();
   /** Usar um favorito só PREENCHE: remonta o corpo com os campos dele e a data de hoje. */
   const usarFavorito = (f: Favorito) => {
     const { params } = paramsDaCopia(f.modelo, isoToBR(localISODate()));
@@ -168,6 +170,8 @@ export default function LancarScreen() {
 
   const onSalvo = (criarOutro: boolean) => {
     void avaliar();
+    // Veio de "A confirmar" (captura de notificação): o lançamento salvo confirma a captura.
+    if (doAplicar && p.captura) resolverCaptura.mutate({ id: p.captura, status: 'confirmed' });
     if (!criarOutro) return router.back();
     setComum(comumDepoisDeSalvar(lerComum.current()));
     setEstados({});

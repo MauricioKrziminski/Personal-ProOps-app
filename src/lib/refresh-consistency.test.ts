@@ -776,6 +776,8 @@ function renderToday(bill: { kind: 'invoice' | 'transaction'; ref_id: string }) 
       useJanelasPorGrupo: () => ({ janelaDe: (_g: string, itens: unknown[]) => ({ visiveis: itens, restantes: 0, proximos: 0 }), verMais: () => {} }),
     };
     if (name === '@/hooks/use-bool-pref') return { useBoolPref: () => [false, () => {}] };
+    if (name === '@/hooks/use-capturas') return { useCapturas: () => query };
+    if (name === '@/components/feed/capturas-da-hoje') return { CapturasDaHoje: 'CapturasDaHoje', pendentesDaCaptura: () => [] };
     if (name === '@/hooks/use-acesso') return { useSemAssinatura: () => false };
     if (name === '@/hooks/use-agora') return { useAgora: () => new Date(2026, 8, 8, 12, 0).getTime() };
     if (name === '@/hooks/use-notes') return { useNotesList: () => ({ ...query, data: { pages: [[]] } }), useNoteFolders: () => query };

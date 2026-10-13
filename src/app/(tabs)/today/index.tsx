@@ -5,6 +5,7 @@ import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { ErrorCard } from '@/components/error-card';
 import { AgendaItem, LinhaDoAtrasado } from '@/components/feed/agenda-item';
+import { CapturasDaHoje, pendentesDaCaptura } from '@/components/feed/capturas-da-hoje';
 import { DinheiroDoDia } from '@/components/feed/dinheiro-do-dia';
 import { AgoraLinha, GrupoDoDia, RotuloNoGrupo } from '@/components/feed/grupo-do-dia';
 import { LinhaDeLembrete } from '@/components/feed/lembrete-do-dia';
@@ -35,6 +36,7 @@ import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useSemAssinatura } from '@/hooks/use-acesso';
 import { useAgora } from '@/hooks/use-agora';
 import { useBoolPref } from '@/hooks/use-bool-pref';
+import { useCapturas } from '@/hooks/use-capturas';
 import { usarDica } from '@/hooks/use-dicas';
 import {
   useAccountBalances,
@@ -155,6 +157,7 @@ export default function TodayScreen() {
   const saldos = useAccountBalances();
   const notas = useNotesList({ sort: 'recentes' });
   const pastas = useNoteFolders();
+  const capturas = useCapturas();
   const setup = useSetupProgress();
   const proximo = useProximoPasso(session?.user?.id);
   const [passosEscondidos, esconderPassos] = useBoolPref(`hoje:passos-escondidos:${session?.user?.id ?? ''}`);
@@ -456,6 +459,14 @@ export default function TodayScreen() {
     </Bloco>
   );
 
+  // Só existe com algo pendente: sem isso, o `Bloco` vazio abriria um vão de 24dp na cascata.
+  const capturasPendentes = pendentesDaCaptura(capturas.data);
+  const capturasBlock = capturasPendentes.length ? (
+    <Bloco key="capturas">
+      <CapturasDaHoje pendentes={capturasPendentes} />
+    </Bloco>
+  ) : null;
+
   const dinheiroBlock = gasto.isError ? (
     <Bloco key="dinheiro">
       <ErrorCard onRetry={() => gasto.refetch()} />
@@ -579,6 +590,7 @@ export default function TodayScreen() {
           gastos.refetch(),
           notas.refetch(),
           pastas.refetch(),
+          capturas.refetch(),
         ])
       }>
       {tablet ? (
@@ -587,6 +599,7 @@ export default function TodayScreen() {
           passos={passosBlock}
           semana={semanaBlock}
           dia={diaBlock}
+          capturas={capturasBlock}
           dinheiro={dinheiroBlock}
           proximos={proximosBlock}
           notas={notasBlock}
@@ -594,7 +607,7 @@ export default function TodayScreen() {
       ) : (
         /* Os blocos DIRETO, sem `Fragment`: a cascata do `Screen` faz de todo elemento uma caixa com
            `gap`, e um `Fragment` com `null` dentro era um vão de 24dp (passos escondidos, sem notas). */
-        [saudacaoBlock, passosBlock, semanaBlock, diaBlock, dinheiroBlock, proximosBlock, notasBlock]
+        [saudacaoBlock, passosBlock, semanaBlock, diaBlock, capturasBlock, dinheiroBlock, proximosBlock, notasBlock]
       )}
     </Screen>
   );
