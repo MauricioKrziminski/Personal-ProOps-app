@@ -1620,6 +1620,8 @@ domínio nova; o que o agente NÃO faz de cada um está em `docs/AGENTE-PARIDADE
 Spec `2026-10-12-captura-de-lancamentos-design.md`. **Nada é lançado sozinho**: a notificação do banco
 (Android) vira `captured_notifications` com o rascunho do MESMO intérprete da voz, e confirmar abre
 `/finance/lancar` preenchido. Regex só confere se há valor em reais. O que já está lançado vira
-`duplicate` pela cascata da importação (`reconcile.conciliar`). A captura não conta no limite mensal
-(`ai_events.kind = 'capture'`), teto de 60 por espaço por dia. Lista de bancos em DOIS lugares
+`duplicate` pela cascata da importação (`reconcile.conciliar`); `duplicate` sem decisão em 30 dias
+vira `discarded` com `texto = null`. Exige assinatura ativa (402 sem ela); não conta no limite
+mensal nem na rajada por hora do chat (`ai_events.kind = 'capture'`), teto de 60 por espaço por dia.
+Sair da conta desliga a captura e esvazia a fila do aparelho. Lista de bancos em DOIS lugares
 (`src/lib/captura.ts` e `agent/app/routes/captures.py`, presas por `captura.test.ts`).

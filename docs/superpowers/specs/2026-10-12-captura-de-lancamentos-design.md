@@ -46,12 +46,14 @@ Data: 12/10/2026. Pedido do dono do produto: *"automatizar o lançamento de um g
    (pelo WhatsApp, por exemplo) entra como `duplicate` com o lançamento achado, fora da Hoje —
    inclusive `near_match` e `uncertain` (mesmo valor em poucos dias, nome parecido), porque o nome
    da notificação ("MERCADO SAO JOSE") quase nunca é o que a pessoa escreveu. Esses vão para
-   "Parecem já lançados", onde ela decide.
+   "Parecem já lançados", onde ela decide. O que ela não decidir em **30 dias** vira `discarded`
+   com `texto = null` (o agente varre na próxima captura do espaço): já casou com um lançamento.
 7b. **Capturas não entram no badge da aba nem em `pendentesDaHoje`.** O badge é o que o "Seu dia"
    tem para resolver (`design.md` §8); o bloco "A confirmar" mostra a própria contagem.
-8. **Cota:** captura não conta no limite MENSAL de mensagens do plano (a pessoa não "mandou
-   mensagem"), mas passa pelo consentimento de IA e pela rajada por hora (`check_limits`,
-   `kind='capture'`) e grava `ai_events` com `kind='capture'` (custo medido). Teto duro de
+8. **Cota:** captura **exige assinatura ativa** (`plan_status.access = 'subscriber'`, senão 402 e
+   a fila fica no aparelho) e o consentimento de IA, mas não conta no limite MENSAL de mensagens
+   (a pessoa não "mandou mensagem") nem na rajada por hora do chat — uma fila de fim de semana
+   barraria o WhatsApp dela. Grava `ai_events` com `kind='capture'` (custo medido). Teto duro de
    **60 chamadas de modelo de captura por espaço em 24 h** (contadas em `ai_events`, inclusive as
    que concluíram "não é lançamento"). Custo estimado: ~US$ 0,002 por notificação
    no Haiku.
