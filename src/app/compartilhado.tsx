@@ -14,6 +14,9 @@ import { AgentApiError, createFinanceDraft, rascunhoDaImagem } from '@/lib/agent
 import { localISODate } from '@/lib/dates';
 import { hrefDoRascunho } from '@/lib/voice-draft';
 
+/** O teto do agente (MAX_CONTENT): acima dele a rota recusa com 422. */
+const MAX_TEXTO = 4000;
+
 /**
  * "Compartilhar" de outro app (comprovante, print, texto do Pix) → o rascunho do lançamento.
  * Nada é gravado aqui: "Montar lançamento" abre o formulário preenchido, e salvar é lá.
@@ -43,7 +46,7 @@ export default function Compartilhado() {
     try {
       const r = arquivo
         ? await rascunhoDaImagem(arquivo.path, localISODate(), fuso)
-        : await createFinanceDraft(texto, localISODate(), fuso);
+        : await createFinanceDraft(texto.slice(0, MAX_TEXTO), localISODate(), fuso);
       router.replace(hrefDoRascunho(r));
     } catch (e) {
       // Sem consentimento: o mesmo aviso da voz, e só a pessoa tenta de novo (Apple 5.1.2(i)).

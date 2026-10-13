@@ -171,7 +171,7 @@ export default function LancarScreen() {
   const onSalvo = (criarOutro: boolean) => {
     void avaliar();
     // Veio de "A confirmar" (captura de notificação): o lançamento salvo confirma a captura.
-    if (doAplicar && p.captura) resolverCaptura.mutate({ id: p.captura, status: 'confirmed' });
+    if (p.captura) resolverCaptura.mutate({ id: p.captura, status: 'confirmed' });
     if (!criarOutro) return router.back();
     setComum(comumDepoisDeSalvar(lerComum.current()));
     setEstados({});

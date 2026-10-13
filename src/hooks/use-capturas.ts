@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { capturaDisponivel, estadoDaCaptura, notificacoesPendentes, removerPendentes } from '../../modules/proops-captura';
+import { capturaDisponivel, configurarCaptura, estadoDaCaptura, notificacoesPendentes, removerPendentes } from '../../modules/proops-captura';
 import { useToast } from '@/components/ui/toast';
 import { useRealtimeInvalidate } from '@/hooks/use-items';
 import { useSession } from '@/hooks/use-session';
@@ -20,22 +20,28 @@ export type Captura = {
 
 const CHAVE = ['captured_notifications'];
 
-/** O que está "a confirmar" (e o que parece já lançado), do mais recente para o mais antigo. */
-export function useCapturas() {
+/**
+ * O que está "a confirmar" (e o que parece já lançado), do mais recente para o mais antigo. `limite`
+ * cresce pelo "Ver mais" e `total` é a contagem exata do servidor; `status` recorta (a Hoje só quer `pending`).
+ */
+export function useCapturas(limite = 20, status?: Captura['status']) {
   useRealtimeInvalidate('captured_notifications', CHAVE);
-  return useQuery({
-    queryKey: CHAVE,
+  const q = useQuery({
+    placeholderData: keepPreviousData,
+    queryKey: [...CHAVE, String(limite), status ?? 'todas'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, count, error } = await supabase
         .from('captured_notifications')
-        .select('id, bank, posted_at, status, draft, entendido, amount_cents, occurred_at, match_transaction_id')
-        .in('status', ['pending', 'duplicate'])
+        .select('id, bank, posted_at, status, draft, entendido, amount_cents, occurred_at, match_transaction_id', { count: 'exact' })
+        .in('status', status ? [status] : ['pending', 'duplicate'])
         .order('posted_at', { ascending: false })
-        .limit(100);
+        .limit(limite);
       if (error) throw error;
-      return (data ?? []) as Captura[];
+      const itens = (data ?? []) as Captura[];
+      return { itens, total: count ?? itens.length };
     },
   });
+  return { ...q, data: q.data?.itens, total: q.data?.total };
 }
 
 /** Confirmar/descartar apaga o texto da notificação: ele só existe enquanto o item está em aberto. */
@@ -64,6 +70,12 @@ export function useResolverCaptura() {
 export function useEnviarCapturas() {
   const userId = useSession().session?.user.id;
   const qc = useQueryClient();
+  // Saiu (sair, conta apagada, sessão revogada): para a captura e esvazia a fila do aparelho.
+  const tinha = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (tinha.current && !userId && capturaDisponivel()) configurarCaptura(false, []);
+    tinha.current = userId;
+  }, [userId]);
   useEffect(() => {
     if (!userId || !capturaDisponivel()) return;
     let enviando = false;

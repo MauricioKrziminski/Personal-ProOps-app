@@ -62,14 +62,14 @@ export function LinhaDaCaptura({ captura: c, acoes }: { captura: Captura; acoes:
 }
 
 /** "A confirmar": compras e Pix lidos das notificações. Quem decide se o bloco existe é a Hoje. */
-export function CapturasDaHoje({ pendentes }: { pendentes: Captura[] }) {
+export function CapturasDaHoje({ pendentes, total }: { pendentes: Captura[]; total?: number }) {
   const acoesDa = useAcoesDaCaptura();
   return (
     <View style={styles.bloco}>
       <BlockHeader
         title="A confirmar"
         voice="app"
-        count={pendentes.length}
+        count={total ?? pendentes.length}
         action={{ label: 'Ver todos', accessibilityLabel: 'Ver tudo o que está a confirmar', onPress: () => router.push('/finance/capturas') }}
       />
       <Section>

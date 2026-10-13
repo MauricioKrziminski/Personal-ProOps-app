@@ -157,7 +157,7 @@ export default function TodayScreen() {
   const saldos = useAccountBalances();
   const notas = useNotesList({ sort: 'recentes' });
   const pastas = useNoteFolders();
-  const capturas = useCapturas();
+  const capturas = useCapturas(3, 'pending');
   const setup = useSetupProgress();
   const proximo = useProximoPasso(session?.user?.id);
   const [passosEscondidos, esconderPassos] = useBoolPref(`hoje:passos-escondidos:${session?.user?.id ?? ''}`);
@@ -463,7 +463,7 @@ export default function TodayScreen() {
   const capturasPendentes = pendentesDaCaptura(capturas.data);
   const capturasBlock = capturasPendentes.length ? (
     <Bloco key="capturas">
-      <CapturasDaHoje pendentes={capturasPendentes} />
+      <CapturasDaHoje pendentes={capturasPendentes} total={capturas.total} />
     </Bloco>
   ) : null;
 
