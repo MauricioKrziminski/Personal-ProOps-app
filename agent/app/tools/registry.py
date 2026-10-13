@@ -16,6 +16,7 @@ import logging
 import psycopg
 
 from app import db
+from app.conhecimento.app import AJUDA_GERAL
 from app.config import get_settings
 from app.graph.schemas import (
     READ_ONLY,
@@ -74,10 +75,8 @@ NOTES_TOOLS = {
     NotesActionType.QUERY_REMINDERS: notes.query_reminders,
 }
 
-AJUDA = (
-    "🤔 Não entendi essa parte. Tenta algo como: \"gastei 45 no mercado\", "
-    "\"recebi 500 de freela\", \"quanto gastei esse mês?\" ou \"anota: ligar pro dentista\"."
-)
+# Uma fonte só: a entrada "o que o agente faz" do catálogo (`conhecimento/app.py`).
+AJUDA = "🤔 Não entendi essa parte.\n" + AJUDA_GERAL
 
 
 def _tool(action: FinanceAction | FinanceQuery | NotesAction):

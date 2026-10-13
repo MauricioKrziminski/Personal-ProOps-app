@@ -101,3 +101,29 @@ def wants_latest(*textos: str | None) -> bool:
         if t and _RECENCIA_SOLTA.search(t):
             return True
     return False
+
+
+# "Em que conta ficou esse gasto?", "qual categoria você usou?": pergunta SOBRE o lançamento que a
+# conversa acabou de escrever. Duas pontas obrigatórias (um atributo perguntado + um ponteiro), para
+# não sequestrar "qual o saldo dessa conta?" ou "quanto gastei nesse mês?". "conta" fica fora do
+# substantivo daqui: nomeia uma entidade de verdade.
+_SUBST_LANCAMENTO = (
+    r"lançamento|lancamento|gasto|despesa|receita|compra|pagamento|recebimento"
+    r"|transação|transacao|registro"
+)
+_PERGUNTA_ATRIBUTO = re.compile(
+    r"\b(em\s+que|qual|quais|que|quanto)\b[^?.!]{0,25}?\b"
+    r"(conta|categoria|cart[aã]o|valor|data|dia|forma|status|custou|ficou|foi)\b",
+    re.IGNORECASE,
+)
+_PONTEIRO_LANCAMENTO = re.compile(
+    rf"\b(?:[nd]?ess[ea]|[nd]?est[ea]|[nd]?aquel[ea])\s+(?:{_SUBST_LANCAMENTO})\b"
+    r"|\bvoc[eê]\s+(?:usou|colocou|lan[cç]ou|registrou|classificou)\b",
+    re.IGNORECASE,
+)
+
+
+def pergunta_do_antecedente(texto: str | None) -> bool:
+    """A frase pergunta um atributo do lançamento que ACABOU de ser escrito?"""
+    t = texto or ""
+    return bool(_PERGUNTA_ATRIBUTO.search(t) and _PONTEIRO_LANCAMENTO.search(t))

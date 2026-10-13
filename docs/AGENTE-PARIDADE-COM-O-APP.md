@@ -768,3 +768,10 @@ nem `FinanceAction` (teto de 252).
 | app | agente |
 |---|---|
 | "Aplicar" no adiantamento da Projeção abre `/finance/aplicar-adiantamento` e grava UM lançamento que cobre as parcelas (`apply_anticipation`); "Editar adiantamento" muda título, valor, data e conta (`edit_anticipation`) | **Não aplica nem edita**: o "E se…?" não existe na conversa. **Apagar desfaz**: `delete_transaction`/`undo_last` sobre o lançamento de uma compra chamam `private.desfazer_adiantamento_da_compra` (as parcelas voltam com o id); dívida e série desfazem pelo gatilho do próprio DELETE. Corrigir valor, data, título, conta ou parcelas é recusado ANTES do SIM (`policy.erro_de_correcao`, pela marca `adiantamento` que a janela de referência congela no candidato) com "muda no app, em *Editar adiantamento*" — a tool repete a recusa como segunda trava; a categoria muda por aqui. Parcelar o lançamento do adiantamento é recusado (`recusa_de_conversao`, e o banco recusa a mudança de estrutura desde `20261010130200`). A resposta do apagar diz que as parcelas voltaram. `tests/test_adiantamento.py`. |
+
+## Saber sobre o próprio app (13/10/2026)
+
+| app | agente |
+|---|---|
+| Guia (`/guia`), Ajuda e suporte, telas e menus | **Responde "onde faço X?", "o que você faz?" e "o que você não faz?"** pelo catálogo `agent/app/conhecimento/app.py` (o modelo só escolhe ids; o texto e o caminho escrito, "Finanças → Lançar", saem do catálogo). No chat do app a resposta traz botões "Abrir <tela>" (`ui_payload.links`). Nada encontrado: "fale com o suporte em Perfil → Ajuda e suporte". Tela ou menu NOVO no app = entrada nova (ou ajustada) no catálogo; `test_conhecimento_sincronia.py` quebra se uma rota some ou se o `GUIA` ganha um destino sem resposta. |
+| Detalhe do lançamento (conta, categoria, data) | **"Em que conta ficou esse gasto?"** logo depois de lançar: template sobre a linha do último registro escrito (`last_write_id`), sem modelo. |

@@ -1,3 +1,4 @@
+import { router, type Href } from 'expo-router';
 import { memo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -8,7 +9,7 @@ import { Sheet } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { Space } from '@/design/tokens';
 import type { AgentUiPayload } from '@/lib/agent-api';
-import { hitlControlsDisabled, parseUiActions, type UiOption } from '@/lib/agent-chat';
+import { hitlControlsDisabled, linksDoPayload, parseUiActions, type UiOption } from '@/lib/agent-chat';
 
 interface Props {
   payload: AgentUiPayload;
@@ -84,6 +85,24 @@ export const ChatActions = memo(function ChatActions({ payload, busy, onDecide }
 
   const inerte = hitlControlsDisabled(payload, { busy });
   const encerrada = payload.resolved;
+
+  // Resposta de ajuda: "Abrir <tela>" (campo `links`, só caminho interno; ver `linksDoPayload`).
+  const links = linksDoPayload(payload);
+  if (options.length === 0 && links.length > 0) {
+    return (
+      <View style={styles.bloco}>
+        {links.map((l) => (
+          <Button
+            key={l.rota}
+            label={l.rotulo}
+            variant="secondary"
+            block
+            onPress={() => router.push(l.rota as Href)}
+          />
+        ))}
+      </View>
+    );
+  }
 
   if (options.length === 0) return null;
 

@@ -14,6 +14,7 @@ import {
   conversationRoute,
   markResolved,
   parseInlineBold,
+  linksDoPayload,
   parseUiActions,
   plainText,
   defaultRandomBytes,
@@ -777,4 +778,22 @@ test('marcarTurnoLocal reabre também a mensagem que o servidor já gravou', () 
   assert.equal(m.status, 'processing');
   assert.equal(m.created_at, '2026-09-25T17:52:00.000Z');
   assert.equal((marcarTurnoLocal(cache as any, 'outro', { status: 'processing' }).pages[0].items[0] as any).status, 'failed');
+});
+
+test('links de ajuda: só caminho interno estrito vira botão', () => {
+  const links = linksDoPayload({
+    body: 'x',
+    links: [
+      { rotulo: 'Abrir Cartões', rota: '/finance/cards' },
+      { rotulo: 'Abrir site', rota: 'https://exemplo.com' },
+      { rotulo: 'Abrir', rota: '//exemplo.com' },
+      { rotulo: 'Abrir', rota: '/../etc' },
+      { rotulo: '', rota: '/today' },
+      { rotulo: 'Abrir', rota: 'finance' },
+      null,
+    ],
+  });
+  assert.deepEqual(links, [{ rotulo: 'Abrir Cartões', rota: '/finance/cards' }]);
+  assert.deepEqual(linksDoPayload({ links: 'x' }), []);
+  assert.deepEqual(linksDoPayload(null), []);
 });

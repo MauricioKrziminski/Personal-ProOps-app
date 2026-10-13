@@ -39,7 +39,21 @@ O serviço que recebe do WhatsApp, decide e escreve. Substituiu o par
   parcelas, e `finance_node` transforma a compra parcelada em 1x em gasto no cartão.
 - **Resposta ao usuário é template Python.** Zero segunda chamada de LLM para escrever texto sobre
   números que já lemos: um modelo escrevendo "você gastou aproximadamente" em cima de um valor
-  exato é alucinação com custo extra. O nó `geral` (saudação, ajuda) também não chama modelo.
+  exato é alucinação com custo extra. Saudação simples e agradecimento
+  também não chamam modelo. **Dúvida sobre o próprio app** ("onde faço um lançamento?", "o que você
+  faz?") passa pelo catálogo `app/conhecimento/app.py`: o modelo (papel `parse`, `conhecimento/ajuda.py`)
+  só ESCOLHE até 3 ids e o texto da resposta sai do catálogo — o modelo nunca escreve o que o app
+  tem, porque aí ele inventaria telas. Id fora do catálogo é descartado; nada escolhido vira "fale
+  com o suporte". Entra em `general_node` e como fallback do `compose` quando o turno termina só com
+  `unknown` (antes o texto fixo "não entendi"); conta em `llm_calls`. No app, as telas citadas
+  viajam em `ui_payload.links`. `AJUDA`/`AJUDA_GERAL` saem da entrada `agente_faz` (uma fonte).
+  `tests/test_conhecimento_sincronia.py` prende o catálogo às rotas de `src/app` e ao `GUIA`.
+  **"Em que conta ficou esse gasto?"** logo após lançar: o roteador e o parse de consulta rodam
+  como sempre; DEPOIS do modelo, `finance_query_node` troca a consulta por um template sobre a linha
+  relida (`tools/antecedente.py`, filtrada por workspace) só se há `last_write_id`, o domínio é só
+  consulta, o parse devolveu UMA `query_transactions` sem termo nem filtro e
+  `reference.pergunta_do_antecedente` casa. O padrão só escolhe entre duas leituras e nunca vira
+  porta de entrada que esconda ação; número nunca sai do modelo.
 - **Teto MEDIDO do schema: o PRODUTO propriedades × valores de enum, não cada um.** O
   `FinanceAction` está em **308** (22×14, soma 36; teto medido de 720 no Lite em 06/10/2026, ver
   `ia.md`); os outros seguem em 198/31. Passar disso devolve `400 INVALID_ARGUMENT` sem detalhe. `tests/test_schemas.py` prende o limite — somar campo

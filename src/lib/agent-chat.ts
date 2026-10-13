@@ -569,6 +569,32 @@ export interface UiPayloadShape {
   text?: string;
   buttons?: unknown;
   rows?: unknown;
+  /** Botões "Abrir <tela>" da resposta de ajuda (campo próprio: não é `pa:` nem `ds:`). */
+  links?: unknown;
+}
+
+export interface LinkDoChat {
+  rotulo: string;
+  rota: string;
+}
+
+/** Caminho interno do expo-router: "/" + segmentos simples. Sem esquema, "//", ".." nem espaço. */
+const ROTA_INTERNA = /^\/[a-z0-9][a-z0-9_-]*(\/[a-z0-9][a-z0-9_-]*)*$/;
+
+/**
+ * Os botões "Abrir <tela>" de `ui_payload.links`. A rota vem do servidor, mas só vale se for caminho
+ * interno estrito; qualquer outra coisa (URL, esquema, formato torto) é ignorada em silêncio.
+ */
+export function linksDoPayload(payload: UiPayloadShape | null | undefined): LinkDoChat[] {
+  if (!Array.isArray(payload?.links)) return [];
+  const links: LinkDoChat[] = [];
+  for (const l of payload.links as unknown[]) {
+    const { rotulo, rota } = (l ?? {}) as Record<string, unknown>;
+    if (typeof rotulo !== 'string' || !rotulo.trim() || typeof rota !== 'string') continue;
+    if (!ROTA_INTERNA.test(rota)) continue;
+    links.push({ rotulo: rotulo.trim().slice(0, 40), rota });
+  }
+  return links.slice(0, 3);
 }
 
 /**

@@ -349,6 +349,15 @@ nenhum outro:
 - Recorrência sempre como **RRULE** (`FREQ=MONTHLY;BYMONTHDAY=5`) — mesmo formato dos reminders.
 - Dinheiro sempre `amount_cents` inteiro ("45 reais" → 4500).
 
+## Ajuda sobre o app: o modelo só escolhe (13/10/2026)
+
+`conhecimento/ajuda.py`: uma chamada estruturada (papel `parse`, `no="ajuda"`) recebe a pergunta no
+envelope `<user_input>` mais a lista `id | título | exemplos` do catálogo e devolve `AjudaEscolha`
+(`ids` até 3, `fora`). Só duas propriedades: cabe folgado no teto de schema. O prompt do sistema é
+constante e o texto do usuário nunca entra nele. A resposta é o texto do catálogo; o modelo não
+escreve nada que o usuário leia. Mexeu no catálogo ou no prompt → `evaluate_answer_forms.py
+--secao ajuda` (27 casos: escolha certa, fora do app, injeção). O prompt do roteador não foi tocado.
+
 ## Embeddings e few-shot (06/10/2026)
 
 - Modelo `gemini-embedding-2`, 768 dimensões normalizadas. **Nível gratuito: 100 requisições/min de

@@ -35,6 +35,7 @@ from app.graph.schemas import (
     FinanceActionType,
     FinancePlan,
     FinanceQuery,
+    FinanceQueryType,
     FinanceQueryPlan,
     NotesAction,
     NotesPlan,
@@ -43,6 +44,7 @@ from app.graph.schemas import (
     ResourceAction, ResourceActionType, ResourceField, ResourcePlan,
 )
 from app.domain import matching
+from app.domain.reference import clean_term, pergunta_do_antecedente
 from app.domain.required import faltando
 from app.domain.money import cents_to_brl
 from app.graph.state import CHAVE_MIDIA, AgentState
@@ -50,7 +52,9 @@ from app.tools import atributos, guards, lote_d, movimentos, resolve
 from app.services import ia
 from app.tools.base import ExecContext
 from app.tools.finance import apply_rules
-from app.tools.registry import AJUDA, execute
+from app.conhecimento import ajuda
+from app.conhecimento.app import AJUDA_GERAL
+from app.tools.registry import execute
 
 log = logging.getLogger(__name__)
 
@@ -58,14 +62,37 @@ log = logging.getLogger(__name__)
 # antes da pergunta, esta é a frase que diz que nada mudou.
 NADA_DO_PAR = "Ainda não apaguei nem criei nada."
 
-AJUDA_GERAL = (
-    "👋 Eu organizo suas finanças e suas notas por aqui. Manda coisas como:\n"
-    "  • \"gastei 45 no mercado\"\n"
-    "  • \"recebi 500 de freela\"\n"
-    "  • \"me lembra de pagar o aluguel todo dia 5\"\n"
-    "  • \"anota: ligar pro dentista\"\n"
-    "  • \"quanto gastei esse mês?\""
-)
+# Saudação e agradecimento simples: respondem sem modelo (ver `route` e `general_node`).
+_SAUDACOES = {
+    "oi", "olá", "ola", "bom dia", "boa tarde", "boa noite",
+    "obrigado", "obrigada", "vlw", "valeu",
+}
+
+
+def _eh_saudacao(texto: str) -> bool:
+    return texto.lower().strip(" !?.,") in _SAUDACOES
+
+
+async def _ajuda_do_catalogo(state: AgentState) -> dict:
+    """Pergunta sobre o app: o modelo ESCOLHE entradas do catálogo e o texto sai dele.
+
+    Sem texto (só mídia) ou com o modelo fora do ar, vale a ajuda geral fixa. No app, as telas
+    citadas viram `links` do `ui_payload` (no WhatsApp o caminho já vai escrito no texto).
+    """
+    texto = (state.get("text") or "").strip()
+    chamadas = 0
+    corpo, links = AJUDA_GERAL, []
+    if texto:
+        try:
+            escolhidas = await ajuda.escolher(texto)
+            chamadas = 1
+            corpo, links = ajuda.responder(escolhidas)
+        except Exception:  # noqa: BLE001 — ajuda nunca derruba o turno
+            log.warning("escolha do catálogo falhou; segue a ajuda geral", exc_info=True)
+    ret: dict = {"results": [corpo], "llm_calls": chamadas}
+    if links and state.get("channel") == "app":
+        ret["reply"] = {"body": corpo, "text": corpo, "links": links}
+    return ret
 
 
 # ---------------------------------------------------------------------------
@@ -91,19 +118,7 @@ async def route(state: AgentState) -> dict:
     if not texto and not state.get("media"):
         return {"domains": [Domain.GERAL.value], "confidence": 1.0, "llm_calls": 0}
 
-    curto = texto.lower().strip(" !?.,")
-    if curto in {
-        "oi",
-        "olá",
-        "ola",
-        "bom dia",
-        "boa tarde",
-        "boa noite",
-        "obrigado",
-        "obrigada",
-        "vlw",
-        "valeu",
-    }:
+    if _eh_saudacao(texto):
         return {"domains": [Domain.GERAL.value], "confidence": 1.0, "llm_calls": 0}
 
     # Documento anexo é quase sempre cupom/fatura: vai direto para finanças.
@@ -488,10 +503,39 @@ async def finance_query_node(state: AgentState) -> dict:
         # 3 rodadas (09/10/2026), e o filtro escondia todo gasto do cartão sem forma informada.
         if a.payment_method and a.payment_method != "not_informed":
             a.payment_method = dom.forma_proposta(a.payment_method, texto)
+    if _consulta_do_antecedente(state, acoes):
+        # O padrão de texto só ESCOLHE entre duas leituras, DEPOIS do modelo: template sobre a
+        # linha relida do banco, número nunca sai do modelo.
+        from app.tools import antecedente
+
+        return {
+            "results": [await antecedente.descrever(state["workspace_id"], state["last_write_id"])],
+            "finance_queries": [],
+            "llm_calls": 1,
+        }
     return {
         "finance_queries": [a.model_dump() for a in acoes],
         "llm_calls": 1,
     }
+
+
+_FILTROS_DA_CONSULTA = ("category", "account", "query_from", "query_to", "amount_cents", "payment_method")
+
+
+def _consulta_do_antecedente(state: AgentState, acoes: list) -> bool:
+    """"Em que conta ficou esse gasto?": leitura SEM nada que a pessoa tenha dito para buscar.
+
+    Só vale com `last_write_id`, domínio só de consulta (nunca esconde uma correção dita junto),
+    uma única `query_transactions` sem termo nem filtro, e a frase apontando para o antecedente.
+    """
+    if not state.get("last_write_id") or set(state.get("domains") or []) != {"financas_consulta"}:
+        return False
+    if len(acoes) != 1 or acoes[0].type != FinanceQueryType.QUERY_TRANSACTIONS:
+        return False
+    a = acoes[0]
+    if clean_term(a.search_term) or any(getattr(a, c) for c in _FILTROS_DA_CONSULTA):
+        return False
+    return pergunta_do_antecedente(state.get("text"))
 
 
 async def _pastas_do_workspace(workspace_id) -> list[str]:
@@ -690,17 +734,19 @@ Catálogo:
 async def general_node(state: AgentState) -> dict:
     if state.get("halted"):
         return {}
-    """Conversa geral SEM chamar o modelo.
+    """Conversa geral: saudação sem modelo; dúvida sobre o app pelo catálogo.
 
-    Deixar o LLM escrever livremente aqui seria a única porta de texto não
-    verificado no produto — e a mais barata de fechar: respostas de saudação e
-    ajuda são finitas e conhecidas. De quebra, economiza uma chamada.
+    Deixar o LLM escrever livremente aqui seria a única porta de texto não verificado no
+    produto. O modelo só ESCOLHE entradas de `conhecimento/app.py`; o texto sai de lá.
     """
     # Só fala quando é o único domínio: "gastei 45 e oi" não pode responder o
     # bloco de ajuda inteiro colado na confirmação do gasto.
     if len(state.get("domains", [])) > 1:
         return {}
-    return {"results": [AJUDA_GERAL]}
+    texto = (state.get("text") or "").strip()
+    if not texto or _eh_saudacao(texto):
+        return {"results": [AJUDA_GERAL]}
+    return await _ajuda_do_catalogo(state)
 
 
 # ---------------------------------------------------------------------------
@@ -1535,11 +1581,19 @@ async def compose(state: AgentState) -> dict:
             ]
         return ret
     linhas = [l for l in state.get("results", []) if l]
+    extra: dict = {}
     if not linhas:
-        linhas = [AJUDA]
+        # Turno que terminou só com `unknown`: em vez do "não entendi" fixo, a mesma escolha do
+        # catálogo ("onde faço X?" que o parse não reconheceu como ação).
+        extra = await _ajuda_do_catalogo(state)
+        linhas = extra["results"]
+        reply = extra.get("reply")
+    else:
+        reply = None
     texto_reply = "\n".join(linhas)
     return {
-        "reply": texto_reply,
+        "reply": reply or texto_reply,
+        "llm_calls": extra.get("llm_calls", 0),
         "messages": [
             *state.get("messages", []),
             {"role": "assistant", "content": texto_reply},

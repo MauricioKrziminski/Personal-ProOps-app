@@ -390,6 +390,7 @@ mandava a lista de cartões (o MESMO payload que vira botão no WhatsApp); `pars
 |---|---|---|
 | `pa:<pendente>:…` | HITL (`pending_actions`): confirmar, recusar, escolher um registro | rota `/actions/<pending_id>`, que revalida o candidato contra a lista CONGELADA |
 | `ds:<rascunho>:…` | rascunho: qual cartão, "é o total ou cada parcela?", "crio esse cartão?" | MENSAGEM comum com `clicked_id`; o servidor só aceita `ds:` por ali |
+| `links: [{rotulo, rota}]` (campo, sem prefixo) | resposta de AJUDA sobre o app (catálogo do agente): "Abrir <tela>" | `router.push(rota)` direto, sem rede. `linksDoPayload` (`agent-chat.ts`) só aceita caminho interno estrito (`/seg/seg`, sem esquema, `//` ou `..`) e no máximo 3; o resto é ignorado. Não é `pa:`/`ds:` e não trava o composer |
 
 Três regras que caem disso:
 
