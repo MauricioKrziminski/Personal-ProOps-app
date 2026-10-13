@@ -499,6 +499,11 @@ garantia sozinho virou responsabilidade do código:
   parse principal, sem terceira chamada) — e a cota grátis do Flash-Lite é 500/dia.
   Os fast-paths determinísticos — saudação, resposta SIM/NÃO, documento anexo — existem para
   devolver parte disso.
+- **Comprovante de Pix leva o NOME do perfil** (`_titular_do_turno`, só em turno com anexo, nos três
+  canais: WhatsApp, chat e Compartilhar). O comprovante mostra origem E destino, e sem saber quem
+  é a pessoa o modelo lançava o Pix RECEBIDO como gasto (Haiku e Gemini, 13/10/2026). O nome vai
+  envelopado (`account_holder`); sem `display_name` (conta antiga de telefone) segue o palpite de
+  antes, e o formulário mostra o lado.
 
 ## Operação (06/10/2026)
 
