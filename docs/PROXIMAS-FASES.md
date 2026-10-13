@@ -1527,6 +1527,46 @@ where sent_on >= current_date - 30 group by 1, 2 order by 3 desc;
 
 ---
 
+## Fase 7 — Guardar o comprovante no lançamento *(mapeada em 13/10/2026, NÃO iniciada)*
+
+Decisão do dono do produto (13/10/2026): *"deixa essa parte de guardar de fora por enquanto, apenas deixe
+mapeado"*. O motivo é a margem: custo fixo novo só entra com medição. Hoje a imagem (Compartilhar, WhatsApp, chat do
+app) passa pelo modelo e é DESCARTADA — nenhum byte fica guardado.
+
+### O que já existe
+
+- `transactions.attachment_path text` (`0017_import_and_rules.sql:119-121`), sem uso: nenhum código grava ou lê,
+  nenhum bucket nas migrations. `duplicar.ts` já não a copia.
+- A imagem chega normalizada (JPEG, ≤ 2000 px, sem EXIF/GPS) por `agent/app/services/imagens.py` nos três caminhos.
+
+### O desenho (quando for feito)
+
+- **Só quando a pessoa pede**: chave "Guardar comprovante" no formulário do lançamento (e "guardar?" no fim do SIM no
+  WhatsApp/chat). Nunca automático — é dado sensível parado e é custo.
+- **Onde**: Cloud Storage do projeto GCP (bucket privado em `southamerica-east1`, chave por
+  `workspace/<id>/transacao/<id>.jpg`), não o Supabase Storage: o plano gratuito do Supabase tem 1 GB de arquivos e
+  forçaria a troca de plano. O app nunca fala com o bucket: o agente entrega URL assinada curta (minutos) por
+  `agentFetch`, conferindo `ensure_owned`.
+- **Tamanho**: arquivar a imagem já normalizada recomprimida (~1600 px, qualidade ~70) ≈ 150 KB.
+- **Limite e retenção por plano** em `private.plan_limits` (quantidade/mês e meses guardados); a retenção diária apaga
+  o que venceu e zera `attachment_path`.
+- **Sai junto**: apagar o lançamento, apagar a conta (`delete_my_account` + limpeza do bucket por prefixo) e a
+  exportação "Baixar meus dados" (lista ou links). Política de Privacidade: item novo em §1, §3 e §5.
+
+### Custo (premissas a CONFERIR na hora, preço muda)
+
+1.000 pessoas × 30 comprovantes/mês × 150 KB ≈ 4,5 GB novos/mês. Armazenamento de objeto custa da ordem de
+US$ 0,02–0,04 por GB/mês: centavos por mês para mil pessoas, crescendo devagar. Ler a imagem com IA NÃO muda de custo
+(já é lida hoje). Medir antes de ligar: tamanho médio real do arquivo e fração de pessoas que ligam a chave.
+
+### Armadilhas
+
+- URL pública ou longa vaza comprovante: só assinada e curta.
+- Retomada de HITL não tem os bytes (`nodes.py`); guardar precisa acontecer no turno que leu a imagem, ou a pergunta
+  "guardar?" fica sem o que guardar.
+- Espaço compartilhado: membro vê o comprovante do lançamento do espaço? Decidir antes (padrão: quem vê o lançamento
+  vê o comprovante).
+
 ## Apêndice A — Decidido NÃO fazer
 
 ### Open Finance / sincronização bancária automática
