@@ -102,7 +102,7 @@ Teste: `com.android.shell` ("Teste (adb)"), aceito só em `__DEV__` no app e com
 
 - **Google Play, Data safety:** coletado "Financial info, Other financial info" e "Purchase history" (texto das
   notificações dos bancos; finalidade App functionality; NÃO efêmero, o texto fica guardado até confirmar ou
-  descartar) e "Photos" (imagens compartilhadas; efêmero, não ficam guardadas); criptografado em trânsito;
+  descartar) "Other in-app messages" (por precaução, conteúdo de notificação) e "Photos" (imagens compartilhadas; efêmero, não ficam guardadas); criptografado em trânsito;
   exclusão a pedido; provedores de IA tratados como service provider.
 - **Google Play, revisão:** a "prominent disclosure" está em Perfil, Lançar pelas notificações (folha "Antes de
   ativar"), antes de abrir o acesso; só pacotes da allowlist; sem `READ_SMS`.
