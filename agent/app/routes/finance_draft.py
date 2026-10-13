@@ -11,7 +11,6 @@ por adivinhação.
 
 from __future__ import annotations
 
-import asyncio
 import base64
 import logging
 import re
@@ -241,7 +240,7 @@ async def rascunho_da_imagem(
     if not _assinatura_de_imagem(dados):
         raise _erro(422, "invalid_image", "O arquivo não é uma imagem válida.")
     try:
-        dados, mime = await asyncio.to_thread(imagens.normalizar, dados, file.content_type)
+        dados, mime = await imagens.normalizar_em_fila(dados, file.content_type)
     except imagens.ImagemInvalida:
         raise _erro(422, "invalid_image", "O arquivo não é uma imagem válida.") from None
     perfil = await _abrir(user_id)

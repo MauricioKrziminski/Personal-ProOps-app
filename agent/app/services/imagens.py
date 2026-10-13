@@ -2,8 +2,8 @@
 como HEIC (app e WhatsApp). Tudo vira JPEG; o resto é bônus (tamanho e privacidade)."""
 from __future__ import annotations
 
+import asyncio
 import io
-import threading
 
 import pillow_heif
 from PIL import Image, ImageOps
@@ -17,8 +17,9 @@ LADO = 2000
 # do CABEÇALHO, antes de decodificar; o JPEG decodifica já reduzido (`draft`, até 1/8) e aceita mais.
 MAX_PIXELS = 50_000_000
 MAX_PIXELS_JPEG = 260_000_000
-# No máximo duas decodificações ao mesmo tempo por instância (app e WhatsApp juntos).
-_DECODIFICANDO = threading.BoundedSemaphore(2)
+# No máximo duas decodificações ao mesmo tempo por instância (app e WhatsApp juntos). A fila espera no
+# EVENT LOOP, nunca numa thread: o pool padrão do `to_thread` também verifica o JWT de toda requisição.
+_DECODIFICANDO = asyncio.Semaphore(2)
 
 
 class ImagemInvalida(ValueError):
@@ -32,8 +33,15 @@ def normalizar(dados: bytes, mime: str) -> tuple[bytes, str]:
     """
     if not mime.startswith("image/"):
         return dados, mime
-    with _DECODIFICANDO:
-        return _para_jpeg(dados)
+    return _para_jpeg(dados)
+
+
+async def normalizar_em_fila(dados: bytes, mime: str) -> tuple[bytes, str]:
+    """`normalizar` fora do event loop, no máximo duas por vez. É o que as rotas chamam."""
+    if not mime.startswith("image/"):
+        return dados, mime
+    async with _DECODIFICANDO:
+        return await asyncio.to_thread(normalizar, dados, mime)
 
 
 def _para_jpeg(dados: bytes) -> tuple[bytes, str]:

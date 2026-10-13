@@ -63,3 +63,31 @@ def test_heic_corrompido_e_imagem_invalida():
     for quebrado in (buf.getvalue()[: len(buf.getvalue()) // 2], buf.getvalue()[:40]):
         with pytest.raises(imagens.ImagemInvalida):
             imagens.normalizar(quebrado, "image/heic")
+
+
+async def test_no_maximo_duas_decodificacoes_por_vez_e_a_espera_nao_ocupa_thread(monkeypatch):
+    import asyncio
+    import threading
+
+    ativas, pico, solta = 0, 0, threading.Event()
+    trava = threading.Lock()
+
+    def lenta(dados, mime):
+        nonlocal ativas, pico
+        with trava:
+            ativas += 1
+            pico = max(pico, ativas)
+        solta.wait(2)
+        with trava:
+            ativas -= 1
+        return dados, "image/jpeg"
+
+    monkeypatch.setattr(imagens, "normalizar", lenta)
+    tarefas = [asyncio.create_task(imagens.normalizar_em_fila(b"x", "image/heic")) for _ in range(5)]
+    await asyncio.sleep(0.2)
+    assert pico == 2
+    # com duas presas, o pool de threads continua livre para o resto (ex.: verificar o JWT)
+    assert await asyncio.wait_for(asyncio.to_thread(lambda: "ok"), 1) == "ok"
+    solta.set()
+    await asyncio.gather(*tarefas)
+    assert pico == 2

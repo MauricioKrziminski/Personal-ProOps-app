@@ -356,7 +356,7 @@ async def _extract_batch(lote: list[dict]) -> dict | None:
                 continue
             if mime.startswith("image/"):
                 try:
-                    conteudo, mime = await asyncio.to_thread(imagens.normalizar, conteudo, mime)
+                    conteudo, mime = await imagens.normalizar_em_fila(conteudo, mime)
                 except imagens.ImagemInvalida:
                     # a reserva (Gemini) ainda tenta ler os bytes originais
                     log.warning("Imagem do WhatsApp não decodificou; segue com o original")
