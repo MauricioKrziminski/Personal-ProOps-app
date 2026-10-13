@@ -63,6 +63,7 @@ export function PrivacidadeSection() {
       />
       <Row
         title="Receber novidades e ofertas"
+        subtitle="Por e-mail e WhatsApp"
         icon="envelope"
         trailing={
           <Interruptor

@@ -240,6 +240,10 @@ function route(method: string, path: string, body: Record<string, unknown>): unk
       row.origin = "manual";
       row.access = body.plan === "free" ? "lapsed" : "subscriber";
     }
+    if (act === "contact") {
+      if (!row.contact_ok) fail(409, "contact_opted_out", "A pessoa pediu para não receber contato.");
+      return { url: body.channel === "whatsapp" ? "https://wa.me/5511900000000?text=Ol%C3%A1%21" : `mailto:${row.email}?subject=ProOps` };
+    }
     if (act === "suspend") row.suspended = true;
     if (act === "reactivate") row.suspended = false;
     if (act === "unlink-whatsapp") row.whatsapp_linked = false;

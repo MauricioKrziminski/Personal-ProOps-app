@@ -117,6 +117,7 @@ export const api = {
   notes: (id: string) => request<{ items: Note[] }>("GET", `/accounts/${id}/notes`),
   addNote: (id: string, body: string) => request<Note>("POST", `/accounts/${id}/notes`, { body }),
   deleteNote: (id: string, noteId: string) => request<{ deleted: boolean }>("DELETE", `/accounts/${id}/notes/${noteId}`),
+  contact: (id: string, channel: "whatsapp" | "email") => request<{ url: string }>("POST", `/accounts/${id}/contact`, { channel }),
   notify: (id: string, title: string, body: string) => request<{ sent: number }>("POST", `/accounts/${id}/notify`, { title, body }),
   appConfig: () => request<AppConfig>("GET", "/app-config"),
   saveAppConfig: (c: Omit<AppConfig, "updated_at" | "updated_by">) => request<AppConfig>("PUT", "/app-config", c),

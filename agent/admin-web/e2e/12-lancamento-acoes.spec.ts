@@ -37,13 +37,37 @@ test.describe("Lançamento: ações que gravam", () => {
     expect(txt.trim().split("\n")).toHaveLength(n + 1); // cabeçalho + as encerradas
     expect(txt.charCodeAt(0), "BOM UTF-8 no início (o Excel abre com acento certo)").toBe(0xfeff);
     const [cabecalho, ...linhas] = txt.slice(1).trim().split("\r\n");
-    expect(cabecalho).toBe("user_id,email,name,created_at,last_sign_in_at,last_seen_at,last_app_version,plan,status,access,is_trial,period_end,origin,ai_used,ai_max,wa_used,wa_max,whatsapp_linked,suspended,contact_ok");
+    expect(cabecalho).toBe("user_id,email,name,created_at,last_sign_in_at,last_seen_at,last_app_version,plan,status,access,is_trial,period_end,origin,ai_used,ai_max,wa_used,wa_max,whatsapp_linked,suspended,contact_ok,whatsapp");
     const celulas = linhas.find((l) => l.startsWith(`${U.encerrada.id},`))!.split(",");
     expect(celulas[1]).toBe(U.encerrada.email); // célula conhecida do seed
     expect(celulas[2], "fórmula neutralizada: começa com apóstrofo").toBe("'=1+1");
     expect(celulas[9]).toBe("lapsed");
     await expect(page.getByText("CSV exportado.")).toBeVisible();
     await expect.poll(async () => (await sql("select 1 from public.admin_audit_events where action = 'accounts_exported'")).length).toBe(antes + 1);
+  });
+
+  test("Entrar em contato: WhatsApp abre o link e audita; quem desligou não tem botão", async ({ page, context }) => {
+    const id = U.apple.id;
+    // wa.me é externo: a aba é respondida aqui, o que importa é o endereço que ela recebeu
+    await context.route("https://wa.me/**", (rt) => rt.fulfill({ status: 200, contentType: "text/html", body: "ok" }));
+    try {
+      await abrir(page, "apple");
+      await page.getByRole("button", { name: "Entrar em contato" }).click();
+      const [aba] = await Promise.all([page.waitForEvent("popup"), page.getByRole("menuitem", { name: "WhatsApp" }).click()]);
+      await expect.poll(() => aba.url()).toMatch(/^https:\/\/wa\.me\/5511988880010\?text=/);
+      await expect.poll(async () => (await acoes("apple")).filter((e) => e.action === "contact_started").map((e) => e.payload)).toEqual([{ channel: "whatsapp" }]);
+      await aba.close();
+
+      await sql("update public.profiles set marketing_opt_out_at = now() where id = $1", [id]);
+      await page.reload();
+      await expect(page.getByText("Não quer contato")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Entrar em contato" })).toHaveCount(0);
+      const r = await adminApi("POST", `/accounts/${id}/contact`, { channel: "email" });
+      expect(r.status, "o servidor recusa mesmo sem o botão").toBe(409);
+    } finally {
+      await sql("update public.profiles set marketing_opt_out_at = null where id = $1", [id]);
+      await sql("delete from public.admin_audit_events where target_user_id = $1 and action = 'contact_started'", [id]);
+    }
   });
 
   test("página App: valida, mostra prévia, salva e diz o que mudou", async ({ page }, info) => {

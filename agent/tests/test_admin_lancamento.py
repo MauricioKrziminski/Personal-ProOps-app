@@ -36,7 +36,7 @@ def _linha(**kw):
 @pytest.fixture
 def banco(monkeypatch):
     est = {"sql": [], "args": [], "escritas": [], "total": 1, "linhas": [_linha()], "token": "ExponentPushToken[x]",
-           "convite": {"status": "pending"}, "membro": {"role": "member"}, "nota_apagada": {"id": NOTA},
+           "convite": {"status": "pending"}, "alvo": {}, "membro": {"role": "member"}, "nota_apagada": {"id": NOTA},
            "config": {c: None for c in admin._CONFIG_CAMPOS} | {"updated_at": AGORA, "updated_by": None}}
 
     @asynccontextmanager
@@ -54,7 +54,8 @@ def banco(monkeypatch):
                     "last_app_version": "1.4.2", "last_app_platform": "ios", "last_seen_at": AGORA,
                     "push_tokens": 1, "notes_count": 2}
         if "w.owner_id = p.id" in sql:
-            return {"id": ALVO, "email": "a@b.com", "phone": TELEFONE, "expo_push_token": est["token"], "ws": WS}
+            return {"id": ALVO, "email": "a@b.com", "phone": TELEFONE, "expo_push_token": est["token"], "ws": WS,
+                    "display_name": "Ana Souza", "marketing_opt_out_at": None} | est["alvo"]
         if "count(*)::int as n" in sql:
             return {"n": est["total"]}
         if "from public.workspace_invites" in sql:
@@ -110,6 +111,7 @@ NOVAS_ROTAS = [
     ("post", f"/admin/api/accounts/{ALVO}/invites/{CONVITE}/revoke", {}),
     ("post", f"/admin/api/accounts/{ALVO}/members/{MEMBRO}/remove", {}),
     ("post", f"/admin/api/accounts/{ALVO}/notify", {"title": "t", "body": "b"}),
+    ("post", f"/admin/api/accounts/{ALVO}/contact", {"channel": "whatsapp"}),
     ("get", "/admin/api/app-config", None),
     ("put", "/admin/api/app-config", {}),
 ]
@@ -204,7 +206,7 @@ def test_sinal_de_inativos_usa_uso_do_app_e_cai_no_login():
 
 # ── CSV ──────────────────────────────────────────────────────────────────────────────────────────────────
 def test_csv_com_bom_cabecalho_filtros_e_auditoria(cli, banco):
-    banco["linhas"] = [_linha(), _linha(name="=HYPERLINK(\"x\")", email="b@c.com")]
+    banco["linhas"] = [_linha(), _linha(name="=HYPERLINK(\"x\")", email="b@c.com", contact_ok=False)]
     r = cli.get("/admin/api/accounts.csv?plan=pro&sort=email_asc")
     assert r.status_code == 200 and r.headers["content-type"] == "text/csv; charset=utf-8"
     assert r.headers["content-disposition"].startswith('attachment; filename="contas-')
@@ -218,7 +220,11 @@ def test_csv_com_bom_cabecalho_filtros_e_auditoria(cli, banco):
     (aud,) = _auditorias(banco)
     assert aud[1] == "accounts_exported" and aud[0] == ADMIN and aud[2] is None
     assert aud[4].obj == {"filters": {"plan": "pro", "sort": "email_asc"}, "total": 2}
-    assert not any(t in r.text for t in (TELEFONE, "phone"))  # telefone não sai no CSV
+    # o WhatsApp sai como link, e só de quem aceita contato; o telefone cru nunca
+    w = linhas[0].index("whatsapp")
+    assert linhas[1][w] == f"https://wa.me/{TELEFONE}?text=Ol%C3%A1%2C%20Ana%21%20Aqui%20%C3%A9%20do%20ProOps."
+    assert linhas[2][w] == "" and linhas[2][linhas[0].index("contact_ok")] == "false"
+    assert r.text.count(TELEFONE) == 1 and "phone" not in linhas[0]
 
 
 def test_csv_acima_do_teto_e_422_sem_auditoria(cli, banco):
@@ -419,3 +425,35 @@ def test_config_mesmo_instante_em_outro_fuso_nao_e_mudanca(cli, banco):
     {"store_url_android": "https://play.google.com/store/apps/details?id=com.proops.personal"}])
 def test_config_aceita_so_os_hosts_das_lojas(cli, banco, corpo):
     assert cli.put("/admin/api/app-config", json=corpo).status_code == 200
+
+
+# ── contato comercial: link e auditoria, nunca para quem desligou ─────────────────────────────────────────
+def test_contato_whatsapp_devolve_link_e_audita(cli, banco):
+    r = cli.post(f"/admin/api/accounts/{ALVO}/contact", json={"channel": "whatsapp"})
+    assert r.status_code == 200
+    assert r.json() == {"url": f"https://wa.me/{TELEFONE}?text=Ol%C3%A1%2C%20Ana%21%20Aqui%20%C3%A9%20do%20ProOps."}
+    (aud,) = _auditorias(banco)
+    assert aud[1] == "contact_started" and aud[2] == ALVO and aud[4].obj == {"channel": "whatsapp"}
+
+
+def test_contato_email_e_sem_nome(cli, banco):
+    banco["alvo"] = {"display_name": None}
+    r = cli.post(f"/admin/api/accounts/{ALVO}/contact", json={"channel": "email"})
+    assert r.status_code == 200 and r.json()["url"] == "mailto:a@b.com?subject=ProOps&body=Ol%C3%A1%21%0A%0A"
+
+
+@pytest.mark.parametrize("alvo,canal,codigo", [
+    ({"marketing_opt_out_at": AGORA}, "whatsapp", "contact_opted_out"),
+    ({"marketing_opt_out_at": AGORA}, "email", "contact_opted_out"),
+    ({"phone": None}, "whatsapp", "no_channel"),
+    ({"email": None}, "email", "no_channel"),
+])
+def test_contato_recusado_nao_audita(cli, banco, alvo, canal, codigo):
+    banco["alvo"] = alvo
+    r = cli.post(f"/admin/api/accounts/{ALVO}/contact", json={"channel": canal})
+    assert r.status_code == 409 and r.json()["error"] == codigo
+    assert _auditorias(banco) == []
+
+
+def test_contato_canal_desconhecido_e_422(cli, banco):
+    assert cli.post(f"/admin/api/accounts/{ALVO}/contact", json={"channel": "sms"}).status_code == 422

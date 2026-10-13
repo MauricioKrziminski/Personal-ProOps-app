@@ -45,7 +45,7 @@ export default function ConsentimentoScreen() {
             <ThemedText type="footnote" themeColor="textSecondary" style={styles.link} accessibilityRole="link" onPress={() => abrirLegal(URL_PRIVACIDADE)}>
               Política de Privacidade
             </ThemedText>
-            . Novidades e ofertas por e-mail você desliga no Perfil.
+            . Podemos enviar novidades por e-mail ou WhatsApp; você desliga no Perfil.
           </ThemedText>
           <Button
             label="Concordo e continuar"

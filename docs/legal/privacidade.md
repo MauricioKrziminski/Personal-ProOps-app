@@ -41,8 +41,8 @@ Não vendemos seus dados, não os compartilhamos para publicidade de terceiros e
 ## 2-A. Comunicações e como deixar de receber
 
 - **O que usamos para falar com você:** só o cadastro (nome, e-mail e o telefone que você vinculou) e a situação da conta (data de cadastro, teste grátis, assinatura, último acesso). **Seus lançamentos, valores, notas, lembretes e conversas nunca são usados para escolher ofertas.**
-- **Por onde:** e-mail, automático ou enviado pela nossa equipe. Ofertas por WhatsApp ou por notificação no aparelho só com a sua autorização prévia e específica.
-- **Para deixar de receber novidades e ofertas:** desligue **Perfil → Privacidade e dados → Receber novidades e ofertas**, use o link de descadastro presente em cada e-mail de oferta, ou escreva para gestao@proops.com.br. O pedido vale a partir do registro e não afeta o uso do aplicativo.
+- **Por onde:** e-mail (automático ou enviado pela nossa equipe) e, se você vinculou o WhatsApp, mensagem escrita e enviada por uma pessoa da nossa equipe, nunca automática. Ofertas por notificação no aparelho não são enviadas.
+- **Para deixar de receber novidades e ofertas:** desligue **Perfil → Privacidade e dados → Receber novidades e ofertas**, use o link de descadastro presente em cada e-mail de oferta, responda à mensagem do WhatsApp pedindo para parar, ou escreva para gestao@proops.com.br. O pedido vale a partir do registro e não afeta o uso do aplicativo.
 - Os **avisos sobre a sua conta** (segurança, cobrança, assinatura, mudanças nestes termos) continuam chegando enquanto a conta existir, porque fazem parte do Serviço.
 
 ## 3. Com quem compartilhamos

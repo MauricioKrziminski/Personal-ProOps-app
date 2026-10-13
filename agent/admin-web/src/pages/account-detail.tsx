@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Ban, ExternalLink, Play, Smartphone, Trash2, UserCog } from "lucide-react";
+import { ArrowLeft, Ban, BellOff, ExternalLink, Mail, MessageCircle, Play, Send, Smartphone, Trash2, UserCog } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Confirm } from "@/components/ui/dialog";
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/dropdown";
 import { Textarea } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { resultTone } from "@/pages/billing";
@@ -74,9 +75,11 @@ function Header({ d, onAction }: { d: AccountDetail; onAction: (k: Parameters<ty
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
             <PlanBadge plan={a.plan} /><StatusBadge a={a} /><OriginBadge origin={a.origin} />
             {a.whatsapp_linked ? <Badge tone="success"><Smartphone />WhatsApp vinculado</Badge> : <Badge>Sem WhatsApp</Badge>}
+            {!a.contact_ok && <Badge><BellOff />Não quer contato</Badge>}
           </div>
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          <Contato d={d} />
           <Button onClick={() => onAction("plan")} className="flex-1 sm:flex-none"><UserCog />Mudar plano</Button>
           {a.suspended
             ? <Button variant="outline" onClick={() => onAction("reactivate")} className="flex-1 sm:flex-none"><Play />Reativar</Button>
@@ -86,6 +89,40 @@ function Header({ d, onAction }: { d: AccountDetail; onAction: (k: Parameters<ty
       </div>
       {a.suspended && <p role="status" className="mt-4 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm font-medium text-destructive">Conta suspensa. Sem acesso ao app e sem respostas no WhatsApp.</p>}
     </Card>
+  );
+}
+
+/** Política §2-A: só aparece para quem não desligou "Receber novidades e ofertas". O servidor confere de novo,
+ *  monta o link e registra na auditoria; a mensagem é escrita por quem clica. */
+function Contato({ d }: { d: AccountDetail }) {
+  const qc = useQueryClient();
+  const a = d.account;
+  const canais: ("whatsapp" | "email")[] = [];
+  if (a.whatsapp_linked) canais.push("whatsapp");
+  if (a.email) canais.push("email");
+  if (!a.contact_ok || canais.length === 0) return null;
+
+  async function abrir(canal: "whatsapp" | "email") {
+    // A aba nasce no clique (depois de um await o navegador a bloquearia) e só recebe o link se o servidor liberar.
+    const aba = canal === "whatsapp" ? window.open("", "_blank") : null;
+    try {
+      const { url } = await api.contact(a.user_id, canal);
+      if (aba) { aba.opener = null; aba.location.href = url; } else window.location.href = url;
+      void qc.invalidateQueries({ queryKey: ["account", a.user_id] });
+    } catch (e) {
+      aba?.close();
+      toast.error(e instanceof Error ? e.message : "Não foi possível abrir o contato.");
+    }
+  }
+
+  return (
+    <Menu>
+      <MenuTrigger asChild><Button variant="outline" className="flex-1 sm:flex-none"><Send />Entrar em contato</Button></MenuTrigger>
+      <MenuContent>
+        {canais.includes("whatsapp") && <MenuItem onSelect={() => void abrir("whatsapp")}><MessageCircle />WhatsApp</MenuItem>}
+        {canais.includes("email") && <MenuItem onSelect={() => void abrir("email")}><Mail />E-mail</MenuItem>}
+      </MenuContent>
+    </Menu>
   );
 }
 

@@ -16,7 +16,7 @@ export const AUDIT_LABEL: Record<string, string> = {
   whatsapp_unlinked: "WhatsApp desvinculado", issue_triaged: "Erro triado", account_deleted: "Conta apagada",
   accounts_exported: "Contas exportadas (CSV)", note_added: "Nota adicionada", note_deleted: "Nota apagada",
   invite_revoked: "Convite revogado", member_removed: "Membro removido", push_sent: "Notificação enviada",
-  app_config_changed: "Configuração do app alterada",
+  app_config_changed: "Configuração do app alterada", contact_started: "Contato iniciado",
 };
 export const BILLING_RESULT_LABEL: Record<string, string> = {
   concedido: "Concedido", revogado: "Revogado", duplicado: "Duplicado", sandbox_ignorado: "Sandbox ignorado",

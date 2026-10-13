@@ -91,8 +91,9 @@ Os MESMOS filtros e a MESMA ordem de `/accounts` (`q`, `access`, `plan`, `origin
 Mais de **10.000** linhas → **422** `{"error":"too_many_rows","message":…}` (nada é gravado). `text/csv; charset=utf-8`
 com BOM, `Content-Disposition: attachment; filename="contas-AAAA-MM-DD.csv"`. Colunas: `user_id, email, name,
 created_at, last_sign_in_at, last_seen_at, last_app_version, plan, status, access, is_trial, period_end, origin,
-ai_used, ai_max, wa_used, wa_max, whatsapp_linked, suspended, contact_ok` (sem telefone; `contact_ok=false` = pediu
-para não receber novidades e ofertas, e fica de fora de qualquer envio comercial). Texto que começa com `= + - @` ganha `'`
+ai_used, ai_max, wa_used, wa_max, whatsapp_linked, suspended, contact_ok, whatsapp` (`contact_ok=false` = pediu
+para não receber novidades e ofertas, e fica de fora de qualquer contato comercial; `whatsapp` = link `wa.me` só de quem
+aceita contato e tem o WhatsApp vinculado, o telefone cru nunca sai). Texto que começa com `= + - @` ganha `'`
 na frente (a planilha não executa como fórmula). Auditoria `accounts_exported` (`payload`: `filters` e `total`).
 
 ### `GET /admin/api/accounts/{user_id}`
@@ -136,6 +137,7 @@ na frente (a planilha não executa como fórmula). Auditoria `accounts_exported`
 | `/accounts/{id}/invites/{invite_id}/revoke` | `{}` | a regra do app (`status = 'revoked'`); só convite PENDENTE do espaço desta conta: outro estado → 409 `invite_not_pending`, outro espaço → 404. Auditoria `invite_revoked` (só o id, sem o telefone do convidado) |
 | `/accounts/{id}/members/{member_user_id}/remove` | `{}` | tira o membro do espaço da conta. O dono → 409 `cannot_remove_owner`; quem não é membro → 404. Auditoria `member_removed` |
 | `/accounts/{id}/notify` | `{"title": "str ≤ 60", "body": "str ≤ 180"}` | push Expo para o aparelho da conta (serviço de push do agente). Sem aparelho → 409 `no_push_tokens`; Expo fora → 502 `push_failed` (sem auditoria). Resposta `{"sent": 1}` (não é o detalhe). Auditoria `push_sent` (só o título) |
+| `/accounts/{id}/contact` | `{"channel": "whatsapp\|email"}` | contato comercial (Política §2-A): devolve `{"url": "https://wa.me/…?text=…"}` ou `{"url": "mailto:…"}` com uma saudação curta; a mensagem é escrita por quem clica. Quem desligou "Receber novidades e ofertas" → 409 `contact_opted_out`; sem WhatsApp vinculado ou sem e-mail → 409 `no_channel` (sem auditoria). Auditoria `contact_started` (`channel`). O painel só mostra "Entrar em contato" para `contact_ok` |
 
 ### Notas internas — `GET|POST /accounts/{id}/notes`, `DELETE /accounts/{id}/notes/{note_id}`
 Nota livre do time sobre a conta (`public.admin_account_notes`, inacessível ao app; some junto com a conta).

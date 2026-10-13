@@ -23,6 +23,7 @@ import re
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
+from urllib.parse import quote
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -365,7 +366,7 @@ async def accounts(
 CSV_TETO = 10_000
 _CSV_COLUNAS = ("user_id", "email", "name", "created_at", "last_sign_in_at", "last_seen_at", "last_app_version",
                 "plan", "status", "access", "is_trial", "period_end", "origin", "ai_used", "ai_max", "wa_used",
-                "wa_max", "whatsapp_linked", "suspended", "contact_ok")
+                "wa_max", "whatsapp_linked", "suspended", "contact_ok", "whatsapp")
 
 
 def _celula(v) -> str:
@@ -393,7 +394,9 @@ async def accounts_csv(
     escritor = csv.writer(saida, lineterminator="\r\n")
     escritor.writerow(_CSV_COLUNAS)
     for r in linhas:
+        # o link (não o número cru: a planilha o leria como número) só de quem aceita contato
         linha = _linha(r)
+        linha["whatsapp"] = _link_whatsapp(r.get("phone"), r.get("name")) if linha["contact_ok"] else None
         escritor.writerow([_celula(linha[c]) for c in _CSV_COLUNAS])
     filtros = {k: v for k, v in {"q": q.strip() or None, "access": access, "plan": plan, "origin": origin,
                                  "signal": signal, "sort": sort}.items() if v is not None}
@@ -540,7 +543,7 @@ async def conta(user_id: UUID, _admin: UUID = Depends(admin_user)):
 # ── ações ─────────────────────────────────────────────────────────────────────────────────────────────
 async def _alvo(user_id: UUID) -> dict:
     r = await db.fetch_one(
-        """select p.id, u.email::text as email, p.phone, p.expo_push_token,
+        """select p.id, u.email::text as email, p.phone, p.expo_push_token, p.display_name, p.marketing_opt_out_at,
                   (select id from public.workspaces w where w.owner_id = p.id order by w.created_at, w.id limit 1) as ws
            from public.profiles p join auth.users u on u.id = p.id where p.id = %s""",
         user_id,
@@ -800,6 +803,46 @@ async def avisar(user_id: UUID, body: AvisoIn, admin: UUID = Depends(admin_user)
     async with db.unidade_de_trabalho():
         await _auditar(admin, "push_sent", alvo, {"title": body.title})
     return _json({"sent": 1})
+
+
+# ── contato comercial (Política §2-A): só com quem não pediu para sair ─────────────────────────────────
+def _primeiro_nome(nome: str | None) -> str:
+    return (nome or "").strip().split(" ")[0][:40]
+
+
+def _link_whatsapp(fone: str | None, nome: str | None) -> str | None:
+    digitos = re.sub(r"\D", "", fone or "")
+    if not digitos:
+        return None
+    oi = f"Olá, {_primeiro_nome(nome)}! Aqui é do ProOps." if _primeiro_nome(nome) else "Olá! Aqui é do ProOps."
+    return f"https://wa.me/{digitos}?text={quote(oi)}"
+
+
+def _link_email(email: str | None, nome: str | None) -> str | None:
+    if not email:
+        return None
+    oi = f"Olá, {_primeiro_nome(nome)}!" if _primeiro_nome(nome) else "Olá!"
+    return f"mailto:{quote(email, safe='@.+')}?subject={quote('ProOps')}&body={quote(oi + chr(10) + chr(10))}"
+
+
+class ContatoIn(BaseModel):
+    channel: Literal["whatsapp", "email"]
+
+
+@router.post("/accounts/{user_id}/contact")
+async def contatar(user_id: UUID, body: ContatoIn, admin: UUID = Depends(admin_user)):
+    """Devolve o link (WhatsApp ou e-mail) e registra quem abriu o contato. A mensagem é escrita e enviada pela
+    pessoa da equipe, nunca por aqui. Quem desligou "Receber novidades e ofertas" não tem link."""
+    alvo = await _alvo(user_id)
+    if alvo.get("marketing_opt_out_at") is not None:
+        raise _erro(409, "contact_opted_out", "A pessoa pediu para não receber contato.")
+    nome = alvo.get("display_name")
+    url = _link_whatsapp(alvo.get("phone"), nome) if body.channel == "whatsapp" else _link_email(alvo.get("email"), nome)
+    if url is None:
+        raise _erro(409, "no_channel", "Sem WhatsApp vinculado." if body.channel == "whatsapp" else "Conta sem e-mail.")
+    async with db.unidade_de_trabalho():
+        await _auditar(admin, "contact_started", alvo, {"channel": body.channel})
+    return _json({"url": url})
 
 
 # ── configuração remota do app (versão mínima, aviso) ──────────────────────────────────────────────────
