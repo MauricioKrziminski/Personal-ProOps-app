@@ -15,3 +15,16 @@ from app.tools.notes import no_estilo_da_nota
 ])
 def test_segue_o_marcador_da_nota(trecho, nota, esperado):
     assert no_estilo_da_nota(trecho, nota) == esperado
+
+
+@pytest.mark.parametrize("conteudo, esperado", [
+    ("# Lista do mercado\n- [ ] arroz\n- [ ] feijão\n- [ ] café", "*Lista do mercado* (arroz, feijão e café)"),
+    ("- [ ] leite\n- [ ] ovos", "*leite e ovos*"),
+    ("O João ligou", "*O João ligou*"),
+    ("# Filmes\n1. A\n2. B\n3. C\n4. D\n5. E\n6. F\n7. G", "*Filmes* (A, B, C, D, E e mais 2)"),
+    ("", "*(vazia)*"),
+])
+def test_previa_da_nota_numa_linha_sem_marcacao(conteudo, esperado):
+    from app.graph.policy import previa_da_nota
+
+    assert previa_da_nota(conteudo) == esperado

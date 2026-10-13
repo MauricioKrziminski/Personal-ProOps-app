@@ -7,6 +7,8 @@ subindo o grafo inteiro é regra que ninguém testa.
 
 from __future__ import annotations
 
+import re
+
 from app.config import get_settings
 from app.domain.correcao_plano import (
     ADIANTAMENTO_SO_NO_APP,
@@ -131,6 +133,38 @@ def needs_confirmation(
     if confidence < CONFIDENCE_MINIMA:
         return "baixa confiança"
     return "registro novo"
+
+
+_MARCA_DA_LINHA = re.compile(r"^\s*(?:#{1,6}\s+|[-*•–]\s\[(?: |x|X)\]\s?|[-*•–]\s+|\d{1,3}[.)]\s+|>\s*)")
+_ITENS_NA_PREVIA = 6
+
+
+def previa_da_nota(conteudo: str | None) -> str:
+    """A nota em UMA linha para a pergunta do SIM ("⚠️ Confirma … ?"), sem marcação crua.
+
+    `*Lista do mercado* (arroz, feijão e mais 2)`: o título vai em negrito e os itens entre
+    parênteses. Com a nota inteira dentro de `*…*`, o negrito quebrava na primeira linha e a
+    pessoa lia `*# Lista do mercado` e `- [ ] arroz` (13/10/2026).
+    """
+    linhas = [l for l in (conteudo or "").split("\n") if l.strip()]
+    if not linhas:
+        return "*(vazia)*"
+    primeira = linhas[0]
+    if primeira.lstrip().startswith("#") or not _MARCA_DA_LINHA.match(primeira):
+        titulo, itens = _MARCA_DA_LINHA.sub("", primeira).strip(), linhas[1:]
+    else:
+        titulo, itens = "", linhas
+    itens = [_MARCA_DA_LINHA.sub("", l).strip().replace("*", "") for l in itens]
+    titulo = titulo.replace("*", "")
+    if len(itens) > _ITENS_NA_PREVIA:
+        lista = ", ".join(itens[:_ITENS_NA_PREVIA - 1]) + f" e mais {len(itens) - _ITENS_NA_PREVIA + 1}"
+    elif len(itens) > 1:
+        lista = ", ".join(itens[:-1]) + f" e {itens[-1]}"
+    else:
+        lista = "".join(itens)
+    if titulo and lista:
+        return f"*{titulo}* ({lista})"
+    return f"*{titulo or lista}*"
 
 
 _VERBO = {
@@ -756,7 +790,7 @@ def describe_for_confirmation(
         return f"cancelar o lembrete de {alvo}"
     if tipo == "create_note":
         pasta = f" na pasta {action.folder}" if action.folder else ""
-        return f"criar a nota *{action.content or ''}*{pasta}"
+        return f"criar a nota {previa_da_nota(action.content)}{pasta}"
     if tipo == "create_reminder":
         quando = ""
         if action.remind_at:
