@@ -1,7 +1,7 @@
 """SPA do painel /admin (build do Vite em `app/static/admin/`, gerado no Dockerfile).
 
 Registrada DEPOIS do router da API (`/admin/api/*`): o fallback para o index.html nunca pode
-engolir uma rota da API. `ADMIN_USER_IDS` vazio = painel desligado = 404, igual à API.
+engolir uma rota da API. Fora do serviço `SERVICO=admin`, ou com `ADMIN_USER_IDS` vazio, 404, igual à API.
 """
 
 from __future__ import annotations
@@ -34,7 +34,8 @@ def _headers(extra: dict[str, str]) -> dict[str, str]:
 @router.get("/admin", include_in_schema=False)
 @router.get("/admin/{caminho:path}", include_in_schema=False)
 def painel(caminho: str = "") -> Response:
-    if not get_settings().admin_ids:
+    s = get_settings()
+    if s.servico != "admin" or not s.admin_ids:
         raise HTTPException(status_code=404, detail="not found")
     if caminho == "api" or caminho.startswith("api/"):
         # rota de API inexistente: nunca responder HTML

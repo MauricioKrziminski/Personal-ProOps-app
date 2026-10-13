@@ -41,6 +41,7 @@ def _linha_base(**kw):
 def cli(monkeypatch):
     get_settings.cache_clear()
     monkeypatch.setenv("ADMIN_USER_IDS", f"lixo, {ADMIN}")
+    monkeypatch.setenv("SERVICO", "admin")
     monkeypatch.setenv("ADMIN_REQUIRE_MFA", "false")  # o default é ligado; os testes de MFA ligam de volta
     monkeypatch.setenv("SUPABASE_URL", "https://x.supabase.co")
     monkeypatch.setenv("SUPABASE_ANON_KEY", "anon-publica")
@@ -166,6 +167,7 @@ POSTS = [("plan", {"plan": "pro"}), ("suspend", {"reason": "x"}), ("reactivate",
 # ── autorização ───────────────────────────────────────────────────────────────────────────────────────
 def test_desligado_e_404_inclusive_config(cli, monkeypatch):
     monkeypatch.setenv("ADMIN_USER_IDS", "")
+    monkeypatch.setenv("SERVICO", "admin")
     get_settings.cache_clear()
     for rota in GETS + ["/admin/api/config"]:
         r = cli.get(rota)

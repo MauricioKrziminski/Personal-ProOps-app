@@ -211,6 +211,7 @@ def _issue_row(**kw):
 def adm(monkeypatch):
     get_settings.cache_clear()
     monkeypatch.setenv("ADMIN_USER_IDS", str(ADMIN))
+    monkeypatch.setenv("SERVICO", "admin")
     monkeypatch.setenv("ADMIN_REQUIRE_MFA", "false")
     estado = {"id": ADMIN, "sql": [], "writes": [], "status": "open"}
 
@@ -308,6 +309,7 @@ def test_autorizacao_igual_ao_admin(adm, monkeypatch):
     adm.estado["id"] = None
     assert adm.get("/admin/api/issues").status_code == 401
     monkeypatch.setenv("ADMIN_USER_IDS", "")
+    monkeypatch.setenv("SERVICO", "admin")
     get_settings.cache_clear()
     assert adm.get("/admin/api/issues").status_code == 404
     assert adm.post(f"/admin/api/issues/{uuid4()}/status", json={"status": "open"}).status_code == 404

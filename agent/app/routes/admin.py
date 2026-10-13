@@ -2,6 +2,8 @@
 
 Segurança:
 
+- Só existe no serviço `SERVICO=admin` (Cloud Run próprio, IAP na frente, asserção do IAP conferida
+  em `main._fronteira`); no agente público toda rota responde 404.
 - Identidade = `sub` do JWT do Supabase (`current_user`), que precisa estar em `ADMIN_USER_IDS`.
   Lista vazia = painel desligado: toda rota responde 404. Nada do corpo decide quem é o admin.
   `ADMIN_REQUIRE_MFA=true` exige `aal: "aal2"` no JWT.
@@ -143,7 +145,8 @@ def _erro(status: int, codigo: str, mensagem: str | None = None) -> HTTPExceptio
 
 
 def _ligado() -> None:
-    if not get_settings().admin_ids:
+    s = get_settings()
+    if s.servico != "admin" or not s.admin_ids:
         raise _erro(404, "not_found")
 
 

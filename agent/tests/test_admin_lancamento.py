@@ -129,6 +129,7 @@ def test_rotas_novas_exigem_admin_e_nao_tocam_no_banco(cli, banco):
 
 def test_painel_desligado_e_404_nas_rotas_novas(cli, banco, monkeypatch):
     monkeypatch.setenv("ADMIN_USER_IDS", "")
+    monkeypatch.setenv("SERVICO", "admin")
     get_settings.cache_clear()
     for metodo, url, corpo in NOVAS_ROTAS:
         assert getattr(cli, metodo)(url, **({"json": corpo} if corpo is not None else {})).status_code == 404

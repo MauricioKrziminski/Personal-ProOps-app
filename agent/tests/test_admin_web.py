@@ -19,6 +19,7 @@ ADMIN = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 def cli(monkeypatch, tmp_path):
     get_settings.cache_clear()
     monkeypatch.setenv("ADMIN_USER_IDS", ADMIN)
+    monkeypatch.setenv("SERVICO", "admin")
     monkeypatch.setenv("SUPABASE_URL", "https://x.supabase.co/")
     (tmp_path / "assets").mkdir()
     (tmp_path / "index.html").write_text("<html>spa</html>")
@@ -34,6 +35,7 @@ def cli(monkeypatch, tmp_path):
 def test_desligado_e_404(cli, monkeypatch):
     get_settings.cache_clear()
     monkeypatch.setenv("ADMIN_USER_IDS", "")
+    monkeypatch.setenv("SERVICO", "admin")
     assert cli.get("/admin").status_code == 404
     assert cli.get("/admin/contas").status_code == 404
 

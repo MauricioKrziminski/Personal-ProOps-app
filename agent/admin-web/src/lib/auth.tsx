@@ -59,7 +59,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const cfg = await api.config();
       setConfig(cfg);
-      const client = createClient(cfg.supabase_url, cfg.supabase_anon_key, { auth: { persistSession: true, autoRefreshToken: true } });
+      // A sessão do painel mora na ABA (sessionStorage), não no navegador: fechou a aba, saiu. No
+      // localStorage o token de atualização sobreviveria em qualquer máquina onde o painel foi aberto.
+      const client = createClient(cfg.supabase_url, cfg.supabase_anon_key, {
+        auth: { persistSession: true, autoRefreshToken: true, storage: window.sessionStorage },
+      });
       clientRef.current = client;
       setTokenGetter(async () => (await client.auth.getSession()).data.session?.access_token ?? null);
       const { data } = await client.auth.getSession();

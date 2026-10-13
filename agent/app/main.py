@@ -1,4 +1,5 @@
-"""Serviço único: webhook do WhatsApp, worker do agente, crons e rotas do app.
+"""Serviço único: webhook do WhatsApp, worker do agente, crons e rotas do app — e, com
+`SERVICO=admin`, só o painel /admin, num serviço próprio do Cloud Run atrás do IAP.
 
 Um processo só, um container só. É isso que mantém a promessa de portabilidade:
 o mesmo build roda no Cloud Run hoje e num VPS com docker compose amanhã, sem
@@ -10,13 +11,14 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app import db, logctx
+from app import db, iap, logctx
 from app.config import DEV_SALT, get_settings
 from app.graph import build as graph_build
 from app.routes import admin, admin_observabilidade, admin_web, captures, chat, errors, cron, finance_draft, hooks, inbound, internal, legal, worker
@@ -63,6 +65,14 @@ log = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    if get_settings().servico == "admin":
+        # O painel não usa o grafo, o WhatsApp nem a IA: sobe só com o banco e as checagens dele.
+        _checa_admin()
+        await db.open_pools()
+        log.info("pronto (painel)")
+        yield
+        await db.close_pools()
+        return
     _checa_producao()
     ia.avisar_sombras()
     await db.open_pools()
@@ -81,6 +91,35 @@ async def _fecha_telemetria() -> None:
         telemetry.shutdown()
     except Exception:  # noqa: BLE001 — fechar não pode impedir o resto do shutdown
         log.warning("telemetria não fechou limpo", exc_info=True)
+
+
+_AUDIENCIA_IAP = re.compile(r"^/projects/\d+/locations/[a-z0-9-]+/services/[a-z0-9-]+$")
+
+
+def _checa_admin() -> None:
+    """No Cloud Run, o painel recusa subir sem IAP, sem audiência, sem e-mails ou sem admins.
+
+    Subir "quase certo" aqui é subir com o painel aberto: a falha tem que ser no boot, barulhenta.
+    """
+    s = get_settings()
+    if not os.getenv("K_SERVICE"):
+        return  # laptop
+    faltando = [
+        nome
+        for nome, ok in (
+            ("ADMIN_EXIGE_IAP=true", s.admin_exige_iap),
+            ("ADMIN_IAP_AUDIENCE", bool(_AUDIENCIA_IAP.match(s.admin_iap_audience))),
+            ("ADMIN_IAP_EMAILS", bool(s.admin_iap_email_set)),
+            ("ADMIN_USER_IDS", bool(s.admin_ids)),
+            # Produção nunca sem TOTP; o staging pode (E2E e testes manuais), e o nome do serviço diz qual é.
+            ("ADMIN_REQUIRE_MFA=true", s.admin_require_mfa or "staging" in os.getenv("K_SERVICE", "")),
+            ("SUPABASE_URL", s.supabase_url.startswith("https://")),
+            ("SUPABASE_ANON_KEY", bool(s.supabase_anon_key)),
+        )
+        if not ok
+    ]
+    if faltando:
+        raise RuntimeError("configuração do painel incompleta: " + ", ".join(faltando))
 
 
 def _checa_producao() -> None:
@@ -125,7 +164,11 @@ def _checa_producao() -> None:
         )
 
 
-app = FastAPI(title="ProOps — agente", lifespan=lifespan)
+# Sem /docs, /redoc e /openapi.json no Cloud Run: o esquema listaria rota a rota (inclusive as do painel)
+# para qualquer um. No laptop continuam.
+_NO_CLOUD = not os.getenv("K_SERVICE")
+app = FastAPI(title="ProOps — agente", lifespan=lifespan, docs_url="/docs" if _NO_CLOUD else None,
+              redoc_url="/redoc" if _NO_CLOUD else None, openapi_url="/openapi.json" if _NO_CLOUD else None)
 
 app.include_router(inbound.router)
 app.include_router(worker.router)
@@ -164,6 +207,44 @@ if _origens:
         allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["authorization", "content-type"],
     )
+
+
+# HSTS: o run.app não manda (conferido em 13/10/2026), e sem ele o primeiro acesso por http:// pode
+# ser interceptado antes do redirecionamento. Dois anos, sem `preload` (exigiria o domínio inteiro).
+_HSTS = "max-age=63072000; includeSubDomains"
+
+
+def _so_painel(caminho: str) -> bool:
+    return caminho == "/admin" or caminho.startswith("/admin/")
+
+
+# O que o serviço do painel atende, além de /admin: os erros que o PRÓPRIO SPA captura (ele posta em
+# /internal/errors, na mesma origem). Também atrás do IAP.
+_DO_PAINEL_SEM_SER_ADMIN = frozenset({"/internal/errors"})
+
+
+@app.middleware("http")
+async def _fronteira(request: Request, call_next):
+    """Cada serviço só responde pelo que é dele, e o painel só com o IAP conferido.
+
+    - `agente`: as rotas do painel não existem (o guarda delas também confere o papel).
+    - `admin`: só /admin e /health; tudo o mais é 404 — o webhook, o worker e os crons moram no
+      outro serviço e não podem ser alcançados por esta porta. /admin exige a asserção do IAP
+      válida, com o `aud` deste serviço e um e-mail da lista.
+    """
+    s = get_settings()
+    caminho = request.url.path
+    if s.servico == "admin":
+        if caminho != "/health" and not _so_painel(caminho) and caminho not in _DO_PAINEL_SEM_SER_ADMIN:
+            return JSONResponse({"error": "not_found"}, status_code=404, headers={"Strict-Transport-Security": _HSTS})
+        if caminho != "/health" and s.admin_exige_iap and not await iap.email_autorizado(
+            request.headers.get("x-goog-iap-jwt-assertion"), s.admin_iap_audience, s.admin_iap_email_set,
+        ):
+            log.warning("painel: requisição sem asserção válida do IAP")
+            return JSONResponse({"error": "forbidden"}, status_code=403, headers={"Strict-Transport-Security": _HSTS})
+    resposta = await call_next(request)
+    resposta.headers.setdefault("Strict-Transport-Security", _HSTS)
+    return resposta
 
 
 @app.get("/health")

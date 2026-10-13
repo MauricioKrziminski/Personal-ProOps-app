@@ -1,8 +1,9 @@
 """Configuração única do serviço. Todo segredo entra por env var."""
 
 import re
-from uuid import UUID
 from functools import lru_cache
+from typing import Literal
+from uuid import UUID
 
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -89,6 +90,21 @@ class Settings(BaseSettings):
     # Exige aal2 (TOTP) no JWT do painel /admin. LIGADO por padrão (09/10/2026): esquecer a variável
     # não pode abrir o painel só com senha. O E2E local e o staging passam `false` de forma explícita.
     admin_require_mfa: bool = True
+
+    # Que papel este processo cumpre (13/10/2026). `agente` (padrão): webhook, worker, crons e as rotas
+    # do app, e o painel NÃO existe aqui (404), mesmo com ADMIN_USER_IDS. `admin`: SÓ o painel /admin,
+    # num serviço próprio do Cloud Run com o IAP na frente; todo o resto responde 404. A mesma imagem
+    # serve os dois, e o painel deixa de dividir processo, porta e segredos com o webhook público.
+    servico: Literal["agente", "admin"] = "agente"
+    # IAP (Identity-Aware Proxy) na frente do painel: toda requisição tem que trazer o
+    # `x-goog-iap-jwt-assertion` assinado pelo Google, com este `aud`
+    # (`/projects/<número>/locations/<região>/services/<serviço>`). LIGADO por padrão: esquecer a
+    # variável fecha o painel em vez de abri-lo. Só o desenvolvimento local passa `false`.
+    admin_exige_iap: bool = True
+    admin_iap_audience: str = ""
+    # E-mails Google que o IAP deixa passar, separados por vírgula. Conferidos DE NOVO aqui: uma
+    # permissão do IAP concedida a mais (um grupo, um domínio) não abre o painel sozinha.
+    admin_iap_emails: str = ""
 
     # Consentimento de IA (LGPD): ligado, quem não tem `profiles.ai_consent_at` não chega ao modelo
     # (app: 403 `ai_consent_required`; WhatsApp: um aviso por dia). Desligado = nada muda. Produção
@@ -187,6 +203,10 @@ class Settings(BaseSettings):
             except ValueError:
                 continue
         return ids
+
+    @property
+    def admin_iap_email_set(self) -> set[str]:
+        return {e.strip().lower() for e in self.admin_iap_emails.split(",") if e.strip()}
 
     @property
     def billing_sandbox_ids(self) -> set[str]:
