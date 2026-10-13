@@ -23,13 +23,21 @@ não tem as chaves de IA nem do WhatsApp, e o webhook, o worker e os crons não 
 
 ## Endereço
 
-`https://painel-wwm7xruoyq-rj.a.run.app/admin` (produção) e `https://painel-staging-wwm7xruoyq-rj.a.run.app/admin`.
+| para lembrar | onde o painel está de verdade |
+|---|---|
+| `https://admin.proops.com.br` | `https://painel-wwm7xruoyq-rj.a.run.app/admin` (produção) |
+| `https://admin-staging.proops.com.br` | `https://painel-staging-wwm7xruoyq-rj.a.run.app/admin` |
 
-Domínio próprio (`admin.proops.com.br`, livre em 13/10/2026; o ERP é `app.proops.com.br`, na Vercel): a região
-`southamerica-east1` não tem *domain mapping* do Cloud Run, e o caminho oficial é um load balancer global, com custo
-fixo mensal, que **não convive com o IAP direto** (o IAP passaria para o load balancer). Com o IAP na frente, o nome
-não muda a segurança. Se um dia quiser o domínio, é o load balancer com o IAP nele, e o `aud` conferido muda para
-`/projects/<n>/global/backendServices/<id>`.
+O nome curto é um **atalho**: o Firebase Hosting responde 302 para o run.app (`scripts/atalho-painel.sh`), e a barra
+do navegador termina no endereço do Google. Nada fica entre o navegador e o painel: o login do Google (IAP) e as
+três camadas continuam no run.app. Sem custo fixo. DNS no Registro.br: um CNAME por nome (`admin` →
+`proops-painel.web.app`, `admin-staging` → `proops-painel-staging.web.app`); `./scripts/atalho-painel.sh status`
+diz o que falta e quando o certificado HTTPS ficou ativo.
+
+Por que não o domínio "de verdade" na barra: a região `southamerica-east1` não tem *domain mapping* do Cloud Run, e o
+caminho oficial é um load balancer global, com custo fixo mensal, que **não convive com o IAP direto** (o IAP
+passaria para o load balancer, e o `aud` conferido mudaria para `/projects/<n>/global/backendServices/<id>`).
+Firebase Hosting como PROXY (rewrite) exigiria o serviço público, o que anula o IAP; como redirecionamento, não.
 
 ## Primeira vez (uma vez por projeto): o cliente OAuth do IAP
 
