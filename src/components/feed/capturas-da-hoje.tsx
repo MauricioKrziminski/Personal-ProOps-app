@@ -23,14 +23,14 @@ const tituloDa = (c: Captura) => c.entendido ?? c.draft.entendido;
 export function useAcoesDaCaptura() {
   const toast = useToast();
   const resolver = useResolverCaptura();
-  const descartar = (id: string) =>
+  // Desfazer devolve ao status de ANTES: o duplicado volta para "Parecem já lançados", não para a Hoje.
+  const descartar = ({ id, status }: Captura) =>
     resolver.mutate({ id, status: 'discarded' }, {
       onSuccess: () => toast({
         message: 'Descartado.',
         tone: 'info',
-        action: { label: 'Desfazer', onPress: () => resolver.mutate({ id, status: 'pending' }) },
+        action: { label: 'Desfazer', onPress: () => resolver.mutate({ id, status }) },
       }),
-      onError: () => toast({ message: 'Não deu para descartar. Tente de novo.', tone: 'error' }),
     });
   return (c: Captura): ItemAction[] => [
     {
@@ -40,7 +40,7 @@ export function useAcoesDaCaptura() {
       arrasto: 'direita',
       onPress: () => router.push(hrefDaCaptura(c)),
     },
-    { label: 'Descartar', icon: 'trash', destructive: true, arrasto: 'esquerda', desfaz: true, onPress: () => descartar(c.id) },
+    { label: 'Descartar', icon: 'trash', destructive: true, arrasto: 'esquerda', desfaz: true, onPress: () => descartar(c) },
   ];
 }
 

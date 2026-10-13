@@ -26,8 +26,24 @@ test('a tela de ajustes explica o que é lido antes de pedir o acesso (prominent
   assert.match(tela, /abrirAjustes/);
   // Ligar só no aceite: uma chamada com `true`, dentro do handler do "Concordo e ativar".
   assert.equal(tela.match(/configurarCaptura\(true/g)?.length, 1);
-  const aceite = tela.slice(tela.indexOf('const concordar'), tela.indexOf('const concordar') + 600);
+  const aceite = tela.slice(tela.indexOf('const concordar'), tela.indexOf('const concordar') + 700);
   assert.match(aceite, /configurarCaptura\(true/);
+  // O acesso do sistema só abre pelo aceite: `abrirAjustes` só é usado ali (fora o import).
+  assert.equal(tela.match(/abrirAjustes/g)?.length, 2);
+  assert.match(aceite, /abrirSistema\(abrirAjustes\)/);
+  // A linha de acesso (caso do backup restaurado) reabre o aviso, não o sistema.
+  assert.match(tela, /onPress=\{acesso \? undefined : \(\) => setAviso\(true\)\}/);
+  // Sem IA, autoriza ali mesmo (como a voz), e a entrada permanente para a lista.
+  assert.match(tela, /<AutorizarIa /);
+  assert.match(tela, /title="A confirmar"[\s\S]{0,300}\/finance\/capturas/);
+});
+
+test('falha ao resolver a captura aparece mesmo com a tela já fechada (onError no hook)', () => {
+  const hook = ler('hooks/use-capturas.ts');
+  const resolver = hook.slice(hook.indexOf('export function useResolverCaptura'));
+  assert.match(resolver.slice(0, 1400), /onError:[\s\S]*Lançado, mas continua em A confirmar/);
+  // Desfazer volta ao status anterior (o duplicado não vai para a Hoje).
+  assert.match(ler('components/feed/capturas-da-hoje.tsx'), /resolver\.mutate\(\{ id, status \}\)/);
 });
 
 test('a Hoje mostra só o que está pendente, nunca o duplicado', () => {

@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { capturaDisponivel, estadoDaCaptura, notificacoesPendentes, removerPendentes } from '../../modules/proops-captura';
+import { useToast } from '@/components/ui/toast';
 import { useRealtimeInvalidate } from '@/hooks/use-items';
 import { useSession } from '@/hooks/use-session';
 import { enviarNotificacoes } from '@/lib/agent-api';
@@ -40,15 +41,22 @@ export function useCapturas() {
 /** Confirmar/descartar apaga o texto da notificação: ele só existe enquanto o item está em aberto. */
 export function useResolverCaptura() {
   const qc = useQueryClient();
+  const toast = useToast();
   return useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: 'confirmed' | 'discarded' | 'pending' }) => {
+    mutationFn: async ({ id, status }: { id: string; status: 'confirmed' | 'discarded' | 'pending' | 'duplicate' }) => {
       const { error } = await supabase
         .from('captured_notifications')
-        .update(status === 'pending' ? { status } : { status, texto: null })
+        .update(status === 'pending' || status === 'duplicate' ? { status } : { status, texto: null })
         .eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: CHAVE }),
+    // Nas opções do hook, não na chamada: o formulário confirma e já sai da tela, e o `onError` por
+    // chamada não rodaria com ela desmontada. Falhar em silêncio deixaria a captura voltar e duplicar.
+    onError: (_e, { status }) =>
+      toast(status === 'confirmed'
+        ? { message: 'Lançado, mas continua em A confirmar. Descarte-o lá.', tone: 'error' }
+        : { message: 'Não deu para atualizar. Tente de novo.', tone: 'error' }),
   });
 }
 

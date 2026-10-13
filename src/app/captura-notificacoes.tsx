@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppState, StyleSheet, View } from 'react-native';
 
 import { abrirAjustes, acessoConcedido, configurarCaptura, estadoDaCaptura } from '../../modules/proops-captura';
+import { AutorizarIa } from '@/components/agent/autorizar-ia';
+import { pendentesDaCaptura } from '@/components/feed/capturas-da-hoje';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { ButtonRow } from '@/components/ui/button-row';
@@ -16,6 +18,7 @@ import { Interruptor } from '@/components/ui/switch-row';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useToast } from '@/components/ui/toast';
 import { Space } from '@/design/tokens';
+import { useCapturas } from '@/hooks/use-capturas';
 import { useConsentimento } from '@/hooks/use-consentimento';
 import { bancosDisponiveis } from '@/lib/captura';
 
@@ -31,6 +34,8 @@ export default function CapturaNotificacoes() {
   const [estado, setEstado] = useState(estadoDaCaptura);
   const [acesso, setAcesso] = useState(acessoConcedido);
   const [aviso, setAviso] = useState(false);
+  const capturas = useCapturas();
+  const pendentes = pendentesDaCaptura(capturas.data).length;
   const reler = useCallback(() => { setEstado(estadoDaCaptura()); setAcesso(acessoConcedido()); }, []);
   // Voltar das configurações do Android traz o app ao primeiro plano: relê o acesso.
   useEffect(() => {
@@ -46,7 +51,6 @@ export default function CapturaNotificacoes() {
       toast({ message: 'Não deu para abrir as configurações.', tone: 'error' });
     }
   };
-  const abrirAcesso = () => abrirSistema(abrirAjustes);
   const abrirDetalhes = () => abrirSistema(() => IntentLauncher.startActivityAsync(
     IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS,
     { data: `package:${Application.applicationId}` },
@@ -62,14 +66,14 @@ export default function CapturaNotificacoes() {
     configurarCaptura(true, pacotes);
     reler();
     setAviso(false);
-    if (!acessoConcedido()) abrirAcesso();
+    // O ÚNICO caminho até o acesso do sistema: o aviso vem imediatamente antes, nesta instalação.
+    if (!acessoConcedido()) abrirSistema(abrirAjustes);
   };
   const alternar = (pacote: string, marcado: boolean) =>
     gravar(estado.ativa, marcado ? [...estado.pacotes, pacote] : estado.pacotes.filter((p) => p !== pacote));
-  const irParaPrivacidade = () => { setAviso(false); router.navigate('/profile'); };
 
   return (
-    <Screen grouped onRefresh={() => { reler(); return consentimento.refetch(); }}>
+    <Screen grouped onRefresh={() => { reler(); return Promise.all([consentimento.refetch(), capturas.refetch()]); }}>
       <Section>
         <Row
           title="Ler notificações dos bancos"
@@ -87,8 +91,17 @@ export default function CapturaNotificacoes() {
           <Row
             title="Acesso às notificações"
             subtitle={acesso ? 'Concedido' : 'Não concedido. Toque para liberar nas configurações do Android.'}
-            onPress={acesso ? undefined : abrirAcesso}
+            // `ativa` pode ter vindo do backup do Android: o aviso de destaque vem antes do acesso.
+            onPress={acesso ? undefined : () => setAviso(true)}
             chevron={!acesso}
+          />
+        ) : null}
+        {/* A entrada que fica: sem pendente a Hoje não mostra o bloco, e o "parece já lançado" mora lá. */}
+        {estado.ativa ? (
+          <Row
+            title="A confirmar"
+            subtitle={pendentes ? `${pendentes} ${pendentes === 1 ? 'pendente' : 'pendentes'}` : undefined}
+            onPress={() => router.push('/finance/capturas')}
           />
         ) : null}
       </Section>
@@ -107,7 +120,7 @@ export default function CapturaNotificacoes() {
           <Note icon="exclamationmark.triangle" tone="warning">
             Sem a autorização de IA as notificações ficam guardadas no aparelho e nada vira lançamento.
           </Note>
-          <Button label="Autorizar em Privacidade e dados" variant="secondary" size="sm" onPress={irParaPrivacidade} />
+          <AutorizarIa aoAutorizar={() => {}} />
         </View>
       ) : null}
 
@@ -141,13 +154,9 @@ export default function CapturaNotificacoes() {
         <SheetScroll contentContainerStyle={styles.folha} keyboardShouldPersistTaps="handled">
           {semIa ? (
             <>
-              <Note icon="exclamationmark.triangle" tone="warning">
-                Para montar lançamentos das notificações, autorize antes o uso de IA em Perfil → Privacidade e dados.
-              </Note>
-              <ButtonRow>
-                <Button label="Autorizar em Privacidade e dados" block onPress={irParaPrivacidade} />
-                <Button label="Agora não" variant="secondary" block onPress={() => setAviso(false)} />
-              </ButtonRow>
+              {/* Autorizar só muda a folha para o aviso: ligar continua pedindo o "Concordo e ativar". */}
+              <AutorizarIa aoAutorizar={() => {}} />
+              <Button label="Agora não" variant="secondary" onPress={() => setAviso(false)} />
             </>
           ) : (
             <>
