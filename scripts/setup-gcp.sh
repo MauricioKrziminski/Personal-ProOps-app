@@ -9,6 +9,9 @@
 #   ./scripts/setup-gcp.sh preflight    # só confere conta/componente, não cria nada
 #   ./scripts/setup-gcp.sh deploy       # só o deploy do Cloud Run
 #   ./scripts/setup-gcp.sh staging      # serviço/fila/segredos de STAGING (sem crons)
+#   ./scripts/setup-gcp.sh painel       # painel /admin de PRODUÇÃO: serviço próprio, atrás do IAP
+#   ./scripts/setup-gcp.sh painel-staging  # o mesmo, para o staging
+#   ./scripts/setup-gcp.sh sa           # contas de serviço e permissões mínimas do ambiente
 #   ./scripts/setup-gcp.sh secrets      # só (re)grava os segredos
 #   ./scripts/setup-gcp.sh backup       # backup diário do banco de PRODUÇÃO (bucket + Cloud Run Job + Scheduler)
 #   ./scripts/setup-gcp.sh backup-staging  # o mesmo, para o banco de staging (docs/BACKUP.md)
@@ -20,23 +23,31 @@ set -euo pipefail
 # Os defaults de staging precisam vir ANTES dos de produção, logo abaixo: quando
 # `main()` roda, SERVICE já vale "agente" e um `${SERVICE:-agente-staging}` lá
 # embaixo nunca dispararia — o "staging" faria deploy EM CIMA da produção.
-if [[ "${1:-}" == staging || "${1:-}" == backup-staging ]]; then
+if [[ "${1:-}" == staging || "${1:-}" == backup-staging || "${1:-}" == painel-staging || "${1:-}" == sa-staging ]]; then
   : "${SERVICE:=agente-staging}"
   : "${QUEUE:=whatsapp-debounce-staging}"
   : "${ENV_FILE:=agent/.env}"
   : "${SECRET_SUFFIX:=-staging}"
+  : "${SA_NAME:=agente-staging-runner}"
 fi
 
 PROJECT_ID="${PROJECT_ID:-personal-proops-agent}"
 REGION="${REGION:-southamerica-east1}"   # São Paulo: perto do Supabase e dos usuários
 SERVICE="${SERVICE:-agente}"
 QUEUE="${QUEUE:-whatsapp-debounce}"
+# UMA conta de serviço POR AMBIENTE (13/10/2026). Antes staging e produção rodavam com a mesma
+# `agente-runner`, que tinha no PROJETO inteiro: ler qualquer segredo, invocar qualquer serviço e
+# enfileirar em qualquer fila. Comprometer o staging era ler a `database-url` de PRODUÇÃO e chamar o
+# worker de produção. Hoje cada conta só alcança o que é do seu ambiente (`restringir_sa`).
 SA_NAME="${SA_NAME:-agente-runner}"
 # Nasce DENTRO da organização. Diferente do ERP, aqui não há chave de service
 # account para conflitar com as políticas seguras-por-padrão da org — o Cloud
 # Run usa a identidade da SA diretamente, sem chave em lugar nenhum.
 ORGANIZATION="${ORGANIZATION:-76291957852}"
 SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+# O painel /admin mora num serviço próprio, atrás do IAP, com a sua conta: ela só lê a URL do banco.
+PAINEL_SERVICE="${PAINEL_SERVICE:-painel${SECRET_SUFFIX}}"
+PAINEL_SA_EMAIL="painel${SECRET_SUFFIX}-runner@${PROJECT_ID}.iam.gserviceaccount.com"
 
 # Segredos lidos de um .env do agente (NUNCA commitado). O script grava no
 # Secret Manager; o Cloud Run recebe por referência, e o valor nunca vira env
@@ -209,14 +220,9 @@ criar_sa() {
       --display-name="Agente do ProOps" --project "$PROJECT_ID"
   fi
 
-  # Ela é a identidade do CONTAINER (lê segredos, cria tasks) e também a que
-  # ASSINA o OIDC das tasks e dos crons. Uma SA só, dois papéis, sem chave
-  # exportada em lugar nenhum.
-  for papel in roles/secretmanager.secretAccessor roles/cloudtasks.enqueuer roles/run.invoker; do
-    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-      --member="serviceAccount:${SA_EMAIL}" --role="$papel" \
-      --condition=None --quiet >/dev/null
-  done
+  # Ela é a identidade do CONTAINER (lê segredos, cria tasks) e também a que ASSINA o OIDC das
+  # tasks e dos crons, sem chave exportada em lugar nenhum. As permissões NÃO são dadas no projeto:
+  # `restringir_sa` as dá recurso a recurso (os segredos do ambiente, a fila, o próprio serviço).
 
   # ...e serviceAccountUser SOBRE SI MESMA. Para criar uma task com token OIDC
   # assinado como esta SA, o Cloud Tasks exige `iam.serviceAccounts.actAs` do
@@ -230,6 +236,81 @@ criar_sa() {
     --member="serviceAccount:${SA_EMAIL}" --role=roles/iam.serviceAccountUser \
     --project "$PROJECT_ID" --quiet >/dev/null
   ok "actAs sobre si mesma (Cloud Tasks assina o OIDC com esta SA)"
+
+  # Os segredos do AMBIENTE, um a um, ANTES do deploy (a revisão nova não sobe sem ler cada um).
+  local nome id
+  for nome in "${SEGREDOS[@]}"; do
+    id="$(id_do_segredo "$nome")"
+    gcloud secrets describe "$id" --project "$PROJECT_ID" &>/dev/null || continue
+    gcloud secrets add-iam-policy-binding "$id" --project "$PROJECT_ID" \
+      --member="serviceAccount:${SA_EMAIL}" --role=roles/secretmanager.secretAccessor \
+      --condition=None --quiet >/dev/null
+  done
+  ok "lê só os segredos ${SECRET_SUFFIX:-de produção}"
+}
+
+# Id do Secret Manager de uma variável, no ambiente corrente (DATABASE_URL → database-url-staging).
+id_do_segredo() { local id="${1//_/-}"; echo "$(echo "$id" | tr '[:upper:]' '[:lower:]')${SECRET_SUFFIX}"; }
+
+# Permissões mínimas da conta do ambiente, recurso a recurso, e SÓ DEPOIS a retirada dos papéis
+# amplos do projeto — nessa ordem não existe janela em que o serviço perde acesso.
+restringir_sa() {
+  log "Permissões mínimas de $SA_EMAIL"
+  if gcloud tasks queues describe "$QUEUE" --location "$REGION" --project "$PROJECT_ID" &>/dev/null; then
+    gcloud tasks queues add-iam-policy-binding "$QUEUE" --location "$REGION" --project "$PROJECT_ID" \
+      --member="serviceAccount:${SA_EMAIL}" --role=roles/cloudtasks.enqueuer --quiet >/dev/null
+    ok "enfileira só em $QUEUE"
+  else
+    warn "fila $QUEUE ainda não existe: sem a permissão de enfileirar (rode de novo depois de criá-la)"
+  fi
+  # As tasks e os crons chamam o PRÓPRIO serviço com OIDC assinado por esta conta.
+  if gcloud run services describe "$SERVICE" --region "$REGION" --project "$PROJECT_ID" &>/dev/null; then
+    gcloud run services add-iam-policy-binding "$SERVICE" --region "$REGION" --project "$PROJECT_ID" \
+      --member="serviceAccount:${SA_EMAIL}" --role=roles/run.invoker --quiet >/dev/null
+    ok "invoca só $SERVICE"
+  else
+    warn "serviço $SERVICE ainda não existe: sem a permissão de invocar (rode de novo depois do deploy)"
+    return
+  fi
+  # O backup do ambiente é disparado pelo Scheduler com esta conta: invocar SÓ o job dele.
+  local job="backup-banco${SECRET_SUFFIX}"
+  if gcloud run jobs describe "$job" --region "$REGION" --project "$PROJECT_ID" &>/dev/null; then
+    gcloud run jobs add-iam-policy-binding "$job" --region "$REGION" --project "$PROJECT_ID" \
+      --member="serviceAccount:${SA_EMAIL}" --role=roles/run.invoker --quiet >/dev/null
+    ok "invoca só o job $job"
+  fi
+  local papel amplos=()
+  for papel in roles/secretmanager.secretAccessor roles/cloudtasks.enqueuer roles/run.invoker; do
+    if gcloud projects get-iam-policy "$PROJECT_ID" --flatten='bindings[].members' \
+         --filter="bindings.role=${papel} AND bindings.members=serviceAccount:${SA_EMAIL}" \
+         --format='value(bindings.role)' 2>/dev/null | grep -q .; then
+      amplos+=("$papel")
+    fi
+  done
+  [[ ${#amplos[@]} -gt 0 ]] || return 0
+  # Outro serviço ou job ainda rodando com ESTA conta (ex.: o staging antes de ganhar a dele) perderia o
+  # acesso junto. Nesse caso não retira nada e diz quem está usando.
+  local outros
+  outros="$( { gcloud run services list --project "$PROJECT_ID" --region "$REGION" \
+                 --format='value(metadata.name,spec.template.spec.serviceAccountName)' 2>/dev/null
+               gcloud run jobs list --project "$PROJECT_ID" --region "$REGION" \
+                 --format='value(metadata.name,spec.template.spec.template.spec.serviceAccountName)' 2>/dev/null
+             } | awk -v sa="$SA_EMAIL" -v svc="$SERVICE" -v job="$job" '$2==sa && $1!=svc && $1!=job {print $1}')"
+  if [[ -n "$outros" ]]; then
+    warn "NÃO retirei os papéis amplos: ainda rodam com $SA_EMAIL: $(echo $outros)"
+    warn "  rode o ambiente deles antes (ex.: '$0 staging' e '$0 backup-staging') e depois '$0 sa'"
+    return 0
+  fi
+  # O IAM leva minutos para propagar (medido no staging em 13/10/2026: o `create_task` foi recusado
+  # logo depois da permissão na fila, e passou depois). Tirar o papel amplo antes disso abriria uma
+  # janela de mensagens sem debounce. Espera, e só então retira.
+  warn "esperando ${IAM_PROPAGACAO_S:-180}s a propagação das permissões novas antes de tirar as amplas"
+  sleep "${IAM_PROPAGACAO_S:-180}"
+  for papel in "${amplos[@]}"; do
+    gcloud projects remove-iam-policy-binding "$PROJECT_ID" \
+      --member="serviceAccount:${SA_EMAIL}" --role="$papel" --condition=None --quiet >/dev/null
+    ok "retirado do projeto inteiro: $papel"
+  done
 }
 
 # ---------------------------------------------------------------------------
@@ -405,26 +486,17 @@ deploy() {
   done
   if [[ -n "$flags" ]]; then printf '  flags: %s\n' "${flags#,}"; fi
 
-  # Painel /admin: a anon key (pública) e os ids de admin vêm do MESMO .env do ambiente. Sem
-  # ADMIN_USER_IDS o painel fica desligado (404). Os ids são separados por vírgula, então a
-  # lista inteira vai com o delimitador `|` do gcloud (`^|^`, ver `gcloud topic escaping`).
-  local admin_ids anon_key
-  admin_ids="$(ler_env ADMIN_USER_IDS)"
+  # O painel /admin NÃO mora aqui (13/10/2026): este serviço é público (a Meta não manda token) e
+  # sobe com `SERVICO=agente`, em que toda rota do painel responde 404. O painel é `$0 painel`.
+  # A anon key (pública) segue: o reset de senha e a configuração do app a usam.
+  local anon_key
   anon_key="$(ler_env SUPABASE_ANON_KEY)"
-  [[ -n "$admin_ids" ]] || warn "ADMIN_USER_IDS vazio em $ENV_FILE — painel /admin desligado"
   local base="GCP_PROJECT=${PROJECT_ID},GCP_LOCATION=${REGION},TASKS_QUEUE=${QUEUE},TASKS_SA_EMAIL=${SA_EMAIL},DEBOUNCE_BACKEND=cloud_tasks,DEBOUNCE_SECONDS=3,WORKER_URL=${url_prevista}/worker/process-thread,OIDC_AUDIENCE=${url_prevista},SUPABASE_URL=${supabase_url},WA_ALERT_TEMPLATE=${wa_alert_template}${flags}"
   # Compra de teste: staging liga BILLING_ALLOW_SANDBOX=true; produção deixa vazio e só lista o id da
   # conta da revisão da Apple em BILLING_SANDBOX_USER_IDS (docs/IN-APP-PURCHASE.md, Fase 5).
   local allow_sandbox sandbox_ids
   allow_sandbox="$(ler_env BILLING_ALLOW_SANDBOX)"
   sandbox_ids="$(ler_env BILLING_SANDBOX_USER_IDS)"
-  local mfa
-  mfa="$(ler_env ADMIN_REQUIRE_MFA)"
-  # Produção NUNCA sobe o painel sem TOTP: o default do agente é ligado, e o deploy recusa o resto.
-  if [[ "$SERVICE" != *staging* && "$mfa" != "true" ]]; then
-    err "ADMIN_REQUIRE_MFA tem que ser 'true' em $ENV_FILE para produção (hoje: '${mfa:-vazio}')."
-    exit 1
-  fi
   local captura_teste
   captura_teste="$(ler_env CAPTURA_ACEITA_TESTE)"
   # Captura aceita notificação de teste só no staging; produção aceita vazio ou 'false' (o pydantic
@@ -436,7 +508,7 @@ deploy() {
     fi
     captura_teste=false
   fi
-  local env_vars="^|^${base//,/|}|SUPABASE_ANON_KEY=${anon_key}|ADMIN_USER_IDS=${admin_ids}|ADMIN_REQUIRE_MFA=${mfa:-false}|CAPTURA_ACEITA_TESTE=${captura_teste:-false}|BILLING_ALLOW_SANDBOX=${allow_sandbox}|BILLING_SANDBOX_USER_IDS=${sandbox_ids}"
+  local env_vars="^|^${base//,/|}|SERVICO=agente|SUPABASE_ANON_KEY=${anon_key}|CAPTURA_ACEITA_TESTE=${captura_teste:-false}|BILLING_ALLOW_SANDBOX=${allow_sandbox}|BILLING_SANDBOX_USER_IDS=${sandbox_ids}"
 
   gcloud run deploy "$SERVICE" \
     --source agent \
@@ -470,6 +542,133 @@ deploy() {
   printf '\n  Webhook da Meta:  %s/whatsapp-inbound\n' "$URL"
   printf '  Hook de OTP:      %s/hooks/otp\n' "$URL"
   printf '  Webhook billing:  %s/hooks/billing\n\n' "$URL"
+}
+
+# ---------------------------------------------------------------------------
+# 6b. painel /admin — serviço próprio, atrás do IAP (13/10/2026)
+# ---------------------------------------------------------------------------
+# Três camadas, cada uma sozinha já barra um desconhecido:
+#   1. IAP (Identity-Aware Proxy): o serviço não é público. Sem login Google de um e-mail da política
+#      do IAP, a requisição nem chega ao container — nem a página de login do painel aparece.
+#   2. O container confere a assinatura do IAP (`x-goog-iap-jwt-assertion`, `aud` deste serviço) e o
+#      e-mail contra ADMIN_IAP_EMAILS: IAP desligado por engano não abre o painel.
+#   3. Login do Supabase com TOTP (aal2) e o id em ADMIN_USER_IDS, como antes.
+# A imagem é a MESMA do agente (o que estiver servindo agora): rode depois de `deploy`/`staging`.
+# Domínio próprio: a região não tem domain mapping; o caminho seria um load balancer (custo fixo
+# mensal), que não convive com o IAP direto. Fica na URL do run.app, que o IAP já protege.
+painel() {
+  log "Painel: $PAINEL_SERVICE (IAP)"
+  local numero imagem anon supabase_url admin_ids emails mfa audiencia
+  numero="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+  imagem="$(gcloud run services describe "$SERVICE" --region "$REGION" --project "$PROJECT_ID" \
+    --format='value(spec.template.spec.containers[0].image)' 2>/dev/null || true)"
+  [[ -n "$imagem" ]] || { err "serviço $SERVICE não existe: faça o deploy do agente antes"; exit 1; }
+  supabase_url="$(ler_env SUPABASE_URL)"
+  anon="$(ler_env SUPABASE_ANON_KEY)"
+  admin_ids="$(ler_env ADMIN_USER_IDS)"
+  # Sem espaço e em minúsculas, como o container compara (`admin_iap_email_set`) e como o IAM devolve:
+  # "a@x.com, b@y.com" faria a sincronização abaixo tirar b@y.com logo depois de adicioná-lo.
+  emails="$(ler_env ADMIN_IAP_EMAILS | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+  mfa="$(ler_env ADMIN_REQUIRE_MFA)"
+  local faltando=()
+  [[ "$supabase_url" == https://* ]] || faltando+=(SUPABASE_URL)
+  [[ -n "$anon" ]] || faltando+=(SUPABASE_ANON_KEY)
+  [[ -n "$admin_ids" ]] || faltando+=(ADMIN_USER_IDS)
+  [[ -n "$emails" ]] || faltando+=(ADMIN_IAP_EMAILS)
+  if [[ ${#faltando[@]} -gt 0 ]]; then
+    err "faltando em $ENV_FILE: ${faltando[*]}"; exit 1
+  fi
+  # Produção NUNCA sobe o painel sem TOTP.
+  if [[ "$PAINEL_SERVICE" != *staging* && "$mfa" != "true" ]]; then
+    err "ADMIN_REQUIRE_MFA tem que ser 'true' em $ENV_FILE para produção (hoje: '${mfa:-vazio}')."
+    exit 1
+  fi
+  audiencia="/projects/${numero}/locations/${REGION}/services/${PAINEL_SERVICE}"
+
+  gcloud services enable iap.googleapis.com cloudresourcemanager.googleapis.com --project "$PROJECT_ID" >/dev/null
+  local iap_sa="service-${numero}@gcp-sa-iap.iam.gserviceaccount.com"
+  gcloud beta services identity create --service=iap.googleapis.com --project "$PROJECT_ID" >/dev/null 2>&1 || true
+
+  local nome_sa="${PAINEL_SA_EMAIL%%@*}"
+  gcloud iam service-accounts describe "$PAINEL_SA_EMAIL" --project "$PROJECT_ID" &>/dev/null \
+    || gcloud iam service-accounts create "$nome_sa" --display-name="Painel do ProOps${SECRET_SUFFIX}" \
+         --project "$PROJECT_ID" >/dev/null
+  local segredo; segredo="$(id_do_segredo DATABASE_URL)"
+  gcloud secrets add-iam-policy-binding "$segredo" --project "$PROJECT_ID" \
+    --member="serviceAccount:${PAINEL_SA_EMAIL}" --role=roles/secretmanager.secretAccessor \
+    --condition=None --quiet >/dev/null
+  ok "conta $PAINEL_SA_EMAIL: lê só $segredo"
+
+  # `^|^`: ids e e-mails são listas separadas por vírgula (ver `gcloud topic escaping`).
+  local env_vars="^|^SERVICO=admin|SUPABASE_URL=${supabase_url}|SUPABASE_ANON_KEY=${anon}|ADMIN_USER_IDS=${admin_ids}|ADMIN_REQUIRE_MFA=${mfa:-false}|ADMIN_EXIGE_IAP=true|ADMIN_IAP_AUDIENCE=${audiencia}|ADMIN_IAP_EMAILS=${emails}|DB_POOL_MAX=2|DB_GRAPH_POOL_MAX=1"
+  gcloud run deploy "$PAINEL_SERVICE" \
+    --image "$imagem" \
+    --project "$PROJECT_ID" --region "$REGION" \
+    --service-account "$PAINEL_SA_EMAIL" \
+    --no-allow-unauthenticated --iap --ingress all \
+    --min-instances 0 --max-instances 2 --concurrency 20 \
+    --cpu 1 --memory 512Mi --timeout 60 \
+    --set-secrets "DATABASE_URL=${segredo}:latest" \
+    --set-env-vars "$env_vars" \
+    --quiet
+
+  # O IAP chama o serviço com a identidade do agente de serviço dele.
+  gcloud run services add-iam-policy-binding "$PAINEL_SERVICE" --region "$REGION" --project "$PROJECT_ID" \
+    --member="serviceAccount:${iap_sa}" --role=roles/run.invoker --quiet >/dev/null
+
+  # Quem passa pelo IAP: EXATAMENTE os e-mails de ADMIN_IAP_EMAILS (adiciona os novos, tira os velhos).
+  local atuais e
+  if ! atuais="$(gcloud iap web get-iam-policy --resource-type=cloud-run --service="$PAINEL_SERVICE" \
+      --region="$REGION" --project "$PROJECT_ID" --flatten='bindings[].members' \
+      --filter='bindings.role=roles/iap.httpsResourceAccessor' --format='value(bindings.members)')"; then
+    err "não consegui ler a política do IAP: nada foi sincronizado"; exit 1
+  fi
+  atuais="$(echo "$atuais" | tr '[:upper:]' '[:lower:]')"
+  for e in ${emails//,/ }; do
+    gcloud iap web add-iam-policy-binding --resource-type=cloud-run --service="$PAINEL_SERVICE" \
+      --region="$REGION" --project "$PROJECT_ID" --member="user:${e}" \
+      --role=roles/iap.httpsResourceAccessor --condition=None --quiet >/dev/null
+  done
+  for e in $atuais; do
+    if [[ ",${emails}," != *",${e#user:},"* ]]; then
+      gcloud iap web remove-iam-policy-binding --resource-type=cloud-run --service="$PAINEL_SERVICE" \
+        --region="$REGION" --project "$PROJECT_ID" --member="$e" \
+        --role=roles/iap.httpsResourceAccessor --condition=None --quiet >/dev/null
+      ok "retirado do IAP: $e"
+    fi
+  done
+  ok "IAP: entra só ${emails}"
+
+  # Conta Google FORA da organização (Gmail) exige um cliente OAuth próprio no IAP, que o Google só
+  # deixa criar pelo console (docs/PAINEL-ADMIN.md). Com o id e o segredo no ambiente do shell, aplica.
+  if [[ -n "${IAP_OAUTH_CLIENT_ID:-}" && -n "${IAP_OAUTH_CLIENT_SECRET:-}" ]]; then
+    local cfg; cfg="$(mktemp)"
+    chmod 600 "$cfg"
+    # o arquivo tem o segredo: sai do disco mesmo se o gcloud falhar (set -e)
+    trap 'rm -f "$cfg"' EXIT
+    printf 'accessSettings:\n  oauthSettings:\n    clientId: %s\n    clientSecret: %s\n' \
+      "$IAP_OAUTH_CLIENT_ID" "$IAP_OAUTH_CLIENT_SECRET" > "$cfg"
+    gcloud iap settings set "$cfg" --resource-type=cloud-run --service="$PAINEL_SERVICE" \
+      --region="$REGION" --project "$PROJECT_ID" --quiet >/dev/null
+    rm -f "$cfg"; trap - EXIT
+    ok "cliente OAuth próprio aplicado ao IAP"
+  fi
+
+  local url
+  url="$(gcloud run services describe "$PAINEL_SERVICE" --region "$REGION" --project "$PROJECT_ID" --format='value(status.url)')"
+  printf '\n  Painel: %s/admin\n\n' "$url"
+}
+
+# O painel roda a MESMA versão do agente. Sem isto ele ficaria preso numa imagem antiga, que a retenção
+# do Artifact Registry (10 versões) acabaria apagando — e o próximo cold start do painel não subiria.
+acompanhar_painel() {
+  gcloud run services describe "$PAINEL_SERVICE" --region "$REGION" --project "$PROJECT_ID" &>/dev/null || return 0
+  local imagem
+  imagem="$(gcloud run services describe "$SERVICE" --region "$REGION" --project "$PROJECT_ID" \
+    --format='value(spec.template.spec.containers[0].image)')"
+  gcloud run services update "$PAINEL_SERVICE" --image "$imagem" --region "$REGION" \
+    --project "$PROJECT_ID" --quiet >/dev/null
+  ok "painel $PAINEL_SERVICE na mesma imagem do agente"
 }
 
 # ---------------------------------------------------------------------------
@@ -585,6 +784,10 @@ JSON
     --member "serviceAccount:${SA_EMAIL}" --role roles/storage.objectUser >/dev/null
   ok "bucket gs://$bucket (privado, diario/ 30 dias, semanal/ 90 dias)"
 
+  # A conta do ambiente lê o segredo ANTES do job existir (a revisão não sobe sem ele).
+  gcloud secrets add-iam-policy-binding "$segredo" --project "$PROJECT_ID" \
+    --member "serviceAccount:${SA_EMAIL}" --role roles/secretmanager.secretAccessor \
+    --condition=None --quiet >/dev/null
   # `^@^`: o gcloud separa --args por vírgula; o script tem vírgulas, então o delimitador vira @.
   gcloud run jobs deploy "$job" --project "$PROJECT_ID" --region "$REGION" \
     --image docker.io/library/postgres:17 \
@@ -596,6 +799,9 @@ JSON
     --cpu 1 --memory 2Gi --task-timeout 20m --max-retries 1 \
     --command bash --args "^@^-c@$(cat "${BACKUP_SCRIPT:-$(dirname "$0")/backup-banco.sh}")" --quiet >/dev/null
   ok "job $job"
+  # O Scheduler dispara o job com esta conta: invocar SÓ este job (não o projeto inteiro).
+  gcloud run jobs add-iam-policy-binding "$job" --project "$PROJECT_ID" --region "$REGION" \
+    --member "serviceAccount:${SA_EMAIL}" --role roles/run.invoker --quiet >/dev/null
 
   local cmd=create
   gcloud scheduler jobs describe "$job" --location "$REGION" --project "$PROJECT_ID" &>/dev/null && cmd=update
@@ -712,18 +918,19 @@ criar_alertas() {
 # ---------------------------------------------------------------------------
 main() {
   case "${1:-tudo}" in
-    deploy)  criar_projeto; deploy; criar_crons; retencao_imagens ;;
+    deploy)  criar_projeto; criar_sa; deploy; restringir_sa; acompanhar_painel; criar_crons; retencao_imagens ;;
     retencao) criar_projeto; retencao_imagens ;;
     # Staging: mesmo projeto GCP, tudo o mais separado. Sem `criar_crons` DE
     # PROPÓSITO — os jobs do Scheduler têm nome fixo (reminders, finance-scheduler,
     # alerts) e `criar_cron` faz `update` quando já existem: rodar staging
     # repontaria os crons de PRODUÇÃO para a URL de staging, em silêncio.
-    staging) criar_projeto; gravar_segredos; criar_fila; deploy ;;
+    staging) criar_projeto; gravar_segredos; criar_sa; criar_fila; deploy; restringir_sa; acompanhar_painel ;;
+    painel|painel-staging) criar_projeto; painel ;;
     preflight) preflight ;;
     alertas) criar_projeto; criar_alertas ;;
-    backup|backup-staging) criar_projeto; criar_backup ;;
+    backup|backup-staging) criar_projeto; criar_sa; criar_backup ;;
     build-iam) criar_projeto; permitir_build ;;
-    sa) criar_projeto; criar_sa ;;
+    sa|sa-staging) criar_projeto; criar_sa; restringir_sa ;;
     secrets) criar_projeto; gravar_segredos ;;
     tudo)
       preflight
@@ -734,12 +941,14 @@ main() {
       gravar_segredos
       criar_fila
       deploy
+      restringir_sa
+      acompanhar_painel
       criar_crons
       retencao_imagens
       criar_backup
       log "Pronto. Aponte o webhook da Meta para a URL acima."
       ;;
-    *) echo "uso: $0 [tudo|deploy|staging|secrets|preflight|build-iam|sa|alertas|retencao|backup|backup-staging]" >&2; exit 1 ;;
+    *) echo "uso: $0 [tudo|deploy|staging|painel|painel-staging|secrets|preflight|build-iam|sa|sa-staging|alertas|retencao|backup|backup-staging]" >&2; exit 1 ;;
   esac
 }
 # ── Trava de produção ──────────────────────────────────────────────────────
@@ -756,7 +965,7 @@ prod_gate() {
   # de STAGING nos segredos de PRODUÇÃO, sem prompt. Gate por subcomando é mais
   # estrito e é uma linha a menos.
   case "$cmd" in
-    tudo|deploy|secrets|sa|build-iam|alertas|retencao|backup) ;;   # escrevem em produção
+    tudo|deploy|secrets|sa|build-iam|alertas|retencao|backup|painel) ;;   # escrevem em produção
     *) return 0 ;;                         # staging, preflight: passam direto
   esac
 
