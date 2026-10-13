@@ -1,0 +1,16 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!-- Lê as notificações dos bancos ESCOLHIDOS no app (Perfil → Lançar pelas notificações).
+         Só o sistema liga neste serviço (BIND_NOTIFICATION_LISTENER_SERVICE), e só depois de a
+         pessoa conceder "Acesso a notificações" nas configurações. -->
+    <service
+      android:name="expo.modules.proopscaptura.CapturaService"
+      android:label="ProOps"
+      android:exported="true"
+      android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+      <intent-filter>
+        <action android:name="android.service.notification.NotificationListenerService" />
+      </intent-filter>
+    </service>
+  </application>
+</manifest>
