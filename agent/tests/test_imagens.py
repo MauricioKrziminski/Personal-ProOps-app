@@ -46,3 +46,20 @@ def test_pdf_passa_intacto():
 def test_lixo_e_imagem_invalida():
     with pytest.raises(imagens.ImagemInvalida):
         imagens.normalizar(b"nao e imagem" * 10, "image/jpeg")
+
+
+def test_png_que_descreve_imagem_enorme_e_recusado_antes_de_decodificar():
+    # 8000×8000 de uma cor só: poucos KB no arquivo, 64 MP (≈ 256 MB em RGBA) se decodificado
+    buf = io.BytesIO()
+    Image.new("RGB", (8000, 8000), "white").save(buf, "PNG")
+    assert len(buf.getvalue()) < 1_000_000
+    with pytest.raises(imagens.ImagemInvalida, match="grande demais"):
+        imagens.normalizar(buf.getvalue(), "image/png")
+
+
+def test_heic_corrompido_e_imagem_invalida():
+    buf = io.BytesIO()
+    Image.new("RGB", (400, 300), "red").save(buf, "HEIF")
+    for quebrado in (buf.getvalue()[: len(buf.getvalue()) // 2], buf.getvalue()[:40]):
+        with pytest.raises(imagens.ImagemInvalida):
+            imagens.normalizar(quebrado, "image/heic")
