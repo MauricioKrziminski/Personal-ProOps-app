@@ -274,7 +274,17 @@ def test_nome_cadastrado_ambiguo_na_fala_pergunta(mundo):
     assert any("mais de uma" in q for q in j["perguntas"])
 
 
-JPEG = b"\xff\xd8\xff\xe0" + b"0" * 64
+def _jpeg_real():
+    import io
+
+    from PIL import Image
+
+    b = io.BytesIO()
+    Image.new("RGB", (8, 8), "white").save(b, "JPEG")
+    return b.getvalue()
+
+
+JPEG = _jpeg_real()
 
 
 def _pede_imagem(conteudo=JPEG, mime="image/jpeg", nome="print.jpg"):
@@ -312,3 +322,24 @@ def test_imagem_que_nao_e_imagem_e_recusada_sem_modelo(mundo, monkeypatch):
 
 def test_imagem_grande_demais(mundo):
     assert _pede_imagem(conteudo=JPEG + b"0" * (8 * 1024 * 1024)).status_code == 413
+
+
+def test_heic_chega_ao_modelo_como_jpeg(mundo, monkeypatch):
+    import io
+
+    import pillow_heif  # noqa: F401  (registra o HEIF no Pillow)
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (64, 64), "red").save(buf, "HEIF")
+    visto = {}
+
+    async def finance_node(estado, config=None):
+        visto["estado"], visto["config"] = estado, config
+        return {"finance_actions": [{"type": "create_expense", "amount_cents": 100, "description": "x"}]}
+
+    monkeypatch.setattr(nodes, "finance_node", finance_node)
+    r = _pede_imagem(conteudo=buf.getvalue(), mime="image/heic", nome="f.heic")
+    assert r.status_code == 200
+    assert visto["config"]["configurable"]["midia_do_turno"]["mime_type"] == "image/jpeg"
+    assert visto["estado"]["media"] == {"mime_type": "image/jpeg"}

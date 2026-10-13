@@ -11,6 +11,7 @@ por adivinhação.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import logging
 import re
@@ -31,7 +32,7 @@ from app.domain.dates import format_date_br
 from app.domain.money import cents_to_brl
 from app.graph import nodes
 from app.graph.state import CHAVE_MIDIA
-from app.services import ia
+from app.services import ia, imagens
 from app.routes.chat import MAX_CONTENT, Corpo
 from app.routes.chat import _erro_audio as _erro
 from app.tools import finance
@@ -239,12 +240,16 @@ async def rascunho_da_imagem(
         raise _erro(413, "image_too_large", "A imagem é grande demais. Mande um print.")
     if not _assinatura_de_imagem(dados):
         raise _erro(422, "invalid_image", "O arquivo não é uma imagem válida.")
+    try:
+        dados, mime = await asyncio.to_thread(imagens.normalizar, dados, file.content_type)
+    except imagens.ImagemInvalida:
+        raise _erro(422, "invalid_image", "O arquivo não é uma imagem válida.") from None
     perfil = await _abrir(user_id)
     fuso = _fuso_valido(timezone)
     texto = "Extraia o lançamento deste comprovante, cupom ou print de notificação."
     estado = {"text": texto, "timezone": fuso, "workspace_id": perfil["workspace_id"], "messages": None,
-              "agora_local": f"{today.isoformat()}T12:00:00", "media": {"mime_type": file.content_type}}
-    config = {"configurable": {CHAVE_MIDIA: {"mime_type": file.content_type,
+              "agora_local": f"{today.isoformat()}T12:00:00", "media": {"mime_type": mime}}
+    config = {"configurable": {CHAVE_MIDIA: {"mime_type": mime,
                                              "data_b64": base64.b64encode(dados).decode()}}}
     try:
         saida = await nodes.finance_node(estado, config)

@@ -26,7 +26,7 @@ import time
 from app import conversation, db, logctx
 from app.config import get_settings
 from app.security import sanitize_untrusted
-from app.services import groq, observabilidade, tasks, whatsapp
+from app.services import groq, imagens, observabilidade, tasks, whatsapp
 
 log = logging.getLogger(__name__)
 
@@ -354,6 +354,12 @@ async def _extract_batch(lote: list[dict]) -> dict | None:
             mime = anexo.get("mime_type") or mime
             if not VISION_MIME.match(mime) or len(conteudo) > MAX_MEDIA_BYTES:
                 continue
+            if mime.startswith("image/"):
+                try:
+                    conteudo, mime = await asyncio.to_thread(imagens.normalizar, conteudo, mime)
+                except imagens.ImagemInvalida:
+                    # a reserva (Gemini) ainda tenta ler os bytes originais
+                    log.warning("Imagem do WhatsApp não decodificou; segue com o original")
             media = {"mime_type": mime, "data_b64": base64.b64encode(conteudo).decode()}
             if anexo.get("caption"):
                 textos.append(anexo["caption"])

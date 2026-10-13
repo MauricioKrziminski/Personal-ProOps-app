@@ -25,6 +25,10 @@ langfuse==4.15.1
 # exigido pelo langfuse.langchain (o CallbackHandler recusa subir só com langchain-core)
 langchain==1.3.18
 
+# --- imagem (HEIC do iPhone -> JPEG antes do modelo) ---
+pillow==12.3.0
+pillow-heif==1.8.1
+
 # --- google / auth ---
 google-cloud-tasks==2.24.0
 google-auth==2.57.0
