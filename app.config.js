@@ -22,10 +22,13 @@
  * dono. Produção exige `APP_VARIANT=production` escrito com todas as letras — é o que o
  * perfil `production`/`distribution` do `eas.json` faz.
  *
- * O `scheme` continua **um só** de propósito: ele não é chave de dado nenhum (o login é por
- * código, e deep link aqui é ferramenta de desenvolvimento). Com dois apps instalados o
- * Android mostra um seletor, que é o comportamento certo — inventar `appproops-staging`
- * quebraria os links que já estão nos testes e nas notas.
+ * O `scheme` ganhou um nome POR VARIANTE na frente (12/10/2026): `appproops-dev` e
+ * `appproops-staging`, com o `appproops` antigo em segundo (os links dos testes e das notas
+ * continuam abrindo). Era um só porque deep link aqui era ferramenta de desenvolvimento e o
+ * seletor do Android resolvia; o "Compartilhar" do iOS mudou isso: a extensão abre o app pelo
+ * PRIMEIRO scheme (`<scheme>://dataUrl=…`) e o pacote lê a chave pelo mesmo nome, e com as três
+ * variantes respondendo `appproops` o comprovante podia ir parar no app de OUTRO banco. Produção
+ * fica só com `appproops`.
  *
  * ⚠️ `android/` e `ios/` são saída de `prebuild` (gitignorados) e têm o package ANTIGO
  * gravado. Depois de mudar de variante, `npx expo prebuild --clean` antes de `run:android`.
@@ -83,13 +86,13 @@ if (DISTRIBUICAO === 'loja' && !(process.env.EXPO_PUBLIC_AGENT_URL || '').trim()
 }
 
 const IDENTIDADE = {
-  development: { id: 'com.proops.personal.dev', nome: 'ProOps' },
-  preview: { id: 'com.proops.personal.staging', nome: 'ProOps' },
-  production: { id: 'com.proops.personal', nome: 'ProOps' },
+  development: { id: 'com.proops.personal.dev', nome: 'ProOps', scheme: ['appproops-dev', 'appproops'] },
+  preview: { id: 'com.proops.personal.staging', nome: 'ProOps', scheme: ['appproops-staging', 'appproops'] },
+  production: { id: 'com.proops.personal', nome: 'ProOps', scheme: 'appproops' },
 };
 
 module.exports = ({ config }) => {
-  const { id, nome } = IDENTIDADE[VARIANTE] || IDENTIDADE.development;
+  const { id, nome, scheme } = IDENTIDADE[VARIANTE] || IDENTIDADE.development;
   const publicConfig = {
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL || '',
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
@@ -98,6 +101,7 @@ module.exports = ({ config }) => {
   return {
     ...config,
     name: nome,
+    scheme,
     plugins: [
       ...(config.plugins || []),
       DISTRIBUICAO === 'loja' ? './plugins/with-sem-instalador-apk' : './plugins/with-apk-installer',

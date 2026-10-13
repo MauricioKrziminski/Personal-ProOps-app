@@ -88,3 +88,9 @@ test('compartilhar: imagem e texto, App Group da própria variante (o mesmo dos 
     assert.equal(op.iosAppGroupIdentifier, widgets[1].groupIdentifier);
   }
 });
+
+test('scheme: o próprio da variante primeiro (o Compartilhar do iOS abre pelo primeiro), o antigo depois', () => {
+  assert.deepEqual(resolver('apk', 'development').scheme, ['appproops-dev', 'appproops']);
+  assert.deepEqual(resolver('apk', 'preview').scheme, ['appproops-staging', 'appproops']);
+  assert.equal(resolver('apk', 'production').scheme, 'appproops');
+});

@@ -193,18 +193,25 @@ function AvisoDaAbertura({ pronto, temSessao }: { pronto: boolean; temSessao: bo
   return null;
 }
 
+/** Portas e portões: daqui o app ainda vai trocar de tela sozinho (o `Redirect` da raiz é `replace`). */
+const FORA_DO_APP = new Set(['/', '/login', '/login-whatsapp', '/signup', '/forgot-password', '/consentimento', '/onboarding', '/assinar']);
+
 /**
  * Com sessão e já dentro do app, cada compartilhado abre "Lançar o que chegou" UMA vez (voltar
- * sem montar não reabre). Espera sair de `/`: o `Redirect` da raiz é um `replace` e trocaria a
- * tela recém-aberta.
+ * sem montar não reabre). Só empurra fora das portas: empurrada lá, a tela seria trocada pelo
+ * `Redirect` e o `beforeRemove` dela apagaria o compartilhado. "Aberto" só conta quando a tela
+ * apareceu de fato.
  */
 function AbreOCompartilhado({ pathname }: { pathname: string }) {
   const { hasShareIntent, shareIntent } = useShareIntentContext();
   const aberto = useRef<unknown>(null);
   useEffect(() => {
-    if (!hasShareIntent || aberto.current === shareIntent || pathname === '/') return;
-    aberto.current = shareIntent;
-    if (pathname !== '/compartilhado') router.push('/compartilhado');
+    if (pathname === '/compartilhado') {
+      aberto.current = shareIntent;
+      return;
+    }
+    if (!hasShareIntent || aberto.current === shareIntent || FORA_DO_APP.has(pathname)) return;
+    router.push('/compartilhado');
   }, [hasShareIntent, shareIntent, pathname]);
   return null;
 }
