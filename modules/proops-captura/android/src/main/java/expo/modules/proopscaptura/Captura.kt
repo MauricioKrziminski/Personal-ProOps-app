@@ -23,9 +23,12 @@ object Captura {
   fun ativa(ctx: Context): Boolean = prefs(ctx).getBoolean("ativa", false)
   fun pacotes(ctx: Context): Set<String> = prefs(ctx).getStringSet("pacotes", emptySet()) ?: emptySet()
 
+  @Synchronized
   fun configurar(ctx: Context, ativa: Boolean, pacotes: List<String>) {
-    prefs(ctx).edit().putBoolean("ativa", ativa).putStringSet("pacotes", pacotes.toSet()).apply()
-    if (!ativa) gravar(ctx, emptyList())
+    val novos = pacotes.toSet()
+    prefs(ctx).edit().putBoolean("ativa", ativa).putStringSet("pacotes", novos).commit()
+    // desligou a captura: esvazia; desligou só um banco: tira da fila o que era dele
+    gravar(ctx, if (ativa) ler(ctx).filter { it.optString("package") in novos } else emptyList())
   }
 
   @Synchronized

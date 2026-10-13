@@ -39,3 +39,9 @@ test('expõe as funções que o app usa', () => {
     assert.match(fonte, new RegExp(`Function\\("${f}"\\)`));
   }
 });
+
+test('configurar é sincronizado e limpa da fila o que saiu da seleção', () => {
+  const fonte = kt('Captura.kt');
+  assert.match(fonte, /@Synchronized\s+fun configurar/);
+  assert.match(fonte, /filter \{ it\.optString\("package"\) in novos \}/);
+});
