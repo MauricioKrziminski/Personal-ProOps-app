@@ -94,6 +94,13 @@ Tirar alguém: remova o e-mail de `ADMIN_IAP_EMAILS` e o id de `ADMIN_USER_IDS` 
 
 ## Conta de admin
 
+**Antes do primeiro login, o projeto Supabase do ambiente precisa do TOTP ligado**: Authentication → Multi-Factor →
+TOTP habilitado (enroll e verify). Desligado, o painel para em "Não foi possível preparar a verificação" (visto em
+produção em 13/10/2026: o staging estava ligado, a produção não).
+
+Crie a conta em Authentication → Users → Add user → Create new user, com **Auto Confirm User**, e ponha o UID em
+`ADMIN_USER_IDS`. Trocou a conta? Troque o UID e rode o subcomando do painel de novo.
+
 Use uma conta do Supabase **só para o painel** (um e-mail que você não usa como cliente do app), com TOTP. A conta
 de cliente fica com sessão em celular, e um celular perdido não deve carregar poder de admin.
 
