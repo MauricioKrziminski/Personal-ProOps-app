@@ -32,7 +32,7 @@ def _config(monkeypatch):
 
 @pytest.fixture
 def mundo(monkeypatch):
-    v = {"limite": None, "gravados": [], "eventos": [], "conhecidos": set(), "hoje": 0,
+    v = {"acesso": "subscriber", "descartadas": 0, "limite": None, "gravados": [], "eventos": [], "conhecidos": set(), "hoje": 0,
          "acoes": [{"type": "create_expense", "amount_cents": 4590, "description": "mercado"}],
          "chamadas": 0, "existentes": []}
 
@@ -70,7 +70,14 @@ def mundo(monkeypatch):
             return {"n": v["hoje"]}
         return None
 
+    async def plano(_ws):
+        return {"access": v["acesso"]}
+
     async def execute(sql, *args):
+        if "update public.captured_notifications" in sql:
+            v["descartadas"] += 1
+            assert "status = 'duplicate'" in sql and "30 days" in sql and "texto = null" in sql
+            return
         assert "insert into public.captured_notifications" in sql
         v["gravados"].append(args)
 
@@ -78,6 +85,7 @@ def mundo(monkeypatch):
         return v["existentes"]
 
     monkeypatch.setattr(db, "chat_profile", perfil)
+    monkeypatch.setattr(db, "plan_status", plano)
     monkeypatch.setattr(db, "fetch", fetch)
     monkeypatch.setattr(db, "fetch_one", fetch_one)
     monkeypatch.setattr(db, "execute", execute)
@@ -222,6 +230,7 @@ def test_modelo_fora_do_ar_nao_aceita(mundo, monkeypatch):
 def test_tem_valor_so_estrutura():
     assert captures.tem_valor("Compra de R$ 45,90")
     assert captures.tem_valor("Pix recebido 1.200,00")
+    assert captures.tem_valor("Pix recebido 1234,56")
     assert not captures.tem_valor("Seu código é 123456")
     assert not captures.tem_valor("Bom dia!")
 
@@ -249,3 +258,29 @@ def test_banco_fora_nao_aceita_e_para_o_lote(mundo, monkeypatch):
     assert r.status_code == 200
     assert r.json() == {"aceitos": [], "novos": 0}
     assert mundo["chamadas"] == 1  # o segundo nem foi interpretado
+
+
+@pytest.mark.parametrize("acesso", ["lapsed", "never"])
+def test_sem_assinatura_responde_402_sem_modelo_nem_gravar(mundo, acesso):
+    mundo["acesso"] = acesso
+    r = _envia(_item())
+    assert r.status_code == 402
+    assert mundo["chamadas"] == 0 and mundo["gravados"] == []
+
+
+def test_duplicata_antiga_e_descartada_uma_vez_por_envio(mundo):
+    _envia(_item(), _item(ext="ext-00000002"))
+    assert mundo["descartadas"] == 1
+
+
+def test_erro_ao_gravar_ignorada_nao_derruba_o_lote(mundo, monkeypatch):
+    original = db.execute
+
+    async def quebra_a_primeira(sql, *args):
+        if "insert" in sql and args[2] == "ext-00000001":
+            raise RuntimeError("db")
+        return await original(sql, *args)
+
+    monkeypatch.setattr(db, "execute", quebra_a_primeira)
+    r = _envia(_item(texto="sem valor"), _item(ext="ext-00000002", texto="sem valor"))
+    assert r.status_code == 200 and r.json()["aceitos"] == ["ext-00000002"]

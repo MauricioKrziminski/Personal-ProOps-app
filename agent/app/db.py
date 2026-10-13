@@ -773,7 +773,8 @@ async def reservar_cota(
             cur = await conn.execute(
                 """
                 select count(*)::int as n from public.ai_events
-                where user_id = %s and created_at >= now() - interval '1 hour'
+                where user_id = %s and kind <> 'capture'
+                  and created_at >= now() - interval '1 hour'
                 """,
                 (user_id,),
             )

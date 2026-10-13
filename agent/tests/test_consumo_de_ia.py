@@ -219,7 +219,8 @@ class _Conexao:
         if "delete from public.ai_events" in sql:
             return _Cursor(None)
         if "interval '1 hour'" in sql:
-            return _Cursor({"n": sum(1 for r in b.linhas if r["user_id"] == params[0])})
+            return _Cursor({"n": sum(1 for r in b.linhas if r["user_id"] == params[0]
+                                         and ("kind <> 'capture'" not in sql or r["kind"] != "capture"))})
         if "_plan_status" in sql:
             if not b.plano:
                 return _Cursor(None)
@@ -396,3 +397,11 @@ def _handler_com_taxa(monkeypatch, taxa, sempre=False):
 def test_amostragem_vem_do_ambiente_e_experimento_nao_amostra(monkeypatch):
     assert _handler_com_taxa(monkeypatch, 0.1)["sample_rate"] == 0.1
     assert _handler_com_taxa(monkeypatch, 0.1, sempre=True)["sample_rate"] == 1.0
+
+
+async def test_captura_nao_gasta_a_rajada_por_hora_do_chat(monkeypatch):
+    banco = _Banco(maximo_mes=1000)
+    banco.linhas = [{"user_id": USER, "kind": "capture", "reserved": False, "id": f"c{i}"}
+                    for i in range(get_settings().max_parses_per_hour)]
+    monkeypatch.setattr(db, "pool", banco.pool)
+    assert await conversation.check_limits(_sessao()) is None

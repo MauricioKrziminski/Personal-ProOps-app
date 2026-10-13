@@ -47,7 +47,7 @@ MAX_POR_ENVIO = 20
 MAX_POR_DIA = 60
 MARGEM_DIAS = 5
 # Estrutura, não sentido: movimento de dinheiro sempre traz valor em reais.
-_VALOR = re.compile(r"R\$\s*\d|\b\d{1,3}(?:\.\d{3})*,\d{2}\b")
+_VALOR = re.compile(r"R\$\s*\d|\b\d+(?:\.\d{3})*,\d{2}\b")
 
 
 class NotificacaoIn(Corpo):
@@ -180,6 +180,19 @@ async def receber(body: EnvioIn, user_id: Annotated[UUID, Depends(current_user)]
     if not perfil or not perfil.get("workspace_id"):
         raise _erro(404, "no_workspace", "Não achei o seu espaço.")
     ws = perfil["workspace_id"]
+    # A captura é da assinatura: sem ela nada é aceito nem interpretado (o app mantém a fila).
+    plano = await db.plan_status(ws)
+    if not plano or plano.get("access") != "subscriber":
+        raise _erro(402, "subscription_required", "A captura faz parte da assinatura.")
+    # Duplicata não fica para sempre: depois de 30 dias o texto some e o item sai da lista.
+    try:
+        await db.execute(
+            """update public.captured_notifications set status = 'discarded', texto = null
+               where workspace_id = %s and status = 'duplicate' and posted_at < now() - interval '30 days'""",
+            ws,
+        )
+    except Exception:  # noqa: BLE001 — limpeza é best-effort
+        log.warning("Limpeza de duplicatas antigas falhou")
     fuso = finance_draft._fuso_valido(body.timezone)
     ids = [i.external_id for i in body.items]
     conhecidos = {r["external_id"] for r in await db.fetch(
@@ -200,7 +213,11 @@ async def receber(body: EnvioIn, user_id: Annotated[UUID, Depends(current_user)]
             continue
         banco = banco_do_pacote(item.package)
         if not banco or not tem_valor(f"{item.title} {item.text}"):
-            await _gravar(ws, user_id, item, banco or item.package[:128], "ignored")
+            try:
+                await _gravar(ws, user_id, item, banco or item.package[:128], "ignored")
+            except Exception:  # noqa: BLE001 — um item ruim não trava a fila: fica no aparelho
+                log.warning("Notificação %s ignorada não gravou", item.external_id)
+                continue
             aceitos.append(item.external_id)
             continue
         if parado or usados >= MAX_POR_DIA:
