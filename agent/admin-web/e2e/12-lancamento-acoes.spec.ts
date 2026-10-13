@@ -37,7 +37,7 @@ test.describe("Lançamento: ações que gravam", () => {
     expect(txt.trim().split("\n")).toHaveLength(n + 1); // cabeçalho + as encerradas
     expect(txt.charCodeAt(0), "BOM UTF-8 no início (o Excel abre com acento certo)").toBe(0xfeff);
     const [cabecalho, ...linhas] = txt.slice(1).trim().split("\r\n");
-    expect(cabecalho).toBe("user_id,email,name,created_at,last_sign_in_at,last_seen_at,last_app_version,plan,status,access,is_trial,period_end,origin,ai_used,ai_max,wa_used,wa_max,whatsapp_linked,suspended");
+    expect(cabecalho).toBe("user_id,email,name,created_at,last_sign_in_at,last_seen_at,last_app_version,plan,status,access,is_trial,period_end,origin,ai_used,ai_max,wa_used,wa_max,whatsapp_linked,suspended,contact_ok");
     const celulas = linhas.find((l) => l.startsWith(`${U.encerrada.id},`))!.split(",");
     expect(celulas[1]).toBe(U.encerrada.email); // célula conhecida do seed
     expect(celulas[2], "fórmula neutralizada: começa com apóstrofo").toBe("'=1+1");

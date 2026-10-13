@@ -81,7 +81,8 @@ Query: `q` (e-mail ou nome; com 4 ou mais dígitos em `q` também casa o TELEFON
   "plan": "free|pro|family", "status": "str", "access": "subscriber|never|lapsed",
   "is_trial": false, "period_end": "date|null", "origin": "apple|google|manual|test_store|null",
   "ai_used": 0, "ai_max": 0, "wa_used": 0, "wa_max": 0, "whatsapp_linked": false,
-  "last_app_version": "str|null", "last_seen_at": "iso|null"
+  "last_app_version": "str|null", "last_seen_at": "iso|null",
+  "contact_ok": true
 }
 ```
 
@@ -90,7 +91,8 @@ Os MESMOS filtros e a MESMA ordem de `/accounts` (`q`, `access`, `plan`, `origin
 Mais de **10.000** linhas → **422** `{"error":"too_many_rows","message":…}` (nada é gravado). `text/csv; charset=utf-8`
 com BOM, `Content-Disposition: attachment; filename="contas-AAAA-MM-DD.csv"`. Colunas: `user_id, email, name,
 created_at, last_sign_in_at, last_seen_at, last_app_version, plan, status, access, is_trial, period_end, origin,
-ai_used, ai_max, wa_used, wa_max, whatsapp_linked, suspended` (sem telefone). Texto que começa com `= + - @` ganha `'`
+ai_used, ai_max, wa_used, wa_max, whatsapp_linked, suspended, contact_ok` (sem telefone; `contact_ok=false` = pediu
+para não receber novidades e ofertas, e fica de fora de qualquer envio comercial). Texto que começa com `= + - @` ganha `'`
 na frente (a planilha não executa como fórmula). Auditoria `accounts_exported` (`payload`: `filters` e `total`).
 
 ### `GET /admin/api/accounts/{user_id}`
@@ -100,6 +102,7 @@ na frente (a planilha não executa como fórmula). Auditoria `accounts_exported`
   "profile": {"phone": "str|null", "email_confirmed_at": "iso|null", "onboarding_completed": false,
               "banned_until": "iso|null", "sessions": 0,
               "terms_version": "str|null", "terms_accepted_at": "iso|null", "ai_consent_at": "iso|null",
+              "marketing_opt_out_at": "iso|null",
               "last_app_version": "str|null", "last_app_platform": "ios|android|web|null",
               "last_seen_at": "iso|null", "push_tokens": 0, "notes_count": 0},
   "subscription": {"plan": "", "status": "", "provider": "", "external_id": "", "product_id": "",

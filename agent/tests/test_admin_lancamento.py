@@ -50,7 +50,7 @@ def banco(monkeypatch):
         est["args"].append(a)
         if "as onboarding" in sql:
             return {"phone": TELEFONE, "email_confirmed_at": AGORA, "banned_until": None, "onboarding": True,
-                    "sessoes": 1, "terms_version": "2026-10-09", "terms_accepted_at": AGORA, "ai_consent_at": AGORA,
+                    "sessoes": 1, "terms_version": "2026-10-09", "terms_accepted_at": AGORA, "ai_consent_at": AGORA, "marketing_opt_out_at": AGORA,
                     "last_app_version": "1.4.2", "last_app_platform": "ios", "last_seen_at": AGORA,
                     "push_tokens": 1, "notes_count": 2}
         if "w.owner_id = p.id" in sql:
@@ -181,6 +181,7 @@ def test_detalhe_traz_aceite_consentimento_versao_push_e_notas(cli, banco):
     p = cli.get(f"/admin/api/accounts/{ALVO}").json()["profile"]
     assert p["terms_version"] == "2026-10-09" and p["terms_accepted_at"] and p["ai_consent_at"]
     assert (p["last_app_version"], p["last_app_platform"]) == ("1.4.2", "ios") and p["last_seen_at"]
+    assert p["marketing_opt_out_at"], "quem saiu do contato comercial aparece no detalhe"
     assert p["push_tokens"] == 1 and p["notes_count"] == 2
     assert "expo_push_token" not in json.dumps(p)  # só a contagem, nunca o token
 

@@ -216,6 +216,7 @@ function AppInfo({ d }: { d: AccountDetail }) {
       <dl className="divide-y px-5 pb-4 pt-1">
         <Row k="Termos aceitos" v={p.terms_version ? `Versão ${p.terms_version}, em ${fmtDate(p.terms_accepted_at, true)}` : "Ainda não aceitou"} />
         <Row k="IA autorizada" v={p.ai_consent_at ? fmtDate(p.ai_consent_at, true) : "Não"} />
+        <Row k="Novidades e ofertas" v={p.marketing_opt_out_at ? `Saiu em ${fmtDate(p.marketing_opt_out_at, true)}` : "Recebe"} />
         <Row k="Versão do app" v={p.last_app_version ? `${p.last_app_version}${p.last_app_platform ? ` · ${PLATFORM_LABEL[p.last_app_platform]}` : ""}` : "—"} />
         <Row k="Último uso do app" v={p.last_seen_at ? `${relTime(p.last_seen_at)} (${fmtDate(p.last_seen_at, true)})` : "Nunca"} />
         <Row k="Tokens de push" v={p.push_tokens} />

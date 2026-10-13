@@ -84,7 +84,7 @@ async def _linhas(sql: str, *args) -> list[dict]:
 
 _PERFIL = ("id, phone, whatsapp_verified, timezone, locale, created_at, updated_at, alerts_enabled, display_name, "
            "alerts_push_enabled, alerts_whatsapp_enabled, terms_version, terms_accepted_at, ai_consent_at, "
-           "last_app_version, last_app_platform, last_seen_at")  # sem expo_push_token: é credencial do aparelho
+           "last_app_version, last_app_platform, last_seen_at, marketing_opt_out_at")  # sem expo_push_token: é credencial do aparelho
 
 
 async def exportar(user_id: UUID) -> dict:

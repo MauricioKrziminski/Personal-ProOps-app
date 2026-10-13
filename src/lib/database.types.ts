@@ -3216,6 +3216,8 @@ export type Database = {
           last_app_version: string | null
           last_seen_at: string | null
           locale: string
+          marketing_opt_out_at: string | null
+          marketing_token: string
           phone: string | null
           terms_accepted_at: string | null
           terms_version: string | null
@@ -3236,6 +3238,8 @@ export type Database = {
           last_app_version?: string | null
           last_seen_at?: string | null
           locale?: string
+          marketing_opt_out_at?: string | null
+          marketing_token?: string
           phone?: string | null
           terms_accepted_at?: string | null
           terms_version?: string | null
@@ -3256,6 +3260,8 @@ export type Database = {
           last_app_version?: string | null
           last_seen_at?: string | null
           locale?: string
+          marketing_opt_out_at?: string | null
+          marketing_token?: string
           phone?: string | null
           terms_accepted_at?: string | null
           terms_version?: string | null
@@ -5603,6 +5609,7 @@ export type Database = {
         Returns: Json
       }
       set_ai_consent: { Args: { p_consent: boolean }; Returns: Json }
+      set_marketing_contact: { Args: { p_accept: boolean }; Returns: Json }
       settle_invoice: {
         Args: { p_invoice_id: string; p_paid_at?: string }
         Returns: string

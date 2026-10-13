@@ -14,6 +14,7 @@ Encarregado pelo tratamento de dados (DPO): gestao@proops.com.br.
 - **Mensagens com o assistente:** texto digitado, **áudios** (que são transcritos em texto), fotos de cupons, PDFs de fatura e arquivos de extrato que você enviar ou importar, e o histórico da conversa necessário para o assistente entender o contexto.
 - **Assinatura:** identificador da conta de assinatura, plano, status e datas, recebidos da loja e da plataforma de assinaturas. Não recebemos os dados do seu cartão ou meio de pagamento.
 - **Notificações:** token de notificação push do seu aparelho.
+- **Preferência de contato:** se você aceita receber novidades e ofertas, e desde quando pediu para não receber.
 - **Notificações dos apps de banco (só Android, se você ativar):** o título e o texto das notificações dos apps de banco que você escolher, para sugerir lançamentos "a confirmar". Notificações de outros apps nunca saem do aparelho. Nada é lançado sem você confirmar, e num espaço compartilhado só você vê as suas.
 - **Imagens e textos que você compartilha com o ProOps** (comprovante, print, texto do Pix): usados só para montar a sugestão do lançamento e não guardados. Antes de seguir para o provedor de IA, a imagem é convertida e perde os metadados (como a localização da foto).
 - **Dados técnicos e de uso:** registros de operação (logs) do servidor, contagem de mensagens de IA usadas no período, versão do aplicativo, plataforma (iOS, Android ou web) e data do último acesso, necessárias à entrega de atualizações, ao suporte e à segurança, e registros de erro do aplicativo, do servidor e do painel.
@@ -32,8 +33,17 @@ Não coletamos dados sensíveis de propósito. Se você escrever algo sensível 
 | Segurança, prevenção a fraude e abuso, diagnóstico de falhas | Legítimo interesse; prevenção à fraude |
 | Cumprir obrigações legais e regulatórias, e defesa em processos | Obrigação legal; exercício regular de direitos |
 | Melhorar a qualidade do assistente com amostras de telemetria, com dados mascarados | Legítimo interesse |
+| Avisos sobre a sua conta e a assinatura (por exemplo: teste grátis terminando, cobrança, cadastro incompleto) | Execução de contrato; legítimo interesse |
+| Enviar novidades e ofertas do ProOps e entrar em contato para ajudar a concluir a assinatura, inclusive com quem criou a conta e não assinou (seção 2-A) | Legítimo interesse (art. 7º, IX), com opção de sair a qualquer momento |
 
-Não vendemos seus dados, não os usamos para publicidade e não fazemos perfis para terceiros.
+Não vendemos seus dados, não os compartilhamos para publicidade de terceiros e não fazemos perfis para terceiros.
+
+## 2-A. Comunicações e como deixar de receber
+
+- **O que usamos para falar com você:** só o cadastro (nome, e-mail e o telefone que você vinculou) e a situação da conta (data de cadastro, teste grátis, assinatura, último acesso). **Seus lançamentos, valores, notas, lembretes e conversas nunca são usados para escolher ofertas.**
+- **Por onde:** e-mail, automático ou enviado pela nossa equipe. Ofertas por WhatsApp ou por notificação no aparelho só com a sua autorização prévia e específica.
+- **Para deixar de receber novidades e ofertas:** desligue **Perfil → Privacidade e dados → Receber novidades e ofertas**, use o link de descadastro presente em cada e-mail de oferta, ou escreva para gestao@proops.com.br. O pedido vale a partir do registro e não afeta o uso do aplicativo.
+- Os **avisos sobre a sua conta** (segurança, cobrança, assinatura, mudanças nestes termos) continuam chegando enquanto a conta existir, porque fazem parte do Serviço.
 
 ## 3. Com quem compartilhamos
 
@@ -46,6 +56,7 @@ Usamos operadores (prestadores) que tratam dados em nosso nome, somente para as 
 - **Langfuse:** telemetria da qualidade da IA, em servidor da União Europeia, com amostragem de interações e **mascaramento automático** de e-mail, CPF, CNPJ e telefone antes do envio.
 - **RevenueCat, Apple App Store e Google Play:** gestão e cobrança da assinatura.
 - **Expo:** entrega de notificações push e de atualizações do aplicativo.
+- **Provedor de envio de e-mail:** entrega dos e-mails do aplicativo (códigos de acesso, avisos da conta e, se você não pediu para sair, novidades e ofertas); recebe só o endereço, o nome e o conteúdo da mensagem.
 
 Também podemos compartilhar dados com autoridades quando houver ordem legal, e em reorganização societária, com o mesmo nível de proteção. Se você usar um espaço compartilhado do aplicativo (por exemplo, com familiar), os membros do espaço veem os dados daquele espaço — exceto as sugestões vindas das notificações dos bancos, que só quem as recebeu vê.
 
@@ -62,6 +73,7 @@ Alguns prestadores (como Anthropic, Google, Groq, Meta, RevenueCat, Expo e Langf
 - **Cópias de segurança** do banco: diárias por **30 dias** e semanais por **90 dias**; só servem para recuperação de desastres, não são consultadas para outra finalidade e os dados apagados somem delas ao fim desse prazo (até 90 dias).
 - **Enquanto a conta existe**, dados técnicos do assistente são apagados automaticamente: fila de mensagens do WhatsApp processadas, confirmações e rascunhos encerrados, 30 dias; registro de ações executadas e avisos enviados, 90 dias; contagens de uso e de envios, 13 meses (necessárias para limites do plano e custo); comentários de avaliação, 180 dias.
 - **Notificações dos bancos**: o texto fica guardado só enquanto a sugestão espera você decidir, e é apagado quando você confirma ou descarta; a sugestão resolvida é apagada 30 dias depois, assim como a que parece já lançada e ficou 30 dias sem decisão. Ao sair de um espaço compartilhado, as suas sugestões daquele espaço são apagadas.
+- **Preferência de contato**: enquanto a conta existir. O pedido de não receber é guardado com a data, para ser respeitado inclusive em listas de envio montadas depois.
 - **Registros de erro**: 30 dias. Os agrupamentos de erro são apagados 90 dias depois de resolvidos.
 - **Histórico do WhatsApp:** a fila de mensagens é apagada em 30 dias; ao apagar a conta, o histórico some por completo.
 - **Logs do servidor** (Google Cloud Logging) seguem a retenção padrão do Google Cloud de **30 dias**.
@@ -70,7 +82,7 @@ Alguns prestadores (como Anthropic, Google, Groq, Meta, RevenueCat, Expo e Langf
 
 ## 6. Seus direitos (LGPD, art. 18)
 
-Você pode, a qualquer momento: confirmar que tratamos seus dados; acessar; corrigir; pedir anonimização, bloqueio ou eliminação de dados desnecessários; pedir **portabilidade**; obter informação sobre compartilhamento; ser informado sobre a possibilidade de não consentir e suas consequências; **revogar consentimento**, quando for a base; e pedir revisão de decisões automatizadas.
+Você pode, a qualquer momento: confirmar que tratamos seus dados; acessar; corrigir; pedir anonimização, bloqueio ou eliminação de dados desnecessários; pedir **portabilidade**; obter informação sobre compartilhamento; ser informado sobre a possibilidade de não consentir e suas consequências; **revogar consentimento**, quando for a base; **opor-se** ao tratamento baseado em legítimo interesse, como o envio de novidades e ofertas; e pedir revisão de decisões automatizadas.
 
 Como exercer: pelo aplicativo você acessa, corrige e apaga seus registros, **baixa seus dados** em Perfil → Privacidade e dados → Baixar meus dados (arquivo JSON) e **apaga a conta** em Perfil → Apagar conta. Se não tiver o aplicativo, peça a exportação por e-mail para gestao@proops.com.br. Para os demais pedidos, escreva para o mesmo endereço. Respondemos em até 15 dias e podemos pedir confirmação da sua identidade. Você também pode reclamar à Autoridade Nacional de Proteção de Dados (ANPD).
 

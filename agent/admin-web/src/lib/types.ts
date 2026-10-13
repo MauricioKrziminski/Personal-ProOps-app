@@ -33,6 +33,8 @@ export interface AccountRow {
   wa_used: number;
   wa_max: number;
   whatsapp_linked: boolean;
+  /** aceita novidades e ofertas (Política §2-A) */
+  contact_ok: boolean;
   last_app_version: string | null;
   last_seen_at: string | null;
 }
@@ -75,7 +77,7 @@ export interface BillingEvent {
 export interface AccountDetail {
   account: AccountRow;
   profile: { phone: string | null; email_confirmed_at: string | null; onboarding_completed: boolean; banned_until: string | null; sessions: number;
-    terms_version: string | null; terms_accepted_at: string | null; ai_consent_at: string | null;
+    terms_version: string | null; terms_accepted_at: string | null; ai_consent_at: string | null; marketing_opt_out_at: string | null;
     last_app_version: string | null; last_app_platform: "ios" | "android" | "web" | null; last_seen_at: string | null;
     push_tokens: number; notes_count: number;
   };

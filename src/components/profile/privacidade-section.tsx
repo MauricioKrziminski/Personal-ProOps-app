@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Row, Section } from '@/components/ui/row';
 import { Interruptor } from '@/components/ui/switch-row';
 import { useToast } from '@/components/ui/toast';
-import { useConsentimento, useDefinirConsentimentoIa } from '@/hooks/use-consentimento';
+import { useConsentimento, useDefinirConsentimentoIa, useDefinirContatoComercial } from '@/hooks/use-consentimento';
 import { AgentApiError } from '@/lib/agent-api';
 import { baixarMeusDados } from '@/lib/exportar-dados';
 import { abrirLegal, URL_PRIVACIDADE, URL_TERMOS } from '@/lib/links-legais';
@@ -13,11 +13,18 @@ export function PrivacidadeSection() {
   const toast = useToast();
   const consentimento = useConsentimento();
   const definir = useDefinirConsentimentoIa();
+  const contato = useDefinirContatoComercial();
   const [baixando, setBaixando] = useState(false);
 
   const trocarIa = (ligar: boolean) =>
     definir.mutate(ligar, {
       onSuccess: () => toast({ message: ligar ? 'IA autorizada.' : 'IA desligada.', tone: 'success' }),
+      onError: () => toast({ message: 'Não deu para mudar agora.', tone: 'error' }),
+    });
+
+  const trocarContato = (aceita: boolean) =>
+    contato.mutate(aceita, {
+      onSuccess: () => toast({ message: aceita ? 'Você vai receber novidades.' : 'Você não vai mais receber ofertas.', tone: 'success' }),
       onError: () => toast({ message: 'Não deu para mudar agora.', tone: 'error' }),
     });
 
@@ -51,6 +58,18 @@ export function PrivacidadeSection() {
             onValueChange={trocarIa}
             disabled={!consentimento.data || definir.isPending}
             accessibilityLabel="Autorizar o uso de IA"
+          />
+        }
+      />
+      <Row
+        title="Receber novidades e ofertas"
+        icon="envelope"
+        trailing={
+          <Interruptor
+            value={!!consentimento.data && !consentimento.data.marketing_opt_out_at}
+            onValueChange={trocarContato}
+            disabled={!consentimento.data || contato.isPending}
+            accessibilityLabel="Receber novidades e ofertas"
           />
         }
       />

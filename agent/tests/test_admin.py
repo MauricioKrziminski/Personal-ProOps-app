@@ -225,7 +225,7 @@ def test_formato_das_rotas_get(cli, banco):
     assert set(lista) == {"items", "total", "page", "page_size"} and lista["page_size"] == 25
     assert set(lista["items"][0]) == {"user_id", "workspace_id", "email", "name", "created_at", "last_sign_in_at",
                                       "suspended", "plan", "status", "access", "is_trial", "period_end", "origin",
-                                      "ai_used", "ai_max", "wa_used", "wa_max", "whatsapp_linked", "last_app_version",
+                                      "ai_used", "ai_max", "wa_used", "wa_max", "whatsapp_linked", "contact_ok", "last_app_version",
                                       "last_seen_at"}
     d = j[f"/admin/api/accounts/{ALVO}"].json()
     assert set(d) == {"account", "profile", "subscription", "usage", "counts", "members", "invites",

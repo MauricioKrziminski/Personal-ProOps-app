@@ -54,6 +54,7 @@ base as (
   select p.id as user_id, prim.ws as workspace_id, u.email::text as email, p.display_name as name,
          p.created_at, u.last_sign_in_at, coalesce(u.banned_until > now(), false) as suspended,
          (p.phone is not null) as whatsapp_linked, p.phone, p.last_app_version, p.last_seen_at,
+         (p.marketing_opt_out_at is null) as contact_ok,
          coalesce(ps.plan, 'free') as plan, coalesce(ps.status, 'active') as status,
          coalesce(ps.access, 'never') as access, coalesce(ps.is_trial, false) as is_trial,
          ps.current_period_end as period_end, ps.provider,
@@ -294,6 +295,8 @@ def _linha(r: dict) -> dict:
         "ai_used": r.get("ai_used") or 0, "ai_max": r.get("ai_max") or 0,
         "wa_used": r.get("wa_used") or 0, "wa_max": r.get("wa_max") or 0,
         "whatsapp_linked": bool(r.get("whatsapp_linked")),
+        # aceita novidades e ofertas (Política §2-A); quem pediu para sair fica de fora de toda campanha
+        "contact_ok": r.get("contact_ok") is not False,
         "last_app_version": r.get("last_app_version"), "last_seen_at": _iso(r.get("last_seen_at")),
     }
 
@@ -362,7 +365,7 @@ async def accounts(
 CSV_TETO = 10_000
 _CSV_COLUNAS = ("user_id", "email", "name", "created_at", "last_sign_in_at", "last_seen_at", "last_app_version",
                 "plan", "status", "access", "is_trial", "period_end", "origin", "ai_used", "ai_max", "wa_used",
-                "wa_max", "whatsapp_linked", "suspended")
+                "wa_max", "whatsapp_linked", "suspended", "contact_ok")
 
 
 def _celula(v) -> str:
@@ -428,7 +431,7 @@ async def _detalhe(user_id: UUID) -> dict:
         """select p.phone, u.email_confirmed_at, u.banned_until,
                   coalesce(u.raw_user_meta_data->>'onboarding_completed', 'false') = 'true' as onboarding,
                   (select count(*) from auth.sessions s where s.user_id = u.id)::int as sessoes,
-                  p.terms_version, p.terms_accepted_at, p.ai_consent_at, p.last_app_version,
+                  p.terms_version, p.terms_accepted_at, p.ai_consent_at, p.marketing_opt_out_at, p.last_app_version,
                   p.last_app_platform, p.last_seen_at, (p.expo_push_token is not null)::int as push_tokens,
                   (select count(*) from public.admin_account_notes n where n.user_id = p.id)::int as notes_count
            from public.profiles p join auth.users u on u.id = p.id where p.id = %s""",
@@ -496,7 +499,9 @@ async def _detalhe(user_id: UUID) -> dict:
                     "onboarding_completed": bool(u.get("onboarding")),
                     "banned_until": _iso(u.get("banned_until")), "sessions": u.get("sessoes") or 0,
                     "terms_version": u.get("terms_version"), "terms_accepted_at": _iso(u.get("terms_accepted_at")),
-                    "ai_consent_at": _iso(u.get("ai_consent_at")), "last_app_version": u.get("last_app_version"),
+                    "ai_consent_at": _iso(u.get("ai_consent_at")),
+                    "marketing_opt_out_at": _iso(u.get("marketing_opt_out_at")),
+                    "last_app_version": u.get("last_app_version"),
                     "last_app_platform": u.get("last_app_platform"), "last_seen_at": _iso(u.get("last_seen_at")),
                     "push_tokens": u.get("push_tokens") or 0, "notes_count": u.get("notes_count") or 0},
         "subscription": {

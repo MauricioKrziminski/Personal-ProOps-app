@@ -8,6 +8,8 @@ import { argumentosDoAceite } from '@/lib/termos';
 export interface Consentimento {
   terms_version: string | null;
   ai_consent_at: string | null;
+  /** null = recebe novidades e ofertas (legítimo interesse, Política §2-A); com data = pediu para sair. */
+  marketing_opt_out_at: string | null;
 }
 
 /** Opções compartilhadas: o portão da raiz (`use-acesso`) lê a MESMA chave que o Perfil. */
@@ -16,7 +18,7 @@ export const consentimentoQuery = (userId: string | undefined) => ({
   queryFn: async (): Promise<Consentimento> => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('terms_version, ai_consent_at')
+      .select('terms_version, ai_consent_at, marketing_opt_out_at')
       .eq('id', userId as string)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -55,6 +57,7 @@ function useGravarConsentimento<V>(
       client.setQueryData<Consentimento>(['consentimento', userId], (antes) => ({
         terms_version: antes?.terms_version ?? null,
         ai_consent_at: antes?.ai_consent_at ?? null,
+        marketing_opt_out_at: antes?.marketing_opt_out_at ?? null,
         ...novo,
       }));
       return client.invalidateQueries({ queryKey: ['consentimento', userId] });
@@ -72,4 +75,9 @@ export function useAceitarTermos() {
 /** Liga ou revoga o consentimento de IA (Perfil → Privacidade e dados; cartão do 403). */
 export function useDefinirConsentimentoIa() {
   return useGravarConsentimento<boolean>((consent) => comoConsentimento(supabase.rpc('set_ai_consent', { p_consent: consent })));
+}
+
+/** "Receber novidades e ofertas" (Perfil → Privacidade e dados). Avisos da conta não passam por aqui. */
+export function useDefinirContatoComercial() {
+  return useGravarConsentimento<boolean>((aceita) => comoConsentimento(supabase.rpc('set_marketing_contact', { p_accept: aceita })));
 }
