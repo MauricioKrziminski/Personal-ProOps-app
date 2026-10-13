@@ -17,6 +17,7 @@ import {
 import { File } from 'expo-file-system';
 import { tokenDoRefresh } from '@/lib/session-load';
 import { supabase } from '@/lib/supabase';
+import type { NotificacaoIn } from '@/lib/captura';
 import type { FinanceDraft } from '@/lib/voice-draft';
 
 export { appendConversationPage, prependMessagePage };
@@ -242,6 +243,30 @@ export function createFinanceDraft(text: string, today: string, timezone: string
     method: 'POST',
     body: JSON.stringify({ text, today, timezone }),
   });
+}
+
+/** Notificações de banco capturadas no aparelho (Android): o agente interpreta e guarda "a confirmar". */
+export function enviarNotificacoes(items: NotificacaoIn[], timezone: string) {
+  return agentFetch<{ aceitos: string[]; novos: number }>('/internal/captures/notifications', {
+    method: 'POST',
+    body: JSON.stringify({ timezone, items }),
+  });
+}
+
+/** O rascunho de lançamento de uma imagem compartilhada (comprovante, print): só interpreta. */
+export async function rascunhoDaImagem(uri: string, today: string, timezone: string) {
+  const file = new File(uri);
+  if (!file.exists || file.size === 0) {
+    throw new AgentApiError(422, 'invalid_image', 'A imagem chegou vazia. Tente compartilhar de novo.');
+  }
+  if (file.size > 8 * 1024 * 1024) {
+    throw new AgentApiError(413, 'image_too_large', 'A imagem é grande demais. Mande um print.');
+  }
+  const body = new FormData();
+  body.append('file', file);
+  body.append('today', today);
+  body.append('timezone', timezone);
+  return agentFetch<FinanceDraft>('/internal/finance/draft/media', { method: 'POST', body });
 }
 
 /**
