@@ -89,6 +89,19 @@ ok()   { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 warn() { printf '  \033[33m!\033[0m %s\n' "$*"; }
 err()  { printf '  \033[31m✗\033[0m %s\n' "$*" >&2; }
 
+# Conta de serviço recém-criada leva alguns segundos para o IAM dos OUTROS recursos (segredo, fila,
+# serviço) a enxergar: o `describe` já responde e o binding ainda volta 400 "does not exist" (13/10/2026,
+# painel-runner em produção). Repete SÓ esse erro, por até ~2 min; qualquer outro falha na hora.
+com_propagacao() {
+  local saida tentativa
+  for tentativa in $(seq 1 24); do
+    if saida="$("$@" 2>&1)"; then return 0; fi
+    grep -q "does not exist" <<<"$saida" || { printf '%s\n' "$saida" >&2; return 1; }
+    sleep 5
+  done
+  printf '%s\n' "$saida" >&2; return 1
+}
+
 # ---------------------------------------------------------------------------
 # 0. preflight — conta certa, componente certo
 # ---------------------------------------------------------------------------
@@ -234,9 +247,9 @@ criar_sa() {
   # 200 ("o sweep recupera"), mas o sweep vive no cron de lembretes, que nasce
   # PAUSADO — então o efeito real é mensagem enfileirada e nunca processada.
   # A org desliga os grants automáticos, então este binding não vem de graça.
-  gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
+  com_propagacao gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
     --member="serviceAccount:${SA_EMAIL}" --role=roles/iam.serviceAccountUser \
-    --project "$PROJECT_ID" --quiet >/dev/null
+    --project "$PROJECT_ID" --quiet
   ok "actAs sobre si mesma (Cloud Tasks assina o OIDC com esta SA)"
 
   # Os segredos do AMBIENTE, um a um, ANTES do deploy (a revisão nova não sobe sem ler cada um).
@@ -244,9 +257,9 @@ criar_sa() {
   for nome in "${SEGREDOS[@]}"; do
     id="$(id_do_segredo "$nome")"
     gcloud secrets describe "$id" --project "$PROJECT_ID" &>/dev/null || continue
-    gcloud secrets add-iam-policy-binding "$id" --project "$PROJECT_ID" \
+    com_propagacao gcloud secrets add-iam-policy-binding "$id" --project "$PROJECT_ID" \
       --member="serviceAccount:${SA_EMAIL}" --role=roles/secretmanager.secretAccessor \
-      --condition=None --quiet >/dev/null
+      --condition=None --quiet
   done
   ok "lê só os segredos ${SECRET_SUFFIX:-de produção}"
 }
@@ -615,9 +628,9 @@ painel() {
     || gcloud iam service-accounts create "$nome_sa" --display-name="Painel do ProOps${SECRET_SUFFIX}" \
          --project "$PROJECT_ID" >/dev/null
   local segredo; segredo="$(id_do_segredo DATABASE_URL)"
-  gcloud secrets add-iam-policy-binding "$segredo" --project "$PROJECT_ID" \
+  com_propagacao gcloud secrets add-iam-policy-binding "$segredo" --project "$PROJECT_ID" \
     --member="serviceAccount:${PAINEL_SA_EMAIL}" --role=roles/secretmanager.secretAccessor \
-    --condition=None --quiet >/dev/null
+    --condition=None --quiet
   ok "conta $PAINEL_SA_EMAIL: lê só $segredo"
 
   # `^|^`: ids e e-mails são listas separadas por vírgula (ver `gcloud topic escaping`).
