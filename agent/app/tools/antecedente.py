@@ -16,7 +16,9 @@ _STATUS = {"cleared": "efetivado", "pending": "previsto (ainda não aconteceu)"}
 NAO_EXISTE = "🤷 Não encontro mais esse lançamento — ele pode ter sido apagado."
 
 
-async def descrever(workspace_id, last_write_id: str) -> str:
+async def descrever(workspace_id, last_write_id: str, de: str | None = None, ate: str | None = None) -> str | None:
+    """`None` quando a linha cai FORA do período que o modelo leu na pergunta: aí ela não é o
+    "esse" da frase, e quem chamou segue a consulta normal."""
     try:
         tx_id = UUID(str(last_write_id))
     except ValueError:
@@ -32,6 +34,9 @@ async def descrever(workspace_id, last_write_id: str) -> str:
     )
     if r is None:
         return NAO_EXISTE
+    dia = str(r["occurred_at"])[:10]
+    if (de and dia < de[:10]) or (ate and dia > ate[:10]):
+        return None
     nome = r.get("description") or r.get("merchant") or "Sem descrição"
     linhas = [
         f"{_TIPO.get(r['kind'], 'Lançamento')}: *{nome}* — {cents_to_brl(r['amount_cents'])}",

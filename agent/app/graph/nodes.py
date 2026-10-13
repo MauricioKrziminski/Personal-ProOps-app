@@ -523,32 +523,38 @@ async def finance_query_node(state: AgentState) -> dict:
         # linha relida do banco, número nunca sai do modelo.
         from app.tools import antecedente
 
-        return {
-            "results": [await antecedente.descrever(state["workspace_id"], state["last_write_id"])],
-            "finance_queries": [],
-            "llm_calls": 1,
-        }
+        a = acoes[0] if acoes else None
+        resposta = await antecedente.descrever(
+            state["workspace_id"], state["last_write_id"], a and a.query_from, a and a.query_to)
+        if resposta is not None:
+            return {"results": [resposta], "finance_queries": [], "llm_calls": 1}
     return {
         "finance_queries": [a.model_dump() for a in acoes],
         "llm_calls": 1,
     }
 
 
-_FILTROS_DA_CONSULTA = ("category", "account", "query_from", "query_to", "amount_cents", "payment_method")
+# O período NÃO está aqui: o modelo põe "hoje" em "em que conta ficou esse lançamento?" sem a pessoa
+# dizer data (staging, 13/10/2026). Quem o confere é `antecedente.descrever`: a linha fora dele não
+# é o "esse" da frase.
+_FILTROS_DA_CONSULTA = ("category", "account", "amount_cents", "payment_method")
 
 
 def _consulta_do_antecedente(state: AgentState, acoes: list) -> bool:
     """"Em que conta ficou esse gasto?": leitura SEM nada que a pessoa tenha dito para buscar.
 
     Só vale com `last_write_id`, domínio só de consulta (nunca esconde uma correção dita junto),
-    uma única `query_transactions` sem termo nem filtro, e a frase apontando para o antecedente.
+    uma única `query_transactions` sem termo nem filtro (período só se contém a linha), e a frase
+    apontando para o antecedente.
     """
     if not state.get("last_write_id") or set(state.get("domains") or []) != {"financas_consulta"}:
         return False
-    if len(acoes) != 1 or acoes[0].type != FinanceQueryType.QUERY_TRANSACTIONS:
+    # Nenhuma consulta extraída também vale: "qual a categoria desse gasto?" o modelo não sabe
+    # escrever como consulta, e sem isto o turno caía na ajuda genérica.
+    if len(acoes) > 1 or (acoes and acoes[0].type != FinanceQueryType.QUERY_TRANSACTIONS):
         return False
-    a = acoes[0]
-    if clean_term(a.search_term) or any(getattr(a, c) for c in _FILTROS_DA_CONSULTA):
+    a = acoes[0] if acoes else None
+    if a and (clean_term(a.search_term) or any(getattr(a, c) for c in _FILTROS_DA_CONSULTA)):
         return False
     return pergunta_do_antecedente(state.get("text"))
 

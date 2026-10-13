@@ -153,11 +153,26 @@ async def test_antecedente_sem_filtro_vira_template(monkeypatch):
 
 
 @pytest.mark.parametrize("campos", [{"search_term": "mercado"}, {"category": "lazer"},
-                                    {"query_from": "2026-10-12"}, {"account": "nubank"}])
+                                    {"query_from": "2026-10-12", "query_to": "2026-10-12"},
+                                    {"account": "nubank"}])
 async def test_consulta_com_filtro_dito_segue_normal(monkeypatch, campos):
     _consulta_fake(monkeypatch, **campos)
     r = await nodes.finance_query_node(_estado("quanto foi esse gasto do mercado de ontem?"))
     assert "results" not in r and len(r["finance_queries"]) == 1
+
+
+async def test_periodo_que_contem_a_linha_nao_bloqueia(monkeypatch):
+    # o modelo pôs "hoje" sem a pessoa dizer data; a linha é de hoje, então é ela
+    _consulta_fake(monkeypatch, query_from="2026-10-13", query_to="2026-10-13")
+    r = await nodes.finance_query_node(_estado("em que conta ficou esse lançamento?"))
+    assert r["finance_queries"] == [] and "Nubank" in r["results"][0]
+
+
+async def test_nenhuma_consulta_extraida_vira_template(monkeypatch):
+    _consulta_fake(monkeypatch)
+    monkeypatch.setattr(ia, "structured", lambda *_a, **_k: _Modelo(FinanceQueryPlan(actions=[])))
+    r = await nodes.finance_query_node(_estado("qual a categoria desse gasto?"))
+    assert r["finance_queries"] == [] and "alimentação" in r["results"][0]
 
 
 async def test_sem_last_write_id_segue_normal(monkeypatch):
