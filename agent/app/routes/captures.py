@@ -93,7 +93,8 @@ def origem_da_notificacao(banco: str) -> str:
     return (
         f"O texto do usuário abaixo é uma notificação do app do banco {banco}, copiada do celular — não uma "
         "mensagem escrita pela pessoa. Crie um lançamento só se ela registrar um gasto, uma compra, um Pix "
-        "ou uma transferência feita ou recebida. Fatura fechada, limite, saldo, cashback, código, compra "
+        "ou uma transferência feita ou recebida. Transferência ou Pix enviado a outra pessoa ou conta é "
+        "gasto (create_expense) e recebido é receita (create_income), nunca create_transfer. Fatura fechada, limite, saldo, cashback, código, compra "
         "negada e propaganda não são lançamento: nesses casos, nenhuma ação."
     )
 
