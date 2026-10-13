@@ -46,9 +46,6 @@ SA_NAME="${SA_NAME:-agente-runner}"
 # Run usa a identidade da SA diretamente, sem chave em lugar nenhum.
 ORGANIZATION="${ORGANIZATION:-76291957852}"
 SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
-# O painel /admin mora num serviço próprio, atrás do IAP, com a sua conta: ela só lê a URL do banco.
-PAINEL_SERVICE="${PAINEL_SERVICE:-painel${SECRET_SUFFIX}}"
-PAINEL_SA_EMAIL="painel${SECRET_SUFFIX}-runner@${PROJECT_ID}.iam.gserviceaccount.com"
 
 # Segredos lidos de um .env do agente (NUNCA commitado). O script grava no
 # Secret Manager; o Cloud Run recebe por referência, e o valor nunca vira env
@@ -66,6 +63,10 @@ ENV_FILE="${ENV_FILE:-agent/.env.production}"
 # que staging existe para impedir. O nome da env var no container não muda:
 #   --set-secrets DATABASE_URL=database-url-staging:latest
 SECRET_SUFFIX="${SECRET_SUFFIX:-}"
+
+# O painel /admin mora num serviço próprio, atrás do IAP, com a sua conta: ela só lê a URL do banco.
+PAINEL_SERVICE="${PAINEL_SERVICE:-painel${SECRET_SUFFIX}}"
+PAINEL_SA_EMAIL="painel${SECRET_SUFFIX}-runner@${PROJECT_ID}.iam.gserviceaccount.com"
 
 SEGREDOS=(
   DATABASE_URL GEMINI_API_KEY ANTHROPIC_API_KEY GROQ_API_KEY
