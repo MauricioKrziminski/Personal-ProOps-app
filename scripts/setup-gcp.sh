@@ -425,7 +425,14 @@ deploy() {
     err "ADMIN_REQUIRE_MFA tem que ser 'true' em $ENV_FILE para produção (hoje: '${mfa:-vazio}')."
     exit 1
   fi
-  local env_vars="^|^${base//,/|}|SUPABASE_ANON_KEY=${anon_key}|ADMIN_USER_IDS=${admin_ids}|ADMIN_REQUIRE_MFA=${mfa:-false}|BILLING_ALLOW_SANDBOX=${allow_sandbox}|BILLING_SANDBOX_USER_IDS=${sandbox_ids}"
+  local captura_teste
+  captura_teste="$(ler_env CAPTURA_ACEITA_TESTE)"
+  # Captura aceita notificação de teste só no staging; produção recusa o deploy com a flag ligada.
+  if [[ "$SERVICE" != *staging* && "$captura_teste" == "true" ]]; then
+    err "CAPTURA_ACEITA_TESTE não pode ser 'true' em $ENV_FILE para produção."
+    exit 1
+  fi
+  local env_vars="^|^${base//,/|}|SUPABASE_ANON_KEY=${anon_key}|ADMIN_USER_IDS=${admin_ids}|ADMIN_REQUIRE_MFA=${mfa:-false}|CAPTURA_ACEITA_TESTE=${captura_teste:-false}|BILLING_ALLOW_SANDBOX=${allow_sandbox}|BILLING_SANDBOX_USER_IDS=${sandbox_ids}"
 
   gcloud run deploy "$SERVICE" \
     --source agent \
