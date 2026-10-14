@@ -207,3 +207,9 @@ async def test_antecedente_apagado_diz_que_nao_existe(monkeypatch):
     monkeypatch.setattr(antecedente.db, "fetch_one", fetch_one)
     assert await antecedente.descrever("ws", TX) == antecedente.NAO_EXISTE
     assert await antecedente.descrever("ws", "nao-e-uuid") == antecedente.NAO_EXISTE
+
+
+async def test_no_app_a_ajuda_nao_oferece_abrir_o_agente(monkeypatch):
+    _modelo(monkeypatch, ids=["agente_app"])
+    app = await nodes.general_node({"text": "como falo com o agente?", "domains": ["geral"], "channel": "app"})
+    assert "reply" not in app

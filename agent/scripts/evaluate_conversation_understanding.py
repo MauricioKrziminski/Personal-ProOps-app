@@ -262,7 +262,9 @@ async def ambiguous_pronoun():
     )
 
     async def list_reads(sql, *args):
-        if "installment_plans" in sql:
+        # fatura também fica de fora: devolver as contas para a busca de faturas dava KeyError
+        # ('card_name') quando o termo casava, e o caso falhava por sorte, não pelo modelo
+        if "installment_plans" in sql or "card_invoices" in sql:
             return []
         term = (
             (args[1] if len(args) > 1 and isinstance(args[1], str) else "")

@@ -27,10 +27,10 @@ from app.services import consumo, embeddings, ia
 
 # --- pinos do caminho v1 ------------------------------------------------------------------
 
-PIN_ROUTER = "6f76e0aa"  # 13/10/2026: regra de nota (pasta) é cadastros, não notas
+PIN_ROUTER = "338041fd"  # 14/10/2026: frase solta é notas; na dúvida geral × notas, notas
 PIN_FINANCE = "d311b689"  # 09/10/2026: detalhe pela palavra-marca, medido no Haiku e no Gemini
 PIN_FINANCE_QUERY = "5d4cc1d7"
-PIN_NOTES = "41913ea3"  # 13/10/2026: pasta com regra na lista de pastas e a frase sobre ela
+PIN_NOTES = "28977bc1"  # 13/10/2026: pasta com regra na lista de pastas e a frase sobre ela
 PIN_SCHEMA_ROUTER = "290d403c0f22daf5"
 PIN_TURNO_SIMPLES = "02e5e46b1513deff"
 PIN_TURNO_COMPLETO = "b0faf9bb068ff346"  # 09/10/2026: "subcategoria X" vence o nome da lista (Haiku)

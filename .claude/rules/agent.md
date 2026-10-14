@@ -610,13 +610,20 @@ vez e saiba que sessões e confirmações pendentes daquele ambiente recomeçam.
 
 - `categorization_rules.folder_id` (regra "nota que cita X vai para a pasta Y"; sem categoria/conta, o `check` confere)
   mora na MESMA tabela das regras de lançamento. `_match_rule` ignora regras com pasta; `_match_note_rule` (e o
-  `private.match_note_rule_do_membro` sob `AGENTE_RLS`) acha a de nota. `notes.create_note` aplica a regra quando a
-  pasta vem vazia ou NÃO existe; pasta existente escolhida pelo modelo fica. O bloco de pastas do `user_turn` leva
+  `private.match_note_rule_do_membro` sob `AGENTE_RLS`) acha a de nota. **A regra é resolvida ANTES do SIM**
+  (`notes_node` → `_congela_pasta_da_regra`, 14/10/2026): a pasta entra na ação e a frase diz "na pasta X". Era só na
+  execução, e "pode ser fora da pasta" confirmava "criar a nota X?" e gravava na pasta da regra. Vale com pasta vazia
+  ou inexistente; pasta existente escolhida fica. `NotesAction.sem_pasta` (o modelo marca em "fora da pasta", "sem
+  pasta") vence a regra, e a frase diz "fora das pastas". `hits` só conta na execução, quando a nota foi para a pasta da regra. O bloco de pastas do `user_turn` leva
   " · notas que citam: ..." (dentro do envelope `folder_names`). `resource_create rules` aceita `folder_id` (nome) OU `category`.
 - `ajuda.responder`: o TEXTO é só o da melhor entrada; os LINKS continuam de todas (até 3). Entrada nova do catálogo: curta.
 - **Pedir a regra é `cadastros`, nunca `notas`** (linha no `ROUTER`): "sempre que eu citar proops numa nota, põe na
   pasta proops" foi para `notas` no Haiku (uma de várias tentativas), o parse de notas não achou nota e a ajuda
   respondeu "não sei". Sem `notas_actions` nada é anotado: a frase fala de notas FUTURAS.
+- **Frase solta é `notas`; `geral` é saudação, agradecimento ou PERGUNTA sobre o app** (14/10/2026, ROUTER): "preciso
+  ver sobre o agente da proops" ia para a ajuda e voltava o cumprimento. Na dúvida, `notas` (a nota confirma).
+  `geral` abaixo de 0,6 (`policy.geral_incerto`) PERGUNTA no `domain_gate`, com "Era uma dúvida sobre o app" como
+  3ª opção: pergunta real vem com 0,85+ no Haiku. No app, a ajuda não oferece link para `/agent*` (já está nele).
 
 ## Qualidade
 

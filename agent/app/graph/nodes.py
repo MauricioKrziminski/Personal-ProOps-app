@@ -19,6 +19,7 @@ from app.domain.dates import local_datetime_iso, local_iso_date, now_utc
 from app.graph.policy import (
     describe_for_confirmation,
     dominio_incerto,
+    geral_incerto,
     erro_de_correcao,
     abertas_com,
     muda_numero_de_parcelas,
@@ -51,6 +52,7 @@ from app.domain.required import faltando
 from app.domain.money import cents_to_brl
 from app.graph.state import CHAVE_MIDIA, AgentState
 from app.tools import atributos, guards, lote_d, movimentos, resolve
+from app.tools import notes as notes_tools
 from app.security import sanitize_untrusted
 from app.services import ia, midia_enviada
 from app.tools.base import ExecContext
@@ -93,6 +95,9 @@ async def _ajuda_do_catalogo(state: AgentState) -> dict:
         except Exception:  # noqa: BLE001 — ajuda nunca derruba o turno
             log.warning("escolha do catálogo falhou; segue a ajuda geral", exc_info=True)
     ret: dict = {"results": [corpo], "llm_calls": chamadas}
+    if state.get("channel") == "app":
+        # a pessoa JÁ está no agente: "Abrir Agente" abriria uma conversa nova
+        links = [l for l in links if not str(l.get("rota", "")).startswith("/agent")]
     if links and state.get("channel") == "app":
         ret["reply"] = {"body": corpo, "text": corpo, "links": links}
     return ret
@@ -740,6 +745,21 @@ async def _pastas_do_workspace(workspace_id) -> list[str]:
     ]
 
 
+async def _congela_pasta_da_regra(workspace_id, acao) -> None:
+    """A pasta da regra de nota entra na ação ANTES do SIM: a frase e o efeito dizem a mesma coisa.
+
+    `sem_pasta` (a pessoa pediu fora das pastas) vence a regra. Sem `hits` aqui: ela pode recusar.
+    """
+    if acao.type.value != "create_note" or acao.sem_pasta or not acao.content:
+        return
+    try:
+        regra = await notes_tools.regra_da_nota(workspace_id, acao.content, acao.folder)
+        if regra:
+            acao.folder = regra["pasta"]["name"]
+    except Exception:  # noqa: BLE001 — a regra nunca derruba o turno
+        log.warning("regra de nota não consultada no parse", exc_info=True)
+
+
 async def notes_node(state: AgentState) -> dict:
     if state.get("preset") or state.get("halted"):
         return {}  # ações semeadas ou turno cancelado: não reextrair
@@ -766,6 +786,8 @@ async def notes_node(state: AgentState) -> dict:
         ]
     )
     acoes = [a for a in plano.actions if a.type.value != "unknown"]
+    for a in acoes:
+        await _congela_pasta_da_regra(state["workspace_id"], a)
     return {
         "notes_actions": [a.model_dump() for a in acoes],
         "llm_calls": 1,
@@ -986,22 +1008,28 @@ async def domain_gate(state: AgentState) -> dict:
                 "confidence": 1.0,
             }
         return {"results": ["Não alterei nenhum dos registros."], "halted": True}
-    if not dominio_incerto(state.get("domains") or [], state.get("confidence", 1.0)):
+    dominios, confianca = state.get("domains") or [], state.get("confidence", 1.0)
+    # imagem lida (produto/outro) já tem resposta própria em `general_node`
+    duvida = geral_incerto(dominios, confianca) and not state.get("leitura_da_imagem")
+    if not duvida and not dominio_incerto(dominios, confianca):
         return {}
 
+    opcoes = [
+        {"id": "financas", "label": "Como gasto/receita"},
+        {"id": "notas", "label": "Como nota"},
+    ]
+    if duvida:
+        opcoes.append({"id": "geral", "label": "Era uma dúvida sobre o app"})
     escolha = interrupt(
         {
             "kind": "domain",
             "action_type": "router",
             "summary": "Como você quer registrar isso?",
-            "options": [
-                {"id": "financas", "label": "Como gasto/receita"},
-                {"id": "notas", "label": "Como nota"},
-            ],
+            "options": opcoes,
         }
     )
     escolhido = escolha.get("candidate_id") if isinstance(escolha, dict) else escolha
-    if escolhido in {"financas", "notas"}:
+    if escolhido in {o["id"] for o in opcoes}:
         # confiança 1.0: quem decidiu foi o usuário, não o modelo
         return {"domains": [escolhido], "confidence": 1.0}
     return {"results": ["👍 Ok, não registrei nada."], "halted": True}

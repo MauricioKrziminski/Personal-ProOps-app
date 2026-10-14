@@ -348,6 +348,7 @@ class NotesAction(BaseModel):
     type: NotesActionType
     content: str | None = Field(None, description="Texto da nota ou o que lembrar.")
     folder: str | None = Field(None, description="Pasta da nota, curta e minúscula.")
+    sem_pasta: bool = Field(False, description="true só se a pessoa pede a nota FORA de qualquer pasta.")
     search_term: str | None = Field(None, description="Trecho que ACHA a nota/lembrete.")
     append_text: str | None = Field(None, description="Texto a ACRESCENTAR numa nota existente.")
     remind_at: str | None = Field(None, description="Quando lembrar, ISO local do usuário.")

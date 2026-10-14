@@ -125,3 +125,56 @@ def test_set_rule_usa_o_alvo_do_unique_novo():
 
     fonte = inspect.getsource(finance.set_rule)
     assert "on conflict (workspace_id, match_type, pattern, (folder_id is null))" in fonte
+
+
+# --- regra resolvida ANTES do SIM, e "fora da pasta" vence a regra (14/10/2026) ---------------
+
+from app.graph import nodes, policy  # noqa: E402
+
+
+def frase(a):
+    return policy.describe_for_confirmation(a, None)
+
+
+async def test_regra_congelada_antes_do_sim_e_frase_diz_a_pasta(banco):
+    b = banco(pastas=["proops"], regra=("proops", "proops"))
+    a = nota(None)
+    await nodes._congela_pasta_da_regra("workspace", a)
+    assert a.folder == "proops" and b.hits == []  # sem hits: a pessoa pode recusar
+    assert frase(a).endswith("na pasta proops")
+
+
+async def test_sem_pasta_nao_consulta_regra_e_grava_sem_pasta(banco, monkeypatch):
+    b = banco(pastas=["proops"], regra=("proops", "proops"))
+    consultas = []
+    antigo = notes.db.fetch_one
+
+    async def espia(sql, *a):
+        consultas.append(sql)
+        return await antigo(sql, *a)
+    monkeypatch.setattr(notes.db, "fetch_one", espia)
+    a = NotesAction(type="create_note", content="ideia para o ProOps", sem_pasta=True)
+    await nodes._congela_pasta_da_regra("workspace", a)
+    assert a.folder is None and "fora das pastas" in frase(a)
+    r = await notes.create_note(ctx(), a)
+    assert "em *" not in r.message and b.notas[0][-1] is None and b.notas[0][-2] is None
+    assert b.hits == [] and not any("_match_note_rule" in c for c in consultas)
+
+
+async def test_hits_conta_quando_a_pasta_ja_e_a_da_regra(banco):
+    b = banco(pastas=["proops"], regra=("proops", "proops"))
+    r = await notes.create_note(ctx(), nota("proops"))
+    assert "*proops*" in r.message and b.hits == ["r1"]
+
+
+async def test_pasta_existente_diferente_da_regra_nao_e_sobrescrita(banco):
+    b = banco(pastas=["proops", "trabalho"], regra=("proops", "proops"))
+    a = nota("trabalho")
+    await nodes._congela_pasta_da_regra("workspace", a)
+    assert a.folder == "trabalho"
+    r = await notes.create_note(ctx(), a)
+    assert "*trabalho*" in r.message and b.hits == []
+
+
+def test_pendente_antigo_sem_sem_pasta_continua_valido():
+    assert NotesAction.model_validate({"type": "create_note", "content": "x"}).sem_pasta is False

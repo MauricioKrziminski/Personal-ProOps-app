@@ -35,7 +35,8 @@ def grafo(monkeypatch):
     from app.graph import nodes
 
     async def router_falso(state):
-        return {"domains": ["financas"], "confidence": state.get("confidence", 1.0)}
+        return {"domains": state.get("domains") or ["financas"],
+                "confidence": state.get("confidence", 1.0)}
 
     async def financas_falso(state):
         # o plano já vem pronto no estado inicial: o dublê só não chama o modelo
@@ -542,6 +543,20 @@ async def test_roteador_inseguro_pergunta_o_dominio_antes_de_gravar(grafo):
     assert valor["kind"] == "domain"
     assert [o["id"] for o in valor["options"]] == ["financas", "notas"]
     assert "EXECUTOU" not in estado.get("results", [])
+
+
+@pytest.mark.asyncio
+async def test_ajuda_em_duvida_pergunta_com_a_ajuda_como_opcao(grafo):
+    """"pesquisar preço de passagem" caía na ajuda com 0,5 e virava o cumprimento do agente."""
+    cfg = {"configurable": {"thread_id": "dominio-geral"}}
+    estado = await grafo.ainvoke({**_estado([]), "domains": ["geral"], "confidence": 0.5}, config=cfg)
+    pausa = estado["__interrupt__"][0]
+    valor = getattr(pausa, "value", pausa)
+
+    assert valor["kind"] == "domain"
+    assert [o["id"] for o in valor["options"]] == ["financas", "notas", "geral"]
+    final = await grafo.ainvoke(Command(resume="notas"), config=cfg)
+    assert final["domains"] == ["notas"]
 
 
 @pytest.mark.asyncio

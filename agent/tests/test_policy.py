@@ -174,6 +174,16 @@ def test_confianca_baixa_do_roteador_pergunta_o_dominio():
     assert not dominio_incerto(["financas_consulta"], 0.5)
 
 
+def test_ajuda_com_roteador_em_duvida_pergunta_antes():
+    """"geral" abaixo de 0,6 é dúvida: a ajuda do catálogo perderia a frase."""
+    from app.graph.policy import geral_incerto
+
+    assert geral_incerto(["geral"], 0.5)
+    assert not geral_incerto(["geral"], 0.85)          # pergunta real sobre o app
+    assert not geral_incerto(["geral", "notas"], 0.5)  # multi-intent não é dúvida
+    assert not geral_incerto(["notas"], 0.5)           # esse é o `dominio_incerto`
+
+
 # ---------------------------------------------------------------------------
 # new_description — "nome → X" nos dois ramos (com alvo e sem alvo)
 # ---------------------------------------------------------------------------

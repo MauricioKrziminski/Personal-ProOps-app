@@ -92,6 +92,18 @@ def dominio_incerto(domains: list[str], confidence: float) -> bool:
     return domains[0] in _AMBIGUOS
 
 
+# "geral" com o roteador em dúvida: a ajuda do catálogo PERDERIA a frase ("pesquisar preço de
+# passagem pra lisboa" virava o cumprimento do agente). Pergunta antes, com a ajuda como uma das
+# opções (14/10/2026, *"se gerar dúvida no agente, ele sempre tem que perguntar"*). Medido no
+# Haiku: pergunta real sobre o app vem com 0,85+; as frases soltas que caíam aqui, com 0,4–0,5.
+GERAL_MINIMO = 0.6
+
+
+def geral_incerto(domains: list[str], confidence: float) -> bool:
+    """O roteador mandou para a ajuda sem ter certeza de que era uma dúvida sobre o app?"""
+    return domains == ["geral"] and confidence < GERAL_MINIMO
+
+
 def needs_confirmation(
     action: FinanceAction | FinanceQuery | NotesAction,
     confidence: float,
@@ -789,7 +801,7 @@ def describe_for_confirmation(
     if tipo == "delete_reminder":
         return f"cancelar o lembrete de {alvo}"
     if tipo == "create_note":
-        pasta = f" na pasta {action.folder}" if action.folder else ""
+        pasta = " fora das pastas" if action.sem_pasta else f" na pasta {action.folder}" if action.folder else ""
         return f"criar a nota {previa_da_nota(action.content)}{pasta}"
     if tipo == "create_reminder":
         quando = ""

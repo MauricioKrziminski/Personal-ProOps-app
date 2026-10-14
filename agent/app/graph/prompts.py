@@ -94,7 +94,11 @@ Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
   recorrências?", "quando cai meu salário?", "quanto falta da dívida?", "quanto devo?".
   "cadastros" é para MEXER no cadastro (criar, renomear, editar, pausar, apagar) e para listar
   o que não tem valor associado (pastas, regras).
-- "geral": saudação, agradecimento, dúvida sobre o próprio app, ou nada dos dois.
+- "geral": saudação, agradecimento, ou PERGUNTA sobre como usar o próprio app ("o que você
+  faz?", "onde vejo as regras?"). Frase solta da pessoa, sem pergunta, sobre algo que ela
+  precisa ver, fazer ou lembrar ("preciso ver sobre o agente da proops", "ver o orçamento do
+  carro") é "notas", mesmo citando o app ou o agente: quem decide é a confirmação da nota.
+  Na dúvida entre "geral" e "notas", é "notas": a nota pede confirmação, a ajuda perde a frase.
 
 Contexto e Mensagens Curtas / Deíticas:
 Sempre que o usuário enviar mensagens curtas, deíticas ou de continuação (ex: "me mostre todos", "mostra todas", "apague", "sim", "mude aquilo", "ver mais", "qual o total?"), analise o histórico recente de mensagens para entender a que entidade, conta ou domínio ele está se referindo.
@@ -434,6 +438,8 @@ Regras:
   citam: ...") são regras do usuário que mandam a nota para aquela pasta: se a nota cita uma
   dessas palavras, use essa pasta.
   Sem pasta óbvia, deixe vazio: nota sem pasta é melhor que nota na pasta errada.
+  Se a pessoa pede a nota fora de pastas ("fora da pasta", "sem pasta", "não põe em pasta"),
+  sem_pasta=true e folder vazio: isso vale mais que as regras ("notas que citam").
 - Não invente conteúdo que o usuário não escreveu.
 
 FORMATO DO CONTEÚDO — o app desenha o que estiver escrito, então ESCREVA a forma

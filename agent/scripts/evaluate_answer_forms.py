@@ -49,8 +49,8 @@ from app.graph import nodes  # noqa: E402
 from app.tools import movimentos, resources  # noqa: E402
 from app.tools.guards import Level1Error  # noqa: E402
 
-PASTAS = ["mercado", "trabalho", "ideias"]
-PALAVRAS = {"trabalho": "reunião, cliente"}  # regras de nota (palavra -> pasta) da pasta
+PASTAS = ["mercado", "trabalho", "ideias", "proops"]
+PALAVRAS = {"trabalho": "reunião, cliente", "proops": "proops"}  # regras de nota (palavra -> pasta) da pasta
 WS = "20000000-0000-0000-0000-000000000001"
 BASE = {"timezone": "America/Sao_Paulo", "workspace_id": WS, "user_id": WS,
         "phone": None, "source_message_id": "avaliacao", "results": []}
@@ -535,6 +535,15 @@ def secoes():
             (t, lambda a: bool(a) and (a.get("folder") or "").lower() == "trabalho", "pasta=trabalho (exato)",
              lambda t=t: _nota(t))
             for t in ["anota: reunião com o cliente sexta às 10", "anota que o cliente pediu desconto"]
+        ],
+        # "fora da pasta" vence a regra (sem_pasta, folder vazio); sem o pedido, a regra manda (controle).
+        "notas/fora da pasta": [
+            ("anota fora da pasta: ideia pro agente da proops",
+             lambda a: bool(a) and a.get("sem_pasta") is True and not a.get("folder"),
+             "sem_pasta=true, sem pasta", lambda: _nota("anota fora da pasta: ideia pro agente da proops")),
+            ("anota: ideia pro agente da proops",
+             lambda a: bool(a) and not a.get("sem_pasta") and (a.get("folder") or "").lower() == "proops",
+             "pasta=proops, sem_pasta=false", lambda: _nota("anota: ideia pro agente da proops")),
         ],
         "notas/fixar": [
             (t, _campo("notes", "pinned", "true"), "notes.pinned=true",
